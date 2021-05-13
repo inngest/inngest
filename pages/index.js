@@ -37,6 +37,10 @@ export default function Home() {
       <Head>
         <title>Inngest</title>
         <link rel="icon" href="/favicon.png" />
+        <meta property="og:title" content="Inngest" />
+        <meta property="og:url" content="https://www.inngest.com" />
+        <meta property="og:image" content="/logo.svg" />
+        <meta property="og:description" content="An event-driven, code automation platform for developers" />
         <script src="/inngest-sdk.js"></script>
       </Head>
 
