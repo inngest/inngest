@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Head from 'next/head'
-import Image from 'next/image'
 import styles from '../styles/Home.module.css'
 
 const INNGESTION_KEY = 'GCcmd9oe4sAWmS2I6zNx5VZ-LNzAJhKZ7c91ryerqTuu0Ix-Nx2kBbkX9eVA5DS5yu7tfPP9TnbRHs-J69twag';
@@ -17,7 +16,7 @@ export default function Home() {
   const onSubmit = (e) => {
     e.preventDefault();
     const Inngest = globalThis.Inngest;
-    
+
     if (!Inngest) return;
 
     Inngest.init(INNGESTION_KEY);
@@ -42,7 +41,7 @@ export default function Home() {
       </Head>
 
       <div className={styles.content}>
-        <Image src="/logo.svg" alt="Inngest logo" width={401} height={120} />
+        <img src="/logo.svg" alt="Inngest logo" />
         <div><b>the first event-driven, code automation platform for developers</b></div>
         <br/>
         <div>
