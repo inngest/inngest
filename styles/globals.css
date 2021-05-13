@@ -1,16 +1,36 @@
-html,
-body {
-  padding: 0;
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
-    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+body, button {
+  font-family: monospace;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-* {
+input {
+  height: 40px;
+  width: 300px;
+  border: 1px solid black;
+  padding: 5px;
+  font-family: monospace;
   box-sizing: border-box;
+}
+
+input:focus {
+  outline: none;
+  border-color: gray;
+}
+
+button {
+  height: 40px;
+  padding: 5px;
+  background-color: black;
+  color: white;
+  border: none;
+  width: 150px;
+}
+
+button:hover {
+  cursor: pointer;
+  background-color: gray;
+}
+
+button:focus {
+  outline: none;
+  background-color: gray;
 }
