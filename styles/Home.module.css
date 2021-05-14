@@ -21,8 +21,24 @@
 }
 
 @media only screen and (max-width: 1000px) {
+  .logo {
+    width: 80%;
+  }
   .content {
       padding: 10px 40px;
-      font-size: 40px;
+      font-size: 20px;
+
+      display: flex;
+      flex-flow: column;
+  }
+
+  .form {
+    display: flex;
+    flex-flow: column;
+    align-items: center;
+  }
+
+  .submit {
+    width: 100%;
   }
 }
