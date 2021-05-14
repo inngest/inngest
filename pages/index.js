@@ -45,20 +45,21 @@ export default function Home() {
       </Head>
 
       <div className={styles.content}>
-        <img src="/logo.svg" alt="Inngest logo" />
+        <img className={styles.logo} src="/logo.svg" alt="Inngest logo" />
         <div><b>the first event-driven, code automation platform for developers</b></div>
         <br/>
         <div>
-          customer management <br /> 
+          event subscriptions <br /> 
           event coordination <br /> 
           scheduling <br /> 
+          DAG workflows <br/>
           workflow functions-as-a-service<br/>
         </div>
         <br/>
         <b>Sign up for updates</b>
-        <form style={{ marginTop: '10px'}} onSubmit={onSubmit}>
+        <form className={styles.form} style={{ marginTop: '10px'}} onSubmit={onSubmit}>
           <input type="email" placeholder="Your email here" value={email} onChange={onChange} />
-          <button type="submit">{buttonText}</button>
+          <button className={styles.submit} type="submit">{buttonText}</button>
         </form>
         </div>
     </div>
