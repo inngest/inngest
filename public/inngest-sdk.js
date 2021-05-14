@@ -44,8 +44,10 @@
     // The event.user object should take precedence over the identify() attributes
     // called.  Copy the event user attributes into a new variable so that we can
     // merge this into `user` from identify, then replace the original event.user.
-    var overwritten = assign({}, event.user || {});
-    event.user = assign(user, overwritten);
+    var overwritten = {};
+    assign(overwritten, user);
+    assign(overwritten, event.user || {});
+    event.user = overwritten;
 
     var body = JSON.stringify(event);
     var url = "https://" + this.options.host + "/e/" + key;
