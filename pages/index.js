@@ -2,19 +2,40 @@ import { useState } from "react";
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 
-const INNGESTION_KEY = 'GCcmd9oe4sAWmS2I6zNx5VZ-LNzAJhKZ7c91ryerqTuu0Ix-Nx2kBbkX9eVA5DS5yu7tfPP9TnbRHs-J69twag';
+const INNGESTION_KEY = 'BIjxBrM6URqxAu0XgIAae5HgBCv8l_LodmdGonFCfngjhwIgQEbvbUUQTwvFMHO21vxCJEGsC7KPdXEzdXgOAQ';
 
 export default function Home() {
   const [email, setEmail] = useState("");
   const [buttonText, setButtonText] = useState("Submit");
+  const [lastSubmitted, setLastSubmitted] = useState(null);
+  const [error, setError] = useState(null);
 
   const onChange = (e) => {
     setEmail(e.target.value);
     setButtonText("Submit");
   }
 
+  const isEmailValid = () => {
+    // stolen from https://www.w3resource.com/javascript/form/email-validation.php
+    return /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/.test(email);
+  }
+
   const onSubmit = (e) => {
     e.preventDefault();
+
+    if (!isEmailValid()) {
+      setError("Is that a valid email address?");
+      return;
+    };
+
+    // prevent users from spamming the submit button
+    if (lastSubmitted === email) {
+      return;
+    }
+
+    setError(null);
+    setLastSubmitted(email);
+
     const Inngest = globalThis.Inngest;
 
     if (!Inngest) return;
@@ -29,6 +50,7 @@ export default function Home() {
         email,
       }
     });
+
     setButtonText("Done!");
   }
 
@@ -57,10 +79,11 @@ export default function Home() {
         </div>
         <br/>
         <b>Sign up for updates</b>
-        <form className={styles.form} style={{ marginTop: '10px'}} onSubmit={onSubmit}>
+        <div>
           <input type="email" placeholder="Your email here" value={email} onChange={onChange} />
-          <button className={styles.submit} type="submit">{buttonText}</button>
-        </form>
+          <button disabled={email === lastSubmitted} className={styles.submit} onClick={onSubmit}>{buttonText}</button>
+        </div>
+        {error && <div style={{ color: 'red', fontSize: '12px', marginTop: "5px" }}>{error}</div>}
         </div>
     </div>
   )
