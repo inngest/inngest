@@ -2,7 +2,12 @@ import { useState } from "react";
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 
-const INNGESTION_KEY = 'BIjxBrM6URqxAu0XgIAae5HgBCv8l_LodmdGonFCfngjhwIgQEbvbUUQTwvFMHO21vxCJEGsC7KPdXEzdXgOAQ';
+// TODO: move these into env vars 
+// prod key
+const INGEST_KEY = 'BIjxBrM6URqxAu0XgIAae5HgBCv8l_LodmdGonFCfngjhwIgQEbvbUUQTwvFMHO21vxCJEGsC7KPdXEzdXgOAQ';
+
+// test key
+// const INGEST_KEY = 'MnzaTCk7Se8i74hA141bZGS-NY9P39RSzYFbxanIHyV2VDNu1fwrns2xBQCEGdIb9XRPtzbp0zdRPjtnA1APTQ';
 
 export default function Home() {
   const [email, setEmail] = useState("");
@@ -12,6 +17,7 @@ export default function Home() {
 
   const onChange = (e) => {
     setEmail(e.target.value);
+    setError(null);
     setButtonText("Submit");
   }
 
@@ -20,9 +26,7 @@ export default function Home() {
     return /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/.test(email);
   }
 
-  const onSubmit = (e) => {
-    e.preventDefault();
-
+  const onSubmit = () => {
     if (!isEmailValid()) {
       setError("Is that a valid email address?");
       return;
@@ -40,7 +44,7 @@ export default function Home() {
 
     if (!Inngest) return;
 
-    Inngest.init(INNGESTION_KEY);
+    Inngest.init(INGEST_KEY);
     Inngest.event({
       name: "marketing.signup",
       data: {
@@ -52,6 +56,13 @@ export default function Home() {
     });
 
     setButtonText("Done!");
+  }
+
+  const onInputKey = (e) => {
+    // enter key
+    if (e.keyCode === 13) {
+      onSubmit();
+    }
   }
 
   return (
@@ -80,7 +91,7 @@ export default function Home() {
         <br/>
         <b>Sign up for updates</b>
         <div>
-          <input type="email" placeholder="Your email here" value={email} onChange={onChange} />
+          <input onKeyDown={onInputKey} type="email" placeholder="Your email here" value={email} onChange={onChange} />
           <button disabled={email === lastSubmitted} className={styles.submit} onClick={onSubmit}>{buttonText}</button>
         </div>
         {error && <div style={{ color: 'red', fontSize: '12px', marginTop: "5px" }}>{error}</div>}
