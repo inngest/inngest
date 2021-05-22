@@ -18,6 +18,10 @@ const ASSETS = [
         name: "Icon - light (png)",
         src: "/icon-light.png",
     },
+    {
+        name: "Icon - transparent (png)",
+        src: "/icon-light-transparent.png",
+    },
 ];
 
 const Press = () => {
