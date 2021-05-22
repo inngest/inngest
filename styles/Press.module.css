@@ -1,0 +1,42 @@
+@import url('https://rsms.me/inter/inter.css');
+
+.container {
+    padding: 30px 60px;
+    font-family: 'Inter', sans-serif;
+}
+
+.assets {
+    display: flex;
+    flex-flow: row;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+
+    background-color: #F3F3F3;
+    border-radius: 10px;
+}
+
+.asset {
+    margin: 20px;
+    display: flex;
+    flex-flow: column;
+    align-items: flex-start;
+}
+
+.asset img {
+    height: 150px;
+}
+
+.asset a:hover {
+    box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
+}
+
+.asset > a {
+    border-radius: 10px;
+    background-color: white;
+    /* border: 1px solid blue; */
+    padding: 20px;
+
+    height: auto;
+    width: auto;
+    margin-bottom: 10px;
+}
