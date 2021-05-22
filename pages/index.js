@@ -4,10 +4,10 @@ import styles from '../styles/Home.module.css'
 
 // TODO: move these into env vars 
 // prod key
-const INGEST_KEY = 'BIjxBrM6URqxAu0XgIAae5HgBCv8l_LodmdGonFCfngjhwIgQEbvbUUQTwvFMHO21vxCJEGsC7KPdXEzdXgOAQ';
-
+export const INGEST_KEY = 'BIjxBrM6URqxAu0XgIAae5HgBCv8l_LodmdGonFCfngjhwIgQEbvbUUQTwvFMHO21vxCJEGsC7KPdXEzdXgOAQ';
+ 
 // test key
-// const INGEST_KEY = 'MnzaTCk7Se8i74hA141bZGS-NY9P39RSzYFbxanIHyV2VDNu1fwrns2xBQCEGdIb9XRPtzbp0zdRPjtnA1APTQ';
+// export const INGEST_KEY = 'MnzaTCk7Se8i74hA141bZGS-NY9P39RSzYFbxanIHyV2VDNu1fwrns2xBQCEGdIb9XRPtzbp0zdRPjtnA1APTQ';
 
 export default function Home() {
   const [email, setEmail] = useState("");
@@ -95,7 +95,7 @@ export default function Home() {
           <button disabled={email === lastSubmitted} className={styles.submit} onClick={onSubmit}>{buttonText}</button>
         </div>
         {error && <div style={{ color: 'red', fontSize: '12px', marginTop: "5px" }}>{error}</div>}
-        </div>
+      </div>
     </div>
   )
 }

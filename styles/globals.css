@@ -1,5 +1,6 @@
 body, button {
   font-family: monospace;
+  margin: 0;
 }
 
 input {
@@ -11,7 +12,7 @@ input {
   box-sizing: border-box;
 }
 
-input:focus {
+input:focus, textarea:focus {
   outline: none;
   border-color: gray;
 }
