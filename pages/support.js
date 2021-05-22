@@ -10,7 +10,7 @@ const Support = () => {
         content: "",
     });
     const [error, setError] = useState(null);
-    const [buttonText, setButtonText] = useState("Submit");
+    const [isSubmitted, setIsSubmitted] = useState(false);
 
     const onChange = (field) => (e) => {
         setData(prev => ({
@@ -46,7 +46,7 @@ const Support = () => {
             }
         });
 
-        setButtonText("Done!")
+        setIsSubmitted(true);
     }
 
     return <div className={styles.container}>
@@ -61,13 +61,19 @@ const Support = () => {
       </Head>
       <div className={styles.content}>
       <img style={{ height: '40px'}} className={styles.logo} src="/logo.svg" alt="Inngest logo" />
-          <h4>Need help? Talk to us! </h4>
-          Join our <a href="https://discord.gg/hUMruzTK">Discord server</a><br/> 
-          - or - <br/>
-          <input style={{ width: '400px', marginBottom: '20px' }} type="email" placeholder="Your email here" value={data.email} onChange={onChange('email')} />
-          <textarea rows={10} style={{ width: '400px', boxSizing: 'border-box', marginBottom: '20px'  }} placeholder="What's up?" value={data.content} onChange={onChange("content")} />
-          <button className={styles.submit} onClick={onSubmit}>{buttonText}</button>
-          {error && <div style={{ color: 'red', fontSize: '12px', marginTop: '20px'}}>{error}</div>}
+      {!isSubmitted && <>
+        <h4>Need help? Talk to us! </h4>
+        Join our <a href="https://discord.gg/hUMruzTK">Discord server</a><br/> 
+        - or - <br/>
+        <input style={{ width: '400px', marginBottom: '20px' }} type="email" placeholder="Your email here" value={data.email} onChange={onChange('email')} />
+        <textarea rows={10} style={{ width: '400px', boxSizing: 'border-box', marginBottom: '20px'  }} placeholder="What's up?" value={data.content} onChange={onChange("content")} />
+        <button className={styles.submit} onClick={onSubmit}>Submit</button>
+        {error && <div style={{ color: 'red', fontSize: '12px', marginTop: '20px'}}>{error}</div>}
+      
+       </>}
+       {isSubmitted && <>
+            Thanks for contacting us! A copy of your request has been sent to {data.email}.
+       </>}
       </div>
     </div>
 };
