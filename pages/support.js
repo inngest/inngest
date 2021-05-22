@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
-import { INGEST_KEY } from "./index";
+
+const INGEST_KEY = 'FNaH21wfs7_39WFH-o1bjM8l0iIWIevoWJqmsBYJIYyb0mei6NIim09DzkTYsOJWwl4P1yBNfwyR6w-c8W0Z2Q';
 
 const Support = () => {
     const [data, setData] = useState({
