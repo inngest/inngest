@@ -842,6 +842,11 @@ inherits@2.0.4, inherits@^2.0.1, inherits@^2.0.3, inherits@^2.0.4, inherits@~2.0
   resolved "https://registry.yarnpkg.com/inherits/-/inherits-2.0.4.tgz#0fa2c64f932917c3433a0ded55363aae37416b7c"
   integrity sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==
 
+inngest-sdk@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/inngest-sdk/-/inngest-sdk-1.0.1.tgz#1eb86ecc618dced2699e231261191b85eb32c4ca"
+  integrity sha512-6rbTGOq8k7CmHOMdHYIA0cySqP8qtsvrKqTjpRNlrqNiJ6/Ujt83yxxc2lzXIBwaqqRBYgQQW4s1f07DqX3C6w==
+
 is-arguments@^1.0.4:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/is-arguments/-/is-arguments-1.1.0.tgz#62353031dfbee07ceb34656a6bde59efecae8dd9"

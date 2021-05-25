@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
+import Inngest2 from 'inngest-sdk';
 
+// prod key 
 const INGEST_KEY = 'FNaH21wfs7_39WFH-o1bjM8l0iIWIevoWJqmsBYJIYyb0mei6NIim09DzkTYsOJWwl4P1yBNfwyR6w-c8W0Z2Q';
+
+// test key
+// const INGEST_KEY = 'RD3uDyJz_SDgaZuZktk4DNiW5WnViEtP4KivNusZYRJ1opaP0m5Yq1vulhBfl1LkluWfe0Ubo_zUMU4hmkAgvA';
 
 const Support = () => {
     const [data, setData] = useState({
@@ -35,8 +40,8 @@ const Support = () => {
             return;
         }
 
-        Inngest.init(INGEST_KEY);
-        Inngest.event({
+        Inngest2.init(INGEST_KEY);
+        Inngest2.event({
             name: "support.request.new",
             data: {
                 content: data.content,
