@@ -13,6 +13,20 @@
   text-align: center;
 }
 
+.content > hgroup {
+  text-align: center;
+  line-height: 1;
+  margin: 1rem 0;
+}
+
+.content > hgroup + div {
+  margin: 0 0 2rem;
+}
+
+.content h1, .content h2 {
+  margin: .5rem 0;
+}
+
 .content > div + div {
   margin-top: 20px;
 }
