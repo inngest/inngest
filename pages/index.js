@@ -82,7 +82,7 @@ export default function Home() {
 
 
         <hgroup>
-          <h2>a serverless platform for event driven systems</h2>
+          <h2>a platform for serverless, event driven systems</h2>
           <h4>build and deploy 25x faster on inngest</h4>
         </hgroup>
 
