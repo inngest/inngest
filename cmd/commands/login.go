@@ -7,6 +7,7 @@ import (
 	"github.com/inngest/inngestctl/inngest/client"
 	"github.com/inngest/inngestctl/inngest/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"golang.org/x/term"
 )
 
@@ -42,7 +43,9 @@ var login = &cobra.Command{
 		}
 
 		log.From(ctx).Info().Msg("Logging in")
-		jwt, err := client.New().Login(ctx, username, password)
+		jwt, err := client.New(
+			client.WithAPI(viper.GetString("api")), // "INNGEST_API", set up by commands/root
+		).Login(ctx, username, password)
 		if err != nil {
 			log.From(ctx).Fatal().Msgf("unable to log in: %s", err.Error())
 		}
