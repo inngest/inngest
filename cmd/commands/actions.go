@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"text/tabwriter"
+	"regexp"
 	"time"
 
+	"github.com/inngest/inngestctl/cmd/commands/internal/table"
 	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/inngest/log"
 	"github.com/mitchellh/go-homedir"
@@ -17,12 +18,14 @@ import (
 var (
 	pushOnly      bool
 	includePublic bool
+	versionRegex  = regexp.MustCompile(`^v?([0-9]+).([0-9]+)$`)
 )
 
 func init() {
 	rootCmd.AddCommand(actionsRoot)
 	actionsRoot.AddCommand(actionsList)
 	actionsRoot.AddCommand(actionsDeploy)
+	actionsRoot.AddCommand(actionsPublish)
 
 	actionsDeploy.Flags().BoolVar(&pushOnly, "push-only", false, "Only push the action code;  do not create the action version")
 	actionsList.Flags().BoolVar(&includePublic, "public", false, "Include publicly available actions")
@@ -30,11 +33,9 @@ func init() {
 
 var actionsRoot = &cobra.Command{
 	Use:   "actions",
-	Short: "Manages actions within your selected workspace",
+	Short: "Manages actions within your account",
 	Run: func(cmd *cobra.Command, args []string) {
-		// With no arguments provided, default to listing the
-		// available actions.
-		actionsList.Run(cmd, args)
+		cmd.Help()
 	},
 }
 
@@ -51,12 +52,10 @@ var actionsList = &cobra.Command{
 			log.From(ctx).Fatal().Msg(err.Error())
 		}
 
-		fmt.Println("")
-		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
-		fmt.Fprint(w, "DSN\tNAME\tLATEST VERSION\tPUBLISHED AT\tUNPUBLISHED AT\n")
+		t := table.New(table.Row{"DSN", "Name", "Latest", "Published at", "Revoked at"})
 		for _, a := range actions {
 			if a.Latest == nil {
-				fmt.Fprintf(w, "%s\t%s\t-\t-\n", a.DSN, a.Name)
+				t.AppendRow(table.Row{a.DSN, a.Name})
 				continue
 			}
 
@@ -70,13 +69,18 @@ var actionsList = &cobra.Command{
 			}
 			if a.Latest.ValidTo != nil {
 				unpublished = a.Latest.ValidTo.Format(time.RFC3339)
+				_ = unpublished
 			}
 
-			fmt.Fprintf(w, "%s\t%s\tv%d.%d\t%s\t%s\n", a.DSN, a.Name, a.Latest.VersionMajor, a.Latest.VersionMinor, published, unpublished)
+			t.AppendRow(table.Row{
+				a.DSN,
+				a.Name,
+				fmt.Sprintf("v%d.%d", a.Latest.VersionMajor, a.Latest.VersionMinor),
+				published,
+				unpublished,
+			})
 		}
-
-		w.Flush()
-		fmt.Println("")
+		t.Render()
 	},
 }
 
@@ -110,5 +114,26 @@ var actionsDeploy = &cobra.Command{
 		}); err != nil {
 			log.From(ctx).Fatal().Msgf("Error deploying: %s", err)
 		}
+	},
+}
+
+var actionsPublish = &cobra.Command{
+	Use:   "publish [dsn] [version, eg. v1.12]",
+	Short: "Pubishes a specific action version for use within workflows",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 2 {
+			return errors.New("An action DSN and version must be spplied, eg: $ inngestctl actions publish my-account/hello world v1.1")
+		}
+		// Check action version
+		match := versionRegex.MatchString(args[1])
+		if !match {
+			return errors.New("Verion must be specified in the format of ${major}.${minor}, eg. v1.23 or 2.54")
+		}
+		return nil
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
+		state := inngest.RequireState(ctx)
+		_ = state
 	},
 }

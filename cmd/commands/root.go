@@ -13,8 +13,8 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().String("log.type", "", "Log type (one of json, tty). Defaults to 'json' without a TTY")
-	rootCmd.PersistentFlags().StringP("log.level", "l", "debug", "Log level")
+	// rootCmd.PersistentFlags().String("log.type", "", "Log type (one of json, tty). Defaults to 'json' without a TTY")
+	// rootCmd.PersistentFlags().StringP("log.level", "l", "debug", "Log level")
 
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		panic(err)

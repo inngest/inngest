@@ -15,8 +15,8 @@ type Action struct {
 }
 
 type ActionVersion struct {
-	VersionMajor uint
-	VersionMinor uint
+	VersionMajor int
+	VersionMinor int
 	ValidFrom    *time.Time
 	ValidTo      *time.Time
 	Runtime      string
