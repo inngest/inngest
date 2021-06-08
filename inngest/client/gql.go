@@ -9,8 +9,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
-
-	"github.com/inngest/inngestctl/inngest/log"
 )
 
 // DoGQL makes a gql request and returns the response
@@ -78,7 +76,7 @@ func (c *httpClient) NewRequest(method string, path string, body io.Reader) (*ht
 func jsonBuffer(ctx context.Context, input interface{}) io.Reader {
 	byt, err := json.Marshal(input)
 	if err != nil {
-		log.From(ctx).Fatal().Err(err).Msg("unable to marshal input")
+		panic(err.Error())
 	}
 	return bytes.NewBuffer(byt)
 }

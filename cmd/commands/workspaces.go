@@ -1,11 +1,8 @@
 package commands
 
 import (
-	"fmt"
-	"os"
-	"text/tabwriter"
-
 	"github.com/google/uuid"
+	"github.com/inngest/inngestctl/cmd/commands/internal/table"
 	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/inngest/client"
 	"github.com/inngest/inngestctl/inngest/log"
@@ -42,22 +39,26 @@ var workspacesList = &cobra.Command{
 			log.From(ctx).Fatal().Err(err).Msg("unable to fetch workspaces")
 		}
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 4, 4, ' ', 0)
-		fmt.Fprint(w, "SELECTED\tID\tNAME\tTYPE\n")
+		t := table.New(table.Row{"Selected", "ID", "Name", "Type"})
 		for _, f := range flows {
 			typ := "live"
 			if f.Test {
 				typ = "test"
 			}
 
+			selected := ""
 			if state.SelectedWorkspace != nil && state.SelectedWorkspace.ID == f.ID {
-				fmt.Fprintf(w, "*** \t%s\t%s\t%s\n", f.ID, f.Name, typ)
-				continue
+				selected = "***"
 			}
 
-			fmt.Fprintf(w, "\t%s\t%s\t%s\n", f.ID, f.Name, typ)
+			t.AppendRow(table.Row{
+				selected,
+				f.ID,
+				f.Name,
+				typ,
+			})
 		}
-		w.Flush()
+		t.Render()
 	},
 }
 
