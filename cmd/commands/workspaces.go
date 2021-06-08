@@ -19,11 +19,7 @@ var workspacesRoot = &cobra.Command{
 	Use:   "workspaces",
 	Short: "Manages workspacess within your Inngest account",
 	Run: func(cmd *cobra.Command, args []string) {
-		// With no arguments provided, default to listing the
-		// available workspacess.
-		if len(args) == 0 {
-			workspacesList.Run(cmd, args)
-		}
+		cmd.Help()
 	},
 }
 
