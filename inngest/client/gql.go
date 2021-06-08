@@ -41,11 +41,7 @@ func (c httpClient) DoGQL(ctx context.Context, input Params) (*Response, error) 
 	}
 
 	if len(r.Errors) > 0 {
-		str := make([]string, len(r.Errors))
-		for i := 0; i < len(r.Errors); i++ {
-			str[i] = r.Errors[i].Message
-		}
-		return nil, fmt.Errorf("%s", strings.Join(str, ", "))
+		return nil, r.Errors
 	}
 
 	return r, nil
@@ -64,9 +60,21 @@ type Response struct {
 
 type ErrorList []*Error
 
+func (e ErrorList) Error() string {
+	str := make([]string, len(e))
+	for i := 0; i < len(e); i++ {
+		str[i] = e[i].Message
+	}
+	return strings.Join(str, ", ")
+}
+
 type Error struct {
 	Message string   `json:"message"`
 	Path    []string `json:"path,omitempty"`
+}
+
+func (e Error) Error() string {
+	return e.Message
 }
 
 func (c *httpClient) NewRequest(method string, path string, body io.Reader) (*http.Request, error) {
