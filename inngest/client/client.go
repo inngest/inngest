@@ -15,6 +15,7 @@ type Client interface {
 	Login(ctx context.Context, email, password string) ([]byte, error)
 	Workspaces(ctx context.Context) ([]Workspace, error)
 	Actions(ctx context.Context, includePublic bool) ([]*Action, error)
+	UpdateActionVersion(ctx context.Context, v ActionVersionQualifier, enabled bool) (*ActionVersion, error)
 	CreateAction(ctx context.Context, config string) (*Action, error)
 }
 

@@ -84,3 +84,45 @@ func (c httpClient) CreateAction(ctx context.Context, input string) (*Action, er
 
 	return data.CreateAction, nil
 }
+
+type ActionVersionQualifier struct {
+	DSN          string `json:"dsn"`
+	VersionMajor int    `json:"versionMajor"`
+	VersionMinor int    `json:"versionMinor"`
+}
+
+func (c httpClient) UpdateActionVersion(ctx context.Context, v ActionVersionQualifier, enabled bool) (*ActionVersion, error) {
+	query := `
+	  mutation UpdateActionVersion($version: ActionVersionQualifier!, $enabled: Boolean!) {
+	    updateActionVersion(version: $version, enabled: $enabled) {
+		versionMajor
+		versionMinor
+		validFrom
+		validTo
+		runtime
+            }
+          }`
+
+	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{
+		"version": v,
+		"enabled": enabled,
+	}})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp.Errors) > 0 {
+		return nil, resp.Errors
+	}
+
+	type response struct {
+		UpdateActionVersion *ActionVersion
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
+	}
+
+	return data.UpdateActionVersion, nil
+}
