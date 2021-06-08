@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/google/uuid"
 )
 
 // Client implements all functionality necessary to communicate with
@@ -16,7 +14,7 @@ type Client interface {
 
 	Login(ctx context.Context, email, password string) ([]byte, error)
 	Workspaces(ctx context.Context) ([]Workspace, error)
-	Actions(ctx context.Context, workspaceID uuid.UUID) error
+	Actions(ctx context.Context, includePublic bool) ([]*Action, error)
 	CreateAction(ctx context.Context, config string) (*Action, error)
 }
 
