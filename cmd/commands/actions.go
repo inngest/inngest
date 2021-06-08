@@ -17,10 +17,10 @@ import (
 )
 
 var (
-	pushOnly          bool
-	includePublic     bool
-	deployWithPublish bool
-	versionRegex      = regexp.MustCompile(`^v?([0-9]+).([0-9]+)$`)
+	pushOnly             bool
+	includePublic        bool
+	deployWithoutPublish bool
+	versionRegex         = regexp.MustCompile(`^v?([0-9]+).([0-9]+)$`)
 )
 
 func init() {
@@ -30,6 +30,7 @@ func init() {
 	actionsRoot.AddCommand(actionsPublish)
 
 	actionsDeploy.Flags().BoolVar(&pushOnly, "push-only", false, "Only push the action code;  do not create the action version")
+	actionsDeploy.Flags().BoolVar(&deployWithoutPublish, "no-publish", false, "Do not publish this action after deploying.  This action will only be useable by test workflows.")
 	actionsList.Flags().BoolVar(&includePublic, "public", false, "Include publicly available actions")
 }
 
@@ -109,12 +110,20 @@ var actionsDeploy = &cobra.Command{
 			log.From(ctx).Fatal().Msgf("Error reading configuration: %s", err)
 		}
 
-		if err := inngest.DeployAction(ctx, inngest.DeployActionOptions{
+		version, err := inngest.DeployAction(ctx, inngest.DeployActionOptions{
 			PushOnly: pushOnly,
 			Config:   string(byt),
 			Client:   state.Client,
-		}); err != nil {
+		})
+		if err != nil {
 			log.From(ctx).Fatal().Msgf("Error deploying: %s", err)
+		}
+
+		if !deployWithoutPublish {
+			actionsPublish.Run(cmd, []string{
+				version.DSN,
+				fmt.Sprintf("v%d.%d", version.Version.Major, version.Version.Minor),
+			})
 		}
 	},
 }

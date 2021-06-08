@@ -30,34 +30,32 @@ type DeployActionOptions struct {
 	Client client.Client
 }
 
-func DeployAction(ctx context.Context, opts DeployActionOptions) error {
+func DeployAction(ctx context.Context, opts DeployActionOptions) (*ActionVersion, error) {
 	if opts.Version == nil {
 		version, err := ParseAction(opts.Config)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		opts.Version = version
 	}
 
 	if !opts.PushOnly {
-		// TODO: Log creating action
 		_, err := opts.Client.CreateAction(ctx, opts.Config)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if opts.Version.Runtime.RuntimeType() == "docker" {
-		// TODO: Log pushing image
 		runtime := opts.Version.Runtime.Runtime.(RuntimeDocker)
-		return DeployImage(ctx, deployImageOptions{
+		return opts.Version, DeployImage(ctx, deployImageOptions{
 			version:     opts.Version,
 			image:       runtime.Image,
 			credentials: opts.Client.Credentials(),
 		})
 	}
 
-	return fmt.Errorf("unknown runtime type: %s", opts.Version.Runtime.RuntimeType())
+	return nil, fmt.Errorf("unknown runtime type: %s", opts.Version.Runtime.RuntimeType())
 }
 
 // deployImage deploys an image to Inngest's registry, allowing the container to be used
