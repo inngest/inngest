@@ -26,7 +26,9 @@ func (c httpClient) CreateAction(ctx context.Context, input string) (*Action, er
             }
           }`
 
-	resp, err := c.DoGQL(ctx, Params{Query: query})
+	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{
+		"config": input,
+	}})
 	if err != nil {
 		return nil, err
 	}

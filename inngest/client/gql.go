@@ -47,7 +47,7 @@ func (c httpClient) DoGQL(ctx context.Context, input Params) (*Response, error) 
 		for i := 0; i < len(r.Errors); i++ {
 			str[i] = r.Errors[i].Message
 		}
-		return nil, fmt.Errorf("error from api: %s", strings.Join(str, ", "))
+		return nil, fmt.Errorf("%s", strings.Join(str, ", "))
 	}
 
 	return r, nil

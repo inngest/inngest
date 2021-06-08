@@ -15,9 +15,14 @@ import (
 	"github.com/inngest/inngestctl/inngest/client"
 )
 
+const (
+	DefaultRegistryHost = "registry.inngest.com"
+)
+
 // DeployActionOptions
 type DeployActionOptions struct {
-	Config string
+	PushOnly bool
+	Config   string
 	// Version is the deserialized cue configuration derived from Config.
 	// If not specified, Config will be deserialized automatically.
 	Version *ActionVersion
@@ -34,16 +39,19 @@ func DeployAction(ctx context.Context, opts DeployActionOptions) error {
 		opts.Version = version
 	}
 
-	// TODO: Log creating action
-	_, err := opts.Client.CreateAction(ctx, opts.Config)
-	if err != nil {
-		return err
+	if !opts.PushOnly {
+		// TODO: Log creating action
+		_, err := opts.Client.CreateAction(ctx, opts.Config)
+		if err != nil {
+			return err
+		}
 	}
 
 	if opts.Version.Runtime.RuntimeType() == "docker" {
 		// TODO: Log pushing image
 		runtime := opts.Version.Runtime.Runtime.(RuntimeDocker)
-		return deployImage(ctx, deployImageOptions{
+		return DeployImage(ctx, deployImageOptions{
+			version:     opts.Version,
 			image:       runtime.Image,
 			credentials: opts.Client.Credentials(),
 		})
@@ -57,7 +65,7 @@ func DeployAction(ctx context.Context, opts DeployActionOptions) error {
 //
 // The action must have been registered within the current account prior to pushing the
 // image, else this will error.
-func deployImage(ctx context.Context, a deployImageOptions) (err error) {
+func DeployImage(ctx context.Context, a deployImageOptions) (err error) {
 	dkr, err := docker.NewClientWithOpts(docker.WithAPIVersionNegotiation())
 	if err != nil {
 		return err
@@ -77,7 +85,21 @@ func deployImage(ctx context.Context, a deployImageOptions) (err error) {
 }
 
 func pushImage(ctx context.Context, a deployImageOptions, dkr *docker.Client) error {
-	rc, err := dkr.ImagePush(ctx, a.image, types.ImagePushOptions{
+	host := DefaultRegistryHost
+	if os.Getenv("INNGEST_REGISTRY") != "" {
+		host = os.Getenv("INNGEST_REGISTRY")
+	}
+
+	tag := fmt.Sprintf("%s/%s:%d-%d", host, a.version.DSN, a.version.Version.Major, a.version.Version.Minor)
+	if err := dkr.ImageTag(ctx, a.image, tag); err != nil {
+		return err
+	}
+
+	defer func() {
+		dkr.ImageRemove(ctx, tag, types.ImageRemoveOptions{})
+	}()
+
+	rc, err := dkr.ImagePush(ctx, tag, types.ImagePushOptions{
 		RegistryAuth: a.Auth(),
 	})
 	if err != nil {
@@ -102,7 +124,8 @@ func buildImage(ctx context.Context, a deployImageOptions, dkr *docker.Client) (
 }
 
 type deployImageOptions struct {
-	image string
+	version *ActionVersion
+	image   string
 
 	// TODO: (tonyhb) allow building of dockerfile from file location
 	dockerfile  string
