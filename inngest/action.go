@@ -23,44 +23,52 @@ func ParseAction(input string) (*ActionVersion, error) {
 	return a, nil
 }
 
+func FormatAction(a ActionVersion) (string, error) {
+	def, err := cuedefs.FormatDef(a)
+	if err != nil {
+		return "", err
+	}
+	// XXX: Inspect cue and implement packages.
+	return fmt.Sprintf(packageTpl, def), nil
+}
+
 // ActionVersion represents a version of an action defined via its cue configuration.
 type ActionVersion struct {
 	// DSN represents the immutable identifier for the action.
-	DSN string
+	DSN string `json:"dsn"`
 	// Name represents the name of this action
-	Name string
+	Name string `json:"name"`
 
 	// Version defines the current action version.  Each action version can have
 	// an updated configuration.
-	Version VersionInfo
+	Version VersionInfo `json:"version"`
 
 	// WorkflowMetadata defines workflow-specific configuration for the action.  For example,
 	// the "wait" action is uniquely configured within each workflow to wait for some specific
 	// amount of time.
-	WorkflowMetadata MetadataMap
+	WorkflowMetadata MetadataMap `json:"workflowMetadata"`
 
 	// Response defines the response type for this action.  This allows us to show UI-specific
 	// information around the "stack" or "baggage" that is built up around your workflow as
 	// actions run.
-	Response map[string]Response
+	Response map[string]Response `json:"response"`
 
 	// Edges define predetermined edges based off of responses for this action.  For example,
 	// the webhook action can define some success and error edges for the response.
-	Edges map[string]Edge
+	Edges map[string]Edge `json:"edges"`
 
 	// Runtime specifies which language/runtime is being used for this action.  This is decoded
 	// via the GetRuntime() function call, as we need a specific decoder to
-	Runtime runtimeWrapper
+	Runtime RuntimeWrapper `json:"runtime"`
 }
 
-type runtimeWrapper struct {
+type RuntimeWrapper struct {
 	Runtime
 }
 
-func (r *runtimeWrapper) UnmarshalJSON(b []byte) error {
+func (r *RuntimeWrapper) UnmarshalJSON(b []byte) error {
 	// XXX: This is wasteful, as we decode the runtime twice.  We can implement a custom decoder
-	// which decodes the JSON map and stores each key/value, then fills structs based off of the
-	// decoded type.
+	// which decodes and fills in one pass.
 	interim := map[string]interface{}{}
 	if err := json.Unmarshal(b, &interim); err != nil {
 		return err
@@ -88,13 +96,26 @@ type Runtime interface {
 }
 
 type RuntimeDocker struct {
-	Image      string
-	Entrypoint *string
+	Image      string  `json:"image"`
+	Entrypoint *string `json:"entrypoint"`
+}
+
+// MarshalJSON implements the JSON marshal interface so that cue can format this
+// correctly when serializing actions.
+func (r RuntimeDocker) MarshalJSON() ([]byte, error) {
+	data := map[string]string{
+		"type":  "docker",
+		"image": r.Image,
+	}
+	if r.Entrypoint != nil {
+		data["entrypoint"] = *r.Entrypoint
+	}
+	return json.Marshal(data)
 }
 
 type VersionInfo struct {
-	Major int
-	Minor int
+	Major int `json:"major"`
+	Minor int `json:"minor"`
 }
 
 // Response represents a value that is returned from the action
@@ -137,20 +158,20 @@ type AsyncEdge struct {
 type MetadataMap map[string]Metadata
 
 type Metadata struct {
-	Name       string
-	Expression *string
-	Required   bool
-	Default    interface{}
+	Name       string      `json:"name"`
+	Expression *string     `json:"expression,omitempty"`
+	Required   bool        `json:"required"`
+	Default    interface{} `json:"default,omitempty"`
 	// Type represents the datatype for this particular entry.
-	Type string
-	Form Form
+	Type string `json:"type"`
+	Form Form   `json:"form"`
 }
 
 // Form represents form-specific data.  It shares two fields common to each
 // form type, and then embedded structs depending on the cue type chosen.
 type Form struct {
-	Title string
-	Type  string
+	Title string `json:"title"`
+	Type  string `json:"type"`
 
 	// By embedding each form type we can leverage the builtin decoder to
 	// properly initialize the correct Form struct.
@@ -184,15 +205,15 @@ func (f Form) Map() map[string]interface{} {
 }
 
 type FormDateTime struct {
-	Templating bool
+	Templating bool `json:"templating,omitempty"`
 }
 
 type FormInput struct {
-	Templating bool
+	Templating bool `json:"templating,omitempty"`
 }
 
 type FormTextarea struct {
-	Templating bool
+	Templating bool `json:"templating,omitempty"`
 }
 
 type FormSelect struct {
@@ -204,3 +225,12 @@ type Choice struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
+
+const packageTpl = `package main
+
+import (
+	"inngest.com/actions"
+)
+
+action: actions.#Action
+action: %s`

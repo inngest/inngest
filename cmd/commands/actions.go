@@ -26,6 +26,7 @@ var (
 func init() {
 	rootCmd.AddCommand(actionsRoot)
 	actionsRoot.AddCommand(actionsList)
+	actionsRoot.AddCommand(actionsScaffold)
 	actionsRoot.AddCommand(actionsDeploy)
 	actionsRoot.AddCommand(actionsPublish)
 
@@ -110,10 +111,16 @@ var actionsDeploy = &cobra.Command{
 			log.From(ctx).Fatal().Msgf("Error reading configuration: %s", err)
 		}
 
-		version, err := inngest.DeployAction(ctx, inngest.DeployActionOptions{
+		version, err := inngest.ParseAction(string(byt))
+		if err != nil {
+			log.From(ctx).Fatal().Msgf("Error reading configuration: %s", err)
+		}
+
+		version, err = inngest.DeployAction(ctx, inngest.DeployActionOptions{
 			PushOnly: pushOnly,
 			Config:   string(byt),
 			Client:   state.Client,
+			Version:  version,
 		})
 		if err != nil {
 			log.From(ctx).Fatal().Msgf("Error deploying: %s", err)
@@ -125,6 +132,38 @@ var actionsDeploy = &cobra.Command{
 				fmt.Sprintf("v%d.%d", version.Version.Major, version.Version.Minor),
 			})
 		}
+	},
+}
+
+var actionsScaffold = &cobra.Command{
+	Use:   "scaffold [name]",
+	Short: "Creates a new, blank cue file for deploying a new serverless action",
+	Run: func(cmd *cobra.Command, args []string) {
+		var name string
+		if len(args) > 0 {
+			name = args[0]
+		}
+		// TODO: Find the DSN prefix from the currently authenticated account
+		output, err := inngest.FormatAction(inngest.ActionVersion{
+			DSN:  "",
+			Name: name,
+			Version: inngest.VersionInfo{
+				Major: 1,
+				Minor: 1,
+			},
+			WorkflowMetadata: inngest.MetadataMap{},
+			Response:         map[string]inngest.Response{},
+			Edges:            map[string]inngest.Edge{},
+			Runtime: inngest.RuntimeWrapper{
+				Runtime: inngest.RuntimeDocker{
+					Image: "your-docker-image",
+				},
+			},
+		})
+		if err != nil {
+			log.From(cmd.Context()).Fatal().Msgf("Error creating action: %s", err)
+		}
+		fmt.Println(output)
 	},
 }
 
