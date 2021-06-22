@@ -23,6 +23,15 @@ func ParseAction(input string) (*ActionVersion, error) {
 	return a, nil
 }
 
+func FormatAction(a ActionVersion) (string, error) {
+	def, err := cuedefs.FormatDef(a)
+	if err != nil {
+		return "", err
+	}
+	// XXX: Inspect cue and implement packages.
+	return fmt.Sprintf(packageTpl, def), nil
+}
+
 // ActionVersion represents a version of an action defined via its cue configuration.
 type ActionVersion struct {
 	// DSN represents the immutable identifier for the action.
@@ -50,17 +59,16 @@ type ActionVersion struct {
 
 	// Runtime specifies which language/runtime is being used for this action.  This is decoded
 	// via the GetRuntime() function call, as we need a specific decoder to
-	Runtime runtimeWrapper
+	Runtime RuntimeWrapper
 }
 
-type runtimeWrapper struct {
+type RuntimeWrapper struct {
 	Runtime
 }
 
-func (r *runtimeWrapper) UnmarshalJSON(b []byte) error {
+func (r *RuntimeWrapper) UnmarshalJSON(b []byte) error {
 	// XXX: This is wasteful, as we decode the runtime twice.  We can implement a custom decoder
-	// which decodes the JSON map and stores each key/value, then fills structs based off of the
-	// decoded type.
+	// which decodes and fills in one pass.
 	interim := map[string]interface{}{}
 	if err := json.Unmarshal(b, &interim); err != nil {
 		return err
@@ -204,3 +212,12 @@ type Choice struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
+
+const packageTpl = `package main
+
+import (
+	"inngest.com/actions"
+)
+
+%s
+`
