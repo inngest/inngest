@@ -78,7 +78,12 @@ func (e Error) Error() string {
 }
 
 func (c *httpClient) NewRequest(method string, path string, body io.Reader) (*http.Request, error) {
-	return http.NewRequest(method, fmt.Sprintf("%s%s", c.api, path), body)
+	req, err := http.NewRequest(method, fmt.Sprintf("%s%s", c.api, path), body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("User-Agent", "inngestctl")
+	return req, nil
 }
 
 func jsonBuffer(ctx context.Context, input interface{}) io.Reader {
