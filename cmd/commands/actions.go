@@ -26,7 +26,7 @@ var (
 func init() {
 	rootCmd.AddCommand(actionsRoot)
 	actionsRoot.AddCommand(actionsList)
-	actionsRoot.AddCommand(actionsScaffold)
+	actionsRoot.AddCommand(actionsNew)
 	actionsRoot.AddCommand(actionsDeploy)
 	actionsRoot.AddCommand(actionsPublish)
 
@@ -135,8 +135,8 @@ var actionsDeploy = &cobra.Command{
 	},
 }
 
-var actionsScaffold = &cobra.Command{
-	Use:   "scaffold [name]",
+var actionsNew = &cobra.Command{
+	Use:   "new [name]",
 	Short: "Creates a new, blank cue file for deploying a new serverless action",
 	Run: func(cmd *cobra.Command, args []string) {
 		var name string
