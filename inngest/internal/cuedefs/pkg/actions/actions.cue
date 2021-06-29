@@ -9,8 +9,8 @@ import (
 #Edge: edges.#Edge
 
 #Action: {
-	name:     string
-	dsn:      string
+	name: string
+	dsn:  string
 
 	version: {
 		major: >0 | *1
@@ -46,9 +46,10 @@ import (
 #Runtime: (#RuntimeDocker)
 
 #RuntimeDocker: {
-	type: "docker"
-	image: string
+	type:        "docker"
+	image:       string
 	entrypoint?: string
+	memory?:     >=128 && <=8096
 }
 
 // ActionType depicts the type of the response and metadata input.
@@ -66,8 +67,8 @@ import (
 
 // Setting is an enum of specific settings which can be set for this action.
 #Setting: {
-	name:    string
-	form:    #Form
+	name: string
+	form: #Form
 } & (#SettingEnum | #SettingString | #SettingWildcard)
 
 #SettingWildcard: {
@@ -84,9 +85,9 @@ import (
 }
 
 #SettingString: {
-	name:    string
-	type:    "string"
-	form:    #Form
+	name: string
+	type: "string"
+	form: #Form
 }
 
 // Metadata represents metadata used to configure the action within a specific workflow.
@@ -142,4 +143,3 @@ import (
 	choices: [ ...{value: string, name: string}] | *[]
 	eval?:   string
 }
-
