@@ -98,6 +98,7 @@ type Runtime interface {
 type RuntimeDocker struct {
 	Image      string  `json:"image"`
 	Entrypoint *string `json:"entrypoint"`
+	Memory     *int    `json:"memory"`
 }
 
 // MarshalJSON implements the JSON marshal interface so that cue can format this
