@@ -96,20 +96,20 @@ type Runtime interface {
 }
 
 type RuntimeDocker struct {
-	Image      string  `json:"image"`
-	Entrypoint *string `json:"entrypoint"`
-	Memory     *int    `json:"memory"`
+	Image      string   `json:"image"`
+	Entrypoint []string `json:"entrypoint,omitempty"`
+	Memory     *int     `json:"memory"`
 }
 
 // MarshalJSON implements the JSON marshal interface so that cue can format this
 // correctly when serializing actions.
 func (r RuntimeDocker) MarshalJSON() ([]byte, error) {
-	data := map[string]string{
+	data := map[string]interface{}{
 		"type":  "docker",
 		"image": r.Image,
 	}
-	if r.Entrypoint != nil {
-		data["entrypoint"] = *r.Entrypoint
+	if len(r.Entrypoint) > 0 {
+		data["entrypoint"] = r.Entrypoint
 	}
 	return json.Marshal(data)
 }

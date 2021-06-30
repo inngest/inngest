@@ -46,10 +46,10 @@ import (
 #Runtime: (#RuntimeDocker)
 
 #RuntimeDocker: {
-	type:        "docker"
-	image:       string
-	entrypoint?: string
-	memory?:     >=128 && <=8096
+	type:    "docker"
+	image:   string
+	memory?: >=128 & <=8096
+	entrypoint?: [ ...string]
 }
 
 // ActionType depicts the type of the response and metadata input.
