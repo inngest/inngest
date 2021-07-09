@@ -17,6 +17,8 @@ import (
 		minor: >0 | *1
 	}
 
+	scopes: [ ...string] | *[]
+
 	// Settings represents settings stored for this action within a workspace.
 	// These settings are configurable by end users.
 	//
@@ -48,7 +50,7 @@ import (
 #RuntimeDocker: {
 	type:    "docker"
 	image:   string
-	memory?: >=128 & <=8096
+	memory?: >=64 & <=8096
 	entrypoint?: [ ...string]
 }
 
@@ -140,6 +142,7 @@ import (
 #FormSelect: {
 	title:   string
 	type:    "select"
+	other:   bool | *false
 	choices: [ ...{value: string, name: string}] | *[]
 	eval?:   string
 }

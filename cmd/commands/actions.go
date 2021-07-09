@@ -27,6 +27,7 @@ func init() {
 	rootCmd.AddCommand(actionsRoot)
 	actionsRoot.AddCommand(actionsList)
 	actionsRoot.AddCommand(actionsNew)
+	actionsRoot.AddCommand(actionsValidate)
 	actionsRoot.AddCommand(actionsDeploy)
 	actionsRoot.AddCommand(actionsPublish)
 
@@ -85,6 +86,32 @@ var actionsList = &cobra.Command{
 			})
 		}
 		t.Render()
+	},
+}
+
+var actionsValidate = &cobra.Command{
+	Use:   "validate [~/path/to/action.cue]",
+	Short: "Ensures that the configuration is valid",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return errors.New("No cue configuration found")
+		}
+		return nil
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx := cmd.Context()
+		path, err := homedir.Expand(args[0])
+		if err != nil {
+			log.From(ctx).Fatal().Msg("Error finding configuration")
+		}
+		byt, err := os.ReadFile(path)
+		if err != nil {
+			log.From(ctx).Fatal().Msgf("Error reading configuration: %s", err)
+		}
+		if _, err := inngest.ParseAction(string(byt)); err != nil {
+			log.From(ctx).Fatal().Msgf("Invalid configuration: %s", err)
+		}
+		log.From(ctx).Info().Msg("Valid")
 	},
 }
 
