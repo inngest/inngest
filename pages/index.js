@@ -115,7 +115,7 @@ export default function Home() {
         <Content>
           <h5>Introducing Inngest</h5>
 
-          <p>Inngest is an <strong>automation platform</strong> which <strong>runs workflows on a schedule</strong> or <strong>in real-time after events happen</strong>. Design&nbsp;<strong>complex operational flows</strong> and <strong>run any code</strong> - including pre-built integrations or your own code - with <strong>zero&nbsp;infrastructure&nbsp;and&nbsp;maintenance</strong>.</p>
+          <p>Inngest is an <strong>automation platform</strong> which <strong>runs workflows on a schedule</strong> or <strong>in real-time after events happen</strong>. Design&nbsp;<strong>complex operational flows</strong> and <strong>run any code</strong> - including pre-built integrations or your own code - with <strong>zero&nbsp;infrastructure and&nbsp;maintenance</strong>.</p>
 
           <IntroGrid>
             <div>
@@ -166,6 +166,10 @@ export default function Home() {
 const Content = styled.div`
   max-width: 1200px;
   margin: 0 auto;
+
+  @media only screen and (max-width: 800px) {
+    padding: 0 20px;
+  }
 `
 
 const Nav = styled(Content)`
@@ -192,6 +196,12 @@ const Nav = styled(Content)`
   a + a {
   margin-left: 20px;
   }
+
+  @media only screen and (max-width: 800px) {
+    div:last-of-type {
+      display: none;
+    }
+  }
 `
 
 
@@ -211,7 +221,7 @@ const Hero = styled(Content)`
     font-size: 1rem;
   }
 
-  form button {
+  button {
     width: 200px;
   }
 
@@ -226,6 +236,32 @@ const Hero = styled(Content)`
     position: relative;
     z-index: 2;
     overflow: hidden;
+  }
+
+
+  @media only screen and (max-width: 800px) {
+    h1 {
+      line-height: 1;
+      font-size: 50px;
+      margin: 40px 0;
+    }
+
+    > div { display: none; }
+
+    p {
+      line-height: 1.3;
+    }
+    form {
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: center;
+    }
+    button, input {
+      width: auto;
+    }
+    input {
+      padding: 24px 16px;
+    }
   }
 `
 
@@ -248,6 +284,21 @@ const Tagline = styled.div`
     line-height: 1.3;
     opacity: .65;
   }
+
+  @media only screen and (max-width: 800px) {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-gap: 7px;
+
+    > div {
+      display: flex;
+      flex-direction: row;
+      text-align: left;
+    }
+
+    p {  margin-left: 10px }
+
+  }
 `;
 
 const Introducing = styled.div`
@@ -259,6 +310,11 @@ const Introducing = styled.div`
   h5 + p {
     font-size: 1.3125rem;
   }
+
+  @media only screen and (max-width: 800px) {
+    margin-top: 20px;
+    padding-top: 40px;
+  }
 `
 
 const IntroGrid = styled.div`
@@ -266,6 +322,11 @@ const IntroGrid = styled.div`
   grid-template-columns: repeat(3, 1fr);
   grid-gap: 100px;
   padding: 30px 0 0;
+
+  @media only screen and (max-width: 800px) {
+    grid-template-columns: 1fr;
+    grid-gap: 20px;
+  }
 `
 
 const Callout = styled.div`
@@ -291,6 +352,11 @@ const Callout = styled.div`
 
   span:last-of-type {
     color: #737885;
+  }
+
+  @media only screen and (max-width: 800px) {
+    grid-template-columns: 1fr;
+    grid-gap: 20px;
   }
 `;
 
