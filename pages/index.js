@@ -157,6 +157,7 @@ export default function Home() {
       </Content>
 
       <Footer>
+        <Content>© 2021 Inngest Inc</Content>
       </Footer>
     </>
   )
@@ -301,5 +302,6 @@ const Footer = styled.div`
   margin-top: 100px;
   background: #222631;
   color: #fff;
-  min-height: 50px;
+  padding: 20px 0;
+  font-size: .9rem;
 `
