@@ -71,14 +71,10 @@ export default function Home() {
         <h1>Trigger low-code logic from events</h1>
         <p>
           Companies use Inngest to build real time, event driven workflows in&nbsp;minutes. <br />
-          It's <u>made for builders</u>, <u>designed for operators</u>.
+          It's <strong>made for builders</strong>, <strong>designed for operators</strong>.
         </p>
 
-        <form onSubmit={onSubmit} className={submitted && "submitted"}>
-          <input type="email" placeholder="Your email" />
-          <button type="submit" disabled={submitted}>Sign up for access</button>
-        </form>
-        {submitted && <p style={{ fontSize: 12 }}>You're on the list and will receive an invite soon!</p>}
+        <a href="https://calendly.com/inngest-thb/30min" className="button" rel="nofollow" target="_blank">Request a free demo</a>
 
         <div>
           <img src="/wflow.png" alt="An example cloud kitchen workflow when paying via Venmo" />
@@ -156,6 +152,14 @@ export default function Home() {
         </Callout>
       </Content>
 
+      <Signup>
+        <form onSubmit={onSubmit} className={submitted && "submitted"}>
+          <input type="email" placeholder="Your email" required />
+          <button type="submit" disabled={submitted}>Sign up for updates</button>
+        </form>
+        {submitted && <p style={{ fontSize: 12 }}>You're on the list and will receive an invite soon!</p>}
+      </Signup>
+
       <Footer>
         <Content>© 2021 Inngest Inc</Content>
       </Footer>
@@ -188,6 +192,7 @@ const Nav = styled(Content)`
     display: inline-block;
     padding: 12px 20px 11px;
     transition: all .2s;
+    text-decoration: none;
   }
   a:not(.button):hover {
     background: #2F6D9D11;
@@ -210,19 +215,12 @@ const Hero = styled(Content)`
   padding: 80px 0 0;
   position: relative;
 
-  form {
-    display: flex;
-    align-items: stretch;
-    justify-content: center;
-    margin: 60px 0 0;
-  }
-
-  form, form * {
+  .button {
+    display: inline-block;
     font-size: 1rem;
-  }
-
-  button {
-    width: 200px;
+    margin-top: 40px;
+    width: auto;
+    height: auto;
   }
 
   > div {
@@ -238,7 +236,6 @@ const Hero = styled(Content)`
     overflow: hidden;
   }
 
-
   @media only screen and (max-width: 800px) {
     h1 {
       line-height: 1;
@@ -247,21 +244,6 @@ const Hero = styled(Content)`
     }
 
     > div { display: none; }
-
-    p {
-      line-height: 1.3;
-    }
-    form {
-      flex-direction: column;
-      align-items: stretch;
-      justify-content: center;
-    }
-    button, input {
-      width: auto;
-    }
-    input {
-      padding: 24px 16px;
-    }
   }
 `
 
@@ -363,6 +345,40 @@ const Callout = styled.div`
 const HIW = styled.div`
   display: grid;
 `;
+
+const Signup = styled(Content)`
+  padding: 10px 0 0;
+  form {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    margin: 60px 0 0;
+  }
+
+  form, form * {
+    font-size: 1rem;
+  }
+
+  button {
+    width: 200px;
+    line-height: 1;
+  }
+
+  @media only screen and (max-width: 800px) {
+    form {
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: center;
+    }
+    button, input {
+      width: auto;
+    }
+    input {
+      padding: 24px 16px;
+    }
+  }
+`
+
 
 const Footer = styled.div`
   margin-top: 100px;
