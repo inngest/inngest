@@ -249,7 +249,7 @@ const Hero = styled(Content)`
 
 const Tagline = styled.div`
   padding: 40px 40px 0;
-  font-size: 12px;
+  font-size: 13px;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   grid-gap: 40px;
