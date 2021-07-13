@@ -1,6 +1,6 @@
 @import url('https://rsms.me/inter/inter.css');
 
-html, body { font-family: 'Inter', sans-serif; color: #222631  }
+html, body, button, input { font-family: 'Inter', sans-serif; color: #222631  }
 
 @supports (font-variation-settings: normal) {
   html { font-family: 'Inter var', sans-serif; }
@@ -13,10 +13,14 @@ body, button {
 input {
   height: 40px;
   width: 300px;
-  border: 1px solid black;
-  padding: 5px;
-  font-family: monospace;
+  padding: 5px 12px;
   box-sizing: border-box;
+
+  background: #fff;
+  border-radius: 2px;
+  border: 1px solid #eee;
+  transition: all .3s;
+  box-shadow: 0 1px 0px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 input:focus, textarea:focus {

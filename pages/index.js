@@ -5,10 +5,10 @@ import styles from '../styles/Home.module.css'
 
 // TODO: move these into env vars 
 // prod key
-export const INGEST_KEY = 'BIjxBrM6URqxAu0XgIAae5HgBCv8l_LodmdGonFCfngjhwIgQEbvbUUQTwvFMHO21vxCJEGsC7KPdXEzdXgOAQ';
+// export const INGEST_KEY = 'BIjxBrM6URqxAu0XgIAae5HgBCv8l_LodmdGonFCfngjhwIgQEbvbUUQTwvFMHO21vxCJEGsC7KPdXEzdXgOAQ';
  
 // test key
-// export const INGEST_KEY = 'MnzaTCk7Se8i74hA141bZGS-NY9P39RSzYFbxanIHyV2VDNu1fwrns2xBQCEGdIb9XRPtzbp0zdRPjtnA1APTQ';
+export const INGEST_KEY = 'MnzaTCk7Se8i74hA141bZGS-NY9P39RSzYFbxanIHyV2VDNu1fwrns2xBQCEGdIb9XRPtzbp0zdRPjtnA1APTQ';
 
 const Check = ({ size = 16, color = "#5ea659" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -17,16 +17,53 @@ const Check = ({ size = 16, color = "#5ea659" }) => (
 )
 
 export default function Home() {
+  const [submitted, setSubmitted] = useState(false);
+
+  const onSubmit = (e) => {
+    e.preventDefault();
+    const email = e.target.querySelector("input").value;
+
+    const Inngest = globalThis.Inngest;
+    if (!Inngest) {
+      console.warn("Inngest not found");
+      return;
+    }
+
+    Inngest.init(INGEST_KEY);
+    Inngest.event({
+      name: "marketing.signup",
+      data: {
+        email,
+      },
+      user: {
+        email,
+      }
+    });
+
+    setSubmitted(true);
+  }
+
 
   return (
     <>
+      <Head>
+        <title>Inngest → serverless event-driven & scheduled workflow automation platform for developers & operators</title>
+        <link rel="icon" href="/favicon.png" />
+        <meta property="og:title" content="Inngest" />
+        <meta property="og:url" content="https://www.inngest.com" />
+        <meta property="og:image" content="/logo.svg" />
+        <meta property="og:description" content="Build, run, operate, and analyze your workflows in minutes." />
+        <script src="/inngest-sdk.js"></script>
+      </Head>
       <Nav>
         <div>
           <img src="/logo-blue.svg" alt="Inngest logo" />
         </div>
         <div>
+          <a href="https://docs.inngest.com/docs/intro" target="_blank">Documentation</a>
           <a href="https://app.inngest.com/login">Sign in</a>
-          <a href="#" className="button">Request a free demo</a>
+
+          <a href="https://calendly.com/inngest-thb/30min" className="button" rel="nofollow" target="_blank">Request a free demo</a>
         </div>
       </Nav>
 
@@ -36,6 +73,12 @@ export default function Home() {
           Companies use Inngest to build real time, event driven workflows in minutes. <br />
           It's <u>made for builders</u>, <u>designed for operators</u>.
         </p>
+
+        <form onSubmit={onSubmit} className={submitted && "submitted"}>
+          <input type="email" placeholder="Your email" />
+          <button type="submit" disabled={submitted}>Sign up for access</button>
+        </form>
+        {submitted && <p style={{ fontSize: 12 }}>You're on the list and will receive an invite soon!</p>}
 
         <div>
           <img src="/wflow.png" alt="An example cloud kitchen workflow when paying via Venmo" />
@@ -68,13 +111,13 @@ export default function Home() {
         </Tagline>
       </Content>
 
-      <HIW>
+      <Introducing>
         <Content>
           <h5>Introducing Inngest</h5>
 
           <p>Inngest is an <strong>automation platform</strong> which <strong>runs workflows on a schedule</strong> or <strong>in real-time after events happen</strong>. Design&nbsp;<strong>complex operational flows</strong> and <strong>run any code</strong> - including pre-built integrations or your own code - with <strong>zero&nbsp;infrastructure&nbsp;and&nbsp;maintenance</strong>.</p>
 
-          <HIWGrid>
+          <IntroGrid>
             <div>
               <h2>Workflow automation</h2>
               <p>Build, manage, and operate your product and ops flows end-to-end.  Complete with out-of-the-box integrations for rapid development, and the ability to run your own serverless code for full&nbsp;flexibility</p>
@@ -87,14 +130,14 @@ export default function Home() {
               <h2>Transparency &amp; debugging</h2>
               <p>Drill down into every workflow run, including which users ran through which versions of a workflow and each workflow’s&nbsp;logs.</p>
             </div>
-          </HIWGrid>
+          </IntroGrid>
         </Content>
-      </HIW>
+      </Introducing>
 
       <Content>
         <Callout className="text-center">
           <div>
-            <span>35x</span>
+            <span>25x</span>
             <strong>faster implementation</strong>
             <span>using our platform and integrations</span>
           </div>
@@ -113,7 +156,8 @@ export default function Home() {
         </Callout>
       </Content>
 
-      <Footer />
+      <Footer>
+      </Footer>
     </>
   )
 }
@@ -155,6 +199,21 @@ const Hero = styled(Content)`
   padding: 80px 0 0;
   position: relative;
 
+  form {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    margin: 60px 0 0;
+  }
+
+  form, form * {
+    font-size: 1rem;
+  }
+
+  form button {
+    width: 200px;
+  }
+
   > div {
     box-shadow: 0 10px 50px rgba(0, 0, 0, 0.1);
     background: #FFFEFC;
@@ -162,7 +221,7 @@ const Hero = styled(Content)`
     max-width: 100%;
     height: 480px;
     max-height: 500px;
-    margin: 100px 0 0;
+    margin: 90px 0 0;
     position: relative;
     z-index: 2;
     overflow: hidden;
@@ -190,7 +249,7 @@ const Tagline = styled.div`
   }
 `;
 
-const HIW = styled.div`
+const Introducing = styled.div`
   box-shadow: inset 0 0 0 20px #fff;
   background: linear-gradient(180deg, rgba(243,245,245,1) 20%, rgba(249,251,254,1) 100%);;
   padding: 450px 40px 180px 40px;
@@ -201,7 +260,7 @@ const HIW = styled.div`
   }
 `
 
-const HIWGrid = styled.div`
+const IntroGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-gap: 100px;
@@ -210,7 +269,7 @@ const HIWGrid = styled.div`
 
 const Callout = styled.div`
   max-width: 80%;
-  margin: -115px auto 0 auto;
+  margin: -115px auto 50px auto;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-gap: 40px;
@@ -234,6 +293,13 @@ const Callout = styled.div`
   }
 `;
 
+const HIW = styled.div`
+  display: grid;
+`;
+
 const Footer = styled.div`
   margin-top: 100px;
+  background: #222631;
+  color: #fff;
+  min-height: 50px;
 `
