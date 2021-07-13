@@ -8,6 +8,8 @@
     "start": "next start"
   },
   "dependencies": {
+    "@emotion/react": "^11.4.0",
+    "@emotion/styled": "^11.3.0",
     "inngest-sdk": "^1.0.1",
     "next": "10.2.0",
     "react": "17.0.2",

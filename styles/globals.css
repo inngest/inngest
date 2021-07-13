@@ -1,5 +1,12 @@
+@import url('https://rsms.me/inter/inter.css');
+
+html, body { font-family: 'Inter', sans-serif; color: #222631  }
+
+@supports (font-variation-settings: normal) {
+  html { font-family: 'Inter var', sans-serif; }
+}
+
 body, button {
-  font-family: monospace;
   margin: 0;
 }
 
@@ -34,4 +41,43 @@ button:hover {
 button:focus {
   outline: none;
   background-color: gray;
+}
+
+.text-center {
+  text-align: center;
+}
+
+p {
+  line-height: 1.6;
+}
+
+h1 {
+  font-size: 60px;
+  margin: 20px 0;
+  color: #2E3A59;
+}
+
+h2 {
+  font-size: 1rem;
+  color: #2E3A59;
+}
+
+strong {
+  font-weight: 600;
+}
+
+h5, .tag {
+  color: #184115bb;
+  font-size: 11px;
+  letter-spacing: 2px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #CEECCE;
+  border-radius: 3px;
+  display: inline-block;
+  padding: 3px 7px;
+}
+
+h5 {
+  margin: 20px 0 10px;
 }
