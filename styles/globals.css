@@ -24,23 +24,33 @@ input:focus, textarea:focus {
   border-color: gray;
 }
 
-button {
+button, .button {
   height: 40px;
-  padding: 5px;
-  background-color: black;
+  padding: 12px 14px 11px;
+  background-color: #2F6D9Dee;
+  text-decoration: none;
   color: white;
   border: none;
   width: 150px;
+  border-radius: 2px;
+  transition: all .3s;
 }
 
-button:hover {
+button:hover, .button:hover {
   cursor: pointer;
   background-color: gray;
+  background-color: #2F6D9Dff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 }
 
-button:focus {
+button:focus, .button:focus {
   outline: none;
-  background-color: gray;
+  background-color: #2F6D9Dff;
+}
+
+
+a {
+  color: #2F77AF;
 }
 
 .text-center {
