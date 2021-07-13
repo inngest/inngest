@@ -1,15 +1,26 @@
+@import url('https://rsms.me/inter/inter.css');
+
+html, body, button, input { font-family: 'Inter', sans-serif; color: #222631  }
+
+@supports (font-variation-settings: normal) {
+  html { font-family: 'Inter var', sans-serif; }
+}
+
 body, button {
-  font-family: monospace;
   margin: 0;
 }
 
 input {
   height: 40px;
   width: 300px;
-  border: 1px solid black;
-  padding: 5px;
-  font-family: monospace;
+  padding: 5px 12px;
   box-sizing: border-box;
+
+  background: #fff;
+  border-radius: 2px;
+  border: 1px solid #eee;
+  transition: all .3s;
+  box-shadow: 0 1px 0px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 input:focus, textarea:focus {
@@ -17,21 +28,70 @@ input:focus, textarea:focus {
   border-color: gray;
 }
 
-button {
+button, .button {
   height: 40px;
-  padding: 5px;
-  background-color: black;
+  padding: 12px 14px 11px;
+  background-color: #2F6D9Dee;
+  text-decoration: none;
   color: white;
   border: none;
   width: 150px;
+  border-radius: 2px;
+  transition: all .3s;
 }
 
-button:hover {
+button:hover, .button:hover {
   cursor: pointer;
   background-color: gray;
+  background-color: #2F6D9Dff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 }
 
-button:focus {
+button:focus, .button:focus {
   outline: none;
-  background-color: gray;
+  background-color: #2F6D9Dff;
+}
+
+
+a {
+  color: #2F77AF;
+}
+
+.text-center {
+  text-align: center;
+}
+
+p {
+  line-height: 1.6;
+}
+
+h1 {
+  font-size: 60px;
+  margin: 20px 0;
+  color: #2E3A59;
+}
+
+h2 {
+  font-size: 1rem;
+  color: #2E3A59;
+}
+
+strong {
+  font-weight: 600;
+}
+
+h5, .tag {
+  color: #184115bb;
+  font-size: 11px;
+  letter-spacing: 2px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #CEECCE;
+  border-radius: 3px;
+  display: inline-block;
+  padding: 3px 7px;
+}
+
+h5 {
+  margin: 20px 0 10px;
 }
