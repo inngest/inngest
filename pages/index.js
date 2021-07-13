@@ -70,7 +70,7 @@ export default function Home() {
       <Hero className="text-center">
         <h1>Trigger low-code logic from events</h1>
         <p>
-          Companies use Inngest to build real time, event driven workflows in minutes. <br />
+          Companies use Inngest to build real time, event driven workflows in&nbsp;minutes. <br />
           It's <u>made for builders</u>, <u>designed for operators</u>.
         </p>
 
