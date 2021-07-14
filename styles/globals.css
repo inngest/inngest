@@ -76,6 +76,12 @@ h2 {
   color: #2E3A59;
 }
 
+h3 {
+  font-size: 1.3125rem;
+  font-weight: 400;
+  margin-bottom: 25px;
+}
+
 strong {
   font-weight: 600;
 }
@@ -93,5 +99,5 @@ h5, .tag {
 }
 
 h5 {
-  margin: 20px 0 10px;
+  margin: 20px 0 18px;
 }

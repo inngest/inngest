@@ -1,7 +1,8 @@
 import { useState } from "react";
 import styled from "@emotion/styled";
 import Head from 'next/head'
-import styles from '../styles/Home.module.css'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import theme from 'react-syntax-highlighter/dist/cjs/styles/prism/dracula';
 
 // TODO: move these into env vars 
 // prod key
@@ -54,6 +55,7 @@ export default function Home() {
         <meta property="og:image" content="/logo.svg" />
         <meta property="og:description" content="Build, run, operate, and analyze your workflows in minutes." />
         <script src="/inngest-sdk.js"></script>
+        <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "e2fa9f28c34844e4a0d29351b8730579"}'></script>
       </Head>
       <Nav>
         <div>
@@ -111,7 +113,7 @@ export default function Home() {
         <Content>
           <h5>Introducing Inngest</h5>
 
-          <p>Inngest is an <strong>automation platform</strong> which <strong>runs workflows on a schedule</strong> or <strong>in real-time after events happen</strong>. Design&nbsp;<strong>complex operational flows</strong> and <strong>run any code</strong> - including pre-built integrations or your own code - with <strong>zero&nbsp;infrastructure and&nbsp;maintenance</strong>.</p>
+          <p>Inngest is an <strong>automation platform</strong> which <strong>runs workflows on a schedule</strong> or <strong>in real-time after events happen</strong>. Design&nbsp;complex operational flows and run any code - including pre-built integrations or your own code - with zero&nbsp;infrastructure and&nbsp;maintenance.</p>
 
           <IntroGrid>
             <div>
@@ -133,27 +135,29 @@ export default function Home() {
       <Content>
         <Callout className="text-center">
           <div>
-            <span>25x</span>
+            <span>25<small>✕</small></span>
             <strong>faster implementation</strong>
             <span>using our platform and integrations</span>
           </div>
 
           <div>
-            <span>20x</span>
+            <span>20<small>✕</small></span>
             <strong>faster debugging &amp; editing</strong>
             <span>with our insights, logs, and editor</span>
           </div>
 
           <div>
-            <span>15x</span>
+            <span>15<small>✕</small></span>
             <strong>more cost effective</strong>
             <span>than deploying &amp; managing yourself</span>
           </div>
         </Callout>
       </Content>
 
+      <HowItWorks />
+
       <Signup>
-        <form onSubmit={onSubmit} className={submitted && "submitted"}>
+        <form onSubmit={onSubmit} className={submitted ? "submitted" : ""}>
           <input type="email" placeholder="Your email" required />
           <button type="submit" disabled={submitted}>Sign up for updates</button>
         </form>
@@ -165,6 +169,64 @@ export default function Home() {
       </Footer>
     </>
   )
+}
+
+const send = `// Send us events with a single call.  Libraries provided for
+// the browser, node, python, and Go.
+Inngest.event({
+  name: "signup.new",
+  data: {
+    email: "some@new.example.com",
+    plan: "enterprise",
+    sector: "fintech",
+  },
+  user: {
+    email: "some@new.example.com",
+    first_name: "Jazmine",
+    last_name: "Doe",
+  }
+});`;
+
+const HowItWorks = () => {
+  return (
+      <HIW>
+        <Content>
+
+          <h5>How it works</h5>
+          <h3>Implement any realtime logic you can dream of, in minutes</h3>
+
+          <div>
+            <HIWGrid>
+              <li>
+                <strong>Send us events</strong>
+                <p>Send us events via the API, SDK, webhooks, or integrations.</p>
+              </li>
+              <li>
+                <strong>Configure your workflows</strong>
+                <p>Create your workflows via the low-code UI or by writing code directly.</p>
+              </li>
+              <li>
+                <strong>Run workflows in real time</strong>
+                <p>Workflows automatically run in real time on each event or on a schedule.</p>
+              </li>
+              <li>
+                <strong>Manage your automations</strong>
+                <p>Easily manage your workflows, with full version histories and visibility into which users run through which versions.</p>
+              </li>
+            </HIWGrid>
+
+            <div>
+              <Code>
+              <SyntaxHighlighter language="javascript" style={theme}>
+                {send}
+              </SyntaxHighlighter>
+              </Code>
+            </div>
+          </div>
+        </Content>
+      </HIW>
+
+  );
 }
 
 const Content = styled.div`
@@ -199,7 +261,11 @@ const Nav = styled(Content)`
   }
 
   a + a {
-  margin-left: 20px;
+    margin-left: 5px;
+  }
+
+  a + a.button {
+    margin-left: 20px;
   }
 
   @media only screen and (max-width: 800px) {
@@ -327,6 +393,10 @@ const Callout = styled.div`
     margin: 4px 0;
   }
 
+  small {
+    font-size: 1.5rem;
+  }
+
   span:first-of-type {
     font-size: 2.6rem;
     margin: 0 0 6px;
@@ -343,7 +413,34 @@ const Callout = styled.div`
 `;
 
 const HIW = styled.div`
+  > div > div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-gap: 80px;
+  }
+
+  @media only screen and (max-width: 800px) {
+    > div > div {
+      grid-template-columns: 1fr;
+    }
+  }
+`;
+
+const HIWGrid = styled.ol`
   display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto;
+  grid-gap: 50px;
+  padding: 0;
+
+  li, strong, p { margin: 0; }
+  strong { display: block; margin: 0 0 10px; }
+
+
+  @media only screen and (max-width: 800px) {
+    grid-template-columns: 1fr;
+    padding: 0 20px;
+  }
 `;
 
 const Signup = styled(Content)`
@@ -386,4 +483,14 @@ const Footer = styled.div`
   color: #fff;
   padding: 20px 0;
   font-size: .9rem;
+`
+
+const Code = styled.div`
+  font-size: 14px;
+  margin-top: -10px;
+  max-width: 90vw;
+
+  @media only screen and (max-width: 800px) {
+    margin-top: -40px;
+  }
 `
