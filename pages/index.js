@@ -165,7 +165,23 @@ export default function Home() {
       </Signup>
 
       <Footer>
-        <Content>© 2021 Inngest Inc</Content>
+        <Content>
+          <Links>
+            <div>
+              <img src="/logo-white.svg" alt="Inngest logo" height="30" />
+              <small>© 2021 Inngest Inc</small>
+            </div>
+            <div>
+              <strong>Inngest</strong>
+              <a href="https://www.inngest.com">Product</a>
+            </div>
+            <div>
+              <strong>Community</strong>
+              <a href="https://discord.gg/EuesV2ZSnX">Discord</a>
+              <a href="https://twitter.com/inngest">Twitter</a>
+            </div>
+          </Links>
+        </Content>
       </Footer>
     </>
   )
@@ -481,9 +497,29 @@ const Footer = styled.div`
   margin-top: 100px;
   background: #222631;
   color: #fff;
-  padding: 20px 0;
+  padding: 40px 0;
   font-size: .9rem;
 `
+
+const Links = styled.div`
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  font-size: 14px;
+  line-height: 1.8;
+  opacity: .7;
+
+  img { display: block; margin: 0 0 4px; }
+
+  strong {
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  a {
+    display: block;
+    color: #fff;
+  }
+`;
 
 const Code = styled.div`
   font-size: 14px;
