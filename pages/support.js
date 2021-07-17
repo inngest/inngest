@@ -68,7 +68,7 @@ const Support = () => {
       <img style={{ height: '40px'}} className={styles.logo} src="/logo.svg" alt="Inngest logo" />
       {!isSubmitted && <>
         <h4>Need help? Talk to us! </h4>
-        Join our <a href="https://discord.gg/hUMruzTK">Discord server</a><br/> 
+        Join our <a href="https://discord.gg/GEXxzPpRuw">Discord server</a><br/> 
         - or - <br/>
         <input style={{ width: '400px', marginBottom: '20px' }} type="email" placeholder="Your email here" value={data.email} onChange={onChange('email')} />
         <textarea rows={10} style={{ width: '400px', boxSizing: 'border-box', marginBottom: '20px'  }} placeholder="What's up?" value={data.content} onChange={onChange("content")} />
