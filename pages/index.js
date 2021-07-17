@@ -19,10 +19,10 @@ const Check = ({ size = 16, color = "#5ea659" }) => (
 
 export default function Home() {
   const [submitted, setSubmitted] = useState(false);
+  const [email, setEmail] = useState("");
 
   const onSubmit = (e) => {
     e.preventDefault();
-    const email = e.target.querySelector("input").value;
 
     const Inngest = globalThis.Inngest;
     if (!Inngest) {
@@ -41,6 +41,7 @@ export default function Home() {
       }
     });
 
+    setEmail("");
     setSubmitted(true);
   }
 
@@ -158,10 +159,10 @@ export default function Home() {
 
       <Signup>
         <form onSubmit={onSubmit} className={submitted ? "submitted" : ""}>
-          <input type="email" placeholder="Your email" required />
+          <input type="email" onChange={e => setEmail(e.target.value)} value={email} placeholder="Your work email" required />
           <button type="submit" disabled={submitted}>Sign up for updates</button>
         </form>
-        {submitted && <p style={{ fontSize: 12 }}>You're on the list and will receive an invite soon!</p>}
+        {submitted && <p style={{ textAlign: 'center', fontSize: 12 }}>You're on the list and will receive an invite soon!</p>}
       </Signup>
 
       <Footer>
@@ -174,10 +175,11 @@ export default function Home() {
             <div>
               <strong>Inngest</strong>
               <a href="https://www.inngest.com">Product</a>
+              <a href="https://docs.inngest.com">Documentation</a>
             </div>
             <div>
               <strong>Community</strong>
-              <a href="https://discord.gg/EuesV2ZSnX">Discord</a>
+              <a href="https://discord.gg/GEXxzPpRuw">Discord</a>
               <a href="https://twitter.com/inngest">Twitter</a>
             </div>
           </Links>
