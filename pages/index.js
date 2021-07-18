@@ -179,7 +179,7 @@ export default function Home() {
             </div>
             <div>
               <strong>Community</strong>
-              <a href="https://discord.gg/GEXxzPpRuw">Discord</a>
+              <a href="https://discord.gg/EuesV2ZSnX">Discord</a>
               <a href="https://twitter.com/inngest">Twitter</a>
             </div>
           </Links>
