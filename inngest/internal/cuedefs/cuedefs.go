@@ -115,7 +115,9 @@ func parseDef(input, lookup, suffix string) (*cue.Value, error) {
 	runtime := cuecontext.New()
 	inst := runtime.BuildInstance(instances[0])
 	if err := inst.Err(); err != nil {
-		return nil, fmt.Errorf("config is invalid: %w", err)
+		buf := &bytes.Buffer{}
+		cueerrors.Print(buf, err, nil)
+		return nil, fmt.Errorf("config is invalid: %s", buf.String())
 	}
 
 	// Find the variable defined as "workflow":  this is a constant used to reference
@@ -128,7 +130,7 @@ func parseDef(input, lookup, suffix string) (*cue.Value, error) {
 	}
 
 	if err := wval.Validate(cue.Final(), cue.Concrete(true)); err != nil {
-		return nil, fmt.Errorf("config is invalud: %w:", err)
+		return nil, fmt.Errorf("config is invalid: %w:", err)
 	}
 
 	return &wval, nil
