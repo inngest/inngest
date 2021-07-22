@@ -171,8 +171,6 @@ github.com/moby/term/windows
 github.com/morikuni/aec
 # github.com/mpvl/unique v0.0.0-20150818121801-cbe035fff7de
 github.com/mpvl/unique
-# github.com/olekukonko/tablewriter v0.0.0-20170122224234-a0225b3f23b5
-## explicit
 # github.com/opencontainers/go-digest v1.0.0
 github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v1.0.1
