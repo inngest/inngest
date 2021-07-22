@@ -122,40 +122,45 @@ import (
 #Form: (#FormInput | #FormSelect | #FormTextarea | #FormDateTime | #FormToggle)
 
 #FormInput: {
-	title: string
-	hint?: string
-	type:  "input"
+	title:        string
+	hint?:        string
+	placeholder?: string
+	type:         "input"
 
 	// deprecated - templating is always on
 	templating: bool | *true
 }
 
 #FormDateTime: {
-	title:      string
-	hint?:      string
-	type:       "datetime"
-	templating: bool | *true
+	title:        string
+	hint?:        string
+	placeholder?: string
+	type:         "datetime"
+	templating:   bool | *true
 }
 
 #FormTextarea: {
-	title:      string
-	hint?:      string
-	type:       "textarea"
-	templating: bool | *true
+	title:        string
+	hint?:        string
+	placeholder?: string
+	type:         "textarea"
+	templating:   bool | *true
 }
 
 #FormToggle: {
-	title:      string
-	hint?:      string
-	type:       "toggle"
-	templating: bool | *true
+	title:        string
+	hint?:        string
+	placeholder?: string
+	type:         "toggle"
+	templating:   bool | *true
 }
 
 #FormSelect: {
-	title:   string
-	hint?:   string
-	type:    "select"
-	other:   bool | *false
-	choices: [ ...{value: string | int, name: string}] | *[]
-	eval?:   string
+	title:        string
+	hint?:        string
+	placeholder?: string
+	type:         "select"
+	other:        bool | *false
+	choices:      [ ...{value: string | int, name: string}] | *[]
+	eval?:        string
 }
