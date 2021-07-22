@@ -152,7 +152,6 @@ import (
 	hint?:        string
 	placeholder?: string
 	type:         "toggle"
-	templating:   bool | *true
 }
 
 #FormSelect: {
