@@ -223,8 +223,8 @@ type FormSelect struct {
 }
 
 type Choice struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+	Name  string      `json:"name"`
+	Value interface{} `json:"value"`
 }
 
 const packageTpl = `package main
