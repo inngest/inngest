@@ -7,7 +7,9 @@ const Footer = () => {
       <Content>
         <Links>
           <div>
-            <a href="https://www.inngest.com"><img src="/logo-white.svg" alt="Inngest logo" height="30" /></a>
+            <a href="https://www.inngest.com">
+              <img src="/logo-white.svg" alt="Inngest logo" height="30" />
+            </a>
             <small>© 2021 Inngest Inc</small>
           </div>
           <div>

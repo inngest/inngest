@@ -36,14 +36,14 @@ const Content = styled.div`
 `;
 
 const StyledLink = styled.a`
-display: inline-block;
-padding: 12px 20px 11px;
-transition: all 0.2s;
-text-decoration: none;
+  display: inline-block;
+  padding: 12px 20px 11px;
+  transition: all 0.2s;
+  text-decoration: none;
 
-&:hover {
+  &:hover {
     background: #2f6d9d11;
-}
+  }
 `;
 
 const Container = styled(Content)`
