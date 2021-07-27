@@ -203,6 +203,8 @@ const Content = styled.div`
   max-width: 1200px;
   margin: 0 auto;
 
+  padding: 0 20px;
+
   @media only screen and (max-width: 800px) {
     padding: 0 20px;
   }
