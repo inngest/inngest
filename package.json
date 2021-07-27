@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "prettier": "prettier --write --trailing-comma es5 \"pages/*.js\" \"shared/*.js\""
   },
   "dependencies": {
     "@emotion/react": "^11.4.0",

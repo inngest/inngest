@@ -1,21 +1,33 @@
 import { useState } from "react";
 import styled from "@emotion/styled";
-import Head from 'next/head'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import theme from 'react-syntax-highlighter/dist/cjs/styles/prism/dracula';
+import Head from "next/head";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import theme from "react-syntax-highlighter/dist/cjs/styles/prism/dracula";
+import Footer from "../shared/footer";
+import Nav from "../shared/nav";
 
-// TODO: move these into env vars 
+// TODO: move these into env vars
 // prod key
-export const INGEST_KEY = 'BIjxBrM6URqxAu0XgIAae5HgBCv8l_LodmdGonFCfngjhwIgQEbvbUUQTwvFMHO21vxCJEGsC7KPdXEzdXgOAQ';
- 
+export const INGEST_KEY =
+  "BIjxBrM6URqxAu0XgIAae5HgBCv8l_LodmdGonFCfngjhwIgQEbvbUUQTwvFMHO21vxCJEGsC7KPdXEzdXgOAQ";
+
 // test key
 // export const INGEST_KEY = 'MnzaTCk7Se8i74hA141bZGS-NY9P39RSzYFbxanIHyV2VDNu1fwrns2xBQCEGdIb9XRPtzbp0zdRPjtnA1APTQ';
 
 const Check = ({ size = 16, color = "#5ea659" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C21.9939 17.5203 17.5203 21.9939 12 22ZM11.984 20H12C16.4167 19.9956 19.9942 16.4127 19.992 11.996C19.9898 7.57929 16.4087 4 11.992 4C7.57528 4 3.99421 7.57929 3.992 11.996C3.98979 16.4127 7.56729 19.9956 11.984 20ZM10 17L6 13L7.41 11.59L10 14.17L16.59 7.58L18 9L10 17Z" fill={color}></path>
-</svg>
-)
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C21.9939 17.5203 17.5203 21.9939 12 22ZM11.984 20H12C16.4167 19.9956 19.9942 16.4127 19.992 11.996C19.9898 7.57929 16.4087 4 11.992 4C7.57528 4 3.99421 7.57929 3.992 11.996C3.98979 16.4127 7.56729 19.9956 11.984 20ZM10 17L6 13L7.41 11.59L10 14.17L16.59 7.58L18 9L10 17Z"
+      fill={color}
+    ></path>
+  </svg>
+);
 
 export default function Home() {
   const [submitted, setSubmitted] = useState(false);
@@ -38,52 +50,63 @@ export default function Home() {
       },
       user: {
         email,
-      }
+      },
     });
 
     setEmail("");
     setSubmitted(true);
-  }
-
+  };
 
   return (
     <>
       <Head>
-        <title>Inngest → serverless event-driven & scheduled workflow automation platform for developers & operators</title>
+        <title>
+          Inngest → serverless event-driven & scheduled workflow automation
+          platform for developers & operators
+        </title>
         <link rel="icon" href="/favicon.png" />
         <meta property="og:title" content="Inngest" />
         <meta property="og:url" content="https://www.inngest.com" />
         <meta property="og:image" content="/logo.svg" />
-        <meta property="og:description" content="Build, run, operate, and analyze your workflows in minutes." />
+        <meta
+          property="og:description"
+          content="Build, run, operate, and analyze your workflows in minutes."
+        />
         <script src="/inngest-sdk.js"></script>
-        <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "e2fa9f28c34844e4a0d29351b8730579"}'></script>
+        <script
+          defer
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon='{"token": "e2fa9f28c34844e4a0d29351b8730579"}'
+        ></script>
       </Head>
-      <Nav>
-        <div>
-          <img src="/logo-blue.svg" alt="Inngest logo" />
-        </div>
-        <div>
-          <a href="https://docs.inngest.com/docs/intro" target="_blank">Documentation</a>
-          <a href="https://app.inngest.com/login">Sign in</a>
 
-          <a href="https://calendly.com/inngest-thb/30min" className="button" rel="nofollow" target="_blank">Request a free demo</a>
-        </div>
-      </Nav>
+      <Nav />
 
       <Hero className="text-center">
         <h1>Trigger low-code logic from events</h1>
         <p>
-          Companies use Inngest to build real time, event driven workflows in&nbsp;minutes. <br />
-          It's <strong>made for builders</strong>, <strong>designed for operators</strong>.
+          Companies use Inngest to build real time, event driven workflows
+          in&nbsp;minutes. <br />
+          It's <strong>made for builders</strong>,{" "}
+          <strong>designed for operators</strong>.
         </p>
 
-        <a href="https://calendly.com/inngest-thb/30min" className="button" rel="nofollow" target="_blank">Request a free demo</a>
+        <a
+          href="https://calendly.com/inngest-thb/30min"
+          className="button"
+          rel="nofollow"
+          target="_blank"
+        >
+          Request a free demo
+        </a>
 
         <div>
-          <img src="/wflow.png" alt="An example cloud kitchen workflow when paying via Venmo" />
+          <img
+            src="/wflow.png"
+            alt="An example cloud kitchen workflow when paying via Venmo"
+          />
         </div>
       </Hero>
-
 
       <Content>
         <Tagline>
@@ -114,20 +137,40 @@ export default function Home() {
         <Content>
           <h5>Introducing Inngest</h5>
 
-          <p>Inngest is an <strong>automation platform</strong> which <strong>runs workflows on a schedule</strong> or <strong>in real-time after events happen</strong>. Design&nbsp;complex operational flows and run any code - including pre-built integrations or your own code - with zero&nbsp;infrastructure and&nbsp;maintenance.</p>
+          <p>
+            Inngest is an <strong>automation platform</strong> which{" "}
+            <strong>runs workflows on a schedule</strong> or{" "}
+            <strong>in real-time after events happen</strong>.
+            Design&nbsp;complex operational flows and run any code - including
+            pre-built integrations or your own code - with
+            zero&nbsp;infrastructure and&nbsp;maintenance.
+          </p>
 
           <IntroGrid>
             <div>
               <h2>Workflow automation</h2>
-              <p>Build, manage, and operate your product and ops flows end-to-end.  Complete with out-of-the-box integrations for rapid development, and the ability to run your own serverless code for full&nbsp;flexibility</p>
+              <p>
+                Build, manage, and operate your product and ops flows
+                end-to-end. Complete with out-of-the-box integrations for rapid
+                development, and the ability to run your own serverless code for
+                full&nbsp;flexibility
+              </p>
             </div>
             <div>
               <h2>Change management</h2>
-              <p>Version every workflow complete with history, schedule workflows to go live, and handle workflow approvals within your account - it’s everything you need for a fully compliant&nbsp;solution</p>
+              <p>
+                Version every workflow complete with history, schedule workflows
+                to go live, and handle workflow approvals within your account -
+                it’s everything you need for a fully compliant&nbsp;solution
+              </p>
             </div>
             <div>
               <h2>Transparency &amp; debugging</h2>
-              <p>Drill down into every workflow run, including which users ran through which versions of a workflow and each workflow’s&nbsp;logs.</p>
+              <p>
+                Drill down into every workflow run, including which users ran
+                through which versions of a workflow and each
+                workflow’s&nbsp;logs.
+              </p>
             </div>
           </IntroGrid>
         </Content>
@@ -136,19 +179,25 @@ export default function Home() {
       <Content>
         <Callout className="text-center">
           <div>
-            <span>25<small>✕</small></span>
+            <span>
+              25<small>✕</small>
+            </span>
             <strong>faster implementation</strong>
             <span>using our platform and integrations</span>
           </div>
 
           <div>
-            <span>20<small>✕</small></span>
+            <span>
+              20<small>✕</small>
+            </span>
             <strong>faster debugging &amp; editing</strong>
             <span>with our insights, logs, and editor</span>
           </div>
 
           <div>
-            <span>15<small>✕</small></span>
+            <span>
+              15<small>✕</small>
+            </span>
             <strong>more cost effective</strong>
             <span>than deploying &amp; managing yourself</span>
           </div>
@@ -159,34 +208,27 @@ export default function Home() {
 
       <Signup>
         <form onSubmit={onSubmit} className={submitted ? "submitted" : ""}>
-          <input type="email" onChange={e => setEmail(e.target.value)} value={email} placeholder="Your work email" required />
-          <button type="submit" disabled={submitted}>Sign up for updates</button>
+          <input
+            type="email"
+            onChange={(e) => setEmail(e.target.value)}
+            value={email}
+            placeholder="Your work email"
+            required
+          />
+          <button type="submit" disabled={submitted}>
+            Sign up for updates
+          </button>
         </form>
-        {submitted && <p style={{ textAlign: 'center', fontSize: 12 }}>You're on the list and will receive an invite soon!</p>}
+        {submitted && (
+          <p style={{ textAlign: "center", fontSize: 12 }}>
+            You're on the list and will receive an invite soon!
+          </p>
+        )}
       </Signup>
 
-      <Footer>
-        <Content>
-          <Links>
-            <div>
-              <img src="/logo-white.svg" alt="Inngest logo" height="30" />
-              <small>© 2021 Inngest Inc</small>
-            </div>
-            <div>
-              <strong>Inngest</strong>
-              <a href="https://www.inngest.com">Product</a>
-              <a href="https://docs.inngest.com">Documentation</a>
-            </div>
-            <div>
-              <strong>Community</strong>
-              <a href="https://discord.gg/EuesV2ZSnX">Discord</a>
-              <a href="https://twitter.com/inngest">Twitter</a>
-            </div>
-          </Links>
-        </Content>
-      </Footer>
+      <Footer />
     </>
-  )
+  );
 }
 
 const send = `// Send us events with a single call.  Libraries provided for
@@ -207,45 +249,52 @@ Inngest.event({
 
 const HowItWorks = () => {
   return (
-      <HIW>
-        <Content>
+    <HIW>
+      <Content>
+        <h5>How it works</h5>
+        <h3>Implement any realtime logic you can dream of, in minutes</h3>
 
-          <h5>How it works</h5>
-          <h3>Implement any realtime logic you can dream of, in minutes</h3>
+        <div>
+          <HIWGrid>
+            <li>
+              <strong>Send us events</strong>
+              <p>Send us events via the API, SDK, webhooks, or integrations.</p>
+            </li>
+            <li>
+              <strong>Configure your workflows</strong>
+              <p>
+                Create your workflows via the low-code UI or by writing code
+                directly.
+              </p>
+            </li>
+            <li>
+              <strong>Run workflows in real time</strong>
+              <p>
+                Workflows automatically run in real time on each event or on a
+                schedule.
+              </p>
+            </li>
+            <li>
+              <strong>Manage your automations</strong>
+              <p>
+                Easily manage your workflows, with full version histories and
+                visibility into which users run through which versions.
+              </p>
+            </li>
+          </HIWGrid>
 
           <div>
-            <HIWGrid>
-              <li>
-                <strong>Send us events</strong>
-                <p>Send us events via the API, SDK, webhooks, or integrations.</p>
-              </li>
-              <li>
-                <strong>Configure your workflows</strong>
-                <p>Create your workflows via the low-code UI or by writing code directly.</p>
-              </li>
-              <li>
-                <strong>Run workflows in real time</strong>
-                <p>Workflows automatically run in real time on each event or on a schedule.</p>
-              </li>
-              <li>
-                <strong>Manage your automations</strong>
-                <p>Easily manage your workflows, with full version histories and visibility into which users run through which versions.</p>
-              </li>
-            </HIWGrid>
-
-            <div>
-              <Code>
+            <Code>
               <SyntaxHighlighter language="javascript" style={theme}>
                 {send}
               </SyntaxHighlighter>
-              </Code>
-            </div>
+            </Code>
           </div>
-        </Content>
-      </HIW>
-
+        </div>
+      </Content>
+    </HIW>
   );
-}
+};
 
 const Content = styled.div`
   max-width: 1200px;
@@ -254,45 +303,7 @@ const Content = styled.div`
   @media only screen and (max-width: 800px) {
     padding: 0 20px;
   }
-`
-
-const Nav = styled(Content)`
-  height: 70px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  font-size: .9rem;
-
-  img {
-    max-height: 40px;
-  }
-
-  a:not(.button) {
-    display: inline-block;
-    padding: 12px 20px 11px;
-    transition: all .2s;
-    text-decoration: none;
-  }
-  a:not(.button):hover {
-    background: #2F6D9D11;
-  }
-
-  a + a {
-    margin-left: 5px;
-  }
-
-  a + a.button {
-    margin-left: 20px;
-  }
-
-  @media only screen and (max-width: 800px) {
-    div:last-of-type {
-      display: none;
-    }
-  }
-`
-
+`;
 
 const Hero = styled(Content)`
   font-size: 1.3125rem;
@@ -309,7 +320,7 @@ const Hero = styled(Content)`
 
   > div {
     box-shadow: 0 10px 50px rgba(0, 0, 0, 0.1);
-    background: #FFFEFC;
+    background: #fffefc;
     width: 100%;
     max-width: 100%;
     height: 480px;
@@ -327,9 +338,11 @@ const Hero = styled(Content)`
       margin: 40px 0;
     }
 
-    > div { display: none; }
+    > div {
+      display: none;
+    }
   }
-`
+`;
 
 const Tagline = styled.div`
   padding: 40px 40px 0;
@@ -348,7 +361,7 @@ const Tagline = styled.div`
   p {
     margin: 4px 0;
     line-height: 1.3;
-    opacity: .65;
+    opacity: 0.65;
   }
 
   @media only screen and (max-width: 800px) {
@@ -362,14 +375,19 @@ const Tagline = styled.div`
       text-align: left;
     }
 
-    p {  margin-left: 10px }
-
+    p {
+      margin-left: 10px;
+    }
   }
 `;
 
 const Introducing = styled.div`
   box-shadow: inset 0 0 0 20px #fff;
-  background: linear-gradient(180deg, rgba(243,245,245,1) 20%, rgba(249,251,254,1) 100%);;
+  background: linear-gradient(
+    180deg,
+    rgba(243, 245, 245, 1) 20%,
+    rgba(249, 251, 254, 1) 100%
+  );
   padding: 450px 40px 180px 40px;
   margin-top: -400px;
 
@@ -381,7 +399,7 @@ const Introducing = styled.div`
     margin-top: 20px;
     padding-top: 40px;
   }
-`
+`;
 
 const IntroGrid = styled.div`
   display: grid;
@@ -393,7 +411,7 @@ const IntroGrid = styled.div`
     grid-template-columns: 1fr;
     grid-gap: 20px;
   }
-`
+`;
 
 const Callout = styled.div`
   max-width: 80%;
@@ -402,11 +420,12 @@ const Callout = styled.div`
   grid-template-columns: repeat(3, 1fr);
   grid-gap: 40px;
 
-  background: #FDFBF6;
+  background: #fdfbf6;
   padding: 40px;
   box-shadow: 0 10px 50px rgba(0, 0, 0, 0.1);
 
-  strong, span {
+  strong,
+  span {
     display: block;
     margin: 4px 0;
   }
@@ -451,9 +470,15 @@ const HIWGrid = styled.ol`
   grid-gap: 50px;
   padding: 0;
 
-  li, strong, p { margin: 0; }
-  strong { display: block; margin: 0 0 10px; }
-
+  li,
+  strong,
+  p {
+    margin: 0;
+  }
+  strong {
+    display: block;
+    margin: 0 0 10px;
+  }
 
   @media only screen and (max-width: 800px) {
     grid-template-columns: 1fr;
@@ -470,7 +495,8 @@ const Signup = styled(Content)`
     margin: 60px 0 0;
   }
 
-  form, form * {
+  form,
+  form * {
     font-size: 1rem;
   }
 
@@ -485,41 +511,13 @@ const Signup = styled(Content)`
       align-items: stretch;
       justify-content: center;
     }
-    button, input {
+    button,
+    input {
       width: auto;
     }
     input {
       padding: 24px 16px;
     }
-  }
-`
-
-
-const Footer = styled.div`
-  margin-top: 100px;
-  background: #222631;
-  color: #fff;
-  padding: 40px 0;
-  font-size: .9rem;
-`
-
-const Links = styled.div`
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  font-size: 14px;
-  line-height: 1.8;
-  opacity: .7;
-
-  img { display: block; margin: 0 0 4px; }
-
-  strong {
-    display: block;
-    margin-bottom: 10px;
-  }
-
-  a {
-    display: block;
-    color: #fff;
   }
 `;
 
@@ -531,4 +529,4 @@ const Code = styled.div`
   @media only screen and (max-width: 800px) {
     margin-top: -40px;
   }
-`
+`;
