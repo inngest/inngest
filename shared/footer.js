@@ -7,7 +7,9 @@ const Footer = () => {
       <Content>
         <Links>
           <div>
-            <img src="/logo-white.svg" alt="Inngest logo" height="30" />
+            <a href="https://www.inngest.com">
+              <img src="/logo-white.svg" alt="Inngest logo" height="30" />
+            </a>
             <small>© 2021 Inngest Inc</small>
           </div>
           <div>
@@ -65,17 +67,13 @@ const Container = styled.div`
   margin-top: 100px;
   background: #222631;
   color: #fff;
-  padding: 40px 0;
+  padding: 40px 20px;
   font-size: 0.9rem;
 `;
 
 const Content = styled.div`
   max-width: 1200px;
   margin: 0 auto;
-
-  @media only screen and (max-width: 800px) {
-    padding: 0 20px;
-  }
 `;
 
 export default Footer;

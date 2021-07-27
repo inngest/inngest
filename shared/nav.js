@@ -4,14 +4,14 @@ import styled from "@emotion/styled";
 const Nav = () => {
   return (
     <Container>
-      <div>
+      <a href="https://www.inngest.com">
         <img src="/logo-blue.svg" alt="Inngest logo" />
-      </div>
+      </a>
       <div>
-        <a href="https://docs.inngest.com/docs/intro" target="_blank">
+        <StyledLink href="https://docs.inngest.com/docs/intro" target="_blank">
           Documentation
-        </a>
-        <a href="https://app.inngest.com/login">Sign in</a>
+        </StyledLink>
+        <StyledLink href="https://app.inngest.com/login">Sign in</StyledLink>
 
         <a
           href="https://calendly.com/inngest-thb/30min"
@@ -35,6 +35,17 @@ const Content = styled.div`
   }
 `;
 
+const StyledLink = styled.a`
+  display: inline-block;
+  padding: 12px 20px 11px;
+  transition: all 0.2s;
+  text-decoration: none;
+
+  &:hover {
+    background: #2f6d9d11;
+  }
+`;
+
 const Container = styled(Content)`
   height: 70px;
   display: flex;
@@ -45,16 +56,6 @@ const Container = styled(Content)`
 
   img {
     max-height: 40px;
-  }
-
-  a:not(.button) {
-    display: inline-block;
-    padding: 12px 20px 11px;
-    transition: all 0.2s;
-    text-decoration: none;
-  }
-  a:not(.button):hover {
-    background: #2f6d9d11;
   }
 
   a + a {
