@@ -4,7 +4,7 @@ A command line tool for working with [Inngest.com](https://www.inngest.com).
 
 ### Installation
 
-```go install github.com/inngest/inngestctl/cmd@latest```
+```curl -sfL https://raw.githubusercontent.com/inngest/inngestctl/main/install.sh | sh```
 
 ### Usage
 
