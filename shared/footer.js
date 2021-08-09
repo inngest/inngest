@@ -23,6 +23,11 @@ const Footer = () => {
             <a href="https://discord.gg/EuesV2ZSnX">Discord</a>
             <a href="https://twitter.com/inngest">Twitter</a>
           </div>
+          <div>
+            <strong>Legal & Policies</strong>
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Twitter</a>
+          </div>
         </Links>
       </Content>
     </Container>
@@ -64,7 +69,6 @@ const Links = styled.div`
 `;
 
 const Container = styled.div`
-  margin-top: 100px;
   background: #222631;
   color: #fff;
   padding: 40px 20px;
