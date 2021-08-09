@@ -9,6 +9,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+
+	"github.com/inngest/inngestctl/inngest/version"
 )
 
 // DoGQL makes a gql request and returns the response
@@ -21,7 +23,7 @@ func (c httpClient) DoGQL(ctx context.Context, input Params) (*Response, error) 
 	}
 
 	req.Header.Set("content-type", "application/json")
-	req.Header.Set("user-agent", "inngestctl")
+	req.Header.Set("user-agent", fmt.Sprintf("inngestctl-%s-%s", version.Version, version.Hash))
 	req.Header.Set("authorization", fmt.Sprintf("Bearer %s", c.creds))
 
 	resp, err := c.Do(req)
