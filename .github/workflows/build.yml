@@ -3,8 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - '*'
-    branches: [ master ]
+      - 'v*'
 
 jobs:
   goreleaser:
