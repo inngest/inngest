@@ -26,7 +26,7 @@ const Footer = () => {
           <div>
             <strong>Legal & Policies</strong>
             <a href="/privacy">Privacy</a>
-            <a href="/terms">Twitter</a>
+            <a href="/terms">Terms</a>
           </div>
         </Links>
       </Content>
