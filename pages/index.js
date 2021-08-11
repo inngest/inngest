@@ -226,7 +226,9 @@ export default function Home() {
         )}
       </Signup>
 
-      <Footer />
+      <div style={{ marginTop: 100}}>
+        <Footer />
+      </div>
     </>
   );
 }
