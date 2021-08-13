@@ -4,7 +4,6 @@ import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 
 export default function Home() {
-
   return (
     <>
       <Head>

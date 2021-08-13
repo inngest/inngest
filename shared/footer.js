@@ -17,6 +17,9 @@ const Footer = () => {
             <a href="https://www.inngest.com">Product</a>
             <a href="https://docs.inngest.com">Documentation</a>
             <a href="https://www.inngest.com/security">Security</a>
+            <a href="https://excessive-satellite-3d9.notion.site/Software-Engineer-Inngest-95db47fcec4d4173a9f57e2a251f6fc1">
+              Careers
+            </a>
           </div>
           <div>
             <strong>Community</strong>
@@ -24,9 +27,9 @@ const Footer = () => {
             <a href="https://twitter.com/inngest">Twitter</a>
           </div>
           <div>
-            <strong>Legal & Policies</strong>
+            <strong>Legal</strong>
             <a href="/privacy">Privacy</a>
-            <a href="/terms">Terms</a>
+            <a href="/terms">Terms and Conditions</a>
           </div>
         </Links>
       </Content>
@@ -54,6 +57,7 @@ const Links = styled.div`
   a {
     display: block;
     color: #fff;
+    text-decoration: none;
   }
 
   @media only screen and (max-width: 800px) {

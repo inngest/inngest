@@ -112,19 +112,19 @@ export default function Home() {
         <Tagline>
           <div>
             <Check />
-            <p>Define workflows as code or&nbsp;via&nbsp;a&nbsp;UI</p>
+            <p>Define workflows in code or in a visual UI</p>
           </div>
           <div>
             <Check />
-            <p>Utilize pre-built integrations</p>
+            <p>Integrate with your existing tools</p>
           </div>
           <div>
             <Check />
-            <p>Run your own code, using&nbsp;any&nbsp;language</p>
+            <p>Run custom code, in any language</p>
           </div>
           <div>
             <Check />
-            <p>Full user transparency &amp; audit&nbsp;trails</p>
+            <p>Full user profiles and audit histories</p>
           </div>
           <div>
             <Check />
@@ -178,29 +178,22 @@ export default function Home() {
 
       <Content>
         <Callout className="text-center">
-          <div>
-            <span>
-              25<small>✕</small>
-            </span>
-            <strong>faster implementation</strong>
-            <span>using our platform and integrations</span>
-          </div>
+          <h5>Integrates with your existing tools</h5>
+          <IntegrationsIcons>
+            <img src="integrations/salesforce.png" alt="Salesforce" />
+            <img
+              style={{ height: "30px" }}
+              src="integrations/jira.png"
+              alt="Atlassian Jira"
+            />
+            <img src="integrations/clickup.png" alt="Clickup" />
+            <img src="integrations/stripe.png" alt="Stripe" />
+            <img src="integrations/onesignal.png" alt="One Signal" />
+            <img src="integrations/slack.png" alt="Slack" />
+            <img src="integrations/twilio.png" alt="Twilio" />
+          </IntegrationsIcons>
 
-          <div>
-            <span>
-              20<small>✕</small>
-            </span>
-            <strong>faster debugging &amp; editing</strong>
-            <span>with our insights, logs, and editor</span>
-          </div>
-
-          <div>
-            <span>
-              15<small>✕</small>
-            </span>
-            <strong>more cost effective</strong>
-            <span>than deploying &amp; managing yourself</span>
-          </div>
+          <small>and many more.</small>
         </Callout>
       </Content>
 
@@ -226,7 +219,7 @@ export default function Home() {
         )}
       </Signup>
 
-      <div style={{ marginTop: 100}}>
+      <div style={{ marginTop: 100 }}>
         <Footer />
       </div>
     </>
@@ -254,25 +247,27 @@ const HowItWorks = () => {
     <HIW>
       <Content>
         <h5>How it works</h5>
-        <h3>Implement any realtime logic you can dream of, in minutes</h3>
+        <h3>Implement any real-time logic you can dream of, in minutes.</h3>
 
         <div>
           <HIWGrid>
             <li>
               <strong>Send us events</strong>
-              <p>Send us events via the API, SDK, webhooks, or integrations.</p>
+              <p>
+                Send us events through the API, SDK, webhooks, or integrations.
+              </p>
             </li>
             <li>
               <strong>Configure your workflows</strong>
               <p>
-                Create your workflows via the low-code UI or by writing code
-                directly.
+                Create your workflows using the drag-and-drop UI or by writing
+                code directly.
               </p>
             </li>
             <li>
               <strong>Run workflows in real time</strong>
               <p>
-                Workflows automatically run in real time on each event or on a
+                Workflows automatically run in real-time on each event or on a
                 schedule.
               </p>
             </li>
@@ -304,6 +299,10 @@ const Content = styled.div`
 
   @media only screen and (max-width: 800px) {
     padding: 0 20px;
+  }
+
+  h5 {
+    font-size: 14px;
   }
 `;
 
@@ -418,31 +417,16 @@ const IntroGrid = styled.div`
 const Callout = styled.div`
   max-width: 80%;
   margin: -115px auto 50px auto;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-gap: 40px;
 
   background: #fdfbf6;
   padding: 40px;
   box-shadow: 0 10px 50px rgba(0, 0, 0, 0.1);
 
-  strong,
-  span {
-    display: block;
-    margin: 4px 0;
-  }
+  display: flex;
+  flex-flow: column;
 
-  small {
-    font-size: 1.5rem;
-  }
-
-  span:first-of-type {
-    font-size: 2.6rem;
-    margin: 0 0 6px;
-  }
-
-  span:last-of-type {
-    color: #737885;
+  > h5 {
+    align-self: center;
   }
 
   @media only screen and (max-width: 800px) {
@@ -530,5 +514,21 @@ const Code = styled.div`
 
   @media only screen and (max-width: 800px) {
     margin-top: -40px;
+  }
+`;
+
+const IntegrationsIcons = styled.div`
+  display: flex;
+  flex-flow: row;
+  justify-content: center;
+  align-items: center;
+
+  flex-wrap: wrap;
+  margin-top: 50px;
+  column-gap: 80px;
+
+  > img {
+    height: 50px;
+    margin-bottom: 40px;
   }
 `;
