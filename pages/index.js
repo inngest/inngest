@@ -80,99 +80,131 @@ export default function Home() {
         ></script>
       </Head>
 
-      <Nav />
+      <Nav dark />
 
       <Hero className="text-center">
-        <h1>Trigger low-code logic from events</h1>
-        <p>
-          Companies use Inngest to build real time, event driven workflows
-          in&nbsp;minutes. <br />
-          It's <strong>made for builders</strong>,{" "}
-          <strong>designed for operators</strong>.
-        </p>
+        <Content>
+          <h1>Trigger low-code logic from events</h1>
+          <p>
+            <strong>
+              People use Inngest to build real time, event driven workflows
+              in&nbsp;minutes,
+              <br /> with or without engineering teams.
+            </strong>{" "}
+            It's made for builders, designed for operators.
+          </p>
 
-        <a
-          href="https://calendly.com/inngest-thb/30min"
-          className="button"
-          rel="nofollow"
-          target="_blank"
-        >
-          Request a free demo
-        </a>
+          <a
+            href="https://calendly.com/inngest-thb/30min"
+            className="button"
+            rel="nofollow"
+            target="_blank"
+          >
+            Request a free demo
+          </a>
 
-        <div>
-          <img
-            src="/wflow.png"
-            alt="An example cloud kitchen workflow when paying via Venmo"
-          />
-        </div>
+          <div className="img">
+            <img
+              src="/wflow.png"
+              alt="An example cloud kitchen workflow when paying via Venmo"
+            />
+          </div>
+        </Content>
       </Hero>
 
       <Content>
         <Tagline>
           <div>
             <Check />
-            <p>Define workflows in code or in a visual UI</p>
+            <p>Define workflows in code or in&nbsp;a&nbsp;visual&nbsp;UI</p>
           </div>
           <div>
             <Check />
-            <p>Integrate with your existing tools</p>
+            <p>Integrate with your existing&nbsp;tools</p>
           </div>
           <div>
             <Check />
-            <p>Run custom code, in any language</p>
+            <p>Run custom code, in any&nbsp;language</p>
           </div>
           <div>
             <Check />
-            <p>Full user profiles and audit histories</p>
+            <p>Full user profiles and audit&nbsp;histories</p>
           </div>
           <div>
             <Check />
-            <p>Complete workflow version histories</p>
+            <p>Complete workflow version&nbsp;histories</p>
           </div>
         </Tagline>
       </Content>
 
       <Introducing>
         <Content>
-          <h5>Introducing Inngest</h5>
+          {/*
+          <div>
 
-          <p>
-            Inngest is an <strong>automation platform</strong> which{" "}
-            <strong>runs workflows on a schedule</strong> or{" "}
-            <strong>in real-time after events happen</strong>.
-            Design&nbsp;complex operational flows and run any code - including
-            pre-built integrations or your own code - with
-            zero&nbsp;infrastructure and&nbsp;maintenance.
-          </p>
+            <h2>React to anything,<br />from any system,<br />with zero code</h2>
 
-          <IntroGrid>
-            <div>
-              <h2>Workflow automation</h2>
-              <p>
-                Build, manage, and operate your product and ops flows
-                end-to-end. Complete with out-of-the-box integrations for rapid
-                development, and the ability to run your own serverless code for
-                full&nbsp;flexibility
-              </p>
-            </div>
-            <div>
-              <h2>Change management</h2>
-              <p>
-                Version every workflow complete with history, schedule workflows
-                to go live, and handle workflow approvals within your account -
-                it’s everything you need for a fully compliant&nbsp;solution
-              </p>
-            </div>
-            <div>
-              <h2>Transparency &amp; debugging</h2>
-              <p>
-                Drill down into every workflow run, including which users ran
-                through which versions of a workflow and each
-                workflow’s&nbsp;logs.
-              </p>
-            </div>
-          </IntroGrid>
+            <p>Put tasks on autopilot with our flexible automation platform.</p>
+
+            <ul>
+              <li>Integrates with any app or API, including your own</li>
+              <li>Drag and drop integrations</li>
+              <li>Create any automation: single steps, or complex flows</li>
+              <li>Run custom code in any language, with zero infrastructure</li>
+              <li>Complex logic, event coordination, timing, and pauses built in</li>
+            </ul>
+          </div>
+
+          <div style={{ paddingTop: 80 }}>
+            TODO: How it works
+          </div>
+          */}
+
+          <div>
+            <h5>Introducing Inngest</h5>
+            <h2>Automation running in&nbsp;minutes</h2>
+
+            <p>
+              Integrate any app within seconds, and build complex automations
+              via drag and drop - no engineering required.
+            </p>
+            <p>
+              Need to update your workflows? Instantly test and deploy new
+              versions, with a full version history and changelog built-in.
+            </p>
+          </div>
+          <div></div>
+
+          <div>
+            <h2>Organize your events &amp; automations together</h2>
+
+            <p>
+              Store and process every event in your business in one central
+              place, then build core workflows to improve your products with a
+              single click.
+            </p>
+            <p>
+              Easily see an event schema, event usage, and the workflows each
+              event triggers in one place.
+            </p>
+          </div>
+
+          <div></div>
+
+          <div>
+            <h2>Instant, reliable, and&nbsp;flexible</h2>
+
+            <p>
+              Your workflows run in real-time, with full logging, audit trails,
+              and retries out of the box.
+            </p>
+            <p>
+              Need something more complex? Run your own custom code as part of a
+              workflow, zero infrastructure required.
+            </p>
+          </div>
+
+          <div></div>
         </Content>
       </Introducing>
 
@@ -300,16 +332,36 @@ const Content = styled.div`
   @media only screen and (max-width: 800px) {
     padding: 0 20px;
   }
-
-  h5 {
-    font-size: 14px;
-  }
 `;
 
-const Hero = styled(Content)`
+const Hero = styled.div`
   font-size: 1.3125rem;
-  padding: 80px 0 0;
+  padding: 100px 0 0;
   position: relative;
+  color: #fff;
+
+  background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
+  box-shadow: inset 0 0 0 20px #fff;
+
+  &:before {
+    content: "";
+    display: block;
+    background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
+    height: 20px;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    border-left: 20px solid #fff;
+    border-right: 20px solid #fff;
+  }
+
+  h1 {
+    color: transparent;
+    background: linear-gradient(90deg, #fff, #f5f5f5);
+    color: #fff;
+    background-clip: text;
+  }
 
   .button {
     display: inline-block;
@@ -319,7 +371,7 @@ const Hero = styled(Content)`
     height: auto;
   }
 
-  > div {
+  .img {
     box-shadow: 0 10px 50px rgba(0, 0, 0, 0.1);
     background: #fffefc;
     width: 100%;
@@ -328,7 +380,7 @@ const Hero = styled(Content)`
     max-height: 500px;
     margin: 90px 0 0;
     position: relative;
-    z-index: 2;
+    z-index: 1;
     overflow: hidden;
   }
 
@@ -339,7 +391,7 @@ const Hero = styled(Content)`
       margin: 40px 0;
     }
 
-    > div {
+    .img {
       display: none;
     }
   }
@@ -352,6 +404,8 @@ const Tagline = styled.div`
   grid-template-columns: repeat(5, 1fr);
   grid-gap: 40px;
   text-align: center;
+  position: relative;
+  z-index: 2;
 
   > div {
     display: flex;
@@ -384,13 +438,15 @@ const Tagline = styled.div`
 
 const Introducing = styled.div`
   box-shadow: inset 0 0 0 20px #fff;
-  background: linear-gradient(
+  background-repeat: repeat;
+  background-image: linear-gradient(
     180deg,
     rgba(243, 245, 245, 1) 20%,
     rgba(249, 251, 254, 1) 100%
   );
-  padding: 450px 40px 180px 40px;
+  padding: 500px 40px 180px 40px;
   margin-top: -400px;
+  position: relative;
 
   h5 + p {
     font-size: 1.3125rem;
@@ -399,6 +455,18 @@ const Introducing = styled.div`
   @media only screen and (max-width: 800px) {
     margin-top: 20px;
     padding-top: 40px;
+  }
+
+  > div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-gap: 80px;
+
+    background-image: linear-gradient(
+      180deg,
+      rgba(243, 245, 245, 1) 20%,
+      rgba(249, 251, 254, 1) 100%
+    );
   }
 `;
 
@@ -424,8 +492,8 @@ const Callout = styled.div`
 
   display: flex;
   flex-flow: column;
-
-  > h5 {
+  position: relative;
+  z- > h5 {
     align-self: center;
   }
 

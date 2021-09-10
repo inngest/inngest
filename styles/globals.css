@@ -6,6 +6,13 @@ html, body, button, input { font-family: 'Inter', sans-serif; color: #222631  }
   html { font-family: 'Inter var', sans-serif; }
 }
 
+:root {
+  --light-grey: #86909a;
+
+  --blue-left: #17273b;
+  --blue-right: #18435c;
+}
+
 body, button {
   margin: 0;
 }
@@ -29,13 +36,11 @@ input:focus, textarea:focus {
 }
 
 button, .button {
-  height: 40px;
   padding: 12px 14px 11px;
   background-color: #2F6D9Dee;
   text-decoration: none;
   color: white;
   border: none;
-  width: 150px;
   border-radius: 2px;
   transition: all .3s;
 }
@@ -72,7 +77,8 @@ h1 {
 }
 
 h2 {
-  font-size: 1rem;
+  font-size: 2.75rem;
+  font-weight: 800;
   color: #2E3A59;
 }
 
@@ -88,7 +94,7 @@ strong {
 
 h5, .tag {
   color: #184115bb;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 2px;
   font-weight: 700;
   text-transform: uppercase;
@@ -100,4 +106,25 @@ h5, .tag {
 
 h5 {
   margin: 20px 0 18px;
+}
+
+h5 + h2 {
+  margin-top: .25rem;
+}
+
+.nav-dark {
+  background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
+  border-left: 20px solid #fff;
+  border-right: 20px solid #fff;
+  color: #fff;
+}
+
+h2, .text--blue {
+  background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
+  background-clip: text;
+  color: transparent;
+}
+
+.nav-dark a {
+  color: #fff;
 }
