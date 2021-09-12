@@ -6,7 +6,7 @@ const Nav = ({ dark }) => {
     <div className={dark ? "nav-dark" : ""}>
       <Container>
         <div>
-          <a href="https://www.inngest.com">
+          <a href="/">
             {dark ? (
               <img src="/logo-white.svg" alt="Inngest logo" />
             ) : (
@@ -20,9 +20,13 @@ const Nav = ({ dark }) => {
                 How it works
                 <span>An overview to the platform</span>
               </a>
-              <a href="/product">
+              <a href="/product/features">
                 Features
-                <span>Things that make Inngest unique</span>
+                <span>An in-depth look at the platform</span>
+              </a>
+              <a href="/product/use-cases">
+                Use cases
+                <span>Examples from our customers</span>
               </a>
 
               <p>Inngest for...</p>
@@ -36,7 +40,7 @@ const Nav = ({ dark }) => {
               </a>
               <a href="/product/for-engineering">
                 Engineering
-                <span>Frictionless setup and handoff</span>
+                <span>Serverless event hub and functions</span>
               </a>
             </div>
           </Hoverable>
@@ -66,7 +70,7 @@ const Nav = ({ dark }) => {
             rel="nofollow"
             target="_blank"
           >
-            See how it works
+            See how it works →
           </a>
         </div>
       </Container>
@@ -127,7 +131,7 @@ const Hoverable = styled.div`
     width: 350px;
     top: 60px;
     left: calc(-1.75rem + 20px);
-    z-index: 1;
+    z-index: 3;
     background: #fff;
     border-radius: 3px;
     box-shadow: 0 8px 50px rgba(0, 0, 0, 0.5);

@@ -100,7 +100,7 @@ export default function Home() {
             rel="nofollow"
             target="_blank"
           >
-            Request a free demo
+            See how it works
           </a>
 
           <div className="img">
@@ -138,11 +138,24 @@ export default function Home() {
       </Content>
 
       <Introducing>
-        <Content>
+        <Content class="text-center">
+          <HighLevel>
+            <h2>Automation running in minutes</h2>
+            <p>
+              Inngest aggregates events from your internal &amp; external
+              systems and runs real-time workflows when things happen in your
+              business.
+            </p>
+            <a href="/product" className="button button--outline">
+              Learn more about the platform
+            </a>
+          </HighLevel>
+        </Content>
+
+        <Content className="grid">
           {/*
           <div>
 
-            <h2>React to anything,<br />from any system,<br />with zero code</h2>
 
             <p>Put tasks on autopilot with our flexible automation platform.</p>
 
@@ -162,11 +175,17 @@ export default function Home() {
 
           <div>
             <h5>Introducing Inngest</h5>
-            <h2>Automation running in&nbsp;minutes</h2>
+            <h2>
+              React to anything,
+              <br />
+              from any system,
+              <br />
+              with zero code
+            </h2>
 
             <p>
               Integrate any app within seconds, and build complex automations
-              via drag and drop - no engineering required.
+              via drag and drop - with or without engineering.
             </p>
             <p>
               Need to update your workflows? Instantly test and deploy new
@@ -457,16 +476,25 @@ const Introducing = styled.div`
     padding-top: 40px;
   }
 
-  > div {
+  .grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-gap: 80px;
+  }
+`;
 
-    background-image: linear-gradient(
-      180deg,
-      rgba(243, 245, 245, 1) 20%,
-      rgba(249, 251, 254, 1) 100%
-    );
+const HighLevel = styled.div`
+  margin: 3rem 0 8rem;
+  h2 {
+    margin: 0 0 1.5rem;
+  }
+
+  p {
+    font-size: 1.3rem;
+    max-width: 40%;
+    margin: 0 auto 3rem;
+    line-height: 1.35;
+    color: var(--dark-grey);
   }
 `;
 
@@ -492,6 +520,7 @@ const Callout = styled.div`
 
   display: flex;
   flex-flow: column;
+  align-items: center;
   position: relative;
   z- > h5 {
     align-self: center;

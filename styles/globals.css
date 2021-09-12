@@ -8,9 +8,12 @@ html, body, button, input { font-family: 'Inter', sans-serif; color: #222631  }
 
 :root {
   --light-grey: #86909a;
+  --dark-grey: #565e66;
 
   --blue-left: #17273b;
   --blue-right: #18435c;
+
+  --cream: #f9f9f1;
 }
 
 body, button {
@@ -40,9 +43,15 @@ button, .button {
   background-color: #2F6D9Dee;
   text-decoration: none;
   color: white;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 2px;
   transition: all .3s;
+}
+
+.button--outline {
+  background-color: transparent;
+  border: 1px solid #2F6D9D99;
+  color: var(--blue-right);
 }
 
 button:hover, .button:hover {
@@ -50,6 +59,7 @@ button:hover, .button:hover {
   background-color: gray;
   background-color: #2F6D9Dff;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+  color: #fff !important;
 }
 
 button:focus, .button:focus {
@@ -127,4 +137,32 @@ h2, .text--blue {
 
 .nav-dark a {
   color: #fff;
+}
+
+.hero-dark {
+  padding: 100px 0 0;
+  background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
+  box-shadow: inset 0 0 0 20px #fff;
+  position: relative;
+  color: #fff;
+}
+
+.hero-dark:before {
+  content: "";
+  display: block;
+  background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
+  height: 20px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  border-left: 20px solid #fff;
+  border-right: 20px solid #fff;
+}
+
+.hero-dark h1 {
+  color: transparent;
+  background: linear-gradient(90deg, #fff, #f5f5f5);
+  color: #fff;
+  background-clip: text;
 }
