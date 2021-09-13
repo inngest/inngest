@@ -156,9 +156,9 @@ export default function Product() {
             <div>
               <Logic>
                 <span />
-                <div>Value</div>
-                <div>&gt;=</div>
-                <div>5,000</div>
+                <div className="white-tag">Value</div>
+                <div className="white-tag">&gt;=</div>
+                <div className="white-tag">7,500</div>
                 <span />
               </Logic>
               <p className="title">Complex logic supported</p>
@@ -168,6 +168,11 @@ export default function Product() {
               </p>
             </div>
             <div>
+              <Time>
+                <div className="white-tag">Wait <b>3 days</b></div>
+                <div className="white-tag">Wait for <b>invoice end date</b></div>
+                <div className="white-tag">If <b>email bounces within 1 day</b></div>
+              </Time>
               <p className="title">Time management built-in</p>
               <p>
                 Pause workflows anywhere, or wait until conditions are met to
@@ -332,13 +337,27 @@ const Grid = styled.div`
   }
 `;
 
-const Drag = styled.div`
+const GridGraphic = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 0 0 2rem;
-  height: 120px;
+  margin: 0 0 2.5rem;
+  height: 100px;
 
+  .white-tag {
+    position: relative;
+    box-sizing: border-box;
+    border-radius: 5px;
+    background: #fff;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+    padding: 8px 14px;
+    font-size: 14px;
+    border: 1px solid #e8e8e6;
+    font-family: monospace;
+  }
+`
+
+const Drag = styled(GridGraphic)`
   > div {
     position: relative;
 
@@ -361,13 +380,7 @@ const Drag = styled.div`
   }
 `;
 
-const Logic = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: 0 0 2rem;
-  height: 120px;
-
+const Logic = styled(GridGraphic)`
   > span:first-of-type {
     display: block;
     width: 30px;
@@ -380,25 +393,25 @@ const Logic = styled.div`
   > span:last-of-type {
     display: block;
     width: 58px;
-    height: 58px;
+    height: 56px;
     content: "";
     background: url(/assets/if-right.svg) no-repeat;
     margin: 0 5px;
   }
 
-  > div {
-    position: relative;
-    box-sizing: border-box;
-    border-radius: 5px;
-    background: #fff;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
-    padding: 8px 14px;
-    font-size: 14px;
-    border: 1px solid #e8e8e6;
-    font-family: monospace;
-  }
-
   > div + div {
-    margin-left: 10px;
+    margin-left: 7px;
   }
 `;
+
+const Time = styled(GridGraphic)`
+  flex-direction: column;
+  align-items: flex-start;
+  
+  > div {
+    margin: 0 0 .25rem 2rem;
+    font-size: 12px !important;
+  }
+  > div:first-of-type { margin-left: 0; }
+  > div:last-of-type { margin-left: 4rem; }
+`
