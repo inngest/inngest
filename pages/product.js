@@ -61,8 +61,8 @@ export default function Product() {
             <SendBox>
               <p>Send us events</p>
               <p>
-                Send us events via built-in integrations, our APIs, our SDKs,
-                or&nbsp;webhooks
+                <a href="https://docs.inngest.com/docs/events/sources/sources" target="_blank">Send us events</a> automatically via built-in integrations, our <a href="https://docs.inngest.com/docs/events/sources/api" target="_blank">APIs</a>, our <a href="https://docs.inngest.com/docs/events/sources/sdks" target="_blank">SDKs</a>,
+                or&nbsp;<a href="https://docs.inngest.com/docs/events/sources/webhooks" target="_blank">webhooks</a>.
               </p>
             </SendBox>
             <SendBox>

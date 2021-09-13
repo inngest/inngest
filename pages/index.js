@@ -87,9 +87,9 @@ export default function Home() {
           <h1>Trigger low-code logic from events</h1>
           <p>
             <strong>
-              People use Inngest to build real time, event driven workflows
+              Build real time, event driven workflows
               in&nbsp;minutes,
-              <br /> with or without engineering teams.
+              with&nbsp;or&nbsp;without engineering&nbsp;teams.<br />
             </strong>{" "}
             It's made for builders, designed for operators.
           </p>
@@ -190,7 +190,7 @@ export default function Home() {
             </p>
             <p>
               <strong>
-                Inngest lets you build event-drive logic while your engineering
+                Inngest lets you build event-driven logic while your engineering
                 team focuses on the core product.
               </strong>
             </p>
@@ -203,7 +203,7 @@ export default function Home() {
             <p>
               <strong>Inngest lets you build faster.</strong> We let you
               integrate with any API, no code required. When your requirements
-              change, it only takes a few seconds to set up your next
+              change, it only takes a few seconds to set up and swap your next
               integration.
             </p>
           </div>
