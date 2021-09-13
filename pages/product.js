@@ -395,7 +395,7 @@ const GridGraphic = styled.div`
     font-size: 13px;
     border: 1px solid #e8e8e6;
     font-family: monospace;
-    color: #555;
+    color: #777;
   }
 
   .white-tag b {
