@@ -56,7 +56,7 @@ const Links = styled.div`
 
   a {
     display: block;
-    color: #fff;
+    color: #fff !important;
     text-decoration: none;
   }
 

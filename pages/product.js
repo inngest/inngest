@@ -47,14 +47,14 @@ export default function Product() {
               automate anything you need.
             </p>
           </div>
-          <div>
+          <div className="images">
             <img src="/screenshot-event.png" alt="An event within Inngest" />
             <img src="/screenshot-workflow.png" alt="An event within Inngest" />
           </div>
         </Content>
       </Hero>
 
-      <Details>
+      <How>
         <Content>
           <h2 className="text-center">How it works</h2>
 
@@ -129,8 +129,12 @@ export default function Product() {
               <Tag>task completed</Tag>
             </EventTags>
           </Events>
+        </Content>
+      </How>
 
-          <h3 className="text-center">A powerful workflow engine</h3>
+      <Details>
+        <Content>
+          <a name="features"><h3 className="text-center">The most powerful workflow engine</h3></a>
           <p className="subtitle text-center">
             Our powerful workflow engine allows complex, multi-step workflows
             which can coordinate between events in your business.
@@ -237,11 +241,56 @@ export default function Product() {
               </GridGraphic>
               <p className="title">Serverless functions</p>
               <p>
-                For full flexibility, run any code that you need within a
-                workflow &emmdash; in any language.
+                For full flexibility, run any code in a
+                workflow &mdash; in any language. {" "}
+                <a href="https://docs.inngest.com/docs/actions/serverless/tutorial" target="_blank">View the docs</a>.
               </p>
             </div>
           </Grid>
+        </Content>
+      </Details>
+
+      <Details>
+        <Content>
+          <Half>
+            <div>
+          <h3>Built for reliability and security</h3>
+          <p>Ensure your workflows run smoothly every time, without manual steps.  Plus, with data encrypted
+            using custom data encryption keys you can rest assured your data is secure.</p>
+
+          <ul>
+            <li><b>Automatic retries</b> prevents issues when other services are down</li>
+            <li><b>Built-in logging</b> shows detailed workflow logs for each step of a workflow</li>
+            <li><b>Error handling</b> allows you to configure custom error workflows any time issues occur</li>
+          </ul>
+            </div>
+            <div>
+              <img src="/screenshot-logs-shadow.png" alt="Workflow logs" className="no-shadow" />
+            </div>
+          </Half>
+        </Content>
+      </Details>
+
+      <Details>
+        <Content>
+          <Half>
+            <div>
+              <img src="/screenshot-versioning.png" alt="Workflow versioning" className="shadow" />
+            </div>
+            <div>
+          <h3>Made for rapid iteration across teams</h3>
+          <p>Workflows are fully versioned with every change stored, and each workflow run stores detailed
+            author information, allowing you to figure out which workflows each of your users run through.</p>
+
+          <ul>
+            <li><b>Unlimited users</b> for wide collaboration and visibility within your company</li>
+            <li><b>Version history</b> allows you to track every change from the very start</li>
+            <li><b>Workflow authoring</b> tracks which users run through which workflows</li>
+            <li><b>Drafts</b> allow you to prep and schedule workflow releases easily</li>
+          </ul>
+
+            </div>
+          </Half>
         </Content>
       </Details>
 
@@ -264,6 +313,10 @@ const Hero = styled.div`
     grid-template-columns: 1fr 1fr;
     grid-gap: 80px;
   }
+
+.images {
+transform: perspective(1500px) rotateY(-15deg);
+}
 
   div {
     position: relative;
@@ -288,6 +341,25 @@ const Hero = styled.div`
     left: -25px;
   }
 `;
+
+const How = styled.div`
+  background: linear-gradient(90deg, #f9f9f1 0%, #fbfbf6 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(243, 245, 245, 1) 20%,
+    rgba(249, 251, 254, 1) 100%
+  );
+  box-shadow: inset 0 -20px 0 20px #fff;
+  margin-top: -40px;
+  margin-bottom: -20px;
+  padding: 6rem 0 6rem;
+  position: relative;
+
+  h2 {
+    margin: 0;
+  }
+`;
+
 
 const Details = styled.div`
   background: linear-gradient(90deg, #f9f9f1 0%, #fbfbf6 100%);
@@ -322,7 +394,7 @@ const HIW = styled.div`
 `;
 
 const Events = styled.div`
-  margin: 0 0 8rem;
+  margin: 0;
   small {
     display: block;
     color: var(--light-grey);
@@ -367,7 +439,7 @@ const Grid = styled.div`
   margin: 3rem 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-gap: 4rem 4rem;
+  grid-gap: 5rem 4rem;
 
   .title {
     font-weight: bold;
@@ -483,3 +555,27 @@ const Logos = styled(GridGraphic)`
     margin: 0.5rem 0.5rem;
   }
 `;
+
+const Half = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-gap: 80px;
+  align-items: center;
+
+  h3 { margin-top: 0 }
+
+  img {
+    object-fit: cover;
+    width: 100%;
+    max-height: 100%;
+    border-radius: 10px;
+  }
+
+  img.shadow {
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  }
+  img.no-shadow {
+    width: calc(100% + 40px);
+    margin-left: -20px;
+  }
+`

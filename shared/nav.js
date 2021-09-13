@@ -20,10 +20,11 @@ const Nav = ({ dark }) => {
                 How it works
                 <span>An overview to the platform</span>
               </a>
-              <a href="/product/features">
+              <a href="/product#features">
                 Features
                 <span>An in-depth look at the platform</span>
               </a>
+              {/*
               <a href="/product/use-cases">
                 Use cases
                 <span>Examples from our customers</span>
@@ -42,8 +43,10 @@ const Nav = ({ dark }) => {
                 Engineering
                 <span>Serverless event hub and functions</span>
               </a>
+                */}
             </div>
           </Hoverable>
+          {/*
           <StyledLink href="/pricing">Pricing</StyledLink>
           <Hoverable>
             <StyledLink href="/company">Company</StyledLink>
@@ -53,6 +56,7 @@ const Nav = ({ dark }) => {
               <a href="/company/press">Press</a>
             </div>
           </Hoverable>
+            */}
           <StyledLink
             href="https://docs.inngest.com/docs/intro"
             target="_blank"
@@ -148,7 +152,7 @@ const Hoverable = styled.div`
     a {
       font-weight: 700;
       display: block;
-      color: var(--blue-right);
+      color: var(--blue-right) !important;
       text-decoration: none;
       transition: all .2s;
 

@@ -146,7 +146,8 @@ export default function Home() {
               systems and runs any code when things happen in your business.
             </p>
             <a href="/product" className="button button--outline">
-              Learn more about the platform
+              Learn more about the platform →
+
             </a>
           </HighLevel>
         </Content>

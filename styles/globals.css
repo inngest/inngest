@@ -42,7 +42,7 @@ button, .button {
   padding: 12px 14px 11px;
   background-color: #2F6D9Dee;
   text-decoration: none;
-  color: white;
+  color: white !important;
   border: 1px solid transparent;
   border-radius: 2px;
   transition: all .3s;
@@ -51,7 +51,7 @@ button, .button {
 .button--outline {
   background-color: transparent;
   border: 1px solid #2F6D9D99;
-  color: var(--blue-right);
+  color: var(--blue-right) !important;
 }
 
 button:hover, .button:hover {
@@ -68,7 +68,7 @@ button:focus, .button:focus {
 }
 
 
-a {
+a[href]:not([href='']) {
   color: #2F77AF;
 }
 
@@ -94,7 +94,7 @@ h2 {
 
 h3 {
   font-size: 1.4125rem;
-  font-weight: 400;
+  font-weight: 500;
   margin-bottom: 25px;
 }
 
@@ -140,7 +140,7 @@ h2, .text--blue {
 }
 
 .nav-dark a {
-  color: #fff;
+  color: #fff !important;
 }
 
 .hero-dark {
@@ -169,4 +169,9 @@ h2, .text--blue {
   background: linear-gradient(90deg, #fff, #f5f5f5);
   color: #fff;
   background-clip: text;
+}
+
+ul { margin: 2rem 0; }
+ul li {
+  margin: 0 0 .75rem;
 }
