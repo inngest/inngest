@@ -87,9 +87,9 @@ export default function Home() {
           <h1>Trigger low-code logic from events</h1>
           <p>
             <strong>
-              Build real time, event driven workflows
-              in&nbsp;minutes,
-              with&nbsp;or&nbsp;without engineering&nbsp;teams.<br />
+              Build real time, event driven workflows in&nbsp;minutes,
+              with&nbsp;or&nbsp;without engineering&nbsp;teams.
+              <br />
             </strong>{" "}
             It's made for builders, designed for operators.
           </p>

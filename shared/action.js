@@ -9,7 +9,7 @@ export default function Action({ name, subtitle, icon }) {
         <small>{subtitle}</small>
       </div>
     </Wrapper>
-  )
+  );
 }
 
 export const Outline = styled.div`
@@ -55,5 +55,4 @@ const Wrapper = styled.div`
     font-size: 11px;
     opacity: 0.6;
   }
-
 `;

@@ -62,8 +62,34 @@ export default function Product() {
             <SendBox>
               <p>Send us events</p>
               <p>
-                <a href="https://docs.inngest.com/docs/events/sources/sources" target="_blank">Send us events</a> automatically via built-in integrations, our <a href="https://docs.inngest.com/docs/events/sources/api" target="_blank">APIs</a>, our <a href="https://docs.inngest.com/docs/events/sources/sdks" target="_blank">SDKs</a>,
-                or&nbsp;<a href="https://docs.inngest.com/docs/events/sources/webhooks" target="_blank">webhooks</a>.
+                <a
+                  href="https://docs.inngest.com/docs/events/sources/sources"
+                  target="_blank"
+                >
+                  Send us events
+                </a>{" "}
+                automatically via built-in integrations, our{" "}
+                <a
+                  href="https://docs.inngest.com/docs/events/sources/api"
+                  target="_blank"
+                >
+                  APIs
+                </a>
+                , our{" "}
+                <a
+                  href="https://docs.inngest.com/docs/events/sources/sdks"
+                  target="_blank"
+                >
+                  SDKs
+                </a>
+                , or&nbsp;
+                <a
+                  href="https://docs.inngest.com/docs/events/sources/webhooks"
+                  target="_blank"
+                >
+                  webhooks
+                </a>
+                .
               </p>
             </SendBox>
             <SendBox>
@@ -107,20 +133,23 @@ export default function Product() {
           <h3 className="text-center">Powerful workflows</h3>
 
           <Grid>
-
             <div>
               <Drag>
-                <div>
-                <img src="/icons/drag.svg" />
-                <Action name="Create lead in Salesforce" subtitle="From the new account" icon="/icons/sf-cloud.svg" />
-                <Outline className='drop' />
+                <div role="img" aria-label="Dragging an action onto a workflow">
+                  <img src="/icons/drag.svg" aria-role="presentation" alt="" />
+                  <Action
+                    name="Create lead in Salesforce"
+                    subtitle="From the new account"
+                    icon="/icons/sf-cloud.svg"
+                  />
+                  <Outline className="drop" />
                 </div>
-                
               </Drag>
 
               <p className="title">Drag &amp; Drop interface</p>
               <p>
-                Visually build workflows to create integrations, define logic, and map data between apps.
+                Visually build workflows to create integrations, define logic,
+                and map data between apps.
               </p>
             </div>
 
