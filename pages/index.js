@@ -143,8 +143,7 @@ export default function Home() {
             <h2>Automation running in minutes</h2>
             <p>
               Inngest aggregates events from your internal &amp; external
-              systems and runs real-time workflows when things happen in your
-              business.
+              systems and runs any code when things happen in your business.
             </p>
             <a href="/product" className="button button--outline">
               Learn more about the platform
@@ -176,7 +175,7 @@ export default function Home() {
           <div>
             <h5>Introducing Inngest</h5>
             <h2>
-              React to anything,
+              React to everything,
               <br />
               from any system,
               <br />
@@ -184,27 +183,28 @@ export default function Home() {
             </h2>
 
             <p>
-              Integrate any app within seconds, and build complex automations
-              via drag and drop - with or without engineering.
+              Build complex automations via drag and drop - with or without
+              engineering. Need to update your workflows? Instantly test and
+              deploy new versions, with a full version history and changelog
+              built-in.
             </p>
             <p>
-              Need to update your workflows? Instantly test and deploy new
-              versions, with a full version history and changelog built-in.
+              <strong>
+                Inngest lets you build event-drive logic while your engineering
+                team focuses on the core product.
+              </strong>
             </p>
           </div>
           <div></div>
 
           <div>
-            <h2>Organize your events &amp; automations together</h2>
+            <h2>Integrate anything, instantly</h2>
 
             <p>
-              Store and process every event in your business in one central
-              place, then build core workflows to improve your products with a
-              single click.
-            </p>
-            <p>
-              Easily see an event schema, event usage, and the workflows each
-              event triggers in one place.
+              <strong>Inngest lets you build faster.</strong> We let you
+              integrate with any API, no code required. When your requirements
+              change, it only takes a few seconds to set up your next
+              integration.
             </p>
           </div>
 
@@ -219,7 +219,8 @@ export default function Home() {
             </p>
             <p>
               Need something more complex? Run your own custom code as part of a
-              workflow, zero infrastructure required.
+              workflow,{" "}
+              <strong>without worrying about servers or server code</strong>.
             </p>
           </div>
 
