@@ -4,6 +4,7 @@ import Marquee from "react-fast-marquee";
 import Nav from "../shared/nav";
 import Footer from "../shared/footer";
 import Content from "../shared/content";
+import Action, { Outline } from "../shared/action";
 import Tag, { greyCSS } from "../shared/tag";
 
 export default function Product() {
@@ -41,7 +42,7 @@ export default function Product() {
               with zero infrastructure.
             </p>
             <p>
-              We aggregate all events in your business, from internal and
+              We aggregate all events in your business from internal and
               external systems, then allow you to build complex workflows to
               automate anything you need.
             </p>
@@ -106,43 +107,53 @@ export default function Product() {
           <h3 className="text-center">Powerful workflows</h3>
 
           <Grid>
+
             <div>
-              <p>Drag &amp; Drop interface</p>
+              <Drag>
+                <div>
+                <img src="/icons/drag.svg" />
+                <Action name="Create lead in Salesforce" subtitle="From the new account" icon="/icons/sf-cloud.svg" />
+                <Outline className='drop' />
+                </div>
+                
+              </Drag>
+
+              <p className="title">Drag &amp; Drop interface</p>
               <p>
-                Visually build and understand workflows with the easy-to-use
-                graph view.
+                Visually build workflows to create integrations, define logic, and map data between apps.
               </p>
             </div>
+
             <div>
-              <p>Complex logic supported</p>
+              <p className="title">Complex logic supported</p>
               <p>
                 Build out complex logic and branching, so that things run only
                 when you want them to.
               </p>
             </div>
             <div>
-              <p>Time management built-in</p>
+              <p className="title">Time management built-in</p>
               <p>
                 Pause workflows anywhere, or wait until conditions are met to
                 continue.
               </p>
             </div>
             <div>
-              <p>Integrate with anything</p>
+              <p className="title">Integrate with anything</p>
               <p>
                 Easily integrate with your current tools to receive events and
                 automate flows.
               </p>
             </div>
             <div>
-              <p>Testing made easy</p>
+              <p className="title">Testing made easy</p>
               <p>
                 Test mode comes built in, and you can run and debug workflows as
                 you're building them.
               </p>
             </div>
             <div>
-              <p>Serverless functions</p>
+              <p className="title">Serverless functions</p>
               <p>
                 For full flexibility, run any code that you need within a
                 workflow, in any language.
@@ -275,11 +286,37 @@ const Grid = styled.div`
   grid-template-columns: repeat(3, 1fr);
   grid-gap: 3rem 4rem;
 
-  div p:first-of-type {
+  .title {
     font-weight: bold;
     font-size: 1.125rem;
   }
-  div p {
+  > div > p {
     margin: 0.25rem 0;
+  }
+`;
+
+const Drag = styled.div`
+  display: flex;
+  justify-content: center;
+  margin: 0 0 2rem;
+
+  > div {
+    position: relative;
+
+    > img {
+      width: 24px;
+      height: 24px;
+      position: absolute;
+      z-index: 2;
+      right: 6px;
+      top: 7px;
+    }
+
+    .drop {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 0;
+    }
   }
 `;
