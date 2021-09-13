@@ -130,9 +130,13 @@ export default function Product() {
             </EventTags>
           </Events>
 
-          <h3 className="text-center">Powerful workflows</h3>
+          <h3 className="text-center">A powerful workflow engine</h3>
+          <p className="subtitle text-center">
+            Our powerful workflow engine allows complex, multi-step workflows
+            which can coordinate between events in your business.
+          </p>
 
-          <Grid>
+          <Grid style={{ paddingTop: 20 }}>
             <div>
               <Drag>
                 <div role="img" aria-label="Dragging an action onto a workflow">
@@ -169,9 +173,17 @@ export default function Product() {
             </div>
             <div>
               <Time>
-                <div className="white-tag">Wait <b>3 days</b></div>
-                <div className="white-tag">Wait for <b>invoice end date</b></div>
-                <div className="white-tag">If <b>email bounces within 1 day</b></div>
+                <div className="white-tag">
+                  <img src="/icons/clock.svg" /> Wait <b>3 days</b>
+                </div>
+                <div className="white-tag">
+                  <img src="/icons/clock.svg" /> Wait for{" "}
+                  <b>invoice end date</b>
+                </div>
+                <div className="white-tag">
+                  <img src="/icons/clock.svg" /> If{" "}
+                  <b>email bounces within 1 day</b>
+                </div>
               </Time>
               <p className="title">Time management built-in</p>
               <p>
@@ -180,20 +192,41 @@ export default function Product() {
               </p>
             </div>
             <div>
+              <Logos className="text-center">
+                <div>
+                  <img src="/integrations/salesforce.png" alt="Salesforce" />
+                  <img
+                    src="/integrations/clickup.png"
+                    alt="Clickup"
+                    height="25"
+                  />
+                  <img src="/integrations/stripe.png" alt="Stripe" />
+                  <img src="/integrations/onesignal.png" alt="One Signal" />
+                  <img src="/integrations/slack.png" alt="Slack" />
+                  <img src="/integrations/twilio.png" alt="Twilio" />
+                </div>
+              </Logos>
               <p className="title">Integrate with anything</p>
               <p>
                 Easily integrate with your current tools to receive events and
                 automate flows.
               </p>
             </div>
+
             <div>
+              <GridGraphic>
+                <img src="/assets/step-over.svg" style={{ marginRight: 20 }} />
+                <div className="white-tag">Run next action: sync to Jira</div>
+              </GridGraphic>
               <p className="title">Testing made easy</p>
               <p>
                 Test mode comes built in, and you can run and debug workflows as
                 you're building them.
               </p>
             </div>
+
             <div>
+              <GridGraphic></GridGraphic>
               <p className="title">Serverless functions</p>
               <p>
                 For full flexibility, run any code that you need within a
@@ -281,7 +314,7 @@ const HIW = styled.div`
 `;
 
 const Events = styled.div`
-  margin: 0 0 7rem;
+  margin: 0 0 8rem;
   small {
     display: block;
     color: var(--light-grey);
@@ -326,7 +359,7 @@ const Grid = styled.div`
   margin: 3rem 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-gap: 3rem 4rem;
+  grid-gap: 4rem 4rem;
 
   .title {
     font-weight: bold;
@@ -341,7 +374,7 @@ const GridGraphic = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 0 0 2.5rem;
+  margin: 0 0 1.5rem;
   height: 100px;
 
   .white-tag {
@@ -350,12 +383,17 @@ const GridGraphic = styled.div`
     border-radius: 5px;
     background: #fff;
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
-    padding: 8px 14px;
-    font-size: 14px;
+    padding: 7px 14px;
+    font-size: 13px;
     border: 1px solid #e8e8e6;
     font-family: monospace;
+    color: #555;
   }
-`
+
+  .white-tag b {
+    font-weight: 600;
+  }
+`;
 
 const Drag = styled(GridGraphic)`
   > div {
@@ -407,11 +445,33 @@ const Logic = styled(GridGraphic)`
 const Time = styled(GridGraphic)`
   flex-direction: column;
   align-items: flex-start;
-  
+
   > div {
-    margin: 0 0 .25rem 2rem;
-    font-size: 12px !important;
+    margin: 0 0 0.25rem 2rem;
+    font-size: 13px !important;
   }
-  > div:first-of-type { margin-left: 0; }
-  > div:last-of-type { margin-left: 4rem; }
-`
+  > div:first-of-type {
+    margin-left: 0;
+  }
+  > div:last-of-type {
+    margin-left: 4rem;
+  }
+
+  img {
+    height: 12px;
+    margin: 0 3px -2px;
+    opacity: 0.4;
+  }
+`;
+
+const Logos = styled(GridGraphic)`
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  img {
+    max-height: 28px;
+    filter: grayscale(100%);
+    opacity: 0.6;
+    margin: 0.5rem 0.5rem;
+  }
+`;
