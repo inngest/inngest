@@ -215,7 +215,7 @@ export default function Product() {
 
             <div>
               <GridGraphic>
-                <img src="/assets/step-over.svg" style={{ marginRight: 20 }} />
+                <img src="/assets/step-over.svg" style={{ marginRight: 20, opacity: .5 }} />
                 <div className="white-tag">Run next action: sync to Jira</div>
               </GridGraphic>
               <p className="title">Testing made easy</p>
@@ -226,11 +226,19 @@ export default function Product() {
             </div>
 
             <div>
-              <GridGraphic></GridGraphic>
+              <GridGraphic>
+                <img src="/assets/code.svg" style={{ marginRight: 20, opacity: .5 }} />
+                <div className="white-tag">
+                  export default (evt, actions) => {"{"}<br />
+                    &nbsp; <span style={{ opacity: .5 }}>// run any language</span><br />
+                  {"}"}
+                </div>
+
+              </GridGraphic>
               <p className="title">Serverless functions</p>
               <p>
                 For full flexibility, run any code that you need within a
-                workflow, in any language.
+                workflow &emmdash; in any language.
               </p>
             </div>
           </Grid>
