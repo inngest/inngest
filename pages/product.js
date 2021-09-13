@@ -139,7 +139,7 @@ export default function Product() {
                   <img src="/icons/drag.svg" aria-role="presentation" alt="" />
                   <Action
                     name="Create lead in Salesforce"
-                    subtitle="From the new account"
+                    subtitle="From the account in the event"
                     icon="/icons/sf-cloud.svg"
                   />
                   <Outline className="drop" />
@@ -154,6 +154,13 @@ export default function Product() {
             </div>
 
             <div>
+              <Logic>
+                <span />
+                <div>Value</div>
+                <div>&gt;=</div>
+                <div>5,000</div>
+                <span />
+              </Logic>
               <p className="title">Complex logic supported</p>
               <p>
                 Build out complex logic and branching, so that things run only
@@ -269,7 +276,7 @@ const HIW = styled.div`
 `;
 
 const Events = styled.div`
-  margin: 0 0 6rem;
+  margin: 0 0 7rem;
   small {
     display: block;
     color: var(--light-grey);
@@ -279,6 +286,7 @@ const Events = styled.div`
 const SendBox = styled.div`
   background: #fff;
   padding: 20px;
+  border-radius: 3px;
   box-shadow: 2px 5px 15px rgba(0, 0, 0, 0.08);
 
   display: flex;
@@ -327,7 +335,9 @@ const Grid = styled.div`
 const Drag = styled.div`
   display: flex;
   justify-content: center;
+  align-items: center;
   margin: 0 0 2rem;
+  height: 120px;
 
   > div {
     position: relative;
@@ -339,6 +349,7 @@ const Drag = styled.div`
       z-index: 2;
       right: 6px;
       top: 7px;
+      pointer-events: none;
     }
 
     .drop {
@@ -347,5 +358,47 @@ const Drag = styled.div`
       left: 10px;
       z-index: 0;
     }
+  }
+`;
+
+const Logic = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 0 2rem;
+  height: 120px;
+
+  > span:first-of-type {
+    display: block;
+    width: 30px;
+    height: 14px;
+    content: "";
+    background: url(/assets/if-left.svg) no-repeat;
+    margin: 0 5px;
+  }
+
+  > span:last-of-type {
+    display: block;
+    width: 58px;
+    height: 58px;
+    content: "";
+    background: url(/assets/if-right.svg) no-repeat;
+    margin: 0 5px;
+  }
+
+  > div {
+    position: relative;
+    box-sizing: border-box;
+    border-radius: 5px;
+    background: #fff;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+    padding: 8px 14px;
+    font-size: 14px;
+    border: 1px solid #e8e8e6;
+    font-family: monospace;
+  }
+
+  > div + div {
+    margin-left: 10px;
   }
 `;
