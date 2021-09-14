@@ -486,15 +486,24 @@ const Hero = styled.div`
   }
 
   @media only screen and (max-width: 800px) {
+    padding: 30px 0;
+    border: 0;
+
     h1 {
       line-height: 1;
       font-size: 50px;
-      margin: 40px 0;
+      margin: 0 0 40px;
     }
 
     .img {
       display: none;
     }
+
+
+    > div {
+      display: block;
+    }
+    .workflow { display: none }
   }
 `;
 
@@ -556,6 +565,7 @@ const Introducing = styled.div`
   @media only screen and (max-width: 800px) {
     margin-top: 20px;
     padding-top: 40px;
+    .grid { padding: 0 }
   }
 
   .grid {
@@ -567,6 +577,7 @@ const Introducing = styled.div`
 
 const HighLevel = styled.div`
   margin: 3rem 0 8rem;
+
   h2 {
     margin: 0 0 1.5rem;
   }
@@ -577,6 +588,18 @@ const HighLevel = styled.div`
     margin: 0 auto 3rem;
     line-height: 1.35;
     color: var(--dark-grey);
+  }
+
+  @media only screen and (max-width: 800px) {
+    text-align: left;
+    margin: 0 0 3rem;
+
+    p { max-width: 100% }
+
+    .button {
+      font-size: 14px;
+      margin: 0 auto;
+    }
   }
 `;
 

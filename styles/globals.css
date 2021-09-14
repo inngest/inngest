@@ -168,6 +168,11 @@ h2, .text--blue {
   border-right: 20px solid #fff;
 }
 
+@media only screen and (max-width: 800px) {
+  .hero-dark:before { display: none }
+  .nav-dark { border: 0 none }
+}
+
 .hero-dark h1 {
   color: transparent;
   background: linear-gradient(90deg, #fff, #f5f5f5);
