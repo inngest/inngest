@@ -120,11 +120,11 @@ export default function Home() {
           </div>
           <div>
             <Check />
-            <p>Run custom code, in any&nbsp;language</p>
+            <p>Switch integrations in seconds,&nbsp;with&nbsp;zero&nbsp;code</p>
           </div>
           <div>
             <Check />
-            <p>Full user profiles and audit&nbsp;histories</p>
+            <p>Run custom code, in any&nbsp;language</p>
           </div>
           <div>
             <Check />
