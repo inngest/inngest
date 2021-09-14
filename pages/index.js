@@ -593,10 +593,10 @@ const HighLevel = styled.div`
 
   p {
     font-size: 1.3rem;
-    max-width: 40%;
+    max-width: 70%;
     margin: 0 auto 3rem;
     line-height: 1.35;
-    color: var(--dark-grey);
+    opacity: .6;
   }
 
   @media only screen and (max-width: 800px) {
