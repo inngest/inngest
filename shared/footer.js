@@ -3,37 +3,54 @@ import styled from "@emotion/styled";
 
 const Footer = () => {
   return (
-    <Container>
-      <Content>
-        <Links>
-          <div>
-            <a href="https://www.inngest.com">
-              <img src="/logo-white.svg" alt="Inngest logo" height="30" />
-            </a>
-            <small>© 2021 Inngest Inc</small>
-          </div>
-          <div>
-            <strong>Inngest</strong>
-            <a href="https://www.inngest.com/product">Product</a>
-            <a href="https://docs.inngest.com">Documentation</a>
-            <a href="https://www.inngest.com/security">Security</a>
-            <a href="https://excessive-satellite-3d9.notion.site/Software-Engineer-Inngest-95db47fcec4d4173a9f57e2a251f6fc1">
-              Careers
-            </a>
-          </div>
-          <div>
-            <strong>Community</strong>
-            <a href="https://discord.gg/EuesV2ZSnX">Discord</a>
-            <a href="https://twitter.com/inngest">Twitter</a>
-          </div>
-          <div>
-            <strong>Legal</strong>
-            <a href="/privacy">Privacy</a>
-            <a href="/terms">Terms and Conditions</a>
-          </div>
-        </Links>
-      </Content>
-    </Container>
+    <>
+      <Container>
+        <Content>
+          <Links>
+            <div>
+              <a href="https://www.inngest.com">
+                <img src="/logo-white.svg" alt="Inngest logo" height="30" />
+              </a>
+              <small>© 2021 Inngest Inc</small>
+            </div>
+            <div>
+              <strong>Inngest</strong>
+              <a href="https://www.inngest.com/product">Product</a>
+              <a href="https://docs.inngest.com">Documentation</a>
+              <a href="https://www.inngest.com/security">Security</a>
+              <a href="https://excessive-satellite-3d9.notion.site/Software-Engineer-Inngest-95db47fcec4d4173a9f57e2a251f6fc1">
+                Careers
+              </a>
+            </div>
+            <div>
+              <strong>Community</strong>
+              <a href="https://discord.gg/EuesV2ZSnX">Discord</a>
+              <a href="https://twitter.com/inngest">Twitter</a>
+            </div>
+            <div>
+              <strong>Legal</strong>
+              <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms and Conditions</a>
+            </div>
+          </Links>
+        </Content>
+      </Container>
+      <script
+        async
+        src="https://www.googletagmanager.com/gtag/js?id=G-4YPM75W7D9"
+      ></script>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-4YPM75W7D9');
+    `,
+        }}
+      />
+    </>
   );
 };
 
