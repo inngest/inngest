@@ -38,13 +38,9 @@ export default function Product() {
           <div>
             <h1>The modern event automation platform</h1>
             <p>
-              Inngest lets you run real-time workflows in response to events,
-              with zero infrastructure.
-            </p>
-            <p>
               We aggregate all events in your business from internal and
-              external systems, then allow you to build complex workflows to
-              automate anything you need.
+              external systems, then allow you to build complex workflows which react to events &mdash;
+              automating anything you need.
             </p>
           </div>
           <div className="images">
@@ -577,5 +573,11 @@ const Half = styled.div`
   img.no-shadow {
     width: calc(100% + 40px);
     margin-left: -20px;
+  }
+
+  ul {
+    list-style-type: none;
+    margin: 2rem 0 0;
+    padding: 0;
   }
 `

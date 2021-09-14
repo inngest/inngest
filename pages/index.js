@@ -5,6 +5,8 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import theme from "react-syntax-highlighter/dist/cjs/styles/prism/dracula";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
+import Workflow from "../shared/workflow";
+import Check from "../shared/icons/check";
 
 // TODO: move these into env vars
 // prod key
@@ -13,21 +15,6 @@ export const INGEST_KEY =
 
 // test key
 // export const INGEST_KEY = 'MnzaTCk7Se8i74hA141bZGS-NY9P39RSzYFbxanIHyV2VDNu1fwrns2xBQCEGdIb9XRPtzbp0zdRPjtnA1APTQ';
-
-const Check = ({ size = 16, color = "#5ea659" }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C21.9939 17.5203 17.5203 21.9939 12 22ZM11.984 20H12C16.4167 19.9956 19.9942 16.4127 19.992 11.996C19.9898 7.57929 16.4087 4 11.992 4C7.57528 4 3.99421 7.57929 3.992 11.996C3.98979 16.4127 7.56729 19.9956 11.984 20ZM10 17L6 13L7.41 11.59L10 14.17L16.59 7.58L18 9L10 17Z"
-      fill={color}
-    ></path>
-  </svg>
-);
 
 export default function Home() {
   const [submitted, setSubmitted] = useState(false);
@@ -82,17 +69,18 @@ export default function Home() {
 
       <Nav dark />
 
-      <Hero className="text-center">
-        <Content>
-          <h1>Trigger low-code logic from events</h1>
-          <p>
-            <strong>
-              Build real time, event driven workflows in&nbsp;minutes,
-              with&nbsp;or&nbsp;without engineering&nbsp;teams.
-              <br />
-            </strong>{" "}
-            It's made for builders, designed for operators.
-          </p>
+      <Hero>
+        <Content className="grid">
+          <div>
+            <h1>Trigger low-code logic from events</h1>
+            <p>
+              <strong>
+                Build real time, event driven workflows in&nbsp;minutes,
+                with&nbsp;or&nbsp;without engineering&nbsp;teams.
+                <br />
+              </strong>{" "}
+              It's made for builders, designed for operators.
+            </p>
 
           <a
             href="https://calendly.com/inngest-thb/30min"
@@ -103,14 +91,22 @@ export default function Home() {
             See how it works
           </a>
 
+          {/*
           <div className="img">
             <img
               src="/wflow.png"
               alt="An example cloud kitchen workflow when paying via Venmo"
             />
           </div>
+          */}
+          </div>
+          <div className="workflow">
+            <Workflow />
+          </div>
         </Content>
+
       </Hero>
+      
 
       <Content>
         <Tagline>
@@ -153,41 +149,19 @@ export default function Home() {
         </Content>
 
         <Content className="grid">
-          {/*
-          <div>
-
-
-            <p>Put tasks on autopilot with our flexible automation platform.</p>
-
-            <ul>
-              <li>Integrates with any app or API, including your own</li>
-              <li>Drag and drop integrations</li>
-              <li>Create any automation: single steps, or complex flows</li>
-              <li>Run custom code in any language, with zero infrastructure</li>
-              <li>Complex logic, event coordination, timing, and pauses built in</li>
-            </ul>
-          </div>
-
-          <div style={{ paddingTop: 80 }}>
-            TODO: How it works
-          </div>
-          */}
-
           <div>
             <h5>Introducing Inngest</h5>
             <h2>
+
               React to everything,
-              <br />
-              from any system,
               <br />
               with zero code
             </h2>
 
             <p>
               Build complex automations via drag and drop - with or without
-              engineering. Need to update your workflows? Instantly test and
-              deploy new versions, with a full version history and changelog
-              built-in.
+              engineering. Instantly test and deploy new workflow versions,
+              with a full version history and changelog built-in.
             </p>
             <p>
               <strong>
@@ -195,6 +169,7 @@ export default function Home() {
                 team focuses on the core product.
               </strong>
             </p>
+
           </div>
           <div></div>
 
@@ -364,6 +339,8 @@ const Hero = styled.div`
   background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
   box-shadow: inset 0 0 0 20px #fff;
 
+  min-height: 400px;
+
   &:before {
     content: "";
     display: block;
@@ -375,6 +352,12 @@ const Hero = styled.div`
     right: 0;
     border-left: 20px solid #fff;
     border-right: 20px solid #fff;
+  }
+
+  > div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-gap: 80px;
   }
 
   h1 {
@@ -403,6 +386,13 @@ const Hero = styled.div`
     position: relative;
     z-index: 1;
     overflow: hidden;
+  }
+
+  .workflow {
+    max-width: 100%;
+    height: 480px;
+    max-height: 500px;
+    padding-left: 20px;
   }
 
   @media only screen and (max-width: 800px) {
@@ -465,8 +455,8 @@ const Introducing = styled.div`
     rgba(243, 245, 245, 1) 20%,
     rgba(249, 251, 254, 1) 100%
   );
-  padding: 500px 40px 180px 40px;
-  margin-top: -400px;
+  padding: 180px 40px 180px 40px;
+  margin-top: -120px;
   position: relative;
 
   h5 + p {
@@ -631,3 +621,16 @@ const IntegrationsIcons = styled.div`
     margin-bottom: 40px;
   }
 `;
+
+const Box = styled.div`
+  box-sizing: border-box;
+  border: 1px solid #e8e8e699;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+  padding: 1.5rem;
+`
+
+const Study = styled(Box)`
+  margin: 4rem 2rem;
+`

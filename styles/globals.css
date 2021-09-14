@@ -16,6 +16,10 @@ html, body, button, input { font-family: 'Inter', sans-serif; color: #222631  }
   --cream: #f9f9f1;
 }
 
+html, body {
+  overflow-x: hidden
+}
+
 body, button {
   margin: 0;
 }
@@ -76,7 +80,7 @@ a[href]:not([href='']) {
   text-align: center;
 }
 
-p {
+p, li {
   line-height: 1.6;
 }
 
@@ -173,5 +177,5 @@ h2, .text--blue {
 
 ul { margin: 2rem 0; }
 ul li {
-  margin: 0 0 .75rem;
+  margin: 0 0 .8rem;
 }
