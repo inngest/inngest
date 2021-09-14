@@ -7,6 +7,7 @@ import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import Workflow from "../shared/workflow";
 import DragFC from "../shared/drag";
+import Tag, { greyCSS } from "../shared/tag";
 import Check from "../shared/icons/check";
 
 // TODO: move these into env vars
@@ -91,15 +92,6 @@ export default function Home() {
           >
             See how it works
           </a>
-
-          {/*
-          <div className="img">
-            <img
-              src="/wflow.png"
-              alt="An example cloud kitchen workflow when paying via Venmo"
-            />
-          </div>
-          */}
           </div>
           <div className="workflow">
             <Workflow />
@@ -204,8 +196,73 @@ export default function Home() {
             </p>
           </div>
 
-          <div></div>
+          <IntegrateGraphic>
+            <div className="wrapper">
 
+              <div className="integration">
+                <div>
+                  <img src="https://app.inngest.com/assets/salesforce.png" alt="Salesforce" />
+                </div>
+                <div>
+                  <p><b>Salesforce</b></p>
+                  <small>CRM, Sales</small>
+                </div>
+              </div>
+
+              <div className="integration">
+                <div>
+                  <img src="https://app.inngest.com/assets/stripe.png" alt="Stripe" />
+                </div>
+                <div>
+                  <p><b>Stripe</b></p>
+                  <small>Payments</small>
+                </div>
+              </div>
+
+              <div className="integration">
+                <div>
+                  <img src="https://cdn.brandfolder.io/5H442O3W/at/pl546j-7le8zk-btwjnu/Slack_RGB.png?height=205&width=500" alt="Slack" />
+                </div>
+                <div>
+                  <p><b>Slack</b></p>
+                  <small>CS, Ops</small>
+                </div>
+              </div>
+
+              <div className="integration">
+                <div>
+                  <img src="https://clickup.com/landing/images/brand-assets/logo-color-transparent.svg" alt="Salesforce" />
+                </div>
+                <div>
+                  <p><b>ClickUp</b></p>
+                  <small>Project management</small>
+                </div>
+              </div>
+
+              <div className="integration">
+                <div>
+                  <img src="https://www.twilio.com/docs/static/company/img/logos/red/twilio-logo-red.e9621c245.png" alt="Stripe" />
+                </div>
+                <div>
+                  <p><b>Twilio</b></p>
+                  <small>Messaging</small>
+                </div>
+              </div>
+
+              <div className="integration">
+                <div>
+                  <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Logo.png" alt="GitHub" />
+                </div>
+                <div>
+                  <p><b>GitHub</b></p>
+                  <small>Developer tools</small>
+                </div>
+              </div>
+
+            </div>
+          </IntegrateGraphic>
+
+          {/*
           <div>
             <h2>Instant, reliable, and&nbsp;flexible</h2>
 
@@ -221,9 +278,11 @@ export default function Home() {
           </div>
 
           <div></div>
+          */}
         </Content>
       </Introducing>
 
+      {/*
       <Content>
         <Callout className="text-center">
           <h5>Integrates with your existing tools</h5>
@@ -244,6 +303,7 @@ export default function Home() {
           <small>and many more.</small>
         </Callout>
       </Content>
+      */}
 
       <HowItWorks />
 
@@ -653,7 +713,7 @@ const DragGraphic = styled.div`
   }
 
   > div {
-    padding: 50px;
+    padding: 50px 60px;
     background: url(/assets/circle.svg) no-repeat center center;
     background-size: contain;
 
@@ -671,3 +731,71 @@ const DragGraphic = styled.div`
   }
 
 `
+
+const IntegrateGraphic = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  &:after {
+    content: "";
+    display: block;
+    height: 100%;
+    width: 100%;
+    background: url(/assets/semi-dots.svg) no-repeat 100% center;
+    background-size: contain;
+    right: -50px;
+    top: -20px;
+    position: absolute;
+    z-index: 0;
+  }
+
+  &, & > div {
+    position: relative;
+    z-index: 1;
+  }
+
+  .wrapper {
+    border-radius: 5px;
+    background: #fafafa;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    width: 100%;
+    padding: 20px;
+
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-gap: 10px;
+    font-size: .9rem;
+  }
+
+  .wrapper > div {
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    grid-gap: 12px;
+    background: #fff;
+    border: 1px solid #f4f4f4;
+    padding: 12px;
+    line-height: 1.2;
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+  }
+
+  p { margin: 0 }
+  small {
+    opacity: .5;
+    font-size: .7rem;
+  }
+
+  img {
+    object-fit: cover;
+    width: 100%;
+    max-height: 100%;
+    border-radius: 10px;
+  }
+`;
