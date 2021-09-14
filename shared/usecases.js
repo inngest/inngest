@@ -17,7 +17,7 @@ export default function UseCases() {
       <Item>
         <div><img src="/assets/churn.png" /></div>
         <h3>Churn management</h3>
-        <p>Decrease churn and increase engagement by creating targeted workflows which run when users begin churning.</p>
+        <p>Decrease churn and increase engagement by creating targeted workflows which run when users begin churning - by monitoring for the <b>absence of events</b>.</p>
       </Item>
 
       <Item>
