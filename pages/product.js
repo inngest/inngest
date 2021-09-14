@@ -387,6 +387,12 @@ const Hero = styled.div`
     top: 30%;
     left: -25px;
   }
+
+  @media only screen and (max-width: 800px) {
+    padding: 20px 0 50px;
+    > div { display: block; }
+    .images { display: none }
+  }
 `;
 
 const How = styled.div`
@@ -402,8 +408,11 @@ const How = styled.div`
   padding: 6rem 0 6rem;
   position: relative;
 
-  h2 {
-    margin: 0;
+  h2 { margin: 0; }
+
+  @media only screen and (max-width: 800px) {
+    box-shadow: none;
+    padding: 3rem 0;
   }
 `;
 
@@ -420,9 +429,9 @@ const Details = styled.div`
   padding: 6rem 0 6rem;
   position: relative;
 
-  h2 {
-    margin: 0;
-  }
+  h2 { margin: 0 }
+
+  @media only screen and (max-width: 800px) { box-shadow: none; }
 `;
 
 const HIW = styled.div`
@@ -436,6 +445,12 @@ const HIW = styled.div`
   > div {
     position: relative;
     z-index: 1;
+  }
+
+  @media only screen and (max-width: 800px) {
+    box-shadow: none;
+    padding: 0 20px;
+    grid-template-columns: 1fr;
   }
 `;
 
@@ -494,6 +509,11 @@ const Grid = styled.div`
   > div > p {
     margin: 0.25rem 0;
   }
+
+  @media only screen and (max-width: 800px) {
+    grid-template-columns: 2fr;
+    grid-gap: 1rem;
+  }
 `;
 
 const GridGraphic = styled.div`
@@ -502,6 +522,11 @@ const GridGraphic = styled.div`
   align-items: center;
   margin: 0 0 1.5rem;
   height: 100px;
+
+  @media only screen and (max-width: 800px) {
+    height: auto;
+    margin-top: 3rem;
+  }
 
   .white-tag {
     position: relative;
@@ -607,6 +632,10 @@ const Half = styled.div`
   grid-template-columns: 1fr 1fr;
   grid-gap: 80px;
   align-items: center;
+
+  @media only screen and (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
 
   h3 {
     margin-top: 0;

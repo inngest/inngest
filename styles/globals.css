@@ -169,6 +169,7 @@ h2, .text--blue {
 }
 
 @media only screen and (max-width: 800px) {
+  .hero-dark { box-shadow: none }
   .hero-dark:before { display: none }
   .nav-dark { border: 0 none }
 }
