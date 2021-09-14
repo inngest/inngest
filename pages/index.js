@@ -5,6 +5,10 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import theme from "react-syntax-highlighter/dist/cjs/styles/prism/dracula";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
+import Workflow from "../shared/workflow";
+import DragFC from "../shared/drag";
+import Tag, { greyCSS } from "../shared/tag";
+import Check from "../shared/icons/check";
 
 // TODO: move these into env vars
 // prod key
@@ -13,21 +17,6 @@ export const INGEST_KEY =
 
 // test key
 // export const INGEST_KEY = 'MnzaTCk7Se8i74hA141bZGS-NY9P39RSzYFbxanIHyV2VDNu1fwrns2xBQCEGdIb9XRPtzbp0zdRPjtnA1APTQ';
-
-const Check = ({ size = 16, color = "#5ea659" }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C21.9939 17.5203 17.5203 21.9939 12 22ZM11.984 20H12C16.4167 19.9956 19.9942 16.4127 19.992 11.996C19.9898 7.57929 16.4087 4 11.992 4C7.57528 4 3.99421 7.57929 3.992 11.996C3.98979 16.4127 7.56729 19.9956 11.984 20ZM10 17L6 13L7.41 11.59L10 14.17L16.59 7.58L18 9L10 17Z"
-      fill={color}
-    ></path>
-  </svg>
-);
 
 export default function Home() {
   const [submitted, setSubmitted] = useState(false);
@@ -80,102 +69,243 @@ export default function Home() {
         ></script>
       </Head>
 
-      <Nav />
+      <Nav dark />
 
-      <Hero className="text-center">
-        <h1>Trigger low-code logic from events</h1>
-        <p>
-          Companies use Inngest to build real time, event driven workflows
-          in&nbsp;minutes. <br />
-          It's <strong>made for builders</strong>,{" "}
-          <strong>designed for operators</strong>.
-        </p>
+      <Hero>
+        <Content className="grid">
+          <div>
+            <h1>Trigger low-code logic from events</h1>
+            <p>
+              <strong>
+                Build real time, event driven workflows in&nbsp;minutes,
+                with&nbsp;or&nbsp;without engineering&nbsp;teams.
+                <br />
+              </strong>{" "}
+              It's made for builders, designed for operators.
+            </p>
 
-        <a
-          href="https://calendly.com/inngest-thb/30min"
-          className="button"
-          rel="nofollow"
-          target="_blank"
-        >
-          Request a free demo
-        </a>
-
-        <div>
-          <img
-            src="/wflow.png"
-            alt="An example cloud kitchen workflow when paying via Venmo"
-          />
-        </div>
+            <a
+              href="https://calendly.com/inngest-thb/30min"
+              className="button"
+              rel="nofollow"
+              target="_blank"
+            >
+              See how it works
+            </a>
+          </div>
+          <div className="workflow">
+            <Workflow />
+          </div>
+        </Content>
       </Hero>
 
       <Content>
         <Tagline>
           <div>
             <Check />
-            <p>Define workflows in code or in a visual UI</p>
+            <p>Define workflows in code or in&nbsp;a&nbsp;visual&nbsp;UI</p>
           </div>
           <div>
             <Check />
-            <p>Integrate with your existing tools</p>
+            <p>Integrate with your existing&nbsp;tools</p>
           </div>
           <div>
             <Check />
-            <p>Run custom code, in any language</p>
+            <p>Switch integrations in seconds,&nbsp;with&nbsp;zero&nbsp;code</p>
           </div>
           <div>
             <Check />
-            <p>Full user profiles and audit histories</p>
+            <p>Run custom code, in any&nbsp;language</p>
           </div>
           <div>
             <Check />
-            <p>Complete workflow version histories</p>
+            <p>Complete workflow version&nbsp;histories</p>
           </div>
         </Tagline>
       </Content>
 
       <Introducing>
-        <Content>
-          <h5>Introducing Inngest</h5>
+        <Content class="text-center">
+          <HighLevel>
+            <h2>Automation running in minutes</h2>
+            <p>
+              Inngest aggregates events from your internal &amp; external
+              systems and runs any code when things happen in your business.
+            </p>
+            <a href="/product" className="button button--outline">
+              Learn more about the platform →
+            </a>
+          </HighLevel>
+        </Content>
 
-          <p>
-            Inngest is an <strong>automation platform</strong> which{" "}
-            <strong>runs workflows on a schedule</strong> or{" "}
-            <strong>in real-time after events happen</strong>.
-            Design&nbsp;complex operational flows and run any code - including
-            pre-built integrations or your own code - with
-            zero&nbsp;infrastructure and&nbsp;maintenance.
-          </p>
+        <Content className="grid">
+          <div>
+            <h5>Introducing Inngest</h5>
+            <h2>
+              React to everything,
+              <br />
+              with zero code
+            </h2>
 
-          <IntroGrid>
+            <p>
+              Build complex automations via drag and drop - with or without
+              engineering. Instantly test and deploy new workflow versions, with
+              a full version history and changelog built-in.
+            </p>
+            <p>
+              <strong>
+                Inngest lets you build event-driven logic while your engineering
+                team focuses on the core product.
+              </strong>
+            </p>
+          </div>
+          <DragGraphic>
             <div>
-              <h2>Workflow automation</h2>
-              <p>
-                Build, manage, and operate your product and ops flows
-                end-to-end. Complete with out-of-the-box integrations for rapid
-                development, and the ability to run your own serverless code for
-                full&nbsp;flexibility
-              </p>
+              <DragFC
+                name="Send churn prevention push"
+                subtitle="To the user's mobile device"
+                icon="/icons/sf-cloud.svg"
+              />
+              <DragFC
+                name="Create lead in Salesforce"
+                subtitle="From the account in the event"
+                icon="/icons/sf-cloud.svg"
+                cursor
+              />
+              <DragFC
+                name="Run suggested products ML"
+                subtitle="For the user in the event"
+                icon="/icons/sf-cloud.svg"
+              />
             </div>
-            <div>
-              <h2>Change management</h2>
-              <p>
-                Version every workflow complete with history, schedule workflows
-                to go live, and handle workflow approvals within your account -
-                it’s everything you need for a fully compliant&nbsp;solution
-              </p>
+          </DragGraphic>
+
+          <div>
+            <h2>Integrate anything, instantly</h2>
+
+            <p>
+              <strong>Inngest lets you build faster.</strong> We let you
+              integrate with any API, no code required. When your requirements
+              change, it only takes a few seconds to set up and swap your next
+              integration.
+            </p>
+          </div>
+
+          <IntegrateGraphic>
+            <div className="wrapper">
+              <div className="integration">
+                <div>
+                  <img
+                    src="https://app.inngest.com/assets/salesforce.png"
+                    alt="Salesforce"
+                  />
+                </div>
+                <div>
+                  <p>
+                    <b>Salesforce</b>
+                  </p>
+                  <small>CRM, Sales</small>
+                </div>
+              </div>
+
+              <div className="integration">
+                <div>
+                  <img
+                    src="https://app.inngest.com/assets/stripe.png"
+                    alt="Stripe"
+                  />
+                </div>
+                <div>
+                  <p>
+                    <b>Stripe</b>
+                  </p>
+                  <small>Payments</small>
+                </div>
+              </div>
+
+              <div className="integration">
+                <div>
+                  <img
+                    src="https://cdn.brandfolder.io/5H442O3W/at/pl546j-7le8zk-btwjnu/Slack_RGB.png?height=205&width=500"
+                    alt="Slack"
+                  />
+                </div>
+                <div>
+                  <p>
+                    <b>Slack</b>
+                  </p>
+                  <small>CS, Ops</small>
+                </div>
+              </div>
+
+              <div className="integration">
+                <div>
+                  <img
+                    src="https://clickup.com/landing/images/brand-assets/logo-color-transparent.svg"
+                    alt="Salesforce"
+                  />
+                </div>
+                <div>
+                  <p>
+                    <b>ClickUp</b>
+                  </p>
+                  <small>Project management</small>
+                </div>
+              </div>
+
+              <div className="integration">
+                <div>
+                  <img
+                    src="https://www.twilio.com/docs/static/company/img/logos/red/twilio-logo-red.e9621c245.png"
+                    alt="Stripe"
+                  />
+                </div>
+                <div>
+                  <p>
+                    <b>Twilio</b>
+                  </p>
+                  <small>Messaging</small>
+                </div>
+              </div>
+
+              <div className="integration">
+                <div>
+                  <img
+                    src="https://github.githubassets.com/images/modules/logos_page/GitHub-Logo.png"
+                    alt="GitHub"
+                  />
+                </div>
+                <div>
+                  <p>
+                    <b>GitHub</b>
+                  </p>
+                  <small>Developer tools</small>
+                </div>
+              </div>
             </div>
-            <div>
-              <h2>Transparency &amp; debugging</h2>
-              <p>
-                Drill down into every workflow run, including which users ran
-                through which versions of a workflow and each
-                workflow’s&nbsp;logs.
-              </p>
-            </div>
-          </IntroGrid>
+          </IntegrateGraphic>
+
+          {/*
+          <div>
+            <h2>Instant, reliable, and&nbsp;flexible</h2>
+
+            <p>
+              Your workflows run in real-time, with full logging, audit trails,
+              and retries out of the box.
+            </p>
+            <p>
+              Need something more complex? Run your own custom code as part of a
+              workflow,{" "}
+              <strong>without worrying about servers or server code</strong>.
+            </p>
+          </div>
+
+          <div></div>
+          */}
         </Content>
       </Introducing>
 
+      {/*
       <Content>
         <Callout className="text-center">
           <h5>Integrates with your existing tools</h5>
@@ -196,6 +326,7 @@ export default function Home() {
           <small>and many more.</small>
         </Callout>
       </Content>
+      */}
 
       <HowItWorks />
 
@@ -300,16 +431,32 @@ const Content = styled.div`
   @media only screen and (max-width: 800px) {
     padding: 0 20px;
   }
-
-  h5 {
-    font-size: 14px;
-  }
 `;
 
-const Hero = styled(Content)`
+const Hero = styled.div`
   font-size: 1.3125rem;
-  padding: 80px 0 0;
+  padding: 100px 0 0;
   position: relative;
+  color: #fff;
+
+  background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
+  border-left: 20px solid #fff;
+  border-right: 20px solid #fff;
+
+  min-height: 400px;
+
+  > div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-gap: 80px;
+  }
+
+  h1 {
+    color: transparent;
+    background: linear-gradient(90deg, #fff, #f5f5f5);
+    color: #fff;
+    background-clip: text;
+  }
 
   .button {
     display: inline-block;
@@ -319,7 +466,7 @@ const Hero = styled(Content)`
     height: auto;
   }
 
-  > div {
+  .img {
     box-shadow: 0 10px 50px rgba(0, 0, 0, 0.1);
     background: #fffefc;
     width: 100%;
@@ -328,18 +475,34 @@ const Hero = styled(Content)`
     max-height: 500px;
     margin: 90px 0 0;
     position: relative;
-    z-index: 2;
+    z-index: 1;
     overflow: hidden;
   }
 
+  .workflow {
+    max-width: 100%;
+    height: 480px;
+    max-height: 500px;
+  }
+
   @media only screen and (max-width: 800px) {
+    padding: 30px 0;
+    border: 0;
+
     h1 {
       line-height: 1;
       font-size: 50px;
-      margin: 40px 0;
+      margin: 0 0 40px;
+    }
+
+    .img {
+      display: none;
     }
 
     > div {
+      display: block;
+    }
+    .workflow {
       display: none;
     }
   }
@@ -352,6 +515,8 @@ const Tagline = styled.div`
   grid-template-columns: repeat(5, 1fr);
   grid-gap: 40px;
   text-align: center;
+  position: relative;
+  z-index: 2;
 
   > div {
     display: flex;
@@ -383,14 +548,16 @@ const Tagline = styled.div`
 `;
 
 const Introducing = styled.div`
-  box-shadow: inset 0 0 0 20px #fff;
-  background: linear-gradient(
+  box-shadow: inset 0 -20px 0 20px #fff;
+  background-repeat: repeat;
+  background-image: linear-gradient(
     180deg,
     rgba(243, 245, 245, 1) 20%,
     rgba(249, 251, 254, 1) 100%
   );
-  padding: 450px 40px 180px 40px;
-  margin-top: -400px;
+  padding: 180px 40px 180px 40px;
+  margin-top: -100px;
+  position: relative;
 
   h5 + p {
     font-size: 1.3125rem;
@@ -399,6 +566,45 @@ const Introducing = styled.div`
   @media only screen and (max-width: 800px) {
     margin-top: 20px;
     padding-top: 40px;
+    .grid {
+      padding: 0;
+    }
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-gap: 80px;
+  }
+`;
+
+const HighLevel = styled.div`
+  margin: 3rem 0 8rem;
+
+  h2 {
+    margin: 0 0 1.5rem;
+  }
+
+  p {
+    font-size: 1.3rem;
+    max-width: 40%;
+    margin: 0 auto 3rem;
+    line-height: 1.35;
+    color: var(--dark-grey);
+  }
+
+  @media only screen and (max-width: 800px) {
+    text-align: left;
+    margin: 0 0 3rem;
+
+    p {
+      max-width: 100%;
+    }
+
+    .button {
+      font-size: 14px;
+      margin: 0 auto;
+    }
   }
 `;
 
@@ -424,8 +630,9 @@ const Callout = styled.div`
 
   display: flex;
   flex-flow: column;
-
-  > h5 {
+  align-items: center;
+  position: relative;
+  z- > h5 {
     align-self: center;
   }
 
@@ -440,6 +647,10 @@ const HIW = styled.div`
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-gap: 80px;
+  }
+
+  h3 {
+    margin: 0.25rem 0 4rem;
   }
 
   @media only screen and (max-width: 800px) {
@@ -530,5 +741,119 @@ const IntegrationsIcons = styled.div`
   > img {
     height: 50px;
     margin-bottom: 40px;
+  }
+`;
+
+const Box = styled.div`
+  box-sizing: border-box;
+  border: 1px solid #e8e8e699;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+  padding: 1.5rem;
+`;
+
+const Study = styled(Box)`
+  margin: 4rem 2rem;
+`;
+
+const DragGraphic = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  &,
+  & > div {
+    position: relative;
+  }
+
+  > div {
+    padding: 50px 60px;
+    background: url(/assets/circle.svg) no-repeat center center;
+    background-size: contain;
+
+    > div {
+      margin-top: 1.5rem;
+      left: 1rem;
+      font-size: 13px !important;
+    }
+    > div:first-of-type {
+      left: -1rem;
+    }
+    > div:last-of-type {
+      left: 3rem;
+    }
+  }
+`;
+
+const IntegrateGraphic = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  &:after {
+    content: "";
+    display: block;
+    height: 100%;
+    width: 100%;
+    background: url(/assets/semi-dots.svg) no-repeat 100% center;
+    background-size: contain;
+    right: -50px;
+    top: -20px;
+    position: absolute;
+    z-index: 0;
+  }
+
+  &,
+  & > div {
+    position: relative;
+    z-index: 1;
+  }
+
+  .wrapper {
+    border-radius: 5px;
+    background: #fafafa;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    width: 100%;
+    padding: 20px;
+
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-gap: 10px;
+    font-size: 0.9rem;
+  }
+
+  .wrapper > div {
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    grid-gap: 12px;
+    background: #fff;
+    border: 1px solid #f4f4f4;
+    padding: 12px;
+    line-height: 1.2;
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+  }
+
+  p {
+    margin: 0;
+  }
+  small {
+    opacity: 0.5;
+    font-size: 0.7rem;
+  }
+
+  img {
+    object-fit: cover;
+    width: 100%;
+    max-height: 100%;
+    border-radius: 10px;
   }
 `;
