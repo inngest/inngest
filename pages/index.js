@@ -86,7 +86,7 @@ export default function Home() {
             </p>
 
             <a
-              href="https://calendly.com/inngest-thb/30min"
+              href="https://3k9rdboxxni.typeform.com/to/mAeyapA8"
               className="button"
               rel="nofollow"
               target="_blank"
@@ -133,7 +133,7 @@ export default function Home() {
               Inngest aggregates events from your internal &amp; external
               systems and runs any code when things happen in your business.
             </p>
-            <a href="/product" className="button button--outline">
+            <a href="https://3k9rdboxxni.typeform.com/to/mAeyapA8" className="button button--outline" rel="nofollow">
               Learn more about the platform →
             </a>
           </HighLevel>
@@ -307,6 +307,12 @@ export default function Home() {
 
         <Content>
           <UseCases />
+
+          <div className="text-center" style={{ marginTop: "8rem" }}>
+            <a href="https://3k9rdboxxni.typeform.com/to/mAeyapA8" className="button button--outline" rel="nofollow">
+              See how the platform works →
+            </a>
+          </div>
         </Content>
       </Introducing>
 

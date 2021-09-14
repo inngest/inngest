@@ -69,7 +69,7 @@ const Nav = ({ dark }) => {
           <StyledLink href="https://app.inngest.com/login">Sign in</StyledLink>
 
           <a
-            href="https://calendly.com/inngest-thb/30min"
+            href="https://3k9rdboxxni.typeform.com/to/mAeyapA8"
             className="button"
             rel="nofollow"
             target="_blank"
