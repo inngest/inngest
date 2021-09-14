@@ -40,8 +40,8 @@ export default function Product() {
             <h1>The modern event automation platform</h1>
             <p>
               We aggregate all events in your business from internal and
-              external systems, then allow you to build complex workflows which react to events &mdash;
-              automating anything you need.
+              external systems, then allow you to build complex workflows which
+              react to events &mdash; automating anything you need.
             </p>
           </div>
           <div className="images">
@@ -131,23 +131,26 @@ export default function Product() {
 
       <Details>
         <Content>
-          <a name="features"><h3 className="text-center">The most powerful workflow engine</h3></a>
+          <a name="features">
+            <h3 className="text-center">The most powerful workflow engine</h3>
+          </a>
           <p className="subtitle text-center">
             Our powerful workflow engine allows complex, multi-step workflows
             which can coordinate between events in your business.
             <br />
-            For engineers, workflows are defined with a strongly typed config language.  For operators, workflows can be edited visually.
+            For engineers, workflows are defined with a strongly typed config
+            language. For operators, workflows can be edited visually.
           </p>
 
           <Grid style={{ paddingTop: 20 }}>
             <div>
               <Drag>
-                  <DragFC
-                    name="Create lead in Salesforce"
-                    subtitle="From the account in the event"
-                    icon="/icons/sf-cloud.svg"
-                    cursor
-                  />
+                <DragFC
+                  name="Create lead in Salesforce"
+                  subtitle="From the account in the event"
+                  icon="/icons/sf-cloud.svg"
+                  cursor
+                />
               </Drag>
 
               <p className="title">Drag &amp; Drop interface</p>
@@ -215,7 +218,10 @@ export default function Product() {
 
             <div>
               <GridGraphic>
-                <img src="/assets/step-over.svg" style={{ marginRight: 20, opacity: .5 }} />
+                <img
+                  src="/assets/step-over.svg"
+                  style={{ marginRight: 20, opacity: 0.5 }}
+                />
                 <div className="white-tag">Run next action: sync to Jira</div>
               </GridGraphic>
               <p className="title">Testing made easy</p>
@@ -227,19 +233,30 @@ export default function Product() {
 
             <div>
               <GridGraphic>
-                <img src="/assets/code.svg" style={{ marginRight: 20, opacity: .5 }} />
+                <img
+                  src="/assets/code.svg"
+                  style={{ marginRight: 20, opacity: 0.5 }}
+                />
                 <div className="white-tag">
-                  export default (evt, actions) => {"{"}<br />
-                    &nbsp; <span style={{ opacity: .5 }}>// run any language</span><br />
+                  export default (evt, actions) => {"{"}
+                  <br />
+                  &nbsp;{" "}
+                  <span style={{ opacity: 0.5 }}>// run any language</span>
+                  <br />
                   {"}"}
                 </div>
-
               </GridGraphic>
               <p className="title">Serverless functions</p>
               <p>
-                For full flexibility, run any code in a
-                workflow &mdash; in any language. {" "}
-                <a href="https://docs.inngest.com/docs/actions/serverless/tutorial" target="_blank">View the docs</a>.
+                For full flexibility, run any code in a workflow &mdash; in any
+                language.{" "}
+                <a
+                  href="https://docs.inngest.com/docs/actions/serverless/tutorial"
+                  target="_blank"
+                >
+                  View the docs
+                </a>
+                .
               </p>
             </div>
           </Grid>
@@ -250,18 +267,34 @@ export default function Product() {
         <Content>
           <Half>
             <div>
-          <h3>Built for reliability and security</h3>
-          <p>Ensure your workflows run smoothly every time, without manual steps.  Plus, with data encrypted
-            using custom data encryption keys you can rest assured your data is secure.</p>
+              <h3>Built for reliability and security</h3>
+              <p>
+                Ensure your workflows run smoothly every time, without manual
+                steps. Plus, with data encrypted using custom data encryption
+                keys you can rest assured your data is secure.
+              </p>
 
-          <ul>
-            <li><b>Automatic retries</b> prevents issues when other services are down</li>
-            <li><b>Built-in logging</b> shows detailed workflow logs for each step of a workflow</li>
-            <li><b>Error handling</b> allows you to configure custom error workflows any time issues occur</li>
-          </ul>
+              <ul>
+                <li>
+                  <b>Automatic retries</b> prevents issues when other services
+                  are down
+                </li>
+                <li>
+                  <b>Built-in logging</b> shows detailed workflow logs for each
+                  step of a workflow
+                </li>
+                <li>
+                  <b>Error handling</b> allows you to configure custom error
+                  workflows any time issues occur
+                </li>
+              </ul>
             </div>
             <div>
-              <img src="/screenshot-logs-shadow.png" alt="Workflow logs" className="no-shadow" />
+              <img
+                src="/screenshot-logs-shadow.png"
+                alt="Workflow logs"
+                className="no-shadow"
+              />
             </div>
           </Half>
         </Content>
@@ -271,20 +304,38 @@ export default function Product() {
         <Content>
           <Half>
             <div>
-              <img src="/screenshot-versioning.png" alt="Workflow versioning" className="shadow" />
+              <img
+                src="/screenshot-versioning.png"
+                alt="Workflow versioning"
+                className="shadow"
+              />
             </div>
             <div>
-          <h3>Made for rapid iteration across teams</h3>
-          <p>Workflows are fully versioned with every change stored, and each workflow run stores detailed
-            author information, allowing you to figure out which workflows each of your users run through.</p>
+              <h3>Made for rapid iteration across teams</h3>
+              <p>
+                Workflows are fully versioned with every change stored, and each
+                workflow run stores detailed author information, allowing you to
+                figure out which workflows each of your users run through.
+              </p>
 
-          <ul>
-            <li><b>Unlimited users</b> for wide collaboration and visibility within your company</li>
-            <li><b>Version history</b> allows you to track every change from the very start</li>
-            <li><b>Workflow authoring</b> tracks which users run through which workflows</li>
-            <li><b>Drafts</b> allow you to prep and schedule workflow releases easily</li>
-          </ul>
-
+              <ul>
+                <li>
+                  <b>Unlimited users</b> for wide collaboration and visibility
+                  within your company
+                </li>
+                <li>
+                  <b>Version history</b> allows you to track every change from
+                  the very start
+                </li>
+                <li>
+                  <b>Workflow authoring</b> tracks which users run through which
+                  workflows
+                </li>
+                <li>
+                  <b>Drafts</b> allow you to prep and schedule workflow releases
+                  easily
+                </li>
+              </ul>
             </div>
           </Half>
         </Content>
@@ -310,9 +361,9 @@ const Hero = styled.div`
     grid-gap: 80px;
   }
 
-.images {
-transform: perspective(1500px) rotateY(-15deg);
-}
+  .images {
+    transform: perspective(1500px) rotateY(-15deg);
+  }
 
   div {
     position: relative;
@@ -355,7 +406,6 @@ const How = styled.div`
     margin: 0;
   }
 `;
-
 
 const Details = styled.div`
   background: linear-gradient(90deg, #f9f9f1 0%, #fbfbf6 100%);
@@ -558,7 +608,9 @@ const Half = styled.div`
   grid-gap: 80px;
   align-items: center;
 
-  h3 { margin-top: 0 }
+  h3 {
+    margin-top: 0;
+  }
 
   img {
     object-fit: cover;
@@ -580,4 +632,4 @@ const Half = styled.div`
     margin: 2rem 0 0;
     padding: 0;
   }
-`
+`;

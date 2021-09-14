@@ -13,7 +13,6 @@ export default function Action({ name, subtitle, icon, className }) {
   );
 }
 
-
 export function Trigger({ name, icon, className }) {
   return (
     <TriggerWrapper className={`action trigger ${className || ""}`}>
@@ -21,17 +20,20 @@ export function Trigger({ name, icon, className }) {
       <img src={icon} />
       <div>
         <p>{name}</p>
-        <small><b>Whenever</b> this event is received</small>
+        <small>
+          <b>Whenever</b> this event is received
+        </small>
       </div>
     </TriggerWrapper>
   );
 }
 
-
 export function If({ expression, className }) {
   return (
     <IfWrapper className={`if expression ${className || ""}`}>
-      <pre><code>{expression}</code></pre>
+      <pre>
+        <code>{expression}</code>
+      </pre>
       <small>If this is true continue</small>
     </IfWrapper>
   );
@@ -69,8 +71,12 @@ export const IfWrapper = styled.div`
   align-items: center;
   justify-content: center;
 
-  pre { margin: 0 0 5px; }
-  small { display: block; }
+  pre {
+    margin: 0 0 5px;
+  }
+  small {
+    display: block;
+  }
 `;
 
 const Wrapper = styled.div`
@@ -138,4 +144,3 @@ const TriggerWrapper = styled(Wrapper)`
     line-height: 1.1;
   }
 `;
-

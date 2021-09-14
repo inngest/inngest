@@ -1,18 +1,18 @@
 import styled from "@emotion/styled";
 import Action, { Outline } from "../shared/action";
 
-export default function Drag({ name, subtitle, icon, cursor })  {
+export default function Drag({ name, subtitle, icon, cursor }) {
   return (
-    <Wrapper role="img" aria-label="Dragging an action onto a workflow" className={cursor ? "dragging" : ""}>
-      { cursor && <img src="/icons/drag.svg" aria-role="presentation" alt="" /> }
-      <Action 
-        name={name}
-        subtitle={subtitle}
-        icon={icon}
-      />
-      { cursor && <Outline className="drop" /> }
+    <Wrapper
+      role="img"
+      aria-label="Dragging an action onto a workflow"
+      className={cursor ? "dragging" : ""}
+    >
+      {cursor && <img src="/icons/drag.svg" aria-role="presentation" alt="" />}
+      <Action name={name} subtitle={subtitle} icon={icon} />
+      {cursor && <Outline className="drop" />}
     </Wrapper>
-  )
+  );
 }
 
 const Wrapper = styled.div`
@@ -39,4 +39,3 @@ const Wrapper = styled.div`
     box-shadow: 0 6px 10px rgba(0, 0, 0, 0.1);
   }
 `;
-

@@ -11,26 +11,52 @@ export default function Workflow({ style, className }) {
         </Row>
         <Rule />
         <Row>
-          <Action name="Update account in Salesforce" subtitle="Set the account's value"
-                    icon="/icons/sf-cloud.svg" className="conn-top conn-bottom" />
-          <Action name="Send a slack notification" subtitle="In #new-payments" className="conn-top conn-bottom"/>
-          <Action name="Send a receipt" subtitle="Via Mailchimp" className="conn-top conn-bottom" />
+          <Action
+            name="Update account in Salesforce"
+            subtitle="Set the account's value"
+            icon="/icons/sf-cloud.svg"
+            className="conn-top conn-bottom"
+          />
+          <Action
+            name="Send a slack notification"
+            subtitle="In #new-payments"
+            className="conn-top conn-bottom"
+          />
+          <Action
+            name="Send a receipt"
+            subtitle="Via Mailchimp"
+            className="conn-top conn-bottom"
+          />
         </Row>
         <Row className="expression">
           <If expression="Amount >= $500" className="conn-bottom conn-top" />
-          <Action name="Update TAM dashboard" subtitle="Within Trello" className="conn-top" />
-          <If expression="If email bounces within 1 day" className="conn-bottom conn-top" />
+          <Action
+            name="Update TAM dashboard"
+            subtitle="Within Trello"
+            className="conn-top"
+          />
+          <If
+            expression="If email bounces within 1 day"
+            className="conn-bottom conn-top"
+          />
         </Row>
         <Row>
-          <Action name="Add to VIP list" subtitle="Via Mailchimp" className="conn-top" />
+          <Action
+            name="Add to VIP list"
+            subtitle="Via Mailchimp"
+            className="conn-top"
+          />
           <Empty />
-          <Action name="Create support issue" subtitle="Within Zendesk" className="conn-top" />
+          <Action
+            name="Create support issue"
+            subtitle="Within Zendesk"
+            className="conn-top"
+          />
         </Row>
       </Flow>
     </Wrapper>
   );
 }
-
 
 const Wrapper = styled.div`
   position: relative;
@@ -56,12 +82,12 @@ const Row = styled.div`
   > div + div {
     margin-left: 40px;
   }
-`
+`;
 
 const lineCSS = `
   background: #ddd;
   opacity: 0.3;
-`
+`;
 
 const BG = styled.div`
   position: absolute;
@@ -86,10 +112,8 @@ const Flow = styled.div`
   */
 
   .action {
-    box-shadow: 8px 10px 30px rgb(0 0 0 / 25%),
-      1px 1px 0px 0px #fff,
-      2px 2px 0px 0px #fff,
-      3px 5px 0px 0px #fff;
+    box-shadow: 8px 10px 30px rgb(0 0 0 / 25%), 1px 1px 0px 0px #fff,
+      2px 2px 0px 0px #fff, 3px 5px 0px 0px #fff;
   }
 
   .conn-top:before {
@@ -104,14 +128,14 @@ const Flow = styled.div`
   }
 
   .conn-bottom:after {
-      width: 1px;
-      content: "";
-      display: block;
-      position: absolute;
-      left: 50%;
-      bottom: -21px;
-      height: 20px;
-      ${lineCSS};
+    width: 1px;
+    content: "";
+    display: block;
+    position: absolute;
+    left: 50%;
+    bottom: -21px;
+    height: 20px;
+    ${lineCSS};
   }
 
   .if {

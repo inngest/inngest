@@ -84,22 +84,20 @@ export default function Home() {
               It's made for builders, designed for operators.
             </p>
 
-          <a
-            href="https://calendly.com/inngest-thb/30min"
-            className="button"
-            rel="nofollow"
-            target="_blank"
-          >
-            See how it works
-          </a>
+            <a
+              href="https://calendly.com/inngest-thb/30min"
+              className="button"
+              rel="nofollow"
+              target="_blank"
+            >
+              See how it works
+            </a>
           </div>
           <div className="workflow">
             <Workflow />
           </div>
         </Content>
-
       </Hero>
-      
 
       <Content>
         <Tagline>
@@ -136,7 +134,6 @@ export default function Home() {
             </p>
             <a href="/product" className="button button--outline">
               Learn more about the platform →
-
             </a>
           </HighLevel>
         </Content>
@@ -145,7 +142,6 @@ export default function Home() {
           <div>
             <h5>Introducing Inngest</h5>
             <h2>
-
               React to everything,
               <br />
               with zero code
@@ -153,8 +149,8 @@ export default function Home() {
 
             <p>
               Build complex automations via drag and drop - with or without
-              engineering. Instantly test and deploy new workflow versions,
-              with a full version history and changelog built-in.
+              engineering. Instantly test and deploy new workflow versions, with
+              a full version history and changelog built-in.
             </p>
             <p>
               <strong>
@@ -162,27 +158,26 @@ export default function Home() {
                 team focuses on the core product.
               </strong>
             </p>
-
           </div>
           <DragGraphic>
-                <div>
-                  <DragFC
-                    name="Send churn prevention push"
-                    subtitle="To the user's mobile device"
-                    icon="/icons/sf-cloud.svg"
-                  />
-                  <DragFC
-                    name="Create lead in Salesforce"
-                    subtitle="From the account in the event"
-                    icon="/icons/sf-cloud.svg"
-                    cursor
-                  />
-                  <DragFC
-                    name="Run suggested products ML"
-                    subtitle="For the user in the event"
-                    icon="/icons/sf-cloud.svg"
-                  />
-                </div>
+            <div>
+              <DragFC
+                name="Send churn prevention push"
+                subtitle="To the user's mobile device"
+                icon="/icons/sf-cloud.svg"
+              />
+              <DragFC
+                name="Create lead in Salesforce"
+                subtitle="From the account in the event"
+                icon="/icons/sf-cloud.svg"
+                cursor
+              />
+              <DragFC
+                name="Run suggested products ML"
+                subtitle="For the user in the event"
+                icon="/icons/sf-cloud.svg"
+              />
+            </div>
           </DragGraphic>
 
           <div>
@@ -198,67 +193,95 @@ export default function Home() {
 
           <IntegrateGraphic>
             <div className="wrapper">
-
               <div className="integration">
                 <div>
-                  <img src="https://app.inngest.com/assets/salesforce.png" alt="Salesforce" />
+                  <img
+                    src="https://app.inngest.com/assets/salesforce.png"
+                    alt="Salesforce"
+                  />
                 </div>
                 <div>
-                  <p><b>Salesforce</b></p>
+                  <p>
+                    <b>Salesforce</b>
+                  </p>
                   <small>CRM, Sales</small>
                 </div>
               </div>
 
               <div className="integration">
                 <div>
-                  <img src="https://app.inngest.com/assets/stripe.png" alt="Stripe" />
+                  <img
+                    src="https://app.inngest.com/assets/stripe.png"
+                    alt="Stripe"
+                  />
                 </div>
                 <div>
-                  <p><b>Stripe</b></p>
+                  <p>
+                    <b>Stripe</b>
+                  </p>
                   <small>Payments</small>
                 </div>
               </div>
 
               <div className="integration">
                 <div>
-                  <img src="https://cdn.brandfolder.io/5H442O3W/at/pl546j-7le8zk-btwjnu/Slack_RGB.png?height=205&width=500" alt="Slack" />
+                  <img
+                    src="https://cdn.brandfolder.io/5H442O3W/at/pl546j-7le8zk-btwjnu/Slack_RGB.png?height=205&width=500"
+                    alt="Slack"
+                  />
                 </div>
                 <div>
-                  <p><b>Slack</b></p>
+                  <p>
+                    <b>Slack</b>
+                  </p>
                   <small>CS, Ops</small>
                 </div>
               </div>
 
               <div className="integration">
                 <div>
-                  <img src="https://clickup.com/landing/images/brand-assets/logo-color-transparent.svg" alt="Salesforce" />
+                  <img
+                    src="https://clickup.com/landing/images/brand-assets/logo-color-transparent.svg"
+                    alt="Salesforce"
+                  />
                 </div>
                 <div>
-                  <p><b>ClickUp</b></p>
+                  <p>
+                    <b>ClickUp</b>
+                  </p>
                   <small>Project management</small>
                 </div>
               </div>
 
               <div className="integration">
                 <div>
-                  <img src="https://www.twilio.com/docs/static/company/img/logos/red/twilio-logo-red.e9621c245.png" alt="Stripe" />
+                  <img
+                    src="https://www.twilio.com/docs/static/company/img/logos/red/twilio-logo-red.e9621c245.png"
+                    alt="Stripe"
+                  />
                 </div>
                 <div>
-                  <p><b>Twilio</b></p>
+                  <p>
+                    <b>Twilio</b>
+                  </p>
                   <small>Messaging</small>
                 </div>
               </div>
 
               <div className="integration">
                 <div>
-                  <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Logo.png" alt="GitHub" />
+                  <img
+                    src="https://github.githubassets.com/images/modules/logos_page/GitHub-Logo.png"
+                    alt="GitHub"
+                  />
                 </div>
                 <div>
-                  <p><b>GitHub</b></p>
+                  <p>
+                    <b>GitHub</b>
+                  </p>
                   <small>Developer tools</small>
                 </div>
               </div>
-
             </div>
           </IntegrateGraphic>
 
@@ -598,6 +621,10 @@ const HIW = styled.div`
     grid-gap: 80px;
   }
 
+  h3 {
+    margin: .25rem 0 4rem;
+  }
+
   @media only screen and (max-width: 800px) {
     > div > div {
       grid-template-columns: 1fr;
@@ -696,11 +723,11 @@ const Box = styled.div`
   background: #fff;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
   padding: 1.5rem;
-`
+`;
 
 const Study = styled(Box)`
   margin: 4rem 2rem;
-`
+`;
 
 const DragGraphic = styled.div`
   display: flex;
@@ -708,7 +735,8 @@ const DragGraphic = styled.div`
   align-items: center;
   justify-content: center;
 
-  &, & > div {
+  &,
+  & > div {
     position: relative;
   }
 
@@ -729,8 +757,7 @@ const DragGraphic = styled.div`
       left: 3rem;
     }
   }
-
-`
+`;
 
 const IntegrateGraphic = styled.div`
   display: flex;
@@ -751,7 +778,8 @@ const IntegrateGraphic = styled.div`
     z-index: 0;
   }
 
-  &, & > div {
+  &,
+  & > div {
     position: relative;
     z-index: 1;
   }
@@ -766,7 +794,7 @@ const IntegrateGraphic = styled.div`
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-gap: 10px;
-    font-size: .9rem;
+    font-size: 0.9rem;
   }
 
   .wrapper > div {
@@ -786,10 +814,12 @@ const IntegrateGraphic = styled.div`
     }
   }
 
-  p { margin: 0 }
+  p {
+    margin: 0;
+  }
   small {
-    opacity: .5;
-    font-size: .7rem;
+    opacity: 0.5;
+    font-size: 0.7rem;
   }
 
   img {
