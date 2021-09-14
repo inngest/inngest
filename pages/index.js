@@ -7,6 +7,7 @@ import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import Workflow from "../shared/workflow";
 import DragFC from "../shared/drag";
+import UseCases from "../shared/usecases";
 import Tag, { greyCSS } from "../shared/tag";
 import Check from "../shared/icons/check";
 
@@ -125,7 +126,7 @@ export default function Home() {
       </Content>
 
       <Introducing>
-        <Content class="text-center">
+        <Content className="text-center">
           <HighLevel>
             <h2>Automation running in minutes</h2>
             <p>
@@ -303,6 +304,10 @@ export default function Home() {
           <div></div>
           */}
         </Content>
+
+        <Content>
+          <UseCases />
+        </Content>
       </Introducing>
 
       {/*
@@ -379,6 +384,7 @@ const HowItWorks = () => {
       <Content>
         <h5>How it works</h5>
         <h3>Implement any real-time logic you can dream of, in minutes.</h3>
+        <p>Start by receiving events automatically via integrations, or by sending us your own events through our API.</p>
 
         <div>
           <HIWGrid>
@@ -574,12 +580,12 @@ const Introducing = styled.div`
   .grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-gap: 80px;
+    grid-gap: 120px 80px;
   }
 `;
 
 const HighLevel = styled.div`
-  margin: 3rem 0 8rem;
+  margin: 5rem 0 10rem;
 
   h2 {
     margin: 0 0 1.5rem;
@@ -608,40 +614,6 @@ const HighLevel = styled.div`
   }
 `;
 
-const IntroGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-gap: 100px;
-  padding: 30px 0 0;
-
-  @media only screen and (max-width: 800px) {
-    grid-template-columns: 1fr;
-    grid-gap: 20px;
-  }
-`;
-
-const Callout = styled.div`
-  max-width: 80%;
-  margin: -115px auto 50px auto;
-
-  background: #fdfbf6;
-  padding: 40px;
-  box-shadow: 0 10px 50px rgba(0, 0, 0, 0.1);
-
-  display: flex;
-  flex-flow: column;
-  align-items: center;
-  position: relative;
-  z- > h5 {
-    align-self: center;
-  }
-
-  @media only screen and (max-width: 800px) {
-    grid-template-columns: 1fr;
-    grid-gap: 20px;
-  }
-`;
-
 const HIW = styled.div`
   > div > div {
     display: grid;
@@ -649,8 +621,10 @@ const HIW = styled.div`
     grid-gap: 80px;
   }
 
-  h3 {
-    margin: 0.25rem 0 4rem;
+  h3 { margin: 0.25rem 0 0.5rem; }
+  h3 + p {
+    margin: 0 0 4rem 0;
+    opacity: .6;
   }
 
   @media only screen and (max-width: 800px) {
