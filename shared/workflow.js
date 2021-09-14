@@ -41,8 +41,8 @@ const Wrapper = styled.div`
   transform: perspective(1500px) rotateX(51deg) rotateZ(43deg);
   transform-style: preserve-3d;
   */
-  transform: perspective(1500px) rotateX(25deg) rotateY(345deg) rotateZ(10deg);
-  transform: perspective(2500px) rotateX(9deg) rotateY(346deg) rotateZ(4deg)
+  transform: perspective(2500px) rotateX(10deg) rotateY(346deg) rotateZ(4deg);
+  transform: perspective(2500px) rotateX(31deg) rotateY(346deg) rotateZ(18deg);
 `;
 
 const Row = styled.div`
@@ -86,7 +86,7 @@ const Flow = styled.div`
   */
 
   .action {
-    box-shadow: 8px 10px 30px rgba(0, 0, 0, 0.15);
+    box-shadow: 8px 10px 30px rgba(0, 0, 0, 0.25);
 
   }
   .conn-top:before {
@@ -109,10 +109,21 @@ const Flow = styled.div`
       bottom: -21px;
       height: 20px;
       ${lineCSS};
-    }
+  }
 
   .if {
     box-shadow: 8px 10px 30px rgba(0, 0, 0, 0.05);
+    height: 60px;
+    margin-top: 10px;
+
+    &.conn-top:before {
+      height: 30px;
+      top: -31px;
+    }
+    &.conn-bottom:after {
+      height: 30px;
+      bottom: -31px;
+    }
   }
 `;
 

@@ -392,7 +392,6 @@ const Hero = styled.div`
     max-width: 100%;
     height: 480px;
     max-height: 500px;
-    padding-left: 20px;
   }
 
   @media only screen and (max-width: 800px) {
