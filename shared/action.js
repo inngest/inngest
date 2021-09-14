@@ -80,7 +80,7 @@ const Wrapper = styled.div`
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
   height: 80px;
   width: 280px;
-  padding: 0 20px;
+  padding: 0 15px 0 20px;
   border: 1px solid #e8e8e6;
   position: relative;
   z-index: 1;
@@ -88,7 +88,7 @@ const Wrapper = styled.div`
   line-height: 0.7;
 
   display: grid;
-  grid-template-columns: 55px auto;
+  grid-template-columns: 50px auto;
   align-items: center;
   text-align: left;
 

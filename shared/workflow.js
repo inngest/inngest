@@ -86,7 +86,10 @@ const Flow = styled.div`
   */
 
   .action {
-    box-shadow: 8px 10px 30px rgba(0, 0, 0, 0.25), 1px 1px 0px 1px #fff;
+    box-shadow: 8px 10px 30px rgb(0 0 0 / 25%),
+      1px 1px 0px 0px #fff,
+      2px 2px 0px 0px #fff,
+      3px 5px 0px 0px #fff;
   }
 
   .conn-top:before {

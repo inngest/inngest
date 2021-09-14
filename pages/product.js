@@ -6,6 +6,7 @@ import Footer from "../shared/footer";
 import Content from "../shared/content";
 import Action, { Outline } from "../shared/action";
 import Tag, { greyCSS } from "../shared/tag";
+import DragFC from "../shared/drag";
 
 export default function Product() {
   return (
@@ -134,20 +135,19 @@ export default function Product() {
           <p className="subtitle text-center">
             Our powerful workflow engine allows complex, multi-step workflows
             which can coordinate between events in your business.
+            <br />
+            For engineers, workflows are defined with a strongly typed config language.  For operators, workflows can be edited visually.
           </p>
 
           <Grid style={{ paddingTop: 20 }}>
             <div>
               <Drag>
-                <div role="img" aria-label="Dragging an action onto a workflow">
-                  <img src="/icons/drag.svg" aria-role="presentation" alt="" />
-                  <Action
+                  <DragFC
                     name="Create lead in Salesforce"
                     subtitle="From the account in the event"
                     icon="/icons/sf-cloud.svg"
+                    cursor
                   />
-                  <Outline className="drop" />
-                </div>
               </Drag>
 
               <p className="title">Drag &amp; Drop interface</p>

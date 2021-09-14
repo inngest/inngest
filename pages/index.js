@@ -6,6 +6,7 @@ import theme from "react-syntax-highlighter/dist/cjs/styles/prism/dracula";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import Workflow from "../shared/workflow";
+import DragFC from "../shared/drag";
 import Check from "../shared/icons/check";
 
 // TODO: move these into env vars
@@ -171,7 +172,26 @@ export default function Home() {
             </p>
 
           </div>
-          <div></div>
+          <DragGraphic>
+                <div>
+                  <DragFC
+                    name="Send churn prevention push"
+                    subtitle="To the user's mobile device"
+                    icon="/icons/sf-cloud.svg"
+                  />
+                  <DragFC
+                    name="Create lead in Salesforce"
+                    subtitle="From the account in the event"
+                    icon="/icons/sf-cloud.svg"
+                    cursor
+                  />
+                  <DragFC
+                    name="Run suggested products ML"
+                    subtitle="For the user in the event"
+                    icon="/icons/sf-cloud.svg"
+                  />
+                </div>
+          </DragGraphic>
 
           <div>
             <h2>Integrate anything, instantly</h2>
@@ -337,22 +357,10 @@ const Hero = styled.div`
   color: #fff;
 
   background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
-  box-shadow: inset 0 0 0 20px #fff;
+  border-left: 20px solid #fff;
+  border-right: 20px solid #fff;
 
   min-height: 400px;
-
-  &:before {
-    content: "";
-    display: block;
-    background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
-    height: 20px;
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    border-left: 20px solid #fff;
-    border-right: 20px solid #fff;
-  }
 
   > div {
     display: grid;
@@ -447,7 +455,7 @@ const Tagline = styled.div`
 `;
 
 const Introducing = styled.div`
-  box-shadow: inset 0 0 0 20px #fff;
+  box-shadow: inset 0 -20px 0 20px #fff;
   background-repeat: repeat;
   background-image: linear-gradient(
     180deg,
@@ -455,7 +463,7 @@ const Introducing = styled.div`
     rgba(249, 251, 254, 1) 100%
   );
   padding: 180px 40px 180px 40px;
-  margin-top: -120px;
+  margin-top: -100px;
   position: relative;
 
   h5 + p {
@@ -632,4 +640,34 @@ const Box = styled.div`
 
 const Study = styled(Box)`
   margin: 4rem 2rem;
+`
+
+const DragGraphic = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  &, & > div {
+    position: relative;
+  }
+
+  > div {
+    padding: 50px;
+    background: url(/assets/circle.svg) no-repeat center center;
+    background-size: contain;
+
+    > div {
+      margin-top: 1.5rem;
+      left: 1rem;
+      font-size: 13px !important;
+    }
+    > div:first-of-type {
+      left: -1rem;
+    }
+    > div:last-of-type {
+      left: 3rem;
+    }
+  }
+
 `
