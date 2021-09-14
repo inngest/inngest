@@ -499,11 +499,12 @@ const Hero = styled.div`
       display: none;
     }
 
-
     > div {
       display: block;
     }
-    .workflow { display: none }
+    .workflow {
+      display: none;
+    }
   }
 `;
 
@@ -565,7 +566,9 @@ const Introducing = styled.div`
   @media only screen and (max-width: 800px) {
     margin-top: 20px;
     padding-top: 40px;
-    .grid { padding: 0 }
+    .grid {
+      padding: 0;
+    }
   }
 
   .grid {
@@ -594,7 +597,9 @@ const HighLevel = styled.div`
     text-align: left;
     margin: 0 0 3rem;
 
-    p { max-width: 100% }
+    p {
+      max-width: 100%;
+    }
 
     .button {
       font-size: 14px;
@@ -645,7 +650,7 @@ const HIW = styled.div`
   }
 
   h3 {
-    margin: .25rem 0 4rem;
+    margin: 0.25rem 0 4rem;
   }
 
   @media only screen and (max-width: 800px) {

@@ -390,8 +390,12 @@ const Hero = styled.div`
 
   @media only screen and (max-width: 800px) {
     padding: 20px 0 50px;
-    > div { display: block; }
-    .images { display: none }
+    > div {
+      display: block;
+    }
+    .images {
+      display: none;
+    }
   }
 `;
 
@@ -408,7 +412,9 @@ const How = styled.div`
   padding: 6rem 0 6rem;
   position: relative;
 
-  h2 { margin: 0; }
+  h2 {
+    margin: 0;
+  }
 
   @media only screen and (max-width: 800px) {
     box-shadow: none;
@@ -429,9 +435,13 @@ const Details = styled.div`
   padding: 6rem 0 6rem;
   position: relative;
 
-  h2 { margin: 0 }
+  h2 {
+    margin: 0;
+  }
 
-  @media only screen and (max-width: 800px) { box-shadow: none; }
+  @media only screen and (max-width: 800px) {
+    box-shadow: none;
+  }
 `;
 
 const HIW = styled.div`
