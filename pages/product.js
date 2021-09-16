@@ -142,7 +142,7 @@ export default function Product() {
             language. For operators, workflows can be edited visually.
           </p>
 
-          <Grid style={{ paddingTop: 20 }}>
+          <Grid style={{ paddingTop: 60 }}>
             <div>
               <Drag>
                 <DragFC
@@ -155,7 +155,7 @@ export default function Product() {
 
               <p className="title">Drag &amp; Drop interface</p>
               <p>
-                Visually build workflows to create integrations, define logic,
+                Visually inspect or modify workflows to create integrations, define logic,
                 and map data between apps.
               </p>
             </div>
@@ -274,7 +274,7 @@ export default function Product() {
                 keys you can rest assured your data is secure.
               </p>
 
-              <ul>
+              <ul className="check">
                 <li>
                   <b>Automatic retries</b> prevents issues when other services
                   are down
@@ -318,7 +318,7 @@ export default function Product() {
                 figure out which workflows each of your users run through.
               </p>
 
-              <ul>
+              <ul className="check">
                 <li>
                   <b>Unlimited users</b> for wide collaboration and visibility
                   within your company
@@ -510,7 +510,7 @@ const Grid = styled.div`
   margin: 3rem 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-gap: 5rem 4rem;
+  grid-gap: 6rem 4rem;
 
   .title {
     font-weight: bold;
