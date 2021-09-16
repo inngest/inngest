@@ -128,7 +128,7 @@ export default function Home() {
             <h2>Automation running in minutes</h2>
             <p>
               Inngest aggregates events from your internal &amp; external
-              systems and runs workflows when things happen in your business.  It's like Segment and GitHub Actions in a blender.
+              systems and runs workflows when things happen in your business.  It's like Segment and GitHub Actions in a blender, for anything.
             </p>
             <a href="https://3k9rdboxxni.typeform.com/to/mAeyapA8" className="button button--outline" rel="nofollow">
               Learn more about the platform →
@@ -140,22 +140,21 @@ export default function Home() {
           <div>
             <h5>Introducing Inngest</h5>
             <h2>
-              React to everything,
-              <br />
-              with zero code
+              React to everything, across any system
             </h2>
 
             <p>
-              Build complex automations via drag and drop - with or without
-              engineering. Instantly test and deploy new workflow versions, with
+              Build, test, and deploy complex automations using statically typed config
+              or our visual UI. Instantly test and deploy new workflow versions, with
               a full version history and changelog built-in.
             </p>
             <p>
               <strong>
-                Inngest lets you build event-driven logic while your engineering
-                team focuses on the core product.
+                Inngest handles your event-driven logic so you can focus
+                on your&nbsp;core&nbsp;product.
               </strong>
             </p>
+
           </div>
           <DragGraphic>
             <div>
@@ -182,8 +181,8 @@ export default function Home() {
             <h2>Integrate anything, instantly</h2>
 
             <p>
-              <strong>Inngest lets you build faster.</strong> We let you
-              integrate with any API, no code required. When your requirements
+              <strong>Inngest lets you build faster, decoupling your integrations from your events.</strong> We let you
+              integrate with any API, out of the box. When your requirements
               change, it only takes a few seconds to set up and swap your next
               integration.
             </p>

@@ -5,7 +5,8 @@ export default function UseCases() {
     <>
           <Title className="text-center">
             <h2>People use us to get stuff done</h2>
-            <p>Say goodbye to fickle integrations and long development cycles.  Get stuff done in minutes using our platform.</p>
+            <p>Say goodbye to fickle integrations and long development cycles.  Get stuff done in minutes using our platform.<br />
+        Here's a few things that people use us for:</p>
           </Title>
     <Grid>
       <Item>
@@ -16,8 +17,8 @@ export default function UseCases() {
 
       <Item>
         <div><img src="/assets/churn.png" /></div>
-        <h3>Churn management</h3>
-        <p>Decrease churn and increase engagement by creating targeted workflows which run when users begin churning - by monitoring for the <b>absence of events</b>.</p>
+        <h3>User flows</h3>
+        <p>Create targeted workflows which run when users do things or <i>don't</i> - by monitoring for the <b>absence of events</b>.</p>
       </Item>
 
       <Item>
@@ -28,8 +29,8 @@ export default function UseCases() {
 
       <Item>
         <div><img src="/assets/ar.png" /></div>
-        <h3>Dunning &amp; AR automation</h3>
-        <p>Run custom logic when subscriptions or payments fail, capturing outstanding AR easily.</p>
+        <h3>Billing &amp; AR automation</h3>
+        <p>Run custom logic when subscriptions charge - or payments fail, capturing outstanding AR easily.</p>
       </Item>
     </Grid>
     </>
