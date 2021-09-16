@@ -32,7 +32,7 @@ export default function Workflow({ style, className }) {
           <If expression="Amount >= $500" className="conn-bottom conn-top" />
           <Action
             name="Update TAM dashboard"
-            subtitle="Within Trello"
+            subtitle="By running custom code"
             className="conn-top"
           />
           <If
@@ -103,13 +103,8 @@ const BG = styled.div`
 const Flow = styled.div`
   position: absolute;
 
-  top: -40px;
-  left: -40px;
-
-  /*
-  top: -20px;
-  left: -20px;
-  */
+  top: 0;
+  left: 0;
 
   .action {
     box-shadow: 8px 10px 30px rgb(0 0 0 / 25%), 1px 1px 0px 0px #fff,

@@ -75,14 +75,11 @@ export default function Home() {
       <Hero>
         <Content className="grid">
           <div>
-            <h1>Trigger low-code logic from events</h1>
+            <h1>Run real-time workflows from any event</h1>
             <p>
               <strong>
-                Build real time, event driven workflows in&nbsp;minutes,
-                with&nbsp;or&nbsp;without engineering&nbsp;teams.
-                <br />
-              </strong>{" "}
-              It's made for builders, designed for operators.
+                Build and run complex workflows in real-time, triggered by any event across your stack.
+              </strong>{" "} It's made for builders, designed for operators.
             </p>
 
             <a
@@ -131,7 +128,7 @@ export default function Home() {
             <h2>Automation running in minutes</h2>
             <p>
               Inngest aggregates events from your internal &amp; external
-              systems and runs any code when things happen in your business.
+              systems and runs workflows when things happen in your business.  It's like Segment and GitHub Actions in a blender.
             </p>
             <a href="https://3k9rdboxxni.typeform.com/to/mAeyapA8" className="button button--outline" rel="nofollow">
               Learn more about the platform →
@@ -447,7 +444,7 @@ const Content = styled.div`
 
 const Hero = styled.div`
   font-size: 1.3125rem;
-  padding: 100px 0 0;
+  padding: 80px 0 60px;
   position: relative;
   color: #fff;
 
@@ -459,7 +456,7 @@ const Hero = styled.div`
 
   > div {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 2fr 3fr;
     grid-gap: 80px;
   }
 
@@ -599,7 +596,7 @@ const HighLevel = styled.div`
 
   p {
     font-size: 1.3rem;
-    max-width: 70%;
+    max-width: 80%;
     margin: 0 auto 3rem;
     line-height: 1.35;
     opacity: .6;
