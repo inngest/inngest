@@ -13,7 +13,6 @@ const Nav = ({ dark }) => {
               <img src="/logo-blue.svg" alt="Inngest logo" />
             )}
           </a>
-          {/*
           <Hoverable>
             <StyledLink href="/product">Product</StyledLink>
             <div>
@@ -44,9 +43,9 @@ const Nav = ({ dark }) => {
                 Engineering
                 <span>Serverless event hub and functions</span>
               </a>
+              */}
             </div>
           </Hoverable>
-          */}
           <StyledLink href="/blog">Blog</StyledLink>
           {/*
           <StyledLink href="/pricing">Pricing</StyledLink>
