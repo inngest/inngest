@@ -23,15 +23,15 @@ It’s like putting GitHub Actions, Lambda, Segment, and Zapier in a blender.  Y
 
 ## Why events?
 
-Events are powerful: they describe exactly what happens in every system.  When a user signs up, that’s an event.  When a user pays (or... fails to pay), that’s an event.  When you update a task, or a Salesforce lead, or a GitHub PR that’s an event.
+Events are powerful: they describe exactly what happens in every system.  When a user signs up, that’s an event.  When a user pays (or... fails to pay), that’s an event.  When you update a task, or a Salesforce lead, or a GitHub PR, that’s an event.
 
 So, **events represent things as they happen in real time**.  You're probably familiar with them already because, well, product analytics has been a thing for some time.
 
-But they're powerful not just because of analytics.  They're powerful because your systems often need to run a bunch of logic when things happen.  For example, when a user signs up to your account you might need to add them to your billing system, add them to marketing lists, add them to your sales tools, add them to your CRM, and send them an email.
+But they're powerful not just because of analytics.  They're powerful because **your systems often need to run a bunch of logic when things happen**.  For example, when a user signs up to your account you might need to add them to your billing system, add them to marketing lists, add them to your sales tools, add them to your CRM, and send them an email.
 
-To start, you might chuck the first integration in your API controller.  Or a goroutine.  And as things progress you might start building out queues, or if you're all in on microservices you might want to build a lot of infrastructure around sending messages - events.
+To start, you might chuck the first integration in your API controller.  Or a goroutine.  And as things progress you might start building out queues for each integration.  Or, if you're all in on microservices, you might want to build a lot of infrastructure around sending messages - events.
 
-The beautiful thing about events is that **events are decoupled from the actual implementation that creates them**.  You can change how signup works (oauth, magic links, or - have mercy - saml), but the event is still the same.  **It gives you freedom**.
+The beautiful thing about events is that **events are decoupled from the actual implementation that creates them**.  You can change how signup works (oauth, magic links, or - have mercy - saml), but the event is still the same.  Events grant you freedom.
 
 Unifying and working with these events makes a lot possible.
 
