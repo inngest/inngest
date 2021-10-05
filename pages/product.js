@@ -406,7 +406,6 @@ const How = styled.div`
     rgba(243, 245, 245, 1) 20%,
     rgba(249, 251, 254, 1) 100%
   );
-  box-shadow: inset 0 -20px 0 20px #fff;
   margin-top: -40px;
   margin-bottom: -20px;
   padding: 6rem 0 6rem;
@@ -429,7 +428,6 @@ const Details = styled.div`
     rgba(243, 245, 245, 1) 20%,
     rgba(249, 251, 254, 1) 100%
   );
-  box-shadow: inset 0 -20px 0 20px #fff;
   margin-top: -40px;
   margin-bottom: -20px;
   padding: 6rem 0 6rem;

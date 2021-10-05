@@ -160,25 +160,12 @@ h2, .text--blue {
 .hero-dark {
   padding: 100px 0 0;
   background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
-  box-shadow: inset 0 0 0 20px #fff;
   position: relative;
   color: #fff;
 }
 
-.hero-dark:before {
-  content: "";
-  display: block;
-  background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
-  height: 20px;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-}
-
 @media only screen and (max-width: 800px) {
   .hero-dark { box-shadow: none }
-  .hero-dark:before { display: none }
   .nav-dark { border: 0 none }
 }
 
