@@ -134,9 +134,8 @@ export default function Home() {
               It's like Segment and GitHub Actions in a blender, for anything.
             </p>
             <a
-              href="https://3k9rdboxxni.typeform.com/to/mAeyapA8"
+              href="https://www.inngest.com/blog/introducing-inngest"
               className="button button--outline"
-              rel="nofollow"
             >
               Learn more about the platform →
             </a>
