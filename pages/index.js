@@ -75,7 +75,7 @@ export default function Home() {
       <Hero>
         <Content className="grid">
           <div>
-            <h1>Run real-time workflows from any event</h1>
+            <h1>Serverless functions <i>driven&nbsp;by</i> events</h1>
             <p>
               <strong>
                 Build and run complex workflows in real-time, triggered by any
@@ -85,12 +85,12 @@ export default function Home() {
             </p>
 
             <a
-              href="https://3k9rdboxxni.typeform.com/to/mAeyapA8"
-              className="button"
+              href="https://app.inngest.com/register"
+              className="button button--outline-white"
               rel="nofollow"
               target="_blank"
             >
-              See how it works
+              Get started for free →
             </a>
           </div>
           <div className="workflow">
@@ -127,7 +127,7 @@ export default function Home() {
       <Introducing>
         <Content className="text-center">
           <HighLevel>
-            <h2>Automation running in minutes</h2>
+            <h2>Serverless workflows running in seconds</h2>
             <p>
               Inngest aggregates events from your internal &amp; external
               systems and runs workflows when things happen in your business.
@@ -145,16 +145,17 @@ export default function Home() {
         <Content className="grid">
           <div>
             <h5>Introducing Inngest</h5>
-            <h2>React to everything, across any system</h2>
+            <h2>React to everything</h2>
+
+            <ul className='check'>
+              <li>Build, test, and deploy serverless functions as workflows in any language</li>
+              <li>Trigger functions and workflows from any event - internal or external</li>
+              <li>Instantly test and deploy new workflow versions, with a full version history and changelog built-in</li>
+            </ul>
 
             <p>
-              Build, test, and deploy complex automations using statically typed
-              config or our visual UI. Instantly test and deploy new workflow
-              versions, with a full version history and changelog built-in.
-            </p>
-            <p>
               <strong>
-                Inngest handles your event-driven logic so you can focus on
+                Inngest handles your business logic so you can focus on
                 your&nbsp;core&nbsp;product.
               </strong>
             </p>
@@ -181,16 +182,19 @@ export default function Home() {
           </DragGraphic>
 
           <div>
-            <h2>Integrate anything, instantly</h2>
+            <h2>Build faster, effortlessly</h2>
+
+            <ul className='check'>
+              <li>Integrate events from external services via webhooks</li>
+              <li>Full logging and step-over debugging supported</li>
+              <li>Common API integrations provided out of the box:  no more glue code</li>
+            </ul>
 
             <p>
               <strong>
                 Inngest lets you build faster, decoupling your integrations from
                 your events.
-              </strong>{" "}
-              We let you integrate with any API, out of the box. When your
-              requirements change, it only takes a few seconds to set up and
-              swap your next integration.
+              </strong>
             </p>
           </div>
 
@@ -307,14 +311,23 @@ export default function Home() {
           */}
         </Content>
 
+        <div className="text-center" style={{ marginTop: "8rem" }}>
+          <a
+            href="https://app.inngest.com/register"
+            className="button button--outline"
+          >
+            Get started for free →
+          </a>
+        </div>
+
+
         <Content>
           <UseCases />
 
           <div className="text-center" style={{ marginTop: "8rem" }}>
             <a
-              href="https://3k9rdboxxni.typeform.com/to/mAeyapA8"
+              href="/product"
               className="button button--outline"
-              rel="nofollow"
             >
               See how the platform works →
             </a>
@@ -424,7 +437,7 @@ const HowItWorks = () => {
               </p>
             </li>
             <li>
-              <strong>Manage your automations</strong>
+              <strong>Manage your functions</strong>
               <p>
                 Easily manage your workflows, with full version histories and
                 visibility into which users run through which versions.
@@ -466,7 +479,7 @@ const Hero = styled.div`
 
   > div {
     display: grid;
-    grid-template-columns: 2fr 3fr;
+    grid-template-columns: 1fr 1fr;
     grid-gap: 80px;
   }
 
@@ -502,6 +515,7 @@ const Hero = styled.div`
     max-width: 100%;
     height: 480px;
     max-height: 500px;
+    transform: scale(0.8);
   }
 
   @media only screen and (max-width: 800px) {
@@ -581,6 +595,10 @@ const Introducing = styled.div`
     font-size: 1.3125rem;
   }
 
+  ul + p {
+    margin-top: 1.5rem;
+  }
+
   @media only screen and (max-width: 800px) {
     margin-top: 20px;
     padding-top: 40px;
@@ -627,6 +645,8 @@ const HighLevel = styled.div`
 `;
 
 const HIW = styled.div`
+  padding: 5rem 0 0;
+
   > div > div {
     display: grid;
     grid-template-columns: 1fr 1fr;

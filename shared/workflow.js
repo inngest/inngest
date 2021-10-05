@@ -96,7 +96,7 @@ const BG = styled.div`
   height: 420px;
   width: 920px;
   border-radius: 20px;
-  opacity: 0.2;
+  opacity: 0.1;
   filter: blur(120px);
 `;
 

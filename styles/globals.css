@@ -68,6 +68,12 @@ button, .button {
   color: var(--blue-right) !important;
 }
 
+.button--outline-white {
+  background-color: transparent;
+  border: 1px solid #ffffffbb;
+  color: #fff !important;
+}
+
 button:hover, .button:hover {
   cursor: pointer;
   background-color: gray;
@@ -102,7 +108,7 @@ h1 {
 }
 
 h2 {
-  font-size: 2.75rem;
+  font-size: 2.5rem;
   font-weight: 800;
   color: #2E3A59;
 }
