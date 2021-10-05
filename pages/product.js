@@ -155,8 +155,8 @@ export default function Product() {
 
               <p className="title">Drag &amp; Drop interface</p>
               <p>
-                Visually inspect or modify workflows to create integrations, define logic,
-                and map data between apps.
+                Visually inspect or modify workflows to create integrations,
+                define logic, and map data between apps.
               </p>
             </div>
 
