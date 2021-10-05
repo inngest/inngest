@@ -6,7 +6,7 @@ export const Wrapper = styled.div`
 
 export const Inner = styled.div`
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
 
   padding: 120px 0;
 
@@ -19,7 +19,7 @@ export const Inner = styled.div`
   }
 
   > p {
-    margin-bottom: 0;
+    margin-bottom: 0.25rem;
   }
   > ul {
     margin: 2rem 0 0;
@@ -28,6 +28,7 @@ export const Inner = styled.div`
   h1 {
     margin: 0 0 2rem;
   }
+
   h2 {
     margin: 3.5rem 0 1rem;
     font-weight: 600;
@@ -48,14 +49,15 @@ export const Inner = styled.div`
     box-sizing: content-box;
     padding: 2rem;
     margin: -1rem 0 0 -2rem;
+    border-radius: 10px;
 
     background-image: linear-gradient(
       -45deg,
-      rgba(0, 0, 0, 0.03) 25%,
+      rgba(0, 0, 0, 0.04) 25%,
       transparent 25%,
       transparent 50%,
-      rgba(0, 0, 0, 0.03) 50%,
-      rgba(0, 0, 0, 0.03) 75%,
+      rgba(0, 0, 0, 0.04) 50%,
+      rgba(0, 0, 0, 0.04) 75%,
       transparent 75%,
       transparent
     );

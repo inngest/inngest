@@ -10,15 +10,7 @@ export default function BlogLayout() {
       <Wrapper>
         <Nav />
         <Content>
-          <List>
-            <a href="/blog/introducing-inngest" className="post--item">
-              <h2>Introducing Inngest: an event workflow platform</h2>
-              <p>
-                We’re launching Inngest, a platform designed to make building
-                event-driven systems fast and easy.
-              </p>
-            </a>
-          </List>
+          <List>$1</List>
         </Content>
         <Footer />
       </Wrapper>

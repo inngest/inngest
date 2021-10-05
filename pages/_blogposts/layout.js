@@ -5,14 +5,12 @@ import { Wrapper, Inner } from "../../shared/blog";
 
 export default function BlogLayout() {
   return (
-    <>
-      <Wrapper>
-        <Nav />
-        <Content>
-          <Inner>$1</Inner>
-        </Content>
-        <Footer />
-      </Wrapper>
-    </>
+    <Wrapper>
+      <Nav />
+      <Content>
+        <Inner>$1</Inner>
+      </Content>
+      <Footer />
+    </Wrapper>
   );
 }
