@@ -1,6 +1,10 @@
 @import url('https://rsms.me/inter/inter.css');
 
-html, body, button, input { font-family: 'Inter', sans-serif; color: #222631  }
+html, body, button, input {
+  font-family: 'Inter', sans-serif;
+  color: #222631;
+  font-size: 18px;
+}
 
 @supports (font-variation-settings: normal) {
   html { font-family: 'Inter var', sans-serif; }
@@ -14,6 +18,12 @@ html, body, button, input { font-family: 'Inter', sans-serif; color: #222631  }
   --blue-right: #18435c;
 
   --cream: #f9f9f1;
+
+  --bg-gradient: linear-gradient(
+    180deg,
+    rgba(243, 245, 245, 1) 20%,
+    rgba(249, 251, 254, 1) 100%
+  );
 }
 
 html, body {
@@ -81,11 +91,12 @@ a[href]:not([href='']) {
 }
 
 p, li {
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 h1 {
   font-size: 60px;
+  line-height: 1.15;
   margin: 20px 0;
   color: #2E3A59;
 }
@@ -132,13 +143,12 @@ h5 + h2 {
 
 .nav-dark {
   background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
-  border-left: 20px solid #fff;
-  border-right: 20px solid #fff;
   color: #fff;
 }
 
 h2, .text--blue {
   background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
+  background: #2E3A59;
   background-clip: text;
   color: transparent;
 }
@@ -164,8 +174,6 @@ h2, .text--blue {
   top: 0;
   left: 0;
   right: 0;
-  border-left: 20px solid #fff;
-  border-right: 20px solid #fff;
 }
 
 @media only screen and (max-width: 800px) {

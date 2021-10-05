@@ -78,8 +78,10 @@ export default function Home() {
             <h1>Run real-time workflows from any event</h1>
             <p>
               <strong>
-                Build and run complex workflows in real-time, triggered by any event across your stack.
-              </strong>{" "} It's made for builders, designed for operators.
+                Build and run complex workflows in real-time, triggered by any
+                event across your stack.
+              </strong>{" "}
+              It's made for builders, designed for operators.
             </p>
 
             <a
@@ -128,9 +130,14 @@ export default function Home() {
             <h2>Automation running in minutes</h2>
             <p>
               Inngest aggregates events from your internal &amp; external
-              systems and runs workflows when things happen in your business.  It's like Segment and GitHub Actions in a blender, for anything.
+              systems and runs workflows when things happen in your business.
+              It's like Segment and GitHub Actions in a blender, for anything.
             </p>
-            <a href="https://3k9rdboxxni.typeform.com/to/mAeyapA8" className="button button--outline" rel="nofollow">
+            <a
+              href="https://3k9rdboxxni.typeform.com/to/mAeyapA8"
+              className="button button--outline"
+              rel="nofollow"
+            >
               Learn more about the platform →
             </a>
           </HighLevel>
@@ -139,22 +146,19 @@ export default function Home() {
         <Content className="grid">
           <div>
             <h5>Introducing Inngest</h5>
-            <h2>
-              React to everything, across any system
-            </h2>
+            <h2>React to everything, across any system</h2>
 
             <p>
-              Build, test, and deploy complex automations using statically typed config
-              or our visual UI. Instantly test and deploy new workflow versions, with
-              a full version history and changelog built-in.
+              Build, test, and deploy complex automations using statically typed
+              config or our visual UI. Instantly test and deploy new workflow
+              versions, with a full version history and changelog built-in.
             </p>
             <p>
               <strong>
-                Inngest handles your event-driven logic so you can focus
-                on your&nbsp;core&nbsp;product.
+                Inngest handles your event-driven logic so you can focus on
+                your&nbsp;core&nbsp;product.
               </strong>
             </p>
-
           </div>
           <DragGraphic>
             <div>
@@ -181,10 +185,13 @@ export default function Home() {
             <h2>Integrate anything, instantly</h2>
 
             <p>
-              <strong>Inngest lets you build faster, decoupling your integrations from your events.</strong> We let you
-              integrate with any API, out of the box. When your requirements
-              change, it only takes a few seconds to set up and swap your next
-              integration.
+              <strong>
+                Inngest lets you build faster, decoupling your integrations from
+                your events.
+              </strong>{" "}
+              We let you integrate with any API, out of the box. When your
+              requirements change, it only takes a few seconds to set up and
+              swap your next integration.
             </p>
           </div>
 
@@ -305,7 +312,11 @@ export default function Home() {
           <UseCases />
 
           <div className="text-center" style={{ marginTop: "8rem" }}>
-            <a href="https://3k9rdboxxni.typeform.com/to/mAeyapA8" className="button button--outline" rel="nofollow">
+            <a
+              href="https://3k9rdboxxni.typeform.com/to/mAeyapA8"
+              className="button button--outline"
+              rel="nofollow"
+            >
               See how the platform works →
             </a>
           </div>
@@ -386,7 +397,10 @@ const HowItWorks = () => {
       <Content>
         <h5>How it works</h5>
         <h3>Implement any real-time logic you can dream of, in minutes.</h3>
-        <p>Start by receiving events automatically via integrations, or by sending us your own events through our API.</p>
+        <p>
+          Start by receiving events automatically via integrations, or by
+          sending us your own events through our API.
+        </p>
 
         <div>
           <HIWGrid>
@@ -442,14 +456,12 @@ const Content = styled.div`
 `;
 
 const Hero = styled.div`
-  font-size: 1.3125rem;
+  font-size: 1.2125rem;
   padding: 80px 0 60px;
   position: relative;
   color: #fff;
 
   background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
-  border-left: 20px solid #fff;
-  border-right: 20px solid #fff;
 
   min-height: 400px;
 
@@ -556,7 +568,6 @@ const Tagline = styled.div`
 `;
 
 const Introducing = styled.div`
-  box-shadow: inset 0 -20px 0 20px #fff;
   background-repeat: repeat;
   background-image: linear-gradient(
     180deg,
@@ -598,7 +609,7 @@ const HighLevel = styled.div`
     max-width: 80%;
     margin: 0 auto 3rem;
     line-height: 1.35;
-    opacity: .6;
+    opacity: 0.6;
   }
 
   @media only screen and (max-width: 800px) {
@@ -623,10 +634,12 @@ const HIW = styled.div`
     grid-gap: 80px;
   }
 
-  h3 { margin: 0.25rem 0 0.5rem; }
+  h3 {
+    margin: 0.25rem 0 0.5rem;
+  }
   h3 + p {
     margin: 0 0 4rem 0;
-    opacity: .6;
+    opacity: 0.6;
   }
 
   @media only screen and (max-width: 800px) {
