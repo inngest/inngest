@@ -70,12 +70,12 @@ const Nav = ({ dark }) => {
           <StyledLink href="https://app.inngest.com/login">Sign in</StyledLink>
 
           <a
-            href="https://3k9rdboxxni.typeform.com/to/mAeyapA8"
+            href="https://app.inngest.com/register"
             className="button"
             rel="nofollow"
             target="_blank"
           >
-            See how it works →
+            Sign up →
           </a>
         </div>
       </Container>
