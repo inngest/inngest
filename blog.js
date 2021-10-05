@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-
 // This provides a framework for constructing blog posts from markdown.  It's relatively
 // small, and creates nextjs pages for each .md post, stripping the JSON data at the top.
 
@@ -7,7 +6,7 @@ const fs = require('fs');
 const marked = require('marked');
 const { exec } = require('child_process');
 
-const path = "./pages/_blogposts/";
+const path = "./_blogposts/";
 
 const layout = fs.readFileSync(path + "layout.js").toString();
 const index = fs.readFileSync(path + "blog.js").toString();
