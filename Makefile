@@ -1,7 +1,7 @@
 .PHONY: build
 build: get-library generate-library blog
+	yarn build
 
-	CI=0 yarn build
 .PHONY: dirty
 dirty:
 	./blog.js
@@ -14,6 +14,7 @@ dirty:
 get-library:
 	echo "generating library json"
 	go run ./getlibrary.go
+	rm -rf ./library/
 	echo "library json generated"
 
 .PHONY: generate-library
