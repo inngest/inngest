@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { State, WorkflowEdge } from "./state";
 import { Action as BaseAction } from "src/types";
 import { Event, RecentEvent } from "./queries";
