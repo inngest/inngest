@@ -20,7 +20,7 @@ const basePath = "./library/library/"
 func main() {
 	_ = os.RemoveAll("./library")
 
-	buf := bytes.Buffer{}
+	buf := &bytes.Buffer{}
 	cmd := exec.Command("git", "clone", "--depth", "1", "git@github.com:inngest/library.git")
 	cmd.Stderr = buf
 

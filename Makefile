@@ -1,3 +1,7 @@
+.PHONY: build
+build: library blog
+
+	yarn build
 .PHONY: dirty
 dirty:
 	./blog.js
@@ -15,7 +19,3 @@ library:
 .PHONY: blog
 blog:
 	./blog.js
-
-.PHONY: build
-build: library blog
-	yarn build
