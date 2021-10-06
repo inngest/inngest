@@ -4,7 +4,7 @@ const fs = require('fs');
 const library = require("./public/json/library.json");
 
 const slugify = (str) => {
-  return encodeURIComponent(str.toLowerCase().replace(" ", "-"));
+  return encodeURIComponent(str.toLowerCase().replace(/ /g, "-"));
 }
 
 const layout = fs.readFileSync("./layouts/library-item.js").toString();

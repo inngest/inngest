@@ -1,7 +1,7 @@
 import isEqual from "react-fast-compare";
 
 export const slugify = (str: string) => {
-  return encodeURIComponent(str.toLowerCase().replace(" ", "-"));
+  return encodeURIComponent(str.toLowerCase().replace(/ /g, "-"));
 }
 
 export const displayCase = (str: string): string => {
