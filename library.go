@@ -16,7 +16,10 @@ import (
 
 const basePath = "./library/library/"
 
-// main parses the library repo and produces a JSON file for all examples.
+// main parses the library repo and produces a JSON file for all examples, stored within
+// public/json/library.json.
+//
+// This can be fetched by our app and by our site to display the library.
 func main() {
 	_ = os.RemoveAll("./library")
 

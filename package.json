@@ -16,7 +16,9 @@
     "next": "11.1.1",
     "react": "17.0.2",
     "react-dom": "17.0.2",
+    "react-fast-compare": "^3.2.0",
     "react-fast-marquee": "^1.2.1",
+    "react-markdown": "^7.0.1",
     "react-syntax-highlighter": "^15.4.3"
   },
   "devDependencies": {
