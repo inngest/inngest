@@ -75,7 +75,9 @@ export default function Home() {
       <Hero>
         <Content className="grid">
           <div>
-            <h1>Serverless functions <i>driven&nbsp;by</i> events</h1>
+            <h1>
+              Serverless functions <i>driven&nbsp;by</i> events
+            </h1>
             <p>
               <strong>
                 Build and run complex workflows in real-time, triggered by any
@@ -147,10 +149,19 @@ export default function Home() {
             <h5>Introducing Inngest</h5>
             <h2>React to everything</h2>
 
-            <ul className='check'>
-              <li>Build, test, and deploy serverless functions as workflows in any language</li>
-              <li>Trigger functions and workflows from any event - internal or external</li>
-              <li>Instantly test and deploy new workflow versions, with a full version history and changelog built-in</li>
+            <ul className="check">
+              <li>
+                Build, test, and deploy serverless functions as workflows in any
+                language
+              </li>
+              <li>
+                Trigger functions and workflows from any event - internal or
+                external
+              </li>
+              <li>
+                Instantly test and deploy new workflow versions, with a full
+                version history and changelog built-in
+              </li>
             </ul>
 
             <p>
@@ -184,10 +195,13 @@ export default function Home() {
           <div>
             <h2>Build faster, effortlessly</h2>
 
-            <ul className='check'>
+            <ul className="check">
               <li>Integrate events from external services via webhooks</li>
               <li>Full logging and step-over debugging supported</li>
-              <li>Common API integrations provided out of the box:  no more glue code</li>
+              <li>
+                Common API integrations provided out of the box: no more glue
+                code
+              </li>
             </ul>
 
             <p>
@@ -320,15 +334,11 @@ export default function Home() {
           </a>
         </div>
 
-
         <Content>
           <UseCases />
 
           <div className="text-center" style={{ marginTop: "8rem" }}>
-            <a
-              href="/product"
-              className="button button--outline"
-            >
+            <a href="/product" className="button button--outline">
               See how the platform works →
             </a>
           </div>
