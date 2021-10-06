@@ -37,10 +37,12 @@ const getInnerContent = (metadata: EdgeMetadata) => {
 
     return (
       <>
-        {len < 30 ? (
-          <code>{(metadata as EdgeMetadataIf).if}</code>
-        ) : (
-          <strong>Conditional</strong>
+        { metadata.name ? <strong>metadata.name</strong> : (
+          {len < 30 ? (
+            <code>{(metadata as EdgeMetadataIf).if}</code>
+          ) : (
+            <strong>Conditional</strong>
+          )}
         )}
         <span>Only ran when the condition is true</span>
       </>
