@@ -1,3 +1,4 @@
+import { useState } from "react";
 import styled from "@emotion/styled";
 import Router from "next/router";
 import Footer from "../shared/footer";
