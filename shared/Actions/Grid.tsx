@@ -1,5 +1,4 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import styled from "@emotion/styled";
 import { categoryIcons, defaultIcon } from "./icons";
 import { Action } from "src/types";
@@ -27,13 +26,11 @@ const ActionItem: React.FC<{
 }> = ({ action, onClick }) => {
   const Icon = categoryIcons[action.category.name] || defaultIcon;
 
-  const Outer = onClick ? Div : Link;
 
   const onClickFn = () => onClick && onClick(action);
 
   return (
-    <Outer
-      to={`/workflows/actions/${encodeURIComponent(action.dsn)}`}
+    <div
       style={{ color: "inherit", textDecoration: "none" }}
       onClick={onClickFn}
     >
@@ -46,7 +43,7 @@ const ActionItem: React.FC<{
           <small>{action.tagline || "-"}</small>
         </div>
       </Wrapper>
-    </Outer>
+    </div>
   );
 };
 
@@ -55,8 +52,6 @@ const Grid = styled.div`
   grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
   grid-gap: 20px;
 `;
-
-const Div = styled.div``;
 
 const Wrapper = styled.div`
   display: grid;

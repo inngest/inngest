@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from "react";
 import styled from "@emotion/styled";
 import { css, SerializedStyles } from "@emotion/react";

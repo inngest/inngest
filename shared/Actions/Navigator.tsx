@@ -1,12 +1,9 @@
 import React, { useMemo } from "react";
-import { Link } from "react-router-dom";
 import styled from "@emotion/styled";
 import { Action } from "src/types";
 import Box from "src/shared/Box";
-import { useIntegrations } from "src/scenes/Integrations/hooks";
-import { useCurrentWorkspace } from "src/state/workspaces";
-import { PageTitle } from "src/shared/Common";
-import { useAccountIdentifier } from "src/scenes/Admin/Org/query";
+import { useIntegrations } from "src/shared/integrationHooks";
+import { PageTitle } from "src/shared/PageTitle";
 import { categoryIcons, defaultIcon } from "./icons";
 
 type Props = {
@@ -15,9 +12,6 @@ type Props = {
 };
 
 const Navigator: React.FC<Props> = ({ actions, onClick }) => {
-  const [identifier] = useAccountIdentifier();
-
-  const w = useCurrentWorkspace();
   // Fetch our integrations so that we can get the integration name and data from
   // the DSN (eg. retriete stripe data from stripe.inngest.com)
   const integrations = useIntegrations();
@@ -41,22 +35,6 @@ const Navigator: React.FC<Props> = ({ actions, onClick }) => {
     );
   }, [sorted]);
 
-  const dsnPrefix = useMemo(() => {
-    return identifier.data && identifier.data.account.identifier
-      ? identifier.data.account.identifier.dsnPrefix
-      : null;
-  }, [identifier.data]);
-
-  const custom: false | Array<Action> = useMemo(() => {
-    if (!identifier.data) {
-      return [];
-    }
-    if (!dsnPrefix) {
-      return false;
-    }
-    return actions.filter((a) => a.dsn.indexOf(dsnPrefix) == 0);
-  }, [actions, dsnPrefix]);
-
   return (
     <Wrapper>
       <Menu>
@@ -65,7 +43,7 @@ const Navigator: React.FC<Props> = ({ actions, onClick }) => {
         <small>Inngest</small>
         <a href="#builtin">Built-in</a>
         <small>Integrations</small>
-        {actionIntegrations.map((ai) => (
+        {actionIntegrations.map((ai: any) => (
           <a href={`#${ai.service}`} key={ai.service}>
             {ai.name}
           </a>
@@ -82,13 +60,6 @@ const Navigator: React.FC<Props> = ({ actions, onClick }) => {
         <h2>
           <a id="builtin">Your own actions</a>
         </h2>
-        {Array.isArray(custom) ? (
-          custom.map((action: Action) => (
-            <Items key={action.dsn}>
-              <ActionFC action={action} onClick={onClick} />
-            </Items>
-          ))
-        ) : (
           <>
             <p>
               You don't have any actions yet. You can run your own code, in any
@@ -116,31 +87,12 @@ const Navigator: React.FC<Props> = ({ actions, onClick }) => {
               </Box>
             </a>
           </>
-        )}
 
         <h2>
           <a id="builtin">Built in</a>
         </h2>
         <Items>
           {builtin.map((action) => {
-            if (
-              !onClick &&
-              (action.dsn === "inngest.com/email" ||
-                action.dsn === "com.inngest/email")
-            ) {
-              return (
-                <Link
-                  to={`/workflows/actions/${encodeURIComponent(action.dsn)}`}
-                  key={action.dsn}
-                >
-                  <ActionFC
-                    action={action}
-                    kind="hoverable"
-                    onClick={onClick}
-                  />
-                </Link>
-              );
-            }
             return (
               <ActionFC action={action} key={action.dsn} onClick={onClick} />
             );

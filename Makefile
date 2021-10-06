@@ -1,7 +1,7 @@
 .PHONY: build
 build: get-library generate-library blog
 
-	yarn build
+	CI=0 yarn build
 .PHONY: dirty
 dirty:
 	./blog.js
