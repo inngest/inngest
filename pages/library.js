@@ -21,7 +21,7 @@ library.forEach((l) => {
 const tags = Array.from(tagset).sort((a, b) => a.localeCompare(b));
 
 export default function Library() {
-  const [selected, setSelected] = useState(useSearchParam("tag"));
+  const [tag, setSelected] = useState(useSearchParam("tag"));
 
   const setTag = (t) => {
     setSelected(t);
