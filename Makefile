@@ -13,7 +13,7 @@ dirty:
 .PHONY: get-library
 get-library:
 	echo "generating library json"
-	go run ./getlibrary.go
+	go run ./getlibrary.go || ./getlibrary
 	rm -rf ./library/
 	echo "library json generated"
 
