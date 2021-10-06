@@ -27,7 +27,7 @@ export default function Library() {
     setSelected(t);
     Router.push({
       pathname: window.location.pathname,
-      search: t,
+      search: `tag=${t}`,
     });
   }
 
