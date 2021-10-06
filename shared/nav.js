@@ -46,6 +46,7 @@ const Nav = ({ dark }) => {
               */}
             </div>
           </Hoverable>
+          <StyledLink href="/library">Library</StyledLink>
           <StyledLink href="/blog">Blog</StyledLink>
           {/*
           <StyledLink href="/pricing">Pricing</StyledLink>
@@ -186,6 +187,8 @@ const Container = styled(Content)`
   padding: 0 20px;
   font-size: 0.9rem;
   font-weight: 600;
+
+  font-size: 14px;
 
   > div {
     display: flex;

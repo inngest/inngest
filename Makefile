@@ -1,7 +1,7 @@
 .PHONY: build
-build: library blog
-
+build: get-library generate-library blog
 	yarn build
+
 .PHONY: dirty
 dirty:
 	./blog.js
@@ -10,11 +10,19 @@ dirty:
 	git diff --exit-code
 
 
-.PHONY: library
-library:
+.PHONY: get-library
+get-library:
 	echo "generating library json"
-	go run ./library.go
+	go run ./getlibrary.go
+	rm -rf ./library/
 	echo "library json generated"
+
+.PHONY: generate-library
+generate-library:
+	./generate-library.js
+
+.PHONY: library
+library: get-library generate-library
 
 .PHONY: blog
 blog:

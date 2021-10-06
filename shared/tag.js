@@ -19,7 +19,9 @@ const Tag = styled.span`
   color: #4e754d;
 `;
 
-export default Tag;
+export default function (props) {
+  return <Tag className="tag" {...props} />;
+}
 
 export const greyCSS = css`
   background: #d7dfd5;
