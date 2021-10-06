@@ -20,9 +20,12 @@ const basePath = "./library/library/"
 func main() {
 	_ = os.RemoveAll("./library")
 
+	buf := bytes.Buffer{}
 	cmd := exec.Command("git", "clone", "--depth", "1", "git@github.com:inngest/library.git")
+	cmd.Stderr = buf
+
 	if err := cmd.Run(); err != nil {
-		fmt.Println(err.Error())
+		fmt.Printf("error: %d\noutput: %s\n", err.Error(), buf.String())
 		os.Exit(1)
 	}
 
