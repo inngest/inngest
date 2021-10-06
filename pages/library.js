@@ -20,7 +20,15 @@ library.forEach((l) => {
 const tags = Array.from(tagset).sort((a, b) => a.localeCompare(b));
 
 export default function Library() {
-  const tag = useSearchParam("tag");
+  const [selected, setSelected] = useState(useSearchParam("tag"));
+
+  const setTag = (t) => {
+    setSelected(t);
+    Router.push({
+      pathname: window.location.pathname,
+      search: t,
+    });
+  }
 
   const visible = useMemo(() => {
     if (!tag) return library;
@@ -45,12 +53,7 @@ export default function Library() {
                   <input
                     type="checkbox"
                     checked={!tag}
-                    onClick={() => {
-                      Router.push({
-                        pathname: window.location.pathname,
-                        search: "",
-                      });
-                    }}
+                    onClick={() => setTag("")}
                   />{" "}
                   All
                 </label>
@@ -65,16 +68,10 @@ export default function Library() {
                         checked={tag === t}
                         onClick={() => {
                           if (tag === t) {
-                            Router.push({
-                              pathname: window.location.pathname,
-                              search: "",
-                            });
+                            setTag("");
                             return;
                           }
-                          Router.push({
-                            pathname: window.location.pathname,
-                            search: "?tag=" + t,
-                          });
+                          setTag(t);
                         }}
                       />{" "}
                       {titleCase(t)}
