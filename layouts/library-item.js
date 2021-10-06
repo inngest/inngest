@@ -8,7 +8,7 @@ import { Wrapper } from "../../shared/blog";
 import library from "../../public/json/library.json";
 import { Inner, WorkflowContent, Description } from "../../shared/libraryitem";
 import { titleCase, slugify } from "../../shared/util";
-const Workflow = dynamic(() => import('../../shared/workflow/workflow'))
+const Workflow = dynamic(() => import('../../shared/Workflow/Viewer'))
 
 const path = "$1";
 
@@ -46,7 +46,7 @@ export default function LibraryItem() {
             </WorkflowContent>
 
             <Description>
-            <ReactMarkdown children={item.description} linkTarget="_blank" />
+              <ReactMarkdown children={item.description} linkTarget="_blank" />
             </Description>
           </Inner>
         </Content>

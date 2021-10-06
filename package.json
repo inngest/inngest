@@ -9,17 +9,26 @@
     "prettier": "prettier --write --trailing-comma es5 \"pages/**/*.js\" \"shared/*.js\""
   },
   "dependencies": {
+    "@emotion/react": "^11.0.0",
     "@emotion/react": "^11.4.0",
     "@emotion/styled": "^11.3.0",
+    "cronstrue": "^1.117.0",
+    "dagre": "^0.8.5",
+    "fs": "^0.0.1-security",
     "inngest-sdk": "^1.0.1",
+    "lodash.debounce": "^4.0.8",
+    "lodash.throttle": "^4.1.1",
     "marked": "^3.0.4",
     "next": "11.1.1",
     "react": "17.0.2",
     "react-dom": "17.0.2",
     "react-fast-compare": "^3.2.0",
     "react-fast-marquee": "^1.2.1",
+    "react-feather": "^2.0.9",
+    "react-flow-renderer": "^9.6.8",
     "react-markdown": "^7.0.1",
-    "react-syntax-highlighter": "^15.4.3"
+    "react-syntax-highlighter": "^15.4.3",
+    "react-use": "^17.3.1"
   },
   "devDependencies": {
     "@types/react": "^17.0.14",

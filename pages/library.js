@@ -1,10 +1,13 @@
 import styled from "@emotion/styled";
+import Router from "next/router";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import Content from "../shared/content";
 import { Wrapper } from "../shared/blog";
 import library from "../public/json/library.json";
+import { useSearchParam } from "react-use";
 import { toggle, titleCase, slugify } from "../shared/util";
+import { useMemo } from "react";
 
 const tagset = new Set();
 
@@ -16,7 +19,14 @@ library.forEach((l) => {
 
 const tags = Array.from(tagset).sort((a, b) => a.localeCompare(b));
 
-export default function BlogLayout() {
+export default function Library() {
+  const tag = useSearchParam("tag");
+
+  const visible = useMemo(() => {
+    if (!tag) return library;
+    return library.filter((l) => l.tags.includes(tag));
+  }, [tag]);
+
   return (
     <>
       <Wrapper>
@@ -34,8 +44,13 @@ export default function BlogLayout() {
                 <label>
                   <input
                     type="checkbox"
-                    defaultChecked={true}
-                    onClick={() => {}}
+                    checked={!tag}
+                    onClick={() => {
+                      Router.push({
+                        pathname: window.location.pathname,
+                        search: "",
+                      });
+                    }}
                   />{" "}
                   All
                 </label>
@@ -45,7 +60,23 @@ export default function BlogLayout() {
                 {tags.map((t) => {
                   return (
                     <label>
-                      <input type="checkbox" onClick={() => {}} />{" "}
+                      <input
+                        type="checkbox"
+                        checked={tag === t}
+                        onClick={() => {
+                          if (tag === t) {
+                            Router.push({
+                              pathname: window.location.pathname,
+                              search: "",
+                            });
+                            return;
+                          }
+                          Router.push({
+                            pathname: window.location.pathname,
+                            search: "?tag=" + t,
+                          });
+                        }}
+                      />{" "}
                       {titleCase(t)}
                     </label>
                   );
@@ -53,25 +84,7 @@ export default function BlogLayout() {
               </Menu>
               <div>
                 <Items>
-                  {library.map((item) => (
-                    <Item href={`/library/${slugify(item.title)}`}>
-                      <p>{item.title}</p>
-                      <p>{item.subtitle}</p>
-                    </Item>
-                  ))}
-                  {library.map((item) => (
-                    <Item href={`/library/${slugify(item.title)}`}>
-                      <p>{item.title}</p>
-                      <p>{item.subtitle}</p>
-                    </Item>
-                  ))}
-                  {library.map((item) => (
-                    <Item href={`/library/${slugify(item.title)}`}>
-                      <p>{item.title}</p>
-                      <p>{item.subtitle}</p>
-                    </Item>
-                  ))}
-                  {library.map((item) => (
+                  {visible.map((item) => (
                     <Item href={`/library/${slugify(item.title)}`}>
                       <p>{item.title}</p>
                       <p>{item.subtitle}</p>

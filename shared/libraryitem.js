@@ -23,16 +23,39 @@ export const Inner = styled.div`
 
 export const WorkflowContent = styled.div`
   display: grid;
+  /*
   grid-template-columns: auto 180px;
   gap: 40px;
-  margin: 80px 0 0;
+  */
+  margin: 80px 0;
+
+  .editor {
+    min-height: 550px;
+  }
 `;
 
 export const Description = styled.div`
-  h1, h2, h3, h4, h5, h6 { font-weight: 600; }
-  h1 { font-size: 1.35rem; }
-  h2, h3, h4 { font-size: 1rem; }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+  }
+  h1 {
+    font-size: 1.35rem;
+  }
+  h2,
+  h3,
+  h4 {
+    font-size: 1rem;
+  }
 
-  h1 { margin: 2rem 0 .5rem; }
-  h2 { margin: 3rem 0 0.25rem; }
+  h1 {
+    margin: 2rem 0 0.5rem;
+  }
+  h2 {
+    margin: 3rem 0 0.25rem;
+  }
 `;
