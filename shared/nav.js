@@ -46,7 +46,7 @@ const Nav = ({ dark }) => {
               */}
             </div>
           </Hoverable>
-          <StyledLink href="/library">Library</StyledLink>
+          {/*<StyledLink href="/library">Library</StyledLink>*/}
           <StyledLink href="/blog">Blog</StyledLink>
           {/*
           <StyledLink href="/pricing">Pricing</StyledLink>
