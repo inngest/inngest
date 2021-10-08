@@ -150,7 +150,7 @@ var actionsDeploy = &cobra.Command{
 			Version:  version,
 		})
 		if err != nil {
-			log.From(ctx).Fatal().Msgf("Error deploying: %s", err)
+			log.From(ctx).Fatal().Msgf("Error deploying: %s.  To push your image to an existing action, run with --push-only.", err)
 		}
 
 		if !deployWithoutPublish {

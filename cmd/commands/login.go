@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"syscall"
 
 	"github.com/inngest/inngestctl/inngest"
@@ -30,19 +31,21 @@ var login = &cobra.Command{
 		ctx := cmd.Context()
 
 		if username == "" {
-			log.From(ctx).Fatal().Msgf("No username found.  Supply with the -u flag")
+			fmt.Printf("Your email: ")
+			_, _ = fmt.Scanln(&username)
 		}
 
 		if password == "" {
-			log.From(ctx).Info().Msg("Enter your password: ")
+			fmt.Printf("Enter your password: ")
 			byt, err := term.ReadPassword(int(syscall.Stdin))
 			if err != nil {
 				log.From(ctx).Fatal().Msgf("unable to read password: %s", err.Error())
 			}
 			password = string(byt)
+			fmt.Println("")
 		}
 
-		log.From(ctx).Info().Msg("Logging in")
+		fmt.Println("Logging in...")
 		jwt, err := client.New(
 			client.WithAPI(viper.GetString("api")), // "INNGEST_API", set up by commands/root
 		).Login(ctx, username, password)
