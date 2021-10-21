@@ -2,11 +2,14 @@ package commands
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/inngest/inngestctl/cmd/commands/internal/state"
 	"github.com/inngest/inngestctl/cmd/commands/internal/table"
 	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/inngest/client"
@@ -21,6 +24,11 @@ var (
 	includePublic        bool
 	deployWithoutPublish bool
 	versionRegex         = regexp.MustCompile(`^v?([0-9]+).([0-9]+)$`)
+	spacesRegex          = regexp.MustCompile(`\s`)
+)
+
+const (
+	actionComment = `// For documentation on action configuration, visit https://docs.inngest.com/docs/actions`
 )
 
 func init() {
@@ -49,7 +57,7 @@ var actionsList = &cobra.Command{
 	Short: "Lists all actions within your account",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
-		state := inngest.RequireState(ctx)
+		state := state.RequireState(ctx)
 		_ = state
 
 		actions, err := state.Client.Actions(ctx, includePublic)
@@ -117,7 +125,7 @@ var actionsValidate = &cobra.Command{
 
 var actionsDeploy = &cobra.Command{
 	Use:   "deploy [~/path/to/action.cue]",
-	Short: "Deploys an action to your account",
+	Short: "Pushes an action to your account and publishes the action for immediate use (skip publishing with --push-only)",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			return errors.New("No cue configuration found")
@@ -126,7 +134,7 @@ var actionsDeploy = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
-		state := inngest.RequireState(ctx)
+		state := state.RequireState(ctx)
 
 		path, err := homedir.Expand(args[0])
 		if err != nil {
@@ -164,15 +172,27 @@ var actionsDeploy = &cobra.Command{
 
 var actionsNew = &cobra.Command{
 	Use:   "new [name]",
-	Short: "Creates a new, blank cue file for deploying a new serverless action",
+	Short: "Creates a config file for deploying a new serverless action",
 	Run: func(cmd *cobra.Command, args []string) {
 		var name string
 		if len(args) > 0 {
-			name = args[0]
+			name = strings.Join(args, " ")
 		}
-		// TODO: Find the DSN prefix from the currently authenticated account
+
+		dsn := ""
+		if state, _ := state.GetState(cmd.Context()); state != nil {
+			dsn = fmt.Sprintf("%s/", state.Account.Identifier.DSNPrefix)
+		}
+
+		if name != "" {
+			suffix := spacesRegex.ReplaceAllString(strings.ToLower(name), "-")
+			dsn += suffix
+		} else {
+			dsn += "your-unique-id"
+		}
+
 		output, err := inngest.FormatAction(inngest.ActionVersion{
-			DSN:  "",
+			DSN:  dsn,
 			Name: name,
 			Version: inngest.VersionInfo{
 				Major: 1,
@@ -180,17 +200,24 @@ var actionsNew = &cobra.Command{
 			},
 			WorkflowMetadata: inngest.MetadataMap{},
 			Response:         map[string]inngest.Response{},
-			Edges:            map[string]inngest.Edge{},
 			Runtime: inngest.RuntimeWrapper{
 				Runtime: inngest.RuntimeDocker{
 					Image: "your-docker-image",
 				},
 			},
 		})
+
 		if err != nil {
 			log.From(cmd.Context()).Fatal().Msgf("Error creating action: %s", err)
 		}
-		fmt.Println(output)
+
+		data := fmt.Sprintf("%s\n%s", actionComment, output)
+
+		ioutil.WriteFile("./action.cue", []byte(data), 0600)
+		fmt.Println("Created an action configuration file: ./action.cue")
+		fmt.Println("")
+		fmt.Println("Edit this file with your configuration and deploy using `inngestctl actions deploy`.")
+
 	},
 }
 
@@ -211,7 +238,7 @@ var actionsPublish = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
-		state := inngest.RequireState(ctx)
+		state := state.RequireState(ctx)
 
 		v := versionRegex.FindStringSubmatch(args[1])
 		major, err := strconv.Atoi(v[1])
