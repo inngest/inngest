@@ -1,9 +1,10 @@
 package commands
 
 import (
+	"fmt"
 	"syscall"
 
-	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/cmd/commands/internal/state"
 	"github.com/inngest/inngestctl/inngest/client"
 	"github.com/inngest/inngestctl/inngest/log"
 	"github.com/spf13/cobra"
@@ -30,27 +31,53 @@ var login = &cobra.Command{
 		ctx := cmd.Context()
 
 		if username == "" {
-			log.From(ctx).Fatal().Msgf("No username found.  Supply with the -u flag")
+			fmt.Printf("Your email: ")
+			_, _ = fmt.Scanln(&username)
 		}
 
 		if password == "" {
-			log.From(ctx).Info().Msg("Enter your password: ")
+			fmt.Printf("Enter your password: ")
 			byt, err := term.ReadPassword(int(syscall.Stdin))
 			if err != nil {
 				log.From(ctx).Fatal().Msgf("unable to read password: %s", err.Error())
 			}
 			password = string(byt)
+			fmt.Println("")
 		}
 
-		log.From(ctx).Info().Msg("Logging in")
-		jwt, err := client.New(
-			client.WithAPI(viper.GetString("api")), // "INNGEST_API", set up by commands/root
-		).Login(ctx, username, password)
+		fmt.Println("Logging in...")
+		jwt, err := client.New(client.WithAPI(viper.GetString("api"))).Login(ctx, username, password)
 		if err != nil {
 			log.From(ctx).Fatal().Msgf("unable to log in: %s", err.Error())
 		}
 
-		state := inngest.State{Credentials: jwt}
+		// Fetch the account.
+		client := client.New(
+			client.WithAPI(viper.GetString("api")),
+			client.WithCredentials(jwt),
+		)
+		account, err := client.Account(ctx)
+		if err != nil {
+			log.From(ctx).Fatal().Msgf("unable to fetch account: %s", err.Error())
+		}
+
+		// Find their workspaces, and select the default workspace.
+		workspaces, err := client.Workspaces(ctx)
+		if err != nil {
+			log.From(ctx).Fatal().Msgf("unable to fetch workspaces: %s", err.Error())
+		}
+
+		state := state.State{
+			Credentials: jwt,
+			Account:     *account,
+		}
+
+		for _, item := range workspaces {
+			if item.Name == "default" && !item.Test {
+				_ = state.SetWorkspace(ctx, item)
+			}
+		}
+
 		if err := state.Persist(ctx); err != nil {
 			log.From(ctx).Fatal().Msgf("unable to log in: %s", err.Error())
 		}

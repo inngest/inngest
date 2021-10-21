@@ -2,8 +2,8 @@ package commands
 
 import (
 	"github.com/google/uuid"
+	"github.com/inngest/inngestctl/cmd/commands/internal/state"
 	"github.com/inngest/inngestctl/cmd/commands/internal/table"
-	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/inngest/client"
 	"github.com/inngest/inngestctl/inngest/log"
 	"github.com/spf13/cobra"
@@ -19,7 +19,7 @@ var workspacesRoot = &cobra.Command{
 	Use:   "workspaces",
 	Short: "Manages workspacess within your Inngest account",
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		workspacesList.Run(cmd, args)
 	},
 }
 
@@ -29,7 +29,7 @@ var workspacesList = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
 
-		state := inngest.RequireState(ctx)
+		state := state.RequireState(ctx)
 		flows, err := state.Client.Workspaces(ctx)
 		if err != nil {
 			log.From(ctx).Fatal().Err(err).Msg("unable to fetch workspaces")
@@ -63,7 +63,7 @@ var workspacesSelect = &cobra.Command{
 	Short: "Select a workspace for modification",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
-		state := inngest.RequireState(ctx)
+		state := state.RequireState(ctx)
 
 		if len(args) == 0 {
 			log.From(ctx).Fatal().Msg("No workspace ID passed to select. Usage: workspaces select [ID]")

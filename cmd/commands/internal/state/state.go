@@ -1,4 +1,4 @@
-package inngest
+package state
 
 import (
 	"context"
@@ -25,8 +25,9 @@ var (
 type State struct {
 	client.Client `json:"-"`
 
-	SelectedWorkspace *Workspace `json:"workspace,omitempty"`
-	Credentials       []byte     `json:"credentials"`
+	SelectedWorkspace *Workspace     `json:"workspace,omitempty"`
+	Credentials       []byte         `json:"credentials"`
+	Account           client.Account `json:"account"`
 }
 
 func (s State) Persist(ctx context.Context) error {
@@ -112,5 +113,6 @@ func RequireState(ctx context.Context) *State {
 	if err != nil {
 		log.From(ctx).Fatal().Msgf("error reading state: %s", err.Error())
 	}
+
 	return state
 }

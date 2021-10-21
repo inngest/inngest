@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/google/uuid"
 )
 
 // Client implements all functionality necessary to communicate with
@@ -13,7 +15,11 @@ type Client interface {
 	Credentials() []byte
 
 	Login(ctx context.Context, email, password string) ([]byte, error)
+	Account(ctx context.Context) (*Account, error)
 	Workspaces(ctx context.Context) ([]Workspace, error)
+
+	Workflows(ctx context.Context, workspaceID uuid.UUID) ([]Workflow, error)
+
 	Actions(ctx context.Context, includePublic bool) ([]*Action, error)
 	UpdateActionVersion(ctx context.Context, v ActionVersionQualifier, enabled bool) (*ActionVersion, error)
 	CreateAction(ctx context.Context, config string) (*Action, error)
@@ -35,7 +41,7 @@ func New(opts ...ClientOpt) Client {
 	return c
 }
 
-// WithCredentials is used to configure a client with an existing JWT.
+// WithCredentials is used to configure a client with a given API host.
 func WithAPI(api string) ClientOpt {
 	return func(c Client) Client {
 		if api == "" {
@@ -48,7 +54,7 @@ func WithAPI(api string) ClientOpt {
 	}
 }
 
-// WithCredentials is used to configure a client with an existing JWT.
+// WithCredentials is used to configure a client with a given JWT.
 func WithCredentials(creds []byte) ClientOpt {
 	return func(c Client) Client {
 		client := c.(*httpClient)
