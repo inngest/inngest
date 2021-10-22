@@ -12,9 +12,17 @@ import (
 	"golang.org/x/text/message"
 )
 
+var (
+	allWorkflows bool
+)
+
 func init() {
 	rootCmd.AddCommand(workflowsRoot)
 	workflowsRoot.AddCommand(workflowsList)
+
+	// Root by default calls list, so add the All flag to both.
+	workflowsRoot.Flags().BoolVar(&allWorkflows, "all", false, "Show all workflows including drafts and archived flows (instead of only live flows)")
+	workflowsList.Flags().BoolVar(&allWorkflows, "all", false, "Show all workflows including drafts and archived flows (instead of only live flows)")
 }
 
 var workflowsRoot = &cobra.Command{
@@ -27,10 +35,9 @@ var workflowsRoot = &cobra.Command{
 
 var workflowsList = &cobra.Command{
 	Use:   "list",
-	Short: "Lists all workflows within the current workspace",
+	Short: "Lists all workflows within the current workspace, defaulting to live workflows.  Use --all for all workflows.",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
-
 		state := state.RequireState(ctx)
 
 		if state.SelectedWorkspace == nil {
@@ -44,26 +51,35 @@ var workflowsList = &cobra.Command{
 
 		t := table.New(table.Row{"ID", "Name", "Live version", "Live since", "Triggers", "24h usage"})
 		p := message.NewPrinter(language.English)
+
 		for _, f := range flows {
+			if f.Current == nil && !allWorkflows {
+				continue
+			}
 
 			row := table.Row{
 				f.ID,
 				f.Name,
 			}
 
-			if f.Current == nil {
-				row = append(row, "", "", "")
-			} else {
-				triggers := make([]string, len(f.Current.Triggers))
-				for n, t := range f.Current.Triggers {
-					triggers[n] = t.String()
-				}
-
-				row = append(row, f.Current.Version, f.Current.ValidFrom, strings.Join(triggers, ", "))
+			if f.Current == nil && allWorkflows {
+				row = append(row, "", "", "", "")
+				t.AppendRow(row)
+				continue
 			}
 
-			row = append(row, p.Sprintf("%d", f.Usage.Total))
+			triggers := make([]string, len(f.Current.Triggers))
+			for n, t := range f.Current.Triggers {
+				triggers[n] = t.String()
+			}
 
+			row = append(
+				row,
+				f.Current.Version,
+				f.Current.ValidFrom,
+				strings.Join(triggers, ", "),
+				p.Sprintf("%d", f.Usage.Total),
+			)
 			t.AppendRow(row)
 		}
 		t.Render()
