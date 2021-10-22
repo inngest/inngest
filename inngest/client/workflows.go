@@ -31,6 +31,23 @@ type WorkflowVersion struct {
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+
+	Triggers []WorkflowTrigger `json:"triggers"`
+}
+
+type WorkflowTrigger struct {
+	EventName *string `json:"eventName"`
+	Schedule  *string `json:"schedule"`
+}
+
+func (w WorkflowTrigger) String() string {
+	if w.EventName != nil {
+		return *w.EventName
+	}
+	if w.Schedule != nil {
+		return *w.Schedule
+	}
+	return ""
 }
 
 func (c httpClient) Workflows(ctx context.Context, workflowID uuid.UUID) ([]Workflow, error) {
@@ -42,7 +59,7 @@ func (c httpClient) Workflows(ctx context.Context, workflowID uuid.UUID) ([]Work
 	        data {
 		  id name 
 		  usage { period range total data { slot count } }
-		  current { config version description validFrom validTo createdAt updatedAt }
+		  current { config version description validFrom validTo createdAt updatedAt triggers { eventName schedule }}
 		  drafts { version description validFrom validTo createdAt updatedAt }
 		  previous { version description validFrom validTo createdAt updatedAt }
 	        }

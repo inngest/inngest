@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"strings"
+
 	"github.com/inngest/inngestctl/cmd/commands/internal/state"
 	"github.com/inngest/inngestctl/cmd/commands/internal/table"
 	"github.com/inngest/inngestctl/inngest/log"
@@ -40,7 +42,7 @@ var workflowsList = &cobra.Command{
 			log.From(ctx).Fatal().Err(err).Msg("unable to fetch workspaces")
 		}
 
-		t := table.New(table.Row{"ID", "Name", "Live version", "Live since", "24h usage"})
+		t := table.New(table.Row{"ID", "Name", "Live version", "Live since", "Triggers", "24h usage"})
 		p := message.NewPrinter(language.English)
 		for _, f := range flows {
 
@@ -50,9 +52,14 @@ var workflowsList = &cobra.Command{
 			}
 
 			if f.Current == nil {
-				row = append(row, "", "")
+				row = append(row, "", "", "")
 			} else {
-				row = append(row, f.Current.Version, f.Current.ValidFrom)
+				triggers := make([]string, len(f.Current.Triggers))
+				for n, t := range f.Current.Triggers {
+					triggers[n] = t.String()
+				}
+
+				row = append(row, f.Current.Version, f.Current.ValidFrom, strings.Join(triggers, ", "))
 			}
 
 			row = append(row, p.Sprintf("%d", f.Usage.Total))
