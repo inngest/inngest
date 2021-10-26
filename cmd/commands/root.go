@@ -9,7 +9,7 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "inngest",
-	Short: "Serverless event-driven infrastructure platform",
+	Short: "A serverless event-driven infrastructure platform",
 }
 
 func init() {
