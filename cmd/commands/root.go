@@ -3,6 +3,7 @@ package commands
 import (
 	"strings"
 
+	"github.com/inngest/inngestctl/inngest/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -26,5 +27,7 @@ func init() {
 }
 
 func Execute() {
-	rootCmd.Execute()
+	if err := rootCmd.Execute(); err != nil {
+		log.Default().Fatal().Msgf("error: %s", err)
+	}
 }

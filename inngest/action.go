@@ -130,32 +130,6 @@ func (RuntimeDocker) RuntimeType() string {
 	return "docker"
 }
 
-type Edge struct {
-	Type string `json:"type"`
-	Name string `json:"name"`
-	If   string `json:"if"`
-
-	// AsyncEdge must be specified if Type is enums.EdgeTypeAsync.
-	*AsyncEdge `json:"async,omitempty"`
-}
-
-func (e Edge) IsZero() bool {
-	return e == Edge{}
-}
-
-type AsyncEdge struct {
-	TTL string `json:"ttl"`
-
-	// Event specifies the event name to listen for, which can coninue this workflow.
-	Event string `json:"event"`
-
-	// Match represents the optional expression to use when matching the event.
-	// If specified, the event name must match and this expression must evaluate
-	// to true for the workflow to continue.  This allows you to filter events
-	// to eg. the same user.
-	Match *string `json:"match"`
-}
-
 type MetadataMap map[string]Metadata
 
 type Metadata struct {

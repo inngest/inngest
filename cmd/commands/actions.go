@@ -6,9 +6,9 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
+	"github.com/inngest/inngestctl/cmd/commands/internal/actions"
 	"github.com/inngest/inngestctl/cmd/commands/internal/state"
 	"github.com/inngest/inngestctl/cmd/commands/internal/table"
 	"github.com/inngest/inngestctl/inngest"
@@ -171,53 +171,30 @@ var actionsDeploy = &cobra.Command{
 }
 
 var actionsNew = &cobra.Command{
-	Use:   "new [name]",
+	Use:   "new",
 	Short: "Creates a config file for deploying a new serverless action",
-	Run: func(cmd *cobra.Command, args []string) {
-		var name string
-		if len(args) > 0 {
-			name = strings.Join(args, " ")
-		}
-
-		dsn := ""
+	RunE: func(cmd *cobra.Command, args []string) error {
+		prefix := ""
 		if state, _ := state.GetState(cmd.Context()); state != nil {
-			dsn = fmt.Sprintf("%s/", state.Account.Identifier.DSNPrefix)
+			prefix = state.Account.Identifier.DSNPrefix
 		}
 
-		if name != "" {
-			suffix := spacesRegex.ReplaceAllString(strings.ToLower(name), "-")
-			dsn += suffix
-		} else {
-			dsn += "your-unique-id"
+		c := actions.Config{}
+		if err := c.Survey(prefix); err != nil {
+			return err
 		}
 
-		output, err := inngest.FormatAction(inngest.ActionVersion{
-			DSN:  dsn,
-			Name: name,
-			Version: inngest.VersionInfo{
-				Major: 1,
-				Minor: 1,
-			},
-			WorkflowMetadata: inngest.MetadataMap{},
-			Response:         map[string]inngest.Response{},
-			Runtime: inngest.RuntimeWrapper{
-				Runtime: inngest.RuntimeDocker{
-					Image: "your-docker-image",
-				},
-			},
-		})
-
+		data, err := c.Configuration()
 		if err != nil {
-			log.From(cmd.Context()).Fatal().Msgf("Error creating action: %s", err)
+			return err
 		}
-
-		data := fmt.Sprintf("%s\n%s", actionComment, output)
 
 		ioutil.WriteFile("./action.cue", []byte(data), 0600)
 		fmt.Println("Created an action configuration file: ./action.cue")
 		fmt.Println("")
 		fmt.Println("Edit this file with your configuration and deploy using `inngestctl actions deploy`.")
 
+		return nil
 	},
 }
 
