@@ -19,6 +19,8 @@ type Client interface {
 	Workspaces(ctx context.Context) ([]Workspace, error)
 
 	Workflows(ctx context.Context, workspaceID uuid.UUID) ([]Workflow, error)
+	Workflow(ctx context.Context, workspaceID, workflowID uuid.UUID) (*Workflow, error)
+	WorkflowVersion(ctx context.Context, workspaceID, workflowID uuid.UUID, version int) (*WorkflowVersion, error)
 
 	Actions(ctx context.Context, includePublic bool) ([]*Action, error)
 	UpdateActionVersion(ctx context.Context, v ActionVersionQualifier, enabled bool) (*ActionVersion, error)

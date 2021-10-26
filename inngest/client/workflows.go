@@ -50,7 +50,75 @@ func (w WorkflowTrigger) String() string {
 	return ""
 }
 
-func (c httpClient) Workflows(ctx context.Context, workflowID uuid.UUID) ([]Workflow, error) {
+func (c httpClient) Workflow(ctx context.Context, workspaceID, workflowID uuid.UUID) (*Workflow, error) {
+	query := `
+	query($workspaceID: ID!, $id: ID!) {
+	    workspace(id: $workspaceID) {
+	      workflow(id: $id) {
+		id name 
+		usage { period range total data { slot count } }
+		current { config version description validFrom validTo createdAt updatedAt triggers { eventName schedule }}
+		drafts { version description validFrom validTo createdAt updatedAt }
+		previous { version description validFrom validTo createdAt updatedAt }
+	      }
+            }
+          }`
+
+	type response struct {
+		Workspace struct {
+			Workflow *Workflow
+		}
+	}
+	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{"workspaceID": workspaceID, "id": workflowID}})
+	if err != nil {
+		return nil, err
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		return nil, fmt.Errorf("error unmarshalling workspaces: %w", err)
+	}
+
+	return data.Workspace.Workflow, nil
+}
+
+func (c httpClient) WorkflowVersion(ctx context.Context, workspaceID, workflowID uuid.UUID, v int) (*WorkflowVersion, error) {
+	query := `
+	query($workspaceID: ID!, $id: ID!, $version: Int!) {
+	    workspace(id: $workspaceID) {
+	      workflow(id: $id) {
+	        version(id: $version) {
+		  config version description validFrom validTo createdAt updatedAt triggers { eventName schedule }
+		}
+	      }
+            }
+          }`
+
+	type response struct {
+		Workspace struct {
+			Workflow struct {
+				Version *WorkflowVersion
+			}
+		}
+	}
+	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{
+		"workspaceID": workspaceID,
+		"id":          workflowID,
+		"version":     v,
+	}})
+	if err != nil {
+		return nil, err
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		return nil, fmt.Errorf("error unmarshalling workspaces: %w", err)
+	}
+
+	return data.Workspace.Workflow.Version, nil
+}
+
+func (c httpClient) Workflows(ctx context.Context, workspaceID uuid.UUID) ([]Workflow, error) {
 	query := `
 	query($id: ID!, $page: Int) {
 	    workspace(id: $id) {
@@ -85,7 +153,7 @@ func (c httpClient) Workflows(ctx context.Context, workflowID uuid.UUID) ([]Work
 
 	all := false
 	for !all {
-		resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{"id": workflowID, "page": page}})
+		resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{"id": workspaceID, "page": page}})
 		if err != nil {
 			return nil, err
 		}
