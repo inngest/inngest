@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	cuelang.org/go v0.4.0
+	github.com/AlecAivazis/survey/v2 v2.3.2
 	github.com/containerd/containerd v1.5.2 // indirect
 	github.com/docker/docker v20.10.6+incompatible
 	github.com/docker/go-connections v0.4.0 // indirect

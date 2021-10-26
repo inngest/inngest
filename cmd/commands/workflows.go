@@ -1,16 +1,14 @@
 package commands
 
 import (
-	"context"
 	"fmt"
+	"io/ioutil"
 	"sort"
 	"strings"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngestctl/cmd/commands/internal/state"
 	"github.com/inngest/inngestctl/cmd/commands/internal/table"
-	"github.com/inngest/inngestctl/inngest/client"
+	"github.com/inngest/inngestctl/cmd/commands/internal/workflows"
 	"github.com/inngest/inngestctl/inngest/log"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -35,19 +33,17 @@ func init() {
 	// Allow showing a single workflow's config
 	workflowsRoot.AddCommand(workflowConfig)
 	workflowsRoot.AddCommand(workflowVersions)
+	workflowsRoot.AddCommand(workflowNew)
 }
 
 var workflowsRoot = &cobra.Command{
 	Use:   "workflows",
 	Short: "Manages workflows within your Inngest account",
-	Run: func(cmd *cobra.Command, args []string) {
-		workflowsList.Run(cmd, args)
-	},
 }
 
 var workflowsList = &cobra.Command{
 	Use:   "list",
-	Short: "Lists all workflows within the current workspace, defaulting to live workflows.  Use --all for all workflows.",
+	Short: "Lists workflows within the current workspace, defaulting to live workflows.  Use --all for all workflows.",
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
 		state := state.RequireState(ctx)
@@ -152,7 +148,7 @@ var workflowVersions = &cobra.Command{
 
 var workflowConfig = &cobra.Command{
 	Use:   "config",
-	Short: "Shows a workflow's configuration, by default using the current live version.  You can use the first few characters of a workflow's ID, provided they're unique.",
+	Short: "Shows a workflow's configuration given its ID or prefix",
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return fmt.Errorf("No workflow ID specified.  Specify a workflow ID or it's prefix")
@@ -189,41 +185,64 @@ var workflowConfig = &cobra.Command{
 	},
 }
 
-func findWorkflow(ctx context.Context, idOrPrefix string) (*client.Workflow, error) {
-	state := state.RequireState(ctx)
-
-	id, err := uuid.Parse(idOrPrefix)
-	if err == nil {
-		return state.Client.Workflow(ctx, state.SelectedWorkspace.ID, id)
-	}
-
-	flows, err := state.Client.Workflows(ctx, state.SelectedWorkspace.ID)
-	if err != nil {
-		log.From(ctx).Fatal().Err(err).Msg("unable to fetch workspaces")
-	}
-
-	candidates := []*client.Workflow{}
-	for _, f := range flows {
-		copied := f
-		if strings.HasPrefix(f.ID.String(), idOrPrefix) {
-			candidates = append(candidates, &copied)
+var workflowNew = &cobra.Command{
+	Use:   "new [name]",
+	Short: "Creates a config file for a new workflow",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		c := workflows.Config{}
+		if err := c.Survey(); err != nil {
+			return err
 		}
-	}
 
-	if len(candidates) == 1 {
-		return candidates[0], nil
-	}
+		data, err := c.Configuration()
+		if err != nil {
+			return err
+		}
 
-	if len(candidates) == 0 {
-		return nil, fmt.Errorf("No workflow in workspace '%s' found for ID: %s", state.SelectedWorkspace.Name, idOrPrefix)
-	}
-
-	return nil, fmt.Errorf("More than one workflow found with the prefix: %s", idOrPrefix)
+		ioutil.WriteFile("./workflow.cue", []byte(data), 0600)
+		fmt.Println("Created a workflow configuration file: ./workflow.cue")
+		fmt.Println("")
+		fmt.Println("Edit this file with your configuration and deploy using `inngestctl workflows deploy`.")
+		return nil
+	},
 }
 
-func formatTime(d *time.Time) string {
-	if d == nil || d.IsZero() {
-		return ""
-	}
-	return d.Format(time.UnixDate)
+var workflowDeploy = &cobra.Command{
+	Use:   "deploy",
+	Short: "Deploys a new version of a workflow",
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		// XXX: Read from stdin as well as an arg.
+		if len(args) == 0 {
+			return fmt.Errorf("No workflow configuration provided")
+		}
+		return nil
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		ctx := cmd.Context()
+		state := state.RequireState(ctx)
+
+		workflow, err := findWorkflow(ctx, args[0])
+		if err != nil {
+			log.From(ctx).Fatal().Err(err).Msg("Unable to find workflow")
+		}
+
+		if versionFlag != 0 && workflow.Current != nil && workflow.Current.Version != versionFlag {
+			// Request that specific version, as by default we only request the config for
+			// the current version in the list.
+			v, err := state.Client.WorkflowVersion(ctx, state.SelectedWorkspace.ID, workflow.ID, versionFlag)
+			if err != nil {
+				log.From(ctx).Fatal().Err(err).Msg("Unable to find workflow version")
+			}
+			fmt.Println(v.Config)
+			return
+		}
+
+		// Show the current version by default
+		if workflow.Current != nil {
+			fmt.Println(workflow.Current.Config)
+			return
+		}
+
+		log.From(ctx).Fatal().Err(err).Msg("No live version to show, and no version supplied with --version flag.  Show a specific version using the --version flag")
+	},
 }
