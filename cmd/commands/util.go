@@ -29,7 +29,11 @@ func findWorkflow(ctx context.Context, idOrPrefix string) (*client.Workflow, err
 	candidates := []*client.Workflow{}
 	for _, f := range flows {
 		copied := f
-		if strings.HasPrefix(f.ID.String(), idOrPrefix) {
+		if f.Slug == idOrPrefix {
+			return &copied, nil
+		}
+
+		if strings.HasPrefix(f.Slug, idOrPrefix) {
 			candidates = append(candidates, &copied)
 		}
 	}

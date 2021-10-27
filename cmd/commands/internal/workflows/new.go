@@ -2,6 +2,8 @@ package workflows
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/inngest/inngestctl/inngest"
@@ -10,6 +12,8 @@ import (
 const (
 	workflowComment = `// For documentation on workflow configuration, visit https://docs.inngest.com/docs/workflows`
 )
+
+var slugifyRegex = regexp.MustCompile(`[^a-z0-9\\-_]+`)
 
 var (
 	questions = []*survey.Question{
@@ -32,6 +36,7 @@ var (
 
 type Config struct {
 	Name        string
+	ID          string
 	TriggerType string
 	EventName   string
 	Cron        string
@@ -75,6 +80,7 @@ func (c *Config) Triggers() []inngest.Trigger {
 func (c *Config) Configuration() (string, error) {
 	output, err := inngest.FormatWorkflow(inngest.Workflow{
 		Name:     c.Name,
+		ID:       strings.ToLower(slugifyRegex.ReplaceAllString(c.Name, "-")),
 		Triggers: c.Triggers(),
 		Actions:  []inngest.Action{},
 		Edges:    []inngest.Edge{},

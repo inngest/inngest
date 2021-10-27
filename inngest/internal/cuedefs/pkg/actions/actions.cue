@@ -10,7 +10,7 @@ import (
 
 #Action: {
 	name: string
-	dsn:  string
+	dsn:  =~"^[a-z0-9-.]+/[a-z0-9-]+$"
 
 	version: {
 		major: >0 | *1
