@@ -66,7 +66,7 @@ var workflowsList = &cobra.Command{
 			}
 
 			row := table.Row{
-				f.ID,
+				f.Slug,
 				f.Name,
 			}
 
@@ -99,7 +99,7 @@ var workflowVersions = &cobra.Command{
 	Short: "Shows a workflow's version information.",
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			return fmt.Errorf("No workflow ID specified.  Specify a workflow ID or it's prefix")
+			return fmt.Errorf("No workflow specified.  Specify a workflow ID (or it's prefix)")
 		}
 		return nil
 	},
@@ -204,45 +204,5 @@ var workflowNew = &cobra.Command{
 		fmt.Println("")
 		fmt.Println("Edit this file with your configuration and deploy using `inngestctl workflows deploy`.")
 		return nil
-	},
-}
-
-var workflowDeploy = &cobra.Command{
-	Use:   "deploy",
-	Short: "Deploys a new version of a workflow",
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		// XXX: Read from stdin as well as an arg.
-		if len(args) == 0 {
-			return fmt.Errorf("No workflow configuration provided")
-		}
-		return nil
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		ctx := cmd.Context()
-		state := state.RequireState(ctx)
-
-		workflow, err := findWorkflow(ctx, args[0])
-		if err != nil {
-			log.From(ctx).Fatal().Err(err).Msg("Unable to find workflow")
-		}
-
-		if versionFlag != 0 && workflow.Current != nil && workflow.Current.Version != versionFlag {
-			// Request that specific version, as by default we only request the config for
-			// the current version in the list.
-			v, err := state.Client.WorkflowVersion(ctx, state.SelectedWorkspace.ID, workflow.ID, versionFlag)
-			if err != nil {
-				log.From(ctx).Fatal().Err(err).Msg("Unable to find workflow version")
-			}
-			fmt.Println(v.Config)
-			return
-		}
-
-		// Show the current version by default
-		if workflow.Current != nil {
-			fmt.Println(workflow.Current.Config)
-			return
-		}
-
-		log.From(ctx).Fatal().Err(err).Msg("No live version to show, and no version supplied with --version flag.  Show a specific version using the --version flag")
 	},
 }

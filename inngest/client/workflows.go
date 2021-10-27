@@ -11,8 +11,12 @@ import (
 
 // Workflow represents all versions of a single workflow in a workspace.
 type Workflow struct {
-	ID   uuid.UUID `json:"id"`
-	Name string    `json:"name"`
+	ID uuid.UUID `json:"id"`
+
+	// Slug represents the human ID for a workflow, used as the "ID"
+	// within a workflow version's configuration.
+	Slug string `json:"slug"`
+	Name string `json:"name"`
 
 	Usage Usage `json:"usage"`
 
@@ -55,7 +59,7 @@ func (c httpClient) Workflow(ctx context.Context, workspaceID, workflowID uuid.U
 	query($workspaceID: ID!, $id: ID!) {
 	    workspace(id: $workspaceID) {
 	      workflow(id: $id) {
-		id name 
+		id name slug
 		usage { period range total data { slot count } }
 		current { config version description validFrom validTo createdAt updatedAt triggers { eventName schedule }}
 		drafts { version description validFrom validTo createdAt updatedAt }
@@ -80,6 +84,39 @@ func (c httpClient) Workflow(ctx context.Context, workspaceID, workflowID uuid.U
 	}
 
 	return data.Workspace.Workflow, nil
+}
+
+func (c httpClient) LatestWorkflowVersion(ctx context.Context, workspaceID, workflowID uuid.UUID) (*WorkflowVersion, error) {
+	query := `
+	query($workspaceID: ID!, $id: ID!) {
+	    workspace(id: $workspaceID) {
+	      workflow(id: $id) {
+	        latest {
+		  config version description validFrom validTo createdAt updatedAt triggers { eventName schedule }
+		}
+	      }
+            }
+          }`
+
+	type response struct {
+		Workspace struct {
+			Workflow struct {
+				Version *WorkflowVersion
+			}
+		}
+	}
+	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{
+		"workspaceID": workspaceID,
+		"id":          workflowID,
+	}})
+	if err != nil {
+		return nil, err
+	}
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		return nil, fmt.Errorf("error unmarshalling workspaces: %w", err)
+	}
+	return data.Workspace.Workflow.Version, nil
 }
 
 func (c httpClient) WorkflowVersion(ctx context.Context, workspaceID, workflowID uuid.UUID, v int) (*WorkflowVersion, error) {
@@ -125,7 +162,7 @@ func (c httpClient) Workflows(ctx context.Context, workspaceID uuid.UUID) ([]Wor
 	      workflows @paginated(page: $page) {
 		page { page totalPages }
 	        data {
-		  id name 
+		  id name slug
 		  usage { period range total data { slot count } }
 		  current { config version description validFrom validTo createdAt updatedAt triggers { eventName schedule }}
 		  drafts { version description validFrom validTo createdAt updatedAt }

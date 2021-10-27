@@ -8,7 +8,13 @@ import (
 
 // a workflow is an entire workflow for our app
 #Workflow: {
-	name:     string
+	// id represents the immutable identifier for the workflow, which groups all
+	// versions into a single workflow.  If this were GitHub, this would be the
+	// repository name.
+	id: =~"^[a-z0-9-]+$"
+
+	// The workflow name.
+	name: string
 
 	// The triggers which start a workflow.
 	//
@@ -50,7 +56,7 @@ import (
 }
 
 #Edge: {
-	outgoing: uint | "trigger" // Either the action ID or 'trigger'
-	incoming: uint
+	outgoing:  uint | "trigger" // Either the action ID or 'trigger'
+	incoming:  uint
 	metadata?: #EdgeMetadata
 }

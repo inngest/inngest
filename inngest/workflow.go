@@ -11,6 +11,13 @@ import (
 // This represents the logic for a workflow, but does not represent any specific
 // workflow in the database.
 type Workflow struct {
+	// ID is the immutable human identifier for the workflow.  This acts
+	// similarly to a git repository name;  a single workflow ID can contain
+	// many workflow versions.
+	//
+	// When deploying a specific workflow version we read the cue configuration
+	// and upsert a version to the given ID.
+	ID   string `json:"id"`
 	Name string `json:"name"`
 
 	Triggers []Trigger `json:"triggers"`
@@ -81,8 +88,7 @@ func FormatWorkflow(a Workflow) (string, error) {
 	return fmt.Sprintf(workflowTpl, def), nil
 }
 
-var workflowTpl = `
-package main
+var workflowTpl = `package main
 
 import (
 	"inngest.com/workflows"
