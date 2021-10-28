@@ -20,6 +20,7 @@ func ParseAction(input string) (*ActionVersion, error) {
 	if err := val.Decode(&a); err != nil {
 		return nil, fmt.Errorf("error deserializing action version: %w", err)
 	}
+
 	return a, nil
 }
 
