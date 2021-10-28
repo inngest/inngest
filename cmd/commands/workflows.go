@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngestctl/cmd/commands/internal/state"
 	"github.com/inngest/inngestctl/cmd/commands/internal/table"
 	"github.com/inngest/inngestctl/cmd/commands/internal/workflows"
+	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/inngest/log"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -19,26 +20,31 @@ import (
 )
 
 var (
-	allWorkflows bool
-	deployLive   bool
-	versionFlag  int
+	allWorkflows    bool
+	deployLive      bool
+	canonicalFormat bool
+	writeFormat     bool
+	versionFlag     int
 )
 
 func init() {
 	rootCmd.AddCommand(workflowsRoot)
 	workflowsRoot.AddCommand(workflowsList)
 
-	// Root by default calls list, so add the All flag to both.
-	workflowsRoot.Flags().BoolVar(&allWorkflows, "all", false, "Show all workflows including drafts and archived flows (instead of only live flows)")
-	workflowsList.Flags().BoolVar(&allWorkflows, "all", false, "Show all workflows including drafts and archived flows (instead of only live flows)")
-	workflowConfig.Flags().IntVar(&versionFlag, "version", 0, "The version of the workflow to select")
-	workflowDeploy.Flags().BoolVar(&deployLive, "live", false, "Deploy as the live, current version of the workflow")
-
 	// Allow showing a single workflow's config
 	workflowsRoot.AddCommand(workflowConfig)
 	workflowsRoot.AddCommand(workflowVersions)
 	workflowsRoot.AddCommand(workflowNew)
 	workflowsRoot.AddCommand(workflowDeploy)
+	workflowsRoot.AddCommand(workflowFormat)
+
+	// Root by default calls list, so add the All flag to both.
+	workflowsRoot.Flags().BoolVar(&allWorkflows, "all", false, "Show all workflows including drafts and archived flows (instead of only live flows)")
+	workflowsList.Flags().BoolVar(&allWorkflows, "all", false, "Show all workflows including drafts and archived flows (instead of only live flows)")
+	workflowConfig.Flags().IntVar(&versionFlag, "version", 0, "The version of the workflow to select")
+	workflowConfig.Flags().BoolVar(&canonicalFormat, "format", false, "Whether to format the configuration")
+	workflowDeploy.Flags().BoolVar(&deployLive, "live", false, "Deploy as the live, current version of the workflow")
+	workflowFormat.Flags().BoolVar(&writeFormat, "write", false, "Edit the file in place with formatted config")
 }
 
 var workflowsRoot = &cobra.Command{
@@ -96,6 +102,34 @@ var workflowsList = &cobra.Command{
 			t.AppendRow(row)
 		}
 		t.Render()
+	},
+}
+
+var workflowFormat = &cobra.Command{
+	Use:   "format",
+	Short: "Formats a config file",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		file, byt, err := readWorkflowFile(args)
+		if err != nil {
+			return err
+		}
+
+		parsed, err := inngest.ParseWorkflow(string(byt))
+		if err != nil {
+			return err
+		}
+		output, err := inngest.FormatWorkflow(*parsed)
+		if err != nil {
+			return err
+		}
+
+		if writeFormat {
+			err = os.WriteFile(file, []byte(output), 0600)
+			return err
+		}
+
+		fmt.Println(output)
+		return nil
 	},
 }
 
@@ -169,6 +203,21 @@ var workflowConfig = &cobra.Command{
 			log.From(ctx).Fatal().Err(err).Msg("Unable to find workflow")
 		}
 
+		printConfig := func(config string) {
+			if canonicalFormat {
+				parsed, err := inngest.ParseWorkflow(config)
+				if err != nil {
+					fmt.Println(config)
+					return
+				}
+				if output, err := inngest.FormatWorkflow(*parsed); err == nil {
+					fmt.Println(output)
+					return
+				}
+			}
+			fmt.Println(config)
+		}
+
 		if versionFlag != 0 && (workflow.Current == nil || workflow.Current.Version != versionFlag) {
 			// Request that specific version, as by default we only request the config for
 			// the current version in the list.
@@ -176,13 +225,13 @@ var workflowConfig = &cobra.Command{
 			if err != nil {
 				log.From(ctx).Fatal().Err(err).Msg("Unable to find workflow version")
 			}
-			fmt.Println(v.Config)
+			printConfig(v.Config)
 			return
 		}
 
 		// Show the current version by default
 		if workflow.Current != nil {
-			fmt.Println(workflow.Current.Config)
+			printConfig(workflow.Current.Config)
 			return
 		}
 
@@ -221,14 +270,9 @@ var workflowDeploy = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		file := "./workflow.cue"
-		if len(args) >= 1 {
-			file = args[0]
-		}
-
-		byt, err := os.ReadFile(file)
+		file, byt, err := readWorkflowFile(args)
 		if err != nil {
-			return fmt.Errorf("unable to read workflow configuration file at '%s'", file)
+			return err
 		}
 
 		s := state.RequireState(ctx)
@@ -247,4 +291,17 @@ var workflowDeploy = &cobra.Command{
 		fmt.Printf("Deployed version %d as a draft\n", v.Version)
 		return nil
 	},
+}
+
+func readWorkflowFile(args []string) (string, []byte, error) {
+	file := "./workflow.cue"
+	if len(args) >= 1 {
+		file = args[0]
+	}
+
+	byt, err := os.ReadFile(file)
+	if err != nil {
+		return file, nil, fmt.Errorf("unable to read workflow configuration file at '%s'", file)
+	}
+	return file, byt, nil
 }

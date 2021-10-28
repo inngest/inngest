@@ -6,6 +6,30 @@ import (
 	"github.com/inngest/inngestctl/inngest/internal/cuedefs"
 )
 
+// ParseWorkflow parses a cue configuration defining a workflow.
+func ParseWorkflow(input string) (*Workflow, error) {
+	val, err := cuedefs.ParseWorkflow(input)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing workflow: %w", err)
+	}
+	w := &Workflow{}
+	if err := val.Decode(&w); err != nil {
+		return nil, fmt.Errorf("error deserializing workflow: %w", err)
+	}
+
+	return w, nil
+}
+
+// FormatWorkflow formats a workflow struct into a canonical cue string representation
+func FormatWorkflow(a Workflow) (string, error) {
+	def, err := cuedefs.FormatDef(a)
+	if err != nil {
+		return "", err
+	}
+	// XXX: Inspect cue and implement packages.
+	return fmt.Sprintf(workflowTpl, def), nil
+}
+
 // Workflow represents a workflow encoded wtihin the Cue configuration language.
 //
 // This represents the logic for a workflow, but does not represent any specific
@@ -57,7 +81,7 @@ type Edge struct {
 	Incoming uint        `json:"incoming"`
 	// Metadata specifies the type of edge to use.  This defaults
 	// to EdgeTypeEdge - a basic link that can conditionally run.
-	Metadata EdgeMetadata `json:"metadata,omitempty"`
+	Metadata *EdgeMetadata `json:"metadata,omitempty"`
 }
 
 type EdgeMetadata struct {
@@ -76,16 +100,6 @@ type AsyncEdgeMetadata struct {
 	// to true for the workflow to continue.  This allows you to filter events
 	// to eg. the same user.
 	Match *string `json:"match"`
-}
-
-// FormatWorkflow formats a workflow struct into a canonical cue string representation
-func FormatWorkflow(a Workflow) (string, error) {
-	def, err := cuedefs.FormatDef(a)
-	if err != nil {
-		return "", err
-	}
-	// XXX: Inspect cue and implement packages.
-	return fmt.Sprintf(workflowTpl, def), nil
 }
 
 var workflowTpl = `package main
