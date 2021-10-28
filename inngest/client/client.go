@@ -26,6 +26,8 @@ type Client interface {
 	WorkflowVersion(ctx context.Context, workspaceID, workflowID uuid.UUID, version int) (*WorkflowVersion, error)
 	// LatestWorkflowVersion returns the latest workflow version by modification date for a given workflow
 	LatestWorkflowVersion(ctx context.Context, workspaceID, workflowID uuid.UUID) (*WorkflowVersion, error)
+	// DeployWorflow idempotently deploys a workflow, by default as a draft.  Set live to true to deploy as the live version.
+	DeployWorkflow(ctx context.Context, workspaceID uuid.UUID, config string, live bool) (*WorkflowVersion, error)
 
 	Actions(ctx context.Context, includePublic bool) ([]*Action, error)
 	UpdateActionVersion(ctx context.Context, v ActionVersionQualifier, enabled bool) (*ActionVersion, error)

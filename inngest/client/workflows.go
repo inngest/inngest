@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngestctl/inngest/internal/cuedefs"
 )
 
 // Workflow represents all versions of a single workflow in a workspace.
@@ -211,4 +212,51 @@ func (c httpClient) Workflows(ctx context.Context, workspaceID uuid.UUID) ([]Wor
 	}
 
 	return workflows, nil
+}
+
+func (c httpClient) DeployWorkflow(ctx context.Context, workspaceID uuid.UUID, config string, live bool) (*WorkflowVersion, error) {
+	if _, err := cuedefs.ParseWorkflow(config); err != nil {
+		return nil, fmt.Errorf("error parsing workflow: %w", err)
+	}
+
+	query := `
+	  mutation($input: UpsertWorkflowInput!) {
+	    upsertWorkflow(input: $input) {
+	      workflow { id name slug }
+	      version { config version description validFrom validTo createdAt updatedAt triggers { eventName schedule } }
+            }
+          }`
+
+	type response struct {
+		UpsertWorkflow struct {
+			Workflow struct {
+				id   uuid.UUID
+				Name string
+				Slug string
+			}
+			Version *WorkflowVersion
+		}
+	}
+
+	resp, err := c.DoGQL(ctx, Params{
+		Query: query,
+		Variables: map[string]interface{}{
+			"input": map[string]interface{}{
+				"live":        live,
+				"config":      config,
+				"workspaceID": workspaceID.String(),
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		return nil, fmt.Errorf("error unmarshalling workspaces: %w", err)
+
+	}
+
+	return data.UpsertWorkflow.Version, nil
 }

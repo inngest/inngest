@@ -3,8 +3,10 @@ package commands
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/inngest/inngestctl/cmd/commands/internal/state"
 	"github.com/inngest/inngestctl/cmd/commands/internal/table"
@@ -18,6 +20,7 @@ import (
 
 var (
 	allWorkflows bool
+	deployLive   bool
 	versionFlag  int
 )
 
@@ -29,11 +32,13 @@ func init() {
 	workflowsRoot.Flags().BoolVar(&allWorkflows, "all", false, "Show all workflows including drafts and archived flows (instead of only live flows)")
 	workflowsList.Flags().BoolVar(&allWorkflows, "all", false, "Show all workflows including drafts and archived flows (instead of only live flows)")
 	workflowConfig.Flags().IntVar(&versionFlag, "version", 0, "The version of the workflow to select")
+	workflowDeploy.Flags().BoolVar(&deployLive, "live", false, "Deploy as the live, current version of the workflow")
 
 	// Allow showing a single workflow's config
 	workflowsRoot.AddCommand(workflowConfig)
 	workflowsRoot.AddCommand(workflowVersions)
 	workflowsRoot.AddCommand(workflowNew)
+	workflowsRoot.AddCommand(workflowDeploy)
 }
 
 var workflowsRoot = &cobra.Command{
@@ -164,7 +169,7 @@ var workflowConfig = &cobra.Command{
 			log.From(ctx).Fatal().Err(err).Msg("Unable to find workflow")
 		}
 
-		if versionFlag != 0 && workflow.Current != nil && workflow.Current.Version != versionFlag {
+		if versionFlag != 0 && (workflow.Current == nil || workflow.Current.Version != versionFlag) {
 			// Request that specific version, as by default we only request the config for
 			// the current version in the list.
 			v, err := state.Client.WorkflowVersion(ctx, state.SelectedWorkspace.ID, workflow.ID, versionFlag)
@@ -180,6 +185,8 @@ var workflowConfig = &cobra.Command{
 			fmt.Println(workflow.Current.Config)
 			return
 		}
+
+		// XXX: If there's no current, show the latest version by default
 
 		log.From(ctx).Fatal().Err(err).Msg("No live version to show, and no version supplied with --version flag.  Show a specific version using the --version flag")
 	},
@@ -203,6 +210,41 @@ var workflowNew = &cobra.Command{
 		fmt.Println("Created a workflow configuration file: ./workflow.cue")
 		fmt.Println("")
 		fmt.Println("Edit this file with your configuration and deploy using `inngestctl workflows deploy`.")
+		return nil
+	},
+}
+
+var workflowDeploy = &cobra.Command{
+	Use:          "deploy",
+	Short:        "Deploys a workflow idempotently using a given config file or ./workflow.cue as a draft (use --live to push live)",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
+
+		file := "./workflow.cue"
+		if len(args) >= 1 {
+			file = args[0]
+		}
+
+		byt, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("unable to read workflow configuration file at '%s'", file)
+		}
+
+		s := state.RequireState(ctx)
+
+		fmt.Printf("Deploying workflow %s...\n", file)
+		v, err := s.Client.DeployWorkflow(ctx, s.SelectedWorkspace.ID, string(byt), deployLive)
+		if err != nil {
+			return fmt.Errorf("failed to deploy workflow: %w", err)
+		}
+
+		if v.ValidFrom != nil && v.ValidFrom.Before(time.Now()) {
+			fmt.Printf("Deployed version %d live\n", v.Version)
+			return nil
+		}
+
+		fmt.Printf("Deployed version %d as a draft\n", v.Version)
 		return nil
 	},
 }
