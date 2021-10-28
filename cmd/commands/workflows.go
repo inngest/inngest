@@ -37,6 +37,7 @@ func init() {
 	workflowsRoot.AddCommand(workflowNew)
 	workflowsRoot.AddCommand(workflowDeploy)
 	workflowsRoot.AddCommand(workflowFormat)
+	workflowsRoot.AddCommand(workflowValidate)
 
 	// Root by default calls list, so add the All flag to both.
 	workflowsRoot.Flags().BoolVar(&allWorkflows, "all", false, "Show all workflows including drafts and archived flows (instead of only live flows)")
@@ -289,6 +290,27 @@ var workflowDeploy = &cobra.Command{
 		}
 
 		fmt.Printf("Deployed version %d as a draft\n", v.Version)
+		return nil
+	},
+}
+
+var workflowValidate = &cobra.Command{
+	Use:   "validate",
+	Short: "Validates a workflow configuration file",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		_, byt, err := readWorkflowFile(args)
+		if err != nil {
+			return err
+		}
+
+		if _, err := inngest.ParseWorkflow(string(byt)); err != nil {
+			return err
+		}
+
+		// XXX: Grab any event and action types from Inngest to perform static
+		// typechecking of metadata
+
+		fmt.Println("Workflow is valid")
 		return nil
 	},
 }
