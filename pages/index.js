@@ -92,7 +92,7 @@ export default function Home() {
 
             <div>
               <h3>Track any event</h3>
-              <p>Ingest webhooks, events from your API, UX events, or events via integrations with zero infrastcture required</p>
+              <p>Ingest webhooks, events from your API, UX events, or events via integrations &mdash; fully HA with zero infrastcture required</p>
             </div>
 
             <div>
@@ -130,6 +130,70 @@ export default function Home() {
             <h2>Build and iterate<br />without complexity</h2>
             <p>Easily create multi-step processes to automate anything, written as code or via a UI.  Then, have them run automatically every time events are received, on a schedule, or manually via your team.</p>
           </header>
+
+          <BuildGrid className="text-center">
+            <div>
+              <img src="https://via.placeholder.com/350x150" />
+              <h3>Build workflows rapidly</h3>
+              <p>Create workflows using a fully typed config hosted in your own VCS, or use our UI to write the code for you.</p>
+            </div>
+            <div>
+              <img src="https://via.placeholder.com/350x150" />
+              <h3>Fully connected</h3>
+              <p>Connect to all of your tools via integrations to common systems, with full API support and secrets built-in.</p>
+            </div>
+            <div>
+              <img src="https://via.placeholder.com/350x150" />
+              <h3>Manage & coordinate events</h3>
+              <p>Automatically run workflows whenever events are received, or pause workflows until we receive new events (or don't).</p>
+            </div>
+          </BuildGrid>
+        </Content>
+        
+        <Content>
+          <SolveGrid>
+            <header>
+              <h2>Solve anything</h2>
+              <p>Built to handle all complex behind-the-scenes flows engineers lose time building, with a library of examples to get started.</p>
+            </header>
+
+            <div>
+              <h4>Customer journeys</h4>
+              <small>eg. post signup flows</small>
+              <p>Ensure new users are added to every system & campaign, with built-in integrations, version control, and handover to other teams</p>
+            </div>
+
+            <div>
+              <h4>Real-time integrations</h4>
+              <small>eg. billing &amp; support systems</small>
+              <p>Respond to activity across all of your systems, such as running inference or auto-escalation with new support tickets, or handling payment failures</p>
+            </div>
+
+            <div>
+              <h4>Scheduled jobs</h4>
+              <small>eg. daily reports &amp; micro-batching</small>
+              <p>Run workflows as scheduled jobs with zero infrastructure, config, and management, then see full logs &amp; history every time flows run.</p>
+            </div>
+
+            <div>
+              <h4>Sequenced flows</h4>
+              <small>eg. churn & abandonment</small>
+              <p>Coordinate between events or the lack of them, such as if a user doesn’t log in within 7 days after signup, or check out after adding to cart — all built in.</p>
+            </div>
+
+            <div>
+              <h4>Alerting</h4>
+              <small>eg. security flows</small>
+              <p>Create alerts any time events happen in your system with built-in integrations, such as new deploys or suspicious logins</p>
+            </div>
+
+            <div>
+              <h4>Internal ops</h4>
+              <small>eg. complex customer requests</small>
+              <p>Build multi-step workflows that your entire team can manage and operate, such as refunding customers</p>
+            </div>
+
+          </SolveGrid>
         </Content>
       </div>
 
@@ -217,7 +281,43 @@ const FeatureGrid = styled.div`
   };
 `
 
+const BuildGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-gap: 55px;
+
+  img { margin: 0 10px 20px }
+  p { opacity: .85; }
+`;
+
+const SolveGrid = styled.div`
+  padding: 15vh 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+
+  > div { padding: 50px 30px 30px; }
+
+  header {
+    grid-column: 1 / span 2;
+    padding: 40px 50px;
+  }
+
+  h4 { margin: 0 }
+  small { opacity: .5; font-size: 12px; }
+  div p { font-size: 14px; margin-top: 1rem; }
+
+  div:nth-of-type(1) { background: #0C1B46; }
+  div:nth-of-type(2) { background: #282F68; }
+  div:nth-of-type(3) { background: #193770; }
+  div:nth-of-type(4) { background: #212B7A; }
+  div:nth-of-type(5) { background: #1F3C74; }
+  div:nth-of-type(6) { background: #263B63; }
+
+
+`;
+
 
 const Signup = styled.div`
 `;
+
 
