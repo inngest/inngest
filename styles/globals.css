@@ -2,8 +2,8 @@
 
 html, body, button, input {
   font-family: 'Inter', sans-serif;
-  color: #222631;
-  font-size: 18px;
+  color: #fff;
+  font-size: 16px;
 }
 
 @supports (font-variation-settings: normal) {
@@ -11,6 +11,8 @@ html, body, button, input {
 }
 
 :root {
+  --bg-dark: #030624;
+
   --light-grey: #86909a;
   --dark-grey: #565e66;
 
@@ -27,7 +29,8 @@ html, body, button, input {
 }
 
 html, body {
-  overflow-x: hidden
+  overflow-x: hidden;
+  background: var(--bg-dark);
 }
 
 body, button {
@@ -89,7 +92,7 @@ button:focus, .button:focus {
 
 
 a[href]:not([href='']) {
-  color: #2F77AF;
+  color: #fff;
 }
 
 .text-center {
@@ -101,22 +104,24 @@ p, li {
 }
 
 h1 {
-  font-size: 60px;
-  line-height: 1.15;
+  font-size: 54px;
+  line-height: 1.07;
+  letter-spacing: -0.5px;
   margin: 20px 0;
-  color: #2E3A59;
 }
 
 h2 {
-  font-size: 2.5rem;
+  font-size: 36px;
   font-weight: 800;
-  color: #2E3A59;
+}
+
+header h2 + p {
+  font-size: 18px;
 }
 
 h3 {
-  font-size: 1.4125rem;
-  font-weight: 500;
-  margin-bottom: 25px;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 h3 + .subtitle {
@@ -153,8 +158,7 @@ h5 + h2 {
 }
 
 h2, .text--blue {
-  background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
-  background: #2E3A59;
+  background: #fff;
   background-clip: text;
   color: transparent;
 }
@@ -197,3 +201,4 @@ ul.check li {
   padding-left: 1.75rem;
   margin-left: .75rem;
 }
+

@@ -1,18 +1,15 @@
 import React from "react";
 import styled from "@emotion/styled";
 
-const Nav = ({ dark }) => {
+const Nav = () => {
   return (
-    <div className={dark ? "nav-dark" : ""}>
+    <div>
       <Container>
         <div>
           <a href="/">
-            {dark ? (
-              <img src="/logo-white.svg" alt="Inngest logo" />
-            ) : (
-              <img src="/logo-blue.svg" alt="Inngest logo" />
-            )}
+            <img src="/logo-white.svg" alt="Inngest logo" />
           </a>
+          {/*
           <Hoverable>
             <StyledLink href="/product">Product</StyledLink>
             <div>
@@ -43,32 +40,43 @@ const Nav = ({ dark }) => {
                 Engineering
                 <span>Serverless event hub and functions</span>
               </a>
-              */}
             </div>
           </Hoverable>
-          {/*<StyledLink href="/library">Library</StyledLink>*/}
-          <StyledLink href="/blog">Blog</StyledLink>
-          {/*
-          <StyledLink href="/pricing">Pricing</StyledLink>
-          <Hoverable>
-            <StyledLink href="/company">Company</StyledLink>
-            <div>
-              <a href="/company">About us</a>
-              <a href="/company/contact">Contact us</a>
-              <a href="/company/press">Press</a>
-            </div>
-          </Hoverable>
-            */}
+          */}
+          <StyledLink href="/library">Library</StyledLink>
           <StyledLink
             href="https://docs.inngest.com/docs/intro"
             target="_blank"
           >
             Docs
           </StyledLink>
+
+          <Hoverable>
+            <StyledLink href="/company">Company</StyledLink>
+            <div>
+              <a href="/company">
+                Careers
+                <span>We're hiring!</span>
+              </a>
+              <a href="/blog">
+                Blog
+                <span>Technical, product & case studies</span>
+              </a>
+              <a href="/company">
+                About us
+              </a>
+              <a href="/company/contact">
+                Contact us
+              </a>
+            </div>
+          </Hoverable>
+
+          <StyledLink href="/pricing">Pricing</StyledLink>
+
         </div>
 
         <div>
-          <StyledLink href="https://app.inngest.com/login">Sign in</StyledLink>
+          <StyledLink href="https://app.inngest.com/login">Log in</StyledLink>
 
           <a
             href="https://app.inngest.com/register"
@@ -98,6 +106,12 @@ const StyledLink = styled.a`
   padding: 12px 20px 11px;
   transition: all 0.2s;
   text-decoration: none;
+
+  font-size: 14px;
+
+  &[href]:not([href=""]) {
+    color: #fff;
+  }
 
   &:hover {
     background: #2f6d9d11;
@@ -159,7 +173,7 @@ const Hoverable = styled.div`
       transition: all .2s;
 
       &:hover, &:hover span {
-        color: var(--blue-left);
+        color: #fff;
       }
     }
 
