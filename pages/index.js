@@ -172,13 +172,13 @@ export default function Home() {
             <div>
               <h4>Scheduled jobs</h4>
               <small>eg. daily reports &amp; micro-batching</small>
-              <p>Run workflows as scheduled jobs with zero infrastructure, config, and management, then see full logs &amp; history every time flows run.</p>
+              <p>Run workflows as scheduled jobs with zero infrastructure, config, and management, then see full logs &amp; history every time flows run</p>
             </div>
 
             <div>
               <h4>Sequenced flows</h4>
               <small>eg. churn & abandonment</small>
-              <p>Coordinate between events or the lack of them, such as if a user doesn’t log in within 7 days after signup, or check out after adding to cart — all built in.</p>
+              <p>Coordinate between events or the lack of them, such as if a user doesn’t log in within 7 days after signup, or check out after adding to cart — all built in</p>
             </div>
 
             <div>
@@ -267,7 +267,7 @@ const FeatureGrid = styled.div`
   grid-gap: 30px 30px;
 
   > div {
-    border: 1px solid #ffffff22;
+    border: 1px solid #ffffff19;
     padding: 30px 30px 30px 120px;
     border-radius: 5px;
   }
@@ -291,9 +291,10 @@ const BuildGrid = styled.div`
 `;
 
 const SolveGrid = styled.div`
-  padding: 15vh 0;
+  margin: 15vh 0;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
 
   > div { padding: 50px 30px 30px; }
 

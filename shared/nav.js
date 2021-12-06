@@ -7,7 +7,7 @@ const Nav = () => {
       <Container>
         <div>
           <a href="/">
-            <img src="/logo-white.svg" alt="Inngest logo" />
+            <img src="/logo-white.svg" alt="Inngest logo" className="logo" />
           </a>
           {/*
           <Hoverable>
@@ -95,6 +95,10 @@ const Nav = () => {
 const Content = styled.div`
   max-width: 1200px;
   margin: 0 auto;
+
+  .logo {
+    max-height: 30px;
+  }
 
   @media only screen and (max-width: 800px) {
     padding: 0 20px;
