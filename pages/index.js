@@ -122,7 +122,14 @@ export default function Home() {
 
           </FeatureGrid>
 
-          <p class="text-center">Plus, you can test easily using our local CLI, integrate easily with CI/CD tooling, leverage our prebuilt&nbsp;integrations, and get full schemas for every version of your events automatically.</p>
+          <p className="text-center">Plus, you can test easily using our local CLI, integrate easily with CI/CD tooling, leverage our prebuilt&nbsp;integrations, and get full schemas for every version of your events automatically.</p>
+        </Content>
+
+        <Content className="top-gradient">
+          <header className="text-center">
+            <h2>Build and iterate<br />without complexity</h2>
+            <p>Easily create multi-step processes to automate anything, written as code or via a UI.  Then, have them run automatically every time events are received, on a schedule, or manually via your team.</p>
+          </header>
         </Content>
       </div>
 
@@ -206,7 +213,7 @@ const FeatureGrid = styled.div`
   & + p {
     opacity: .7;
     margin: 2rem auto;
-    max-width: 80vw;
+    max-width: min(80vw, 850px);
   };
 `
 

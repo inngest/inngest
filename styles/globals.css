@@ -115,8 +115,14 @@ h2 {
   font-weight: 800;
 }
 
+header {
+  position: relative;
+  z-index: 1;
+}
+
 header h2 + p {
   font-size: 18px;
+  opacity: .9;
 }
 
 h3 {
