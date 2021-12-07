@@ -21,6 +21,10 @@ html, body, button, input {
 
   --cream: #f9f9f1;
 
+  --green: #94D09A;
+  --button-bg-color: var(--green);
+  --button-text-color: var(--bg-dark);
+
   --bg-gradient: linear-gradient(
     180deg,
     rgba(243, 245, 245, 1) 20%,
@@ -42,9 +46,10 @@ input {
   width: 300px;
   padding: 5px 12px;
   box-sizing: border-box;
+  color: var(--bg-dark);
 
   background: #fff;
-  border-radius: 2px;
+  border-radius: 3px;
   border: 1px solid #eee;
   transition: all .3s;
   box-shadow: 0 1px 0px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
@@ -56,27 +61,15 @@ input:focus, textarea:focus {
 }
 
 button, .button {
-  padding: 12px 14px 11px;
-  background-color: #2F6D9Dee;
+  padding: 12px 18px 11px;
+  background-color: var(--button-bg-color);
   text-decoration: none;
-  color: white !important;
+  color: var(--button-text-color) !important;
+  font-weight: 600;
   border: 1px solid transparent;
-  border-radius: 2px;
+  border-radius: 3px;
   transition: all .3s;
 }
-
-.button--outline {
-  background-color: transparent;
-  border: 1px solid #2F6D9D99;
-  color: var(--blue-right) !important;
-}
-
-.button--outline-white {
-  background-color: transparent;
-  border: 1px solid #ffffffbb;
-  color: #fff !important;
-}
-
 button:hover, .button:hover {
   cursor: pointer;
   background-color: gray;
@@ -84,10 +77,18 @@ button:hover, .button:hover {
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
   color: #fff !important;
 }
-
 button:focus, .button:focus {
   outline: none;
   background-color: #2F6D9Dff;
+}
+
+.button--outline {
+  background-color: transparent;
+  border: 1px solid #fff;
+  color: #fff !important;
+}
+.button--outline:hover {
+  background: #ffffff33;
 }
 
 

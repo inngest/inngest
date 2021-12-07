@@ -197,27 +197,50 @@ export default function Home() {
         </Content>
       </div>
 
-      {/*
-      <Signup>
-        <form onSubmit={onSubmit} className={submitted ? "submitted" : ""}>
-          <input
-            type="email"
-            onChange={(e) => setEmail(e.target.value)}
-            value={email}
-            placeholder="Your work email"
-            required
-          />
-          <button type="submit" disabled={submitted}>
-            Sign up for updates
-          </button>
-        </form>
+      <Content>
+        <GetStarted>
+          <h2>
+            Ready to
+            <br />
+            get&nbsp;started?
+          </h2>
+          <div>
+            <p>Inngest’s programmable serverless event platform allows you to get started building rapidly deployable, easily changeable workflows with zero infrastructure, that run whenever you need them to.</p>
+            <p>Plus, you can create workflows and offload the operations of them to your wider team, using Inngest as an internal tool.</p>
+
+            <div>
+              <a href="https://app.inngest.com/register" class="button button--outline">Sign up →</a>
+
+              <a href="https://www.inngest.com/docs">Explore documentation</a>
+            </div>
+          </div>
+        </GetStarted>
+      </Content>
+
+      <Newsletter>
+        <p><b>Bonus:  sign up to our newsletter?</b>  You’ve scrolled pretty far, and we didn’t really want to nag you earlier.  No pressure, and we’ll only send you fun & interesting things.  Like, say, news about open sourcing our execution platform!</p>
+
+        {!submitted && (
+          <form onSubmit={onSubmit} className={submitted ? "submitted" : ""}>
+            <input
+              type="email"
+              onChange={(e) => setEmail(e.target.value)}
+              value={email}
+              placeholder="Your work email"
+              required
+            />
+            <button type="submit" disabled={submitted}>
+              Subscribe
+            </button>
+          </form>
+        )}
         {submitted && (
-          <p style={{ textAlign: "center", fontSize: 12 }}>
-            You're on the list and will receive an invite soon!
+          <p style={{ textAlign: "center", fontSize: 12, marginTop: "2rem" }}>
+            You're added!  Only top-shelf stuff.  If not, yoink us from your inbox.
           </p>
         )}
-      </Signup>
-      */}
+
+      </Newsletter>
 
       <div style={{ marginTop: 100 }}>
         <Footer />
@@ -291,7 +314,7 @@ const BuildGrid = styled.div`
 `;
 
 const SolveGrid = styled.div`
-  margin: 15vh 0;
+  margin: 18vh 0;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
@@ -317,8 +340,48 @@ const SolveGrid = styled.div`
 
 `;
 
+const GetStarted = styled.div`
+  max-width: min(90vw, 1100px);
+  margin: 18vh auto;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  grid-gap: 50px;
 
-const Signup = styled.div`
+  p { font-size: 18px; opacity: .85; }
+  p + div { margin: 3rem 0 0; font-size: 14px; }
+  a.button { margin: 0 2rem 0 0 }
+`;
+
+const Newsletter = styled.div`
+  width: min(90vw, 650px);
+  margin: 0 auto 18vh;
+  border: 1px solid #ffffff19;
+  border-radius: 20px;
+  padding: 30px;
+  background: #00000233;
+  box-shadow: 0 20px 80px rgba(0, 0,0, 0.7);
+
+  p { opacity: .6; font-size: 14px; };
+
+  form {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: center;
+    margin: 2rem 0 0;
+  }
+
+  input {
+    height: auto;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    font-size: 14px;
+  }
+  button {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    font-size: 14px;
+  }
 `;
 
 

@@ -15,7 +15,6 @@ const Footer = () => {
             </div>
             <div>
               <strong>Inngest</strong>
-              <a href="https://www.inngest.com/product">Product</a>
               <a href="https://docs.inngest.com">Documentation</a>
               <a href="https://www.inngest.com/security">Security</a>
               <a href="https://excessive-satellite-3d9.notion.site/Software-Engineer-Inngest-95db47fcec4d4173a9f57e2a251f6fc1">
