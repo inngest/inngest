@@ -16,12 +16,14 @@
     "cronstrue": "^1.117.0",
     "dagre": "^0.8.5",
     "fs": "^0.0.1-security",
+    "gray-matter": "^4.0.3",
     "inngest-sdk": "^1.0.1",
     "lodash.debounce": "^4.0.8",
     "lodash.throttle": "^4.1.1",
     "marked": "^3.0.4",
     "monaco-editor": "^0.28.1",
-    "next": "11.1.1",
+    "next": "12.0.7",
+    "next-mdx-remote": "^3.0.8",
     "quickjs-emscripten": "^0.13.0",
     "react": "17.0.2",
     "react-dom": "17.0.2",
@@ -34,6 +36,7 @@
     "react-markdown": "^7.0.1",
     "react-syntax-highlighter": "^15.4.3",
     "react-use": "^17.3.1",
+    "reading-time": "^1.5.0",
     "urql": "^2.0.5"
   },
   "devDependencies": {

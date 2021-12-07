@@ -1,17 +1,15 @@
-{
-  "slug": "introducing-inngest",
-  "redirects": [],
-  "meta": {
-    "title": ""
-  },
-  "popular": true,
-  "order": 1,
-  "date": "2021-10-05",
-  "heading": "Introducing Inngest:  an event workflow platform",
-  "subtitle": "We’re launching Inngest, a platform designed to make building event-driven systems fast and easy."
-}
+---
+# focus sets this blog post as the blog focus.  The latest post will be focused if there's
+# > 1 focus post.
+focus: true
+heading: "Introducing Inngest:  an event workflow platform"
+subtitle: We’re launching Inngest, a platform designed to make building event-driven systems fast and easy.
+date: 2021-10-05
+order: 1
+---
 
-~~~
+
+<div className="blog--callout">
 
 We’re launching Inngest, a platform designed to make building event-driven systems fast and easy.
 
@@ -19,7 +17,7 @@ First, what is Inngest?  Inngest is a serverless event platform.  It aggregates 
 
 It’s like putting GitHub Actions, Lambda, Segment, and Zapier in a blender.  You can build server-side functions and glue code in minutes, with no servers.  If you're interested, you can sign up to Inngest for free and start today by [visiting here](https://app.inngest.com/register).
 
-~~~
+</div>
 
 ## Why events?
 

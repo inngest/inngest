@@ -77,7 +77,7 @@ export default function Home() {
               need, with zero&nbsp;config&nbsp;or&nbsp;infra.
             </p>
 
-            <div class="cta">
+            <div className="cta">
               <a hrefName="https://app.inngest.com/register">
                 Join the preview
               </a>
@@ -305,7 +305,7 @@ export default function Home() {
               </p>
             </div>
           </SolveGrid>
-          <div class='justify-right'>
+          <div className='justify-right'>
             <a href="/library" className='button button--outline'>Explore our library</a>
           </div>
         </Content>
@@ -333,7 +333,7 @@ export default function Home() {
             <div>
               <a
                 href="https://app.inngest.com/register"
-                class="button"
+                className="button"
               >
                 Sign up →
               </a>
@@ -382,7 +382,7 @@ export default function Home() {
 }
 
 const Hero = styled.div`
-  padding: 10vh 0;
+  padding: 12vh 0;
   border-bottom: 4px solid #ffffffdd;
 
   .grid {
