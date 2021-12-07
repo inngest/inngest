@@ -29,7 +29,7 @@ export default function Library() {
       pathname: window.location.pathname,
       search: `tag=${t}`,
     });
-  }
+  };
 
   const visible = useMemo(() => {
     if (!tag) return library;

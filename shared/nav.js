@@ -62,17 +62,12 @@ const Nav = () => {
                 Blog
                 <span>Technical, product & case studies</span>
               </a>
-              <a href="/company">
-                About us
-              </a>
-              <a href="/company/contact">
-                Contact us
-              </a>
+              <a href="/company">About us</a>
+              <a href="/company/contact">Contact us</a>
             </div>
           </Hoverable>
 
           <StyledLink href="/pricing">Pricing</StyledLink>
-
         </div>
 
         <div>
