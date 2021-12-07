@@ -50,6 +50,9 @@ const Nav = () => {
           >
             Docs
           </StyledLink>
+          <StyledLink href="/blog">
+            Blog
+          </StyledLink>
 
           <Hoverable>
             <StyledLink href="/company">Company</StyledLink>
@@ -57,10 +60,6 @@ const Nav = () => {
               <a href="/company">
                 Careers
                 <span>We're hiring!</span>
-              </a>
-              <a href="/blog">
-                Blog
-                <span>Technical, product & case studies</span>
               </a>
               <a href="/company">About us</a>
               <a href="/company/contact">Contact us</a>
