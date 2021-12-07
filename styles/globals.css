@@ -24,12 +24,6 @@ html, body, button, input {
   --green: #94D09A;
   --button-bg-color: var(--green);
   --button-text-color: var(--bg-dark);
-
-  --bg-gradient: linear-gradient(
-    180deg,
-    rgba(243, 245, 245, 1) 20%,
-    rgba(249, 251, 254, 1) 100%
-  );
 }
 
 html, body {
@@ -61,7 +55,7 @@ input:focus, textarea:focus {
 }
 
 button, .button {
-  padding: 12px 18px 11px;
+  padding: 12px 22px 11px;
   background-color: var(--button-bg-color);
   text-decoration: none;
   color: var(--button-text-color) !important;
@@ -98,6 +92,11 @@ a[href]:not([href='']) {
 
 .text-center {
   text-align: center;
+}
+
+.justify-right {
+  display: flex;
+  justify-content: flex-end;
 }
 
 p, li {

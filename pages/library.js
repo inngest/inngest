@@ -42,11 +42,14 @@ export default function Library() {
         <Nav />
         <Content>
           <Inner>
-            <h2>Run serverless workflows in minutes</h2>
-            <p>
-              Explore our library of example workflows and get started in one
-              click.
-            </p>
+
+            <header>
+              <h2>Run serverless workflows in minutes</h2>
+              <p>
+                Explore our library of example workflows and get started in one
+                click.
+              </p>
+            </header>
 
             <Grid>
               <Menu>
@@ -86,6 +89,8 @@ export default function Library() {
                     <Item href={`/library/${slugify(item.title)}`}>
                       <p>{item.title}</p>
                       <p>{item.subtitle}</p>
+                      
+                      <span class="button button--outline">View</span>
                     </Item>
                   ))}
                 </Items>
@@ -129,19 +134,18 @@ const Grid = styled.div`
 const Items = styled.div`
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+  gap: 2rem;
 `;
 
 const Item = styled.a`
   text-decoration: none;
 
-  display: block;
-  border-radius: 5px;
-  border: 1px solid rgb(244, 244, 244);
-  background: #fff;
-  padding: 2rem;
+  display: flex;
+  flex-direction: column;
 
-  border: 1px solid transparent;
+  border-radius: 5px;
+  border: 1px solid #ffffff19;
+  padding: 2rem;
   transition: all 0.3s;
 
   &:hover {
@@ -154,15 +158,25 @@ const Item = styled.a`
   }
 
   p:first-of-type {
-    color: #222631;
     opacity: 0.8;
     font-weight: bold;
     margin-bottom: 0.5rem;
   }
 
   p:last-of-type {
-    color: var(--dark-grey);
     font-size: 14px;
+    opacity: .85;
+  }
+
+  .button {
+    font-size: 14px;
+    align-self: stretch;
+    text-align: center;
+    border-color: #ffffff66;
+    margin: 1.5rem 0 0;
+    opacity: .7;
+    padding: 8px 0;
+    font-weight: normal;
   }
 `;
 
@@ -196,6 +210,6 @@ const Menu = styled.div`
   hr {
     margin: 1rem 0;
     border: 0;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid #ffffff19;
   }
 `;

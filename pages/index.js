@@ -305,7 +305,11 @@ export default function Home() {
               </p>
             </div>
           </SolveGrid>
+          <div class='justify-right'>
+            <a href="/library" className='button button--outline'>Explore our library</a>
+          </div>
         </Content>
+
       </div>
 
       <Content>
@@ -329,12 +333,12 @@ export default function Home() {
             <div>
               <a
                 href="https://app.inngest.com/register"
-                class="button button--outline"
+                class="button"
               >
                 Sign up →
               </a>
 
-              <a href="https://www.inngest.com/docs">Explore documentation</a>
+              <a href="/docs">Explore documentation</a>
             </div>
           </div>
         </GetStarted>
@@ -410,7 +414,7 @@ const Hero = styled.div`
       color: #fff;
       line-height: 1;
       text-decoration: none;
-      padding: 12px 18px 14px;
+      padding: 12px 22px 14px;
       margin: 0 20px 0 0;
     }
 
@@ -474,14 +478,17 @@ const BuildGrid = styled.div`
 `;
 
 const SolveGrid = styled.div`
-  margin: 18vh 0;
+  margin: 18vh 0 2rem;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
 
+  & + div { margin-bottom: 18vh; font-size: 14px; }
+
   > div {
     padding: 50px 30px 30px;
   }
+
 
   header {
     grid-column: 1 / span 2;
