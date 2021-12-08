@@ -1,3 +1,4 @@
+
 export type DocScope = {
   // If the slug contains a forward slahs (eg. foo/bar), this page will automatically
   // be nested under the page with a slug of "foo"

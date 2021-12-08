@@ -1,9 +1,11 @@
 import React from "react";
 import { useRouter } from "next/router";
-
 import styled from "@emotion/styled";
+
 import Nav from "../shared/nav";
 import { getAllDocs, Categories, Category, DocScope } from "../utils/docs";
+import { categoryMeta } from "../utils/docsCategories";
+import Home from "../shared/Icons/Home";
 
 export default function DocsHome(props) {
   return (
@@ -79,13 +81,16 @@ export const DocsLayout: React.FC<{ categories: Categories }> = ({
             <ul>
               <li>
                 <a href="/docs" className="category">
-                  Home
+                  <Home fill="#fff" size={20} /> Home
                 </a>
               </li>
               {Object.values(categories).map((c) => {
+                const meta = categoryMeta[c.title.toLowerCase()] || {};
                 return (
                   <li>
-                    <span className="category">{c.title}</span>
+                    <span className="category">
+                      {meta.icon} {c.title}
+                    </span>
                     <ul className="items">
                       {c.pages
                         .sort((a, b) => a.order - b.order)
@@ -187,11 +192,20 @@ const Menu = styled.div`
 
   .category,
   a.category {
-    display: block;
+    display: flex;
     margin: 1rem 0;
     font-weight: 500;
     color: #fff !important;
     opacity: 0.9 !important;
+
+    align-items: center;
+    line-height: 1;
+
+    svg {
+      margin-right: 15px;
+      opacity: 0.8;
+      stroke-width: 1 !important;
+    }
   }
 
   ul,
@@ -214,6 +228,10 @@ const Menu = styled.div`
       opacity: 1;
       color: #fff !important;
     }
+  }
+
+  .items {
+    margin-left: 35px;
   }
 
   .subcategory {
