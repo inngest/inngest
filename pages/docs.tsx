@@ -137,7 +137,7 @@ const renderDocLink = (s: DocScope, c: Category, currentRoute?: string) => {
     (p) => p.slug.length > s.slug.length && p.slug.indexOf(s.slug) === 0
   );
 
-  const id = c.title.toLowerCase().replaceAll(" ", "-");
+  const id = s.title.toLowerCase().replaceAll(" ", "-");
 
   // If we're on this page or any of the children under this page, we're "active"
   const isCurrent = !![s, ...children].find(
@@ -156,8 +156,8 @@ const renderDocLink = (s: DocScope, c: Category, currentRoute?: string) => {
       >
         {s.title}
         { children.length > 0 && (<span className="toggle-subcategory" onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
+          e.preventDefault();
+          e.stopPropagation();
           document.querySelector(`#${id}`).classList.toggle("expanded")
         }}>toggle</span>)}
       </a>
