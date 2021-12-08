@@ -194,7 +194,7 @@ export const DocsContent = styled.div`
   grid-template-columns: 3fr 1fr;
 
   h2 {
-    margin-top: 5rem;
+    margin-top: 4rem;
   }
 
   /* "On this page" */
@@ -203,6 +203,14 @@ export const DocsContent = styled.div`
   }
 
 `;
+
+export const InnerDocsContent = styled.div`
+  padding-bottom: 10vh;
+  h2 {
+    padding-top: 2rem;
+    font-size: 28px;
+  }
+`
 
 const Menu = styled.div`
   border-right: 1px solid #ffffff19;

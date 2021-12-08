@@ -101,7 +101,11 @@ a[href]:not([href='']) {
 }
 
 p, li {
-  line-height: 1.5;
+  line-height: 1.7;
+}
+
+p + p {
+  margin-top: 1.8rem;
 }
 
 h1 {
@@ -136,7 +140,7 @@ h3 + .subtitle {
 }
 
 strong {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 h5 {

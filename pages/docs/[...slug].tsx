@@ -3,7 +3,7 @@ import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
 import rehypeSlug from "rehype-slug";
 import { getAllDocs, getDocs, DocScope, Categories } from "../../utils/docs";
-import { DocsLayout, DocsContent } from "../docs";
+import { DocsLayout, DocsContent, InnerDocsContent } from "../docs";
 
 export default function DocLayout(props: any) {
   // TODO: Add previous / next.  Add layout.
@@ -34,7 +34,9 @@ export default function DocLayout(props: any) {
               })}
           </TOC>
 
-          <MDXRemote compiledSource={props.post.compiledSource} scope={scope} />
+          <InnerDocsContent>
+            <MDXRemote compiledSource={props.post.compiledSource} scope={scope} />
+          </InnerDocsContent>
         </div>
       </DocsContent>
     </DocsLayout>
