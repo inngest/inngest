@@ -5,7 +5,6 @@ export default ({ fill = "#222631", size = "20" }) => (
     width={size}
     height={size}
     viewBox="0 0 11 13"
-    style={{marginLeft: Math.floor(parseInt(size) * 0.0769) }}
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >

@@ -137,7 +137,7 @@ const renderDocLink = (s: DocScope, c: Category, currentRoute?: string) => {
     (p) => p.slug.length > s.slug.length && p.slug.indexOf(s.slug) === 0
   );
 
-  const id = s.title.toLowerCase().replaceAll(" ", "-");
+  const id = s.title.toLowerCase().replace(/[^a-z]+/g, "-");
 
   // If we're on this page or any of the children under this page, we're "active"
   const isCurrent = !![s, ...children].find(
@@ -201,13 +201,14 @@ export const DocsContent = styled.div`
   h2 + h5 {
     margin-top: 3rem;
   }
+
 `;
 
 const Menu = styled.div`
   border-right: 1px solid #ffffff19;
   display: flex;
   justify-content: flex-end;
-  padding: 3rem 2rem;
+  padding: 3rem 4rem 3rem 3rem;;
   background: rgba(0, 0, 0, 0.4);
   font-size: 14px;
 
@@ -224,6 +225,7 @@ const Menu = styled.div`
       cursor: pointer;
       opacity: .6;
       transition: all .3s;
+      margin-right: -2.5rem;
       &:hover {
         opacity: 1;
       }
@@ -283,7 +285,8 @@ const Menu = styled.div`
 
   .toggle-subcategory {
     position: absolute;
-    right: 0;
+    right: -2.5rem;
+    margin-top: 3px;
     opacity: .4;
     transition: all .3s;
     font-size: 11px;
