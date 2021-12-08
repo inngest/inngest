@@ -44,15 +44,8 @@ const Nav = () => {
           </Hoverable>
           */}
           <StyledLink href="/library">Library</StyledLink>
-          <StyledLink
-            href="https://docs.inngest.com/docs/intro"
-            target="_blank"
-          >
-            Docs
-          </StyledLink>
-          <StyledLink href="/blog">
-            Blog
-          </StyledLink>
+          <StyledLink href="/docs">Docs</StyledLink>
+          <StyledLink href="/blog">Blog</StyledLink>
 
           <Hoverable>
             <StyledLink href="/company">Company</StyledLink>

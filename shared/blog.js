@@ -24,7 +24,9 @@ export const Inner = styled.div`
     margin: 2rem 0 0;
   }
 
-  p, ul, li {
+  p,
+  ul,
+  li {
     font-size: 18px;
     line-height: 1.7;
   }

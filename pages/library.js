@@ -42,7 +42,6 @@ export default function Library() {
         <Nav />
         <Content>
           <Inner>
-
             <header>
               <h2>Run serverless workflows in minutes</h2>
               <p>
@@ -89,7 +88,7 @@ export default function Library() {
                     <Item href={`/library/${slugify(item.title)}`}>
                       <p>{item.title}</p>
                       <p>{item.subtitle}</p>
-                      
+
                       <span class="button button--outline">View</span>
                     </Item>
                   ))}
@@ -165,7 +164,7 @@ const Item = styled.a`
 
   p:last-of-type {
     font-size: 14px;
-    opacity: .85;
+    opacity: 0.85;
   }
 
   .button {
@@ -174,7 +173,7 @@ const Item = styled.a`
     text-align: center;
     border-color: #ffffff66;
     margin: 1.5rem 0 0;
-    opacity: .7;
+    opacity: 0.7;
     padding: 8px 0;
     font-weight: normal;
   }
