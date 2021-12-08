@@ -9,6 +9,6 @@ export const categoryMeta = {
   },
   "sending and managing events": {
     order: 1,
-    icon: <Event fill="#fff" size={20} />
+    icon: <Event fill="#fff" size="20" />
   },
 }
