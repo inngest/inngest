@@ -139,7 +139,15 @@ strong {
   font-weight: 600;
 }
 
-h5, .intro-tag {
+h5 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: .6;
+  letter-spacing: 1px;
+}
+
+.intro-tag {
   color: #184115bb;
   font-size: 12px;
   letter-spacing: 2px;

@@ -1,7 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
 import Nav from "../shared/nav";
-import Content from "../shared/content";
 
 export default function DocsHome() {
   return (

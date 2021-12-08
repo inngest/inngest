@@ -1,13 +1,15 @@
-type DocScope = {
+export type DocScope = {
   category?: string;
   title?: string;
   position?: number;
   reading: { text: string, time: number, words: number, minutes: number };
+
   toc?: Headings;
 }
 
 type Headings = {
   [title: string]: {
+    order: number;
     title: string;
     slug: string;
     subheadings: [{ title: string; slug: string; }]
@@ -52,13 +54,15 @@ export const getAllDocs = (() => {
         content,
         scope: {
           ...scope,
-          headings: getHeadings(content),
+          toc: getHeadings(content),
           reading: readingTime(content),
         },
       }
     });
 
     // TODO: Create categories, etc.
+
+
     return memoizedDocs;
   }
 })()
@@ -73,12 +77,14 @@ const getHeadings = (content: string) => {
   const slugify = require('slugify');
   const headings = {};
   let h2 = null; // store the current heading we're in
+  let order = 0;
 
   (content.match(/^###? (.*)/gm) || []).forEach(heading => {
     const title = heading.replace(/^###? /, "");
     if (heading.indexOf("## ") === 0) {
       h2 = title;
-      headings[title] = { title, slug: slugify(title), subheadings: [] }
+      headings[title] = { title, slug: slugify(title).toLowerCase(), subheadings: [], order }
+      order++
       return;
     }
     // add this subheading to the current heading list.
