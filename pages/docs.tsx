@@ -1,10 +1,11 @@
 import React from "react";
 import styled from "@emotion/styled";
 import Nav from "../shared/nav";
+import { getAllDocs, Categories } from "../utils/docs";
 
-export default function DocsHome() {
+export default function DocsHome(props) {
   return (
-    <DocsLayout>
+    <DocsLayout categories={props.categories}>
       <Hero>
         <h1>Documentation</h1>
         {/* TODO: Quick start guide callouts, and graphic */}
@@ -55,12 +56,25 @@ export default function DocsHome() {
   );
 }
 
-export const DocsLayout: React.FC = ({ children }) => {
+export async function getStaticProps() {
+  const categories = getAllDocs().categories;
+  return { props: { categories } };
+}
+
+export const DocsLayout: React.FC<{ categories: Categories }> = ({
+  children,
+  categories,
+}) => {
+  console.log("lol", categories);
   return (
     <>
       <Nav />
       <ContentWrapper>
-        <Menu></Menu>
+        <Menu>
+          {Object.values(categories).map((c) => {
+            return <p>{c.title}</p>;
+          })}
+        </Menu>
         <Inner>{children}</Inner>
       </ContentWrapper>
     </>
@@ -74,6 +88,11 @@ export const DocsContent = styled.div`
 
   h2 {
     margin-top: 5rem;
+  }
+
+  /* "On this page" */
+  h2 + h5 {
+    margin-top: 3rem;
   }
 `;
 

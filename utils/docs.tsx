@@ -1,9 +1,15 @@
 export type DocScope = {
-  category?: string;
-  title?: string;
-  position?: number;
-  reading: { text: string, time: number, words: number, minutes: number };
+  category: string;
+  // subcategory must match a DocScope.title to nest under that doc page.
+  subcategory?: string;
+  // title is the title of the documentation page.  If this also contiains a
+  // subcategory, the subcategory for other pages must match this title.
+  title: string;
+  order: number;
 
+  // reading is reading information automatically added when parsing content
+  reading?: { text: string, time: number, words: number, minutes: number };
+  // toc is the table of contents automatically added when parsing contnet
   toc?: Headings;
 }
 
@@ -22,20 +28,30 @@ type Doc = {
   scope: DocScope,
 }
 
+type Category = {
+  title: string;
+  pages: DocScope[];
+}
+
+export type Categories = { [title: string]: Category }
+
 type Docs = {
   docs: { [slug: string]: Doc }
   slugs: string[];
+  categories: Categories;
 }
 
 export const getAllDocs = (() => {
-  let memoizedDocs = {
+  let memoizedDocs: Docs = {
     // docs maps docs by slug 
     docs: {},
-    slugs: []
+    slugs: [],
+    categories: {},
   }
 
   return (): Docs => {
-    if (memoizedDocs.slugs.length > 0) {
+    if (memoizedDocs.slugs.length > 0 && process.env.NODE_ENV === "production") {
+    // memoizing in dev means you need to restart the server to see changes
       return memoizedDocs;
     }
     
@@ -43,14 +59,24 @@ export const getAllDocs = (() => {
     const matter = require('gray-matter');
     const readingTime = require('reading-time');
 
-    fs.readdirSync("./pages/docs/_docs/").filter((fname: string) => {
-      const source = fs.readFileSync("./pages/docs/_docs/" + fname);
+    // parseDir is given the current directory path, then returns a function which
+    // can read all files from the given basepath and processes the input.
+    const parseDir = (basepath: string) => (fname: string) => {
+      const fullpath = basepath + fname;
+
+      if (fs.statSync(fullpath).isDirectory()) {
+        // recurse into this directory with a new parse function using the extended
+        // path.
+        fs.readdirSync(fullpath).forEach(parseDir(fullpath + "/"));
+        return
+      }
+
+      const source = fs.readFileSync(fullpath);
       const { content, data: scope } = matter(source)
 
-      const slug = `/docs/${fname.replace(/.mdx?/, "")}`
-      memoizedDocs.slugs.push(slug);
-      memoizedDocs.docs[slug] = {
-        slug,
+      memoizedDocs.slugs.push("/docs/" + scope.slug);
+      memoizedDocs.docs[scope.slug] = {
+        slug: scope.slug,
         content,
         scope: {
           ...scope,
@@ -58,10 +84,32 @@ export const getAllDocs = (() => {
           reading: readingTime(content),
         },
       }
+    }
+
+    fs.readdirSync("./pages/docs/_docs/").forEach(parseDir("./pages/docs/_docs/"));
+
+    const categories = {};
+
+    // Iterate through each docs page and add the category.
+    Object.values(memoizedDocs.docs).forEach((d: Doc) => {
+      if (!d.scope.category) {
+        console.warn("no category for doc", JSON.stringify(d.scope));
+        return;
+      }
+
+      // Add category to list.
+      if (!categories[d.scope.category]) {
+        categories[d.scope.category] = {
+          title: d.scope.category,
+          pages: [d.scope],
+        }
+      } else {
+        categories[d.scope.category].pages.push(d.scope);
+      }
+
     });
 
-    // TODO: Create categories, etc.
-
+    memoizedDocs.categories = categories;
 
     return memoizedDocs;
   }
