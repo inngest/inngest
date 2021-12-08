@@ -1,10 +1,11 @@
 import React from "react";
 
-export default ({ fill = "#222631" }) => (
+export default ({ fill = "#222631", size = "20" }) => (
   <svg
-    width="11"
-    height="13"
+    width={size}
+    height={size}
     viewBox="0 0 11 13"
+    style={{marginLeft: Math.floor(parseInt(size) * 0.0769) }}
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >

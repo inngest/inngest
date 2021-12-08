@@ -94,7 +94,7 @@ export async function getStaticProps() {
 const Intro = styled.div`
   padding: 10vh 18px 17vh;
   z-index: 0;
-  background: linear-gradient(#030624, #13162f);
+  background: rgba(255, 255, 255, 0.03);
 
   header {
     max-width: 100% !important;
