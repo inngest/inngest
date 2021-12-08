@@ -1,9 +1,9 @@
 export type DocScope = {
+  // If the slug contains a forward slahs (eg. foo/bar), this page will automatically
+  // be nested under the page with a slug of "foo"
+  slug: string;
   category: string;
-  // subcategory must match a DocScope.title to nest under that doc page.
-  subcategory?: string;
-  // title is the title of the documentation page.  If this also contiains a
-  // subcategory, the subcategory for other pages must match this title.
+  // title is the title of the documentation page
   title: string;
   order: number;
 
@@ -28,7 +28,7 @@ type Doc = {
   scope: DocScope,
 }
 
-type Category = {
+export type Category = {
   title: string;
   pages: DocScope[];
 }
