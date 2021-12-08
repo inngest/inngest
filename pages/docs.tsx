@@ -76,7 +76,22 @@ export const DocsLayout: React.FC<{ categories: Categories }> = ({
       <ContentWrapper>
         <Menu>
           <div>
-            <h5>Contents</h5>
+            <h5>
+              <span>Contents</span>
+              <span
+                className="toggle off"
+                onClick={(e) => {
+                  const span = (e.target as HTMLSpanElement);
+                  const on = !span.classList.contains("off");
+                  document.querySelectorAll(".category").forEach(a => {
+                    on ? a.classList.remove("expanded") : a.classList.add("expanded");
+                  })
+                  span.classList.toggle("off");
+                }}
+              >
+                Toggle categories
+              </span>
+            </h5>
 
             <ul>
               <li>
@@ -86,9 +101,15 @@ export const DocsLayout: React.FC<{ categories: Categories }> = ({
               </li>
               {Object.values(categories).map((c) => {
                 const meta = categoryMeta[c.title.toLowerCase()] || {};
+
+                const isCurrent = !!c.pages.find(p => p.slug === router.asPath.replace("/docs/", ""))
+
                 return (
                   <li>
-                    <span className="category">
+                    <span
+                      className={["category", isCurrent && "expanded"].filter(Boolean).join(" ")}
+                      onClick={(e) => (e.target as HTMLSpanElement).classList.toggle("expanded")}
+                      >
                       {meta.icon} {c.title}
                     </span>
                     <ul className="items">
@@ -116,6 +137,8 @@ const renderDocLink = (s: DocScope, c: Category, currentRoute?: string) => {
     (p) => p.slug.length > s.slug.length && p.slug.indexOf(s.slug) === 0
   );
 
+  const id = c.title.toLowerCase().replaceAll(" ", "-");
+
   // If we're on this page or any of the children under this page, we're "active"
   const isCurrent = !![s, ...children].find(
     (page) => page.slug.indexOf(currentSlug) === 0
@@ -132,9 +155,14 @@ const renderDocLink = (s: DocScope, c: Category, currentRoute?: string) => {
         className={s.slug === currentSlug ? "active" : ""}
       >
         {s.title}
+        { children.length > 0 && (<span className="toggle-subcategory" onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+          document.querySelector(`#${id}`).classList.toggle("expanded")
+        }}>toggle</span>)}
       </a>
-      {isCurrent && children.length > 0 && (
-        <ul className="subcategory">
+      {children.length > 0 && (
+        <ul id={id} className={["subcategory", isCurrent && "expanded"].filter(Boolean).join(" ")}>
           {children.map((child) => {
             return (
               <li>
@@ -180,9 +208,7 @@ const Menu = styled.div`
   display: flex;
   justify-content: flex-end;
   padding: 3rem 2rem;
-
   background: rgba(0, 0, 0, 0.4);
-
   font-size: 14px;
 
   > div {
@@ -190,10 +216,25 @@ const Menu = styled.div`
     min-width: 300px;
   }
 
+  h5 {
+    display: flex;
+    justify-content: space-between;
+
+    .toggle {
+      cursor: pointer;
+      opacity: .6;
+      transition: all .3s;
+      &:hover {
+        opacity: 1;
+      }
+    }
+  }
+
   .category,
   a.category {
+    cursor: pointer;
     display: flex;
-    margin: 1rem 0;
+    margin: 1.5rem 0 .65rem;
     font-weight: 500;
     color: #fff !important;
     opacity: 0.9 !important;
@@ -222,6 +263,7 @@ const Menu = styled.div`
     transition: all 0.3s;
     padding: 0.5rem 0;
     color: #cbcdd8 !important;
+    position: relative;
 
     &:hover,
     &.active {
@@ -231,11 +273,34 @@ const Menu = styled.div`
   }
 
   .items {
+    display: none;
     margin-left: 35px;
   }
 
+  .expanded + .items {
+    display: block;
+  }
+
+  .toggle-subcategory {
+    position: absolute;
+    right: 0;
+    opacity: .4;
+    transition: all .3s;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    &:hover {
+      opacity: 1;
+    }
+  }
+
   .subcategory {
+    display: none;
     margin: 0.5rem 1rem 1rem;
+
+    &.expanded {
+      display: block;
+    }
 
     a {
       border-left: 2px solid #ffffff44;
