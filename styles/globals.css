@@ -206,7 +206,7 @@ h2, .text--blue {
 }
 
 ul { margin: 2rem 0; }
-ul li {
+ol li, ul li {
   margin: 0 0 .6rem;
 }
 

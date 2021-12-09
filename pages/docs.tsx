@@ -197,6 +197,11 @@ export const DocsContent = styled.div`
     margin-top: 4rem;
   }
 
+  h3 {
+    margin-top: 3rem;
+  }
+
+
   /* "On this page" */
   h2 + h5 {
     margin-top: 3rem;
@@ -209,6 +214,11 @@ export const InnerDocsContent = styled.div`
   h2 {
     padding-top: 2rem;
     font-size: 28px;
+  }
+
+  pre {
+    margin: 3rem 0;
+    padding: 1rem;
   }
 `
 
