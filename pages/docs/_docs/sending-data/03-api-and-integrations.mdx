@@ -10,7 +10,7 @@ order: 3
 
 <div className="tldr">
 
-You can send us events by a single POST request to https://inn.gs/e/$ingestKey. The request body must be your JSON-encoded event, and a maximum of 256KB. On success, the API returns a 201 status code.
+You can send us events with a single POST request to `https://inn.gs/e/$ingestKey`, or `https://inn.gs/` with the key as a Bearer token. The request body must be your JSON-encoded event and has a maximum size of 256KB. On success, the API returns a 201 status code.  This can be done via your API or used as a webhook.
 
 </div>
 
