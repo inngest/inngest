@@ -105,7 +105,7 @@ export const DocsLayout: React.FC<{ categories: Categories }> = ({
                 const isCurrent = !!c.pages.find(p => p.slug === router.asPath.replace("/docs/", ""))
 
                 return (
-                  <li>
+                  <li key={c.title}>
                     <span
                       className={["category", isCurrent && "expanded"].filter(Boolean).join(" ")}
                       onClick={(e) => (e.target as HTMLSpanElement).classList.toggle("expanded")}
@@ -149,7 +149,7 @@ const renderDocLink = (s: DocScope, c: Category, currentRoute?: string) => {
   }
 
   return (
-    <li>
+    <li key={s.slug}>
       <a
         href={"/docs/" + s.slug}
         className={s.slug === currentSlug ? "active" : ""}
@@ -165,7 +165,7 @@ const renderDocLink = (s: DocScope, c: Category, currentRoute?: string) => {
         <ul id={id} className={["subcategory", isCurrent && "expanded"].filter(Boolean).join(" ")}>
           {children.map((child) => {
             return (
-              <li>
+              <li key={child.slug}>
                 <a
                   href={"/docs/" + child.slug}
                   className={child.slug === currentSlug ? "active" : ""}

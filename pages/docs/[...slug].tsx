@@ -24,7 +24,7 @@ export default function DocLayout(props: any) {
               .sort((a, b) => a.order - b.order)
               .map((h, n) => {
                 return (
-                  <li>
+                  <li key={h.slug}>
                     <a href={`#${h.slug}`}>
                       {n + 1}. {h.title}
                     </a>
