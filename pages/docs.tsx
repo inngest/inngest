@@ -240,6 +240,34 @@ export const InnerDocsContent = styled.div`
     display: none;
   }
 
+  .tldr {
+    border: 1px solid #ffffff33;
+    border-radius: 3px;
+    padding: 3rem 2rem 1rem;
+    margin: 0 0 4rem;
+    font-size: 12px;
+    position: relative;
+
+    p, li { margin: 0 }
+    p + p { margin: 1rem 0 0 }
+
+    ol, ul { margin: 1rem 0 }
+
+    &:before {
+      content: "TL;DR";
+      display: block;
+      position: absolute;
+      top: 1.3rem;
+      left: 2rem;
+      opacity: .5;
+
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+  }
+
   pre {
     margin: 3rem 0;
     padding: 1rem;
