@@ -486,6 +486,11 @@ pre .logger {
   font-size: 12px;
   margin: 5px 0 10px;
   opacity: .3;
+  cursor: default;
+  transition: all .3s;
+  &:hover {
+    opacity: .8;
+  }
 }
 pre .logger.error-log {
 	background-color: #fee;
