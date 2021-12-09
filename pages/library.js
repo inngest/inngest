@@ -55,7 +55,7 @@ export default function Library() {
                 <label>
                   <input
                     type="checkbox"
-                    checked={!tag}
+                    defaultChecked={!tag}
                     onClick={() => setTag("")}
                   />{" "}
                   All
@@ -68,7 +68,7 @@ export default function Library() {
                     <label>
                       <input
                         type="checkbox"
-                        checked={tag === t}
+                        defaultChecked={tag === t}
                         onClick={() => {
                           if (tag === t) {
                             setTag("");
