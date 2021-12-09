@@ -219,6 +219,7 @@ export const InnerDocsContent = styled.div`
   pre {
     margin: 3rem 0;
     padding: 1rem;
+    border-radius: 3px;
   }
 `
 

@@ -2,16 +2,15 @@ import styled from "@emotion/styled";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
 import rehypeSlug from "rehype-slug";
+// local
 import { getAllDocs, getDocs, DocScope, Categories } from "../../utils/docs";
 import { DocsLayout, DocsContent, InnerDocsContent } from "../docs";
+import { highlightPlugin } from "../../utils/code";
 
 export default function DocLayout(props: any) {
-  // TODO: Add previous / next.  Add layout.
   const scope: DocScope & { categories: Categories } = JSON.parse(
     props.post.scope.json
   );
-
-  console.log(scope);
 
   return (
     <DocsLayout categories={scope.categories}>
@@ -36,6 +35,8 @@ export default function DocLayout(props: any) {
 
           <InnerDocsContent>
             <MDXRemote compiledSource={props.post.compiledSource} scope={scope} />
+
+            {/* TODO: Add a prev / next button */}
           </InnerDocsContent>
         </div>
       </DocsContent>
@@ -74,6 +75,7 @@ export async function getStaticProps({ params }) {
   const post = await serialize(content, {
     scope: { json: JSON.stringify(scope) },
     mdxOptions: {
+      remarkPlugins: [await highlightPlugin()],
       rehypePlugins: [rehypeSlug],
     },
   });
