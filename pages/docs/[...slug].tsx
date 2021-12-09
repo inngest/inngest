@@ -5,7 +5,7 @@ import rehypeSlug from "rehype-slug";
 // local
 import { getAllDocs, getDocs, DocScope, Categories } from "../../utils/docs";
 import { DocsLayout, DocsContent, InnerDocsContent } from "../docs";
-import { highlightPlugin } from "../../utils/code";
+import { highlight } from "../../utils/code";
 
 export default function DocLayout(props: any) {
   const scope: DocScope & { categories: Categories } = JSON.parse(
@@ -75,7 +75,7 @@ export async function getStaticProps({ params }) {
   const post = await serialize(content, {
     scope: { json: JSON.stringify(scope) },
     mdxOptions: {
-      remarkPlugins: [await highlightPlugin()],
+      remarkPlugins: [highlight],
       rehypePlugins: [rehypeSlug],
     },
   });

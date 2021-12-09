@@ -42,7 +42,7 @@ Without these fields there is no way for Inngest to know which user the event be
 
 If you send an event containing user data of `external_id` "1" and `stripe_customer_id` "S1", either of these attributes can be used to refer to that user from then on. Given the following event:
 
-```json
+```json twoslash
 {
   "name": "ticket.updated",
   "data": {
@@ -52,7 +52,9 @@ If you send an event containing user data of `external_id` "1" and `stripe_custo
   },
   "user": {
     "external_id": 83561,
+// @log: `external_id` takes precedence and will be used to upsert a new user.
     "zendesk_id": "1274895",
+// @log: The user will also be tagged with `zendesk_id`.  This field can be used in the future to reference the same user without any other identifier.<br /><br />If you start consuming events directly from Zendesk, as long as `zendesk_id` exists in the user object we will attribute the event correctly:  no lookups necessary.
     "email": "test@example.com"
     "last_seen": 1632232002369,
     "plan": "pro"
@@ -61,7 +63,6 @@ If you send an event containing user data of `external_id` "1" and `stripe_custo
   "ts": 1632232002369,
 }
 ```
-
 
 This event will upsert a user with the specified attributes (`external_id`, `email`, `zendesk_id`, `last_seen`, and `plan`). Because we identify users given the above order of preference the system will search for a user in the following order:
 
