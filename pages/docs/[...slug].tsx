@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import styled from "@emotion/styled";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
@@ -12,6 +13,20 @@ export default function DocLayout(props: any) {
     props.post.scope.json
   );
 
+  useEffect(() => {
+    const cb = (entries: IntersectionObserverEntry[]) => {
+      if (entries.length === 0) {
+        return;
+      }
+      document
+        .querySelector("#toc-side")
+        ?.classList?.toggle("visible", !entries.shift().isIntersecting);
+    };
+    const observer = new IntersectionObserver(cb, {});
+    observer.observe(document.querySelector("#toc"));
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <DocsLayout categories={scope.categories}>
       <DocsContent>
@@ -19,7 +34,7 @@ export default function DocLayout(props: any) {
           <h2>{scope.title}</h2>
 
           <h5>On this page</h5>
-          <TOC>
+          <TOC id="toc">
             {Object.values(scope.toc)
               .sort((a, b) => a.order - b.order)
               .map((h, n) => {
@@ -34,10 +49,29 @@ export default function DocLayout(props: any) {
           </TOC>
 
           <InnerDocsContent>
-            <MDXRemote compiledSource={props.post.compiledSource} scope={scope} />
-
+            <MDXRemote
+              compiledSource={props.post.compiledSource}
+              scope={scope}
+            />
             {/* TODO: Add a prev / next button */}
           </InnerDocsContent>
+        </div>
+        <div>
+          <TOCSide id="toc-side">
+            <h5>On this page</h5>
+
+            {Object.values(scope.toc)
+              .sort((a, b) => a.order - b.order)
+              .map((h, n) => {
+                return (
+                  <li key={h.slug}>
+                    <a href={`#${h.slug}`}>
+                      {n + 1}. {h.title}
+                    </a>
+                  </li>
+                );
+              })}
+          </TOCSide>
         </div>
       </DocsContent>
     </DocsLayout>
@@ -86,6 +120,40 @@ const TOC = styled.ol`
   margin: 0 0 4rem;
   padding: 0;
   font-size: 12px;
+
+  li a {
+    display: block;
+    padding: 0.5rem 0;
+    text-decoration: none;
+    opacity: 0.85;
+  }
+  li {
+    border-bottom: 1px solid #ffffff19;
+    transition: all 0.3s;
+    text-indent: 0;
+    list-style: none;
+    &:hover {
+      padding-left: 0.5rem;
+    }
+  }
+`;
+
+const TOCSide = styled.ol`
+  position: fixed;
+  top: calc(70px + 5vh);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s;
+
+  z-index: 0;
+
+  font-size: 12px;
+
+  &.visible {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
+  }
 
   li a {
     display: block;

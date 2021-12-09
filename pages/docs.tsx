@@ -81,11 +81,13 @@ export const DocsLayout: React.FC<{ categories: Categories }> = ({
               <span
                 className="toggle off"
                 onClick={(e) => {
-                  const span = (e.target as HTMLSpanElement);
+                  const span = e.target as HTMLSpanElement;
                   const on = !span.classList.contains("off");
-                  document.querySelectorAll(".category").forEach(a => {
-                    on ? a.classList.remove("expanded") : a.classList.add("expanded");
-                  })
+                  document.querySelectorAll(".category").forEach((a) => {
+                    on
+                      ? a.classList.remove("expanded")
+                      : a.classList.add("expanded");
+                  });
                   span.classList.toggle("off");
                 }}
               >
@@ -102,14 +104,22 @@ export const DocsLayout: React.FC<{ categories: Categories }> = ({
               {Object.values(categories).map((c) => {
                 const meta = categoryMeta[c.title.toLowerCase()] || {};
 
-                const isCurrent = !!c.pages.find(p => p.slug === router.asPath.replace("/docs/", ""))
+                const isCurrent = !!c.pages.find(
+                  (p) => p.slug === router.asPath.replace("/docs/", "")
+                );
 
                 return (
                   <li key={c.title}>
                     <span
-                      className={["category", isCurrent && "expanded"].filter(Boolean).join(" ")}
-                      onClick={(e) => (e.target as HTMLSpanElement).classList.toggle("expanded")}
-                      >
+                      className={["category", isCurrent && "expanded"]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={(e) =>
+                        (e.target as HTMLSpanElement).classList.toggle(
+                          "expanded"
+                        )
+                      }
+                    >
                       {meta.icon} {c.title}
                     </span>
                     <ul className="items">
@@ -155,14 +165,26 @@ const renderDocLink = (s: DocScope, c: Category, currentRoute?: string) => {
         className={s.slug === currentSlug ? "active" : ""}
       >
         {s.title}
-        { children.length > 0 && (<span className="toggle-subcategory" onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          document.querySelector(`#${id}`).classList.toggle("expanded")
-        }}>toggle</span>)}
+        {children.length > 0 && (
+          <span
+            className="toggle-subcategory"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              document.querySelector(`#${id}`).classList.toggle("expanded");
+            }}
+          >
+            toggle
+          </span>
+        )}
       </a>
       {children.length > 0 && (
-        <ul id={id} className={["subcategory", isCurrent && "expanded"].filter(Boolean).join(" ")}>
+        <ul
+          id={id}
+          className={["subcategory", isCurrent && "expanded"]
+            .filter(Boolean)
+            .join(" ")}
+        >
           {children.map((child) => {
             return (
               <li key={child.slug}>
@@ -201,12 +223,10 @@ export const DocsContent = styled.div`
     margin-top: 3rem;
   }
 
-
   /* "On this page" */
   h2 + h5 {
     margin-top: 3rem;
   }
-
 `;
 
 export const InnerDocsContent = styled.div`
@@ -216,7 +236,9 @@ export const InnerDocsContent = styled.div`
     font-size: 28px;
   }
 
-  .language-id { display: none };
+  .language-id {
+    display: none;
+  }
 
   pre {
     margin: 3rem 0;
@@ -224,43 +246,46 @@ export const InnerDocsContent = styled.div`
     border-radius: 3px;
   }
 
- pre.shiki {
+  pre.shiki {
     overflow-x: auto;
-}
- pre.shiki div.dim {
-	 opacity: 0.8;
-   transition: all .3s;
-   &:hover { opacity: 1; }
-}
- pre.shiki div.dim, pre.shiki div.highlight {
-	 margin: 0;
-	 padding: 0;
-}
- pre.shiki div.highlight {
-	 opacity: 1;
-	 background-color: rgba(255, 255, 255, 0.05);
-}
- pre.shiki div.line {
-	 min-height: 1rem;
-}
+  }
+  pre.shiki div.dim {
+    opacity: 0.8;
+    transition: all 0.3s;
+    &:hover {
+      opacity: 1;
+    }
+  }
+  pre.shiki div.dim,
+  pre.shiki div.highlight {
+    margin: 0;
+    padding: 0;
+  }
+  pre.shiki div.highlight {
+    opacity: 1;
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  pre.shiki div.line {
+    min-height: 1rem;
+  }
 
-/** Don't show the language identifiers */
-pre.shiki .language-id{
+  /** Don't show the language identifiers */
+  pre.shiki .language-id {
     display: none;
-}
+  }
 
-/* Visually differentiates twoslash code samples  */
- pre.twoslash {
-	 border-color: #719af4;
-}
+  /* Visually differentiates twoslash code samples  */
+  pre.twoslash {
+    border-color: #719af4;
+  }
 
-/** When you mouse over the pre, show the underlines */
-pre.twoslash:hover data-lsp {
+  /** When you mouse over the pre, show the underlines */
+  pre.twoslash:hover data-lsp {
     border-color: #747474;
-}
+  }
 
-/** The tooltip-like which provides the LSP response */
-pre.twoslash data-lsp:hover::before {
+  /** The tooltip-like which provides the LSP response */
+  pre.twoslash data-lsp:hover::before {
     content: attr(lsp);
     position: absolute;
     transform: translate(0, 1rem);
@@ -270,62 +295,65 @@ pre.twoslash data-lsp:hover::before {
     text-align: left;
     padding: 5px 8px;
     border-radius: 2px;
-    font-family: "JetBrains Mono", Menlo, Monaco, Consolas, Courier New, monospace;
+    font-family: "JetBrains Mono", Menlo, Monaco, Consolas, Courier New,
+      monospace;
     font-size: 14px;
     white-space: pre-wrap;
     z-index: 100;
-}
+  }
 
-pre .code-container {
-	 overflow: auto;
-}
-/* The try button */
- pre .code-container > a {
-	 position: absolute;
-	 right: 8px;
-	 bottom: 8px;
-	 border-radius: 4px;
-	 border: 1px solid #719af4;
-	 padding: 0 8px;
-	 color: #719af4;
-	 text-decoration: none;
-	 opacity: 0;
-	 transition-timing-function: ease;
-	 transition: opacity 0.3s;
-}
-/* Respect no animations */
-@media (prefers-reduced-motion: reduce) {
-	 pre .code-container > a {
-		 transition: none;
-	}
-}
- pre .code-container > a:hover {
-	 color: white;
-	 background-color: #719af4;
-}
- pre .code-container:hover a {
-	 opacity: 1;
-}
+  pre .code-container {
+    overflow: auto;
+  }
+  /* The try button */
+  pre .code-container > a {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    border-radius: 4px;
+    border: 1px solid #719af4;
+    padding: 0 8px;
+    color: #719af4;
+    text-decoration: none;
+    opacity: 0;
+    transition-timing-function: ease;
+    transition: opacity 0.3s;
+  }
+  /* Respect no animations */
+  @media (prefers-reduced-motion: reduce) {
+    pre .code-container > a {
+      transition: none;
+    }
+  }
+  pre .code-container > a:hover {
+    color: white;
+    background-color: #719af4;
+  }
+  pre .code-container:hover a {
+    opacity: 1;
+  }
 
- pre code {
-	 font-size: 15px;
-	 font-family: "JetBrains Mono", Menlo, Monaco, Consolas, Courier New, monospace;;
-	 white-space: pre;
-	 -webkit-overflow-scrolling: touch;
-}
- pre code a {
-	 text-decoration: none;
-}
- pre data-err {
+  pre code {
+    font-size: 15px;
+    font-family: "JetBrains Mono", Menlo, Monaco, Consolas, Courier New,
+      monospace;
+    white-space: pre;
+    -webkit-overflow-scrolling: touch;
+  }
+  pre code a {
+    text-decoration: none;
+  }
+  pre data-err {
     /* Extracted from VS Code */
-	 background: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%206%203'%20enable-background%3D'new%200%200%206%203'%20height%3D'3'%20width%3D'6'%3E%3Cg%20fill%3D'%23c94824'%3E%3Cpolygon%20points%3D'5.5%2C0%202.5%2C3%201.1%2C3%204.1%2C0'%2F%3E%3Cpolygon%20points%3D'4%2C0%206%2C2%206%2C0.6%205.4%2C0'%2F%3E%3Cpolygon%20points%3D'0%2C2%201%2C3%202.4%2C3%200%2C0.6'%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") repeat-x bottom left;
-	 padding-bottom: 3px;
-}
- pre .query {
-	 margin-bottom: 10px;
-	 color: #137998;
-	 display: inline-block;
-}
+    background: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%206%203'%20enable-background%3D'new%200%200%206%203'%20height%3D'3'%20width%3D'6'%3E%3Cg%20fill%3D'%23c94824'%3E%3Cpolygon%20points%3D'5.5%2C0%202.5%2C3%201.1%2C3%204.1%2C0'%2F%3E%3Cpolygon%20points%3D'4%2C0%206%2C2%206%2C0.6%205.4%2C0'%2F%3E%3Cpolygon%20points%3D'0%2C2%201%2C3%202.4%2C3%200%2C0.6'%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E")
+      repeat-x bottom left;
+    padding-bottom: 3px;
+  }
+  pre .query {
+    margin-bottom: 10px;
+    color: #137998;
+    display: inline-block;
+  }
 
   /* In order to have the 'popped out' style design and to not break the layout
   /* we need to place a fake and un-selectable copy of the error which _isn't_ broken out
@@ -333,191 +361,192 @@ pre .code-container {
 
   /* This sections keeps both of those two in in sync  */
 
- pre .error, pre .error-behind {
-	 margin-left: -14px;
-	 margin-top: 8px;
-	 margin-bottom: 4px;
-	 padding: 6px;
-	 padding-left: 14px;
-	 width: calc(100% - 20px);
-	 white-space: pre-wrap;
-	 display: block;
-}
- pre .error {
-	 position: absolute;
-	 background-color: #fee;
-	 border-left: 2px solid #bf1818;
-	/* Give the space to the error code */
-	 display: flex;
-	 align-items: center;
-	 color: black;
-}
- pre .error .code {
-	 display: none;
-}
- pre .error-behind {
-	 user-select: none;
-	 visibility: transparent;
-	 color: #fee;
-}
-/* Queries */
- pre .arrow {
-	/* Transparent background */
-	 background-color: #eee;
-	 position: relative;
-	 top: -7px;
-	 margin-left: 0.1rem;
-	/* Edges */
-	 border-left: 1px solid #eee;
-	 border-top: 1px solid #eee;
-	 transform: translateY(25%) rotate(45deg);
-	/* Size */
-	 height: 8px;
-	 width: 8px;
-}
- pre .popover {
-	 margin-bottom: 10px;
-	 background-color: #eee;
-	 display: inline-block;
-	 padding: 0 0.5rem 0.3rem;
-	 margin-top: 10px;
-	 border-radius: 3px;
-}
-/* Completion */
- pre .inline-completions ul.dropdown {
-	 display: inline-block;
-	 position: absolute;
-	 width: 240px;
-	 background-color: gainsboro;
-	 color: grey;
-	 padding-top: 4px;
-	 font-family: var(--code-font);
-	 font-size: 0.8rem;
-	 margin: 0;
-	 padding: 0;
-	 border-left: 4px solid #4b9edd;
-}
- pre .inline-completions ul.dropdown::before {
-	 background-color: #4b9edd;
-	 width: 2px;
-	 position: absolute;
-	 top: -1.2rem;
-	 left: -3px;
-	 content: " ";
-}
- pre .inline-completions ul.dropdown li {
-	 overflow-x: hidden;
-	 padding-left: 4px;
-	 margin-bottom: 4px;
-}
- pre .inline-completions ul.dropdown li.deprecated {
-	 text-decoration: line-through;
-}
- pre .inline-completions ul.dropdown li span.result-found {
-	 color: #4b9edd;
-}
- pre .inline-completions ul.dropdown li span.result {
-	 width: 100px;
-	 color: black;
-	 display: inline-block;
-}
- .dark-theme .markdown pre {
-	 background-color: #d8d8d8;
-	 border-color: #ddd;
-	 filter: invert(98%) hue-rotate(180deg);
-}
- data-lsp {
-	/* Ensures there's no 1px jump when the hover happens */
-	 border-bottom: 1px dotted transparent;
-	/* Fades in unobtrusively */
-	 transition-timing-function: ease;
-	 transition: border-color 0.3s;
-}
-/* Respect people's wishes to not have animations */
- @media (prefers-reduced-motion: reduce) {
-	 data-lsp {
-		 transition: none;
-	}
-}
-
-/** Annotations support, providing a tool for meta commentary */
-.tag-container {
-	position: relative;
-}
-.tag-container .twoslash-annotation {
-	position: absolute;
-	font-family: "JetBrains Mono", Menlo, Monaco, Consolas, Courier New, monospace;
-	right: -10px;
-   /** Default annotation text to 200px */
-	width: 200px;
-	color: #187abf;
-	background-color: #fcf3d9 bb;
-}
-.tag-container .twoslash-annotation p {
-	text-align: left;
-	font-size: 0.8rem;
-	line-height: 0.9rem;
-}
-.tag-container .twoslash-annotation svg {
-	float: left;
-	margin-left: -44px;
-}
-.tag-container .twoslash-annotation.left {
-	right: auto;
-	left: -200px;
-}
-.tag-container .twoslash-annotation.left svg {
-	float: right;
-	margin-right: -5px;
-}
-
-/** Support for showing console log/warn/errors inline */
-pre .logger {
-	display: grid;
-  grid-template-columns: 15px 1fr;
-  grid-gap: 10px;
-
-	align-items: center;
-	color: black;
-	padding: 4px 6px;
-	padding-left: 8px;
-	width: calc(100% - 19px);
-	white-space: pre-wrap;
-  font-size: 12px;
-  margin: 5px 0 10px;
-  opacity: .3;
-  cursor: default;
-  transition: all .3s;
-  &:hover {
-    opacity: .8;
+  pre .error,
+  pre .error-behind {
+    margin-left: -14px;
+    margin-top: 8px;
+    margin-bottom: 4px;
+    padding: 6px;
+    padding-left: 14px;
+    width: calc(100% - 20px);
+    white-space: pre-wrap;
+    display: block;
   }
-}
-pre .logger.error-log {
-	background-color: #fee;
-	border-left: 2px solid #bf1818;
-}
-pre .logger.warn-log {
-	background-color: #ffe;
-	border-left: 2px solid #eae662;
-}
-pre .logger.log-log {
-  background: #090a12;
-	border-left: 2px solid #ababab;
-  color: #fff;
-}
-pre .logger.log-log svg {
-	margin-left: 6px;
-	margin-right: 9px;
-  height: 10px;
-}
+  pre .error {
+    position: absolute;
+    background-color: #fee;
+    border-left: 2px solid #bf1818;
+    /* Give the space to the error code */
+    display: flex;
+    align-items: center;
+    color: black;
+  }
+  pre .error .code {
+    display: none;
+  }
+  pre .error-behind {
+    user-select: none;
+    visibility: transparent;
+    color: #fee;
+  }
+  /* Queries */
+  pre .arrow {
+    /* Transparent background */
+    background-color: #eee;
+    position: relative;
+    top: -7px;
+    margin-left: 0.1rem;
+    /* Edges */
+    border-left: 1px solid #eee;
+    border-top: 1px solid #eee;
+    transform: translateY(25%) rotate(45deg);
+    /* Size */
+    height: 8px;
+    width: 8px;
+  }
+  pre .popover {
+    margin-bottom: 10px;
+    background-color: #eee;
+    display: inline-block;
+    padding: 0 0.5rem 0.3rem;
+    margin-top: 10px;
+    border-radius: 3px;
+  }
+  /* Completion */
+  pre .inline-completions ul.dropdown {
+    display: inline-block;
+    position: absolute;
+    width: 240px;
+    background-color: gainsboro;
+    color: grey;
+    padding-top: 4px;
+    font-family: var(--code-font);
+    font-size: 0.8rem;
+    margin: 0;
+    padding: 0;
+    border-left: 4px solid #4b9edd;
+  }
+  pre .inline-completions ul.dropdown::before {
+    background-color: #4b9edd;
+    width: 2px;
+    position: absolute;
+    top: -1.2rem;
+    left: -3px;
+    content: " ";
+  }
+  pre .inline-completions ul.dropdown li {
+    overflow-x: hidden;
+    padding-left: 4px;
+    margin-bottom: 4px;
+  }
+  pre .inline-completions ul.dropdown li.deprecated {
+    text-decoration: line-through;
+  }
+  pre .inline-completions ul.dropdown li span.result-found {
+    color: #4b9edd;
+  }
+  pre .inline-completions ul.dropdown li span.result {
+    width: 100px;
+    color: black;
+    display: inline-block;
+  }
+  .dark-theme .markdown pre {
+    background-color: #d8d8d8;
+    border-color: #ddd;
+    filter: invert(98%) hue-rotate(180deg);
+  }
+  data-lsp {
+    /* Ensures there's no 1px jump when the hover happens */
+    border-bottom: 1px dotted transparent;
+    /* Fades in unobtrusively */
+    transition-timing-function: ease;
+    transition: border-color 0.3s;
+  }
+  /* Respect people's wishes to not have animations */
+  @media (prefers-reduced-motion: reduce) {
+    data-lsp {
+      transition: none;
+    }
+  }
 
-`
+  /** Annotations support, providing a tool for meta commentary */
+  .tag-container {
+    position: relative;
+  }
+  .tag-container .twoslash-annotation {
+    position: absolute;
+    font-family: "JetBrains Mono", Menlo, Monaco, Consolas, Courier New,
+      monospace;
+    right: -10px;
+    /** Default annotation text to 200px */
+    width: 200px;
+    color: #187abf;
+    background-color: #fcf3d9 bb;
+  }
+  .tag-container .twoslash-annotation p {
+    text-align: left;
+    font-size: 0.8rem;
+    line-height: 0.9rem;
+  }
+  .tag-container .twoslash-annotation svg {
+    float: left;
+    margin-left: -44px;
+  }
+  .tag-container .twoslash-annotation.left {
+    right: auto;
+    left: -200px;
+  }
+  .tag-container .twoslash-annotation.left svg {
+    float: right;
+    margin-right: -5px;
+  }
+
+  /** Support for showing console log/warn/errors inline */
+  pre .logger {
+    display: grid;
+    grid-template-columns: 15px 1fr;
+    grid-gap: 10px;
+
+    align-items: center;
+    color: black;
+    padding: 4px 6px;
+    padding-left: 8px;
+    width: calc(100% - 19px);
+    white-space: pre-wrap;
+    font-size: 12px;
+    margin: 5px 0 10px;
+    opacity: 0.3;
+    cursor: default;
+    transition: all 0.3s;
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+  pre .logger.error-log {
+    background-color: #fee;
+    border-left: 2px solid #bf1818;
+  }
+  pre .logger.warn-log {
+    background-color: #ffe;
+    border-left: 2px solid #eae662;
+  }
+  pre .logger.log-log {
+    background: #090a12;
+    border-left: 2px solid #ababab;
+    color: #fff;
+  }
+  pre .logger.log-log svg {
+    margin-left: 6px;
+    margin-right: 9px;
+    height: 10px;
+  }
+`;
 
 const Menu = styled.div`
   border-right: 1px solid #ffffff19;
   display: flex;
   justify-content: flex-end;
-  padding: 3rem 4rem 3rem 3rem;;
+  padding: 3rem 4rem 3rem 3rem;
   background: rgba(0, 0, 0, 0.4);
   font-size: 14px;
 
@@ -532,8 +561,8 @@ const Menu = styled.div`
 
     .toggle {
       cursor: pointer;
-      opacity: .6;
-      transition: all .3s;
+      opacity: 0.6;
+      transition: all 0.3s;
       margin-right: -2.5rem;
       &:hover {
         opacity: 1;
@@ -545,7 +574,7 @@ const Menu = styled.div`
   a.category {
     cursor: pointer;
     display: flex;
-    margin: 1.5rem 0 .65rem;
+    margin: 1.5rem 0 0.65rem;
     font-weight: 500;
     color: #fff !important;
     opacity: 0.9 !important;
@@ -596,8 +625,8 @@ const Menu = styled.div`
     position: absolute;
     right: -2.5rem;
     margin-top: 3px;
-    opacity: .4;
-    transition: all .3s;
+    opacity: 0.4;
+    transition: all 0.3s;
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 1px;
