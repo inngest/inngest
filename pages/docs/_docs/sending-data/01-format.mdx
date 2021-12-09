@@ -42,7 +42,7 @@ These are the fields which you can provide in an event:
 
 - `name`: (required) The event name as a string.  We recommend a simple format of "noun.action", eg "payment.succeeded", "email.sent", "post.viewed"
 - `data`: (required) An object containing any data pertinent to the event
-- `user`: (optional) An object containing [information relating to the user](/docs/events/user-identification) which the event belongs to.  For example, a “payment.succeeded” event should contain information on the user who paid.
+- `user`: (optional) An object containing [information relating to the user](/docs/event-user-audit-trails) which the event belongs to.  For example, a “payment.succeeded” event should contain information on the user who paid.
 - `v`: (optional) A string representing the event version.  We recommend the format “YYYY-MM-DD.XY”, where XY increments with changes.  This allows you to see the implementation date easily, and allows for infinite changes
 - `ts`: (optional) An int representing the milliseconds since the unix epoch at which this event occurred.  If this is blank we default to the time the event was received. This is useful when backfilling contact attribute history
 
@@ -50,7 +50,7 @@ These are the fields which you can provide in an event:
 
 Each field represents unique information and has been chosen to increase flexibility powering our system.  We store a unique type schema for each version of each event, allowing you to adapt systems over time without changing event names.
 
-The timestamp allows you to backdate events when importing into our systems.  This is important when adding user information to our system, as the user attributes are valid from the time of the event.  For more information, see [user identification within events](/docs/event-user-audit-trails).
+The timestamp allows you to backdate events when importing into our systems.  This is important when adding user information to our system, as the user attributes are valid from the time of the event.  For more information, see [user identification within events](/docs/event-user-audit-traile).
 
 The payload allows us to:
 
