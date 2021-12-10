@@ -1,6 +1,6 @@
 module github.com/inngest/inngestctl
 
-go 1.16
+go 1.17
 
 require (
 	cuelang.org/go v0.4.0
