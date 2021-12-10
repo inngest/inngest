@@ -123,7 +123,6 @@ export const getDocs = (slug: string): Doc | undefined => {
 
 const getHeadings = (content: string) => {
   // Get headers for table of contents.
-  const slugify = require('slugify');
   const headings = {};
   let h2 = null; // store the current heading we're in
   let order = 0;
@@ -132,12 +131,21 @@ const getHeadings = (content: string) => {
     const title = heading.replace(/^###? /, "");
     if (heading.indexOf("## ") === 0) {
       h2 = title;
-      headings[title] = { title, slug: slugify(title).toLowerCase(), subheadings: [], order }
+      headings[title] = { title, slug: toSlug(title), subheadings: [], order }
       order++
       return;
     }
     // add this subheading to the current heading list.
-    headings[h2].subheadings.push({ title, slug: slugify(title) });
+    headings[h2].subheadings.push({ title, slug: toSlug(title) });
   });
   return headings;
+}
+
+const toSlug = (s: string) => {
+  s = s.replace(/[^a-zA-Z0-9 :]/g, "")
+  // rehype's `rehypeSlug` plugin converts "foo: one"  to "foo--one", and doesn't
+  // remove multple slashes.  It does convert multiple spaces to just one slash.
+  s = s.replace(/ +/g, "-")
+  s = s.replace(/[:]/g, "-")
+  return s.toLowerCase()
 }

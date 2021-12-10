@@ -208,6 +208,8 @@ const ContentWrapper = styled.div`
   display: grid;
   grid-template-columns: 2fr 4fr;
   min-height: calc(100vh - 70px);
+
+  @media (max-width: 980px) { grid-template-columns: 2fr 5fr; }
 `;
 
 export const DocsContent = styled.div`
@@ -240,6 +242,8 @@ export const InnerDocsContent = styled.div`
     display: none;
   }
 
+  ol, ul { margin: 1.4rem 0 1.5rem }
+
   .tldr {
     border: 1px solid #ffffff33;
     border-radius: 3px;
@@ -259,6 +263,7 @@ export const InnerDocsContent = styled.div`
       position: absolute;
       top: 1.3rem;
       left: 2rem;
+      font-size: .8rem;
       opacity: .5;
 
       font-size: 11px;
@@ -581,6 +586,15 @@ const Menu = styled.div`
   > div {
     max-width: 300px;
     min-width: 300px;
+  }
+
+  @media (max-width: 980px) {
+    font-size: 13px;
+    padding: 2rem 4rem 2rem 2rem;
+
+    > div {
+      min-width: 240px;
+    }
   }
 
   h5 {
