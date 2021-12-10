@@ -51,4 +51,24 @@ Use "inngest [command] --help" for more information about a command.
 
 ## Using the CLI to validate and deploy workflows
 
-## Tips
+After you've edited your workflow code locally you can verify that your workflow config is valid
+by running:
+
+```bash
+inngestctl workflows validate ./path-to-config.cue
+```
+
+If the workflow looks good, you can push the workflow **without publishing** with the following
+command:
+
+```bash
+inngestctl workflows deploy ./path-to-config.cue
+```
+
+If you want to push the workflow live, you can run the same command with the live flag:
+
+```bash
+inngestctl workflows deploy --live ./path-to-config.cue
+```
+
+That's it;  your workflows will be deployed and will run without doing anything further.
