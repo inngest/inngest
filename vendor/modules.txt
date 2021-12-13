@@ -1,5 +1,5 @@
 # cuelang.org/go v0.4.0
-## explicit
+## explicit; go 1.13
 cuelang.org/go/cue
 cuelang.org/go/cue/ast
 cuelang.org/go/cue/ast/astutil
@@ -76,24 +76,28 @@ cuelang.org/go/pkg/tool/http
 cuelang.org/go/pkg/tool/os
 cuelang.org/go/pkg/uuid
 # github.com/AlecAivazis/survey/v2 v2.3.2
-## explicit
+## explicit; go 1.13
 github.com/AlecAivazis/survey/v2
 github.com/AlecAivazis/survey/v2/core
 github.com/AlecAivazis/survey/v2/terminal
 # github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
+## explicit
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
 # github.com/Microsoft/go-winio v0.4.17
+## explicit; go 1.12
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
 # github.com/cockroachdb/apd/v2 v2.0.1
+## explicit
 github.com/cockroachdb/apd/v2
 # github.com/containerd/containerd v1.5.2
-## explicit
+## explicit; go 1.16
 github.com/containerd/containerd/errdefs
 github.com/containerd/containerd/log
 github.com/containerd/containerd/platforms
 # github.com/docker/distribution v2.7.1+incompatible
+## explicit
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
 github.com/docker/distribution/registry/api/errcode
@@ -124,16 +128,22 @@ github.com/docker/go-connections/nat
 github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.4.0
+## explicit
 github.com/docker/go-units
 # github.com/emicklei/proto v1.6.15
+## explicit; go 1.12
 github.com/emicklei/proto
 # github.com/fsnotify/fsnotify v1.4.9
+## explicit; go 1.13
 github.com/fsnotify/fsnotify
 # github.com/gogo/protobuf v1.3.2
+## explicit; go 1.15
 github.com/gogo/protobuf/proto
 # github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
+## explicit
 github.com/golang/glog
 # github.com/golang/protobuf v1.4.3
+## explicit; go 1.9
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
@@ -143,6 +153,7 @@ github.com/golang/protobuf/ptypes/timestamp
 ## explicit
 github.com/google/uuid
 # github.com/hashicorp/hcl v1.0.0
+## explicit
 github.com/hashicorp/hcl
 github.com/hashicorp/hcl/hcl/ast
 github.com/hashicorp/hcl/hcl/parser
@@ -154,47 +165,61 @@ github.com/hashicorp/hcl/json/parser
 github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
 # github.com/inconshreveable/mousetrap v1.0.0
+## explicit
 github.com/inconshreveable/mousetrap
 # github.com/jedib0t/go-pretty/v6 v6.2.2
-## explicit
+## explicit; go 1.13
 github.com/jedib0t/go-pretty/v6/table
 github.com/jedib0t/go-pretty/v6/text
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
+## explicit
 github.com/kballard/go-shellquote
 # github.com/magiconair/properties v1.8.1
+## explicit
 github.com/magiconair/properties
 # github.com/mattn/go-colorable v0.1.2
+## explicit
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.8
+## explicit
 github.com/mattn/go-isatty
 # github.com/mattn/go-runewidth v0.0.9
+## explicit; go 1.9
 github.com/mattn/go-runewidth
 # github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
+## explicit
 github.com/mgutz/ansi
 # github.com/mitchellh/go-homedir v1.1.0
 ## explicit
 github.com/mitchellh/go-homedir
 # github.com/mitchellh/mapstructure v1.1.2
+## explicit
 github.com/mitchellh/mapstructure
 # github.com/moby/term v0.0.0-20200312100748-672ec06f55cd
+## explicit; go 1.13
 github.com/moby/term
 github.com/moby/term/windows
 # github.com/morikuni/aec v1.0.0
 ## explicit
 github.com/morikuni/aec
 # github.com/mpvl/unique v0.0.0-20150818121801-cbe035fff7de
+## explicit
 github.com/mpvl/unique
 # github.com/opencontainers/go-digest v1.0.0
+## explicit; go 1.13
 github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v1.0.1
+## explicit
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
 # github.com/pelletier/go-toml v1.8.1
+## explicit; go 1.12
 github.com/pelletier/go-toml
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
 # github.com/protocolbuffers/txtpbfmt v0.0.0-20201118171849-f6a6b3f636fc
+## explicit; go 1.13
 github.com/protocolbuffers/txtpbfmt/ast
 github.com/protocolbuffers/txtpbfmt/parser
 github.com/protocolbuffers/txtpbfmt/unquote
@@ -204,38 +229,46 @@ github.com/rs/zerolog
 github.com/rs/zerolog/internal/cbor
 github.com/rs/zerolog/internal/json
 # github.com/sirupsen/logrus v1.7.0
+## explicit; go 1.13
 github.com/sirupsen/logrus
 # github.com/spf13/afero v1.2.2
+## explicit
 github.com/spf13/afero
 github.com/spf13/afero/mem
 # github.com/spf13/cast v1.3.0
+## explicit
 github.com/spf13/cast
 # github.com/spf13/cobra v1.1.3
-## explicit
+## explicit; go 1.12
 github.com/spf13/cobra
 # github.com/spf13/jwalterweatherman v1.0.0
+## explicit
 github.com/spf13/jwalterweatherman
 # github.com/spf13/pflag v1.0.5
+## explicit; go 1.12
 github.com/spf13/pflag
 # github.com/spf13/viper v1.7.1
-## explicit
+## explicit; go 1.12
 github.com/spf13/viper
 # github.com/subosito/gotenv v1.2.0
+## explicit
 github.com/subosito/gotenv
 # golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
+## explicit; go 1.11
 golang.org/x/net/idna
 golang.org/x/net/internal/socks
 golang.org/x/net/proxy
 # golang.org/x/sys v0.0.0-20210324051608-47abb6519492
+## explicit; go 1.12
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/term v0.0.0-20210503060354-a79de5458b56
-## explicit
+## explicit; go 1.17
 golang.org/x/term
 # golang.org/x/text v0.3.4
-## explicit
+## explicit; go 1.11
 golang.org/x/text/encoding
 golang.org/x/text/encoding/internal
 golang.org/x/text/encoding/internal/identifier
@@ -260,15 +293,19 @@ golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 golang.org/x/text/width
 # golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
+## explicit; go 1.11
 golang.org/x/xerrors
 golang.org/x/xerrors/internal
 # google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a
+## explicit; go 1.11
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.33.2
+## explicit; go 1.11
 google.golang.org/grpc/codes
 google.golang.org/grpc/internal/status
 google.golang.org/grpc/status
 # google.golang.org/protobuf v1.25.0
+## explicit; go 1.9
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
 google.golang.org/protobuf/internal/descfmt
@@ -299,8 +336,11 @@ google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/ini.v1 v1.51.0
+## explicit
 gopkg.in/ini.v1
 # gopkg.in/yaml.v2 v2.4.0
+## explicit; go 1.15
 gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+## explicit
 gopkg.in/yaml.v3

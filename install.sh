@@ -289,8 +289,8 @@ execute() {
     log_info "installed ${bin_dir}${binexe}"
     rm -rf "${tmpdir}"
 
-    echo -e "\ninngestctl has been installed into ${bin_dir}${binexe}.  To place inngestctl into your path run:\n"
-    echo -e "\tsudo mv ${bin_dir}${binexe} /usr/local/bin\n"
+    printf "\ninngestctl has been installed into ${bin_dir}${binexe}.  To place inngestctl into your path run:\n"
+    printf "\tsudo mv ${bin_dir}${binexe} /usr/local/bin/${binexe}\n"
 }
 
 execute
