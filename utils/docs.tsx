@@ -146,6 +146,7 @@ const toSlug = (s: string) => {
   // rehype's `rehypeSlug` plugin converts "foo: one"  to "foo--one", and doesn't
   // remove multple slashes.  It does convert multiple spaces to just one slash.
   s = s.replace(/ +/g, "-")
-  s = s.replace(/[:]/g, "-")
+  s = s.replace(/[:&]/g, "-")
+  s = s.replace(/--/g, "-")
   return s.toLowerCase()
 }
