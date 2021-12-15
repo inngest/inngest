@@ -85,7 +85,9 @@ export default function Home() {
             </div>
           </div>
 
-          <div style={{ background: "#fff", opacity: 0.2 }}>SCREENSHOT</div>
+          <div>
+            <img src="/assets/scrn.png" />
+          </div>
         </Content>
       </Hero>
 
@@ -380,16 +382,16 @@ export default function Home() {
 }
 
 const Hero = styled.div`
-  padding: 13vh 0;
   border-bottom: 4px solid #ffffff55;
   position: relative;
-  z-index: 1;
+  z-index: 2;
+  overflow: hidden;
 
   &:after {
     content: "";
     display: block;
     background: #040834 url(/assets/bg.jpg) no-repeat bottom right;
-    opacity: 0.6;
+    opacity: 0.4;
     position: absolute;
     z-index: 0;
     height: 100%;
@@ -403,11 +405,22 @@ const Hero = styled.div`
   .grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
+
     > div:first-of-type {
-      z-index: 1;
+      z-index: 2;
+      padding: 13vh 0;
     }
+
     > div:last-of-type {
-      z-index: 0;
+      padding: 4vh 0 0;
+      z-index: 1;
+      position: relative;
+
+      img {
+        opacity: .6;
+        position: absolute;
+        max-height: 130%;
+      }
     }
   }
 
