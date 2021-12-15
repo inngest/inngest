@@ -78,7 +78,7 @@ export default function Home() {
             </p>
 
             <div className="cta">
-              <a hrefName="https://app.inngest.com/register">
+              <a href="https://app.inngest.com/register">
                 Join the preview
               </a>
               or <a href="/contact">speak with us</a>
@@ -380,8 +380,25 @@ export default function Home() {
 }
 
 const Hero = styled.div`
-  padding: 12vh 0;
-  border-bottom: 4px solid #ffffff22;
+  padding: 13vh 0;
+  border-bottom: 4px solid #ffffff55;
+  position: relative;
+  z-index: 1;
+
+  &:after {
+    content: "";
+    display: block;
+    background: #040834 url(/assets/bg.jpg) no-repeat bottom right;
+    opacity: 0.6;
+    position: absolute;
+    z-index: 0;
+    height: 100%;
+    width: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+  }
+
 
   .grid {
     display: grid;

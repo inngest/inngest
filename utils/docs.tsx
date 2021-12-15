@@ -75,6 +75,10 @@ export const getAllDocs = (() => {
       const source = fs.readFileSync(fullpath);
       const { content, data: scope } = matter(source)
 
+      if (scope.hide === true) {
+        return;
+      }
+
       memoizedDocs.slugs.push("/docs/" + scope.slug);
       memoizedDocs.docs[scope.slug] = {
         slug: scope.slug,
