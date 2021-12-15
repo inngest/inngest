@@ -424,6 +424,7 @@ const Hero = styled.div`
   h1 {
     width: 130%;
   }
+
   h1 + p {
     font-size: 22px;
     line-height: 1.45;

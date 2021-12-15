@@ -1,7 +1,7 @@
 import React from "react";
 import styled from "@emotion/styled";
 
-const Nav = ({ blue }) => {
+const Nav = () => {
   return (
     <div>
       <Container>
