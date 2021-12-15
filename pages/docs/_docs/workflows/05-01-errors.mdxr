@@ -3,5 +3,7 @@ category: "Managing workflows"
 title: "Error handling"
 slug: "workflows-in-production/error-handling"
 order: 7
+
+hide: true
 ---
 
