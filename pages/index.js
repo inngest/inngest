@@ -213,7 +213,6 @@ export default function Home() {
 
           <BuildGrid className="text-center">
             <div>
-              <img src="https://via.placeholder.com/350x150" />
               <h3>Build workflows rapidly</h3>
               <p>
                 Create workflows using a fully typed config hosted in your own
@@ -221,7 +220,6 @@ export default function Home() {
               </p>
             </div>
             <div>
-              <img src="https://via.placeholder.com/350x150" />
               <h3>Fully connected</h3>
               <p>
                 Connect to all of your tools via integrations to common systems,
@@ -229,7 +227,6 @@ export default function Home() {
               </p>
             </div>
             <div>
-              <img src="https://via.placeholder.com/350x150" />
               <h3>Manage & coordinate events</h3>
               <p>
                 Automatically run workflows whenever events are received, or
