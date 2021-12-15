@@ -2,8 +2,8 @@
 
 html, body, button, input {
   font-family: 'Inter', sans-serif;
-  color: #222631;
-  font-size: 18px;
+  color: #fff;
+  font-size: 16px;
 }
 
 @supports (font-variation-settings: normal) {
@@ -11,6 +11,9 @@ html, body, button, input {
 }
 
 :root {
+  --bg-dark: #030624;
+  --bg-dark: #0f111e;
+
   --light-grey: #86909a;
   --dark-grey: #565e66;
 
@@ -19,15 +22,14 @@ html, body, button, input {
 
   --cream: #f9f9f1;
 
-  --bg-gradient: linear-gradient(
-    180deg,
-    rgba(243, 245, 245, 1) 20%,
-    rgba(249, 251, 254, 1) 100%
-  );
+  --green: #94D09A;
+  --button-bg-color: var(--green);
+  --button-text-color: var(--bg-dark);
 }
 
 html, body {
-  overflow-x: hidden
+  overflow-x: hidden;
+  background: var(--bg-dark);
 }
 
 body, button {
@@ -39,9 +41,10 @@ input {
   width: 300px;
   padding: 5px 12px;
   box-sizing: border-box;
+  color: var(--bg-dark);
 
   background: #fff;
-  border-radius: 2px;
+  border-radius: 3px;
   border: 1px solid #eee;
   transition: all .3s;
   box-shadow: 0 1px 0px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
@@ -53,27 +56,15 @@ input:focus, textarea:focus {
 }
 
 button, .button {
-  padding: 12px 14px 11px;
-  background-color: #2F6D9Dee;
+  padding: 12px 22px 11px;
+  background-color: var(--button-bg-color);
   text-decoration: none;
-  color: white !important;
+  color: var(--button-text-color) !important;
+  font-weight: 600;
   border: 1px solid transparent;
-  border-radius: 2px;
+  border-radius: 3px;
   transition: all .3s;
 }
-
-.button--outline {
-  background-color: transparent;
-  border: 1px solid #2F6D9D99;
-  color: var(--blue-right) !important;
-}
-
-.button--outline-white {
-  background-color: transparent;
-  border: 1px solid #ffffffbb;
-  color: #fff !important;
-}
-
 button:hover, .button:hover {
   cursor: pointer;
   background-color: gray;
@@ -81,42 +72,67 @@ button:hover, .button:hover {
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
   color: #fff !important;
 }
-
 button:focus, .button:focus {
   outline: none;
   background-color: #2F6D9Dff;
 }
 
+.button--outline {
+  background-color: transparent;
+  border: 1px solid #fff;
+  color: #fff !important;
+}
+.button--outline:hover {
+  background: #ffffff33;
+}
+
 
 a[href]:not([href='']) {
-  color: #2F77AF;
+  color: #fff;
 }
 
 .text-center {
   text-align: center;
 }
 
+.justify-right {
+  display: flex;
+  justify-content: flex-end;
+}
+
 p, li {
-  line-height: 1.5;
+  line-height: 1.7;
+}
+
+p + p {
+  margin-top: 1.8rem;
 }
 
 h1 {
-  font-size: 60px;
-  line-height: 1.15;
+  font-size: 54px;
+  line-height: 1.07;
+  letter-spacing: -0.5px;
   margin: 20px 0;
-  color: #2E3A59;
 }
 
 h2 {
-  font-size: 2.5rem;
+  font-size: 36px;
   font-weight: 800;
-  color: #2E3A59;
+}
+
+header {
+  position: relative;
+  z-index: 1;
+}
+
+header h2 + p {
+  font-size: 18px;
+  opacity: .9;
 }
 
 h3 {
-  font-size: 1.4125rem;
-  font-weight: 500;
-  margin-bottom: 25px;
+  font-size: 18px;
+  font-weight: 600;
 }
 
 h3 + .subtitle {
@@ -124,10 +140,18 @@ h3 + .subtitle {
 }
 
 strong {
-  font-weight: 600;
+  font-weight: 700;
 }
 
-h5, .intro-tag {
+h5 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: .6;
+  letter-spacing: 1px;
+}
+
+.intro-tag {
   color: #184115bb;
   font-size: 12px;
   letter-spacing: 2px;
@@ -153,8 +177,7 @@ h5 + h2 {
 }
 
 h2, .text--blue {
-  background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
-  background: #2E3A59;
+  background: #fff;
   background-clip: text;
   color: transparent;
 }
@@ -183,7 +206,7 @@ h2, .text--blue {
 }
 
 ul { margin: 2rem 0; }
-ul li {
+ol li, ul li {
   margin: 0 0 .6rem;
 }
 

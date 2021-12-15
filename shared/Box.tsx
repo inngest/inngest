@@ -15,7 +15,6 @@ type Props = {
   action?: string;
   onAction?: () => void;
   onClick?: () => void;
-
 };
 
 enum Kinds {

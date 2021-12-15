@@ -23,10 +23,13 @@ export const Inner = styled.div`
 
 export const WorkflowContent = styled.div`
   display: grid;
+  color: var(--dark-grey);
+
   /*
   grid-template-columns: auto 180px;
   gap: 40px;
   */
+
   margin: 80px 0;
 
   .editor {

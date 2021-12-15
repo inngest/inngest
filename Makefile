@@ -1,10 +1,9 @@
 .PHONY: build
-build: get-library generate-library blog
+build: get-library generate-library
 	yarn build
 
 .PHONY: dirty
 dirty:
-	./blog.js
 	go run ./library.go
 	yarn prettier
 	git diff --exit-code
@@ -23,7 +22,3 @@ generate-library:
 
 .PHONY: library
 library: get-library generate-library
-
-.PHONY: blog
-blog:
-	./blog.js

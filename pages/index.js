@@ -1,15 +1,16 @@
 import { useState } from "react";
 import styled from "@emotion/styled";
 import Head from "next/head";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import theme from "react-syntax-highlighter/dist/cjs/styles/prism/dracula";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
-import Workflow from "../shared/workflow";
-import DragFC from "../shared/drag";
-import UseCases from "../shared/usecases";
-import Tag, { greyCSS } from "../shared/tag";
-import Check from "../shared/icons/check";
+import Content from "../shared/content";
+
+import Airplane from "../shared/Icons/Airplane";
+import Audit from "../shared/Icons/Audit";
+import Language from "../shared/Icons/Language";
+import Alert from "../shared/Icons/Alert";
+import Users from "../shared/Icons/Users";
+import VCS from "../shared/Icons/VCS";
 
 // TODO: move these into env vars
 // prod key
@@ -25,24 +26,17 @@ export default function Home() {
 
   const onSubmit = (e) => {
     e.preventDefault();
-
     const Inngest = globalThis.Inngest;
     if (!Inngest) {
       console.warn("Inngest not found");
       return;
     }
-
     Inngest.init(INGEST_KEY);
     Inngest.event({
       name: "marketing.signup",
-      data: {
-        email,
-      },
-      user: {
-        email,
-      },
+      data: { email },
+      user: { email },
     });
-
     setEmail("");
     setSubmitted(true);
   };
@@ -51,8 +45,7 @@ export default function Home() {
     <>
       <Head>
         <title>
-          Inngest → serverless event-driven & scheduled workflow automation
-          platform for developers & operators
+          Inngest → build serverless event-driven systems in seconds
         </title>
         <link rel="icon" href="/favicon.png" />
         <meta property="og:title" content="Inngest" />
@@ -60,7 +53,7 @@ export default function Home() {
         <meta property="og:image" content="/logo.svg" />
         <meta
           property="og:description"
-          content="Build, run, operate, and analyze your workflows in minutes."
+          content="Build event serverless event-driven systems in seconds"
         />
         <script src="/inngest-sdk.js"></script>
         <script
@@ -70,325 +63,313 @@ export default function Home() {
         ></script>
       </Head>
 
-      <Nav dark />
+      <Nav />
 
       <Hero>
         <Content className="grid">
           <div>
             <h1>
-              Serverless functions <i>driven&nbsp;by</i> events
+              Build serverless event&nbsp;driven systems, <i>in seconds</i>
             </h1>
             <p>
-              <strong>
-                Build and run complex workflows in real-time, triggered by any
-                event across your stack.
-              </strong>{" "}
-              It's made for builders, designed for operators.
+              A flexible platform which manages all of your events and runs
+              serverless workloads in real time &mdash; automating anything you
+              need, with zero&nbsp;config&nbsp;or&nbsp;infra.
             </p>
 
-            <a
-              href="https://app.inngest.com/register"
-              className="button button--outline-white"
-              rel="nofollow"
-              target="_blank"
-            >
-              Get started for free →
-            </a>
+            <div className="cta">
+              <a href="https://app.inngest.com/register">
+                Join the preview
+              </a>
+              or <a href="/contact">speak with us</a>
+            </div>
           </div>
-          <div className="workflow">
-            <Workflow />
+
+          <div>
+            <img src="/assets/scrn.png" />
           </div>
         </Content>
       </Hero>
 
-      <Content>
-        <Tagline>
-          <div>
-            <Check />
-            <p>Define workflows in code or in&nbsp;a&nbsp;visual&nbsp;UI</p>
-          </div>
-          <div>
-            <Check />
-            <p>Integrate with your existing&nbsp;tools</p>
-          </div>
-          <div>
-            <Check />
-            <p>Switch integrations in seconds,&nbsp;with&nbsp;zero&nbsp;code</p>
-          </div>
-          <div>
-            <Check />
-            <p>Run custom code, in any&nbsp;language</p>
-          </div>
-          <div>
-            <Check />
-            <p>Complete workflow version&nbsp;histories</p>
-          </div>
-        </Tagline>
-      </Content>
-
-      <Introducing>
-        <Content className="text-center">
-          <HighLevel>
-            <h2>Serverless workflows running in seconds</h2>
+      <div>
+        <Content>
+          <header className="text-center">
+            <h2>
+              Made for developers.
+              <br />
+              Designed for teams.
+            </h2>
             <p>
-              Inngest aggregates events from your internal &amp; external
-              systems and runs workflows when things happen in your business.
-              It's like Segment and GitHub Actions in a blender, for anything.
+              Our platform is crafted to help you build processes faster, and
+              designed so that your entire team can
+              understand&nbsp;and&nbsp;operate&nbsp;them.
             </p>
-            <a
-              href="https://www.inngest.com/blog/introducing-inngest"
-              className="button button--outline"
-            >
-              Learn more about the platform →
-            </a>
-          </HighLevel>
-        </Content>
+          </header>
 
-        <Content className="grid">
-          <div>
-            <h5>Introducing Inngest</h5>
-            <h2>React to everything</h2>
-
-            <ul className="check">
-              <li>
-                Build, test, and deploy serverless functions as workflows in any
-                language
-              </li>
-              <li>
-                Trigger functions and workflows from any event - internal or
-                external
-              </li>
-              <li>
-                Instantly test and deploy new workflow versions, with a full
-                version history and changelog built-in
-              </li>
-            </ul>
-
-            <p>
-              <strong>
-                Inngest handles your business logic so you can focus on
-                your&nbsp;core&nbsp;product.
-              </strong>
-            </p>
-          </div>
-          <DragGraphic>
+          <FeatureGrid>
             <div>
-              <DragFC
-                name="Send churn prevention push"
-                subtitle="To the user's mobile device"
-                icon="/icons/sf-cloud.svg"
-              />
-              <DragFC
-                name="Create lead in Salesforce"
-                subtitle="From the account in the event"
-                icon="/icons/sf-cloud.svg"
-                cursor
-              />
-              <DragFC
-                name="Run suggested products ML"
-                subtitle="For the user in the event"
-                icon="/icons/sf-cloud.svg"
-              />
-            </div>
-          </DragGraphic>
-
-          <div>
-            <h2>Build faster, effortlessly</h2>
-
-            <ul className="check">
-              <li>Integrate events from external services via webhooks</li>
-              <li>Full logging and step-over debugging supported</li>
-              <li>
-                Common API integrations provided out of the box: no more glue
-                code
-              </li>
-            </ul>
-
-            <p>
-              <strong>
-                Inngest lets you build faster, decoupling your integrations from
-                your events.
-              </strong>
-            </p>
-          </div>
-
-          <IntegrateGraphic>
-            <div className="wrapper">
-              <div className="integration">
-                <div>
-                  <img
-                    src="https://app.inngest.com/assets/salesforce.png"
-                    alt="Salesforce"
-                  />
-                </div>
-                <div>
-                  <p>
-                    <b>Salesforce</b>
-                  </p>
-                  <small>CRM, Sales</small>
-                </div>
+              <div>
+                <Airplane />
               </div>
-
-              <div className="integration">
-                <div>
-                  <img
-                    src="https://app.inngest.com/assets/stripe.png"
-                    alt="Stripe"
-                  />
-                </div>
-                <div>
-                  <p>
-                    <b>Stripe</b>
-                  </p>
-                  <small>Payments</small>
-                </div>
-              </div>
-
-              <div className="integration">
-                <div>
-                  <img
-                    src="https://cdn.brandfolder.io/5H442O3W/at/pl546j-7le8zk-btwjnu/Slack_RGB.png?height=205&width=500"
-                    alt="Slack"
-                  />
-                </div>
-                <div>
-                  <p>
-                    <b>Slack</b>
-                  </p>
-                  <small>CS, Ops</small>
-                </div>
-              </div>
-
-              <div className="integration">
-                <div>
-                  <img
-                    src="https://clickup.com/landing/images/brand-assets/logo-color-transparent.svg"
-                    alt="Salesforce"
-                  />
-                </div>
-                <div>
-                  <p>
-                    <b>ClickUp</b>
-                  </p>
-                  <small>Project management</small>
-                </div>
-              </div>
-
-              <div className="integration">
-                <div>
-                  <img
-                    src="https://www.twilio.com/docs/static/company/img/logos/red/twilio-logo-red.e9621c245.png"
-                    alt="Stripe"
-                  />
-                </div>
-                <div>
-                  <p>
-                    <b>Twilio</b>
-                  </p>
-                  <small>Messaging</small>
-                </div>
-              </div>
-
-              <div className="integration">
-                <div>
-                  <img
-                    src="https://github.githubassets.com/images/modules/logos_page/GitHub-Logo.png"
-                    alt="GitHub"
-                  />
-                </div>
-                <div>
-                  <p>
-                    <b>GitHub</b>
-                  </p>
-                  <small>Developer tools</small>
-                </div>
+              <div>
+                <h3>Track any event</h3>
+                <p>
+                  Ingest webhooks, events from your API, UX events, or events
+                  via integrations &mdash; fully HA with zero infrastcture
+                  required
+                </p>
               </div>
             </div>
-          </IntegrateGraphic>
 
-          {/*
-          <div>
-            <h2>Instant, reliable, and&nbsp;flexible</h2>
+            <div>
+              <div>
+                <Audit />
+              </div>
 
-            <p>
-              Your workflows run in real-time, with full logging, audit trails,
-              and retries out of the box.
-            </p>
-            <p>
-              Need something more complex? Run your own custom code as part of a
-              workflow,{" "}
-              <strong>without worrying about servers or server code</strong>.
-            </p>
-          </div>
+              <div>
+                <h3>Audit trails</h3>
+                <p>
+                  See which users are responsible for every event and action in
+                  your system, with infinite retention
+                </p>
+              </div>
+            </div>
 
-          <div></div>
-          */}
+            <div>
+              <div>
+                <Language />
+              </div>
+
+              <div>
+                <h3>Any runtime, any language</h3>
+                <p>
+                  Hook into your existing infra via AWS Lambda and Cloudflare
+                  Workers. Or, run any code within your workloads, in any
+                  language
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div>
+                <Users />
+              </div>
+              <div>
+                <h3>Manual approvals &amp; coordination</h3>
+                <p>
+                  Automate complex flows with built-in manual approvals, and
+                  built-in event coordination with timeouts
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div>
+                <VCS />
+              </div>
+              <div>
+                <h3>Version control</h3>
+                <p>
+                  Every workload you build is fully versioned, allowing you to
+                  schedule releases and roll back quickly
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div>
+                <Alert />
+              </div>
+              <div>
+                <h3>Logging, debugging, & retries</h3>
+                <p>
+                  First-class support for logging, a step-over debugger,
+                  built-in retries, and error management out of the box
+                </p>
+              </div>
+            </div>
+          </FeatureGrid>
+
+          <p className="text-center">
+            Plus, you can test easily using our local CLI, integrate easily with
+            CI/CD tooling, leverage our prebuilt&nbsp;integrations, and get full
+            schemas for every version of your events automatically.
+          </p>
         </Content>
 
-        <div className="text-center" style={{ marginTop: "8rem" }}>
-          <a
-            href="https://app.inngest.com/register"
-            className="button button--outline"
-          >
-            Get started for free →
-          </a>
-        </div>
+        <Content className="top-gradient">
+          <header className="text-center">
+            <h2>
+              Build and iterate
+              <br />
+              without complexity
+            </h2>
+            <p>
+              Easily create multi-step processes to automate anything, written
+              as code or via a UI. Then, have them run automatically every time
+              events are received, on a schedule, or manually via your team.
+            </p>
+          </header>
+
+          <BuildGrid className="text-center">
+            <div>
+              <h3>Build workflows rapidly</h3>
+              <p>
+                Create workflows using a fully typed config hosted in your own
+                VCS, or use our UI to write the code for you.
+              </p>
+            </div>
+            <div>
+              <h3>Fully connected</h3>
+              <p>
+                Connect to all of your tools via integrations to common systems,
+                with full API support and secrets built-in.
+              </p>
+            </div>
+            <div>
+              <h3>Manage & coordinate events</h3>
+              <p>
+                Automatically run workflows whenever events are received, or
+                pause workflows until we receive new events (or don't).
+              </p>
+            </div>
+          </BuildGrid>
+        </Content>
 
         <Content>
-          <UseCases />
+          <SolveGrid>
+            <header>
+              <h2>Solve anything</h2>
+              <p>
+                Built to handle all complex behind-the-scenes flows engineers
+                lose time building, with a library of examples to get started.
+              </p>
+            </header>
 
-          <div className="text-center" style={{ marginTop: "8rem" }}>
-            <a href="/product" className="button button--outline">
-              See how the platform works →
+            <div>
+              <h4>Customer journeys</h4>
+              <small>eg. post signup flows</small>
+              <p>
+                Ensure new users are added to every system & campaign, with
+                built-in integrations, version control, and handover to other
+                teams
+              </p>
+            </div>
+
+            <div>
+              <h4>Real-time integrations</h4>
+              <small>eg. billing &amp; support systems</small>
+              <p>
+                Respond to activity across all of your systems, such as running
+                inference or auto-escalation with new support tickets, or
+                handling payment failures
+              </p>
+            </div>
+
+            <div>
+              <h4>Scheduled jobs</h4>
+              <small>eg. daily reports &amp; micro-batching</small>
+              <p>
+                Run workflows as scheduled jobs with zero infrastructure,
+                config, and management, then see full logs &amp; history every
+                time flows run
+              </p>
+            </div>
+
+            <div>
+              <h4>Sequenced flows</h4>
+              <small>eg. churn & abandonment</small>
+              <p>
+                Coordinate between events or the lack of them, such as if a user
+                doesn’t log in within 7 days after signup, or check out after
+                adding to cart — all built in
+              </p>
+            </div>
+
+            <div>
+              <h4>Alerting</h4>
+              <small>eg. security flows</small>
+              <p>
+                Create alerts any time events happen in your system with
+                built-in integrations, such as new deploys or suspicious logins
+              </p>
+            </div>
+
+            <div>
+              <h4>Internal ops</h4>
+              <small>eg. complex customer requests</small>
+              <p>
+                Build multi-step workflows that your entire team can manage and
+                operate, such as refunding customers
+              </p>
+            </div>
+          </SolveGrid>
+          <div className="justify-right">
+            <a href="/library" className="button button--outline">
+              Explore our library
             </a>
           </div>
         </Content>
-      </Introducing>
+      </div>
 
-      {/*
       <Content>
-        <Callout className="text-center">
-          <h5>Integrates with your existing tools</h5>
-          <IntegrationsIcons>
-            <img src="integrations/salesforce.png" alt="Salesforce" />
-            <img
-              style={{ height: "30px" }}
-              src="integrations/jira.png"
-              alt="Atlassian Jira"
-            />
-            <img src="integrations/clickup.png" alt="Clickup" />
-            <img src="integrations/stripe.png" alt="Stripe" />
-            <img src="integrations/onesignal.png" alt="One Signal" />
-            <img src="integrations/slack.png" alt="Slack" />
-            <img src="integrations/twilio.png" alt="Twilio" />
-          </IntegrationsIcons>
+        <GetStarted>
+          <h2>
+            Ready to
+            <br />
+            get&nbsp;started?
+          </h2>
+          <div>
+            <p>
+              Inngest’s programmable serverless event platform allows you to get
+              started building rapidly deployable, easily changeable workflows
+              with zero infrastructure, that run whenever you need them to.
+            </p>
+            <p>
+              Plus, you can create workflows and offload the operations of them
+              to your wider team, using Inngest as an internal tool.
+            </p>
 
-          <small>and many more.</small>
-        </Callout>
+            <div>
+              <a href="https://app.inngest.com/register" className="button">
+                Sign up →
+              </a>
+
+              <a href="/docs">Explore documentation</a>
+            </div>
+          </div>
+        </GetStarted>
       </Content>
-      */}
 
-      <HowItWorks />
+      <Newsletter>
+        <p>
+          <b>Bonus: sign up to our newsletter?</b> You’ve scrolled pretty far,
+          and we didn’t really want to nag you earlier. No pressure, and we’ll
+          only send you fun & interesting things. Like, say, news about open
+          sourcing our execution platform!
+        </p>
 
-      <Signup>
-        <form onSubmit={onSubmit} className={submitted ? "submitted" : ""}>
-          <input
-            type="email"
-            onChange={(e) => setEmail(e.target.value)}
-            value={email}
-            placeholder="Your work email"
-            required
-          />
-          <button type="submit" disabled={submitted}>
-            Sign up for updates
-          </button>
-        </form>
+        {!submitted && (
+          <form onSubmit={onSubmit} className={submitted ? "submitted" : ""}>
+            <input
+              type="email"
+              onChange={(e) => setEmail(e.target.value)}
+              value={email}
+              placeholder="Your work email"
+              required
+            />
+            <button type="submit" disabled={submitted}>
+              Subscribe
+            </button>
+          </form>
+        )}
         {submitted && (
-          <p style={{ textAlign: "center", fontSize: 12 }}>
-            You're on the list and will receive an invite soon!
+          <p style={{ textAlign: "center", fontSize: 12, marginTop: "2rem" }}>
+            You're added! Only top-shelf stuff. If not, yoink us from your
+            inbox.
           </p>
         )}
-      </Signup>
+      </Newsletter>
 
       <div style={{ marginTop: 100 }}>
         <Footer />
@@ -397,481 +378,234 @@ export default function Home() {
   );
 }
 
-const send = `// Send us events with a single call.  Libraries provided for
-// the browser, node, python, and Go.
-Inngest.event({
-  name: "signup.new",
-  data: {
-    email: "some@new.example.com",
-    plan: "enterprise",
-    sector: "fintech",
-  },
-  user: {
-    email: "some@new.example.com",
-    first_name: "Jazmine",
-    last_name: "Doe",
-  }
-});`;
-
-const HowItWorks = () => {
-  return (
-    <HIW>
-      <Content>
-        <h5>How it works</h5>
-        <h3>Implement any real-time logic you can dream of, in minutes.</h3>
-        <p>
-          Start by receiving events automatically via integrations, or by
-          sending us your own events through our API.
-        </p>
-
-        <div>
-          <HIWGrid>
-            <li>
-              <strong>Send us events</strong>
-              <p>
-                Send us events through the API, SDK, webhooks, or integrations.
-              </p>
-            </li>
-            <li>
-              <strong>Configure your workflows</strong>
-              <p>
-                Create your workflows using the drag-and-drop UI or by writing
-                code directly.
-              </p>
-            </li>
-            <li>
-              <strong>Run workflows in real time</strong>
-              <p>
-                Workflows automatically run in real-time on each event or on a
-                schedule.
-              </p>
-            </li>
-            <li>
-              <strong>Manage your functions</strong>
-              <p>
-                Easily manage your workflows, with full version histories and
-                visibility into which users run through which versions.
-              </p>
-            </li>
-          </HIWGrid>
-
-          <div>
-            <Code>
-              <SyntaxHighlighter language="javascript" style={theme}>
-                {send}
-              </SyntaxHighlighter>
-            </Code>
-          </div>
-        </div>
-      </Content>
-    </HIW>
-  );
-};
-
-const Content = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-
-  @media only screen and (max-width: 800px) {
-    padding: 0 20px;
-  }
-`;
-
 const Hero = styled.div`
-  font-size: 1.2125rem;
-  padding: 80px 0 60px;
-  position: relative;
-  color: #fff;
-
-  background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
-
-  min-height: 400px;
-
-  > div {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-gap: 80px;
-  }
-
-  h1 {
-    color: transparent;
-    background: linear-gradient(90deg, #fff, #f5f5f5);
-    color: #fff;
-    background-clip: text;
-  }
-
-  .button {
-    display: inline-block;
-    font-size: 1rem;
-    margin-top: 40px;
-    width: auto;
-    height: auto;
-  }
-
-  .img {
-    box-shadow: 0 10px 50px rgba(0, 0, 0, 0.1);
-    background: #fffefc;
-    width: 100%;
-    max-width: 100%;
-    height: 480px;
-    max-height: 500px;
-    margin: 90px 0 0;
-    position: relative;
-    z-index: 1;
-    overflow: hidden;
-  }
-
-  .workflow {
-    max-width: 100%;
-    height: 480px;
-    max-height: 500px;
-    transform: scale(0.8);
-  }
-
-  @media only screen and (max-width: 800px) {
-    padding: 30px 0;
-    border: 0;
-
-    h1 {
-      line-height: 1;
-      font-size: 50px;
-      margin: 0 0 40px;
-    }
-
-    .img {
-      display: none;
-    }
-
-    > div {
-      display: block;
-    }
-    .workflow {
-      display: none;
-    }
-  }
-`;
-
-const Tagline = styled.div`
-  padding: 40px 40px 0;
-  font-size: 13px;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  grid-gap: 40px;
-  text-align: center;
+  border-bottom: 4px solid #ffffff55;
   position: relative;
   z-index: 2;
-
-  > div {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  p {
-    margin: 4px 0;
-    line-height: 1.3;
-    opacity: 0.65;
-  }
-
-  @media only screen and (max-width: 800px) {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto;
-    grid-gap: 7px;
-
-    > div {
-      display: flex;
-      flex-direction: row;
-      text-align: left;
-    }
-
-    p {
-      margin-left: 10px;
-    }
-  }
-`;
-
-const Introducing = styled.div`
-  background-repeat: repeat;
-  background-image: linear-gradient(
-    180deg,
-    rgba(243, 245, 245, 1) 20%,
-    rgba(249, 251, 254, 1) 100%
-  );
-  padding: 180px 40px 180px 40px;
-  margin-top: -100px;
-  position: relative;
-
-  h5 + p {
-    font-size: 1.3125rem;
-  }
-
-  ul + p {
-    margin-top: 1.5rem;
-  }
-
-  @media only screen and (max-width: 800px) {
-    margin-top: 20px;
-    padding-top: 40px;
-    .grid {
-      padding: 0;
-    }
-  }
-
-  .grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-gap: 120px 80px;
-  }
-`;
-
-const HighLevel = styled.div`
-  margin: 5rem 0 10rem;
-
-  h2 {
-    margin: 0 0 1.5rem;
-  }
-
-  p {
-    font-size: 1.3rem;
-    max-width: 80%;
-    margin: 0 auto 3rem;
-    line-height: 1.35;
-    opacity: 0.6;
-  }
-
-  @media only screen and (max-width: 800px) {
-    text-align: left;
-    margin: 0 0 3rem;
-
-    p {
-      max-width: 100%;
-    }
-
-    .button {
-      font-size: 14px;
-      margin: 0 auto;
-    }
-  }
-`;
-
-const HIW = styled.div`
-  padding: 5rem 0 0;
-
-  > div > div {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-gap: 80px;
-  }
-
-  h3 {
-    margin: 0.25rem 0 0.5rem;
-  }
-  h3 + p {
-    margin: 0 0 4rem 0;
-    opacity: 0.6;
-  }
-
-  @media only screen and (max-width: 800px) {
-    > div > div {
-      grid-template-columns: 1fr;
-    }
-  }
-`;
-
-const HIWGrid = styled.ol`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto;
-  grid-gap: 50px;
-  padding: 0;
-
-  li,
-  strong,
-  p {
-    margin: 0;
-  }
-  strong {
-    display: block;
-    margin: 0 0 10px;
-  }
-
-  @media only screen and (max-width: 800px) {
-    grid-template-columns: 1fr;
-    padding: 0 20px;
-  }
-`;
-
-const Signup = styled(Content)`
-  padding: 10px 0 0;
-  form {
-    display: flex;
-    align-items: stretch;
-    justify-content: center;
-    margin: 60px 0 0;
-  }
-
-  form,
-  form * {
-    font-size: 1rem;
-  }
-
-  button {
-    width: 200px;
-    line-height: 1;
-  }
-
-  @media only screen and (max-width: 800px) {
-    form {
-      flex-direction: column;
-      align-items: stretch;
-      justify-content: center;
-    }
-    button,
-    input {
-      width: auto;
-    }
-    input {
-      padding: 24px 16px;
-    }
-  }
-`;
-
-const Code = styled.div`
-  font-size: 14px;
-  margin-top: -10px;
-  max-width: 90vw;
-
-  @media only screen and (max-width: 800px) {
-    margin-top: -40px;
-  }
-`;
-
-const IntegrationsIcons = styled.div`
-  display: flex;
-  flex-flow: row;
-  justify-content: center;
-  align-items: center;
-
-  flex-wrap: wrap;
-  margin-top: 50px;
-  column-gap: 80px;
-
-  > img {
-    height: 50px;
-    margin-bottom: 40px;
-  }
-`;
-
-const Box = styled.div`
-  box-sizing: border-box;
-  border: 1px solid #e8e8e699;
-  border-radius: 5px;
-  background: #fff;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
-  padding: 1.5rem;
-`;
-
-const Study = styled(Box)`
-  margin: 4rem 2rem;
-`;
-
-const DragGraphic = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-
-  &,
-  & > div {
-    position: relative;
-  }
-
-  > div {
-    padding: 50px 60px;
-    background: url(/assets/circle.svg) no-repeat center center;
-    background-size: contain;
-
-    > div {
-      margin-top: 1.5rem;
-      left: 1rem;
-      font-size: 13px !important;
-    }
-    > div:first-of-type {
-      left: -1rem;
-    }
-    > div:last-of-type {
-      left: 3rem;
-    }
-  }
-`;
-
-const IntegrateGraphic = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
 
   &:after {
     content: "";
     display: block;
-    height: 100%;
-    width: 100%;
-    background: url(/assets/semi-dots.svg) no-repeat 100% center;
-    background-size: contain;
-    right: -50px;
-    top: -20px;
+    background: #040834 url(/assets/bg.jpg) no-repeat bottom right;
+    opacity: 0.6;
     position: absolute;
     z-index: 0;
-  }
-
-  &,
-  & > div {
-    position: relative;
-    z-index: 1;
-  }
-
-  .wrapper {
-    border-radius: 5px;
-    background: #fafafa;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    height: 100%;
     width: 100%;
-    padding: 20px;
-
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-gap: 10px;
-    font-size: 0.9rem;
+    top: 0;
+    left: 0;
+    pointer-events: none;
   }
 
-  .wrapper > div {
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    grid-gap: 12px;
-    background: #fff;
-    border: 1px solid #f4f4f4;
-    padding: 12px;
-    line-height: 1.2;
 
-    > div {
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+
+    > div:first-of-type {
+      z-index: 2;
+      padding: 13vh 0;
+    }
+
+    > div:last-of-type {
+      padding: 4vh 0 0;
+      z-index: 1;
+      position: relative;
+
+      img {
+        opacity: .8;
+        position: absolute;
+        max-height: 130%;
+      }
+    }
+  }
+
+  h1 {
+    width: 130%;
+  }
+
+  h1 + p {
+    font-size: 22px;
+    line-height: 1.45;
+  }
+
+  .cta {
+    margin: 60px 0 0;
+
+    a:first-of-type {
+      display: inline-block;
+      border: 1px solid #fff;
+      border-radius: 3px;
+      color: #fff;
+      line-height: 1;
+      text-decoration: none;
+      padding: 12px 22px 14px;
+      margin: 0 20px 0 0;
+    }
+
+    a:last-of-type {
+      display: inline-block;
+      margin-left: 12px;
+    }
+  }
+`;
+
+const FeatureGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-gap: 30px 30px;
+
+  > div {
+    border: 1px solid #ffffff19;
+    border-radius: 5px;
+    color: #fff;
+
+    padding: 30px 30px 30px 0;
+    display: grid;
+    grid-template-columns: 120px auto;
+    align-items: center;
+
+    > div:first-of-type {
       display: flex;
-      flex-direction: column;
       justify-content: center;
     }
   }
 
+  img {
+    width: 24px;
+    height: 24px;
+    color: #fff;
+    stroke: #fff;
+  }
+
   p {
+    opacity: 0.8;
+  }
+
+  & + p {
+    opacity: 0.6;
+    margin: 3rem auto 2rem;
+    max-width: min(80vw, 850px);
+  }
+`;
+
+const BuildGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-gap: 55px;
+
+  img {
+    margin: 0 10px 20px;
+  }
+  p {
+    opacity: 0.85;
+  }
+`;
+
+const SolveGrid = styled.div`
+  margin: 18vh 0 2rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+
+  & + div {
+    margin-bottom: 18vh;
+    font-size: 14px;
+  }
+
+  > div {
+    padding: 50px 30px 30px;
+  }
+
+  header {
+    grid-column: 1 / span 2;
+    padding: 40px 50px;
+  }
+
+  h4 {
     margin: 0;
   }
   small {
     opacity: 0.5;
-    font-size: 0.7rem;
+    font-size: 12px;
+  }
+  div p {
+    font-size: 14px;
+    margin-top: 1rem;
   }
 
-  img {
-    object-fit: cover;
-    width: 100%;
-    max-height: 100%;
-    border-radius: 10px;
+  div:nth-of-type(1) {
+    background: #0c1b46;
+  }
+  div:nth-of-type(2) {
+    background: #282f68;
+  }
+  div:nth-of-type(3) {
+    background: #193770;
+  }
+  div:nth-of-type(4) {
+    background: #212b7a;
+  }
+  div:nth-of-type(5) {
+    background: #1f3c74;
+  }
+  div:nth-of-type(6) {
+    background: #263b63;
+  }
+`;
+
+const GetStarted = styled.div`
+  max-width: min(90vw, 1100px);
+  margin: 18vh auto;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  grid-gap: 50px;
+
+  p {
+    font-size: 18px;
+    opacity: 0.85;
+  }
+  p + div {
+    margin: 3rem 0 0;
+    font-size: 14px;
+  }
+  a.button {
+    margin: 0 2rem 0 0;
+  }
+`;
+
+const Newsletter = styled.div`
+  width: min(90vw, 650px);
+  margin: 0 auto 18vh;
+  border: 1px solid #ffffff19;
+  border-radius: 20px;
+  padding: 30px;
+  background: #00000233;
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.7);
+
+  p {
+    opacity: 0.6;
+    font-size: 14px;
+  }
+
+  form {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: center;
+    margin: 2rem 0 0;
+  }
+
+  input {
+    height: auto;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    font-size: 14px;
+  }
+  button {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    font-size: 14px;
   }
 `;

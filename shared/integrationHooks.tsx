@@ -22,7 +22,9 @@ export type Integration = {
 
 export const fetchIntegrations = async (setter: (a: any) => void) => {
   try {
-    const result = await fetch("https://api.inngest.com/v1/public/integrations");
+    const result = await fetch(
+      "https://api.inngest.com/v1/public/integrations"
+    );
     setter(await result.json());
   } catch (e) {}
 };
@@ -36,7 +38,9 @@ export const useIntegration = async (
       return;
     }
     try {
-      const result = await fetch(`https://api.inngest.com/v1/public/integrations/${name}`);
+      const result = await fetch(
+        `https://api.inngest.com/v1/public/integrations/${name}`
+      );
       setter(await result.json());
     } catch (e) {}
   };
