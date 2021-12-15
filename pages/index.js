@@ -391,7 +391,7 @@ const Hero = styled.div`
     content: "";
     display: block;
     background: #040834 url(/assets/bg.jpg) no-repeat bottom right;
-    opacity: 0.4;
+    opacity: 0.6;
     position: absolute;
     z-index: 0;
     height: 100%;
@@ -417,7 +417,7 @@ const Hero = styled.div`
       position: relative;
 
       img {
-        opacity: .6;
+        opacity: .7;
         position: absolute;
         max-height: 130%;
       }
