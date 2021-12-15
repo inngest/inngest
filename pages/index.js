@@ -81,7 +81,7 @@ export default function Home() {
               <a href="https://app.inngest.com/register">
                 Join the preview
               </a>
-              or <a href="/contact">speak with us</a>
+              or <a href="mailto:hello@inngest.com">speak with us</a>
             </div>
           </div>
 
