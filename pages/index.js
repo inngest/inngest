@@ -396,6 +396,7 @@ const Hero = styled.div`
     top: 0;
     left: 0;
     pointer-events: none;
+
   }
 
 
@@ -412,11 +413,16 @@ const Hero = styled.div`
       padding: 4vh 0 0;
       z-index: 1;
       position: relative;
+      opacity: .825;
+      transition: all .3s;
+
+      &:hover { opacity: 1 }
 
       img {
-        opacity: .8;
+        pointer-events: none;
         position: absolute;
         max-height: 130%;
+        box-shadow: 0 0 80px rgba(0, 0, 0, 0.7)
       }
     }
   }
