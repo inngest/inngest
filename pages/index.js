@@ -414,7 +414,7 @@ const Hero = styled.div`
       position: relative;
 
       img {
-        opacity: .7;
+        opacity: .8;
         position: absolute;
         max-height: 130%;
       }
