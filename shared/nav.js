@@ -1,7 +1,7 @@
 import React from "react";
 import styled from "@emotion/styled";
 
-const Nav = () => {
+const Nav = ({ blue }) => {
   return (
     <div>
       <Container>
@@ -47,6 +47,7 @@ const Nav = () => {
           <StyledLink href="/docs">Docs</StyledLink>
           <StyledLink href="/blog">Blog</StyledLink>
 
+          {/*
           <Hoverable>
             <StyledLink href="/company">Company</StyledLink>
             <div>
@@ -60,6 +61,7 @@ const Nav = () => {
           </Hoverable>
 
           <StyledLink href="/pricing">Pricing</StyledLink>
+          */}
         </div>
 
         <div>

@@ -63,7 +63,7 @@ export default function Home() {
         ></script>
       </Head>
 
-      <Nav dark />
+      <Nav blue />
 
       <Hero>
         <Content className="grid">
