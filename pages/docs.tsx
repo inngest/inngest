@@ -210,6 +210,10 @@ const ContentWrapper = styled.div`
   min-height: calc(100vh - 70px);
 
   @media (max-width: 980px) { grid-template-columns: 2fr 5fr; }
+
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 export const DocsContent = styled.div`
@@ -228,6 +232,10 @@ export const DocsContent = styled.div`
   /* "On this page" */
   h2 + h5 {
     margin-top: 3rem;
+  }
+
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
   }
 `;
 
@@ -694,6 +702,24 @@ const Menu = styled.div`
       border-left: 2px solid #ffffff88;
     }
   }
+
+  /* Mobile */
+  @media (max-width: 800px) {
+    padding: 2rem;
+    grid-template-columns: 1fr;
+    justify-content: flex-start;
+    box-sizing: border-box;
+
+    > div {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .toggle, .toggle-subcategory {
+      margin-right: 0 !important;
+      right: 0 !important;
+    }
+  }
 `;
 
 const Inner = styled.div`
@@ -702,11 +728,23 @@ const Inner = styled.div`
   > div {
     padding: 1rem 4rem;
   }
+
+  @media (max-width: 800px) {
+    > div { padding: 2rem }
+  }
 `;
 
 const Hero = styled.div`
   padding: 8vh 4rem 7vh !important;
   background: rgba(255, 255, 255, 0.03);
+
+  @media (max-width: 800px) {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 8vh 2rem !important;
+
+    h1 { font-size: 42px; }
+  }
 `;
 
 const Discover = styled.div`
@@ -723,5 +761,13 @@ const Discover = styled.div`
 
   ul {
     margin-top: 3.5rem;
+  }
+
+  @media (max-width: 800px) {
+    > div {
+      grid-template-columns: 1fr;
+      grid-gap: 0;
+    }
+    ul { margin-top: 1rem }
   }
 `;
