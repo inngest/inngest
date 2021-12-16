@@ -170,4 +170,8 @@ const TOCSide = styled.ol`
       padding-left: 0.5rem;
     }
   }
+
+  @media (max-width: 800px) {
+    &.visible { opacity: 0; display: none }
+  }
 `;

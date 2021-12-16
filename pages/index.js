@@ -457,6 +457,8 @@ const Hero = styled.div`
   }
 
   @media (max-width: 800px) {
+    .grid { grid-template-columns: 1fr; }
+
     h1 { width: 100% }
 
     .cta {
