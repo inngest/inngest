@@ -81,7 +81,7 @@ export default function Home() {
               <a href="https://app.inngest.com/register">
                 Join the preview
               </a>
-              or <a href="mailto:hello@inngest.com">speak with us</a>
+              <span>or <a href="mailto:hello@inngest.com">speak with us</a></span>
             </div>
           </div>
 
@@ -101,7 +101,7 @@ export default function Home() {
             </h2>
             <p>
               Our platform is crafted to help you build processes faster, and
-              designed so that your entire team can
+              designed so that your entire&nbsp;team can
               understand&nbsp;and&nbsp;operate&nbsp;them.
             </p>
           </header>
@@ -439,7 +439,7 @@ const Hero = styled.div`
   .cta {
     margin: 60px 0 0;
 
-    a:first-of-type {
+    > a:first-of-type {
       display: inline-block;
       border: 1px solid #fff;
       border-radius: 3px;
@@ -455,12 +455,28 @@ const Hero = styled.div`
       margin-left: 12px;
     }
   }
+
+  @media (max-width: 800px) {
+    h1 { width: 100% }
+
+    .cta {
+      a:first-of-type {
+        margin-bottom: 30px;
+      }
+      span { display: block; margin-left: 12px; }
+    }
+  }
+
 `;
 
 const FeatureGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-gap: 30px 30px;
+
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
 
   > div {
     border: 1px solid #ffffff19;
@@ -501,6 +517,8 @@ const BuildGrid = styled.div`
   grid-template-columns: 1fr 1fr 1fr;
   grid-gap: 55px;
 
+  @media (max-width: 800px) { grid-template-columns: 1fr; }
+
   img {
     margin: 0 10px 20px;
   }
@@ -515,6 +533,17 @@ const SolveGrid = styled.div`
   grid-template-columns: repeat(4, 1fr);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
 
+  header {
+    grid-column: 1 / span 2;
+    padding: 40px 50px;
+  }
+
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+
+    header { grid-column: 1 }
+  }
+
   & + div {
     margin-bottom: 18vh;
     font-size: 14px;
@@ -522,11 +551,6 @@ const SolveGrid = styled.div`
 
   > div {
     padding: 50px 30px 30px;
-  }
-
-  header {
-    grid-column: 1 / span 2;
-    padding: 40px 50px;
   }
 
   h4 {
@@ -568,6 +592,10 @@ const GetStarted = styled.div`
   grid-template-columns: 1fr 2fr;
   grid-gap: 50px;
 
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
+
   p {
     font-size: 18px;
     opacity: 0.85;
@@ -589,6 +617,12 @@ const Newsletter = styled.div`
   padding: 30px;
   background: #00000233;
   box-shadow: 0 20px 80px rgba(0, 0, 0, 0.7);
+  box-sizing: border-box;
+
+
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
 
   p {
     opacity: 0.6;
