@@ -49,6 +49,7 @@ const Footer = () => {
     `,
         }}
       />
+      <script dangerouslySetInnerHTML={{__html: `window.$crisp=[];window.CRISP_WEBSITE_ID="4df9c579-f99d-42f8-bdac-42eb51e3f6df";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`}} />
     </>
   );
 };
