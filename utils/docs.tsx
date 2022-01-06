@@ -140,7 +140,7 @@ const getHeadings = (content: string) => {
       return;
     }
     // add this subheading to the current heading list.
-    headings[h2].subheadings.push({ title, slug: toSlug(title) });
+    (headings[h2]?.subheadings || []).push({ title, slug: toSlug(title) });
   });
   return headings;
 }
