@@ -69,4 +69,16 @@ export const Inner = styled.div`
     );
     background-size: 5px 5px;
   }
+
+  img {
+    max-width: 100%;
+    max-height: 200px;
+    margin: 0 0 50px;
+    pointer-events: none;
+  }
+
+  img.hero {
+    padding: 0 0 50px;
+  }
+
 `;
