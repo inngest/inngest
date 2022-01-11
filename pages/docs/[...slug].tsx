@@ -172,6 +172,9 @@ const TOCSide = styled.ol`
   }
 
   @media (max-width: 800px) {
-    &.visible { opacity: 0; display: none }
+    &.visible {
+      opacity: 0;
+      display: none;
+    }
   }
 `;

@@ -60,8 +60,8 @@ const Nav = () => {
             </div>
           </Hoverable>
 
-          <StyledLink href="/pricing">Pricing</StyledLink>
           */}
+          <StyledLink href="/pricing">Pricing</StyledLink>
         </div>
 
         <div>
@@ -73,7 +73,7 @@ const Nav = () => {
             rel="nofollow"
             target="_blank"
           >
-            Sign up →
+            Sign up for free →
           </a>
         </div>
       </Container>

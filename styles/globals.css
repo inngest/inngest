@@ -221,3 +221,10 @@ ul.check li {
   padding-left: 1.75rem;
   margin-left: .75rem;
 }
+
+hr {
+  border: 0;
+  border-bottom: 1px solid #fff;
+  opacity: .2;
+  margin: 8vh 0;
+}

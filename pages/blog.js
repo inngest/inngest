@@ -47,7 +47,7 @@ export default function BlogLayout(props) {
                 key={item.slug}
               >
                 <h2>{item.heading}</h2>
-                  <Date>{item.humanDate}</Date>
+                <Date>{item.humanDate}</Date>
                 <p>{item.subtitle}</p>
               </a>
             ))}
@@ -138,10 +138,10 @@ const Focus = styled.div`
 `;
 
 const Date = styled.div`
-  font-size: .9rem;
-  opacity: .7;
+  font-size: 0.9rem;
+  opacity: 0.7;
   margin-bottom: 1.5rem;
-`
+`;
 
 const List = styled.div`
   display: grid;
@@ -163,6 +163,6 @@ const List = styled.div`
   }
 
   > div:last-of-type {
-    opacity: .6;
+    opacity: 0.6;
   }
 `;
