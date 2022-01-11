@@ -188,10 +188,10 @@ export class FinisherHeader {
     this.c.width = this.o.c.w;
     this.c.height = this.o.c.h;
     const offset = getOppositeSide(this.o.skew, this.o.c.w / 2);
-    const transform = `skewY(${this.o.skew}deg) translateY(-${offset}px)`;
+    const transform = `skewY(${this.o.skew || 0}deg) translateY(-${offset || 0}px)`;
     this.c.setAttribute(
       "style",
-      `position:absolute;top:0;left:0;right:0;bottom:0;-webkit-transform:${transform};transform:${transform};outline: 1px solid transparent;background-color:rgba(${this.bc.r},${this.bc.g},${this.bc.b},1);`
+      `position: absolute; top: 0; left: 0; right: 0; bottom: 0; -webkit-transform: ${transform}; transform: ${transform}; background: rgb(${this.bc.r}, ${this.bc.g}, ${this.bc.b});`
     );
   }
 
