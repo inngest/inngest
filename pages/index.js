@@ -122,7 +122,7 @@ export default function Home() {
             <div className="cta">
               <a href="https://app.inngest.com/register">Sign up for free →</a>
               <span>
-                or <a href="mailto:hello@inngest.com">speak with us</a>
+                or <a href="/contact">speak with us</a>
               </span>
             </div>
           </div>
