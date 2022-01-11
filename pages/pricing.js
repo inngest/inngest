@@ -232,11 +232,12 @@ export default function Pricing() {
           <div onClick={toggleFAQ}>
             <h3>What resources are available?</h3>
             <p>
-              Free accounts are limited to 128mb of ram, and a maximum runtime
-              of 10 seconds per function. Paid accounts can utilize 1GB of ram
-              and have a runime limit of 60 seconds per function. Advanced
-              accounts can use up to 16GB of ram and can run functions for up to
-              6 hours; if you need this functionality get in touch.
+              Free accounts are limited to 128mb of ram and a maximum runtime of
+              10 seconds per function. Paid accounts can utilize 1GB of ram and
+              have a runime limit of 60 seconds per function. Advanced accounts
+              can use up to 16GB of ram and can run functions for up to 6 hours;
+              if you need this functionality{" "}
+              <a href="/contact">get in touch with us</a>.
             </p>
           </div>
 
