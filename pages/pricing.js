@@ -376,10 +376,23 @@ const Free = styled(Plan)`
     display: flex;
   }
 
-  ul li {
+  li {
     display: flex;
     align-items: center;
     margin: 0 3rem 0 0;
+  }
+
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+    grid-gap: 60px;
+    padding-bottom: 3rem;
+
+    ul {
+      flex-direction: column;
+    }
+    li {
+      margin: 0;
+    }
   }
 `;
 
@@ -410,6 +423,10 @@ const Grid = styled.div`
   small {
     opacity: 0.5;
     font-size: 100%;
+  }
+
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
   }
 `;
 
