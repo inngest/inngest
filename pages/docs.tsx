@@ -19,12 +19,14 @@ export default function DocsHome(props) {
         <div>
           <h2>What is Inngest</h2>
           <p>
-            Inngest is a programmable event platform which allows you to aggregate
-            every event in your business, and react to them by running code in real-time.
+            Inngest is a programmable event platform which allows you to
+            aggregate every event in your business, and react to them by running
+            code in real-time.
           </p>
 
-          <p>You can think of it as a programmable Segment:  We subscribe to every event
-            in your stack, and allow you to run workflows whenever specific events are received.
+          <p>
+            We subscribe to every event in your stack, and allow you to run a
+            DAG of serverless functions whenever specific events are received.
           </p>
           <p>
             Our platform allows you to build your product, ops, and internal
@@ -211,7 +213,9 @@ const ContentWrapper = styled.div`
   grid-template-columns: 2fr 4fr;
   min-height: calc(100vh - 70px);
 
-  @media (max-width: 980px) { grid-template-columns: 2fr 5fr; }
+  @media (max-width: 980px) {
+    grid-template-columns: 2fr 5fr;
+  }
 
   @media (max-width: 800px) {
     grid-template-columns: 1fr;
@@ -257,7 +261,10 @@ export const InnerDocsContent = styled.div`
     display: none;
   }
 
-  ol, ul { margin: 1.4rem 0 1.5rem }
+  ol,
+  ul {
+    margin: 1.4rem 0 1.5rem;
+  }
 
   .tldr {
     border: 1px solid #ffffff33;
@@ -267,10 +274,18 @@ export const InnerDocsContent = styled.div`
     font-size: 12px;
     position: relative;
 
-    p, li { margin: 0 }
-    p + p { margin: 1rem 0 0 }
+    p,
+    li {
+      margin: 0;
+    }
+    p + p {
+      margin: 1rem 0 0;
+    }
 
-    ol, ul { margin: 1rem 0 }
+    ol,
+    ul {
+      margin: 1rem 0;
+    }
 
     &:before {
       content: "TL;DR";
@@ -278,8 +293,8 @@ export const InnerDocsContent = styled.div`
       position: absolute;
       top: 1.3rem;
       left: 2rem;
-      font-size: .8rem;
-      opacity: .5;
+      font-size: 0.8rem;
+      opacity: 0.5;
 
       font-size: 11px;
       font-weight: 600;
@@ -288,7 +303,9 @@ export const InnerDocsContent = styled.div`
     }
   }
 
-  img { max-width: 100%; }
+  img {
+    max-width: 100%;
+  }
 
   pre {
     margin: 3rem 0;
@@ -724,7 +741,8 @@ const Menu = styled.div`
       box-sizing: border-box;
     }
 
-    .toggle, .toggle-subcategory {
+    .toggle,
+    .toggle-subcategory {
       margin-right: 0 !important;
       right: 0 !important;
     }
@@ -739,7 +757,9 @@ const Inner = styled.div`
   }
 
   @media (max-width: 800px) {
-    > div { padding: 2rem }
+    > div {
+      padding: 2rem;
+    }
   }
 `;
 
@@ -752,7 +772,9 @@ const Hero = styled.div`
     width: 100%;
     padding: 8vh 2rem !important;
 
-    h1 { font-size: 42px; }
+    h1 {
+      font-size: 42px;
+    }
   }
 `;
 
@@ -777,6 +799,8 @@ const Discover = styled.div`
       grid-template-columns: 1fr;
       grid-gap: 0;
     }
-    ul { margin-top: 1rem }
+    ul {
+      margin-top: 1rem;
+    }
   }
 `;
