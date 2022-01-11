@@ -164,7 +164,7 @@ export class FinisherHeader {
     this.c = document.createElement("canvas");
     this.x = this.c.getContext("2d");
     this.suffix = Math.floor(Math.random() * 100000).toString(16);
-    this.c.setAttribute("id", "finisher-canvas-" + this.suffix);
+    this.c.setAttribute("id", this.suffix);
 
     el.appendChild(this.c);
     let tm;

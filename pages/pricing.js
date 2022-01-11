@@ -379,7 +379,7 @@ const Free = styled(Plan)`
   li {
     display: flex;
     align-items: center;
-    margin: 0 3rem 0 0;
+    margin: 0 3rem 0 0 !important;
   }
 
   @media (max-width: 800px) {
@@ -390,9 +390,7 @@ const Free = styled(Plan)`
     ul {
       flex-direction: column;
     }
-    li {
-      margin: 0;
-    }
+    li { margin: 0 !important; }
   }
 `;
 
