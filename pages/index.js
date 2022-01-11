@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import Head from "next/head";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import Content from "../shared/content";
+import { FinisherHeader } from "../shared/HeaderBG";
 
 import Airplane from "../shared/Icons/Airplane";
 import Audit from "../shared/Icons/Audit";
@@ -11,6 +12,43 @@ import Language from "../shared/Icons/Language";
 import Alert from "../shared/Icons/Alert";
 import Users from "../shared/Icons/Users";
 import VCS from "../shared/Icons/VCS";
+
+const gradient = (
+  el,
+  colors = ["#18435c", "#18435c", "#2f622f", "#2f622f", "#893eb5"]
+) => {
+  new FinisherHeader(
+    {
+      count: 6,
+      size: {
+        min: 700,
+        max: 900,
+        pulse: 0,
+      },
+      speed: {
+        x: {
+          min: 0.1,
+          max: 1.1,
+        },
+        y: {
+          min: 0.1,
+          max: 1,
+        },
+      },
+      colors: {
+        background: "#0f111e",
+        particles: colors,
+      },
+      blending: "lighten",
+      opacity: {
+        center: 0.5,
+        edge: 0,
+      },
+      shapes: ["c"],
+    },
+    el
+  );
+};
 
 // TODO: move these into env vars
 // prod key
@@ -41,6 +79,10 @@ export default function Home() {
     setSubmitted(true);
   };
 
+  useEffect(() => {
+    gradient(document.querySelector(".hero"));
+  }, []);
+
   return (
     <>
       <Head>
@@ -65,7 +107,7 @@ export default function Home() {
 
       <Nav />
 
-      <Hero>
+      <Hero className="hero">
         <Content className="grid">
           <div>
             <h1>
@@ -78,10 +120,10 @@ export default function Home() {
             </p>
 
             <div className="cta">
-              <a href="https://app.inngest.com/register">
-                Join the preview
-              </a>
-              <span>or <a href="mailto:hello@inngest.com">speak with us</a></span>
+              <a href="https://app.inngest.com/register">Sign up for free →</a>
+              <span>
+                or <a href="/contact">speak with us</a>
+              </span>
             </div>
           </div>
 
@@ -396,9 +438,7 @@ const Hero = styled.div`
     top: 0;
     left: 0;
     pointer-events: none;
-
   }
-
 
   .grid {
     display: grid;
@@ -413,16 +453,18 @@ const Hero = styled.div`
       padding: 4vh 0 0;
       z-index: 1;
       position: relative;
-      opacity: .825;
-      transition: all .3s;
+      opacity: 0.825;
+      transition: all 0.3s;
 
-      &:hover { opacity: 1 }
+      &:hover {
+        opacity: 1;
+      }
 
       img {
         pointer-events: none;
         position: absolute;
         max-height: 130%;
-        box-shadow: 0 0 80px rgba(0, 0, 0, 0.7)
+        box-shadow: 0 0 80px rgba(0, 0, 0, 0.7);
       }
     }
   }
@@ -457,18 +499,24 @@ const Hero = styled.div`
   }
 
   @media (max-width: 800px) {
-    .grid { grid-template-columns: 1fr; }
+    .grid {
+      grid-template-columns: 1fr;
+    }
 
-    h1 { width: 100% }
+    h1 {
+      width: 100%;
+    }
 
     .cta {
       a:first-of-type {
         margin-bottom: 30px;
       }
-      span { display: block; margin-left: 12px; }
+      span {
+        display: block;
+        margin-left: 12px;
+      }
     }
   }
-
 `;
 
 const FeatureGrid = styled.div`
@@ -484,11 +532,19 @@ const FeatureGrid = styled.div`
     border: 1px solid #ffffff19;
     border-radius: 5px;
     color: #fff;
+    background: rgba(255, 255, 255, 0.015);
 
-    padding: 30px 30px 30px 0;
+    padding: 50px 30px 50px 0;
     display: grid;
     grid-template-columns: 120px auto;
     align-items: center;
+
+    h3 {
+      margin-top: 0;
+    }
+    p:last-of-type {
+      margin-bottom: 0;
+    }
 
     > div:first-of-type {
       display: flex;
@@ -519,7 +575,9 @@ const BuildGrid = styled.div`
   grid-template-columns: 1fr 1fr 1fr;
   grid-gap: 55px;
 
-  @media (max-width: 800px) { grid-template-columns: 1fr; }
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
 
   img {
     margin: 0 10px 20px;
@@ -543,7 +601,9 @@ const SolveGrid = styled.div`
   @media (max-width: 800px) {
     grid-template-columns: 1fr;
 
-    header { grid-column: 1 }
+    header {
+      grid-column: 1;
+    }
   }
 
   & + div {
@@ -620,7 +680,6 @@ const Newsletter = styled.div`
   background: #00000233;
   box-shadow: 0 20px 80px rgba(0, 0, 0, 0.7);
   box-sizing: border-box;
-
 
   @media (max-width: 800px) {
     grid-template-columns: 1fr;

@@ -17,6 +17,7 @@ const Footer = () => {
               <strong>Inngest</strong>
               <a href="https://docs.inngest.com">Documentation</a>
               <a href="https://www.inngest.com/security">Security</a>
+              <a href="https://www.inngest.com/contact">Contact us</a>
               <a href="https://excessive-satellite-3d9.notion.site/Software-Engineer-Inngest-95db47fcec4d4173a9f57e2a251f6fc1">
                 Careers
               </a>
@@ -49,7 +50,11 @@ const Footer = () => {
     `,
         }}
       />
-      <script dangerouslySetInnerHTML={{__html: `window.$crisp=[];window.CRISP_WEBSITE_ID="4df9c579-f99d-42f8-bdac-42eb51e3f6df";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`}} />
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `window.$crisp=[];window.CRISP_WEBSITE_ID="4df9c579-f99d-42f8-bdac-42eb51e3f6df";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`,
+        }}
+      />
     </>
   );
 };

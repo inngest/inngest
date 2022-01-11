@@ -80,5 +80,4 @@ export const Inner = styled.div`
   img.hero {
     padding: 0 0 50px;
   }
-
 `;

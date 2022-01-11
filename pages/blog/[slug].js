@@ -18,7 +18,7 @@ export default function BlogLayout(props) {
           <Inner>
             <div>
               <Image>
-              {scope.img && <img src={scope.img} alt="" className="hero" />}
+                {scope.img && <img src={scope.img} alt="" className="hero" />}
               </Image>
 
               <h1>{scope.heading}</h1>
@@ -76,4 +76,4 @@ export async function getStaticProps({ params }) {
 
 const Image = styled.div`
   text-align: center;
-`
+`;
