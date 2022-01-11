@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import Head from "next/head";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import Content from "../shared/content";
+import { FinisherHeader } from "../shared/HeaderBG";
 
 import Airplane from "../shared/Icons/Airplane";
 import Audit from "../shared/Icons/Audit";
@@ -11,6 +12,41 @@ import Language from "../shared/Icons/Language";
 import Alert from "../shared/Icons/Alert";
 import Users from "../shared/Icons/Users";
 import VCS from "../shared/Icons/VCS";
+
+const gradient = (el, colors = ["#18435c", "#18435c", "#2f622f", "#2f622f", "#893eb5"]) => {
+  new FinisherHeader(
+    {
+      count: 6,
+      size: {
+        min: 700,
+        max: 900,
+        pulse: 0,
+      },
+      speed: {
+        x: {
+          min: 0.1,
+          max: 1.1,
+        },
+        y: {
+          min: 0.1,
+          max: 1,
+        },
+      },
+      colors: {
+        background: "#0f111e",
+        particles: colors,
+      },
+      blending: "lighten",
+      opacity: {
+        center: 0.5,
+        edge: 0,
+      },
+      shapes: ["c"],
+    },
+    el
+  );
+};
+
 
 // TODO: move these into env vars
 // prod key
@@ -41,6 +77,8 @@ export default function Home() {
     setSubmitted(true);
   };
 
+  useEffect(() => { gradient(document.querySelector(".hero")) }, []);
+
   return (
     <>
       <Head>
@@ -65,7 +103,7 @@ export default function Home() {
 
       <Nav />
 
-      <Hero>
+      <Hero className="hero">
         <Content className="grid">
           <div>
             <h1>
@@ -78,7 +116,7 @@ export default function Home() {
             </p>
 
             <div className="cta">
-              <a href="https://app.inngest.com/register">Join the preview</a>
+              <a href="https://app.inngest.com/register">Sign up for free →</a>
               <span>
                 or <a href="mailto:hello@inngest.com">speak with us</a>
               </span>
