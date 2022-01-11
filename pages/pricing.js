@@ -47,7 +47,7 @@ const gradient = (el, colors = ["#18435c", "#18435c", "#2f622f"]) => {
   );
 };
 
-export default function Home() {
+export default function Pricing() {
   useEffect(() => {
     gradient(document.querySelector(".pro"));
     gradient(document.querySelector(".advanced"), [
@@ -64,9 +64,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>
-          Inngest → build serverless event-driven systems in seconds
-        </title>
+        <title>Inngest → programmable event platform pricing</title>
         <link rel="icon" href="/favicon.png" />
         <meta property="og:title" content="Inngest" />
         <meta property="og:url" content="https://www.inngest.com" />
@@ -180,7 +178,8 @@ export default function Home() {
                 throughput
               </li>
               <li>
-                <Audit size="18" /> <b>1 month</b>&nbsp;or more audit & log history
+                <Audit size="18" /> <b>1 month</b>&nbsp;or more audit & log
+                history
               </li>
               <li>
                 <Plus size="18" /> <b>Add-ons</b>&nbsp;available
@@ -226,7 +225,7 @@ export default function Home() {
             <p>
               We're currently accepting all events, uncapped. Our "soft" limit
               is 1M events/mo across free and paid plans, and from 50M events/mo
-              on custom plans.  We don't throttle you, right now.
+              on custom plans. We don't throttle you, right now.
             </p>
           </div>
 
@@ -253,11 +252,10 @@ export default function Home() {
             <p>You can buy an extra 20,000 runs for $10.</p>
           </div>
 
-
           <div onClick={toggleFAQ}>
             <h3>What are add-ons?</h3>
             <p>
-              Add-ons allow you to customise the funtionality of Inngest.  For
+              Add-ons allow you to customise the funtionality of Inngest. For
               example, you can run the executor on-premise, increase the memory
               and CPU capablities of your workflows, increase the audit history
               length, and so on.

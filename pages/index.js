@@ -13,7 +13,10 @@ import Alert from "../shared/Icons/Alert";
 import Users from "../shared/Icons/Users";
 import VCS from "../shared/Icons/VCS";
 
-const gradient = (el, colors = ["#18435c", "#18435c", "#2f622f", "#2f622f", "#893eb5"]) => {
+const gradient = (
+  el,
+  colors = ["#18435c", "#18435c", "#2f622f", "#2f622f", "#893eb5"]
+) => {
   new FinisherHeader(
     {
       count: 6,
@@ -47,7 +50,6 @@ const gradient = (el, colors = ["#18435c", "#18435c", "#2f622f", "#2f622f", "#89
   );
 };
 
-
 // TODO: move these into env vars
 // prod key
 export const INGEST_KEY =
@@ -77,7 +79,9 @@ export default function Home() {
     setSubmitted(true);
   };
 
-  useEffect(() => { gradient(document.querySelector(".hero")) }, []);
+  useEffect(() => {
+    gradient(document.querySelector(".hero"));
+  }, []);
 
   return (
     <>
@@ -535,8 +539,12 @@ const FeatureGrid = styled.div`
     grid-template-columns: 120px auto;
     align-items: center;
 
-    h3 { margin-top: 0 }
-    p:last-of-type { margin-bottom: 0 }
+    h3 {
+      margin-top: 0;
+    }
+    p:last-of-type {
+      margin-bottom: 0;
+    }
 
     > div:first-of-type {
       display: flex;

@@ -1,6 +1,6 @@
 @import url('https://rsms.me/inter/inter.css');
 
-html, body, button, input {
+html, body, button, input, textarea {
   font-family: 'Inter', sans-serif;
   color: #fff;
   font-size: 16px;
@@ -36,7 +36,7 @@ body, button {
   margin: 0;
 }
 
-input {
+input, textarea {
   height: 40px;
   width: 300px;
   padding: 5px 12px;
