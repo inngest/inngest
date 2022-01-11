@@ -17,7 +17,7 @@ export default function BlogLayout(props) {
         <Intro>
           <Content>
             <header>
-              <h1>Inngest Blog</h1>
+              <h3>Inngest Blog</h3>
               <p>
                 The latest news and announcements about Inngest, our ecosystem,
                 product uses, and the engineering effort behind it.
@@ -31,8 +31,10 @@ export default function BlogLayout(props) {
               <a href={`/blog/${focus.slug}`}>
                 <div>
                   <h2>{focus.heading}</h2>
+                  <Date>{focus.humanDate}</Date>
                   <p>{focus.subtitle}</p>
                 </div>
+                {focus.img && <img src={focus.img} />}
               </a>
             </Focus>
           )}
@@ -45,6 +47,7 @@ export default function BlogLayout(props) {
                 key={item.slug}
               >
                 <h2>{item.heading}</h2>
+                  <Date>{item.humanDate}</Date>
                 <p>{item.subtitle}</p>
               </a>
             ))}
@@ -80,6 +83,7 @@ export async function getStaticProps() {
     const { data, content } = matter(source);
     data.reading = readingTime(content);
     data.humanDate = data.date.toLocaleDateString();
+    console.log(data);
     data.slug = fname.replace(/.mdx?/, "");
 
     // Disregard content, as the snippet for the blog list should be in
@@ -92,13 +96,13 @@ export async function getStaticProps() {
 }
 
 const Intro = styled.div`
-  padding: 10vh 18px 17vh;
+  padding: 6vh 18px 15vh;
   z-index: 0;
   background: rgba(255, 255, 255, 0.03);
 
   header {
     max-width: 100% !important;
-    padding: 0 3rem !important;
+    padding: 0 2rem !important;
     h1 {
       opacity: 0.8;
     }
@@ -110,12 +114,18 @@ const Focus = styled.div`
   border: 1px solid #ffffff19;
   z-index: 1;
   background: var(--bg-dark);
-  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.5);
+  border-radius: 3px;
 
   a {
     text-decoration: none;
     display: grid;
     grid-template-columns: 3fr 2fr;
+    align-items: center;
+
+    img {
+      max-width: 100%;
+    }
 
     /* Text */
     > div:first-of-type {
@@ -123,22 +133,36 @@ const Focus = styled.div`
     }
   }
   h2 {
-    margin: 0;
+    margin: 0 0 10px;
   }
 `;
+
+const Date = styled.div`
+  font-size: .9rem;
+  opacity: .7;
+  margin-bottom: 1.5rem;
+`
 
 const List = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
+  grid-gap: 2rem;
   padding: 0 0 20vh 0;
 
   > div,
   > a {
     border: 1px solid #ffffff19;
-    padding: 2rem 3rem;
+    padding: 3rem 3rem 2rem;
+    text-decoration: none;
+    border-radius: 3px;
   }
 
   h2 {
     font-size: 1.65rem;
+    margin: 0 0 10px;
+  }
+
+  > div:last-of-type {
+    opacity: .6;
   }
 `;

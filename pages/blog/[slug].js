@@ -17,6 +17,10 @@ export default function BlogLayout(props) {
         <Content>
           <Inner>
             <div>
+              <Image>
+              {scope.img && <img src={scope.img} alt="" className="hero" />}
+              </Image>
+
               <h1>{scope.heading}</h1>
               <p className="blog--date">
                 {scope.humanDate} &middot; {scope.reading.text}
@@ -69,3 +73,7 @@ export async function getStaticProps({ params }) {
   const post = await serialize(content, { scope: JSON.stringify(data) });
   return { props: { post } };
 }
+
+const Image = styled.div`
+  text-align: center;
+`

@@ -133,6 +133,7 @@ header h2 + p {
 h3 {
   font-size: 18px;
   font-weight: 600;
+  margin-top: 3rem;
 }
 
 h3 + .subtitle {
