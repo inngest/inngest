@@ -19,10 +19,12 @@ export default function DocsHome(props) {
         <div>
           <h2>What is Inngest</h2>
           <p>
-            Inngest is a serverless platform for running code in real-time
-            whenever things happen in your business. We subscribe to every event
-            in your stack, and allow you to run workflows whenever specific
-            events are received.
+            Inngest is a programmable event platform which allows you to aggregate
+            every event in your business, and react to them by running code in real-time.
+          </p>
+
+          <p>You can think of it as a programmable Segment:  We subscribe to every event
+            in your stack, and allow you to run workflows whenever specific events are received.
           </p>
           <p>
             Our platform allows you to build your product, ops, and internal
@@ -241,9 +243,14 @@ export const DocsContent = styled.div`
 
 export const InnerDocsContent = styled.div`
   padding-bottom: 10vh;
+
   h2 {
     padding-top: 2rem;
     font-size: 28px;
+  }
+
+  h4 {
+    padding-top: 1.5rem;
   }
 
   .language-id {
@@ -280,6 +287,8 @@ export const InnerDocsContent = styled.div`
       letter-spacing: 1px;
     }
   }
+
+  img { max-width: 100%; }
 
   pre {
     margin: 3rem 0;
