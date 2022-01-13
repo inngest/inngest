@@ -390,7 +390,9 @@ const Free = styled(Plan)`
     ul {
       flex-direction: column;
     }
-    li { margin: 0 !important; }
+    li {
+      margin: 0 !important;
+    }
   }
 `;
 
