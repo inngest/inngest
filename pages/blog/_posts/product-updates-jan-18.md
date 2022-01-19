@@ -1,6 +1,6 @@
 ---
 focus: true
-heading: "Product updates:  Jan 18, 22"
+heading: "Product updates:  Jan 18, 2022"
 subtitle: What's fresh out of the oven recently, and what's cooking?  Here's our bi-weekly product deep dive.
 date: 2022-01-19
 order: 3
