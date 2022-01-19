@@ -34,7 +34,7 @@ export default function BlogLayout(props) {
                   <Date>{focus.humanDate}</Date>
                   <p>{focus.subtitle}</p>
                 </div>
-                {focus.img && <img src={focus.img} />}
+                {focus.img && <div className="img"><img src={focus.img} /></div>}
               </a>
             </Focus>
           )}
@@ -134,6 +134,11 @@ const Focus = styled.div`
   }
   h2 {
     margin: 0 0 10px;
+  }
+
+  .img { 
+    display: flex;
+    justify-content: center;
   }
 `;
 
