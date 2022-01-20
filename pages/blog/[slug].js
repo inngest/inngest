@@ -14,7 +14,7 @@ export default function BlogLayout(props) {
   return (
     <>
       <Head>
-        <title>{scope.heading} · Inngest Blog</title>
+        <title>{scope.heading} → Inngest Blog</title>
       </Head>
       <Wrapper>
         <Nav />

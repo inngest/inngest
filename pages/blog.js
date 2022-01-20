@@ -15,7 +15,7 @@ export default function BlogLayout(props) {
   return (
     <>
       <Head>
-        <title>Inngest · Product & engineering blog</title>
+        <title>Inngest → Product & engineering blog</title>
       </Head>
 
       <Wrapper>
