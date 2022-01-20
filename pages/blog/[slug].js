@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+import Head from "next/head";
 
 import Footer from "../../shared/footer";
 import Nav from "../../shared/nav";
@@ -12,6 +13,9 @@ export default function BlogLayout(props) {
   const scope = JSON.parse(props.post.scope);
   return (
     <>
+      <Head>
+        <title>{scope.heading} · Inngest Blog</title>
+      </Head>
       <Wrapper>
         <Nav />
         <Content>

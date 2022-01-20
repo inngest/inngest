@@ -1,4 +1,6 @@
 import styled from "@emotion/styled";
+import Head from "next/head";
+
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import Content from "../shared/content";
@@ -12,6 +14,10 @@ export default function BlogLayout(props) {
 
   return (
     <>
+      <Head>
+        <title>Inngest · Product & engineering blog</title>
+      </Head>
+
       <Wrapper>
         <Nav />
         <Intro>
