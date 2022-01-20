@@ -1,3 +1,4 @@
+import Head from "next/head";
 import dynamic from 'next/dynamic'
 import ReactMarkdown from "react-markdown";
 import Footer from "../../shared/footer";
@@ -30,6 +31,11 @@ export default function LibraryItem() {
 
   return (
     <>
+      <Head>
+        <title>
+          {item.title} → Inngest Serverless Library
+        </title>
+      </Head>
       <Wrapper>
         <Nav />
         <Content>
