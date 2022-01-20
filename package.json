@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && next-sitemap",
     "start": "next start",
     "prettier": "prettier --write --trailing-comma es5 \"pages/**/*.tsx\" \"pages/**/*.js\" \"shared/*.tsx\" \"shared/*.js\""
   },
@@ -45,6 +45,7 @@
   },
   "devDependencies": {
     "@types/react": "^17.0.14",
+    "next-sitemap": "^1.9.12",
     "prettier": "^2.4.0",
     "typescript": "^4.3.5"
   }

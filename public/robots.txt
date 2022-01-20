@@ -1,0 +1,9 @@
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://www.inngest.com
+
+# Sitemaps
+Sitemap: https://www.inngest.com/sitemap.xml
