@@ -14,7 +14,7 @@ import (
 func ParseAction(input string) (*ActionVersion, error) {
 	val, err := cuedefs.ParseAction(input)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing action definition: %w", err)
+		return nil, err
 	}
 	a := &ActionVersion{}
 	if err := val.Decode(&a); err != nil {
