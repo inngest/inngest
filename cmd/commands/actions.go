@@ -11,7 +11,6 @@ import (
 	"github.com/inngest/inngestctl/cmd/commands/internal/state"
 	"github.com/inngest/inngestctl/cmd/commands/internal/table"
 	"github.com/inngest/inngestctl/inngest"
-	"github.com/inngest/inngestctl/inngest/client"
 	"github.com/inngest/inngestctl/inngest/log"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
@@ -104,6 +103,12 @@ var actionsValidate = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := cmd.Context()
+
+		prefix := ""
+		if state := state.RequireState(ctx); state != nil {
+			prefix = state.Account.Identifier.DSNPrefix
+		}
+
 		path, err := homedir.Expand(args[0])
 		if err != nil {
 			log.From(ctx).Fatal().Msg("Error finding configuration")
@@ -112,10 +117,19 @@ var actionsValidate = &cobra.Command{
 		if err != nil {
 			log.From(ctx).Fatal().Msgf("Error reading configuration: %s", err)
 		}
-		if _, err := inngest.ParseAction(string(byt)); err != nil {
+		_, formatted, err := actions.Parse(prefix, string(byt))
+		if err != nil {
 			log.From(ctx).Fatal().Msgf("Invalid configuration: %s", err)
 		}
-		log.From(ctx).Info().Msg("Valid")
+
+		if formatted == string(byt) {
+			log.From(ctx).Info().Msg("Valid action configuration")
+			return
+		}
+
+		log.From(ctx).Info().Msg("Valid action configuration, with the following changes automatically applied on deploy:")
+		fmt.Println(formatted)
+
 	},
 }
 
@@ -142,14 +156,14 @@ var actionsDeploy = &cobra.Command{
 			log.From(ctx).Fatal().Msgf("Error reading configuration: %s", err)
 		}
 
-		version, err := inngest.ParseAction(string(byt))
+		version, cueConfig, err := actions.Parse(state.Account.Identifier.DSNPrefix, string(byt))
 		if err != nil {
 			log.From(ctx).Fatal().Msgf("Error reading configuration: %s", err)
 		}
 
 		version, err = inngest.DeployAction(ctx, inngest.DeployActionOptions{
 			PushOnly: pushOnly,
-			Config:   string(byt),
+			Config:   cueConfig,
 			Client:   state.Client,
 			Version:  version,
 		})
