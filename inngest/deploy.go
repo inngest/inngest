@@ -30,6 +30,8 @@ type DeployActionOptions struct {
 	Client client.Client
 }
 
+// DeployAction pushes the action to Inngest, making it available for use within
+// all workflows.
 func DeployAction(ctx context.Context, opts DeployActionOptions) (*ActionVersion, error) {
 	if opts.Version == nil {
 		version, err := ParseAction(opts.Config)
@@ -46,24 +48,37 @@ func DeployAction(ctx context.Context, opts DeployActionOptions) (*ActionVersion
 		}
 	}
 
-	if opts.Version.Runtime.RuntimeType() == "docker" {
+	switch opts.Version.Runtime.RuntimeType() {
+	case "docker":
 		runtime := opts.Version.Runtime.Runtime.(RuntimeDocker)
-		return opts.Version, DeployImage(ctx, deployImageOptions{
+		err := prepareAndPushImage(ctx, deployImageOptions{
 			version:     opts.Version,
 			image:       runtime.Image,
 			credentials: opts.Client.Credentials(),
 		})
+		if err != nil {
+			return opts.Version, err
+		}
+	default:
+		return nil, fmt.Errorf("unknown runtime type: %s", opts.Version.Runtime.RuntimeType())
 	}
 
-	return nil, fmt.Errorf("unknown runtime type: %s", opts.Version.Runtime.RuntimeType())
+	// Ensure that the version is enabled, allowing all workflows to automatically
+	// use the action.
+	_, err := opts.Client.UpdateActionVersion(ctx, client.ActionVersionQualifier{
+		DSN:          opts.Version.DSN,
+		VersionMajor: opts.Version.Version.Major,
+		VersionMinor: opts.Version.Version.Minor,
+	}, true)
+	return opts.Version, err
 }
 
-// deployImage deploys an image to Inngest's registry, allowing the container to be used
-// as an action within a workflow.
+// prepareAndPushImage pushes an image to Inngest's registry, allowing the container
+// to be used as an action within a workflow.
 //
 // The action must have been registered within the current account prior to pushing the
 // image, else this will error.
-func DeployImage(ctx context.Context, a deployImageOptions) (err error) {
+func prepareAndPushImage(ctx context.Context, a deployImageOptions) (err error) {
 	dkr, err := docker.NewClientWithOpts(docker.WithAPIVersionNegotiation())
 	if err != nil {
 		return err

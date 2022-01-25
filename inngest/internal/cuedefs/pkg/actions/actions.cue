@@ -10,7 +10,11 @@ import (
 
 #Action: {
 	name: string
-	dsn:  =~"^[a-z0-9-.]+/[a-z0-9-]+$"
+
+	// Locally, we allow action DSNs to exist without account prefixes so that you can
+	// push and clone actions easily.  We automatically add the signed in user's account
+	// prefix to this DSN before pushing.
+	dsn: =~"^([a-z0-9-.]+/)?[a-z0-9-]+$"
 
 	version: {
 		major: >0 | *1

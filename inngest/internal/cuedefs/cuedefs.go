@@ -117,7 +117,7 @@ func parseDef(input, lookup, suffix string) (*cue.Value, error) {
 	if err := inst.Err(); err != nil {
 		buf := &bytes.Buffer{}
 		cueerrors.Print(buf, err, nil)
-		return nil, fmt.Errorf("config is invalid: %s", buf.String())
+		return nil, fmt.Errorf("error parsing config: %s", buf.String())
 	}
 
 	// Find the variable defined as "workflow":  this is a constant used to reference
