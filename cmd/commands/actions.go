@@ -105,7 +105,7 @@ var actionsValidate = &cobra.Command{
 		ctx := cmd.Context()
 
 		prefix := ""
-		if state := state.RequireState(ctx); state != nil {
+		if state, _ := state.GetState(ctx); state != nil {
 			prefix = state.Account.Identifier.DSNPrefix
 		}
 
