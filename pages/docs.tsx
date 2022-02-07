@@ -1,4 +1,5 @@
 import React from "react";
+import Head from "next/head";
 import { useRouter } from "next/router";
 import styled from "@emotion/styled";
 
@@ -10,6 +11,9 @@ import Home from "../shared/Icons/Home";
 export default function DocsHome(props) {
   return (
     <DocsLayout categories={props.categories}>
+      <Head>
+        <title>Inngest → documentation & event-driven serverless guides</title>
+      </Head>
       <Hero>
         <h1>Documentation</h1>
         {/* TODO: Quick start guide callouts, and graphic */}

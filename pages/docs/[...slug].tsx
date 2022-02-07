@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import Head from "next/head";
 import styled from "@emotion/styled";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
@@ -29,6 +30,9 @@ export default function DocLayout(props: any) {
 
   return (
     <DocsLayout categories={scope.categories}>
+      <Head>
+        <title>{scope.title } → Inngest docs</title>
+      </Head>
       <DocsContent>
         <div>
           <h2>{scope.title}</h2>
