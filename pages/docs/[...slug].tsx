@@ -31,7 +31,7 @@ export default function DocLayout(props: any) {
   return (
     <DocsLayout categories={scope.categories}>
       <Head>
-        <title>{scope.title } → Inngest docs</title>
+        <title>{scope.title} → Inngest docs</title>
       </Head>
       <DocsContent>
         <div>
@@ -121,9 +121,9 @@ export async function getStaticProps({ params }) {
 }
 
 const TOC = styled.ol`
-  margin: 0 0 4rem;
+  margin: 1.5rem 0 4rem;
   padding: 0;
-  font-size: 12px;
+  font-size: 0.9rem;
 
   li a {
     display: block;
@@ -148,10 +148,9 @@ const TOCSide = styled.ol`
   opacity: 0;
   pointer-events: none;
   transition: all 0.3s;
+  font-size: 0.9rem;
 
   z-index: 0;
-
-  font-size: 12px;
 
   &.visible {
     display: block;

@@ -1,214 +1,388 @@
-@import url('https://rsms.me/inter/inter.css');
+@import url("./reset.css");
+@import url("https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=Roboto+Mono&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;700&display=swap");
 
-html, body, button, input, textarea {
-  font-family: 'Inter', sans-serif;
-  color: #fff;
-  font-size: 16px;
-}
+/** Standard **/
 
 @supports (font-variation-settings: normal) {
-  html { font-family: 'Inter var', sans-serif; }
+  html {
+    font-family: "Inter var", sans-serif;
+  }
 }
 
 :root {
-  --bg-dark: #030624;
-  --bg-dark: #0f111e;
+  /* Used for text pages;  not the homepage */
+  --text-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  --font: "Roboto Condensed", var(--text-font);
+  --font-mono: "Roboto Mono", "Fira Mono", monospace;
+  --font-heading: "Alegreya Sans", var(--font);
 
-  --light-grey: #86909a;
-  --dark-grey: #565e66;
+  --bg-color: #121327;
+  --highlight-color: #000;
+  --primary-color: #4636f5;
+  --primary-color-rgb: 70, 54, 245;
+  --stroke-color: #525661;
+  --font-color-primary: #fff;
+  --font-color: #acb2c2;
+  --black: #040408;
+  --black-rgb: 4, 4, 8;
+  --gray: #212121;
 
-  --blue-left: #17273b;
-  --blue-right: #18435c;
+  --grid-line-color: #414652cc;
+  --grid-gap: 30px;
 
-  --cream: #f9f9f1;
+  --button-padding: 16px 32px;
+  --border-radius: 0.35rem;
 
-  --green: #94D09A;
-  --button-bg-color: var(--green);
-  --button-text-color: var(--bg-dark);
+  --header-trailing-padding: 4vh;
+  --section-padding: 10vh;
+
+  --nav-height: 120px;
+
+  font-size: 20px;
+  font-family: var(--text-font);
+  color: var(--font-color-primary);
 }
 
-html, body {
+.home {
+  font-family: var(--font);
+  /* Roboto condensed has a... unique base size */
+  font-size: 22px;
+}
+
+.home p {
+  color: var(--font-color);
+}
+
+p + p {
+  margin-top: 1.5rem;
+}
+li + li {
+  margin-top: 0.75rem;
+}
+
+a {
+  color: #dfe2e9;
+}
+
+.nav-grid {
+  position: relative;
+  z-index: 1;
+}
+
+html,
+body {
   overflow-x: hidden;
-  background: var(--bg-dark);
+  background: var(--bg-color);
 }
 
-body, button {
+body,
+button {
   margin: 0;
 }
 
-input, textarea {
-  height: 40px;
-  width: 300px;
-  padding: 5px 12px;
-  box-sizing: border-box;
-  color: var(--bg-dark);
+/** Typography **/
 
-  background: #fff;
-  border-radius: 3px;
-  border: 1px solid #eee;
-  transition: all .3s;
-  box-shadow: 0 1px 0px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+h1,
+h2,
+h3,
+.subheading,
+.h1,
+.h2,
+.h3 {
+  font-family: var(--font-heading);
 }
 
-input:focus, textarea:focus {
-  outline: none;
-  border-color: gray;
+h1 {
+  font-size: 5rem;
+  line-height: 1.05;
+  padding: 0 0 2rem;
 }
 
-button, .button {
-  padding: 12px 22px 11px;
-  background-color: var(--button-bg-color);
-  text-decoration: none;
-  color: var(--button-text-color) !important;
-  font-weight: 600;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  transition: all .3s;
-}
-button:hover, .button:hover {
-  cursor: pointer;
-  background-color: gray;
-  background-color: #2F6D9Dff;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
-  color: #fff !important;
-}
-button:focus, .button:focus {
-  outline: none;
-  background-color: #2F6D9Dff;
+h1 + .subheading {
+  font-size: 1.5rem;
 }
 
-.button--outline {
-  background-color: transparent;
-  border: 1px solid #fff;
-  color: #fff !important;
+h2 {
+  font-size: 1.8rem;
+  line-height: 1.15;
 }
-.button--outline:hover {
-  background: #ffffff33;
+
+h3,
+.h3 {
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+
+h4 {
+  font-size: 1.2rem;
+  font-weight: normal;
+}
+
+h5 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+input, textarea, select {
+  border: 0;
+  padding: .5rem .5rem;
+  border-radius: var(--border-radius);
+}
+
+/* Home versions, as REM is changed cuz roboto mono */
+
+.home h2,
+.h2 {
+  font-size: 1.6rem;
+}
+
+.home h3,
+.h3 {
+  font-size: 1.2rem;
+}
+
+/** Copy relationship: everything but home. **/
+
+:not(.home) h2 + p {
+  margin-top: 2rem;
+}
+
+:not(.home) h3 + p {
+  margin-top: 1rem;
 }
 
 
-a[href]:not([href='']) {
-  color: #fff;
+:not(.home) p + h3, ol + h3, ul + h3 {
+  margin-top: 3rem;
 }
+
+p + ul, p + ol, ol + p, ul + p { margin: 1.5rem 0 }
+li > ol, li > ul  { margin: 1rem 0 }
+
+@media (max-width: 800px) {
+  h1 { font-size: 3rem; line-height: 1; }
+  h2 { font-size: 3rem; line-height: 1; }
+  h4 { font-size: 1.1rem; }
+  h5 { font-size: 0.7rem; }
+
+  /**
+   * This ensures that pre-formatted code breaks so that there's no
+   * horizontal scroll.  `code .line` is used for code formatting.
+   */
+  pre, code .line {
+    white-space: pre-wrap !important;
+    overflow: auto !important;
+  }
+}
+
+
+/** Classes **/
 
 .text-center {
   text-align: center;
 }
 
-.justify-right {
+.section-label {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: absolute;
+  margin: -1.5rem 0 0 3px;
+}
+
+.relative {
+  position: relative;
+}
+
+.monospace {
+  font-family: var(--font-mono);
+}
+
+.bg-primary {
+  background: var(--primary-color);
+}
+
+.full-width {
+  width: 100%;
+}
+
+/** New grid **/
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-gap: var(--grid-gap);
+}
+
+.grid-center-4, .col-4-center {
+  /* Skip first and last two columns */
+  grid-column: 4 / -4;
+}
+
+.grid-center-6, .col-6-center {
+  /* Skip first and last two columns */
+  grid-column: 3 / -3;
+}
+
+.grid-center-7, .col-7-center {
+  grid-column: 3 / -2;
+}
+
+.grid-center-8, .col-8-center {
+  /* Skip first and last column */
+  grid-column: 2 / -2;
+}
+
+.col-4-center {
+  grid-column: 4 / -4;
+}
+
+.grid-2-offset-2 {
+  grid-column: 3 / span 2;
+}
+
+.grid-1, .col-1 {
+  grid-column: span 1;
+}
+
+.grid-2, .col-2 {
+  grid-column: span 2;
+}
+
+.col-3 {
+  grid-column: span 3;
+}
+
+.col-4 {
+  grid-column: span 4;
+}
+
+.col-5 {
+  grid-column: span 5;
+}
+
+.col-6 {
+  grid-column: span 6;
+}
+
+.grid-line {
+  grid-column-start: 1;
+  grid-column-end: 1;
+  border-right: 1px dashed var(--grid-line-color);
+  grid-row-start: 1;
   display: flex;
   justify-content: flex-end;
+  color: var(--grid-line-color);
+  font-size: 0.875rem;
+  height: 100%;
 }
 
-p, li {
-  line-height: 1.7;
+.grid-line span {
+  margin-right: -1.75rem;
+  margin: .4rem 0 0;
+  display: block;
+  font: var(--font-mono);
 }
 
-p + p {
-  margin-top: 1.4rem;
+.nav-grid {
+  border-bottom: 1px dashed var(--grid-line-color);
 }
 
-h1 {
-  font-size: 54px;
-  line-height: 1.07;
-  letter-spacing: -0.5px;
-  margin: 20px 0;
+/* Specialized grids */
+
+.two-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-gap: var(--grid-gap);
 }
 
-h2 {
-  font-size: 36px;
-  font-weight: 800;
+.four-cols {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-gap: var(--grid-gap);
 }
 
-header {
-  position: relative;
-  z-index: 1;
-}
 
-header h2 + p {
-  font-size: 18px;
-  opacity: .9;
-}
+/** Mobile grid **/
 
-h3 {
-  font-size: 18px;
-  font-weight: 600;
-  margin-top: 3rem;
-}
+@media (max-width: 800px) {
+  :root { --grid-gap: 1rem; }
+  /*
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  */
 
-h3 + .subtitle {
-  margin: -15px 0 60px;
-}
+  .sm-grid-center-4, .sm-col-4-center {
+    /* Skip first and last two columns */
+    grid-column: 4 / -4;
+  }
 
-strong {
-  font-weight: 700;
-}
+  .sm-grid-center-6, .sm-col-6-center {
+    /* Skip first and last two columns */
+    grid-column: 3 / -3;
+  }
 
-h5 {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  opacity: .6;
-  letter-spacing: 1px;
-}
+  .sm-grid-center-7, .sm-col-7-center {
+    grid-column: 3 / -2;
+  }
 
-.intro-tag {
-  color: #184115bb;
-  font-size: 12px;
-  letter-spacing: 2px;
-  font-weight: 700;
-  text-transform: uppercase;
-  background: #CEECCE;
-  border-radius: 3px;
-  display: inline-block;
-  padding: 3px 7px;
-}
+  .sm-grid-center-8, .sm-col-8-center {
+    /* Skip first and last column */
+    grid-column: 2 / -2;
+  }
 
-h5 {
-  margin: 20px 0 18px;
-}
+  .sm-col-4-center {
+    grid-column: 4 / -4;
+  }
 
-h5 + h2 {
-  margin-top: .25rem;
-}
+  .sm-grid-2-offset-2 {
+    grid-column: 3 / span 2;
+  }
 
-.nav-dark {
-  background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
-  color: #fff;
-}
+  .sm-grid-1, .sm-col-1 {
+    grid-column: span 1;
+  }
 
-h2, .text--blue {
-  background: #fff;
-  background-clip: text;
-  color: transparent;
-}
+  .sm-grid-2, .sm-col-2 {
+    grid-column: span 2;
+  }
 
-.nav-dark a {
-  color: #fff !important;
-}
+  .sm-col-3 {
+    grid-column: span 3;
+  }
 
-.hero-dark {
-  padding: 100px 0 0;
-  background: linear-gradient(90deg, var(--blue-left), var(--blue-right));
-  position: relative;
-  color: #fff;
-}
+  .sm-col-4 {
+    grid-column: span 4;
+  }
 
-@media only screen and (max-width: 800px) {
-  .hero-dark { box-shadow: none }
-  .nav-dark { border: 0 none }
-}
+  .sm-col-5 {
+    grid-column: span 5;
+  }
 
-.hero-dark h1 {
-  color: transparent;
-  background: linear-gradient(90deg, #fff, #f5f5f5);
-  color: #fff;
-  background-clip: text;
-}
+  .sm-col-6 {
+    grid-column: span 6;
+  }
 
-ul { margin: 2rem 0; }
-ol li, ul li {
-  margin: 0 0 .6rem;
+  .sm-col-10 {
+    grid-column: span 10;
+  }
+
+  .grid-line span {
+    display: none;
+  }
+
+  .two-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .four-cols {
+    grid-template-columns: 1fr;
+  }
+
 }
 
 ul.check {
@@ -222,9 +396,6 @@ ul.check li {
   margin-left: .75rem;
 }
 
-hr {
-  border: 0;
-  border-bottom: 1px solid #fff;
-  opacity: .2;
-  margin: 8vh 0;
+.react-flow__edge-path {
+  stroke: var(--black) !important;
 }

@@ -1,6 +1,6 @@
 import React from "react";
 import Modal from "./Modal";
-import Button, { KindStrings, ButtonGroup } from "src/shared/Button";
+import Button, { Kinds } from "src/shared/Button";
 import styled from "@emotion/styled";
 
 export type Confirm = {
@@ -10,7 +10,7 @@ export type Confirm = {
 
   // confirm button text
   confirm?: string;
-  kind?: KindStrings;
+  kind?: Kinds;
   // cancel button text
   cancel?: string;
 
@@ -76,7 +76,7 @@ export const ConfirmWrapper: React.FC<{}> = (props) => {
                 <b>{confirm.prompt}</b>
               </p>
             </div>
-            <ButtonGroup right style={{ padding: 20 }}>
+            <div style={{ padding: 20 }}>
               <Button onClick={() => reject.current && reject.current()}>
                 {confirm.cancel || "No"}
               </Button>
@@ -86,7 +86,7 @@ export const ConfirmWrapper: React.FC<{}> = (props) => {
               >
                 {confirm.confirm || "Yes"}
               </Button>
-            </ButtonGroup>
+            </div>
           </Wrapper>
         </Modal>
       )}
@@ -113,14 +113,14 @@ export const ConfirmModal: React.FC<Confirm> = ({
           </p>
           {detail && <p style={{ marginTop: 15, opacity: 0.8 }}>{detail}</p>}
         </div>
-        <ButtonGroup right style={{ padding: 20 }}>
+        <div style={{ padding: 20 }}>
           <Button onClick={onCancel ? onCancel : onClose}>
             {cancel || "No"}
           </Button>
           <Button kind={kind || "danger"} onClick={onConfirm}>
             {confirm || "Yes"}
           </Button>
-        </ButtonGroup>
+        </div>
       </Wrapper>
     </Modal>
   );

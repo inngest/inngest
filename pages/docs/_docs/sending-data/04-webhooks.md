@@ -1,5 +1,5 @@
 ---
-category: "Sending and Managing Events"
+category: "Sending & Managing Events"
 title: "Webhooks"
 slug: "event-webhooks"
 order: 4

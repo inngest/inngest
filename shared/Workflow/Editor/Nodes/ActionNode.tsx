@@ -25,7 +25,7 @@ const ActionNode: React.FC<Props> = (props) => {
         onMouseOver && onMouseOver();
       }}
     >
-      <Icon size={20} />
+      <Icon size={20} color="#fff" />
       <div>
         <p>{action.name}</p>
         {draggable && (

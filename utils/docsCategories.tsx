@@ -8,7 +8,7 @@ export const categoryMeta = {
     order: 1,
     icon: <Airplane fill="#fff" size={20} />
   },
-  "sending and managing events": {
+  "sending & managing events": {
     order: 1,
     icon: <Event fill="#fff" size="20" />
   },

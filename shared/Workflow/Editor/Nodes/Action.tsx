@@ -261,7 +261,7 @@ const pausedCSS = css`
     display: block;
     width: 100%;
     content: "PAUSED";
-    background: #ceecce;
+    background: var(--bg-color);
     text-align: center;
     font-size: 10px;
     font-weight: bold;
@@ -310,13 +310,14 @@ const PausedCard = styled.div`
 `;
 
 const HoverCard = styled.div`
+  display: none;
   width: 560px;
   max-height: 340px;
   position: absolute;
   left: -20px;
   top: -20px;
-  border: 1px solid #eee;
-  background: #fff;
+  border: 1px solid var(--black);
+  background: var(--bg-color);
   opacity: 0;
   transform: scale(0.97);
   z-index: 1;
@@ -329,7 +330,7 @@ const HoverCard = styled.div`
 
 const HoverHeader = styled.div`
   cursor: default;
-  background: #fdfbf6;
+  background: var(--bg-color);
   height: ${nodeH + 40}px;
   padding: 20px 20px 20px ${nodeW + 40}px;
   display: flex;
@@ -345,9 +346,9 @@ const HoverHeader = styled.div`
 `;
 
 const HoverBody = styled.div`
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--black);
   padding: 14px 20px;
-  background: #fdfbf666;
+  background: var(--bg-color);
   height: auto;
   overflow: hidden;
 

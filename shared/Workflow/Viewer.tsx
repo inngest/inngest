@@ -36,8 +36,8 @@ const Viewer = (props: Props) => {
 
 const Layout = styled.div`
   font-size: 13px;
-  background: #fff;
-  border: 1px solid #e8e8e6;
+  background: rgba(var(--black-rgb), 0.2);
+  border: 1px solid var(--black);
   border-radius: 2px;
   * { box-sizing: border-box; }
 `;

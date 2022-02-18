@@ -20,53 +20,69 @@ export default function BlogLayout(props) {
 
       <Wrapper>
         <Nav />
-        <Intro>
-          <Content>
+
+        <div className="header-grid grid">
+          <div className="col-4-center sm-col-8-center">
             <header>
-              <h3>Inngest Blog</h3>
+              <h2>Inngest Blog</h2>
               <p>
                 The latest news and announcements about Inngest, our ecosystem,
                 product uses, and the engineering effort behind it.
               </p>
             </header>
-          </Content>
-        </Intro>
-        <Content>
-          {focus && (
-            <Focus>
-              <a href={`/blog/${focus.slug}`}>
-                <div>
-                  <h2>{focus.heading}</h2>
-                  <Date>{focus.humanDate}</Date>
-                  <p>{focus.subtitle}</p>
-                </div>
-                {focus.img && <div className="img"><img src={focus.img} /></div>}
-              </a>
-            </Focus>
-          )}
+          </div>
+          <div className="grid-line">
+            <span>/01</span>
+          </div>
+        </div>
 
-          <List>
-            {rest.map((item) => (
-              <a
-                href={`/blog/${item.slug}`}
-                className="post--item"
-                key={item.slug}
-              >
-                <h2>{item.heading}</h2>
-                <Date>{item.humanDate}</Date>
-                <p>{item.subtitle}</p>
-              </a>
-            ))}
+        <div className="grid">
+          <div className="col-6-center sm-col-8-center">
+            {/* Blog posts */}
 
-            <div>
-              <h2>More to come...</h2>
-              <p>
-                We'll be posting engineering articles, product releases and case
-                studies consistently.
-              </p>
-            </div>
-          </List>
-        </Content>
+            {focus && (
+              <Focus className={focus.img ? "" : "no-img"}>
+                <a href={`/blog/${focus.slug}`}>
+                  <div>
+                    <h2>{focus.heading}</h2>
+                    <Date>{focus.humanDate}</Date>
+                    <p>{focus.subtitle}</p>
+                  </div>
+                  {focus.img && (
+                    <div className="img">
+                      <img src={focus.img} />
+                    </div>
+                  )}
+                </a>
+              </Focus>
+            )}
+
+            <List>
+              {rest.map((item) => (
+                <a
+                  href={`/blog/${item.slug}`}
+                  className="post--item"
+                  key={item.slug}
+                >
+                  <h2>{item.heading}</h2>
+                  <Date>{item.humanDate}</Date>
+                  <p>{item.subtitle}</p>
+                </a>
+              ))}
+
+              <div>
+                <h2>More to come...</h2>
+                <p>
+                  We'll be posting engineering articles, product releases and
+                  case studies consistently.
+                </p>
+              </div>
+            </List>
+          </div>
+          <div className="grid-line">
+            <span>/02</span>
+          </div>
+        </div>
         <Footer />
       </Wrapper>
     </>
@@ -101,27 +117,18 @@ export async function getStaticProps() {
   return { props: { content } };
 }
 
-const Intro = styled.div`
-  padding: 6vh 18px 15vh;
-  z-index: 0;
-  background: rgba(255, 255, 255, 0.03);
-
-  header {
-    max-width: 100% !important;
-    padding: 0 2rem !important;
-    h1 {
-      opacity: 0.8;
-    }
-  }
-`;
-
 const Focus = styled.div`
-  margin: -10vh 0 8vh;
-  border: 1px solid #ffffff19;
+  margin: 1rem 0 2rem -2rem;
+  width: calc(100% + 4rem);
   z-index: 1;
-  background: var(--bg-dark);
-  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.5);
-  border-radius: 3px;
+  box-shadow: 0 20px 80px rgba(var(--black-rgb), 0.5);
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(var(--black-rgb), 0.5);
+  background: var(--black);
+
+  &.no-img a {
+    display: block;
+  }
 
   a {
     text-decoration: none;
@@ -142,7 +149,7 @@ const Focus = styled.div`
     margin: 0 0 10px;
   }
 
-  .img { 
+  .img {
     display: flex;
     justify-content: center;
   }
@@ -156,16 +163,17 @@ const Date = styled.div`
 
 const List = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   grid-gap: 2rem;
   padding: 0 0 20vh 0;
 
   > div,
   > a {
-    border: 1px solid #ffffff19;
+    background: #00000077;
+    border: 1px solid rgba(var(--black-rgb), 0.5);
     padding: 3rem 3rem 2rem;
     text-decoration: none;
-    border-radius: 3px;
+    border-radius: var(--border-radius);
   }
 
   h2 {
@@ -175,5 +183,9 @@ const List = styled.div`
 
   > div:last-of-type {
     opacity: 0.6;
+  }
+
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
   }
 `;

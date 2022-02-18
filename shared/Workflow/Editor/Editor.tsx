@@ -238,7 +238,7 @@ export const Editor: React.FC<StateProps> = (props) => {
           e.preventDefault();
         }}
       >
-        <Background color="#aaa" gap={gridSize} />
+        <Background color="#666" gap={gridSize} />
       </ReactFlow>
     </div>
   );

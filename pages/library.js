@@ -5,6 +5,7 @@ import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import Content from "../shared/content";
 import { Wrapper } from "../shared/blog";
+import Block from "../shared/Block";
 import library from "../public/json/library.json";
 import { useSearchParam } from "react-use";
 import { toggle, titleCase, slugify } from "../shared/util";
@@ -85,12 +86,14 @@ export default function Library() {
               <div>
                 <Items>
                   {visible.map((item) => (
+                    <Block>
                     <Item href={`/library/${slugify(item.title)}`}>
                       <p>{item.title}</p>
                       <p>{item.subtitle}</p>
 
                       <span class="button button--outline">View</span>
                     </Item>
+                    </Block>
                   ))}
                 </Items>
               </div>
@@ -105,8 +108,9 @@ export default function Library() {
 
 const Inner = styled.div`
   box-sizing: border-box;
-  padding: 100px 0;
   min-height: calc(100vh - 270px);
+
+  header { padding-bottom: 0 }
 
   h2,
   h2 + p {
@@ -120,6 +124,7 @@ const Inner = styled.div`
     margin: 0.5rem 0 3rem;
     opacity: 0.6;
   }
+
 `;
 
 const Grid = styled.div`
@@ -128,12 +133,19 @@ const Grid = styled.div`
   grid-template-columns: 175px auto;
   gap: 40px;
   margin: 80px 0 0;
+
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const Items = styled.div`
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2rem;
+  @media (max-width: 800px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const Item = styled.a`
@@ -141,10 +153,6 @@ const Item = styled.a`
 
   display: flex;
   flex-direction: column;
-
-  border-radius: 5px;
-  border: 1px solid #ffffff19;
-  padding: 2rem;
   transition: all 0.3s;
 
   &:hover {
@@ -159,11 +167,11 @@ const Item = styled.a`
   p:first-of-type {
     opacity: 0.8;
     font-weight: bold;
+    font-size: 1.1rem;
     margin-bottom: 0.5rem;
   }
 
   p:last-of-type {
-    font-size: 14px;
     opacity: 0.85;
   }
 

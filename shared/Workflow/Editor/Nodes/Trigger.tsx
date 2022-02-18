@@ -135,7 +135,7 @@ const Actions = ({ visible }: { visible: boolean }) => {
     <ActionWrapper css={[showEdges && showEdgesCSS]}>
       <div>
         <DefaultActions>
-          <ButtonGroup right>
+          <div right>
             <Button
               size="small"
               onClick={(e: React.SyntheticEvent) => {
@@ -145,7 +145,7 @@ const Actions = ({ visible }: { visible: boolean }) => {
             >
               Add child
             </Button>
-          </ButtonGroup>
+          </div>
         </DefaultActions>
       </div>
     </ActionWrapper>
@@ -192,8 +192,7 @@ const DefaultActions = styled.div`
 const TriggerCard = styled.div`
   ${baseCSS};
   padding: 12px 20px 8px;
-  border-color: #ceecce;
-  color: #103f10;
+  color: #fff;
   line-height: 1.5;
   position: relative;
   text-align: center;
@@ -241,6 +240,7 @@ const ScheduledTag = styled(Tag)`
 `;
 
 const HoverCard = styled.div`
+  display: none;
   width: 560px;
   max-height: 340px;
   position: absolute;

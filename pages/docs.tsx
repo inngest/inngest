@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import styled from "@emotion/styled";
 
 import Nav from "../shared/nav";
+import Footer from "../shared/footer";
 import { getAllDocs, Categories, Category, DocScope } from "../utils/docs";
 import { categoryMeta } from "../utils/docsCategories";
 import Home from "../shared/Icons/Home";
@@ -81,68 +82,66 @@ export const DocsLayout: React.FC<{ categories: Categories }> = ({
   return (
     <>
       <Nav />
-      <ContentWrapper>
-        <Menu>
-          <div>
-            <h5>
-              <span>Contents</span>
-              <span
-                className="toggle off"
-                onClick={(e) => {
-                  const span = e.target as HTMLSpanElement;
-                  const on = !span.classList.contains("off");
-                  document.querySelectorAll(".category").forEach((a) => {
-                    on
-                      ? a.classList.remove("expanded")
-                      : a.classList.add("expanded");
-                  });
-                  span.classList.toggle("off");
-                }}
-              >
-                Toggle categories
-              </span>
-            </h5>
 
-            <ul>
-              <li>
-                <a href="/docs" className="category">
-                  <Home fill="#fff" size={20} /> Home
-                </a>
-              </li>
-              {Object.values(categories).map((c) => {
-                const meta = categoryMeta[c.title.toLowerCase()] || {};
+      <div className="grid">
+        <Menu className="col-3 sm-col-10">
+          <h5>
+            <span>Contents</span>
+            <span
+              className="toggle off"
+              onClick={(e) => {
+                const span = e.target as HTMLSpanElement;
+                const on = !span.classList.contains("off");
+                document.querySelectorAll(".category").forEach((a) => {
+                  on
+                    ? a.classList.remove("expanded")
+                    : a.classList.add("expanded");
+                });
+                span.classList.toggle("off");
+              }}
+            >
+              Toggle categories
+            </span>
+          </h5>
 
-                const isCurrent = !!c.pages.find(
-                  (p) => p.slug === router.asPath.replace("/docs/", "")
-                );
+          <ul>
+            <li>
+              <a href="/docs" className="category" style={{ paddingBottom: 0 }}>
+                <Home fill="#fff" size={20} /> Home
+              </a>
+            </li>
+            {Object.values(categories).map((c) => {
+              const meta = categoryMeta[c.title.toLowerCase()] || {};
 
-                return (
-                  <li key={c.title}>
-                    <span
-                      className={["category", isCurrent && "expanded"]
-                        .filter(Boolean)
-                        .join(" ")}
-                      onClick={(e) =>
-                        (e.target as HTMLSpanElement).classList.toggle(
-                          "expanded"
-                        )
-                      }
-                    >
-                      {meta.icon} {c.title}
-                    </span>
-                    <ul className="items">
-                      {c.pages
-                        .sort((a, b) => a.order - b.order)
-                        .map((d) => renderDocLink(d, c, router.asPath))}
-                    </ul>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+              const isCurrent = !!c.pages.find(
+                (p) => p.slug === router.asPath.replace("/docs/", "")
+              );
+
+              return (
+                <li key={c.title}>
+                  <span
+                    className={["category", isCurrent && "expanded"]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={(e) =>
+                      (e.target as HTMLSpanElement).classList.toggle("expanded")
+                    }
+                  >
+                    {meta.icon} {c.title}
+                  </span>
+                  <ul className="items">
+                    {c.pages
+                      .sort((a, b) => a.order - b.order)
+                      .map((d) => renderDocLink(d, c, router.asPath))}
+                  </ul>
+                </li>
+              );
+            })}
+          </ul>
         </Menu>
-        <Inner>{children}</Inner>
-      </ContentWrapper>
+        <Content className="col-6 sm-col-10">{children}</Content>
+      </div>
+      <Footer />
     </>
   );
 };
@@ -211,29 +210,11 @@ const renderDocLink = (s: DocScope, c: Category, currentRoute?: string) => {
   );
 };
 
-const ContentWrapper = styled.div`
-  border-top: 1px solid #ffffff19;
-  display: grid;
-  grid-template-columns: 2fr 4fr;
-  min-height: calc(100vh - 70px);
-
-  @media (max-width: 980px) {
-    grid-template-columns: 2fr 5fr;
-  }
-
-  @media (max-width: 800px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
 export const DocsContent = styled.div`
   display: grid;
-  max-width: 800px;
   grid-template-columns: 3fr 1fr;
 
-  h2 {
-    margin-top: 4rem;
-  }
+  h2 { margin-top: 4rem; }
 
   h3 {
     margin-top: 3rem;
@@ -246,6 +227,8 @@ export const DocsContent = styled.div`
 
   @media (max-width: 800px) {
     grid-template-columns: 1fr;
+
+    h2 { margin-top: 2.5rem; }
   }
 `;
 
@@ -254,7 +237,6 @@ export const InnerDocsContent = styled.div`
 
   h2 {
     padding-top: 2rem;
-    font-size: 28px;
   }
 
   h4 {
@@ -273,10 +255,11 @@ export const InnerDocsContent = styled.div`
   .tldr {
     border: 1px solid #ffffff33;
     border-radius: 3px;
-    padding: 3rem 2rem 1rem;
+    padding: 3rem 2rem 2rem;
     margin: 0 0 4rem;
-    font-size: 12px;
+    font-size: 0.9rem;
     position: relative;
+    box-shadow: 0 5px 20px rgba(var(--black-rgb), 0.3);
 
     p,
     li {
@@ -297,10 +280,9 @@ export const InnerDocsContent = styled.div`
       position: absolute;
       top: 1.3rem;
       left: 2rem;
-      font-size: 0.8rem;
+      font-size: 0.9rem;
       opacity: 0.5;
 
-      font-size: 11px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 1px;
@@ -614,36 +596,23 @@ export const InnerDocsContent = styled.div`
 `;
 
 const Menu = styled.div`
-  border-right: 1px solid #ffffff19;
-  display: flex;
-  justify-content: flex-end;
-  padding: 3rem 4rem 3rem 3rem;
+  border-right: 1px dashed var(--grid-line-color);
+  border-bottom: 1px dashed var(--grid-line-color);
+
+  padding: 3rem;
   background: rgba(0, 0, 0, 0.4);
-  font-size: 14px;
-
-  > div {
-    max-width: 300px;
-    min-width: 300px;
-  }
-
-  @media (max-width: 980px) {
-    font-size: 13px;
-    padding: 2rem 4rem 2rem 2rem;
-
-    > div {
-      min-width: 240px;
-    }
-  }
 
   h5 {
     display: flex;
     justify-content: space-between;
+    align-items: center;
 
     .toggle {
       cursor: pointer;
-      opacity: 0.6;
+      font-size: .7rem;
+      opacity: 0.4;
       transition: all 0.3s;
-      margin-right: -2.5rem;
+      text-align: right;
       &:hover {
         opacity: 1;
       }
@@ -660,7 +629,6 @@ const Menu = styled.div`
     opacity: 0.9 !important;
 
     align-items: center;
-    line-height: 1;
 
     svg {
       margin-right: 15px;
@@ -701,15 +669,19 @@ const Menu = styled.div`
     display: block;
   }
 
+  .items a {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
   .toggle-subcategory {
-    position: absolute;
-    right: -2.5rem;
     margin-top: 3px;
     opacity: 0.4;
     transition: all 0.3s;
-    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 1px;
+    font-size: 0.7rem;
     &:hover {
       opacity: 1;
     }
@@ -748,16 +720,20 @@ const Menu = styled.div`
     .toggle,
     .toggle-subcategory {
       margin-right: 0 !important;
-      right: 0 !important;
     }
+  }
+
+  @media (max-width: 800px) {
+    .category, a.category {
+      margin: 1rem 0 0.65rem;
+    }
+    font-size: .85rem;
   }
 `;
 
-const Inner = styled.div`
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.4);
-
+const Content = styled.div`
   > div {
-    padding: 1rem 4rem;
+    padding: 1rem 4rem 25vh;
   }
 
   @media (max-width: 800px) {
@@ -769,15 +745,15 @@ const Inner = styled.div`
 
 const Hero = styled.div`
   padding: 8vh 4rem 7vh !important;
-  background: rgba(255, 255, 255, 0.03);
 
   @media (max-width: 800px) {
     box-sizing: border-box;
     width: 100%;
-    padding: 8vh 2rem !important;
+    padding: 4vh 2rem 0 !important;
 
     h1 {
       font-size: 42px;
+      padding: 0;
     }
   }
 `;
@@ -787,11 +763,6 @@ const Discover = styled.div`
     display: grid;
     grid-template-columns: 3fr 2fr;
     grid-gap: 2rem;
-  }
-
-  p,
-  ul {
-    font-size: 14px;
   }
 
   ul {

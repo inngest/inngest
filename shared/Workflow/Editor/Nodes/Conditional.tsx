@@ -107,7 +107,7 @@ const Blank = styled.div`
 
 const Condition = styled.div`
   cursor: pointer;
-  background: #f6f6f6;
+  background: var(--gray);
   border-top-left-radius: 4px;
   border-top-right-radius: 4px;
   border-radius: 4px;
@@ -115,14 +115,13 @@ const Condition = styled.div`
   width: ${nodeW}px;
   padding: 3px 0 4px;
 
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--gray);
 
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
 
-  color: #303e2fcc;
   text-align: center;
   font-size: 11px;
   line-height: 1.2;
