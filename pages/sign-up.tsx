@@ -3,7 +3,7 @@ import Nav from "../shared/nav";
 import Button from "../shared/Button";
 import { useState } from "react";
 
-const api = process.env.REACT_APP_API_HOST || "https://api-dev.inngest.com";
+const api = process.env.REACT_APP_API_HOST || "https://api.inngest.com";
 
 const apiURL = (s: string) => {
   return api + s;
