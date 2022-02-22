@@ -99,9 +99,10 @@ h3,
 }
 
 h1 {
-  font-size: 5rem;
+  font-size: 92px;
+  letter-spacing: -2px;
   line-height: 1.05;
-  padding: 0 0 2rem;
+  padding: 0 0 0.2em;
 }
 
 h1 + .subheading {
@@ -130,9 +131,11 @@ h5 {
   letter-spacing: 1px;
 }
 
-input, textarea, select {
+input,
+textarea,
+select {
   border: 0;
-  padding: .5rem .5rem;
+  padding: 0.5rem 0.5rem;
   border-radius: var(--border-radius);
 }
 
@@ -158,30 +161,49 @@ input, textarea, select {
   margin-top: 1rem;
 }
 
-
-:not(.home) p + h3, ol + h3, ul + h3 {
+:not(.home) p + h3,
+ol + h3,
+ul + h3 {
   margin-top: 3rem;
 }
 
-p + ul, p + ol, ol + p, ul + p { margin: 1.5rem 0 }
-li > ol, li > ul  { margin: 1rem 0 }
+p + ul,
+p + ol,
+ol + p,
+ul + p {
+  margin: 1.5rem 0;
+}
+li > ol,
+li > ul {
+  margin: 1rem 0;
+}
 
 @media (max-width: 800px) {
-  h1 { font-size: 3rem; line-height: 1; }
-  h2 { font-size: 3rem; line-height: 1; }
-  h4 { font-size: 1.1rem; }
-  h5 { font-size: 0.7rem; }
+  h1 {
+    font-size: 3rem;
+    line-height: 1;
+  }
+  h2 {
+    font-size: 3rem;
+    line-height: 1;
+  }
+  h4 {
+    font-size: 1.1rem;
+  }
+  h5 {
+    font-size: 0.7rem;
+  }
 
   /**
    * This ensures that pre-formatted code breaks so that there's no
    * horizontal scroll.  `code .line` is used for code formatting.
    */
-  pre, code .line {
+  pre,
+  code .line {
     white-space: pre-wrap !important;
     overflow: auto !important;
   }
 }
-
 
 /** Classes **/
 
@@ -221,21 +243,25 @@ li > ol, li > ul  { margin: 1rem 0 }
   grid-gap: var(--grid-gap);
 }
 
-.grid-center-4, .col-4-center {
+.grid-center-4,
+.col-4-center {
   /* Skip first and last two columns */
   grid-column: 4 / -4;
 }
 
-.grid-center-6, .col-6-center {
+.grid-center-6,
+.col-6-center {
   /* Skip first and last two columns */
   grid-column: 3 / -3;
 }
 
-.grid-center-7, .col-7-center {
+.grid-center-7,
+.col-7-center {
   grid-column: 3 / -2;
 }
 
-.grid-center-8, .col-8-center {
+.grid-center-8,
+.col-8-center {
   /* Skip first and last column */
   grid-column: 2 / -2;
 }
@@ -248,11 +274,13 @@ li > ol, li > ul  { margin: 1rem 0 }
   grid-column: 3 / span 2;
 }
 
-.grid-1, .col-1 {
+.grid-1,
+.col-1 {
   grid-column: span 1;
 }
 
-.grid-2, .col-2 {
+.grid-2,
+.col-2 {
   grid-column: span 2;
 }
 
@@ -286,7 +314,7 @@ li > ol, li > ul  { margin: 1rem 0 }
 
 .grid-line span {
   margin-right: -1.75rem;
-  margin: .4rem 0 0;
+  margin: 0.4rem 0 0;
   display: block;
   font: var(--font-mono);
 }
@@ -309,32 +337,37 @@ li > ol, li > ul  { margin: 1rem 0 }
   grid-gap: var(--grid-gap);
 }
 
-
 /** Mobile grid **/
 
 @media (max-width: 800px) {
-  :root { --grid-gap: 1rem; }
+  :root {
+    --grid-gap: 1rem;
+  }
   /*
   .grid {
     grid-template-columns: 1fr;
   }
   */
 
-  .sm-grid-center-4, .sm-col-4-center {
+  .sm-grid-center-4,
+  .sm-col-4-center {
     /* Skip first and last two columns */
     grid-column: 4 / -4;
   }
 
-  .sm-grid-center-6, .sm-col-6-center {
+  .sm-grid-center-6,
+  .sm-col-6-center {
     /* Skip first and last two columns */
     grid-column: 3 / -3;
   }
 
-  .sm-grid-center-7, .sm-col-7-center {
+  .sm-grid-center-7,
+  .sm-col-7-center {
     grid-column: 3 / -2;
   }
 
-  .sm-grid-center-8, .sm-col-8-center {
+  .sm-grid-center-8,
+  .sm-col-8-center {
     /* Skip first and last column */
     grid-column: 2 / -2;
   }
@@ -347,11 +380,13 @@ li > ol, li > ul  { margin: 1rem 0 }
     grid-column: 3 / span 2;
   }
 
-  .sm-grid-1, .sm-col-1 {
+  .sm-grid-1,
+  .sm-col-1 {
     grid-column: span 1;
   }
 
-  .sm-grid-2, .sm-col-2 {
+  .sm-grid-2,
+  .sm-col-2 {
     grid-column: span 2;
   }
 
@@ -386,7 +421,6 @@ li > ol, li > ul  { margin: 1rem 0 }
   .four-cols {
     grid-template-columns: 1fr;
   }
-
 }
 
 ul.check {
@@ -397,7 +431,7 @@ ul.check {
 ul.check li {
   background: url(/icons/check.svg) no-repeat left center;
   padding-left: 1.75rem;
-  margin-left: .75rem;
+  margin-left: 0.75rem;
 }
 
 .react-flow__edge-path {

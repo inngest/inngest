@@ -190,7 +190,8 @@ export default function Home() {
             </p>
 
             <Button kind="primary" href="/sign-up">
-              {">"}_ Start building
+              <span className="button-text-light">{">"}_</span>{" "}
+              <span className="button-text-med">Start building</span>
             </Button>
             <Button kind="outline" href="/docs">
               Explore docs →
@@ -531,7 +532,9 @@ const Wrapper = styled.div`
   }
 
   @media (max-width: 800px) {
-    .code p { margin: 1rem 0 0; }
+    .code p {
+      margin: 1rem 0 0;
+    }
 
     .integrations {
       grid-template-columns: 1fr;
@@ -547,7 +550,7 @@ const Wrapper = styled.div`
 `;
 
 const Hero = styled.div`
-  padding: 12vh 0;
+  padding: 8em 0;
 
   display: grid;
   grid-template-columns: repeat(8, 1fr);
@@ -563,13 +566,20 @@ const Hero = styled.div`
   }
 
   p {
-    padding: 0 0 4rem;
+    padding: 0 0 1.5rem;
     font-family: var(--font);
   }
 
   .button {
     font-family: var(--font-mono);
     display: inline-block;
+    letter-spacing: -0.5px;
+  }
+  .button-text-light {
+    font-weight: 200;
+  }
+  .button-text-med {
+    font-weight: 600;
   }
 
   @media (max-width: 800px) {
@@ -584,7 +594,9 @@ const Hero = styled.div`
       display: none;
     }
 
-    p { padding: 0 0 2rem }
+    p {
+      padding: 0 0 2rem;
+    }
 
     .button {
       display: flex;
@@ -603,12 +615,13 @@ const HIW = styled.div`
   }
 
   @media (max-width: 800px) {
-    > div { padding: 2vh 0 0 0 };
+    > div {
+      padding: 2vh 0 0 0;
+    }
   }
 
   .grid-line {
     grid-row-start: 1;
     grid-row-end: 4;
-
   }
 `;
