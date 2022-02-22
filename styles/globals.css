@@ -77,6 +77,10 @@ body {
   background: var(--bg-color);
 }
 
+body {
+  border-top: 8px solid var(--primary-color);
+}
+
 body,
 button {
   margin: 0;
