@@ -1,11 +1,11 @@
-import React, { useState } from "react";
-import styled from "@emotion/styled";
-import Button from "../shared/Button";
-import Hamburger from "../shared/Icons/Hamburger";
+import React, { useState } from "react"
+import styled from "@emotion/styled"
+import Button from "../shared/Button"
+import Hamburger from "../shared/Icons/Hamburger"
 
 type Props = {
-  nolinks?: boolean;
-};
+  nolinks?: boolean
+}
 
 const Nav: React.FC<Props> = (props) => {
   return (
@@ -13,11 +13,11 @@ const Nav: React.FC<Props> = (props) => {
       <NavContent {...props} />
       <div className="grid-line" />
     </div>
-  );
-};
+  )
+}
 
 const NavContent: React.FC<Props> = (props: Props) => {
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(false)
   return (
     <Container className={["grid-center-8", show ? "show" : ""].join(" ")}>
       <div>
@@ -44,10 +44,12 @@ const NavContent: React.FC<Props> = (props: Props) => {
         </Button>
       </div>
 
-      <a href="#" className="toggle" onClick={() => setShow(!show)}><Hamburger /></a>
+      <a href="#" className="toggle" onClick={() => setShow(!show)}>
+        <Hamburger />
+      </a>
     </Container>
-  );
-};
+  )
+}
 
 const Container = styled.div`
   z-index: 1;
@@ -64,7 +66,8 @@ const Container = styled.div`
     font-weight: 600;
   }
 
-  > div, > a {
+  > div,
+  > a {
     /* Stack hamburger menu beneath the logo & toggle */
     position: relative;
     z-index: 2;
@@ -88,7 +91,9 @@ const Container = styled.div`
     margin-left: 20px;
   }
 
-  .toggle { display: none; }
+  .toggle {
+    display: none;
+  }
 
   @media only screen and (max-width: 950px) {
     div:last-of-type {
@@ -99,7 +104,7 @@ const Container = styled.div`
       /* Hide in a way that enables transitions */
       pointer-events: none;
       opacity: 0;
-      transition: opacity .3s;
+      transition: opacity 0.3s;
 
       /**
        * When shown, add a background to the entire menu by pos absolute
@@ -127,10 +132,9 @@ const Container = styled.div`
       a {
         grid-column: 2 / -2;
         margin: 0;
-        padding: .5rem 4px;
+        padding: 0.5rem 4px;
       }
     }
-
 
     align-items: center;
 
@@ -144,16 +148,15 @@ const Container = styled.div`
       opacity: 1;
       pointer-events: inherit;
     }
-
   }
-
-`;
+`
 
 const StyledLink = styled.a`
   display: inline-block;
   padding: 12px 20px 11px;
   transition: all 0.2s;
   text-decoration: none;
+  border-radius: var(--border-radius);
 
   &[href]:not([href=""]) {
     color: #fff;
@@ -162,7 +165,7 @@ const StyledLink = styled.a`
   &:hover {
     background: #2f6d9d11;
   }
-`;
+`
 
 const Hoverable = styled.div`
   position: relative;
@@ -235,6 +238,6 @@ const Hoverable = styled.div`
       transition: all 0.2s;
     }
   }
-`;
+`
 
-export default Nav;
+export default Nav
