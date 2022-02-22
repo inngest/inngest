@@ -179,7 +179,7 @@ li > ul {
   margin: 1rem 0;
 }
 
-@media (max-width: 800px) {
+@media (max-width: 980px) {
   h1 {
     font-size: 3rem;
     line-height: 1;
@@ -343,9 +343,10 @@ li > ul {
 
 /** Mobile grid **/
 
-@media (max-width: 800px) {
+@media (max-width: 980px) {
   :root {
     --grid-gap: 1rem;
+    word-break: break-word;
   }
   /*
   .grid {

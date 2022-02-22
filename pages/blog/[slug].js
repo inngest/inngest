@@ -67,7 +67,7 @@ const Header = styled.div`
     padding: var(--section-padding) 0 0;
   }
 
-  @media (max-width: 800px) {
+  @media (max-width: 980px) {
     header {
       padding: 6vh 0;
     }
@@ -80,7 +80,7 @@ const Main = styled.div`
   }
 
   main {
-    max-width: 800px;
+    max-width: 980px;
     margin: 0 auto;
   }
 
@@ -449,7 +449,7 @@ const Main = styled.div`
     height: 10px;
   }
 
-  @media (max-width: 800px) {
+  @media (max-width: 980px) {
     .blog--callout {
       padding: 1.5rem;
       width: calc(100% - 1rem);
