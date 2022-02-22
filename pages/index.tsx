@@ -217,7 +217,8 @@ export default function Home() {
             </p>
 
             <Button kind="primary" href="/sign-up">
-              <span className="button-text-light">{">"}_</span>{" "}
+              <span className="button-text-light">{">"}_</span>
+              &nbsp;
               <span className="button-text-med">Start building</span>
             </Button>
             <Button kind="outline" href="/docs">
@@ -576,10 +577,6 @@ const Wrapper = styled.div`
   }
 
   @media (max-width: 800px) {
-    .code p {
-      margin: 1rem 0 0;
-    }
-
     .integrations {
       grid-template-columns: 1fr;
     }
