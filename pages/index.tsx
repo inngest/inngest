@@ -476,6 +476,11 @@ const Wrapper = styled.div`
     }
   }
 
+  .img-mesh {
+    border: 1px solid #000;
+    border-radius: var(--border-radius);
+  }
+
   .integrations {
     padding: 2rem 0;
     display: grid;
