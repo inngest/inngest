@@ -348,9 +348,6 @@ li > ul {
     --grid-gap: 1rem;
     word-break: break-word;
   }
-  :root a {
-    word-break: break-all;
-  }
   /*
   .grid {
     grid-template-columns: 1fr;
