@@ -39,7 +39,12 @@ const NavContent: React.FC<Props> = (props: Props) => {
 
       <div>
         <StyledLink href="https://app.inngest.com/login">Log in</StyledLink>
-        <Button href="/sign-up" className="button" kind="primary">
+        <Button
+          href="/sign-up"
+          className="button"
+          kind="primary"
+          style={{ padding: "0.4rem 0.8rem" }}
+        >
           Start building →
         </Button>
       </div>
