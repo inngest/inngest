@@ -27,6 +27,7 @@ const Wrapper = styled.div`
   justify-content: center;
   box-shadow: 0 5px 40px rgba(var(--black-rgb), 0.5);
   font-family: var(--font-mono);
+  font-size: 20px;
 `;
 
 const CheckList = styled.ul`
@@ -50,7 +51,7 @@ const ChecklistItem = styled.li`
   padding: 0 0 0 2rem;
 
   & + & {
-    margin: 0 0 0 3rem;
+    margin: 0 0 0 2rem;
   }
 
   @media (max-width: 800px) {
