@@ -1,5 +1,5 @@
-import React from "react";
-import styled from "@emotion/styled";
+import React from "react"
+import styled from "@emotion/styled"
 
 const Footer = () => {
   return (
@@ -27,6 +27,12 @@ const Footer = () => {
             <a href="/docs">Documentation</a>
             <a href="/integrations">Integrations</a>
             <a href="/docs/event-http-api-and-libraries">Libraries & SDKs</a>
+            <a
+              href="https://typedwebhook.tools?ref=inngest-footer"
+              class="typedwebhook-button"
+            >
+              TypedWebhook.tools
+            </a>
           </div>
           <div>
             <p>Community</p>
@@ -53,10 +59,10 @@ const Footer = () => {
       </div>
       <div className="grid-line" />
     </Wrapper>
-  );
-};
+  )
+}
 
-export default Footer;
+export default Footer
 
 const Wrapper = styled.div`
   overflow: hidden;
@@ -101,4 +107,32 @@ const Wrapper = styled.div`
     opacity: 0.5;
     z-index: 0;
   }
-`;
+
+  .typedwebhook-button {
+    display: block;
+    padding: 0.3rem 0.5rem;
+
+    background-color: var(--primary-color);
+    background: radial-gradient(
+        62.5% 62.5% at 20.5% 95.25%,
+        rgba(254, 255, 191, 0.25) 0%,
+        rgba(255, 237, 191, 0.035) 100%
+      ),
+      radial-gradient(
+        72% 92.13% at 78.88% 16.5%,
+        rgba(181, 81, 198, 0.3243) 0%,
+        rgba(124, 87, 128, 0.0893) 100%
+      ),
+      linear-gradient(180deg, #4636f5 0%, #1d66d2 100%);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: bold;
+    border-radius: var(--border-radius);
+    transition: all 200ms ease-in-out;
+
+    &:hover {
+      box-shadow: 0 5px 45px rgba(var(--primary-color-rgb), 0.6);
+      transform: translateY(-0.1rem);
+    }
+  }
+`
