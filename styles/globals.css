@@ -212,11 +212,13 @@ li > ul {
 }
 
 .section-label {
-  font-size: 0.875rem;
+  font-size: 0.6em;
   text-transform: uppercase;
   letter-spacing: 1px;
   position: absolute;
-  margin: -1.5rem 0 0 3px;
+  margin: -1.3rem 0 0 3px;
+  font-family: var(--font-mono);
+  font-weight: bold;
 }
 
 .relative {
