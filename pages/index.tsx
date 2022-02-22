@@ -549,6 +549,7 @@ const Wrapper = styled.div`
       box-shadow: 0 10px 5rem rgba(var(--black-rgb), 0.5);
       pointer-events: none;
       width: 100%;
+      border-radius: var(--border-radius);
     }
   }
 
