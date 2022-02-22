@@ -229,7 +229,6 @@ export default function Home() {
       </div>
 
       <SectionHeader
-        label="Events"
         title="How it works"
         subtitle="Our Event Mesh makes it easy to build event-driven apps."
         counter="/02"
