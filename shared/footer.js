@@ -19,13 +19,13 @@ const Footer = () => {
           <div>
             <p>Company</p>
             <a href="/about">About</a>
-            <a href="/careers">Careers</a>
+    {/*<a href="/careers">Careers</a>*/}
             <a href="/contact">Contact Us</a>
           </div>
           <div>
             <p>Product</p>
             <a href="/docs">Documentation</a>
-            <a href="/integrations">Integrations</a>
+    {/*<a href="/integrations">Integrations</a>*/}
             <a href="/docs/event-http-api-and-libraries">Libraries & SDKs</a>
             <a
               href="https://typedwebhook.tools?ref=inngest-footer"
