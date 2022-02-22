@@ -313,10 +313,11 @@ li > ul {
 }
 
 .grid-line span {
-  margin-right: -1.75rem;
-  margin: 0.4rem 0 0;
+  margin: 0.4rem -1.3rem 0 0;
   display: block;
-  font: var(--font-mono);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: bold;
 }
 
 .nav-grid {
