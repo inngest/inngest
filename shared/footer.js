@@ -1,5 +1,5 @@
-import React from "react"
-import styled from "@emotion/styled"
+import React from "react";
+import styled from "@emotion/styled";
 
 const Footer = () => {
   return (
@@ -19,17 +19,17 @@ const Footer = () => {
           <div>
             <p>Company</p>
             <a href="/about">About</a>
-    {/*<a href="/careers">Careers</a>*/}
+            {/*<a href="/careers">Careers</a>*/}
             <a href="/contact">Contact Us</a>
           </div>
           <div>
             <p>Product</p>
             <a href="/docs">Documentation</a>
-    {/*<a href="/integrations">Integrations</a>*/}
+            {/*<a href="/integrations">Integrations</a>*/}
             <a href="/docs/event-http-api-and-libraries">Libraries & SDKs</a>
             <a
               href="https://typedwebhook.tools?ref=inngest-footer"
-              class="typedwebhook-button"
+              className="typedwebhook-button"
             >
               TypedWebhook.tools
             </a>
@@ -59,10 +59,10 @@ const Footer = () => {
       </div>
       <div className="grid-line" />
     </Wrapper>
-  )
-}
+  );
+};
 
-export default Footer
+export default Footer;
 
 const Wrapper = styled.div`
   overflow: hidden;
@@ -135,4 +135,4 @@ const Wrapper = styled.div`
       transform: translateY(-0.1rem);
     }
   }
-`
+`;
