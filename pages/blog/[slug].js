@@ -72,7 +72,6 @@ const Header = styled.div`
       padding: 6vh 0;
     }
   }
-
 `;
 
 const Main = styled.div`
@@ -142,9 +141,16 @@ const Main = styled.div`
     padding: 0 0 50px;
   }
 
+  code {
+    background: rgb(46, 52, 64);
+    padding: 0.1em 0.3em 0.15em;
+    border-radius: 3px;
+    color: rgb(216, 222, 233);
+  }
+
   pre {
     margin: 3rem 0;
-    padding: 1rem;
+    padding: 1em;
     border-radius: 3px;
   }
 
