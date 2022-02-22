@@ -40,6 +40,7 @@
     "react-fast-marquee": "^1.2.1",
     "react-feather": "^2.0.9",
     "react-flow-renderer": "^9.6.8",
+    "react-highlight.js": "^1.0.7",
     "react-json-view": "^1.21.3",
     "react-markdown": "^7.0.1",
     "react-syntax-highlighter": "^15.4.3",

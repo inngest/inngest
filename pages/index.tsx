@@ -169,6 +169,10 @@ export default function Home() {
           property="og:description"
           content="Build event serverless event-driven systems in seconds"
         />
+        <link
+          rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.4.0/styles/github-dark.min.css"
+        />
         <script src="/inngest-sdk.js" defer async></script>
         <script
           defer

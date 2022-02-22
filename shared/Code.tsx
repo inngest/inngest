@@ -1,10 +1,16 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
-import { highlight } from "../utils/code";
+import Highlight from "react-highlight.js";
 
 type Props = {
   code: { [language: string]: string };
   selected?: string;
+};
+
+const HIJS_LANGUAGES = {
+  curl: "bash",
+  javascript: "javascript",
+  go: "go",
 };
 
 const Code: React.FC<Props> = (props) => {
@@ -23,7 +29,9 @@ const Code: React.FC<Props> = (props) => {
         </ul>
       )}
       <pre>
-        <code>{props.code[selected]}</code>
+        <Highlight language={HIJS_LANGUAGES[selected.toLowerCase()]}>
+          {props.code[selected]}
+        </Highlight>
       </pre>
     </Wrapper>
   );
@@ -36,6 +44,13 @@ const Wrapper = styled.div`
   padding: 1.5em;
   border-radius: var(--border-radius);
   font-family: var(--font-mono);
+
+  .hljs {
+    background-color: var(--black);
+  }
+  .hljs-string {
+    color: var(--green);
+  }
 
   ul {
     list-style: none;
