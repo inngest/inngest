@@ -33,28 +33,38 @@ export default Code;
 
 const Wrapper = styled.div`
   background: var(--black);
-  padding: 2rem;
+  padding: 1.5em;
   border-radius: var(--border-radius);
+  font-family: var(--font-mono);
 
   ul {
     list-style: none;
     display: flex;
-    margin: 0 0 2rem;
+    margin: 0 0 1.5rem;
     padding: 0;
+    font-size: 0.8rem;
   }
 
   li button {
-    padding: 0.5rem 0.75rem;
+    padding: 0.2rem 0.6rem;
     border: 0;
     background: transparent;
-    color: #fff;
+    color: #c4c4c4;
     border-radius: var(--border-radius);
+    font-weight: bold;
+
+    &:hover {
+      background: rgba(var(--primary-color-rgb), 0.3);
+    }
   }
 
-  li + li { margin: 0 0 0 1rem; }
+  li + li {
+    margin: 0 0 0 1rem;
+  }
 
   li.selected button {
     background: var(--primary-color);
+    color: #fff;
   }
 
   pre,
@@ -65,10 +75,12 @@ const Wrapper = styled.div`
   @media (max-width: 800px) {
     padding: 1rem;
     li button {
-      font-size: .9rem;
-      padding: .25rem .5rem;
+      font-size: 0.9rem;
+      padding: 0.25rem 0.5rem;
     }
-    li + li { margin: 0 0 0 .5rem; }
+    li + li {
+      margin: 0 0 0 0.5rem;
+    }
 
     pre,
     code {
