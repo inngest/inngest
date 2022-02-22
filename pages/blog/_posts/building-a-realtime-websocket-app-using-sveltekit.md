@@ -2,7 +2,7 @@
 focus: true
 heading: "Building a real-time websocket app using SvelteKit"
 subtitle: Our experience building https://typedwebhook.tools in 2 days using SvelteKit.
-date: 2022-02-18
+date: 2022-02-22
 order: 5
 ---
 
@@ -11,7 +11,7 @@ order: 5
 We're Inngest.  We make it easy to run serverless functions in response to events.  How?  We're an event mesh that fully types, records, and analyzes all of your events, then runs functions instantly we receive them.  It makes building reliable serverless functions much easier.  [You can get started for free](/sign-up).
 </div>
 
-We recently built a [webhook testing tool which auto-generates types for each request](https://typedwebhook.tools).  It's called https://typedwebhook.tools, it's free, and it's meant to make development easier.
+We recently built a [webhook testing tool which auto-generates types for each request](https://typedwebhook.tools).  It's called https://typedwebhook.tools, it's free, [open source](https://github.com/inngest/typedwebhook.tools), and it's meant to make development easier.
 
 While there are things you can use to see webhook payloads, most of the time you want to work with that request body — and for that, you need to generate types.  In this post we’ll walk through how we built the real-time UI for the webhook tool using Svelte.  Here’s what we’ll discuss:
 
@@ -100,7 +100,7 @@ export const connect = () => {
 }
 ```
 
-There's more to websockets than this, but in essence state management is about 4 lines of work, with zero context or component relationships to manage.
+There's more to websockets than this, but in essence state management is about 4 lines of work, with zero context or component relationships to manage.  You can see the code for the site here: https://github.com/inngest/typedwebhook.tools.
 
 ### Comparisons to react
 
