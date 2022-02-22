@@ -106,6 +106,29 @@ const integrations = [
   },
 ];
 
+const SDKs = [
+  {
+    name: "JavaScript",
+    logo: "/assets/languages/icon-logo-js.svg",
+    url: "https://github.com/inngest/javascript-sdk",
+  },
+  {
+    name: "Python",
+    logo: "/assets/languages/icon-logo-python.svg",
+    url: "https://github.com/inngest/inngest-python",
+  },
+  {
+    name: "Go",
+    logo: "/assets/languages/icon-logo-go.svg",
+    url: "https://github.com/inngest/inngestgo",
+  },
+  {
+    name: "Ruby",
+    logo: "/assets/languages/icon-logo-ruby.svg",
+    url: "https://github.com/inngest/inngest-ruby",
+  },
+];
+
 const SectionHeader: React.FC<{
   label?: string;
   title: string;
@@ -276,7 +299,14 @@ export default function Home() {
       <div className="section code-grid grid">
         <div className="code grid-center-6 sm-col-8-center">
           <Code code={events} />
-          <p className="text-center">Get started with an SDK: </p>
+          <div className="sdk-list">
+            <p className="text-center">Get started with an SDK: </p>
+            {SDKs.map((sdk, idx) => (
+              <a key={idx} href={sdk.url} className="sdk-list-item">
+                <img src={sdk.logo} alt={`${sdk.name} SDK`} />
+              </a>
+            ))}
+          </div>
         </div>
 
         <div className="grid-line" />
@@ -454,8 +484,14 @@ export default function Home() {
 const Wrapper = styled.div`
   .code {
     padding: 2rem 0 10vh;
-    p {
-      margin: 2rem 0 0;
+  }
+
+  .sdk-list {
+    display: flex;
+    justify-content: center;
+    margin: 2rem 0 0;
+    .sdk-list-item {
+      margin-left: 0.8em;
     }
   }
 
