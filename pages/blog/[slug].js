@@ -5,6 +5,7 @@ import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
 import Footer from "../../shared/footer";
 import Nav from "../../shared/nav";
+import Callout from "../../shared/Callout";
 import { Wrapper } from "../../shared/blog";
 import { highlight } from "../../utils/code";
 
@@ -53,6 +54,12 @@ export default function BlogLayout(props) {
             <span>{scope.img ? "/03" : "/02"}</span>
           </div>
         </Main>
+        <Callout
+          small="But, what is Inngest?"
+          heading="Inngest is serverless event mesh"
+          link="/?ref=blog-footer"
+          cta="Learn more >"
+        />
         <Footer />
       </Wrapper>
     </>
@@ -81,7 +88,7 @@ const Main = styled.div`
 
   main {
     max-width: 980px;
-    margin: 0 auto;
+    margin: 0 auto 4rem;
   }
 
   p {

@@ -4,9 +4,11 @@ import Button from "./Button";
 type Props = {
   small?: string;
   heading?: string;
+  cta?: string;
+  link?: string;
 };
 
-const Callout: React.FC<Props> = ({ small, heading }) => {
+const Callout: React.FC<Props> = ({ small, heading, cta, link }) => {
   return (
     <div className="grid">
       <Content className="bg-primary">
@@ -14,8 +16,8 @@ const Callout: React.FC<Props> = ({ small, heading }) => {
           <span>{small || "Now with zero yaml ;-)"}</span>
           <h2>{heading || "Deploy a serverless function in minutes."}</h2>
         </div>
-        <Button kind="black" href="/sign-up">
-          {">"}_ Start building
+        <Button kind="black" href={link || "/sign-up"}>
+          {cta || ">_ Start building"}
         </Button>
       </Content>
     </div>
@@ -53,7 +55,8 @@ const Content = styled.div`
     font-size: 20px;
   }
 
-  button:hover, a:hover {
+  button:hover,
+  a:hover {
     background: var(--black);
     border-color: var(--black);
     box-shadow: 0 5px 25px rgba(var(--black-rgb), 0.6) !important;
@@ -75,5 +78,4 @@ const Content = styled.div`
     grid-template-columns: 1fr;
     grid-gap: 1rem;
   }
-
 `;
