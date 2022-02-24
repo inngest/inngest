@@ -95,6 +95,7 @@ export default function Home() {
         </Grid>
 
         <h2>Investors</h2>
+        <small>Some of our investors:</small>
         <Grid>
           {INVESTORS.map((investor) => {
             return (
@@ -139,6 +140,10 @@ const Grid = styled.div`
   grid-template-columns: 1fr 1fr 1fr;
   grid-gap: 2rem 2rem;
   margin: 2rem 0;
+
+  @media (max-width: 980px) {
+    grid-template-columns: 1fr;
+  }
 `
 
 const Label = styled.p`
