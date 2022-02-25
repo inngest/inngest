@@ -106,7 +106,11 @@ var actionsValidate = &cobra.Command{
 
 		prefix := ""
 		if state, _ := state.GetState(ctx); state != nil {
-			prefix = state.Account.Identifier.DSNPrefix
+			if state.Account.Identifier.Domain == nil {
+				prefix = state.Account.Identifier.DSNPrefix
+			} else {
+				prefix = *state.Account.Identifier.Domain
+			}
 		}
 
 		path, err := homedir.Expand(args[0])
