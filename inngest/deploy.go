@@ -91,15 +91,15 @@ func prepareAndPushImage(ctx context.Context, a deployImageOptions) (err error) 
 	}
 
 	if a.image == "" {
-		return fmt.Errorf("no image specified")
+		return errors.New("no image specified")
 	}
 
 	resp, _, err := dkr.ImageInspectWithRaw(ctx, a.image)
 	if err != nil {
-		return fmt.Errorf("could not locate image")
+		return errors.New("could not locate image")
 	}
-	if resp.Architecture != "amd64" {
-		return fmt.Errorf("image architecture is not amd64, please rebuild")
+	if resp.Architecture != "amd64" || resp.Os != "linux" {
+		return errors.New("image architecture is not linux/amd64, please rebuild")
 	}
 
 	return pushImage(ctx, a, dkr)
