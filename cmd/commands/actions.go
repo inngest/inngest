@@ -160,7 +160,12 @@ var actionsDeploy = &cobra.Command{
 			log.From(ctx).Fatal().Msgf("Error reading configuration: %s", err)
 		}
 
-		version, cueConfig, err := actions.Parse(state.Account.Identifier.DSNPrefix, string(byt))
+		prefix := state.Account.Identifier.DSNPrefix
+		if state.Account.Identifier.Domain != nil {
+			prefix = *state.Account.Identifier.Domain
+		}
+
+		version, cueConfig, err := actions.Parse(prefix, string(byt))
 		if err != nil {
 			log.From(ctx).Fatal().Msgf("Error reading configuration: %s", err)
 		}

@@ -13,6 +13,7 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/inngest/inngestctl/inngest/client"
+	"github.com/inngest/inngestctl/inngest/log"
 )
 
 const (
@@ -33,6 +34,8 @@ type DeployActionOptions struct {
 // DeployAction pushes the action to Inngest, making it available for use within
 // all workflows.
 func DeployAction(ctx context.Context, opts DeployActionOptions) (*ActionVersion, error) {
+	log.From(ctx).Info().Msgf("Deploying action %s\n", opts.Version.DSN)
+
 	if opts.Version == nil {
 		version, err := ParseAction(opts.Config)
 		if err != nil {
