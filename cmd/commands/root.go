@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -27,7 +28,9 @@ func init() {
 }
 
 func Execute() {
+	rootCmd.AddCommand(NewCmdBuild())
 	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }
