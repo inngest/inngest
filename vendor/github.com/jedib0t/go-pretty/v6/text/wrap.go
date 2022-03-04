@@ -225,11 +225,8 @@ func wrapSoft(paragraph string, wrapLen int, out *strings.Builder) {
 		if escSeq != "" {
 			lastSeenEscSeq = escSeq
 		}
-		spacing, spacingLen := "", 0
-		if lineLen > 0 {
-			spacing, spacingLen = " ", 1
-		}
 
+		spacing, spacingLen := wrapSoftSpacing(lineLen)
 		wordLen := RuneCount(word)
 		if lineLen+spacingLen+wordLen <= wrapLen { // word fits within the line
 			out.WriteString(spacing)
@@ -253,4 +250,12 @@ func wrapSoft(paragraph string, wrapLen int, out *strings.Builder) {
 		}
 	}
 	terminateOutput(lastSeenEscSeq, out)
+}
+
+func wrapSoftSpacing(lineLen int) (string, int) {
+	spacing, spacingLen := "", 0
+	if lineLen > 0 {
+		spacing, spacingLen = " ", 1
+	}
+	return spacing, spacingLen
 }

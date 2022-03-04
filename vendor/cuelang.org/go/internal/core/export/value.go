@@ -46,6 +46,18 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 	if e.cfg.ShowAttributes {
 		attrs = ExtractDeclAttrs(n)
 	}
+
+	s, saved := e.pushFrame(n.Conjuncts)
+	e.top().upCount++
+	defer func() {
+		e.top().upCount--
+		e.popFrame(saved)
+	}()
+
+	for _, c := range n.Conjuncts {
+		e.markLets(c.Expr().Source())
+	}
+
 	switch x := n.BaseValue.(type) {
 	case nil:
 		// bare
@@ -91,6 +103,16 @@ func (e *exporter) vertex(n *adt.Vertex) (result ast.Expr) {
 		}
 		result = ast.NewBinExpr(token.AND, a...)
 	}
+
+	if len(s.Elts) > 0 {
+		filterUnusedLets(s)
+	}
+	if result != s && len(s.Elts) > 0 {
+		// There are used let expressions within a non-struct.
+		// For now we just fall back to the original expressions.
+		result = e.adt(n, n.Conjuncts)
+	}
+
 	return result
 }
 
@@ -322,6 +344,21 @@ func (e *exporter) listComposite(v *adt.Vertex) ast.Expr {
 
 		l.Elts = append(l.Elts, elem)
 	}
+	m, ok := v.BaseValue.(*adt.ListMarker)
+	if !e.cfg.TakeDefaults && ok && m.IsOpen {
+		ellipsis := &ast.Ellipsis{}
+		typ := &adt.Vertex{
+			Parent: v,
+			Label:  adt.AnyIndex,
+		}
+		v.MatchAndInsert(e.ctx, typ)
+		typ.Finalize(e.ctx)
+		if typ.Kind() != adt.TopKind {
+			ellipsis.Type = e.value(typ)
+		}
+
+		l.Elts = append(l.Elts, ellipsis)
+	}
 	return l
 }
 
@@ -342,12 +379,7 @@ func (e exporter) showArcs(v *adt.Vertex) bool {
 }
 
 func (e *exporter) structComposite(v *adt.Vertex, attrs []*ast.Attribute) ast.Expr {
-	s, saved := e.pushFrame(v.Conjuncts)
-	e.top().upCount++
-	defer func() {
-		e.top().upCount--
-		e.popFrame(saved)
-	}()
+	s := e.top().scope
 
 	showRegular := false
 	switch x := v.BaseValue.(type) {

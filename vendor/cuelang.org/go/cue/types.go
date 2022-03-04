@@ -44,42 +44,44 @@ import (
 // Kind determines the underlying type of a Value.
 type Kind = adt.Kind
 
-const BottomKind Kind = 0
-
 const (
+	// BottomKind represents the bottom value.
+	BottomKind Kind = adt.BottomKind
+
 	// NullKind indicates a null value.
 	NullKind Kind = adt.NullKind
 
 	// BoolKind indicates a boolean value.
-	BoolKind = adt.BoolKind
+	BoolKind Kind = adt.BoolKind
 
 	// IntKind represents an integral number.
-	IntKind = adt.IntKind
+	IntKind Kind = adt.IntKind
 
 	// FloatKind represents a decimal float point number that cannot be
 	// converted to an integer. The underlying number may still be integral,
 	// but resulting from an operation that enforces the float type.
-	FloatKind = adt.FloatKind
+	FloatKind Kind = adt.FloatKind
 
 	// StringKind indicates any kind of string.
-	StringKind = adt.StringKind
+	StringKind Kind = adt.StringKind
 
 	// BytesKind is a blob of data.
-	BytesKind = adt.BytesKind
+	BytesKind Kind = adt.BytesKind
 
 	// StructKind is a kev-value map.
-	StructKind = adt.StructKind
+	StructKind Kind = adt.StructKind
 
 	// ListKind indicates a list of values.
-	ListKind = adt.ListKind
+	ListKind Kind = adt.ListKind
 
 	// _numberKind is used as a implementation detail inside
 	// Kind.String to indicate NumberKind.
 
 	// NumberKind represents any kind of number.
-	NumberKind = IntKind | FloatKind
+	NumberKind Kind = IntKind | FloatKind
 
-	TopKind = adt.TopKind
+	// TopKind represents the top value.
+	TopKind Kind = adt.TopKind
 )
 
 // An structValue represents a JSON object.
@@ -886,6 +888,7 @@ func (v Value) Kind() Kind {
 	if !v.v.IsConcrete() {
 		return BottomKind
 	}
+	// TODO: perhaps we should not consider open lists as "incomplete".
 	if v.IncompleteKind() == adt.ListKind && !v.v.IsClosedList() {
 		return BottomKind
 	}
@@ -974,6 +977,7 @@ func (v Value) Syntax(opts ...Option) ast.Node {
 		ShowHidden:      !o.omitHidden && !o.concrete,
 		ShowAttributes:  !o.omitAttrs,
 		ShowDocs:        o.docs,
+		ShowErrors:      o.showErrors,
 	}
 
 	pkgID := v.instance().ID()
@@ -989,7 +993,7 @@ Value:
 %v
 
 You could file a bug with the above information at:
-    https://github.com/cuelang/cue/issues/new?assignees=&labels=NeedsInvestigation&template=bug_report.md&title=.
+    https://cuelang.org/issues/new?assignees=&labels=NeedsInvestigation&template=bug_report.md&title=.
 `
 		cg := &ast.CommentGroup{Doc: true}
 		msg := fmt.Sprintf(format, name, err, p, v)
@@ -1004,7 +1008,7 @@ You could file a bug with the above information at:
 	// var expr ast.Expr
 	var err error
 	var f *ast.File
-	if o.concrete || o.final {
+	if o.concrete || o.final || o.resolveReferences {
 		// inst = v.instance()
 		var expr ast.Expr
 		expr, err = p.Value(v.idx, pkgID, v.v)
@@ -1968,7 +1972,7 @@ func reference(rt *runtime.Runtime, c *adt.OpContext, env *adt.Environment, r ad
 		path = appendSelector(path, valueToSel(v))
 
 	case *adt.ImportReference:
-		inst, _ = rt.LoadImport(rt.LabelStr(x.ImportPath))
+		inst = rt.LoadImport(rt.LabelStr(x.ImportPath))
 
 	case *adt.SelectorExpr:
 		inst, path = reference(rt, c, env, x.X)
@@ -2003,6 +2007,7 @@ type options struct {
 	omitOptional      bool
 	omitAttrs         bool
 	resolveReferences bool
+	showErrors        bool
 	final             bool
 	ignoreClosedness  bool // used for comparing APIs
 	docs              bool
@@ -2059,7 +2064,20 @@ func DisallowCycles(disallow bool) Option {
 // ResolveReferences forces the evaluation of references when outputting.
 // This implies the input cannot have cycles.
 func ResolveReferences(resolve bool) Option {
-	return func(p *options) { p.resolveReferences = resolve }
+	return func(p *options) {
+		p.resolveReferences = resolve
+
+		// ResolveReferences is implemented as a Value printer, rather than
+		// a definition printer, even though it should be more like the latter.
+		// To reflect this we convert incomplete errors to their original
+		// expression.
+		//
+		// TODO: ShowErrors mostly shows incomplete errors, even though this is
+		// just an approximation. There seems to be some inconsistencies as to
+		// when child errors are marked as such, making the conversion somewhat
+		// inconsistent. This option is conservative, though.
+		p.showErrors = true
+	}
 }
 
 // Raw tells Syntax to generate the value as is without any simplifications.
@@ -2271,7 +2289,7 @@ func (v Value) Expr() (Op, []Value) {
 		for i, disjunct := range x.Values {
 			if i < x.NumDefaults {
 				for _, n := range x.Values[x.NumDefaults:] {
-					if subsume.Value(v.ctx(), n, disjunct) == nil {
+					if subsume.Simplify.Value(v.ctx(), n, disjunct) == nil {
 						continue outer
 					}
 				}
@@ -2309,7 +2327,7 @@ func (v Value) Expr() (Op, []Value) {
 						continue
 					}
 					a.Parent = v.v.Parent
-					if !n.Default && subsume.Value(ctx, &a, &b) == nil {
+					if !n.Default && subsume.Simplify.Value(ctx, &a, &b) == nil {
 						continue outerExpr
 					}
 				}
@@ -2367,6 +2385,20 @@ func (v Value) Expr() (Op, []Value) {
 			op = OrOp
 			if fn.Name == "and" {
 				op = AndOp
+			}
+
+			if len(a) == 0 {
+				// Mimic semantics of builtin.
+				switch op {
+				case AndOp:
+					a = append(a, remakeValue(v, env, &adt.Top{}))
+				case OrOp:
+					a = append(a, remakeValue(v, env, &adt.Bottom{
+						Code: adt.IncompleteError,
+						Err:  errors.Newf(x.Src.Fun.Pos(), "empty list in call to or"),
+					}))
+				}
+				op = NoOp
 			}
 			break
 		}
@@ -2451,9 +2483,10 @@ func (v Value) Expr() (Op, []Value) {
 			a = append(a, makeValue(v.idx, n, v.parent_))
 		}
 
-		if len(a) > 1 {
-			op = adt.AndOp
+		if len(a) == 1 {
+			return a[0].Expr()
 		}
+		op = adt.AndOp
 
 	default:
 		a = append(a, v)

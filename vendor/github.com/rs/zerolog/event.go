@@ -148,8 +148,10 @@ func (e *Event) msg(msg string) {
 	}
 }
 
-// Fields is a helper function to use a map to set fields using type assertion.
-func (e *Event) Fields(fields map[string]interface{}) *Event {
+// Fields is a helper function to use a map or slice to set fields using type assertion.
+// Only map[string]interface{} and []interface{} are accepted. []interface{} must
+// alternate string keys and arbitrary values, and extraneous ones are ignored.
+func (e *Event) Fields(fields interface{}) *Event {
 	if e == nil {
 		return e
 	}
@@ -207,13 +209,30 @@ func (e *Event) Object(key string, obj LogObjectMarshaler) *Event {
 		return e
 	}
 	e.buf = enc.AppendKey(e.buf, key)
+	if obj == nil {
+		e.buf = enc.AppendNil(e.buf)
+
+		return e
+	}
+
 	e.appendObject(obj)
+	return e
+}
+
+// Func allows an anonymous func to run only if the event is enabled.
+func (e *Event) Func(f func(e *Event)) *Event {
+	if e != nil && e.Enabled() {
+		f(e)
+	}
 	return e
 }
 
 // EmbedObject marshals an object that implement the LogObjectMarshaler interface.
 func (e *Event) EmbedObject(obj LogObjectMarshaler) *Event {
 	if e == nil {
+		return e
+	}
+	if obj == nil {
 		return e
 	}
 	obj.MarshalZerologObject(e)
@@ -238,18 +257,24 @@ func (e *Event) Strs(key string, vals []string) *Event {
 	return e
 }
 
-// Stringer adds the field key with val.String() (or null if val is nil) to the *Event context.
+// Stringer adds the field key with val.String() (or null if val is nil)
+// to the *Event context.
 func (e *Event) Stringer(key string, val fmt.Stringer) *Event {
 	if e == nil {
 		return e
 	}
+	e.buf = enc.AppendStringer(enc.AppendKey(e.buf, key), val)
+	return e
+}
 
-	if val != nil {
-		e.buf = enc.AppendString(enc.AppendKey(e.buf, key), val.String())
+// Stringers adds the field key with vals where each individual val
+// is used as val.String() (or null if val is empty) to the *Event
+// context.
+func (e *Event) Stringers(key string, vals []fmt.Stringer) *Event {
+	if e == nil {
 		return e
 	}
-
-	e.buf = enc.AppendInterface(enc.AppendKey(e.buf, key), nil)
+	e.buf = enc.AppendStringers(enc.AppendKey(e.buf, key), vals)
 	return e
 }
 
@@ -690,6 +715,9 @@ func (e *Event) Interface(key string, i interface{}) *Event {
 // CallerSkipFrame instructs any future Caller calls to skip the specified number of frames.
 // This includes those added via hooks from the context.
 func (e *Event) CallerSkipFrame(skip int) *Event {
+	if e == nil {
+		return e
+	}
 	e.skipFrame += skip
 	return e
 }

@@ -591,6 +591,7 @@ Some settings can be changed and will by applied to all loggers:
 ### Advanced Fields
 
 * `Err`: Takes an `error` and renders it as a string using the `zerolog.ErrorFieldName` field name.
+* `Func`: Run a `func` only if the level is enabled.
 * `Timestamp`: Inserts a timestamp field with `zerolog.TimestampFieldName` field name, formatted using `zerolog.TimeFieldFormat`.
 * `Time`: Adds a field with time formatted with `zerolog.TimeFieldFormat`.
 * `Dur`: Adds a field with `time.Duration`.
@@ -616,6 +617,7 @@ with zerolog library is [CSD](https://github.com/toravir/csd/).
 
 * [grpc-zerolog](https://github.com/cheapRoc/grpc-zerolog): Implementation of `grpclog.LoggerV2` interface using `zerolog`
 * [overlog](https://github.com/Trendyol/overlog): Implementation of `Mapped Diagnostic Context` interface using `zerolog`
+* [zerologr](https://github.com/go-logr/zerologr): Implementation of `logr.LogSink` interface using `zerolog`
 
 ## Benchmarks
 

@@ -67,11 +67,12 @@ staticcheck: $(STATICCHECK)
 .PHONY: lint
 # TODO: readd errcheck when fixed
 #lint: golint vet errcheck staticcheck
-lint: golint vet staticcheck
+#lint: golint vet staticcheck
+lint: golint vet
 
 .PHONY: test
 test:
-	go test -race ./...
+	go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
 .PHONY: clean
 clean:

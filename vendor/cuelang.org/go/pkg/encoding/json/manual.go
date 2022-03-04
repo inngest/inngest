@@ -18,13 +18,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/parser"
 	"cuelang.org/go/cue/token"
-	"cuelang.org/go/internal/value"
+	cuejson "cuelang.org/go/encoding/json"
 )
 
 // Compact generates the JSON-encoded src with insignificant space characters
@@ -92,6 +93,26 @@ func MarshalStream(v cue.Value) (string, error) {
 	return buf.String(), nil
 }
 
+// UnmarshalStream parses the JSON to a CUE instance.
+func UnmarshalStream(data []byte) (ast.Expr, error) {
+	var r cue.Runtime
+	d := cuejson.NewDecoder(&r, "", bytes.NewReader(data))
+
+	a := []ast.Expr{}
+	for {
+		x, err := d.Extract()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		a = append(a, x)
+	}
+
+	return ast.NewList(a...), nil
+}
+
 // Unmarshal parses the JSON-encoded data.
 func Unmarshal(b []byte) (ast.Expr, error) {
 	if !json.Valid(b) {
@@ -108,18 +129,9 @@ func Unmarshal(b []byte) (ast.Expr, error) {
 // Validate validates JSON and confirms it matches the constraints
 // specified by v.
 func Validate(b []byte, v cue.Value) (bool, error) {
-	if !json.Valid(b) {
-		return false, fmt.Errorf("json: invalid JSON")
-	}
-	r := value.ConvertToRuntime(v.Context())
-	inst, err := r.Compile("json.Validate", b)
+	err := cuejson.Validate(b, v)
 	if err != nil {
 		return false, err
-	}
-
-	v = v.Unify(inst.Value())
-	if v.Err() != nil {
-		return false, v.Err()
 	}
 	return true, nil
 }

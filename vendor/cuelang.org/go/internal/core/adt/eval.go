@@ -150,7 +150,7 @@ func (c *OpContext) evaluate(v *Vertex, state VertexStatus) Value {
 	if v.status < Finalized && v.state != nil {
 		// TODO: errors are slightly better if we always add addNotify, but
 		// in this case it is less likely to cause a performance penalty.
-		// See https://github.com/cuelang/cue/issues/661. It may be possible to
+		// See https://cuelang.org/issue/661. It may be possible to
 		// relax this again once we have proper tests to prevent regressions of
 		// that issue.
 		if !v.state.done() || v.state.errs != nil {
@@ -195,6 +195,15 @@ func (c *OpContext) Unify(v *Vertex, state VertexStatus) {
 		if v.Parent != nil {
 			if v.Parent.Closed {
 				v.Closed = true
+			}
+		}
+
+		if p := v.Parent; p != nil && p.state != nil && v.Label.IsString() {
+			for _, s := range p.state.node.Structs {
+				if s.Disable {
+					continue
+				}
+				s.MatchAndInsert(n.ctx, v)
 			}
 		}
 
@@ -1188,7 +1197,15 @@ func (n *nodeContext) addExprConjunct(v Conjunct) {
 		n.addStruct(env, x, id)
 
 	case *ListLit:
-		n.lists = append(n.lists, envList{env: env, list: x, id: id})
+		childEnv := &Environment{
+			Up:     env,
+			Vertex: n.node,
+		}
+		if env != nil {
+			childEnv.Cyclic = env.Cyclic
+			childEnv.Deref = env.Deref
+		}
+		n.lists = append(n.lists, envList{env: childEnv, list: x, id: id})
 
 	case *DisjunctionExpr:
 		n.addDisjunction(env, x, id)
@@ -1684,8 +1701,6 @@ func (n *nodeContext) addStruct(
 
 	n.updateCyclicStatus(env) // to handle empty structs.
 
-	ctx := n.ctx
-
 	// NOTE: This is a crucial point in the code:
 	// Unification derferencing happens here. The child nodes are set to
 	// an Environment linked to the current node. Together with the De Bruijn
@@ -1760,12 +1775,6 @@ func (n *nodeContext) addStruct(
 		n.aStructID = closeInfo
 	}
 
-	// Apply existing fields
-	for _, arc := range n.node.Arcs {
-		// Reuse Acceptor interface.
-		parent.MatchAndInsert(ctx, arc)
-	}
-
 	parent.Disable = false
 
 	for _, d := range s.Decls {
@@ -1793,19 +1802,11 @@ func (n *nodeContext) addStruct(
 // disjunctions.
 func (n *nodeContext) insertField(f Feature, x Conjunct) *Vertex {
 	ctx := n.ctx
-	arc, isNew := n.node.GetArc(ctx, f)
+	arc, _ := n.node.GetArc(ctx, f)
 
 	arc.addConjunct(x)
 
 	switch {
-	case isNew:
-		for _, s := range n.node.Structs {
-			if s.Disable {
-				continue
-			}
-			s.MatchAndInsert(ctx, arc)
-		}
-
 	case arc.state != nil:
 		s := arc.state
 		switch {
@@ -2038,7 +2039,7 @@ func (n *nodeContext) addLists() (oneOfTheLists Expr, anID CloseInfo) {
 
 outer:
 	for i, l := range n.lists {
-		n.updateCyclicStatus(l.env)
+		n.updateCyclicStatus(l.env.Up)
 
 		index := int64(0)
 		hasComprehension := false

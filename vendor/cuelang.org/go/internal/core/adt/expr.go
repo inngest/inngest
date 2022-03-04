@@ -826,7 +826,10 @@ func (x *ImportReference) Source() ast.Node {
 
 func (x *ImportReference) resolve(ctx *OpContext, state VertexStatus) *Vertex {
 	path := x.ImportPath.StringValue(ctx)
-	v, _ := ctx.Runtime.LoadImport(path)
+	v := ctx.Runtime.LoadImport(path)
+	if v == nil {
+		ctx.addErrf(EvalError, x.Src.Pos(), "cannot find package %q", path)
+	}
 	return v
 }
 
@@ -1621,15 +1624,15 @@ func (x *ForClause) yield(c *OpContext, f YieldFunc) {
 
 		n := &Vertex{status: Finalized}
 
-		// TODO: only needed if value label != _
-
-		b := &Vertex{
-			Label:     x.Value,
-			BaseValue: a,
+		if x.Value != InvalidLabel {
+			b := &Vertex{
+				Label:     x.Value,
+				BaseValue: a,
+			}
+			n.Arcs = append(n.Arcs, b)
 		}
-		n.Arcs = append(n.Arcs, b)
 
-		if x.Key != 0 {
+		if x.Key != InvalidLabel {
 			v := &Vertex{Label: x.Key}
 			key := a.Label.ToValue(c)
 			v.AddConjunct(MakeRootConjunct(c.Env(0), key))

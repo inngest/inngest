@@ -72,6 +72,7 @@ func (e *Enum) parse(p *Parser) error {
 		}
 	}
 	e.Name = lit
+	consumeCommentFor(p, e)
 	_, tok, lit = p.next()
 	if tok != tLEFTCURLY {
 		return p.unexpected(lit, "enum opening {", e)

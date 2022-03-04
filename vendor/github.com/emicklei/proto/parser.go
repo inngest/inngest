@@ -129,7 +129,8 @@ func (p *Parser) next() (pos scanner.Position, tok token, lit string) {
 
 // pre: first single quote has been read
 func (p *Parser) nextSingleQuotedString() (pos scanner.Position, tok token, lit string) {
-	ch := p.scanner.Scan()
+	var ch rune
+	p.ignoreErrorsWhile(func() { ch = p.scanner.Scan() })
 	if ch == scanner.EOF {
 		return p.scanner.Position, tEOF, ""
 	}
@@ -142,7 +143,7 @@ func (p *Parser) nextSingleQuotedString() (pos scanner.Position, tok token, lit 
 
 	// scan for partial tokens until actual closing single-quote(') token
 	for {
-		ch = p.scanner.Scan()
+		p.ignoreErrorsWhile(func() { ch = p.scanner.Scan() })
 
 		if ch == scanner.EOF {
 			return p.scanner.Position, tEOF, ""
@@ -159,6 +160,14 @@ func (p *Parser) nextSingleQuotedString() (pos scanner.Position, tok token, lit 
 		p.unexpected(lit, "'", p)
 	}
 	return p.scanner.Position, tIDENT, fmt.Sprintf("'%s'", lit)
+}
+
+func (p *Parser) ignoreErrorsWhile(block func()) {
+	// during block call change error handler which ignores it all
+	p.scanner.Error = func(s *scanner.Scanner, msg string) { return }
+	block()
+	// restore
+	p.scanner.Error = p.handleScanError
 }
 
 // nextPut sets the buffer
@@ -205,8 +214,32 @@ func (p *Parser) nextIdentifier() (pos scanner.Position, tok token, lit string) 
 }
 
 // nextTypeName implements the Packages and Name Resolution for finding the name of the type.
+// Valid examples:
+// .google.protobuf.Empty
+// stream T must return tSTREAM
+// optional int32 must return tOPTIONAL
+// Bogus must return Bogus
 func (p *Parser) nextTypeName() (pos scanner.Position, tok token, lit string) {
-	return p.nextIdentifier()
+	pos, tok, lit = p.next()
+	startPos := pos
+	fullLit := lit
+	// leading dot allowed
+	if tDOT == tok {
+		pos, tok, lit = p.next()
+		fullLit = fmt.Sprintf(".%s", lit)
+	}
+	// type can be namespaced more
+	for {
+		r := p.peekNonWhitespace()
+		if '.' != r {
+			break
+		}
+		p.next() // consume dot
+		pos, tok, lit = p.next()
+		fullLit = fmt.Sprintf("%s.%s", fullLit, lit)
+		tok = tIDENT
+	}
+	return startPos, tok, fullLit
 }
 
 func (p *Parser) nextIdent(keywordStartAllowed bool) (pos scanner.Position, tok token, lit string) {

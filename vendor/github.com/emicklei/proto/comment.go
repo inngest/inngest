@@ -144,3 +144,16 @@ func mergeOrReturnComment(elements []Visitee, lit string, pos scanner.Position) 
 
 // parent is part of elementContainer
 func (c *Comment) parent(Visitee) {}
+
+// consumeCommentFor is for reading and taking all comment lines before the body of an element (starting at {)
+func consumeCommentFor(p *Parser, e elementContainer) {
+	pos, tok, lit := p.next()
+	if tok == tCOMMENT {
+		if com := mergeOrReturnComment(e.elements(), lit, pos); com != nil { // not merged?
+			e.addElement(com)
+		}
+		consumeCommentFor(p, e) // bit of recursion is fine
+	} else {
+		p.nextPut(pos, tok, lit)
+	}
+}
