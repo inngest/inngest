@@ -1,0 +1,183 @@
+package function
+
+import (
+	"fmt"
+
+	"github.com/gosimple/slug"
+	multierror "github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngestctl/inngest"
+)
+
+const (
+	derivedWorkflow = "workflow"
+	derivedAction   = "action"
+)
+
+// Function represents a step function which is triggered whenever an event
+// is received or on a schedule.  In essence, it contains:
+//
+// - Triggers, which represent when a function is invoked
+//
+// - Steps, which represent the individual steps of actions that the function calls.
+//
+// A function may be simple (ie. only having a single step) or complex (ie. many
+// steps).  Simple functions are easy:  run the single step's action.  Complex functions
+// represent steps as a DAG, with edges between the trigger and each step.
+type Function struct {
+	// Name is the descriptive name for the function
+	Name string `json:"name"`
+
+	// Trigger represnets the trigger for the function.
+	Triggers []Trigger `json:"triggers"`
+
+	// Actions represents the actions to take for this function.  If empty, this assumes
+	// that we have a single action specified in the current directory using
+	//
+	// TODO: Enable for use with step functions, with edges.
+	// Actions []Action
+}
+
+// Validate returns an error if the function definition is invalid.
+func (f Function) Validate() error {
+	var err error
+	if f.Name == "" {
+		err = multierror.Append(err, fmt.Errorf("Name is required"))
+	}
+	if len(f.Triggers) == 0 {
+		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
+	}
+	for _, t := range f.Triggers {
+		if terr := t.Validate(); terr != nil {
+			err = multierror.Append(err, terr)
+		}
+	}
+	return err
+}
+
+// Workflow produces the workflow.cue definition for a function.  Our executor
+// runs a "workflow", which is a DAG of the function steps.  Its a subset of
+// the function used purely for execution.
+func (f Function) Workflow() (*DerivedConfig, error) {
+	id := slug.Make(f.Name)
+
+	w := inngest.Workflow{
+		Name:     f.Name,
+		ID:       id,
+		Triggers: make([]inngest.Trigger, len(f.Triggers)),
+	}
+
+	for n, t := range f.Triggers {
+		if t.EventTrigger != nil {
+			w.Triggers[n].EventTrigger = &inngest.EventTrigger{
+				Event:      t.EventTrigger.Event,
+				Expression: t.EventTrigger.Expression,
+			}
+			continue
+		}
+		if t.CronTrigger != nil {
+			w.Triggers[n].CronTrigger = &inngest.CronTrigger{
+				Cron: t.CronTrigger.Cron,
+			}
+			continue
+		}
+		return nil, fmt.Errorf("unknown trigger type")
+	}
+
+	// This has references to actions.  Create the actions then reference them
+	// from the workflow.
+	actions, err := f.Actions()
+	if err != nil {
+		return nil, err
+	}
+
+	for n, a := range actions {
+		w.Actions = append(w.Actions, inngest.Action{
+			ClientID: uint(n) + 1, // 0 is the trigger; use 1 offset
+			Name:     a.name,
+			DSN:      a.id,
+		})
+	}
+
+	// TODO: When supporting > 1 step, the function must define edges itself.
+	// Right now we assume a single action (all that's supported) and build an
+	// edge from the trigger to the action.
+	w.Edges = []inngest.Edge{{
+		Outgoing: "trigger",
+		Incoming: 1,
+	}}
+
+	config, err := inngest.FormatWorkflow(w)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DerivedConfig{
+		name:       f.Name,
+		id:         id,
+		kind:       derivedWorkflow,
+		definition: w,
+		config:     []byte(config),
+	}, nil
+}
+
+// Actions produces configuration for each step of the function.  Each config
+// file specifies how to run the code.
+func (f Function) Actions() ([]*DerivedConfig, error) {
+	// XXX: In the very near future we'll adapt this function package to
+	// support step functions in the same way that a workflow does.  This
+	// means that we have to support returning many actions.
+
+	// This has no defined actions, which means its an implicit
+	// single action invocation.  We assume that a Dockerfile
+	// exists in the project root, and that we can build the
+	// image which contains all of the code necessary to run
+	// the function.
+	return f.defaultAction()
+}
+
+func (f Function) defaultAction() ([]*DerivedConfig, error) {
+	id := slug.Make(f.Name) + "-action"
+	a := inngest.ActionVersion{
+		Name: f.Name,
+		DSN:  id,
+		// This is a custom action, so allow reading any secret.
+		Scopes: []string{"secret:read:*"},
+		Runtime: inngest.RuntimeWrapper{
+			Runtime: inngest.RuntimeDocker{
+				Image: slug.Make(f.Name),
+			},
+		},
+	}
+
+	config, err := inngest.FormatAction(a)
+	if err != nil {
+		return nil, err
+	}
+
+	return []*DerivedConfig{{
+		name:       f.Name,
+		id:         id,
+		kind:       derivedAction,
+		definition: a,
+		config:     []byte(config),
+	}}, nil
+}
+
+// DerivedConfig represents configuration derived from the function used in
+// execution.
+type DerivedConfig struct {
+	// name is the name of the config
+	name string
+	// id is the workflow ID or action DSN
+	id string
+	// kind is the definition type, eg. workflow or action.  this is only
+	// used in debugging.
+	kind string
+	// definition stores the original struct which generated the definition
+	definition interface{}
+	// config is the serialized cue configuration.
+	config []byte
+}
+
+/*
+ */
