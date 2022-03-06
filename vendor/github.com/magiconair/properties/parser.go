@@ -59,6 +59,14 @@ func (p *parser) errorf(format string, args ...interface{}) {
 	panic(fmt.Errorf(format, args...))
 }
 
+func (p *parser) expect(expected itemType) (token item) {
+	token = p.lex.nextItem()
+	if token.typ != expected {
+		p.unexpected(token)
+	}
+	return token
+}
+
 func (p *parser) expectOneOf(expected ...itemType) (token item) {
 	token = p.lex.nextItem()
 	for _, v := range expected {
@@ -83,4 +91,5 @@ func (p *parser) recover(errp *error) {
 		}
 		*errp = e.(error)
 	}
+	return
 }

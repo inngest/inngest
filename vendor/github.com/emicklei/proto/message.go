@@ -53,7 +53,6 @@ func (m *Message) parse(p *Parser) error {
 		}
 	}
 	m.Name = lit
-	consumeCommentFor(p, m)
 	_, tok, lit = p.next()
 	if tok != tLEFTCURLY {
 		return p.unexpected(lit, m.groupName()+" opening {", m)

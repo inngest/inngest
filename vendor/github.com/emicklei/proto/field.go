@@ -78,7 +78,7 @@ func (f *NormalField) parse(p *Parser) error {
 			return f.parse(p)
 		case tIDENT:
 			f.Type = lit
-			return parseFieldAfterType(f.Field, p, f)
+			return parseFieldAfterType(f.Field, p)
 		default:
 			goto done
 		}
@@ -89,7 +89,7 @@ done:
 
 // parseFieldAfterType expects:
 // fieldName "=" fieldNumber [ "[" fieldOptions "]" ] ";
-func parseFieldAfterType(f *Field, p *Parser, parent Visitee) error {
+func parseFieldAfterType(f *Field, p *Parser) error {
 	pos, tok, lit := p.next()
 	if tok != tIDENT {
 		if !isKeyword(tok) {
@@ -117,7 +117,6 @@ func parseFieldAfterType(f *Field, p *Parser, parent Visitee) error {
 		o := new(Option)
 		o.Position = pos
 		o.IsEmbedded = true
-		o.parent(parent)
 		err := o.parse(p)
 		if err != nil {
 			return err
@@ -175,7 +174,7 @@ func (f *MapField) parse(p *Parser) error {
 	if tGREATER != tok {
 		return p.unexpected(lit, "map valueType >", f)
 	}
-	return parseFieldAfterType(f.Field, p, f)
+	return parseFieldAfterType(f.Field, p)
 }
 
 func (f *Field) parent(v Visitee) { f.Parent = v }
