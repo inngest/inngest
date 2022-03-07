@@ -120,7 +120,10 @@ func pushImage(ctx context.Context, a deployImageOptions, dkr *docker.Client) er
 	}
 
 	defer func() {
-		dkr.ImageRemove(ctx, tag, types.ImageRemoveOptions{})
+		if _, err := dkr.ImageRemove(ctx, tag, types.ImageRemoveOptions{}); err != nil {
+			log.From(ctx).Info().Msgf("failed to remove docker image %v", err)
+		}
+
 	}()
 
 	rc, err := dkr.ImagePush(ctx, tag, types.ImagePushOptions{

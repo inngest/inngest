@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"regexp"
 	"time"
 
 	"github.com/inngest/inngestctl/cmd/commands/internal/actions"
@@ -20,12 +19,6 @@ import (
 var (
 	pushOnly      bool
 	includePublic bool
-	versionRegex  = regexp.MustCompile(`^v?([0-9]+).([0-9]+)$`)
-	spacesRegex   = regexp.MustCompile(`\s`)
-)
-
-const (
-	actionComment = `// For documentation on action configuration, visit https://docs.inngest.com/docs/actions`
 )
 
 func NewCmdActions() *cobra.Command {
@@ -33,7 +26,8 @@ func NewCmdActions() *cobra.Command {
 		Use:   "actions",
 		Short: "Manages actions within your account",
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+			// cmd.Help always returns nil so ignore the error
+			_ = cmd.Help()
 		},
 	}
 
@@ -193,7 +187,9 @@ func NewCmdActions() *cobra.Command {
 				return err
 			}
 
-			ioutil.WriteFile("./action.cue", []byte(data), 0600)
+			if err := ioutil.WriteFile("./action.cue", []byte(data), 0600); err != nil {
+				fmt.Printf("Error writing action.cue file - error:%v", err)
+			}
 			fmt.Println("Created an action configuration file: ./action.cue")
 			fmt.Println("")
 			fmt.Println("Edit this file with your configuration and deploy using `inngestctl actions deploy`.")
