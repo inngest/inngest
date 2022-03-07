@@ -53,10 +53,10 @@ func NewCmdWorkspaces() *cobra.Command {
 
 			if found == nil {
 				log.From(ctx).Fatal().Msg("Workspace not found")
-			}
-
-			if err := state.SetWorkspace(ctx, *found); err != nil {
-				log.From(ctx).Fatal().Msgf("Error setting workspace: %s", err)
+			} else {
+				if err := state.SetWorkspace(ctx, *found); err != nil {
+					log.From(ctx).Fatal().Msgf("Error setting workspace: %s", err)
+				}
 			}
 
 			log.From(ctx).Info().Msg("Workspace selected")

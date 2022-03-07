@@ -236,7 +236,9 @@ func NewCmdWorkflows() *cobra.Command {
 				return err
 			}
 
-			ioutil.WriteFile("./workflow.cue", []byte(data), 0600)
+			if err := ioutil.WriteFile("./workflow.cue", []byte(data), 0600); err != nil {
+				fmt.Printf("Error writing workflow.cue file - error:%v", err)
+			}
 			fmt.Println("Created a workflow configuration file: ./workflow.cue")
 			fmt.Println("")
 			fmt.Println("Edit this file with your configuration and deploy using `inngestctl workflows deploy`.")

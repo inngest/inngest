@@ -85,7 +85,7 @@ func (r *RuntimeWrapper) UnmarshalJSON(b []byte) error {
 		if err := json.Unmarshal(b, &docker); err != nil {
 			return err
 		}
-		*&r.Runtime = docker
+		r.Runtime = docker
 		return nil
 	}
 

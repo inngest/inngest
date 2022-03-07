@@ -75,7 +75,6 @@ func build(cmd *cobra.Command, args []string) {
 }
 
 func createBuildCommand(args []string) []string {
-	var a []string
-	a = append([]string{"buildx", "build", "--load"}, args...)
+	a := append([]string{"buildx", "build", "--load"}, args...)
 	return a
 }
