@@ -142,7 +142,9 @@ func (e *Environment) evalCached(c *OpContext, x Expr) Value {
 		c.e, c.src = e, x.Source()
 		v = c.evalState(x, Partial) // TODO: should this be Finalized?
 		c.e, c.src = env, src
-		e.cache[x] = v
+		if b, ok := v.(*Bottom); !ok || !b.IsIncomplete() {
+			e.cache[x] = v
+		}
 	}
 	return v
 }
@@ -213,6 +215,12 @@ type Vertex struct {
 	// Structs is a slice of struct literals that contributed to this value.
 	// This information is used to compute the topological sort of arcs.
 	Structs []*StructInfo
+}
+
+func (v *Vertex) Clone() *Vertex {
+	c := *v
+	c.state = nil
+	return &c
 }
 
 type StructInfo struct {
@@ -479,7 +487,7 @@ func Unwrap(v Value) Value {
 	if !ok {
 		return v
 	}
-	// b, _ := x.BaseValue.(*Bottom)
+	x = x.Indirect()
 	if n := x.state; n != nil && isCyclePlaceholder(x.BaseValue) {
 		if n.errs != nil && !n.errs.IsIncomplete() {
 			return n.errs
@@ -489,6 +497,19 @@ func Unwrap(v Value) Value {
 		}
 	}
 	return x.Value()
+}
+
+// Indirect unrolls indirections of Vertex values. These may be introduced,
+// for instance, by temporary bindings such as comprehension values.
+// It returns v itself if v does not point to another Vertex.
+func (v *Vertex) Indirect() *Vertex {
+	for {
+		arc, ok := v.BaseValue.(*Vertex)
+		if !ok {
+			return v
+		}
+		v = arc
+	}
 }
 
 // OptionalType is a bit field of the type of optional constraints in use by an
@@ -586,7 +607,7 @@ func (v *Vertex) Accept(ctx *OpContext, f Feature) bool {
 		}
 	}
 
-	if k := v.Kind(); k&StructKind == 0 && f.IsString() && f != AnyLabel {
+	if k := v.Kind(); k&StructKind == 0 && f.IsString() {
 		// If the value is bottom, we may not really know if this used to
 		// be a struct.
 		if k != BottomKind || len(v.Structs) == 0 {
@@ -631,6 +652,7 @@ func (v *Vertex) IsList() bool {
 func (v *Vertex) Lookup(f Feature) *Vertex {
 	for _, a := range v.Arcs {
 		if a.Label == f {
+			a = a.Indirect()
 			return a
 		}
 	}

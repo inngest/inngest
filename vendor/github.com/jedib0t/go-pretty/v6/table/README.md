@@ -161,8 +161,7 @@ You can also roll your own style:
             UnfinishedRow:    " ~~~",
         },
         Color: table.ColorOptions{
-            AutoIndexColumn: nil,
-            FirstColumn:     nil,
+            IndexColumn:     text.Colors{text.BgCyan, text.FgBlack},
             Footer:          text.Colors{text.BgCyan, text.FgBlack},
             Header:          text.Colors{text.BgHiCyan, text.FgBlack},
             Row:             text.Colors{text.BgHiWhite, text.FgBlack},
@@ -187,6 +186,7 @@ Or you can use one of the ready-to-use Styles, and just make a few tweaks:
 ```golang
     t.SetStyle(table.StyleLight)
     t.Style().Color.Header = text.Colors{text.BgHiCyan, text.FgBlack}
+    t.Style().Color.IndexColumn = text.Colors{text.BgHiCyan, text.FgBlack}
     t.Style().Format.Footer = text.FormatLower
     t.Style().Options.DrawBorder = false
 ```

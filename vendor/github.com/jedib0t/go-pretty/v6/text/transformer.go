@@ -133,26 +133,15 @@ func NewJSONTransformer(prefix string, indent string) Transformer {
 // location (use time.Local to get localized timestamps).
 func NewTimeTransformer(layout string, location *time.Location) Transformer {
 	return func(val interface{}) string {
-		formatTime := func(t time.Time) string {
-			rsp := ""
-			if t.Unix() > 0 {
-				if location != nil {
-					t = t.In(location)
-				}
-				rsp = t.Format(layout)
-			}
-			return rsp
-		}
-
 		rsp := fmt.Sprint(val)
 		if valTime, ok := val.(time.Time); ok {
-			rsp = formatTime(valTime)
+			rsp = formatTime(valTime, layout, location)
 		} else {
 			// cycle through some supported layouts to see if the string form
 			// of the object matches any of these layouts
 			for _, possibleTimeLayout := range possibleTimeLayouts {
 				if valTime, err := time.Parse(possibleTimeLayout, rsp); err == nil {
-					rsp = formatTime(valTime)
+					rsp = formatTime(valTime, layout, location)
 					break
 				}
 			}
@@ -168,24 +157,14 @@ func NewTimeTransformer(layout string, location *time.Location) Transformer {
 // If a non-nil location value is provided, the time will be localized to that
 // location (use time.Local to get localized timestamps).
 func NewUnixTimeTransformer(layout string, location *time.Location) Transformer {
-	timeTransformer := NewTimeTransformer(layout, location)
-	formatUnixTime := func(unixTime int64) string {
-		if unixTime >= unixTimeMinNanoSeconds {
-			unixTime = unixTime / time.Second.Nanoseconds()
-		} else if unixTime >= unixTimeMinMicroseconds {
-			unixTime = unixTime / (time.Second.Nanoseconds() / 1000)
-		} else if unixTime >= unixTimeMinMilliseconds {
-			unixTime = unixTime / (time.Second.Nanoseconds() / 1000000)
-		}
-		return timeTransformer(time.Unix(unixTime, 0))
-	}
+	transformer := NewTimeTransformer(layout, location)
 
 	return func(val interface{}) string {
 		if unixTime, ok := val.(int64); ok {
-			return formatUnixTime(unixTime)
+			return formatTimeUnix(unixTime, transformer)
 		} else if unixTimeStr, ok := val.(string); ok {
 			if unixTime, err := strconv.ParseInt(unixTimeStr, 10, 64); err == nil {
-				return formatUnixTime(unixTime)
+				return formatTimeUnix(unixTime, transformer)
 			}
 		}
 		return fmt.Sprint(val)
@@ -198,4 +177,26 @@ func NewURLTransformer() Transformer {
 	return func(val interface{}) string {
 		return colorsURL.Sprint(val)
 	}
+}
+
+func formatTime(t time.Time, layout string, location *time.Location) string {
+	rsp := ""
+	if t.Unix() > 0 {
+		if location != nil {
+			t = t.In(location)
+		}
+		rsp = t.Format(layout)
+	}
+	return rsp
+}
+
+func formatTimeUnix(unixTime int64, timeTransformer Transformer) string {
+	if unixTime >= unixTimeMinNanoSeconds {
+		unixTime = unixTime / time.Second.Nanoseconds()
+	} else if unixTime >= unixTimeMinMicroseconds {
+		unixTime = unixTime / (time.Second.Nanoseconds() / 1000)
+	} else if unixTime >= unixTimeMinMilliseconds {
+		unixTime = unixTime / (time.Second.Nanoseconds() / 1000000)
+	}
+	return timeTransformer(time.Unix(unixTime, 0))
 }

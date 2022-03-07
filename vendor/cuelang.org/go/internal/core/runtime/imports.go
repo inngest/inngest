@@ -58,17 +58,19 @@ var sharedIndex = newIndex()
 //
 // All instances belonging to the same package should share this index.
 type index struct {
-	// Change this to Instance at some point.
-	// From *structLit/*Vertex -> Instance
+	// lock is used to guard imports-related maps.
+	// TODO: makes these per cuecontext.
+	lock           sync.RWMutex
 	imports        map[*adt.Vertex]*build.Instance
 	importsByPath  map[string]*adt.Vertex
 	importsByBuild map[*build.Instance]*adt.Vertex
-	builtinPaths   map[string]PackageFunc // Full path
-	builtinShort   map[string]string      // Commandline shorthand
 
-	// mutex     sync.Mutex
+	// These are initialized during Go package initialization time and do not
+	// need to be guarded.
+	builtinPaths map[string]PackageFunc // Full path
+	builtinShort map[string]string      // Commandline shorthand
+
 	typeCache sync.Map // map[reflect.Type]evaluated
-
 }
 
 func newIndex() *index {
@@ -88,6 +90,9 @@ func (x *index) shortBuiltinToPath(id string) string {
 }
 
 func (r *Runtime) AddInst(path string, key *adt.Vertex, p *build.Instance) {
+	r.index.lock.Lock()
+	defer r.index.lock.Unlock()
+
 	x := r.index
 	if key == nil {
 		panic("key must not be nil")
@@ -100,26 +105,35 @@ func (r *Runtime) AddInst(path string, key *adt.Vertex, p *build.Instance) {
 }
 
 func (r *Runtime) GetInstanceFromNode(key *adt.Vertex) *build.Instance {
+	r.index.lock.RLock()
+	defer r.index.lock.RUnlock()
+
 	return r.index.imports[key]
 }
 
 func (r *Runtime) getNodeFromInstance(key *build.Instance) *adt.Vertex {
+	r.index.lock.RLock()
+	defer r.index.lock.RUnlock()
+
 	return r.index.importsByBuild[key]
 }
 
-func (r *Runtime) LoadImport(importPath string) (*adt.Vertex, errors.Error) {
+func (r *Runtime) LoadImport(importPath string) *adt.Vertex {
+	r.index.lock.Lock()
+	defer r.index.lock.Unlock()
+
 	x := r.index
 
 	key := x.importsByPath[importPath]
 	if key != nil {
-		return key, nil
+		return key
 	}
 
 	if x.builtinPaths != nil {
 		if f := x.builtinPaths[importPath]; f != nil {
 			p, err := f(r)
 			if err != nil {
-				return adt.ToVertex(&adt.Bottom{Err: err}), nil
+				return adt.ToVertex(&adt.Bottom{Err: err})
 			}
 			inst := &build.Instance{
 				ImportPath: importPath,
@@ -128,9 +142,9 @@ func (r *Runtime) LoadImport(importPath string) (*adt.Vertex, errors.Error) {
 			x.imports[p] = inst
 			x.importsByPath[importPath] = p
 			x.importsByBuild[inst] = p
-			return p, nil
+			return p
 		}
 	}
 
-	return key, nil
+	return key
 }

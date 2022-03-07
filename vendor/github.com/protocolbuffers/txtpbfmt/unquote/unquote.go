@@ -14,9 +14,19 @@ import (
 // Unquote returns the value of the string node.
 // Calling Unquote on non-string node doesn't panic, but is otherwise undefined.
 func Unquote(n *ast.Node) (string, error) {
+	return unquoteValues(n.Values, unquote)
+}
+
+// Raw returns the raw value of the string node, with string escapes left in place.
+// Calling UnquoteRaw on non-string node doesn't panic, but is otherwise undefined.
+func Raw(n *ast.Node) (string, error) {
+	return unquoteValues(n.Values, unquoteRaw)
+}
+
+func unquoteValues(values []*ast.Value, unquoter func(string) (string, error)) (string, error) {
 	var ret strings.Builder
-	for _, v := range n.Values {
-		uq, err := unquote(v.Value)
+	for _, v := range values {
+		uq, err := unquoter(v.Value)
 		if err != nil {
 			return "", err
 		}
@@ -25,18 +35,36 @@ func Unquote(n *ast.Node) (string, error) {
 	return ret.String(), nil
 }
 
-func unquote(s string) (string, error) {
+// Returns the quote rune used in the given string (' or "). Returns an error if the string doesn't
+// start and end with a matching pair of valid quotes.
+func quoteRune(s string) (rune, error) {
 	if len(s) < 2 {
-		return "", errors.New("not a quoted string")
+		return 0, errors.New("not a quoted string")
 	}
 	quote := s[0]
 	if quote != '"' && quote != '\'' {
-		return "", errors.New("invalid quote character")
+		return 0, fmt.Errorf("invalid quote character %s", string(quote))
 	}
 	if s[len(s)-1] != quote {
-		return "", errors.New("unmatched quote")
+		return 0, errors.New("unmatched quote")
 	}
-	return unquoteC(s[1:len(s)-1], rune(quote))
+	return rune(quote), nil
+}
+
+func unquote(s string) (string, error) {
+	quote, err := quoteRune(s)
+	if err != nil {
+		return "", err
+	}
+	return unquoteC(s[1:len(s)-1], quote)
+}
+
+func unquoteRaw(s string) (string, error) {
+	_, err := quoteRune(s) // Trigger validation, which guarantees this is a quote-wrapped string.
+	if err != nil {
+		return "", err
+	}
+	return s[1 : len(s)-1], nil
 }
 
 var (
@@ -151,7 +179,7 @@ func unescape(s string) (ch string, tail string, err error) {
 		if i > utf8.MaxRune {
 			return "", "", fmt.Errorf(`\%c%s is not a valid Unicode code point`, r, ss)
 		}
-		return string(i), s, nil
+		return strconv.FormatUint(i, 10), s, nil
 	}
 	return "", "", fmt.Errorf(`unknown escape \%c`, r)
 }

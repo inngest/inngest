@@ -57,8 +57,6 @@ type Instance struct {
 	Err        errors.Error // non-nil if the package had errors
 
 	inst *build.Instance
-
-	// complete bool // for cycle detection
 }
 
 type hiddenInstance = Instance
@@ -118,7 +116,7 @@ func getImportFromNode(x *runtime.Runtime, v *adt.Vertex) *Instance {
 }
 
 func getImportFromPath(x *runtime.Runtime, id string) *Instance {
-	node, _ := x.LoadImport(id)
+	node := x.LoadImport(id)
 	if node == nil {
 		return nil
 	}
@@ -245,7 +243,6 @@ func Merge(inst ...*Instance) *Instance {
 
 	p := addInst(i.index, &Instance{
 		root: v,
-		// complete: true,
 	})
 	return p
 }
@@ -279,8 +276,6 @@ func (inst *hiddenInstance) Build(p *build.Instance) *Instance {
 	if err != nil {
 		i.setListOrError(err)
 	}
-
-	// i.complete = true
 
 	return i
 }

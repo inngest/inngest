@@ -112,8 +112,8 @@ type Runtime interface {
 	StringIndexer
 
 	// LoadImport loads a unique Vertex associated with a given import path. It
-	// returns an error if no import for this package could be found.
-	LoadImport(importPath string) (*Vertex, errors.Error)
+	// returns nil if no import for this package could be found.
+	LoadImport(importPath string) *Vertex
 
 	// StoreType associates a CUE expression with a Go type.
 	StoreType(t reflect.Type, src ast.Expr, expr Expr)
@@ -400,13 +400,7 @@ func (c *OpContext) Resolve(env *Environment, r Resolver) (*Vertex, *Bottom) {
 		return nil, arc.ChildErrors
 	}
 
-	for {
-		x, ok := arc.BaseValue.(*Vertex)
-		if !ok {
-			break
-		}
-		arc = x
-	}
+	arc = arc.Indirect()
 
 	return arc, err
 }
@@ -761,6 +755,9 @@ func (c *OpContext) lookup(x *Vertex, pos token.Pos, l Feature, state VertexStat
 	}
 
 	a := x.Lookup(l)
+	if a != nil {
+		a = a.Indirect()
+	}
 
 	var hasCycle bool
 outer:

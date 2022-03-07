@@ -91,10 +91,10 @@ func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct,
 		attrs:    []*ast.Attribute{},
 	}
 
-	_, saved := e.pushFrame(orig)
+	s, saved := e.pushFrame(orig)
 	defer e.popFrame(saved)
 
-	// Handle value aliases
+	// Handle value aliases and lets
 	var valueAlias *ast.Alias
 	for _, c := range a {
 		if f, ok := c.c.Field().Source().(*ast.Field); ok {
@@ -110,13 +110,19 @@ func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct,
 				e.valueAlias[a] = valueAlias
 			}
 		}
+		x.markLets(c.c.Expr().Source())
 	}
+
+	defer filterUnusedLets(s)
+
 	defer func() {
 		if valueAlias != nil {
 			valueAlias.Expr = expr
 			expr = valueAlias
 		}
 	}()
+
+	hasAlias := len(s.Elts) > 0
 
 	for _, c := range a {
 		e.top().upCount = c.up
@@ -132,8 +138,6 @@ func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct,
 			}
 		}
 	}
-
-	s := x.top().scope
 
 	for _, a := range e.attrs {
 		s.Elts = append(s.Elts, a)
@@ -173,8 +177,8 @@ func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct,
 			if len(e.attrs) > 0 {
 				break
 			}
-			if len(e.structs) > 0 {
-				return s
+			if len(e.structs) > 0 || e.isData {
+				return e.wrapCloseIfNecessary(s, src)
 			}
 			return ast.NewIdent("_")
 		case 1:
@@ -184,20 +188,13 @@ func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct,
 			} else {
 				x = e.embed[0]
 			}
-			if len(e.attrs) == 0 {
+			if len(e.attrs) == 0 && !hasAlias {
 				return x
 			}
 			if st, ok := x.(*ast.StructLit); ok {
 				s.Elts = append(s.Elts, st.Elts...)
-				return s
+				return e.wrapCloseIfNecessary(s, src)
 			}
-		case 2:
-			if len(e.attrs) > 0 {
-				break
-			}
-			// Simplify.
-			e.conjuncts = append(e.conjuncts, e.embed...)
-			return ast.NewBinExpr(token.AND, e.conjuncts...)
 		}
 	}
 
@@ -253,14 +250,25 @@ func (x *exporter) mergeValues(label adt.Feature, src *adt.Vertex, a []conjunct,
 		s.Elts = append(s.Elts, &ast.Ellipsis{})
 	}
 
-	// TODO: why was this necessary?
-	// else if src != nil && src.IsClosedStruct() && e.inDefinition == 0 {
-	// return ast.NewCall(ast.NewIdent("close"), s)
-	// }
+	ws := e.wrapCloseIfNecessary(s, src)
+	switch {
+	case len(e.conjuncts) == 0:
+		return ws
 
-	e.conjuncts = append(e.conjuncts, s)
+	case len(e.structs) > 0, len(s.Elts) > 0:
+		e.conjuncts = append(e.conjuncts, ws)
+	}
 
 	return ast.NewBinExpr(token.AND, e.conjuncts...)
+}
+
+func (e *conjuncts) wrapCloseIfNecessary(s *ast.StructLit, v *adt.Vertex) ast.Expr {
+	if !e.hasEllipsis && v != nil {
+		if st, ok := v.BaseValue.(*adt.StructMarker); ok && st.NeedClose {
+			return ast.NewCall(ast.NewIdent("close"), s)
+		}
+	}
+	return s
 }
 
 // Conjuncts if for collecting values of a single vertex.
@@ -274,6 +282,10 @@ type conjuncts struct {
 	fields      map[adt.Feature]field
 	attrs       []*ast.Attribute
 	hasEllipsis bool
+
+	// A value is a struct if it has a non-zero structs slice or if isData is
+	// set to true. Data vertices may not have conjuncts associated with them.
+	isData bool
 }
 
 func (c *conjuncts) addValueConjunct(src *adt.Vertex, env *adt.Environment, x adt.Expr) {
@@ -372,6 +384,7 @@ func (e *conjuncts) addExpr(env *adt.Environment, src *adt.Vertex, x adt.Expr, i
 
 			case v.IsData():
 				e.structs = append(e.structs, v.Structs...)
+				e.isData = true
 
 				if y, ok := v.BaseValue.(adt.Value); ok {
 					e.addValueConjunct(src, env, y)

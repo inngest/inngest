@@ -190,7 +190,7 @@ func (c *compiler) updateAlias(id *ast.Ident, expr adt.Expr) {
 }
 
 // lookupAlias looks up an alias with the given name at the k'th stack position.
-func (c compiler) lookupAlias(k int, id *ast.Ident) aliasEntry {
+func (c *compiler) lookupAlias(k int, id *ast.Ident) aliasEntry {
 	m := c.stack[k].aliases
 	name := id.Name
 	entry, ok := m[name]
@@ -322,6 +322,10 @@ func (c *compiler) resolve(n *ast.Ident) adt.Expr {
 	}
 
 	label := c.label(n)
+
+	if label == adt.InvalidLabel { // `_`
+		return &adt.Top{Src: n}
+	}
 
 	// Unresolved field.
 	if n.Node == nil {
@@ -565,6 +569,10 @@ func (c *compiler) decl(d ast.Decl) adt.Decl {
 		case *ast.Ident, *ast.BasicLit:
 			label := c.label(lab)
 
+			if label == adt.InvalidLabel {
+				return c.errf(x, "cannot use _ as label")
+			}
+
 			// TODO(legacy): remove: old-school definitions
 			if x.Token == token.ISA && !label.IsDef() {
 				name, isIdent, err := ast.LabelName(lab)
@@ -650,10 +658,10 @@ func (c *compiler) decl(d ast.Decl) adt.Decl {
 		return c.comprehension(x)
 
 	case *ast.EmbedDecl: // Deprecated
-		return c.embed(x.Expr)
+		return c.expr(x.Expr)
 
 	case ast.Expr:
-		return c.embed(x)
+		return c.expr(x)
 	}
 	return nil
 }
@@ -769,18 +777,6 @@ func (c *compiler) comprehension(x *ast.Comprehension) adt.Elem {
 	return first
 }
 
-func (c *compiler) embed(expr ast.Expr) adt.Expr {
-	switch n := expr.(type) {
-	case *ast.StructLit:
-		c.pushScope(nil, 1, n)
-		v := &adt.StructLit{Src: n}
-		c.addDecls(v, n.Elts)
-		c.popScope()
-		return v
-	}
-	return c.expr(expr)
-}
-
 func (c *compiler) labeledExpr(f *ast.Field, lab labeler, expr ast.Expr) adt.Expr {
 	k := len(c.stack) - 1
 	return c.labeledExprAt(k, f, lab, expr)
@@ -816,6 +812,7 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 		return v
 
 	case *ast.ListLit:
+		c.pushScope(nil, 1, n)
 		v := &adt.ListLit{Src: n}
 		elts, ellipsis := internal.ListEllipsis(n)
 		for _, d := range elts {
@@ -836,6 +833,7 @@ func (c *compiler) expr(expr ast.Expr) adt.Expr {
 			}
 			v.Elems = append(v.Elems, d)
 		}
+		c.popScope()
 		return v
 
 	case *ast.SelectorExpr:
