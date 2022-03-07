@@ -2,14 +2,56 @@ package function
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/fs"
+	"os"
 	"path"
+	"path/filepath"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/load"
 	"github.com/inngest/inngestctl/pkg/cuedefs"
 )
+
+var (
+	ErrNotFound = fmt.Errorf("inngest definition not found")
+)
+
+// Load loads the inngest function from the given directory.  It searches for both inngest.cue
+// and inngest.json as both are supported.  If neither exist, this returns ErrNotFound.
+func Load(dir string) (*Function, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	// First attempt to find inngest.cue, the canonical reference.
+	cue := filepath.Join(abs, "inngest.cue")
+	if _, err := os.Stat(cue); err == nil {
+		// The cue file exists.
+		byt, err := os.ReadFile(cue)
+		if err != nil {
+			return nil, err
+		}
+		return Unmarshal(byt)
+	}
+
+	json := filepath.Join(abs, "inngest.json")
+	if _, err := os.Stat(json); err != nil {
+		// This doesn't exist.  Return ErrNotFound.
+		if os.IsNotExist(err) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	byt, err := os.ReadFile(json)
+	if err != nil {
+		return nil, err
+	}
+	return Unmarshal(byt)
+}
 
 // Unmarshal parses the input data and returns a function definition or an error.  The input
 // data may be either a cue definition of a function or a JSON object containing the function
@@ -34,6 +76,10 @@ func Unmarshal(input []byte) (*Function, error) {
 	return fn, nil
 }
 
+func MarshalJSON(f Function) ([]byte, error) {
+	return json.MarshalIndent(f, "", "  ")
+}
+
 // prepare generates a cue instance for the configuration.
 func prepare(input []byte) (*cue.Instance, error) {
 	cfg := &load.Config{
@@ -46,6 +92,9 @@ func prepare(input []byte) (*cue.Instance, error) {
 
 	// Add each of the embedded cue files from our definitions to our config.
 	err := fs.WalkDir(cuedefs.FS, ".", func(p string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
 		if entry.IsDir() {
 			return nil
 		}

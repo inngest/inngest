@@ -16,9 +16,10 @@ func TestUnmarshal(t *testing.T) {
 	}{
 		{
 			name:  "simplest json defintion",
-			input: `{"name":"test", triggers: [{ "event": "test.event" }] }`,
+			input: `{"id":"wut", "name":"test", triggers: [{ "event": "test.event" }] }`,
 			expected: Function{
 				Name: "test",
+				ID:   "wut",
 				Triggers: []Trigger{
 					{EventTrigger: &EventTrigger{Event: "test.event"}},
 				},
@@ -28,6 +29,7 @@ func TestUnmarshal(t *testing.T) {
 			name: "simplest plain cue definition",
 			input: `
 			{
+				id: "wut"
 				name: "test"
 				triggers: [{
 					event: "test.event"
@@ -35,6 +37,7 @@ func TestUnmarshal(t *testing.T) {
 			}`,
 			expected: Function{
 				Name: "test",
+				ID:   "wut",
 				Triggers: []Trigger{
 					{EventTrigger: &EventTrigger{Event: "test.event"}},
 				},
@@ -49,6 +52,7 @@ func TestUnmarshal(t *testing.T) {
 				)
 
 				function: defs.#Function & {
+					id: "hellz-yea"
 					name: "test"
 					triggers: [{
 						event: "test.event"
@@ -56,6 +60,7 @@ func TestUnmarshal(t *testing.T) {
 				}`,
 			expected: Function{
 				Name: "test",
+				ID:   "hellz-yea",
 				Triggers: []Trigger{
 					{EventTrigger: &EventTrigger{Event: "test.event"}},
 				},
@@ -77,8 +82,13 @@ func TestUnmarshal(t *testing.T) {
 		msg string
 	}{
 		{
-			name:  "no trigger specified",
+			name:  "no ID specified",
 			input: `{"name":"test"}`,
+			msg:   "ID is required",
+		},
+		{
+			name:  "no trigger specified",
+			input: `{"name":"test", "id": "wut"}`,
 			msg:   "trigger is required",
 		},
 		{

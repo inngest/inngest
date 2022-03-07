@@ -73,7 +73,7 @@ func (c *Config) Triggers() []inngest.Trigger {
 		}
 	}
 	return []inngest.Trigger{
-		{ScheduleTrigger: &inngest.ScheduleTrigger{Cron: c.Cron}},
+		{CronTrigger: &inngest.CronTrigger{Cron: c.Cron}},
 	}
 }
 

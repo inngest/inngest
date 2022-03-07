@@ -74,7 +74,7 @@ func (c *Config) Configuration() (string, error) {
 	output, err := inngest.FormatAction(inngest.ActionVersion{
 		DSN:  c.DSN,
 		Name: c.Name,
-		Version: inngest.VersionInfo{
+		Version: &inngest.VersionInfo{
 			Major: 1,
 			Minor: 1,
 		},

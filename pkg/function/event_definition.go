@@ -29,18 +29,18 @@ const (
 type EventDefinition struct {
 	// Format represents the format for the event definition.  This may be
 	// either "cue" or "string
-	Format DefinitionFormat
+	Format DefinitionFormat `json:"format"`
 
 	// Synced represents whether this is synced via the event registry or
 	// if this is a new event and is the source of truth itself.
-	Synced bool
+	Synced bool `json:"synced"`
 
 	// Def represents the type definition.  This may be the JSON schema
 	// definition, the cue syntax, or (soon) the avro syntax, etc.
 	//
 	// This may be the event definition itself, or it may be a path to
 	// a file which contains the event definition.
-	Def []byte
+	Def string `json:"def"`
 
 	// cueType is canonical cue definition for the event.  We use cue as our
 	// source of truth; to generate other event types we convert Def to cue,
@@ -68,11 +68,9 @@ func (ed *EventDefinition) createCueType() error {
 	file, err := filepath.Abs(string(ed.Def))
 	if err == nil {
 		// The event definition is stored within a file.
-		byt, err := os.ReadFile(file)
-		if err != nil {
-			return fmt.Errorf("error reading event definition file: %w", err)
+		if byt, err := os.ReadFile(file); err == nil {
+			ed.Def = string(byt)
 		}
-		ed.Def = byt
 	}
 
 	switch ed.Format {
@@ -114,7 +112,7 @@ func (ed *EventDefinition) JSONSchema() (map[string]interface{}, error) {
 	// definitions.
 	if ed.Format == FormatJSONSchema {
 		data := map[string]interface{}{}
-		err := json.Unmarshal(ed.Def, &data)
+		err := json.Unmarshal([]byte(ed.Def), &data)
 		return data, err
 	}
 

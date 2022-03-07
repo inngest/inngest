@@ -1,9 +1,11 @@
 package function
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 
-	"github.com/gosimple/slug"
+	petname "github.com/dustinkirkland/golang-petname"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngestctl/inngest"
 )
@@ -27,6 +29,9 @@ type Function struct {
 	// Name is the descriptive name for the function
 	Name string `json:"name"`
 
+	// ID is the immutable random ID for the function.
+	ID string `json:"id"`
+
 	// Trigger represnets the trigger for the function.
 	Triggers []Trigger `json:"triggers"`
 
@@ -37,11 +42,23 @@ type Function struct {
 	// Actions []Action
 }
 
+// New returns a new, empty function with a randomly generated ID.
+func New() (*Function, error) {
+	id, err := randomID()
+	if err != nil {
+		return nil, err
+	}
+	return &Function{ID: id}, nil
+}
+
 // Validate returns an error if the function definition is invalid.
 func (f Function) Validate() error {
 	var err error
+	if f.ID == "" {
+		err = multierror.Append(err, fmt.Errorf("A function ID is required"))
+	}
 	if f.Name == "" {
-		err = multierror.Append(err, fmt.Errorf("Name is required"))
+		err = multierror.Append(err, fmt.Errorf("A function name is required"))
 	}
 	if len(f.Triggers) == 0 {
 		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
@@ -58,11 +75,9 @@ func (f Function) Validate() error {
 // runs a "workflow", which is a DAG of the function steps.  Its a subset of
 // the function used purely for execution.
 func (f Function) Workflow() (*DerivedConfig, error) {
-	id := slug.Make(f.Name)
-
 	w := inngest.Workflow{
 		Name:     f.Name,
-		ID:       id,
+		ID:       f.ID,
 		Triggers: make([]inngest.Trigger, len(f.Triggers)),
 	}
 
@@ -113,7 +128,7 @@ func (f Function) Workflow() (*DerivedConfig, error) {
 
 	return &DerivedConfig{
 		name:       f.Name,
-		id:         id,
+		id:         f.ID,
 		kind:       derivedWorkflow,
 		definition: w,
 		config:     []byte(config),
@@ -136,7 +151,7 @@ func (f Function) Actions() ([]*DerivedConfig, error) {
 }
 
 func (f Function) defaultAction() ([]*DerivedConfig, error) {
-	id := slug.Make(f.Name) + "-action"
+	id := f.ID + "-action"
 	a := inngest.ActionVersion{
 		Name: f.Name,
 		DSN:  id,
@@ -144,7 +159,7 @@ func (f Function) defaultAction() ([]*DerivedConfig, error) {
 		Scopes: []string{"secret:read:*"},
 		Runtime: inngest.RuntimeWrapper{
 			Runtime: inngest.RuntimeDocker{
-				Image: slug.Make(f.Name),
+				Image: f.ID,
 			},
 		},
 	}
@@ -179,5 +194,15 @@ type DerivedConfig struct {
 	config []byte
 }
 
-/*
- */
+func randomID() (string, error) {
+	// Generate a 6 character long hex string.  This is the suffix to
+	// our DSN prefix, which decreases the chance of collosion by 1/16,777,216.
+	// This makes the total chance of collisions from an _empty_ keyspace
+	// 1 in 3,435,034,312,704 (we'll ignore birthday problems).
+	byt := make([]byte, 3)
+	if _, err := rand.Read(byt); err != nil {
+		return "", fmt.Errorf("error generating ID: %w", err)
+	}
+	petname.NonDeterministicMode()
+	return fmt.Sprintf("%s-%s", petname.Generate(2, "-"), hex.EncodeToString(byt)), nil
+}

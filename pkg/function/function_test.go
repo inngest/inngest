@@ -13,6 +13,7 @@ func TestDerivedConfigDefault(t *testing.T) {
 	expr := "event.version >= 2"
 	fn := Function{
 		Name: "Foo",
+		ID:   "magical-id-1",
 		Triggers: []Trigger{
 			{
 				EventTrigger: &EventTrigger{
@@ -21,7 +22,7 @@ func TestDerivedConfigDefault(t *testing.T) {
 					Definition: &EventDefinition{
 						Format: FormatCue,
 						Synced: false,
-						Def:    []byte(`{ name: string }`),
+						Def:    `{ name: string }`,
 					},
 				},
 			},
@@ -30,11 +31,11 @@ func TestDerivedConfigDefault(t *testing.T) {
 
 	expectedActionVersion := inngest.ActionVersion{
 		Name:   "Foo",
-		DSN:    "foo-action",
+		DSN:    "magical-id-1-action",
 		Scopes: []string{"secret:read:*"},
 		Runtime: inngest.RuntimeWrapper{
 			Runtime: inngest.RuntimeDocker{
-				Image: "foo",
+				Image: "magical-id-1",
 			},
 		},
 	}
@@ -47,11 +48,11 @@ import (
 
 action: actions.#Action
 action: {
-  dsn:  "foo-action"
+  dsn:  "magical-id-1-action"
   name: "Foo"
   scopes: ["secret:read:*"]
   runtime: {
-    image: "foo"
+    image: "magical-id-1"
     type:  "docker"
   }
 }`
@@ -63,7 +64,7 @@ action: {
 	require.EqualValues(t, expectedActionConfig, string(actions[0].config))
 
 	expectedWorkflow := inngest.Workflow{
-		ID:   "foo",
+		ID:   "magical-id-1",
 		Name: "Foo",
 		Triggers: []inngest.Trigger{
 			{
@@ -95,7 +96,7 @@ import (
 )
 
 workflow: workflows.#Workflow & {
-  id:   "foo"
+  id:   "magical-id-1"
   name: "Foo"
   triggers: [{
     event:      "test.event.plz"
@@ -104,7 +105,7 @@ workflow: workflows.#Workflow & {
   actions: [{
     clientID: 1
     name:     "Foo"
-    dsn:      "foo-action"
+    dsn:      "magical-id-1-action"
   }]
   edges: [{
     outgoing: "trigger"

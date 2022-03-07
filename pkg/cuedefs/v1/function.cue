@@ -1,6 +1,7 @@
 package v1
 
 #Function: {
+	id:   string
 	name: string
 	triggers: [...#Trigger]
 }
