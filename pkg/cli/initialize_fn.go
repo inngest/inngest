@@ -21,6 +21,8 @@ const (
 	stateAskName  = "name"
 	stateAskEvent = "event"
 	stateDone     = "done"
+	// stateQuit is used when terminating the walkthrough early
+	stateQuit = "quit"
 
 	eventPlaceholder = "What event name triggers this function?  Use your own event name or an event from an integration."
 
@@ -80,7 +82,7 @@ var _ tea.Model = (*initModel)(nil)
 
 // DidQuitEarly returns whether we quit the walthrough early.
 func (f *initModel) DidQuitEarly() bool {
-	return false
+	return f.state == stateQuit
 }
 
 // Function returns the formatted function given answers from the TUI state.
@@ -129,6 +131,7 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyCtrlBackslash:
+			f.state = stateQuit
 			return f, tea.Quit
 		}
 	}

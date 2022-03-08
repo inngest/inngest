@@ -43,7 +43,8 @@ func runInit(cmd *cobra.Command, args []string) {
 	}
 
 	if state.DidQuitEarly() {
-		fmt.Println(cli.RenderWarning("Quitting wihtout making your function.  Take care! :D") + "\n")
+		fmt.Println("\n" + cli.RenderWarning("Quitting without making your function.  Take care!") + "\n")
+		return
 	}
 
 	// Get the function from the state.
