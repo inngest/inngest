@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -35,18 +36,12 @@ func NewCmdBuild() *cobra.Command {
 		Run:     build,
 		Args:    cobra.MinimumNArgs(1),
 	}
-	cmd.Flags().StringP("builder", "b", "docker", "Specify the builder to use. Options: docker or podman")
 	return cmd
 }
 
 func build(cmd *cobra.Command, args []string) {
-	builder, err := cmd.Flags().GetString("builder")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	builder := strings.ToLower(viper.GetString("builder"))
 
-	builder = strings.ToLower(builder)
 	if builder != builderDocker && builder != builderPodman {
 		fmt.Printf("Invalid builder specified:%v\nValid values are [docker] or [podman]\n\n", builder)
 		fmt.Println(cmd.Help())

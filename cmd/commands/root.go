@@ -9,14 +9,27 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	longDescription = `
+    ____                            __ 
+   /  _/___  ____  ____ ____  _____/ /_
+   / // __ \/ __ \/ __ '/ _ \/ ___/ __/
+ _/ // / / / / / / /_/ /  __(__  ) /_  
+/___/_/ /_/_/ /_/\__, /\___/____/\__/  
+                /____/                 
+`
+)
+
 func Execute() {
 	rootCmd := &cobra.Command{
 		Use:   "inngest",
 		Short: "A serverless event-driven infrastructure platform",
+		Long:  longDescription,
 	}
 
 	rootCmd.PersistentFlags().String("log.type", "", "Log type (one of json, tty). Defaults to 'json' without a TTY")
 	rootCmd.PersistentFlags().StringP("log.level", "l", "debug", "Log level")
+	rootCmd.PersistentFlags().StringP("builder", "b", "docker", "Specify the builder to use. Options: docker or podman")
 
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		panic(err)
