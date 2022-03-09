@@ -49,8 +49,6 @@ type ActionVersion struct {
 	// amount of time.
 	WorkflowMetadata MetadataMap `json:"workflowMetadata"`
 
-	Scopes []string `json:"scopes"`
-
 	// Response defines the response type for this action.  This allows us to show UI-specific
 	// information around the "stack" or "baggage" that is built up around your workflow as
 	// actions run.
