@@ -52,16 +52,17 @@ type Workflow struct {
 // Trigger represents the starting point for a workflow
 type Trigger struct {
 	*EventTrigger
-	*ScheduleTrigger
+	*CronTrigger
 }
 
 // EventTrigger represents an event that triggers this workflow.
 type EventTrigger struct {
-	Event string `json:"event"`
+	Event      string  `json:"event"`
+	Expression *string `json:"expression"`
 }
 
-// ScheduleTrigger represents the cron schedule that triggers this workflow
-type ScheduleTrigger struct {
+// CronTrigger represents the cron schedule that triggers this workflow
+type CronTrigger struct {
 	Cron string `json:"cron"`
 }
 

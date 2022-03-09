@@ -1,4 +1,3 @@
-//go:build windows
 // +build windows
 
 package winio
@@ -253,23 +252,15 @@ func (conn *HvsockConn) Close() error {
 	return conn.sock.Close()
 }
 
-func (conn *HvsockConn) IsClosed() bool {
-	return conn.sock.IsClosed()
-}
-
 func (conn *HvsockConn) shutdown(how int) error {
-	if conn.IsClosed() {
-		return ErrFileClosed
-	}
-
-	err := syscall.Shutdown(conn.sock.handle, how)
+	err := syscall.Shutdown(conn.sock.handle, syscall.SHUT_RD)
 	if err != nil {
 		return os.NewSyscallError("shutdown", err)
 	}
 	return nil
 }
 
-// CloseRead shuts down the read end of the socket, preventing future read operations.
+// CloseRead shuts down the read end of the socket.
 func (conn *HvsockConn) CloseRead() error {
 	err := conn.shutdown(syscall.SHUT_RD)
 	if err != nil {
@@ -278,8 +269,8 @@ func (conn *HvsockConn) CloseRead() error {
 	return nil
 }
 
-// CloseWrite shuts down the write end of the socket, preventing future write operations and
-// notifying the other endpoint that no more data will be written.
+// CloseWrite shuts down the write end of the socket, notifying the other endpoint that
+// no more data will be written.
 func (conn *HvsockConn) CloseWrite() error {
 	err := conn.shutdown(syscall.SHUT_WR)
 	if err != nil {

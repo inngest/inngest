@@ -16,9 +16,9 @@ import (
 	// The workflow name.
 	name: string
 
-	workflowType: "alert" | "error_alert" | *"general"
+	workflowType:    "alert" | "error_alert" | *"general"
 	throttlePeriod?: string
-	throttleCount?: >=0 | *0
+	throttleCount?:  >=0 | *0
 
 	// The triggers which start a workflow.
 	//
@@ -39,7 +39,8 @@ import (
 #Trigger: #EventTrigger | #ScheduleTrigger
 
 #EventTrigger: {
-	event: string
+	event:       string
+	expression?: string
 }
 
 #ScheduleTrigger: {

@@ -10,15 +10,11 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	log "github.com/golang/glog"
-	"github.com/mitchellh/go-wordwrap"
 	"github.com/protocolbuffers/txtpbfmt/ast"
-	"github.com/protocolbuffers/txtpbfmt/unquote"
 )
 
 // Config can be used to pass additional config parameters to the formatter at
@@ -45,21 +41,6 @@ type Config struct {
 
 	// Permit usage of Python-style """ or ''' delimited strings.
 	AllowTripleQuotedStrings bool
-
-	// Max columns for string field values. If zero, no string wrapping will occur.
-	// Strings that may contain HTML tags will never be wrapped.
-	WrapStringsAtColumn int
-
-	// Whether strings that appear to contain HTML tags should be wrapped
-	// (requires WrapStringsAtColumn to be set).
-	WrapHTMLStrings bool
-
-	// Whether angle brackets used instead of curly braces should be preserved
-	// when outputting a formatted textproto.
-	PreserveAngleBrackets bool
-
-	// Use single quotes around strings that contain double but not single quotes.
-	SmartQuotes bool
 }
 
 type parser struct {
@@ -75,7 +56,6 @@ type parser struct {
 }
 
 var defConfig = Config{}
-var tagRegex = regexp.MustCompile(`<.*>`)
 
 const indentSpaces = "  "
 
@@ -132,7 +112,6 @@ func sameLineBrackets(in []byte, allowTripleQuotedStrings bool) (map[int]bool, e
 	res := map[int]bool{}
 	insideComment := false
 	insideString := false
-	insideTemplate := false
 	insideTripleQuotedString := false
 	var stringDelimiter string
 	isEscapedChar := false
@@ -142,12 +121,12 @@ func sameLineBrackets(in []byte, allowTripleQuotedStrings bool) (map[int]bool, e
 			line++
 			insideComment = false
 		case '{', '<':
-			if insideComment || insideString || insideTemplate {
+			if insideComment || insideString {
 				continue
 			}
 			open = append(open, bracket{index: i, line: line})
 		case '}', '>':
-			if insideComment || insideString || insideTemplate {
+			if insideComment || insideString {
 				continue
 			}
 			if len(open) == 0 {
@@ -164,15 +143,6 @@ func sameLineBrackets(in []byte, allowTripleQuotedStrings bool) (map[int]bool, e
 				continue
 			}
 			insideComment = true
-		case '%':
-			if insideComment || insideString {
-				continue
-			}
-			if insideTemplate {
-				insideTemplate = false
-			} else {
-				insideTemplate = true
-			}
 		case '"', '\'':
 			if insideComment {
 				continue
@@ -284,13 +254,6 @@ func parseWithConfig(in []byte, c Config, metaComments map[string]bool) ([]*ast.
 	if metaComments["allow_triple_quoted_strings"] {
 		c.AllowTripleQuotedStrings = true
 	}
-	if metaComments["wrap_html_strings"] {
-		c.WrapHTMLStrings = true
-	}
-	if metaComments["smartquotes"] {
-		c.SmartQuotes = true
-	}
-	setMetaCommentIntValue("wrap_strings_at_column", metaComments, &c.WrapStringsAtColumn)
 	p, err := newParser(in, c)
 	if err != nil {
 		return nil, err
@@ -308,31 +271,8 @@ func parseWithConfig(in []byte, c Config, metaComments map[string]bool) ([]*ast.
 	if p.index < p.length {
 		return nil, fmt.Errorf("parser didn't consume all input. Stopped at %s", p.errorContext())
 	}
-	wrapStrings(nodes, 0, c)
 	sortAndFilterNodes(nodes, nodeSortFunction(c.SortFieldsByFieldName, c.SortRepeatedFieldsByContent), c.RemoveDuplicateValuesForRepeatedFields)
 	return nodes, err
-}
-
-// For a MetaComment in the form comment_name=<int> set *int to the value. Will not change
-// the *int if the comment name isn't present.
-func setMetaCommentIntValue(name string, metaComments map[string]bool, value *int) {
-	for mc := range metaComments {
-		if strings.HasPrefix(mc, fmt.Sprintf("%s ", name)) {
-			log.Errorf("format should be %s=<int>, got: %s", name, mc)
-			return
-		}
-		prefix := fmt.Sprintf("%s=", name)
-		if strings.HasPrefix(mc, prefix) {
-			intStr := strings.TrimPrefix(mc, prefix)
-			var err error
-			i, err := strconv.Atoi(strings.TrimSpace(intStr))
-			if err != nil {
-				log.Errorf("error parsing %s value %q (skipping): %v", name, intStr, err)
-				return
-			}
-			*value = i
-		}
-	}
 }
 
 func newParser(in []byte, c Config) (*parser, error) {
@@ -483,7 +423,7 @@ func (p *parser) parse(isRoot bool) (result []*ast.Node, endPos ast.Position, er
 			comments = append(comments, c...)
 		}
 
-		if endPos := p.position(); p.consume('}') || p.consume('>') || p.consume(']') {
+		if endPos := p.position(); p.consume('}') || p.consume('>') {
 			// Handle comments after last child.
 
 			if len(comments) > 0 {
@@ -496,9 +436,6 @@ func (p *parser) parse(isRoot bool) (result []*ast.Node, endPos ast.Position, er
 				endPos.Byte--
 				endPos.Column--
 			}
-
-			_ = p.consume(';') // Ignore optional ';'.
-			_ = p.consume(',') // Ignore optional ','.
 
 			// Done parsing children.
 			return res, endPos, nil
@@ -565,7 +502,6 @@ func (p *parser) parse(isRoot bool) (result []*ast.Node, endPos ast.Position, er
 				nd.SkipColon = true
 			}
 			nd.ChildrenSameLine = p.bracketSameLine[p.index-1]
-			nd.IsAngleBracket = p.config.PreserveAngleBrackets && p.in[p.index-1] == '<'
 			// Recursive call to parse child nodes.
 			nodes, lastPos, err := p.parse( /*isRoot=*/ false)
 			if err != nil {
@@ -576,68 +512,53 @@ func (p *parser) parse(isRoot bool) (result []*ast.Node, endPos ast.Position, er
 
 			nd.ClosingBraceComment = p.readInlineComment()
 		} else if p.consume('[') {
+			// Handle list of values.
+
+			nd.ValuesAsList = true // We found values in list - keep it as list.
 			openBracketLine := p.line
 
 			// Skip separator.
-			preComments := p.readContinuousBlocksOfComments()
+			preComments, _ := p.skipWhiteSpaceAndReadComments(true /* multiLine */)
 
-			if p.nextInputIs('{') {
-				// Handle list of nodes.
-				nd.ChildrenAsList = true
+			for ld := p.getLoopDetector(); !p.consume(']') && p.index < p.length; {
+				if err := ld.iter(); err != nil {
+					if p.nextInputIs('{') {
+						err = fmt.Errorf("\n\n[{}] notation not supported, see http://b/74558064.\n\nFull error: %s", err)
+					}
+					return nil, ast.Position{}, err
+				}
 
-				nodes, lastPos, err := p.parse( /*isRoot=*/ true)
+				// Read each value in the list.
+				vals, err := p.readValues()
 				if err != nil {
 					return nil, ast.Position{}, err
 				}
-				if len(nodes) > 0 {
-					nodes[0].PreComments = preComments
+				if len(vals) != 1 {
+					return nil, ast.Position{}, fmt.Errorf("multiple-string value not supported (%v). Please add comma explcitily, see http://b/162070952", vals)
+				}
+				vals[0].PreComments = append(vals[0].PreComments, preComments...)
+
+				// Skip separator.
+				_, _ = p.skipWhiteSpaceAndReadComments(false /* multiLine */)
+				if p.consume(',') {
+					vals[0].InlineComment = p.readInlineComment()
 				}
 
-				nd.Children = nodes
-				nd.End = lastPos
-				nd.ClosingBraceComment = p.readInlineComment()
-				nd.ChildrenSameLine = openBracketLine == p.line
-			} else {
-				// Handle list of values.
-				nd.ValuesAsList = true // We found values in list - keep it as list.
+				nd.Values = append(nd.Values, vals...)
 
-				for ld := p.getLoopDetector(); !p.consume(']') && p.index < p.length; {
-					if err := ld.iter(); err != nil {
-						return nil, ast.Position{}, err
-					}
-
-					// Read each value in the list.
-					vals, err := p.readValues()
-					if err != nil {
-						return nil, ast.Position{}, err
-					}
-					if len(vals) != 1 {
-						return nil, ast.Position{}, fmt.Errorf("multiple-string value not supported (%v). Please add comma explcitily, see http://b/162070952", vals)
-					}
-					vals[0].PreComments = append(vals[0].PreComments, preComments...)
-
-					// Skip separator.
-					_, _ = p.skipWhiteSpaceAndReadComments(false /* multiLine */)
-					if p.consume(',') {
-						vals[0].InlineComment = p.readInlineComment()
-					}
-
-					nd.Values = append(nd.Values, vals...)
-
-					preComments, _ = p.skipWhiteSpaceAndReadComments(true /* multiLine */)
-				}
-				nd.ChildrenSameLine = openBracketLine == p.line
-
-				res = append(res, nd)
-
-				// Handle comments after last line (or for empty list)
-				nd.PostValuesComments = preComments
-				nd.ClosingBraceComment = p.readInlineComment()
-
-				_ = p.consume(';') // Ignore optional ';'.
-				_ = p.consume(',') // Ignore optional ','.
-				continue
+				preComments, _ = p.skipWhiteSpaceAndReadComments(true /* multiLine */)
 			}
+			nd.ChildrenSameLine = (openBracketLine == p.line)
+
+			res = append(res, nd)
+
+			// Handle comments after last line (or for empty list)
+			nd.PostValuesComments = preComments
+			nd.ClosingBraceComment = p.readInlineComment()
+
+			_ = p.consume(';') // Ignore optional ';'.
+			_ = p.consume(',') // Ignore optional ','.
+			continue
 		} else {
 			// Rewind comments.
 			p.index = int(previousPos.Byte)
@@ -679,22 +600,6 @@ func removeBlanks(in string) string {
 		s = bytes.Replace(s, []byte{b}, nil, -1)
 	}
 	return string(s)
-}
-
-func (p *parser) readContinuousBlocksOfComments() []string {
-	var preComments []string
-	for {
-		comments, blankLines := p.skipWhiteSpaceAndReadComments(true)
-		if len(comments) == 0 {
-			break
-		}
-		if blankLines > 0 && len(preComments) > 0 {
-			comments = append([]string{""}, comments...)
-		}
-		preComments = append(preComments, comments...)
-	}
-
-	return preComments
 }
 
 // skipWhiteSpaceAndReadComments has multiple cases:
@@ -796,12 +701,7 @@ func (p *parser) readValues() ([]*ast.Value, error) {
 				return nil, fmt.Errorf("found literal (unescaped) new line in string at %s", p.errorContext())
 			}
 			if p.in[i] == p.in[stringBegin] {
-				var vl string
-				if p.config.SmartQuotes {
-					vl = smartQuotes(p.advance(i))
-				} else {
-					vl = fixQuotes(p.advance(i))
-				}
+				vl := fixQuotes(p.advance(i))
 				_ = p.advance(i + 1) // Skip the quote.
 				values = append(values, p.populateValue(vl, preComments))
 
@@ -942,103 +842,6 @@ func sortAndFilterNodes(nodes []*ast.Node, sortFunction func([]*ast.Node), remov
 	}
 }
 
-func wrapStrings(nodes []*ast.Node, depth int, c Config) {
-	if c.WrapStringsAtColumn == 0 {
-		return
-	}
-	for _, nd := range nodes {
-		if nd.ChildrenSameLine {
-			return
-		}
-		if needsWrapping(nd, depth, c) {
-			wrapLines(nd, depth, c)
-		}
-		wrapStrings(nd.Children, depth+1, c)
-	}
-}
-
-func needsWrapping(nd *ast.Node, depth int, c Config) bool {
-	// Even at depth 0 we have a 2-space indent when the wrapped string is rendered on the line below
-	// the field name.
-	const lengthBuffer = 2
-	maxLength := c.WrapStringsAtColumn - lengthBuffer - (depth * len(indentSpaces))
-
-	if !c.WrapHTMLStrings {
-		for _, v := range nd.Values {
-			if tagRegex.Match([]byte(v.Value)) {
-				return false
-			}
-		}
-	}
-
-	for _, v := range nd.Values {
-		if len(v.Value) >= 3 && (strings.HasPrefix(v.Value, `'''`) || strings.HasPrefix(v.Value, `"""`)) {
-			// Don't wrap triple-quoted strings
-			return false
-		}
-		if len(v.Value) > 0 && v.Value[0] != '\'' && v.Value[0] != '"' {
-			// Only wrap strings
-			return false
-		}
-		if len(v.Value) > maxLength {
-			return true
-		}
-	}
-	return false
-}
-
-// If the Values of this Node constitute a string, and if Config.WrapStringsAtColumn > 0, then wrap
-// the string so each line is within the specified columns. Wraps only the current Node (does not
-// recurse into Children).
-func wrapLines(nd *ast.Node, depth int, c Config) {
-	// This function looks at the unquoted ast.Value.Value string (i.e., with each Value's wrapping
-	// quote chars removed). We need to remove these quotes, since otherwise they'll be re-flowed into
-	// the body of the text.
-	lengthBuffer := 4 // Even at depth 0 we have a 2-space indent and a pair of quotes
-	maxLength := c.WrapStringsAtColumn - lengthBuffer - (depth * len(indentSpaces))
-
-	str, err := unquote.Raw(nd)
-	if err != nil {
-		log.Errorf("skipping string wrapping on node %q (error unquoting string): %v", nd.Name, err)
-		return
-	}
-
-	// Remove one from the max length since a trailing space may be added below.
-	wrappedStr := wordwrap.WrapString(str, uint(maxLength)-1)
-	lines := strings.Split(wrappedStr, "\n")
-	newValues := make([]*ast.Value, 0, len(lines))
-	// The Value objects have more than just the string in them. They also have any leading and
-	// trailing comments. To maintain these comments we recycle the existing Value objects if
-	// possible.
-	var i int
-	var line string
-	for i, line = range lines {
-		var v *ast.Value
-		if len(nd.Values) > i {
-			v = nd.Values[i]
-		} else {
-			v = &ast.Value{}
-		}
-		if i < len(lines)-1 {
-			line = line + " "
-		}
-		v.Value = fmt.Sprintf(`"%s"`, line)
-		newValues = append(newValues, v)
-	}
-
-	for i++; i < len(nd.Values); i++ {
-		// If this executes, then the text was wrapped into less lines of text (less Values) than
-		// previously. If any of these had comments on them, we collect them so they are not lost.
-		v := nd.Values[i]
-		nd.PostValuesComments = append(nd.PostValuesComments, v.PreComments...)
-		if len(v.InlineComment) > 0 {
-			nd.PostValuesComments = append(nd.PostValuesComments, v.InlineComment)
-		}
-	}
-
-	nd.Values = newValues
-}
-
 func fixQuotes(s string) string {
 	res := make([]byte, 0, len(s))
 	res = append(res, '"')
@@ -1053,39 +856,6 @@ func fixQuotes(s string) string {
 	}
 	res = append(res, '"')
 	return string(res)
-}
-
-func unescapeQuotes(s string) string {
-	res := make([]byte, 0, len(s))
-	for i := 0; i < len(s); i++ {
-		// If we hit an escape sequence...
-		if s[i] == '\\' {
-			// ... keep the backslash unless it's in front of a quote ...
-			if i == len(s)-1 || (s[i+1] != '"' && s[i+1] != '\'') {
-				res = append(res, '\\')
-			}
-			// ... then point at the escaped character so it is output verbatim below.
-			// Doing this within the loop (without "continue") ensures correct handling
-			// of escaped backslashes.
-			i++
-		}
-		if i < len(s) {
-			res = append(res, s[i])
-		}
-	}
-	return string(res)
-}
-
-func smartQuotes(s string) string {
-	s = unescapeQuotes(s)
-	if strings.Contains(s, "\"") && !strings.Contains(s, "'") {
-		// If we hit this branch, the string doesn't contain any single quotes, and
-		// is being wrapped in single quotes, so no escaping is needed.
-		return "'" + s + "'"
-	}
-	// fixQuotes will wrap the string in double quotes, but will escape any
-	// double quotes that appear within the string.
-	return fixQuotes(s)
 }
 
 // DebugFormat returns a textual representation of the specified nodes for
@@ -1115,13 +885,13 @@ func DebugFormat(nodes []*ast.Node, depth int) string {
 // Pretty formats the nodes at the given indentation depth (0 = top-level).
 func Pretty(nodes []*ast.Node, depth int) string {
 	var result strings.Builder
-	formatter{&result}.writeNodes(removeDeleted(nodes), depth, false /* isSameLine */, false /* asListItems */)
+	formatter{&result}.writeNodes(removeDeleted(nodes), depth, false /* isSameLine */)
 	return result.String()
 }
 
 func out(nodes []*ast.Node) []byte {
 	var result bytes.Buffer
-	formatter{&result}.writeNodes(removeDeleted(nodes), 0, false /* isSameLine */, false /* asListItems */)
+	formatter{&result}.writeNodes(removeDeleted(nodes), 0, false /* isSameLine */)
 	return result.Bytes()
 }
 
@@ -1148,22 +918,11 @@ type formatter struct {
 	stringWriter
 }
 
-func (f formatter) writeNodes(nodes []*ast.Node, depth int, isSameLine, asListItems bool) {
+func (f formatter) writeNodes(nodes []*ast.Node, depth int, isSameLine bool) {
 	indent := " "
 	if !isSameLine {
 		indent = strings.Repeat(indentSpaces, depth)
 	}
-
-	lastNonCommentIndex := 0
-	if asListItems {
-		for i := len(nodes) - 1; i >= 0; i-- {
-			if !nodes[i].IsCommentOnly() {
-				lastNonCommentIndex = i
-				break
-			}
-		}
-	}
-
 	for index, nd := range nodes {
 		for _, comment := range nd.PreComments {
 			if len(comment) == 0 {
@@ -1205,20 +964,11 @@ func (f formatter) writeNodes(nodes []*ast.Node, depth int, isSameLine, asListIt
 		if nd.ValuesAsList { // For ValuesAsList option we will preserve even empty list  `field: []`
 			f.writeValuesAsList(nd, nd.Values, indent+indentSpaces)
 		} else if len(nd.Values) > 0 {
-			f.writeValues(nd, nd.Values, indent+indentSpaces)
+			f.writeValues(nd.Values, indent+indentSpaces)
 		}
 		if nd.Children != nil { // Also for 0 Children.
-			if nd.ChildrenAsList {
-				f.writeChildrenAsListItems(nd.Children, depth+1, isSameLine || nd.ChildrenSameLine)
-			} else {
-				f.writeChildren(nd.Children, depth+1, isSameLine || nd.ChildrenSameLine, nd.IsAngleBracket)
-			}
+			f.writeChildren(nd.Children, depth+1, (isSameLine || nd.ChildrenSameLine))
 		}
-
-		if asListItems && index < lastNonCommentIndex {
-			f.WriteString(",")
-		}
-
 		if (nd.Children != nil || nd.ValuesAsList) && len(nd.ClosingBraceComment) > 0 {
 			f.WriteString(indentSpaces)
 			f.WriteString(nd.ClosingBraceComment)
@@ -1230,7 +980,7 @@ func (f formatter) writeNodes(nodes []*ast.Node, depth int, isSameLine, asListIt
 	}
 }
 
-func (f formatter) writeValues(nd *ast.Node, vals []*ast.Value, indent string) {
+func (f formatter) writeValues(vals []*ast.Value, indent string) {
 	if len(vals) == 0 {
 		// This should never happen: formatValues can be called only if there are some values.
 		return
@@ -1250,10 +1000,6 @@ func (f formatter) writeValues(nd *ast.Node, vals []*ast.Value, indent string) {
 			f.WriteString(indentSpaces)
 			f.WriteString(v.InlineComment)
 		}
-	}
-	for _, comment := range nd.PostValuesComments {
-		f.WriteString(sep)
-		f.WriteString(comment)
 	}
 }
 
@@ -1303,43 +1049,18 @@ func (f formatter) writeValuesAsList(nd *ast.Node, vals []*ast.Value, indent str
 }
 
 // writeChildren writes the child nodes. The result always ends with a closing brace.
-func (f formatter) writeChildren(children []*ast.Node, depth int, sameLine, isAngleBracket bool) {
-	openBrace := "{"
-	closeBrace := "}"
-	if isAngleBracket {
-		openBrace = "<"
-		closeBrace = ">"
-	}
+func (f formatter) writeChildren(children []*ast.Node, depth int, sameLine bool) {
 	switch {
 	case sameLine && len(children) == 0:
-		f.WriteString(openBrace + closeBrace)
+		f.WriteString("{}")
 	case sameLine:
-		f.WriteString(openBrace)
-		f.writeNodes(children, depth, sameLine, false /* asListItems */)
-		f.WriteString(" " + closeBrace)
+		f.WriteString("{")
+		f.writeNodes(children, depth, sameLine)
+		f.WriteString(" }")
 	default:
-		f.WriteString(openBrace + "\n")
-		f.writeNodes(children, depth, sameLine, false /* asListItems */)
+		f.WriteString("{\n")
+		f.writeNodes(children, depth, sameLine)
 		f.WriteString(strings.Repeat(indentSpaces, depth-1))
-		f.WriteString(closeBrace)
-	}
-}
-
-// writeChildrenAsListItems writes the child nodes as list items.
-func (f formatter) writeChildrenAsListItems(children []*ast.Node, depth int, sameLine bool) {
-	openBrace := "["
-	closeBrace := "]"
-	switch {
-	case sameLine && len(children) == 0:
-		f.WriteString(openBrace + closeBrace)
-	case sameLine:
-		f.WriteString(openBrace)
-		f.writeNodes(children, depth, sameLine, true /* asListItems */)
-		f.WriteString(" " + closeBrace)
-	default:
-		f.WriteString(openBrace + "\n")
-		f.writeNodes(children, depth, sameLine, true /* asListItems */)
-		f.WriteString(strings.Repeat(indentSpaces, depth-1))
-		f.WriteString(closeBrace)
+		f.WriteString("}")
 	}
 }

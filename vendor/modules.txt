@@ -84,18 +84,82 @@ github.com/AlecAivazis/survey/v2/terminal
 ## explicit; go 1.16
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
-# github.com/Microsoft/go-winio v0.5.2
-## explicit; go 1.13
+# github.com/Microsoft/go-winio v0.5.1
+## explicit; go 1.12
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
+# github.com/alecthomas/chroma v0.10.0
+## explicit; go 1.13
+github.com/alecthomas/chroma
+github.com/alecthomas/chroma/formatters
+github.com/alecthomas/chroma/formatters/html
+github.com/alecthomas/chroma/formatters/svg
+github.com/alecthomas/chroma/lexers
+github.com/alecthomas/chroma/lexers/a
+github.com/alecthomas/chroma/lexers/b
+github.com/alecthomas/chroma/lexers/c
+github.com/alecthomas/chroma/lexers/circular
+github.com/alecthomas/chroma/lexers/d
+github.com/alecthomas/chroma/lexers/e
+github.com/alecthomas/chroma/lexers/f
+github.com/alecthomas/chroma/lexers/g
+github.com/alecthomas/chroma/lexers/h
+github.com/alecthomas/chroma/lexers/i
+github.com/alecthomas/chroma/lexers/internal
+github.com/alecthomas/chroma/lexers/j
+github.com/alecthomas/chroma/lexers/k
+github.com/alecthomas/chroma/lexers/l
+github.com/alecthomas/chroma/lexers/m
+github.com/alecthomas/chroma/lexers/n
+github.com/alecthomas/chroma/lexers/o
+github.com/alecthomas/chroma/lexers/p
+github.com/alecthomas/chroma/lexers/q
+github.com/alecthomas/chroma/lexers/r
+github.com/alecthomas/chroma/lexers/s
+github.com/alecthomas/chroma/lexers/t
+github.com/alecthomas/chroma/lexers/v
+github.com/alecthomas/chroma/lexers/w
+github.com/alecthomas/chroma/lexers/x
+github.com/alecthomas/chroma/lexers/y
+github.com/alecthomas/chroma/lexers/z
+github.com/alecthomas/chroma/quick
+github.com/alecthomas/chroma/styles
+# github.com/atotto/clipboard v0.1.4
+## explicit
+github.com/atotto/clipboard
+# github.com/charmbracelet/bubbles v0.10.3
+## explicit; go 1.13
+github.com/charmbracelet/bubbles/help
+github.com/charmbracelet/bubbles/key
+github.com/charmbracelet/bubbles/list
+github.com/charmbracelet/bubbles/paginator
+github.com/charmbracelet/bubbles/spinner
+github.com/charmbracelet/bubbles/textinput
+github.com/charmbracelet/bubbles/viewport
+# github.com/charmbracelet/bubbletea v0.20.0
+## explicit; go 1.13
+github.com/charmbracelet/bubbletea
+# github.com/charmbracelet/lipgloss v0.4.0
+## explicit; go 1.15
+github.com/charmbracelet/lipgloss
 # github.com/cockroachdb/apd/v2 v2.0.2
 ## explicit
 github.com/cockroachdb/apd/v2
+# github.com/containerd/console v1.0.3
+## explicit; go 1.13
+github.com/containerd/console
 # github.com/containerd/containerd v1.6.1
 ## explicit; go 1.16
 github.com/containerd/containerd/errdefs
 github.com/containerd/containerd/log
 github.com/containerd/containerd/platforms
+# github.com/davecgh/go-spew v1.1.1
+## explicit
+github.com/davecgh/go-spew/spew
+# github.com/dlclark/regexp2 v1.4.0
+## explicit
+github.com/dlclark/regexp2
+github.com/dlclark/regexp2/syntax
 # github.com/docker/distribution v2.8.0+incompatible
 ## explicit
 github.com/docker/distribution/digestset
@@ -130,7 +194,10 @@ github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.4.0
 ## explicit
 github.com/docker/go-units
-# github.com/emicklei/proto v1.9.2
+# github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
+## explicit
+github.com/dustinkirkland/golang-petname
+# github.com/emicklei/proto v1.6.15
 ## explicit; go 1.12
 github.com/emicklei/proto
 # github.com/fsnotify/fsnotify v1.5.1
@@ -139,8 +206,8 @@ github.com/fsnotify/fsnotify
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
 github.com/gogo/protobuf/proto
-# github.com/golang/glog v1.0.0
-## explicit; go 1.11
+# github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
+## explicit
 github.com/golang/glog
 # github.com/golang/protobuf v1.5.2
 ## explicit; go 1.9
@@ -152,6 +219,12 @@ github.com/golang/protobuf/ptypes/timestamp
 # github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
+# github.com/hashicorp/errwrap v1.1.0
+## explicit
+github.com/hashicorp/errwrap
+# github.com/hashicorp/go-multierror v1.1.1
+## explicit; go 1.13
+github.com/hashicorp/go-multierror
 # github.com/hashicorp/hcl v1.0.0
 ## explicit
 github.com/hashicorp/hcl
@@ -167,6 +240,14 @@ github.com/hashicorp/hcl/json/token
 # github.com/inconshreveable/mousetrap v1.0.0
 ## explicit
 github.com/inconshreveable/mousetrap
+# github.com/inngest/cuetypescript v0.0.0-20220302153725-a00e933fdf87
+## explicit; go 1.17
+github.com/inngest/cuetypescript
+github.com/inngest/cuetypescript/generation
+# github.com/inngest/event-schemas v0.0.0-20220306170247-8eec6a6ad22b
+## explicit; go 1.17
+github.com/inngest/event-schemas/events
+github.com/inngest/event-schemas/events/marshalling/jsonschema
 # github.com/jedib0t/go-pretty/v6 v6.2.7
 ## explicit; go 1.16
 github.com/jedib0t/go-pretty/v6/table
@@ -174,7 +255,12 @@ github.com/jedib0t/go-pretty/v6/text
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 ## explicit
 github.com/kballard/go-shellquote
-# github.com/magiconair/properties v1.8.6
+# github.com/konsorten/go-windows-terminal-sequences v1.0.3
+## explicit
+# github.com/lucasb-eyer/go-colorful v1.2.0
+## explicit; go 1.12
+github.com/lucasb-eyer/go-colorful
+# github.com/magiconair/properties v1.8.5
 ## explicit; go 1.13
 github.com/magiconair/properties
 # github.com/mattn/go-colorable v0.1.12
@@ -186,15 +272,12 @@ github.com/mattn/go-isatty
 # github.com/mattn/go-runewidth v0.0.13
 ## explicit; go 1.9
 github.com/mattn/go-runewidth
-# github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
+# github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 ## explicit
 github.com/mgutz/ansi
 # github.com/mitchellh/go-homedir v1.1.0
 ## explicit
 github.com/mitchellh/go-homedir
-# github.com/mitchellh/go-wordwrap v1.0.1
-## explicit; go 1.14
-github.com/mitchellh/go-wordwrap
 # github.com/mitchellh/mapstructure v1.4.3
 ## explicit; go 1.14
 github.com/mitchellh/mapstructure
@@ -208,6 +291,19 @@ github.com/morikuni/aec
 # github.com/mpvl/unique v0.0.0-20150818121801-cbe035fff7de
 ## explicit
 github.com/mpvl/unique
+# github.com/muesli/ansi v0.0.0-20211018074035-2e021307bc4b
+## explicit; go 1.17
+github.com/muesli/ansi
+github.com/muesli/ansi/compressor
+# github.com/muesli/reflow v0.3.0
+## explicit; go 1.13
+github.com/muesli/reflow/ansi
+github.com/muesli/reflow/truncate
+github.com/muesli/reflow/wordwrap
+github.com/muesli/reflow/wrap
+# github.com/muesli/termenv v0.11.1-0.20220212125758-44cd13922739
+## explicit; go 1.13
+github.com/muesli/termenv
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
@@ -221,7 +317,10 @@ github.com/pelletier/go-toml
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
-# github.com/protocolbuffers/txtpbfmt v0.0.0-20220131092820-39736dd543b4
+# github.com/pmezard/go-difflib v1.0.0
+## explicit
+github.com/pmezard/go-difflib/difflib
+# github.com/protocolbuffers/txtpbfmt v0.0.0-20201118171849-f6a6b3f636fc
 ## explicit; go 1.13
 github.com/protocolbuffers/txtpbfmt/ast
 github.com/protocolbuffers/txtpbfmt/parser
@@ -234,10 +333,13 @@ github.com/rivo/uniseg
 github.com/rs/zerolog
 github.com/rs/zerolog/internal/cbor
 github.com/rs/zerolog/internal/json
+# github.com/sahilm/fuzzy v0.1.0
+## explicit
+github.com/sahilm/fuzzy
 # github.com/sirupsen/logrus v1.8.1
 ## explicit; go 1.13
 github.com/sirupsen/logrus
-# github.com/spf13/afero v1.8.1
+# github.com/spf13/afero v1.6.0
 ## explicit; go 1.13
 github.com/spf13/afero
 github.com/spf13/afero/mem
@@ -261,15 +363,19 @@ github.com/spf13/viper/internal/encoding/hcl
 github.com/spf13/viper/internal/encoding/json
 github.com/spf13/viper/internal/encoding/toml
 github.com/spf13/viper/internal/encoding/yaml
+# github.com/stretchr/testify v1.7.0
+## explicit; go 1.13
+github.com/stretchr/testify/assert
+github.com/stretchr/testify/require
 # github.com/subosito/gotenv v1.2.0
 ## explicit
 github.com/subosito/gotenv
-# golang.org/x/net v0.0.0-20220225172249-27dd8689420f
+# golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
 ## explicit; go 1.17
 golang.org/x/net/idna
 golang.org/x/net/internal/socks
 golang.org/x/net/proxy
-# golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9
+# golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e
 ## explicit; go 1.17
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
@@ -307,10 +413,10 @@ golang.org/x/text/width
 ## explicit; go 1.11
 golang.org/x/xerrors
 golang.org/x/xerrors/internal
-# google.golang.org/genproto v0.0.0-20220304144024-325a89244dc8
-## explicit; go 1.15
+# google.golang.org/genproto v0.0.0-20211208223120-3a66f561d7aa
+## explicit; go 1.11
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.44.0
+# google.golang.org/grpc v1.43.0
 ## explicit; go 1.14
 google.golang.org/grpc/codes
 google.golang.org/grpc/internal/status
@@ -347,7 +453,7 @@ google.golang.org/protobuf/types/descriptorpb
 google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
-# gopkg.in/ini.v1 v1.66.4
+# gopkg.in/ini.v1 v1.66.2
 ## explicit
 gopkg.in/ini.v1
 # gopkg.in/yaml.v2 v2.4.0

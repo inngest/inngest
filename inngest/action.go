@@ -42,12 +42,14 @@ type ActionVersion struct {
 
 	// Version defines the current action version.  Each action version can have
 	// an updated configuration.
-	Version VersionInfo `json:"version"`
+	Version *VersionInfo `json:"version,omitempty"`
 
 	// WorkflowMetadata defines workflow-specific configuration for the action.  For example,
 	// the "wait" action is uniquely configured within each workflow to wait for some specific
 	// amount of time.
 	WorkflowMetadata MetadataMap `json:"workflowMetadata"`
+
+	Scopes []string `json:"scopes"`
 
 	// Response defines the response type for this action.  This allows us to show UI-specific
 	// information around the "stack" or "baggage" that is built up around your workflow as
