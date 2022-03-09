@@ -66,6 +66,16 @@ type Workspace struct {
 	IsOverridden bool `json:"-"`
 }
 
+// Client returns an API client, attempting to use authentication from
+// state if found.
+func Client(ctx context.Context) client.Client {
+	state, _ := GetState(ctx)
+	if state != nil {
+		return state.Client
+	}
+	return client.New(client.WithAPI(viper.GetString("api")))
+}
+
 func GetState(ctx context.Context) (*State, error) {
 	path, err := homedir.Expand("~/.config/inngest")
 	if err != nil {

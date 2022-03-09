@@ -1,26 +1,34 @@
 package cli
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/inngest/event-schemas/events"
+	"github.com/google/uuid"
+	"github.com/inngest/inngestctl/inngest/client"
+	"github.com/inngest/inngestctl/inngest/state"
 	"github.com/inngest/inngestctl/pkg/function"
+	"github.com/inngest/inngestctl/pkg/scaffold"
 	"golang.org/x/term"
 )
 
 const (
-	stateAskName  = "name"
-	stateAskEvent = "event"
-	stateDone     = "done"
+	stateAskName     = "name"
+	stateAskEvent    = "event"
+	stateAskLanguage = "language"
+	stateAskScaffold = "scaffold"
+
+	// stateDone is triggered as soon as we're complete and are quitting the walkthrough.
+	stateDone = "done"
 	// stateQuit is used when terminating the walkthrough early
 	stateQuit = "quit"
 
@@ -28,32 +36,43 @@ const (
 
 	// the Y offset when rendering the event browser.
 	eventBrowserOffset = 25
+
+	// anotherLanguage is the list item which is rendered at the bottom for a user
+	// to select if we have no scaffolds for their language.
+	anotherLanguage = "another language"
 )
 
 // NewInitModel renders the UI for initializing a new function.
 func NewInitModel() (*initModel, error) {
 	width, height, _ := term.GetSize(int(os.Stdout.Fd()))
 
-	schemas, err := fetchEvents()
-	if err != nil {
-		fmt.Println(RenderWarning("We couldn't fetch your latest events from our API"))
-	}
-
-	sort.Slice(schemas, func(i, j int) bool {
-		return schemas[i].Name < schemas[j].Name
-	})
+	languageDelegate := list.NewDefaultDelegate()
+	languageDelegate.ShowDescription = false
 
 	f := &initModel{
-		width:     width,
-		height:    height,
-		events:    schemas,
-		state:     stateAskName,
-		textinput: textinput.New(),
+		width:        width,
+		height:       height,
+		events:       []client.Event{},
+		state:        stateAskName,
+		textinput:    textinput.New(),
+		loading:      spinner.New(),
+		languageList: list.New([]list.Item{}, languageDelegate, width, height-eventBrowserOffset),
+		scaffoldList: list.New([]list.Item{}, list.NewDefaultDelegate(), width, height-eventBrowserOffset),
 	}
+
 	f.textinput.Focus()
 	f.textinput.CharLimit = 156
 	f.textinput.Width = width
 	f.textinput.Prompt = "→  "
+
+	f.loading.Spinner = spinner.Dot
+	f.loading.Style = lipgloss.NewStyle().Foreground(Primary)
+
+	f.languageList.SetShowFilter(false)
+	f.languageList.SetShowHelp(false)
+	f.languageList.SetShowStatusBar(false)
+	f.languageList.SetShowStatusBar(false)
+	f.languageList.SetShowTitle(false)
 
 	return f, nil
 }
@@ -65,16 +84,37 @@ type initModel struct {
 	width  int
 	height int
 
-	events []events.Event
-
 	// The current state we're on.
 	state string
 
-	name  string
+	// name is the function name entered from the user
+	name string
+	// event is the event entered from the user
 	event string
+	// language is the language selected by the user
+	language string
+	// scaffold is the scaffold selected by the user
+	scaffold *scaffold.Template
 
-	textinput textinput.Model
-	browser   *EventBrowser
+	events          []client.Event
+	eventFetchError error
+
+	// scaffolds are all scaffolds we have available, parsed after scaffolds
+	// have updated.
+	scaffolds *scaffold.Mapping
+	// scaffoldCacheError is filled if pulling the cache of scaffolds fails.
+	// this lets us render a warning if updating wasnt successful.
+	scaffoldCacheError error
+	// scaffoldDone records whether we have finished updating scaffolds.  this
+	// lets us render spinners.
+	scaffoldDone bool
+
+	// these are models used to render helpers.
+	textinput    textinput.Model
+	browser      *EventBrowser
+	languageList list.Model
+	scaffoldList list.Model
+	loading      spinner.Model
 }
 
 // Ensure that initModel fulfils the tea.Model interface.
@@ -92,11 +132,11 @@ func (f *initModel) Function() (*function.Function, error) {
 	// cue schema inside the function.
 	var ed *function.EventDefinition
 	for _, e := range f.events {
-		if e.Name == f.event {
+		if e.Name == f.event && len(e.Versions) > 0 {
 			ed = &function.EventDefinition{
 				Format: function.FormatCue,
 				Synced: true,
-				Def:    e.Cue,
+				Def:    e.Versions[0].CueType,
 			}
 			break
 		}
@@ -115,13 +155,52 @@ func (f *initModel) Function() (*function.Function, error) {
 	return fn, fn.Validate()
 }
 
+func (f *initModel) Template() *scaffold.Template {
+	return f.scaffold
+}
+
 func (f *initModel) Init() tea.Cmd {
+	go func() {
+		schemas, err := fetchEvents()
+		if err != nil {
+			f.eventFetchError = err
+		}
+
+		sort.Slice(schemas, func(i, j int) bool {
+			return schemas[i].Name < schemas[j].Name
+		})
+		f.events = schemas
+		f.browser.SetEvents(f.events)
+	}()
+
 	// Remove the first N lines of the CLI height, which account for the header etc.
 	f.browser, _ = NewEventBrowser(f.width, f.height-eventBrowserOffset, f.events)
-	return nil
+
+	go func() {
+		f.scaffoldCacheError = scaffold.UpdateCache(context.Background())
+		f.scaffoldDone = true
+	}()
+
+	return f.loading.Tick
 }
 
 func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var (
+		cmd  tea.Cmd
+		cmds []tea.Cmd
+	)
+
+	// Base stuff we should always run.
+	if !f.scaffoldDone {
+		// Spin the scaffolding spinner if we're waiting.
+		f.loading, cmd = f.loading.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	if f.scaffoldDone && f.scaffolds == nil {
+		f.scaffolds, _ = scaffold.Parse(context.Background())
+	}
+
 	// Globals.  These always run whenever changes happen.
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -134,16 +213,32 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			f.state = stateQuit
 			return f, tea.Quit
 		}
+
+		if msg.String() == "q" && f.state == stateAskLanguage {
+			// If the user pressed "q" when waiting for scaffolds to be
+			// loaded, quit and make the base inngest.json file.
+			f.state = stateDone
+			return f, tea.Quit
+		}
 	}
 
-	switch f.state {
-	case stateAskName:
-		return f.updateName(msg)
-	case stateAskEvent:
-		return f.updateEvent(msg)
-	}
+	// Run the update events for each state.
+	_, cmd = func() (tea.Model, tea.Cmd) {
+		switch f.state {
+		case stateAskName:
+			return f.updateName(msg)
+		case stateAskEvent:
+			return f.updateEvent(msg)
+		case stateAskLanguage:
+			return f.updateLanguage(msg)
+		}
+		return f, nil
+	}()
+	// Merge the async commands from each state into the top-level commands to run.
+	cmds = append(cmds, cmd)
 
-	return f, nil
+	// Return our updated state and all commands to run.
+	return f, tea.Batch(cmds...)
 }
 
 func (f *initModel) updateName(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -181,9 +276,16 @@ func (f *initModel) updateEvent(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return f, nil
 			}
 
-			// We're done.  Quit this TUI to resume the CLI functionality with state.
-			f.state = stateDone
-			return f, tea.Quit
+			// If we've attempted to update the scaffolds but have zeor languages available,
+			// quit early.
+			if f.scaffoldDone && f.scaffolds == nil || len(f.scaffolds.Languages) == 0 {
+				f.state = stateDone
+				return f, nil
+			}
+
+			// We have scaffolds with languages available, so move to the languages question.
+			f.state = stateAskLanguage
+			return f, nil
 
 		case tea.KeyUp, tea.KeyDown:
 			// Send this to the event browser to navigate the filter list.
@@ -208,6 +310,38 @@ func (f *initModel) updateEvent(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return f, tea.Batch(cmds...)
 }
 
+func (f *initModel) updateLanguage(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var (
+		cmd  tea.Cmd
+		cmds []tea.Cmd
+	)
+
+	if key, ok := msg.(tea.KeyMsg); ok && key.Type == tea.KeyEnter {
+		// We've selected a language.
+		f.language = f.languageList.SelectedItem().FilterValue()
+
+		// We have no templates for unsupported languages, so send a done signal.
+		if f.language == anotherLanguage {
+			f.state = stateDone
+			return f, tea.Quit
+		}
+
+		// If we only have one template for this language, use that and quit.
+		if len(f.scaffolds.Languages[f.language]) == 1 {
+			f.scaffold = &f.scaffolds.Languages[f.language][0]
+			f.state = stateDone
+			return f, tea.Quit
+		}
+
+		// Switch state to render a list to ask which scaffold to use.
+		f.state = stateAskScaffold
+	}
+
+	f.languageList, cmd = f.languageList.Update(msg)
+	cmds = append(cmds, cmd)
+	return f, tea.Batch(cmds...)
+}
+
 // View is called to render the CLI's UI.
 func (f *initModel) View() string {
 
@@ -227,6 +361,8 @@ func (f *initModel) View() string {
 		b.WriteString(f.renderName())
 	case stateAskEvent:
 		b.WriteString(f.renderEvent())
+	case stateAskLanguage:
+		b.WriteString(f.renderLanguageSelection())
 	case stateDone:
 		// Done.  Add some padding to the final view for the parent.
 		b.WriteString("\n")
@@ -240,11 +376,16 @@ func (f *initModel) renderState() string {
 	if f.state == stateAskName {
 		return ""
 	}
+
 	b := &strings.Builder{}
 	b.WriteString(fmt.Sprintf("1. Function name: %s\n", f.name))
 	if f.event != "" && f.state != stateAskEvent {
 		b.WriteString(fmt.Sprintf("2. Event: %s\n", f.event))
 	}
+	if f.language != "" && f.state != stateAskLanguage {
+		b.WriteString(fmt.Sprintf("3. Language: %s\n", f.language))
+	}
+
 	return b.String()
 }
 
@@ -267,11 +408,20 @@ func (f *initModel) renderEvent() string {
 	)
 	b.WriteString(f.textinput.View() + "\n\n\n")
 
+	if f.eventFetchError != nil {
+		b.WriteString("\n" + RenderWarning(fmt.Sprintf("We couldn't fetch your latest events from our API: %s", f.eventFetchError)) + "\n")
+	}
+
+	if f.height < 40 {
+		b.WriteString("\n" + RenderWarning("Your TTY doesn't have enough height to render the event browser") + "\n")
+		return b.String()
+	}
+
 	// Render two columns of text.
 	headerMsg := lipgloss.JoinVertical(lipgloss.Center,
 		BoldStyle.Copy().Foreground(Feint).Render("Event browser"),
 		TextStyle.Copy().Foreground(Feint).Render("Showing events within your workspace, and their Cue schema. ")+
-			BoldStyle.Copy().Foreground(Feint).Render("Tab: select.  Ctrl-j/k: navigate code"),
+			BoldStyle.Copy().Foreground(Feint).Render("Tab: select. Ctrl-j/k: navigate code"),
 	)
 
 	// Place the header in the center of the screen.
@@ -282,8 +432,34 @@ func (f *initModel) renderEvent() string {
 	)
 
 	b.WriteString(header)
-
 	b.WriteString(f.browser.View())
+
+	return b.String()
+}
+
+func (f *initModel) renderLanguageSelection() string {
+	if !f.scaffoldDone || f.scaffolds == nil {
+		return fmt.Sprintf("\n\n   %s Loading scaffold templates... Press q to quit and save your function without using a template.\n\n", f.loading.View())
+	}
+
+	b := &strings.Builder{}
+
+	languages := []list.Item{}
+	for k := range f.scaffolds.Languages {
+		languages = append(languages, initListItem{name: k})
+	}
+	languages = append(languages, initListItem{name: anotherLanguage})
+	f.languageList.SetItems(languages)
+
+	b.WriteString(
+		BoldStyle.Render("3. Which language would you like to use?") +
+			TextStyle.Copy().Foreground(Feint).Render(" (q to quit without using a scaffold)") + "\n\n",
+	)
+
+	if f.scaffoldCacheError != nil {
+		b.WriteString(RenderWarning(fmt.Sprintf("Couldn't update scaffolds: %s", f.scaffoldCacheError)) + "\n\n")
+	}
+	b.WriteString(f.languageList.View())
 
 	return b.String()
 }
@@ -291,7 +467,7 @@ func (f *initModel) renderEvent() string {
 func (f *initModel) renderWelcome() string {
 	dialogBoxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#874BFD")).
+		BorderForeground(Primary).
 		Padding(1, 0).
 		BorderTop(true).
 		BorderLeft(true).
@@ -302,32 +478,36 @@ func (f *initModel) renderWelcome() string {
 		f.width, 7,
 		lipgloss.Center, lipgloss.Center,
 		dialogBoxStyle.Render(TextStyle.Copy().Bold(true).PaddingLeft(3).PaddingRight(4).Render("👋 Welcome to Inngest!")),
-		lipgloss.WithWhitespaceChars("⎻⎼⎽⎼"),
+		lipgloss.WithWhitespaceChars("⎼⎽"),
 		lipgloss.WithWhitespaceForeground(lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#333333"}),
 	)
 	return dialog
 }
 
-func fetchEvents() ([]events.Event, error) {
-	// Fetch our events.
-	//
-	// XXX: This should be moved to our GQL endpoint and should request
-	// the users events, once merged.
-	resp, err := http.Get("https://schemas.inngest.com/generated.json")
-	if err != nil {
-		return nil, fmt.Errorf("error fetching events: %w", err)
+func fetchEvents() ([]client.Event, error) {
+	ctx, done := context.WithTimeout(context.Background(), 20*time.Second)
+	defer done()
+
+	var workspaceID *uuid.UUID
+	if s, err := state.GetState(ctx); err == nil {
+		workspaceID = &s.SelectedWorkspace.ID
 	}
-	defer resp.Body.Close()
-	// Update the event browser directly here.  This runs before View() and
-	// we don't need to run through the update flow.
-	byt, err := io.ReadAll(resp.Body)
+
+	c := state.Client(ctx)
+	evts, err := c.AllEvents(ctx, &client.EventQuery{
+		WorkspaceID: workspaceID,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("error fetching events: %w", err)
+		return nil, err
 	}
-	schemas := []events.Event{}
-	err = json.Unmarshal(byt, &schemas)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshalling events: %w", err)
-	}
-	return schemas, nil
+	return evts, nil
 }
+
+type initListItem struct {
+	name        string
+	description string
+}
+
+func (i initListItem) Title() string       { return i.name }
+func (i initListItem) Description() string { return i.description }
+func (i initListItem) FilterValue() string { return i.name }

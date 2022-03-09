@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/inngest/inngestctl/cmd/commands/internal/actions"
-	"github.com/inngest/inngestctl/cmd/commands/internal/state"
 	"github.com/inngest/inngestctl/cmd/commands/internal/table"
 	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/inngest/log"
+	"github.com/inngest/inngestctl/inngest/state"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -37,7 +37,6 @@ func NewCmdActions() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			ctx := cmd.Context()
 			state := state.RequireState(ctx)
-			_ = state
 
 			actions, err := state.Client.Actions(ctx, includePublic)
 			if err != nil {

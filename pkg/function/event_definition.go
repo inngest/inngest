@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/inngest/cuetypescript"
 	"github.com/inngest/event-schemas/events/marshalling/jsonschema"
@@ -101,7 +102,14 @@ func (ed *EventDefinition) Typescript() (string, error) {
 	if err := ed.createCueType(); err != nil {
 		return "", err
 	}
-	return cuetypescript.MarshalString(ed.cueType)
+
+	// Ensure we have an identifier so that this isn't broken into event components.
+	def := ed.cueType
+	if strings.TrimSpace(ed.cueType)[0] == '{' {
+		def = "#Event: " + def
+	}
+
+	return cuetypescript.MarshalString(def)
 }
 
 // JSONSchema returns the JSON Schema for the event.

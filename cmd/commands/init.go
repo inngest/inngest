@@ -6,8 +6,10 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/inngest/inngestctl/pkg/cli"
 	"github.com/inngest/inngestctl/pkg/function"
+	"github.com/inngest/inngestctl/pkg/scaffold"
 	"github.com/spf13/cobra"
 )
 
@@ -54,18 +56,27 @@ func runInit(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Once complete, state should contain everything we need to create our
-	// function file.
-	byt, err := function.MarshalJSON(*fn)
-	if err != nil {
-		fmt.Println(cli.RenderError(fmt.Sprintf("Error creating JSON: %s", err)) + "\n")
+	// If we have a template, render that.
+	tpl := state.Template()
+	if tpl == nil {
+		// Use a blank template with no fs.FS to render only the JSON into the directory.
+		tpl = &scaffold.Template{}
+	}
+	if err := tpl.Render(*fn); err != nil {
+		fmt.Println(cli.RenderError(fmt.Sprintf("There was an error creating the function: %s", err)) + "\n")
 		return
 	}
 
-	if err := os.WriteFile("./inngest.json", byt, 0600); err != nil {
-		fmt.Println(cli.RenderError(fmt.Sprintf("Error writing inngest.json: %s", err)) + "\n")
+	fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render(fmt.Sprintf("🎉 Done!  Your project has been created in ./%s", fn.Slug())))
+
+	if tpl.PostSetup != "" {
+		renderer, _ := glamour.NewTermRenderer(
+			// detect background color and pick either the default dark or light theme
+			glamour.WithAutoStyle(),
+		)
+		out, _ := renderer.Render(tpl.PostSetup)
+		fmt.Println(out)
 	}
 
-	fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render("🎉 Done!  ./inngest.json has been created and you're ready to go."))
 	fmt.Println(cli.TextStyle.Render("For more information, read our documentation at https://www.inngest.com/docs\n"))
 }

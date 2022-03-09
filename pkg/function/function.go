@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngestctl/inngest"
 )
@@ -49,6 +50,10 @@ func New() (*Function, error) {
 		return nil, err
 	}
 	return &Function{ID: id}, nil
+}
+
+func (f Function) Slug() string {
+	return slug.Make(f.Name)
 }
 
 // Validate returns an error if the function definition is invalid.

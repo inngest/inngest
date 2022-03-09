@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inngest/inngestctl/cmd/commands/internal/state"
 	"github.com/inngest/inngestctl/cmd/commands/internal/table"
 	"github.com/inngest/inngestctl/cmd/commands/internal/workflows"
 	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/inngest/log"
+	"github.com/inngest/inngestctl/inngest/state"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/text/language"
