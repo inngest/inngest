@@ -54,6 +54,9 @@ type ActionVersion struct {
 	// actions run.
 	Response map[string]Response `json:"response"`
 
+	// Scopes defines the permissions that this action requires to execute.
+	Scopes []string `json:"scopes"`
+
 	// Edges define predetermined edges based off of responses for this action.  For example,
 	// the webhook action can define some success and error edges for the response.
 	Edges map[string]Edge `json:"edges"`
