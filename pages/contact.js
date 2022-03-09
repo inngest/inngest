@@ -7,7 +7,6 @@ import Content from "../shared/content";
 import Workflow from "../shared/Icons/Workflow";
 import Language from "../shared/Icons/Language";
 import Lightning from "../shared/Icons/Lightning";
-import Plus from "../shared/Icons/Plus";
 import Support from "../shared/Icons/Support";
 import Audit from "../shared/Icons/Audit";
 import { useState } from "react";

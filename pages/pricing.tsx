@@ -1,21 +1,21 @@
-import { useEffect } from "react"
-import styled from "@emotion/styled"
-import Head from "next/head"
-import Footer from "../shared/footer"
-import Nav from "../shared/nav"
-import Content from "../shared/content"
-import Callout from "../shared/Callout"
+import { useEffect } from "react";
+import styled from "@emotion/styled";
+import Head from "next/head";
+import Footer from "../shared/footer";
+import Nav from "../shared/nav";
+import Content from "../shared/content";
+import Callout from "../shared/Callout";
 
-import Block from "../shared/Block"
-import IconList from "../shared/IconList"
-import Button from "../shared/Button"
+import Block from "../shared/Block";
+import IconList from "../shared/IconList";
+import Button from "../shared/Button";
 
-import Workflow from "../shared/Icons/Workflow"
-import Language from "../shared/Icons/Language"
-import Lightning from "../shared/Icons/Lightning"
-import Plus from "../shared/Icons/Plus"
-import Support from "../shared/Icons/Support"
-import Audit from "../shared/Icons/Audit"
+import Workflow from "../shared/Icons/Workflow";
+import Language from "../shared/Icons/Language";
+import Lightning from "../shared/Icons/Lightning";
+import Plus from "../shared/Icons/Plus";
+import ListCheck from "../shared/Icons/ListCheck";
+import UserVoice from "../shared/Icons/UserVoice";
 
 const PLANS = {
   free: {
@@ -69,7 +69,7 @@ const PLANS = {
         text: "resources & throughput",
       },
       {
-        icon: Audit,
+        icon: ListCheck,
         quantity: "1 week",
         text: "audit & log history",
       },
@@ -95,7 +95,7 @@ const PLANS = {
         text: "resources & throughput",
       },
       {
-        icon: Audit,
+        icon: ListCheck,
         quantity: "1 month",
         text: "or more audit & log history",
       },
@@ -105,18 +105,18 @@ const PLANS = {
         text: "available",
       },
       {
-        icon: Support,
-        quantity: "Add-ons",
-        text: "available",
+        icon: UserVoice,
+        quantity: "Dedicated",
+        text: "support",
       },
     ],
   },
-}
+};
 
 export default function Pricing() {
   const toggleFAQ = (e) => {
-    e.currentTarget.classList.toggle("active")
-  }
+    e.currentTarget.classList.toggle("active");
+  };
 
   return (
     <>
@@ -318,7 +318,7 @@ export default function Pricing() {
         <Footer />
       </div>
     </>
-  )
+  );
 }
 
 const Hero = styled.div`
@@ -337,10 +337,10 @@ const Hero = styled.div`
   p {
     font-family: var(--font);
   }
-`
+`;
 
 const PlanHeader = styled.div<{
-  flexDirection: "row" | "column"
+  flexDirection: "row" | "column";
 }>`
   display: flex;
   flex-direction: ${(props) => props.flexDirection || "row"};
@@ -354,7 +354,7 @@ const PlanHeader = styled.div<{
   p {
     margin: 1rem 0;
   }
-`
+`;
 
 const Grid = styled.div`
   display: grid;
@@ -370,14 +370,14 @@ const Grid = styled.div`
   @media (max-width: 800px) {
     grid-template-columns: 1fr;
   }
-`
+`;
 
 const AllPlansInfo = styled.p`
   margin: 2rem auto 4rem;
   max-width: 40rem;
   line-height: 1.5rem;
   text-align: center;
-`
+`;
 
 const FAQGrid = styled.div`
   display: grid;
@@ -405,4 +405,4 @@ const FAQGrid = styled.div`
       display: block;
     }
   }
-`
+`;

@@ -1,17 +1,17 @@
-import React from "react"
-import styled from "@emotion/styled"
+import React from "react";
+import styled from "@emotion/styled";
 
 type IconListProps = {
-  direction?: "horizontal" | "vertical"
-  collapseWidth?: number | string
-  circles?: boolean
-  size?: "small" | "default"
+  direction?: "horizontal" | "vertical";
+  collapseWidth?: number | string;
+  circles?: boolean;
+  size?: "small" | "default";
   items: Array<{
-    icon: React.FC<any>
-    text: string | React.ReactFragment
-    quantity?: string
-  }>
-}
+    icon: React.FC<any>;
+    text: string | React.ReactFragment;
+    quantity?: string;
+  }>;
+};
 
 const IconList: React.FC<IconListProps> = ({
   direction = "horizontal",
@@ -25,7 +25,7 @@ const IconList: React.FC<IconListProps> = ({
       {items.map((item, idx) => (
         <ListItem key={idx}>
           <IconWrapper circle={circles}>
-            <item.icon size="1.1em" color="#fff" />
+            <item.icon size="1em" color="#fff" />
           </IconWrapper>
           <span>
             {item.quantity ? (
@@ -39,13 +39,13 @@ const IconList: React.FC<IconListProps> = ({
         </ListItem>
       ))}
     </List>
-  )
-}
+  );
+};
 
 const List = styled.ul<{
-  direction: "horizontal" | "vertical"
-  collapseWidth: number | string
-  size: "small" | "default"
+  direction: "horizontal" | "vertical";
+  collapseWidth: number | string;
+  size: "small" | "default";
 }>`
   padding: 0;
   list-style: none;
@@ -67,7 +67,7 @@ const List = styled.ul<{
       margin-left: 0 !important;
     }
   }
-`
+`;
 
 const ListItem = styled.li`
   display: flex;
@@ -76,7 +76,7 @@ const ListItem = styled.li`
   line-height: 1.2rem;
   margin: 0;
   padding: 0;
-`
+`;
 
 const IconWrapper = styled.div<{ circle: boolean }>`
   display: flex;
@@ -88,6 +88,6 @@ const IconWrapper = styled.div<{ circle: boolean }>`
   margin-right: 0.5em;
   background: ${(props) => (props.circle ? "var(--primary-color)" : "none")};
   border-radius: 50%;
-`
+`;
 
-export default IconList
+export default IconList;
