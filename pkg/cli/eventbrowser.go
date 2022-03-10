@@ -14,9 +14,12 @@ import (
 	"github.com/inngest/inngestctl/inngest/client"
 )
 
-var listWidth = 50
+var (
+	listWidth           = 50
+	newEventDescription = "A new event you're typing *right now*"
+)
 
-func NewEventBrowser(width, height int, evts []client.Event) (*EventBrowser, error) {
+func NewEventBrowser(width, height int, evts []client.Event, showNewEvent bool) (*EventBrowser, error) {
 	delegate := list.NewDefaultDelegate()
 	delegate.SetSpacing(1)
 	l := list.New([]list.Item{}, delegate, listWidth, height)
@@ -29,11 +32,12 @@ func NewEventBrowser(width, height int, evts []client.Event) (*EventBrowser, err
 	v.KeyMap = viewportKeyMap()
 
 	return &EventBrowser{
-		width:    width,
-		height:   height,
-		schemas:  evts,
-		list:     l,
-		viewport: v,
+		width:        width,
+		height:       height,
+		showNewEvent: showNewEvent,
+		schemas:      evts,
+		list:         l,
+		viewport:     v,
 	}, nil
 }
 
@@ -43,6 +47,9 @@ func NewEventBrowser(width, height int, evts []client.Event) (*EventBrowser, err
 type EventBrowser struct {
 	width  int
 	height int
+
+	// Whether to show a "new event" if the prefix doesn't match.
+	showNewEvent bool
 
 	schemas []client.Event
 	prefix  string
@@ -144,7 +151,7 @@ func (e *EventBrowser) View() string {
 	//
 	// We use len(filtered) here instead of selectedEvent so that we can show newly
 	// filtered events when text is deleted via backspace.
-	if e.prefix != "" && len(filtered) == 0 {
+	if e.prefix != "" && len(filtered) == 0 && !e.showNewEvent {
 		msg := TextStyle.Copy().Foreground(Feint).Render("No event matched ")
 		msg += BoldStyle.Copy().Render(e.prefix)
 		msg += TextStyle.Copy().Foreground(Feint).Render(".  The function will be triggered using this unseen event.")
@@ -162,10 +169,28 @@ func (e *EventBrowser) View() string {
 }
 
 func (e *EventBrowser) renderList(schemas []client.Event) string {
+	var found bool
 	items := make([]list.Item, len(schemas))
 	for n, evt := range schemas {
+		if evt.Name == e.prefix {
+			found = true
+		}
 		items[n] = eventListItem{e: evt}
 	}
+
+	// If there's a prefix that doesn't match an event, see if we want
+	// to show a "new event" at the top of the list.
+	if e.showNewEvent && e.prefix != "" && !found {
+		items = append([]list.Item{
+			eventListItem{
+				e: client.Event{
+					Name:        e.prefix,
+					Description: newEventDescription,
+				},
+			},
+		}, items...)
+	}
+
 	e.list.SetItems(items)
 	left := lipgloss.NewStyle().
 		Width(listWidth+2). // plus padding
