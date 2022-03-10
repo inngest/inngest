@@ -112,11 +112,9 @@ func update(ctx context.Context) error {
 
 // clone clones the scaffold directory into
 func clone(ctx context.Context) error {
-	if err := os.MkdirAll(InngestRoot, 0644); err != nil {
+	if err := os.MkdirAll(InngestRoot, 0755); err != nil {
 		return fmt.Errorf("unable to make cache dir: %w", err)
 	}
-
-	RepoURL = "https://github.com/inngest/inngestctl.git"
 	_, err := git.PlainClone(CacheDir, false, &git.CloneOptions{
 		URL:      RepoURL,
 		Progress: nil,

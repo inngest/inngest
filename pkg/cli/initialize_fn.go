@@ -276,11 +276,11 @@ func (f *initModel) updateEvent(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return f, nil
 			}
 
-			// If we've attempted to update the scaffolds but have zeor languages available,
+			// If we've attempted to update the scaffolds but have zero languages available,
 			// quit early.
-			if f.scaffoldDone && f.scaffolds == nil || len(f.scaffolds.Languages) == 0 {
+			if f.scaffolds == nil || (f.scaffoldDone && len(f.scaffolds.Languages) == 0) {
 				f.state = stateDone
-				return f, nil
+				return f, tea.Quit
 			}
 
 			// We have scaffolds with languages available, so move to the languages question.
@@ -438,7 +438,7 @@ func (f *initModel) renderEvent() string {
 }
 
 func (f *initModel) renderLanguageSelection() string {
-	if !f.scaffoldDone || f.scaffolds == nil {
+	if !f.scaffoldDone || f.scaffolds == nil || len(f.scaffolds.Languages) == 0 {
 		return fmt.Sprintf("\n\n   %s Loading scaffold templates... Press q to quit and save your function without using a template.\n\n", f.loading.View())
 	}
 
