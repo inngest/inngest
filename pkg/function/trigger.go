@@ -1,6 +1,11 @@
 package function
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/gosimple/slug"
+)
 
 // Trigger represents either an event trigger or a cron trigger.  Only one is valid;  when
 // defining a function within Cue we enforce that only an event or cron field can be specified.
@@ -37,6 +42,11 @@ type EventTrigger struct {
 
 	// Definition represents the schema or type definition for the event.
 	Definition *EventDefinition `json:"definition,omitempty"`
+}
+
+func (e EventTrigger) TitleName() string {
+	words := strings.ReplaceAll(slug.Make(e.Event), "-", " ")
+	return strings.ReplaceAll(strings.Title(words), " ", "")
 }
 
 func (e EventTrigger) Validate() error {

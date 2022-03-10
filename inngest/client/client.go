@@ -18,6 +18,9 @@ type Client interface {
 	Account(ctx context.Context) (*Account, error)
 	Workspaces(ctx context.Context) ([]Workspace, error)
 
+	AllEvents(ctx context.Context, query *EventQuery) ([]Event, error)
+	Events(ctx context.Context, query *EventQuery, cursor *Cursor) (*PaginatedEvents, error)
+
 	// Workflows lists all workflows in a given workspace
 	Workflows(ctx context.Context, workspaceID uuid.UUID) ([]Workflow, error)
 	// Workflow returns a specific workflow by ID

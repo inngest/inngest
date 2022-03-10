@@ -2,10 +2,10 @@ package commands
 
 import (
 	"github.com/google/uuid"
-	"github.com/inngest/inngestctl/cmd/commands/internal/state"
 	"github.com/inngest/inngestctl/cmd/commands/internal/table"
 	"github.com/inngest/inngestctl/inngest/client"
 	"github.com/inngest/inngestctl/inngest/log"
+	"github.com/inngest/inngestctl/inngest/state"
 	"github.com/spf13/cobra"
 )
 

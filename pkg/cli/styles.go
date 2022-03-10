@@ -3,11 +3,12 @@ package cli
 import "github.com/charmbracelet/lipgloss"
 
 var (
-	Color  = lipgloss.AdaptiveColor{Light: "#111222", Dark: "#FAFAFA"}
-	Green  = lipgloss.Color("#9dcc3a")
-	Red    = lipgloss.Color("#ff0000")
-	White  = lipgloss.Color("#ffffff")
-	Orange = lipgloss.Color("#D3A347")
+	Color   = lipgloss.AdaptiveColor{Light: "#111222", Dark: "#FAFAFA"}
+	Primary = lipgloss.Color("#4636f5")
+	Green   = lipgloss.Color("#9dcc3a")
+	Red     = lipgloss.Color("#ff0000")
+	White   = lipgloss.Color("#ffffff")
+	Orange  = lipgloss.Color("#D3A347")
 
 	Feint     = lipgloss.AdaptiveColor{Light: "#333333", Dark: "#888888"}
 	TextStyle = lipgloss.NewStyle().Foreground(Color)

@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/chroma/quick"
 	"github.com/charmbracelet/bubbles/key"
@@ -10,12 +11,12 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/inngest/event-schemas/events"
+	"github.com/inngest/inngestctl/inngest/client"
 )
 
 var listWidth = 50
 
-func NewEventBrowser(width, height int, evts []events.Event) (*EventBrowser, error) {
+func NewEventBrowser(width, height int, evts []client.Event) (*EventBrowser, error) {
 	delegate := list.NewDefaultDelegate()
 	delegate.SetSpacing(1)
 	l := list.New([]list.Item{}, delegate, listWidth, height)
@@ -43,7 +44,7 @@ type EventBrowser struct {
 	width  int
 	height int
 
-	schemas []events.Event
+	schemas []client.Event
 	prefix  string
 
 	// Renders the list on the left.
@@ -62,10 +63,16 @@ func (e *EventBrowser) Init() tea.Cmd {
 
 // UpdateSize updates the size of the event browser's rendering area.
 func (e *EventBrowser) UpdateSize(width, height int) {
+	if width < 100 {
+		listWidth = 24
+	} else {
+		listWidth = 50
+	}
+
 	e.width = width
 	e.height = height
-	// the list's width is fixed.
 	e.list.SetHeight(height)
+	e.list.SetWidth(listWidth)
 	e.viewport.Width = width
 	e.viewport.Height = height
 }
@@ -88,11 +95,11 @@ func (e *EventBrowser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // Selected returns the selected event via the list, or nil if no event is selected.
-func (e EventBrowser) Selected() *events.Event {
+func (e EventBrowser) Selected() *client.Event {
 	if e.list.SelectedItem() == nil {
 		return nil
 	}
-	s := e.list.SelectedItem().(listItem)
+	s := e.list.SelectedItem().(eventListItem)
 	return &s.e
 }
 
@@ -101,12 +108,17 @@ func (e *EventBrowser) UpdatePrefix(s string) {
 	e.prefix = s
 }
 
+func (e *EventBrowser) SetEvents(evts []client.Event) {
+	e.schemas = evts
+}
+
 // View renders the list.
 func (e *EventBrowser) View() string {
+
 	// Filter the events by prefix.
 	filtered := e.schemas
 	if e.prefix != "" {
-		filtered = []events.Event{}
+		filtered = []client.Event{}
 		for _, evt := range e.schemas {
 			if strings.HasPrefix(strings.ToLower(evt.Name), strings.ToLower(e.prefix)) {
 				filtered = append(filtered, evt)
@@ -115,9 +127,9 @@ func (e *EventBrowser) View() string {
 	}
 
 	// Render the event viewer.
-	var selectedEvent *events.Event
+	var selectedEvent *client.Event
 	if e.list.SelectedItem() != nil {
-		s := e.list.SelectedItem().(listItem)
+		s := e.list.SelectedItem().(eventListItem)
 		selectedEvent = &s.e
 	}
 
@@ -149,20 +161,20 @@ func (e *EventBrowser) View() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, list, detail)
 }
 
-func (e *EventBrowser) renderList(schemas []events.Event) string {
+func (e *EventBrowser) renderList(schemas []client.Event) string {
 	items := make([]list.Item, len(schemas))
 	for n, evt := range schemas {
-		items[n] = listItem{e: evt}
+		items[n] = eventListItem{e: evt}
 	}
 	e.list.SetItems(items)
 	left := lipgloss.NewStyle().
-		Width(listWidth + 4). // plus padding
-		Padding(2).
+		Width(listWidth+2). // plus padding
+		Padding(2, 2, 2, 0).
 		Render(e.list.View())
 	return left
 }
 
-func (e *EventBrowser) renderDetail(selected *events.Event) string {
+func (e *EventBrowser) renderDetail(selected *client.Event) string {
 	// This is the outer box.
 	panel := lipgloss.NewStyle().
 		Width(e.width - listWidth - 8). // list padding + inner padding
@@ -173,9 +185,13 @@ func (e *EventBrowser) renderDetail(selected *events.Event) string {
 		return panel.Render("No event selected")
 	}
 
+	if len(selected.Versions) == 0 {
+		return panel.Render("No event type recorded")
+	}
+
 	// Render the type, using terminal colouring
 	buf := &bytes.Buffer{}
-	if err := quick.Highlight(buf, selected.Cue, "go", "terminal256", "monokai"); err != nil {
+	if err := quick.Highlight(buf, selected.Versions[0].CueType, "go", "terminal256", "monokai"); err != nil {
 		panic(err)
 	}
 	e.viewport.SetContent(buf.String())
@@ -183,14 +199,25 @@ func (e *EventBrowser) renderDetail(selected *events.Event) string {
 	return panel.Render(e.viewport.View())
 }
 
-// listItem renders an event in the list.
-type listItem struct {
-	e events.Event
+// eventListItem renders an event in the list.
+type eventListItem struct {
+	e client.Event
 }
 
-func (i listItem) Title() string       { return i.e.Name }
-func (i listItem) Description() string { return i.e.Description }
-func (i listItem) FilterValue() string { return i.e.Name }
+func (i eventListItem) Title() string       { return i.e.Name }
+func (i eventListItem) FilterValue() string { return i.e.Name }
+func (i eventListItem) Description() string {
+	if i.e.Description == "" {
+		if !i.e.FirstSeen.IsZero() {
+			return "First seen " + i.e.FirstSeen.Format(time.Stamp)
+		}
+		if i.e.IntegrationName != "" {
+			return "Via an integration"
+		}
+		return "-"
+	}
+	return i.e.Description
+}
 
 func listKeyMap() list.KeyMap {
 	return list.KeyMap{
