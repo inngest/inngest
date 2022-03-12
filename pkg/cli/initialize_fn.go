@@ -174,7 +174,7 @@ func (f *initModel) Init() tea.Cmd {
 	}()
 
 	// Remove the first N lines of the CLI height, which account for the header etc.
-	f.browser, _ = NewEventBrowser(f.width, f.height-eventBrowserOffset, f.events)
+	f.browser, _ = NewEventBrowser(f.width, f.height-eventBrowserOffset, f.events, true)
 
 	go func() {
 		f.scaffoldCacheError = scaffold.UpdateCache(context.Background())
@@ -274,6 +274,10 @@ func (f *initModel) updateEvent(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if f.event == "" {
 				// There's no name, so don't do anything.
 				return f, nil
+			}
+
+			if sel := f.browser.Selected(); sel != nil {
+				f.event = sel.Name
 			}
 
 			// If we've attempted to update the scaffolds but have zero languages available,
