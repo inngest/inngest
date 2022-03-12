@@ -84,7 +84,7 @@ func (t Template) Render(f function.Function) error {
 				}
 
 				if len(names) == 0 {
-					return ""
+					return "export type EventTriggers = {};"
 				}
 
 				// Write an enum which joins all event triggers.
