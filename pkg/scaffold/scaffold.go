@@ -107,7 +107,13 @@ func update(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return w.Pull(&git.PullOptions{RemoteName: "origin"})
+
+	err = w.Pull(&git.PullOptions{RemoteName: "origin"})
+	if err == git.NoErrAlreadyUpToDate {
+		return nil
+	}
+
+	return err
 }
 
 // clone clones the scaffold directory into

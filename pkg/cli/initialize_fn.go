@@ -498,7 +498,8 @@ func fetchEvents() ([]client.Event, error) {
 		WorkspaceID: workspaceID,
 	})
 	if err != nil {
-		return nil, err
+		// Attempt to fetch unauthed events.
+		return c.AllEvents(ctx, nil)
 	}
 	return evts, nil
 }
