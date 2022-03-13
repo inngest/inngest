@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/gosimple/slug"
 	"github.com/inngest/cuetypescript"
 	"github.com/inngest/inngestctl/pkg/function"
 )
@@ -33,7 +34,8 @@ type tplData struct {
 // Render renders the template and all files into the folder specified by function.
 func (t Template) Render(f function.Function) error {
 	dirname := f.Slug()
-	root, _ := filepath.Abs("./" + dirname)
+	relative := "./" + dirname
+	root, _ := filepath.Abs(relative)
 
 	if _, err := os.Stat(root); err == nil {
 		return fmt.Errorf("%s already exists", dirname)
@@ -148,6 +150,34 @@ func (t Template) Render(f function.Function) error {
 		}
 	}
 
+	// For each event within the function create a new event file.
+	madeEventFolder := false
+	for n, trigger := range f.Triggers {
+		if trigger.EventTrigger == nil || trigger.EventTrigger.Definition == nil {
+			continue
+		}
+
+		cue, err := trigger.Definition.Cue()
+		if err != nil {
+			// XXX: We would like to log this as a warning.
+			continue
+		}
+
+		if !madeEventFolder {
+			if err := os.MkdirAll(filepath.Join(root, "events"), 0755); err != nil {
+				return fmt.Errorf("error making folder for event types: %w", err)
+			}
+			madeEventFolder = true
+		}
+
+		name := fmt.Sprintf("%s.cue", eventFilename(trigger.Event))
+		path := filepath.Join(root, "events", name)
+		if err := os.WriteFile(path, []byte(cue), 0644); err != nil {
+			return fmt.Errorf("error writing event definition: %w", err)
+		}
+		f.Triggers[n].Definition.Def = fmt.Sprintf("file://./events/%s", name)
+	}
+
 	// Once complete, state should contain everything we need to create our
 	// function file.
 	byt, err := function.MarshalJSON(f)
@@ -160,4 +190,11 @@ func (t Template) Render(f function.Function) error {
 	}
 
 	return nil
+}
+
+// eventFilename returns a string for the event's filename.  Some events contain forward
+// slashes (eg. stripe/customer.created).  These slashes cannot be in a filename, and are
+// escpaed.
+func eventFilename(evt string) string {
+	return slug.Make(evt)
 }

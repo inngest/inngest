@@ -20,6 +20,8 @@ const (
 	// FormatJSONSchema specifies that the event type is valid JSON Schema
 	FormatJSONSchema = "json-schema"
 
+	FilePrefix = "file://"
+
 	// eventIdentifier is the identifier used within cue to declare the event's type.
 	eventIdentifier = "InngestEvent"
 )
@@ -66,12 +68,19 @@ func (ed *EventDefinition) createCueType() error {
 		return nil
 	}
 
-	file, err := filepath.Abs(string(ed.Def))
-	if err == nil {
-		// The event definition is stored within a file.
-		if byt, err := os.ReadFile(file); err == nil {
-			ed.Def = string(byt)
+	if strings.HasPrefix(ed.Def, FilePrefix) {
+		path := strings.Replace(ed.Def, FilePrefix, "", 1)
+
+		file, err := filepath.Abs(path)
+		if err != nil {
+			return fmt.Errorf("error determining event definition path: %w", err)
 		}
+		// The event definition is stored within a file.
+		byt, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("error reading event definition '%s': %w", path, err)
+		}
+		ed.Def = string(byt)
 	}
 
 	switch ed.Format {

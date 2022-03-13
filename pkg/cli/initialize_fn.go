@@ -271,13 +271,13 @@ func (f *initModel) updateEvent(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.Type {
 		case tea.KeyEnter:
+			if sel := f.browser.Selected(); sel != nil {
+				f.event = sel.Name
+			}
+
 			if f.event == "" {
 				// There's no name, so don't do anything.
 				return f, nil
-			}
-
-			if sel := f.browser.Selected(); sel != nil {
-				f.event = sel.Name
 			}
 
 			// If we've attempted to update the scaffolds but have zero languages available,
