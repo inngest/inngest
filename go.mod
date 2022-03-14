@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	cuelang.org/go v0.4.2
+	github.com/99designs/gqlgen v0.17.1
 	github.com/AlecAivazis/survey/v2 v2.3.2
 	github.com/alecthomas/chroma v0.10.0
 	github.com/charmbracelet/bubbles v0.10.3
@@ -90,6 +91,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
+	github.com/vektah/gqlparser/v2 v2.4.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
 	github.com/yuin/goldmark v1.4.4 // indirect
 	github.com/yuin/goldmark-emoji v1.0.1 // indirect
