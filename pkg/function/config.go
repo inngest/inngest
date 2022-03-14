@@ -76,6 +76,8 @@ func Unmarshal(input []byte) (*Function, error) {
 	return fn, nil
 }
 
+// MarshalJSON marshals a function to pretty JSON.  It's a plain wrapper
+// around json.MarshalIndent with defaults.
 func MarshalJSON(f Function) ([]byte, error) {
 	return json.MarshalIndent(f, "", "  ")
 }
