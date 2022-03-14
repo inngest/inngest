@@ -10,11 +10,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngestctl/inngest/version"
 )
 
 // DoGQL makes a gql request and returns the response
-func (c httpClient) DoGQL(ctx context.Context, input Params) (*Response, error) {
+func (c httpClient) DoGQL(ctx context.Context, input Params) (*graphql.Response, error) {
 	buf := jsonBuffer(ctx, input)
 
 	req, err := c.NewRequest(http.MethodPost, "/gql", buf)
@@ -37,8 +38,10 @@ func (c httpClient) DoGQL(ctx context.Context, input Params) (*Response, error) 
 		return nil, fmt.Errorf("invalid status code %d: %s", resp.StatusCode, string(body))
 	}
 
-	r := &Response{}
-	if err = json.NewDecoder(resp.Body).Decode(r); err != nil {
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	r := &graphql.Response{}
+	if err = json.Unmarshal(body, &r); err != nil {
 		return nil, fmt.Errorf("invalid json response: %w", err)
 	}
 

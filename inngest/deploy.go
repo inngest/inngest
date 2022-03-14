@@ -53,10 +53,9 @@ func DeployAction(ctx context.Context, opts DeployActionOptions) (*ActionVersion
 
 	switch opts.Version.Runtime.RuntimeType() {
 	case "docker":
-		runtime := opts.Version.Runtime.Runtime.(RuntimeDocker)
 		err := prepareAndPushImage(ctx, deployImageOptions{
 			version:     opts.Version,
-			image:       runtime.Image,
+			image:       opts.Version.Runtime.RuntimeImage(),
 			credentials: opts.Client.Credentials(),
 		})
 		if err != nil {
@@ -110,8 +109,8 @@ func prepareAndPushImage(ctx context.Context, a deployImageOptions) (err error) 
 
 func pushImage(ctx context.Context, a deployImageOptions, dkr *docker.Client) error {
 	host := DefaultRegistryHost
-	if os.Getenv("INNGEST_REGISTRY") != "" {
-		host = os.Getenv("INNGEST_REGISTRY")
+	if registry := os.Getenv("INNGEST_REGISTRY"); registry != "" {
+		host = registry
 	}
 
 	tag := fmt.Sprintf("%s/%s:%d-%d", host, a.version.DSN, a.version.Version.Major, a.version.Version.Minor)

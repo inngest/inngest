@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/inngest/inngestctl/cmd/commands/function"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -27,6 +28,10 @@ func Execute() {
 		Long:  longDescription,
 	}
 
+	rootCmd.CompletionOptions = cobra.CompletionOptions{
+		HiddenDefaultCmd: true,
+	}
+
 	rootCmd.PersistentFlags().String("log.type", "", "Log type (one of json, tty). Defaults to 'json' without a TTY")
 	rootCmd.PersistentFlags().StringP("log.level", "l", "debug", "Log level")
 	rootCmd.PersistentFlags().StringP("builder", "b", "docker", "Specify the builder to use. Options: docker or podman")
@@ -42,10 +47,11 @@ func Execute() {
 	// Register Top Level Commands
 	rootCmd.AddCommand(NewCmdActions())
 	rootCmd.AddCommand(NewCmdBuild())
+	rootCmd.AddCommand(function.NewCmdFunction())
+	rootCmd.AddCommand(NewCmdInit())
 	rootCmd.AddCommand(NewCmdLogin())
 	rootCmd.AddCommand(NewCmdWorkflows())
 	rootCmd.AddCommand(NewCmdWorkspaces())
-	rootCmd.AddCommand(NewCmdInit())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

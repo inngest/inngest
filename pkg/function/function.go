@@ -1,19 +1,17 @@
 package function
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngestctl/inngest"
-)
-
-const (
-	derivedWorkflow = "workflow"
-	derivedAction   = "action"
+	"github.com/inngest/inngestctl/inngest/state"
 )
 
 // Function represents a step function which is triggered whenever an event
@@ -36,11 +34,11 @@ type Function struct {
 	// Trigger represnets the trigger for the function.
 	Triggers []Trigger `json:"triggers"`
 
-	// Actions represents the actions to take for this function.  If empty, this assumes
-	// that we have a single action specified in the current directory using
-	//
-	// TODO: Enable for use with step functions, with edges.
-	// Actions []Action
+	// Workflow is the in memory representation of the workflow based off the function
+	Workflow *inngest.Workflow
+
+	// Actions represents the actions to take for this function.
+	Actions []*inngest.ActionVersion
 }
 
 // New returns a new, empty function with a randomly generated ID.
@@ -57,7 +55,7 @@ func (f Function) Slug() string {
 }
 
 // Validate returns an error if the function definition is invalid.
-func (f Function) Validate() error {
+func (f *Function) Validate() error {
 	var err error
 	if f.ID == "" {
 		err = multierror.Append(err, fmt.Errorf("A function ID is required"))
@@ -79,8 +77,12 @@ func (f Function) Validate() error {
 // Workflow produces the workflow.cue definition for a function.  Our executor
 // runs a "workflow", which is a DAG of the function steps.  Its a subset of
 // the function used purely for execution.
-func (f Function) Workflow() (*DerivedConfig, error) {
-	w := inngest.Workflow{
+func (f *Function) GetWorkflow(s *state.State) (*inngest.Workflow, error) {
+	if f.Workflow != nil {
+		return f.Workflow, nil
+	}
+
+	w := &inngest.Workflow{
 		Name:     f.Name,
 		ID:       f.ID,
 		Triggers: make([]inngest.Trigger, len(f.Triggers)),
@@ -105,7 +107,7 @@ func (f Function) Workflow() (*DerivedConfig, error) {
 
 	// This has references to actions.  Create the actions then reference them
 	// from the workflow.
-	actions, err := f.Actions()
+	actions, err := f.GetActions(s)
 	if err != nil {
 		return nil, err
 	}
@@ -113,8 +115,8 @@ func (f Function) Workflow() (*DerivedConfig, error) {
 	for n, a := range actions {
 		w.Actions = append(w.Actions, inngest.Action{
 			ClientID: uint(n) + 1, // 0 is the trigger; use 1 offset
-			Name:     a.name,
-			DSN:      a.id,
+			Name:     a.Name,
+			DSN:      a.DSN,
 		})
 	}
 
@@ -126,23 +128,17 @@ func (f Function) Workflow() (*DerivedConfig, error) {
 		Incoming: 1,
 	}}
 
-	config, err := inngest.FormatWorkflow(w)
-	if err != nil {
-		return nil, err
-	}
+	f.Workflow = w
 
-	return &DerivedConfig{
-		name:       f.Name,
-		id:         f.ID,
-		kind:       derivedWorkflow,
-		definition: w,
-		config:     []byte(config),
-	}, nil
+	return w, nil
 }
 
 // Actions produces configuration for each step of the function.  Each config
 // file specifies how to run the code.
-func (f Function) Actions() ([]*DerivedConfig, error) {
+func (f *Function) GetActions(s *state.State) ([]*inngest.ActionVersion, error) {
+	if f.Actions != nil {
+		return f.Actions, nil
+	}
 	// XXX: In the very near future we'll adapt this function package to
 	// support step functions in the same way that a workflow does.  This
 	// means that we have to support returning many actions.
@@ -152,14 +148,29 @@ func (f Function) Actions() ([]*DerivedConfig, error) {
 	// exists in the project root, and that we can build the
 	// image which contains all of the code necessary to run
 	// the function.
-	return f.defaultAction()
+	actions, err := f.defaultAction(s)
+	if err != nil {
+		return nil, err
+	}
+	f.Actions = actions
+	return actions, nil
 }
 
-func (f Function) defaultAction() ([]*DerivedConfig, error) {
-	id := f.ID + "-action"
-	a := inngest.ActionVersion{
+func (f *Function) defaultAction(s *state.State) ([]*inngest.ActionVersion, error) {
+	prefix := s.Account.Identifier.DSNPrefix
+	if s.Account.Identifier.Domain != nil {
+		prefix = *s.Account.Identifier.Domain
+	}
+
+	var sb strings.Builder
+	sb.WriteString(prefix)
+	sb.WriteString("/")
+	sb.WriteString(f.ID)
+	sb.WriteString("-action")
+
+	a := &inngest.ActionVersion{
 		Name: f.Name,
-		DSN:  id,
+		DSN:  sb.String(),
 		// This is a custom action, so allow reading any secret.
 		Scopes: []string{"secret:read:*"},
 		Runtime: inngest.RuntimeWrapper{
@@ -167,36 +178,15 @@ func (f Function) defaultAction() ([]*DerivedConfig, error) {
 				Image: f.ID,
 			},
 		},
+		Version: &inngest.VersionInfo{},
 	}
 
-	config, err := inngest.FormatAction(a)
+	err := populateActionVersion(context.Background(), s, a)
 	if err != nil {
 		return nil, err
 	}
 
-	return []*DerivedConfig{{
-		name:       f.Name,
-		id:         id,
-		kind:       derivedAction,
-		definition: a,
-		config:     []byte(config),
-	}}, nil
-}
-
-// DerivedConfig represents configuration derived from the function used in
-// execution.
-type DerivedConfig struct {
-	// name is the name of the config
-	name string
-	// id is the workflow ID or action DSN
-	id string
-	// kind is the definition type, eg. workflow or action.  this is only
-	// used in debugging.
-	kind string
-	// definition stores the original struct which generated the definition
-	definition interface{}
-	// config is the serialized cue configuration.
-	config []byte
+	return []*inngest.ActionVersion{a}, nil
 }
 
 func randomID() (string, error) {
@@ -210,4 +200,27 @@ func randomID() (string, error) {
 	}
 	petname.NonDeterministicMode()
 	return fmt.Sprintf("%s-%s", petname.Generate(2, "-"), hex.EncodeToString(byt)), nil
+}
+
+// populateActionVersion attempts to pull an existing action from Inngest and if it exists
+// populates the version info. We currently hardcode scopes which is the only time a major version is required.
+func populateActionVersion(ctx context.Context, state *state.State, action *inngest.ActionVersion) error {
+	fmt.Println(state.Client)
+	a, err := state.Client.Action(ctx, action.DSN)
+	if err != nil {
+		fmt.Println(err)
+		if err.Error() == "action not found" {
+			// Set default values
+			action.Version.Major = 1
+			action.Version.Minor = 1
+			return nil
+		}
+		return err
+	}
+
+	action.Version.Major = a.Latest.VersionMajor
+	action.Version.Minor = a.Latest.VersionMinor
+
+	fmt.Println(action.Version.Major, action.Version.Minor)
+	return nil
 }

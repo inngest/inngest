@@ -35,6 +35,8 @@ type Client interface {
 	Actions(ctx context.Context, includePublic bool) ([]*Action, error)
 	UpdateActionVersion(ctx context.Context, v ActionVersionQualifier, enabled bool) (*ActionVersion, error)
 	CreateAction(ctx context.Context, config string) (*Action, error)
+	// Action returns a specific action based on DSN
+	Action(ctx context.Context, dsn string) (*Action, error)
 }
 
 type ClientOpt func(Client) Client

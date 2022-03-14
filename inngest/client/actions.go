@@ -58,6 +58,43 @@ func (c httpClient) Actions(ctx context.Context, includePublic bool) ([]*Action,
 	return data.Actions, nil
 }
 
+// Action returns a specific action based on DSN
+func (c httpClient) Action(ctx context.Context, dsn string) (*Action, error) {
+	query := `
+query ($dsn: String!) {
+	action(dsn: $dsn) {
+		dsn name tagline
+		latest {
+			versionMajor
+			versionMinor
+			validFrom
+			validTo
+			runtime
+		}
+	}
+}
+`
+
+	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{
+		"dsn": dsn,
+	},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	type response struct {
+		Action *Action
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
+	}
+
+	return data.Action, nil
+}
+
 func (c httpClient) CreateAction(ctx context.Context, input string) (*Action, error) {
 	query := `
 	  mutation CreateAction($config: String!) {

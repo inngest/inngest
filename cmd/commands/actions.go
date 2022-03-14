@@ -29,6 +29,7 @@ func NewCmdActions() *cobra.Command {
 			// cmd.Help always returns nil so ignore the error
 			_ = cmd.Help()
 		},
+		Hidden: true,
 	}
 
 	actionsList := &cobra.Command{
@@ -74,6 +75,8 @@ func NewCmdActions() *cobra.Command {
 			t.Render()
 		},
 	}
+
+	actionsList.Flags().BoolVar(&includePublic, "public", false, "Include publicly available actions")
 
 	actionsValidate := &cobra.Command{
 		Use:   "validate [~/path/to/action.cue]",
@@ -167,6 +170,8 @@ func NewCmdActions() *cobra.Command {
 		},
 	}
 
+	actionsDeploy.Flags().BoolVar(&pushOnly, "push-only", false, "Only push the action code;  do not create the action version")
+
 	actionsNew := &cobra.Command{
 		Use:   "new",
 		Short: "Creates a config file for deploying a new serverless action",
@@ -201,9 +206,6 @@ func NewCmdActions() *cobra.Command {
 	actionsRoot.AddCommand(actionsNew)
 	actionsRoot.AddCommand(actionsValidate)
 	actionsRoot.AddCommand(actionsDeploy)
-
-	actionsDeploy.Flags().BoolVar(&pushOnly, "push-only", false, "Only push the action code;  do not create the action version")
-	actionsList.Flags().BoolVar(&includePublic, "public", false, "Include publicly available actions")
 
 	return actionsRoot
 }

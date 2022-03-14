@@ -4,6 +4,9 @@ import (
 	"testing"
 
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/inngest/client"
+	"github.com/inngest/inngestctl/inngest/state"
+	"github.com/inngest/inngestctl/test/mocks"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,41 +32,37 @@ func TestDerivedConfigDefault(t *testing.T) {
 		},
 	}
 
-	expectedActionVersion := inngest.ActionVersion{
+	expectedActionVersion := &inngest.ActionVersion{
 		Name:   "Foo",
-		DSN:    "magical-id-1-action",
+		DSN:    "coolprefix/magical-id-1-action",
 		Scopes: []string{"secret:read:*"},
 		Runtime: inngest.RuntimeWrapper{
 			Runtime: inngest.RuntimeDocker{
 				Image: "magical-id-1",
 			},
 		},
+		Version: &inngest.VersionInfo{
+			Major: 1,
+			Minor: 1,
+		},
 	}
 
-	expectedActionConfig := `package main
+	s := &state.State{
+		Client: mocks.NewMockClient(),
+		Account: client.Account{
+			Identifier: client.AccountIdentifier{
+				DSNPrefix: "coolprefix",
+			},
+		},
+	}
 
-import (
-	"inngest.com/actions"
-)
-
-action: actions.#Action
-action: {
-  dsn:  "magical-id-1-action"
-  name: "Foo"
-  scopes: ["secret:read:*"]
-  runtime: {
-    image: "magical-id-1"
-    type:  "docker"
-  }
-}`
-
-	actions, err := fn.Actions()
+	actions, err := fn.GetActions(s)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(actions))
-	require.EqualValues(t, expectedActionVersion, actions[0].definition)
-	require.EqualValues(t, expectedActionConfig, string(actions[0].config))
+	require.EqualValues(t, expectedActionVersion, actions[0])
+	// require.EqualValues(t, expectedActionConfig, string(actions[0].config))
 
-	expectedWorkflow := inngest.Workflow{
+	expectedWorkflow := &inngest.Workflow{
 		ID:   "magical-id-1",
 		Name: "Foo",
 		Triggers: []inngest.Trigger{
@@ -89,32 +88,7 @@ action: {
 		},
 	}
 
-	expectedWorkflowConfig := `package main
-
-import (
-	"inngest.com/workflows"
-)
-
-workflow: workflows.#Workflow & {
-  id:   "magical-id-1"
-  name: "Foo"
-  triggers: [{
-    event:      "test.event.plz"
-    expression: "event.version >= 2"
-  }]
-  actions: [{
-    clientID: 1
-    name:     "Foo"
-    dsn:      "magical-id-1-action"
-  }]
-  edges: [{
-    outgoing: "trigger"
-    incoming: 1
-  }]
-}`
-
-	wflow, err := fn.Workflow()
+	wflow, err := fn.GetWorkflow(s)
 	require.NoError(t, err)
-	require.EqualValues(t, expectedWorkflow, wflow.definition)
-	require.EqualValues(t, expectedWorkflowConfig, string(wflow.config))
+	require.EqualValues(t, expectedWorkflow, wflow)
 }

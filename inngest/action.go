@@ -97,6 +97,7 @@ func (r *RuntimeWrapper) UnmarshalJSON(b []byte) error {
 
 type Runtime interface {
 	RuntimeType() string
+	RuntimeImage() string
 }
 
 type RuntimeDocker struct {
@@ -118,6 +119,14 @@ func (r RuntimeDocker) MarshalJSON() ([]byte, error) {
 	return json.Marshal(data)
 }
 
+func (RuntimeDocker) RuntimeType() string {
+	return "docker"
+}
+
+func (r RuntimeDocker) RuntimeImage() string {
+	return r.Image
+}
+
 type VersionInfo struct {
 	Major int `json:"major"`
 	Minor int `json:"minor"`
@@ -128,10 +137,6 @@ type Response struct {
 	Name     string `json:"name"`
 	Type     string `json:"type"`
 	Optional bool   `json:"optional"`
-}
-
-func (RuntimeDocker) RuntimeType() string {
-	return "docker"
 }
 
 type MetadataMap map[string]Metadata

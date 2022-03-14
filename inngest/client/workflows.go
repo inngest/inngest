@@ -249,7 +249,7 @@ func (c httpClient) DeployWorkflow(ctx context.Context, workspaceID uuid.UUID, c
 		},
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed DoGQL call: %w", err)
 	}
 
 	data := &response{}
