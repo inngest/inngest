@@ -11,11 +11,6 @@ import (
 	"github.com/inngest/inngestctl/inngest"
 )
 
-const (
-	derivedWorkflow = "workflow"
-	derivedAction   = "action"
-)
-
 // Function represents a step function which is triggered whenever an event
 // is received or on a schedule.  In essence, it contains:
 //
@@ -79,7 +74,7 @@ func (f Function) Validate() error {
 // Workflow produces the workflow.cue definition for a function.  Our executor
 // runs a "workflow", which is a DAG of the function steps.  Its a subset of
 // the function used purely for execution.
-func (f Function) Workflow() (*DerivedConfig, error) {
+func (f Function) Workflow() (*inngest.Workflow, error) {
 	w := inngest.Workflow{
 		Name:     f.Name,
 		ID:       f.ID,
@@ -113,8 +108,8 @@ func (f Function) Workflow() (*DerivedConfig, error) {
 	for n, a := range actions {
 		w.Actions = append(w.Actions, inngest.Action{
 			ClientID: uint(n) + 1, // 0 is the trigger; use 1 offset
-			Name:     a.name,
-			DSN:      a.id,
+			Name:     a.Name,
+			DSN:      a.DSN,
 		})
 	}
 
@@ -126,23 +121,12 @@ func (f Function) Workflow() (*DerivedConfig, error) {
 		Incoming: 1,
 	}}
 
-	config, err := inngest.FormatWorkflow(w)
-	if err != nil {
-		return nil, err
-	}
-
-	return &DerivedConfig{
-		name:       f.Name,
-		id:         f.ID,
-		kind:       derivedWorkflow,
-		definition: w,
-		config:     []byte(config),
-	}, nil
+	return &w, nil
 }
 
 // Actions produces configuration for each step of the function.  Each config
 // file specifies how to run the code.
-func (f Function) Actions() ([]*DerivedConfig, error) {
+func (f Function) Actions() ([]inngest.ActionVersion, error) {
 	// XXX: In the very near future we'll adapt this function package to
 	// support step functions in the same way that a workflow does.  This
 	// means that we have to support returning many actions.
@@ -155,7 +139,7 @@ func (f Function) Actions() ([]*DerivedConfig, error) {
 	return f.defaultAction()
 }
 
-func (f Function) defaultAction() ([]*DerivedConfig, error) {
+func (f Function) defaultAction() ([]inngest.ActionVersion, error) {
 	id := f.ID + "-action"
 	a := inngest.ActionVersion{
 		Name: f.Name,
@@ -168,35 +152,7 @@ func (f Function) defaultAction() ([]*DerivedConfig, error) {
 			},
 		},
 	}
-
-	config, err := inngest.FormatAction(a)
-	if err != nil {
-		return nil, err
-	}
-
-	return []*DerivedConfig{{
-		name:       f.Name,
-		id:         id,
-		kind:       derivedAction,
-		definition: a,
-		config:     []byte(config),
-	}}, nil
-}
-
-// DerivedConfig represents configuration derived from the function used in
-// execution.
-type DerivedConfig struct {
-	// name is the name of the config
-	name string
-	// id is the workflow ID or action DSN
-	id string
-	// kind is the definition type, eg. workflow or action.  this is only
-	// used in debugging.
-	kind string
-	// definition stores the original struct which generated the definition
-	definition interface{}
-	// config is the serialized cue configuration.
-	config []byte
+	return []inngest.ActionVersion{a}, nil
 }
 
 func randomID() (string, error) {

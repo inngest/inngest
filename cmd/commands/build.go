@@ -1,14 +1,13 @@
 package commands
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/inngest/inngestctl/pkg/cli"
+	"github.com/inngest/inngestctl/pkg/docker"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 const (
@@ -35,41 +34,21 @@ func NewCmdBuild() *cobra.Command {
 		Example: example,
 		Run:     build,
 		Args:    cobra.MinimumNArgs(1),
+		Hidden:  true,
 	}
 	return cmd
 }
 
 func build(cmd *cobra.Command, args []string) {
-	builder := strings.ToLower(viper.GetString("builder"))
-
-	if builder != builderDocker && builder != builderPodman {
-		fmt.Printf("Invalid builder specified:%v\nValid values are [docker] or [podman]\n\n", builder)
-		fmt.Println(cmd.Help())
-		return
-	}
-
-	path, err := exec.LookPath(builder)
+	ui, err := cli.NewBuilder(cmd.Context(), docker.BuildOpts{
+		Args: args,
+	})
 	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			fmt.Printf("The builder %v was not found in your PATH, please add it\n", builder)
-			return
-		}
-		fmt.Println(err)
-		return
+		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+		os.Exit(1)
 	}
-
-	builderArgs := createBuildCommand(args)
-
-	dockerCmd := exec.Command(path, builderArgs...)
-	dockerCmd.Stderr = os.Stderr
-	dockerCmd.Stdout = os.Stdout
-	err = dockerCmd.Run()
-	if err != nil {
-		fmt.Println(err)
+	if err := tea.NewProgram(ui).Start(); err != nil {
+		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+		os.Exit(1)
 	}
-}
-
-func createBuildCommand(args []string) []string {
-	a := append([]string{"buildx", "build", "--load"}, args...)
-	return a
 }

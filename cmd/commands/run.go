@@ -1,0 +1,120 @@
+package commands
+
+import (
+	"bufio"
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/inngest/inngestctl/pkg/cli"
+	"github.com/inngest/inngestctl/pkg/docker"
+	"github.com/inngest/inngestctl/pkg/function"
+	"github.com/spf13/cobra"
+)
+
+func NewCmdRun() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "run",
+		Short:   "Run a serverless function locally",
+		Example: "inngestctl run",
+		Run:     doRun,
+	}
+	return cmd
+}
+
+func doRun(cmd *cobra.Command, args []string) {
+	fn, err := function.Load(".")
+	if err != nil {
+		fmt.Println("\n" + cli.RenderError("No inngest.json or inngest.cue file found in your current directory") + "\n")
+		os.Exit(1)
+		return
+	}
+
+	err = runFunction(cmd.Context(), *fn)
+	if err != nil {
+		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+		os.Exit(1)
+		return
+	}
+}
+
+// runFunction builds the function's images and runs the function.
+func runFunction(ctx context.Context, fn function.Function) error {
+	evt, err := event()
+	if err != nil {
+		return err
+	}
+
+	actions, err := fn.Actions()
+	if err != nil {
+		return err
+	}
+	if len(actions) != 1 {
+		return fmt.Errorf("running step-functions locally is not yet supported")
+	}
+
+	// Build the image.
+	ui, err := cli.NewBuilder(ctx, docker.BuildOpts{
+		Path: ".",
+		Tag:  actions[0].DSN,
+	})
+	if err != nil {
+		return err
+	}
+	if err := tea.NewProgram(ui).Start(); err != nil {
+		return err
+	}
+
+	exec, err := docker.NewExecutor()
+	if err != nil {
+		return err
+	}
+	state := map[string]interface{}{
+		"event": evt,
+	}
+
+	fmt.Println(cli.TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function..."))
+
+	start := time.Now()
+	resp, err := exec.Execute(ctx, actions[0], state)
+	if err != nil {
+		return err
+	}
+	duration := time.Now().Sub(start)
+	response, _ := json.Marshal(resp)
+
+	fmt.Println(
+		cli.BoldStyle.Copy().Foreground(cli.Green).Padding(0, 0, 1, 0).
+			Render(fmt.Sprintf("Function complete in %d seconds", int(duration.Seconds()))),
+	)
+	fmt.Println(cli.TextStyle.Copy().Foreground(cli.Feint).Render("Output:"))
+	fmt.Println(cli.TextStyle.Copy().Padding(0, 0, 1, 0).Render(string(response)))
+
+	return nil
+}
+
+// event retrieves the event for use within testing the function.  It first checks stdin
+// to see if we're passed an event, or resorts to generating a fake event based off of
+// the function's event type.
+func event() (map[string]interface{}, error) {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if (fi.Mode() & os.ModeCharDevice) == 0 {
+		// Read stdin
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		evt := scanner.Bytes()
+
+		data := map[string]interface{}{}
+		err := json.Unmarshal(evt, &data)
+		return data, err
+	}
+
+	//. XXX: Generate a new event.
+	return nil, nil
+}
