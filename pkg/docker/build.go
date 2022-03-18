@@ -61,13 +61,26 @@ func (b *Builder) Run() error {
 	return err
 }
 
+func (b *Builder) Error() error {
+	if b.stderr.err != nil {
+		// This is the most important, diagnostic error from the
+		// build output itself.
+		return b.stderr.err
+	}
+	if b.err != nil {
+		// This is a process error.
+		return b.err
+	}
+	return nil
+}
+
 func (b Builder) Progress() float64 {
 	progress := b.stderr.Progress()
-	if progress == 100 && !b.done {
+	if progress >= 100 && !b.done {
 		// This is "technically complete" in building, but we're still
 		// exporting the image.  Return 99, which is waiting for export.
 		// We don't know how long this will take.
-		return 99
+		return 95
 	}
 	return progress
 }
@@ -138,6 +151,8 @@ type progressReader struct {
 	total   int
 	current int
 	status  string
+	// error records an "error: " outputs from Docker.
+	err error
 }
 
 func (p *progressReader) Write(byt []byte) (n int, err error) {
@@ -146,15 +161,21 @@ func (p *progressReader) Write(byt []byte) (n int, err error) {
 		// Take the last match
 		match := matches[len(matches)-1]
 		if len(match) == 4 {
-			p.total, _ = strconv.Atoi(match[1])
-			p.current, _ = strconv.Atoi(match[2])
-			p.status = fmt.Sprintf("Building step %s of your image", match[2])
+			p.total, _ = strconv.Atoi(match[2])
+			p.current, _ = strconv.Atoi(match[1])
+			p.status = fmt.Sprintf("Building step %d of your image", p.current)
 
 		}
 		if p.current == p.total {
 			p.status = "Exporting image..."
 		}
 	}
+
+	if strings.Contains(string(byt), "error: ") {
+		// If there are errors, set the error here.
+		p.err = fmt.Errorf(string(byt))
+	}
+
 	return p.buf.Write(byt)
 }
 

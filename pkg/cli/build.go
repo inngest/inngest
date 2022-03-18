@@ -98,8 +98,8 @@ func (b *BuilderUI) View() string {
 	s := &strings.Builder{}
 
 	output := b.Builder.Output(1)
-	if strings.Contains(output, "error") {
-		output = RenderError(strings.ReplaceAll(output, "error: ", ""))
+	if err := b.Builder.Error(); err != nil {
+		output = RenderError(err.Error())
 	} else {
 		output = TextStyle.Copy().Foreground(Feint).Render(output)
 	}
@@ -109,7 +109,7 @@ func (b *BuilderUI) View() string {
 		lipgloss.Left, lipgloss.Center,
 		lipgloss.JoinVertical(
 			lipgloss.Top,
-			b.progress.ViewAs(b.Builder.Progress()),
+			b.progress.ViewAs(b.Builder.Progress()/100),
 			TextStyle.Copy().Foreground(Feint).Render(b.Builder.ProgressText()),
 			output,
 		),

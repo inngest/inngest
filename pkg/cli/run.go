@@ -56,6 +56,11 @@ type RunUI struct {
 	response []byte
 }
 
+// Error returns the error from building or running the function, if part of the process failed.
+func (r *RunUI) Error() error {
+	return r.err
+}
+
 func (r *RunUI) Init() tea.Cmd {
 	cmd := r.build.Init()
 	return cmd
@@ -86,17 +91,26 @@ func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var (
 		cmds []tea.Cmd
 	)
+
 	// Send updates to Build so that the builder can update.  This is heirarchical;
 	// Update is called via tea's manager, and we need to forward those to sub-UI
 	// components.
 	_, cmd := r.build.Update(msg)
 	cmds = append(cmds, cmd)
 
-	if r.build.Builder.Done() && atomic.LoadInt32(&r.started) == 0 {
+	if r.build.Builder.Done() && r.build.Builder.Error() == nil && atomic.LoadInt32(&r.started) == 0 {
+		// The build completed.  Run the function.
 		atomic.StoreInt32(&r.started, 1)
 		go func() {
 			r.run(r.ctx)
 		}()
+	}
+
+	if r.build.Builder.Done() && r.build.Builder.Error() != nil {
+		// There was a build error.  Store the error so that the parent can os.Exit(1),
+		// and quit the UI loop.
+		r.err = r.build.Builder.Error()
+		cmds = append(cmds, tea.Quit)
 	}
 
 	if r.duration != 0 {

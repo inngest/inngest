@@ -33,9 +33,7 @@ func doRun(cmd *cobra.Command, args []string) {
 
 	err = runFunction(cmd.Context(), *fn)
 	if err != nil {
-		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
-		return
 	}
 }
 
@@ -62,7 +60,8 @@ func runFunction(ctx context.Context, fn function.Function) error {
 	if err := tea.NewProgram(ui).Start(); err != nil {
 		return err
 	}
-	return nil
+	// So we can exit with a non-zero code.
+	return ui.Error()
 }
 
 // event retrieves the event for use within testing the function.  It first checks stdin
