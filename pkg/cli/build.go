@@ -21,13 +21,14 @@ func NewBuilder(ctx context.Context, opts docker.BuildOpts) (*BuilderUI, error) 
 	p := progress.New(progress.WithDefaultGradient())
 	b, err := docker.NewBuilder(ctx, opts)
 	return &BuilderUI{
-		builder:  b,
+		Builder:  b,
 		progress: p,
 	}, err
 }
 
 type BuilderUI struct {
-	builder  *docker.Builder
+	Builder *docker.Builder
+
 	buildErr error
 
 	done bool
@@ -43,11 +44,11 @@ type BuilderUI struct {
 func (b *BuilderUI) Init() tea.Cmd {
 
 	// Start the build.
-	b.buildErr = b.builder.Start()
+	b.buildErr = b.Builder.Start()
 	b.start = time.Now()
 
 	go func() {
-		b.builder.Wait()
+		b.Builder.Wait()
 		<-time.After(tickDelay * 2)
 		b.done = true
 	}()
@@ -77,29 +78,25 @@ func (b *BuilderUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	b.progress = m.(progress.Model)
 	cmds = append(cmds, cmd)
 
-	if b.done == true {
-		cmds = append(cmds, tea.Quit)
-	}
-
 	return b, tea.Batch(cmds...)
 }
 
 func (b *BuilderUI) tick(t time.Time) tea.Msg {
 	taken := time.Now().Sub(b.start)
 
-	if taken > warningDelay && b.builder.Progress() == 0 {
+	if taken > warningDelay && b.Builder.Progress() == 0 {
 		b.warning = "This is taking some time.  Do you have internet?"
 	}
 
-	if taken > warningDelay*2 && b.builder.Progress() == 0 {
+	if taken > warningDelay*2 && b.Builder.Progress() == 0 {
 		b.warning = "Like, a really long time :("
 	}
 
-	if taken > warningDelay*4 && b.builder.Progress() == 0 {
+	if taken > warningDelay*4 && b.Builder.Progress() == 0 {
 		b.warning = "We need internet to pull image metadata.  Sorry, but it's not working now."
 	}
 
-	return progressMsg(b.builder.Progress())
+	return progressMsg(b.Builder.Progress())
 
 }
 
@@ -110,13 +107,21 @@ func (b *BuilderUI) View() string {
 
 	s := &strings.Builder{}
 
+	output := b.Builder.Output(1)
+	if strings.Contains(output, "error") {
+		output = RenderError(strings.ReplaceAll(output, "error: ", ""))
+	} else {
+		output = TextStyle.Copy().Foreground(Feint).Render(output)
+	}
+
 	header := lipgloss.Place(
-		50, 4,
+		50, 3,
 		lipgloss.Left, lipgloss.Center,
 		lipgloss.JoinVertical(
 			lipgloss.Top,
-			b.progress.ViewAs(b.builder.Progress()),
-			TextStyle.Copy().Foreground(Feint).Render(b.builder.ProgressText()),
+			b.progress.ViewAs(b.Builder.Progress()),
+			TextStyle.Copy().Foreground(Feint).Render(b.Builder.ProgressText()),
+			output,
 		),
 	)
 
@@ -127,5 +132,5 @@ func (b *BuilderUI) View() string {
 		s.WriteString(TextStyle.Copy().Foreground(Orange).Render(b.warning))
 	}
 
-	return lipgloss.NewStyle().Padding(0, 1).Render(s.String())
+	return lipgloss.NewStyle().Padding(1, 0).Render(s.String())
 }

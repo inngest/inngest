@@ -6,11 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngestctl/pkg/cli"
-	"github.com/inngest/inngestctl/pkg/docker"
 	"github.com/inngest/inngestctl/pkg/function"
 	"github.com/spf13/cobra"
 )
@@ -57,42 +55,13 @@ func runFunction(ctx context.Context, fn function.Function) error {
 	}
 
 	// Build the image.
-	ui, err := cli.NewBuilder(ctx, docker.BuildOpts{
-		Path: ".",
-		Tag:  actions[0].DSN,
-	})
+	ui, err := cli.NewRunUI(ctx, actions[0], evt)
 	if err != nil {
 		return err
 	}
 	if err := tea.NewProgram(ui).Start(); err != nil {
 		return err
 	}
-
-	exec, err := docker.NewExecutor()
-	if err != nil {
-		return err
-	}
-	state := map[string]interface{}{
-		"event": evt,
-	}
-
-	fmt.Println(cli.TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function..."))
-
-	start := time.Now()
-	resp, err := exec.Execute(ctx, actions[0], state)
-	if err != nil {
-		return err
-	}
-	duration := time.Now().Sub(start)
-	response, _ := json.Marshal(resp)
-
-	fmt.Println(
-		cli.BoldStyle.Copy().Foreground(cli.Green).Padding(0, 0, 1, 0).
-			Render(fmt.Sprintf("Function complete in %d seconds", int(duration.Seconds()))),
-	)
-	fmt.Println(cli.TextStyle.Copy().Foreground(cli.Feint).Render("Output:"))
-	fmt.Println(cli.TextStyle.Copy().Padding(0, 0, 1, 0).Render(string(response)))
-
 	return nil
 }
 

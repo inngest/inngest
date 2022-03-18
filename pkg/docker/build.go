@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 var (
@@ -28,26 +29,70 @@ type BuildOpts struct {
 type Builder struct {
 	cmd    *exec.Cmd
 	stderr *progressReader
+
+	done bool
+	err  error
 }
 
-func (b Builder) Start() error {
-	return b.cmd.Start()
+func (b *Builder) Start() error {
+	err := b.cmd.Start()
+	go func() {
+		b.err = b.cmd.Wait()
+		b.done = true
+	}()
+	return err
 }
 
-func (b Builder) Wait() error {
-	return b.cmd.Wait()
+func (b *Builder) Wait() error {
+	err := b.cmd.Wait()
+	b.done = true
+	b.err = err
+	return err
+}
+
+func (b Builder) Done() bool {
+	return b.done
 }
 
 func (b Builder) Run() error {
-	return b.cmd.Run()
+	err := b.cmd.Run()
+	b.done = true
+	b.err = err
+	return err
 }
 
 func (b Builder) Progress() float64 {
-	return b.stderr.Progress()
+	progress := b.stderr.Progress()
+	if progress == 100 && !b.done {
+		// This is "technically complete" in building, but we're still
+		// exporting the image.  Return 99, which is waiting for export.
+		// We don't know how long this will take.
+		return 99
+	}
+	return progress
 }
 
 func (b Builder) ProgressText() string {
-	return b.stderr.text
+	return b.stderr.status
+}
+
+// Output returns the last N lines of output from stderr
+func (b Builder) Output(n int) string {
+	if n <= 0 {
+		return b.stderr.buf.String()
+	}
+	str := b.stderr.buf.String()
+	parts := []string{}
+	for _, p := range strings.Split(str, "\n") {
+		if strings.TrimSpace(p) == "" {
+			continue
+		}
+		parts = append(parts, p)
+	}
+	if len(parts) < n {
+		return str
+	}
+	return strings.Join(parts[len(parts)-n:], "\n")
 }
 
 func NewBuilder(ctx context.Context, opts BuildOpts) (*Builder, error) {
@@ -83,8 +128,8 @@ func createBuildCommand(args []string) []string {
 
 func newProgressReader() *progressReader {
 	return &progressReader{
-		buf:  &bytes.Buffer{},
-		text: "Preparing build...",
+		buf:    &bytes.Buffer{},
+		status: "Preparing build...",
 	}
 }
 
@@ -92,7 +137,7 @@ type progressReader struct {
 	buf     *bytes.Buffer
 	total   int
 	current int
-	text    string
+	status  string
 }
 
 func (p *progressReader) Write(byt []byte) (n int, err error) {
@@ -103,13 +148,12 @@ func (p *progressReader) Write(byt []byte) (n int, err error) {
 		if len(match) == 4 {
 			p.total, _ = strconv.Atoi(match[1])
 			p.current, _ = strconv.Atoi(match[2])
-			p.text = match[3]
+			p.status = fmt.Sprintf("Building step %s of your image", match[2])
 
 		}
 		if p.current == p.total {
-			p.text = "Exporting image..."
+			p.status = "Exporting image..."
 		}
-		p.total++
 	}
 	return p.buf.Write(byt)
 }
