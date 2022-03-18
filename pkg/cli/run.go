@@ -127,6 +127,12 @@ func (r *RunUI) View() string {
 		BoldStyle.Copy().Foreground(Green).Padding(0, 0, 1, 0).Render("Function complete"),
 	)
 	s.WriteString("\n")
+
+	input, _ := json.Marshal(r.event)
+	s.WriteString(TextStyle.Copy().Foreground(Feint).Render("Input:"))
+	s.WriteString("\n")
+	s.WriteString(TextStyle.Copy().Foreground(Feint).Padding(0, 0, 1, 0).Render(string(input)))
+	s.WriteString("\n")
 	s.WriteString(TextStyle.Copy().Foreground(Feint).Render("Output:"))
 	s.WriteString("\n")
 	s.WriteString(TextStyle.Copy().Padding(0, 0, 1, 0).Render(string(r.response)))
