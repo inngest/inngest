@@ -120,6 +120,7 @@ func (r *RunUI) View() string {
 	s.WriteString("\n")
 
 	if r.duration == 0 {
+		// We have't ran the action yet.
 		return s.String()
 	}
 

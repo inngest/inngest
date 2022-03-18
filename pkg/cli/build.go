@@ -46,13 +46,6 @@ func (b *BuilderUI) Init() tea.Cmd {
 	// Start the build.
 	b.buildErr = b.Builder.Start()
 	b.start = time.Now()
-
-	go func() {
-		b.Builder.Wait()
-		<-time.After(tickDelay * 2)
-		b.done = true
-	}()
-
 	return tea.Tick(tickDelay, b.tick)
 }
 
