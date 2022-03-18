@@ -54,7 +54,6 @@ type RunUI struct {
 	duration time.Duration
 	// response stores the response for the function
 	response []byte
-	status   int
 }
 
 func (r *RunUI) Init() tea.Cmd {
@@ -79,7 +78,7 @@ func (r *RunUI) run(ctx context.Context) {
 		r.err = err
 		return
 	}
-	r.duration = time.Now().Sub(start)
+	r.duration = time.Since(start)
 	r.response, _ = json.Marshal(resp)
 }
 

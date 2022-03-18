@@ -27,11 +27,8 @@ func NewBuilder(ctx context.Context, opts docker.BuildOpts) (*BuilderUI, error) 
 }
 
 type BuilderUI struct {
-	Builder *docker.Builder
-
+	Builder  *docker.Builder
 	buildErr error
-
-	done bool
 
 	// warning is shown if the build takes a long time, or it takes a while
 	// to progress from 0
@@ -75,7 +72,7 @@ func (b *BuilderUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (b *BuilderUI) tick(t time.Time) tea.Msg {
-	taken := time.Now().Sub(b.start)
+	taken := time.Since(b.start)
 
 	if taken > warningDelay && b.Builder.Progress() == 0 {
 		b.warning = "This is taking some time.  Do you have internet?"

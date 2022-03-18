@@ -54,7 +54,7 @@ func (b Builder) Done() bool {
 	return b.done
 }
 
-func (b Builder) Run() error {
+func (b *Builder) Run() error {
 	err := b.cmd.Run()
 	b.done = true
 	b.err = err

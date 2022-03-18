@@ -11,9 +11,7 @@ import (
 )
 
 const (
-	builderDocker = "docker"
-	builderPodman = "podman"
-	long          = `
+	long = `
 Build an action for testing or pushing to Inngest.
 
 Supports passing any argument to the builder after a '--' separator 
@@ -22,7 +20,7 @@ from the commands args and flags.
 	example = `
 $ inngestctl build .
 $ inngestctl build /path/to/Dockerfile
-$ inngestctl build . --builder docker -- --tag mycoolimage
+$ inngestctl build . -- --tag mycoolimage
 `
 )
 
