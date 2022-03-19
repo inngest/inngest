@@ -23,9 +23,11 @@ type RunUIOpts struct {
 }
 
 func NewRunUI(ctx context.Context, opts RunUIOpts) (*RunUI, error) {
-	build, err := NewBuilder(ctx, docker.BuildOpts{
-		Path: ".",
-		Tag:  opts.Action.DSN,
+	build, err := NewBuilder(ctx, BuilderUIOpts{
+		BuildOpts: docker.BuildOpts{
+			Path: ".",
+			Tag:  opts.Action.DSN,
+		},
 	})
 	if err != nil {
 		return nil, err

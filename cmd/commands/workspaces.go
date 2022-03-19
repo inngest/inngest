@@ -11,9 +11,10 @@ import (
 
 func NewCmdWorkspaces() *cobra.Command {
 	workspacesRoot := &cobra.Command{
-		Use:   "workspaces",
-		Short: "Manages workspacess within your Inngest account",
-		Run:   listWorkspaces,
+		Use:    "workspaces",
+		Short:  "Manages workspacess within your Inngest account",
+		Run:    listWorkspaces,
+		Hidden: true,
 	}
 
 	workspacesList := &cobra.Command{

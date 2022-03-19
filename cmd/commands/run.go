@@ -57,7 +57,7 @@ func runFunction(ctx context.Context, fn function.Function) error {
 		return err
 	}
 
-	actions, err := fn.Actions()
+	actions, err := fn.Actions(ctx)
 	if err != nil {
 		return err
 	}

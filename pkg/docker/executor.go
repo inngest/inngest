@@ -131,7 +131,7 @@ func (d *DockerExecutor) startOpts(ctx context.Context, action inngest.ActionVer
 				"Event": state["event"],
 			},
 			"Actions": map[uint]map[string]interface{}{
-				0: map[string]interface{}{},
+				0: {},
 			},
 		},
 	})

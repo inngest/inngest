@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/inngest/inngestctl/inngest"
 )
 
 type Action struct {
@@ -12,14 +14,69 @@ type Action struct {
 	Name    string
 	Tagline string
 	Latest  *ActionVersion
+	Version *ActionVersion
 }
 
+// ActionVersion represents the data received from GQL for an action version. This
+// is a superset of an inngest.ActionVersion;  it contains the configuration for
+// the version plus additional account-specific metadata.
 type ActionVersion struct {
-	VersionMajor int
-	VersionMinor int
-	ValidFrom    *time.Time
-	ValidTo      *time.Time
-	Runtime      string
+	inngest.ActionVersion
+
+	Name        string
+	DSN         string
+	Config      string
+	ValidFrom   *time.Time
+	ValidTo     *time.Time
+	ImageSha256 *string
+}
+
+func (c httpClient) Action(ctx context.Context, dsn string, v *inngest.VersionInfo) (*ActionVersion, error) {
+	var major, minor *int
+	if v != nil {
+		major = &v.Major
+		minor = &v.Minor
+	}
+
+	query := `
+	  query ($dsn: String!, $major: Int, $minor: Int) {
+	    action(dsn: $dsn) {
+	      dsn name tagline
+	      version(major: $major, minor: $minor) {
+	        dsn
+		name
+		validFrom
+		validTo
+		imageSha256
+		config
+	      }
+            }
+          }`
+
+	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{
+		"dsn":   dsn,
+		"major": major,
+		"minor": minor,
+	}})
+	if err != nil {
+		return nil, err
+	}
+
+	type response struct {
+		Action *Action
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
+	}
+
+	av, err := inngest.ParseAction(data.Action.Version.Config)
+	if err != nil {
+		return nil, err
+	}
+	data.Action.Version.ActionVersion = *av
+	return data.Action.Version, nil
 }
 
 func (c httpClient) Actions(ctx context.Context, includePublic bool) ([]*Action, error) {
@@ -28,11 +85,15 @@ func (c httpClient) Actions(ctx context.Context, includePublic bool) ([]*Action,
 	    actions(filter: $filter) {
 	      dsn name tagline
 	      latest {
+	        dsn
+		name
 		versionMajor
 		versionMinor
 		validFrom
 		validTo
 		runtime
+		imageSha256
+		config
 	      }
             }
           }`
@@ -99,7 +160,10 @@ func (c httpClient) UpdateActionVersion(ctx context.Context, v ActionVersionQual
 		versionMinor
 		validFrom
 		validTo
-		runtime
+		config
+		name
+		dsn
+		imageSha256
             }
           }`
 

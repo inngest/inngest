@@ -76,6 +76,20 @@ func Client(ctx context.Context) client.Client {
 	return client.New(client.WithAPI(viper.GetString("api")))
 }
 
+func AccountIdentifier(ctx context.Context) (string, error) {
+	state, err := GetState(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// Add your account identifier locally, before finding action versions.
+	if state.Account.Identifier.Domain == nil {
+		return state.Account.Identifier.DSNPrefix, nil
+	}
+
+	return *state.Account.Identifier.Domain, nil
+}
+
 func GetState(ctx context.Context) (*State, error) {
 	path, err := homedir.Expand("~/.config/inngest")
 	if err != nil {
@@ -117,7 +131,8 @@ func GetState(ctx context.Context) (*State, error) {
 func RequireState(ctx context.Context) *State {
 	state, err := GetState(ctx)
 	if err == ErrNoState {
-		log.From(ctx).Fatal().Msg("no Inngest state found. Run `inngestctl login` to log in.")
+		fmt.Println("\nRun `inngestctl login` and log in before running this command.\n")
+		os.Exit(1)
 	}
 
 	if err != nil {

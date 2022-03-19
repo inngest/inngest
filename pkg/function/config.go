@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	ErrNotFound = fmt.Errorf("inngest definition not found")
+	ErrNotFound = fmt.Errorf("No inngest file could be found.")
 )
 
 // Load loads the inngest function from the given directory.  It searches for both inngest.cue

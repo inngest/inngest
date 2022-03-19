@@ -37,8 +37,13 @@ func (c httpClient) DoGQL(ctx context.Context, input Params) (*Response, error) 
 		return nil, fmt.Errorf("invalid status code %d: %s", resp.StatusCode, string(body))
 	}
 
+	byt, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response: %w", err)
+	}
+
 	r := &Response{}
-	if err = json.NewDecoder(resp.Body).Decode(r); err != nil {
+	if err = json.Unmarshal(byt, r); err != nil {
 		return nil, fmt.Errorf("invalid json response: %w", err)
 	}
 

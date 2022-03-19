@@ -1,6 +1,7 @@
 package function
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/inngest/state"
 )
 
 // Function represents a step function which is triggered whenever an event
@@ -74,7 +76,7 @@ func (f Function) Validate() error {
 // Workflow produces the workflow.cue definition for a function.  Our executor
 // runs a "workflow", which is a DAG of the function steps.  Its a subset of
 // the function used purely for execution.
-func (f Function) Workflow() (*inngest.Workflow, error) {
+func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 	w := inngest.Workflow{
 		Name:     f.Name,
 		ID:       f.ID,
@@ -100,7 +102,7 @@ func (f Function) Workflow() (*inngest.Workflow, error) {
 
 	// This has references to actions.  Create the actions then reference them
 	// from the workflow.
-	actions, err := f.Actions()
+	actions, err := f.Actions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +128,7 @@ func (f Function) Workflow() (*inngest.Workflow, error) {
 
 // Actions produces configuration for each step of the function.  Each config
 // file specifies how to run the code.
-func (f Function) Actions() ([]inngest.ActionVersion, error) {
+func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, error) {
 	// XXX: In the very near future we'll adapt this function package to
 	// support step functions in the same way that a workflow does.  This
 	// means that we have to support returning many actions.
@@ -136,11 +138,16 @@ func (f Function) Actions() ([]inngest.ActionVersion, error) {
 	// exists in the project root, and that we can build the
 	// image which contains all of the code necessary to run
 	// the function.
-	return f.defaultAction()
+	return f.defaultAction(ctx)
 }
 
-func (f Function) defaultAction() ([]inngest.ActionVersion, error) {
+func (f Function) defaultAction(ctx context.Context) ([]inngest.ActionVersion, error) {
 	id := f.ID + "-action"
+
+	if prefix, err := state.AccountIdentifier(ctx); err == nil {
+		id = fmt.Sprintf("%s/%s", prefix, id)
+	}
+
 	a := inngest.ActionVersion{
 		Name: f.Name,
 		DSN:  id,

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngestctl/inngest"
 )
 
 // Client implements all functionality necessary to communicate with
@@ -32,8 +33,16 @@ type Client interface {
 	// DeployWorflow idempotently deploys a workflow, by default as a draft.  Set live to true to deploy as the live version.
 	DeployWorkflow(ctx context.Context, workspaceID uuid.UUID, config string, live bool) (*WorkflowVersion, error)
 
+	// Action returns a single action by DSN.  If no version is specified, this will return the latest
+	// major/minor version.  If a major version is supplied with no minor version, this will return the
+	// latest minor version for the gievn major version.  If both are supplied, this will return the
+	// specific version requested.
+	Action(ctx context.Context, dsn string, v *inngest.VersionInfo) (*ActionVersion, error)
+	// Acitons returns all actions with their latest versions.
 	Actions(ctx context.Context, includePublic bool) ([]*Action, error)
+	// UpdateActionVersion updates the given action version, enabling or disbaling the action version.
 	UpdateActionVersion(ctx context.Context, v ActionVersionQualifier, enabled bool) (*ActionVersion, error)
+	// CreateAction creates a new action in your account.
 	CreateAction(ctx context.Context, config string) (*Action, error)
 }
 
@@ -42,7 +51,8 @@ type ClientOpt func(Client) Client
 func New(opts ...ClientOpt) Client {
 	c := &httpClient{
 		Client: http.DefaultClient,
-		api:    "https://api.inngest.com",
+		//api:    "https://api.inngest.com",
+		api:    "http://127.0.0.1:8090",
 		ingest: "https://inn.gs",
 	}
 

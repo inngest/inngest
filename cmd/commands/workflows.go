@@ -29,8 +29,9 @@ var (
 
 func NewCmdWorkflows() *cobra.Command {
 	workflowsRoot := &cobra.Command{
-		Use:   "workflows",
-		Short: "Manages workflows within your Inngest account",
+		Use:    "workflows",
+		Short:  "Manages workflows within your Inngest account",
+		Hidden: true,
 	}
 
 	workflowsList := &cobra.Command{
