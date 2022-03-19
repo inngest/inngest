@@ -131,7 +131,7 @@ func GetState(ctx context.Context) (*State, error) {
 func RequireState(ctx context.Context) *State {
 	state, err := GetState(ctx)
 	if err == ErrNoState {
-		fmt.Println("\nRun `inngestctl login` and log in before running this command.\n")
+		fmt.Println("\nRun `inngestctl login` and log in before running this command.")
 		os.Exit(1)
 	}
 

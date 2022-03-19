@@ -1,6 +1,7 @@
 package function
 
 import (
+	"context"
 	"testing"
 
 	"github.com/inngest/inngestctl/inngest"
@@ -57,7 +58,7 @@ action: {
   }
 }`
 
-	actions, err := fn.Actions()
+	actions, err := fn.Actions(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, 1, len(actions))
 
@@ -116,7 +117,7 @@ workflow: workflows.#Workflow & {
   }]
 }`
 
-	wflow, err := fn.Workflow()
+	wflow, err := fn.Workflow(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, wflow)
 	require.EqualValues(t, expectedWorkflow, *wflow)

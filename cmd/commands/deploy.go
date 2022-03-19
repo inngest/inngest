@@ -193,7 +193,7 @@ func configureVersionInfo(ctx context.Context, a inngest.ActionVersion) (inngest
 	found, err := state.Action(ctx, a.DSN, a.Version)
 	// When deploying without specifying an action, allow "action not found"
 	// errors.
-	if a.Version == nil && err != nil && err.Error() != "action not found" {
+	if a.Version == nil && err != nil && err.Error() == "action not found" {
 		a.Version = &inngest.VersionInfo{
 			Major: 1,
 			Minor: 1,
