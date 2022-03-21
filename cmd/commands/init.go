@@ -20,7 +20,6 @@ func NewCmdInit() *cobra.Command {
 		Example: "inngestctl init",
 		Run:     runInit,
 	}
-	cmd.Flags().StringP("builder", "b", "docker", "Specify the builder to use. Options: docker or podman")
 	return cmd
 }
 

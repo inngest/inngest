@@ -46,6 +46,7 @@ func Execute() {
 	rootCmd.AddCommand(NewCmdWorkflows())
 	rootCmd.AddCommand(NewCmdWorkspaces())
 	rootCmd.AddCommand(NewCmdInit())
+	rootCmd.AddCommand(NewCmdRun())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

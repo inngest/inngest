@@ -60,8 +60,11 @@ action: {
 	actions, err := fn.Actions()
 	require.NoError(t, err)
 	require.Equal(t, 1, len(actions))
-	require.EqualValues(t, expectedActionVersion, actions[0].definition)
-	require.EqualValues(t, expectedActionConfig, string(actions[0].config))
+
+	def, err := inngest.FormatAction(actions[0])
+	require.NoError(t, err)
+	require.EqualValues(t, expectedActionVersion, actions[0])
+	require.EqualValues(t, expectedActionConfig, string(def))
 
 	expectedWorkflow := inngest.Workflow{
 		ID:   "magical-id-1",
@@ -115,6 +118,9 @@ workflow: workflows.#Workflow & {
 
 	wflow, err := fn.Workflow()
 	require.NoError(t, err)
-	require.EqualValues(t, expectedWorkflow, wflow.definition)
-	require.EqualValues(t, expectedWorkflowConfig, string(wflow.config))
+	require.NotNil(t, wflow)
+	require.EqualValues(t, expectedWorkflow, *wflow)
+	def, err = inngest.FormatWorkflow(*wflow)
+	require.NoError(t, err)
+	require.EqualValues(t, expectedWorkflowConfig, string(def))
 }
