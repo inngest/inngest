@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -153,8 +154,17 @@ func (t Template) Render(f function.Function) error {
 	// For each event within the function create a new event file.
 	madeEventFolder := false
 	for n, trigger := range f.Triggers {
-		if trigger.EventTrigger == nil || trigger.EventTrigger.Definition == nil {
+		if trigger.EventTrigger == nil {
 			continue
+		}
+
+		if trigger.EventTrigger.Definition == nil || trigger.EventTrigger.Definition.Def == "" {
+			// Use an empty event format.
+			trigger.EventTrigger.Definition = &function.EventDefinition{
+				Format: function.FormatCue,
+				Synced: false,
+				Def:    fmt.Sprintf(evtDefinition, strconv.Quote(trigger.Event)),
+			}
 		}
 
 		cue, err := trigger.Definition.Cue()
@@ -198,3 +208,14 @@ func (t Template) Render(f function.Function) error {
 func eventFilename(evt string) string {
 	return slug.Make(evt)
 }
+
+const evtDefinition = `{
+  name: %s
+  data: {
+    // Your event data should go here.
+  },
+  user: {
+    // Any user information for audit trails, eg. email, external_id, should go here.
+  },
+  v: "1", // A sortable version
+}`
