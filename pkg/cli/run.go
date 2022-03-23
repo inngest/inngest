@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -15,10 +16,16 @@ import (
 	"golang.org/x/term"
 )
 
-func NewRunUI(ctx context.Context, a inngest.ActionVersion, evt map[string]interface{}) (*RunUI, error) {
+type RunUIOpts struct {
+	Action inngest.ActionVersion
+	Event  map[string]interface{}
+	Seed   int64
+}
+
+func NewRunUI(ctx context.Context, opts RunUIOpts) (*RunUI, error) {
 	build, err := NewBuilder(ctx, docker.BuildOpts{
 		Path: ".",
-		Tag:  a.DSN,
+		Tag:  opts.Action.DSN,
 	})
 	if err != nil {
 		return nil, err
@@ -26,8 +33,9 @@ func NewRunUI(ctx context.Context, a inngest.ActionVersion, evt map[string]inter
 
 	r := &RunUI{
 		ctx:    ctx,
-		action: a,
-		event:  evt,
+		action: opts.Action,
+		event:  opts.Event,
+		seed:   opts.Seed,
 		build:  build,
 	}
 	return r, nil
@@ -43,6 +51,8 @@ type RunUI struct {
 	action inngest.ActionVersion
 	// event stores the event data used as a trigger for the function.
 	event map[string]interface{}
+	// seed is the seed used to generate fake data
+	seed int64
 
 	// build stores a reference to the BuildUI component, rendering the
 	// UI for building the function before running.
@@ -135,8 +145,14 @@ func (r *RunUI) View() string {
 		return s.String()
 	}
 
-	s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function..."))
-	s.WriteString("\n")
+	if r.seed > 0 {
+		s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function using seed "))
+		s.WriteString(BoldStyle.Copy().Render(fmt.Sprintf("%d", r.seed)))
+		s.WriteString("\n")
+	} else {
+		s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function..."))
+		s.WriteString("\n")
+	}
 
 	if r.err != nil {
 		s.WriteString(RenderError("There was an error running your function: " + r.err.Error()))

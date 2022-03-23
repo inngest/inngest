@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"time"
 
 	"cuelang.org/go/cue"
 	tea "github.com/charmbracelet/bubbletea"
@@ -16,6 +17,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var runSeed int64
+
 func NewCmdRun() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "run",
@@ -23,6 +26,8 @@ func NewCmdRun() *cobra.Command {
 		Example: "inngestctl run",
 		Run:     doRun,
 	}
+
+	cmd.Flags().Int64Var(&runSeed, "seed", 0, "Sets the seed for deterministically generating random events")
 	return cmd
 }
 
@@ -42,6 +47,11 @@ func doRun(cmd *cobra.Command, args []string) {
 
 // runFunction builds the function's images and runs the function.
 func runFunction(ctx context.Context, fn function.Function) error {
+	if runSeed <= 0 {
+		rand.Seed(time.Now().UnixNano())
+		runSeed = rand.Int63n(1_000_000)
+	}
+
 	evt, err := event(ctx, fn)
 	if err != nil {
 		return err
@@ -56,7 +66,11 @@ func runFunction(ctx context.Context, fn function.Function) error {
 	}
 
 	// Build the image.
-	ui, err := cli.NewRunUI(ctx, actions[0], evt)
+	ui, err := cli.NewRunUI(ctx, cli.RunUIOpts{
+		Action: actions[0],
+		Event:  evt,
+		Seed:   runSeed,
+	})
 	if err != nil {
 		return err
 	}
@@ -112,6 +126,8 @@ func fakeEvent(ctx context.Context, fn function.Function) (map[string]interface{
 	if err != nil {
 		return nil, err
 	}
+
+	fakedata.DefaultOptions.Rand = rand.New(rand.NewSource(runSeed))
 
 	val, err := fakedata.Fake(ctx, inst.Value())
 	if err != nil {
