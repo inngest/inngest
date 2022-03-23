@@ -41,6 +41,7 @@ func doRun(cmd *cobra.Command, args []string) {
 
 	err = runFunction(cmd.Context(), *fn)
 	if err != nil {
+		fmt.Println("\n" + cli.RenderError(err.Error()))
 		os.Exit(1)
 	}
 }
