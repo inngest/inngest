@@ -51,8 +51,7 @@ type ClientOpt func(Client) Client
 func New(opts ...ClientOpt) Client {
 	c := &httpClient{
 		Client: http.DefaultClient,
-		//api:    "https://api.inngest.com",
-		api:    "http://127.0.0.1:8090",
+		api:    "https://api.inngest.com",
 		ingest: "https://inn.gs",
 	}
 

@@ -2,11 +2,13 @@ package commands
 
 import (
 	"fmt"
+	"os"
 	"syscall"
 
 	"github.com/inngest/inngestctl/inngest/client"
 	"github.com/inngest/inngestctl/inngest/log"
 	"github.com/inngest/inngestctl/inngest/state"
+	"github.com/inngest/inngestctl/pkg/cli"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
@@ -42,7 +44,8 @@ func NewCmdLogin() *cobra.Command {
 			fmt.Println("Logging in...")
 			jwt, err := client.New(client.WithAPI(viper.GetString("api"))).Login(ctx, username, password)
 			if err != nil {
-				log.From(ctx).Fatal().Msgf("unable to log in: %s", err.Error())
+				fmt.Println(cli.RenderError(fmt.Sprintf("unable to log in: %s", err.Error())))
+				os.Exit(1)
 			}
 
 			// Fetch the account.
@@ -52,7 +55,12 @@ func NewCmdLogin() *cobra.Command {
 			)
 			account, err := client.Account(ctx)
 			if err != nil {
-				log.From(ctx).Fatal().Msgf("unable to fetch account: %s", err.Error())
+				fmt.Println(cli.RenderError(fmt.Sprintf("unable to log in: %s", err.Error())))
+				os.Exit(1)
+			}
+			if account == nil {
+				fmt.Println(cli.RenderError(fmt.Sprintf("unable to log in: %s", err.Error())))
+				os.Exit(1)
 			}
 
 			// Find their workspaces, and select the default workspace.

@@ -24,6 +24,8 @@ type BuildOpts struct {
 	Path string
 	Tag  string
 	Args []string
+
+	Platform string
 }
 
 type Builder struct {
@@ -124,9 +126,15 @@ func NewBuilder(ctx context.Context, opts BuildOpts) (*Builder, error) {
 		return nil, err
 	}
 
+	// Some users won't have installed the correct QEMU binaries for cross-compilation.
+	// We want to check if that's the case here.
+	if err := verifyBuildx(opts); err != nil {
+		return nil, err
+	}
+
 	builder := &Builder{
 		stderr: newProgressReader(),
-		cmd:    exec.Command(path, createBuildCommand(opts.Args)...),
+		cmd:    exec.Command(path, createBuildCommand(opts)...),
 	}
 	builder.cmd.Stderr = builder.stderr
 	builder.cmd.Stdout = builder.stderr
@@ -134,8 +142,27 @@ func NewBuilder(ctx context.Context, opts BuildOpts) (*Builder, error) {
 	return builder, nil
 }
 
-func createBuildCommand(args []string) []string {
-	a := append([]string{"buildx", "build", "--load"}, args...)
+func verifyBuildx(o BuildOpts) error {
+	cmd := exec.Command("docker", "buildx", "ls")
+	byt, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("unable to verify buildx platform support: %w", err)
+	}
+
+	if o.Platform == "linux/amd64" {
+		if !bytes.Contains(byt, []byte("linux/amd64")) {
+			return fmt.Errorf("You don't have buildx x86 compilation support enabled.  To install, run:\n\tdocker run --privileged --rm tonistiigi/binfmt --install amd64")
+		}
+	}
+	return nil
+}
+
+func createBuildCommand(o BuildOpts) []string {
+	defaults := []string{"buildx", "build", "--load"}
+	if o.Platform != "" {
+		defaults = append(defaults, "--platform", o.Platform)
+	}
+	a := append(defaults, o.Args...)
 	return a
 }
 

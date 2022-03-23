@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -120,7 +121,6 @@ func (d *DockerExecutor) start(ctx context.Context, action inngest.ActionVersion
 }
 
 func (d *DockerExecutor) startOpts(ctx context.Context, action inngest.ActionVersion, state map[string]interface{}) (docker.CreateContainerOptions, error) {
-
 	marshalled, err := json.Marshal(map[string]interface{}{
 		"args_version": 1,
 		"metadata": map[string]interface{}{
@@ -149,6 +149,8 @@ func (d *DockerExecutor) startOpts(ctx context.Context, action inngest.ActionVer
 		Config: &docker.Config{
 			Image: action.DSN,
 			Cmd:   []string{string(marshalled)},
+			// Add all env vars from the local machine
+			Env: os.Environ(),
 		},
 	}, nil
 }

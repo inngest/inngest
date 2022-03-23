@@ -98,8 +98,9 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 	ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
 		QuitOnComplete: true,
 		BuildOpts: docker.BuildOpts{
-			Path: ".",
-			Tag:  tag,
+			Path:     ".",
+			Tag:      tag,
+			Platform: "linux/amd64",
 		},
 	})
 	if err != nil {
