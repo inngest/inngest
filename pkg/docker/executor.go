@@ -57,10 +57,16 @@ func (d *DockerExecutor) Execute(ctx context.Context, action inngest.ActionVersi
 		return nil, err
 	}
 
-	stdout, _, err := d.watch(ctx, h)
+	stdout, stderr, err := d.watch(ctx, h)
 	if err != nil {
 		return nil, err
 	}
+
+	exit, err := d.client.WaitContainer(h.c.ID)
+	if err != nil {
+		return nil, err
+	}
+	_ = exit
 
 	byt, err := io.ReadAll(stdout)
 	if err != nil {
@@ -68,7 +74,11 @@ func (d *DockerExecutor) Execute(ctx context.Context, action inngest.ActionVersi
 	}
 
 	if len(byt) == 0 {
-		return nil, fmt.Errorf("no docker output received")
+		byt, _ := io.ReadAll(stderr)
+		if len(byt) > 0 {
+			return nil, fmt.Errorf("no stdout received.  stderr: %s", string(byt))
+		}
+		return nil, fmt.Errorf("no stdout received")
 	}
 
 	split := bytes.SplitN(byt, []byte(" "), 2)

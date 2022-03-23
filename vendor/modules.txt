@@ -176,6 +176,10 @@ github.com/atotto/clipboard
 ## explicit
 github.com/aymerick/douceur/css
 github.com/aymerick/douceur/parser
+# github.com/bxcodec/faker/v3 v3.8.0
+## explicit; go 1.12
+github.com/bxcodec/faker/v3
+github.com/bxcodec/faker/v3/support/slice
 # github.com/charmbracelet/bubbles v0.10.3
 ## explicit; go 1.13
 github.com/charmbracelet/bubbles/help
@@ -401,9 +405,13 @@ github.com/inconshreveable/mousetrap
 ## explicit; go 1.17
 github.com/inngest/cuetypescript
 github.com/inngest/cuetypescript/generation
-# github.com/inngest/event-schemas v0.0.0-20220306170247-8eec6a6ad22b
+# github.com/inngest/event-schemas v0.0.0-20220323015016-13728939c1a6
 ## explicit; go 1.17
 github.com/inngest/event-schemas/events/marshalling/jsonschema
+github.com/inngest/event-schemas/pkg/fakedata
+# github.com/inngest/golorem v0.0.0-20220323014825-15bf7a53bf79
+## explicit
+github.com/inngest/golorem
 # github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 ## explicit
 github.com/jbenet/go-context/io
