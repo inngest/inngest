@@ -159,6 +159,8 @@ github.com/buger/jsonparser v1.1.1/go.mod h1:6RYKKt7H4d4+iWqouImQ9R2FZql3VbhNgx2
 github.com/bugsnag/bugsnag-go v0.0.0-20141110184014-b1d153021fcd/go.mod h1:2oa8nejYd4cQ/b0hMIopN0lCRxU0bueqREvZLWFrtK8=
 github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b/go.mod h1:obH5gd0BsqsP2LwDJ9aOkm/6J86V6lyAXCoQWGw3K50=
 github.com/bugsnag/panicwrap v0.0.0-20151223152923-e2c28503fcd0/go.mod h1:D/8v3kj0zr8ZAKg1AQ6crr+5VwKN5eIywRkfhyM/+dE=
+github.com/bxcodec/faker/v3 v3.8.0 h1:F59Qqnsh0BOtZRC+c4cXoB/VNYDMS3R5mlSpxIap1oU=
+github.com/bxcodec/faker/v3 v3.8.0/go.mod h1:gF31YgnMSMKgkvl+fyEo1xuSMbEuieyqfeslGYFjneM=
 github.com/cenkalti/backoff/v4 v4.1.1/go.mod h1:scbssz8iZGpm3xbr14ovlUdkxfGXNInqkPWOWmG2CLw=
 github.com/cenkalti/backoff/v4 v4.1.2/go.mod h1:scbssz8iZGpm3xbr14ovlUdkxfGXNInqkPWOWmG2CLw=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
@@ -653,8 +655,10 @@ github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NH
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/inngest/cuetypescript v0.0.0-20220302153725-a00e933fdf87 h1:ZNGiPCVk0VbQ5TXjkaFS9iaxcCoJG0+nYFnPJ7BhwMI=
 github.com/inngest/cuetypescript v0.0.0-20220302153725-a00e933fdf87/go.mod h1:z9T6/U4kdwf++EnQvcTWBJ0kX3rFfE7IG/sf30Hn82A=
-github.com/inngest/event-schemas v0.0.0-20220306170247-8eec6a6ad22b h1:dSo2lHVB06XuX/aQojmlqZMi5Z/oxgfqS42tNbxCJjM=
-github.com/inngest/event-schemas v0.0.0-20220306170247-8eec6a6ad22b/go.mod h1:XhIEJPIzj75BJeSr4Qa+BlIbxGTG7oa4vmqX7QCbGiI=
+github.com/inngest/event-schemas v0.0.0-20220323015016-13728939c1a6 h1:E0HNzuy+khDHyb7nsB6aXxv3ZyLoDVpiQeZMc032oJw=
+github.com/inngest/event-schemas v0.0.0-20220323015016-13728939c1a6/go.mod h1:9t3eazMCsHjLm5mZOMqB0Ac/pTZiJqLzr++WFL240PI=
+github.com/inngest/golorem v0.0.0-20220323014825-15bf7a53bf79 h1:Z5wDJxZTie5JaOcNZ5gcJLu3dpd/rZ1UWeJyKBhgCHg=
+github.com/inngest/golorem v0.0.0-20220323014825-15bf7a53bf79/go.mod h1:jrbJIsFaGv6GkS2KnYp9p1Mq8RrEpoMQCgd9bOVZGnc=
 github.com/intel/goresctrl v0.2.0/go.mod h1:+CZdzouYFn5EsxgqAQTEzMfwKwuc0fVdMrT9FCCAVRQ=
 github.com/j-keck/arping v0.0.0-20160618110441-2cf9dc699c56/go.mod h1:ymszkNOg6tORTn+6F6j+Jc8TOr5osrynvN6ivFWZ2GA=
 github.com/j-keck/arping v1.0.2/go.mod h1:aJbELhR92bSk7tp79AWM/ftfc90EfEi2bQJrbBFOsPw=

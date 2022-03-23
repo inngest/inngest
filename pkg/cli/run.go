@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -10,6 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/pkg/docker"
+	"github.com/muesli/reflow/wrap"
+	"golang.org/x/term"
 )
 
 func NewRunUI(ctx context.Context, a inngest.ActionVersion, evt map[string]interface{}) (*RunUI, error) {
@@ -113,7 +116,8 @@ func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, tea.Quit)
 	}
 
-	if r.duration != 0 {
+	if r.duration != 0 || r.err != nil {
+		// The fn has ran.
 		cmds = append(cmds, tea.Quit)
 	}
 
@@ -121,6 +125,8 @@ func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (r *RunUI) View() string {
+	width, _, _ := term.GetSize(int(os.Stdout.Fd()))
+
 	s := &strings.Builder{}
 
 	s.WriteString(r.build.View())
@@ -131,6 +137,10 @@ func (r *RunUI) View() string {
 
 	s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function..."))
 	s.WriteString("\n")
+
+	if r.err != nil {
+		s.WriteString(RenderError("There was an error running your function: " + r.err.Error()))
+	}
 
 	if r.duration == 0 {
 		// We have't ran the action yet.
@@ -145,7 +155,8 @@ func (r *RunUI) View() string {
 	input, _ := json.Marshal(r.event)
 	s.WriteString(TextStyle.Copy().Foreground(Feint).Render("Input:"))
 	s.WriteString("\n")
-	s.WriteString(TextStyle.Copy().Foreground(Feint).Padding(0, 0, 1, 0).Render(string(input)))
+	s.WriteString(TextStyle.Copy().Foreground(Feint).Render(wrap.String(string(input), width)))
+	s.WriteString("\n")
 	s.WriteString("\n")
 	s.WriteString(TextStyle.Copy().Foreground(Feint).Render("Output:"))
 	s.WriteString("\n")

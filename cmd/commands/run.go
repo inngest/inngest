@@ -5,9 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 
+	"cuelang.org/go/cue"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/inngest/event-schemas/pkg/fakedata"
 	"github.com/inngest/inngestctl/pkg/cli"
 	"github.com/inngest/inngestctl/pkg/function"
 	"github.com/spf13/cobra"
@@ -39,7 +42,7 @@ func doRun(cmd *cobra.Command, args []string) {
 
 // runFunction builds the function's images and runs the function.
 func runFunction(ctx context.Context, fn function.Function) error {
-	evt, err := event()
+	evt, err := event(ctx, fn)
 	if err != nil {
 		return err
 	}
@@ -67,7 +70,7 @@ func runFunction(ctx context.Context, fn function.Function) error {
 // event retrieves the event for use within testing the function.  It first checks stdin
 // to see if we're passed an event, or resorts to generating a fake event based off of
 // the function's event type.
-func event() (map[string]interface{}, error) {
+func event(ctx context.Context, fn function.Function) (map[string]interface{}, error) {
 	fi, err := os.Stdin.Stat()
 	if err != nil {
 		return nil, err
@@ -83,6 +86,40 @@ func event() (map[string]interface{}, error) {
 		return data, err
 	}
 
-	//. XXX: Generate a new event.
-	return nil, nil
+	return fakeEvent(ctx, fn)
+}
+
+func fakeEvent(ctx context.Context, fn function.Function) (map[string]interface{}, error) {
+	evtTriggers := []function.Trigger{}
+	for _, t := range fn.Triggers {
+		if t.EventTrigger != nil {
+			evtTriggers = append(evtTriggers, t)
+		}
+	}
+
+	i := rand.Intn(len(evtTriggers))
+	if evtTriggers[i].EventTrigger.Definition == nil {
+		return nil, nil
+	}
+
+	def, err := evtTriggers[i].EventTrigger.Definition.Cue()
+	if err != nil {
+		return nil, err
+	}
+
+	r := &cue.Runtime{}
+	inst, err := r.Compile(".", def)
+	if err != nil {
+		return nil, err
+	}
+
+	val, err := fakedata.Fake(ctx, inst.Value())
+	if err != nil {
+		return nil, err
+	}
+
+	mapped := map[string]interface{}{}
+	err = val.Decode(&mapped)
+
+	return mapped, err
 }
