@@ -123,6 +123,14 @@ type VersionInfo struct {
 	Minor int `json:"minor"`
 }
 
+func (v VersionInfo) String() string {
+	return fmt.Sprintf("%d.%d", v.Major, v.Minor)
+}
+
+func (v VersionInfo) Tag() string {
+	return fmt.Sprintf("%d-%d", v.Major, v.Minor)
+}
+
 // Response represents a value that is returned from the action
 type Response struct {
 	Name     string `json:"name"`

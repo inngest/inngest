@@ -16,17 +16,25 @@ var (
 	warningDelay = 8 * time.Second
 )
 
+type BuilderUIOpts struct {
+	BuildOpts      docker.BuildOpts
+	QuitOnComplete bool
+}
+
 // NewBuilder renders UI for building an image.
-func NewBuilder(ctx context.Context, opts docker.BuildOpts) (*BuilderUI, error) {
+func NewBuilder(ctx context.Context, opts BuilderUIOpts) (*BuilderUI, error) {
 	p := progress.New(progress.WithDefaultGradient())
-	b, err := docker.NewBuilder(ctx, opts)
+	b, err := docker.NewBuilder(ctx, opts.BuildOpts)
 	return &BuilderUI{
+		opts:     opts,
 		Builder:  b,
 		progress: p,
 	}, err
 }
 
 type BuilderUI struct {
+	opts BuilderUIOpts
+
 	Builder  *docker.Builder
 	buildErr error
 
@@ -68,6 +76,10 @@ func (b *BuilderUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	b.progress = m.(progress.Model)
 	cmds = append(cmds, cmd)
 
+	if b.Builder.Done() && b.opts.QuitOnComplete {
+		cmds = append(cmds, tea.Quit)
+	}
+
 	return b, tea.Batch(cmds...)
 }
 
@@ -99,7 +111,7 @@ func (b *BuilderUI) View() string {
 
 	output := b.Builder.Output(1)
 	if err := b.Builder.Error(); err != nil {
-		output = RenderError(err.Error())
+		output = "\n" + RenderError(err.Error())
 	} else {
 		output = TextStyle.Copy().Foreground(Feint).Render(output)
 	}

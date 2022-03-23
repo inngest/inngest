@@ -27,10 +27,6 @@ func Execute() {
 		Long:  longDescription,
 	}
 
-	rootCmd.PersistentFlags().String("log.type", "", "Log type (one of json, tty). Defaults to 'json' without a TTY")
-	rootCmd.PersistentFlags().StringP("log.level", "l", "debug", "Log level")
-	rootCmd.PersistentFlags().StringP("builder", "b", "docker", "Specify the builder to use. Options: docker or podman")
-
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		panic(err)
 	}
@@ -40,13 +36,13 @@ func Execute() {
 	viper.AutomaticEnv()
 
 	// Register Top Level Commands
-	rootCmd.AddCommand(NewCmdActions())
 	rootCmd.AddCommand(NewCmdBuild())
 	rootCmd.AddCommand(NewCmdLogin())
 	rootCmd.AddCommand(NewCmdWorkflows())
 	rootCmd.AddCommand(NewCmdWorkspaces())
 	rootCmd.AddCommand(NewCmdInit())
 	rootCmd.AddCommand(NewCmdRun())
+	rootCmd.AddCommand(NewCmdDeploy())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

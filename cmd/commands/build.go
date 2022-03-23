@@ -38,8 +38,11 @@ func NewCmdBuild() *cobra.Command {
 }
 
 func build(cmd *cobra.Command, args []string) {
-	ui, err := cli.NewBuilder(cmd.Context(), docker.BuildOpts{
-		Args: args,
+	ui, err := cli.NewBuilder(cmd.Context(), cli.BuilderUIOpts{
+		QuitOnComplete: true,
+		BuildOpts: docker.BuildOpts{
+			Args: args,
+		},
 	})
 	if err != nil {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
