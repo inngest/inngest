@@ -49,7 +49,6 @@ export default function Contact() {
           property="og:description"
           content="Build event serverless event-driven systems in seconds"
         />
-        <script src="/inngest-sdk.js"></script>
         <script
           defer
           src="https://static.cloudflareinsights.com/beacon.min.js"

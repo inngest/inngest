@@ -1,4 +1,6 @@
 import Head from "next/head";
+import Script from "next/script";
+import { v4 as uuid } from "uuid";
 import "../styles/globals.css";
 
 function MyApp({ Component, pageProps }) {
@@ -8,20 +10,38 @@ function MyApp({ Component, pageProps }) {
         <link rel="icon" href="/favicon.png" />
       </Head>
       <Component {...pageProps} />
+      <Script
+        id="js-inngest-sdk"
+        strategy="afterInteractive"
+        src="/inngest-sdk.js"
+        onLoad={() => {
+          Inngest.init(process.env.NEXT_PUBLIC_INNGEST_KEY);
+          const anonId = () => {
+            let id = window.localStorage.getItem("inngest-anon-id");
+            if (!id) {
+              id = uuid();
+              window.localStorage.setItem("inngest-anon-id", id);
+            }
+            return id;
+          };
+          Inngest.identify({ anonymous_id: anonId() });
+          Inngest.event({ name: "website/page.viewed" });
+        }}
+      />
       <script
-          async
-          src="https://www.googletagmanager.com/gtag/js?id=G-4YPM75W7D9"
-        ></script>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
+        async
+        src="https://www.googletagmanager.com/gtag/js?id=G-4YPM75W7D9"
+      ></script>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
         gtag('config', 'G-4YPM75W7D9');
       `,
-          }}
-        />
+        }}
+      />
     </>
   );
 }

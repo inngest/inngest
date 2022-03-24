@@ -50,7 +50,8 @@
     "remark-shiki-twoslash": "^3.0.6",
     "shiki": "^0.9.14",
     "slugify": "^1.6.3",
-    "urql": "^2.0.5"
+    "urql": "^2.0.5",
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "@babel/core": "^7.17.4",
