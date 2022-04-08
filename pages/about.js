@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react"
-import styled from "@emotion/styled"
-import Head from "next/head"
-import Footer from "../shared/footer"
-import Nav from "../shared/nav"
-import Content from "../shared/content"
+import { useEffect, useState } from "react";
+import styled from "@emotion/styled";
+import Head from "next/head";
+import Footer from "../shared/footer";
+import Nav from "../shared/nav";
+import Content from "../shared/content";
 
-import Block from "../shared/Block"
+import Block from "../shared/Block";
 
-const MISSION = "To accelerate the adoption of event based architecture."
+const MISSION = "To accelerate the adoption of event based architecture.";
 
 const TEAM = [
   {
@@ -17,18 +17,12 @@ const TEAM = [
     avatar: "/assets/team/tony-2022-02-18.jpg",
   },
   {
-    name: "Dan Ramich",
-    role: "Founding Engineer",
-    bio: "Former Staff Engineer at Rancher (SUSE)",
-    avatar: "/assets/team/dan-r-2022-02-18.jpg",
-  },
-  {
     name: "Dan Farrelly",
     role: "Founding Engineer",
     bio: "Former CTO at Buffer",
     avatar: "/assets/team/dan-f-2022-02-18.jpg",
   },
-]
+];
 
 const INVESTORS = [
   {
@@ -44,7 +38,7 @@ const INVESTORS = [
     name: "Banana Capital",
     logo: "/assets/about/banana-capital.png",
   },
-]
+];
 
 export default function Home() {
   return (
@@ -90,7 +84,7 @@ export default function Home() {
                   <strong>{person.role}</strong> - {person.bio}
                 </p>
               </Block>
-            )
+            );
           })}
         </Grid>
 
@@ -106,7 +100,7 @@ export default function Home() {
                   style={{ maxWidth: investor.maxWidth || "" }}
                 />
               </InvestorBlock>
-            )
+            );
           })}
         </Grid>
       </Content>
@@ -115,25 +109,25 @@ export default function Home() {
         <Footer />
       </div>
     </Page>
-  )
+  );
 }
 
 const Page = styled.div`
   background: url(/assets/hero-grid.svg) no-repeat right top;
-`
+`;
 
 const Avatar = styled.img`
   border-radius: 50%;
   width: 5rem;
   height: 5rem;
   margin-bottom: 1rem;
-`
+`;
 
 const InvestorBlock = styled(Block)`
   display: flex;
   align-items: center;
   justify-content: center;
-`
+`;
 
 const Grid = styled.div`
   display: grid;
@@ -144,14 +138,14 @@ const Grid = styled.div`
   @media (max-width: 980px) {
     grid-template-columns: 1fr;
   }
-`
+`;
 
 const Label = styled.p`
   font-size: 0.7rem;
   text-transform: uppercase;
   margin: 0.5rem 0;
   font-family: var(--font-mono);
-`
+`;
 
 const Hero = styled.div`
   margin: 4rem 0;
@@ -162,4 +156,4 @@ const Hero = styled.div`
   p {
     max-width: 36rem;
   }
-`
+`;
