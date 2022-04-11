@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	progressRegexp = regexp.MustCompile(`\[(\d)/(\d)\] (.+)`)
+	progressRegexp = regexp.MustCompile(`\[.*(\d)/(\d)\] (.+)`)
 )
 
 type Artifact struct {
