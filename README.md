@@ -16,6 +16,11 @@
 
 Using events for serverless functions makes development **fast, easy, safe, and fun!**.  Our aim is to make event-driven development _easier than ever_.
 
+Here's a _quick_ demo of scaffolding a new function and running it locally:
+
+https://user-images.githubusercontent.com/306177/162748583-8d1241e0-d3f1-4a77-a65e-2a6f6e143918.mp4
+
+
 <br />
 <br />
 
@@ -62,6 +67,10 @@ It's *really easy*:
 2. `cd` into your new function
 3. Run `inngestctl run` to *run your function locally* using data generated from the event definition
 4. Run `inngestctl deploy` to deploy your function.
+
+Here's all of that in a quick video:
+
+https://user-images.githubusercontent.com/306177/162748583-8d1241e0-d3f1-4a77-a65e-2a6f6e143918.mp4
 
 <br />
 <hr />
