@@ -143,7 +143,7 @@ func (r *RunUI) View() string {
 
 	s.WriteString(r.build.View())
 
-	if r.build.Builder.Progress() < 100 {
+	if !r.build.Builder.Done() {
 		return s.String()
 	}
 

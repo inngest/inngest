@@ -25,7 +25,7 @@ func NewCmdInit() *cobra.Command {
 
 func runInit(cmd *cobra.Command, args []string) {
 	if _, err := function.Load("."); err == nil {
-		// XXX: We can't both SilenceUsage and SilenceErroo we handle error checking inside
+		// XXX: We can't both SilenceUsage and SilenceError, so we handle error checking inside
 		// the init function here.
 		fmt.Println("\n" + cli.RenderError("An inngest project already exists in this directory.  Remove the inngest file to continue.") + "\n")
 		os.Exit(1)
