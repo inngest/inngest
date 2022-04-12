@@ -35,7 +35,7 @@ const (
 	eventPlaceholder = "What event name triggers this function?  Use your own event name or an event from an integration."
 
 	// the Y offset when rendering the event browser.
-	eventBrowserOffset = 25
+	eventBrowserOffset = 15
 
 	// anotherLanguage is the list item which is rendered at the bottom for a user
 	// to select if we have no scaffolds for their language.
@@ -160,28 +160,36 @@ func (f *initModel) Template() *scaffold.Template {
 }
 
 func (f *initModel) Init() tea.Cmd {
-	go func() {
-		schemas, err := fetchEvents()
-		if err != nil {
-			f.eventFetchError = err
-		}
-
-		sort.Slice(schemas, func(i, j int) bool {
-			return schemas[i].Name < schemas[j].Name
-		})
-		f.events = schemas
-		f.browser.SetEvents(f.events)
-	}()
-
 	// Remove the first N lines of the CLI height, which account for the header etc.
 	f.browser, _ = NewEventBrowser(f.width, f.height-eventBrowserOffset, f.events, true)
+	return tea.Batch(
+		f.loading.Tick,
+		func() tea.Msg {
+			schemas, err := fetchEvents()
+			if err != nil {
+				f.eventFetchError = err
+			}
 
-	go func() {
-		f.scaffoldCacheError = scaffold.UpdateCache(context.Background())
-		f.scaffoldDone = true
-	}()
+			sort.Slice(schemas, func(i, j int) bool {
+				return schemas[i].Name < schemas[j].Name
+			})
+			f.events = schemas
+			f.browser.SetEvents(f.events)
 
-	return f.loading.Tick
+			// XXX: We could / should send a message here which contains the schemas
+			// and/or error into Update directly.  However, because we have an initModel
+			// singleton which is a pointer, it's safe to update our state here and return
+			// a nil message which will trigger a re-render.  It's also easier and has less
+			// allocations;  we're not creating a new struct which is passed via goroutines
+			// to update the initModel members.
+			return nil
+		},
+		func() tea.Msg {
+			f.scaffoldCacheError = scaffold.UpdateCache(context.Background())
+			f.scaffoldDone = true
+			return nil
+		},
+	)
 }
 
 func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -351,13 +359,7 @@ func (f *initModel) View() string {
 
 	b := &strings.Builder{}
 
-	_, _ = b.WriteString(f.renderWelcome())
-	b.WriteString("\n\n")
-	b.WriteString(BoldStyle.Render("Let's get you set up with a new serverless function."))
-	b.WriteString("\n")
-	b.WriteString(TextStyle.Copy().Foreground(Feint).Render("Answer these questions to get started."))
-	b.WriteString("\n\n")
-	b.WriteString(f.renderState())
+	b.WriteString(f.renderIntro(f.state == stateAskName))
 
 	// If we have no workflow name, ask for it.
 	switch f.state {
@@ -465,6 +467,20 @@ func (f *initModel) renderLanguageSelection() string {
 	}
 	b.WriteString(f.languageList.View())
 
+	return b.String()
+}
+
+func (f *initModel) renderIntro(welcome bool) string {
+	b := &strings.Builder{}
+	if welcome {
+		b.WriteString(f.renderWelcome())
+	}
+	b.WriteString("\n\n")
+	b.WriteString(BoldStyle.Render("Let's get you set up with a new serverless function."))
+	b.WriteString("\n")
+	b.WriteString(TextStyle.Copy().Foreground(Feint).Render("Answer these questions to get started."))
+	b.WriteString("\n\n")
+	b.WriteString(f.renderState())
 	return b.String()
 }
 
