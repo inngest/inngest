@@ -178,7 +178,7 @@ func findField(s reflect.Value, name string) (reflect.Value, reflect.StructField
 	// then look for matching names
 	for _, f := range fields {
 		// if the name of the field matches what we're looking for
-		if strings.ToLower(f.fieldType.Name) == strings.ToLower(name) {
+		if strings.EqualFold(f.fieldType.Name, name) {
 			return f.value, f.fieldType, nil
 		}
 	}
@@ -197,9 +197,7 @@ func flattenFields(s reflect.Value) []reflectField {
 
 		if field.Kind() == reflect.Struct && fieldType.Anonymous {
 			// field is a promoted structure
-			for _, f := range flattenFields(field) {
-				fields = append(fields, f)
-			}
+			fields = append(fields, flattenFields(field)...)
 			continue
 		}
 		fields = append(fields, reflectField{field, fieldType})
@@ -361,7 +359,9 @@ func copy(t reflect.Value, v reflect.Value) (err error) {
 			// otherwise it could be an array
 			case reflect.Array:
 				// set the index to the appropriate value
-				copy(t.Slice(i, i+1).Index(0), v.Index(i))
+				if err := copy(t.Slice(i, i+1).Index(0), v.Index(i)); err != nil {
+					return err
+				}
 			}
 		}
 	} else {

@@ -176,7 +176,7 @@ func (s *Select) OnChange(key rune, config *PromptConfig) bool {
 	}
 
 	// render the options
-	s.RenderWithCursorOffset(SelectQuestionTemplate, tmplData, opts, idx)
+	_ = s.RenderWithCursorOffset(SelectQuestionTemplate, tmplData, opts, idx)
 
 	// keep prompting
 	return false
@@ -272,8 +272,10 @@ func (s *Select) Prompt(config *PromptConfig) (interface{}, error) {
 	s.useDefault = true
 
 	rr := s.NewRuneReader()
-	rr.SetTermMode()
-	defer rr.RestoreTermMode()
+	_ = rr.SetTermMode()
+	defer func() {
+		_ = rr.RestoreTermMode()
+	}()
 
 	// start waiting for input
 	for {

@@ -152,9 +152,10 @@ func (i *Input) Prompt(config *PromptConfig) (interface{}, error) {
 
 	// start reading runes from the standard in
 	rr := i.NewRuneReader()
-	rr.SetTermMode()
-	defer rr.RestoreTermMode()
-
+	_ = rr.SetTermMode()
+	defer func() {
+		_ = rr.RestoreTermMode()
+	}()
 	cursor := i.NewCursor()
 	if !config.ShowCursor {
 		cursor.Hide()       // hide the cursor

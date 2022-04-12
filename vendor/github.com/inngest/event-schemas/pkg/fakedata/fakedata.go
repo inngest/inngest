@@ -106,6 +106,11 @@ func walk(ctx context.Context, v cue.Value, to *ast.StructLit, o Options) (err e
 			continue
 		}
 
+		// An optional field has a 50% chance of being generated.
+		if it.IsOptional() && o.Rand.Intn(2) == 1 {
+			continue
+		}
+
 		nestedCtx := withPath(ctx, it.Label())
 
 		val := it.Value()

@@ -184,7 +184,7 @@ func (m *MultiSelect) OnChange(key rune, config *PromptConfig) {
 	}
 
 	// render the options
-	m.RenderWithCursorOffset(MultiSelectQuestionTemplate, tmplData, opts, idx)
+	_ = m.RenderWithCursorOffset(MultiSelectQuestionTemplate, tmplData, opts, idx)
 }
 
 func (m *MultiSelect) filterOptions(config *PromptConfig) []core.OptionAnswer {
@@ -284,8 +284,10 @@ func (m *MultiSelect) Prompt(config *PromptConfig) (interface{}, error) {
 	}
 
 	rr := m.NewRuneReader()
-	rr.SetTermMode()
-	defer rr.RestoreTermMode()
+	_ = rr.SetTermMode()
+	defer func() {
+		_ = rr.RestoreTermMode()
+	}()
 
 	// start waiting for input
 	for {
