@@ -35,7 +35,7 @@ const (
 	eventPlaceholder = "What event name triggers this function?  Use your own event name or an event from an integration."
 
 	// the Y offset when rendering the event browser.
-	eventBrowserOffset = 15
+	eventBrowserOffset = 25
 
 	// anotherLanguage is the list item which is rendered at the bottom for a user
 	// to select if we have no scaffolds for their language.
@@ -359,7 +359,7 @@ func (f *initModel) View() string {
 
 	b := &strings.Builder{}
 
-	b.WriteString(f.renderIntro(f.state == stateAskName))
+	b.WriteString(f.renderIntro(true))
 
 	// If we have no workflow name, ask for it.
 	switch f.state {
