@@ -1,8 +1,22 @@
 #!/bin/sh
 
+# Hi!  We're glad that you're inspecting this script before running - good idea!
+#
+# You're looking at a bash script that:
+#
+# - Checks for latest inngest CLI releases
+# - Downloads the correct release artifact for your system
+# - Verifies the checksum
+# - Untars/unzips it
+#
+# There's no need for sudo.  We don't do anything else :)
+#
+# Reach out to us (founders@inngest.com) if you have any questions.
+
 set -e
 
-name="inngestctl"
+binname="inngest"
+reponame="inngest-cli"
 base="https://github.com/inngest"
 
 cat /dev/null <<EOF
@@ -242,7 +256,7 @@ uname_arch() {
 
 if [ -z "${VERSION}" ]; then
   log_info "checking GitHub for latest version"
-  VERSION=$(github_last_release "inngest/inngestctl")
+  VERSION=$(github_last_release "inngest/$reponame")
 fi
 
 # if version starts with 'v', remove it
@@ -251,14 +265,14 @@ VERSION=${VERSION#v}
 base_url() {
     os="$(uname_os)"
     arch="$(uname_arch)"
-    url="${base}/${name}/releases/download/v${VERSION}"
+    url="${base}/${reponame}/releases/download/v${VERSION}"
     echo "$url"
 }
 
 tarball() {
     os="$(uname_os)"
     arch="$(uname_arch)"
-    name="${name}_${VERSION}_${os}_${arch}"
+    name="${reponame}_${VERSION}_${os}_${arch}"
     if [ "$os" = "windows" ]; then
         name="${name}.zip"
     else
@@ -274,7 +288,7 @@ execute() {
     checksum="checksums.txt"
     checksum_url="${base_url}/${checksum}"
     bin_dir="./"
-    binexe="inngestctl"
+    binexe=$binname
 
     tmpdir=$(mktemp -d)
     log_debug "downloading files into ${tmpdir}"
@@ -289,7 +303,7 @@ execute() {
     log_info "installed ${bin_dir}${binexe}"
     rm -rf "${tmpdir}"
 
-    printf "\ninngestctl has been installed into ${bin_dir}${binexe}.  To place inngestctl into your path run:\n"
+    printf "\n${binexe} has been installed into ${bin_dir}${binexe}.  To place ${binexe} into your path run:\n"
     printf "\tsudo mv ${bin_dir}${binexe} /usr/local/bin/${binexe}\n"
 }
 
