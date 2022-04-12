@@ -6,7 +6,7 @@
 <br />
 
 
-`inngestctl` allows you to locally build and test **event-driven** serverless functions.  Using this CLI, you can:
+`inngest` allows you to locally build and test **event-driven** serverless functions.  Using this CLI, you can:
 
 - **Scaffold new serverless functions in seconds**
 - **Locally run functions** for fast development
@@ -38,21 +38,21 @@ https://user-images.githubusercontent.com/306177/162748583-8d1241e0-d3f1-4a77-a6
 Quick start:
 
 ```bash
-# downloads inngestctl for your os+arch into ./inngestctl
-curl -sfL https://raw.githubusercontent.com/inngest/inngestctl/main/install.sh | sh && \
-  sudo mv ./inngestctl /usr/local/bin/inngestctl
+# downloads inngest for your os+arch into ./inngest
+curl -sfL https://raw.githubusercontent.com/inngest/inngest-cli/main/install.sh | sh && \
+  sudo mv ./inngest /usr/local/bin/inngest
 ```
 
 <b>Via the install script</b>
 
 
-1. Run `curl -sfL https://raw.githubusercontent.com/inngest/inngestctl/main/install.sh | sh` to automatically download the latest binary for your OS and arch
-2. Move the new `./inngestctl` file into your `$PATH` (eg. `mv ./inngestctl /usr/local/bin`)
+1. Run `curl -sfL https://raw.githubusercontent.com/inngest/inngest-cli/main/install.sh | sh` to automatically download the latest binary for your OS and arch
+2. Move the new `./inngest` file into your `$PATH` (eg. `mv ./inngest /usr/local/bin`)
 
 <b>Manually</b>
 
-1. Download a [pre-compiled binary](https://github.com/inngest/inngestctl/releases) and place the binary in your path
-2. Move the new `./inngestctl` file into your `$PATH` (eg. `mv ./inngestctl /usr/local/bin`)
+1. Download a [pre-compiled binary](https://github.com/inngest/inngest-cli/releases) and place the binary in your path
+2. Move the new `./inngest` file into your `$PATH` (eg. `mv ./inngest /usr/local/bin`)
 
 <br />
 <hr />
@@ -63,10 +63,10 @@ curl -sfL https://raw.githubusercontent.com/inngest/inngestctl/main/install.sh |
 
 It's *really easy*:
 
-1. Run `inngestctl init` to scaffold a new function.  We'll ask you for your *function name*; the *event that triggers the function*; and *the function language*.
+1. Run `inngest init` to scaffold a new function.  We'll ask you for your *function name*; the *event that triggers the function*; and *the function language*.
 2. `cd` into your new function
-3. Run `inngestctl run` to *run your function locally* using data generated from the event definition
-4. Run `inngestctl deploy` to deploy your function.
+3. Run `inngest run` to *run your function locally* using data generated from the event definition
+4. Run `inngest deploy` to deploy your function.
 
 Here's all of that in a quick video:
 
@@ -112,7 +112,7 @@ Telemtry is currently **extremely limited**.  First, some commitments:
 - We only ever want to record _metrics_ for product improvement
 - For example, we want to answer "Is generating test data for XYZ language heavily used?"
  
-We're a small team and want to make sure we're building the right things.  You can opt out by exporting `DO_NOT_TRACK=1` before running `inngestctl`;  we will never send requests with this env variable set.
+We're a small team and want to make sure we're building the right things.  You can opt out by exporting `DO_NOT_TRACK=1` before running `inngest`;  we will never send requests with this env variable set.
 
 ### License
 
