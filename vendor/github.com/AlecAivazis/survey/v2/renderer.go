@@ -61,7 +61,9 @@ func (r *Renderer) Error(config *PromptConfig, invalid error) error {
 	}
 
 	// send the message to the user
-	fmt.Fprint(terminal.NewAnsiStdout(r.stdio.Out), userOut)
+	if _, err := fmt.Fprint(terminal.NewAnsiStdout(r.stdio.Out), userOut); err != nil {
+		return err
+	}
 
 	// add the printed text to the rendered error buffer so we can cleanup later
 	r.appendRenderedError(layoutOut)
@@ -90,7 +92,9 @@ func (r *Renderer) Render(tmpl string, data interface{}) error {
 	}
 
 	// print the summary
-	fmt.Fprint(terminal.NewAnsiStdout(r.stdio.Out), userOut)
+	if _, err := fmt.Fprint(terminal.NewAnsiStdout(r.stdio.Out), userOut); err != nil {
+		return err
+	}
 
 	// add the printed text to the rendered text buffer so we can cleanup later
 	r.AppendRenderedText(layoutOut)
@@ -165,8 +169,8 @@ func (r *Renderer) countLines(buf bytes.Buffer) int {
 
 	count := 0
 	curr := 0
-	delim := -1
 	for curr < len(bufBytes) {
+		var delim int
 		// read until the next newline or the end of the string
 		relDelim := bytes.IndexRune(bufBytes[curr:], '\n')
 		if relDelim != -1 {
