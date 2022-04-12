@@ -18,7 +18,9 @@ Using events for serverless functions makes development **fast, easy, safe, and 
 
 Here's a _quick_ demo of scaffolding a new function and running it locally:
 
-https://user-images.githubusercontent.com/306177/162748583-8d1241e0-d3f1-4a77-a65e-2a6f6e143918.mp4
+
+https://user-images.githubusercontent.com/306177/162943776-62c20fc6-c6ab-4633-ad76-07ab55d66bce.mp4
+
 
 
 <br />
@@ -70,7 +72,7 @@ It's *really easy*:
 
 Here's all of that in a quick video:
 
-https://user-images.githubusercontent.com/306177/162748583-8d1241e0-d3f1-4a77-a65e-2a6f6e143918.mp4
+https://user-images.githubusercontent.com/306177/162943776-62c20fc6-c6ab-4633-ad76-07ab55d66bce.mp4
 
 <br />
 <hr />
