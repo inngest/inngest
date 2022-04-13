@@ -67,5 +67,4 @@ func runActionDeploy(cmd *cobra.Command, args []string) {
 		fmt.Println(cli.RenderError(fmt.Sprintf("Error deploying action: %s", err)))
 		os.Exit(1)
 	}
-	return
 }
