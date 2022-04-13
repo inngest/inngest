@@ -619,6 +619,7 @@ const Hero = styled.div`
     font-family: var(--font);
     font-size: 1.1em;
     line-height: 1.6em;
+    font-weight: normal;
   }
 
   .button {

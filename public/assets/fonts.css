@@ -1,0 +1,48 @@
+/*
+This CSS resource incorporates links to font software which is the valuable copyrighted property of Monotype and/or its suppliers. You may not attempt to copy, install, redistribute, convert, modify or reverse engineer this font software. Please contact Monotype with any questions regarding Web Fonts: http://www.fontshop.com
+*/
+@font-face {
+	font-family: "Real Head";
+	src: url("/assets/fonts/5510745/cf348b51-5d6f-469b-811a-353deb1ecb59.woff2") format("woff2"),
+	  url("/assets/fonts/5510745/3e1cb9e8-e4b0-4f51-aad6-c7b55dc43daa.woff") format("woff");
+	font-weight: normal;
+}
+@font-face {
+	font-family: "Real Text";
+	src: url("/assets/fonts/5510789/4da4d9f1-291e-4765-8ce9-08233d84363b.woff2") format("woff2"),
+	  url("/assets/fonts/5510789/5d23a796-8edf-40f1-9413-7149b95f6c86.woff") format("woff");
+	font-weight: normal;
+}
+@font-face {
+	font-family: "Real Text";
+	src: url("/assets/fonts/5510813/3ad5982f-8c4b-4a6c-b46c-2a4dad8b912a.woff2") format("woff2"),
+	  url("/assets/fonts/5510813/8a97a41d-ba1d-4f9f-847e-73f03c8b57b4.woff") format("woff");
+	font-weight: bold;
+}
+@font-face {
+	font-family: "Real Text";
+	src: url("/assets/fonts/5510825/b8b09105-298b-451e-aaf5-640dd365c98d.woff2") format("woff2"),
+	  url("/assets/fonts/5510825/e5a35c83-caf7-4e1f-bddc-7bd6442fd500.woff") format("woff");
+	font-weight: 900;
+}
+@font-face {
+	font-family: "Real Text";
+	src: url("/assets/fonts/5724264/59408874-8296-4356-9c9e-9563d8be2208.woff2") format("woff2"),
+	  url("/assets/fonts/5724264/98299dd0-2490-4264-9040-0e98829f4433.woff") format("woff");
+	font-style: italic;
+}
+@font-face {
+	font-family: "Real Text";
+	src: url("/assets/fonts/5724284/82cade6f-cade-449f-8aac-1c21d6b04f0a.woff2") format("woff2"),
+	  url("/assets/fonts/5724284/c57fdc80-4d40-4f2d-8e89-925ba55f8ced.woff") format("woff");
+	font-weight: bold;
+	font-style: italic;
+}
+@font-face {
+	font-family: "Real Text";
+	src: url("/assets/fonts/5724300/29fb68a0-4a06-4443-8c87-46e3d6849831.woff2") format("woff2"),
+	  url("/assets/fonts/5724300/9ab30fa1-d21d-4aac-a855-a6b3a43fde8a.woff") format("woff");
+	font-weight: 900;
+	font-style: italic;
+}
+
