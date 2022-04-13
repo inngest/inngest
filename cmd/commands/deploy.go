@@ -51,7 +51,7 @@ func deployFunction(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, a := range actions {
-		if err := deployAction(ctx, a, true); err != nil {
+		if err := deployAction(ctx, a); err != nil {
 			return err
 		}
 	}
@@ -84,8 +84,7 @@ func deployWorkflow(ctx context.Context, fn *function.Function) error {
 
 // deployAction deploys a given action to Inngest, creating a new version, pushing the image,
 // the  setting the action to "published" once pushed.
-func deployAction(ctx context.Context, a inngest.ActionVersion, build bool) error {
-	var err error
+func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 	state := state.RequireState(ctx)
 
 	// Ensure we normalize the DSN before building.
@@ -94,28 +93,26 @@ func deployAction(ctx context.Context, a inngest.ActionVersion, build bool) erro
 	tag := a.DSN
 	fmt.Println(cli.BoldStyle.Render(fmt.Sprintf("Building action %s...", tag)))
 
-	if build {
-		// Build the image.  We always need to do this first to ensure we have
-		// an up-to-date image and checksum for the action.
-		ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
-			QuitOnComplete: true,
-			BuildOpts: docker.BuildOpts{
-				Path:     ".",
-				Tag:      tag,
-				Platform: "linux/amd64",
-			},
-		})
-		if err != nil {
-			return err
-		}
-		if err := tea.NewProgram(ui).Start(); err != nil {
-			return err
-		}
-		if ui.Builder.Error() != nil {
-			// We don't want to repeat the docker build error in
-			// the UI.
-			return fmt.Errorf("Exiting after a build error")
-		}
+	// Build the image.  We always need to do this first to ensure we have
+	// an up-to-date image and checksum for the action.
+	ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
+		QuitOnComplete: true,
+		BuildOpts: docker.BuildOpts{
+			Path:     ".",
+			Tag:      tag,
+			Platform: "linux/amd64",
+		},
+	})
+	if err != nil {
+		return err
+	}
+	if err := tea.NewProgram(ui).Start(); err != nil {
+		return err
+	}
+	if ui.Builder.Error() != nil {
+		// We don't want to repeat the docker build error in
+		// the UI.
+		return fmt.Errorf("Exiting after a build error")
 	}
 
 	fmt.Println("")

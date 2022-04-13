@@ -5,8 +5,10 @@ import (
 	"os"
 
 	"github.com/inngest/inngestctl/cmd/commands/internal/actions"
+	"github.com/inngest/inngestctl/inngest/client"
 	"github.com/inngest/inngestctl/inngest/state"
 	"github.com/inngest/inngestctl/pkg/cli"
+	"github.com/inngest/inngestctl/pkg/docker"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 )
@@ -57,14 +59,38 @@ func runActionDeploy(cmd *cobra.Command, args []string) {
 		prefix = *state.Account.Identifier.Domain
 	}
 
-	version, _, err := actions.Parse(prefix, string(byt))
+	a, config, err := actions.Parse(prefix, string(byt))
 	if err != nil {
 		fmt.Println(cli.RenderError("Error parsing configuration"))
 		os.Exit(1)
 	}
 
-	if err := deployAction(ctx, *version, false); err != nil {
-		fmt.Println(cli.RenderError(fmt.Sprintf("Error deploying action: %s", err)))
+	// Create the action in the UI.
+	if _, err = state.Client.CreateAction(ctx, config); err != nil {
+		fmt.Println(cli.RenderError(fmt.Sprintf("error creating action: %s", err)))
 		os.Exit(1)
+	}
+
+	// Push
+	switch a.Runtime.RuntimeType() {
+	case "docker":
+		if _, err = docker.Push(ctx, *a, state.Client.Credentials()); err != nil {
+			fmt.Println(cli.RenderError(fmt.Sprintf("error pushing action: %s", err)))
+			os.Exit(1)
+		}
+	default:
+		fmt.Printf("unknown runtime type: %s", a.Runtime.RuntimeType())
+		os.Exit(1)
+	}
+
+	// Publish
+	_, err = state.Client.UpdateActionVersion(ctx, client.ActionVersionQualifier{
+		DSN:          a.DSN,
+		VersionMajor: a.Version.Major,
+		VersionMinor: a.Version.Minor,
+	}, true)
+
+	if err == nil {
+		fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render("Action deployed"))
 	}
 }
