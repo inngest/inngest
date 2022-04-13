@@ -20,14 +20,40 @@ var (
 	ErrNoState = fmt.Errorf("no Inngest state found")
 )
 
+const (
+	SettingRanInit = "ranInit"
+)
+
+func SaveSetting(ctx context.Context, key string, value interface{}) error {
+	s, _ := GetState(ctx)
+	if s == nil {
+		s = &State{Settings: make(map[string]interface{})}
+	}
+	s.Settings[key] = value
+	return s.Persist(ctx)
+}
+
+func GetSetting(ctx context.Context, key string) interface{} {
+	s, _ := GetState(ctx)
+	if s == nil {
+		return nil
+	}
+	setting, ok := s.Settings[key]
+	if !ok {
+		return nil
+	}
+	return setting
+}
+
 // State persists across each cli invokation, allowing functionality such as workspace
 // switching, etc.
 type State struct {
 	client.Client `json:"-"`
 
-	SelectedWorkspace *Workspace     `json:"workspace,omitempty"`
-	Credentials       []byte         `json:"credentials"`
-	Account           client.Account `json:"account"`
+	SelectedWorkspace *Workspace             `json:"workspace,omitempty"`
+	Credentials       []byte                 `json:"credentials"`
+	Account           client.Account         `json:"account"`
+	Settings          map[string]interface{} `json:"settings"`
 }
 
 func (s State) Persist(ctx context.Context) error {
