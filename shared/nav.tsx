@@ -1,11 +1,11 @@
-import React, { useState } from "react"
-import styled from "@emotion/styled"
-import Button from "../shared/Button"
-import Hamburger from "../shared/Icons/Hamburger"
+import React, { useState } from "react";
+import styled from "@emotion/styled";
+import Button from "../shared/Button";
+import Hamburger from "../shared/Icons/Hamburger";
 
 type Props = {
-  nolinks?: boolean
-}
+  nolinks?: boolean;
+};
 
 const Nav: React.FC<Props> = (props) => {
   return (
@@ -13,11 +13,11 @@ const Nav: React.FC<Props> = (props) => {
       <NavContent {...props} />
       <div className="grid-line" />
     </div>
-  )
-}
+  );
+};
 
 const NavContent: React.FC<Props> = (props: Props) => {
-  const [show, setShow] = useState(false)
+  const [show, setShow] = useState(false);
   return (
     <Container className={["grid-center-8", show ? "show" : ""].join(" ")}>
       <div>
@@ -43,7 +43,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
           href="/sign-up"
           className="button"
           kind="primary"
-          style={{ padding: "0.4rem 0.8rem" }}
+          style={{ padding: "0.4rem 1rem" }}
         >
           Start building →
         </Button>
@@ -53,8 +53,8 @@ const NavContent: React.FC<Props> = (props: Props) => {
         <Hamburger />
       </a>
     </Container>
-  )
-}
+  );
+};
 
 const Container = styled.div`
   z-index: 1;
@@ -65,7 +65,8 @@ const Container = styled.div`
   height: 120px;
 
   font-family: var(--font);
-  font-size: 22px;
+  font-size: 0.9em;
+  font-weight: bold;
 
   .button {
     font-weight: 600;
@@ -154,7 +155,7 @@ const Container = styled.div`
       pointer-events: inherit;
     }
   }
-`
+`;
 
 const StyledLink = styled.a`
   display: inline-block;
@@ -170,7 +171,7 @@ const StyledLink = styled.a`
   &:hover {
     background: #2f6d9d11;
   }
-`
+`;
 
 const Hoverable = styled.div`
   position: relative;
@@ -243,6 +244,6 @@ const Hoverable = styled.div`
       transition: all 0.2s;
     }
   }
-`
+`;
 
-export default Nav
+export default Nav;

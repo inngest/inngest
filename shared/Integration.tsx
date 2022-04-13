@@ -40,12 +40,13 @@ const Wrapper = styled.div`
   border-radius: var(--border-radius);
   display: grid;
   align-items: center;
-  grid-template-columns: minmax(2rem, 8rem) minmax(10rem, 1fr);
+  grid-template-columns: minmax(4rem, 8rem) minmax(10rem, 1fr);
 
   /* This automatically has 1rem added to it, as the image is pulled left 1rem */
   grid-gap: 0.5rem;
 
   margin-left: 1rem;
+  padding: 1em 0;
 
   img {
     margin-left: -1rem;
@@ -53,16 +54,17 @@ const Wrapper = styled.div`
   }
 
   div {
-    padding: 2rem 2rem 2rem 0;
+    /* padding: 1rem 1rem 1rem 0; */
   }
 
   .name {
     font-weight: bold;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
   }
 
   span {
     display: block;
+    font-size: 0.8rem;
     margin: 0.25rem 0;
   }
 
@@ -76,9 +78,14 @@ const Wrapper = styled.div`
   }
 
   @media (max-width: 800px) {
-    grid-template-columns: 3.5rem minmax(10rem, 1fr);
+    grid-template-columns: 6rem minmax(10rem, 1fr);
 
-    .name { font-size: 1.2rem; }
-    span { font-size: 1rem; line-height: 1.2; }
+    .name {
+      font-size: 1.2rem;
+    }
+    span {
+      font-size: 1rem;
+      line-height: 1.2;
+    }
   }
 `;

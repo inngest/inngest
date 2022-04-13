@@ -1,6 +1,7 @@
 @import url("./reset.css");
 @import url("https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=Roboto+Mono&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap");
 
 /** Standard **/
 
@@ -14,11 +15,11 @@
   /* Used for text pages;  not the homepage */
   --text-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-  --font: "Roboto Condensed", var(--text-font);
+  --font: "Inter", "Roboto Condensed", var(--text-font);
   --font-mono: "Roboto Mono", "Fira Mono", monospace;
-  --font-heading: "Alegreya Sans", var(--font);
+  --font-heading: "Inter", "Alegreya Sans", var(--font);
 
-  --bg-color: #121327;
+  --bg-color: #0a0a12;
   --highlight-color: #000;
   --primary-color: #4636f5;
   --primary-color-rgb: 70, 54, 245;
@@ -48,8 +49,6 @@
 
 .home {
   font-family: var(--font);
-  /* Roboto condensed has a... unique base size */
-  font-size: 22px;
 }
 
 .home p {
@@ -100,14 +99,14 @@ h3,
 }
 
 h1 {
-  font-size: 92px;
+  font-size: 3em;
   letter-spacing: -2px;
   line-height: 1.05;
   padding: 0 0 0.2em;
 }
 
 h1 + .subheading {
-  font-size: 1.5rem;
+  font-size: 1em;
 }
 
 h2 {
@@ -185,7 +184,7 @@ li > ul {
     line-height: 1;
   }
   h2 {
-    font-size: 3rem;
+    font-size: 2rem;
     line-height: 1;
   }
   h4 {
@@ -324,7 +323,7 @@ li > ul {
 }
 
 .nav-grid {
-  border-bottom: 1px dashed var(--grid-line-color);
+  /* border-bottom: 1px dashed var(--grid-line-color); */
 }
 
 /* Specialized grids */

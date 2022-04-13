@@ -159,7 +159,7 @@ export default function Home() {
     // Defer loading of background textures.
     const style = document.createElement("style");
     style.innerText = `
-      .home { 
+      .home {
         background: url(/assets/texture.webp) repeat-y;
         background-size: cover;
       }
@@ -209,11 +209,17 @@ export default function Home() {
       <div className="grid hero-grid">
         <Hero className="grid-center-8">
           <div>
-            <h1>Make event-driven apps fun to build</h1>
-            <p className="subheading">
-              Deploy serverless functions in minutes.
+            <h1>
+              <strong>Create</strong> easily.
               <br />
-              No infra. No servers. Zero YAML.
+              <strong>Test</strong> confidently.
+              <br />
+              <strong>Deploy</strong> instantly.
+            </h1>
+            <p className="subheading">
+              The fastest way to build and ship event-driven code.
+              <br />
+              No configuration. No infra to manage. Just ship.
             </p>
 
             <Button kind="primary" href="/sign-up">
@@ -474,9 +480,6 @@ export default function Home() {
       <Callout small="Still reading?" />
 
       <Footer />
-      {/* Roboto Condensed is a weird font - way smaller than others -
-      so we adjust the root size for this page only :/ */}
-      <style>{`:root { font-size: 22px; }`} </style>
     </Wrapper>
   );
 }
@@ -592,7 +595,7 @@ const Wrapper = styled.div`
 `;
 
 const Hero = styled.div`
-  padding: 8em 0;
+  padding: 7em 0;
 
   display: grid;
   grid-template-columns: repeat(8, 1fr);
@@ -607,9 +610,15 @@ const Hero = styled.div`
     width: 100%;
   }
 
+  h1 {
+    font-weight: 200;
+  }
+
   p {
-    padding: 0 0 1.5rem;
+    padding: 1em 0 1.5rem;
     font-family: var(--font);
+    font-size: 1.1em;
+    line-height: 1.6em;
   }
 
   .button {

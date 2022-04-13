@@ -113,7 +113,7 @@ export default function Home() {
 }
 
 const Page = styled.div`
-  background: url(/assets/hero-grid.svg) no-repeat right top;
+  background: url(/assets/hero-grid.svg?v=2022-04-13) no-repeat right top;
 `;
 
 const Avatar = styled.img`
