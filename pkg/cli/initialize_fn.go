@@ -34,31 +34,34 @@ const (
 
 	eventPlaceholder = "What event name triggers this function?  Use your own event name or an event from an integration."
 
-	// the Y offset when rendering the event browser.
-	eventBrowserOffset = 25
-
 	// anotherLanguage is the list item which is rendered at the bottom for a user
 	// to select if we have no scaffolds for their language.
 	anotherLanguage = "another language"
 )
 
+type InitOpts struct {
+	ShowWelcome bool
+}
+
 // NewInitModel renders the UI for initializing a new function.
-func NewInitModel() (*initModel, error) {
+func NewInitModel(o InitOpts) (*initModel, error) {
 	width, height, _ := term.GetSize(int(os.Stdout.Fd()))
 
 	languageDelegate := list.NewDefaultDelegate()
 	languageDelegate.ShowDescription = false
 
 	f := &initModel{
-		width:        width,
-		height:       height,
-		events:       []client.Event{},
-		state:        stateAskName,
-		textinput:    textinput.New(),
-		loading:      spinner.New(),
-		languageList: list.New([]list.Item{}, languageDelegate, width, height-eventBrowserOffset),
-		scaffoldList: list.New([]list.Item{}, list.NewDefaultDelegate(), width, height-eventBrowserOffset),
+		width:       width,
+		height:      height,
+		showWelcome: o.ShowWelcome,
+		events:      []client.Event{},
+		state:       stateAskName,
+		textinput:   textinput.New(),
+		loading:     spinner.New(),
 	}
+
+	f.languageList = list.New([]list.Item{}, languageDelegate, width, height-f.eventBrowserOffset())
+	f.scaffoldList = list.New([]list.Item{}, list.NewDefaultDelegate(), width, height-f.eventBrowserOffset())
 
 	f.textinput.Focus()
 	f.textinput.CharLimit = 156
@@ -83,6 +86,9 @@ type initModel struct {
 	// as the welcome message, the evnet browser, etc.
 	width  int
 	height int
+
+	// whether to show the welcome message.
+	showWelcome bool
 
 	// The current state we're on.
 	state string
@@ -159,9 +165,17 @@ func (f *initModel) Template() *scaffold.Template {
 	return f.scaffold
 }
 
+// the Y offset when rendering the event browser.
+func (f *initModel) eventBrowserOffset() int {
+	if f.showWelcome && f.height > 35 {
+		return 25
+	}
+	return 11
+}
+
 func (f *initModel) Init() tea.Cmd {
 	// Remove the first N lines of the CLI height, which account for the header etc.
-	f.browser, _ = NewEventBrowser(f.width, f.height-eventBrowserOffset, f.events, true)
+	f.browser, _ = NewEventBrowser(f.width, f.height-f.eventBrowserOffset(), f.events, true)
 	return tea.Batch(
 		f.loading.Tick,
 		func() tea.Msg {
@@ -214,7 +228,7 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		f.width = msg.Width
 		f.height = msg.Height
-		f.browser.UpdateSize(f.width, f.height-eventBrowserOffset)
+		f.browser.UpdateSize(f.width, f.height-f.eventBrowserOffset())
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyCtrlBackslash:
@@ -359,7 +373,9 @@ func (f *initModel) View() string {
 
 	b := &strings.Builder{}
 
-	b.WriteString(f.renderIntro(true))
+	if f.height > 35 {
+		b.WriteString(f.renderIntro(f.showWelcome))
+	}
 
 	// If we have no workflow name, ask for it.
 	switch f.state {
@@ -418,7 +434,7 @@ func (f *initModel) renderEvent() string {
 		b.WriteString("\n" + RenderWarning(fmt.Sprintf("We couldn't fetch your latest events from our API: %s", f.eventFetchError)) + "\n")
 	}
 
-	if f.height < 40 {
+	if f.height < 20 {
 		b.WriteString("\n" + RenderWarning("Your TTY doesn't have enough height to render the event browser") + "\n")
 		return b.String()
 	}

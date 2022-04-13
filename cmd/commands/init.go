@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	istate "github.com/inngest/inngestctl/inngest/state"
 	"github.com/inngest/inngestctl/pkg/cli"
 	"github.com/inngest/inngestctl/pkg/function"
 	"github.com/inngest/inngestctl/pkg/scaffold"
@@ -32,9 +33,17 @@ func runInit(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	showWelcome := true
+	if setting, ok := istate.GetSetting(cmd.Context(), istate.SettingRanInit).(bool); ok {
+		// only show the welcome if we haven't ran init
+		showWelcome = !setting
+	}
+
 	// Create a new TUI which walks through questions for creating a function.  Once
 	// the walkthrough is complete, this blocks and returns.
-	state, err := cli.NewInitModel()
+	state, err := cli.NewInitModel(cli.InitOpts{
+		ShowWelcome: showWelcome,
+	})
 	if err != nil {
 		fmt.Println(cli.RenderError(fmt.Sprintf("Error starting init command: %s", err)) + "\n")
 		return
@@ -47,6 +56,10 @@ func runInit(cmd *cobra.Command, args []string) {
 		fmt.Println("\n" + cli.RenderWarning("Quitting without making your function.  Take care!") + "\n")
 		return
 	}
+
+	// Save a setting which indicates that we've ran init successfully.
+	// This is used to prevent us from showing the welcome message on subsequent runs.
+	_ = istate.SaveSetting(cmd.Context(), istate.SettingRanInit, true)
 
 	// Get the function from the state.
 	fn, err := state.Function()
