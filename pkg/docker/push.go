@@ -37,9 +37,14 @@ func Push(ctx context.Context, a inngest.ActionVersion, creds []byte) (string, e
 		return "", err
 	}
 
-	img, err := c.InspectImage(a.DSN)
+	imageTag := a.DSN
+	if a.Runtime.Runtime.(inngest.RuntimeDocker).Image != "" {
+		imageTag = a.Runtime.Runtime.(inngest.RuntimeDocker).Image
+	}
+
+	img, err := c.InspectImage(imageTag)
 	if err != nil {
-		return "", fmt.Errorf("error finding image to push: %w", err)
+		return "", fmt.Errorf("error finding image '%s' to push: %w", a.DSN, err)
 	}
 
 	id := strings.Replace(img.ID, "sha256:", "", 1)
@@ -54,7 +59,7 @@ func Push(ctx context.Context, a inngest.ActionVersion, creds []byte) (string, e
 	}
 
 	image := fmt.Sprintf("%s/%s", host, a.DSN)
-	err = c.TagImage(a.DSN, docker.TagImageOptions{
+	err = c.TagImage(imageTag, docker.TagImageOptions{
 		Repo: image,
 		Tag:  a.Version.Tag(),
 	})
