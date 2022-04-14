@@ -5,7 +5,6 @@ focus: true
 heading: "Programmable event platforms"
 subtitle: Programmable event platforms allow you to build serverless event-driven systems in minutes.  Here's an introduction to them.
 date: 2022-01-10
-order: 1
 img: "/img/globe.png"
 ---
 

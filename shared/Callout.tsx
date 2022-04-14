@@ -33,6 +33,7 @@ export default Callout;
 const Content = styled.div`
   position: relative;
   grid-column: 3 / -2;
+  grid-gap: 2rem;
 
   display: grid;
   grid-template-columns: 4fr 2fr;

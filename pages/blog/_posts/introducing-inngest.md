@@ -5,7 +5,6 @@ focus: false
 heading: "Introducing Inngest:  an event workflow platform"
 subtitle: We’re launching Inngest, a platform designed to make building event-driven systems fast and easy.
 date: 2021-10-05
-order: 1
 ---
 
 

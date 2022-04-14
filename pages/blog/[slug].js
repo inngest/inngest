@@ -86,6 +86,10 @@ const Main = styled.div`
     margin: var(--section-padding) 0 0;
   }
 
+  video {
+    margin: 4rem 0;
+  }
+
   main {
     max-width: 980px;
     margin: 0 auto 4rem;
@@ -157,7 +161,7 @@ const Main = styled.div`
 
   pre {
     margin: 3rem 0;
-    padding: 1em;
+    padding: .25rem 1em;
     border-radius: 3px;
   }
 

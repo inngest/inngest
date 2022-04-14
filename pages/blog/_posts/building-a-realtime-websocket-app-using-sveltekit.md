@@ -1,9 +1,8 @@
 ---
-focus: true
+focus: false
 heading: "Building a real-time websocket app using SvelteKit"
 subtitle: Our experience building https://typedwebhook.tools in 2 days using SvelteKit.
 date: 2022-02-22
-order: 5
 ---
 
 <div className="blog--callout">

@@ -10,7 +10,8 @@ export default function BlogLayout(props) {
   const content = props.content.map(JSON.parse);
 
   const focus = content.find((c) => c.focus);
-  const rest = content.filter((c) => !focus || c.slug !== focus.slug);
+  const rest = content.filter((c) => !focus || c.slug !== focus.slug).
+    sort((a, z) => z.date.localeCompare(a.date));
 
   return (
     <>
@@ -105,7 +106,6 @@ export async function getStaticProps() {
     const { data, content } = matter(source);
     data.reading = readingTime(content);
     data.humanDate = data.date.toLocaleDateString();
-    console.log(data);
     data.slug = fname.replace(/.mdx?/, "");
 
     // Disregard content, as the snippet for the blog list should be in
