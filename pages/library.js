@@ -66,7 +66,7 @@ export default function Library() {
 
                 {tags.map((t) => {
                   return (
-                    <label>
+                    <label key={`t-${t}`}>
                       <input
                         type="checkbox"
                         defaultChecked={tag === t}
@@ -86,13 +86,13 @@ export default function Library() {
               <div>
                 <Items>
                   {visible.map((item) => (
-                    <Block>
-                    <Item href={`/library/${slugify(item.title)}`}>
-                      <p>{item.title}</p>
-                      <p>{item.subtitle}</p>
+                    <Block key={`lib-${slugify(item.title)}`}>
+                      <Item href={`/library/${slugify(item.title)}`}>
+                        <p>{item.title}</p>
+                        <p>{item.subtitle}</p>
 
-                      <span class="button button--outline">View</span>
-                    </Item>
+                        <span class="button button--outline">View</span>
+                      </Item>
                     </Block>
                   ))}
                 </Items>
@@ -110,7 +110,9 @@ const Inner = styled.div`
   box-sizing: border-box;
   min-height: calc(100vh - 270px);
 
-  header { padding-bottom: 0 }
+  header {
+    padding-bottom: 0;
+  }
 
   h2,
   h2 + p {
@@ -124,7 +126,6 @@ const Inner = styled.div`
     margin: 0.5rem 0 3rem;
     opacity: 0.6;
   }
-
 `;
 
 const Grid = styled.div`
