@@ -80,7 +80,7 @@ const SignUp = () => {
             </span>
           </Button>
 
-          <Button href={apiURL("/v1/login/oauth/github/redirect")} kind="black">
+          <Button href={apiURL("/v1/login/oauth/google/redirect")} kind="black">
             <img
               src="https://app.inngest.com/assets/icons/google.svg"
               alt="Google"
