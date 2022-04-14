@@ -44,7 +44,7 @@ func Push(ctx context.Context, a inngest.ActionVersion, creds []byte) (string, e
 
 	img, err := c.InspectImage(imageTag)
 	if err != nil {
-		return "", fmt.Errorf("error finding image '%s' to push: %w", a.DSN, err)
+		return "", fmt.Errorf("error finding image '%s' to push: %w", imageTag, err)
 	}
 
 	id := strings.Replace(img.ID, "sha256:", "", 1)

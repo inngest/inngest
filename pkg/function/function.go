@@ -155,7 +155,7 @@ func (f Function) defaultAction(ctx context.Context) ([]inngest.ActionVersion, e
 		Scopes: []string{"secret:read:*"},
 		Runtime: inngest.RuntimeWrapper{
 			Runtime: inngest.RuntimeDocker{
-				Image: f.ID,
+				Image: id,
 			},
 		},
 	}

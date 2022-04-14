@@ -29,6 +29,9 @@ func SaveSetting(ctx context.Context, key string, value interface{}) error {
 	if s == nil {
 		s = &State{Settings: make(map[string]interface{})}
 	}
+	if s.Settings == nil {
+		s.Settings = make(map[string]interface{})
+	}
 	s.Settings[key] = value
 	return s.Persist(ctx)
 }
