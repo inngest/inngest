@@ -55,8 +55,8 @@ export default function BlogLayout(props) {
           </div>
         </Main>
         <Callout
-          small="But, what is Inngest?"
-          heading="Inngest is serverless event mesh"
+          small="What is Inngest?"
+          heading="The fastest way to build and ship event-driven functions"
           link="/?ref=blog-footer"
           cta="Learn more >"
         />

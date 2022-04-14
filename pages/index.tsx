@@ -222,12 +222,12 @@ export default function Home() {
               No configuration. No infra to manage. Just ship.
             </p>
 
-            <Button kind="primary" href="/sign-up">
+            <Button kind="primary" href="/sign-up?ref=home-hero">
               <span className="button-text-light">{">"}_</span>
               &nbsp;
               <span className="button-text-med">Start building</span>
             </Button>
-            <Button kind="outline" href="/docs">
+            <Button kind="outline" href="/docs?ref=home-hero">
               Explore docs →
             </Button>
           </div>
@@ -380,7 +380,7 @@ export default function Home() {
         <div className="grid-line" />
       </div>
 
-      <Callout />
+      <Callout ctaRef="home-callout-mid" />
 
       <SectionHeader
         title="Batteries included"
@@ -477,7 +477,7 @@ export default function Home() {
         <div className="grid-line" />
       </div>
 
-      <Callout small="Still reading?" />
+      <Callout small="Still reading?" ctaRef="home-callout-end" />
 
       <Footer />
     </Wrapper>

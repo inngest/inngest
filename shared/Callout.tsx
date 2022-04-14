@@ -6,9 +6,10 @@ type Props = {
   heading?: string;
   cta?: string;
   link?: string;
+  ctaRef?: string;
 };
 
-const Callout: React.FC<Props> = ({ small, heading, cta, link }) => {
+const Callout: React.FC<Props> = ({ small, heading, cta, link, ctaRef }) => {
   return (
     <div className="grid">
       <Content className="bg-primary">
@@ -16,7 +17,10 @@ const Callout: React.FC<Props> = ({ small, heading, cta, link }) => {
           <span>{small || "Now with zero yaml ;-)"}</span>
           <h2>{heading || "Deploy a serverless function in minutes."}</h2>
         </div>
-        <Button kind="black" href={link || "/sign-up"}>
+        <Button
+          kind="black"
+          href={`${link || "/sign-up"}${ctaRef ? "?ref=" + ctaRef : ""}`}
+        >
           {cta || ">_ Start building"}
         </Button>
       </Content>

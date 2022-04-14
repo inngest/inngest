@@ -161,7 +161,10 @@ export default function Pricing() {
               <p>{PLANS.free.description}</p>
             </div>
             <div>
-              <Button kind="outlineHighContrast" href="/sign-up">
+              <Button
+                kind="outlineHighContrast"
+                href="/sign-up?ref=pricing-free"
+              >
                 Sign up for free →
               </Button>
             </div>
@@ -176,7 +179,7 @@ export default function Pricing() {
               <p>{PLANS.pro.description}</p>
             </PlanHeader>
             <div style={{ marginBottom: "2rem" }}>
-              <Button kind="primary" href="/sign-up">
+              <Button kind="primary" href="/sign-up?ref=pricing-early-adopter">
                 Sign up as an early adopter →
               </Button>
             </div>
@@ -189,7 +192,7 @@ export default function Pricing() {
               <p>{PLANS.advanced.description}</p>
             </PlanHeader>
             <div style={{ marginBottom: "2rem" }}>
-              <Button kind="primary" href="/contact">
+              <Button kind="primary" href="/contact?ref=pricing-advanced">
                 Contact us →
               </Button>
             </div>
@@ -311,7 +314,7 @@ export default function Pricing() {
           </div>
         </FAQGrid>
 
-        <Callout />
+        <Callout ctaRef="pricing-callout-end" />
       </Content>
 
       <div style={{ marginTop: 100 }}>

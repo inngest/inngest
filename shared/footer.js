@@ -24,7 +24,7 @@ const Footer = () => {
           </div>
           <div>
             <p>Product</p>
-            <a href="/docs">Documentation</a>
+            <a href="/docs?ref=footer">Documentation</a>
             {/*<a href="/integrations">Integrations</a>*/}
             <a href="/docs/event-http-api-and-libraries">Libraries & SDKs</a>
             <a
