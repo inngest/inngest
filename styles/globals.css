@@ -17,7 +17,7 @@
     Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   --font: "Real Text", var(--text-font);
   --font-mono: "Roboto Mono", "Fira Mono", monospace;
-  --font-heading: "Real Head", var(--font);
+  --font-heading: var(--font);
 
   --bg-color: #0a0a12;
   --highlight-color: #000;
@@ -100,7 +100,6 @@ h3,
 
 h1 {
   font-size: 3em;
-  letter-spacing: -2px;
   line-height: 1.05;
   padding: 0 0 0.2em;
 }

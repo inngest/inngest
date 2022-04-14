@@ -210,11 +210,11 @@ export default function Home() {
         <Hero className="grid-center-8">
           <div>
             <h1>
-              <strong>Create</strong> easily.
+              Create easily.
               <br />
-              <strong>Test</strong> confidently.
+              Test confidently.
               <br />
-              <strong>Deploy</strong> instantly.
+              Deploy instantly.
             </h1>
             <p className="subheading">
               The fastest way to build and ship event-driven code.
@@ -608,10 +608,6 @@ const Hero = styled.div`
   img {
     grid-column: span 3;
     width: 100%;
-  }
-
-  h1 {
-    font-weight: 200;
   }
 
   p {
