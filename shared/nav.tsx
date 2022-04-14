@@ -66,10 +66,9 @@ const Container = styled.div`
 
   font-family: var(--font);
   font-size: 0.9em;
-  font-weight: bold;
 
   .button {
-    font-weight: 600;
+    /* font-weight: 600; */
   }
 
   > div,
