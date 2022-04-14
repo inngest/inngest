@@ -86,7 +86,7 @@ func runInit(cmd *cobra.Command, args []string) {
 			// detect background color and pick either the default dark or light theme
 			glamour.WithAutoStyle(),
 		)
-		out, _ := renderer.Render(tpl.PostSetup)
+		out, _ := renderer.Render(tpl.TemplatedPostSetup(*fn))
 		fmt.Println(out)
 	}
 

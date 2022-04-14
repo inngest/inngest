@@ -36,7 +36,7 @@ func TestDerivedConfigDefault(t *testing.T) {
 		Scopes: []string{"secret:read:*"},
 		Runtime: inngest.RuntimeWrapper{
 			Runtime: inngest.RuntimeDocker{
-				Image: "magical-id-1",
+				Image: "magical-id-1-action",
 			},
 		},
 	}
@@ -53,7 +53,7 @@ action: {
   name: "Foo"
   scopes: ["secret:read:*"]
   runtime: {
-    image: "magical-id-1"
+    image: "magical-id-1-action"
     type:  "docker"
   }
 }`

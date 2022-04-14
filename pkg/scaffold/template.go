@@ -32,6 +32,27 @@ type tplData struct {
 	EventTriggers []*function.EventTrigger
 }
 
+func (t Template) TemplatedPostSetup(f function.Function) string {
+	tpl, err := template.New("postsetup").Parse(string(t.PostSetup))
+	if err != nil {
+		return t.PostSetup
+	}
+
+	data := map[string]string{
+		"id":   f.ID,
+		"name": f.Name,
+		"slug": f.Slug(),
+		"dir":  f.Slug(),
+	}
+
+	buf := &bytes.Buffer{}
+	if err := tpl.Execute(buf, data); err != nil {
+		return t.PostSetup
+	}
+
+	return buf.String()
+}
+
 // Render renders the template and all files into the folder specified by function.
 func (t Template) Render(f function.Function) error {
 	dirname := f.Slug()
