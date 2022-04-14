@@ -70,7 +70,7 @@ const Wrapper = styled.div`
   margin-top: -40vh;
 
   font-family: var(--font);
-  font-size: 22px;
+  font-size: 0.9rem;
 
   background: url(/assets/footer-grid.svg) no-repeat right 10%;
   background-size: cover;
@@ -81,7 +81,7 @@ const Wrapper = styled.div`
 
   p {
     font-weight: bold;
-    font-size: 1.35rem;
+    font-size: 1rem;
   }
 
   small {
@@ -109,7 +109,8 @@ const Wrapper = styled.div`
   }
 
   .typedwebhook-button {
-    display: block;
+    display: inline-block;
+    margin: 0.5rem 0;
     padding: 0.3rem 0.5rem;
 
     background-color: var(--primary-color);

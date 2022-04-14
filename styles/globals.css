@@ -130,6 +130,10 @@ h5 {
   letter-spacing: 1px;
 }
 
+p, ol, ul, li {
+  font-size: 0.9rem;
+}
+
 input,
 textarea,
 select {
