@@ -170,7 +170,7 @@ func (f *initModel) eventBrowserOffset() int {
 	if f.showWelcome && f.height > 35 {
 		return 25
 	}
-	return 11
+	return 17
 }
 
 func (f *initModel) Init() tea.Cmd {
