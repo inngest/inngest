@@ -1,10 +1,8 @@
 ---
-# focus sets this blog post as the blog focus.  The latest post will be focused if there's
-# > 1 focus post.
 focus: true
-heading: "Building interactive CLIs in Go with Bubbletea"
+heading: "Rapidly building interactive CLIs in Go with Bubbletea"
 subtitle: Our product is just different enough to make our CLI require really good interactivity.  We bundle an interactive event browser in our CLI.  Here's how it's built.
-date: 2022-04-14
+date: 2022-04-15
 ---
 
 In this post we’ll walk through our use of Bubbletea, an elm-inspired TUI interface for Golang.  We’ll discuss why we chose it, some example code, and some thoughts.  Let’s start with context — what we’re building and why.
