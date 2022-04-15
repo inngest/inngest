@@ -231,7 +231,10 @@ export default function Home() {
               Explore docs →
             </Button>
           </div>
-          <img src="/assets/preview.svg" alt="Inngest visualization" />
+          <img
+            src="/assets/preview.svg?v=2022-04-15"
+            alt="Inngest visualization"
+          />
         </Hero>
         <div className="grid-line" />
       </div>
