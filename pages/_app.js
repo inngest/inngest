@@ -30,7 +30,7 @@ function MyApp({ Component, pageProps }) {
       />
       <script
         async
-        src="https://www.googletagmanager.com/gtag/js?id=G-4YPM75W7D9"
+        src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GTAG_ID}`}
       ></script>
       <script
         dangerouslySetInnerHTML={{
@@ -38,7 +38,7 @@ function MyApp({ Component, pageProps }) {
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-        gtag('config', 'G-4YPM75W7D9');
+        gtag('config', '${process.env.NEXT_PUBLIC_GTAG_ID}');
       `,
         }}
       />
