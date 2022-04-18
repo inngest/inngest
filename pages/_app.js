@@ -16,8 +16,10 @@ function MyApp({ Component, pageProps }) {
         src="/inngest-sdk.js"
         onLoad={() => {
           Inngest.init(process.env.NEXT_PUBLIC_INNGEST_KEY);
+          let firstTouch = false;
           const anonId = () => {
             let id = window.localStorage.getItem("inngest-anon-id");
+            firstTouch = !id;
             if (!id) {
               id = uuid();
               window.localStorage.setItem("inngest-anon-id", id);
@@ -25,7 +27,12 @@ function MyApp({ Component, pageProps }) {
             return id;
           };
           Inngest.identify({ anonymous_id: anonId() });
-          Inngest.event({ name: "website/page.viewed" });
+          Inngest.event({
+            name: "website/page.viewed",
+            data: {
+              first_touch: firstTouch,
+            },
+          });
         }}
       />
       <script
