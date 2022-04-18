@@ -26,11 +26,17 @@ function MyApp({ Component, pageProps }) {
             }
             return id;
           };
+          let ref = null;
+          try {
+            const urlParams = new URLSearchParams(window.location.search);
+            ref = urlParams.get("ref");
+          } catch (e) {}
           Inngest.identify({ anonymous_id: anonId() });
           Inngest.event({
             name: "website/page.viewed",
             data: {
               first_touch: firstTouch,
+              ref: ref,
             },
           });
         }}
