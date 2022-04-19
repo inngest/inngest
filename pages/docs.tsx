@@ -252,6 +252,12 @@ export const InnerDocsContent = styled.div`
     margin: 1.4rem 0 1.5rem;
   }
 
+  aside {
+    margin: 2rem 0;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 2rem;
+  }
+
   .tldr {
     border: 1px solid #ffffff33;
     border-radius: 3px;
