@@ -5,7 +5,8 @@ import IconList from "../shared/IconList";
 import Check from "../shared/Icons/Check";
 import { useState } from "react";
 
-const api = process.env.REACT_APP_API_HOST || "https://api.inngest.com";
+const api = process.env.NEXT_PUBLIC_API_HOST || "https://api.inngest.com";
+const appURL = process.env.NEXT_PUBLIC_APP_HOST || "https://app.inngest.com";
 
 const apiURL = (s: string) => {
   return api + s;
@@ -21,6 +22,8 @@ const SignUp = () => {
     e.preventDefault();
     setLoading(true);
 
+    let anonId = window.localStorage.getItem("inngest-anon-id");
+
     let result;
     try {
       result = await fetch(apiURL(`/v1/register`), {
@@ -29,7 +32,7 @@ const SignUp = () => {
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, anon_id: anonId }),
       });
     } catch (e) {
       setError("There was an error signing you up.  Please try again.");
@@ -50,7 +53,7 @@ const SignUp = () => {
 
     setLoading(false);
     // @ts-ignore
-    window.location = "https://app.inngest.com";
+    window.location = appURL;
   };
 
   return (

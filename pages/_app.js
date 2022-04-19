@@ -18,6 +18,7 @@ function MyApp({ Component, pageProps }) {
   });
   useEffect(() => {
     const handleRouteChange = (url) => {
+      // Track page views when using Next's Link component as it doesn't do a full refresh
       trackPageView(url);
     };
     router.events.on("routeChangeComplete", handleRouteChange);
@@ -46,6 +47,11 @@ function MyApp({ Component, pageProps }) {
             firstTouch = !id;
             if (!id) {
               id = uuid();
+              // Set to inngest.com for testing
+              const domain =
+                process.env.NODE_ENV === "production" ? "inngest.com" : "";
+              // Store in cookie for oauth, LS for session
+              document.cookie = `inngest-anon-id=${id};max-age=31536000;path=/;domain=${domain};SameSite=Strict`;
               window.localStorage.setItem("inngest-anon-id", id);
             }
             return id;
