@@ -11,7 +11,6 @@ const Nav: React.FC<Props> = (props) => {
   return (
     <div className="grid nav-grid">
       <NavContent {...props} />
-      <div className="grid-line" />
     </div>
   );
 };
@@ -29,7 +28,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
       {!props.nolinks && (
         <>
           <div className="links">
-            <StyledLink href="/library">Library</StyledLink>
+            {/* <StyledLink href="/library">Library</StyledLink> */}
             <StyledLink href="/docs">Docs</StyledLink>
             <StyledLink href="/blog">Blog</StyledLink>
             <StyledLink href="/pricing">Pricing</StyledLink>
