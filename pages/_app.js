@@ -3,12 +3,18 @@ import Script from "next/script";
 import { v4 as uuid } from "uuid";
 import "../styles/globals.css";
 
+import PageBanner from "../shared/PageBanner";
+
 function MyApp({ Component, pageProps }) {
   return (
     <>
       <Head>
         <link rel="icon" href="/favicon.png" />
       </Head>
+      <PageBanner href="/docs/using-the-inngest-cli?ref=page-banner">
+        Introducing the Inngest CLI: build, test, and ship serverless functions
+        locally &rsaquo;
+      </PageBanner>
       <Component {...pageProps} />
       <Script
         id="js-inngest-sdk"

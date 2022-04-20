@@ -20,12 +20,14 @@
   --font-heading: var(--font);
 
   --bg-color: #0a0a12;
+  --bg-primary-highlight: #12112b; /* A color that is used in gradients w/ the bg color to add depth */
   --highlight-color: #000;
   --primary-color: #4636f5;
   --primary-color-rgb: 70, 54, 245;
   --stroke-color: #525661;
+  --stroke-color-light: #80848e;
   --font-color-primary: #fff;
-  --font-color: #acb2c2;
+  --font-color-secondary: #acb2c2;
   --black: #040408;
   --black-rgb: 4, 4, 8;
   --gray: #212121;
@@ -35,8 +37,12 @@
   --grid-gap: 30px;
 
   --button-padding: 16px 32px;
-  --border-radius: 0.35rem;
+  --button-padding-medium: 0.6rem 1.2rem;
+  --button-padding-small: 0.4rem 1rem;
+  --button-border-width: 2px;
+  --border-radius: 0.35em;
 
+  --max-page-width: 60em; /* 1200px */
   --header-trailing-padding: 4vh;
   --section-padding: 10vh;
 
@@ -51,9 +57,9 @@
   font-family: var(--font);
 }
 
-.home p {
-  color: var(--font-color);
-}
+/* .home p {
+  color: var(--font-color-secondary);
+} */
 
 p + p {
   margin-top: 1.5rem;
@@ -77,10 +83,6 @@ body {
   background: var(--bg-color);
 }
 
-body {
-  border-top: 8px solid var(--primary-color);
-}
-
 body,
 button {
   margin: 0;
@@ -91,7 +93,6 @@ button {
 h1,
 h2,
 h3,
-.subheading,
 .h1,
 .h2,
 .h3 {
@@ -104,13 +105,9 @@ h1 {
   padding: 0 0 0.2em;
 }
 
-h1 + .subheading {
-  font-size: 1em;
-}
-
 h2 {
   font-size: 1.8rem;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 h3,
@@ -120,8 +117,7 @@ h3,
 }
 
 h4 {
-  font-size: 1.2rem;
-  font-weight: normal;
+  font-size: 1.1rem;
 }
 
 h5 {
@@ -144,7 +140,6 @@ select {
 
 /* Home versions, as REM is changed cuz roboto mono */
 
-.home h2,
 .h2 {
   font-size: 1.6rem;
 }
@@ -156,9 +151,9 @@ select {
 
 /** Copy relationship: everything but home. **/
 
-:not(.home) h2 + p {
+/* :not(.home) h2 + p {
   margin-top: 2rem;
-}
+} */
 
 :not(.home) h3 + p {
   margin-top: 1rem;
@@ -184,11 +179,11 @@ li > ul {
 @media (max-width: 980px) {
   h1 {
     font-size: 3rem;
-    line-height: 1;
+    /* line-height: 1; */
   }
   h2 {
     font-size: 2rem;
-    line-height: 1;
+    /* line-height: 1; */
   }
   h4 {
     font-size: 1.1rem;
@@ -230,6 +225,14 @@ li > ul {
 
 .monospace {
   font-family: var(--font-mono);
+}
+
+.light-text {
+  font-weight: normal;
+}
+
+.secondary-text {
+  color: var(--font-color-secondary);
 }
 
 .bg-primary {
@@ -317,16 +320,17 @@ li > ul {
   height: 100%;
 }
 
+.grid-line-horizontal {
+  width: 100%;
+  border-bottom: 1px dashed var(--grid-line-color);
+}
+
 .grid-line span {
   margin: 0.4rem -1.3rem 0 0;
   display: block;
   font-family: var(--font-mono);
   font-size: 14px;
   font-weight: bold;
-}
-
-.nav-grid {
-  /* border-bottom: 1px dashed var(--grid-line-color); */
 }
 
 /* Specialized grids */

@@ -7,145 +7,30 @@ import Button from "../shared/Button";
 import Code from "../shared/Code";
 import Callout from "../shared/Callout";
 import Integration, { IntegrationType } from "../shared/Integration";
+import SectionHeader from "../shared/SectionHeader";
+
 // Icons
+import ClockIcon from "../shared/Icons/Clock";
+import RewindIcon from "../shared/Icons/Replays";
+import PathHorizontalIcon from "../shared/Icons/PathHorizontal";
+
 import Hub from "../shared/Icons/Hub";
 import Functions from "../shared/Icons/Functions";
-import History from "../shared/Icons/History";
+
 import Create from "../shared/Icons/Create";
 import Deploy from "../shared/Icons/Deploy";
 import Monitor from "../shared/Icons/Monitor";
 import CLI from "../shared/Icons/CLI";
 import Retries from "../shared/Icons/Retries";
-import Replays from "../shared/Icons/Replays";
+
 import Transforms from "../shared/Icons/Transforms";
 import Versions from "../shared/Icons/Versions";
 import Rollback from "../shared/Icons/Rollback";
 import Audit from "../shared/Icons/Audit";
 import Logging from "../shared/Icons/Logging";
-import Historical from "../shared/Icons/Historical";
+
 import Observability from "../shared/Icons/Observability";
 import Alerting from "../shared/Icons/Alerting";
-import { CheckBanner } from "../shared/Banner";
-
-// Send event preformatted code
-const events = {
-  cURL: `curl -X POST "https://inn.gs/e/test-key-goes-here-bjm8xj6nji0vzzu0l1k" \\
-  -d '{"name": "test.event", "data": { "email": "gob@bluth-dev.com" } }'`,
-  JavaScript: `Inngest.event({
-  name: "test.event",
-  data: { email: "gob@bluth-dev.com" },
-  user: { email: "gob@bluth-dev.com" },
-});`,
-  Go: `package main
-
-import (
-	"context"
-	"os"
-
-	"github.com/inngest/inngestgo"
-)
-
-func SendEvent(ctx context.Context) {
-	// Create a new client
-	client := inngestgo.NewClient(os.Getenv("INGEST_KEY"))
-	// Send an event
-	client.Send(ctx, inngestgo.Event{
-		Name: "user.created",
-		Data: map[string]interface{}{
-			"plan": "pro",
-			"ip":   "10.0.0.10",
-		},
-		User: map[string]interface{}{
-			// Use the external_id field within User so that we can add context
-			// for audit trails.
-			inngestgo.ExternalID: user.ID,
-			inngestgo.Email:      user.Email,
-		},
-		Version:   "2022-01-01.01",
-		Timestamp: inngestgo.Now(),
-	})
-}`,
-};
-
-const integrations = [
-  {
-    name: "Stripe",
-    logo: "/integrations/stripe.svg",
-    category: "Payments & Billing",
-    type: [IntegrationType.EVENTS],
-  },
-  {
-    name: "Twilio",
-    logo: "/integrations/twilio.svg",
-    category: "Messaging & Communication",
-    type: [IntegrationType.EVENTS],
-  },
-  {
-    name: "Mailchimp",
-    logo: "/integrations/mailchimp.svg",
-    category: "Messaging & Communication",
-    type: [IntegrationType.EVENTS],
-  },
-  {
-    name: "Salesforce",
-    logo: "/integrations/salesforce.svg",
-    category: "Sales Enablement",
-    type: [IntegrationType.EVENTS],
-  },
-  {
-    name: "Chatwoot",
-    logo: "/integrations/chatwoot.svg",
-    category: "Customer support",
-    type: [IntegrationType.EVENTS],
-  },
-  {
-    name: "GitHub",
-    logo: "/integrations/github.svg",
-    category: "Software Collaboration",
-    type: [IntegrationType.EVENTS],
-  },
-];
-
-const SDKs = [
-  {
-    name: "JavaScript",
-    logo: "/assets/languages/icon-logo-js.svg",
-    url: "https://github.com/inngest/javascript-sdk",
-  },
-  {
-    name: "Python",
-    logo: "/assets/languages/icon-logo-python.svg",
-    url: "https://github.com/inngest/inngest-python",
-  },
-  {
-    name: "Go",
-    logo: "/assets/languages/icon-logo-go.svg",
-    url: "https://github.com/inngest/inngestgo",
-  },
-  {
-    name: "Ruby",
-    logo: "/assets/languages/icon-logo-ruby.svg",
-    url: "https://github.com/inngest/inngest-ruby",
-  },
-];
-
-const SectionHeader: React.FC<{
-  label?: string;
-  title: string;
-  subtitle: string;
-  counter?: string;
-}> = ({ label, title, subtitle, counter }) => {
-  return (
-    <div className="grid section-header">
-      <div className="grid-center-6 sm-col-8-center">
-        <span className="section-label">{label}</span>
-        <h2>{title}</h2>
-        <h4>{subtitle}</h4>
-      </div>
-      <div className="grid-line">{counter && <span>{counter}</span>}</div>
-    </div>
-  );
-};
 
 // TODO: move these into env vars
 export const INGEST_KEY =
@@ -155,22 +40,6 @@ export const INGEST_KEY =
 // export const INGEST_KEY = 'MnzaTCk7Se8i74hA141bZGS-NY9P39RSzYFbxanIHyV2VDNu1fwrns2xBQCEGdIb9XRPtzbp0zdRPjtnA1APTQ';
 
 export default function Home() {
-  useEffect(() => {
-    // Defer loading of background textures.
-    const style = document.createElement("style");
-    style.innerText = `
-      .home {
-        background: url(/assets/texture.webp) repeat-y;
-        background-size: cover;
-      }
-    `;
-    style.id = "bg-texture";
-    document.body.appendChild(style);
-    return () => {
-      document.querySelector("#bg-texture").remove();
-    };
-  }, []);
-
   return (
     <Wrapper className="home">
       <Head>
@@ -210,275 +79,236 @@ export default function Home() {
         <Hero className="grid-center-8">
           <div>
             <h1>
-              Create easily.
-              <br />
-              Test confidently.
-              <br />
-              Deploy instantly.
+              Build, test, and ship reactive functions <br />
+              <em>in minutes</em>
             </h1>
-            <p className="subheading">
-              The fastest way to build and ship event-driven code.
-              <br />
-              No configuration. No infra to manage. Just ship.
+            <p className="hero-subheading">
+              Inngest is an <strong>event-driven serverless platform</strong>{" "}
+              that lets you <strong>focus on your product</strong> by giving you
+              all the tools you need to build, test, and ship reactive
+              serverless functions faster than ever before.
             </p>
+            <p className="hero-subheading">No infra, no config — just ship.</p>
 
-            <Button kind="primary" href="/sign-up?ref=home-hero">
-              <span className="button-text-light">{">"}_</span>
-              &nbsp;
-              <span className="button-text-med">Start building</span>
-            </Button>
-            <Button kind="outline" href="/docs?ref=home-hero">
-              Explore docs →
-            </Button>
+            <div className="hero-ctas">
+              <Button kind="primary" href="/sign-up?ref=home-hero">
+                <span className="button-text-light">{">"}_</span>
+                &nbsp;
+                <span className="button-text-med">Start building</span>
+              </Button>
+              <Button kind="outline" href="/docs?ref=home-hero">
+                Explore docs →
+              </Button>
+            </div>
           </div>
           <img
             src="/assets/preview.svg?v=2022-04-15"
             alt="Inngest visualization"
           />
         </Hero>
-        <div className="grid-line" />
       </div>
-      <CheckBanner
-        className="monospace"
-        list={[
-          "Developer CLI",
-          "Auto-gen'd types & schemas",
-          "Retries & replays built in",
-        ]}
-      />
+
+      <div className="grid-line-horizontal"></div>
 
       <SectionHeader
-        label="Introducing our"
-        title="Event mesh"
-        subtitle="Everything you need to build production ready event driven apps."
-        counter="/01"
+        className="section-header-top"
+        size="large"
+        title={
+          <>
+            <span className="light-text">We help</span> developers build
+            event-driven, reactive systems — faster & easier than ever.
+          </>
+        }
+        subtitle="Our CLI and web IDE let you scaffold, develop, test, and deploy serverless functions — without any config:"
       />
 
       <div className="grid">
         <div className="grid-center-6 sm-col-8-center">
           <img
-            src="/assets/graphic.svg"
-            alt="Event driven serverless function example"
-            className="full-width img-mesh"
+            src="/assets/homepage/cli-ui-placeholder.svg"
+            alt="Using our CLI and Web IDE"
+            className="full-width"
           />
         </div>
-        <div className="grid-line" />
       </div>
 
       <SectionHeader
-        title="How it works"
-        subtitle="Our Event Mesh makes it easy to build event-driven apps."
-        counter="/02"
+        title="Developer tooling, built specifically with good UX."
+        subtitle="Everything we craft is to help you ship better and faster."
       />
 
-      <HIW className="grid">
-        <div className="grid-2-offset-2 sm-col-8-center">
-          <Hub />
-          <h3>One event hub</h3>
-          <p>
-            We ingest all your events via our one-click integrations, SDKs, or
-            webhooks.
-          </p>
-        </div>
-        <div className="grid-2 sm-col-8-center">
-          <Functions />
-          <h3>Serverless Functions</h3>
-          <p>
-            Your code is executed instantly against the events you specify.
-            Automatic retries built-in.
-          </p>
-        </div>
-        <div className="grid-2 sm-col-8-center">
-          <History />
-          <h3>Unified History</h3>
-          <p>
-            View logging, payload data, and audit-trails for your events and
-            functions together in one place.
-          </p>
-        </div>
-        <div className="grid-line" />
-      </HIW>
-
-      <SectionHeader
-        label="Events"
-        title="Send your events from anywhere"
-        subtitle="Use our SDKs or webhooks to send events from your app"
-        counter="/03"
-      />
-
-      <div className="section code-grid grid">
-        <div className="code grid-center-6 sm-col-8-center">
-          <Code code={events} />
-          <div className="sdk-list">
-            <p className="text-center">Get started with an SDK: </p>
-            {SDKs.map((sdk, idx) => (
-              <a key={idx} href={sdk.url} className="sdk-list-item">
-                <img src={sdk.logo} alt={`${sdk.name} SDK`} />
-              </a>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid-line" />
-      </div>
-
-      <div className="section grid">
+      <div className="grid">
         <div className="grid-center-6 sm-col-8-center">
-          <h4>
-            Automatically stream events from 3rd party apps with our
-            integrations
-          </h4>
-          <div className="integrations">
-            {integrations.map((i) => (
-              <Integration {...i} key={i.name} />
-            ))}
+          <div className="button-group">
+            <Button kind="primary" size="small">
+              Start for free
+            </Button>
+            <Button kind="outline" size="small">
+              What is Inngest?
+            </Button>
           </div>
         </div>
-        <div className="grid-line" />
       </div>
+
+      <SectionContext>
+        <h3>
+          Fast, reliable event-driven systems for all. With powerful
+          functionality out of the box.
+        </h3>
+        <p className="secondary-text">
+          Discover the easiest way to build scalable, complex software — by
+          letting us do the infrastructure and platform for you. Here's some of
+          the features you get for free:
+        </p>
+      </SectionContext>
+
+      {/* Features */}
+      <BoxGrid>
+        <Box>
+          <IconBox>
+            <RewindIcon />
+          </IconBox>
+          <h4>Historical testing</h4>
+          <p>Go one step further than integration tests.</p>
+          <p>
+            <strong>
+              Test your serverless functions with real, historical data before
+              deploying.
+            </strong>{" "}
+            Guarantee that your code works in the real world before it's live.
+          </p>
+        </Box>
+        <Box>
+          <IconBox>
+            <ClockIcon />
+          </IconBox>
+          <h4>Time travel</h4>
+          <p>Never wish you’d built something earlier.</p>
+          <p>
+            Guarantee that your code works in the real world before it's live.
+            Deploy functionality then{" "}
+            <strong>
+              process historic events as if your feature were live in the past
+            </strong>
+            . Never before have you been able to make your team and users
+            this happy.
+          </p>
+        </Box>
+        <Box>
+          <IconBox>
+            <PathHorizontalIcon />
+          </IconBox>
+          <h4>Coordinated functionality</h4>
+          <p>
+            Wave goodbye to messy cron jobs to check whether logic should run.
+          </p>
+          <p>
+            <strong>
+              Chain multiple functions together, only running steps when
+              specific events happen
+            </strong>
+            . Or... don't happen. No spaghetti code required.
+          </p>
+        </Box>
+        <Box>
+          <IconBox>
+            <PathHorizontalIcon /> {/* TODO */}
+          </IconBox>
+          <h4>Idempotency</h4>
+          <p>No nightmares about building it yourself.</p>
+          <p>
+            <strong>
+              When you need it, ensure that items are processed once
+            </strong>{" "}
+            — and only once. Built in, configurable idempotency for each
+            function allows you to rest easy.
+          </p>
+        </Box>
+        <Box>
+          <IconBox>
+            <PathHorizontalIcon /> {/* TODO */}
+          </IconBox>
+          <h4>Data Enrichment</h4>
+          <p>Messy data? Don't know what you mean :)</p>
+          <p>
+            <strong>Enrich any event with additional data</strong>, ensuring
+            that your functions, data pipelines, and team have everything they
+            need from the start.
+          </p>
+        </Box>
+        <Box>
+          <IconBox>
+            <PathHorizontalIcon /> {/* TODO */}
+          </IconBox>
+          <h4>Versioning, audits, rollbacks...</h4>
+          <p>An easy way to answer “why did this happen four weeks ago?”.</p>
+          <p>
+            <strong>See every version of every function</strong>, the exact
+            times each function was live, and which version was used for each
+            event. With immediate rollbacks, when you need it.
+          </p>
+        </Box>
+      </BoxGrid>
+
+      <Callout small="Ready to get started?" ctaRef="home-callout-mid" />
 
       <SectionHeader
-        label="DX First"
-        title="Build with superpowers"
-        subtitle="Create, deploy, and monitor event-driven serverless functions with confidence."
-        counter="/04"
+        title="Use cases"
+        subtitle="A few examples on how you can leverage Inngest’s event-driven platform."
+        align="left"
       />
 
-      <div className="grid">
-        <div className="grid-center-6 sm-col-8-center two-cols dx">
-          <div>
-            <Create />
-            <h3>Create and test with real data</h3>
-            <p>
-              Start building functions with our auto-typed example payloads or
-              use historical event data. Easily run fuzz testing and handle type
-              changes without issues.
-            </p>
-          </div>
-          <img src="/assets/payload.svg" alt="Event payload" />
-
-          <div>
-            <Deploy />
-            <h3>Deploy with confidence</h3>
-            <p>
-              Get realtime insights into which payloads are causing errors.
-              Instantly rollback to any previous version. And replay failed
-              payloads when an issue is resolved.{" "}
-            </p>
-          </div>
-          <img src="/assets/deploy.svg" alt="Deployed functions and events" />
-
-          <div>
-            <Monitor />
-            <h3>Monitor your serverless functions</h3>
-            <p>
-              Get granular visibility into event → function pathways including
-              conditional execution, function chains, and how often each
-              function runs.
-            </p>
-          </div>
-          <img src="/assets/history.svg" alt="Deployed function history" />
-        </div>
-
-        <div className="grid-line" />
-      </div>
-
-      <Callout ctaRef="home-callout-mid" />
-
-      <SectionHeader
-        title="Batteries included"
-        subtitle="Everything you need to build event-driven apps including:"
-        counter="/05"
-      />
-
-      <div className="grid">
-        <div className="grid-center-6 four-cols batteries sm-col-8-center">
-          <div>
-            <div className="icon">
-              <CLI />
-            </div>
-            <p>Developer CLI</p>
-          </div>
-
-          <div>
-            <div className="icon">
-              <Retries />
-            </div>
-            <p>Automatic Retries</p>
-          </div>
-
-          <div>
-            <div className="icon">
-              <Replays />
-            </div>
-            <p>Manual Replays</p>
-          </div>
-
-          <div>
-            <div className="icon">
-              <Transforms />
-            </div>
-            <p>Payload Transforms</p>
-          </div>
-
-          <div>
-            <div className="icon">
-              <Versions />
-            </div>
-            <p>Version History</p>
-          </div>
-
-          <div>
-            <div className="icon">
-              <Rollback />
-            </div>
-            <p>Instant Rollbacks</p>
-          </div>
-
-          <div>
-            <div className="icon">
-              <Audit />
-            </div>
-            <p>Audit Trails</p>
-          </div>
-
-          <div>
-            <div className="icon">
-              <Logging />
-            </div>
-            <p>Full Logging</p>
-          </div>
-
-          <div>
-            <div className="icon">
-              <Historical />
-            </div>
-            <p>Historical Testing</p>
-          </div>
-
-          <div>
-            <div className="icon">
-              <Observability />
-            </div>
-            <p>End-to-end Observability</p>
-          </div>
-
-          <div>
-            <div className="icon">
-              <Alerting />
-            </div>
-            <p>Alerting</p>
-          </div>
-
-          <div>
-            <div className="icon">
-              <CLI />
-            </div>
-            <p>Developer CLI</p>
-          </div>
-        </div>
-        <div className="grid-line" />
-      </div>
+      <UseCases>
+        <InfoBlock>
+          <h4>Webhooks</h4>
+          <p>
+            Process incoming webhooks as events, getting HA, event typing, and
+            retries for free — no infra needed.
+          </p>
+        </InfoBlock>
+        <InfoBlock>
+          <h4>Background jobs</h4>
+          <p>
+            Run functions as background jobs with a single HTTP request,
+            speeding up your API.
+          </p>
+        </InfoBlock>
+        <InfoBlock>
+          <h4>Coordinated logic</h4>
+          <p>
+            Handle logic based off of a sequence of events without crons,
+            background jobs, and complex state.
+          </p>
+        </InfoBlock>
+        <InfoBlock>
+          <h4>User flows</h4>
+          <p>
+            Implement functionality triggered by user activity automatically, in
+            any language
+          </p>
+        </InfoBlock>
+        <InfoBlock>
+          <h4>Scheduled jobs</h4>
+          <p>
+            Run jobs automatically, on a schedule, with full logs and
+            versioning. And, of course, no infra needed.
+          </p>
+        </InfoBlock>
+        <InfoBlock>
+          <h4>Internal tools</h4>
+          <p>
+            Empower your team to do more with functions built for your team to
+            run, with full audit trails baked in.
+          </p>
+        </InfoBlock>
+        <InfoBlock>
+          <h4>Integrations</h4>
+          <p>
+            Work with integrations automatically triggered by events in a single
+            place — no complex app code necessary.
+          </p>
+        </InfoBlock>
+      </UseCases>
 
       <Callout small="Still reading?" ctaRef="home-callout-end" />
 
@@ -489,27 +319,13 @@ export default function Home() {
 
 // Wrapper defines a top-level scope for nesting home-specific CSS classes within.
 const Wrapper = styled.div`
-  .code {
-    padding: 2rem 0 10vh;
+  .section-header-top {
+    margin-top: 6rem;
   }
 
-  .sdk-list {
+  .button-group {
     display: flex;
     justify-content: center;
-    margin: 2rem 0 0;
-    .sdk-list-item {
-      margin-left: 0.8em;
-    }
-  }
-
-  /* Apply spacing prior to each header */
-  .section-header > div {
-    padding-top: var(--section-padding);
-  }
-
-  /* Automatically apply spacing to the section's content after the header */
-  .section-header + .grid > div:first-of-type {
-    padding-top: var(--header-trailing-padding);
   }
 
   .hero-grid {
@@ -521,84 +337,10 @@ const Wrapper = styled.div`
       color: #fff;
     }
   }
-
-  .img-mesh {
-    border: 1px solid #000;
-    border-radius: var(--border-radius);
-  }
-
-  .integrations {
-    padding: 2rem 0;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-gap: var(--grid-gap);
-    p {
-      color: #fff;
-    }
-  }
-
-  .dx {
-    align-items: center;
-    grid-gap: var(--header-trailing-padding) var(--grid-gap);
-    padding-bottom: var(--section-padding);
-
-    svg {
-      margin: 0 0 0.85rem;
-    }
-
-    h3 {
-      margin: 0 0 0.75rem;
-    }
-
-    img {
-      border: 1px solid rgba(var(--black-rgb), 0.5);
-      box-shadow: 0 10px 5rem rgba(var(--black-rgb), 0.5);
-      pointer-events: none;
-      width: 100%;
-      border-radius: var(--border-radius);
-    }
-  }
-
-  .batteries {
-    padding-bottom: var(--section-padding);
-
-    > div {
-      background: var(--black);
-      border-radius: var(--border-radius);
-      padding: 1rem;
-      font-size: 1.2rem;
-    }
-    p {
-      color: #fff;
-    }
-    .icon {
-      height: 4rem;
-      width: 4rem;
-      margin: 0 0 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: var(--border-radius);
-      background: var(--primary-color);
-    }
-  }
-
-  @media (max-width: 960px) {
-    .integrations {
-      grid-template-columns: 1fr;
-    }
-
-    .dx > div {
-      margin-top: 1rem;
-    }
-    .dx img {
-      margin-bottom: 2rem;
-    }
-  }
 `;
 
 const Hero = styled.div`
-  padding: 7em 0;
+  padding: 3em 0 4em;
 
   display: grid;
   grid-template-columns: repeat(8, 1fr);
@@ -613,12 +355,14 @@ const Hero = styled.div`
     width: 100%;
   }
 
-  p {
-    padding: 1em 0 1.5rem;
-    font-family: var(--font);
-    font-size: 1.1em;
-    line-height: 1.6em;
-    font-weight: normal;
+  .hero-subheading {
+    margin: 0.5em 0;
+    max-width: 600px;
+    font-size: 1.1rem;
+  }
+
+  .hero-ctas {
+    margin-top: 2em;
   }
 
   .button {
@@ -645,7 +389,7 @@ const Hero = styled.div`
       display: none;
     }
 
-    p {
+    .hero-subheading:last-child {
       padding: 0 0 2rem;
     }
 
@@ -655,24 +399,123 @@ const Hero = styled.div`
       margin: 0.5rem 0 0 0;
     }
   }
-`;
-
-const HIW = styled.div`
-  > div {
-    padding: var(--header-trailing-padding) 1rem 3rem 0;
-  }
-  svg {
-    margin: 0 0 1rem;
-  }
-
-  @media (max-width: 800px) {
-    > div {
-      padding: 2vh 0 0 0;
+  @media (max-width: 600px) {
+    h1 {
+      font-size: 2rem;
+    }
+    .hero-subheading {
+      font-size: 0.9rem;
     }
   }
+`;
 
-  .grid-line {
-    grid-row-start: 1;
-    grid-row-end: 4;
+const SectionContext = styled.div`
+  --stripe-color: #15151c;
+
+  margin: 3em auto 2em;
+  padding: 1.5em 3em;
+  max-width: 30rem;
+  text-align: center;
+  background: linear-gradient(
+    135deg,
+    var(--stripe-color) 12.5%,
+    var(--bg-color) 12.5%,
+    var(--bg-color) 50%,
+    var(--stripe-color) 50%,
+    var(--stripe-color) 62.5%,
+    var(--bg-color) 62.5%,
+    var(--bg-color) 100%
+  );
+  background-size: 9px 9px;
+
+  h3 {
+    font-size: 1.1em;
+  }
+  p {
+    font-size: 0.8em;
+  }
+`;
+
+const BoxGrid = styled.div`
+  --spacing: 1em;
+
+  display: grid;
+  margin: 2em auto;
+  max-width: var(--max-page-width);
+  grid-template-columns: repeat(3, 1fr);
+  grid-gap: var(--spacing);
+
+  background: radial-gradient(
+    51.4% 51.4% at 50% 50%,
+    var(--bg-primary-highlight) 11.81%,
+    var(--bg-color) 71.75%
+  );
+
+  @media (max-width: 1100px) {
+    margin-left: var(--spacing);
+    margin-right: var(--spacing);
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 700px) {
+    margin-left: var(--spacing);
+    margin-right: var(--spacing);
+    grid-template-columns: repeat(1, 1fr);
+  }
+`;
+
+const InfoBlock = styled.div`
+  grid-column: span 1;
+
+  p {
+    margin: 0.8em 0;
+    font-size: 0.8em;
+    color: var(--font-color-secondary);
+  }
+`;
+
+const Box = styled(InfoBlock)`
+  padding: 1em;
+  background-color: var(--bg-color);
+  border-radius: var(--border-radius);
+`;
+
+const IconBox = styled.div`
+  height: 1.6em;
+  width: 1.6em;
+  margin-bottom: 0.5em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius);
+  background: var(--primary-color);
+
+  svg {
+    max-width: 0.5em;
+    max-height: 0.5em;
+  }
+`;
+
+const UseCases = styled.div`
+  --spacing: 1em;
+
+  display: grid;
+  margin: 2em auto;
+  max-width: var(--max-page-width);
+  grid-template-columns: repeat(4, 1fr);
+  grid-gap: calc(2 * var(--spacing)) var(--spacing);
+
+  @media (max-width: 1240px) {
+    margin-left: calc(2 * var(--spacing));
+    margin-right: calc(2 * var(--spacing));
+  }
+  @media (max-width: 900px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  @media (max-width: 700px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  @media (max-width: 540px) {
+    grid-template-columns: repeat(1, 1fr);
   }
 `;

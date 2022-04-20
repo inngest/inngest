@@ -20,6 +20,7 @@ type Props = React.HTMLAttributes<any> & {
   target?: string;
   style?: object;
   className?: string;
+  size?: "small" | "medium";
   children: React.ReactNode;
 };
 
@@ -51,7 +52,11 @@ export default React.forwardRef<HTMLButtonElement, Props>(
       <C
         {...cProps}
         ref={ref}
-        css={[kind && kindCSS[kind], props.disabled && disabledCSS]}
+        css={[
+          kind && kindCSS[kind],
+          props.disabled && disabledCSS,
+          props.size && sizeCSS[props.size],
+        ]}
         {...rest}
         onClick={onClick}
         className={`button ${props.className || ""}`}
@@ -63,7 +68,7 @@ export default React.forwardRef<HTMLButtonElement, Props>(
 );
 
 export const buttonCSS = css`
-  border: 1px transparent;
+  border: var(--button-border-width) solid transparent;
   border-radius: var(--border-radius);
   padding: var(--button-padding);
   background: transparent;
@@ -102,8 +107,12 @@ const primaryCSS = css`
 `;
 
 const outlineCSS = css`
-  border: 1px solid var(--stroke-color);
+  border: var(--button-border-width) solid var(--stroke-color);
   color: #fff;
+
+  &:hover {
+    border-color: var(--stroke-color-light);
+  }
 `;
 
 const outlineHighContrastCSS = css`
@@ -112,7 +121,7 @@ const outlineHighContrastCSS = css`
 `;
 
 const blackCSS = css`
-  border: 1px solid var(--black);
+  border: var(--button-border-width) solid var(--black);
   background: var(--black);
   color: #fff;
 
@@ -122,6 +131,17 @@ const blackCSS = css`
 `;
 
 const disabledCSS = css``;
+
+const sizeCSS = {
+  small: css`
+    padding: var(--button-padding-small);
+    font-size: 0.7rem;
+  `,
+  medium: css`
+    padding: var(--button-padding-medium);
+    font-size: 0.9rem;
+  `,
+};
 
 const kindCSS: { [item in Kinds]: SerializedStyles } = {
   primary: primaryCSS,

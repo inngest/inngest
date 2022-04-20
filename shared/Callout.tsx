@@ -19,6 +19,7 @@ const Callout: React.FC<Props> = ({ small, heading, cta, link, ctaRef }) => {
         </div>
         <Button
           kind="black"
+          size="medium"
           href={`${link || "/sign-up"}${ctaRef ? "?ref=" + ctaRef : ""}`}
         >
           {cta || ">_ Start building"}
@@ -47,6 +48,10 @@ const Content = styled.div`
 
   box-shadow: 0 0 4rem rgba(var(--black-rgb), 0.5);
 
+  h2 {
+    font-size: 1.3em;
+  }
+
   span,
   button,
   a {
@@ -54,10 +59,6 @@ const Content = styled.div`
   }
   span {
     font-size: 16px;
-  }
-  button,
-  a {
-    font-size: 20px;
   }
 
   button:hover,

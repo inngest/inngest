@@ -1,6 +1,6 @@
-import * as React from "react"
+import * as React from "react";
 
-const History: React.FC<{}> = (props) => {
+const PathHorizontal: React.FC<{}> = (props) => {
   return (
     <svg
       width={64}
@@ -16,8 +16,7 @@ const History: React.FC<{}> = (props) => {
         fill="#fff"
       />
     </svg>
-  )
-}
+  );
+};
 
-export default History
-
+export default PathHorizontal;

@@ -10,7 +10,7 @@ import Integration, { IntegrationType } from "../shared/Integration";
 // Icons
 import Hub from "../shared/Icons/Hub";
 import Functions from "../shared/Icons/Functions";
-import History from "../shared/Icons/History";
+import History from "../shared/Icons/PathHorizontal";
 import Create from "../shared/Icons/Create";
 import Deploy from "../shared/Icons/Deploy";
 import Monitor from "../shared/Icons/Monitor";
@@ -22,7 +22,7 @@ import Versions from "../shared/Icons/Versions";
 import Rollback from "../shared/Icons/Rollback";
 import Audit from "../shared/Icons/Audit";
 import Logging from "../shared/Icons/Logging";
-import Historical from "../shared/Icons/Historical";
+import Historical from "../shared/Icons/Clock";
 import Observability from "../shared/Icons/Observability";
 import Alerting from "../shared/Icons/Alerting";
 import { CheckBanner } from "../shared/Banner";
