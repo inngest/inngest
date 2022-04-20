@@ -26,18 +26,18 @@ const NavContent: React.FC<Props> = (props: Props) => {
       </div>
 
       {!props.nolinks && (
-        <>
-          <div className="links">
-            {/* <StyledLink href="/library">Library</StyledLink> */}
-            <StyledLink href="/docs">Docs</StyledLink>
-            <StyledLink href="/blog">Blog</StyledLink>
-            <StyledLink href="/pricing">Pricing</StyledLink>
-          </div>
-        </>
+        <div className="links">
+          {/* <StyledLink href="/library">Library</StyledLink> */}
+          <StyledLink href="/docs">Docs</StyledLink>
+          <StyledLink href="/blog">Blog</StyledLink>
+          <StyledLink href="/pricing">Pricing</StyledLink>
+        </div>
       )}
 
-      <div>
-        <StyledLink href="https://app.inngest.com/login">Log in</StyledLink>
+      <div className="auth-options">
+        <StyledLink className="auth-login" href="https://app.inngest.com/login">
+          Log in
+        </StyledLink>
         <Button
           href="/sign-up?ref=nav"
           className="button"
@@ -57,18 +57,13 @@ const NavContent: React.FC<Props> = (props: Props) => {
 
 const Container = styled.div`
   z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   padding: 2rem 0;
   height: 120px;
 
   font-family: var(--font);
   font-size: 0.9em;
-
-  .button {
-    /* font-weight: 600; */
-  }
 
   > div,
   > a {
@@ -80,6 +75,13 @@ const Container = styled.div`
   > div {
     display: flex;
     align-items: center;
+  }
+
+  .links {
+    justify-content: center;
+  }
+  .auth-options {
+    justify-content: end;
   }
 
   img {
@@ -99,7 +101,22 @@ const Container = styled.div`
     display: none;
   }
 
-  @media only screen and (max-width: 950px) {
+  @media (max-width: 1100px) {
+    grid-template-columns: 1fr 2fr 2fr;
+  }
+
+  @media (max-width: 920px) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    .auth-login {
+      display: none;
+    }
+  }
+
+  @media only screen and (max-width: 800px) {
+    grid-template-columns: 1fr 64px;
+
     div:last-of-type {
       display: none;
     }
@@ -145,7 +162,6 @@ const Container = styled.div`
     .toggle {
       display: block;
       padding: 1rem;
-      margin-right: -1rem;
     }
 
     &.show .links {
