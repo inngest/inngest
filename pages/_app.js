@@ -11,10 +11,10 @@ function MyApp({ Component, pageProps }) {
       <Head>
         <link rel="icon" href="/favicon.png" />
       </Head>
-      <PageBanner href="/docs/using-the-inngest-cli?ref=page-banner">
+      {/* <PageBanner href="/docs/using-the-inngest-cli?ref=page-banner">
         Introducing the Inngest CLI: build, test, and ship serverless functions
         locally &rsaquo;
-      </PageBanner>
+      </PageBanner> */}
       <Component {...pageProps} />
       <Script
         id="js-inngest-sdk"

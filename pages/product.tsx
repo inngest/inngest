@@ -10,7 +10,7 @@ import Integration, { IntegrationType } from "../shared/Integration";
 // Icons
 import Hub from "../shared/Icons/Hub";
 import Functions from "../shared/Icons/Functions";
-import History from "../shared/Icons/PathHorizontal";
+import History from "../shared/Icons/History";
 import Create from "../shared/Icons/Create";
 import Deploy from "../shared/Icons/Deploy";
 import Monitor from "../shared/Icons/Monitor";

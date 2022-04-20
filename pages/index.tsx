@@ -12,24 +12,9 @@ import SectionHeader from "../shared/SectionHeader";
 import ClockIcon from "../shared/Icons/Clock";
 import RewindIcon from "../shared/Icons/Replays";
 import PathHorizontalIcon from "../shared/Icons/PathHorizontal";
-
-import Hub from "../shared/Icons/Hub";
-import Functions from "../shared/Icons/Functions";
-
-import Create from "../shared/Icons/Create";
-import Deploy from "../shared/Icons/Deploy";
-import Monitor from "../shared/Icons/Monitor";
-import CLI from "../shared/Icons/CLI";
-import Retries from "../shared/Icons/Retries";
-
-import Transforms from "../shared/Icons/Transforms";
-import Versions from "../shared/Icons/Versions";
-import Rollback from "../shared/Icons/Rollback";
-import Audit from "../shared/Icons/Audit";
-import Logging from "../shared/Icons/Logging";
-
-import Observability from "../shared/Icons/Observability";
-import Alerting from "../shared/Icons/Alerting";
+import CheckAllIcon from "../shared/Icons/CheckAll";
+import FileCheckIcon from "../shared/Icons/FileCheck";
+import ArchiveIcon from "../shared/Icons/Archive";
 
 // TODO: move these into env vars
 export const INGEST_KEY =
@@ -193,15 +178,15 @@ export default function Home() {
             <ClockIcon />
           </IconBox>
           <h4>Time travel</h4>
-          <p>Never wish you’d built something earlier.</p>
+          <p>Never wish you'd built something earlier.</p>
           <p>
             Guarantee that your code works in the real world before it's live.
             Deploy functionality then{" "}
             <strong>
               process historic events as if your feature were live in the past
             </strong>
-            . Never before have you been able to make your team and users
-            this happy.
+            . Never before have you been able to make your team and users this
+            happy.
           </p>
         </Box>
         <Box>
@@ -222,7 +207,7 @@ export default function Home() {
         </Box>
         <Box>
           <IconBox>
-            <PathHorizontalIcon /> {/* TODO */}
+            <CheckAllIcon />
           </IconBox>
           <h4>Idempotency</h4>
           <p>No nightmares about building it yourself.</p>
@@ -236,7 +221,7 @@ export default function Home() {
         </Box>
         <Box>
           <IconBox>
-            <PathHorizontalIcon /> {/* TODO */}
+            <FileCheckIcon />
           </IconBox>
           <h4>Data Enrichment</h4>
           <p>Messy data? Don't know what you mean :)</p>
@@ -248,7 +233,7 @@ export default function Home() {
         </Box>
         <Box>
           <IconBox>
-            <PathHorizontalIcon /> {/* TODO */}
+            <ArchiveIcon />
           </IconBox>
           <h4>Versioning, audits, rollbacks...</h4>
           <p>An easy way to answer “why did this happen four weeks ago?”.</p>
@@ -320,7 +305,8 @@ export default function Home() {
         </InfoBlock>
       </UseCases>
 
-      <Callout small="Still reading?" ctaRef="home-callout-end" />
+      {/* NOTE - We'll bring this back when we add the architecture section and we have more space between callouts */}
+      {/* <Callout small="Still reading?" ctaRef="home-callout-end" /> */}
 
       <Footer />
     </Wrapper>
@@ -512,8 +498,8 @@ const IconBox = styled.div`
   background: var(--primary-color);
 
   svg {
-    max-width: 0.5em;
-    max-height: 0.5em;
+    max-width: 0.7em;
+    max-height: 0.7em;
   }
 `;
 
