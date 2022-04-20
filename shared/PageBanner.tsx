@@ -8,7 +8,7 @@ type Props = {
 
 const PageBanner = styled.a<Props>`
   display: block;
-  padding: 0.75em;
+  padding: 0.75em 2em;
   background: #7e4ff5 linear-gradient(270deg, #4636f5 0%, #b565f3 100%);
   background-size: 100%;
   font-size: 14px;
