@@ -1,6 +1,5 @@
 @import url("./reset.css");
-@import url("https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&family=Roboto+Mono&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap");
 @import url("/assets/fonts.css");
 
 /** Standard **/
@@ -49,7 +48,7 @@
   --nav-height: 120px;
 
   font-size: 20px;
-  font-family: var(--text-font);
+  font-family: var(--font);
   color: var(--font-color-primary);
 }
 

@@ -3,10 +3,9 @@ import styled from "@emotion/styled";
 import Head from "next/head";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
+import VideoPlayer from "../shared/VideoPlayer";
 import Button from "../shared/Button";
-import Code from "../shared/Code";
 import Callout from "../shared/Callout";
-import Integration, { IntegrationType } from "../shared/Integration";
 import SectionHeader from "../shared/SectionHeader";
 
 // Icons
@@ -122,15 +121,26 @@ export default function Home() {
         subtitle="Our CLI and web IDE let you scaffold, develop, test, and deploy serverless functions — without any config:"
       />
 
-      <div className="grid">
-        <div className="grid-center-6 sm-col-8-center">
-          <img
-            src="/assets/homepage/cli-ui-placeholder.svg"
-            alt="Using our CLI and Web IDE"
-            className="full-width"
-          />
-        </div>
-      </div>
+      <VideoPlayer
+        className="video-player"
+        src="/assets/homepage/init-run-deploy-2022-04-20.mp4"
+        autoPlay={true}
+        duration={53}
+        chapters={[
+          {
+            name: "Build",
+            start: 0,
+          },
+          {
+            name: "Test",
+            start: 20,
+          },
+          {
+            name: "Deploy",
+            start: 29.1,
+          },
+        ]}
+      />
 
       <SectionHeader
         title="Developer tooling, built specifically with good UX."
@@ -335,6 +345,17 @@ const Wrapper = styled.div`
     align-items: center;
     p {
       color: #fff;
+    }
+  }
+
+  .video-player {
+    max-width: 1000px;
+    margin: 0 auto;
+    border: 1px solid var(--gray);
+  }
+  @media (max-width: 1040px) {
+    .video-player {
+      margin: 0 1em;
     }
   }
 `;
