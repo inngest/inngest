@@ -63,8 +63,8 @@ export default function Home() {
         <Hero className="grid-center-8">
           <div>
             <h1>
-              Build, test, and ship reactive functions <br />
-              <em>in minutes</em>
+              Build, test, and ship reactive functions
+              <em>in&nbsp;minutes</em>
             </h1>
             <p className="hero-subheading">
               Inngest is an <strong>event-driven serverless platform</strong>{" "}
