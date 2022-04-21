@@ -1,64 +1,67 @@
-
 export type DocScope = {
   // If the slug contains a forward slahs (eg. foo/bar), this page will automatically
   // be nested under the page with a slug of "foo"
   slug: string;
   category: string;
+  pages?: DocScope[]; // Sub pages
   // title is the title of the documentation page
   title: string;
   order: number;
 
   // reading is reading information automatically added when parsing content
-  reading?: { text: string, time: number, words: number, minutes: number };
+  reading?: { text: string; time: number; words: number; minutes: number };
   // toc is the table of contents automatically added when parsing contnet
   toc?: Headings;
-}
+};
 
-type Headings = {
+export type Headings = {
   [title: string]: {
     order: number;
     title: string;
     slug: string;
-    subheadings: [{ title: string; slug: string; }]
-  }
+    subheadings: [{ title: string; slug: string }];
+  };
 };
 
 type Doc = {
-  slug: string,
-  content: string,
-  scope: DocScope,
-}
+  slug: string;
+  content: string;
+  scope: DocScope;
+};
 
 export type Category = {
   title: string;
   pages: DocScope[];
-}
+};
 
-export type Categories = { [title: string]: Category }
+export type Categories = { [title: string]: Category };
 
 type Docs = {
-  docs: { [slug: string]: Doc }
+  docs: { [slug: string]: Doc };
   slugs: string[];
   categories: Categories;
-}
+};
 
 export const getAllDocs = (() => {
   let memoizedDocs: Docs = {
-    // docs maps docs by slug 
+    // docs maps docs by slug
     docs: {},
     slugs: [],
     categories: {},
-  }
+  };
 
   return (): Docs => {
-    if (memoizedDocs.slugs.length > 0 && process.env.NODE_ENV === "production") {
-    // memoizing in dev means you need to restart the server to see changes
+    if (
+      memoizedDocs.slugs.length > 0 &&
+      process.env.NODE_ENV === "production"
+    ) {
+      // memoizing in dev means you need to restart the server to see changes
       return memoizedDocs;
     }
-    
-    const fs = require('fs');
-    const matter = require('gray-matter');
-    const readingTime = require('reading-time');
+
+    const fs = require("fs");
+    const matter = require("gray-matter");
+    const readingTime = require("reading-time");
 
     // parseDir is given the current directory path, then returns a function which
     // can read all files from the given basepath and processes the input.
@@ -69,11 +72,11 @@ export const getAllDocs = (() => {
         // recurse into this directory with a new parse function using the extended
         // path.
         fs.readdirSync(fullpath).forEach(parseDir(fullpath + "/"));
-        return
+        return;
       }
 
       const source = fs.readFileSync(fullpath);
-      const { content, data: scope } = matter(source)
+      const { content, data: scope } = matter(source);
 
       if (scope.hide === true) {
         return;
@@ -88,10 +91,12 @@ export const getAllDocs = (() => {
           toc: getHeadings(content),
           reading: readingTime(content),
         },
-      }
-    }
+      };
+    };
 
-    fs.readdirSync("./pages/docs/_docs/").forEach(parseDir("./pages/docs/_docs/"));
+    fs.readdirSync("./pages/docs/_docs/").forEach(
+      parseDir("./pages/docs/_docs/")
+    );
 
     const categories = {};
 
@@ -107,23 +112,22 @@ export const getAllDocs = (() => {
         categories[d.scope.category] = {
           title: d.scope.category,
           pages: [d.scope],
-        }
+        };
       } else {
         categories[d.scope.category].pages.push(d.scope);
       }
-
     });
 
     memoizedDocs.categories = categories;
 
     return memoizedDocs;
-  }
-})()
+  };
+})();
 
 export const getDocs = (slug: string): Doc | undefined => {
   const docs = getAllDocs();
   return docs.docs[slug];
-}
+};
 
 const getHeadings = (content: string) => {
   // Get headers for table of contents.
@@ -131,26 +135,26 @@ const getHeadings = (content: string) => {
   let h2 = null; // store the current heading we're in
   let order = 0;
 
-  (content.match(/^###? (.*)/gm) || []).forEach(heading => {
+  (content.match(/^###? (.*)/gm) || []).forEach((heading) => {
     const title = heading.replace(/^###? /, "");
     if (heading.indexOf("## ") === 0) {
       h2 = title;
-      headings[title] = { title, slug: toSlug(title), subheadings: [], order }
-      order++
+      headings[title] = { title, slug: toSlug(title), subheadings: [], order };
+      order++;
       return;
     }
     // add this subheading to the current heading list.
     (headings[h2]?.subheadings || []).push({ title, slug: toSlug(title) });
   });
   return headings;
-}
+};
 
 const toSlug = (s: string) => {
-  s = s.replace(/[^a-zA-Z0-9 :]/g, "")
+  s = s.replace(/[^a-zA-Z0-9 :]/g, "");
   // rehype's `rehypeSlug` plugin converts "foo: one"  to "foo--one", and doesn't
   // remove multple slashes.  It does convert multiple spaces to just one slash.
-  s = s.replace(/ +/g, "-")
-  s = s.replace(/[:&]/g, "-")
-  s = s.replace(/--/g, "-")
-  return s.toLowerCase()
-}
+  s = s.replace(/ +/g, "-");
+  s = s.replace(/[:&]/g, "-");
+  s = s.replace(/--/g, "-");
+  return s.toLowerCase();
+};

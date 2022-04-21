@@ -18,19 +18,29 @@
   --font-mono: "Roboto Mono", "Fira Mono", monospace;
   --font-heading: var(--font);
 
-  --bg-color: #0a0a12;
+  --black: #040408;
+  --black-rgb: 4, 4, 8;
+  --gray: #212121;
+  --green: #16a973;
+  --color-white: #fff;
+  --color-iris-60: #A5A6F6;
+  --color-iris-100: #5D5FEF;
+
+  --bg-color-d: #0a0a12;
+  --bg-color-l: #fbfbff;
+  --bg-color: var(--bg-color-d);
+
   --bg-primary-highlight: #12112b; /* A color that is used in gradients w/ the bg color to add depth */
   --highlight-color: #000;
   --primary-color: #4636f5;
   --primary-color-rgb: 70, 54, 245;
   --stroke-color: #525661;
   --stroke-color-light: #80848e;
-  --font-color-primary: #fff;
+  --font-color-primary: var(--color-white);
   --font-color-secondary: #acb2c2;
-  --black: #040408;
-  --black-rgb: 4, 4, 8;
-  --gray: #212121;
-  --green: #16a973;
+  --link-color: #dfe2e9;
+
+  --box-shadow: 0 1px 1rem 1rem rgba(255, 255, 255, 0.1);
 
   --grid-line-color: #414652cc;
   --grid-gap: 30px;
@@ -52,6 +62,25 @@
   color: var(--font-color-primary);
 }
 
+body.light-mode {
+  --bg-color: var(--bg-color-l);
+  /* --bg-primary-highlight: #fafafa; //  */
+  /* --highlight-color: #fff; */
+  --stroke-color: #D3D3DF;
+  --stroke-color-light: #80848e;
+  --font-color-primary: #070707;
+  --font-color-secondary: #8F8F9D;
+  --link-color: var(--color-iris-100);
+
+  --box-shadow: 0 1px 1rem 1rem rgba(0, 0, 0, 0.1);
+
+  color: var(--font-color-primary);
+}
+
+.brand-logo {
+  color: var(--font-color-primary);
+}
+
 .home {
   font-family: var(--font);
 }
@@ -68,7 +97,7 @@ li + li {
 }
 
 a {
-  color: #dfe2e9;
+  color: var(--link-color);
 }
 
 .nav-grid {
@@ -78,7 +107,6 @@ a {
 
 html,
 body {
-  overflow-x: hidden;
   background: var(--bg-color);
 }
 

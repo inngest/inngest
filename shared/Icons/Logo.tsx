@@ -15,8 +15,8 @@ const widthToHeight = 100 / 30;
 export default ({
   width,
   height,
-  fill = "#222631",
-  className,
+  fill = "currentColor",
+  className = "brand-logo",
   style,
 }: Props) => {
   let h = height,

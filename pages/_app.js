@@ -1,3 +1,4 @@
+import React, { useEffect } from "react";
 import Head from "next/head";
 import Script from "next/script";
 import { v4 as uuid } from "uuid";
@@ -6,6 +7,12 @@ import "../styles/globals.css";
 import PageBanner from "../shared/PageBanner";
 
 function MyApp({ Component, pageProps }) {
+  // useEffect(() => {
+  //   // Ensure we persist the html and body classes set in _document on the client side
+  //   const isDark =
+  //     typeof pageProps.isDarkMode === "undefined" ? true : pageProps.isDarkMode;
+  //   document.body.className = isDark ? "dark-mode" : "light-mode";
+  // });
   return (
     <>
       <Head>
