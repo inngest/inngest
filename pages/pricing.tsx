@@ -30,7 +30,7 @@ const PLANS = {
       {
         icon: Workflow,
         quantity: "5",
-        text: "workflows",
+        text: "functions",
       },
       {
         icon: Language,
@@ -56,7 +56,7 @@ const PLANS = {
       {
         icon: Workflow,
         quantity: "50",
-        text: "workflows",
+        text: "functions",
       },
       {
         icon: Language,
@@ -82,7 +82,7 @@ const PLANS = {
       {
         icon: Workflow,
         quantity: "Unlimited",
-        text: "workflows",
+        text: "functions",
       },
       {
         icon: Language,
@@ -202,7 +202,7 @@ export default function Pricing() {
 
         <AllPlansInfo>
           All plans include unlimited team members, uncapped events, scheduled
-          workflows, audit trails, API access, CD via our CLI, and first-class
+          functions, audit trails, API access, CD via our CLI, and first-class
           debugging.
         </AllPlansInfo>
 
@@ -210,18 +210,17 @@ export default function Pricing() {
 
         <FAQGrid>
           <div onClick={toggleFAQ}>
-            <h3>What's a workflow?</h3>
+            <h3>What's a "function?"</h3>
             <p>
-              Workflows are a sequence of serverless functions. Workflows can
-              run automatically (each time an event is received), on a schedule,
-              or manually via forms (in the case of internal tools, or
-              one-offs).
+              A function is a single serverless function or step function.
+              Functions can run automatically (each time an event is received),
+              on a schedule, or manually via forms (in the case of internal
+              tools, or one-offs).
             </p>
             <p>
-              Workflows allow you to chain logic together, coordinate between
+              Functions allow you to chain logic together, coordinate between
               events, and create complex user flows and operational logic for
-              your company. A simple workflow might only run one single
-              serverless function; this is still a workflow.
+              your company.
             </p>
           </div>
 
@@ -239,7 +238,7 @@ export default function Pricing() {
             <p>
               Free accounts are limited to 128mb of ram and a maximum runtime of
               10 seconds per function. Paid accounts can utilize 1GB of ram and
-              have a runime limit of 60 seconds per function. Advanced accounts
+              have a runtime limit of 60 seconds per function. Advanced accounts
               can use up to 16GB of ram and can run functions for up to 6 hours;
               if you need this functionality{" "}
               <a href="/contact">get in touch with us</a>.
@@ -250,7 +249,7 @@ export default function Pricing() {
             <h3>What if I need to run more functions?</h3>
             <p>
               That's okay! We'll alert you when you're nearing your cap and will
-              throttle your workflows after hitting the limit. You can always
+              throttle your functions after hitting the limit. You can always
               purchase more capacity, but we won't apply overage fees unless you
               specify payment caps (coming soon). We dislike surprise costs as
               much as you.
@@ -261,9 +260,9 @@ export default function Pricing() {
           <div onClick={toggleFAQ}>
             <h3>What are add-ons?</h3>
             <p>
-              Add-ons allow you to customise the funtionality of Inngest. For
+              Add-ons allow you to customize the functionality of Inngest. For
               example, you can run the executor on-premise, increase the memory
-              and CPU capablities of your workflows, increase the audit history
+              and CPU capabilities of your functions, increase the audit history
               length, and so on.
             </p>
           </div>
@@ -272,7 +271,7 @@ export default function Pricing() {
             <h3>What is event coordination, and how can I use it?</h3>
             <p>
               Event coordination allows you to wait for specific events from
-              within a workflow. For example, after creating a shopping cart you
+              within a function. For example, after creating a shopping cart you
               might want to wait for the "order created" event for up to 24
               hours. If this event is received, the person who created the
               shopping cart checked out. If the event isn't received within 24
@@ -284,24 +283,22 @@ export default function Pricing() {
             </p>
           </div>
 
-          <div onClick={toggleFAQ}>
-            <h3>Are there limits to how complex I can make a workflow?</h3>
+          {/* <div onClick={toggleFAQ}>
+            <h3>Are there limits to how complex I can make a function?</h3>
             <p>
               No, not really. You can chain hundreds of functions in parallel;
               we'll run it for you.
             </p>
-          </div>
+          </div> */}
 
           <div onClick={toggleFAQ}>
-            <h3>
-              Is there a limit to how often I can run scheduled workflows?
-            </h3>
+            <h3>Is there a limit to how often I can run scheduled function?</h3>
             <p>
-              In the community edition, workflows are limited to 15 minute
+              In the community edition, functions are limited to 15 minute
               intervals and may be throttled for fair usage. Paid plans can run
-              scheduled workflows every minute, and are not subject to
+              scheduled functions every minute, and are not subject to
               throttling. Custom plans have their own dedicated pools for
-              managing workflows.
+              managing functions.
             </p>
           </div>
 
