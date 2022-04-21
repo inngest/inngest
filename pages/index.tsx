@@ -63,7 +63,7 @@ export default function Home() {
         <Hero className="grid-center-8">
           <div>
             <h1>
-              Build, test, and ship reactive functions
+              Build, test, and ship reactive functions{" "}
               <em>in&nbsp;minutes</em>
             </h1>
             <p className="hero-subheading">
@@ -135,11 +135,11 @@ export default function Home() {
       <div className="grid">
         <div className="grid-center-6 sm-col-8-center">
           <div className="button-group">
-            <Button kind="primary" size="small">
+            <Button kind="primary" size="small" href="/sign-up?ref=home-vid-cta">
               Start for free
             </Button>
-            <Button kind="outline" size="small">
-              What is Inngest?
+            <Button kind="outline" size="small" href="/product">
+              How it works
             </Button>
           </div>
         </div>
@@ -245,7 +245,11 @@ export default function Home() {
         </Box>
       </BoxGrid>
 
-      <Callout small="Ready to get started?" ctaRef="home-callout-mid" />
+      <Callout
+        small="Ready to get started?"
+        ctaRef="home-callout-mid" 
+        style={{ margin: "6rem 0" }}
+      />
 
       <SectionHeader
         title="Use cases"
@@ -419,7 +423,7 @@ const Hero = styled.div`
 const SectionContext = styled.div`
   --stripe-color: #15151c;
 
-  margin: 3em auto 2em;
+  margin: 4em auto 3em;
   padding: 1.5em 3em;
   max-width: 30rem;
   text-align: center;

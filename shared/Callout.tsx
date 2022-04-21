@@ -7,11 +7,12 @@ type Props = {
   cta?: string;
   link?: string;
   ctaRef?: string;
+  style?: any;
 };
 
-const Callout: React.FC<Props> = ({ small, heading, cta, link, ctaRef }) => {
+const Callout: React.FC<Props> = ({ small, heading, cta, link, ctaRef, style }) => {
   return (
-    <div className="grid">
+    <div className="grid" style={style}>
       <Content className="bg-primary">
         <div>
           <span>{small || "Now with zero yaml ;-)"}</span>
