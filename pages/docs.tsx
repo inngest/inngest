@@ -252,8 +252,11 @@ export const InnerDocsContent = styled.div`
     margin: 1.4rem 0 1.5rem;
   }
 
-  aside {
+  aside, video {
     margin: 2rem 0;
+  }
+
+  aside {
     border: 1px solid rgba(255, 255, 255, 0.05);
     padding: 2rem;
   }
