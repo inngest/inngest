@@ -51,9 +51,7 @@
     "shiki": "^0.9.14",
     "slugify": "^1.6.3",
     "urql": "^2.0.5",
-    "uuid": "^8.3.2"
-  },
-  "devDependencies": {
+    "uuid": "^8.3.2",
     "@babel/core": "^7.17.4",
     "@storybook/addon-actions": "^6.4.19",
     "@storybook/addon-essentials": "^6.4.19",
