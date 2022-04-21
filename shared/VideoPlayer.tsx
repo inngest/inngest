@@ -1,10 +1,11 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styled from "@emotion/styled";
 
 type VideoPlayerProps = {
   className: string;
   src: string;
   autoPlay?: boolean;
+  muted?: boolean;
   duration: number;
   chapters?: {
     name: string;
@@ -16,11 +17,27 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   className = "",
   src,
   autoPlay = true,
+  muted = true,
   duration,
   chapters = [{ start: 0 }],
 }) => {
   const video = useRef<HTMLVideoElement>();
   const [progressPercentage, setProgressPercentage] = useState(0);
+
+  // Autoplay the video when the video visible
+  useEffect(() => {
+    if (!autoPlay) {
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        video.current.play();
+      } else {
+        video.current.pause();
+      }
+    });
+    observer.observe(video.current);
+  }, [video.current]);
 
   const onTimeUpdate = (e: React.SyntheticEvent) => {
     const percentCompleted =
@@ -46,6 +63,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onClick={onVideoClick}
         controls={false}
         autoPlay={autoPlay}
+        muted={muted}
       >
         <source src={src} type="video/mp4" />
       </video>
