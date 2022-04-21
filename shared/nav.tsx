@@ -28,9 +28,15 @@ const NavContent: React.FC<Props> = (props: Props) => {
       {!props.nolinks && (
         <div className="links">
           {/* <StyledLink href="/library">Library</StyledLink> */}
-          <StyledLink href="/docs">Docs</StyledLink>
-          <StyledLink href="/blog">Blog</StyledLink>
-          <StyledLink href="/pricing">Pricing</StyledLink>
+          <StyledLink key="docs" href="/docs">
+            Docs
+          </StyledLink>
+          <StyledLink key="blog" href="/blog">
+            Blog
+          </StyledLink>
+          <StyledLink key="pricing" href="/pricing">
+            Pricing
+          </StyledLink>
         </div>
       )}
 
