@@ -19,55 +19,53 @@ export default function DocsHome(props) {
       <Head>
         <title>Inngest → Documentation & Guides</title>
       </Head>
-      <Hero>
-        <h1>Documentation</h1>
-        {/* TODO: Quick start guide callouts, and graphic */}
-      </Hero>
-
       <DocsContent>
-        <div>
-          <h2>What is Inngest</h2>
-          <p>
-            Inngest is a programmable event platform which allows you to
-            aggregate every event in your business, and react to them by running
-            code in real-time.
-          </p>
+        <Hero>
+          <h1>Documentation</h1>
+          {/* TODO: Quick start guide callouts, and graphic */}
+        </Hero>
 
-          <p>
-            We subscribe to every event in your stack, and allow you to run a
-            DAG of serverless functions whenever specific events are received.
-          </p>
-          <p>
-            Our platform allows you to build your product, ops, and internal
-            flows behind a single abstraction: treating anything that happens
-            across any service as a single event.
-          </p>
+        <h2>What is Inngest</h2>
+        <p>
+          Inngest is a programmable event platform which allows you to aggregate
+          every event in your business, and react to them by running code in
+          real-time.
+        </p>
 
-          {/* Start building for free callout */}
+        <p>
+          We subscribe to every event in your stack, and allow you to run a DAG
+          of serverless functions whenever specific events are received.
+        </p>
+        <p>
+          Our platform allows you to build your product, ops, and internal flows
+          behind a single abstraction: treating anything that happens across any
+          service as a single event.
+        </p>
 
-          <h2>Discover Inngest</h2>
+        {/* Start building for free callout */}
 
-          <Discover>
+        <h2>Discover Inngest</h2>
+
+        <Discover>
+          <div>
             <div>
-              <div>
-                <h3>Getting Started</h3>
-                <p>
-                  A technical and non-technical introduction to the features of
-                  Inngest, how it works, and step-by-step examples to get you
-                  running in minutes.
-                </p>
-              </div>
-              <ul>
-                <li>
-                  <a href="/docs/what-is-inngest">What is Inngest?</a>
-                </li>
-                <li>
-                  <a href="/docs/how-inngest-works">How Inngest works</a>
-                </li>
-              </ul>
+              <h3>Getting Started</h3>
+              <p>
+                A technical and non-technical introduction to the features of
+                Inngest, how it works, and step-by-step examples to get you
+                running in minutes.
+              </p>
             </div>
-          </Discover>
-        </div>
+            <ul>
+              <li>
+                <a href="/docs/what-is-inngest">What is Inngest?</a>
+              </li>
+              <li>
+                <a href="/docs/how-inngest-works">How Inngest works</a>
+              </li>
+            </ul>
+          </div>
+        </Discover>
       </DocsContent>
     </DocsLayout>
   );
