@@ -55,9 +55,9 @@ const DocsNav: React.FC<{ categories: Categories }> = ({ categories }) => {
               <DocsNavItem key={`cat-${idx}`} category={c} />
             ))}
           </NavList>
-          {/* <div>
+          <div>
             <ScreenModeToggle />
-          </div> */}
+          </div>
         </Nav>
         <CTAContainer>
           <a
