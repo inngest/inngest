@@ -5,6 +5,8 @@ export type DocScope = {
   category: string;
   /** Featured image */
   image?: string;
+  /** A meta description for the page itself */
+  description?: string;
   /** Sub pages */
   pages?: DocScope[];
   // title is the title of the documentation page

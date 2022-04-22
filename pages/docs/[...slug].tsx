@@ -20,12 +20,21 @@ export default function DocLayout(props: any) {
     props.post.scope.json
   );
 
+  const description =
+    scope.description || `Inngest documentation for ${scope.title}`;
+
   return (
     <DocsLayout categories={scope.categories}>
       <Head>
         <title>{scope.title} → Inngest docs</title>
+        <meta name="description" content={description}></meta>
         <meta property="og:title" content={`${scope.title} → Inngest docs`} />
+        <meta property="og:description" content={description} />
         <meta property="og:type" content="article" />
+        <meta
+          property="og:url"
+          content={`${process.env.NEXT_PUBLIC_HOST}/docs/${scope.slug}`}
+        />
         {!!scope.image && (
           <meta
             property="og:image"
