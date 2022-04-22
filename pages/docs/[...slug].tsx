@@ -24,6 +24,14 @@ export default function DocLayout(props: any) {
     <DocsLayout categories={scope.categories}>
       <Head>
         <title>{scope.title} → Inngest docs</title>
+        <meta property="og:title" content={`${scope.title} → Inngest docs`} />
+        <meta property="og:type" content="article" />
+        {!!scope.image && (
+          <meta
+            property="og:image"
+            content={`${process.env.NEXT_PUBLIC_HOST}${scope.image}`}
+          />
+        )}
       </Head>
       <DocsContent>
         <header>

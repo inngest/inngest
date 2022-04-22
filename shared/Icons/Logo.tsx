@@ -12,7 +12,7 @@ const defaultWidth = 100;
 const defaultHeight = 30;
 const widthToHeight = 100 / 30;
 
-export default ({
+const Logo = ({
   width,
   height,
   fill = "currentColor",
@@ -52,3 +52,5 @@ export default ({
     </div>
   );
 };
+
+export default Logo;
