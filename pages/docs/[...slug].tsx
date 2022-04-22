@@ -12,7 +12,7 @@ import {
   Categories,
   Headings,
 } from "../../utils/docs";
-import { DocsLayout, DocsContent, InnerDocsContent } from "../docs";
+import { DocsLayout, DocsContent } from "../docs";
 import { highlight } from "../../utils/code";
 
 export default function DocLayout(props: any) {
@@ -26,14 +26,22 @@ export default function DocLayout(props: any) {
         <title>{scope.title} → Inngest docs</title>
       </Head>
       <DocsContent>
-        <h1>{scope.title}</h1>
-
-        <InnerDocsContent>
-          <MDXRemote compiledSource={props.post.compiledSource} scope={scope} />
-          {/* TODO: Add a prev / next button */}
-        </InnerDocsContent>
-        <TOCSide toc={scope.toc} />
+        <header>
+          <h1>{scope.title}</h1>
+          {!!scope.image && (
+            <img
+              src={scope.image}
+              className="featured-image"
+              alt="Featured image"
+            />
+          )}
+        </header>
+        <MDXRemote compiledSource={props.post.compiledSource} scope={scope} />
+        {/* TODO: Add a prev / next button */}
       </DocsContent>
+      <aside>
+        <TOCSide toc={scope.toc} />
+      </aside>
     </DocsLayout>
   );
 }
@@ -134,7 +142,9 @@ const TOC = styled.nav<{ isExpanded: boolean }>`
   }
 
   // See relatd MQs in docs.tsx
-  @media (max-width: 980px) {
+  @media (max-width: 1000px) {
+    top: 1.5em;
+    right: 1.5em;
     padding: 0 1.5em;
     max-width: calc(var(--docs-toc-width) + 3em);
     background-color: var(--bg-color);

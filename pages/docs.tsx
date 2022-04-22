@@ -82,7 +82,7 @@ export const DocsLayout: React.FC<{ categories: Categories }> = ({
     <>
       <DocsWrapper>
         <DocsNav categories={categories} />
-        <Content>{children}</Content>
+        <Main>{children}</Main>
       </DocsWrapper>
       <Footer />
     </>
@@ -91,24 +91,36 @@ export const DocsLayout: React.FC<{ categories: Categories }> = ({
 
 // NOTE - We use em's here to base all sizing off our base 14px font-size in the docs
 const DocsWrapper = styled.div`
-  /* --border-color: #414652; */
   --border-color: var(--stroke-color);
 
   position: relative;
   display: grid;
   min-height: 100vh;
-  grid-template-columns: 17em 1fr;
+  grid-template-columns: 17em auto;
+  gap: 4em;
+  padding-right: 4em;
   font-size: 0.7rem;
   border-bottom: 1px solid var(--border-color);
 
   @media (max-width: 800px) {
     display: block;
+    padding-right: 0;
   }
 `;
 
-const Content = styled.div`
-  padding: 4em;
+const Main = styled.main`
+  --docs-toc-width: 176px;
 
+  display: grid;
+  grid-template-columns: auto var(--docs-toc-width);
+  gap: 4em;
+  padding: 4em 0;
+
+  // TOC changes to floating button - no need for grid
+  @media (max-width: 1000px) {
+    display: block;
+    padding-top: 6em;
+  }
   @media (max-width: 800px) {
     padding: 8em 2em 2em;
   }
@@ -121,11 +133,12 @@ const Hero = styled.div`
   }
 `;
 
-export const DocsContent = styled.div`
-  --docs-toc-width: 160px;
+export const DocsContent = styled.article`
+  --base-size: 16px;
 
-  max-width: 600px;
-  margin-right: calc(var(--docs-toc-width) + 2em);
+  max-width: 720px;
+  margin: 0 auto;
+  padding-bottom: 10vh;
   font-size: 16px;
 
   h2,
@@ -135,14 +148,16 @@ export const DocsContent = styled.div`
     line-height: 1.5em;
   }
   h1 {
-    font-size: 2em; // 28px
-    margin-bottom: 1em;
+    font-size: 2em;
+    margin-bottom: calc(2 * var(--base-size));
   }
   h2 {
-    font-size: 1.5em; // 12px
+    font-size: 1.5em;
+    margin-top: calc(2 * var(--base-size));
   }
   h3 {
     font-size: 1.3em;
+    margin-top: calc(1.5 * var(--base-size));
   }
   h3 {
     font-size: 1.3em;
@@ -154,12 +169,21 @@ export const DocsContent = styled.div`
     font-size: 16px;
   }
   p {
-    margin: 2em 0;
+    margin: 1em 0;
     line-height: 1.7em;
   }
 
   ol,
   ul {
+    margin: 2em 0;
+  }
+
+  img {
+    max-width: 100%;
+    border-radius: var(--border-radius);
+  }
+
+  .featured-image {
     margin: 2em 0;
   }
 
@@ -169,23 +193,8 @@ export const DocsContent = styled.div`
     border-radius: 3px;
   }
 
-  // Hide TOC
-  @media (max-width: 980px) {
-    margin-right: 0;
-  }
-`;
-
-export const InnerDocsContent = styled.div`
-  padding-bottom: 10vh;
-
   .language-id {
     display: none;
-  }
-
-  aside {
-    margin: 2rem 0;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    padding: 2rem;
   }
 
   .tldr {
@@ -220,10 +229,6 @@ export const InnerDocsContent = styled.div`
       text-transform: uppercase;
       letter-spacing: 1px;
     }
-  }
-
-  img {
-    max-width: 100%;
   }
 
   // We export this to keep this file smaller and simpler

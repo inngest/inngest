@@ -3,7 +3,10 @@ export type DocScope = {
   // be nested under the page with a slug of "foo"
   slug: string;
   category: string;
-  pages?: DocScope[]; // Sub pages
+  /** Featured image */
+  image?: string;
+  /** Sub pages */
+  pages?: DocScope[];
   // title is the title of the documentation page
   title: string;
   order: number;
