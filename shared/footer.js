@@ -34,7 +34,7 @@ const Footer = () => {
           </div>
           <div>
             <p>Community</p>
-            <a href="https://discord.gg/EuesV2ZSnX" rel="nofollow">
+            <a href={process.env.NEXT_PUBLIC_DISCORD_URL} rel="nofollow">
               Discord
             </a>
             <a href="https://github.com/inngest" rel="nofollow">

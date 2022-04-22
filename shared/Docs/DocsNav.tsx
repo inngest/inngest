@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 
 import { Categories, Category, DocScope } from "../../utils/docs";
 import ScreenModeToggle from "../ScreenModeToggle";
+import Button from "../Button";
 import Logo from "../Icons/Logo";
 import Hamburger from "../Icons/Hamburger";
 
@@ -44,17 +45,43 @@ const DocsNav: React.FC<{ categories: Categories }> = ({ categories }) => {
           className="mobile-nav-toggle"
           onClick={() => setExpanded(!isExpanded)}
         >
-          <Hamburger />
+          <Hamburger size="24" />
         </a>
       </div>
-      <Nav isExpanded={isExpanded}>
-        <NavList>
-          {nestedTOC.map((c, idx) => (
-            <DocsNavItem key={`cat-${idx}`} category={c} />
-          ))}
-        </NavList>
-      </Nav>
-      <div className="align-bottom">{/* <ScreenModeToggle /> */}</div>
+      <Menu isExpanded={isExpanded}>
+        <Nav>
+          <NavList>
+            {nestedTOC.map((c, idx) => (
+              <DocsNavItem key={`cat-${idx}`} category={c} />
+            ))}
+          </NavList>
+          {/* <div>
+            <ScreenModeToggle />
+          </div> */}
+        </Nav>
+        <CTAContainer>
+          <a
+            href={process.env.NEXT_PUBLIC_DISCORD_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Join our Discord
+          </a>
+          <div className="auth-ctas">
+            <Button
+              href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=docs-nav`}
+              size="small"
+              kind="primary"
+              style={{ padding: "0.4em 0.9em" }}
+            >
+              Sign up for free
+            </Button>
+            <a className="auth-login" href={process.env.NEXT_PUBLIC_LOGIN_URL}>
+              Log in
+            </a>
+          </div>
+        </CTAContainer>
+      </Menu>
     </Sidebar>
   );
 };
@@ -115,21 +142,25 @@ const DocsNavItem: React.FC<{ category: Category; doc?: DocScope }> = ({
 };
 
 const Sidebar = styled.div`
+  --sidebar-padding: 2em;
+
+  display: flex;
   flex-direction: column;
   position: sticky;
   top: 0px;
   height: 100vh;
-  padding: 2em;
   overflow: scroll;
   border-right: 1px solid var(--border-color);
   background-color: var(--bg-color);
 
   .sidebar-header {
+    padding: var(--sidebar-padding);
     display: flex;
     justify-content: space-between;
   }
   .mobile-nav-toggle {
     display: none;
+    color: var(--text-color);
   }
   .align-bottom {
     position: absolute;
@@ -140,12 +171,16 @@ const Sidebar = styled.div`
   // Drop the parent display grid so the content goes to 100%
   @media (max-width: 800px) {
     position: fixed;
-    padding: 1em 2em;
     width: 100%;
+    max-height: 100vh; // to enable scrolling for large menus
     height: auto;
     z-index: 1;
     border-right: none;
     border-bottom: 1px solid var(--border-color);
+
+    .sidebar-header {
+      padding: calc(0.5 * var(--sidebar-padding)) var(--sidebar-padding);
+    }
 
     .brand-logo svg {
       position: relative;
@@ -164,12 +199,23 @@ const Sidebar = styled.div`
   }
 `;
 
-const Nav = styled.nav<{ isExpanded: boolean }>`
-  margin-top: 4em;
+const Menu = styled.div<{ isExpanded: boolean }>`
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
   @media (max-width: 800px) {
-    margin-top: 2em;
+    margin-top: 1em;
     display: ${({ isExpanded }) => (isExpanded ? "block" : "none")};
+    overflow: scroll;
   }
+`;
+
+const Nav = styled.nav`
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-grow: 1;
+  padding: 0 var(--sidebar-padding) var(--sidebar-padding);
 `;
 
 const NavList = styled.ul<{ isExpanded?: boolean }>`
@@ -211,5 +257,22 @@ const NavItem = styled.li<{ isCurrentPage?: boolean }>`
   > .docs-page {
     color: ${({ isCurrentPage }) =>
       isCurrentPage ? "var(--color-iris-60)" : ""};
+  }
+`;
+
+const CTAContainer = styled.div`
+  display: grid;
+  padding: var(--sidebar-padding);
+  grid-row-gap: 1em;
+  border-top: 1px solid var(--border-color);
+
+  .auth-ctas {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  a {
+    text-decoration: none;
   }
 `;
