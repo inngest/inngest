@@ -45,8 +45,11 @@ const ScreenModeToggle: React.FC = () => {
 };
 
 const ToggleButton = styled.button<{ mode: string; isOpen: boolean }>`
+  --padding: 0.1em 0.2em;
+
   position: relative;
-  padding: 0.1em 0.6em;
+  padding: var(--padding);
+  min-width: 58px; // prevent wrapping of "Light" on mobile
   border: var(--button-border-width) solid var(--color-iris-60);
   border-radius: 6px;
   color: var(--color-iris-60);
@@ -71,7 +74,7 @@ const ToggleButton = styled.button<{ mode: string; isOpen: boolean }>`
   }
   .screen-mode-option {
     display: block;
-    padding: 0.1em 0.6em;
+    padding: var(--padding);
     border-radius: 4px;
 
     &.dark {
@@ -80,6 +83,11 @@ const ToggleButton = styled.button<{ mode: string; isOpen: boolean }>`
     &.light {
       background: var(--bg-color-l);
     }
+  }
+
+  @media (max-width: 800px) {
+    min-width: 64px;
+    font-size: 16px;
   }
 `;
 
