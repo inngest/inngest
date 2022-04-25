@@ -84,6 +84,11 @@ export const buttonCSS = css`
   & + .button {
     margin-left: 16px;
   }
+
+  // Icons - Should be before the text
+  svg {
+    margin-right: 0.3em;
+  }
 `;
 
 const Link = styled.a`

@@ -15,6 +15,7 @@ import PathHorizontalIcon from "../shared/Icons/PathHorizontal";
 import CheckAllIcon from "../shared/Icons/CheckAll";
 import FileCheckIcon from "../shared/Icons/FileCheck";
 import ArchiveIcon from "../shared/Icons/Archive";
+import ArrowUpRightIcon from "../shared/Icons/ArrowUpRight";
 
 // TODO: move these into env vars
 export const INGEST_KEY =
@@ -63,8 +64,7 @@ export default function Home() {
         <Hero className="grid-center-8">
           <div>
             <h1>
-              Build, test, and ship reactive functions{" "}
-              <em>in&nbsp;minutes</em>
+              Build, test, and ship reactive functions <em>in&nbsp;minutes</em>
             </h1>
             <p className="hero-subheading">
               Inngest is an <strong>event-driven serverless platform</strong>{" "}
@@ -135,11 +135,15 @@ export default function Home() {
       <div className="grid">
         <div className="grid-center-6 sm-col-8-center">
           <div className="button-group">
-            <Button kind="primary" size="small" href="/sign-up?ref=home-vid-cta">
-              Start for free
+            <Button
+              kind="primary"
+              size="small"
+              href="/sign-up?ref=home-vid-cta"
+            >
+              <ArrowUpRightIcon /> Start for free
             </Button>
             <Button kind="outline" size="small" href="/product">
-              How it works
+              <ArrowUpRightIcon /> How it works
             </Button>
           </div>
         </div>
@@ -247,7 +251,7 @@ export default function Home() {
 
       <Callout
         small="Ready to get started?"
-        ctaRef="home-callout-mid" 
+        ctaRef="home-callout-mid"
         style={{ margin: "6rem 0" }}
       />
 
