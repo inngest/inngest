@@ -86,7 +86,11 @@ export default function DocsHome(props) {
               language.
             </p>
 
-            <Button kind="primary" size="small" href="/docs/cli">
+            <Button
+              kind="primary"
+              size="small"
+              href="/docs/using-the-inngest-cli"
+            >
               <ArrowUpRightIcon /> Read the guide
             </Button>
           </FeaturedDoc>
@@ -98,7 +102,7 @@ export default function DocsHome(props) {
               install needed.
             </p>
 
-            <Button kind="primary" size="small" href="/docs/cli">
+            <Button kind="primary" size="small" href="/docs/function-ide-guide">
               <ArrowUpRightIcon /> Read the guide
             </Button>
           </FeaturedDoc>
