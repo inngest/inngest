@@ -125,7 +125,9 @@ export const getAllDocs = (() => {
         const order = CATEGORY_ORDER.hasOwnProperty(d.scope.category)
           ? CATEGORY_ORDER[d.scope.category]
           : 100;
-        console.warn("no order for category", d.scope.category);
+        if (order === 100) {
+          console.warn("no order for category", d.scope.category);
+        }
         categories[d.scope.category] = {
           title: d.scope.category,
           pages: [d.scope],

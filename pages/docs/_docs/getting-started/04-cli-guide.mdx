@@ -2,6 +2,8 @@
 category: "Getting started"
 title: "Using the CLI in 2 minutes"
 slug: "using-the-inngest-cli"
+description: "Learn how to use the Inngest CLI to build, test, and deploy functions in any language."
+image: "/assets/docs/using-the-inngest-cli/cli-featured-image.jpg"
 order: 5
 ---
 
@@ -14,11 +16,11 @@ The general flow of writing a serverless function using our CLI — which we’l
 3. Test the function by running it locally, using `inngest run`
 4. Deploy the function to your host, using `inngest deploy`
 
-We’ll run through each of these steps beginning with **installing the CLI.**  More advanced steps include setting up CI/CD;  testing with historical, real-world data;  monitoring your functions;  and deploying to > 1 cloud provider.
+We’ll run through each of these steps beginning with **installing the CLI.** More advanced steps include setting up CI/CD; testing with historical, real-world data; monitoring your functions; and deploying to > 1 cloud provider.
 
 ## Installing the CLI
 
-To begin the process you’re going to need to install the CLI.  The quickest and easiest method is by copying and pasting the following into your terminal:
+To begin the process you’re going to need to install the CLI. The quickest and easiest method is by copying and pasting the following into your terminal:
 
 ```go
 curl -sfL https://raw.githubusercontent.com/inngest/inngest-cli/main/install.sh | sh && \
@@ -63,17 +65,17 @@ With the CLI installed, you can create your first function.
 
 ## Creating your first function
 
-Our CLI allows you to create a new serverless function using a single command.  You can start developing in seconds by running `inngest init`.
+Our CLI allows you to create a new serverless function using a single command. You can start developing in seconds by running `inngest init`.
 
 When you run `inngest init`, you’ll be asked for the following questions:
 
 1. **Your function name,** for easily understanding your functions.
-2. **A function trigger,**  which specifies the event that automatically triggers your function.
+2. **A function trigger,** which specifies the event that automatically triggers your function.
 3. **A function language,** using one of our pre-built templates.
 
 We’ll guide you through the `inngest init` process this guide’s function, and afterwards we’ll walk through what these options mean in detail.
 
-**Making your first function**
+### Making your first function
 
 Let’s go ahead and run `inngest init` to create your function:
 
@@ -96,9 +98,9 @@ Answer these questions to get started.
 
 For this guide, we’ll name the function “Post-payment flow”.
 
-After you’ve entered your function name you’ll be prompted to select the **event that triggers the function**.  In this case, type `stripe/` and select the `stripe/charge.succeeded` event.  This function will be triggered any time this event is received in your Inngest account.
+After you’ve entered your function name you’ll be prompted to select the **event that triggers the function**. In this case, type `stripe/` and select the `stripe/charge.succeeded` event. This function will be triggered any time this event is received in your Inngest account.
 
-Finally, let’s select the “Typescript” language to use the typescript template.  You should see the following:
+Finally, let’s select the “Typescript” language to use the typescript template. You should see the following:
 
 ```go
 hi@inngest.com $ inngest init
@@ -123,25 +125,45 @@ For more information, read our documentation at https://www.inngest.com/docs
 
 Your serverless function is ready to go in a new folder: `./post-payment-flow`.
 
-**Triggers**
+### Triggers
 
-Serverless functions need to be invoked to run.  In Inngest, functions are invoked by a *trigger*, which can be one of two things:
+Serverless functions need to be invoked to run. In Inngest, functions are invoked by a _trigger_, which can be one of two things:
 
 - **An event**, such as a JSON payload from your API, a webhook payload such as Stripe’s `charge.succeeded` event, someone signing in to your app, your own queuing system, an HTTP request, etc.
 - **A cron schedule**, allowing you to run functions repeatedly on a schedule
 
-Specifying the trigger before you begin developing your function allows you to make sure you’re working with the right data, and it makes sure that your function doesn’t have bugs relating to data issues.  
+Specifying the trigger before you begin developing your function allows you to make sure you’re working with the right data, and it makes sure that your function doesn’t have bugs relating to data issues.
 
 <aside>
-  <p><b>Tip:</b>  <strong>Inngest asks you for the event that triggers the function before you get started.</strong>  This allows the CLI to automatically generate types for your function, to run local mock testing, and to ensure that invalid data doesn’t cause issues for your function in production.</p>
+  <p>
+    <b>Tip:</b>{" "}
+    <strong>
+      Inngest asks you for the event that triggers the function before you get
+      started.
+    </strong>{" "}
+    This allows the CLI to automatically generate types for your function, to
+    run local mock testing, and to ensure that invalid data doesn’t cause issues
+    for your function in production.
+  </p>
 </aside>
 
 <aside>
-  <p>Tip:  Our event browser shows you <strong>all events you’ve received in your Inngest account after logging in via <code>inngest login</code></strong>, along with events available via integrations.  We automatically record and type any event you receive in your account.</p>
-  <p>You can also <strong>define your own custom events from the CLI</strong> by typing in the name of a new event.</p>
+  <p>
+    Tip: Our event browser shows you{" "}
+    <strong>
+      all events you’ve received in your Inngest account after logging in via{" "}
+      <code>inngest login</code>
+    </strong>
+    , along with events available via integrations. We automatically record and type
+    any event you receive in your account.
+  </p>
+  <p>
+    You can also <strong>define your own custom events from the CLI</strong> by
+    typing in the name of a new event.
+  </p>
 </aside>
 
-**Languages**
+### Languages
 
 As well as specifying the trigger, you need to choose the language that you’ll use to write your serverless function.
 
@@ -149,13 +171,16 @@ The language you choose will be used to create the function’s bootstrapping lo
 
 <aside>
 
-  <p><b>Note:</b>  If the language you’d like to work with isn’t yet supported, let us know by making an issue in the CLI repository and we’ll get started on it.</p>
+<p>
+  <b>Note:</b> If the language you’d like to work with isn’t yet supported, let
+  us know by making an issue in the CLI repository and we’ll get started on it.
+</p>
 
 </aside>
 
 ## Writing and testing code
 
-Once your project has been initialized, you can navigate to the directory containing your code to start writing your business logic.  Each Inngest function has an `inngest.json` or `inngest.cue` file at the project’s root directory, which defines the function configuration:
+Once your project has been initialized, you can navigate to the directory containing your code to start writing your business logic. Each Inngest function has an `inngest.json` or `inngest.cue` file at the project’s root directory, which defines the function configuration:
 
 ```tsx
 {
@@ -177,7 +202,7 @@ Once your project has been initialized, you can navigate to the directory contai
   ]
 ```
 
-In the Typescript template, your code begins execution within `./src/index.ts`.  An empty project contains the following:
+In the Typescript template, your code begins execution within `./src/index.ts`. An empty project contains the following:
 
 ```tsx
 import type { Args } from "./types";
@@ -188,7 +213,7 @@ export async function run({ event }: Args) {
 }
 ```
 
-Your serverless function is passed the `event` as an argument, allowing your code to work with the incoming event’s data.  You can install any packages you need to handle your business logic.  For example, given you receive a new payment you can:
+Your serverless function is passed the `event` as an argument, allowing your code to work with the incoming event’s data. You can install any packages you need to handle your business logic. For example, given you receive a new payment you can:
 
 - Use node-fetch or axios to call other external APIs
 - Send notifications via slack, discord, or email
@@ -196,17 +221,17 @@ Your serverless function is passed the `event` as an argument, allowing your cod
 - Store data in your own datastores eg. for recordkeeping, or ML
 - Send the event to your own data warehouse
 
-**Locally testing your function**
+### Locally testing your function
 
-For now, we’ll run the entire project as-is.  Running the command `inngest run` in the project root will build your serverless function, then run it locally using mock data.
+For now, we’ll run the entire project as-is. Running the command `inngest run` in the project root will build your serverless function, then run it locally using mock data.
 
 Let’s build and test the base project:
 
 <video controls>
-	<source src="/assets/video/guide-run.mp4" type="video/mp4" />
+  <source src="/assets/video/guide-run.mp4" type="video/mp4" />
 </video>
 
-From here, you can make changes to `./src/index.ts`, then re-run `inngest run` to compile and test your serverless function.  
+From here, you can make changes to `./src/index.ts`, then re-run `inngest run` to compile and test your serverless function.
 
 <aside>
   <p><b>Tip:</b> You can re-run functions with the same data by passing a <code>--seed</code> argument into <code>inngest run</code>.  You can also pipe events into <code>inngest run</code> via stdin to invoke your function with custom data: <code>echo '&#123;&#125;' | inngest run</code>.</p>
@@ -214,19 +239,28 @@ From here, you can make changes to `./src/index.ts`, then re-run `inngest run` t
 </aside>
 
 <aside>
-  <p><b>Tip:</b> You can also re-run functions using historical production or test data from your Inngest account via the CLI.  This allows you to guarantee that your function works given real-world data.</p>
+  <p>
+    <b>Tip:</b> You can also re-run functions using historical production or
+    test data from your Inngest account via the CLI. This allows you to
+    guarantee that your function works given real-world data.
+  </p>
 </aside>
 
 ## Deploying your function
 
-When your function is ready to deploy, you can build and launch your function with a single command: `inngest deploy`.  The CLI will re-build your image (using `buildx`), push a new version of the function to Inngest, and make this function version live.
+When your function is ready to deploy, you can build and launch your function with a single command: `inngest deploy`. The CLI will re-build your image (using `buildx`), push a new version of the function to Inngest, and make this function version live.
 
-You must be logged in to your Inngest account to fully deploy your function.  First, run `inngest login` to log in, and type your email address and password to log in.
+You must be logged in to your Inngest account to fully deploy your function. First, run `inngest login` to log in, and type your email address and password to log in.
 
 <aside>
-  <p><b>Tip:</b>  Every function you deploy with Inngest is fully versioned.  You can see all versions for a function, including when each version was live.  If necessary, you can roll back to previous versions with a single click in our UI.</p>
+  <p>
+    <b>Tip:</b> Every function you deploy with Inngest is fully versioned. You
+    can see all versions for a function, including when each version was live.
+    If necessary, you can roll back to previous versions with a single click in
+    our UI.
+  </p>
 </aside>
 
-With our upcoming Lambda compatibility, the CLI will deploy the function to your own Lambda account.  Inngest itself will trigger your lambda function every time the event is received, or on the schedule you specify.
+With our upcoming Lambda compatibility, the CLI will deploy the function to your own Lambda account. Inngest itself will trigger your lambda function every time the event is received, or on the schedule you specify.
 
-That’s it!  With three commands — `inngest init`, `inngest run`, and `inngest deploy` — you’ve built, locally tested, and deployed a serverless function, without writing any config or boilerplate code.
+That’s it! With three commands — `inngest init`, `inngest run`, and `inngest deploy` — you’ve built, locally tested, and deployed a serverless function, without writing any config or boilerplate code.
