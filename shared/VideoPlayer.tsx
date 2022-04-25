@@ -86,6 +86,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           const isActive = completion > 0 && completion < 100;
           return (
             <Chapter
+              key={`chapter-${idx}`}
               startPercentage={startPercentage}
               endPercentage={endPercentage}
               isActive={isActive}
@@ -108,8 +109,7 @@ const Player = styled.div`
   cursor: pointer;
   background: #1e1f22;
   padding: 0 0 40px 0;
-  box-shadow:
-    0px 20px 350px rgba(70, 54, 245, 0.12),
+  box-shadow: 0px 20px 350px rgba(70, 54, 245, 0.12),
     0px 10px 30px rgba(0, 0, 0, 0.85);
 `;
 const Controls = styled.div`

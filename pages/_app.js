@@ -1,3 +1,4 @@
+import React, { useEffect } from "react";
 import Head from "next/head";
 import Script from "next/script";
 import { v4 as uuid } from "uuid";
@@ -11,10 +12,10 @@ function MyApp({ Component, pageProps }) {
       <Head>
         <link rel="icon" href="/favicon.png" />
       </Head>
-      {/* <PageBanner href="/docs/using-the-inngest-cli?ref=page-banner">
-        Introducing the Inngest CLI: build, test, and ship serverless functions
-        locally &rsaquo;
-      </PageBanner> */}
+      <PageBanner href="/docs/function-ide-guide?ref=page-banner">
+        Our new <strong>Function IDE</strong>: Build, test and deploy functions
+        right from your browser - Read the quickstart guide &rsaquo;
+      </PageBanner>
       <Component {...pageProps} />
       <Script
         id="js-inngest-sdk"

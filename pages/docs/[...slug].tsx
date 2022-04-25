@@ -1,12 +1,18 @@
-import { useEffect } from "react";
+import { useState } from "react";
 import Head from "next/head";
 import styled from "@emotion/styled";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
 import rehypeSlug from "rehype-slug";
 // local
-import { getAllDocs, getDocs, DocScope, Categories } from "../../utils/docs";
-import { DocsLayout, DocsContent, InnerDocsContent } from "../docs";
+import {
+  getAllDocs,
+  getDocs,
+  DocScope,
+  Categories,
+  Headings,
+} from "../../utils/docs";
+import { DocsLayout, DocsContent } from "../docs";
 import { highlight } from "../../utils/code";
 
 export default function DocLayout(props: any) {
@@ -14,73 +20,70 @@ export default function DocLayout(props: any) {
     props.post.scope.json
   );
 
-  useEffect(() => {
-    const cb = (entries: IntersectionObserverEntry[]) => {
-      if (entries.length === 0) {
-        return;
-      }
-      document
-        .querySelector("#toc-side")
-        ?.classList?.toggle("visible", !entries.shift().isIntersecting);
-    };
-    const observer = new IntersectionObserver(cb, {});
-    observer.observe(document.querySelector("#toc"));
-    return () => observer.disconnect();
-  }, []);
+  const description =
+    scope.description || `Inngest documentation for ${scope.title}`;
 
   return (
     <DocsLayout categories={scope.categories}>
       <Head>
         <title>{scope.title} → Inngest docs</title>
+        <meta name="description" content={description}></meta>
+        <meta property="og:title" content={`${scope.title} → Inngest docs`} />
+        <meta property="og:description" content={description} />
+        <meta property="og:type" content="article" />
+        <meta
+          property="og:url"
+          content={`${process.env.NEXT_PUBLIC_HOST}/docs/${scope.slug}`}
+        />
+        {!!scope.image && (
+          <meta
+            property="og:image"
+            content={`${process.env.NEXT_PUBLIC_HOST}${scope.image}`}
+          />
+        )}
       </Head>
       <DocsContent>
-        <div>
-          <h2>{scope.title}</h2>
-
-          <h5>On this page</h5>
-          <TOC id="toc">
-            {Object.values(scope.toc)
-              .sort((a, b) => a.order - b.order)
-              .map((h, n) => {
-                return (
-                  <li key={h.slug}>
-                    <a href={`#${h.slug}`}>
-                      {n + 1}. {h.title}
-                    </a>
-                  </li>
-                );
-              })}
-          </TOC>
-
-          <InnerDocsContent>
-            <MDXRemote
-              compiledSource={props.post.compiledSource}
-              scope={scope}
+        <header>
+          <h1>{scope.title}</h1>
+          {!!scope.image && (
+            <img
+              src={scope.image}
+              className="featured-image"
+              alt="Featured image"
             />
-            {/* TODO: Add a prev / next button */}
-          </InnerDocsContent>
-        </div>
-        <div>
-          <TOCSide id="toc-side">
-            <h5>On this page</h5>
-
-            {Object.values(scope.toc)
-              .sort((a, b) => a.order - b.order)
-              .map((h, n) => {
-                return (
-                  <li key={h.slug}>
-                    <a href={`#${h.slug}`}>
-                      {n + 1}. {h.title}
-                    </a>
-                  </li>
-                );
-              })}
-          </TOCSide>
-        </div>
+          )}
+        </header>
+        <MDXRemote compiledSource={props.post.compiledSource} scope={scope} />
+        {/* TODO: Add a prev / next button */}
       </DocsContent>
+      <aside>
+        <TOCSide toc={scope.toc} />
+      </aside>
     </DocsLayout>
   );
 }
+
+const TOCSide: React.FC<{ toc: Headings }> = ({ toc = {} }) => {
+  const [isExpanded, setExpanded] = useState(false);
+  return (
+    <TOC isExpanded={isExpanded}>
+      <h5 onClick={() => setExpanded(!isExpanded)}>On this page</h5>
+      <ol>
+        {Object.values(toc)
+          .sort((a, b) => a.order - b.order)
+          .map((h, n) => {
+            return (
+              <li key={h.slug}>
+                <a href={`#${h.slug}`} onClick={() => setExpanded(!isExpanded)}>
+                  {h.title}
+                </a>
+              </li>
+            );
+          })}
+      </ol>
+    </TOC>
+  );
+};
 
 // This function gets called at build time to figure out which URLs
 // we need to statically compile.
@@ -117,67 +120,59 @@ export async function getStaticProps({ params }) {
       rehypePlugins: [rehypeSlug],
     },
   });
-  return { props: { post } };
+  return { props: { post, htmlClassName: "docs" } };
 }
 
-const TOC = styled.ol`
-  margin: 1.5rem 0 4rem;
-  padding: 0;
-  font-size: 0.9rem;
-
-  li a {
-    display: block;
-    padding: 0.5rem 0;
-    text-decoration: none;
-    opacity: 0.85;
-  }
-  li {
-    border-bottom: 1px solid #ffffff19;
-    transition: all 0.3s;
-    text-indent: 0;
-    list-style: none;
-    &:hover {
-      padding-left: 0.5rem;
-    }
-  }
-`;
-
-const TOCSide = styled.ol`
+const TOC = styled.nav<{ isExpanded: boolean }>`
   position: fixed;
-  top: calc(70px + 5vh);
-  opacity: 0;
-  pointer-events: none;
+  top: 3em;
+  right: 2em;
+  max-width: var(--docs-toc-width);
+  pointer-events: auto;
   transition: all 0.3s;
-  font-size: 0.9rem;
+  font-size: 14px;
+  text-align: right;
 
   z-index: 0;
 
-  &.visible {
-    display: block;
-    opacity: 1;
-    pointer-events: auto;
+  h5,
+  ol,
+  li {
+    margin: 1em 0;
+    font-size: 1em;
   }
 
-  li a {
+  a {
     display: block;
-    padding: 0.5rem 0;
     text-decoration: none;
-    opacity: 0.85;
+    color: var(--font-color-secondary);
+    &:hover {
+      color: var(--font-color-primary);
+    }
+  }
+
+  ol {
+    padding: 0;
   }
   li {
-    border-bottom: 1px solid #ffffff19;
-    transition: all 0.3s;
-    text-indent: 0;
     list-style: none;
-    &:hover {
-      padding-left: 0.5rem;
-    }
   }
 
-  @media (max-width: 800px) {
-    &.visible {
-      opacity: 0;
-      display: none;
+  // See relatd MQs in docs.tsx
+  @media (max-width: 1000px) {
+    top: 1.5em;
+    right: 1.5em;
+    padding: 0 1.5em;
+    max-width: calc(var(--docs-toc-width) + 3em);
+    background-color: var(--bg-color);
+    border-radius: var(--border-radius);
+    box-shadow: ${({ isExpanded }) =>
+      isExpanded ? "var(--box-shadow)" : "none"};
+    ol {
+      display: ${({ isExpanded }) => (isExpanded ? "block" : "none")};
     }
+  }
+  @media (max-width: 800px) {
+    display: none;
   }
 `;

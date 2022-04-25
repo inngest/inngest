@@ -55,7 +55,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
       </div>
 
       <a href="#" className="toggle" onClick={() => setShow(!show)}>
-        <Hamburger />
+        <Hamburger size="24" />
       </a>
     </Container>
   );

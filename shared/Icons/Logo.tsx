@@ -12,11 +12,11 @@ const defaultWidth = 100;
 const defaultHeight = 30;
 const widthToHeight = 100 / 30;
 
-export default ({
+const Logo = ({
   width,
   height,
-  fill = "#222631",
-  className,
+  fill = "currentColor",
+  className = "brand-logo",
   style,
 }: Props) => {
   let h = height,
@@ -52,3 +52,5 @@ export default ({
     </div>
   );
 };
+
+export default Logo;

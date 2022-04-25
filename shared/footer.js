@@ -1,18 +1,15 @@
 import React from "react";
 import styled from "@emotion/styled";
 
+import Logo from "./Icons/Logo";
+
 const Footer = () => {
   return (
     <Wrapper className="grid">
       <div className="grid-center-6">
         <div className="four-cols">
           <a href="https://www.inngest.com">
-            <img
-              src="/logo-white.svg"
-              alt="Inngest logo"
-              height="30"
-              className="logo"
-            />
+            <Logo height={30} />
           </a>
         </div>
         <div className="four-cols">
@@ -37,7 +34,7 @@ const Footer = () => {
           </div>
           <div>
             <p>Community</p>
-            <a href="https://discord.gg/EuesV2ZSnX" rel="nofollow">
+            <a href={process.env.NEXT_PUBLIC_DISCORD_URL} rel="nofollow">
               Discord
             </a>
             <a href="https://github.com/inngest" rel="nofollow">
@@ -58,7 +55,6 @@ const Footer = () => {
           <small>© {new Date().getFullYear()} Inngest Inc</small>
         </div>
       </div>
-      <div className="grid-line" />
     </Wrapper>
   );
 };
@@ -96,7 +92,7 @@ const Wrapper = styled.div`
 
   a {
     display: block;
-    color: #fff !important;
+    color: var(--font-color-primary);
     text-decoration: none;
     margin: 1rem 0;
   }
@@ -126,6 +122,7 @@ const Wrapper = styled.div`
         rgba(124, 87, 128, 0.0893) 100%
       ),
       linear-gradient(180deg, #4636f5 0%, #1d66d2 100%);
+    color: var(--color-white);
     font-family: var(--font-mono);
     font-size: 0.7rem;
     font-weight: bold;
@@ -135,6 +132,16 @@ const Wrapper = styled.div`
     &:hover {
       box-shadow: 0 5px 45px rgba(var(--primary-color-rgb), 0.6);
       transform: translateY(-0.1rem);
+    }
+  }
+
+  @media (max-width: 400px) {
+    margin-left: 1em;
+    .grid-center-6 {
+      grid-column: 2/-2;
+    }
+    > div {
+      padding: 10vh 0 5vh;
     }
   }
 `;
