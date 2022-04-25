@@ -28,6 +28,7 @@ const createNestedTOC = (categories: Categories) => {
     });
     return {
       title: category.title,
+      order: category.order,
       pages,
     };
   });
