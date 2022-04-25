@@ -124,7 +124,7 @@ export async function getStaticProps({ params }) {
 }
 
 const TOC = styled.nav<{ isExpanded: boolean }>`
-  position: fixed;
+  position: sticky;
   top: 3em;
   right: 2em;
   max-width: var(--docs-toc-width);

@@ -69,8 +69,11 @@ export default function DocsHome(props) {
         </p>
 
         <p>
-          Check out our quick start guides below or read more about the system
-          architecture here.
+          Check out our quick start guides below or read more about{" "}
+          <a href="/docs/high-level-architecture">
+            the system architecture here
+          </a>
+          .
         </p>
 
         <h2>Quick start guides</h2>
@@ -234,22 +237,40 @@ export const DocsContent = styled.article`
 
   ol,
   ul {
-    margin: 2em 0;
+    margin: 1.5em 0;
   }
 
   aside,
   video {
-    margin: 2rem 0;
+    margin: 1em 0;
   }
 
   aside {
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    padding: 2rem;
+    padding: 1.4em 1.5em;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--highlight-color);
+
+    > p:first-of-type {
+      margin-top: 0;
+    }
+    > p:last-of-type {
+      margin-bottom: 0;
+    }
+  }
+
+  a {
+    color: var(--color-iris-60);
   }
 
   img {
     max-width: 100%;
     border-radius: var(--border-radius);
+  }
+
+  hr {
+    border-color: var(--border-color);
+    height: 1px;
   }
 
   .featured-image {
@@ -324,11 +345,8 @@ const FeaturedDoc = styled.div`
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
 
-  > *:first-child {
+  > h3:first-child {
     margin-top: 0;
-  }
-  > *:last-child {
-    margin-bottom: 0;
   }
 
   p:last-of-type {
