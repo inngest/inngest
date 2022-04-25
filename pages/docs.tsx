@@ -5,6 +5,8 @@ import styled from "@emotion/styled";
 
 import DocsNav from "../shared/Docs/DocsNav";
 import Footer from "../shared/footer";
+import Button from "../shared/Button";
+import ArrowUpRightIcon from "../shared/Icons/ArrowUpRight";
 import { getAllDocs, Categories } from "../utils/docs";
 import docsSyntaxHighlightingCSS from "../shared/Docs/docsSyntaxHighlighting";
 
@@ -21,26 +23,85 @@ export default function DocsHome(props) {
       </Head>
       <DocsContent>
         <Hero>
-          <h1>Documentation</h1>
-          {/* TODO: Quick start guide callouts, and graphic */}
+          <h1>Introduction to Inngest</h1>
         </Hero>
 
-        <h2>What is Inngest</h2>
         <p>
-          Inngest is a programmable event platform which allows you to aggregate
-          every event in your business, and react to them by running code in
-          real-time.
+          The Inngest platform allows you to easily build, deploy, and manage
+          <strong>serverless functions</strong> that run whenever events happen,
+          from any source (SDKs, APIs, webhooks, or pub/sub).
+          {/* TODO - Link to future docs */}
+        </p>
+        <p>
+          Inngest's tooling makes developers lives easier: get auto-typed
+          events, develop & test serverless functions locally, backtest using
+          historical data, release with full version histories, apply immediate
+          rollbacks, and get full observability, metrics, monitoring, and audit
+          trails out of the box. Inngest's serverless platform allows anyone to
+          build event-driven software that scales.
+        </p>
+
+        <h2>What is Inngest?</h2>
+        <p>
+          Inngest is an <strong>event-driven serverless platform</strong> that
+          lets you <strong>focus on your product</strong> by giving you all the
+          tools you need to build, test, and ship reactive serverless functions
+          faster than ever before.
+        </p>
+        <p>
+          We've taken our experience building systems for event-driven
+          architecture and async workloads and created a platform that allows
+          you to run any serverless function that reacts to events. Inngest can
+          be used in place of an event bus or message queue as well as the
+          runtime for your event consumers or workers.
+        </p>
+        <p>
+          Inngest allows you to build complex applications without all of the
+          boilerplate and endless infrastructure configuration. No need to waste
+          time writing boilerplate consumer code or polling logic. Don't waste
+          time configuring retry policies, dead letter queues, or other
+          infrastructure.
         </p>
 
         <p>
-          We subscribe to every event in your stack, and allow you to run a DAG
-          of serverless functions whenever specific events are received.
+          Leave the boring stuff to us and focus on shipping amazing products,
+          getting your idea to market faster than ever before.
         </p>
+
         <p>
-          Our platform allows you to build your product, ops, and internal flows
-          behind a single abstraction: treating anything that happens across any
-          service as a single event.
+          Check out our quick start guides below or read more about the system
+          architecture here.
         </p>
+
+        <h2>Quick start guides</h2>
+
+        <FeaturedDocs>
+          <FeaturedDoc>
+            <h3>Learn our cli in 2 minutes</h3>
+            <p>
+              Use the Inngest CLI to build, test, and deploy functions in any
+              language.
+            </p>
+
+            <Button kind="primary" size="small" href="/docs/cli">
+              <ArrowUpRightIcon /> Read the guide
+            </Button>
+          </FeaturedDoc>
+
+          <FeaturedDoc>
+            <h3>Use our browser IDE</h3>
+            <p>
+              Create, test and deploy functions right from your browser. No
+              install needed.
+            </p>
+
+            <Button kind="primary" size="small" href="/docs/cli">
+              <ArrowUpRightIcon /> Read the guide
+            </Button>
+          </FeaturedDoc>
+        </FeaturedDocs>
+
+        <h2>Learn the key concepts</h2>
 
         {/* Start building for free callout */}
 
@@ -176,7 +237,8 @@ export const DocsContent = styled.article`
     margin: 2em 0;
   }
 
-  aside, video {
+  aside,
+  video {
     margin: 2rem 0;
   }
 
@@ -240,6 +302,42 @@ export const DocsContent = styled.article`
 
   // We export this to keep this file smaller and simpler
   ${docsSyntaxHighlightingCSS}
+`;
+
+const FeaturedDocs = styled.section`
+  margin: 2em 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1em;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const FeaturedDoc = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  padding: 1.4em 1.5em;
+  background: var(--highlight-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+
+  > *:first-child {
+    margin-top: 0;
+  }
+  > *:last-child {
+    margin-bottom: 0;
+  }
+
+  p:last-of-type {
+    flex-grow: 1; // ensure button is at the bottom
+  }
+
+  .button {
+    align-self: end;
+  }
 `;
 
 const Discover = styled.div`

@@ -31,7 +31,7 @@
   --bg-color: var(--bg-color-d);
 
   --bg-primary-highlight: #12112b; /* A color that is used in gradients w/ the bg color to add depth */
-  --highlight-color: #000;
+  --highlight-color: var(--black);
   --primary-color: #4636f5;
   --primary-color-rgb: 70, 54, 245;
   --stroke-color: #525661;
@@ -64,8 +64,8 @@
 
 body.light-mode {
   --bg-color: var(--bg-color-l);
-  /* --bg-primary-highlight: #fafafa; //  */
-  /* --highlight-color: #fff; */
+  /* --bg-primary-highlight: #fafafa; */
+  --highlight-color: #fff;
   --stroke-color: #D3D3DF;
   --stroke-color-light: #80848e;
   --font-color-primary: #070707;
