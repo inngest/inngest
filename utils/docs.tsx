@@ -53,6 +53,7 @@ const CATEGORY_ORDER = {
   "Getting started": 1,
   "Sending Data": 2,
   "Working with Events": 3,
+  Functions: 4,
   "Managing workflows": 10,
 };
 

@@ -1,0 +1,37 @@
+---
+category: "Functions"
+title: "Introduction"
+slug: "functions/introduction"
+order: 1
+---
+
+Functions are a core part of Inngest - it's how you run your own code. Functions are run either automatically when events are received, on a schedule, or manually by people on your team. They're the programmable part of the platform that allow you to build automated systems with zero infra.
+
+With Inngest, you can build and deploy your own custom functions in two ways: via
+the [Inngest CLI](/docs/using-the-inngest-cli) or via our [web IDE](/docs/function-ide-guide).
+We'll walk through the basics of a function on the Inngest platform:
+
+1. The trigger
+2. Your code
+3. The function response
+
+## The trigger
+
+Every function on Inngest has a trigger. There can be 2 types of triggers:
+
+- **An Event** - The function will be run when a specific event is recieved by Inngest. Each function can have 1 or more event triggers.
+- **A Schedule** - The function will be run on a schedule that you declare, in crontab schedule format.
+
+## Your code
+
+You can write your own code in any language you prefer. Inngest supports anything that you can put in a Docker container,
+so if you're familiar with writing a Dockerfile, you can run whatever you want on Inngest. Alternatively, you can write
+simple Node.js functions right from the Inngest [web IDE](/docs/function-ide-guide).
+
+We've designed a fantastic workflow with [our cli](/docs/using-the-inngest-cli) that enables you to quickly create, test, and deploy your functions in any language.
+
+## The function response
+
+Your function should always return a response to `stdout`. You can log anything, but we'll only capture and save the last line of output. The output should be formatted as JSON, but can also be a string. The response is important as it will allow you to understand the behavior of your function.
+
+If your funciton has an error, you can throw an error and exit or print your output and return a non-zero exit code. With this, you'll be able to monitor your function's outcome in the Inngest web dashboard.

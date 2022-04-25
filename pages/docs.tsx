@@ -108,10 +108,13 @@ export default function DocsHome(props) {
 
         <ul>
           <li>
-            <a href="/docs/what-is-inngest">What is Inngest?</a>
+            <a href="/docs/quick-start">Quick start</a>
           </li>
           <li>
-            <a href="/docs/how-inngest-works">How Inngest works</a>
+            <a href="/docs/event-format-and-structure">Event format</a>
+          </li>
+          <li>
+            <a href="/docs/event-user-audit-trails">Event user attribution</a>
           </li>
         </ul>
 
