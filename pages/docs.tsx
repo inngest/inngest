@@ -176,6 +176,15 @@ export const DocsContent = styled.article`
     margin: 2em 0;
   }
 
+  aside, video {
+    margin: 2rem 0;
+  }
+
+  aside {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 2rem;
+  }
+
   img {
     max-width: 100%;
     border-radius: var(--border-radius);
