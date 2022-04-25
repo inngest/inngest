@@ -1,5 +1,5 @@
 ---
-category: "Sending & Managing Events"
+category: "Sending Data"
 title: "Format and structure"
 # By adding a forward slash, this automatically nests the page under
 # the parent.
@@ -15,44 +15,42 @@ You can optionally add user information within `user` (an object), version event
 
 </div>
 
-
 Events ingested into our system have a specific format. Here is the entire payload, though only name and data are required:
 
 ```json twoslash
 {
   "name": "ticket.updated",
-// @log: The event name is required.
+  // @log: The event name is required.
   "data": {
     "ticket_id": 189325,
     "comment": "Thanks for sending me the return label!",
     "status": "open"
   },
-// @log: Data is also required.
+  // @log: Data is also required.
   "user": {
     "external_id": 83561,
     "email": "test@example.com"
   },
   "v": "2021-09-15.01",
-  "ts": 1632232002369,
+  "ts": 1632232002369
 }
 ```
-
 
 ## Fields
 
 These are the fields which you can provide in an event:
 
-- `name`: (required) The event name as a string.  We recommend a simple format of "noun.action", eg "payment.succeeded", "email.sent", "post.viewed"
+- `name`: (required) The event name as a string. We recommend a simple format of "noun.action", eg "payment.succeeded", "email.sent", "post.viewed"
 - `data`: (required) An object containing any data pertinent to the event
-- `user`: (optional) An object containing [information relating to the user](/docs/event-user-audit-trails) which the event belongs to.  For example, a “payment.succeeded” event should contain information on the user who paid.
-- `v`: (optional) A string representing the event version.  We recommend the format “YYYY-MM-DD.XY”, where XY increments with changes.  This allows you to see the implementation date easily, and allows for infinite changes
-- `ts`: (optional) An int representing the milliseconds since the unix epoch at which this event occurred.  If this is blank we default to the time the event was received. This is useful when backfilling contact attribute history
+- `user`: (optional) An object containing [information relating to the user](/docs/event-user-audit-trails) which the event belongs to. For example, a “payment.succeeded” event should contain information on the user who paid.
+- `v`: (optional) A string representing the event version. We recommend the format “YYYY-MM-DD.XY”, where XY increments with changes. This allows you to see the implementation date easily, and allows for infinite changes
+- `ts`: (optional) An int representing the milliseconds since the unix epoch at which this event occurred. If this is blank we default to the time the event was received. This is useful when backfilling contact attribute history
 
 ## Why this format?
 
-Each field represents unique information and has been chosen to increase flexibility powering our system.  We store a unique type schema for each version of each event, allowing you to adapt systems over time without changing event names.
+Each field represents unique information and has been chosen to increase flexibility powering our system. We store a unique type schema for each version of each event, allowing you to adapt systems over time without changing event names.
 
-The timestamp allows you to backdate events when importing into our systems.  This is important when adding user information to our system, as the user attributes are valid from the time of the event.  For more information, see [user identification within events](/docs/event-user-audit-trails).
+The timestamp allows you to backdate events when importing into our systems. This is important when adding user information to our system, as the user attributes are valid from the time of the event. For more information, see [user identification within events](/docs/event-user-audit-trails).
 
 The payload allows us to:
 
@@ -60,4 +58,3 @@ The payload allows us to:
 - Create workflows that are triggered off of both event names and versions
 - Adapt to changes in your systems over time, without renaming events
 - Correctly specify users for audit trails without need for persistent tracking
-

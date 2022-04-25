@@ -106,30 +106,16 @@ export default function DocsHome(props) {
 
         <h2>Learn the key concepts</h2>
 
+        <ul>
+          <li>
+            <a href="/docs/what-is-inngest">What is Inngest?</a>
+          </li>
+          <li>
+            <a href="/docs/how-inngest-works">How Inngest works</a>
+          </li>
+        </ul>
+
         {/* Start building for free callout */}
-
-        <h2>Discover Inngest</h2>
-
-        <Discover>
-          <div>
-            <div>
-              <h3>Getting Started</h3>
-              <p>
-                A technical and non-technical introduction to the features of
-                Inngest, how it works, and step-by-step examples to get you
-                running in minutes.
-              </p>
-            </div>
-            <ul>
-              <li>
-                <a href="/docs/what-is-inngest">What is Inngest?</a>
-              </li>
-              <li>
-                <a href="/docs/how-inngest-works">How Inngest works</a>
-              </li>
-            </ul>
-          </div>
-        </Discover>
       </DocsContent>
     </DocsLayout>
   );
@@ -259,7 +245,7 @@ export const DocsContent = styled.article`
     }
   }
 
-  a {
+  a:not(.button) {
     color: var(--color-iris-60);
   }
 
@@ -269,8 +255,9 @@ export const DocsContent = styled.article`
   }
 
   hr {
-    border-color: var(--border-color);
+    border: 0;
     height: 1px;
+    background: var(--border-color);
   }
 
   .featured-image {
@@ -355,27 +342,5 @@ const FeaturedDoc = styled.div`
 
   .button {
     align-self: end;
-  }
-`;
-
-const Discover = styled.div`
-  > div {
-    display: grid;
-    grid-template-columns: 3fr 2fr;
-    grid-gap: 2rem;
-  }
-
-  ul {
-    margin-top: 3.5rem;
-  }
-
-  @media (max-width: 800px) {
-    > div {
-      grid-template-columns: 1fr;
-      grid-gap: 0;
-    }
-    ul {
-      margin-top: 1rem;
-    }
   }
 `;

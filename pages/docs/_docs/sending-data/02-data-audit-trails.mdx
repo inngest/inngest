@@ -1,5 +1,5 @@
 ---
-category: "Sending & Managing Events"
+category: "Sending Data"
 title: "User identification and audit trails"
 # By adding a forward slash, this automatically nests the page under
 # the parent.
@@ -22,7 +22,7 @@ By adding user information to an event you automatically activate user-level wor
 
 </div>
 
-Inngest offers a full audit trail of every event and workflow in your system.  Each time an event is received, we inspect the `user` object to:
+Inngest offers a full audit trail of every event and workflow in your system. Each time an event is received, we inspect the `user` object to:
 
 1. Identify the user
 2. Link the event to the user
@@ -31,12 +31,12 @@ Inngest offers a full audit trail of every event and workflow in your system.  E
 
 ## Field precedence
 
-In order to attribute an event to a user you must include the `user` field within your event.  The `user` field must contain at least one identifying field from the following, in <a name="order-of-preference">order of precedence</a>:
+In order to attribute an event to a user you must include the `user` field within your event. The `user` field must contain at least one identifying field from the following, in <a name="order-of-preference">order of precedence</a>:
 
 1. `external_id` - the user ID in your system. This is the preferred identification key, as it is static
 2. `email` - the user's email
 3. `phone` - the user's phone
-4. any other attribute ending in _id (eg. `stripe_customer_id`, `zendesk_id`)
+4. any other attribute ending in \_id (eg. `stripe_customer_id`, `zendesk_id`)
 
 Without these fields there is no way for Inngest to know which user the event belongs to. It is preferrable to always include the external_id where possible.
 
@@ -70,7 +70,7 @@ This event will upsert a user with the specified attributes (`external_id`, `ema
 2. email matching test@example.com
 3. zendesk_id matching 1274895
 
-If not found, a new user will be created. If a user is found, all attributes will be written to that user. From then on any of these identifiers can be used to reference the user in the future.  For example, an event containing only a `user.zendesk_id` of "1274895" will be associated with the same user.
+If not found, a new user will be created. If a user is found, all attributes will be written to that user. From then on any of these identifiers can be used to reference the user in the future. For example, an event containing only a `user.zendesk_id` of "1274895" will be associated with the same user.
 
 ## Security
 
@@ -79,4 +79,3 @@ Each user's attributes is stored fully encrypted in our database using row-level
 Each user gets its own encryption key which is permenantly deleted when you delete the user from our system, which helps ensure we're GDPR and CCPA compliant.
 
 Finally, this information is never shared without your configuration (for example, unless you share it within a workflow).
-

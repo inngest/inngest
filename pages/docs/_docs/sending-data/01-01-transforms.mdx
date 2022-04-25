@@ -1,5 +1,5 @@
 ---
-category: "Sending & Managing Events"
+category: "Sending Data"
 title: "Event transforms"
 # By adding a forward slash, this automatically nests the page under
 # the parent.
@@ -7,17 +7,17 @@ slug: "event-format-and-structure/transforms"
 order: 2
 ---
 
-Inngest requires events to be in the [documentented format](/docs/event-format-and-structure) in order to be properly processed.  What if your events have a different structure, or you need to consume a webhook with a different payload?
+Inngest requires events to be in the [documentented format](/docs/event-format-and-structure) in order to be properly processed. What if your events have a different structure, or you need to consume a webhook with a different payload?
 
-Inngest allows you to create transforms which run every time an event is received.  You can define a small Javascript functon that takes in the original payload and HTTP headers, runs transformations, and returns an event in our format.
+Inngest allows you to create transforms which run every time an event is received. You can define a small Javascript functon that takes in the original payload and HTTP headers, runs transformations, and returns an event in our format.
 
 This means **you can send us data from anywhere without changes to your existing systems**, or consume webhooks from any system with high availability.
 
 ## Defining a transform
 
-Transforms are defined per "ingest key" - an API key which you use to send us events.  Typically, you create one key per webhook or per API implementation.
+Transforms are defined per "ingest key" - an API key which you use to send us events. Typically, you create one key per webhook or per API implementation.
 
-When you create or edit an ingest key you have the option to write a javascript-based transform function to alter the event shape.  This transform function can run **ES6** code, but must return within 20ms and has no network access.
+When you create or edit an ingest key you have the option to write a javascript-based transform function to alter the event shape. This transform function can run **ES6** code, but must return within 20ms and has no network access.
 
 Here's an example of a transform for consuming GitHub events:
 
@@ -30,12 +30,12 @@ function transform(evt, headers = {}) {
     name: "github/" + name.trim().replace("Event", "").toLowerCase(),
     data: evt,
     user: { github_id },
-   };
-};
+  };
+}
 ```
 
-The transform function gets the incoming event object and the HTTP headers, then returns data in our format.  We add the `github_id` user identification field for audit tracking.
+The transform function gets the incoming event object and the HTTP headers, then returns data in our format. We add the `github_id` user identification field for audit tracking.
 
 ## Limits
 
-Transforms must be under 2KB in size and must run within 20ms.  They have no disk access and no network access.
+Transforms must be under 2KB in size and must run within 20ms. They have no disk access and no network access.

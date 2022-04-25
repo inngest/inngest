@@ -51,8 +51,9 @@ type Docs = {
 const CATEGORY_ORDER = {
   "What is Inngest?": 0,
   "Getting started": 1,
-  "Sending & Managing Events": 2,
-  "Managing workflows": 3,
+  "Sending Data": 2,
+  "Working with Events": 3,
+  "Managing workflows": 10,
 };
 
 export const getAllDocs = (() => {

@@ -1,31 +1,25 @@
 ---
-category: "Sending & Managing Events"
-title: "Sending events via HTTP & libraries"
+category: "Sending Data"
+title: "via HTTP"
 # By adding a forward slash, this automatically nests the page under
 # the parent.
-slug: "event-http-api-and-libraries"
-order: 3
+slug: "sending-data-via-http"
+order: 7
 ---
-
 
 <div className="tldr">
 
-You can send us events with a single POST request to `https://inn.gs/e/$ingestKey`, or `https://inn.gs/` with the key as a Bearer token. The request body must be your JSON-encoded event and has a maximum size of 256KB. On success, the API returns a 201 status code.  This can be done via your API or used as a webhook.
+You can send us events with a single POST request to `https://inn.gs/e/$ingestKey`, or `https://inn.gs/` with the key as a Bearer token. The request body must be your JSON-encoded event and has a maximum size of 256KB. On success, the API returns a 201 status code. This can be done via your API or used as a webhook.
 
 </div>
 
-Our ingestion API allows you to perform a single POST request to submit an event from your application code or webhook.  For convenience, we offer pre-built libraries for making this POST request in several popular languages, but in essence — it's a POST request!
+Our ingestion API allows you to perform a single POST request to submit an event from your application code or webhook. For convenience, we offer pre-built libraries for making this POST request in several popular languages, but in essence — it's a POST request!
 
-## Libraries
-
-You can use our pre-build libraries for sending us events for the following languages:
-
-- Go: https://github.com/inngest/inngestgo
-- Python: https://github.com/inngest/inngest-python
-- Javascript: https://github.com/inngest/javascript-sdk
-- Ruby: https://github.com/inngest/inngest-ruby
-
-These SDKs all follow the same format: initialize the SDK with an ingest key from your workspace, then use the client to send events. Each SDK has documentation and examples in the readme.
+<aside>
+  <a href="/docs/sending-data-via-inngest-sdks">
+    Check out our list of SDKs here
+  </a>
+</aside>
 
 ## HTTP requests
 
@@ -65,7 +59,6 @@ When creating ingest keys you can add an optional filter. A filter is either an 
 **Denylist**
 
 `denylist` allows you to specify events which the key cannot fire, or IPs which cannot use the key. If the key is used to attempt these events the API returns with a 403 status code.
-
 
 ## Security
 
