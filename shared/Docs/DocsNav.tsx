@@ -12,7 +12,10 @@ import Hamburger from "../Icons/Hamburger";
  * Creates an array of categories, nested each sub pages under their parent
  */
 const createNestedTOC = (categories: Categories) => {
-  return Object.values(categories).map((category) => {
+  const sortedCategories = Object.values(categories).sort(
+    (a, b) => a.order - b.order
+  );
+  return sortedCategories.map((category) => {
     const pages = [];
     category.pages.forEach((page) => {
       const basePath = page.slug.split("/").slice(0, -1).join("/");

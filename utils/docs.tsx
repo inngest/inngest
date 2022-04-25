@@ -36,6 +36,7 @@ type Doc = {
 
 export type Category = {
   title: string;
+  order: number;
   pages: DocScope[];
 };
 
@@ -45,6 +46,13 @@ type Docs = {
   docs: { [slug: string]: Doc };
   slugs: string[];
   categories: Categories;
+};
+
+const CATEGORY_ORDER = {
+  "What is Inngest?": 0,
+  "Getting started": 1,
+  "Sending & Managing Events": 2,
+  "Managing workflows": 3,
 };
 
 export const getAllDocs = (() => {
@@ -114,9 +122,14 @@ export const getAllDocs = (() => {
 
       // Add category to list.
       if (!categories[d.scope.category]) {
+        const order = CATEGORY_ORDER.hasOwnProperty(d.scope.category)
+          ? CATEGORY_ORDER[d.scope.category]
+          : 100;
+        console.warn("no order for category", d.scope.category);
         categories[d.scope.category] = {
           title: d.scope.category,
           pages: [d.scope],
+          order,
         };
       } else {
         categories[d.scope.category].pages.push(d.scope);
