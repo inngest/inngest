@@ -525,7 +525,7 @@ func fetchEvents() ([]client.Event, error) {
 	defer done()
 
 	var workspaceID *uuid.UUID
-	if s, err := state.GetState(ctx); err == nil {
+	if s, err := state.GetState(ctx); err == nil && s.SelectedWorkspace != nil {
 		workspaceID = &s.SelectedWorkspace.ID
 	}
 
