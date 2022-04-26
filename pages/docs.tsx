@@ -2,6 +2,7 @@ import React from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import styled from "@emotion/styled";
+import { Global, css } from "@emotion/react";
 
 import DocsNav from "../shared/Docs/DocsNav";
 import Footer from "../shared/footer";
@@ -12,7 +13,7 @@ import docsSyntaxHighlightingCSS from "../shared/Docs/docsSyntaxHighlighting";
 
 export async function getStaticProps() {
   const categories = getAllDocs().categories;
-  return { props: { categories: categories } };
+  return { props: { categories: categories, htmlClassName: "docs" } };
 }
 
 export default function DocsHome(props) {
@@ -21,13 +22,13 @@ export default function DocsHome(props) {
       <Head>
         <title>Inngest → Documentation & Guides</title>
       </Head>
-      <DocsContent>
+      <DocsContent hasTOC={false}>
         <Hero>
           <h1>Introduction to Inngest</h1>
         </Hero>
 
         <p>
-          The Inngest platform allows you to easily build, deploy, and manage
+          The Inngest platform allows you to easily build, deploy, and manage{" "}
           <strong>serverless functions</strong> that run whenever events happen,
           from any source (SDKs, APIs, webhooks, or pub/sub).
           {/* TODO - Link to future docs */}
@@ -135,6 +136,7 @@ export const DocsLayout: React.FC<{ categories: Categories }> = ({
   const router = useRouter();
   return (
     <>
+      <Global styles={DocsGlobalStyles} />
       <DocsWrapper>
         <DocsNav categories={categories} />
         <Main>{children}</Main>
@@ -143,6 +145,15 @@ export const DocsLayout: React.FC<{ categories: Categories }> = ({
     </>
   );
 };
+
+const DocsGlobalStyles = css`
+  // Push the page down on mobile below the fixed nav for the page text OR PageBanner
+  .docs body {
+    @media (max-width: 800px) {
+      margin-top: 62px;
+    }
+  }
+`;
 
 // NOTE - We use em's here to base all sizing off our base 14px font-size in the docs
 const DocsWrapper = styled.div`
@@ -174,10 +185,10 @@ const Main = styled.main`
   // TOC changes to floating button - no need for grid
   @media (max-width: 1000px) {
     display: block;
-    padding-top: 6em;
+    padding-top: 4em;
   }
   @media (max-width: 800px) {
-    padding: 8em 2em 2em;
+    padding: 4em 2em 2em;
   }
 `;
 
@@ -188,7 +199,7 @@ const Hero = styled.div`
   }
 `;
 
-export const DocsContent = styled.article`
+export const DocsContent = styled.article<{ hasTOC: boolean }>`
   --base-size: 16px;
 
   max-width: 720px;
@@ -205,6 +216,14 @@ export const DocsContent = styled.article`
   h1 {
     font-size: 2em;
     margin-bottom: calc(2 * var(--base-size));
+
+    // Ensure text does not go under floating TOC
+    @media (max-width: 1000px) {
+      margin-right: ${({ hasTOC }) => (hasTOC ? "4em" : "0")};
+    }
+    @media (max-width: 800px) {
+      margin-right: 0;
+    }
   }
   h2 {
     font-size: 1.5em;

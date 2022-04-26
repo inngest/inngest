@@ -9,14 +9,11 @@ const ScreenModeToggle: React.FC = () => {
 
   const getOppositeMode = (mode: string): "light" | "dark" =>
     mode === "light" ? "dark" : "light";
-  const getCurrentMode = () =>
-    document.body.className.includes("dark") ? "dark" : "light";
 
   const updateModeAndSave = (newMode: "light" | "dark") => {
-    // const newMode = getOppositeMode(getCurrentMode());
-    document.body.className = `${newMode}-mode`;
+    document.body.classList.remove(`${getOppositeMode(newMode)}-mode`);
+    document.body.classList.add(`${newMode}-mode`);
     setMode(newMode);
-    console.log("Update to ", newMode);
     window.localStorage.setItem("screen-mode", newMode);
   };
   useEffect(() => {

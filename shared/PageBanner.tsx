@@ -24,4 +24,8 @@ const PageBanner = styled.a<Props>`
   }
 `;
 
+PageBanner.defaultProps = {
+  className: "page-banner",
+};
+
 export default PageBanner;

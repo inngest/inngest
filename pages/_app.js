@@ -7,14 +7,20 @@ import "../styles/globals.css";
 import PageBanner from "../shared/PageBanner";
 
 function MyApp({ Component, pageProps }) {
+  useEffect(() => {
+    if (pageProps.htmlClassName) {
+      document.getElementsByTagName("html")[0].className =
+        pageProps.htmlClassName;
+    }
+  });
   return (
     <>
       <Head>
         <link rel="icon" href="/favicon.png" />
       </Head>
       <PageBanner href="/docs/function-ide-guide?ref=page-banner">
-        Our new <strong>Function IDE</strong>: Build, test and deploy functions
-        right from your browser - Read the quickstart guide &rsaquo;
+        Our new <strong>Web IDE</strong>: Build, test and deploy functions right
+        from your browser - Read the quickstart guide &rsaquo;
       </PageBanner>
       <Component {...pageProps} />
       <Script

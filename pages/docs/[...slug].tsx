@@ -42,7 +42,7 @@ export default function DocLayout(props: any) {
           />
         )}
       </Head>
-      <DocsContent>
+      <DocsContent hasTOC={true}>
         <header>
           <h1>{scope.title}</h1>
           {!!scope.image && (
@@ -160,7 +160,8 @@ const TOC = styled.nav<{ isExpanded: boolean }>`
 
   // See relatd MQs in docs.tsx
   @media (max-width: 1000px) {
-    top: 1.5em;
+    position: fixed;
+    top: 3em;
     right: 1.5em;
     padding: 0 1.5em;
     max-width: calc(var(--docs-toc-width) + 3em);
