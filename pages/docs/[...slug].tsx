@@ -20,6 +20,7 @@ export default function DocLayout(props: any) {
     props.post.scope.json
   );
 
+  const formattedTitle = scope.title.replace(/`(.+)`/, "<code>$1</code>");
   const description =
     scope.description || `Inngest documentation for ${scope.title}`;
 
@@ -44,7 +45,11 @@ export default function DocLayout(props: any) {
       </Head>
       <DocsContent hasTOC={true}>
         <header>
-          <h1>{scope.title}</h1>
+          <h1
+            dangerouslySetInnerHTML={{
+              __html: formattedTitle,
+            }}
+          ></h1>
           {!!scope.image && (
             <img
               src={scope.image}

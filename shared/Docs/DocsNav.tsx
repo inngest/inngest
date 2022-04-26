@@ -113,19 +113,26 @@ const DocsNavItem: React.FC<{ category: Category; doc?: DocScope }> = ({
     }
   }, [shouldExpand]);
 
+  const formattedTitle = title.replace(/`(.+)`/, "<code>$1</code>");
+
   return (
     <NavItem key={title} isCurrentPage={isCurrentPage}>
       {doc && doc.reading?.words > 0 ? (
-        <a className="docs-page" href={`/docs/${doc.slug}`}>
-          {title}
-        </a>
+        <a
+          className="docs-page"
+          href={`/docs/${doc.slug}`}
+          dangerouslySetInnerHTML={{
+            __html: formattedTitle,
+          }}
+        ></a>
       ) : (
         <span
           className="docs-category"
           onClick={() => setExpanded(!isExpanded)}
-        >
-          {title}
-        </span>
+          dangerouslySetInnerHTML={{
+            __html: formattedTitle,
+          }}
+        ></span>
       )}
 
       {!!pages?.length && (
