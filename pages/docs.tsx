@@ -1,3 +1,4 @@
+import Link from "next/link";
 import React from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
@@ -71,9 +72,9 @@ export default function DocsHome(props) {
 
         <p>
           Check out our quick start guides below or read more about{" "}
-          <a href="/docs/high-level-architecture">
+          <Link href="/docs/high-level-architecture">
             the system architecture here
-          </a>
+          </Link>
           .
         </p>
 
@@ -87,13 +88,11 @@ export default function DocsHome(props) {
               language.
             </p>
 
-            <Button
-              kind="primary"
-              size="small"
-              href="/docs/using-the-inngest-cli"
-            >
-              <ArrowUpRightIcon /> Read the guide
-            </Button>
+            <Link href="/docs/using-the-inngest-cli?ref=docs-home">
+              <Button kind="primary" size="small">
+                <ArrowUpRightIcon /> Read the guide
+              </Button>
+            </Link>
           </FeaturedDoc>
 
           <FeaturedDoc>
@@ -103,9 +102,11 @@ export default function DocsHome(props) {
               install needed.
             </p>
 
-            <Button kind="primary" size="small" href="/docs/function-ide-guide">
-              <ArrowUpRightIcon /> Read the guide
-            </Button>
+            <Link href="/docs/function-ide-guide?ref=docs-home">
+              <Button kind="primary" size="small">
+                <ArrowUpRightIcon /> Read the guide
+              </Button>
+            </Link>
           </FeaturedDoc>
         </FeaturedDocs>
 
@@ -113,13 +114,15 @@ export default function DocsHome(props) {
 
         <ul>
           <li>
-            <a href="/docs/quick-start">Quick start</a>
+            <Link href="/docs/quick-start">Quick start</Link>
           </li>
           <li>
-            <a href="/docs/event-format-and-structure">Event format</a>
+            <Link href="/docs/event-format-and-structure">Event format</Link>
           </li>
           <li>
-            <a href="/docs/event-user-audit-trails">Event user attribution</a>
+            <Link href="/docs/event-user-audit-trails">
+              Event user attribution
+            </Link>
           </li>
         </ul>
 

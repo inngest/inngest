@@ -1,3 +1,4 @@
+import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
@@ -118,13 +119,14 @@ const DocsNavItem: React.FC<{ category: Category; doc?: DocScope }> = ({
   return (
     <NavItem key={title} isCurrentPage={isCurrentPage}>
       {doc && doc.reading?.words > 0 ? (
-        <a
-          className="docs-page"
-          href={`/docs/${doc.slug}`}
-          dangerouslySetInnerHTML={{
-            __html: formattedTitle,
-          }}
-        ></a>
+        <Link href={`/docs/${doc.slug}`}>
+          <a
+            className="docs-page"
+            dangerouslySetInnerHTML={{
+              __html: formattedTitle,
+            }}
+          ></a>
+        </Link>
       ) : (
         <span
           className="docs-category"

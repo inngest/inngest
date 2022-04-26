@@ -1,18 +1,30 @@
 import React, { useEffect } from "react";
 import Head from "next/head";
+import { useRouter } from "next/router";
 import Script from "next/script";
 import { v4 as uuid } from "uuid";
+import { trackPageView } from "../utils/tracking";
 import "../styles/globals.css";
 
 import PageBanner from "../shared/PageBanner";
 
 function MyApp({ Component, pageProps }) {
+  const router = useRouter();
   useEffect(() => {
     if (pageProps.htmlClassName) {
       document.getElementsByTagName("html")[0].className =
         pageProps.htmlClassName;
     }
   });
+  useEffect(() => {
+    const handleRouteChange = (url) => {
+      trackPageView(url);
+    };
+    router.events.on("routeChangeComplete", handleRouteChange);
+    return () => {
+      router.events.off("routeChangeComplete", handleRouteChange);
+    };
+  }, [router.events]);
   return (
     <>
       <Head>
@@ -45,6 +57,7 @@ function MyApp({ Component, pageProps }) {
             ref = urlParams.get("ref");
           } catch (e) {}
           Inngest.identify({ anonymous_id: anonId() });
+          // See tracking for next/link based transitions in tracking.ts
           Inngest.event({
             name: "website/page.viewed",
             data: {
