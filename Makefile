@@ -1,5 +1,5 @@
 .PHONY: build
-build: get-library generate-library
+build: #get-library generate-library
 	yarn build
 
 .PHONY: dirty
