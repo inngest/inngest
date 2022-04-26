@@ -24,7 +24,9 @@ const Footer = () => {
             <a href="/product?ref=footer">Features</a>
             <a href="/docs?ref=footer">Documentation</a>
             {/*<a href="/integrations">Integrations</a>*/}
-            <a href="/docs/event-http-api-and-libraries">Libraries & SDKs</a>
+            <a href="/docs/docs/sending-data-via-inngest-sdks?ref=footer">
+              Libraries & SDKs
+            </a>
             <a
               href="https://typedwebhook.tools?ref=inngest-footer"
               className="typedwebhook-button"
