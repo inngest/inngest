@@ -3,16 +3,17 @@ category: "Managing workflows"
 title: "Deploying serverless functions"
 slug: "deploying-serverless-functions"
 order: 3
+hide: true
 ---
 
 This tutorial will take you through deploying your own serverless functions from scratch.
 
-We're going to be deploying a basic typescript function that gets the weather from workflow metadata, though any language can run on Inngest.  Here's the code:
+We're going to be deploying a basic typescript function that gets the weather from workflow metadata, though any language can run on Inngest. Here's the code:
 
 ```typescript
 async function main() {
   // Get the city from workflow metadata.  This is configured in the side panel.
-  const args = JSON.parse(Deno.args[0] || '{}');
+  const args = JSON.parse(Deno.args[0] || "{}");
   const city = args?.metadata?.city;
 
   if (!city) {
@@ -44,7 +45,7 @@ async function main() {
 main();
 ```
 
-Of course, your action can do anything you need:  resize files, run audio-to-text machine learning models, enriching data - whatever you want to code.
+Of course, your action can do anything you need: resize files, run audio-to-text machine learning models, enriching data - whatever you want to code.
 
 ## Prerequisites
 
@@ -97,7 +98,7 @@ You can generate an empty config file by running:
 inngestctl actions new $name > action.cue
 ```
 
-This will save the empty configuration to action.cue.  Remove ` > action.cue` to show the output without saving it.
+This will save the empty configuration to action.cue. Remove ` > action.cue` to show the output without saving it.
 
 The action configuration looks like this:
 
@@ -127,7 +128,6 @@ action: {
 ```
 
 Let's fill this in:
-
 
 ```json
 package main
@@ -175,7 +175,7 @@ action: {
 }
 ```
 
-You should commit this file to your repository.  With this saved, you can now deploy:
+You should commit this file to your repository. With this saved, you can now deploy:
 
 ```
 $ inngestctl actions deploy ./action.cue
@@ -186,5 +186,4 @@ it, finds the docker image you specified and uploads it from your machine to our
 
 Then, your action is ready for you to use in your account!
 
-To see more serverless examples, head to our serverless actions repository:  https://github.com/inngest/serverless-actions/
-
+To see more serverless examples, head to our serverless actions repository: https://github.com/inngest/serverless-actions/
