@@ -20,7 +20,7 @@ function MyApp({ Component, pageProps }) {
       </Head>
       <PageBanner href="/docs/function-ide-guide?ref=page-banner">
         Our new <strong>Web IDE</strong>: Build, test and deploy functions right
-        from your browser - Read the quickstart guide &rsaquo;
+        from your browser - Read the quickstart guide
       </PageBanner>
       <Component {...pageProps} />
       <Script
