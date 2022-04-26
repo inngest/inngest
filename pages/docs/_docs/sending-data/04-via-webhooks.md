@@ -33,7 +33,7 @@ When creating a webhook you will be prompted for it's name and can optionally sp
 
 ## Transforms
 
-Transforms allow you to change an incoming event's structure before we process it. Each event we process must match our [event format](/docs/events/event-format) by having **at least** the `name` and `data` field. You can specify ES6+ [JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript) code which transforms an incoming event when creating a webhook.
+Transforms allow you to change an incoming event's structure before we process it. Each event we process must match our [event format](/docs/event-format-and-structure) by having **at least** the `name` and `data` field. You can specify ES6+ [JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript) code which transforms an incoming event when creating a webhook.
 
 The transform **must return an object containing a `name` and `data` field**:
 

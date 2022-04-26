@@ -6,11 +6,11 @@ image: /assets/docs/high-level-architecture/high-level-architecture-featured-ima
 position: 1
 ---
 
-At a very high level, the Inngest platform is simple to understand. It's primarily composed of 4 main components: the event stream, the event store, an executor engine and a secure compute layer.
+At a very high level, the Inngest platform is simple to understand. The system is primarily composed of 4 main components: the event stream, the event store, an executor engine and a secure compute layer.
 
 ## Event stream
 
-The event stream is composed of a high volume API and and internal data stream that categorizes, transforms, and filters events in real time. The event stream is isolated by unique sources, which allows us to keep user data separated and secure. A user can create any number of sources, each with a unique source key, or use built in integrations which are all powered by the same source infrastructure.
+The event stream is composed of a high volume API and and internal data stream that categorizes, transforms, and filters events in real time. The event stream is isolated by unique sources, which allows us to keep user data separated and secure. You can create any number of sources, each with a unique source key, or use built in integrations which are all powered by the same source infrastructure.
 
 ## Event store
 
@@ -18,11 +18,13 @@ As event data is ingested, all events and their payload data are stored in our e
 
 ## Executor engine
 
-The executor engine is built to ensure that your functions run reliably and timely. When new [events are ingested](/docs/event-apis-and-integrations) our executor schedules what functions to run for that particular event. Each function can be triggered by `n` number of events and an Inngest account may have `n` number of functions triggered by a given event. The executor engine handles all of this logic deciding exactly what needs to be run.
+The executor engine is built to ensure that your functions run reliably and timely. When new [events are ingested](/docs/sending-data-via-inngest-sdks) our executor schedules what functions to run for that particular event. Each function can be triggered by `n` number of events and an Inngest account may have `n` number of functions triggered by a given event. The executor engine handles all of this logic deciding exactly what needs to be run.
 
 The executor engine also handles logging information to creates audit trails and retries the functions for when things may fail if an external service you communicate with is down.
 
 ## Secure computer layer
+
+This is where your function code runs.
 
 The executor engine passes off jobs to our compute layer which runs every function securely within it's own container. We've configured our system to ensure the complete isolation between functions.
 
