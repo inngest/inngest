@@ -1,3 +1,5 @@
+import { TOC } from "../pages/docs/_docs/_toc";
+
 export type DocScope = {
   // If the slug contains a forward slahs (eg. foo/bar), this page will automatically
   // be nested under the page with a slug of "foo"
@@ -46,15 +48,6 @@ type Docs = {
   docs: { [slug: string]: Doc };
   slugs: string[];
   categories: Categories;
-};
-
-const CATEGORY_ORDER = {
-  "What is Inngest?": 0,
-  "Getting started": 1,
-  "Sending Data": 2,
-  "Working with Events": 3,
-  Functions: 4,
-  "Managing workflows": 10,
 };
 
 export const getAllDocs = (() => {
@@ -124,8 +117,8 @@ export const getAllDocs = (() => {
 
       // Add category to list.
       if (!categories[d.scope.category]) {
-        const order = CATEGORY_ORDER.hasOwnProperty(d.scope.category)
-          ? CATEGORY_ORDER[d.scope.category]
+        const order = TOC.hasOwnProperty(d.scope.category)
+          ? TOC[d.scope.category]
           : 100;
         if (order === 100) {
           console.warn("no order for category", d.scope.category);
