@@ -271,6 +271,13 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
     }
   }
 
+  p,
+  li {
+    code {
+      color: var(--color-iris-100);
+    }
+  }
+
   a:not(.button) {
     color: var(--color-iris-60);
   }
