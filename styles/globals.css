@@ -65,7 +65,7 @@
 body.light-mode {
   --bg-color: var(--bg-color-l);
   /* --bg-primary-highlight: #fafafa; */
-  --highlight-color: #fff;
+  --highlight-color: #ffffff;
   --stroke-color: #D3D3DF;
   --stroke-color-light: #80848e;
   --font-color-primary: #070707;
