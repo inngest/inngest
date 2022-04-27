@@ -9,10 +9,10 @@ import Callout from "../../shared/Callout";
 import syntaxHighlightingCSS from "../../shared/syntaxHighlightingCSS";
 import { Wrapper } from "../../shared/blog";
 import { highlight } from "../../utils/code";
+import ThemeToggleButton from "../../shared/ThemeToggleButton";
 
 export default function BlogLayout(props) {
   const scope = JSON.parse(props.post.scope);
-  console.log(scope);
   return (
     <>
       <Head>
@@ -32,6 +32,9 @@ export default function BlogLayout(props) {
           />
         )}
       </Head>
+
+      <ThemeToggleButton isFloating={true} />
+
       <Wrapper>
         <Nav sticky={true} />
 

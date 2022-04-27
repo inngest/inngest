@@ -13,10 +13,17 @@ export default class MyDocument extends Document {
             dangerouslySetInnerHTML={{
               __html: `
                (function(){
-                 const hasLightMode = document.location.pathname.indexOf("/docs") === 0;
-                 const mode = window.localStorage.getItem("screen-mode");
-                 if (hasLightMode && mode) {
-                  document.body.classList.add(mode + "-mode");
+                // Any page with a base path matching this will enable light mode
+                const LIGHT_THEME_SUPPORT = [
+                  "/docs",
+                  "/blog"
+                ];
+                 const hasLightTheme = !!LIGHT_THEME_SUPPORT.find(function(p) {
+                  return document.location.pathname.indexOf(p) === 0;
+                 });
+                 const theme = window.localStorage.getItem("theme");
+                 if (hasLightTheme && theme) {
+                  document.body.classList.add(theme + "-theme");
                  }
                })();
               `,

@@ -4,6 +4,7 @@ import Head from "next/head";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import Content from "../shared/content";
+import ThemeToggleButton from "../shared/ThemeToggleButton";
 import { Wrapper } from "../shared/blog";
 
 export default function BlogLayout(props) {
@@ -27,6 +28,8 @@ export default function BlogLayout(props) {
         />
         <meta property="og:description" content={description} />
       </Head>
+
+      <ThemeToggleButton isFloating={true} />
 
       <Wrapper>
         <Nav />
@@ -103,7 +106,7 @@ const Main = styled.main`
   margin: 1rem auto 4rem;
   max-width: 980px;
 
-  @media (max-width: 980px) {
+  @media (max-width: 1000px) {
     margin-left: 1.5rem;
     margin-right: 1.5rem;
   }
@@ -114,6 +117,9 @@ const Header = styled.header`
   margin: 3rem auto 4rem;
   line-height: 1em;
   align-items: center;
+  h1 {
+    white-space: nowrap;
+  }
   h1,
   p {
     font-size: 0.8rem;
@@ -158,6 +164,14 @@ const FocusPost = styled(BlogPost)`
     margin-left: 1.6rem;
     max-width: 36%;
     border-radius: var(--border-radius);
+  }
+
+  @media (max-width: 800px) {
+    flex-direction: column-reverse;
+    img {
+      margin: 0 0 1rem;
+      max-width: 100%;
+    }
   }
 `;
 

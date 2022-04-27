@@ -62,7 +62,7 @@
   color: var(--font-color-primary);
 }
 
-body.light-mode {
+body.light-theme {
   --bg-color: var(--bg-color-l);
   /* --bg-primary-highlight: #fafafa; */
   --highlight-color: #ffffff;

@@ -112,7 +112,7 @@ const Container = styled.div<{ sticky?: boolean }>`
   }
 
   a:not(.button) {
-    color: var(--text-color);
+    color: var(--font-color-primary);
   }
 
   a + a {
@@ -143,7 +143,7 @@ const Container = styled.div<{ sticky?: boolean }>`
   @media only screen and (max-width: 800px) {
     grid-template-columns: 1fr 64px;
 
-    div:last-of-type {
+    .auth-options {
       display: none;
     }
 
@@ -204,7 +204,7 @@ const StyledLink = styled.a`
   text-decoration: none;
   border-radius: var(--border-radius);
 
-  color: var(--text-color);
+  color: var(--font-color-primary);
 
   &:hover {
     background: #2f6d9d11;

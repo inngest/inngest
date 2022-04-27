@@ -4,7 +4,7 @@ import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 
 import { Categories, Category, DocScope } from "../../utils/docs";
-import ScreenModeToggle from "../ScreenModeToggle";
+import ThemeToggleButton from "../ThemeToggleButton";
 import Button from "../Button";
 import Logo from "../Icons/Logo";
 import Hamburger from "../Icons/Hamburger";
@@ -61,7 +61,7 @@ const DocsNav: React.FC<{ categories: Categories }> = ({ categories }) => {
             ))}
           </NavList>
           <div>
-            <ScreenModeToggle />
+            <ThemeToggleButton />
           </div>
         </Nav>
         <CTAContainer>
@@ -173,7 +173,7 @@ const Sidebar = styled.div`
   }
   .mobile-nav-toggle {
     display: none;
-    color: var(--text-color);
+    color: var(--font-color-primary);
   }
   .align-bottom {
     position: absolute;
