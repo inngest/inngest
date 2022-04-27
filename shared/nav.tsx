@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
+import Logo from "../shared/Icons/Logo";
 import Button from "../shared/Button";
 import Hamburger from "../shared/Icons/Hamburger";
 
@@ -22,7 +23,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
     <Container className={["grid-center-8", show ? "show" : ""].join(" ")}>
       <div>
         <a href="/">
-          <img src="/logo-white.svg" alt="Inngest logo" className="logo" />
+          <Logo width={115} className="logo" />
         </a>
       </div>
 
@@ -77,7 +78,7 @@ const NavWrapper = styled.nav<{ sticky: boolean }>`
   background-color: var(--bg-color);
 `;
 
-const Container = styled.div<{ sticky: boolean }>`
+const Container = styled.div<{ sticky?: boolean }>`
   z-index: 1;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -108,6 +109,10 @@ const Container = styled.div<{ sticky: boolean }>`
   img {
     max-height: 60px;
     margin: 5px 40px 0 4px;
+  }
+
+  a:not(.button) {
+    color: var(--text-color);
   }
 
   a + a {
@@ -199,9 +204,7 @@ const StyledLink = styled.a`
   text-decoration: none;
   border-radius: var(--border-radius);
 
-  &[href]:not([href=""]) {
-    color: #fff;
-  }
+  color: var(--text-color);
 
   &:hover {
     background: #2f6d9d11;
