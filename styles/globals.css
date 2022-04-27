@@ -173,20 +173,6 @@ select {
 
 /** Copy relationship: everything but home. **/
 
-/* :not(.home) h2 + p {
-  margin-top: 2rem;
-} */
-
-:not(.home) h3 + p {
-  margin-top: 1rem;
-}
-
-:not(.home) p + h3,
-ol + h3,
-ul + h3 {
-  margin-top: 3rem;
-}
-
 p + ul,
 p + ol,
 ol + p,

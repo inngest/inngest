@@ -10,7 +10,7 @@ import Footer from "../shared/footer";
 import Button from "../shared/Button";
 import ArrowUpRightIcon from "../shared/Icons/ArrowUpRight";
 import { getAllDocs, Categories } from "../utils/docs";
-import docsSyntaxHighlightingCSS from "../shared/Docs/docsSyntaxHighlighting";
+import docsSyntaxHighlightingCSS from "../shared/syntaxHighlightingCSS";
 
 export async function getStaticProps() {
   const categories = getAllDocs().categories;
