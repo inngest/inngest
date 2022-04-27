@@ -5,13 +5,14 @@ import Hamburger from "../shared/Icons/Hamburger";
 
 type Props = {
   nolinks?: boolean;
+  sticky?: boolean;
 };
 
 const Nav: React.FC<Props> = (props) => {
   return (
-    <div className="grid nav-grid">
+    <NavWrapper sticky={props.sticky} className="grid">
       <NavContent {...props} />
-    </div>
+    </NavWrapper>
   );
 };
 
@@ -54,19 +55,33 @@ const NavContent: React.FC<Props> = (props: Props) => {
         </Button>
       </div>
 
-      <a href="#" className="toggle" onClick={() => setShow(!show)}>
+      <a
+        href="#"
+        className="toggle"
+        onClick={(e) => {
+          e.preventDefault();
+          setShow(!show);
+        }}
+      >
         <Hamburger size="24" />
       </a>
     </Container>
   );
 };
 
-const Container = styled.div`
+const NavWrapper = styled.nav<{ sticky: boolean }>`
+  position: ${({ sticky }) => (sticky ? "sticky" : "relative")};
+  z-index: 1;
+  top: ${({ sticky }) => (sticky ? "0" : "auto")};
+  margin: 1.5rem 0;
+  background-color: var(--bg-color);
+`;
+
+const Container = styled.div<{ sticky: boolean }>`
   z-index: 1;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  padding: 2rem 0;
-  height: 120px;
+  padding: 0.5rem 0;
 
   font-family: var(--font);
   font-size: 0.9em;

@@ -17,7 +17,7 @@ export default function BlogLayout(props) {
         <title>{scope.heading} → Inngest Blog</title>
       </Head>
       <Wrapper>
-        <Nav />
+        <Nav sticky={true} />
 
         {scope.img && (
           <div className="image grid">
@@ -25,9 +25,6 @@ export default function BlogLayout(props) {
               <Image>
                 {scope.img && <img src={scope.img} alt="" className="hero" />}
               </Image>
-            </div>
-            <div className="grid-line">
-              <span>/01</span>
             </div>
           </div>
         )}
@@ -39,9 +36,6 @@ export default function BlogLayout(props) {
               {scope.humanDate} &middot; {scope.reading.text}
             </p>
           </header>
-          <div className="grid-line">
-            <span>{scope.img ? "/02" : "/01"}</span>
-          </div>
         </Header>
         <Main className="grid">
           <main className="col-6-center sm-col-8-center">
@@ -50,9 +44,6 @@ export default function BlogLayout(props) {
               scope={scope}
             />
           </main>
-          <div className="grid-line">
-            <span>{scope.img ? "/03" : "/02"}</span>
-          </div>
         </Main>
         <Callout
           small="What is Inngest?"

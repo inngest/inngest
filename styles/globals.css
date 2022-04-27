@@ -100,11 +100,6 @@ a {
   color: var(--link-color);
 }
 
-.nav-grid {
-  position: relative;
-  z-index: 1;
-}
-
 html,
 body {
   background: var(--bg-color);
