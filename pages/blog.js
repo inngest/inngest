@@ -10,80 +10,62 @@ export default function BlogLayout(props) {
   const content = props.content.map(JSON.parse);
 
   const focus = content.find((c) => c.focus);
-  const rest = content.filter((c) => !focus || c.slug !== focus.slug).
-    sort((a, z) => z.date.localeCompare(a.date));
+  const rest = content
+    .filter((c) => !focus || c.slug !== focus.slug)
+    .sort((a, z) => z.date.localeCompare(a.date));
+
+  const description = `Updates from the Inngest team about our product, engineering, and community.`;
 
   return (
     <>
       <Head>
-        <title>Inngest → Product & engineering blog</title>
+        <title>Inngest → Product & Engineering blog</title>
+        <meta name="description" content={description}></meta>
+        <meta
+          property="og:title"
+          content="Inngest → Product & Engineering blog"
+        />
+        <meta property="og:description" content={description} />
       </Head>
 
       <Wrapper>
         <Nav />
 
-        <div className="header-grid grid">
-          <div className="col-4-center sm-col-8-center">
-            <header>
-              <h2>Inngest Blog</h2>
-              <p>
-                The latest news and announcements about Inngest, our ecosystem,
-                product uses, and the engineering effort behind it.
-              </p>
-            </header>
-          </div>
-          <div className="grid-line">
-            <span>/01</span>
-          </div>
-        </div>
+        <Main>
+          <Header>
+            <h1>Blog</h1>
+            <span className="divider">|</span>
+            <p>{description}</p>
+          </Header>
 
-        <div className="grid">
-          <div className="col-6-center sm-col-8-center">
-            {/* Blog posts */}
-
-            {focus && (
-              <Focus className={focus.img ? "" : "no-img"}>
-                <a href={`/blog/${focus.slug}`}>
-                  <div>
-                    <h2>{focus.heading}</h2>
-                    <Date>{focus.humanDate}</Date>
-                    <p>{focus.subtitle}</p>
-                  </div>
-                  {focus.img && (
-                    <div className="img">
-                      <img src={focus.img} />
-                    </div>
-                  )}
-                </a>
-              </Focus>
-            )}
-
-            <List>
-              {rest.map((item) => (
-                <a
-                  href={`/blog/${item.slug}`}
-                  className="post--item"
-                  key={item.slug}
-                >
-                  <h2>{item.heading}</h2>
-                  <Date>{item.humanDate}</Date>
-                  <p>{item.subtitle}</p>
-                </a>
-              ))}
-
-              <div>
-                <h2>More to come...</h2>
-                <p>
-                  We'll be posting engineering articles, product releases and
-                  case studies consistently.
-                </p>
+          {focus && (
+            <FocusPost href={`/blog/${focus.slug}`}>
+              <div className="post-text">
+                <h2>{focus.heading}</h2>
+                <p className="byline">{focus.humanDate}</p>
+                <p>{focus.subtitle}</p>
               </div>
-            </List>
-          </div>
-          <div className="grid-line">
-            <span>/02</span>
-          </div>
-        </div>
+              {focus.image && <img src={focus.image} />}
+            </FocusPost>
+          )}
+
+          <List>
+            {rest.map((item) => (
+              <PreviousPost
+                href={`/blog/${item.slug}`}
+                className="post--item"
+                key={item.slug}
+              >
+                {item.image && <img src={item.image} />}
+                <div className="post-text">
+                  <h2>{item.heading}</h2>
+                  <p className="byline">{item.humanDate}</p>
+                  <p>{item.subtitle}</p>
+                </div>
+              </PreviousPost>
+            ))}
+          </List>
+        </Main>
         <Footer />
       </Wrapper>
     </>
@@ -117,73 +99,96 @@ export async function getStaticProps() {
   return { props: { content } };
 }
 
-const Focus = styled.div`
-  margin: 1rem 0 2rem -2rem;
-  width: calc(100% + 4rem);
-  z-index: 1;
-  box-shadow: 0 20px 80px rgba(var(--black-rgb), 0.5);
-  border-radius: var(--border-radius);
-  border: 1px solid rgba(var(--black-rgb), 0.5);
-  background: var(--black);
+const Main = styled.main`
+  margin: 1rem auto 4rem;
+  max-width: 980px;
 
-  &.no-img a {
-    display: block;
-  }
-
-  a {
-    text-decoration: none;
-    display: grid;
-    grid-template-columns: 3fr 2fr;
-    align-items: center;
-
-    img {
-      max-width: 100%;
-    }
-
-    /* Text */
-    > div:first-of-type {
-      padding: 4rem 3rem;
-    }
-  }
-  h2 {
-    margin: 0 0 10px;
-  }
-
-  .img {
-    display: flex;
-    justify-content: center;
+  @media (max-width: 980px) {
+    margin-left: 1.5rem;
+    margin-right: 1.5rem;
   }
 `;
 
-const Date = styled.div`
-  font-size: 0.9rem;
-  opacity: 0.7;
-  margin-bottom: 1.5rem;
+const Header = styled.header`
+  display: flex;
+  margin: 3rem auto 4rem;
+  line-height: 1em;
+  align-items: center;
+  h1,
+  p {
+    font-size: 0.8rem;
+    line-height: 1em;
+    padding: 0;
+  }
+  p {
+    color: var(--font-color-secondary);
+  }
+  .divider {
+    margin: 0 0.5rem;
+    font-size: 0.8rem;
+    color: var(--stroke-color);
+  }
+`;
+
+const BlogPost = styled.a`
+  display: flex;
+
+  flex-direction: column;
+  color: var(--font-color-primary);
+  text-decoration: none;
+
+  .byline {
+    margin: 0.5rem 0;
+    font-size: 0.8rem;
+    color: var(--font-color-secondary);
+  }
+  p {
+    margin-top: 1.2rem;
+    font-size: 0.9rem;
+  }
+`;
+
+const FocusPost = styled(BlogPost)`
+  width: 100%;
+  margin: 3rem 0;
+  align-items: center;
+  flex-direction: row;
+
+  img {
+    margin-left: 1.6rem;
+    max-width: 36%;
+    border-radius: var(--border-radius);
+  }
+`;
+
+const PreviousPost = styled(BlogPost)`
+  align-items: start;
+  /* background: var(--highlight-color); */
+  border: 1px solid var(--stroke-color);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+
+  .post-text {
+    padding: 1.2rem;
+  }
+
+  h2 {
+    font-size: 1.3rem;
+    line-height: 1.4em;
+  }
+
+  img {
+    align-self: center;
+    max-width: 100%; // a 600x300px image filles the width
+    width: auto;
+  }
 `;
 
 const List = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-gap: 2rem;
-  padding: 0 0 20vh 0;
-
-  > div,
-  > a {
-    background: #00000077;
-    border: 1px solid rgba(var(--black-rgb), 0.5);
-    padding: 3rem 3rem 2rem;
-    text-decoration: none;
-    border-radius: var(--border-radius);
-  }
-
-  h2 {
-    font-size: 1.65rem;
-    margin: 0 0 10px;
-  }
-
-  > div:last-of-type {
-    opacity: 0.6;
-  }
+  margin: 5rem 2rem 20vh;
 
   @media (max-width: 800px) {
     grid-template-columns: 1fr;
