@@ -162,7 +162,7 @@ const FocusPost = styled(BlogPost)`
 
   img {
     margin-left: 1.6rem;
-    max-width: 36%;
+    max-width: 45%;
     border-radius: var(--border-radius);
   }
 
