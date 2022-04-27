@@ -30,9 +30,9 @@ function MyApp({ Component, pageProps }) {
       <Head>
         <link rel="icon" href="/favicon.png" />
       </Head>
-      <PageBanner href="/docs/function-ide-guide?ref=page-banner">
-        Our new <strong>Web IDE</strong>: Build, test and deploy functions right
-        from your browser - Read the quickstart guide
+      <PageBanner href="/docs/using-the-inngest-cli?ref=page-banner">
+        Introducing the Inngest CLI: build, test, and ship serverless functions
+        locally
       </PageBanner>
       <Component {...pageProps} />
       <Script
