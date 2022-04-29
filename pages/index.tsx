@@ -149,6 +149,30 @@ export default function Home() {
         </div>
       </div>
 
+      <Consulting>
+        <p><strong>Get started with experts.</strong> We're working with startups and engineering teams to consult implement product functionality, no strings attached.</p>
+        <p className="secondary-text">
+          Let us show you how to build reliable serverless functionality for your product, in minutes.  We'll walk through implementation using your product requirements from start to end &mdash; delivering live functionality for your product.
+        </p>
+        <p className="secondary-text">
+          Get in touch:
+        </p>
+      <div className="grid">
+        <div className="grid-center-6 sm-col-8-center">
+          <div className="button-group">
+            <Button
+              kind="primary"
+              size="small"
+              href="https://calendly.com/inngest-thb/30min"
+            >
+              <ArrowUpRightIcon /> Schedule a call
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      </Consulting>
+
       <SectionContext>
         <h3>
           Fast, reliable event-driven systems for all. With powerful
@@ -354,6 +378,39 @@ const Wrapper = styled.div`
   }
 `;
 
+const Consulting = styled.div`
+  --stripe-color: #15151c;
+
+  background: linear-gradient(
+    135deg,
+    var(--stripe-color) 0%,
+    var(--bg-color) 12.5%,
+    var(--bg-color) 50%,
+    var(--stripe-color) 15%,
+    var(--stripe-color) 15%,
+    var(--bg-color) 62.5%,
+    var(--bg-color) 100%
+  );
+  background-size: 9px 9px;
+
+  padding: 8vh 0;
+  margin: 10vh 0;
+  border-top: 1px dashed var(--grid-line-color);
+  border-bottom: 1px dashed var(--grid-line-color);
+  text-align: center;
+
+  p:first-of-type {
+    margin: 0.2rem auto 1rem;
+    font-size: 1.1em;
+  }
+  p {
+    max-width: 800px;
+    margin: 0 auto 2rem;
+    text-align: center;
+  }
+`
+
+
 const Hero = styled.div`
   padding: 3em 0 4em;
 
@@ -427,10 +484,7 @@ const Hero = styled.div`
 const SectionContext = styled.div`
   --stripe-color: #15151c;
 
-  margin: 4em auto 3em;
-  padding: 1.5em 3em;
-  max-width: 30rem;
-  text-align: center;
+/*
   background: linear-gradient(
     135deg,
     var(--stripe-color) 12.5%,
@@ -442,6 +496,12 @@ const SectionContext = styled.div`
     var(--bg-color) 100%
   );
   background-size: 9px 9px;
+*/
+
+  margin: 4em auto 3em;
+  padding: 1.5em 3em;
+  max-width: 30rem;
+  text-align: center;
 
   h3 {
     font-size: 1.1em;
