@@ -33,11 +33,28 @@ type Function struct {
 	// Trigger represnets the trigger for the function.
 	Triggers []Trigger `json:"triggers"`
 
+	// Idempotency allows the specification of an idempotency key by templating event
+	// data, eg:
+	//
+	//  `{{ event.data.order_id }}`.
+	//
+	// When specified, a function will run at most once per 24 hours for the given unique
+	// key.
+	Idempotency *string `json:"idempotency,omitempty"`
+
+	// Throttle allows specifying custom throttling for the function.
+	Throttle *inngest.Throttle `json:"throttle,omitempty"`
+
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
-	//
-	// TODO: Enable for use with step functions, with edges.
-	// Actions []Action
+	Steps []Step `json:"steps,omitempty"`
+}
+
+// Step represents a single unit of code (action) which runs as part of a step function, in a DAG.
+type Step struct {
+	ID      string                 `json:"id"`
+	Name    string                 `json:"name"`
+	Runtime inngest.RuntimeWrapper `json:"runtime"`
 }
 
 // New returns a new, empty function with a randomly generated ID.
@@ -100,9 +117,21 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 		return nil, fmt.Errorf("unknown trigger type")
 	}
 
+	if f.Throttle != nil {
+		w.Throttle = f.Throttle
+	}
+
+	if f.Idempotency != nil {
+		w.Throttle = &inngest.Throttle{
+			Key:    f.Idempotency,
+			Count:  1,
+			Period: "24h",
+		}
+	}
+
 	// This has references to actions.  Create the actions then reference them
 	// from the workflow.
-	actions, err := f.Actions(ctx)
+	actions, edges, err := f.Actions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -115,33 +144,66 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 		})
 	}
 
-	// TODO: When supporting > 1 step, the function must define edges itself.
-	// Right now we assume a single action (all that's supported) and build an
-	// edge from the trigger to the action.
-	w.Edges = []inngest.Edge{{
-		Outgoing: "trigger",
-		Incoming: 1,
-	}}
+	w.Edges = edges
+
+	// TODO: When supporting > 1 action, validate the edges.
 
 	return &w, nil
 }
 
 // Actions produces configuration for each step of the function.  Each config
 // file specifies how to run the code.
-func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, error) {
-	// XXX: In the very near future we'll adapt this function package to
-	// support step functions in the same way that a workflow does.  This
-	// means that we have to support returning many actions.
-
+func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []inngest.Edge, error) {
 	// This has no defined actions, which means its an implicit
 	// single action invocation.  We assume that a Dockerfile
 	// exists in the project root, and that we can build the
 	// image which contains all of the code necessary to run
 	// the function.
-	return f.defaultAction(ctx)
+	if len(f.Steps) == 0 {
+		return f.defaultAction(ctx)
+	}
+
+	// XXX: We're redefining how we define "edges" within steps, and so right now
+	// only support 1 edge.
+	if len(f.Steps) > 1 {
+		return nil, nil, fmt.Errorf("Function definitions currently only support one step")
+	}
+
+	// TODO: With > 1 step, convert each step into a tree, with nodes pointing from the trigger
+	// to each step in a stable manner.
+
+	a, err := f.action(ctx, f.Steps[0], 0)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	edges := []inngest.Edge{{
+		Outgoing: "trigger",
+		Incoming: 1,
+	}}
+	return []inngest.ActionVersion{a}, edges, nil
 }
 
-func (f Function) defaultAction(ctx context.Context) ([]inngest.ActionVersion, error) {
+func (f Function) action(ctx context.Context, s Step, n int) (inngest.ActionVersion, error) {
+	id := fmt.Sprintf("%s-step-%d", f.ID, n)
+	if prefix, err := state.AccountIdentifier(ctx); err == nil {
+		id = fmt.Sprintf("%s/%s", prefix, id)
+	}
+
+	a := inngest.ActionVersion{
+		Name:    s.Name,
+		DSN:     id,
+		Runtime: s.Runtime,
+	}
+	if s.Runtime.RuntimeType() != "http" {
+		// Non-HTTP actions can read secrets;  http actions are external APIs and so
+		// don't need secret access.
+		a.Scopes = []string{"secret:read:*"}
+	}
+	return a, nil
+}
+
+func (f Function) defaultAction(ctx context.Context) ([]inngest.ActionVersion, []inngest.Edge, error) {
 	id := f.ID + "-action"
 
 	if prefix, err := state.AccountIdentifier(ctx); err == nil {
@@ -159,7 +221,11 @@ func (f Function) defaultAction(ctx context.Context) ([]inngest.ActionVersion, e
 			},
 		},
 	}
-	return []inngest.ActionVersion{a}, nil
+	edges := []inngest.Edge{{
+		Outgoing: "trigger",
+		Incoming: 1,
+	}}
+	return []inngest.ActionVersion{a}, edges, nil
 }
 
 func randomID() (string, error) {

@@ -44,9 +44,23 @@ type Workflow struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 
+	Throttle *Throttle `json:"throttle,omitempty"`
+
 	Triggers []Trigger `json:"triggers"`
 	Actions  []Action  `json:"actions"`
 	Edges    []Edge    `json:"edges"`
+}
+
+type Throttle struct {
+	// Count is how often the function can be called within the specified period
+	Count uint `json:"count"`
+	// Period represents the time period for throttling the function
+	Period string `json:"period"`
+	// Key is an optional string to constrain throttling using event data.  For
+	// example, if you want to throttle incoming notifications based off of a user's
+	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
+	// that we throttle functions for each user independently.
+	Key *string `json:"key"`
 }
 
 // Trigger represents the starting point for a workflow

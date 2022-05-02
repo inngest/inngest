@@ -71,31 +71,6 @@ import (
 	optional: bool | *false // whether this is an optional/nullable type.
 }
 
-// Setting is an enum of specific settings which can be set for this action.
-#Setting: {
-	name: string
-	form: #Form
-} & (#SettingEnum | #SettingString | #SettingWildcard)
-
-#SettingWildcard: {
-	name: string
-	type: "wildcard"
-	form: #Form
-}
-
-#SettingEnum: {
-	name:    string
-	type:    "enum"
-	form:    #Form
-	choices: [ ...string] | *[]
-}
-
-#SettingString: {
-	name: string
-	type: "string"
-	form: #Form
-}
-
 // Metadata represents metadata used to configure the action within a specific workflow.
 #Metadata: {
 	// The name of the metadata used in our setting.

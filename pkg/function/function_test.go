@@ -58,7 +58,8 @@ action: {
   }
 }`
 
-	actions, err := fn.Actions(context.Background())
+	actions, edges, err := fn.Actions(context.Background())
+	_ = edges
 	require.NoError(t, err)
 	require.Equal(t, 1, len(actions))
 

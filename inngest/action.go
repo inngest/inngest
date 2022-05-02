@@ -118,6 +118,28 @@ func (r RuntimeDocker) MarshalJSON() ([]byte, error) {
 	return json.Marshal(data)
 }
 
+func (RuntimeDocker) RuntimeType() string {
+	return "docker"
+}
+
+type RuntimeHTTP struct {
+	URL string `json:"url"`
+}
+
+// MarshalJSON implements the JSON marshal interface so that cue can format this
+// correctly when serializing actions.
+func (r RuntimeHTTP) MarshalJSON() ([]byte, error) {
+	data := map[string]interface{}{
+		"type": "http",
+		"url":  r.URL,
+	}
+	return json.Marshal(data)
+}
+
+func (RuntimeHTTP) RuntimeType() string {
+	return "http"
+}
+
 type VersionInfo struct {
 	Major int `json:"major"`
 	Minor int `json:"minor"`
@@ -136,10 +158,6 @@ type Response struct {
 	Name     string `json:"name"`
 	Type     string `json:"type"`
 	Optional bool   `json:"optional"`
-}
-
-func (RuntimeDocker) RuntimeType() string {
-	return "docker"
 }
 
 type MetadataMap map[string]Metadata

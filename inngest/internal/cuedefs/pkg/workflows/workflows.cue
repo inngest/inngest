@@ -16,10 +16,6 @@ import (
 	// The workflow name.
 	name: string
 
-	workflowType:    "alert" | "error_alert" | *"general"
-	throttlePeriod?: string
-	throttleCount?:  >=0 | *0
-
 	// The triggers which start a workflow.
 	//
 	// If this is a scheduled trigger, only one trigger may exist.
