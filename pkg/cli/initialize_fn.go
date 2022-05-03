@@ -407,7 +407,7 @@ func (f *initModel) updateCron(msg tea.Msg) (tea.Model, tea.Cmd) {
 		f.nextCron = schedule.Next(time.Now())
 	}
 
-	if key, ok := msg.(tea.KeyMsg); ok && key.Type == tea.KeyEnter && f.name != "" && f.cronError == nil {
+	if key, ok := msg.(tea.KeyMsg); ok && key.Type == tea.KeyEnter && f.cron != "" && f.cronError == nil {
 		f.textinput.Placeholder = cronPlaceholder
 		f.textinput.SetValue("")
 		f.state = stateAskRuntime
@@ -507,9 +507,11 @@ func (f *initModel) updateTrigger(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "Event based":
 			f.textinput.Placeholder = eventPlaceholder
 			f.state = stateAskEvent
+			f.textinput.SetValue("")
 		case "Scheduled":
 			f.textinput.Placeholder = cronPlaceholder
 			f.state = stateAskCron
+			f.textinput.SetValue("")
 		}
 		return f, nil
 	}
@@ -535,6 +537,7 @@ func (f *initModel) updateRuntime(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case runtimeHTTP:
 			// Ask for the URL we're hitting.
 			f.textinput.Placeholder = urlPlaceholder
+			f.textinput.SetValue("")
 			f.state = stateAskURL
 		case runtimeDocker:
 			// If we've attempted to update the scaffolds but have zero languages available,
@@ -634,14 +637,14 @@ func (f *initModel) renderState() string {
 
 	write("Function name: " + BoldStyle.Render(f.name) + "\n")
 
-	if f.runtimeType != "" {
-		write("Function type: " + BoldStyle.Render(f.runtimeType) + "\n")
-	}
 	if f.triggerType != "" {
 		write("Function trigger: " + BoldStyle.Render(f.triggerType) + "\n")
 	}
 	if f.cron != "" && f.state != stateAskCron {
 		write("Cron schedule: " + BoldStyle.Render(f.cron) + " (" + f.humanCron + ")\n")
+	}
+	if f.runtimeType != "" {
+		write("Function type: " + BoldStyle.Render(f.runtimeType) + "\n")
 	}
 	if f.event != "" && f.state != stateAskEvent {
 		write(fmt.Sprintf("Event trigger: %s\n", f.event))
