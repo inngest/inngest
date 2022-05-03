@@ -83,39 +83,43 @@ func deployWorkflow(ctx context.Context, fn *function.Function) error {
 }
 
 // deployAction deploys a given action to Inngest, creating a new version, pushing the image,
-// the  setting the action to "published" once pushed.
+// the setting the action to "published" once pushed.
 func deployAction(ctx context.Context, a inngest.ActionVersion) error {
+	var err error
+
 	state := state.RequireState(ctx)
 
 	// Ensure we normalize the DSN before building.
 	a = normalizeDSN(ctx, a)
 
 	tag := a.DSN
-	fmt.Println(cli.BoldStyle.Render(fmt.Sprintf("Building action %s...", tag)))
 
-	// Build the image.  We always need to do this first to ensure we have
-	// an up-to-date image and checksum for the action.
-	ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
-		QuitOnComplete: true,
-		BuildOpts: docker.BuildOpts{
-			Path:     ".",
-			Tag:      tag,
-			Platform: "linux/amd64",
-		},
-	})
-	if err != nil {
-		return err
-	}
-	if err := tea.NewProgram(ui).Start(); err != nil {
-		return err
-	}
-	if ui.Builder.Error() != nil {
-		// We don't want to repeat the docker build error in
-		// the UI.
-		return fmt.Errorf("Exiting after a build error")
-	}
+	if a.Runtime.RuntimeType() == inngest.RuntimeTypeDocker {
+		fmt.Println(cli.BoldStyle.Render(fmt.Sprintf("Building action %s...", tag)))
 
-	fmt.Println("")
+		// Build the image.  We always need to do this first to ensure we have
+		// an up-to-date image and checksum for the action.
+		ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
+			QuitOnComplete: true,
+			BuildOpts: docker.BuildOpts{
+				Path:     ".",
+				Tag:      tag,
+				Platform: "linux/amd64",
+			},
+		})
+		if err != nil {
+			return err
+		}
+		if err := tea.NewProgram(ui).Start(); err != nil {
+			return err
+		}
+		if ui.Builder.Error() != nil {
+			// We don't want to repeat the docker build error in
+			// the UI.
+			return fmt.Errorf("Exiting after a build error")
+		}
+		fmt.Println("")
+	}
 
 	// configure version information, ensuring that we skip redeploying actions that are
 	// already live.
@@ -135,27 +139,29 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 
 	fmt.Println(cli.BoldStyle.Render(fmt.Sprintf("Deploying action version %s...", a.Version.String())))
 
-	// Create the action in the UI.
+	// Create the action in the API.
 	if _, err = state.Client.CreateAction(ctx, config); err != nil {
 		return fmt.Errorf("error creating action: %w", err)
 	}
 
-	// Push
-	switch a.Runtime.RuntimeType() {
-	case "docker":
-		if _, err = docker.Push(ctx, a, state.Client.Credentials()); err != nil {
-			return fmt.Errorf("error pushing action: %w", err)
+	if a.Runtime.RuntimeType() == inngest.RuntimeTypeDocker {
+		// Push the docker image.
+		switch a.Runtime.RuntimeType() {
+		case "docker":
+			if _, err = docker.Push(ctx, a, state.Client.Credentials()); err != nil {
+				return fmt.Errorf("error pushing action: %w", err)
+			}
+		default:
+			return fmt.Errorf("unknown runtime type: %s", a.Runtime.RuntimeType())
 		}
-	default:
-		return fmt.Errorf("unknown runtime type: %s", a.Runtime.RuntimeType())
-	}
 
-	// Publish
-	_, err = state.Client.UpdateActionVersion(ctx, client.ActionVersionQualifier{
-		DSN:          a.DSN,
-		VersionMajor: a.Version.Major,
-		VersionMinor: a.Version.Minor,
-	}, true)
+		// Publish
+		_, err = state.Client.UpdateActionVersion(ctx, client.ActionVersionQualifier{
+			DSN:          a.DSN,
+			VersionMajor: a.Version.Major,
+			VersionMinor: a.Version.Minor,
+		}, true)
+	}
 
 	if err == nil {
 		fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render("Action deployed"))
@@ -184,11 +190,6 @@ func normalizeDSN(ctx context.Context, a inngest.ActionVersion) inngest.ActionVe
 func configureVersionInfo(ctx context.Context, a inngest.ActionVersion) (inngest.ActionVersion, error) {
 	state := state.RequireState(ctx)
 
-	digest, err := docker.Digest(ctx, a)
-	if err != nil {
-		return a, err
-	}
-
 	// If we're publishing a specific version, attempt to find it.  Else, load the latest
 	// action version.  This automatically happens depending on whether a.Version is nil.
 	found, err := state.Action(ctx, a.DSN, a.Version)
@@ -211,18 +212,39 @@ func configureVersionInfo(ctx context.Context, a inngest.ActionVersion) (inngest
 		return a, fmt.Errorf("Version %s of the action already exists", a.Version.String())
 	}
 
-	// If the found action version already deployed has the same digest, we can skip
-	// deploying altogether.
-	if found != nil && found.ImageSha256 != nil && *found.ImageSha256 == digest {
-		// XXX: Ensure that the image is live.
-		return a, ErrAlreadyDeployed
-	}
-
-	if found != nil {
-		// Deploy the next minor version.
+	// Are the runtimes the same?
+	if a.Runtime.Runtime != found.Runtime.Runtime {
 		a.Version = &inngest.VersionInfo{
 			Major: found.Version.Major,
 			Minor: found.Version.Minor + 1,
+		}
+		return a, nil
+	}
+
+	switch a.Runtime.RuntimeType() {
+	case inngest.RuntimeTypeHTTP:
+		// The URL must be the same, which is covered in the check above.
+		return a, ErrAlreadyDeployed
+
+	case inngest.RuntimeTypeDocker:
+		digest, err := docker.Digest(ctx, a)
+		if err != nil {
+			return a, err
+		}
+
+		// If the found action version already deployed has the same digest, we can skip
+		// deploying altogether.
+		if found != nil && found.ImageSha256 != nil && *found.ImageSha256 == digest {
+			// XXX: Ensure that the image is live.
+			return a, ErrAlreadyDeployed
+		}
+
+		if found != nil {
+			// Deploy the next minor version.
+			a.Version = &inngest.VersionInfo{
+				Major: found.Version.Major,
+				Minor: found.Version.Minor + 1,
+			}
 		}
 	}
 

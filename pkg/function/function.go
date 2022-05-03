@@ -194,7 +194,6 @@ func (f Function) action(ctx context.Context, s Step, n int) (inngest.ActionVers
 		DSN:     id,
 		Runtime: s.Runtime,
 	}
-	fmt.Printf("%#v\n", s)
 	if s.Runtime.RuntimeType() != "http" {
 		// Non-HTTP actions can read secrets;  http actions are external APIs and so
 		// don't need secret access.

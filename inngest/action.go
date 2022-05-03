@@ -10,6 +10,11 @@ import (
 	"github.com/inngest/inngestctl/inngest/internal/cuedefs"
 )
 
+const (
+	RuntimeTypeDocker = "docker"
+	RuntimeTypeHTTP   = "http"
+)
+
 // ParseAction parses a cue configuration defining an action.
 func ParseAction(input string) (*ActionVersion, error) {
 	val, err := cuedefs.ParseAction(input)
@@ -87,14 +92,14 @@ func (r *RuntimeWrapper) UnmarshalJSON(b []byte) error {
 	}
 
 	switch typ {
-	case "docker":
+	case RuntimeTypeDocker:
 		docker := RuntimeDocker{}
 		if err := json.Unmarshal(b, &docker); err != nil {
 			return err
 		}
 		r.Runtime = docker
 		return nil
-	case "http":
+	case RuntimeTypeHTTP:
 		rt := RuntimeHTTP{}
 		if err := json.Unmarshal(b, &rt); err != nil {
 			return err
@@ -120,7 +125,7 @@ type RuntimeDocker struct {
 // correctly when serializing actions.
 func (r RuntimeDocker) MarshalJSON() ([]byte, error) {
 	data := map[string]interface{}{
-		"type":  "docker",
+		"type":  RuntimeTypeDocker,
 		"image": r.Image,
 	}
 	if len(r.Entrypoint) > 0 {
@@ -130,7 +135,7 @@ func (r RuntimeDocker) MarshalJSON() ([]byte, error) {
 }
 
 func (RuntimeDocker) RuntimeType() string {
-	return "docker"
+	return RuntimeTypeDocker
 }
 
 type RuntimeHTTP struct {
@@ -141,14 +146,14 @@ type RuntimeHTTP struct {
 // correctly when serializing actions.
 func (r RuntimeHTTP) MarshalJSON() ([]byte, error) {
 	data := map[string]interface{}{
-		"type": "http",
+		"type": RuntimeTypeHTTP,
 		"url":  r.URL,
 	}
 	return json.Marshal(data)
 }
 
 func (RuntimeHTTP) RuntimeType() string {
-	return "http"
+	return RuntimeTypeHTTP
 }
 
 type VersionInfo struct {

@@ -31,7 +31,7 @@ import (
 	//  2. A map of setting names to their definitions, ensuring that users configure each setting correctly.
 	settings?: {[Category=_]:
 		// A setting category can have either any setting names, or a specific set.
-		{[Name=_]: #Setting & {name: Name}}
+		{[Name=_]: {name: Name}}
 	}
 
 	// workflowMetadata represents workflow-specific metadata used to configure the action
@@ -49,13 +49,18 @@ import (
 	runtime: #Runtime
 }
 
-#Runtime: (#RuntimeDocker)
+#Runtime: (#RuntimeDocker | #RuntimeHTTP)
 
 #RuntimeDocker: {
 	type:    "docker"
 	image:   string
 	memory?: >=64 & <=8096
 	entrypoint?: [ ...string]
+}
+
+#RuntimeHTTP: {
+	type: "http"
+	url:  string
 }
 
 // ActionType depicts the type of the response and metadata input.
