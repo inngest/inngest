@@ -70,6 +70,10 @@ type RuntimeWrapper struct {
 	Runtime
 }
 
+func (r *RuntimeWrapper) MarshalJSON() ([]byte, error) {
+	return json.Marshal(r.Runtime)
+}
+
 func (r *RuntimeWrapper) UnmarshalJSON(b []byte) error {
 	// XXX: This is wasteful, as we decode the runtime twice.  We can implement a custom decoder
 	// which decodes and fills in one pass.
@@ -90,9 +94,16 @@ func (r *RuntimeWrapper) UnmarshalJSON(b []byte) error {
 		}
 		r.Runtime = docker
 		return nil
+	case "http":
+		rt := RuntimeHTTP{}
+		if err := json.Unmarshal(b, &rt); err != nil {
+			return err
+		}
+		r.Runtime = rt
+		return nil
+	default:
+		return fmt.Errorf("unknown runtime type: %s", typ)
 	}
-
-	return nil
 }
 
 type Runtime interface {

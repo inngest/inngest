@@ -34,6 +34,7 @@ func NewCmdRun() *cobra.Command {
 func doRun(cmd *cobra.Command, args []string) {
 	fn, err := function.Load(".")
 	if err != nil {
+		fmt.Println(err.Error())
 		fmt.Println("\n" + cli.RenderError("No inngest.json or inngest.cue file found in your current directory") + "\n")
 		os.Exit(1)
 		return
@@ -41,7 +42,7 @@ func doRun(cmd *cobra.Command, args []string) {
 
 	err = runFunction(cmd.Context(), *fn)
 	if err != nil {
-		fmt.Println("\n" + cli.RenderError(err.Error()))
+		// This should already have been printed to the terminal.
 		os.Exit(1)
 	}
 }
@@ -68,9 +69,10 @@ func runFunction(ctx context.Context, fn function.Function) error {
 
 	// Build the image.
 	ui, err := cli.NewRunUI(ctx, cli.RunUIOpts{
-		Action: actions[0],
-		Event:  evt,
-		Seed:   runSeed,
+		Function: fn,
+		Action:   actions[0],
+		Event:    evt,
+		Seed:     runSeed,
 	})
 	if err != nil {
 		return err
@@ -104,6 +106,8 @@ func event(ctx context.Context, fn function.Function) (map[string]interface{}, e
 	return fakeEvent(ctx, fn)
 }
 
+// fakeEvent finds event triggers within the function definition, then chooses
+// a random trigger from the definitions and generates fake data for the event.
 func fakeEvent(ctx context.Context, fn function.Function) (map[string]interface{}, error) {
 	evtTriggers := []function.Trigger{}
 	for _, t := range fn.Triggers {
@@ -112,9 +116,15 @@ func fakeEvent(ctx context.Context, fn function.Function) (map[string]interface{
 		}
 	}
 
-	i := rand.Intn(len(evtTriggers))
+	if len(evtTriggers) == 0 {
+		return map[string]interface{}{}, nil
+	}
+
+	rng := rand.New(rand.NewSource(runSeed))
+
+	i := rng.Intn(len(evtTriggers))
 	if evtTriggers[i].EventTrigger.Definition == nil {
-		return nil, nil
+		return map[string]interface{}{}, nil
 	}
 
 	def, err := evtTriggers[i].EventTrigger.Definition.Cue()
@@ -128,7 +138,7 @@ func fakeEvent(ctx context.Context, fn function.Function) (map[string]interface{
 		return nil, err
 	}
 
-	fakedata.DefaultOptions.Rand = rand.New(rand.NewSource(runSeed))
+	fakedata.DefaultOptions.Rand = rng
 
 	val, err := fakedata.Fake(ctx, inst.Value())
 	if err != nil {

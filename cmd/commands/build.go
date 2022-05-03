@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngestctl/pkg/cli"
-	"github.com/inngest/inngestctl/pkg/docker"
+	"github.com/inngest/inngestctl/pkg/runtime/docker"
 	"github.com/spf13/cobra"
 )
 
