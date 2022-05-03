@@ -1,0 +1,23 @@
+sudo: false
+
+language: go
+
+env:
+  - GO111MODULE=on
+
+go:
+  - "1.13.x"
+  - "1.14.x"
+go_import_path: github.com/lnquy/cron
+
+git:
+  depth: 1
+
+before_script:
+  - go get github.com/mattn/goveralls
+
+script:
+  #- make vet
+  - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit; fi'
+  - go test -race -covermode=atomic -coverprofile=coverage.out ./...
+  - $(go env GOPATH | awk 'BEGIN{FS=":"} {print $1}')/bin/goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN

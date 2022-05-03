@@ -1,0 +1,55 @@
+#before:
+#  hooks:
+#    - go mod download
+#    - go generate ./...
+
+builds:
+  - id: hcron
+    main: ./cmd/hcron/main.go
+    binary: hcron
+    flags:
+      - --trimpath
+      - -v
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - freebsd
+      - windows
+    goarch:
+      - 386
+      - amd64
+    ignore:
+      - goos: darwin
+        goarch: 386
+    skip: false
+
+archives:
+  - id: hcron
+    builds:
+    - hcron
+    name_template: "hcron_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    replacements:
+      386: i386
+      amd64: x86_64
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
