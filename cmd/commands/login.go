@@ -63,21 +63,10 @@ func NewCmdLogin() *cobra.Command {
 				os.Exit(1)
 			}
 
-			// Find their workspaces, and select the default workspace.
-			workspaces, err := client.Workspaces(ctx)
-			if err != nil {
-				log.From(ctx).Fatal().Msgf("unable to fetch workspaces: %s", err.Error())
-			}
-
+			// TODO: Create a new temporary PSK and use this instead of a JWT for credentials.
 			state := state.State{
 				Credentials: jwt,
 				Account:     *account,
-			}
-
-			for _, item := range workspaces {
-				if item.Name == "default" && !item.Test {
-					_ = state.SetWorkspace(ctx, item)
-				}
 			}
 
 			if err := state.Persist(ctx); err != nil {

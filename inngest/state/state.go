@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngestctl/inngest/client"
 	"github.com/inngest/inngestctl/inngest/log"
 	"github.com/mitchellh/go-homedir"
@@ -18,6 +17,9 @@ import (
 
 var (
 	ErrNoState = fmt.Errorf("no Inngest state found")
+
+	prodFlag    = "prod"
+	prodEnvVars = []string{"ENV", "NODE_ENV", "ENVIRONMENT"}
 )
 
 const (
@@ -53,10 +55,9 @@ func GetSetting(ctx context.Context, key string) interface{} {
 type State struct {
 	client.Client `json:"-"`
 
-	SelectedWorkspace *Workspace             `json:"workspace,omitempty"`
-	Credentials       []byte                 `json:"credentials"`
-	Account           client.Account         `json:"account"`
-	Settings          map[string]interface{} `json:"settings"`
+	Credentials []byte                 `json:"credentials"`
+	Account     client.Account         `json:"account"`
+	Settings    map[string]interface{} `json:"settings"`
 }
 
 func (s State) Persist(ctx context.Context) error {
@@ -80,19 +81,6 @@ func (s State) Persist(ctx context.Context) error {
 	}
 
 	return ioutil.WriteFile(path, byt, 0600)
-}
-
-func (s *State) SetWorkspace(ctx context.Context, w client.Workspace) error {
-	s.SelectedWorkspace = &Workspace{Workspace: w}
-	return s.Persist(ctx)
-}
-
-// Workspace represents a single workspace within an Inngest account. The pertinent
-// fields for the active workspace are marshalled into State.
-type Workspace struct {
-	client.Workspace
-
-	IsOverridden bool `json:"-"`
 }
 
 // Client returns an API client, attempting to use authentication from
@@ -142,19 +130,38 @@ func GetState(ctx context.Context) (*State, error) {
 		client.WithAPI(viper.GetString("api")), // "INNGEST_API", set up by commands/root
 	)
 
-	wid := viper.GetString("workspace.id")
-	if wid == "" {
-		return state, nil
-	}
-
-	id, err := uuid.Parse(wid)
-	if err != nil {
-		log.From(ctx).Warn().Err(err).Msg("invalid WORKSPACE_ID uuid")
-		return state, nil
-	}
-
-	state.SelectedWorkspace = &Workspace{Workspace: client.Workspace{ID: id}, IsOverridden: true}
 	return state, nil
+}
+
+// IsProd returns whether we're accessing a production environment for the current
+// command.  There are two ways to specify production:  a global --prod flag, or
+// by setting the "ENV", "NODE_ENV", or "ENVIRONMENT" env vars to "production".
+func IsProd() bool {
+	if viper.GetBool(prodFlag) {
+		return true
+	}
+	for _, f := range prodEnvVars {
+		if os.Getenv(f) == "production" {
+			return true
+		}
+	}
+	return false
+}
+
+// Workspace returns the current workspace, based off of the current environment.
+func Workspace(ctx context.Context) (client.Workspace, error) {
+	all, err := Client(ctx).Workspaces(ctx)
+	if err != nil {
+		return client.Workspace{}, nil
+	}
+
+	for _, ws := range all {
+		// FIXME: change the way we handle default workspaces.
+		if ws.Name == "default" && ws.Test != IsProd() {
+			return ws, nil
+		}
+	}
+	return client.Workspace{}, fmt.Errorf("No workspace found")
 }
 
 func RequireState(ctx context.Context) *State {

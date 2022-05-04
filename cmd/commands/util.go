@@ -14,14 +14,19 @@ import (
 
 // findWorkflow finds a workflow given a UUID or a UUID prefix.
 func findWorkflow(ctx context.Context, idOrPrefix string) (*client.Workflow, error) {
-	state := state.RequireState(ctx)
+	s := state.RequireState(ctx)
+
+	ws, err := state.Workspace(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	id, err := uuid.Parse(idOrPrefix)
 	if err == nil {
-		return state.Client.Workflow(ctx, state.SelectedWorkspace.ID, id)
+		return s.Client.Workflow(ctx, ws.ID, id)
 	}
 
-	flows, err := state.Client.Workflows(ctx, state.SelectedWorkspace.ID)
+	flows, err := s.Client.Workflows(ctx, ws.ID)
 	if err != nil {
 		log.From(ctx).Fatal().Err(err).Msg("unable to fetch workspaces")
 	}
@@ -43,7 +48,7 @@ func findWorkflow(ctx context.Context, idOrPrefix string) (*client.Workflow, err
 	}
 
 	if len(candidates) == 0 {
-		return nil, fmt.Errorf("No workflow in workspace '%s' found for ID: %s", state.SelectedWorkspace.Name, idOrPrefix)
+		return nil, fmt.Errorf("No workflow in workspace '%s' found for ID: %s", ws.Name, idOrPrefix)
 	}
 
 	return nil, fmt.Errorf("More than one workflow found with the prefix: %s", idOrPrefix)
