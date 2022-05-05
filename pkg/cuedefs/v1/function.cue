@@ -6,7 +6,7 @@ package v1
 	// triggers represent how the function is invoked.
 	triggers: [...#Trigger]
 	// A function can have > 1 step, which is an individual "action" called in a DAG.
-	steps?: [string]: #Step
+	steps?: [Name=string]: #Step & {name: Name}
 	// idempotency allows the specification of an idempotency key using event data.
 	idempotency?: string
 	// throttle allows you to throttle workflows, only running them a given number
