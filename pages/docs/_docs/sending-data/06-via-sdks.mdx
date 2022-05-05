@@ -26,6 +26,36 @@ Your now have a new entry on your list of sources.
 
 ![Source view page](/assets/docs/sending-data-via-inngest-sdks/source-view-page.jpg)
 
+## JavaScript (Node) SDK example
+
+The JavaScript SDK works in Node.js environments with TypeScript, ES Modules, or Common.js modules. Trigger an event from anywhere, like at the end of an API request and it will immediately be sent to Inngest.
+
+```shell
+$ npm install inngest
+# or
+$ yarn add inngest
+```
+
+```js
+// ES Modules / TypeScript
+import { Inngest } from "inngest";
+// or CommonJS
+const { Inngest } = require("inngest");
+
+const inngest = new Inngest(process.env.INNGEST_SOURCE_API_KEY);
+
+await inngest.send({
+  name: "user.signup",
+  data: {
+    plan: account.planType,
+  },
+  user: {
+    external_id: user.id,
+    email: user.email,
+  },
+});
+```
+
 ## Go SDK example
 
 With your new source key, here's an example for how you can use the Go SDK to send data to Inngest:
