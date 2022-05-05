@@ -13,7 +13,6 @@ import (
 	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/inngest/log"
 	"github.com/inngest/inngestctl/inngest/state"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
@@ -39,13 +38,14 @@ func NewCmdWorkflows() *cobra.Command {
 		Short: "Lists workflows within the current workspace, defaulting to live workflows.  Use --all for all workflows.",
 		Run: func(cmd *cobra.Command, args []string) {
 			ctx := cmd.Context()
-			state := state.RequireState(ctx)
+			s := state.RequireState(ctx)
 
-			if state.SelectedWorkspace == nil {
-				log.From(ctx).Fatal().Err(errors.New("no workspace")).Msg("No workspace selected")
+			ws, err := state.Workspace(ctx)
+			if err != nil {
+				log.From(ctx).Fatal().Err(err).Msg("No workspace selected")
 			}
 
-			flows, err := state.Client.Workflows(ctx, state.SelectedWorkspace.ID)
+			flows, err := s.Client.Workflows(ctx, ws.ID)
 			if err != nil {
 				log.From(ctx).Fatal().Err(err).Msg("unable to fetch workspaces")
 			}
@@ -178,7 +178,12 @@ func NewCmdWorkflows() *cobra.Command {
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			ctx := cmd.Context()
-			state := state.RequireState(ctx)
+			s := state.RequireState(ctx)
+
+			ws, err := state.Workspace(ctx)
+			if err != nil {
+				log.From(ctx).Fatal().Err(err).Msg("No workspace selected")
+			}
 
 			workflow, err := findWorkflow(ctx, args[0])
 			if err != nil {
@@ -203,7 +208,7 @@ func NewCmdWorkflows() *cobra.Command {
 			if versionFlag != 0 && (workflow.Current == nil || workflow.Current.Version != versionFlag) {
 				// Request that specific version, as by default we only request the config for
 				// the current version in the list.
-				v, err := state.Client.WorkflowVersion(ctx, state.SelectedWorkspace.ID, workflow.ID, versionFlag)
+				v, err := s.Client.WorkflowVersion(ctx, ws.ID, workflow.ID, versionFlag)
 				if err != nil {
 					log.From(ctx).Fatal().Err(err).Msg("Unable to find workflow version")
 				}
@@ -261,8 +266,13 @@ func NewCmdWorkflows() *cobra.Command {
 
 			s := state.RequireState(ctx)
 
+			ws, err := state.Workspace(ctx)
+			if err != nil {
+				log.From(ctx).Fatal().Err(err).Msg("No workspace selected")
+			}
+
 			fmt.Printf("Deploying workflow %s...\n", file)
-			v, err := s.Client.DeployWorkflow(ctx, s.SelectedWorkspace.ID, string(byt), deployLive)
+			v, err := s.Client.DeployWorkflow(ctx, ws.ID, string(byt), deployLive)
 			if err != nil {
 				return fmt.Errorf("failed to deploy workflow: %w", err)
 			}

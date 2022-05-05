@@ -27,6 +27,8 @@ func Execute() {
 		Long:  longDescription,
 	}
 
+	rootCmd.PersistentFlags().Bool("prod", false, "Use the production environment for the current command.")
+
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		panic(err)
 	}

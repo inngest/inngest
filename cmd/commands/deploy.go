@@ -31,6 +31,8 @@ func NewCmdDeploy() *cobra.Command {
 }
 
 func doDeploy(cmd *cobra.Command, args []string) {
+	fmt.Println(cli.EnvString())
+
 	if err := deployFunction(cmd, args); err != nil {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
@@ -60,7 +62,12 @@ func deployFunction(cmd *cobra.Command, args []string) error {
 }
 
 func deployWorkflow(ctx context.Context, fn *function.Function) error {
-	state := state.RequireState(ctx)
+	s := state.RequireState(ctx)
+
+	ws, err := state.Workspace(ctx)
+	if err != nil {
+		return err
+	}
 
 	wflow, err := fn.Workflow(ctx)
 	if err != nil {
@@ -73,7 +80,7 @@ func deployWorkflow(ctx context.Context, fn *function.Function) error {
 	}
 
 	fmt.Println(cli.BoldStyle.Render(fmt.Sprintf("Deploying workflow %s...", wflow.Name)))
-	v, err := state.Client.DeployWorkflow(ctx, state.SelectedWorkspace.ID, config, true)
+	v, err := s.Client.DeployWorkflow(ctx, ws.ID, config, true)
 	if err != nil {
 		return fmt.Errorf("failed to deploy workflow: %w", err)
 	}

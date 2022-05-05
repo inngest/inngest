@@ -8,6 +8,7 @@ var (
 	Green   = lipgloss.Color("#9dcc3a")
 	Red     = lipgloss.Color("#ff0000")
 	White   = lipgloss.Color("#ffffff")
+	Black   = lipgloss.Color("#000000")
 	Orange  = lipgloss.Color("#D3A347")
 
 	Feint     = lipgloss.AdaptiveColor{Light: "#333333", Dark: "#888888"}
