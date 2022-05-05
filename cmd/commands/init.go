@@ -57,16 +57,16 @@ func runInit(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Save a setting which indicates that we've ran init successfully.
-	// This is used to prevent us from showing the welcome message on subsequent runs.
-	_ = istate.SaveSetting(cmd.Context(), istate.SettingRanInit, true)
-
 	// Get the function from the state.
 	fn, err := state.Function()
 	if err != nil {
 		fmt.Println(cli.RenderError(fmt.Sprintf("There was an error creating the function: %s", err)) + "\n")
 		return
 	}
+
+	// Save a setting which indicates that we've ran init successfully.
+	// This is used to prevent us from showing the welcome message on subsequent runs.
+	_ = istate.SaveSetting(cmd.Context(), istate.SettingRanInit, true)
 
 	// If we have a template, render that.
 	tpl := state.Template()

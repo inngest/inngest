@@ -374,6 +374,10 @@ github.com/klauspost/compress/huff0
 github.com/klauspost/compress/snappy
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
+# github.com/lnquy/cron v1.1.1
+## explicit; go 1.11
+github.com/lnquy/cron
+github.com/lnquy/cron/i18n
 # github.com/lucasb-eyer/go-colorful v1.2.0
 ## explicit; go 1.12
 github.com/lucasb-eyer/go-colorful
@@ -463,6 +467,9 @@ github.com/protocolbuffers/txtpbfmt/unquote
 # github.com/rivo/uniseg v0.2.0
 ## explicit; go 1.12
 github.com/rivo/uniseg
+# github.com/robfig/cron/v3 v3.0.1
+## explicit; go 1.12
+github.com/robfig/cron/v3
 # github.com/rs/zerolog v1.26.1
 ## explicit; go 1.15
 github.com/rs/zerolog

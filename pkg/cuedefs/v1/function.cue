@@ -3,7 +3,20 @@ package v1
 #Function: {
 	id:   string
 	name: string
+	// triggers represent how the function is invoked.
 	triggers: [...#Trigger]
+	// A function can have > 1 step, which is an individual "action" called in a DAG.
+	steps?: [string]: #Step
+	// idempotency allows the specification of an idempotency key using event data.
+	idempotency?: string
+	// throttle allows you to throttle workflows, only running them a given number
+	// of times (count) per period.  This can optionally include a throttle key,
+	// which is used to 
+	throttle?: {
+		key?:   string
+		count:  uint & >=1 | *1
+		period: string
+	}
 }
 
 #EventTrigger: {
@@ -42,4 +55,15 @@ package v1
 	// If this is a string, it is assumed that this represents a filepath
 	// to load the definition from.
 	def: string | {[string]: _}
+}
+
+// Step represents a single action within a function.  An action is an individual unit
+// of code which is scheduled as part of the function execution.
+#Step: {
+	name: string | *""
+
+	// Runtime represents how the function is executed.  Each runtime specifies data
+	// necessary for executing the image, eg. if this is an externally hosted serverless
+	// function via an API this will include the URL to use in order to invoke the function.
+	runtime: #Runtime
 }
