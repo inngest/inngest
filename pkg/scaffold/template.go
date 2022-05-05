@@ -164,7 +164,6 @@ func (t Template) Render(f function.Function) error {
 				return err
 			}
 
-			// TODO: Template contents.
 			return os.WriteFile(filepath.Join(root, path), buf.Bytes(), 0644)
 		})
 		if err != nil {

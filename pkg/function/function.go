@@ -47,7 +47,7 @@ type Function struct {
 
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
-	Steps []Step `json:"steps,omitempty"`
+	Steps map[string]Step `json:"steps,omitempty"`
 }
 
 // Step represents a single unit of code (action) which runs as part of a step function, in a DAG.
@@ -62,7 +62,10 @@ func New() (*Function, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Function{ID: id}, nil
+	return &Function{
+		ID:    id,
+		Steps: map[string]Step{},
+	}, nil
 }
 
 func (f Function) Slug() string {
@@ -171,9 +174,15 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 	// TODO: With > 1 step, convert each step into a tree, with nodes pointing from the trigger
 	// to each step in a stable manner.
 
-	a, err := f.action(ctx, f.Steps[0], 0)
-	if err != nil {
-		return nil, nil, err
+	var (
+		a   inngest.ActionVersion
+		err error
+	)
+
+	for _, step := range f.Steps {
+		if a, err = f.action(ctx, step, 0); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	edges := []inngest.Edge{{

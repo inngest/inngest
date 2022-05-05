@@ -75,7 +75,7 @@ type RuntimeWrapper struct {
 	Runtime
 }
 
-func (r *RuntimeWrapper) MarshalJSON() ([]byte, error) {
+func (r RuntimeWrapper) MarshalJSON() ([]byte, error) {
 	return json.Marshal(r.Runtime)
 }
 

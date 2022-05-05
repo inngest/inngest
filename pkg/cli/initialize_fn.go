@@ -229,14 +229,14 @@ func (f *initModel) Function() (*function.Function, error) {
 
 	// If this is an HTTP function, set the runtime.
 	if f.runtimeType == runtimeHTTP {
-		fn.Steps = append(fn.Steps, function.Step{
+		fn.Steps[fn.Name] = function.Step{
 			Name: fn.Name,
 			Runtime: inngest.RuntimeWrapper{
 				Runtime: inngest.RuntimeHTTP{
 					URL: f.url,
 				},
 			},
-		})
+		}
 	}
 
 	return fn, fn.Validate()
