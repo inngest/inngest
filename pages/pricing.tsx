@@ -305,8 +305,8 @@ export default function Pricing() {
           <div onClick={toggleFAQ}>
             <h3>Can I run this on prem?</h3>
             <p>
-              If you'd like to self-host Inngest or the executor platform [reach
-              out to us with your needs](/contact).
+              If you'd like to self-host Inngest or the executor platform <a href="/contact">reach
+              out to us with your needs</a>.
             </p>
           </div>
         </FAQGrid>
