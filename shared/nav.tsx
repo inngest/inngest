@@ -22,7 +22,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
   return (
     <Container className={["grid-center-8", show ? "show" : ""].join(" ")}>
       <div>
-        <a href="/">
+        <a href="/?ref=nav">
           <Logo width={115} className="logo" />
         </a>
       </div>
@@ -30,20 +30,23 @@ const NavContent: React.FC<Props> = (props: Props) => {
       {!props.nolinks && (
         <div className="links">
           {/* <StyledLink href="/library">Library</StyledLink> */}
-          <StyledLink key="docs" href="/docs">
+          <StyledLink key="docs" href="/docs?ref=nav">
             Docs
           </StyledLink>
-          <StyledLink key="blog" href="/blog">
+          <StyledLink key="blog" href="/blog?ref=nav">
             Blog
           </StyledLink>
-          <StyledLink key="pricing" href="/pricing">
+          <StyledLink key="pricing" href="/pricing?ref=nav">
             Pricing
           </StyledLink>
         </div>
       )}
 
       <div className="auth-options">
-        <StyledLink className="auth-login" href="https://app.inngest.com/login">
+        <StyledLink
+          className="auth-login"
+          href="https://app.inngest.com/login?ref=nav"
+        >
           Log in
         </StyledLink>
         <Button
