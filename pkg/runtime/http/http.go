@@ -40,10 +40,10 @@ func (e executor) Execute(ctx context.Context, action inngest.ActionVersion, sta
 	}
 
 	req, err := http.NewRequest(http.MethodPost, rt.URL, bytes.NewBuffer(input))
-	req.Header.Add("Content-Type", "application/json")
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := e.client.Do(req)
 	if err != nil {

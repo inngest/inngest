@@ -193,7 +193,12 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 }
 
 func (f Function) action(ctx context.Context, s Step, n int) (inngest.ActionVersion, error) {
-	id := fmt.Sprintf("%s-step-%d", f.ID, n)
+	suffix := "test"
+	if state.IsProd() {
+		suffix = "prod"
+	}
+
+	id := fmt.Sprintf("%s-step-%d-%s", f.ID, n, suffix)
 	if prefix, err := state.AccountIdentifier(ctx); err == nil {
 		id = fmt.Sprintf("%s/%s", prefix, id)
 	}
