@@ -11,6 +11,12 @@ import { Wrapper } from "../../shared/blog";
 import { highlight } from "../../utils/code";
 import ThemeToggleButton from "../../shared/ThemeToggleButton";
 
+// MDX Components
+import DiscordCTA from "../../shared/Blog/DiscordCTA";
+const components = {
+  DiscordCTA,
+};
+
 export default function BlogLayout(props) {
   const scope = JSON.parse(props.post.scope);
   return (
@@ -52,15 +58,18 @@ export default function BlogLayout(props) {
             <MDXRemote
               compiledSource={props.post.compiledSource}
               scope={scope}
+              components={components}
             />
           </Body>
         </Article>
-        <Callout
-          small="What is Inngest?"
-          heading="The fastest way to build and ship event-driven functions"
-          link="/?ref=blog-footer"
-          cta="Learn more >"
-        />
+        {!scope.hideBottomCTA && (
+          <Callout
+            small="What is Inngest?"
+            heading="The fastest way to build and ship event-driven functions"
+            link="/?ref=blog-footer"
+            cta="Learn more >"
+          />
+        )}
         <Footer />
       </Wrapper>
     </>
@@ -141,12 +150,13 @@ const Body = styled.main`
 
   img {
     max-width: 100%;
-    max-height: 300px;
+    /* max-height: 300px; */
     margin: 2rem auto 2rem;
     pointer-events: none;
   }
 
-  code {
+  p code,
+  li code {
     background: rgb(46, 52, 64);
     padding: 0.1em 0.3em 0.15em;
     border-radius: 3px;
@@ -228,7 +238,12 @@ export async function getStaticProps({ params }) {
   const readingTime = require("reading-time");
   const matter = require("gray-matter");
 
-  const source = fs.readFileSync("./pages/blog/_posts/" + params.slug + ".md");
+  let filePath = `./pages/blog/_posts/${params.slug}.md`;
+  if (!fs.existsSync(filePath) && fs.existsSync(filePath + "x")) {
+    filePath += "x";
+  }
+
+  const source = fs.readFileSync(filePath);
   const { content, data } = matter(source);
 
   data.path = `/blog/${params.slug}`;

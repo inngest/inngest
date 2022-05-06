@@ -1,7 +1,4 @@
 ---
-# focus sets this blog post as the blog focus.  The latest post will be focused if there's
-# > 1 focus post.
-focus: true
 heading: "Programmable event platforms"
 subtitle: Programmable event platforms allow you to build serverless event-driven systems in minutes.  Here's an introduction to them.
 date: 2022-01-10

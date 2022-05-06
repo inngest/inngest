@@ -116,7 +116,8 @@ const outlineCSS = css`
   color: #fff;
 
   &:hover {
-    border-color: var(--stroke-color-light);
+    background-color: rgba(255, 255, 255, 0.1);
+    /* border-color: var(--stroke-color-light); */
   }
 `;
 
