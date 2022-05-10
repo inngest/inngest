@@ -90,7 +90,7 @@ func Client(ctx context.Context) client.Client {
 	if state != nil {
 		return state.Client
 	}
-	return client.New(client.WithAPI(viper.GetString("api")))
+	return client.New()
 }
 
 func AccountIdentifier(ctx context.Context) (string, error) {
