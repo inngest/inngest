@@ -122,7 +122,6 @@ export default function Pricing() {
     <>
       <Head>
         <title>Inngest → programmable event platform pricing</title>
-        <link rel="icon" href="/favicon.png" />
         <meta property="og:title" content="Inngest" />
         <meta property="og:url" content="https://www.inngest.com" />
         <meta property="og:image" content="/logo.svg" />
@@ -305,8 +304,8 @@ export default function Pricing() {
           <div onClick={toggleFAQ}>
             <h3>Can I run this on prem?</h3>
             <p>
-              If you'd like to self-host Inngest or the executor platform <a href="/contact">reach
-              out to us with your needs</a>.
+              If you'd like to self-host Inngest or the executor platform{" "}
+              <a href="/contact">reach out to us with your needs</a>.
             </p>
           </div>
         </FAQGrid>

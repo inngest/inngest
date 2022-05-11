@@ -10,7 +10,6 @@ const Security = () => {
     <div>
       <Head>
         <title>Inngest | Security</title>
-        <link rel="icon" href="/favicon.png" />
         <meta property="og:title" content="Inngest" />
         <meta property="og:url" content="https://www.inngest.com" />
         <meta property="og:image" content="/logo.svg" />

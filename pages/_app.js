@@ -28,7 +28,7 @@ function MyApp({ Component, pageProps }) {
   return (
     <>
       <Head>
-        <link rel="icon" href="/favicon.png" />
+        <link rel="icon" href="/favicon-may-2022.png" />
       </Head>
       <PageBanner href="/docs/using-the-inngest-cli?ref=page-banner">
         Introducing the Inngest CLI: build, test, and ship serverless functions

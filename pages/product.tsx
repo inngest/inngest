@@ -175,7 +175,6 @@ export default function Home() {
         <title>
           Inngest → build serverless event-driven functions in minutes
         </title>
-        <link rel="icon" href="/favicon.png" />
         <meta
           property="og:title"
           content="Inngest - build serverless event-driven functions in minutes"

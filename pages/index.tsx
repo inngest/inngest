@@ -31,7 +31,6 @@ export default function Home() {
         <title>
           Inngest → build serverless event-driven functions in minutes
         </title>
-        <link rel="icon" href="/favicon.png" />
         <meta
           property="og:title"
           content="Inngest - build serverless event-driven functions in minutes"
@@ -150,27 +149,31 @@ export default function Home() {
       </div>
 
       <Consulting>
-        <p><strong>Get started with experts.</strong> We're working with startups and engineering teams to consult implement product functionality, no strings attached.</p>
-        <p className="secondary-text">
-          Let us show you how to build reliable serverless functionality for your product, in minutes.  We'll walk through implementation using your product requirements from start to end &mdash; delivering live functionality for your product.
+        <p>
+          <strong>Get started with experts.</strong> We're working with startups
+          and engineering teams to consult implement product functionality, no
+          strings attached.
         </p>
         <p className="secondary-text">
-          Get in touch:
+          Let us show you how to build reliable serverless functionality for
+          your product, in minutes. We'll walk through implementation using your
+          product requirements from start to end &mdash; delivering live
+          functionality for your product.
         </p>
-      <div className="grid">
-        <div className="grid-center-6 sm-col-8-center">
-          <div className="button-group">
-            <Button
-              kind="primary"
-              size="small"
-              href="https://calendly.com/inngest-thb/30min"
-            >
-              <ArrowUpRightIcon /> Schedule a call
-            </Button>
+        <p className="secondary-text">Get in touch:</p>
+        <div className="grid">
+          <div className="grid-center-6 sm-col-8-center">
+            <div className="button-group">
+              <Button
+                kind="primary"
+                size="small"
+                href="https://calendly.com/inngest-thb/30min"
+              >
+                <ArrowUpRightIcon /> Schedule a call
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-
       </Consulting>
 
       <SectionContext>
@@ -408,8 +411,7 @@ const Consulting = styled.div`
     margin: 0 auto 2rem;
     text-align: center;
   }
-`
-
+`;
 
 const Hero = styled.div`
   padding: 3em 0 4em;
@@ -484,7 +486,7 @@ const Hero = styled.div`
 const SectionContext = styled.div`
   --stripe-color: #15151c;
 
-/*
+  /*
   background: linear-gradient(
     135deg,
     var(--stripe-color) 12.5%,

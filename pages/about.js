@@ -45,7 +45,6 @@ export default function Home() {
     <Page>
       <Head>
         <title>Inngest: About Us</title>
-        <link rel="icon" href="/favicon.png" />
         <meta property="og:title" content="Inngest" />
         <meta property="og:url" content="https://www.inngest.com" />
         <meta property="og:image" content="/logo.svg" />
