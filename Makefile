@@ -2,6 +2,12 @@
 build: #get-library generate-library
 	yarn build
 
+.PHONY: cloudflare-build
+cloudflare-build:
+	yarn build
+	yarn next export
+	cp ./_redirects ./out/_redirects
+
 .PHONY: dirty
 dirty:
 	go run ./library.go
