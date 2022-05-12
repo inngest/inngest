@@ -5,9 +5,11 @@ package runner
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/pkg/execution/driver"
 	"github.com/inngest/inngestctl/pkg/execution/executor"
 	"github.com/inngest/inngestctl/pkg/execution/state"
 	"github.com/oklog/ulid"
@@ -38,6 +40,7 @@ type InMemoryRunner struct {
 	available []string
 }
 
+// NewRun initializes a new run for the given workflow.
 func (i *InMemoryRunner) NewRun(ctx context.Context, f inngest.Workflow) (*state.Identifier, error) {
 	state, err := i.sm.New(ctx, f, ulid.MustNew(ulid.Now(), rand.Reader))
 	if err != nil {
@@ -58,8 +61,13 @@ func (i *InMemoryRunner) Execute(ctx context.Context, id state.Identifier) error
 
 		children, err := i.exec.Execute(ctx, id, next)
 		if err != nil {
-			// TODO: Is retryable?  Store failed state, etc.
-			return fmt.Errorf("error running workflow: %s", err)
+
+			resp := driver.Response{}
+			if !errors.As(err, &resp) || resp.Retryable() {
+				// TODO: If this is retryable, schedule
+				// up to N runs based off of the func.
+			}
+			return fmt.Errorf("execution error: %s", err)
 		}
 		i.available = append(i.available, children...)
 	}

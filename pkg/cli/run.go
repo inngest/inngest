@@ -11,7 +11,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/pkg/execution/actionloader"
 	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
+	"github.com/inngest/inngestctl/pkg/execution/executor"
+	"github.com/inngest/inngestctl/pkg/execution/runner"
+	"github.com/inngest/inngestctl/pkg/execution/state"
+	"github.com/inngest/inngestctl/pkg/execution/state/inmemory"
 	"github.com/inngest/inngestctl/pkg/function"
 	"github.com/muesli/reflow/wrap"
 	"golang.org/x/term"
@@ -25,28 +30,12 @@ type RunUIOpts struct {
 }
 
 func NewRunUI(ctx context.Context, opts RunUIOpts) (*RunUI, error) {
-	var build *BuilderUI
-
-	if opts.Action.Runtime.RuntimeType() == "docker" {
-		var err error
-		build, err = NewBuilder(ctx, BuilderUIOpts{
-			BuildOpts: dockerdriver.BuildOpts{
-				Path: ".",
-				Tag:  opts.Action.DSN,
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	r := &RunUI{
 		ctx:    ctx,
 		action: opts.Action,
 		event:  opts.Event,
 		seed:   opts.Seed,
 		fn:     opts.Function,
-		build:  build,
 	}
 	return r, nil
 }
@@ -75,6 +64,11 @@ type RunUI struct {
 	// An atomic lock for starting the container.
 	started int32
 
+	// sm is the state manager used for the execution.
+	sm state.Manager
+	// id is the identifier for the execution, once started.
+	id *state.Identifier
+
 	// duration stores how long the function took to execute.
 	duration time.Duration
 	done     bool
@@ -97,37 +91,54 @@ func (r *RunUI) Init() tea.Cmd {
 
 // run performs the running of the function.
 func (r *RunUI) run(ctx context.Context) {
-	/*
-		TODO
-		var (
-			exec driver.Driver
-			err  error
-		)
+	al := actionloader.NewMemoryLoader()
 
-		switch r.action.Runtime.RuntimeType() {
-		case "docker":
-			exec, err = dockerdriver.NewExecutor()
-		case "http":
-			exec = httpdriver.DefaultExecutor
-		}
+	// Add all action definitions from the function into the action loader.
+	flow, err := r.fn.Workflow(ctx)
+	if err != nil {
+		r.err = err
+		return
+	}
+	avs, _, _ := r.fn.Actions(ctx)
+	for _, a := range avs {
+		al.Add(a)
+	}
 
-		if err != nil {
-			r.err = err
-			return
-		}
+	// Create a new state manager.
+	r.sm = inmemory.NewStateManager()
 
-		start := time.Now()
-		resp, err := exec.Execute(ctx, r.action, map[string]interface{}{
-			"event": r.event,
-		})
-		r.duration = time.Since(start)
-		if err != nil {
-			r.err = err
-			return
-		}
-		r.done = true
-		r.response, _ = json.Marshal(resp)
-	*/
+	// Create our drivers.
+	dd, err := dockerdriver.New()
+	if err != nil {
+		r.err = fmt.Errorf("error creating action loader: %w", err)
+		return
+	}
+
+	// Create an executor with the state manager and drivers.
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(r.sm),
+		executor.WithActionLoader(al),
+		executor.WithRuntimeDrivers(
+			dd,
+		),
+	)
+	if err != nil {
+		r.err = fmt.Errorf("error creating executor: %w", err)
+		return
+	}
+
+	// Create a high-level runner, which executes our functions.
+	runner := runner.NewInMemoryRunner(r.sm, exec)
+	id, err := runner.NewRun(ctx, *flow)
+	if err != nil {
+		r.err = fmt.Errorf("error creating new run: %s", err)
+		return
+	}
+
+	r.id = id
+	if err := runner.Execute(ctx, *id); err != nil {
+		r.err = err
+	}
 }
 
 func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

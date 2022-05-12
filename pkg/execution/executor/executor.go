@@ -147,7 +147,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 
 	next, err := e.run(ctx, w, id, from, state)
 	if err != nil {
-		// TODO: Retries
+		// This is likely a driver.Response, which itself includes
+		// whether the action can be retried based off of the output.
+		//
+		// The runner is responsible for scheduling jobs and will check
+		// whether the action can be retried.
 		return nil, err
 	}
 

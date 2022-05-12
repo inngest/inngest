@@ -74,3 +74,7 @@ func (r Response) Error() string {
 	}
 	return r.Err.Error()
 }
+
+func (r Response) Unwrap() error {
+	return r.Err
+}

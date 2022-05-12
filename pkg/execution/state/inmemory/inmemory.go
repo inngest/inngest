@@ -87,8 +87,6 @@ func (m *mem) SaveActionOutput(ctx context.Context, i state.Identifier, actionID
 func (m *mem) SaveActionError(ctx context.Context, i state.Identifier, actionID string, err error) (state.State, error) {
 	s, _ := m.Load(ctx, i)
 
-	fmt.Printf("err: %#v %s;\n", err, actionID)
-
 	state := s.(*memstate)
 	state.errors[actionID] = err
 

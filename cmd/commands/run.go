@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"time"
@@ -14,11 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/event-schemas/pkg/fakedata"
 	"github.com/inngest/inngestctl/pkg/cli"
-	"github.com/inngest/inngestctl/pkg/execution/actionloader"
 	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
-	"github.com/inngest/inngestctl/pkg/execution/executor"
-	"github.com/inngest/inngestctl/pkg/execution/runner"
-	"github.com/inngest/inngestctl/pkg/execution/state/inmemory"
 	"github.com/inngest/inngestctl/pkg/function"
 	"github.com/spf13/cobra"
 )
@@ -51,15 +46,13 @@ func doRun(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	err = buildImg(cmd.Context(), *fn)
-	if err != nil {
+	if err = buildImg(cmd.Context(), *fn); err != nil {
 		// This should already have been printed to the terminal.
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	err = runExecutor(cmd.Context(), *fn)
-	if err != nil {
+	if err = runFunction(cmd.Context(), *fn); err != nil {
 		// This should already have been printed to the terminal.
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -87,55 +80,6 @@ func buildImg(ctx context.Context, fn function.Function) error {
 	return nil
 }
 
-func runExecutor(ctx context.Context, fn function.Function) error {
-	al := actionloader.NewMemoryLoader()
-
-	// XXX: HAVE ONE SINGLE FN/FLOW/STEP DEFINITION PLEASE FFS.
-	flow, err := fn.Workflow(ctx)
-	if err != nil {
-		return err
-	}
-
-	avs, _, _ := fn.Actions(ctx)
-	for _, a := range avs {
-		al.Add(a)
-	}
-
-	// Create a new state manager.
-	sm := inmemory.NewStateManager()
-
-	// Create our drivers.
-	dd, err := dockerdriver.New()
-	if err != nil {
-		return fmt.Errorf("error creating action loader: %w", err)
-	}
-
-	// Create an executor with the state manager and drivers.
-	exec, err := executor.NewExecutor(
-		executor.WithStateManager(sm),
-		executor.WithActionLoader(al),
-		executor.WithRuntimeDrivers(
-			dd,
-		),
-	)
-	if err != nil {
-		return fmt.Errorf("error creating executor: %w", err)
-	}
-
-	// Create a high-level runner, which executes our functions.
-	r := runner.NewInMemoryRunner(sm, exec)
-	id, err := r.NewRun(ctx, *flow)
-	if err != nil {
-		log.Fatalf("error creating new run: %s", err)
-	}
-
-	if err := r.Execute(ctx, *id); err != nil {
-		log.Fatalf("error creating executor: %s", err)
-	}
-
-	return nil
-}
-
 // runFunction builds the function's images and runs the function.
 func runFunction(ctx context.Context, fn function.Function) error {
 	if runSeed <= 0 {
@@ -156,7 +100,7 @@ func runFunction(ctx context.Context, fn function.Function) error {
 		return fmt.Errorf("running step-functions locally is not yet supported")
 	}
 
-	// Build the image.
+	// Run the function.
 	ui, err := cli.NewRunUI(ctx, cli.RunUIOpts{
 		Function: fn,
 		Action:   actions[0],
