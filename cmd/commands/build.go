@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngestctl/pkg/cli"
-	"github.com/inngest/inngestctl/pkg/runtime/docker"
+	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +40,7 @@ func NewCmdBuild() *cobra.Command {
 func build(cmd *cobra.Command, args []string) {
 	ui, err := cli.NewBuilder(cmd.Context(), cli.BuilderUIOpts{
 		QuitOnComplete: true,
-		BuildOpts: docker.BuildOpts{
+		BuildOpts: dockerdriver.BuildOpts{
 			Args: args,
 		},
 	})

@@ -139,8 +139,8 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 	}
 
 	for n, a := range actions {
-		w.Actions = append(w.Actions, inngest.Action{
-			ClientID: uint(n) + 1, // 0 is the trigger; use 1 offset
+		w.Steps = append(w.Steps, inngest.Step{
+			ClientID: fmt.Sprintf("%d", uint(n)+1), // 0 is the trigger; use 1 offset
 			Name:     a.Name,
 			DSN:      a.DSN,
 		})
@@ -186,8 +186,8 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 	}
 
 	edges := []inngest.Edge{{
-		Outgoing: "trigger",
-		Incoming: 1,
+		Outgoing: inngest.TriggerName,
+		Incoming: "1",
 	}}
 	return []inngest.ActionVersion{a}, edges, nil
 }
@@ -199,7 +199,7 @@ func (f Function) action(ctx context.Context, s Step, n int) (inngest.ActionVers
 	}
 
 	id := fmt.Sprintf("%s-step-%d-%s", f.ID, n, suffix)
-	if prefix, err := state.AccountIdentifier(ctx); err == nil {
+	if prefix, err := state.AccountIdentifier(ctx); err == nil && prefix != "" {
 		id = fmt.Sprintf("%s/%s", prefix, id)
 	}
 
@@ -219,7 +219,7 @@ func (f Function) action(ctx context.Context, s Step, n int) (inngest.ActionVers
 func (f Function) defaultAction(ctx context.Context) ([]inngest.ActionVersion, []inngest.Edge, error) {
 	id := f.ID + "-action"
 
-	if prefix, err := state.AccountIdentifier(ctx); err == nil {
+	if prefix, err := state.AccountIdentifier(ctx); err == nil && prefix != "" {
 		id = fmt.Sprintf("%s/%s", prefix, id)
 	}
 
@@ -235,8 +235,8 @@ func (f Function) defaultAction(ctx context.Context) ([]inngest.ActionVersion, [
 		},
 	}
 	edges := []inngest.Edge{{
-		Outgoing: "trigger",
-		Incoming: 1,
+		Outgoing: inngest.TriggerName,
+		Incoming: "1",
 	}}
 	return []inngest.ActionVersion{a}, edges, nil
 }

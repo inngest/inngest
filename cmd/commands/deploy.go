@@ -10,9 +10,10 @@ import (
 	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/inngest/client"
 	"github.com/inngest/inngestctl/inngest/state"
+	"github.com/inngest/inngestctl/internal/cuedefs"
 	"github.com/inngest/inngestctl/pkg/cli"
+	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngestctl/pkg/function"
-	"github.com/inngest/inngestctl/pkg/runtime/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -74,7 +75,7 @@ func deployWorkflow(ctx context.Context, fn *function.Function) error {
 		return err
 	}
 
-	config, err := inngest.FormatWorkflow(*wflow)
+	config, err := cuedefs.FormatWorkflow(*wflow)
 	if err != nil {
 		return err
 	}
@@ -108,7 +109,7 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 		// an up-to-date image and checksum for the action.
 		ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
 			QuitOnComplete: true,
-			BuildOpts: docker.BuildOpts{
+			BuildOpts: dockerdriver.BuildOpts{
 				Path:     ".",
 				Tag:      tag,
 				Platform: "linux/amd64",
@@ -139,7 +140,7 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 		return fmt.Errorf("error preparing action: %w", err)
 	}
 
-	config, err := inngest.FormatAction(a)
+	config, err := cuedefs.FormatAction(a)
 	if err != nil {
 		return err
 	}
@@ -155,7 +156,7 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 		// Push the docker image.
 		switch a.Runtime.RuntimeType() {
 		case "docker":
-			if _, err = docker.Push(ctx, a, state.Client.Credentials()); err != nil {
+			if _, err = dockerdriver.Push(ctx, a, state.Client.Credentials()); err != nil {
 				return fmt.Errorf("error pushing action: %w", err)
 			}
 		default:
@@ -234,7 +235,7 @@ func configureVersionInfo(ctx context.Context, a inngest.ActionVersion) (inngest
 		return a, ErrAlreadyDeployed
 
 	case inngest.RuntimeTypeDocker:
-		digest, err := docker.Digest(ctx, a)
+		digest, err := dockerdriver.Digest(ctx, a)
 		if err != nil {
 			return a, err
 		}

@@ -54,15 +54,18 @@ import (
 	// or "com.datosapp.comms.email" to send an email
 	dsn: string
 	// version of the action DSN to run.  If this is undefined, this defaults
-	// to the latest version of the action at time of workflow creation.
-	version?: uint
+	// to the latest version of the action.
+	version?: {
+		major?: uint
+		minor?: uint
+	}
 	// Metadata about how the action will be used.  Each action requires custom
 	// input to work, eg. what data to transform, what email template to use, etc.
 	metadata?: [string]: _
 }
 
 #Edge: {
-	outgoing:  uint | "trigger" // Either the action ID or 'trigger'
-	incoming:  uint
+	outgoing:  string | "$trigger" // Either the action ID or 'trigger'
+	incoming:  string
 	metadata?: #EdgeMetadata
 }

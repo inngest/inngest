@@ -1,4 +1,4 @@
-package docker
+package dockerdriver
 
 import (
 	"bytes"
@@ -15,19 +15,29 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/gosimple/slug"
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/pkg/execution/driver"
+	"github.com/inngest/inngestctl/pkg/execution/state"
 )
 
-func NewExecutor() (*DockerExecutor, error) {
+// New returns a basic docker implementation for running containers within a workflow.  This
+// executes containers running on a local docker instance, then monitors the containers until
+// it finishes running to scrape the output.  It does this in a blocking, synchronous manner.
+//
+// NOTE: This does not persist information about running containers, so if the executor
+// terminates the container's output will not be returned.  A more reliable way of executing
+// containers for the docker runtime would be to use a scheduler which maintains state in a
+// fault tolerant manner.
+func New() (driver.Driver, error) {
 	c, err := docker.NewClientFromEnv()
 	if err != nil {
 		return nil, err
 	}
-	return &DockerExecutor{
+	return &dockerExec{
 		client: c,
 	}, nil
 }
 
-type DockerExecutor struct {
+type dockerExec struct {
 	client *docker.Client
 }
 
@@ -35,8 +45,11 @@ type handle struct {
 	c *docker.Container
 }
 
-// Execute is a blocking operation which runs a container.
-func (d *DockerExecutor) Execute(ctx context.Context, action inngest.ActionVersion, state map[string]interface{}) (map[string]interface{}, error) {
+func (dockerExec) RuntimeType() string {
+	return "docker"
+}
+
+func (d *dockerExec) Execute(ctx context.Context, state state.State, action inngest.ActionVersion, wf inngest.Step) (*driver.Response, error) {
 	var (
 		h   *handle
 		err error
@@ -53,12 +66,12 @@ func (d *DockerExecutor) Execute(ctx context.Context, action inngest.ActionVersi
 		})
 	}()
 
-	h, err = d.start(ctx, action, state)
+	h, err = d.start(ctx, state, wf)
 	if err != nil {
 		return nil, err
 	}
 
-	stdout, stderr, err := d.watch(ctx, h)
+	stdout, _, err := d.watch(ctx, h)
 	if err != nil {
 		return nil, err
 	}
@@ -67,35 +80,43 @@ func (d *DockerExecutor) Execute(ctx context.Context, action inngest.ActionVersi
 	if err != nil {
 		return nil, err
 	}
-	_ = exit
 
 	byt, err := io.ReadAll(stdout)
 	if err != nil {
 		return nil, fmt.Errorf("error reading docker output: %w", err)
 	}
 
-	if len(byt) == 0 {
-		byt, _ := io.ReadAll(stderr)
-		if len(byt) > 0 {
-			return nil, fmt.Errorf("no stdout received.  stderr: %s", string(byt))
-		}
-		return nil, fmt.Errorf("no stdout received")
+	resp := &driver.Response{
+		Output: map[string]interface{}{},
+	}
+	if exit != 0 {
+		resp.Err = fmt.Errorf("non-zero status code: %d", exit)
 	}
 
+	if len(byt) == 0 {
+		// TODO: read and log stderr.
+		// byt, _ := io.ReadAll(stderr)
+		return resp, nil
+	}
+
+	// note: right now we're ignoring timestamps.
 	split := bytes.SplitN(byt, []byte(" "), 2)
 	_, content := split[0], split[1]
 
+	// XXX: we could support ndjson here, treating the last line as output and any previous lines
+	// as stderr logs.
+
 	// Return the output as JSON
-	data := map[string]interface{}{}
-	if err := json.Unmarshal(content, &data); err != nil {
-		return nil, fmt.Errorf("error reading output as JSON: \n%s", string(byt))
+	if err := json.Unmarshal(content, &resp.Output); err != nil {
+		resp.Output["body"] = string(content)
 	}
 
-	return data, nil
+	return resp, nil
 }
 
-func (d *DockerExecutor) start(ctx context.Context, action inngest.ActionVersion, state map[string]interface{}) (*handle, error) {
-	opts, err := d.startOpts(ctx, action, state)
+// start creates and runs the container.
+func (d *dockerExec) start(ctx context.Context, state state.State, wa inngest.Step) (*handle, error) {
+	opts, err := d.startOpts(ctx, state, wa)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +131,7 @@ func (d *DockerExecutor) start(ctx context.Context, action inngest.ActionVersion
 		if err == nil || strings.Contains(err.Error(), "Container already running") {
 			return &handle{c: container}, nil
 		}
-		<-time.After(500 * time.Millisecond)
+		<-time.After(100 * time.Millisecond)
 	}
 
 	// Clean up.
@@ -120,34 +141,26 @@ func (d *DockerExecutor) start(ctx context.Context, action inngest.ActionVersion
 	return nil, fmt.Errorf("unable to start container")
 }
 
-func (d *DockerExecutor) startOpts(ctx context.Context, action inngest.ActionVersion, state map[string]interface{}) (docker.CreateContainerOptions, error) {
+func (d *dockerExec) startOpts(ctx context.Context, state state.State, wa inngest.Step) (docker.CreateContainerOptions, error) {
 	marshalled, err := json.Marshal(map[string]interface{}{
-		"args_version": 1,
-		"metadata": map[string]interface{}{
-			"js": "export default function({ event }) { return { event } }",
-		},
-		"baggage": map[string]interface{}{
-			"WorkspaceEvent": map[string]interface{}{
-				"Event": state["event"],
-			},
-			"Actions": map[uint]map[string]interface{}{
-				0: {},
-			},
+		"event": state.Event(),
+		"steps": state.Actions(),
+		"ctx": map[string]interface{}{
+			"workflow_id": state.WorkflowID(),
 		},
 	})
 	if err != nil {
 		return docker.CreateContainerOptions{}, fmt.Errorf("error marshalling state")
 	}
-
 	byt := make([]byte, 3)
 	if _, err := rand.Read(byt); err != nil {
 		return docker.CreateContainerOptions{}, fmt.Errorf("error generating ID: %w", err)
 	}
-	name := fmt.Sprintf("%s-%s", slug.Make(action.Name), hex.EncodeToString(byt))
+	name := fmt.Sprintf("%s-%s-%s", state.RunID(), slug.Make(wa.Name), hex.EncodeToString(byt))
 	return docker.CreateContainerOptions{
 		Name: name,
 		Config: &docker.Config{
-			Image: action.DSN,
+			Image: wa.DSN,
 			Cmd:   []string{string(marshalled)},
 			// Add all env vars from the local machine
 			Env: os.Environ(),
@@ -155,9 +168,8 @@ func (d *DockerExecutor) startOpts(ctx context.Context, action inngest.ActionVer
 	}, nil
 }
 
-func (d *DockerExecutor) watch(ctx context.Context, h *handle) (stdout, stderr io.Reader, err error) {
+func (d *dockerExec) watch(ctx context.Context, h *handle) (stdout, stderr io.Reader, err error) {
 	stdout, stderr = &bytes.Buffer{}, &bytes.Buffer{}
-
 	logs := docker.LogsOptions{
 		Context:      ctx,
 		Container:    h.c.ID,

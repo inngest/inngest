@@ -11,10 +11,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngestctl/pkg/function"
-	"github.com/inngest/inngestctl/pkg/runtime"
-	"github.com/inngest/inngestctl/pkg/runtime/docker"
-	"github.com/inngest/inngestctl/pkg/runtime/http"
 	"github.com/muesli/reflow/wrap"
 	"golang.org/x/term"
 )
@@ -32,7 +30,7 @@ func NewRunUI(ctx context.Context, opts RunUIOpts) (*RunUI, error) {
 	if opts.Action.Runtime.RuntimeType() == "docker" {
 		var err error
 		build, err = NewBuilder(ctx, BuilderUIOpts{
-			BuildOpts: docker.BuildOpts{
+			BuildOpts: dockerdriver.BuildOpts{
 				Path: ".",
 				Tag:  opts.Action.DSN,
 			},
@@ -99,34 +97,37 @@ func (r *RunUI) Init() tea.Cmd {
 
 // run performs the running of the function.
 func (r *RunUI) run(ctx context.Context) {
-	var (
-		exec runtime.Executor
-		err  error
-	)
+	/*
+		TODO
+		var (
+			exec driver.Driver
+			err  error
+		)
 
-	switch r.action.Runtime.RuntimeType() {
-	case "docker":
-		exec, err = docker.NewExecutor()
-	case "http":
-		exec = http.DefaultExecutor
-	}
+		switch r.action.Runtime.RuntimeType() {
+		case "docker":
+			exec, err = dockerdriver.NewExecutor()
+		case "http":
+			exec = httpdriver.DefaultExecutor
+		}
 
-	if err != nil {
-		r.err = err
-		return
-	}
+		if err != nil {
+			r.err = err
+			return
+		}
 
-	start := time.Now()
-	resp, err := exec.Execute(ctx, r.action, map[string]interface{}{
-		"event": r.event,
-	})
-	r.duration = time.Since(start)
-	if err != nil {
-		r.err = err
-		return
-	}
-	r.done = true
-	r.response, _ = json.Marshal(resp)
+		start := time.Now()
+		resp, err := exec.Execute(ctx, r.action, map[string]interface{}{
+			"event": r.event,
+		})
+		r.duration = time.Since(start)
+		if err != nil {
+			r.err = err
+			return
+		}
+		r.done = true
+		r.response, _ = json.Marshal(resp)
+	*/
 }
 
 func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

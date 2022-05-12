@@ -8,7 +8,7 @@ import (
 	"github.com/inngest/inngestctl/inngest/client"
 	"github.com/inngest/inngestctl/inngest/state"
 	"github.com/inngest/inngestctl/pkg/cli"
-	"github.com/inngest/inngestctl/pkg/runtime/docker"
+	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 )
@@ -74,7 +74,7 @@ func runActionDeploy(cmd *cobra.Command, args []string) {
 	// Push
 	switch a.Runtime.RuntimeType() {
 	case "docker":
-		if _, err = docker.Push(ctx, *a, state.Client.Credentials()); err != nil {
+		if _, err = dockerdriver.Push(ctx, *a, state.Client.Credentials()); err != nil {
 			fmt.Println(cli.RenderError(fmt.Sprintf("error pushing action: %s", err)))
 			os.Exit(1)
 		}

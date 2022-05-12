@@ -7,6 +7,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/internal/cuedefs"
 )
 
 const (
@@ -71,7 +72,7 @@ func (c *Config) Survey(dsnPrefix string) error {
 }
 
 func (c *Config) Configuration() (string, error) {
-	output, err := inngest.FormatAction(inngest.ActionVersion{
+	output, err := cuedefs.FormatAction(inngest.ActionVersion{
 		DSN:  c.DSN,
 		Name: c.Name,
 		Version: &inngest.VersionInfo{

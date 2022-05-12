@@ -26,7 +26,20 @@ func Load(dir string) (*Function, error) {
 		return nil, err
 	}
 
-	// First attempt to find inngest.cue, the canonical reference.
+	// First attempt to read the specific file given to us.
+	stat, err := os.Stat(abs)
+	if err == nil {
+		if !stat.IsDir() {
+			// The cue file exists.
+			byt, err := os.ReadFile(abs)
+			if err != nil {
+				return nil, err
+			}
+			return Unmarshal(byt)
+		}
+	}
+
+	// Then attempt to find inngest.cue, the canonical reference.
 	cue := filepath.Join(abs, "inngest.cue")
 	if _, err := os.Stat(cue); err == nil {
 		// The cue file exists.
@@ -37,6 +50,7 @@ func Load(dir string) (*Function, error) {
 		return Unmarshal(byt)
 	}
 
+	// Finally, use inngest.json in the given dir.
 	json := filepath.Join(abs, "inngest.json")
 	if _, err := os.Stat(json); err != nil {
 		// This doesn't exist.  Return ErrNotFound.

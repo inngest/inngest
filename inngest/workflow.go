@@ -1,53 +1,29 @@
 package inngest
 
-import (
-	"fmt"
+import "github.com/google/uuid"
 
-	"github.com/inngest/inngestctl/inngest/internal/cuedefs"
+const (
+	TriggerName = "$trigger"
 )
-
-// ParseWorkflow parses a cue configuration defining a workflow.
-func ParseWorkflow(input string) (*Workflow, error) {
-	val, err := cuedefs.ParseWorkflow(input)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing workflow: %w", err)
-	}
-	w := &Workflow{}
-	if err := val.Decode(&w); err != nil {
-		return nil, fmt.Errorf("error deserializing workflow: %w", err)
-	}
-
-	return w, nil
-}
-
-// FormatWorkflow formats a workflow struct into a canonical cue string representation
-func FormatWorkflow(a Workflow) (string, error) {
-	def, err := cuedefs.FormatDef(a)
-	if err != nil {
-		return "", err
-	}
-	// XXX: Inspect cue and implement packages.
-	return fmt.Sprintf(workflowTpl, def), nil
-}
 
 // Workflow represents a workflow encoded wtihin the Cue configuration language.
 //
 // This represents the logic for a workflow, but does not represent any specific
 // workflow in the database.
 type Workflow struct {
+	// UUID is a surrogate key.
+	UUID uuid.UUID `json:"-"`
 	// ID is the immutable human identifier for the workflow.  This acts
 	// similarly to a git repository name;  a single workflow ID can contain
 	// many workflow versions.
 	//
 	// When deploying a specific workflow version we read the cue configuration
 	// and upsert a version to the given ID.
-	ID   string `json:"id"`
-	Name string `json:"name"`
-
+	ID       string    `json:"id"`
+	Name     string    `json:"name"`
 	Throttle *Throttle `json:"throttle,omitempty"`
-
 	Triggers []Trigger `json:"triggers"`
-	Actions  []Action  `json:"actions"`
+	Steps    []Step    `json:"actions"`
 	Edges    []Edge    `json:"edges"`
 }
 
@@ -80,20 +56,18 @@ type CronTrigger struct {
 	Cron string `json:"cron"`
 }
 
-// Action represents a serialized action within a workflow.  This represents
-// the set of information to run a single action.Action for a workflow.  It
-// is not the action itself.
-type Action struct {
-	ClientID uint                   `json:"clientID"`
+// Step is a reference to an action within a workflow.
+type Step struct {
+	ClientID string                 `json:"clientID"`
 	Name     string                 `json:"name"`
 	DSN      string                 `json:"dsn"`
-	Version  *uint                  `json:"version,omitempty"`
+	Version  *VersionConstraint     `json:"version,omitempty"`
 	Metadata map[string]interface{} `json:"metadata"`
 }
 
 type Edge struct {
-	Outgoing interface{} `json:"outgoing"`
-	Incoming uint        `json:"incoming"`
+	Outgoing string `json:"outgoing"`
+	Incoming string `json:"incoming"`
 	// Metadata specifies the type of edge to use.  This defaults
 	// to EdgeTypeEdge - a basic link that can conditionally run.
 	Metadata *EdgeMetadata `json:"metadata,omitempty"`
@@ -117,10 +91,13 @@ type AsyncEdgeMetadata struct {
 	Match *string `json:"match"`
 }
 
-var workflowTpl = `package main
-
-import (
-	"inngest.com/workflows"
-)
-
-workflow: workflows.#Workflow & %s`
+// VersionCoinstraint represents version constraints for an action.  We use semver without
+// patches:
+// - Major versions are backwards-incompatible (eg. requesting different secrets,
+//   incompatible APIs).
+// - Minor versions are backwards compatible improvements, fixes, or additions.  We
+//   automatically use the latest minor version within every step function.
+type VersionConstraint struct {
+	Major *uint `json:"version,omitempty"`
+	Minor *uint `json:"minor,omitempty"`
+}
