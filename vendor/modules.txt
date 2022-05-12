@@ -109,6 +109,9 @@ github.com/ProtonMail/go-crypto/openpgp/s2k
 # github.com/acomagu/bufpipe v1.0.3
 ## explicit; go 1.12
 github.com/acomagu/bufpipe
+# github.com/agext/levenshtein v1.2.2
+## explicit
+github.com/agext/levenshtein
 # github.com/alecthomas/chroma v0.10.0
 ## explicit; go 1.13
 github.com/alecthomas/chroma
@@ -145,6 +148,9 @@ github.com/alecthomas/chroma/lexers/y
 github.com/alecthomas/chroma/lexers/z
 github.com/alecthomas/chroma/quick
 github.com/alecthomas/chroma/styles
+# github.com/apparentlymart/go-textseg/v13 v13.0.0
+## explicit; go 1.16
+github.com/apparentlymart/go-textseg/v13/textseg
 # github.com/atotto/clipboard v0.1.4
 ## explicit
 github.com/atotto/clipboard
@@ -337,6 +343,13 @@ github.com/hashicorp/hcl/hcl/token
 github.com/hashicorp/hcl/json/parser
 github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
+# github.com/hashicorp/hcl/v2 v2.10.0
+## explicit; go 1.12
+github.com/hashicorp/hcl/v2
+# github.com/hashicorp/terraform v0.15.3
+## explicit; go 1.14
+github.com/hashicorp/terraform/dag
+github.com/hashicorp/terraform/tfdiags
 # github.com/imdario/mergo v0.3.12
 ## explicit; go 1.13
 github.com/imdario/mergo
@@ -403,6 +416,9 @@ github.com/microcosm-cc/bluemonday/css
 # github.com/mitchellh/go-homedir v1.1.0
 ## explicit
 github.com/mitchellh/go-homedir
+# github.com/mitchellh/go-wordwrap v1.0.0
+## explicit
+github.com/mitchellh/go-wordwrap
 # github.com/mitchellh/mapstructure v1.4.3
 ## explicit; go 1.14
 github.com/mitchellh/mapstructure
@@ -437,6 +453,9 @@ github.com/muesli/reflow/wrap
 # github.com/muesli/termenv v0.11.1-0.20220212125758-44cd13922739
 ## explicit; go 1.13
 github.com/muesli/termenv
+# github.com/oklog/ulid v1.3.1
+## explicit
+github.com/oklog/ulid
 # github.com/olekukonko/tablewriter v0.0.5
 ## explicit; go 1.12
 github.com/olekukonko/tablewriter
@@ -534,6 +553,13 @@ github.com/yuin/goldmark/util
 github.com/yuin/goldmark-emoji
 github.com/yuin/goldmark-emoji/ast
 github.com/yuin/goldmark-emoji/definition
+# github.com/zclconf/go-cty v1.8.3
+## explicit; go 1.12
+github.com/zclconf/go-cty/cty
+github.com/zclconf/go-cty/cty/convert
+github.com/zclconf/go-cty/cty/function
+github.com/zclconf/go-cty/cty/gocty
+github.com/zclconf/go-cty/cty/set
 # golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e
 ## explicit; go 1.17
 golang.org/x/crypto/blowfish
