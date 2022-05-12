@@ -87,9 +87,7 @@ func (d *dockerExec) Execute(ctx context.Context, state state.State, action inng
 	}
 
 	resp := &driver.Response{
-		Output: map[string]interface{}{
-			"body": string(byt),
-		},
+		Output: map[string]interface{}{},
 	}
 	if exit != 0 {
 		resp.Err = fmt.Errorf("non-zero status code: %d", exit)
@@ -97,7 +95,7 @@ func (d *dockerExec) Execute(ctx context.Context, state state.State, action inng
 
 	if len(byt) == 0 {
 		byt, _ := io.ReadAll(stderr)
-		resp.Output["body"] = string(byt)
+		resp.Output["stderr"] = string(byt)
 		return resp, nil
 	}
 

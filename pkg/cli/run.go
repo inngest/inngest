@@ -231,7 +231,8 @@ func (r *RunUI) RenderState() string {
 	for id, data := range output {
 		byt, _ := json.Marshal(data)
 		s.WriteString(BoldStyle.Render(fmt.Sprintf("Step '%s'", id)))
-		s.WriteString(": " + wrap.String(string(byt), width))
+		s.WriteString(": \n")
+		s.WriteString(wrap.String(string(byt), width))
 		s.WriteString("\n")
 	}
 

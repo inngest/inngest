@@ -47,7 +47,6 @@ func doRun(cmd *cobra.Command, args []string) {
 
 	if err = buildImg(cmd.Context(), *fn); err != nil {
 		// This should already have been printed to the terminal.
-		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
@@ -75,7 +74,7 @@ func buildImg(ctx context.Context, fn function.Function) error {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
 	}
-	return nil
+	return ui.Builder.Error()
 }
 
 // runFunction builds the function's images and runs the function.
