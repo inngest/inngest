@@ -40,7 +40,6 @@ func doRun(cmd *cobra.Command, args []string) {
 
 	fn, err := function.Load(path)
 	if err != nil {
-		fmt.Println(err.Error())
 		fmt.Println("\n" + cli.RenderError("No inngest.json or inngest.cue file found in your current directory") + "\n")
 		os.Exit(1)
 		return
@@ -54,7 +53,6 @@ func doRun(cmd *cobra.Command, args []string) {
 
 	if err = runFunction(cmd.Context(), *fn); err != nil {
 		// This should already have been printed to the terminal.
-		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 }
@@ -92,18 +90,9 @@ func runFunction(ctx context.Context, fn function.Function) error {
 		return err
 	}
 
-	actions, _, err := fn.Actions(ctx)
-	if err != nil {
-		return err
-	}
-	if len(actions) != 1 {
-		return fmt.Errorf("running step-functions locally is not yet supported")
-	}
-
 	// Run the function.
 	ui, err := cli.NewRunUI(ctx, cli.RunUIOpts{
 		Function: fn,
-		Action:   actions[0],
 		Event:    evt,
 		Seed:     runSeed,
 	})

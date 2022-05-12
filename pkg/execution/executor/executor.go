@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/pkg/execution/actionloader"
 	"github.com/inngest/inngestctl/pkg/execution/driver"
@@ -226,13 +227,17 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		return response, nil
 	}
 
-	// Store the output or the error.
-	if response.Err != nil {
-		_, err = e.sm.SaveActionError(ctx, id, action.ClientID, response.Err)
-		return response, err
+	if _, serr := e.sm.SaveActionOutput(ctx, id, action.ClientID, response.Output); serr != nil {
+		err = multierror.Append(err, serr)
 	}
 
-	_, err = e.sm.SaveActionOutput(ctx, id, action.ClientID, response.Output)
+	// Store the output or the error.
+	if response.Err != nil {
+		if _, serr := e.sm.SaveActionError(ctx, id, action.ClientID, response.Err); serr != nil {
+			err = multierror.Append(err, serr)
+		}
+	}
+
 	return response, err
 }
 
