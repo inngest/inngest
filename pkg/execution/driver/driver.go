@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/pkg/execution/state"
@@ -77,4 +78,16 @@ func (r Response) Error() string {
 
 func (r Response) Unwrap() error {
 	return r.Err
+}
+
+// MarshalV1 marshals state as an input to driver runtimes.
+func MarshalV1(s state.State) ([]byte, error) {
+	data := map[string]interface{}{
+		"event": s.Event(),
+		"steps": s.Actions(),
+		"ctx": map[string]interface{}{
+			"workflow_id": s.WorkflowID(),
+		},
+	}
+	return json.Marshal(data)
 }

@@ -119,7 +119,7 @@ func (r *RunUI) run(ctx context.Context) {
 
 	// Create a high-level runner, which executes our functions.
 	runner := runner.NewInMemoryRunner(r.sm, exec)
-	id, err := runner.NewRun(ctx, *flow)
+	id, err := runner.NewRun(ctx, *flow, r.event)
 	if err != nil {
 		r.err = fmt.Errorf("error creating new run: %s", err)
 		return
@@ -178,7 +178,7 @@ func (r *RunUI) View() string {
 		s.WriteString("\n")
 	} else {
 		s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function..."))
-		s.WriteString("\n")
+		s.WriteString("\n\n")
 	}
 
 	input, _ := json.Marshal(r.event)
@@ -199,7 +199,9 @@ func (r *RunUI) View() string {
 	}
 
 	s.WriteString(
-		BoldStyle.Copy().Foreground(Green).Padding(0, 0, 1, 0).Render("Function complete"),
+		BoldStyle.Copy().Foreground(Green).Padding(0, 0, 1, 0).Render(
+			fmt.Sprintf("Function complete in %.2f seconds", r.duration.Seconds()),
+		),
 	)
 
 	return s.String()

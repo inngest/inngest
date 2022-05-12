@@ -110,7 +110,7 @@ func TestExecutor(t *testing.T) {
 		},
 	}
 
-	state, err := sm.New(ctx, w, ulid.MustNew(ulid.Now(), rand.Reader))
+	state, err := sm.New(ctx, w, ulid.MustNew(ulid.Now(), rand.Reader), map[string]interface{}{})
 	require.Nil(t, err)
 
 	driver := &mockdriver.Mock{
@@ -173,6 +173,6 @@ func TestExecutor(t *testing.T) {
 	assert.Equal(t, 0, len(available), "incorrect number of functions available")
 	// An error should be recorded.
 	state, err = sm.Load(ctx, state.Identifier())
-	assert.Equal(t, 1, len(state.Actions()))
+	assert.Equal(t, 2, len(state.Actions()))
 	assert.Equal(t, 1, len(state.Errors()))
 }

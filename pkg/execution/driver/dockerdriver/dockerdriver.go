@@ -144,13 +144,7 @@ func (d *dockerExec) start(ctx context.Context, state state.State, wa inngest.St
 }
 
 func (d *dockerExec) startOpts(ctx context.Context, state state.State, wa inngest.Step) (docker.CreateContainerOptions, error) {
-	marshalled, err := json.Marshal(map[string]interface{}{
-		"event": state.Event(),
-		"steps": state.Actions(),
-		"ctx": map[string]interface{}{
-			"workflow_id": state.WorkflowID(),
-		},
-	})
+	marshalled, err := driver.MarshalV1(state)
 	if err != nil {
 		return docker.CreateContainerOptions{}, fmt.Errorf("error marshalling state")
 	}

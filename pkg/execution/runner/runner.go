@@ -41,8 +41,8 @@ type InMemoryRunner struct {
 }
 
 // NewRun initializes a new run for the given workflow.
-func (i *InMemoryRunner) NewRun(ctx context.Context, f inngest.Workflow) (*state.Identifier, error) {
-	state, err := i.sm.New(ctx, f, ulid.MustNew(ulid.Now(), rand.Reader))
+func (i *InMemoryRunner) NewRun(ctx context.Context, f inngest.Workflow, data map[string]interface{}) (*state.Identifier, error) {
+	state, err := i.sm.New(ctx, f, ulid.MustNew(ulid.Now(), rand.Reader), data)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing new run: %w", err)
 	}

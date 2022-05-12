@@ -36,7 +36,7 @@ func (e executor) Execute(ctx context.Context, state state.State, action inngest
 		return nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
 	}
 
-	input, err := json.Marshal(state)
+	input, err := driver.MarshalV1(state)
 	if err != nil {
 		return nil, err
 	}

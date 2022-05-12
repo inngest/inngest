@@ -23,12 +23,12 @@ type mem struct {
 	lock  sync.RWMutex
 }
 
-func (m *mem) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID) (state.State, error) {
+func (m *mem) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, data map[string]interface{}) (state.State, error) {
 	state := &memstate{
 		workflow:   workflow,
 		runID:      runID,
 		workflowID: workflow.UUID,
-		event:      map[string]interface{}{},
+		event:      data,
 		actions:    map[string]map[string]interface{}{},
 		errors:     map[string]error{},
 	}
