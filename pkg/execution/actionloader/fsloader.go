@@ -15,8 +15,10 @@ import (
 func FSLoader(path string) (ActionLoader, error) {
 	loader := NewMemoryLoader()
 
-	var walk fs.WalkDirFunc
-	walk = func(path string, d fs.DirEntry, err error) error {
+	walk := func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
 		file, _ := filepath.Abs(path)
 		if d.IsDir() {
 			return nil

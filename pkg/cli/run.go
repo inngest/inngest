@@ -59,8 +59,6 @@ type RunUI struct {
 	// duration stores how long the function took to execute.
 	duration time.Duration
 	done     bool
-	// response stores the response for the function
-	response []byte
 }
 
 // Error returns the error from building or running the function, if part of the process failed.

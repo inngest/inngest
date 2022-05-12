@@ -141,6 +141,7 @@ func TestExecutor(t *testing.T) {
 	assert.ElementsMatch(t, []string{"1", "2"}, available)
 	// There should be no state.
 	state, err = sm.Load(ctx, state.Identifier())
+	require.NoError(t, err)
 	assert.Equal(t, 0, len(state.Actions()))
 
 	// Run the first item.
@@ -151,6 +152,7 @@ func TestExecutor(t *testing.T) {
 	assert.ElementsMatch(t, []string{"3"}, available)
 	// Ensure we recorded state.
 	state, err = sm.Load(ctx, state.Identifier())
+	require.NoError(t, err)
 	assert.Equal(t, 1, len(state.Actions()))
 	assert.Equal(t, 0, len(state.Errors()))
 
@@ -163,6 +165,7 @@ func TestExecutor(t *testing.T) {
 	assert.Equal(t, 0, len(available), "incorrect number of functions available")
 	// No state should be recorded.
 	state, err = sm.Load(ctx, state.Identifier())
+	require.NoError(t, err)
 	assert.Equal(t, 1, len(state.Actions()))
 	assert.Equal(t, 0, len(state.Errors()))
 
@@ -173,6 +176,7 @@ func TestExecutor(t *testing.T) {
 	assert.Equal(t, 0, len(available), "incorrect number of functions available")
 	// An error should be recorded.
 	state, err = sm.Load(ctx, state.Identifier())
+	require.NoError(t, err)
 	assert.Equal(t, 2, len(state.Actions()))
 	assert.Equal(t, 1, len(state.Errors()))
 }

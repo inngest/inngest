@@ -5,11 +5,9 @@ package runner
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 
 	"github.com/inngest/inngestctl/inngest"
-	"github.com/inngest/inngestctl/pkg/execution/driver"
 	"github.com/inngest/inngestctl/pkg/execution/executor"
 	"github.com/inngest/inngestctl/pkg/execution/state"
 	"github.com/oklog/ulid"
@@ -30,8 +28,6 @@ func NewInMemoryRunner(sm state.Manager, exec executor.Executor) *InMemoryRunner
 type InMemoryRunner struct {
 	sm   state.Manager
 	exec executor.Executor
-
-	identifier state.Identifier
 
 	// available reperesents functions that are available to be executed.  We
 	// traverse the step functions from the trigger downards in a BFS, executing
@@ -61,12 +57,11 @@ func (i *InMemoryRunner) Execute(ctx context.Context, id state.Identifier) error
 
 		children, err := i.exec.Execute(ctx, id, next)
 		if err != nil {
-
-			resp := driver.Response{}
-			if !errors.As(err, &resp) || resp.Retryable() {
-				// TODO: If this is retryable, schedule
-				// up to N runs based off of the func.
-			}
+			// resp := driver.Response{}
+			// if !errors.As(err, &resp) || resp.Retryable() {
+			// 	// TODO: If this is retryable, schedule
+			// 	// up to N runs based off of the func.
+			// }
 			return fmt.Errorf("execution error: %s", err)
 		}
 		i.available = append(i.available, children...)

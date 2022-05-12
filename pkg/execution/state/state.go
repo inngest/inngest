@@ -35,7 +35,7 @@ type Pause struct {
 	Expires time.Time `json:"expires"`
 	// Event is an optional event that can resume the pause automatically,
 	// often paired with an expression.
-	Event *string `json"event"`
+	Event *string `json:"event"`
 	// Expression is an optional expression that must match for the pause
 	// to be resumed.
 	Expression *string `json:"expression"`

@@ -39,7 +39,7 @@ func (m *Mock) Execute(ctx context.Context, state state.State, action inngest.Ac
 
 	m.Executed[step.ClientID] = action
 
-	response, _ := m.Responses[step.ClientID]
-	err, _ := m.Errors[step.ClientID]
+	response := m.Responses[step.ClientID]
+	err := m.Errors[step.ClientID]
 	return &response, err
 }
