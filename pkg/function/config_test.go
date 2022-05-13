@@ -1,10 +1,67 @@
 package function
 
 import (
+	"context"
+	"encoding/json"
+	"log"
+	"os"
+	"path"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/tools/txtar"
 )
+
+func TestUnmarshal_testdata(t *testing.T) {
+	entries, err := os.ReadDir("./testdata")
+	require.NoError(t, err)
+
+	type testdata struct {
+		input    []byte
+		function []byte
+		workflow []byte
+	}
+
+	for _, e := range entries {
+		t.Run(e.Name(), func(t *testing.T) {
+			if !strings.HasSuffix(e.Name(), ".txtar") {
+				return
+			}
+
+			archive, err := txtar.ParseFile(path.Join("./testdata", e.Name()))
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			td := testdata{}
+			for _, f := range archive.Files {
+				switch f.Name {
+				case "input":
+					td.input = f.Data
+				case "function.json":
+					td.function = f.Data
+				case "workflow.json":
+					td.workflow = f.Data
+				}
+			}
+
+			fn, err := Unmarshal(td.input)
+			require.NoError(t, err)
+
+			marshalled, err := json.MarshalIndent(fn, "", "  ")
+			require.NoError(t, err)
+			require.EqualValues(t, strings.TrimSpace(string(td.function)), string(marshalled))
+
+			flow, err := fn.Workflow(context.Background())
+			require.NoError(t, err)
+
+			marshalled, err = json.MarshalIndent(flow, "", "  ")
+			require.EqualValues(t, strings.TrimSpace(string(td.workflow)), string(marshalled))
+		})
+	}
+
+}
 
 // TestUnmarshal asserts that unmarshalling a function definition works as expected, producing
 // the correct struct defintions or errors.

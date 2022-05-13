@@ -3,15 +3,19 @@ package v1
 #Function: {
 	id:   string
 	name: string
+
 	// triggers represent how the function is invoked.
 	triggers: [...#Trigger]
+
 	// A function can have > 1 step, which is an individual "action" called in a DAG.
 	steps?: [Name=string]: #Step & {name: Name}
+
 	// idempotency allows the specification of an idempotency key using event data.
+	// If specified, this overrides the throttle object.
 	idempotency?: string
 	// throttle allows you to throttle workflows, only running them a given number
 	// of times (count) per period.  This can optionally include a throttle key,
-	// which is used to 
+	// which is used to  further constrain throttling similar to idempotency.
 	throttle?: {
 		key?:   string
 		count:  uint & >=1 | *1
@@ -66,4 +70,23 @@ package v1
 	// necessary for executing the image, eg. if this is an externally hosted serverless
 	// function via an API this will include the URL to use in order to invoke the function.
 	runtime: #Runtime
+
+	// after specifies that this step should run after each of the following steps.
+	//
+	// If more than one item is supplied in this array, the step will run multiple times after
+	// each preceeding step finishes.
+	after?: [...#After]
+}
+
+#After: {
+	step: string | "$trigger"
+	// TODO: support Promise.all() like support in which we wait after all steps
+	// specified in an array are finished before running this once.
+	// steps?: [...string]
+	if?: string
+	// wait allows you to delay a step from running for a set amount of time, eg.
+	// to delay a step from running you can set wait to "10m".  This will enqueue
+	// the step to run after 10 minutes.
+	wait?: string
+	// TODO: async
 }

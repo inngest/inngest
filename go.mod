@@ -33,6 +33,7 @@ require (
 	github.com/xhit/go-str2duration/v2 v2.0.0
 	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171
 	golang.org/x/text v0.3.7
+	golang.org/x/tools v0.1.7
 )
 
 require (

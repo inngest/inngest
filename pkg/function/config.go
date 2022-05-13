@@ -85,7 +85,7 @@ func Unmarshal(input []byte) (*Function, error) {
 		return nil, err
 	}
 	if err := fn.Validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("The function is not valid: %w", err)
 	}
 	return fn, nil
 }

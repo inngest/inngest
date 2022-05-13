@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/gosimple/slug"
@@ -54,6 +55,14 @@ type Function struct {
 type Step struct {
 	Name    string                 `json:"name"`
 	Runtime inngest.RuntimeWrapper `json:"runtime"`
+	After   []After                `json:"after"`
+}
+
+type After struct {
+	Step string `json:"step,omitempty"`
+	// TODO: support multiple steps all finishing prior to running this once.
+	// Steps []string `json:"steps,omitempty"`
+	Wait *string `json:"wait,omitempty"`
 }
 
 // New returns a new, empty function with a randomly generated ID.
@@ -69,7 +78,7 @@ func New() (*Function, error) {
 }
 
 func (f Function) Slug() string {
-	return slug.Make(f.Name)
+	return strings.ToLower(slug.Make(f.Name))
 }
 
 // Validate returns an error if the function definition is invalid.
@@ -138,16 +147,15 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 		return nil, err
 	}
 
-	for n, a := range actions {
+	for _, a := range actions {
 		w.Steps = append(w.Steps, inngest.Step{
-			ClientID: fmt.Sprintf("%d", uint(n)+1), // 0 is the trigger; use 1 offset
+			ClientID: a.Name,
 			Name:     a.Name,
 			DSN:      a.DSN,
 		})
 	}
 
 	w.Edges = edges
-
 	// TODO: When supporting > 1 action, validate the edges.
 
 	return &w, nil
@@ -165,40 +173,40 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 		return f.defaultAction(ctx)
 	}
 
-	// XXX: We're redefining how we define "edges" within steps, and so right now
-	// only support 1 edge.
-	if len(f.Steps) > 1 {
-		return nil, nil, fmt.Errorf("Function definitions currently only support one step")
-	}
-
-	// TODO: With > 1 step, convert each step into a tree, with nodes pointing from the trigger
-	// to each step in a stable manner.
-
-	var (
-		a   inngest.ActionVersion
-		err error
-	)
+	avs := []inngest.ActionVersion{}
+	edges := []inngest.Edge{}
 
 	for _, step := range f.Steps {
-		if a, err = f.action(ctx, step, 0); err != nil {
+		av, err := f.action(ctx, step)
+		if err != nil {
 			return nil, nil, err
+		}
+		avs = append(avs, av)
+
+		// For each of the "after" items, add an edge.
+		for _, after := range step.After {
+			edges = append(edges, inngest.Edge{
+				Outgoing: after.Step,
+				Incoming: step.Name,
+				Metadata: &inngest.EdgeMetadata{
+					Wait: after.Wait,
+				},
+			})
 		}
 	}
 
-	edges := []inngest.Edge{{
-		Outgoing: inngest.TriggerName,
-		Incoming: "1",
-	}}
-	return []inngest.ActionVersion{a}, edges, nil
+	return avs, edges, nil
 }
 
-func (f Function) action(ctx context.Context, s Step, n int) (inngest.ActionVersion, error) {
+func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, error) {
 	suffix := "test"
 	if state.IsProd() {
 		suffix = "prod"
 	}
 
-	id := fmt.Sprintf("%s-step-%d-%s", f.ID, n, suffix)
+	slug := strings.ToLower(slug.Make(s.Name))
+
+	id := fmt.Sprintf("%s-step-%s-%s", f.ID, slug, suffix)
 	if prefix, err := state.AccountIdentifier(ctx); err == nil && prefix != "" {
 		id = fmt.Sprintf("%s/%s", prefix, id)
 	}
@@ -216,6 +224,9 @@ func (f Function) action(ctx context.Context, s Step, n int) (inngest.ActionVers
 	return a, nil
 }
 
+// defaultAction returns the default action used when no steps are specified.  This assumes
+// that we're writing a single step function using custom code with the docker executor, and
+// that the code is in the current directory.
 func (f Function) defaultAction(ctx context.Context) ([]inngest.ActionVersion, []inngest.Edge, error) {
 	id := f.ID + "-action"
 
@@ -236,7 +247,7 @@ func (f Function) defaultAction(ctx context.Context) ([]inngest.ActionVersion, [
 	}
 	edges := []inngest.Edge{{
 		Outgoing: inngest.TriggerName,
-		Incoming: "1",
+		Incoming: f.Name,
 	}}
 	return []inngest.ActionVersion{a}, edges, nil
 }

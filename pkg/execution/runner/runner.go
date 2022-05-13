@@ -82,10 +82,10 @@ func (i *InMemoryRunner) Execute(ctx context.Context, id state.Identifier) error
 }
 
 func (i *InMemoryRunner) run(ctx context.Context, id state.Identifier, e inngest.Edge) {
-	if e.Metadata != nil && e.Metadata.Wait != "" {
-		dur, err := str2duration.ParseDuration(e.Metadata.Wait)
+	if e.Metadata != nil && e.Metadata.Wait != nil {
+		dur, err := str2duration.ParseDuration(*e.Metadata.Wait)
 		if err != nil {
-			i.err = multierror.Append(i.err, fmt.Errorf("invalid edge duration '%s'", e.Metadata.Wait))
+			i.err = multierror.Append(i.err, fmt.Errorf("invalid edge duration '%s'", *e.Metadata.Wait))
 		}
 		<-time.After(dur)
 	}

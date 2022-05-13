@@ -68,7 +68,7 @@ type Step struct {
 	Name     string                 `json:"name"`
 	DSN      string                 `json:"dsn"`
 	Version  *VersionConstraint     `json:"version,omitempty"`
-	Metadata map[string]interface{} `json:"metadata"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 type Edge struct {
@@ -80,13 +80,13 @@ type Edge struct {
 }
 
 type EdgeMetadata struct {
-	Type string `json:"type"`
-	Name string `json:"name"`
-	If   string `json:"if"`
+	Type string `json:"type,omitempty"`
+	Name string `json:"name,omitempty"`
+	If   string `json:"if,omitempty"`
 	// Wait specifies that the edge should only be traversed after the specified
 	// duration.  This, in effect, allows you to delay jobs for a given amount of
 	// time.
-	Wait               string `json:"wait"`
+	Wait               *string `json:"wait,omitempty"`
 	*AsyncEdgeMetadata `json:"async,omitempty"`
 }
 

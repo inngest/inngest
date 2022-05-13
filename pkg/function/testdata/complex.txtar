@@ -1,0 +1,112 @@
+-- input --
+package main
+
+import (
+	defs "inngest.com/defs/v1"
+)
+
+function: defs.#Function & {
+	id:   "some-id"
+	name: "test"
+	triggers: [defs.#EventTrigger & {
+		event:      "test.event"
+		expression: "data.run == true"
+	}]
+	idempotency: "{{ event.data.foo }}"
+	steps: {
+		first: {
+			runtime: defs.#RuntimeDocker
+			after: [{
+				step: "$trigger"
+				wait: "5m"
+			}]
+		}
+		second: {
+			runtime: defs.#RuntimeDocker
+			after: [{
+				step: "first"
+			}]
+		}
+	}
+}
+-- function.json --
+{
+  "name": "test",
+  "id": "some-id",
+  "triggers": [
+    {
+      "event": "test.event",
+      "expression": "data.run == true"
+    }
+  ],
+  "idempotency": "{{ event.data.foo }}",
+  "steps": {
+    "first": {
+      "name": "first",
+      "runtime": {
+        "image": "",
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "$trigger",
+          "wait": "5m"
+        }
+      ]
+    },
+    "second": {
+      "name": "second",
+      "runtime": {
+        "image": "",
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "first"
+        }
+      ]
+    }
+  }
+}
+-- workflow.json --
+{
+  "id": "some-id",
+  "name": "test",
+  "throttle": {
+    "count": 1,
+    "period": "24h",
+    "key": "{{ event.data.foo }}"
+  },
+  "triggers": [
+    {
+      "event": "test.event",
+      "expression": "data.run == true"
+    }
+  ],
+  "actions": [
+    {
+      "clientID": "first",
+      "name": "first",
+      "dsn": "some-id-step-first-test"
+    },
+    {
+      "clientID": "second",
+      "name": "second",
+      "dsn": "some-id-step-second-test"
+    }
+  ],
+  "edges": [
+    {
+      "outgoing": "$trigger",
+      "incoming": "first",
+      "metadata": {
+        "wait": "5m"
+      }
+    },
+    {
+      "outgoing": "first",
+      "incoming": "second",
+      "metadata": {}
+    }
+  ]
+}
