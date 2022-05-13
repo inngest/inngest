@@ -75,7 +75,7 @@ package v1
 	//
 	// If more than one item is supplied in this array, the step will run multiple times after
 	// each preceeding step finishes.
-	after?: [...#After]
+	after: [...#After]
 }
 
 #After: {

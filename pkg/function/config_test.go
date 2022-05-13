@@ -59,6 +59,7 @@ func TestUnmarshal_testdata(t *testing.T) {
 			require.NoError(t, err)
 
 			marshalled, err = json.MarshalIndent(flow, "", "  ")
+			require.NoError(t, err)
 			require.EqualValues(t, strings.TrimSpace(string(td.workflow)), string(marshalled))
 		})
 	}

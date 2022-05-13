@@ -52,7 +52,7 @@ type RunUI struct {
 	err error
 
 	// sm is the state manager used for the execution.
-	sm state.Manager
+	sm inmemory.Queue
 	// id is the identifier for the execution, once started.
 	id *state.Identifier
 
