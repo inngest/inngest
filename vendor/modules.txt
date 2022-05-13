@@ -537,6 +537,9 @@ github.com/subosito/gotenv
 # github.com/xanzy/ssh-agent v0.3.0
 ## explicit
 github.com/xanzy/ssh-agent
+# github.com/xhit/go-str2duration/v2 v2.0.0
+## explicit; go 1.13
+github.com/xhit/go-str2duration/v2
 # github.com/yuin/goldmark v1.4.4
 ## explicit; go 1.16
 github.com/yuin/goldmark

@@ -36,7 +36,11 @@ func NewGraph(w Workflow) (Graph, error) {
 	// both vertices to the graph if they are not yet present, so this adds
 	// all of our actions for us.
 	for _, e := range w.Edges {
-		edge := GraphEdge{Outgoing: vertices[e.Outgoing], Incoming: vertices[e.Incoming]}
+		edge := GraphEdge{
+			WorkflowEdge: e,
+			Outgoing:     vertices[e.Outgoing],
+			Incoming:     vertices[e.Incoming],
+		}
 		g.Connect(edge)
 	}
 

@@ -6,6 +6,12 @@ const (
 	TriggerName = "$trigger"
 )
 
+var (
+	SourceEdge = Edge{
+		Incoming: TriggerName,
+	}
+)
+
 // Workflow represents a workflow encoded wtihin the Cue configuration language.
 //
 // This represents the logic for a workflow, but does not represent any specific
@@ -74,9 +80,13 @@ type Edge struct {
 }
 
 type EdgeMetadata struct {
-	Type               string `json:"type"`
-	Name               string `json:"name"`
-	If                 string `json:"if"`
+	Type string `json:"type"`
+	Name string `json:"name"`
+	If   string `json:"if"`
+	// Wait specifies that the edge should only be traversed after the specified
+	// duration.  This, in effect, allows you to delay jobs for a given amount of
+	// time.
+	Wait               string `json:"wait"`
 	*AsyncEdgeMetadata `json:"async,omitempty"`
 }
 

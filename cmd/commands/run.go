@@ -12,6 +12,7 @@ import (
 	"cuelang.org/go/cue"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/event-schemas/pkg/fakedata"
+	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/pkg/cli"
 	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngestctl/pkg/function"
@@ -58,6 +59,9 @@ func doRun(cmd *cobra.Command, args []string) {
 
 func buildImg(ctx context.Context, fn function.Function) error {
 	a, _, _ := fn.Actions(ctx)
+	if a[0].Runtime.RuntimeType() != inngest.RuntimeTypeDocker {
+		return nil
+	}
 
 	ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
 		QuitOnComplete: true,

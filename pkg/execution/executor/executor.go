@@ -53,7 +53,7 @@ type Executor interface {
 	// It is important for this function to be atomic;  if the function was scheduled
 	// and the context terminates, we must store the output or async data in workflow
 	// state then schedule the child functions else the workflow will terminate early.
-	Execute(ctx context.Context, id state.Identifier, from string) ([]string, error)
+	Execute(ctx context.Context, id state.Identifier, from string) ([]inngest.Edge, error)
 
 	// XXX: These have been moved into the runner, as these aren't actually "executing"
 	//      a step of a function.
@@ -135,7 +135,7 @@ type executor struct {
 // Execute loads a workflow and the current run state, then executes the
 // workflow via an executor.  This returns all available steps we can run from
 // the workflow after the step has been executed.
-func (e *executor) Execute(ctx context.Context, id state.Identifier, from string) ([]string, error) {
+func (e *executor) Execute(ctx context.Context, id state.Identifier, from string) ([]inngest.Edge, error) {
 	state, err := e.sm.Load(ctx, id)
 	if err != nil {
 		return nil, err
@@ -160,7 +160,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 }
 
 // run executes the action with the given client ID.
-func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, clientID string, s state.State) ([]string, error) {
+func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, clientID string, s state.State) ([]inngest.Edge, error) {
 	if clientID != inngest.TriggerName {
 		var step *inngest.Step
 		for _, s := range w.Steps {
@@ -244,7 +244,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 // availabileChildren iterates through all children of the given client ID, determining which
 // children can be executed based off of the current workflow state.  Some children may not
 // be executed due to conditional expressions etc.
-func (e *executor) availabileChildren(ctx context.Context, w inngest.Workflow, id state.Identifier, clientID string, s state.State) ([]string, error) {
+func (e *executor) availabileChildren(ctx context.Context, w inngest.Workflow, id state.Identifier, clientID string, s state.State) ([]inngest.Edge, error) {
 	g, err := inngest.NewGraph(w)
 	if err != nil {
 		return nil, err
@@ -261,10 +261,9 @@ func (e *executor) availabileChildren(ctx context.Context, w inngest.Workflow, i
 		return nil, fmt.Errorf("error loading state: %w", err)
 	}
 
-	future := []string{}
+	future := []inngest.Edge{}
 	for _, edge := range edges {
 		// TODO: Is this an async edge?
-
 		ok, err := e.canTraverseEdge(ctx, state, edge)
 		if err != nil {
 			return nil, err
@@ -276,7 +275,7 @@ func (e *executor) availabileChildren(ctx context.Context, w inngest.Workflow, i
 		// We can traverse this edge.  Schedule a new execution from this node.
 		// Scheduling executions needs to be done regardless of whether
 		// the context has cancelled.
-		future = append(future, edge.Incoming.ID())
+		future = append(future, edge.WorkflowEdge)
 	}
 	return future, nil
 }
@@ -287,16 +286,12 @@ func (e *executor) availabileChildren(ctx context.Context, w inngest.Workflow, i
 // asynchronous edges which wait for an event mathing a condition to be traversed (at some
 // point in the future, with a TTL).
 func (e *executor) canTraverseEdge(ctx context.Context, state state.State, edge inngest.GraphEdge) (bool, error) {
-	if edge.Outgoing.ID() == inngest.TriggerName {
-		return true, nil
-	}
-
-	if !state.ActionComplete(edge.Outgoing.ID()) {
+	if edge.Outgoing.ID() != inngest.TriggerName && !state.ActionComplete(edge.Outgoing.ID()) {
 		return false, nil
 	}
 
-	// TODO: Check the expression.  Template the expression, then evaluate it using
-	// CEL.
+	// TODO: Check expressions.
+	// TODO: Chec waits, set up future jobs.
 
 	return true, nil
 }

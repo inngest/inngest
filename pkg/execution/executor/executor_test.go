@@ -132,13 +132,21 @@ func TestExecutor(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, exec)
 
+	availableIDs := func(edges []inngest.Edge) []string {
+		strs := make([]string, len(edges))
+		for n, e := range edges {
+			strs[n] = e.Incoming
+		}
+		return strs
+	}
+
 	// Executing the trigger does nothing but validate which descendents from the trigger
 	// in the dag can run.
 	available, err := exec.Execute(ctx, state.Identifier(), inngest.TriggerName)
 	assert.NoError(t, err)
 	assert.Equal(t, len(driver.Executed), 0)
 	assert.Equal(t, len(available), 2)
-	assert.ElementsMatch(t, []string{"1", "2"}, available)
+	assert.ElementsMatch(t, []string{"1", "2"}, availableIDs(available))
 	// There should be no state.
 	state, err = sm.Load(ctx, state.Identifier())
 	require.NoError(t, err)
@@ -149,7 +157,7 @@ func TestExecutor(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
 	assert.Equal(t, 1, len(available))
-	assert.ElementsMatch(t, []string{"3"}, available)
+	assert.ElementsMatch(t, []string{"3"}, availableIDs(available))
 	// Ensure we recorded state.
 	state, err = sm.Load(ctx, state.Identifier())
 	require.NoError(t, err)
