@@ -76,7 +76,7 @@ type Edge struct {
 	Incoming string `json:"incoming"`
 	// Metadata specifies the type of edge to use.  This defaults
 	// to EdgeTypeEdge - a basic link that can conditionally run.
-	Metadata *EdgeMetadata `json:"metadata,omitempty"`
+	Metadata EdgeMetadata `json:"metadata,omitempty"`
 }
 
 type EdgeMetadata struct {

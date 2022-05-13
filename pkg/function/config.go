@@ -2,6 +2,7 @@ package function
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -20,7 +21,7 @@ var (
 
 // Load loads the inngest function from the given directory.  It searches for both inngest.cue
 // and inngest.json as both are supported.  If neither exist, this returns ErrNotFound.
-func Load(dir string) (*Function, error) {
+func Load(ctx context.Context, dir string) (*Function, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
@@ -35,7 +36,7 @@ func Load(dir string) (*Function, error) {
 			if err != nil {
 				return nil, err
 			}
-			return Unmarshal(byt)
+			return Unmarshal(ctx, byt)
 		}
 	}
 
@@ -47,7 +48,7 @@ func Load(dir string) (*Function, error) {
 		if err != nil {
 			return nil, err
 		}
-		return Unmarshal(byt)
+		return Unmarshal(ctx, byt)
 	}
 
 	// Finally, use inngest.json in the given dir.
@@ -64,7 +65,7 @@ func Load(dir string) (*Function, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Unmarshal(byt)
+	return Unmarshal(ctx, byt)
 }
 
 // Unmarshal parses the input data and returns a function definition or an error.  The input
@@ -73,7 +74,7 @@ func Load(dir string) (*Function, error) {
 // for ease of use.
 //
 // This validates the function after parsing, returning any validation errors.
-func Unmarshal(input []byte) (*Function, error) {
+func Unmarshal(ctx context.Context, input []byte) (*Function, error) {
 	// Note that cue is a superset of JSON;  we can parse the input using our cue definition
 	// for both a JSON and Cue input.
 	instance, err := prepare(input)
@@ -84,7 +85,18 @@ func Unmarshal(input []byte) (*Function, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := fn.Validate(); err != nil {
+
+	// Note that some of the fields are optional for a quick-start experience.  For example,
+	// it's not necessary to include a "step" array if you have a single step function which
+	// runs custom code.
+	//
+	// Here we want to ensure that the struct fields are all filled out in a canonical
+	// format.
+	if err := fn.canonicalize(ctx); err != nil {
+		return nil, err
+	}
+
+	if err := fn.Validate(ctx); err != nil {
 		return nil, fmt.Errorf("The function is not valid: %w", err)
 	}
 	return fn, nil

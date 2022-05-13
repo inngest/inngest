@@ -43,7 +43,7 @@ func doDeploy(cmd *cobra.Command, args []string) {
 func deployFunction(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	fn, err := function.Load(".")
+	fn, err := function.Load(ctx, ".")
 	if err != nil {
 		return err
 	}

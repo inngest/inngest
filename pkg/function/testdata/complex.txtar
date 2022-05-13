@@ -40,11 +40,15 @@ function: defs.#Function & {
     }
   ],
   "idempotency": "{{ event.data.foo }}",
+  "throttle": {
+    "count": 1,
+    "period": "24h",
+    "key": "{{ event.data.foo }}"
+  },
   "steps": {
     "first": {
       "name": "first",
       "runtime": {
-        "image": "",
         "type": "docker"
       },
       "after": [
@@ -57,7 +61,6 @@ function: defs.#Function & {
     "second": {
       "name": "second",
       "runtime": {
-        "image": "",
         "type": "docker"
       },
       "after": [

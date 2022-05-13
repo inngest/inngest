@@ -56,7 +56,6 @@ func (r *RuntimeWrapper) UnmarshalJSON(b []byte) error {
 }
 
 type RuntimeDocker struct {
-	Image      string   `json:"image"`
 	Entrypoint []string `json:"entrypoint,omitempty"`
 	Memory     *int     `json:"memory"`
 }
@@ -65,8 +64,7 @@ type RuntimeDocker struct {
 // correctly when serializing actions.
 func (r RuntimeDocker) MarshalJSON() ([]byte, error) {
 	data := map[string]interface{}{
-		"type":  RuntimeTypeDocker,
-		"image": r.Image,
+		"type": RuntimeTypeDocker,
 	}
 	if len(r.Entrypoint) > 0 {
 		data["entrypoint"] = r.Entrypoint

@@ -38,9 +38,6 @@ func Push(ctx context.Context, a inngest.ActionVersion, creds []byte) (string, e
 	}
 
 	imageTag := a.DSN
-	if a.Runtime.Runtime.(inngest.RuntimeDocker).Image != "" {
-		imageTag = a.Runtime.Runtime.(inngest.RuntimeDocker).Image
-	}
 
 	img, err := c.InspectImage(imageTag)
 	if err != nil {

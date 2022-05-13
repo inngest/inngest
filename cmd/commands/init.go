@@ -25,7 +25,7 @@ func NewCmdInit() *cobra.Command {
 }
 
 func runInit(cmd *cobra.Command, args []string) {
-	if _, err := function.Load("."); err == nil {
+	if _, err := function.Load(cmd.Context(), "."); err == nil {
 		// XXX: We can't both SilenceUsage and SilenceError, so we handle error checking inside
 		// the init function here.
 		fmt.Println("\n" + cli.RenderError("An inngest project already exists in this directory.  Remove the inngest file to continue.") + "\n")
@@ -58,7 +58,7 @@ func runInit(cmd *cobra.Command, args []string) {
 	}
 
 	// Get the function from the state.
-	fn, err := state.Function()
+	fn, err := state.Function(cmd.Context())
 	if err != nil {
 		fmt.Println(cli.RenderError(fmt.Sprintf("There was an error creating the function: %s", err)) + "\n")
 		return

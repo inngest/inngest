@@ -35,14 +35,15 @@ func TestDerivedConfigDefault(t *testing.T) {
 		},
 	}
 
+	err = fn.canonicalize(context.Background())
+	require.NoError(t, err)
+
 	expectedActionVersion := inngest.ActionVersion{
 		Name:   "Foo",
-		DSN:    "magical-id-action",
+		DSN:    "magical-id-step-foo-test",
 		Scopes: []string{"secret:read:*"},
 		Runtime: inngest.RuntimeWrapper{
-			Runtime: inngest.RuntimeDocker{
-				Image: "magical-id-action",
-			},
+			Runtime: inngest.RuntimeDocker{},
 		},
 	}
 
@@ -54,13 +55,10 @@ import (
 
 action: actions.#Action
 action: {
-  dsn:  "magical-id-action"
+  dsn:  "magical-id-step-foo-test"
   name: "Foo"
   scopes: ["secret:read:*"]
-  runtime: {
-    image: "magical-id-action"
-    type:  "docker"
-  }
+  runtime: type: "docker"
 }`
 
 	actions, edges, err := fn.Actions(context.Background())
@@ -115,11 +113,12 @@ workflow: workflows.#Workflow & {
   actions: [{
     clientID: "Foo"
     name:     "Foo"
-    dsn:      "magical-id-action"
+    dsn:      "magical-id-step-foo-test"
   }]
   edges: [{
     outgoing: "$trigger"
     incoming: "Foo"
+    metadata: {}
   }]
 }`
 

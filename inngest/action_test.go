@@ -17,10 +17,10 @@ func TestMarshalRuntimeWrapper(t *testing.T) {
 			name: "docker",
 			r: RuntimeWrapper{
 				Runtime: RuntimeDocker{
-					Image: "conduit",
+					Entrypoint: []string{"main", "--json"},
 				},
 			},
-			expected: []byte(`{"image":"conduit","type":"docker"}`),
+			expected: []byte(`{"entrypoint":["main","--json"],"type":"docker"}`),
 		},
 		{
 			name: "http",

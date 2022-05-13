@@ -39,7 +39,7 @@ func doRun(cmd *cobra.Command, args []string) {
 		path = args[0]
 	}
 
-	fn, err := function.Load(path)
+	fn, err := function.Load(cmd.Context(), path)
 	if err != nil {
 		fmt.Println("\n" + cli.RenderError("No inngest.json or inngest.cue file found in your current directory") + "\n")
 		os.Exit(1)
