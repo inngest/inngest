@@ -75,13 +75,6 @@ type State interface {
 	ActionComplete(id string) bool
 }
 
-/*
-type Response struct {
-	Status int    `json:"status"`
-	Body   string `json:"body"`
-}
-*/
-
 // Loader allows loading of previously stored state based off of a given Identifier.
 type Loader interface {
 	Load(ctx context.Context, i Identifier) (State, error)

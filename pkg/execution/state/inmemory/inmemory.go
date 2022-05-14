@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngestctl/inngest"
@@ -11,18 +12,53 @@ import (
 	"github.com/oklog/ulid"
 )
 
-func NewStateManager() state.Manager {
+// Queue is a simplistic, **non production ready** queue for processing steps
+// of functions, keepign the queue in-memory with zero persistence.
+type Queue interface {
+	// Embed the state.Manager interface for processing state items.
+	state.Manager
+
+	Queue() chan QueueItem
+	Enqueue(item QueueItem, at *time.Time)
+}
+
+type QueueItem struct {
+	ID         state.Identifier
+	Edge       inngest.Edge
+	ErrorCount int
+}
+
+// NewStateManager returns a new in-memory queue and state manager for processing
+// functions in-memory, for development and testing only.
+func NewStateManager() Queue {
 	return &mem{
 		state: map[ulid.ULID]state.State{},
 		lock:  sync.RWMutex{},
+		q:     make(chan QueueItem),
 	}
 }
 
 type mem struct {
 	state map[ulid.ULID]state.State
 	lock  sync.RWMutex
+
+	q chan QueueItem
 }
 
+func (m *mem) Enqueue(item QueueItem, at *time.Time) {
+	go func() {
+		if at != nil {
+			<-time.After(time.Until(*at))
+		}
+		m.q <- item
+	}()
+}
+
+func (m *mem) Queue() chan QueueItem {
+	return m.q
+}
+
+// New initializes state for a new run using the specifid ID and starting data.
 func (m *mem) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, data map[string]interface{}) (state.State, error) {
 	state := &memstate{
 		workflow:   workflow,
