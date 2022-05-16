@@ -8,15 +8,14 @@ import (
 
 	"github.com/inngest/inngestctl/pkg/event"
 	"github.com/inngest/inngestctl/pkg/logger"
-	"github.com/inngest/inngestctl/pkg/logger/stdoutlogger"
 )
 
 type EventHandler func(*event.Event) error
 
-type Opts struct {
+type Options struct {
 	Port         string
 	EventHandler EventHandler
-	PrettyOutput bool
+	Logger       logger.Logger
 }
 
 const (
@@ -29,21 +28,17 @@ var (
 	EventPathRegex = regexp.MustCompile("^/e/([a-zA-Z0-9-_]+)$")
 )
 
-func NewAPI(o Opts) error {
-	l := stdoutlogger.NewLogger(logger.Options{
-		Pretty: o.PrettyOutput,
-	})
-
+func NewAPI(o Options) error {
 	api := API{
 		EventHandler: o.EventHandler,
-		Logger:       l,
+		Logger:       o.Logger,
 	}
 
 	http.HandleFunc("/", api.HealthCheck)
 	http.HandleFunc("/health", api.HealthCheck)
 	http.HandleFunc("/e/", api.ReceiveEvent)
 
-	l.Log(logger.Message{
+	o.Logger.Log(logger.Message{
 		Object: "API",
 		Action: "STARTED",
 		Msg:    fmt.Sprintf("Server starting on port %s", o.Port),
@@ -99,17 +94,16 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, evt := range events {
+		a.Logger.Log(logger.Message{
+			Object:  "EVENT",
+			Msg:     evt.Name,
+			Context: evt,
+		})
 		if err := a.EventHandler(evt); err != nil {
 			a.Logger.Log(logger.Message{
 				Object: "EVENT",
 				Action: "REJECTED",
 				Msg:    fmt.Sprintf("Failed to process event: %s", evt.Name),
-			})
-		} else {
-			a.Logger.Log(logger.Message{
-				Object:  "EVENT",
-				Msg:     evt.Name,
-				Context: evt,
 			})
 		}
 	}
