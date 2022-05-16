@@ -11,6 +11,8 @@ var (
 	Black   = lipgloss.Color("#000000")
 	Orange  = lipgloss.Color("#D3A347")
 	Feint   = lipgloss.AdaptiveColor{Light: "#333333", Dark: "#888888"}
+	Iris    = lipgloss.Color("#5D5FEF")
+	Fuschia = lipgloss.Color("#EF5DA8")
 
 	TextStyle  = lipgloss.NewStyle().Foreground(Color)
 	FeintStyle = TextStyle.Copy().Foreground(Feint)
