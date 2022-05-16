@@ -36,7 +36,7 @@ func Load(ctx context.Context, dir string) (*Function, error) {
 			if err != nil {
 				return nil, err
 			}
-			return Unmarshal(ctx, byt)
+			return Unmarshal(ctx, byt, abs)
 		}
 	}
 
@@ -48,7 +48,7 @@ func Load(ctx context.Context, dir string) (*Function, error) {
 		if err != nil {
 			return nil, err
 		}
-		return Unmarshal(ctx, byt)
+		return Unmarshal(ctx, byt, cue)
 	}
 
 	// Finally, use inngest.json in the given dir.
@@ -65,7 +65,36 @@ func Load(ctx context.Context, dir string) (*Function, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Unmarshal(ctx, byt)
+	return Unmarshal(ctx, byt, json)
+}
+
+func LoadRecursive(ctx context.Context, dir string) ([]*Function, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+	var functions []*Function
+	err = filepath.WalkDir(abs, func(path string, f fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if f.IsDir() {
+			return nil
+		}
+		if f.Name() != "inngest.cue" && f.Name() != "inngest.json" {
+			return nil
+		}
+		function, err := Load(ctx, path)
+		if err != nil {
+			return err
+		}
+		functions = append(functions, function)
+		return nil
+	})
+	if err != nil {
+		return []*Function{}, err
+	}
+	return functions, nil
 }
 
 // Unmarshal parses the input data and returns a function definition or an error.  The input
@@ -74,7 +103,7 @@ func Load(ctx context.Context, dir string) (*Function, error) {
 // for ease of use.
 //
 // This validates the function after parsing, returning any validation errors.
-func Unmarshal(ctx context.Context, input []byte) (*Function, error) {
+func Unmarshal(ctx context.Context, input []byte, path string) (*Function, error) {
 	// Note that cue is a superset of JSON;  we can parse the input using our cue definition
 	// for both a JSON and Cue input.
 	instance, err := prepare(input)
@@ -92,7 +121,7 @@ func Unmarshal(ctx context.Context, input []byte) (*Function, error) {
 	//
 	// Here we want to ensure that the struct fields are all filled out in a canonical
 	// format.
-	if err := fn.canonicalize(ctx); err != nil {
+	if err := fn.canonicalize(ctx, path); err != nil {
 		return nil, err
 	}
 

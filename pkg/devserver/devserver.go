@@ -1,8 +1,10 @@
 package devserver
 
 import (
+	"context"
+
 	"github.com/inngest/inngestctl/pkg/api"
-	"github.com/inngest/inngestctl/pkg/event"
+	"github.com/inngest/inngestctl/pkg/engine"
 	"github.com/inngest/inngestctl/pkg/logger"
 	"github.com/inngest/inngestctl/pkg/logger/stdoutlogger"
 )
@@ -12,66 +14,53 @@ type Options struct {
 	PrettyOutput bool
 }
 
+type DevServer struct {
+	Logger logger.Logger
+	API    api.API
+	Engine engine.Engine
+}
+
 // Create and start a new dev server (API, Exectutor, State, Logger, etc.)
-func NewDevServer(o Options) error {
+func NewDevServer(o Options) (DevServer, error) {
 	l := stdoutlogger.NewLogger(logger.Options{
 		Pretty: o.PrettyOutput,
 	})
-
-	// TODO - Init "Loader" to load all functions into memory and pass to Executor
-	// TODO - ExecutorRegistry? - something that loads functions from disk and builds a registry of them to then execute
-
-	// TODO - Create Executor instance / load inngest.json files, pass logger to Executor
-	// executor, err := executor.NewExecutor(executor.Options{}
-	registry := NewExecutorRegistry(EROptions{
-		logger: l,
+	eng := engine.NewFunctionEngine(engine.Options{
+		Logger: l,
 	})
-
-	err := api.NewAPI(api.Options{
+	api, err := api.NewAPI(api.Options{
 		Port:         o.Port,
-		EventHandler: registry.Handler,
+		EventHandler: eng.HandleEvent,
 		Logger:       l,
 	})
-
-	return err
-}
-
-type EROptions struct {
-	logger logger.Logger
-}
-
-type ExecutorRegistry struct {
-	logger logger.Logger
-}
-
-func NewExecutorRegistry(o EROptions) ExecutorRegistry {
-	r := ExecutorRegistry{
-		logger: o.logger,
+	if err != nil {
+		return DevServer{}, err
 	}
-	r.Load()
-	return r
+
+	d := DevServer{
+		Logger: l,
+		API:    api,
+		Engine: eng,
+	}
+
+	return d, err
 }
 
-func (r *ExecutorRegistry) Load() error {
-	r.logger.Log(logger.Message{
-		Object: "REGISTRY",
-		Action: "LOAD",
-		Msg:    "Loaded 6 functions",
-	})
-	return nil
-}
-
-func (r *ExecutorRegistry) Handler(e *event.Event) error {
-	r.logger.Log(logger.Message{
-		Object: "FUNCTION",
-		Action: "STARTED",
-		Msg:    "myFunctionName",
-	})
-	r.logger.Log(logger.Message{
-		Object:  "FUNCTION",
-		Action:  "COMPLETED",
-		Msg:     "myFunctionName",
-		Context: "{ \"status\": \"200\" }",
-	})
-	return nil
+func (d DevServer) Start(ctx context.Context) error {
+	err := d.Engine.Load(ctx)
+	if err != nil {
+		d.Logger.Log(logger.Message{
+			Object: "ERROR",
+			Msg:    err.Error(),
+		})
+		return err
+	}
+	err = d.API.Start(ctx)
+	if err != nil {
+		d.Logger.Log(logger.Message{
+			Object: "ERROR",
+			Msg:    err.Error(),
+		})
+	}
+	return err
 }

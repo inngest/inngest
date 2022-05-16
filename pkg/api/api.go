@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,8 +29,9 @@ var (
 	EventPathRegex = regexp.MustCompile("^/e/([a-zA-Z0-9-_]+)$")
 )
 
-func NewAPI(o Options) error {
+func NewAPI(o Options) (API, error) {
 	api := API{
+		Port:         o.Port,
 		EventHandler: o.EventHandler,
 		Logger:       o.Logger,
 	}
@@ -38,18 +40,22 @@ func NewAPI(o Options) error {
 	http.HandleFunc("/health", api.HealthCheck)
 	http.HandleFunc("/e/", api.ReceiveEvent)
 
-	o.Logger.Log(logger.Message{
-		Object: "API",
-		Action: "STARTED",
-		Msg:    fmt.Sprintf("Server starting on port %s", o.Port),
-	})
-
-	return http.ListenAndServe(fmt.Sprintf(":%s", o.Port), nil)
+	return api, nil
 }
 
 type API struct {
+	Port string
 	EventHandler
 	Logger logger.Logger
+}
+
+func (a API) Start(ctx context.Context) error {
+	a.Logger.Log(logger.Message{
+		Object: "API",
+		Action: "STARTED",
+		Msg:    fmt.Sprintf("Server starting on port %s", a.Port),
+	})
+	return http.ListenAndServe(fmt.Sprintf(":%s", a.Port), nil)
 }
 
 func (API) HealthCheck(w http.ResponseWriter, r *http.Request) {

@@ -26,13 +26,17 @@ func NewCmdDev() *cobra.Command {
 }
 
 func doDev(cmd *cobra.Command, args []string) {
-	err := devserver.NewDevServer(devserver.Options{
+	ctx := cmd.Context()
+	devserver, err := devserver.NewDevServer(devserver.Options{
 		Port:         cmd.Flag("port").Value.String(),
 		PrettyOutput: prettyOutput,
 	})
-
 	if err != nil {
 		fmt.Println(err)
+		os.Exit(1)
+	}
+	err = devserver.Start(ctx)
+	if err != nil {
 		os.Exit(1)
 	}
 }

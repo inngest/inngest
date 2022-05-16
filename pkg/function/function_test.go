@@ -34,8 +34,9 @@ func TestDerivedConfigDefault(t *testing.T) {
 			},
 		},
 	}
+	path := "/Users/johnny/dev/repo/functions/inngest.json"
 
-	err = fn.canonicalize(context.Background())
+	err = fn.canonicalize(context.Background(), path)
 	require.NoError(t, err)
 
 	expectedActionVersion := inngest.ActionVersion{
@@ -129,4 +130,37 @@ workflow: workflows.#Workflow & {
 	def, err = cuedefs.FormatWorkflow(*wflow)
 	require.NoError(t, err)
 	require.EqualValues(t, expectedWorkflowConfig, string(def))
+}
+
+// TestEventDefinitionAbsolutePath asserts that the event definition file path is not relative
+func TestEventDefinitionAbsolutePath(t *testing.T) {
+	err := state.Clear(context.Background())
+	require.NoError(t, err)
+
+	expr := "event.version >= 2"
+	fn := Function{
+		Name: "Foo",
+		ID:   "relative-id",
+		Triggers: []Trigger{
+			{
+				EventTrigger: &EventTrigger{
+					Event:      "event.def.in.file",
+					Expression: &expr,
+					Definition: &EventDefinition{
+						Format: FormatCue,
+						Synced: false,
+						Def:    "file://./events/event-def-in-file.cue",
+					},
+				},
+			},
+		},
+	}
+
+	path := "/Users/johnny/dev/repo/functions/inngest.json"
+
+	err = fn.canonicalize(context.Background(), path)
+	require.NoError(t, err)
+
+	abs := "file:///Users/johnny/dev/repo/functions//events/event-def-in-file.cue"
+	require.EqualValues(t, abs, fn.Triggers[0].EventTrigger.Definition.Def)
 }

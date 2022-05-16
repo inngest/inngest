@@ -48,7 +48,7 @@ func TestUnmarshal_testdata(t *testing.T) {
 				}
 			}
 
-			fn, err := Unmarshal(ctx, td.input)
+			fn, err := Unmarshal(ctx, td.input, "/dir/inngest.json")
 			require.NoError(t, err)
 
 			marshalled, err := json.MarshalIndent(fn, "", "  ")
@@ -170,7 +170,7 @@ func TestUnmarshal(t *testing.T) {
 
 	for _, i := range valid {
 		t.Run(i.name, func(t *testing.T) {
-			f, err := Unmarshal(ctx, []byte(i.input))
+			f, err := Unmarshal(ctx, []byte(i.input), "/dir/inngest.json")
 			require.NoError(t, err, i.name)
 			require.NotNil(t, f, i.name)
 			require.EqualValues(t, i.expected, *f, i.name)
@@ -206,7 +206,7 @@ func TestUnmarshal(t *testing.T) {
 	}
 
 	for _, i := range invalid {
-		f, err := Unmarshal(ctx, []byte(i.input))
+		f, err := Unmarshal(ctx, []byte(i.input), "/dir/inngest.json")
 		require.Error(t, err, i.name)
 		require.Contains(t, err.Error(), i.msg, i.name)
 		require.Nil(t, f, i.name)
