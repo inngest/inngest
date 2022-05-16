@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -252,7 +253,7 @@ func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, er
 	return a, nil
 }
 
-func (f *Function) canonicalize(ctx context.Context) error {
+func (f *Function) canonicalize(ctx context.Context, path string) error {
 	if f.Idempotency != nil {
 		// Replace the throttle field with idempotency.
 		f.Throttle = &inngest.Throttle{
@@ -278,6 +279,17 @@ func (f *Function) canonicalize(ctx context.Context) error {
 					Step: inngest.TriggerName,
 				},
 			},
+		}
+	}
+
+	// Ensure any relative file:// paths are absolute
+	dir := filepath.Dir(path)
+	for _, trigger := range f.Triggers {
+		if trigger.EventTrigger != nil {
+			if strings.HasPrefix(trigger.EventTrigger.Definition.Def, FilePrefix) {
+				abs := strings.Replace(trigger.EventTrigger.Definition.Def, FilePrefix+".", "file://"+dir, 1)
+				trigger.EventTrigger.Definition.Def = abs
+			}
 		}
 	}
 
