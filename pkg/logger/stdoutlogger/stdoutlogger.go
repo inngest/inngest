@@ -26,6 +26,7 @@ func (l *stdoutLogger) Log(m logger.Message) {
 	category := strings.TrimSpace(fmt.Sprintf("%s %s", m.Object, m.Action))
 
 	prefixColor := map[string]lipgloss.Color{
+		"REGISTRY": lipgloss.Color("28"),
 		"API":      lipgloss.Color("32"),
 		"EVENT":    cli.Fuschia,
 		"FUNCTION": cli.Iris,

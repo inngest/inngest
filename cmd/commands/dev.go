@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/inngest/inngestctl/pkg/api"
+	"github.com/inngest/inngestctl/pkg/devserver"
 	"github.com/spf13/cobra"
 )
 
@@ -26,10 +26,9 @@ func NewCmdDev() *cobra.Command {
 }
 
 func doDev(cmd *cobra.Command, args []string) {
-	err := api.NewAPI(api.Opts{
+	err := devserver.NewDevServer(devserver.Options{
 		Port:         cmd.Flag("port").Value.String(),
 		PrettyOutput: prettyOutput,
-		EventHandler: api.BasicEventHandler,
 	})
 
 	if err != nil {
