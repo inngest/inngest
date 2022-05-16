@@ -161,6 +161,6 @@ func TestEventDefinitionAbsolutePath(t *testing.T) {
 	err = fn.canonicalize(context.Background(), path)
 	require.NoError(t, err)
 
-	abs := "file:///Users/johnny/dev/repo/functions//events/event-def-in-file.cue"
+	abs := "file:///Users/johnny/dev/repo/functions/events/event-def-in-file.cue"
 	require.EqualValues(t, abs, fn.Triggers[0].EventTrigger.Definition.Def)
 }
