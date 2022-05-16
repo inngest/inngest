@@ -285,7 +285,7 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 	// Ensure any relative file:// paths are absolute
 	dir := filepath.Dir(path)
 	for _, trigger := range f.Triggers {
-		if trigger.EventTrigger != nil {
+		if trigger.EventTrigger != nil && trigger.EventTrigger.Definition != nil {
 			if strings.HasPrefix(trigger.EventTrigger.Definition.Def, FilePrefix) {
 				abs := strings.Replace(trigger.EventTrigger.Definition.Def, FilePrefix+".", "file://"+dir, 1)
 				trigger.EventTrigger.Definition.Def = abs
