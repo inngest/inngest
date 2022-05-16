@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -32,10 +31,6 @@ func Execute() {
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		panic(err)
 	}
-
-	viper.SetEnvPrefix("inngest")
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.AutomaticEnv()
 
 	// Register Top Level Commands
 	rootCmd.AddCommand(NewCmdBuild())

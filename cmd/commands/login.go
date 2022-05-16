@@ -42,7 +42,7 @@ func NewCmdLogin() *cobra.Command {
 			}
 
 			fmt.Println("Logging in...")
-			jwt, err := client.New(client.WithAPI(viper.GetString("api"))).Login(ctx, username, password)
+			jwt, err := client.New().Login(ctx, username, password)
 			if err != nil {
 				fmt.Println(cli.RenderError(fmt.Sprintf("unable to log in: %s", err.Error())))
 				os.Exit(1)

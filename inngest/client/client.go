@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngestctl/inngest"
@@ -49,9 +51,14 @@ type Client interface {
 type ClientOpt func(Client) Client
 
 func New(opts ...ClientOpt) Client {
+	api := "https://api.inngest.com"
+	if os.Getenv("INNGEST_API") != "" {
+		api = os.Getenv("INNGEST_API")
+	}
+
 	c := &httpClient{
 		Client: http.DefaultClient,
-		api:    "https://api.inngest.com",
+		api:    api,
 		ingest: "https://inn.gs",
 	}
 
@@ -114,6 +121,10 @@ func (c httpClient) Login(ctx context.Context, email, password string) ([]byte, 
 		return nil, fmt.Errorf("error performing login request: %s", err)
 	}
 	defer resp.Body.Close()
+	byt, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response: %s", err)
+	}
 
 	type response struct {
 		Error string
@@ -121,8 +132,8 @@ func (c httpClient) Login(ctx context.Context, email, password string) ([]byte, 
 	}
 
 	r := &response{}
-	if err = json.NewDecoder(resp.Body).Decode(r); err != nil {
-		return nil, fmt.Errorf("invalid json response: %w", err)
+	if err = json.Unmarshal(byt, r); err != nil {
+		return nil, fmt.Errorf("invalid json response: %w: \n%s", err, string(byt))
 	}
 
 	if resp.StatusCode != 200 {
