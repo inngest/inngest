@@ -237,6 +237,13 @@ func (f *initModel) Function(ctx context.Context) (*function.Function, error) {
 				},
 			},
 		}
+	} else {
+		fn.Steps[fn.Name] = function.Step{
+			Name: fn.Name,
+			Runtime: inngest.RuntimeWrapper{
+				Runtime: inngest.RuntimeDocker{},
+			},
+		}
 	}
 
 	return fn, fn.Validate(ctx)
