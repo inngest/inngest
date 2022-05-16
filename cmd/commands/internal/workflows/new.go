@@ -7,6 +7,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/internal/cuedefs"
 )
 
 const (
@@ -78,11 +79,11 @@ func (c *Config) Triggers() []inngest.Trigger {
 }
 
 func (c *Config) Configuration() (string, error) {
-	output, err := inngest.FormatWorkflow(inngest.Workflow{
+	output, err := cuedefs.FormatWorkflow(inngest.Workflow{
 		Name:     c.Name,
 		ID:       strings.ToLower(slugifyRegex.ReplaceAllString(c.Name, "-")),
 		Triggers: c.Triggers(),
-		Actions:  []inngest.Action{},
+		Steps:    []inngest.Step{},
 		Edges:    []inngest.Edge{},
 	})
 	if err != nil {

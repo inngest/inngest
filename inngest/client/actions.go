@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/internal/cuedefs"
 )
 
 type Action struct {
@@ -32,7 +33,7 @@ type ActionVersion struct {
 }
 
 func (c httpClient) Action(ctx context.Context, dsn string, v *inngest.VersionInfo) (*ActionVersion, error) {
-	var major, minor *int
+	var major, minor *uint
 	if v != nil {
 		major = &v.Major
 		minor = &v.Minor
@@ -71,7 +72,7 @@ func (c httpClient) Action(ctx context.Context, dsn string, v *inngest.VersionIn
 		return nil, fmt.Errorf("error unmarshalling response: %w", err)
 	}
 
-	av, err := inngest.ParseAction(data.Action.Version.Config)
+	av, err := cuedefs.ParseAction(data.Action.Version.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +149,8 @@ func (c httpClient) CreateAction(ctx context.Context, input string) (*Action, er
 
 type ActionVersionQualifier struct {
 	DSN          string `json:"dsn"`
-	VersionMajor int    `json:"versionMajor"`
-	VersionMinor int    `json:"versionMinor"`
+	VersionMajor uint   `json:"versionMajor"`
+	VersionMinor uint   `json:"versionMinor"`
 }
 
 func (c httpClient) UpdateActionVersion(ctx context.Context, v ActionVersionQualifier, enabled bool) (*ActionVersion, error) {

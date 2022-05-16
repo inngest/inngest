@@ -5,12 +5,13 @@ import (
 	"strings"
 
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/internal/cuedefs"
 )
 
 // Parse parses an action.  This differs from inngest.ParseAction as we automatically
 // prefix the action DSN with the given account identifier if not present.
 func Parse(accountPrefix, input string) (version *inngest.ActionVersion, formatted string, err error) {
-	version, err = inngest.ParseAction(input)
+	version, err = cuedefs.ParseAction(input)
 
 	if err != nil || strings.Contains(version.DSN, "/") {
 		return version, input, err
@@ -35,6 +36,6 @@ func Parse(accountPrefix, input string) (version *inngest.ActionVersion, formatt
 	}
 
 	// Re-format the cue config and return the newly formatted data.
-	formatted, err = inngest.FormatAction(*version)
+	formatted, err = cuedefs.FormatAction(*version)
 	return version, formatted, err
 }

@@ -10,10 +10,11 @@ var (
 	White   = lipgloss.Color("#ffffff")
 	Black   = lipgloss.Color("#000000")
 	Orange  = lipgloss.Color("#D3A347")
+	Feint   = lipgloss.AdaptiveColor{Light: "#333333", Dark: "#888888"}
 
-	Feint     = lipgloss.AdaptiveColor{Light: "#333333", Dark: "#888888"}
-	TextStyle = lipgloss.NewStyle().Foreground(Color)
-	BoldStyle = TextStyle.Copy().Bold(true)
+	TextStyle  = lipgloss.NewStyle().Foreground(Color)
+	FeintStyle = TextStyle.Copy().Foreground(Feint)
+	BoldStyle  = TextStyle.Copy().Bold(true)
 )
 
 // RenderError returns a formatted error string.

@@ -192,7 +192,7 @@ func (f *initModel) DidQuitEarly() bool {
 
 // Function returns the formatted function given answers from the TUI state.
 // This returns an error if the function is not valid.
-func (f *initModel) Function() (*function.Function, error) {
+func (f *initModel) Function(ctx context.Context) (*function.Function, error) {
 	// Attempt to find the schema that matches this event, and dump the
 	// cue schema inside the function.
 	var ed *function.EventDefinition
@@ -237,9 +237,16 @@ func (f *initModel) Function() (*function.Function, error) {
 				},
 			},
 		}
+	} else {
+		fn.Steps[fn.Name] = function.Step{
+			Name: fn.Name,
+			Runtime: inngest.RuntimeWrapper{
+				Runtime: inngest.RuntimeDocker{},
+			},
+		}
 	}
 
-	return fn, fn.Validate()
+	return fn, fn.Validate(ctx)
 }
 
 func (f *initModel) Template() *scaffold.Template {

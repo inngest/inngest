@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/inngest/inngestctl/pkg/runtime/docker"
+	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
 )
 
 var (
@@ -17,14 +17,14 @@ var (
 )
 
 type BuilderUIOpts struct {
-	BuildOpts      docker.BuildOpts
+	BuildOpts      dockerdriver.BuildOpts
 	QuitOnComplete bool
 }
 
 // NewBuilder renders UI for building an image.
 func NewBuilder(ctx context.Context, opts BuilderUIOpts) (*BuilderUI, error) {
 	p := progress.New(progress.WithDefaultGradient())
-	b, err := docker.NewBuilder(ctx, opts.BuildOpts)
+	b, err := dockerdriver.NewBuilder(ctx, opts.BuildOpts)
 	return &BuilderUI{
 		opts:     opts,
 		Builder:  b,
@@ -35,7 +35,7 @@ func NewBuilder(ctx context.Context, opts BuilderUIOpts) (*BuilderUI, error) {
 type BuilderUI struct {
 	opts BuilderUIOpts
 
-	Builder  *docker.Builder
+	Builder  *dockerdriver.Builder
 	buildErr error
 
 	// warning is shown if the build takes a long time, or it takes a while

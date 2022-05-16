@@ -1,14 +1,75 @@
 package function
 
 import (
+	"context"
+	"encoding/json"
+	"log"
+	"os"
+	"path"
+	"strings"
 	"testing"
 
+	"github.com/inngest/inngestctl/inngest"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/tools/txtar"
 )
+
+func TestUnmarshal_testdata(t *testing.T) {
+	entries, err := os.ReadDir("./testdata")
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	type testdata struct {
+		input    []byte
+		function []byte
+		workflow []byte
+	}
+
+	for _, e := range entries {
+		t.Run(e.Name(), func(t *testing.T) {
+			if !strings.HasSuffix(e.Name(), ".txtar") {
+				return
+			}
+
+			archive, err := txtar.ParseFile(path.Join("./testdata", e.Name()))
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			td := testdata{}
+			for _, f := range archive.Files {
+				switch f.Name {
+				case "input":
+					td.input = f.Data
+				case "function.json":
+					td.function = f.Data
+				case "workflow.json":
+					td.workflow = f.Data
+				}
+			}
+
+			fn, err := Unmarshal(ctx, td.input)
+			require.NoError(t, err)
+
+			marshalled, err := json.MarshalIndent(fn, "", "  ")
+			require.NoError(t, err)
+			require.EqualValues(t, strings.TrimSpace(string(td.function)), string(marshalled))
+
+			flow, err := fn.Workflow(context.Background())
+			require.NoError(t, err)
+
+			marshalled, err = json.MarshalIndent(flow, "", "  ")
+			require.NoError(t, err)
+			require.EqualValues(t, strings.TrimSpace(string(td.workflow)), string(marshalled))
+		})
+	}
+
+}
 
 // TestUnmarshal asserts that unmarshalling a function definition works as expected, producing
 // the correct struct defintions or errors.
 func TestUnmarshal(t *testing.T) {
+	ctx := context.Background()
 	valid := []struct {
 		name     string
 		input    string
@@ -22,6 +83,19 @@ func TestUnmarshal(t *testing.T) {
 				ID:   "wut",
 				Triggers: []Trigger{
 					{EventTrigger: &EventTrigger{Event: "test.event"}},
+				},
+				Steps: map[string]Step{
+					"test": {
+						Name: "test",
+						Runtime: inngest.RuntimeWrapper{
+							Runtime: inngest.RuntimeDocker{},
+						},
+						After: []After{
+							{
+								Step: inngest.TriggerName,
+							},
+						},
+					},
 				},
 			},
 		},
@@ -40,6 +114,19 @@ func TestUnmarshal(t *testing.T) {
 				ID:   "wut",
 				Triggers: []Trigger{
 					{EventTrigger: &EventTrigger{Event: "test.event"}},
+				},
+				Steps: map[string]Step{
+					"test": {
+						Name: "test",
+						Runtime: inngest.RuntimeWrapper{
+							Runtime: inngest.RuntimeDocker{},
+						},
+						After: []After{
+							{
+								Step: inngest.TriggerName,
+							},
+						},
+					},
 				},
 			},
 		},
@@ -64,15 +151,30 @@ func TestUnmarshal(t *testing.T) {
 				Triggers: []Trigger{
 					{EventTrigger: &EventTrigger{Event: "test.event"}},
 				},
+				Steps: map[string]Step{
+					"test": {
+						Name: "test",
+						Runtime: inngest.RuntimeWrapper{
+							Runtime: inngest.RuntimeDocker{},
+						},
+						After: []After{
+							{
+								Step: inngest.TriggerName,
+							},
+						},
+					},
+				},
 			},
 		},
 	}
 
 	for _, i := range valid {
-		f, err := Unmarshal([]byte(i.input))
-		require.NoError(t, err, i.name)
-		require.NotNil(t, f, i.name)
-		require.EqualValues(t, i.expected, *f, i.name)
+		t.Run(i.name, func(t *testing.T) {
+			f, err := Unmarshal(ctx, []byte(i.input))
+			require.NoError(t, err, i.name)
+			require.NotNil(t, f, i.name)
+			require.EqualValues(t, i.expected, *f, i.name)
+		})
 	}
 
 	invalid := []struct {
@@ -104,7 +206,7 @@ func TestUnmarshal(t *testing.T) {
 	}
 
 	for _, i := range invalid {
-		f, err := Unmarshal([]byte(i.input))
+		f, err := Unmarshal(ctx, []byte(i.input))
 		require.Error(t, err, i.name)
 		require.Contains(t, err.Error(), i.msg, i.name)
 		require.Nil(t, f, i.name)

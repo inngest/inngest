@@ -50,6 +50,10 @@ func GetSetting(ctx context.Context, key string) interface{} {
 	return setting
 }
 
+func Clear(ctx context.Context) error {
+	return (State{}).Persist(ctx)
+}
+
 // State persists across each cli invokation, allowing functionality such as workspace
 // switching, etc.
 type State struct {

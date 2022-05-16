@@ -5,16 +5,34 @@ import (
 )
 
 minimal: defs.#Function & {
+	id:   "some-id"
 	name: "test"
 	triggers: [{
 		event: "test.event"
 	}]
 }
 
-expression: defs.#Function & {
+complex: defs.#Function & {
+	id:   "some-id"
 	name: "test"
 	triggers: [{
 		event:      "test.event"
 		expression: "data.run == true"
 	}]
+	idempotency: "{{ event.data.foo }}"
+	steps: {
+		first: {
+			runtime: defs.#RuntimeDocker
+			after: [{
+				step: "$trigger"
+				wait: "5m"
+			}]
+		}
+		second: {
+			runtime: defs.#RuntimeDocker
+			after: [{
+				step: "first"
+			}]
+		}
+	}
 }

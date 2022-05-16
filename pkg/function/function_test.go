@@ -5,16 +5,21 @@ import (
 	"testing"
 
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/inngest/state"
+	"github.com/inngest/inngestctl/internal/cuedefs"
 	"github.com/stretchr/testify/require"
 )
 
 // TestDerivedConfigDefault asserts that the derived config for simple, default workflows
 // is correct.
 func TestDerivedConfigDefault(t *testing.T) {
+	err := state.Clear(context.Background())
+	require.NoError(t, err)
+
 	expr := "event.version >= 2"
 	fn := Function{
 		Name: "Foo",
-		ID:   "magical-id-1",
+		ID:   "magical-id",
 		Triggers: []Trigger{
 			{
 				EventTrigger: &EventTrigger{
@@ -30,14 +35,15 @@ func TestDerivedConfigDefault(t *testing.T) {
 		},
 	}
 
+	err = fn.canonicalize(context.Background())
+	require.NoError(t, err)
+
 	expectedActionVersion := inngest.ActionVersion{
 		Name:   "Foo",
-		DSN:    "magical-id-1-action",
+		DSN:    "magical-id-step-foo-test",
 		Scopes: []string{"secret:read:*"},
 		Runtime: inngest.RuntimeWrapper{
-			Runtime: inngest.RuntimeDocker{
-				Image: "magical-id-1-action",
-			},
+			Runtime: inngest.RuntimeDocker{},
 		},
 	}
 
@@ -49,13 +55,10 @@ import (
 
 action: actions.#Action
 action: {
-  dsn:  "magical-id-1-action"
+  dsn:  "magical-id-step-foo-test"
   name: "Foo"
   scopes: ["secret:read:*"]
-  runtime: {
-    image: "magical-id-1-action"
-    type:  "docker"
-  }
+  runtime: type: "docker"
 }`
 
 	actions, edges, err := fn.Actions(context.Background())
@@ -63,13 +66,13 @@ action: {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(actions))
 
-	def, err := inngest.FormatAction(actions[0])
+	def, err := cuedefs.FormatAction(actions[0])
 	require.NoError(t, err)
 	require.EqualValues(t, expectedActionVersion, actions[0])
 	require.EqualValues(t, expectedActionConfig, string(def))
 
 	expectedWorkflow := inngest.Workflow{
-		ID:   "magical-id-1",
+		ID:   "magical-id",
 		Name: "Foo",
 		Triggers: []inngest.Trigger{
 			{
@@ -79,17 +82,17 @@ action: {
 				},
 			},
 		},
-		Actions: []inngest.Action{
+		Steps: []inngest.Step{
 			{
-				ClientID: 1,
+				ClientID: "Foo",
 				Name:     expectedActionVersion.Name,
 				DSN:      expectedActionVersion.DSN,
 			},
 		},
 		Edges: []inngest.Edge{
 			{
-				Outgoing: "trigger",
-				Incoming: 1,
+				Outgoing: inngest.TriggerName,
+				Incoming: "Foo",
 			},
 		},
 	}
@@ -101,20 +104,21 @@ import (
 )
 
 workflow: workflows.#Workflow & {
-  id:   "magical-id-1"
+  id:   "magical-id"
   name: "Foo"
   triggers: [{
     event:      "test.event.plz"
     expression: "event.version >= 2"
   }]
   actions: [{
-    clientID: 1
+    clientID: "Foo"
     name:     "Foo"
-    dsn:      "magical-id-1-action"
+    dsn:      "magical-id-step-foo-test"
   }]
   edges: [{
-    outgoing: "trigger"
-    incoming: 1
+    outgoing: "$trigger"
+    incoming: "Foo"
+    metadata: {}
   }]
 }`
 
@@ -122,7 +126,7 @@ workflow: workflows.#Workflow & {
 	require.NoError(t, err)
 	require.NotNil(t, wflow)
 	require.EqualValues(t, expectedWorkflow, *wflow)
-	def, err = inngest.FormatWorkflow(*wflow)
+	def, err = cuedefs.FormatWorkflow(*wflow)
 	require.NoError(t, err)
 	require.EqualValues(t, expectedWorkflowConfig, string(def))
 }

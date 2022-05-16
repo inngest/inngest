@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngestctl/inngest/internal/cuedefs"
+	"github.com/inngest/inngestctl/internal/cuedefs"
 )
 
 // Workflow represents all versions of a single workflow in a workspace.

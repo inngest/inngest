@@ -10,9 +10,9 @@ import (
 
 	"github.com/inngest/inngestctl/cmd/commands/internal/table"
 	"github.com/inngest/inngestctl/cmd/commands/internal/workflows"
-	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/inngest/log"
 	"github.com/inngest/inngestctl/inngest/state"
+	"github.com/inngest/inngestctl/internal/cuedefs"
 	"github.com/spf13/cobra"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
@@ -96,11 +96,11 @@ func NewCmdWorkflows() *cobra.Command {
 				return err
 			}
 
-			parsed, err := inngest.ParseWorkflow(string(byt))
+			parsed, err := cuedefs.ParseWorkflow(string(byt))
 			if err != nil {
 				return err
 			}
-			output, err := inngest.FormatWorkflow(*parsed)
+			output, err := cuedefs.FormatWorkflow(*parsed)
 			if err != nil {
 				return err
 			}
@@ -192,12 +192,12 @@ func NewCmdWorkflows() *cobra.Command {
 
 			printConfig := func(config string) {
 				if canonicalFormat {
-					parsed, err := inngest.ParseWorkflow(config)
+					parsed, err := cuedefs.ParseWorkflow(config)
 					if err != nil {
 						fmt.Println(config)
 						return
 					}
-					if output, err := inngest.FormatWorkflow(*parsed); err == nil {
+					if output, err := cuedefs.FormatWorkflow(*parsed); err == nil {
 						fmt.Println(output)
 						return
 					}
@@ -296,7 +296,7 @@ func NewCmdWorkflows() *cobra.Command {
 				return err
 			}
 
-			if _, err := inngest.ParseWorkflow(string(byt)); err != nil {
+			if _, err := cuedefs.ParseWorkflow(string(byt)); err != nil {
 				return err
 			}
 
