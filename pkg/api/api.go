@@ -7,20 +7,16 @@ import (
 	"regexp"
 
 	"github.com/inngest/inngestctl/pkg/event"
+	"github.com/inngest/inngestctl/pkg/logger"
+	"github.com/inngest/inngestctl/pkg/logger/stdoutlogger"
 )
 
-type OutputMessage struct {
-	Type    string
-	Msg     string
-	Context string
-}
 type EventHandler func(*event.Event) error
-type OutputWriter func(OutputMessage)
 
 type Opts struct {
 	Port         string
 	EventHandler EventHandler
-	Output       OutputWriter
+	PrettyOutput bool
 }
 
 const (
@@ -34,23 +30,31 @@ var (
 )
 
 func NewAPI(o Opts) error {
-	fmt.Printf("Server starting on port %s\n", o.Port)
+	l := stdoutlogger.NewLogger(logger.Options{
+		Pretty: o.PrettyOutput,
+	})
 
 	api := API{
 		EventHandler: o.EventHandler,
-		Output:       o.Output,
+		Logger:       l,
 	}
 
 	http.HandleFunc("/", api.HealthCheck)
 	http.HandleFunc("/health", api.HealthCheck)
 	http.HandleFunc("/e/", api.ReceiveEvent)
 
+	l.Log(logger.Message{
+		Object: "API",
+		Action: "STARTED",
+		Msg:    fmt.Sprintf("Server starting on port %s", o.Port),
+	})
+
 	return http.ListenAndServe(fmt.Sprintf(":%s", o.Port), nil)
 }
 
 type API struct {
 	EventHandler
-	Output OutputWriter
+	Logger logger.Logger
 }
 
 func (API) HealthCheck(w http.ResponseWriter, r *http.Request) {
@@ -96,15 +100,16 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	for _, evt := range events {
 		if err := a.EventHandler(evt); err != nil {
-			a.Output(OutputMessage{
-				Type: "EVENT REJECTED",
-				Msg:  fmt.Sprintf("Failed to process event: %s", evt.Name),
+			a.Logger.Log(logger.Message{
+				Object: "EVENT",
+				Action: "REJECTED",
+				Msg:    fmt.Sprintf("Failed to process event: %s", evt.Name),
 			})
 		} else {
-			a.Output(OutputMessage{
-				Type: "EVENT",
-				Msg:  evt.Name,
-				// Context: TODO - JSON Stringify the event
+			a.Logger.Log(logger.Message{
+				Object:  "EVENT",
+				Msg:     evt.Name,
+				Context: evt,
 			})
 		}
 	}
