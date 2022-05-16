@@ -79,7 +79,6 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 	if err != nil {
 		// TODO: Handle max retries.
 		resp := driver.Response{}
-
 		if !errors.As(err, &resp) || resp.Retryable() {
 			next := item
 			next.ErrorCount += 1

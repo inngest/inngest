@@ -56,7 +56,7 @@ type Function struct {
 type Step struct {
 	Name    string                 `json:"name"`
 	Runtime inngest.RuntimeWrapper `json:"runtime"`
-	After   []After                `json:"after"`
+	After   []After                `json:"after,omitempty"`
 }
 
 type After struct {
