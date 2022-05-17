@@ -12,12 +12,14 @@ import (
 type Options struct {
 	Port         string
 	PrettyOutput bool
+	Dir          string
 }
 
 type DevServer struct {
 	Logger logger.Logger
 	API    api.API
-	Engine engine.Engine
+	Engine *engine.Engine
+	Dir    string
 }
 
 // Create and start a new dev server (API, Exectutor, State, Logger, etc.)
@@ -41,13 +43,14 @@ func NewDevServer(o Options) (DevServer, error) {
 		Logger: l,
 		API:    api,
 		Engine: eng,
+		Dir:    o.Dir,
 	}
 
 	return d, err
 }
 
 func (d DevServer) Start(ctx context.Context) error {
-	err := d.Engine.Load(ctx)
+	err := d.Engine.Load(ctx, d.Dir)
 	if err != nil {
 		d.Logger.Log(logger.Message{
 			Object: "ERROR",

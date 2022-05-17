@@ -21,6 +21,7 @@ func NewCmdDev() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("port", "p", "9999", "port to run the API on")
+	cmd.Flags().String("dir", "./functions", "directory to load functions from")
 	cmd.Flags().BoolVar(&prettyOutput, "pretty", false, "pretty print the JSON output")
 	return cmd
 }
@@ -30,6 +31,7 @@ func doDev(cmd *cobra.Command, args []string) {
 	devserver, err := devserver.NewDevServer(devserver.Options{
 		Port:         cmd.Flag("port").Value.String(),
 		PrettyOutput: prettyOutput,
+		Dir:          cmd.Flag("dir").Value.String(),
 	})
 	if err != nil {
 		fmt.Println(err)
