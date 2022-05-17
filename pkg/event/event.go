@@ -1,5 +1,9 @@
 package event
 
+import (
+	"encoding/json"
+)
+
 type Event struct {
 	Name string                 `json:"name"`
 	Data map[string]interface{} `json:"data"`
@@ -15,4 +19,11 @@ type Event struct {
 	// If this is not provided, we will insert the current time upon receipt of the event
 	Timestamp int64  `json:"ts,omitempty"`
 	Version   string `json:"v,omitempty"`
+}
+
+func (evt *Event) Map() (map[string]interface{}, error) {
+	data := map[string]interface{}{}
+	eventJson, _ := json.Marshal(evt)
+	err := json.Unmarshal(eventJson, &data)
+	return data, err
 }
