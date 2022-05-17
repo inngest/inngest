@@ -130,7 +130,7 @@ func Unmarshal(ctx context.Context, input []byte, path string) (*Function, error
 	}
 
 	// Store the directory for future reference.
-	fn.dir = path
+	fn.dir = filepath.Dir(path)
 
 	return fn, nil
 }
