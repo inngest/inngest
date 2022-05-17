@@ -59,7 +59,10 @@ func (a API) Start(ctx context.Context) error {
 }
 
 func (API) HealthCheck(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("OK"))
+	writeResponse(w, HTTPResponse{
+		StatusCode: http.StatusOK,
+		Message:    "OK",
+	})
 }
 
 func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
@@ -94,8 +97,10 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	events, err := parseBody(body)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("{\"error\":\"Unable to process event payload\"}"))
+		writeResponse(w, HTTPResponse{
+			StatusCode: http.StatusBadRequest,
+			Error:      "Unable to process event payload",
+		})
 		return
 	}
 

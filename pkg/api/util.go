@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/inngest/inngestctl/pkg/event"
@@ -45,9 +46,12 @@ func writeResponse(w http.ResponseWriter, h HTTPResponse) {
 	}
 	byt, err := json.Marshal(body)
 	if err != nil {
-		panic(err)
+		fmt.Println("Error marshalling response:", err)
 	}
-	w.Write(byt)
+	_, err = w.Write(byt)
+	if err != nil {
+		fmt.Println("Error writing response:", err)
+	}
 }
 
 func BasicEventHandler(*event.Event) error {
