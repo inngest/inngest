@@ -35,12 +35,12 @@ func (eng *Engine) Load(ctx context.Context, dir string) error {
 	if err != nil {
 		return err
 	}
-	for _, f := range functions {
-		eng.Functions = append(eng.Functions, f)
+	for _, fn := range functions {
+		eng.Functions = append(eng.Functions, fn)
 		eng.Logger.Log(logger.Message{
 			Object: "FUNCTION",
 			Action: "LOADED",
-			Msg:    f.Name,
+			Msg:    fn.Name,
 		})
 	}
 
@@ -51,47 +51,47 @@ func (eng *Engine) Load(ctx context.Context, dir string) error {
 	return nil
 }
 
-func (eng *Engine) HandleEvent(e *event.Event) error {
-	functions, err := eng.FindFunctionsByEvent(context.Background(), e)
+func (eng *Engine) HandleEvent(evt *event.Event) error {
+	functions, err := eng.FindFunctionsByEvent(context.Background(), evt)
 	if err != nil {
 		return nil
 	}
 	if len(functions) == 0 {
 		eng.Logger.Log(logger.Message{
 			Object: "ENGINE",
-			Msg:    fmt.Sprintf("No matching function triggers for %s", e.Name),
+			Msg:    fmt.Sprintf("No matching function triggers for %s", evt.Name),
 		})
 		return nil
 	}
-	for _, f := range functions {
-		eng.ExecuteFunction(context.Background(), f, e)
+	for _, fn := range functions {
+		eng.ExecuteFunction(context.Background(), fn, evt)
 	}
 	return nil
 }
 
-func (eng *Engine) FindFunctionsByEvent(ctx context.Context, e *event.Event) ([]*function.Function, error) {
+func (eng *Engine) FindFunctionsByEvent(ctx context.Context, evt *event.Event) ([]*function.Function, error) {
 	var functions []*function.Function
-	for _, f := range eng.Functions {
-		for _, t := range f.Triggers {
-			if t.Event == e.Name {
-				functions = append(functions, f)
+	for _, fn := range eng.Functions {
+		for _, t := range fn.Triggers {
+			if t.Event == evt.Name {
+				functions = append(functions, fn)
 			}
 		}
 	}
 	return functions, nil
 }
 
-func (eng Engine) ExecuteFunction(ctx context.Context, f *function.Function, e *event.Event) error {
+func (eng Engine) ExecuteFunction(ctx context.Context, fn *function.Function, evt *event.Event) error {
 	eng.Logger.Log(logger.Message{
 		Object: "FUNCTION",
 		Action: "STARTED",
-		Msg:    f.Name,
+		Msg:    fn.Name,
 	})
 	// TODO - Execute function
 	eng.Logger.Log(logger.Message{
 		Object:  "FUNCTION",
 		Action:  "COMPLETED",
-		Msg:     f.Name,
+		Msg:     fn.Name,
 		Context: "{ \"status\": \"200\" }",
 	})
 	return nil
