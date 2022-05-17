@@ -66,7 +66,7 @@ func buildImg(ctx context.Context, fn function.Function) error {
 	ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
 		QuitOnComplete: true,
 		BuildOpts: dockerdriver.BuildOpts{
-			Path: ".",
+			Path: fn.Dir(),
 			Tag:  a[0].DSN,
 		},
 	})
