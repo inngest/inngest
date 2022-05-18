@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/pkg/backoff"
 	"github.com/inngest/inngestctl/pkg/execution/driver"
 	"github.com/inngest/inngestctl/pkg/execution/executor"
 	"github.com/inngest/inngestctl/pkg/execution/state"
@@ -52,7 +53,7 @@ func (i *InMemoryRunner) NewRun(ctx context.Context, f inngest.Workflow, data ma
 	i.sm.Enqueue(inmemory.QueueItem{
 		ID:   id,
 		Edge: inngest.SourceEdge,
-	}, nil)
+	}, time.Now())
 
 	return &id, nil
 }
@@ -61,10 +62,9 @@ func (i *InMemoryRunner) NewRun(ctx context.Context, f inngest.Workflow, data ma
 func (i *InMemoryRunner) Execute(ctx context.Context, id state.Identifier) error {
 	var err error
 	go func() {
-		for item := range i.sm.Queue() {
-			if err = i.run(ctx, item); err != nil {
-				return
-			}
+		for item := range i.sm.Channel() {
+			// We could terminate the executor here on error
+			_ = i.run(ctx, item)
 		}
 	}()
 
@@ -74,15 +74,29 @@ func (i *InMemoryRunner) Execute(ctx context.Context, id state.Identifier) error
 }
 
 func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error {
+	defer func() {
+		i.wg.Done()
+	}()
+
 	children, err := i.exec.Execute(ctx, item.ID, item.Edge.Incoming)
 
 	if err != nil {
-		// TODO: Handle max retries.
 		resp := driver.Response{}
 		if !errors.As(err, &resp) || resp.Retryable() {
 			next := item
 			next.ErrorCount += 1
-			i.sm.Enqueue(next, nil)
+
+			at := backoff.LinearJitterBackoff(next.ErrorCount)
+
+			// XXX: When we add max retries to steps, read the step from the
+			// state store here to chech for the step's retry data.
+			//
+			// For now, we retry steps of a function up to 3 times.
+			if next.ErrorCount < 3 {
+				i.wg.Add(1)
+				i.sm.Enqueue(next, at)
+				return nil
+			}
 		}
 
 		return fmt.Errorf("execution error: %s", err)
@@ -106,9 +120,8 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 		i.sm.Enqueue(inmemory.QueueItem{
 			ID:   item.ID,
 			Edge: next,
-		}, &at)
+		}, at)
 	}
 
-	i.wg.Done()
 	return nil
 }

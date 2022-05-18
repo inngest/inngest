@@ -18,8 +18,8 @@ type Queue interface {
 	// Embed the state.Manager interface for processing state items.
 	state.Manager
 
-	Queue() chan QueueItem
-	Enqueue(item QueueItem, at *time.Time)
+	Channel() chan QueueItem
+	Enqueue(item QueueItem, at time.Time)
 }
 
 type QueueItem struct {
@@ -45,16 +45,14 @@ type mem struct {
 	q chan QueueItem
 }
 
-func (m *mem) Enqueue(item QueueItem, at *time.Time) {
+func (m *mem) Enqueue(item QueueItem, at time.Time) {
 	go func() {
-		if at != nil {
-			<-time.After(time.Until(*at))
-		}
+		<-time.After(time.Until(at))
 		m.q <- item
 	}()
 }
 
-func (m *mem) Queue() chan QueueItem {
+func (m *mem) Channel() chan QueueItem {
 	return m.q
 }
 

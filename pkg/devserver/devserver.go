@@ -5,65 +5,60 @@ import (
 
 	"github.com/inngest/inngestctl/pkg/api"
 	"github.com/inngest/inngestctl/pkg/engine"
-	"github.com/inngest/inngestctl/pkg/logger"
-	"github.com/inngest/inngestctl/pkg/logger/stdoutlogger"
+	"github.com/rs/zerolog"
 )
 
 type Options struct {
-	Port         string
-	PrettyOutput bool
-	Dir          string
+	Port string
+	Log  *zerolog.Logger
+	Dir  string
 }
 
 type DevServer struct {
-	Logger logger.Logger
 	API    api.API
 	Engine *engine.Engine
-	Dir    string
+
+	dir string
+	log *zerolog.Logger
 }
 
 // Create and start a new dev server (API, Exectutor, State, Logger, etc.)
 func NewDevServer(o Options) (DevServer, error) {
-	l := stdoutlogger.NewLogger(logger.Options{
-		Pretty: o.PrettyOutput,
+	eng, err := engine.New(engine.Options{
+		Logger: o.Log,
 	})
-	eng := engine.New(engine.Options{
-		Logger: l,
-	})
+	if err != nil {
+		return DevServer{}, err
+	}
 	api, err := api.NewAPI(api.Options{
 		Port:         o.Port,
 		EventHandler: eng.HandleEvent,
-		Logger:       l,
+		Logger:       o.Log,
 	})
 	if err != nil {
 		return DevServer{}, err
 	}
 
 	d := DevServer{
-		Logger: l,
 		API:    api,
 		Engine: eng,
-		Dir:    o.Dir,
+
+		dir: o.Dir,
+		log: o.Log,
 	}
 
 	return d, err
 }
 
 func (d DevServer) Start(ctx context.Context) error {
-	err := d.Engine.Load(ctx, d.Dir)
+	err := d.Engine.Load(ctx, d.dir)
 	if err != nil {
-		d.Logger.Log(logger.Message{
-			Object: "ERROR",
-			Msg:    err.Error(),
-		})
+		d.log.Error().Msg(err.Error())
 		return err
 	}
 	err = d.API.Start(ctx)
 	if err != nil {
-		d.Logger.Log(logger.Message{
-			Object: "ERROR",
-			Msg:    err.Error(),
-		})
+		d.log.Error().Msg(err.Error())
 	}
 	return err
 }

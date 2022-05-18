@@ -17,13 +17,25 @@ type Event struct {
 	Version   string `json:"v,omitempty"`
 }
 
-func (evt *Event) Map() (map[string]interface{}, error) {
-	return map[string]interface{}{
+func (evt *Event) Map() map[string]interface{} {
+	if evt.Data == nil {
+		evt.Data = make(map[string]interface{})
+	}
+	if evt.User == nil {
+		evt.User = make(map[string]interface{})
+	}
+
+	data := map[string]interface{}{
 		"name": evt.Name,
 		"data": evt.Data,
 		"user": evt.User,
 		"id":   evt.ID,
 		"ts":   evt.Timestamp,
-		"v":    evt.Version,
-	}, nil
+	}
+
+	if evt.Version != "" {
+		data["v"] = evt.Version
+	}
+
+	return data
 }

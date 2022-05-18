@@ -1,8 +1,4 @@
-package logger
-
-type Logger interface {
-	Log(msg Message)
-}
+package log
 
 type Options struct {
 	Pretty bool
