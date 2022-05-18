@@ -88,7 +88,7 @@ func (eng *Engine) Load(ctx context.Context, dir string) error {
 
 			// Set up a cron schedule for the current function.
 			_, err := eng.cronmanager.AddFunc(t.Cron, func() {
-				eng.execute(ctx, f, &event.Event{})
+				_ = eng.execute(ctx, f, &event.Event{})
 			})
 			if err != nil {
 				return err
@@ -159,8 +159,12 @@ func (eng *Engine) HandleEvent(evt *event.Event) error {
 }
 
 func (eng *Engine) findFunction(ctx context.Context, evt *event.Event) ([]function.Function, error) {
-	funcs, _ := eng.EventTriggers[evt.Name]
-	// TODO: Execute expressions here.
+	funcs, ok := eng.EventTriggers[evt.Name]
+	if !ok {
+		return nil, nil
+	}
+	// TODO: Execute expressions here, ensuring that each function is only triggered
+	// under the correct conditions.
 	return funcs, nil
 }
 
