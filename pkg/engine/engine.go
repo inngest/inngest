@@ -25,6 +25,11 @@ type Engine struct {
 	// EventTriggers stores a map of event triggers to the function that
 	// it triggers for lookups when receiving an event from the dev server.
 	EventTriggers map[string][]function.Function
+
+	// cronmanager stores a reference to a cron manager for invoking scheduled
+	// functions.  we store a reference so that we can terminate the crons when
+	// recreating the engine.
+	cronmanager *cron.Cron
 }
 
 func New(o Options) *Engine {
@@ -46,7 +51,22 @@ func (eng *Engine) Load(ctx context.Context, dir string) error {
 		return err
 	}
 
-	c := cron.New(
+	eng.Logger.Log(logger.Message{
+		Object: "ENGINE",
+		Msg:    fmt.Sprintf("Found %d functions", len(eng.Functions)),
+	})
+
+	// Build all function images.
+	if err := eng.buildImages(ctx); err != nil {
+		return err
+	}
+
+	// If a previous cron manager exists, cancel it.
+	if eng.cronmanager != nil {
+		eng.cronmanager.Stop()
+	}
+
+	eng.cronmanager = cron.New(
 		cron.WithParser(
 			cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow),
 		),
@@ -67,8 +87,7 @@ func (eng *Engine) Load(ctx context.Context, dir string) error {
 			}
 
 			// Set up a cron schedule for the current function.
-			_, err := c.AddFunc(t.Cron, func() {
-				// TODO: Add a base cron function here.
+			_, err := eng.cronmanager.AddFunc(t.Cron, func() {
 				eng.execute(ctx, f, &event.Event{})
 			})
 			if err != nil {
@@ -77,12 +96,8 @@ func (eng *Engine) Load(ctx context.Context, dir string) error {
 		}
 	}
 
-	eng.Logger.Log(logger.Message{
-		Object: "ENGINE",
-		Msg:    fmt.Sprintf("Found %d functions", len(eng.Functions)),
-	})
-
-	return eng.buildImages(ctx)
+	eng.cronmanager.Start()
+	return nil
 }
 
 // buildImages builds all images hosted within the engine.  This iterates through all
