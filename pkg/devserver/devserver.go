@@ -27,7 +27,7 @@ func NewDevServer(o Options) (DevServer, error) {
 	l := stdoutlogger.NewLogger(logger.Options{
 		Pretty: o.PrettyOutput,
 	})
-	eng := engine.NewFunctionEngine(engine.Options{
+	eng := engine.New(engine.Options{
 		Logger: l,
 	})
 	api, err := api.NewAPI(api.Options{

@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngestctl/pkg/function"
 	"github.com/inngest/inngestctl/pkg/logger"
+	cron "github.com/robfig/cron/v3"
 )
 
 type Options struct {
@@ -20,11 +21,16 @@ type Options struct {
 type Engine struct {
 	Logger    logger.Logger
 	Functions []*function.Function
+
+	// EventTriggers stores a map of event triggers to the function that
+	// it triggers for lookups when receiving an event from the dev server.
+	EventTriggers map[string][]function.Function
 }
 
-func NewFunctionEngine(o Options) *Engine {
+func New(o Options) *Engine {
 	eng := &Engine{
-		Logger: o.Logger,
+		Logger:        o.Logger,
+		EventTriggers: map[string][]function.Function{},
 	}
 	return eng
 }
@@ -40,7 +46,36 @@ func (eng *Engine) Load(ctx context.Context, dir string) error {
 		return err
 	}
 
+	c := cron.New(
+		cron.WithParser(
+			cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow),
+		),
+	)
+
+	// Set the functions within the engine, then iterate through each function's
+	// triggers so that we can easily invoke them.  We also need to immediately
+	// set up cron timers to invoke functions on a schedule.
 	eng.Functions = functions
+	for _, f := range functions {
+		for _, t := range f.Triggers {
+			if t.EventTrigger != nil {
+				if _, ok := eng.EventTriggers[t.Event]; !ok {
+					eng.EventTriggers[t.Event] = []function.Function{}
+				}
+				eng.EventTriggers[t.Event] = append(eng.EventTriggers[t.Event], *f)
+				continue
+			}
+
+			// Set up a cron schedule for the current function.
+			_, err := c.AddFunc(t.Cron, func() {
+				// TODO: Add a base cron function here.
+				eng.execute(ctx, f, &event.Event{})
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
 
 	eng.Logger.Log(logger.Message{
 		Object: "ENGINE",
@@ -83,7 +118,7 @@ func (eng Engine) buildImages(ctx context.Context) error {
 }
 
 func (eng *Engine) HandleEvent(evt *event.Event) error {
-	functions, err := eng.FindFunctionsByEvent(context.Background(), evt)
+	functions, err := eng.findFunction(context.Background(), evt)
 	if err != nil {
 		return nil
 	}
@@ -95,7 +130,7 @@ func (eng *Engine) HandleEvent(evt *event.Event) error {
 		return nil
 	}
 	for _, fn := range functions {
-		err := eng.ExecuteFunction(context.Background(), fn, evt)
+		err := eng.execute(context.Background(), &fn, evt)
 		if err != nil {
 			eng.Logger.Log(logger.Message{
 				Object:  "FUNCTION",
@@ -108,19 +143,13 @@ func (eng *Engine) HandleEvent(evt *event.Event) error {
 	return nil
 }
 
-func (eng *Engine) FindFunctionsByEvent(ctx context.Context, evt *event.Event) ([]*function.Function, error) {
-	var functions []*function.Function
-	for _, fn := range eng.Functions {
-		for _, t := range fn.Triggers {
-			if t.Event == evt.Name {
-				functions = append(functions, fn)
-			}
-		}
-	}
-	return functions, nil
+func (eng *Engine) findFunction(ctx context.Context, evt *event.Event) ([]function.Function, error) {
+	funcs, _ := eng.EventTriggers[evt.Name]
+	// TODO: Execute expressions here.
+	return funcs, nil
 }
 
-func (eng Engine) ExecuteFunction(ctx context.Context, fn *function.Function, evt *event.Event) error {
+func (eng Engine) execute(ctx context.Context, fn *function.Function, evt *event.Event) error {
 	eventMap, err := evt.Map()
 	if err != nil {
 		return err
