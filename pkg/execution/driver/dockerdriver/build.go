@@ -9,6 +9,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/pkg/function"
 )
 
 var (
@@ -20,6 +24,38 @@ type Artifact struct {
 	Tag  string
 }
 
+func FnBuildOpts(ctx context.Context, f function.Function) ([]BuildOpts, error) {
+	actions, _, err := f.Actions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := []BuildOpts{}
+	for _, a := range actions {
+		if a.Runtime.RuntimeType() != inngest.RuntimeTypeDocker {
+			continue
+		}
+
+		s, ok := f.Steps[a.Name]
+		if !ok {
+			return nil, fmt.Errorf("step not found for action: %s", a.Name)
+		}
+
+		path := s.Path
+		if s.Path == "" {
+			path = f.Dir()
+		}
+
+		opts = append(opts, BuildOpts{
+			Path: path,
+			Tag:  a.DSN,
+		})
+	}
+
+	return opts, nil
+}
+
+// BuildOpts represents options for a single docker build, using buildx.
 type BuildOpts struct {
 	Path string
 	Tag  string
@@ -32,23 +68,26 @@ type Builder struct {
 	cmd    *exec.Cmd
 	stderr *progressReader
 
-	done bool
-	err  error
+	StartAt time.Time
+	EndAt   time.Time
+	done    bool
+	err     error
 }
 
 func (b *Builder) Start() error {
 	err := b.cmd.Start()
 	go func() {
-		b.err = b.cmd.Wait()
-		b.done = true
+		_ = b.Wait()
 	}()
 	return err
 }
 
 func (b *Builder) Wait() error {
+	b.StartAt = time.Now()
 	err := b.cmd.Wait()
 	b.done = true
 	b.err = err
+	b.EndAt = time.Now()
 	return err
 }
 
@@ -57,9 +96,11 @@ func (b Builder) Done() bool {
 }
 
 func (b *Builder) Run() error {
+	b.StartAt = time.Now()
 	err := b.cmd.Run()
 	b.done = true
 	b.err = err
+	b.EndAt = time.Now()
 	return err
 }
 
@@ -93,6 +134,9 @@ func (b Builder) ProgressText() string {
 
 // Output returns the last N lines of output from stderr
 func (b Builder) Output(n int) string {
+	if b.done {
+		return "Build complete"
+	}
 	if n <= 0 {
 		return b.stderr.buf.String()
 	}

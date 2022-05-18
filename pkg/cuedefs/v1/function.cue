@@ -66,6 +66,10 @@ package v1
 #Step: {
 	name: string | *""
 
+	// path represents the location on disk for the step defintiion.  A single function
+	// may have >1 docker-based step.  This lists the directory which contains the step.
+	path: string | *""
+
 	// Runtime represents how the function is executed.  Each runtime specifies data
 	// necessary for executing the image, eg. if this is an externally hosted serverless
 	// function via an API this will include the URL to use in order to invoke the function.

@@ -62,6 +62,7 @@ func (f Function) Dir() string {
 
 // Step represents a single unit of code (action) which runs as part of a step function, in a DAG.
 type Step struct {
+	Path    string                 `json:"path"`
 	Name    string                 `json:"name"`
 	Runtime inngest.RuntimeWrapper `json:"runtime"`
 	After   []After                `json:"after,omitempty"`

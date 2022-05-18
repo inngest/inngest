@@ -52,7 +52,6 @@ type API struct {
 func (a API) Start(ctx context.Context) error {
 	a.Logger.Log(logger.Message{
 		Object: "API",
-		Action: "STARTED",
 		Msg:    fmt.Sprintf("Server starting on port %s", a.Port),
 	})
 	return http.ListenAndServe(fmt.Sprintf(":%s", a.Port), nil)

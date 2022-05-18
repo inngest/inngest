@@ -40,8 +40,10 @@ func NewCmdBuild() *cobra.Command {
 func build(cmd *cobra.Command, args []string) {
 	ui, err := cli.NewBuilder(cmd.Context(), cli.BuilderUIOpts{
 		QuitOnComplete: true,
-		BuildOpts: dockerdriver.BuildOpts{
-			Args: args,
+		BuildOpts: []dockerdriver.BuildOpts{
+			dockerdriver.BuildOpts{
+				Args: args,
+			},
 		},
 	})
 	if err != nil {
