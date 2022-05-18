@@ -51,10 +51,18 @@ type Function struct {
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
 	Steps map[string]Step `json:"steps,omitempty"`
+
+	// dir is an internal field which maps the root directory for the function
+	dir string
+}
+
+func (f Function) Dir() string {
+	return f.dir
 }
 
 // Step represents a single unit of code (action) which runs as part of a step function, in a DAG.
 type Step struct {
+	Path    string                 `json:"path"`
 	Name    string                 `json:"name"`
 	Runtime inngest.RuntimeWrapper `json:"runtime"`
 	After   []After                `json:"after,omitempty"`

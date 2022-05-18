@@ -63,12 +63,14 @@ func buildImg(ctx context.Context, fn function.Function) error {
 		return nil
 	}
 
+	opts, err := dockerdriver.FnBuildOpts(ctx, fn)
+	if err != nil {
+		return err
+	}
+
 	ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
 		QuitOnComplete: true,
-		BuildOpts: dockerdriver.BuildOpts{
-			Path: ".",
-			Tag:  a[0].DSN,
-		},
+		BuildOpts:      opts,
 	})
 	if err != nil {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
@@ -78,7 +80,7 @@ func buildImg(ctx context.Context, fn function.Function) error {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
 	}
-	return ui.Builder.Error()
+	return ui.Error()
 }
 
 // runFunction builds the function's images and runs the function.

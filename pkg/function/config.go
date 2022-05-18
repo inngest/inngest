@@ -128,6 +128,10 @@ func Unmarshal(ctx context.Context, input []byte, path string) (*Function, error
 	if err := fn.Validate(ctx); err != nil {
 		return nil, fmt.Errorf("The function is not valid: %w", err)
 	}
+
+	// Store the directory for future reference.
+	fn.dir = filepath.Dir(path)
+
 	return fn, nil
 }
 

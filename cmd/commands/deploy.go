@@ -109,10 +109,12 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 		// an up-to-date image and checksum for the action.
 		ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
 			QuitOnComplete: true,
-			BuildOpts: dockerdriver.BuildOpts{
-				Path:     ".",
-				Tag:      tag,
-				Platform: "linux/amd64",
+			BuildOpts: []dockerdriver.BuildOpts{
+				dockerdriver.BuildOpts{
+					Path:     ".",
+					Tag:      tag,
+					Platform: "linux/amd64",
+				},
 			},
 		})
 		if err != nil {
@@ -121,7 +123,7 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 		if err := tea.NewProgram(ui).Start(); err != nil {
 			return err
 		}
-		if ui.Builder.Error() != nil {
+		if ui.Error() != nil {
 			// We don't want to repeat the docker build error in
 			// the UI.
 			return fmt.Errorf("Exiting after a build error")

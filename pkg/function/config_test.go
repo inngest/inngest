@@ -97,6 +97,7 @@ func TestUnmarshal(t *testing.T) {
 						},
 					},
 				},
+				dir: "/dir",
 			},
 		},
 		{
@@ -128,6 +129,7 @@ func TestUnmarshal(t *testing.T) {
 						},
 					},
 				},
+				dir: "/dir",
 			},
 		},
 		{
@@ -164,6 +166,7 @@ func TestUnmarshal(t *testing.T) {
 						},
 					},
 				},
+				dir: "/dir",
 			},
 		},
 	}

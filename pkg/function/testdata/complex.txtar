@@ -47,6 +47,7 @@ function: defs.#Function & {
   },
   "steps": {
     "first": {
+      "path": "",
       "name": "first",
       "runtime": {
         "type": "docker"
@@ -59,6 +60,7 @@ function: defs.#Function & {
       ]
     },
     "second": {
+      "path": "",
       "name": "second",
       "runtime": {
         "type": "docker"
