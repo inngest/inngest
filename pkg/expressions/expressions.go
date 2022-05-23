@@ -159,7 +159,7 @@ func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (bool, *
 	program, err := e.env.Program(
 		e.ast,
 		cel.EvalOptions(cel.OptExhaustiveEval, cel.OptTrackState, cel.OptPartialEval), // Exhaustive, always, right now.
-		// cel.CustomDecorator(unknownDecorator(act)),
+		cel.CustomDecorator(unknownDecorator(act)),
 		cel.CustomDecorator(td),
 	)
 	if err != nil {

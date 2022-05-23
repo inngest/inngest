@@ -95,7 +95,6 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 			if next.ErrorCount < 3 {
 				i.wg.Add(1)
 				i.sm.Enqueue(next, at)
-				return nil
 			}
 		}
 
@@ -111,6 +110,9 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 			}
 			at = at.Add(dur)
 		}
+
+		// TODO: If there's an async expression here, add a new event trigger
+		// to the map which continues the function from the given point.
 
 		// Add to the waitgroup, ensuring that the runner blocks until the enqueued item
 		// is finished.

@@ -138,7 +138,7 @@ func mapify(data map[string]interface{}) map[string]interface{} {
 		default:
 			// XXX: slices are not handled, but are not added to our system as non-maps
 			// internally.
-			if reflect.TypeOf(v).Kind() == reflect.Struct {
+			if reflect.TypeOf(v).Kind() == reflect.Struct || reflect.TypeOf(v).Kind() == reflect.Map {
 				// Convert to JSON and back again, as we want to use the JSON encoding
 				// tags for the map names.
 				m := map[string]interface{}{}

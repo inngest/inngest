@@ -236,6 +236,8 @@ func (eng Engine) execute(ctx context.Context, fn *function.Function, evt *event
 		return err
 	}
 
+	// Create a new runner which will wait until the function has completely
+	// executed in memory.
 	runlog := eng.log.With().Str("caller", "runner").Logger()
 	runner := runner.NewInMemoryRunner(
 		eng.sm,

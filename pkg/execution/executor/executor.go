@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngestctl/pkg/execution/actionloader"
 	"github.com/inngest/inngestctl/pkg/execution/driver"
 	"github.com/inngest/inngestctl/pkg/execution/state"
+	"github.com/inngest/inngestctl/pkg/expressions"
 )
 
 var (
@@ -268,6 +269,7 @@ func (e *executor) availabileChildren(ctx context.Context, w inngest.Workflow, i
 		if err != nil {
 			return nil, err
 		}
+
 		if !ok {
 			continue
 		}
@@ -277,6 +279,7 @@ func (e *executor) availabileChildren(ctx context.Context, w inngest.Workflow, i
 		// the context has cancelled.
 		future = append(future, edge.WorkflowEdge)
 	}
+
 	return future, nil
 }
 
@@ -290,8 +293,37 @@ func (e *executor) canTraverseEdge(ctx context.Context, state state.State, edge 
 		return false, nil
 	}
 
-	// TODO: Check expressions.
-	// TODO: Chec waits, set up future jobs.
+	exprdata := ExpressionData(ctx, state, edge)
+
+	if edge.WorkflowEdge.Metadata.If != "" {
+		ok, _, err := expressions.Evaluate(ctx, edge.WorkflowEdge.Metadata.If, exprdata)
+		if err != nil || !ok {
+			return ok, err
+		}
+	}
+
+	if edge.WorkflowEdge.Metadata.AsyncEdgeMetadata != nil {
+		match := edge.WorkflowEdge.Metadata.AsyncEdgeMetadata.Match
+		if match != nil {
+			// TODO: Evaluate match.
+		}
+
+		// todo: if there's a match, tpl the expr data.
+
+		// TODO: match on
+		// TODO: save pause
+	}
 
 	return true, nil
+}
+
+func ExpressionData(ctx context.Context, s state.State, e inngest.GraphEdge) map[string]interface{} {
+	// Add the outgoing edge's data as a "response" field for predefined edges.
+	response, _ := s.ActionID(e.Outgoing.ID())
+	data := map[string]interface{}{
+		"event":    s.Event(),
+		"steps":    s.Actions(),
+		"response": response,
+	}
+	return data
 }
