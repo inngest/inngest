@@ -80,7 +80,6 @@ type Edge struct {
 }
 
 type EdgeMetadata struct {
-	Type string `json:"type,omitempty"`
 	Name string `json:"name,omitempty"`
 	If   string `json:"if,omitempty"`
 	// Wait specifies that the edge should only be traversed after the specified

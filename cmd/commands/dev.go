@@ -25,7 +25,7 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().StringP("port", "p", "9999", "port to run the API on")
 	cmd.Flags().String("dir", ".", "directory to load functions from")
 	cmd.Flags().BoolVar(&prettyOutput, "pretty", false, "pretty print the JSON output")
-	cmd.Flags().BoolVar(&prettyOutput, "json", false, "pretty print the JSON output")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "pretty print the JSON output")
 	return cmd
 }
 

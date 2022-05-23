@@ -16,9 +16,8 @@ import (
 func timeDecorator(act interpreter.PartialActivation) (*timeRefs, interpreter.InterpretableDecorator) {
 	// Create a new dispatcher with all functions added
 	dispatcher := interpreter.NewDispatcher()
-	//overloads := append(functions.StandardOverloads(), celOverloads()...)
-	overloads := append(functions.StandardOverloads())
-	dispatcher.Add(overloads...)
+	overloads := append(functions.StandardOverloads(), celOverloads()...)
+	_ = dispatcher.Add(overloads...)
 
 	tr := &timeRefs{}
 

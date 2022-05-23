@@ -275,6 +275,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 		WithActionLoader(al),
 		WithRuntimeDrivers(driver),
 	)
+	require.NoError(t, err)
 
 	available, err := exec.Execute(ctx, state.Identifier(), inngest.TriggerName)
 	require.NoError(t, err)

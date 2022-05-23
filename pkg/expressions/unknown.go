@@ -22,7 +22,7 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 	// Create a new dispatcher with all functions added
 	dispatcher := interpreter.NewDispatcher()
 	overloads := append(functions.StandardOverloads(), celOverloads()...)
-	dispatcher.Add(overloads...)
+	_ = dispatcher.Add(overloads...)
 
 	return func(i interpreter.Interpretable) (interpreter.Interpretable, error) {
 		// If this is a fold call, this is a macro (exists, has, etc), and is not an InterpretableCall
@@ -223,7 +223,10 @@ func (t *argColl) Exists(typ ref.Type) bool {
 
 // OfType returns all arguments of the given type.
 func (t *argColl) OfType(typ ref.Type) []ref.Val {
-	coll, _ := t.types[typ]
+	coll, ok := t.types[typ]
+	if !ok {
+		return nil
+	}
 	return coll
 }
 

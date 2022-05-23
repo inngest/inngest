@@ -1,7 +1,8 @@
-package log
+package logger
 
 import (
 	"context"
+	"io"
 	"os"
 
 	"github.com/rs/zerolog"
@@ -59,4 +60,13 @@ func Default() *zerolog.Logger {
 		panic(err)
 	}
 	return New(lvl)
+}
+
+func Buffered(buf io.Writer) *zerolog.Logger {
+	l := Default()
+	l.Output(zerolog.ConsoleWriter{
+		Out:         buf,
+		FormatLevel: func(i interface{}) string { return "" },
+	})
+	return l
 }

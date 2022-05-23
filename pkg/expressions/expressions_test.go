@@ -954,10 +954,6 @@ func TestFilteredAttributes(t *testing.T) {
 	}
 }
 
-func timePtr(t time.Time) *time.Time {
-	return &t
-}
-
 func BenchmarkEvaluate(b *testing.B) {
 	expression := `["P0", "P1"].exists(p, p in event.data.tag) && lowercase(event.data.project) == "benchmark" && user.email.endsWith("example.net")`
 	data := NewData(map[string]interface{}{
@@ -975,6 +971,9 @@ func BenchmarkEvaluate(b *testing.B) {
 
 	for n := 0; n < b.N; n++ {
 		expr, err := NewExpressionEvaluator(ctx, expression)
+		if err != nil {
+			b.Fatalf("unknown error in benchmark: %s", err)
+		}
 		res, _, err := expr.Evaluate(ctx, data)
 		if err != nil {
 			b.Fatalf("unknown error in benchmark: %s", err)

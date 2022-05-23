@@ -26,6 +26,8 @@ type Options struct {
 	Logger *zerolog.Logger
 }
 
+// Engine bundles together a runner, in-memory state manager, and local functions
+// for use within a local dev server, for development only.
 type Engine struct {
 	Functions []*function.Function
 
@@ -88,6 +90,11 @@ func New(o Options) (*Engine, error) {
 	return eng, nil
 }
 
+func (eng *Engine) setExecutor(e executor.Executor) {
+	eng.exec = e
+	eng.runner = runner.NewInMemoryRunner(eng.sm, eng.exec)
+}
+
 // Load loads all functions and their steps from the given directory into the engine.
 //
 // This replaces all action versions previously loaded, and replaces all function definitions
@@ -98,11 +105,17 @@ func (eng *Engine) Load(ctx context.Context, dir string) error {
 		Str("dir", dir).
 		Msgf("Recursively loading functions from %s", dir)
 
-	if eng.Functions, err = function.LoadRecursive(ctx, dir); err != nil {
+	funcs, err := function.LoadRecursive(ctx, dir)
+	if err != nil {
 		return err
 	}
+	eng.log.Info().Int("len", len(funcs)).Msgf("Found functions")
 
-	eng.log.Info().Int("len", len(eng.Functions)).Msgf("Found functions")
+	return eng.SetFunctions(ctx, funcs)
+}
+
+func (eng *Engine) SetFunctions(ctx context.Context, functions []*function.Function) error {
+	eng.Functions = functions
 
 	// Build all function images.
 	if err := eng.buildImages(ctx); err != nil {
@@ -168,6 +181,10 @@ func (eng Engine) buildImages(ctx context.Context) error {
 		opts = append(opts, steps...)
 	}
 
+	if len(opts) == 0 {
+		return nil
+	}
+
 	// XXX: Depending on the type of output here, we want to either
 	// create an interactive UI for building images or show JSON output
 	// as we build.
@@ -187,20 +204,21 @@ func (eng Engine) buildImages(ctx context.Context) error {
 	return ui.Error()
 }
 
-func (eng *Engine) HandleEvent(evt *event.Event) error {
+func (eng *Engine) HandleEvent(ctx context.Context, evt *event.Event) error {
 	// See if we have any pauses that must be triggered by the event.
-
 	functions, err := eng.findFunctions(context.Background(), evt)
 	if err != nil {
 		return err
 	}
-	if len(functions) == 0 {
-		return nil
-	}
+
 	for _, fn := range functions {
 		go func(fn function.Function) {
 			_ = eng.execute(context.Background(), &fn, evt)
 		}(fn)
+	}
+
+	if err := eng.handlePauses(ctx, evt); err != nil {
+		return err
 	}
 	return nil
 }
@@ -239,7 +257,7 @@ func (eng *Engine) handlePauses(ctx context.Context, evt *event.Event) error {
 		}
 
 		// Schedule an execution from the pause's entrypoint.
-		eng.sm.Enqueue(inmemory.QueueItem{
+		eng.runner.Enqueue(ctx, inmemory.QueueItem{
 			ID: pause.Identifier,
 			Edge: inngest.Edge{
 				Incoming: pause.Target,

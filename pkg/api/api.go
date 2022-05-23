@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type EventHandler func(*event.Event) error
+type EventHandler func(context.Context, *event.Event) error
 
 type Options struct {
 	Port         string
@@ -109,7 +109,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		copied := evt
 		go func(e event.Event) {
 			a.log.Info().Str("event", e.Name).Msg("received event")
-			if err := a.handler(&e); err != nil {
+			if err := a.handler(r.Context(), &e); err != nil {
 				a.log.Error().Msg(err.Error())
 			}
 		}(*copied)
