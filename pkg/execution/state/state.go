@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrActionIncomplete = fmt.Errorf("action has not yet completed")
+	ErrStepIncomplete = fmt.Errorf("step has not yet completed")
 )
 
 // Identifier represents the unique identifier for a workflow run.
@@ -24,7 +24,7 @@ type Identifier struct {
 // It pauses a specific workflow run via an Identifier, at a specific step in
 // the function as specified by Target.
 type Pause struct {
-	Token uuid.UUID `json:"token"`
+	ID uuid.UUID `json:"token"`
 	// Identifier is the specific workflow run to resume.  This is required.
 	Identifier Identifier `json:"identifier"`
 	// Target is the client ID of the step to resume from when the pause
@@ -44,6 +44,9 @@ type Pause struct {
 // State represents the current state of a workflow.  It is data-structure
 // agnostic;  each backing store can change the structure of the state to
 // suit its implementation.
+//
+// It is assumed that, once initialized, state does not error when returning
+// data for the given identifier.
 type State interface {
 	// Workflow returns the concrete workflow that is being executed
 	// for the given run.
@@ -93,8 +96,20 @@ type Mutater interface {
 	// considered final, as in the action will not be retried.
 	SaveActionError(ctx context.Context, i Identifier, actionID string, err error) (State, error)
 
-	// TODO
-	// SavePause(ctx context.Context, p Pause) error
+	// SavePause indicates that the traversal of an edge is paused until some future time.
+	//
+	// The runner which coordinates workflow executions is responsible for managing paused
+	// DAG executions.
+	//
+	// Note that in production it's likely that you want to coordinate amongst pauses and only
+	// let a pause be used once.  This requires syncing with distributed locks / leases.  This
+	// basic interface does not provide a mechanism for "leasing" a pause temporarily whilst
+	// a step is scheduled.  An implementation may choose to extend this interface with its own
+	// leasing or locking mechanism.
+	SavePause(ctx context.Context, p Pause) error
+
+	// ConsumePause consumes a pause by its ID such that it won't be used again.
+	ConsumePause(ctx context.Context, id uuid.UUID) error
 }
 
 // Manager represents a state manager which can both load and mutate state.

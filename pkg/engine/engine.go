@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/pkg/cli"
 	"github.com/inngest/inngestctl/pkg/event"
 	"github.com/inngest/inngestctl/pkg/execution/actionloader"
@@ -41,6 +43,11 @@ type Engine struct {
 	// al is n action loader which stores actions in memory.
 	al *actionloader.MemoryLoader
 
+	// runner coordinates scheduling of steps between the executor and state queue.
+	runner *runner.InMemoryRunner
+
+	// exec is the executor used to run steps and calculate expression data
+	// for expressions.
 	exec executor.Executor
 
 	// sm stores the in-memory state and queue for our functions.  this is used
@@ -76,9 +83,15 @@ func New(o Options) (*Engine, error) {
 		return nil, fmt.Errorf("error creating executor: %w", err)
 	}
 
+	eng.runner = runner.NewInMemoryRunner(eng.sm, eng.exec)
+
 	return eng, nil
 }
 
+// Load loads all functions and their steps from the given directory into the engine.
+//
+// This replaces all action versions previously loaded, and replaces all function definitions
+// previously available.  This allows for hot reloading during development.
 func (eng *Engine) Load(ctx context.Context, dir string) error {
 	var err error
 	eng.log.Info().
@@ -175,6 +188,8 @@ func (eng Engine) buildImages(ctx context.Context) error {
 }
 
 func (eng *Engine) HandleEvent(evt *event.Event) error {
+	// See if we have any pauses that must be triggered by the event.
+
 	functions, err := eng.findFunctions(context.Background(), evt)
 	if err != nil {
 		return err
@@ -187,6 +202,51 @@ func (eng *Engine) HandleEvent(evt *event.Event) error {
 			_ = eng.execute(context.Background(), &fn, evt)
 		}(fn)
 	}
+	return nil
+}
+
+func (eng *Engine) handlePauses(ctx context.Context, evt *event.Event) error {
+	for _, pause := range eng.sm.Pauses() {
+		if pause.Event == nil || *pause.Event != evt.Name {
+			continue
+		}
+		if pause.Expires.Before(time.Now()) {
+			continue
+		}
+		if pause.Expression != nil {
+			// Get expression data from the executor for the given run ID.
+			data, err := eng.exec.ExpressionData(ctx, pause.Identifier)
+			if err != nil {
+				return err
+			}
+
+			// Add the async event data to the expression
+			data["async"] = evt.Map()
+
+			// Compile and run the expression.
+			ok, _, err := expressions.Evaluate(ctx, *pause.Expression, data)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				continue
+			}
+		}
+
+		// Remove this pause from the state store, as it will be consumed.
+		if err := eng.sm.ConsumePause(ctx, pause.ID); err != nil {
+			return err
+		}
+
+		// Schedule an execution from the pause's entrypoint.
+		eng.sm.Enqueue(inmemory.QueueItem{
+			ID: pause.Identifier,
+			Edge: inngest.Edge{
+				Incoming: pause.Target,
+			},
+		}, time.Now())
+	}
+
 	return nil
 }
 
@@ -236,15 +296,7 @@ func (eng Engine) execute(ctx context.Context, fn *function.Function, evt *event
 		return err
 	}
 
-	// Create a new runner which will wait until the function has completely
-	// executed in memory.
-	runlog := eng.log.With().Str("caller", "runner").Logger()
-	runner := runner.NewInMemoryRunner(
-		eng.sm,
-		NewLoggingExecutor(eng.exec, &runlog),
-	)
-
-	id, err := runner.NewRun(ctx, *flow, data)
+	id, err := eng.runner.NewRun(ctx, *flow, data)
 	if err != nil {
 		return fmt.Errorf("error initializing execution: %w", err)
 	}
@@ -256,10 +308,11 @@ func (eng Engine) execute(ctx context.Context, fn *function.Function, evt *event
 		Logger()
 
 	log.Info().Msg("executing function")
-	if err = runner.Execute(ctx, *id); err != nil {
+	if err = eng.runner.Execute(ctx, *id); err != nil {
 		log.Error().Err(err).Msg("executed function")
 		return err
 	}
+
 	log.Info().Msg("executed function")
 	return nil
 }

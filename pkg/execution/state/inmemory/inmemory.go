@@ -13,13 +13,20 @@ import (
 )
 
 // Queue is a simplistic, **non production ready** queue for processing steps
-// of functions, keepign the queue in-memory with zero persistence.
+// of functions, keepign the queue in-memory with zero persistence.  It is used
+// to simulate a production environment for local testing.
 type Queue interface {
 	// Embed the state.Manager interface for processing state items.
 	state.Manager
 
+	// Channel returns a channel which receives available jobs on the queue.
 	Channel() chan QueueItem
+
+	// Enqueue enqueues a new item for scheduling at the specific time.
 	Enqueue(item QueueItem, at time.Time)
+
+	// Pauses returns all available pauses.
+	Pauses() map[uuid.UUID]state.Pause
 }
 
 type QueueItem struct {
@@ -32,15 +39,19 @@ type QueueItem struct {
 // functions in-memory, for development and testing only.
 func NewStateManager() Queue {
 	return &mem{
-		state: map[ulid.ULID]state.State{},
-		lock:  sync.RWMutex{},
-		q:     make(chan QueueItem),
+		state:  map[ulid.ULID]state.State{},
+		pauses: map[uuid.UUID]state.Pause{},
+		lock:   sync.RWMutex{},
+		q:      make(chan QueueItem),
 	}
 }
 
 type mem struct {
 	state map[ulid.ULID]state.State
-	lock  sync.RWMutex
+
+	pauses map[uuid.UUID]state.Pause
+
+	lock sync.RWMutex
 
 	q chan QueueItem
 }
@@ -131,6 +142,26 @@ func (m *mem) SaveActionError(ctx context.Context, i state.Identifier, actionID 
 	return state, nil
 }
 
+func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
+	m.lock.Lock()
+	m.pauses[p.ID] = p
+	m.lock.Unlock()
+	return nil
+}
+
+func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID) error {
+	m.lock.Lock()
+	delete(m.pauses, id)
+	m.lock.Unlock()
+	return nil
+}
+
+func (m *mem) Pauses() map[uuid.UUID]state.Pause {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	return m.pauses
+}
+
 type memstate struct {
 	workflow inngest.Workflow
 
@@ -183,12 +214,12 @@ func (s memstate) ActionID(id string) (map[string]interface{}, error) {
 	data, hasAction := s.Actions()[id]
 	err, hasError := s.Errors()[id]
 	if !hasAction && !hasError {
-		return nil, state.ErrActionIncomplete
+		return nil, state.ErrStepIncomplete
 	}
 	return data, err
 }
 
 func (s memstate) ActionComplete(id string) bool {
 	_, err := s.ActionID(id)
-	return err != state.ErrActionIncomplete
+	return err != state.ErrStepIncomplete
 }

@@ -3,13 +3,16 @@ package executor
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/pkg/execution/actionloader"
 	"github.com/inngest/inngestctl/pkg/execution/driver"
 	"github.com/inngest/inngestctl/pkg/execution/state"
 	"github.com/inngest/inngestctl/pkg/expressions"
+	"github.com/xhit/go-str2duration/v2"
 )
 
 var (
@@ -56,23 +59,13 @@ type Executor interface {
 	// state then schedule the child functions else the workflow will terminate early.
 	Execute(ctx context.Context, id state.Identifier, from string) ([]inngest.Edge, error)
 
-	// XXX: These have been moved into the runner, as these aren't actually "executing"
-	//      a step of a function.
-	//
-	// Complete indicates that a function has completed with the given data. It communicates
-	// with the state store to record the data, then returns future functions which can be
-	// executed.
-	// Complete(ctx context.Context, id state.Identifier, clientID string, data map[string]interface{}) ([]string, error)
-	//
-	// Fail indicates that a function has failed with the given error.
-	// Depending on the retry metadata, will attempt to retry the function or
-	// fail the action and terminate this branch.
-	// Fail(ctx context.Context, id state.Identifier, clientID string, err error) error
+	ExpressionData(ctx context.Context, id state.Identifier) (map[string]interface{}, error)
 }
 
 func NewExecutor(opts ...ExecutorOpt) (Executor, error) {
 	m := &executor{
 		runtimeDrivers: map[string]driver.Driver{},
+		exprDataGen:    ExpressionData,
 	}
 
 	for _, o := range opts {
@@ -95,6 +88,9 @@ func NewExecutor(opts ...ExecutorOpt) (Executor, error) {
 // ExecutorOpt modifies the built in executor on creation.
 type ExecutorOpt func(m Executor) error
 
+// ExpressionDataGenerator is a function which is used to generate data for expressions within a workflow.
+type ExpressionDataGenerator func(ctx context.Context, s state.State, e inngest.GraphEdge) map[string]interface{}
+
 // WithActionLoader sets the action loader to use when retrieving function definitions
 // in a workflow.
 func WithActionLoader(al actionloader.ActionLoader) ExecutorOpt {
@@ -108,6 +104,14 @@ func WithActionLoader(al actionloader.ActionLoader) ExecutorOpt {
 func WithStateManager(sm state.Manager) ExecutorOpt {
 	return func(e Executor) error {
 		e.(*executor).sm = sm
+		return nil
+	}
+}
+
+// WithStateManager sets which state manager to use when creating an executor.
+func WithExpressionDataGenerator(datagen ExpressionDataGenerator) ExecutorOpt {
+	return func(e Executor) error {
+		e.(*executor).exprDataGen = datagen
 		return nil
 	}
 }
@@ -131,6 +135,7 @@ type executor struct {
 	sm             state.Manager
 	al             actionloader.ActionLoader
 	runtimeDrivers map[string]driver.Driver
+	exprDataGen    ExpressionDataGenerator
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -158,6 +163,14 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 	}
 
 	return next, nil
+}
+
+func (e *executor) ExpressionData(ctx context.Context, id state.Identifier) (map[string]interface{}, error) {
+	state, err := e.sm.Load(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return e.exprDataGen(ctx, state, inngest.GraphEdge{}), nil
 }
 
 // run executes the action with the given client ID.
@@ -288,12 +301,12 @@ func (e *executor) availabileChildren(ctx context.Context, w inngest.Workflow, i
 // expressions which are traversed conditionally based off of workflow state;  and
 // asynchronous edges which wait for an event mathing a condition to be traversed (at some
 // point in the future, with a TTL).
-func (e *executor) canTraverseEdge(ctx context.Context, state state.State, edge inngest.GraphEdge) (bool, error) {
-	if edge.Outgoing.ID() != inngest.TriggerName && !state.ActionComplete(edge.Outgoing.ID()) {
+func (e *executor) canTraverseEdge(ctx context.Context, s state.State, edge inngest.GraphEdge) (bool, error) {
+	if edge.Outgoing.ID() != inngest.TriggerName && !s.ActionComplete(edge.Outgoing.ID()) {
 		return false, nil
 	}
 
-	exprdata := ExpressionData(ctx, state, edge)
+	exprdata := e.exprDataGen(ctx, s, edge)
 
 	if edge.WorkflowEdge.Metadata.If != "" {
 		ok, _, err := expressions.Evaluate(ctx, edge.WorkflowEdge.Metadata.If, exprdata)
@@ -302,16 +315,36 @@ func (e *executor) canTraverseEdge(ctx context.Context, state state.State, edge 
 		}
 	}
 
+	// We want to wait for another event to come in to traverse this edge within the DAG.
+	//
+	// Create a new "pause", which informs the state manager that we're pausing the traversal
+	// of this edge until later.
+	//
+	// The runner should load all pauses and automatically resume the traversal when a
+	// matching event is received.
 	if edge.WorkflowEdge.Metadata.AsyncEdgeMetadata != nil {
-		match := edge.WorkflowEdge.Metadata.AsyncEdgeMetadata.Match
-		if match != nil {
-			// TODO: Evaluate match.
+		am := edge.WorkflowEdge.Metadata.AsyncEdgeMetadata
+
+		if am.Event == "" {
+			return false, fmt.Errorf("no async edge event specified")
+		}
+		dur, err := str2duration.ParseDuration(am.TTL)
+		if err != nil {
+			return false, fmt.Errorf("error parsing async edge ttl '%s': %w", am.TTL, err)
 		}
 
-		// todo: if there's a match, tpl the expr data.
-
-		// TODO: match on
-		// TODO: save pause
+		err = e.sm.SavePause(ctx, state.Pause{
+			ID:         uuid.New(),
+			Identifier: s.Identifier(),
+			Target:     edge.Incoming.ID(),
+			Expires:    time.Now().Add(dur),
+			Event:      &am.Event,
+			Expression: am.Match,
+		})
+		if err != nil {
+			return false, fmt.Errorf("error saving edge pause: %w", err)
+		}
+		return false, nil
 	}
 
 	return true, nil
@@ -319,7 +352,10 @@ func (e *executor) canTraverseEdge(ctx context.Context, state state.State, edge 
 
 func ExpressionData(ctx context.Context, s state.State, e inngest.GraphEdge) map[string]interface{} {
 	// Add the outgoing edge's data as a "response" field for predefined edges.
-	response, _ := s.ActionID(e.Outgoing.ID())
+	var response map[string]interface{}
+	if e.Outgoing.Step != nil {
+		response, _ = s.ActionID(e.Outgoing.ID())
+	}
 	data := map[string]interface{}{
 		"event":    s.Event(),
 		"steps":    s.Actions(),
