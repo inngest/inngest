@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/inngest/inngestctl/inngest"
-	"github.com/inngest/inngestctl/pkg/execution/state"
+	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/execution/state"
 )
 
 type Driver interface {

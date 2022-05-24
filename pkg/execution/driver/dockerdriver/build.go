@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inngest/inngestctl/inngest"
-	"github.com/inngest/inngestctl/pkg/function"
+	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/function"
 )
 
 var (

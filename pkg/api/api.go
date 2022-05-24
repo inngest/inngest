@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/inngest/inngestctl/pkg/event"
+	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/rs/zerolog"
 )
 

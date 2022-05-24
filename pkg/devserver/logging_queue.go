@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/inngest/inngestctl/pkg/execution/state"
-	"github.com/inngest/inngestctl/pkg/execution/state/inmemory"
+	"github.com/inngest/inngest-cli/pkg/execution/state"
+	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
 	"github.com/rs/zerolog"
 )
 

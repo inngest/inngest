@@ -7,11 +7,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngestctl/inngest"
-	"github.com/inngest/inngestctl/pkg/execution/actionloader"
-	"github.com/inngest/inngestctl/pkg/execution/driver"
-	"github.com/inngest/inngestctl/pkg/execution/state"
-	"github.com/inngest/inngestctl/pkg/expressions"
+	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
+	"github.com/inngest/inngest-cli/pkg/execution/driver"
+	"github.com/inngest/inngest-cli/pkg/execution/state"
+	"github.com/inngest/inngest-cli/pkg/expressions"
 	"github.com/xhit/go-str2duration/v2"
 )
 

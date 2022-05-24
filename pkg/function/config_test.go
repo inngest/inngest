@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngest-cli/inngest"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/txtar"
 )

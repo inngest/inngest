@@ -11,7 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/inngest/inngestctl/inngest/client"
+	"github.com/inngest/inngest-cli/inngest/client"
 )
 
 var (

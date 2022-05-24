@@ -12,7 +12,7 @@ import (
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/load"
-	"github.com/inngest/inngestctl/pkg/cuedefs"
+	"github.com/inngest/inngest-cli/pkg/cuedefs"
 )
 
 var (

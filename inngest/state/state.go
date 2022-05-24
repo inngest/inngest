@@ -9,8 +9,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/inngest/inngestctl/inngest/client"
-	"github.com/inngest/inngestctl/inngest/log"
+	"github.com/inngest/inngest-cli/inngest/client"
+	"github.com/inngest/inngest-cli/inngest/log"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )

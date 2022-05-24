@@ -13,7 +13,7 @@ import (
 
 	"github.com/gosimple/slug"
 	"github.com/inngest/cuetypescript"
-	"github.com/inngest/inngestctl/pkg/function"
+	"github.com/inngest/inngest-cli/pkg/function"
 )
 
 type Template struct {
