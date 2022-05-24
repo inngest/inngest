@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/rs/zerolog"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -41,11 +42,12 @@ func From(ctx context.Context) *zerolog.Logger {
 func New(lvl zerolog.Level) *zerolog.Logger {
 	l := zerolog.New(os.Stderr).Level(lvl).With().Timestamp().Logger()
 
-	// TODO: Switch between log formats
-	l = l.Output(zerolog.ConsoleWriter{
-		Out:         os.Stderr,
-		FormatLevel: func(i interface{}) string { return "" },
-	})
+	if !viper.GetBool("json") {
+		l = l.Output(zerolog.ConsoleWriter{
+			Out:         os.Stderr,
+			FormatLevel: func(i interface{}) string { return "" },
+		})
+	}
 
 	return &l
 }
@@ -63,10 +65,14 @@ func Default() *zerolog.Logger {
 }
 
 func Buffered(buf io.Writer) *zerolog.Logger {
-	l := Default()
-	l.Output(zerolog.ConsoleWriter{
-		Out:         buf,
-		FormatLevel: func(i interface{}) string { return "" },
-	})
-	return l
+	l := zerolog.New(buf).Level(DefaultLevel).With().Timestamp().Logger()
+
+	if !viper.GetBool("json") {
+		l = l.Output(zerolog.ConsoleWriter{
+			Out:         buf,
+			FormatLevel: func(i interface{}) string { return "" },
+		})
+	}
+
+	return &l
 }
