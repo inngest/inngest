@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/pkg/cli"
@@ -181,9 +180,6 @@ func (eng Engine) buildImages(ctx context.Context) error {
 		return nil
 	}
 
-	// XXX: Depending on the type of output here, we want to either
-	// create an interactive UI for building images or show JSON output
-	// as we build.
 	ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
 		QuitOnComplete: true,
 		BuildOpts:      opts,
@@ -192,7 +188,10 @@ func (eng Engine) buildImages(ctx context.Context) error {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
 	}
-	if err := tea.NewProgram(ui).Start(); err != nil {
+	// calling Start on our UI instance invokes either a pretty TTY output
+	// via tea, or renders output as JSON directly depending on the global
+	// JSON flag.
+	if err := ui.Start(ctx); err != nil {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
 	}

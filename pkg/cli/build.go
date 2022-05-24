@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/progress"
@@ -11,6 +12,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
+	"github.com/inngest/inngestctl/pkg/logger"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -45,6 +48,51 @@ func NewBuilder(ctx context.Context, opts BuilderUIOpts) (*BuilderUI, error) {
 		Instances: instances,
 		progress:  p,
 	}, nil
+}
+
+func (b *BuilderUI) Start(ctx context.Context) error {
+	// Depending on the type of output here, we want to either
+	// create an interactive UI for building images or show JSON output
+	// as we build.
+	if viper.GetBool("json") {
+		return b.StartJSON(ctx)
+	}
+	if err := tea.NewProgram(b).Start(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (b *BuilderUI) StartJSON(ctx context.Context) error {
+	wg := &sync.WaitGroup{}
+	var builderr error
+
+	l := logger.Default().With().Str("caller", "builder").Logger()
+
+	for _, opt := range b.opts.BuildOpts {
+		b, err := dockerdriver.NewBuilder(ctx, opt)
+		if err != nil {
+			return err
+		}
+		wg.Add(1)
+		go func(opt dockerdriver.BuildOpts) {
+			l.Info().Interface("opts", opt).Msg("building image")
+			err := b.Run()
+			wg.Done()
+			if err != nil {
+				l.Error().
+					Interface("opts", opt).
+					Err(err).
+					Msg("error building image")
+				builderr = multierror.Append(builderr, err)
+				return
+			}
+			l.Info().Interface("opts", opt).Msg("successfully built image")
+		}(opt)
+	}
+
+	wg.Wait()
+	return builderr
 }
 
 // instance represents a single builder instance used to compile a single
