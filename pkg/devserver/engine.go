@@ -1,4 +1,4 @@
-package engine
+package devserver
 
 import (
 	"context"
@@ -21,10 +21,6 @@ import (
 	cron "github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
 )
-
-type Options struct {
-	Logger *zerolog.Logger
-}
 
 // Engine bundles together a runner, in-memory state manager, and local functions
 // for use within a local dev server, for development only.
@@ -57,14 +53,14 @@ type Engine struct {
 	sm inmemory.Queue
 }
 
-func New(o Options) (*Engine, error) {
-	logger := o.Logger.With().Str("caller", "engine").Logger()
+func NewEngine(l *zerolog.Logger) (*Engine, error) {
+	logger := l.With().Str("caller", "engine").Logger()
 
 	eng := &Engine{
 		log:           &logger,
 		EventTriggers: map[string][]function.Function{},
 		al:            actionloader.NewMemoryLoader(),
-		sm:            NewLoggingQueue(o.Logger),
+		sm:            NewLoggingQueue(l),
 	}
 
 	// Create our drivers.
