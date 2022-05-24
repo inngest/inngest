@@ -1,9 +1,5 @@
 package event
 
-import (
-	"encoding/json"
-)
-
 type Event struct {
 	Name string                 `json:"name"`
 	Data map[string]interface{} `json:"data"`
@@ -21,9 +17,25 @@ type Event struct {
 	Version   string `json:"v,omitempty"`
 }
 
-func (evt *Event) Map() (map[string]interface{}, error) {
-	data := map[string]interface{}{}
-	eventJson, _ := json.Marshal(evt)
-	err := json.Unmarshal(eventJson, &data)
-	return data, err
+func (evt *Event) Map() map[string]interface{} {
+	if evt.Data == nil {
+		evt.Data = make(map[string]interface{})
+	}
+	if evt.User == nil {
+		evt.User = make(map[string]interface{})
+	}
+
+	data := map[string]interface{}{
+		"name": evt.Name,
+		"data": evt.Data,
+		"user": evt.User,
+		"id":   evt.ID,
+		"ts":   evt.Timestamp,
+	}
+
+	if evt.Version != "" {
+		data["v"] = evt.Version
+	}
+
+	return data
 }

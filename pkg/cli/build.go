@@ -125,6 +125,10 @@ func (b *BuilderUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (b *BuilderUI) tick(t time.Time) tea.Msg {
+	if len(b.Instances) == 0 {
+		return nil
+	}
+
 	// Get the earliest start time.
 	taken := time.Since(b.Instances[0].builder.StartAt)
 
@@ -151,6 +155,9 @@ func (b *BuilderUI) tick(t time.Time) tea.Msg {
 }
 
 func (b *BuilderUI) View() string {
+	if len(b.Instances) == 0 {
+		return ""
+	}
 	// If we're rendering a single instance, use the progress directly from
 	// the docker builder.
 	if len(b.Instances) == 1 {

@@ -9,7 +9,7 @@ import (
 	"github.com/inngest/inngestctl/pkg/event"
 )
 
-type HTTPResponse struct {
+type apiResponse struct {
 	StatusCode int
 	Message    string
 	Error      string
@@ -35,15 +35,20 @@ func parseBody(body []byte) ([]*event.Event, error) {
 	return []*event.Event{evt}, nil
 }
 
-func writeResponse(w http.ResponseWriter, h HTTPResponse) {
+func (a API) writeResponse(w http.ResponseWriter, h apiResponse) {
 	w.WriteHeader(h.StatusCode)
+
 	body := map[string]string{}
+
 	if h.Message != "" {
 		body["message"] = h.Message
 	}
+
 	if h.Error != "" {
+		a.log.Error().Msg(h.Error)
 		body["error"] = h.Error
 	}
+
 	byt, err := json.Marshal(body)
 	if err != nil {
 		fmt.Println("Error marshalling response:", err)

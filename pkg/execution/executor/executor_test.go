@@ -34,7 +34,7 @@ func TestNewExecutor(t *testing.T) {
 	assert.NotNil(t, exec)
 }
 
-func TestExecutor(t *testing.T) {
+func TestExecute_state(t *testing.T) {
 	ctx := context.Background()
 	sm := inmemory.NewStateManager()
 
@@ -132,14 +132,6 @@ func TestExecutor(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, exec)
 
-	availableIDs := func(edges []inngest.Edge) []string {
-		strs := make([]string, len(edges))
-		for n, e := range edges {
-			strs[n] = e.Incoming
-		}
-		return strs
-	}
-
 	// Executing the trigger does nothing but validate which descendents from the trigger
 	// in the dag can run.
 	available, err := exec.Execute(ctx, state.Identifier(), inngest.TriggerName)
@@ -187,4 +179,122 @@ func TestExecutor(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, len(state.Actions()))
 	assert.Equal(t, 1, len(state.Errors()))
+}
+
+// TestExecute_edge_expressions asserts that we execute expressions using the correct
+// data, calculating edge expressions appropriately.
+func TestExecute_edge_expressions(t *testing.T) {
+	ctx := context.Background()
+	sm := inmemory.NewStateManager()
+
+	al := actionloader.NewMemoryLoader()
+	al.Add(inngest.ActionVersion{
+		DSN: "test",
+		Runtime: inngest.RuntimeWrapper{
+			Runtime: &mockdriver.Mock{},
+		},
+	})
+
+	w := inngest.Workflow{
+		UUID: uuid.New(),
+		Steps: []inngest.Step{
+			{
+				DSN:      "test",
+				ClientID: "run-step-trigger",
+			},
+			{
+				DSN:      "test",
+				ClientID: "dont-run-step-trigger",
+			},
+			{
+				DSN:      "test",
+				ClientID: "run-step-child",
+			},
+			{
+				DSN:      "test",
+				ClientID: "dont-run-step-child",
+			},
+		},
+		Edges: []inngest.Edge{
+			{
+				Outgoing: inngest.TriggerName,
+				Incoming: "run-step-trigger",
+				Metadata: inngest.EdgeMetadata{
+					If: "event.data.run == true && event.data.string == 'yes'",
+				},
+			},
+			// This won't be ran, as the expression is invalid
+			{
+				Outgoing: inngest.TriggerName,
+				Incoming: "dont-run-step-trigger",
+				Metadata: inngest.EdgeMetadata{
+					If: "event.data.run == false || event.data.string != 'yes'",
+				},
+			},
+			// This should run, using "response" as the output of the first step.  It should
+			// also allow hard-coding steps directly.
+			{
+				Outgoing: "run-step-trigger",
+				Incoming: "run-step-child",
+				Metadata: inngest.EdgeMetadata{
+					If: "response.ok == true && response.step == 'run-step-trigger' && event.data.run == true && steps['run-step-trigger'].ok == true",
+				},
+			},
+			// This shouldn't run.
+			{
+				Outgoing: "run-step-trigger",
+				Incoming: "run-step-child",
+				Metadata: inngest.EdgeMetadata{
+					If: "response.ok != true || response.step != 'run-step-trigger'",
+				},
+			},
+		},
+	}
+
+	state, err := sm.New(ctx, w, ulid.MustNew(ulid.Now(), rand.Reader), map[string]interface{}{
+		"data": map[string]interface{}{
+			"run":    true,
+			"string": "yes",
+		},
+	})
+	require.Nil(t, err)
+
+	driver := &mockdriver.Mock{
+		Responses: map[string]driver.Response{
+			"run-step-trigger": {Output: map[string]interface{}{
+				"ok":   true,
+				"step": "run-step-trigger",
+				"pi":   3.141,
+			}},
+			"run-step-child": {Output: map[string]interface{}{"ok": true, "step": "run-step-child"}},
+		},
+	}
+
+	exec, err := NewExecutor(
+		WithStateManager(sm),
+		WithActionLoader(al),
+		WithRuntimeDrivers(driver),
+	)
+	require.NoError(t, err)
+
+	available, err := exec.Execute(ctx, state.Identifier(), inngest.TriggerName)
+	require.NoError(t, err)
+	require.Equal(t, len(driver.Executed), 0)
+	require.Equal(t, len(available), 1)
+	require.ElementsMatch(t, []string{"run-step-trigger"}, availableIDs(available))
+
+	// Run the next step.
+	available, err = exec.Execute(ctx, state.Identifier(), "run-step-trigger")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(driver.Executed))
+	assert.Equal(t, 1, len(available))
+	assert.ElementsMatch(t, []string{"run-step-child"}, availableIDs(available))
+}
+
+func availableIDs(edges []inngest.Edge) []string {
+	strs := make([]string, len(edges))
+	for n, e := range edges {
+		strs[n] = e.Incoming
+	}
+	return strs
 }

@@ -92,5 +92,12 @@ package v1
 	// to delay a step from running you can set wait to "10m".  This will enqueue
 	// the step to run after 10 minutes.
 	wait?: string
-	// TODO: async
+
+	// async allows you to specify an event that must be received within a specific
+	// amount of time (ttl) to continue with the specified step. 
+	async?: {
+		ttl:    string
+		event:  string
+		match?: string
+	}
 }

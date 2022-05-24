@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngestctl/pkg/backoff"
 	"github.com/inngest/inngestctl/pkg/execution/driver"
 	"github.com/inngest/inngestctl/pkg/execution/executor"
 	"github.com/inngest/inngestctl/pkg/execution/state"
@@ -24,20 +25,21 @@ import (
 // please, and only to test.
 func NewInMemoryRunner(sm inmemory.Queue, exec executor.Executor) *InMemoryRunner {
 	return &InMemoryRunner{
-		sm:   sm,
-		exec: exec,
-		wg:   &sync.WaitGroup{},
+		sm:    sm,
+		exec:  exec,
+		waits: map[ulid.ULID]*sync.WaitGroup{},
 	}
 }
 
-// InMemoryRunner represents a runner that does some funky shit for my peeps please.
+// InMemoryRunner represents a runner which coordinates steps enqueued within an
+// in memory queue, and executing the steps within the executor.
 type InMemoryRunner struct {
 	sm   inmemory.Queue
 	exec executor.Executor
 
-	// The waitgroup allows us to terminate the inmemory runner when all nodes in
-	// a single function is complete, instead of blocking forever.
-	wg *sync.WaitGroup
+	// In a dev server, we want to wait until all current steps of a state.Identifier
+	// are complete.  We create a new waitgroup per identifier to wait for the steps.
+	waits map[ulid.ULID]*sync.WaitGroup
 }
 
 // NewRun initializes a new run for the given workflow.
@@ -48,41 +50,62 @@ func (i *InMemoryRunner) NewRun(ctx context.Context, f inngest.Workflow, data ma
 	}
 	id := state.Identifier()
 
-	i.wg.Add(1)
-	i.sm.Enqueue(inmemory.QueueItem{
+	i.Enqueue(ctx, inmemory.QueueItem{
 		ID:   id,
 		Edge: inngest.SourceEdge,
-	}, nil)
+	}, time.Now())
 
 	return &id, nil
+}
+
+func (i InMemoryRunner) Enqueue(ctx context.Context, item inmemory.QueueItem, at time.Time) {
+	if _, ok := i.waits[item.ID.RunID]; !ok {
+		i.waits[item.ID.RunID] = &sync.WaitGroup{}
+	}
+
+	// Add to the waitgroup, ensuring that the runner blocks until the enqueued item
+	// is finished.
+	i.waits[item.ID.RunID].Add(1)
+	i.sm.Enqueue(item, at)
 }
 
 // Execute runs all available tasks, blocking until terminated.
 func (i *InMemoryRunner) Execute(ctx context.Context, id state.Identifier) error {
 	var err error
 	go func() {
-		for item := range i.sm.Queue() {
-			if err = i.run(ctx, item); err != nil {
-				return
-			}
+		for item := range i.sm.Channel() {
+			// We could terminate the executor here on error
+			_ = i.run(ctx, item)
 		}
 	}()
 
 	// Wait for all items in the queue to be complete.
-	i.wg.Wait()
+	i.waits[id.RunID].Wait()
 	return err
 }
 
 func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error {
+	defer func() {
+		i.waits[item.ID.RunID].Done()
+	}()
+
 	children, err := i.exec.Execute(ctx, item.ID, item.Edge.Incoming)
 
 	if err != nil {
-		// TODO: Handle max retries.
 		resp := driver.Response{}
 		if !errors.As(err, &resp) || resp.Retryable() {
 			next := item
 			next.ErrorCount += 1
-			i.sm.Enqueue(next, nil)
+
+			at := backoff.LinearJitterBackoff(next.ErrorCount)
+
+			// XXX: When we add max retries to steps, read the step from the
+			// state store here to chech for the step's retry data.
+			//
+			// For now, we retry steps of a function up to 3 times.
+			if next.ErrorCount < 3 {
+				i.Enqueue(ctx, next, at)
+			}
 		}
 
 		return fmt.Errorf("execution error: %s", err)
@@ -98,17 +121,12 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 			at = at.Add(dur)
 		}
 
-		// Add to the waitgroup, ensuring that the runner blocks until the enqueued item
-		// is finished.
-		i.wg.Add(1)
-
 		// Enqueue the next child in our in-memory state queue.
-		i.sm.Enqueue(inmemory.QueueItem{
+		i.Enqueue(ctx, inmemory.QueueItem{
 			ID:   item.ID,
 			Edge: next,
-		}, &at)
+		}, at)
 	}
 
-	i.wg.Done()
 	return nil
 }

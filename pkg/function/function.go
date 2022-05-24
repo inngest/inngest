@@ -69,10 +69,21 @@ type Step struct {
 }
 
 type After struct {
+	// Step represents the step name to run after.
 	Step string `json:"step,omitempty"`
+
+	// Wait represents a duration that we should wait before continuing with
+	// this step, eg. "24h" or "1h30m".
+	Wait *string `json:"wait,omitempty"`
+
+	// Async, when specified, indicates that we must wait for another event
+	// to be received before continuing with this step.  Note that we may
+	// specify expressions within an Async block to only continue with specific
+	// event data.
+	Async *inngest.AsyncEdgeMetadata `json:"async,omitempty"`
+
 	// TODO: support multiple steps all finishing prior to running this once.
 	// Steps []string `json:"steps,omitempty"`
-	Wait *string `json:"wait,omitempty"`
 }
 
 // New returns a new, empty function with a randomly generated ID.
@@ -217,7 +228,8 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 				Outgoing: after.Step,
 				Incoming: step.Name,
 				Metadata: inngest.EdgeMetadata{
-					Wait: after.Wait,
+					Wait:              after.Wait,
+					AsyncEdgeMetadata: after.Async,
 				},
 			})
 		}
