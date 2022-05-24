@@ -12,7 +12,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
-	"github.com/oklog/ulid"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

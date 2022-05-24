@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
-	"github.com/oklog/ulid"
+	"github.com/oklog/ulid/v2"
 )
 
 // Queue is a simplistic, **non production ready** queue for processing steps
