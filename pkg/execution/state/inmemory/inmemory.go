@@ -68,12 +68,13 @@ func (m *mem) Channel() chan QueueItem {
 }
 
 // New initializes state for a new run using the specifid ID and starting data.
-func (m *mem) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, data map[string]interface{}) (state.State, error) {
+func (m *mem) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, data any) (state.State, error) {
+	event := data.(map[string]interface{})
 	state := &memstate{
 		workflow:   workflow,
 		runID:      runID,
 		workflowID: workflow.UUID,
-		event:      data,
+		event:      event,
 		actions:    map[string]map[string]interface{}{},
 		errors:     map[string]error{},
 	}

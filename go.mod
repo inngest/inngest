@@ -1,6 +1,6 @@
 module github.com/inngest/inngest-cli
 
-go 1.17
+go 1.18
 
 require (
 	cuelang.org/go v0.4.2
@@ -23,6 +23,7 @@ require (
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/karlseguin/ccache/v2 v2.0.8
 	github.com/lnquy/cron v1.1.1
+	github.com/mattn/go-isatty v0.0.14
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/muesli/reflow v0.3.0
 	github.com/oklog/ulid v1.3.1
@@ -84,7 +85,6 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
-	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/microcosm-cc/bluemonday v1.0.17 // indirect
