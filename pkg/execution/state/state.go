@@ -85,9 +85,12 @@ type Loader interface {
 
 // Mutater mutates state for a given identifier, storing the state and returning
 // the new state.
+//
+// It accepst any starting state as its input.  This is usually, and locally in dev,
+// a map[string]interface{} containing event data.
 type Mutater interface {
 	// New creates a new state for the given run ID, using the event as the input data for the root workflow.
-	New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, event map[string]interface{}) (State, error)
+	New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, input any) (State, error)
 
 	// SaveActionOutput stores output for a single action within a workflow run.
 	SaveActionOutput(ctx context.Context, i Identifier, actionID string, data map[string]interface{}) (State, error)
