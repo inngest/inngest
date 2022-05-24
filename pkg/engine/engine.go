@@ -4,22 +4,31 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngestctl/inngest"
 	"github.com/inngest/inngestctl/pkg/cli"
 	"github.com/inngest/inngestctl/pkg/event"
+	"github.com/inngest/inngestctl/pkg/execution/actionloader"
 	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
+	"github.com/inngest/inngestctl/pkg/execution/executor"
+	"github.com/inngest/inngestctl/pkg/execution/runner"
+	"github.com/inngest/inngestctl/pkg/execution/state/inmemory"
+	"github.com/inngest/inngestctl/pkg/expressions"
 	"github.com/inngest/inngestctl/pkg/function"
-	"github.com/inngest/inngestctl/pkg/logger"
 	cron "github.com/robfig/cron/v3"
+	"github.com/rs/zerolog"
 )
 
 type Options struct {
-	Logger logger.Logger
+	Logger *zerolog.Logger
 }
 
+// Engine bundles together a runner, in-memory state manager, and local functions
+// for use within a local dev server, for development only.
 type Engine struct {
-	Logger    logger.Logger
 	Functions []*function.Function
 
 	// EventTriggers stores a map of event triggers to the function that
@@ -30,31 +39,83 @@ type Engine struct {
 	// functions.  we store a reference so that we can terminate the crons when
 	// recreating the engine.
 	cronmanager *cron.Cron
+
+	log *zerolog.Logger
+
+	// al is n action loader which stores actions in memory.
+	al *actionloader.MemoryLoader
+
+	// runner coordinates scheduling of steps between the executor and state queue.
+	runner *runner.InMemoryRunner
+
+	// exec is the executor used to run steps and calculate expression data
+	// for expressions.
+	exec executor.Executor
+
+	// sm stores the in-memory state and queue for our functions.  this is used
+	// within the runner.
+	sm inmemory.Queue
 }
 
-func New(o Options) *Engine {
+func New(o Options) (*Engine, error) {
+	logger := o.Logger.With().Str("caller", "engine").Logger()
+
 	eng := &Engine{
-		Logger:        o.Logger,
+		log:           &logger,
 		EventTriggers: map[string][]function.Function{},
+		al:            actionloader.NewMemoryLoader(),
+		sm:            NewLoggingQueue(o.Logger),
 	}
-	return eng
+
+	// Create our drivers.
+	dd, err := dockerdriver.New()
+	if err != nil {
+		return nil, err
+	}
+
+	// Create an executor with the state manager and drivers.
+	eng.exec, err = executor.NewExecutor(
+		executor.WithStateManager(eng.sm),
+		executor.WithActionLoader(eng.al),
+		executor.WithRuntimeDrivers(
+			dd,
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating executor: %w", err)
+	}
+
+	eng.runner = runner.NewInMemoryRunner(eng.sm, eng.exec)
+
+	return eng, nil
 }
 
-func (eng *Engine) Load(ctx context.Context, dir string) error {
-	eng.Logger.Log(logger.Message{
-		Object: "ENGINE",
-		Msg:    fmt.Sprintf("Recursively loading functions from %s", dir),
-	})
+func (eng *Engine) setExecutor(e executor.Executor) {
+	eng.exec = e
+	eng.runner = runner.NewInMemoryRunner(eng.sm, eng.exec)
+}
 
-	functions, err := function.LoadRecursive(ctx, dir)
+// Load loads all functions and their steps from the given directory into the engine.
+//
+// This replaces all action versions previously loaded, and replaces all function definitions
+// previously available.  This allows for hot reloading during development.
+func (eng *Engine) Load(ctx context.Context, dir string) error {
+	var err error
+	eng.log.Info().
+		Str("dir", dir).
+		Msgf("Recursively loading functions from %s", dir)
+
+	funcs, err := function.LoadRecursive(ctx, dir)
 	if err != nil {
 		return err
 	}
+	eng.log.Info().Int("len", len(funcs)).Msgf("Found functions")
 
-	eng.Logger.Log(logger.Message{
-		Object: "ENGINE",
-		Msg:    fmt.Sprintf("Found %d functions", len(eng.Functions)),
-	})
+	return eng.SetFunctions(ctx, funcs)
+}
+
+func (eng *Engine) SetFunctions(ctx context.Context, functions []*function.Function) error {
+	eng.Functions = functions
 
 	// Build all function images.
 	if err := eng.buildImages(ctx); err != nil {
@@ -75,8 +136,7 @@ func (eng *Engine) Load(ctx context.Context, dir string) error {
 	// Set the functions within the engine, then iterate through each function's
 	// triggers so that we can easily invoke them.  We also need to immediately
 	// set up cron timers to invoke functions on a schedule.
-	eng.Functions = functions
-	for _, f := range functions {
+	for _, f := range eng.Functions {
 		for _, t := range f.Triggers {
 			if t.EventTrigger != nil {
 				if _, ok := eng.EventTriggers[t.Event]; !ok {
@@ -93,6 +153,14 @@ func (eng *Engine) Load(ctx context.Context, dir string) error {
 			if err != nil {
 				return err
 			}
+			eng.log.Info().Str("function", f.Name).Msg("creating scheduled function")
+		}
+
+		// For each function, add each action to our actionloader.
+		avs, _, _ := f.Actions(ctx)
+		for _, a := range avs {
+			eng.log.Info().Str("action", a.Name).Msg("making action version available to executor")
+			eng.al.Add(a)
 		}
 	}
 
@@ -111,6 +179,10 @@ func (eng Engine) buildImages(ctx context.Context) error {
 			return err
 		}
 		opts = append(opts, steps...)
+	}
+
+	if len(opts) == 0 {
+		return nil
 	}
 
 	// XXX: Depending on the type of output here, we want to either
@@ -132,63 +204,133 @@ func (eng Engine) buildImages(ctx context.Context) error {
 	return ui.Error()
 }
 
-func (eng *Engine) HandleEvent(evt *event.Event) error {
-	functions, err := eng.findFunction(context.Background(), evt)
+func (eng *Engine) HandleEvent(ctx context.Context, evt *event.Event) error {
+	// See if we have any pauses that must be triggered by the event.
+	functions, err := eng.findFunctions(context.Background(), evt)
 	if err != nil {
-		return nil
+		return err
 	}
-	if len(functions) == 0 {
-		eng.Logger.Log(logger.Message{
-			Object: "ENGINE",
-			Msg:    fmt.Sprintf("No matching function triggers for %s", evt.Name),
-		})
-		return nil
-	}
+
 	for _, fn := range functions {
-		err := eng.execute(context.Background(), &fn, evt)
-		if err != nil {
-			eng.Logger.Log(logger.Message{
-				Object:  "FUNCTION",
-				Action:  "FAILED",
-				Msg:     fn.Name,
-				Context: err,
-			})
-		}
+		go func(fn function.Function) {
+			_ = eng.execute(context.Background(), &fn, evt)
+		}(fn)
+	}
+
+	if err := eng.handlePauses(ctx, evt); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (eng *Engine) findFunction(ctx context.Context, evt *event.Event) ([]function.Function, error) {
+func (eng *Engine) handlePauses(ctx context.Context, evt *event.Event) error {
+	for _, pause := range eng.sm.Pauses() {
+		if pause.Event == nil || *pause.Event != evt.Name {
+			continue
+		}
+		if pause.Expires.Before(time.Now()) {
+			continue
+		}
+		if pause.Expression != nil {
+			// Get expression data from the executor for the given run ID.
+			data, err := eng.exec.ExpressionData(ctx, pause.Identifier)
+			if err != nil {
+				return err
+			}
+
+			// Add the async event data to the expression
+			data["async"] = evt.Map()
+
+			// Compile and run the expression.
+			ok, _, err := expressions.Evaluate(ctx, *pause.Expression, data)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				continue
+			}
+		}
+
+		// Remove this pause from the state store, as it will be consumed.
+		if err := eng.sm.ConsumePause(ctx, pause.ID); err != nil {
+			return err
+		}
+
+		// Schedule an execution from the pause's entrypoint.
+		eng.runner.Enqueue(ctx, inmemory.QueueItem{
+			ID: pause.Identifier,
+			Edge: inngest.Edge{
+				Incoming: pause.Target,
+			},
+		}, time.Now())
+	}
+
+	return nil
+}
+
+func (eng *Engine) findFunctions(ctx context.Context, evt *event.Event) ([]function.Function, error) {
+	var err error
+
 	funcs, ok := eng.EventTriggers[evt.Name]
 	if !ok {
 		return nil, nil
 	}
-	// TODO: Execute expressions here, ensuring that each function is only triggered
-	// under the correct conditions.
-	return funcs, nil
+
+	triggered := []function.Function{}
+	for _, f := range funcs {
+		for _, t := range f.Triggers {
+			if t.EventTrigger == nil || t.Event != evt.Name {
+				continue
+			}
+
+			if t.Expression == nil {
+				triggered = append(triggered, f)
+				continue
+			}
+
+			// Execute expressions here, ensuring that each function is only triggered
+			// under the correct conditions.
+			ok, _, evalerr := expressions.Evaluate(ctx, *t.Expression, evt.Map())
+			if evalerr != nil {
+				err = multierror.Append(err, evalerr)
+				continue
+			}
+			if ok {
+				triggered = append(triggered, f)
+			}
+		}
+	}
+
+	return triggered, nil
 }
 
 func (eng Engine) execute(ctx context.Context, fn *function.Function, evt *event.Event) error {
-	eventMap, err := evt.Map()
-	if err != nil {
-		return err
-	}
-	ui, err := cli.NewRunUI(ctx, cli.RunUIOpts{
-		Function: *fn,
-		Event:    eventMap,
-	})
+	data := evt.Map()
+
+	// XXX: We could/should memoize this, though as this is a development engine it's not
+	// necessarily a big deal.
+	flow, err := fn.Workflow(ctx)
 	if err != nil {
 		return err
 	}
 
-	eng.Logger.Log(logger.Message{
-		Object: "FUNCTION",
-		Action: "STARTED",
-		Msg:    fn.Name,
-	})
+	id, err := eng.runner.NewRun(ctx, *flow, data)
+	if err != nil {
+		return fmt.Errorf("error initializing execution: %w", err)
+	}
 
-	if err := tea.NewProgram(ui).Start(); err != nil {
+	log := eng.log.With().
+		Str("function", fn.Name).
+		Str("event", evt.Name).
+		Str("run_id", id.RunID.String()).
+		Logger()
+
+	log.Info().Msg("executing function")
+	if err = eng.runner.Execute(ctx, *id); err != nil {
+		log.Error().Err(err).Msg("executed function")
 		return err
 	}
-	return ui.Error()
+
+	log.Info().Msg("executed function")
+	return nil
 }

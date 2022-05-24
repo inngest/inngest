@@ -98,7 +98,7 @@ func (r *RunUI) run(ctx context.Context) {
 	// Create our drivers.
 	dd, err := dockerdriver.New()
 	if err != nil {
-		r.err = fmt.Errorf("error creating action loader: %w", err)
+		r.err = fmt.Errorf("error creating docker driver: %w", err)
 		return
 	}
 

@@ -8,15 +8,15 @@ import (
 	"regexp"
 
 	"github.com/inngest/inngestctl/pkg/event"
-	"github.com/inngest/inngestctl/pkg/logger"
+	"github.com/rs/zerolog"
 )
 
-type EventHandler func(*event.Event) error
+type EventHandler func(context.Context, *event.Event) error
 
 type Options struct {
 	Port         string
 	EventHandler EventHandler
-	Logger       logger.Logger
+	Logger       *zerolog.Logger
 }
 
 const (
@@ -30,10 +30,12 @@ var (
 )
 
 func NewAPI(o Options) (API, error) {
+	logger := o.Logger.With().Str("caller", "api").Logger()
+
 	api := API{
-		Port:         o.Port,
-		EventHandler: o.EventHandler,
-		Logger:       o.Logger,
+		port:    o.Port,
+		handler: o.EventHandler,
+		log:     &logger,
 	}
 
 	http.HandleFunc("/", api.HealthCheck)
@@ -44,29 +46,29 @@ func NewAPI(o Options) (API, error) {
 }
 
 type API struct {
-	Port string
-	EventHandler
-	Logger logger.Logger
+	handler EventHandler
+	port    string
+	log     *zerolog.Logger
 }
 
 func (a API) Start(ctx context.Context) error {
-	a.Logger.Log(logger.Message{
-		Object: "API",
-		Msg:    fmt.Sprintf("Server starting on port %s", a.Port),
-	})
-	return http.ListenAndServe(fmt.Sprintf(":%s", a.Port), nil)
+	a.log.Info().Msgf("Starting server on port %s", a.port)
+	return http.ListenAndServe(fmt.Sprintf(":%s", a.port), http.DefaultServeMux)
 }
 
-func (API) HealthCheck(w http.ResponseWriter, r *http.Request) {
-	writeResponse(w, HTTPResponse{
+func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
+	a.log.Debug().Msg("healthcheck")
+	a.writeResponse(w, apiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "OK",
 	})
 }
 
 func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
 	if r.ContentLength > MaxSize {
-		writeResponse(w, HTTPResponse{
+		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusRequestEntityTooLarge,
 			Error:      "Payload larger than maximum allowed 256KB",
 		})
@@ -75,28 +77,28 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	matches := EventPathRegex.FindStringSubmatch(r.URL.Path)
 	if matches == nil || len(matches) != 2 {
-		writeResponse(w, HTTPResponse{
+		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusUnauthorized,
 			Error:      "API Key is required",
 		})
 		return
 	}
+
 	// noop on the key for now
 	// key := matches[1]
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, MaxSize))
 	if err != nil {
-		writeResponse(w, HTTPResponse{
+		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusBadRequest,
 			Error:      "Could not read event payload",
 		})
 		return
 	}
-	defer r.Body.Close()
 
 	events, err := parseBody(body)
 	if err != nil {
-		writeResponse(w, HTTPResponse{
+		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusBadRequest,
 			Error:      "Unable to process event payload",
 		})
@@ -104,21 +106,16 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, evt := range events {
-		a.Logger.Log(logger.Message{
-			Object:  "EVENT",
-			Msg:     evt.Name,
-			Context: evt,
-		})
-		if err := a.EventHandler(evt); err != nil {
-			a.Logger.Log(logger.Message{
-				Object: "EVENT",
-				Action: "REJECTED",
-				Msg:    fmt.Sprintf("Failed to process event: %s", evt.Name),
-			})
-		}
+		copied := evt
+		go func(e event.Event) {
+			a.log.Info().Str("event", e.Name).Msg("received event")
+			if err := a.handler(r.Context(), &e); err != nil {
+				a.log.Error().Msg(err.Error())
+			}
+		}(*copied)
 	}
 
-	writeResponse(w, HTTPResponse{
+	a.writeResponse(w, apiResponse{
 		StatusCode: http.StatusOK,
 		Message:    fmt.Sprintf("Received %d events", len(events)),
 	})
