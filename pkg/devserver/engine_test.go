@@ -1,4 +1,4 @@
-package engine
+package devserver
 
 import (
 	"bytes"
@@ -22,9 +22,7 @@ func TestEngine_async(t *testing.T) {
 	ctx := context.Background()
 	buf := &bytes.Buffer{}
 
-	e, err := New(Options{
-		Logger: logger.Buffered(buf),
-	})
+	e, err := NewEngine(logger.Buffered(buf))
 	require.NoError(t, err)
 
 	err = e.SetFunctions(ctx, []*function.Function{
