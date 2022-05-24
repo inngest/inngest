@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/oklog/ulid"
+	"github.com/oklog/ulid/v2"
 )
 
 var (

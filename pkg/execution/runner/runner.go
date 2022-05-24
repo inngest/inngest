@@ -16,7 +16,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
-	"github.com/oklog/ulid"
+	"github.com/oklog/ulid/v2"
 	"github.com/xhit/go-str2duration/v2"
 )
 
