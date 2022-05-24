@@ -127,8 +127,8 @@ func (c httpClient) Login(ctx context.Context, email, password string) ([]byte, 
 	}
 
 	type response struct {
-		Error string
-		JWT   string
+		Message string
+		JWT     string
 	}
 
 	r := &response{}
@@ -137,7 +137,7 @@ func (c httpClient) Login(ctx context.Context, email, password string) ([]byte, 
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%s", r.Error)
+		return nil, fmt.Errorf("%s", r.Message)
 	}
 
 	return []byte(r.JWT), nil
