@@ -7,10 +7,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
-	istate "github.com/inngest/inngestctl/inngest/state"
-	"github.com/inngest/inngestctl/pkg/cli"
-	"github.com/inngest/inngestctl/pkg/function"
-	"github.com/inngest/inngestctl/pkg/scaffold"
+	istate "github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/pkg/cli"
+	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest-cli/pkg/scaffold"
 	"github.com/spf13/cobra"
 )
 

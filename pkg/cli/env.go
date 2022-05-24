@@ -2,7 +2,7 @@ package cli
 
 import (
 	"github.com/charmbracelet/lipgloss"
-	"github.com/inngest/inngestctl/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/state"
 )
 
 func EnvString() string {

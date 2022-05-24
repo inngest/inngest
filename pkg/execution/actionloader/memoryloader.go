@@ -6,7 +6,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngest-cli/inngest"
 )
 
 func NewMemoryLoader() *MemoryLoader {

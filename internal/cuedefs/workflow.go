@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"cuelang.org/go/cue"
-	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngest-cli/inngest"
 )
 
 const (

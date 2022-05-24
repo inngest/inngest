@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/inngest/inngestctl/cmd/commands/internal/actions"
-	"github.com/inngest/inngestctl/inngest/client"
-	"github.com/inngest/inngestctl/inngest/state"
-	"github.com/inngest/inngestctl/pkg/cli"
-	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
+	"github.com/inngest/inngest-cli/cmd/commands/internal/actions"
+	"github.com/inngest/inngest-cli/inngest/client"
+	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/pkg/cli"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 )

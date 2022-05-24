@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngestctl/pkg/execution/state"
+	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/oklog/ulid"
 	"github.com/stretchr/testify/assert"
 )

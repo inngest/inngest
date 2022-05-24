@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/inngest/inngestctl/inngest"
-	"github.com/inngest/inngestctl/inngest/client"
-	"github.com/inngest/inngestctl/inngest/state"
-	"github.com/inngest/inngestctl/internal/cuedefs"
-	"github.com/inngest/inngestctl/pkg/cli"
-	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
-	"github.com/inngest/inngestctl/pkg/function"
+	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/inngest/client"
+	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/internal/cuedefs"
+	"github.com/inngest/inngest-cli/pkg/cli"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
+	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/spf13/cobra"
 )
 

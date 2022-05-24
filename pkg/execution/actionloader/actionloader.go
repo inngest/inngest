@@ -3,7 +3,7 @@ package actionloader
 import (
 	"context"
 
-	"github.com/inngest/inngestctl/inngest"
+	"github.com/inngest/inngest-cli/inngest"
 )
 
 // ActionLoader loads and returns function definitions for the executor.  These let the executor

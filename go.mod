@@ -1,4 +1,4 @@
-module github.com/inngest/inngestctl
+module github.com/inngest/inngest-cli
 
 go 1.17
 

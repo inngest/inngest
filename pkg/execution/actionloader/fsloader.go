@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/inngest/inngestctl/internal/cuedefs"
+	"github.com/inngest/inngest-cli/internal/cuedefs"
 )
 
 // FSLoader returns a new action loader which recursively scans the given directory for

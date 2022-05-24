@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/inngest/inngestctl/pkg/function"
+	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/stretchr/testify/require"
 )
 

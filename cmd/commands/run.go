@@ -12,10 +12,10 @@ import (
 	"cuelang.org/go/cue"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/event-schemas/pkg/fakedata"
-	"github.com/inngest/inngestctl/inngest"
-	"github.com/inngest/inngestctl/pkg/cli"
-	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
-	"github.com/inngest/inngestctl/pkg/function"
+	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/cli"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
+	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/spf13/cobra"
 )
 

@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngestctl/inngest"
-	"github.com/inngest/inngestctl/pkg/execution/actionloader"
-	"github.com/inngest/inngestctl/pkg/execution/driver"
-	"github.com/inngest/inngestctl/pkg/execution/driver/mockdriver"
-	"github.com/inngest/inngestctl/pkg/execution/executor"
-	"github.com/inngest/inngestctl/pkg/execution/state/inmemory"
+	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
+	"github.com/inngest/inngest-cli/pkg/execution/driver"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
+	"github.com/inngest/inngest-cli/pkg/execution/executor"
+	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
 	"github.com/stretchr/testify/require"
 )
 

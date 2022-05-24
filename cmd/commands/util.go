@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngestctl/inngest/client"
-	"github.com/inngest/inngestctl/inngest/log"
-	"github.com/inngest/inngestctl/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/client"
+	"github.com/inngest/inngest-cli/inngest/log"
+	"github.com/inngest/inngest-cli/inngest/state"
 )
 
 // findWorkflow finds a workflow given a UUID or a UUID prefix.

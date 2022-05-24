@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/inngest/inngestctl/inngest"
-	"github.com/inngest/inngestctl/inngest/state"
-	"github.com/inngest/inngestctl/internal/cuedefs"
+	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/internal/cuedefs"
 	"github.com/stretchr/testify/require"
 )
 

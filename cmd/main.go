@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/inngest/inngestctl/cmd/commands"
+	"github.com/inngest/inngest-cli/cmd/commands"
 )
 
 func main() {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/inngest/inngestctl/pkg/devserver"
-	log "github.com/inngest/inngestctl/pkg/logger"
+	"github.com/inngest/inngest-cli/pkg/devserver"
+	log "github.com/inngest/inngest-cli/pkg/logger"
 	"github.com/spf13/cobra"
 )
 

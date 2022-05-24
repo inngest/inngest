@@ -3,7 +3,7 @@ package devserver
 import (
 	"context"
 
-	"github.com/inngest/inngestctl/pkg/api"
+	"github.com/inngest/inngest-cli/pkg/api"
 	"github.com/rs/zerolog"
 )
 

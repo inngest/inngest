@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngestctl/inngest"
-	"github.com/inngest/inngestctl/pkg/event"
-	"github.com/inngest/inngestctl/pkg/execution/driver"
-	"github.com/inngest/inngestctl/pkg/execution/driver/mockdriver"
-	"github.com/inngest/inngestctl/pkg/execution/executor"
-	"github.com/inngest/inngestctl/pkg/function"
-	"github.com/inngest/inngestctl/pkg/logger"
+	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/event"
+	"github.com/inngest/inngest-cli/pkg/execution/driver"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
+	"github.com/inngest/inngest-cli/pkg/execution/executor"
+	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest-cli/pkg/logger"
 	"github.com/stretchr/testify/require"
 )
 

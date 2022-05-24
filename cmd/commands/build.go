@@ -5,8 +5,8 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/inngest/inngestctl/pkg/cli"
-	"github.com/inngest/inngestctl/pkg/execution/driver/dockerdriver"
+	"github.com/inngest/inngest-cli/pkg/cli"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/spf13/cobra"
 )
 

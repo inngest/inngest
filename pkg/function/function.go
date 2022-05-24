@@ -12,8 +12,8 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngestctl/inngest"
-	"github.com/inngest/inngestctl/inngest/state"
+	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/inngest/state"
 )
 
 // Function represents a step function which is triggered whenever an event

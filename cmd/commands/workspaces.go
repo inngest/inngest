@@ -1,9 +1,9 @@
 package commands
 
 import (
-	"github.com/inngest/inngestctl/cmd/commands/internal/table"
-	"github.com/inngest/inngestctl/inngest/log"
-	"github.com/inngest/inngestctl/inngest/state"
+	"github.com/inngest/inngest-cli/cmd/commands/internal/table"
+	"github.com/inngest/inngest-cli/inngest/log"
+	"github.com/inngest/inngest-cli/inngest/state"
 	"github.com/spf13/cobra"
 )
 
