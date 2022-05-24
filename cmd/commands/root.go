@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	isatty "github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -27,9 +28,15 @@ func Execute() {
 	}
 
 	rootCmd.PersistentFlags().Bool("prod", false, "Use the production environment for the current command.")
+	rootCmd.PersistentFlags().Bool("json", false, "Output logs as JSON.  Set to true if stdout is not a TTY.")
 
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		panic(err)
+	}
+
+	if !isatty.IsTerminal(os.Stdout.Fd()) {
+		// Alwyas use JSON when not in a terminal
+		viper.Set("json", true)
 	}
 
 	// Register Top Level Commands
