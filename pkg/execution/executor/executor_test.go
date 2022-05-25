@@ -134,7 +134,7 @@ func TestExecute_state(t *testing.T) {
 
 	// Executing the trigger does nothing but validate which descendents from the trigger
 	// in the dag can run.
-	available, err := exec.Execute(ctx, state.Identifier(), inngest.TriggerName)
+	_, available, err := exec.Execute(ctx, state.Identifier(), inngest.TriggerName)
 	assert.NoError(t, err)
 	assert.Equal(t, len(driver.Executed), 0)
 	assert.Equal(t, len(available), 2)
@@ -145,7 +145,7 @@ func TestExecute_state(t *testing.T) {
 	assert.Equal(t, 0, len(state.Actions()))
 
 	// Run the first item.
-	available, err = exec.Execute(ctx, state.Identifier(), "1")
+	_, available, err = exec.Execute(ctx, state.Identifier(), "1")
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
 	assert.Equal(t, 1, len(available))
@@ -159,7 +159,7 @@ func TestExecute_state(t *testing.T) {
 	// Test "scheduled" responses.  The driver should respond with a Scheduled
 	// message, which means that the function has begun execution but no further
 	// actions are available.
-	available, err = exec.Execute(ctx, state.Identifier(), "4")
+	_, available, err = exec.Execute(ctx, state.Identifier(), "4")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(driver.Executed), "function not executed")
 	assert.Equal(t, 0, len(available), "incorrect number of functions available")
@@ -170,7 +170,7 @@ func TestExecute_state(t *testing.T) {
 	assert.Equal(t, 0, len(state.Errors()))
 
 	// Test "error" responses
-	available, err = exec.Execute(ctx, state.Identifier(), "5")
+	_, available, err = exec.Execute(ctx, state.Identifier(), "5")
 	assert.Error(t, err)
 	assert.Equal(t, 3, len(driver.Executed), "function not executed")
 	assert.Equal(t, 0, len(available), "incorrect number of functions available")
@@ -277,7 +277,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	available, err := exec.Execute(ctx, state.Identifier(), inngest.TriggerName)
+	_, available, err := exec.Execute(ctx, state.Identifier(), inngest.TriggerName)
 	require.NoError(t, err)
 	require.Equal(t, len(driver.Executed), 0)
 	require.Equal(t, len(available), 1)
@@ -292,7 +292,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 	require.ElementsMatch(t, []string{}, availableIDs(edges))
 
 	// Run the next step.
-	available, err = exec.Execute(ctx, state.Identifier(), "run-step-trigger")
+	_, available, err = exec.Execute(ctx, state.Identifier(), "run-step-trigger")
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
 	assert.Equal(t, 1, len(available))
