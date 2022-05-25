@@ -222,6 +222,17 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 		}
 		avs = append(avs, av)
 
+		// We support barebones function definitions with a single step.  Any time
+		// a single step is specified without an After block, it's ran automatically
+		// from the trigger.
+		if len(f.Steps) == 1 && len(step.After) == 0 {
+			edges = append(edges, inngest.Edge{
+				Outgoing: inngest.TriggerName,
+				Incoming: step.Name,
+			})
+			continue
+		}
+
 		// For each of the "after" items, add an edge.
 		for _, after := range step.After {
 			edges = append(edges, inngest.Edge{
