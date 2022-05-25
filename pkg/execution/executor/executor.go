@@ -59,6 +59,11 @@ type Executor interface {
 	// state then schedule the child functions else the workflow will terminate early.
 	Execute(ctx context.Context, id state.Identifier, from string) ([]inngest.Edge, error)
 
+	// AvailableChildren returns the available children to execute from a given action, based off of
+	// state fetched from the executor.
+	AvailableChildren(ctx context.Context, id state.Identifier, from string) ([]inngest.Edge, error)
+
+	// ExpressionData returns data for running expressions from the given state.
 	ExpressionData(ctx context.Context, id state.Identifier) (map[string]interface{}, error)
 }
 
@@ -203,7 +208,7 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 			return nil, nil
 		}
 	}
-	return e.availabileChildren(ctx, w, id, clientID, s)
+	return e.AvailableChildren(ctx, id, clientID)
 }
 
 func (e *executor) executeAction(ctx context.Context, id state.Identifier, action *inngest.Step) (*driver.Response, error) {
@@ -255,10 +260,20 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	return response, err
 }
 
-// availabileChildren iterates through all children of the given client ID, determining which
+// availableChildren iterates through all children of the given client ID, determining which
 // children can be executed based off of the current workflow state.  Some children may not
 // be executed due to conditional expressions etc.
-func (e *executor) availabileChildren(ctx context.Context, w inngest.Workflow, id state.Identifier, clientID string, s state.State) ([]inngest.Edge, error) {
+func (e *executor) AvailableChildren(ctx context.Context, id state.Identifier, clientID string) ([]inngest.Edge, error) {
+	state, err := e.sm.Load(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("error loading state: %w", err)
+	}
+
+	w, err := state.Workflow()
+	if err != nil {
+		return nil, fmt.Errorf("error loading workflow: %w", err)
+	}
+
 	g, err := inngest.NewGraph(w)
 	if err != nil {
 		return nil, err
@@ -270,14 +285,8 @@ func (e *executor) availabileChildren(ctx context.Context, w inngest.Workflow, i
 		return nil, nil
 	}
 
-	state, err := e.sm.Load(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("error loading state: %w", err)
-	}
-
 	future := []inngest.Edge{}
 	for _, edge := range edges {
-		// TODO: Is this an async edge?
 		ok, err := e.canTraverseEdge(ctx, state, edge)
 		if err != nil {
 			return nil, err

@@ -282,6 +282,14 @@ func TestExecute_edge_expressions(t *testing.T) {
 	require.Equal(t, len(driver.Executed), 0)
 	require.Equal(t, len(available), 1)
 	require.ElementsMatch(t, []string{"run-step-trigger"}, availableIDs(available))
+	edges, err := exec.AvailableChildren(ctx, state.Identifier(), inngest.TriggerName)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"run-step-trigger"}, availableIDs(edges))
+
+	// As we haven't ran the step called run-step-trigger, we should have no children available.
+	edges, err = exec.AvailableChildren(ctx, state.Identifier(), "run-step-trigger")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{}, availableIDs(edges))
 
 	// Run the next step.
 	available, err = exec.Execute(ctx, state.Identifier(), "run-step-trigger")
@@ -289,6 +297,9 @@ func TestExecute_edge_expressions(t *testing.T) {
 	assert.Equal(t, 1, len(driver.Executed))
 	assert.Equal(t, 1, len(available))
 	assert.ElementsMatch(t, []string{"run-step-child"}, availableIDs(available))
+	edges, err = exec.AvailableChildren(ctx, state.Identifier(), "run-step-trigger")
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"run-step-child"}, availableIDs(edges))
 }
 
 func availableIDs(edges []inngest.Edge) []string {
