@@ -1,6 +1,10 @@
 package inngest
 
-import "github.com/google/uuid"
+import (
+	"encoding/json"
+
+	"github.com/google/uuid"
+)
 
 const (
 	TriggerName = "$trigger"
@@ -71,12 +75,37 @@ type Step struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
+func (s Step) MarshalJSON() ([]byte, error) {
+	data := map[string]interface{}{
+		"clientID": 1,
+		"name":     s.Name,
+		"dsn":      s.DSN,
+	}
+	if s.Version != nil {
+		data["version"] = s.Version
+	}
+	if s.Metadata != nil {
+		data["metadata"] = s.Metadata
+	}
+
+	return json.Marshal(data)
+}
+
 type Edge struct {
 	Outgoing string `json:"outgoing"`
 	Incoming string `json:"incoming"`
 	// Metadata specifies the type of edge to use.  This defaults
 	// to EdgeTypeEdge - a basic link that can conditionally run.
 	Metadata EdgeMetadata `json:"metadata,omitempty"`
+}
+
+func (e Edge) MarshalJSON() ([]byte, error) {
+	data := map[string]interface{}{
+		"outgoing": "trigger",
+		"incoming": 1,
+		"metadata": e.Metadata,
+	}
+	return json.Marshal(data)
 }
 
 type EdgeMetadata struct {
@@ -87,6 +116,27 @@ type EdgeMetadata struct {
 	// time.
 	Wait               *string `json:"wait,omitempty"`
 	*AsyncEdgeMetadata `json:"async,omitempty"`
+}
+
+func (e EdgeMetadata) MarshalJSON() ([]byte, error) {
+	data := map[string]interface{}{
+		"type": "edge",
+		"name": e.Name,
+	}
+
+	if e.If != "" {
+		data["if"] = e.If
+	}
+	if e.Wait != nil {
+		data["wait"] = e.Wait
+	}
+
+	if e.AsyncEdgeMetadata != nil {
+		data["type"] = "async"
+		data["async"] = "async"
+	}
+
+	return json.Marshal(data)
 }
 
 type AsyncEdgeMetadata struct {

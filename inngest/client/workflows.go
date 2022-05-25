@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest-cli/internal/cuedefs"
 )
 
 // Workflow represents all versions of a single workflow in a workspace.
@@ -215,10 +214,6 @@ func (c httpClient) Workflows(ctx context.Context, workspaceID uuid.UUID) ([]Wor
 }
 
 func (c httpClient) DeployWorkflow(ctx context.Context, workspaceID uuid.UUID, config string, live bool) (*WorkflowVersion, error) {
-	if _, err := cuedefs.ParseWorkflow(config); err != nil {
-		return nil, fmt.Errorf("error parsing workflow: %w", err)
-	}
-
 	query := `
 	  mutation($input: UpsertWorkflowInput!) {
 	    upsertWorkflow(input: $input) {
