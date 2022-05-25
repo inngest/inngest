@@ -223,7 +223,7 @@ func configureVersionInfo(ctx context.Context, a inngest.ActionVersion) (inngest
 	}
 
 	// Are the runtimes the same?
-	if a.Runtime.Runtime != found.Runtime.Runtime {
+	if a.Runtime.RuntimeType() != found.Runtime.RuntimeType() {
 		a.Version = &inngest.VersionInfo{
 			Major: found.Version.Major,
 			Minor: found.Version.Minor + 1,
