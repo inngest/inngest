@@ -108,7 +108,9 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	for _, evt := range events {
 		copied := evt
 		go func(e event.Event) {
-			a.log.Info().Str("event", e.Name).Msg("received event")
+			a.log.Info().Str("event", e.Name).
+				Interface("payload", e).
+				Msg("received event")
 			if err := a.handler(r.Context(), &e); err != nil {
 				a.log.Error().Msg(err.Error())
 			}
