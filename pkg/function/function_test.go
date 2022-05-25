@@ -7,6 +7,7 @@ import (
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/inngest/state"
 	"github.com/inngest/inngest-cli/internal/cuedefs"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/stretchr/testify/require"
 )
 
@@ -163,4 +164,30 @@ func TestEventDefinitionAbsolutePath(t *testing.T) {
 
 	abs := "file:///Users/johnny/dev/repo/functions/events/event-def-in-file.cue"
 	require.EqualValues(t, abs, fn.Triggers[0].EventTrigger.Definition.Def)
+}
+
+func TestFunctionActions_single(t *testing.T) {
+	fn := Function{
+		Name: "test",
+		Triggers: []Trigger{{
+			EventTrigger: &EventTrigger{
+				Event: "test/foo.bar",
+			},
+		}},
+		Steps: map[string]Step{
+			"single": {
+				Name: "single",
+				Runtime: inngest.RuntimeWrapper{
+					Runtime: &mockdriver.Mock{},
+				},
+			},
+		},
+	}
+
+	actions, edges, err := fn.Actions(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 1, len(actions))
+	require.Equal(t, 1, len(edges))
+	require.Equal(t, inngest.TriggerName, edges[0].Outgoing)
+	require.Equal(t, "single", edges[0].Incoming)
 }
