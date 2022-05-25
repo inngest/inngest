@@ -64,7 +64,8 @@ type RuntimeDocker struct {
 // correctly when serializing actions.
 func (r RuntimeDocker) MarshalJSON() ([]byte, error) {
 	data := map[string]interface{}{
-		"type": RuntimeTypeDocker,
+		"type":  RuntimeTypeDocker,
+		"image": "",
 	}
 	if len(r.Entrypoint) > 0 {
 		data["entrypoint"] = r.Entrypoint
