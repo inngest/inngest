@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/rs/zerolog"
@@ -20,18 +21,28 @@ type loggingExecutor struct {
 	log *zerolog.Logger
 }
 
-func (l loggingExecutor) Execute(ctx context.Context, id state.Identifier, from string) ([]inngest.Edge, error) {
+func (l loggingExecutor) Execute(ctx context.Context, id state.Identifier, from string) (*driver.Response, []inngest.Edge, error) {
 	l.log.Info().
 		Str("run_id", id.RunID.String()).
 		Str("step", from).
 		Msg("executing step")
 
-	edges, err := l.Executor.Execute(ctx, id, from)
+	resp, edges, err := l.Executor.Execute(ctx, id, from)
 
-	l.log.Info().
-		Str("run_id", id.RunID.String()).
-		Str("step", from).
-		Msg("executed step")
+	if err == nil {
+		l.log.Info().
+			Str("run_id", id.RunID.String()).
+			Str("step", from).
+			Interface("response", resp).
+			Msg("executed step")
+	} else {
+		l.log.Info().
+			Str("run_id", id.RunID.String()).
+			Str("step", from).
+			Interface("response", resp).
+			Bool("retryable", resp.Retryable()).
+			Msg("error executing step step")
+	}
 
-	return edges, err
+	return resp, edges, err
 }

@@ -20,14 +20,14 @@ type Response struct {
 	// Managing messaging and monitoring of asynchronous jobs is outside of
 	// the scope of this executor.  It's possible to store your own queues
 	// and state for managing asynchronous jobs in another manager.
-	Scheduled bool
+	Scheduled bool `json:"scheduled"`
 
 	// Output is the output from an action, as a JSON map.
-	Output map[string]interface{}
+	Output map[string]interface{} `json:"output"`
 
 	// Err represents the error from the action, if the action errored.
 	// If the action terminated successfully this must be nil.
-	Err error
+	Err error `json:"err"`
 }
 
 // Retryable returns whether the response indicates that the action is

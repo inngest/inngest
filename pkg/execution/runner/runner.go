@@ -5,7 +5,6 @@ package runner
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -89,11 +88,13 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 		i.waits[item.ID.RunID].Done()
 	}()
 
-	children, err := i.exec.Execute(ctx, item.ID, item.Edge.Incoming)
+	resp, children, err := i.exec.Execute(ctx, item.ID, item.Edge.Incoming)
 
 	if err != nil {
-		resp := driver.Response{}
-		if !errors.As(err, &resp) || resp.Retryable() {
+		// If the error is not of type response error, we can assume that this is
+		// always retryable.
+		_, isResponseError := err.(*driver.Response)
+		if (resp != nil && resp.Retryable()) || !isResponseError {
 			next := item
 			next.ErrorCount += 1
 

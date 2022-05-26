@@ -69,7 +69,7 @@ func NewEngine(l *zerolog.Logger) (*Engine, error) {
 	}
 
 	// Create an executor with the state manager and drivers.
-	eng.exec, err = executor.NewExecutor(
+	exec, err := executor.NewExecutor(
 		executor.WithStateManager(eng.sm),
 		executor.WithActionLoader(eng.al),
 		executor.WithRuntimeDrivers(
@@ -80,6 +80,7 @@ func NewEngine(l *zerolog.Logger) (*Engine, error) {
 		return nil, fmt.Errorf("error creating executor: %w", err)
 	}
 
+	eng.exec = NewLoggingExecutor(exec, l)
 	eng.runner = runner.NewInMemoryRunner(eng.sm, eng.exec)
 
 	return eng, nil

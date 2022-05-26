@@ -57,8 +57,13 @@ type Executor interface {
 	// It is important for this function to be atomic;  if the function was scheduled
 	// and the context terminates, we must store the output or async data in workflow
 	// state then schedule the child functions else the workflow will terminate early.
-	Execute(ctx context.Context, id state.Identifier, from string) ([]inngest.Edge, error)
+	Execute(ctx context.Context, id state.Identifier, from string) (*driver.Response, []inngest.Edge, error)
 
+	// AvailableChildren returns the available children to execute from a given action, based off of
+	// state fetched from the executor.
+	AvailableChildren(ctx context.Context, id state.Identifier, from string) ([]inngest.Edge, error)
+
+	// ExpressionData returns data for running expressions from the given state.
 	ExpressionData(ctx context.Context, id state.Identifier) (map[string]interface{}, error)
 }
 
@@ -141,28 +146,28 @@ type executor struct {
 // Execute loads a workflow and the current run state, then executes the
 // workflow via an executor.  This returns all available steps we can run from
 // the workflow after the step has been executed.
-func (e *executor) Execute(ctx context.Context, id state.Identifier, from string) ([]inngest.Edge, error) {
+func (e *executor) Execute(ctx context.Context, id state.Identifier, from string) (*driver.Response, []inngest.Edge, error) {
 	state, err := e.sm.Load(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	w, err := state.Workflow()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	next, err := e.run(ctx, w, id, from, state)
+	resp, next, err := e.run(ctx, w, id, from, state)
 	if err != nil {
 		// This is likely a driver.Response, which itself includes
 		// whether the action can be retried based off of the output.
 		//
 		// The runner is responsible for scheduling jobs and will check
 		// whether the action can be retried.
-		return nil, err
+		return resp, nil, err
 	}
 
-	return next, nil
+	return resp, next, nil
 }
 
 func (e *executor) ExpressionData(ctx context.Context, id state.Identifier) (map[string]interface{}, error) {
@@ -174,7 +179,12 @@ func (e *executor) ExpressionData(ctx context.Context, id state.Identifier) (map
 }
 
 // run executes the action with the given client ID.
-func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, clientID string, s state.State) ([]inngest.Edge, error) {
+func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, clientID string, s state.State) (*driver.Response, []inngest.Edge, error) {
+	var (
+		response *driver.Response
+		err      error
+	)
+
 	if clientID != inngest.TriggerName {
 		var step *inngest.Step
 		for _, s := range w.Steps {
@@ -184,26 +194,29 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 			}
 		}
 		if step == nil {
-			return nil, fmt.Errorf("unknown vertex: %s", clientID)
+			return nil, nil, fmt.Errorf("unknown vertex: %s", clientID)
 		}
-		response, err := e.executeAction(ctx, id, step)
+		response, err = e.executeAction(ctx, id, step)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if response.Err != nil {
 			// This action errored.  We've stored this in our state manager already;
-			// return the response error only.
-			return nil, response
+			// return the response error only.  We can use the same variable for both
+			// the response and the error to indicate an error value.
+			return response, nil, response
 		}
 		if response.Scheduled {
 			// This action is not yet complete, so we can't traverse
 			// its children.  We assume that the driver is responsible for
 			// retrying and coordinating async state here;  the executor's
 			// job is to execute the action only.
-			return nil, nil
+			return response, nil, nil
 		}
 	}
-	return e.availabileChildren(ctx, w, id, clientID, s)
+
+	edges, err := e.AvailableChildren(ctx, id, clientID)
+	return response, edges, err
 }
 
 func (e *executor) executeAction(ctx context.Context, id state.Identifier, action *inngest.Step) (*driver.Response, error) {
@@ -255,10 +268,20 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	return response, err
 }
 
-// availabileChildren iterates through all children of the given client ID, determining which
+// availableChildren iterates through all children of the given client ID, determining which
 // children can be executed based off of the current workflow state.  Some children may not
 // be executed due to conditional expressions etc.
-func (e *executor) availabileChildren(ctx context.Context, w inngest.Workflow, id state.Identifier, clientID string, s state.State) ([]inngest.Edge, error) {
+func (e *executor) AvailableChildren(ctx context.Context, id state.Identifier, clientID string) ([]inngest.Edge, error) {
+	state, err := e.sm.Load(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("error loading state: %w", err)
+	}
+
+	w, err := state.Workflow()
+	if err != nil {
+		return nil, fmt.Errorf("error loading workflow: %w", err)
+	}
+
 	g, err := inngest.NewGraph(w)
 	if err != nil {
 		return nil, err
@@ -270,14 +293,8 @@ func (e *executor) availabileChildren(ctx context.Context, w inngest.Workflow, i
 		return nil, nil
 	}
 
-	state, err := e.sm.Load(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("error loading state: %w", err)
-	}
-
 	future := []inngest.Edge{}
 	for _, edge := range edges {
-		// TODO: Is this an async edge?
 		ok, err := e.canTraverseEdge(ctx, state, edge)
 		if err != nil {
 			return nil, err
