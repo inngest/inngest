@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -309,6 +310,11 @@ func (e *executor) AvailableChildren(ctx context.Context, id state.Identifier, c
 		// the context has cancelled.
 		future = append(future, edge.WorkflowEdge)
 	}
+
+	// Sort the edges which are returned according to incoming string order.
+	sort.Slice(future, func(i, j int) bool {
+		return future[i].Incoming < future[j].Incoming
+	})
 
 	return future, nil
 }
