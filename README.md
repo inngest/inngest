@@ -108,14 +108,14 @@ Nothing's stopping you from developing regular ol' HTTP based serverless functio
 
 <b>Telemetry</b>
 
-Telemtry is currently **extremely limited**.  First, some commitments:
+Telemtry is currently **extremely limited**. First, some commitments:
 
 - We never track personal information (eg. IP) from the CLI
 - We only ever want to record _metrics_ for product improvement
 - For example, we want to answer "Is generating test data for XYZ language heavily used?"
- 
-We're a small team and want to make sure we're building the right things.  You can opt out by exporting `DO_NOT_TRACK=1` before running `inngest`;  we will never send requests with this env variable set.
+
+We're a small team and want to make sure we're building the right things. You can opt out by exporting `DO_NOT_TRACK=1` before running `inngest`; we will never send requests with this env variable set.
 
 ### License
 
-This product is released under the GPL-3 license.  It's copyleft.  We want to make sure our work is open-source and it's always appreciated when improvements are committed back to the community.
+This project is released under the [Server Side Public License](./LICENSE.md). We want to ensure that you can always run and self-host this software as you choose while ensuring Inngest is protected so we can continuing building.
