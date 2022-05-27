@@ -113,8 +113,8 @@ func TestRunner_run_source(t *testing.T) {
 	f := inngest.Workflow{
 		Steps: []inngest.Step{
 			{
-				ClientID: "first",
-				DSN:      "step-a",
+				ID:  "first",
+				DSN: "step-a",
 			},
 		},
 		Edges: []inngest.Edge{
@@ -171,8 +171,8 @@ func TestRunner_run_retry(t *testing.T) {
 	f := inngest.Workflow{
 		Steps: []inngest.Step{
 			{
-				ClientID: "first",
-				DSN:      "step-a",
+				ID:  "first",
+				DSN: "step-a",
 			},
 		},
 		Edges: []inngest.Edge{

@@ -64,7 +64,13 @@ type CronTrigger struct {
 
 // Step is a reference to an action within a workflow.
 type Step struct {
-	ClientID string                 `json:"clientID"`
+	// ID is a string-based identifier for the step, used to reference
+	// the step's output in code.
+	ID string `json:"id"`
+	// ClientID represnets an incrementing ID for the step.
+	//
+	// Deprecated:  use a string-based ID instead.
+	ClientID uint                   `json:"clientID"`
 	Name     string                 `json:"name"`
 	DSN      string                 `json:"dsn"`
 	Version  *VersionConstraint     `json:"version,omitempty"`

@@ -28,7 +28,7 @@ func NewGraph(w Workflow) (Graph, error) {
 	for _, s := range w.Steps {
 		step := s
 		v := Vertex{Step: &step}
-		vertices[step.ClientID] = v
+		vertices[step.ID] = v
 		g.Add(v)
 	}
 
@@ -55,8 +55,8 @@ func (g Graph) Workflow() Workflow {
 	return g.workflow
 }
 
-func (g Graph) From(clientID string) []GraphEdge {
-	ifaces := g.EdgesFrom(LookupVertex{ClientID: clientID})
+func (g Graph) From(id string) []GraphEdge {
+	ifaces := g.EdgesFrom(LookupVertex{ID: id})
 	edges := make([]GraphEdge, len(ifaces))
 	for n, i := range ifaces {
 		edges[n] = i.(GraphEdge)
@@ -65,11 +65,11 @@ func (g Graph) From(clientID string) []GraphEdge {
 }
 
 type LookupVertex struct {
-	ClientID string
+	ID string
 }
 
 func (l LookupVertex) Hashcode() interface{} {
-	return l.ClientID
+	return l.ID
 }
 
 // Vertex represents an action or the trigger within our workflow graph
@@ -86,7 +86,7 @@ func (g Vertex) ID() string {
 	if g.Step == nil {
 		return TriggerName
 	}
-	return g.Step.ClientID
+	return g.Step.ID
 }
 
 // Edge inherits functionality from simple.Edge and includes our workflow edge

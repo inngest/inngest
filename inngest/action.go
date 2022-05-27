@@ -10,6 +10,7 @@ import (
 type ActionVersion struct {
 	// DSN represents the immutable identifier for the action.
 	DSN string `json:"dsn"`
+
 	// Name represents the name of this action
 	Name string `json:"name"`
 

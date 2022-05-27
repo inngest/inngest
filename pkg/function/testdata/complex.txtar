@@ -15,6 +15,7 @@ function: defs.#Function & {
 	idempotency: "{{ event.data.foo }}"
 	steps: {
 		first: {
+			name: "My first func"
 			runtime: defs.#RuntimeDocker
 			after: [{
 				step: "$trigger"
@@ -22,6 +23,7 @@ function: defs.#Function & {
 			}]
 		}
 		second: {
+			name: "A second func that does something cool!"
 			runtime: defs.#RuntimeDocker
 			after: [{
 				step: "first"
@@ -47,8 +49,9 @@ function: defs.#Function & {
   },
   "steps": {
     "first": {
+      "id": "first",
       "path": "",
-      "name": "first",
+      "name": "My first func",
       "runtime": {
         "type": "docker"
       },
@@ -60,8 +63,9 @@ function: defs.#Function & {
       ]
     },
     "second": {
+      "id": "second",
       "path": "",
-      "name": "second",
+      "name": "A second func that does something cool!",
       "runtime": {
         "type": "docker"
       },
@@ -90,13 +94,15 @@ function: defs.#Function & {
   ],
   "actions": [
     {
-      "clientID": "first",
-      "name": "first",
+      "id": "first",
+      "clientID": 1,
+      "name": "My first func",
       "dsn": "some-id-step-first-test"
     },
     {
-      "clientID": "second",
-      "name": "second",
+      "id": "second",
+      "clientID": 2,
+      "name": "A second func that does something cool!",
       "dsn": "some-id-step-second-test"
     }
   ],
