@@ -63,11 +63,13 @@ type Executor interface {
 	// AvailableChildren returns the available children to execute from a given action, based off of
 	// state fetched from the executor.
 	AvailableChildren(ctx context.Context, id state.Identifier, from string) ([]inngest.Edge, error)
-
-	// ExpressionData returns data for running expressions from the given state.
-	ExpressionData(ctx context.Context, id state.Identifier) (map[string]interface{}, error)
 }
 
+// NewExecutor returns a new executor, responsible for running the specific step of a
+// function (using the available drivers) and storing the step's output or error.
+//
+// Note that this only executes a single step of the function;  it returns which children
+// can be directly executed next and saves a state.Pause for edges that have async conditions.
 func NewExecutor(opts ...ExecutorOpt) (Executor, error) {
 	m := &executor{
 		runtimeDrivers: map[string]driver.Driver{},
@@ -95,7 +97,7 @@ func NewExecutor(opts ...ExecutorOpt) (Executor, error) {
 type ExecutorOpt func(m Executor) error
 
 // EdgeExpressionDataGen is a function which is used to generate data for expressions within a workflow.
-type EdgeExpressionDataGen func(ctx context.Context, s state.State, e inngest.Edge) map[string]interface{}
+type EdgeExpressionDataGen func(ctx context.Context, s state.State, outgoingID string) map[string]interface{}
 
 // WithActionLoader sets the action loader to use when retrieving function definitions
 // in a workflow.
@@ -114,14 +116,21 @@ func WithStateManager(sm state.Manager) ExecutorOpt {
 	}
 }
 
-// WithStateManager sets which state manager to use when creating an executor.
-func WithExpressionDataGenerator(datagen EdgeExpressionDataGen) ExecutorOpt {
+// WithEdgeExpressionDataGenerator sets the function to use for generating the
+// input data to an edge expression.  By default, the executor uses
+// state.EdgeExpressionData and this does not need to be specified.
+func WithEdgeExpressionDataGenerator(datagen EdgeExpressionDataGen) ExecutorOpt {
 	return func(e Executor) error {
 		e.(*executor).exprDataGen = datagen
 		return nil
 	}
 }
 
+// WithRuntimeDrivers specifies the drivers available to use when executing steps
+// of a function.
+//
+// When invoking a step in a function, we find the registered driver with the step's
+// RuntimeType() and use that driver to execute the step.
 func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 	return func(exec Executor) error {
 		e := exec.(*executor)
@@ -169,14 +178,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 	}
 
 	return resp, next, nil
-}
-
-func (e *executor) ExpressionData(ctx context.Context, id state.Identifier) (map[string]interface{}, error) {
-	state, err := e.sm.Load(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return e.exprDataGen(ctx, state, inngest.Edge{}), nil
 }
 
 // run executes the step with the given step ID.
@@ -333,7 +334,7 @@ func (e *executor) canTraverseEdge(ctx context.Context, s state.State, edge inng
 		return false, nil
 	}
 
-	exprdata := e.exprDataGen(ctx, s, edge.WorkflowEdge)
+	exprdata := e.exprDataGen(ctx, s, edge.WorkflowEdge.Outgoing)
 
 	if edge.WorkflowEdge.Metadata.If != "" {
 		ok, _, err := expressions.Evaluate(ctx, edge.WorkflowEdge.Metadata.If, exprdata)
@@ -363,7 +364,8 @@ func (e *executor) canTraverseEdge(ctx context.Context, s state.State, edge inng
 		err = e.sm.SavePause(ctx, state.Pause{
 			ID:         uuid.New(),
 			Identifier: s.Identifier(),
-			Target:     edge.Incoming.ID(),
+			Outgoing:   edge.Outgoing.ID(),
+			Incoming:   edge.Incoming.ID(),
 			Expires:    time.Now().Add(dur),
 			Event:      &am.Event,
 			Expression: am.Match,

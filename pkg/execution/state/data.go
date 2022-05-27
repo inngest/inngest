@@ -8,11 +8,11 @@ import (
 
 // EdgeExpressionData returns data from the current state to evaluate the given
 // edge's expressions.
-func EdgeExpressionData(ctx context.Context, s State, e inngest.Edge) map[string]interface{} {
+func EdgeExpressionData(ctx context.Context, s State, outgoingID string) map[string]interface{} {
 	// Add the outgoing edge's data as a "response" field for predefined edges.
 	var response map[string]interface{}
-	if e.Outgoing != "" && e.Outgoing != inngest.TriggerName {
-		response, _ = s.ActionID(e.Outgoing)
+	if outgoingID != "" && outgoingID != inngest.TriggerName {
+		response, _ = s.ActionID(outgoingID)
 	}
 	data := map[string]interface{}{
 		"event":    s.Event(),

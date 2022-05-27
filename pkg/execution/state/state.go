@@ -27,9 +27,10 @@ type Pause struct {
 	ID uuid.UUID `json:"token"`
 	// Identifier is the specific workflow run to resume.  This is required.
 	Identifier Identifier `json:"identifier"`
-	// Target is the client ID of the step to resume from when the pause
-	// is completed.  This is required.
-	Target string `json:"target"`
+	// Outgoing is the parent step for the pause.
+	Outgoing string `json:"outgoing"`
+	// Incoming is the step to run after the pause completes.
+	Incoming string `json:"incoming"`
 	// Expires is a time at which the pause can no longer be resumed.  This
 	// gives each pause of a function a TTL.  This is required.
 	Expires time.Time `json:"expires"`
