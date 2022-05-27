@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/runner"
+	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
 	"github.com/inngest/inngest-cli/pkg/expressions"
 	"github.com/inngest/inngest-cli/pkg/function"
@@ -234,12 +235,13 @@ func (eng *Engine) handlePauses(ctx context.Context, evt *event.Event) error {
 			continue
 		}
 		if pause.Expression != nil {
-			// Get expression data from the executor for the given run ID.
-			data, err := eng.exec.ExpressionData(ctx, pause.Identifier)
+			s, err := eng.sm.Load(ctx, pause.Identifier)
 			if err != nil {
 				return err
 			}
 
+			// Get expression data from the executor for the given run ID.
+			data := state.EdgeExpressionData(ctx, s, pause.Outgoing)
 			// Add the async event data to the expression
 			data["async"] = evt.Map()
 
@@ -262,7 +264,7 @@ func (eng *Engine) handlePauses(ctx context.Context, evt *event.Event) error {
 		eng.runner.Enqueue(ctx, inmemory.QueueItem{
 			ID: pause.Identifier,
 			Edge: inngest.Edge{
-				Incoming: pause.Target,
+				Incoming: pause.Incoming,
 			},
 		}, time.Now())
 	}
