@@ -71,7 +71,7 @@ type Executor interface {
 func NewExecutor(opts ...ExecutorOpt) (Executor, error) {
 	m := &executor{
 		runtimeDrivers: map[string]driver.Driver{},
-		exprDataGen:    ExpressionData,
+		exprDataGen:    state.EdgeExpressionData,
 	}
 
 	for _, o := range opts {
@@ -94,8 +94,8 @@ func NewExecutor(opts ...ExecutorOpt) (Executor, error) {
 // ExecutorOpt modifies the built in executor on creation.
 type ExecutorOpt func(m Executor) error
 
-// ExpressionDataGenerator is a function which is used to generate data for expressions within a workflow.
-type ExpressionDataGenerator func(ctx context.Context, s state.State, e inngest.GraphEdge) map[string]interface{}
+// EdgeExpressionDataGen is a function which is used to generate data for expressions within a workflow.
+type EdgeExpressionDataGen func(ctx context.Context, s state.State, e inngest.Edge) map[string]interface{}
 
 // WithActionLoader sets the action loader to use when retrieving function definitions
 // in a workflow.
@@ -115,7 +115,7 @@ func WithStateManager(sm state.Manager) ExecutorOpt {
 }
 
 // WithStateManager sets which state manager to use when creating an executor.
-func WithExpressionDataGenerator(datagen ExpressionDataGenerator) ExecutorOpt {
+func WithExpressionDataGenerator(datagen EdgeExpressionDataGen) ExecutorOpt {
 	return func(e Executor) error {
 		e.(*executor).exprDataGen = datagen
 		return nil
@@ -141,7 +141,7 @@ type executor struct {
 	sm             state.Manager
 	al             actionloader.ActionLoader
 	runtimeDrivers map[string]driver.Driver
-	exprDataGen    ExpressionDataGenerator
+	exprDataGen    EdgeExpressionDataGen
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -176,7 +176,7 @@ func (e *executor) ExpressionData(ctx context.Context, id state.Identifier) (map
 	if err != nil {
 		return nil, err
 	}
-	return e.exprDataGen(ctx, state, inngest.GraphEdge{}), nil
+	return e.exprDataGen(ctx, state, inngest.Edge{}), nil
 }
 
 // run executes the step with the given step ID.
@@ -333,7 +333,7 @@ func (e *executor) canTraverseEdge(ctx context.Context, s state.State, edge inng
 		return false, nil
 	}
 
-	exprdata := e.exprDataGen(ctx, s, edge)
+	exprdata := e.exprDataGen(ctx, s, edge.WorkflowEdge)
 
 	if edge.WorkflowEdge.Metadata.If != "" {
 		ok, _, err := expressions.Evaluate(ctx, edge.WorkflowEdge.Metadata.If, exprdata)
@@ -375,18 +375,4 @@ func (e *executor) canTraverseEdge(ctx context.Context, s state.State, edge inng
 	}
 
 	return true, nil
-}
-
-func ExpressionData(ctx context.Context, s state.State, e inngest.GraphEdge) map[string]interface{} {
-	// Add the outgoing edge's data as a "response" field for predefined edges.
-	var response map[string]interface{}
-	if e.Outgoing.Step != nil {
-		response, _ = s.ActionID(e.Outgoing.ID())
-	}
-	data := map[string]interface{}{
-		"event":    s.Event(),
-		"steps":    s.Actions(),
-		"response": response,
-	}
-	return data
 }
