@@ -16,6 +16,10 @@ import (
 	"github.com/inngest/inngest-cli/inngest/state"
 )
 
+const (
+	defaultStepName = "step-function"
+)
+
 // Function represents a step function which is triggered whenever an event
 // is received or on a schedule.  In essence, it contains:
 //
@@ -62,6 +66,7 @@ func (f Function) Dir() string {
 
 // Step represents a single unit of code (action) which runs as part of a step function, in a DAG.
 type Step struct {
+	ID      string                 `json:"id"`
 	Path    string                 `json:"path"`
 	Name    string                 `json:"name"`
 	Runtime inngest.RuntimeWrapper `json:"runtime"`
@@ -117,6 +122,12 @@ func (f Function) Validate(ctx context.Context) error {
 	for _, t := range f.Triggers {
 		if terr := t.Validate(); terr != nil {
 			err = multierror.Append(err, terr)
+		}
+	}
+
+	for k, step := range f.Steps {
+		if k == "" || step.ID == "" {
+			return fmt.Errorf("A step must have an ID defined")
 		}
 	}
 
@@ -182,14 +193,25 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 
 	// This has references to actions.  Create the actions then reference them
 	// from the workflow.
-	actions, edges, err := f.Actions(ctx)
+	versions, edges, err := f.Actions(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, a := range actions {
+	for n, a := range versions {
+		// TODO: remove this n^n loop with a refactoring of how we consider
+		// actions to be defined within a workflow, plus data type changes.
+		var found Step
+		for _, s := range f.Steps {
+			if s.Name == a.Name {
+				found = s
+				break
+			}
+		}
+
 		w.Steps = append(w.Steps, inngest.Step{
-			ClientID: a.Name,
+			ClientID: uint(n) + 1,
+			ID:       found.ID,
 			Name:     a.Name,
 			DSN:      a.DSN,
 		})
@@ -228,7 +250,7 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 		if len(f.Steps) == 1 && len(step.After) == 0 {
 			edges = append(edges, inngest.Edge{
 				Outgoing: inngest.TriggerName,
-				Incoming: step.Name,
+				Incoming: step.ID,
 			})
 			continue
 		}
@@ -237,7 +259,7 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 		for _, after := range step.After {
 			edges = append(edges, inngest.Edge{
 				Outgoing: after.Step,
-				Incoming: step.Name,
+				Incoming: step.ID,
 				Metadata: inngest.EdgeMetadata{
 					Wait:              after.Wait,
 					AsyncEdgeMetadata: after.Async,
@@ -264,7 +286,7 @@ func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, er
 		suffix = "prod"
 	}
 
-	slug := strings.ToLower(slug.Make(s.Name))
+	slug := strings.ToLower(slug.Make(s.ID))
 
 	id := fmt.Sprintf("%s-step-%s-%s", f.ID, slug, suffix)
 	if prefix, err := state.AccountIdentifier(ctx); err == nil && prefix != "" {
@@ -300,7 +322,8 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 		// custom code with the docker executor, and that the code is
 		// in the current directory.
 		f.Steps = map[string]Step{}
-		f.Steps[f.Name] = Step{
+		f.Steps["step-function"] = Step{
+			ID:   "step-function",
 			Name: f.Name,
 			Runtime: inngest.RuntimeWrapper{
 				Runtime: inngest.RuntimeDocker{},

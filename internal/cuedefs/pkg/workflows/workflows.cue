@@ -46,8 +46,8 @@ import (
 #Action: {
 	// clientID represents the ID of the action as represented by edges and
 	// by the frontend's rendering.
-	clientID: uint
-	clientID: >=1
+	clientID: uint & >=1
+	id:       string | *""
 	// name of the action
 	name: string
 	// dsn of the action.  eg "com.datosapp.logic.if" to test a predicate

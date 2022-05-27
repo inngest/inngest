@@ -8,7 +8,7 @@ package v1
 	triggers: [...#Trigger]
 
 	// A function can have > 1 step, which is an individual "action" called in a DAG.
-	steps?: [Name=string]: #Step & {name: Name}
+	steps?: [ID=string]: #Step & {id: ID}
 
 	// idempotency allows the specification of an idempotency key using event data.
 	// If specified, this overrides the throttle object.
@@ -64,6 +64,7 @@ package v1
 // Step represents a single action within a function.  An action is an individual unit
 // of code which is scheduled as part of the function execution.
 #Step: {
+	id:   string
 	name: string | *""
 
 	// path represents the location on disk for the step defintiion.  A single function

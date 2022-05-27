@@ -37,9 +37,9 @@ func (m *Mock) Execute(ctx context.Context, state state.State, action inngest.Ac
 		m.Executed = map[string]inngest.ActionVersion{}
 	}
 
-	m.Executed[step.ClientID] = action
+	m.Executed[step.ID] = action
 
-	response := m.Responses[step.ClientID]
-	err := m.Errors[step.ClientID]
+	response := m.Responses[step.ID]
+	err := m.Errors[step.ID]
 	return &response, err
 }

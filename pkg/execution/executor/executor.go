@@ -179,23 +179,23 @@ func (e *executor) ExpressionData(ctx context.Context, id state.Identifier) (map
 	return e.exprDataGen(ctx, state, inngest.GraphEdge{}), nil
 }
 
-// run executes the action with the given client ID.
-func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, clientID string, s state.State) (*driver.Response, []inngest.Edge, error) {
+// run executes the step with the given step ID.
+func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, stepID string, s state.State) (*driver.Response, []inngest.Edge, error) {
 	var (
 		response *driver.Response
 		err      error
 	)
 
-	if clientID != inngest.TriggerName {
+	if stepID != inngest.TriggerName {
 		var step *inngest.Step
 		for _, s := range w.Steps {
-			if s.ClientID == clientID {
+			if s.ID == stepID {
 				step = &s
 				break
 			}
 		}
 		if step == nil {
-			return nil, nil, fmt.Errorf("unknown vertex: %s", clientID)
+			return nil, nil, fmt.Errorf("unknown vertex: %s", stepID)
 		}
 		response, err = e.executeAction(ctx, id, step)
 		if err != nil {
@@ -216,7 +216,7 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 		}
 	}
 
-	edges, err := e.AvailableChildren(ctx, id, clientID)
+	edges, err := e.AvailableChildren(ctx, id, stepID)
 	return response, edges, err
 }
 
@@ -246,22 +246,26 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 
 	// This action may have executed _asynchronously_.  That is, it may have been
 	// scheduled for execution but the result is pending.  In this case we cannot
-	// traverse this node's children as we don't have the response yet.  We must
-	// save workflow state indicating that the result is pending (TODO).
+	// traverse this node's children as we don't have the response yet.
 	//
 	// This happens when eg. a docker image takes a long time to run, and/or running
 	// the container (via a scheduler) isn't a blocking operation.
+	//
+	// XXX: We can add a state interface to indicate that the step is pending.
 	if response.Scheduled {
 		return response, nil
 	}
 
-	if _, serr := e.sm.SaveActionOutput(ctx, id, action.ClientID, response.Output); serr != nil {
+	// TODO (tonyhb): now that we're returning the response directly, should the runner
+	// which calls the executor manage state?  We could then have a state.State instance
+	// passed into execute, removing the need for this to have a state manager.
+	if _, serr := e.sm.SaveActionOutput(ctx, id, action.ID, response.Output); serr != nil {
 		err = multierror.Append(err, serr)
 	}
 
 	// Store the output or the error.
 	if response.Err != nil {
-		if _, serr := e.sm.SaveActionError(ctx, id, action.ClientID, response.Err); serr != nil {
+		if _, serr := e.sm.SaveActionError(ctx, id, action.ID, response.Err); serr != nil {
 			err = multierror.Append(err, serr)
 		}
 	}
@@ -269,10 +273,10 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	return response, err
 }
 
-// availableChildren iterates through all children of the given client ID, determining which
+// availableChildren iterates through all children of the given step ID, determining which
 // children can be executed based off of the current workflow state.  Some children may not
 // be executed due to conditional expressions etc.
-func (e *executor) AvailableChildren(ctx context.Context, id state.Identifier, clientID string) ([]inngest.Edge, error) {
+func (e *executor) AvailableChildren(ctx context.Context, id state.Identifier, stepID string) ([]inngest.Edge, error) {
 	state, err := e.sm.Load(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("error loading state: %w", err)
@@ -289,7 +293,7 @@ func (e *executor) AvailableChildren(ctx context.Context, id state.Identifier, c
 	}
 
 	// Handle the outgoing edges from this particular node.
-	edges := g.From(clientID)
+	edges := g.From(stepID)
 	if len(edges) == 0 {
 		return nil, nil
 	}

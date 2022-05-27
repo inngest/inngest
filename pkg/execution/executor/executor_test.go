@@ -50,32 +50,32 @@ func TestExecute_state(t *testing.T) {
 		UUID: uuid.New(),
 		Steps: []inngest.Step{
 			{
-				DSN:      "test",
-				ClientID: "1",
+				DSN: "test",
+				ID:  "1",
 			},
 			{
-				DSN:      "test",
-				ClientID: "2",
+				DSN: "test",
+				ID:  "2",
 			},
 			{
-				DSN:      "test",
-				ClientID: "3",
+				DSN: "test",
+				ID:  "3",
 			},
 			{
-				DSN:      "test",
-				ClientID: "4",
+				DSN: "test",
+				ID:  "4",
 			},
 			{
-				DSN:      "test",
-				ClientID: "5",
+				DSN: "test",
+				ID:  "5",
 			},
 			{
-				DSN:      "test",
-				ClientID: "6",
+				DSN: "test",
+				ID:  "6",
 			},
 			{
-				DSN:      "test",
-				ClientID: "7",
+				DSN: "test",
+				ID:  "7",
 			},
 		},
 		Edges: []inngest.Edge{
@@ -199,20 +199,20 @@ func TestExecute_edge_expressions(t *testing.T) {
 		UUID: uuid.New(),
 		Steps: []inngest.Step{
 			{
-				DSN:      "test",
-				ClientID: "run-step-trigger",
+				DSN: "test",
+				ID:  "run-step-trigger",
 			},
 			{
-				DSN:      "test",
-				ClientID: "dont-run-step-trigger",
+				DSN: "test",
+				ID:  "dont-run-step-trigger",
 			},
 			{
-				DSN:      "test",
-				ClientID: "run-step-child",
+				DSN: "test",
+				ID:  "run-step-child",
 			},
 			{
-				DSN:      "test",
-				ClientID: "dont-run-step-child",
+				DSN: "test",
+				ID:  "dont-run-step-child",
 			},
 		},
 		Edges: []inngest.Edge{

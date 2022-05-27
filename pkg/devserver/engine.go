@@ -111,6 +111,12 @@ func (eng *Engine) Load(ctx context.Context, dir string) error {
 }
 
 func (eng *Engine) SetFunctions(ctx context.Context, functions []*function.Function) error {
+	for _, f := range functions {
+		if err := f.Validate(ctx); err != nil {
+			return fmt.Errorf("error setting functions: %w", err)
+		}
+	}
+
 	eng.Functions = functions
 
 	// Build all function images.

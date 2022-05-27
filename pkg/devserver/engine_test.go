@@ -38,7 +38,8 @@ func TestEngine_async(t *testing.T) {
 			},
 			Steps: map[string]function.Step{
 				"first": {
-					Name: "first",
+					ID:   "first",
+					Name: "Basic step",
 					Runtime: inngest.RuntimeWrapper{
 						Runtime: &mockdriver.Mock{},
 					},
@@ -49,7 +50,8 @@ func TestEngine_async(t *testing.T) {
 					},
 				},
 				"wait-for-evt": {
-					Name: "wait-for-evt",
+					ID:   "wait-for-evt",
+					Name: "A step with a wait",
 					Runtime: inngest.RuntimeWrapper{
 						Runtime: &mockdriver.Mock{},
 					},
@@ -114,7 +116,7 @@ func TestEngine_async(t *testing.T) {
 		return len(driver.Executed) == 1
 	}, 50*time.Millisecond, 10*time.Millisecond)
 	// Assert that the first step ran.
-	require.Equal(t, "first", driver.Executed["first"].Name)
+	require.Equal(t, "Basic step", driver.Executed["first"].Name)
 	// And we should have a pause.
 	require.Eventually(t, func() bool {
 		return len(e.sm.Pauses()) == 1
@@ -147,7 +149,7 @@ func TestEngine_async(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return len(driver.Executed) == 2
 	}, 50*time.Millisecond, 10*time.Millisecond)
-	require.Equal(t, "wait-for-evt", driver.Executed["wait-for-evt"].Name)
+	require.Equal(t, "A step with a wait", driver.Executed["wait-for-evt"].Name)
 }
 
 func strptr(s string) *string {

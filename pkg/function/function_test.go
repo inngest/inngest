@@ -42,7 +42,7 @@ func TestDerivedConfigDefault(t *testing.T) {
 
 	expectedActionVersion := inngest.ActionVersion{
 		Name:   "Foo",
-		DSN:    "magical-id-step-foo-test",
+		DSN:    "magical-id-step-step-function-test",
 		Scopes: []string{"secret:read:*"},
 		Runtime: inngest.RuntimeWrapper{
 			Runtime: inngest.RuntimeDocker{},
@@ -57,7 +57,7 @@ import (
 
 action: actions.#Action
 action: {
-  dsn:  "magical-id-step-foo-test"
+  dsn:  "magical-id-step-step-function-test"
   name: "Foo"
   scopes: ["secret:read:*"]
   runtime: type: "docker"
@@ -86,7 +86,8 @@ action: {
 		},
 		Steps: []inngest.Step{
 			{
-				ClientID: "Foo",
+				ID:       defaultStepName,
+				ClientID: 1,
 				Name:     expectedActionVersion.Name,
 				DSN:      expectedActionVersion.DSN,
 			},
@@ -94,7 +95,7 @@ action: {
 		Edges: []inngest.Edge{
 			{
 				Outgoing: inngest.TriggerName,
-				Incoming: "Foo",
+				Incoming: defaultStepName,
 			},
 		},
 	}
@@ -113,13 +114,14 @@ workflow: workflows.#Workflow & {
     expression: "event.version >= 2"
   }]
   actions: [{
-    clientID: "Foo"
+    id:       "step-function"
+    clientID: 1
     name:     "Foo"
-    dsn:      "magical-id-step-foo-test"
+    dsn:      "magical-id-step-step-function-test"
   }]
   edges: [{
     outgoing: "$trigger"
-    incoming: "Foo"
+    incoming: "step-function"
     metadata: {}
   }]
 }`
@@ -168,6 +170,7 @@ func TestEventDefinitionAbsolutePath(t *testing.T) {
 
 func TestFunctionActions_single(t *testing.T) {
 	fn := Function{
+		ID:   "hi",
 		Name: "test",
 		Triggers: []Trigger{{
 			EventTrigger: &EventTrigger{
@@ -176,6 +179,7 @@ func TestFunctionActions_single(t *testing.T) {
 		}},
 		Steps: map[string]Step{
 			"single": {
+				ID:   "single",
 				Name: "single",
 				Runtime: inngest.RuntimeWrapper{
 					Runtime: &mockdriver.Mock{},
@@ -183,6 +187,8 @@ func TestFunctionActions_single(t *testing.T) {
 			},
 		},
 	}
+	err := fn.Validate(context.Background())
+	require.NoError(t, err)
 
 	actions, edges, err := fn.Actions(context.Background())
 	require.NoError(t, err)
