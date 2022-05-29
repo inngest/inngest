@@ -21,7 +21,6 @@ require (
 	github.com/inngest/cuetypescript v0.0.0-20220302153725-a00e933fdf87
 	github.com/inngest/event-schemas v0.0.0-20220323133008-96be406e1ea4
 	github.com/jedib0t/go-pretty/v6 v6.3.0
-	github.com/karlseguin/ccache/v2 v2.0.8
 	github.com/lnquy/cron v1.1.1
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mitchellh/go-homedir v1.1.0
@@ -34,7 +33,6 @@ require (
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.1
 	github.com/xhit/go-str2duration/v2 v2.0.0
-	go.opentelemetry.io/otel v1.3.0
 	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171
 	golang.org/x/text v0.3.7
 	golang.org/x/tools v0.1.7
@@ -66,8 +64,6 @@ require (
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/go-git/gcfg v1.5.0 // indirect
 	github.com/go-git/go-billy/v5 v5.3.1 // indirect
-	github.com/go-logr/logr v1.2.2 // indirect
-	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
@@ -118,7 +114,6 @@ require (
 	github.com/yuin/goldmark v1.4.4 // indirect
 	github.com/yuin/goldmark-emoji v1.0.1 // indirect
 	github.com/zclconf/go-cty v1.8.3 // indirect
-	go.opentelemetry.io/otel/trace v1.3.0 // indirect
 	golang.org/x/crypto v0.0.0-20211215165025-cf75a172585e // indirect
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f // indirect
 	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e // indirect
