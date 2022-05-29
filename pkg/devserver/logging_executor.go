@@ -3,7 +3,6 @@ package devserver
 import (
 	"context"
 
-	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
@@ -21,13 +20,13 @@ type loggingExecutor struct {
 	log *zerolog.Logger
 }
 
-func (l loggingExecutor) Execute(ctx context.Context, id state.Identifier, from string) (*driver.Response, []inngest.Edge, error) {
+func (l loggingExecutor) Execute(ctx context.Context, id state.Identifier, from string) (*driver.Response, error) {
 	l.log.Info().
 		Str("run_id", id.RunID.String()).
 		Str("step", from).
 		Msg("executing step")
 
-	resp, edges, err := l.Executor.Execute(ctx, id, from)
+	resp, err := l.Executor.Execute(ctx, id, from)
 
 	if err == nil {
 		l.log.Info().
@@ -44,5 +43,5 @@ func (l loggingExecutor) Execute(ctx context.Context, id state.Identifier, from 
 			Msg("error executing step step")
 	}
 
-	return resp, edges, err
+	return resp, err
 }

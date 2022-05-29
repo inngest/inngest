@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/backoff"
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
@@ -88,8 +89,7 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 		i.waits[item.ID.RunID].Done()
 	}()
 
-	resp, children, err := i.exec.Execute(ctx, item.ID, item.Edge.Incoming)
-
+	resp, err := i.exec.Execute(ctx, item.ID, item.Edge.Incoming)
 	if err != nil {
 		// If the error is not of type response error, we can assume that this is
 		// always retryable.
@@ -112,7 +112,51 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 		return fmt.Errorf("execution error: %s", err)
 	}
 
+	s, err := i.sm.Load(ctx, item.ID)
+	if err != nil {
+		return err
+	}
+
+	children, err := state.DefaultEdgeEvaluator.AvailableChildren(ctx, s, item.Edge.Incoming)
+	if err != nil {
+		return err
+	}
+
 	for _, next := range children {
+
+		// We want to wait for another event to come in to traverse this edge within the DAG.
+		//
+		// Create a new "pause", which informs the state manager that we're pausing the traversal
+		// of this edge until later.
+		//
+		// The runner should load all pauses and automatically resume the traversal when a
+		// matching event is received.
+		if next.Metadata.AsyncEdgeMetadata != nil {
+			am := next.Metadata.AsyncEdgeMetadata
+
+			if am.Event == "" {
+				return fmt.Errorf("no async edge event specified")
+			}
+			dur, err := str2duration.ParseDuration(am.TTL)
+			if err != nil {
+				return fmt.Errorf("error parsing async edge ttl '%s': %w", am.TTL, err)
+			}
+
+			err = i.sm.SavePause(ctx, state.Pause{
+				ID:         uuid.New(),
+				Identifier: s.Identifier(),
+				Outgoing:   next.Outgoing,
+				Incoming:   next.Incoming,
+				Expires:    time.Now().Add(dur),
+				Event:      &am.Event,
+				Expression: am.Match,
+			})
+			if err != nil {
+				return fmt.Errorf("error saving edge pause: %w", err)
+			}
+			continue
+		}
+
 		at := time.Now()
 		if next.Metadata.Wait != nil {
 			dur, err := str2duration.ParseDuration(*next.Metadata.Wait)

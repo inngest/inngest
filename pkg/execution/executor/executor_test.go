@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
+	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -110,7 +111,7 @@ func TestExecute_state(t *testing.T) {
 		},
 	}
 
-	state, err := sm.New(ctx, w, ulid.MustNew(ulid.Now(), rand.Reader), map[string]interface{}{})
+	s, err := sm.New(ctx, w, ulid.MustNew(ulid.Now(), rand.Reader), map[string]interface{}{})
 	require.Nil(t, err)
 
 	driver := &mockdriver.Mock{
@@ -134,51 +135,51 @@ func TestExecute_state(t *testing.T) {
 
 	// Executing the trigger does nothing but validate which descendents from the trigger
 	// in the dag can run.
-	_, available, err := exec.Execute(ctx, state.Identifier(), inngest.TriggerName)
+	_, err = exec.Execute(ctx, s.Identifier(), inngest.TriggerName)
 	assert.NoError(t, err)
 	assert.Equal(t, len(driver.Executed), 0)
-	assert.Equal(t, len(available), 2)
-	assert.ElementsMatch(t, []string{"1", "2"}, availableIDs(available))
+	// assert.Equal(t, len(available), 2)
+	// assert.ElementsMatch(t, []string{"1", "2"}, availableIDs(available))
 	// There should be no state.
-	state, err = sm.Load(ctx, state.Identifier())
+	s, err = sm.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	assert.Equal(t, 0, len(state.Actions()))
+	assert.Equal(t, 0, len(s.Actions()))
 
 	// Run the first item.
-	_, available, err = exec.Execute(ctx, state.Identifier(), "1")
+	_, err = exec.Execute(ctx, s.Identifier(), "1")
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
-	assert.Equal(t, 1, len(available))
-	assert.ElementsMatch(t, []string{"3"}, availableIDs(available))
+	// assert.Equal(t, 1, len(available))
+	// assert.ElementsMatch(t, []string{"3"}, availableIDs(available))
 	// Ensure we recorded state.
-	state, err = sm.Load(ctx, state.Identifier())
+	s, err = sm.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	assert.Equal(t, 1, len(state.Actions()))
-	assert.Equal(t, 0, len(state.Errors()))
+	assert.Equal(t, 1, len(s.Actions()))
+	assert.Equal(t, 0, len(s.Errors()))
 
 	// Test "scheduled" responses.  The driver should respond with a Scheduled
 	// message, which means that the function has begun execution but no further
 	// actions are available.
-	_, available, err = exec.Execute(ctx, state.Identifier(), "4")
+	_, err = exec.Execute(ctx, s.Identifier(), "4")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(driver.Executed), "function not executed")
-	assert.Equal(t, 0, len(available), "incorrect number of functions available")
+	// assert.Equal(t, 0, len(available), "incorrect number of functions available")
 	// No state should be recorded.
-	state, err = sm.Load(ctx, state.Identifier())
+	s, err = sm.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	assert.Equal(t, 1, len(state.Actions()))
-	assert.Equal(t, 0, len(state.Errors()))
+	assert.Equal(t, 1, len(s.Actions()))
+	assert.Equal(t, 0, len(s.Errors()))
 
 	// Test "error" responses
-	_, available, err = exec.Execute(ctx, state.Identifier(), "5")
+	_, err = exec.Execute(ctx, s.Identifier(), "5")
 	assert.Error(t, err)
 	assert.Equal(t, 3, len(driver.Executed), "function not executed")
-	assert.Equal(t, 0, len(available), "incorrect number of functions available")
+	// assert.Equal(t, 0, len(available), "incorrect number of functions available")
 	// An error should be recorded.
-	state, err = sm.Load(ctx, state.Identifier())
+	s, err = sm.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	assert.Equal(t, 2, len(state.Actions()))
-	assert.Equal(t, 1, len(state.Errors()))
+	assert.Equal(t, 2, len(s.Actions()))
+	assert.Equal(t, 1, len(s.Errors()))
 }
 
 // TestExecute_edge_expressions asserts that we execute expressions using the correct
@@ -251,7 +252,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 		},
 	}
 
-	state, err := sm.New(ctx, w, ulid.MustNew(ulid.Now(), rand.Reader), map[string]interface{}{
+	s, err := sm.New(ctx, w, ulid.MustNew(ulid.Now(), rand.Reader), map[string]interface{}{
 		"data": map[string]interface{}{
 			"run":    true,
 			"string": "yes",
@@ -277,27 +278,29 @@ func TestExecute_edge_expressions(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, available, err := exec.Execute(ctx, state.Identifier(), inngest.TriggerName)
+	_, err = exec.Execute(ctx, s.Identifier(), inngest.TriggerName)
 	require.NoError(t, err)
 	require.Equal(t, len(driver.Executed), 0)
-	require.Equal(t, len(available), 1)
-	require.ElementsMatch(t, []string{"run-step-trigger"}, availableIDs(available))
-	edges, err := exec.AvailableChildren(ctx, state.Identifier(), inngest.TriggerName)
+
+	s, err = sm.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	edges, err := state.DefaultEdgeEvaluator.AvailableChildren(ctx, s, inngest.TriggerName)
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{"run-step-trigger"}, availableIDs(edges))
 
 	// As we haven't ran the step called run-step-trigger, we should have no children available.
-	edges, err = exec.AvailableChildren(ctx, state.Identifier(), "run-step-trigger")
+	edges, err = state.DefaultEdgeEvaluator.AvailableChildren(ctx, s, "run-step-trigger")
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{}, availableIDs(edges))
 
 	// Run the next step.
-	_, available, err = exec.Execute(ctx, state.Identifier(), "run-step-trigger")
+	_, err = exec.Execute(ctx, s.Identifier(), "run-step-trigger")
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
-	assert.Equal(t, 1, len(available))
-	assert.ElementsMatch(t, []string{"run-step-child"}, availableIDs(available))
-	edges, err = exec.AvailableChildren(ctx, state.Identifier(), "run-step-trigger")
+
+	s, err = sm.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	edges, err = state.DefaultEdgeEvaluator.AvailableChildren(ctx, s, "run-step-trigger")
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{"run-step-child"}, availableIDs(edges))
 }

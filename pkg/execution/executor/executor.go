@@ -3,17 +3,12 @@ package executor
 import (
 	"context"
 	"fmt"
-	"sort"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
-	"github.com/inngest/inngest-cli/pkg/expressions"
-	"github.com/xhit/go-str2duration/v2"
 )
 
 var (
@@ -58,11 +53,7 @@ type Executor interface {
 	// It is important for this function to be atomic;  if the function was scheduled
 	// and the context terminates, we must store the output or async data in workflow
 	// state then schedule the child functions else the workflow will terminate early.
-	Execute(ctx context.Context, id state.Identifier, from string) (*driver.Response, []inngest.Edge, error)
-
-	// AvailableChildren returns the available children to execute from a given action, based off of
-	// state fetched from the executor.
-	AvailableChildren(ctx context.Context, id state.Identifier, from string) ([]inngest.Edge, error)
+	Execute(ctx context.Context, id state.Identifier, from string) (*driver.Response, error)
 }
 
 // NewExecutor returns a new executor, responsible for running the specific step of a
@@ -73,7 +64,6 @@ type Executor interface {
 func NewExecutor(opts ...ExecutorOpt) (Executor, error) {
 	m := &executor{
 		runtimeDrivers: map[string]driver.Driver{},
-		exprDataGen:    state.EdgeExpressionData,
 	}
 
 	for _, o := range opts {
@@ -96,9 +86,6 @@ func NewExecutor(opts ...ExecutorOpt) (Executor, error) {
 // ExecutorOpt modifies the built in executor on creation.
 type ExecutorOpt func(m Executor) error
 
-// EdgeExpressionDataGen is a function which is used to generate data for expressions within a workflow.
-type EdgeExpressionDataGen func(ctx context.Context, s state.State, outgoingID string) map[string]interface{}
-
 // WithActionLoader sets the action loader to use when retrieving function definitions
 // in a workflow.
 func WithActionLoader(al actionloader.ActionLoader) ExecutorOpt {
@@ -112,16 +99,6 @@ func WithActionLoader(al actionloader.ActionLoader) ExecutorOpt {
 func WithStateManager(sm state.Manager) ExecutorOpt {
 	return func(e Executor) error {
 		e.(*executor).sm = sm
-		return nil
-	}
-}
-
-// WithEdgeExpressionDataGenerator sets the function to use for generating the
-// input data to an edge expression.  By default, the executor uses
-// state.EdgeExpressionData and this does not need to be specified.
-func WithEdgeExpressionDataGenerator(datagen EdgeExpressionDataGen) ExecutorOpt {
-	return func(e Executor) error {
-		e.(*executor).exprDataGen = datagen
 		return nil
 	}
 }
@@ -150,38 +127,37 @@ type executor struct {
 	sm             state.Manager
 	al             actionloader.ActionLoader
 	runtimeDrivers map[string]driver.Driver
-	exprDataGen    EdgeExpressionDataGen
 }
 
 // Execute loads a workflow and the current run state, then executes the
 // workflow via an executor.  This returns all available steps we can run from
 // the workflow after the step has been executed.
-func (e *executor) Execute(ctx context.Context, id state.Identifier, from string) (*driver.Response, []inngest.Edge, error) {
+func (e *executor) Execute(ctx context.Context, id state.Identifier, from string) (*driver.Response, error) {
 	state, err := e.sm.Load(ctx, id)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	w, err := state.Workflow()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	resp, next, err := e.run(ctx, w, id, from, state)
+	resp, err := e.run(ctx, w, id, from, state)
 	if err != nil {
 		// This is likely a driver.Response, which itself includes
 		// whether the action can be retried based off of the output.
 		//
 		// The runner is responsible for scheduling jobs and will check
 		// whether the action can be retried.
-		return resp, nil, err
+		return resp, err
 	}
 
-	return resp, next, nil
+	return resp, nil
 }
 
 // run executes the step with the given step ID.
-func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, stepID string, s state.State) (*driver.Response, []inngest.Edge, error) {
+func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, stepID string, s state.State) (*driver.Response, error) {
 	var (
 		response *driver.Response
 		err      error
@@ -196,29 +172,28 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 			}
 		}
 		if step == nil {
-			return nil, nil, fmt.Errorf("unknown vertex: %s", stepID)
+			return nil, fmt.Errorf("unknown vertex: %s", stepID)
 		}
 		response, err = e.executeAction(ctx, id, step)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if response.Err != nil {
 			// This action errored.  We've stored this in our state manager already;
 			// return the response error only.  We can use the same variable for both
 			// the response and the error to indicate an error value.
-			return response, nil, response
+			return response, response
 		}
 		if response.Scheduled {
 			// This action is not yet complete, so we can't traverse
 			// its children.  We assume that the driver is responsible for
 			// retrying and coordinating async state here;  the executor's
 			// job is to execute the action only.
-			return response, nil, nil
+			return response, nil
 		}
 	}
 
-	edges, err := e.AvailableChildren(ctx, id, stepID)
-	return response, edges, err
+	return response, err
 }
 
 func (e *executor) executeAction(ctx context.Context, id state.Identifier, action *inngest.Step) (*driver.Response, error) {
@@ -272,109 +247,4 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	}
 
 	return response, err
-}
-
-// availableChildren iterates through all children of the given step ID, determining which
-// children can be executed based off of the current workflow state.  Some children may not
-// be executed due to conditional expressions etc.
-func (e *executor) AvailableChildren(ctx context.Context, id state.Identifier, stepID string) ([]inngest.Edge, error) {
-	state, err := e.sm.Load(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("error loading state: %w", err)
-	}
-
-	w, err := state.Workflow()
-	if err != nil {
-		return nil, fmt.Errorf("error loading workflow: %w", err)
-	}
-
-	g, err := inngest.NewGraph(w)
-	if err != nil {
-		return nil, err
-	}
-
-	// Handle the outgoing edges from this particular node.
-	edges := g.From(stepID)
-	if len(edges) == 0 {
-		return nil, nil
-	}
-
-	future := []inngest.Edge{}
-	for _, edge := range edges {
-		ok, err := e.canTraverseEdge(ctx, state, edge)
-		if err != nil {
-			return nil, err
-		}
-
-		if !ok {
-			continue
-		}
-
-		// We can traverse this edge.  Schedule a new execution from this node.
-		// Scheduling executions needs to be done regardless of whether
-		// the context has cancelled.
-		future = append(future, edge.WorkflowEdge)
-	}
-
-	// Sort the edges which are returned according to incoming string order.
-	sort.Slice(future, func(i, j int) bool {
-		return future[i].Incoming < future[j].Incoming
-	})
-
-	return future, nil
-}
-
-// canTraverseEdge determines whether the edge can be traversed immediately.  Edges come
-// in three flavours:  plain graph edges which link functions in a DAG;  edges with
-// expressions which are traversed conditionally based off of workflow state;  and
-// asynchronous edges which wait for an event mathing a condition to be traversed (at some
-// point in the future, with a TTL).
-func (e *executor) canTraverseEdge(ctx context.Context, s state.State, edge inngest.GraphEdge) (bool, error) {
-	if edge.Outgoing.ID() != inngest.TriggerName && !s.ActionComplete(edge.Outgoing.ID()) {
-		return false, nil
-	}
-
-	exprdata := e.exprDataGen(ctx, s, edge.WorkflowEdge.Outgoing)
-
-	if edge.WorkflowEdge.Metadata.If != "" {
-		ok, _, err := expressions.Evaluate(ctx, edge.WorkflowEdge.Metadata.If, exprdata)
-		if err != nil || !ok {
-			return ok, err
-		}
-	}
-
-	// We want to wait for another event to come in to traverse this edge within the DAG.
-	//
-	// Create a new "pause", which informs the state manager that we're pausing the traversal
-	// of this edge until later.
-	//
-	// The runner should load all pauses and automatically resume the traversal when a
-	// matching event is received.
-	if edge.WorkflowEdge.Metadata.AsyncEdgeMetadata != nil {
-		am := edge.WorkflowEdge.Metadata.AsyncEdgeMetadata
-
-		if am.Event == "" {
-			return false, fmt.Errorf("no async edge event specified")
-		}
-		dur, err := str2duration.ParseDuration(am.TTL)
-		if err != nil {
-			return false, fmt.Errorf("error parsing async edge ttl '%s': %w", am.TTL, err)
-		}
-
-		err = e.sm.SavePause(ctx, state.Pause{
-			ID:         uuid.New(),
-			Identifier: s.Identifier(),
-			Outgoing:   edge.Outgoing.ID(),
-			Incoming:   edge.Incoming.ID(),
-			Expires:    time.Now().Add(dur),
-			Event:      &am.Event,
-			Expression: am.Match,
-		})
-		if err != nil {
-			return false, fmt.Errorf("error saving edge pause: %w", err)
-		}
-		return false, nil
-	}
-
-	return true, nil
 }
