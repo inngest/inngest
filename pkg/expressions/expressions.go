@@ -15,35 +15,20 @@ package expressions
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
-	"github.com/karlseguin/ccache/v2"
 	"github.com/pkg/errors"
-	"go.opentelemetry.io/otel"
 	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 var (
-	CacheExtendTime = time.Minute * 10
-	CacheTTL        = time.Minute * 30
-
 	ErrNoResult      = errors.New("expression did not return true or false")
 	ErrInvalidResult = errors.New("expression errored")
 )
-
-var (
-	// cache is a global cache of precompiled expressions.
-	cache *ccache.Cache
-)
-
-func init() {
-	cache = ccache.New(ccache.Configure().MaxSize(10_000))
-}
 
 // Evaluable represents a cacheable, goroutine safe manager for evaluating a single
 // precompiled expression with arbitrary data.
@@ -79,27 +64,12 @@ func Evaluate(ctx context.Context, expression string, input map[string]interface
 // instance can be used across many goroutines to evaluate the expression against any
 // data. The Evaluable instance is loaded from the cache, or is cached if not found.
 func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluable, error) {
-	sha := sum(expression)
-
-	if eval := cache.Get(sha); eval != nil {
-		eval.Extend(CacheExtendTime)
-		return eval.Value().(*expressionEvaluator), nil
-	}
-
-	ctx, span := otel.Tracer("expressions").Start(ctx, "NewExpressionEvaluator")
-	defer span.End()
-
-	span.AddEvent("creating env")
 	e, err := env()
-	span.AddEvent("created env")
 	if err != nil {
-		span.RecordError(err)
 		return nil, err
 	}
 
-	span.AddEvent("compiling")
 	ast, issues := e.Compile(expression)
-	span.AddEvent("compiled")
 	if issues != nil {
 		return nil, fmt.Errorf("error compiling expression: %w", issues.Err())
 	}
@@ -114,7 +84,6 @@ func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluable, 
 		return nil, err
 	}
 
-	cache.Set(sha, eval, CacheTTL)
 	return eval, nil
 }
 
@@ -369,9 +338,4 @@ func (u *UsedAttributes) add(root string, path []string) {
 		// store this key so it's not duplicated.
 		u.exists[key] = struct{}{}
 	}
-}
-
-// sum returns a checksum of the given expression, used as the cache key.
-func sum(expression string) string {
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(expression)))
 }
