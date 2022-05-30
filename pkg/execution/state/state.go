@@ -12,6 +12,7 @@ import (
 
 var (
 	ErrStepIncomplete = fmt.Errorf("step has not yet completed")
+	ErrPauseNotFound  = fmt.Errorf("pause not found")
 )
 
 // Identifier represents the unique identifier for a workflow run.
@@ -40,6 +41,9 @@ type Pause struct {
 	// Expression is an optional expression that must match for the pause
 	// to be resumed.
 	Expression *string `json:"expression"`
+	// OnTimeout indicates that this incoming edge should only be ran
+	// when the pause times out, if set to true.
+	OnTimeout bool `json:"onTimeout"`
 }
 
 // State represents the current state of a workflow.  It is data-structure

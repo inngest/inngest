@@ -6,6 +6,7 @@ package edges
 	type:  "edge"
 	name?: string
 	if?:   string
+	wait?: string
 })
 
 // An AsyncEdge represents an edge that can be traversed at some future point in time
@@ -18,5 +19,8 @@ package edges
 		ttl:    string
 		event:  string
 		match?: string
+		// onTimeout specifies that this edge should be traversed on timeout only,
+		// if the event is not received within the TTL.
+		onTimeout?: bool
 	})
 })
