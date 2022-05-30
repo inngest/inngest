@@ -123,7 +123,6 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 	}
 
 	for _, next := range children {
-
 		// We want to wait for another event to come in to traverse this edge within the DAG.
 		//
 		// Create a new "pause", which informs the state manager that we're pausing the traversal

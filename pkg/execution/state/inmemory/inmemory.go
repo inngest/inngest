@@ -144,16 +144,42 @@ func (m *mem) SaveActionError(ctx context.Context, i state.Identifier, actionID 
 }
 
 func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
+	go func() {
+		<-time.After(time.Until(p.Expires))
+		m.lock.Lock()
+		defer m.lock.Unlock()
+		// If the pause exists, it can't have been consumed
+		// and is therefore timed out.  Enqueue the edge as
+		// we only want this to be scheduled on timeout.
+		if p.OnTimeout {
+			if _, ok := m.pauses[p.ID]; ok {
+				m.Enqueue(QueueItem{
+					ID: p.Identifier,
+					Edge: inngest.Edge{
+						Outgoing: p.Outgoing,
+						Incoming: p.Incoming,
+					},
+				}, time.Now())
+			}
+		}
+		delete(m.pauses, p.ID)
+	}()
+
 	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	m.pauses[p.ID] = p
-	m.lock.Unlock()
 	return nil
 }
 
 func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID) error {
 	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if pause, ok := m.pauses[id]; !ok || pause.Expires.Before(time.Now()) {
+		return state.ErrPauseNotFound
+	}
 	delete(m.pauses, id)
-	m.lock.Unlock()
 	return nil
 }
 

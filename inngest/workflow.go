@@ -103,7 +103,8 @@ type AsyncEdgeMetadata struct {
 	// If specified, the event name must match and this expression must evaluate
 	// to true for the workflow to continue.  This allows you to filter events
 	// to eg. the same user.
-	Match *string `json:"match"`
+	Match     *string `json:"match"`
+	OnTimeout bool    `json:"onTimeout"`
 }
 
 // VersionCoinstraint represents version constraints for an action.  We use semver without

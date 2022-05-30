@@ -100,5 +100,8 @@ package v1
 		ttl:    string
 		event:  string
 		match?: string
+		// onTimeout specifies that this edge should be traversed on timeout only,
+		// if the event is not received within the TTL.
+		onTimeout?: bool
 	}
 }
