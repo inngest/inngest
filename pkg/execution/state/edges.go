@@ -56,9 +56,9 @@ type EdgeEvaluator interface {
 	AvailableChildren(ctx context.Context, state State, stepID string) ([]inngest.Edge, error)
 }
 
-// New returns a new EdgeEvaluator, using the given function to return data for
+// NewEdgeEvaluator returns a new EdgeEvaluator, using the given function to return data for
 // variables within the expression.
-func New(e EdgeExpressionDataGen) EdgeEvaluator {
+func NewEdgeEvaluator(e EdgeExpressionDataGen) EdgeEvaluator {
 	return edgeEvaluator{
 		datagen: e,
 	}
