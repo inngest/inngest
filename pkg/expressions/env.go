@@ -8,26 +8,40 @@ import (
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
+var (
+	defaultKeys = []string{
+		"event",
+		"steps",
+		"response",
+		"async",
+		"user",
+		"actions", // deprecated
+		"action",  // deprecated
+	}
+)
+
 // env creates a new environment in which we define a single user attribute as a map
 // of string to dynamic types, plus functions to augment date handling
-func env() (*cel.Env, error) {
-	decls := []*exprpb.Decl{
-		// declare top-level containers - user and event are possible.
-		decls.NewVar("event", decls.NewMapType(decls.String, decls.Dyn)),    // Event information
-		decls.NewVar("steps", decls.NewMapType(decls.String, decls.Dyn)),    // A common typo for action;  allow both.
-		decls.NewVar("response", decls.NewMapType(decls.String, decls.Dyn)), // used in edges
-		decls.NewVar("async", decls.NewMapType(decls.String, decls.Dyn)),    // used in async edges for the new async data.
-		decls.NewVar("user", decls.NewMapType(decls.String, decls.Dyn)),     // User information
-		// Legacy
-		decls.NewVar("actions", decls.NewMapType(decls.String, decls.Dyn)),
-		decls.NewVar("action", decls.NewMapType(decls.String, decls.Dyn)),
+func env(keys ...string) (*cel.Env, error) {
+	if len(keys) == 0 {
+		keys = defaultKeys
+	}
+
+	vars := []*exprpb.Decl{}
+
+	// declare top-level variable names as containers.
+	for _, key := range keys {
+		vars = append(
+			vars,
+			decls.NewVar(key, decls.NewMapType(decls.String, decls.Dyn)),
+		)
 	}
 
 	// create a new environment in which we define a single user attribute as a map
 	// of string to dynamic types.
 	env, err := cel.NewCustomEnv(
 		cel.Lib(customLibrary{}),
-		cel.Declarations(decls...),
+		cel.Declarations(vars...),
 	)
 
 	if err != nil {
