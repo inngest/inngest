@@ -87,7 +87,8 @@ func (d *dockerExec) Execute(ctx context.Context, state state.State, action inng
 	}
 
 	resp := &driver.Response{
-		Output: map[string]interface{}{},
+		Output:        map[string]interface{}{},
+		ActionVersion: action.Version,
 	}
 	if exit != 0 {
 		resp.Err = fmt.Errorf("non-zero status code: %d", exit)
