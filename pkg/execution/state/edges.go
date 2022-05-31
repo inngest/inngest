@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/expressions"
@@ -14,13 +15,17 @@ var (
 	// current state, using EdgeExpressionData to return data to use within
 	// edge expressions.
 	DefaultEdgeEvaluator = edgeEvaluator{
-		datagen: EdgeExpressionData,
+		datagen:   EdgeExpressionData,
+		evaluator: expressions.Evaluate,
 	}
 )
 
 // EdgeExpressionDataGen is a function which generates a map of data to be used within
 // expressions, when comparing edges.
 type EdgeExpressionDataGen func(ctx context.Context, s State, outgoingID string) map[string]interface{}
+
+// Evaluator is a function which evaluates the current expression, returning whether it's true.
+type Evaluator func(ctx context.Context, expression string, input map[string]interface{}) (bool, *time.Time, error)
 
 // EdgeExpressionData returns data from the current state to evaluate the given
 // edge's expressions.
@@ -58,14 +63,24 @@ type EdgeEvaluator interface {
 
 // NewEdgeEvaluator returns a new EdgeEvaluator, using the given function to return data for
 // variables within the expression.
-func NewEdgeEvaluator(e EdgeExpressionDataGen) EdgeEvaluator {
+func NewEdgeEvaluator(eval Evaluator, datagen EdgeExpressionDataGen) EdgeEvaluator {
+	// TODO (tonyhb): clean this up with options.
+	if eval == nil {
+		eval = expressions.Evaluate
+	}
+	if datagen == nil {
+		datagen = EdgeExpressionData
+	}
+
 	return edgeEvaluator{
-		datagen: e,
+		evaluator: eval,
+		datagen:   datagen,
 	}
 }
 
 type edgeEvaluator struct {
-	datagen EdgeExpressionDataGen
+	evaluator Evaluator
+	datagen   EdgeExpressionDataGen
 }
 
 func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepID string) ([]inngest.Edge, error) {
@@ -123,7 +138,7 @@ func (i edgeEvaluator) canTraverseEdge(ctx context.Context, s State, edge innges
 	exprdata := i.datagen(ctx, s, edge.WorkflowEdge.Outgoing)
 
 	if edge.WorkflowEdge.Metadata.If != "" {
-		ok, _, err := expressions.Evaluate(ctx, edge.WorkflowEdge.Metadata.If, exprdata)
+		ok, _, err := i.evaluator(ctx, edge.WorkflowEdge.Metadata.If, exprdata)
 		if err != nil || !ok {
 			return ok, err
 		}
