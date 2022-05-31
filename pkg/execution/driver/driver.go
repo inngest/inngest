@@ -28,6 +28,11 @@ type Response struct {
 	// Err represents the error from the action, if the action errored.
 	// If the action terminated successfully this must be nil.
 	Err error `json:"err"`
+
+	// ActionVersion returns the version of the action executed, as some workflows
+	// may have ranges.  This must be included in a driver.Response as this is the
+	// return result from an executor.
+	ActionVersion *inngest.VersionInfo `json:"actionVersion"`
 }
 
 // Retryable returns whether the response indicates that the action is

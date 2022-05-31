@@ -78,6 +78,7 @@ func (e executor) Execute(ctx context.Context, state state.State, action inngest
 			"status": resp.StatusCode,
 			"body":   body,
 		},
-		Err: err,
+		Err:           err,
+		ActionVersion: action.Version,
 	}, nil
 }

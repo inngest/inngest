@@ -294,9 +294,11 @@ func TestExecute_edge_expressions(t *testing.T) {
 	require.ElementsMatch(t, []string{}, availableIDs(edges))
 
 	// Run the next step.
-	_, err = exec.Execute(ctx, s.Identifier(), "run-step-trigger")
+	response, err := exec.Execute(ctx, s.Identifier(), "run-step-trigger")
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
+	assert.NoError(t, response.Err)
+	assert.EqualValues(t, *response, driver.Responses["run-step-trigger"])
 
 	s, err = sm.Load(ctx, s.Identifier())
 	require.NoError(t, err)

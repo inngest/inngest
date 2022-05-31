@@ -220,6 +220,12 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		return nil, fmt.Errorf("error executing action: %w", err)
 	}
 
+	if response.ActionVersion == nil {
+		// Set the ActionVersion automatically from the executor, where
+		// provided from the definition.
+		response.ActionVersion = definition.Version
+	}
+
 	// This action may have executed _asynchronously_.  That is, it may have been
 	// scheduled for execution but the result is pending.  In this case we cannot
 	// traverse this node's children as we don't have the response yet.
