@@ -194,7 +194,7 @@ github.com/cockroachdb/apd/v2
 # github.com/containerd/console v1.0.3
 ## explicit; go 1.13
 github.com/containerd/console
-# github.com/containerd/containerd v1.6.1
+# github.com/containerd/containerd v1.6.0-rc.0
 ## explicit; go 1.16
 github.com/containerd/containerd/pkg/userns
 # github.com/davecgh/go-spew v1.1.1
@@ -491,8 +491,8 @@ github.com/opencontainers/go-digest
 ## explicit
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.1.0
-## explicit; go 1.16
+# github.com/opencontainers/runc v1.0.3
+## explicit; go 1.13
 github.com/opencontainers/runc/libcontainer/user
 # github.com/pelletier/go-toml v1.9.4
 ## explicit; go 1.12
