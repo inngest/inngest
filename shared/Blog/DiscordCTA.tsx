@@ -31,5 +31,8 @@ const Box = styled.div`
   svg {
     font-size: 120px;
   }
+  p {
+    margin: 1.5rem 0;
+  }
 `;
 export default DiscordCTA;

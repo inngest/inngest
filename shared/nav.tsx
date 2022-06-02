@@ -3,6 +3,7 @@ import styled from "@emotion/styled";
 import Logo from "../shared/Icons/Logo";
 import Button from "../shared/Button";
 import Hamburger from "../shared/Icons/Hamburger";
+import Discord from "../shared/Icons/Discord";
 
 type Props = {
   nolinks?: boolean;
@@ -38,6 +39,13 @@ const NavContent: React.FC<Props> = (props: Props) => {
           </StyledLink>
           <StyledLink key="pricing" href="/pricing?ref=nav">
             Pricing
+          </StyledLink>
+          <StyledLink
+            key="discord"
+            className=""
+            href={process.env.NEXT_PUBLIC_DISCORD_URL}
+          >
+            <Discord />
           </StyledLink>
         </div>
       )}

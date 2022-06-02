@@ -2,6 +2,7 @@ import React from "react";
 import styled from "@emotion/styled";
 
 import Logo from "./Icons/Logo";
+import Discord from "./Icons/Discord";
 
 const Footer = () => {
   return (
@@ -16,6 +17,7 @@ const Footer = () => {
           <div>
             <p>Company</p>
             <a href="/about">About</a>
+            <a href="/blog">Blog</a>
             {/*<a href="/careers">Careers</a>*/}
             <a href="/contact">Contact Us</a>
           </div>
@@ -37,7 +39,7 @@ const Footer = () => {
           <div>
             <p>Community</p>
             <a href={process.env.NEXT_PUBLIC_DISCORD_URL} rel="nofollow">
-              Discord
+              <Discord /> Discord
             </a>
             <a href="https://github.com/inngest" rel="nofollow">
               Github
@@ -93,10 +95,16 @@ const Wrapper = styled.div`
   }
 
   a {
-    display: block;
+    display: flex;
+    align-items: center;
     color: var(--font-color-primary);
     text-decoration: none;
     margin: 1rem 0;
+
+    // Icons
+    svg {
+      margin-right: 0.4rem;
+    }
   }
 
   .footer-grid {

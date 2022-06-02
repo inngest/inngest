@@ -61,15 +61,8 @@ export default function BlogLayout(props) {
               components={components}
             />
           </Body>
+          <DiscordCTA />
         </Article>
-        {!scope.hideBottomCTA && (
-          <Callout
-            small="What is Inngest?"
-            heading="The fastest way to build and ship event-driven functions"
-            link="/?ref=blog-footer"
-            cta="Learn more >"
-          />
-        )}
         <Footer />
       </Wrapper>
     </>

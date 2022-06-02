@@ -4,7 +4,6 @@ heading: "Run Next.js functions in the background with events and schedules on V
 subtitle: "Learn how to take regular Next.js api functions and run them as you would a message queue or a cron job."
 image: "/assets/blog/run-nextjs-functions-in-the-background/featured-image.jpg"
 date: 2022-05-11
-hideBottomCTA: true
 ---
 
 There comes a point in time when your application gets too complex to be completely comprised of synchronous API endpoints. APIs are fantastic for CRUD actions that your users are taking that need an immediate response, but there are use cases when you want to do some work in your application in the background:
@@ -187,5 +186,3 @@ When you deploy either a scheduled function or a background job, you'll get full
 Congrats! You now know how you can easily move key logic in your app to be asynchronous and out of the critical path of a request. Background jobs are important for any scaling and performant application that you have so we think this will really help you grow your amazing products.
 
 _PS - If you need to run background jobs for event longer (up to 15 minutes!), you can deploy your functions directly to Inngest: [Here's a quick start guide to create and deploy a TypeScript function](https://www.inngest.com/docs/using-the-inngest-cli?ref=blog-run-nextjs-functions-in-the-background)_
-
-<DiscordCTA />
