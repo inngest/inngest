@@ -90,7 +90,7 @@ const docsSyntaxHighlightingCSS = css`
   }
 
   pre code {
-    font-size: 15px;
+    font-size: 14px;
     font-family: "JetBrains Mono", Menlo, Monaco, Consolas, Courier New,
       monospace;
     white-space: pre-wrap; // this fixes an issue of the code element not shrinking width and breaking layout
