@@ -3,10 +3,11 @@ category: "Managing workflows"
 title: "Via the CLI, including CI/CD"
 slug: "building-workflows/via-the-cli"
 order: 4
+hide: true
 ---
 
 Using our [CLI](https://github.com/inngest/inngestctl) you can deploy and manage workflows
-without interacting with our UI.  This is great for managing your workflows as code using CI/CD
+without interacting with our UI. This is great for managing your workflows as code using CI/CD
 &mdash; you can store workflow configuration directly within your version control repo.
 
 ## Installing the CLI
@@ -17,9 +18,9 @@ You can install the CLI on any platform by running the following code:
 curl -sfL https://raw.githubusercontent.com/inngest/inngestctl/main/install.sh | sh
 ```
 
-As always, you might want to inspect the shell code before running it.  This line downloads the
+As always, you might want to inspect the shell code before running it. This line downloads the
 latest binaries for your architecture [from our releases](https://github.com/inngest/inngestctl/releases)
-page into your current working directory.  You'll want to move them into your `$PATH` to use them
+page into your current working directory. You'll want to move them into your `$PATH` to use them
 from any location.
 
 You can also download the binaries manually, or build from source if you have [go](https://go.dev/)
@@ -71,4 +72,4 @@ If you want to push the workflow live, you can run the same command with the liv
 inngestctl workflows deploy --live ./path-to-config.cue
 ```
 
-That's it;  your workflows will be deployed and will run without doing anything further.
+That's it; your workflows will be deployed and will run without doing anything further.

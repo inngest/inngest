@@ -3,19 +3,20 @@ category: "Managing workflows"
 title: "Expressions and conditionals"
 slug: "building-workflows/expressions-and-conditionals"
 order: 9
+hide: true
 ---
 
 You might commonly want to run actions or workflows when criteria are met. For example, if you're
 subscribing to all Shopify order events you might only want to run workflows if the order total
 is over $500. This is built into the platform via expressions.
 
-Expressions work by testing statements to see if they're true.  For example, `"hi" == "hi"` is true;
+Expressions work by testing statements to see if they're true. For example, `"hi" == "hi"` is true;
 hi is equal to hi. Using the power of expressions, you can check any part of your event data, user
 data, or action data to conditionally run parts of your workflow.
 
 ## Using & writing expressions
 
-Expressions can be created via the UI and written as a common "IF" expression.  Here's a small
+Expressions can be created via the UI and written as a common "IF" expression. Here's a small
 example:
 
 `event.data.total >= 500`
@@ -27,22 +28,23 @@ This true if the value of "total" within the event is greater than or equal to 5
 These variables are always available:
 
 - `event`, which contains event data
-- `action`, which contains action results.  This is used in the same way as templating, eg. `action.1.status` to refer to the "status" field in the output of action 1.
+- `action`, which contains action results. This is used in the same way as templating, eg. `action.1.status` to refer to the "status" field in the output of action 1.
 - `user`, which contains user information
 
 The following are available in specific circumstances:
+
 - `response`, used in edges to refer to the previous action's response
 - `async`, used when waiting for another event in a workflow to refer to the new event's data
 
 **`response`**
 
-If you're testing an edge, you can use the shortcut `response` to refer to the action that just completed.  For example,
+If you're testing an edge, you can use the shortcut `response` to refer to the action that just completed. For example,
 if you have action 1 which leads to action 2, the `response` variable in this edge refers to `action.1`.
 
 **`async`**
 
 If you're waiting for another event by using the built in "Wait for event" action, the new event's
-data is available in the `async` variable.  This lets you compare the new event you just received
+data is available in the `async` variable. This lets you compare the new event you just received
 to the event that originally kicked off the workflow.
 
 ## Expression functions
@@ -78,7 +80,7 @@ to the event that originally kicked off the workflow.
 
 ### Time, date, and duration functions
 
-`date($)`: casts a string or int to a date for date comparisons.  Accepts dates in all common formats, including RFC3339 (with or without timezones), RFC822, Unix formatting, Ruby formatting, ANSIC, "YYYY-MM-DD", unix timestamps, and unix timestamps in seconds.
+`date($)`: casts a string or int to a date for date comparisons. Accepts dates in all common formats, including RFC3339 (with or without timezones), RFC822, Unix formatting, Ruby formatting, ANSIC, "YYYY-MM-DD", unix timestamps, and unix timestamps in seconds.
 
 `now_plus($)`: Returns a date extended by a duration (in months, weeks, days, hours, or seconds)<br /><small>`date(event.data) < now_plus("2w3d12h") // 2 weeks, 3 days, 12 hours`</small>
 
@@ -87,7 +89,7 @@ to the event that originally kicked off the workflow.
 ## Examples
 
 ```js
-event.data.total >= 500 && event.data.items.exists(x, x.price >= 100)
+event.data.total >= 500 && event.data.items.exists(x, x.price >= 100);
 
 // Given the following data:
 // {
@@ -125,5 +127,5 @@ event.data.tag.exists(t, t.match("/[pP][0-2]/"))
 Async event coordination:
 
 ```js
-async.event.data.subject == "Reply" && '{{ event.data.subject }}' == "Sent:"
+async.event.data.subject == "Reply" && "{{ event.data.subject }}" == "Sent:";
 ```
