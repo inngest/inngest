@@ -85,8 +85,8 @@ func TestUnmarshal(t *testing.T) {
 					{EventTrigger: &EventTrigger{Event: "test.event"}},
 				},
 				Steps: map[string]Step{
-					defaultStepName: {
-						ID:   defaultStepName,
+					DefaultStepName: {
+						ID:   DefaultStepName,
 						Name: "test",
 						Runtime: inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeDocker{},
@@ -118,8 +118,8 @@ func TestUnmarshal(t *testing.T) {
 					{EventTrigger: &EventTrigger{Event: "test.event"}},
 				},
 				Steps: map[string]Step{
-					defaultStepName: {
-						ID:   defaultStepName,
+					DefaultStepName: {
+						ID:   DefaultStepName,
 						Name: "test",
 						Runtime: inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeDocker{},
@@ -156,8 +156,8 @@ func TestUnmarshal(t *testing.T) {
 					{EventTrigger: &EventTrigger{Event: "test.event"}},
 				},
 				Steps: map[string]Step{
-					defaultStepName: {
-						ID:   defaultStepName,
+					DefaultStepName: {
+						ID:   DefaultStepName,
 						Name: "test",
 						Runtime: inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeDocker{},

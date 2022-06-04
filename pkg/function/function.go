@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	defaultStepName = "step-function"
+	DefaultStepName = "step-1"
 )
 
 // Function represents a step function which is triggered whenever an event
@@ -322,8 +322,8 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 		// custom code with the docker executor, and that the code is
 		// in the current directory.
 		f.Steps = map[string]Step{}
-		f.Steps["step-function"] = Step{
-			ID:   "step-function",
+		f.Steps[DefaultStepName] = Step{
+			ID:   DefaultStepName,
 			Name: f.Name,
 			Runtime: inngest.RuntimeWrapper{
 				Runtime: inngest.RuntimeDocker{},

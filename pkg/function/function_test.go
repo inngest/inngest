@@ -42,7 +42,7 @@ func TestDerivedConfigDefault(t *testing.T) {
 
 	expectedActionVersion := inngest.ActionVersion{
 		Name:   "Foo",
-		DSN:    "magical-id-step-step-function-test",
+		DSN:    "magical-id-step-step-1-test",
 		Scopes: []string{"secret:read:*"},
 		Runtime: inngest.RuntimeWrapper{
 			Runtime: inngest.RuntimeDocker{},
@@ -57,7 +57,7 @@ import (
 
 action: actions.#Action
 action: {
-  dsn:  "magical-id-step-step-function-test"
+  dsn:  "magical-id-step-step-1-test"
   name: "Foo"
   scopes: ["secret:read:*"]
   runtime: type: "docker"
@@ -86,7 +86,7 @@ action: {
 		},
 		Steps: []inngest.Step{
 			{
-				ID:       defaultStepName,
+				ID:       DefaultStepName,
 				ClientID: 1,
 				Name:     expectedActionVersion.Name,
 				DSN:      expectedActionVersion.DSN,
@@ -95,7 +95,7 @@ action: {
 		Edges: []inngest.Edge{
 			{
 				Outgoing: inngest.TriggerName,
-				Incoming: defaultStepName,
+				Incoming: DefaultStepName,
 			},
 		},
 	}
@@ -114,14 +114,14 @@ workflow: workflows.#Workflow & {
     expression: "event.version >= 2"
   }]
   actions: [{
-    id:       "step-function"
+    id:       "step-1"
     clientID: 1
     name:     "Foo"
-    dsn:      "magical-id-step-step-function-test"
+    dsn:      "magical-id-step-step-1-test"
   }]
   edges: [{
     outgoing: "$trigger"
-    incoming: "step-function"
+    incoming: "step-1"
     metadata: {}
   }]
 }`
