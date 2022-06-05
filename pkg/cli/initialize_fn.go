@@ -224,12 +224,13 @@ func (f *initModel) Function(ctx context.Context) (*function.Function, error) {
 			{CronTrigger: &function.CronTrigger{Cron: f.cron}},
 		}
 	default:
-		return fn, fmt.Errorf("Unknown trigger type: %s", f.triggerType)
+		return nil, fmt.Errorf("Unknown trigger type: %s", f.triggerType)
 	}
 
 	// If this is an HTTP function, set the runtime.
 	if f.runtimeType == runtimeHTTP {
-		fn.Steps[fn.Name] = function.Step{
+		fn.Steps[function.DefaultStepName] = function.Step{
+			ID:   function.DefaultStepName,
 			Name: fn.Name,
 			Runtime: inngest.RuntimeWrapper{
 				Runtime: inngest.RuntimeHTTP{
@@ -238,7 +239,8 @@ func (f *initModel) Function(ctx context.Context) (*function.Function, error) {
 			},
 		}
 	} else {
-		fn.Steps[fn.Name] = function.Step{
+		fn.Steps[function.DefaultStepName] = function.Step{
+			ID:   function.DefaultStepName,
 			Name: fn.Name,
 			Runtime: inngest.RuntimeWrapper{
 				Runtime: inngest.RuntimeDocker{},
