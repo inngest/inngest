@@ -21,6 +21,9 @@ func NewCmdInit() *cobra.Command {
 		Example: "inngestctl init",
 		Run:     runInit,
 	}
+
+	cmd.Flags().String("event", "", "An optional event name which triggers the function")
+
 	return cmd
 }
 
@@ -43,6 +46,7 @@ func runInit(cmd *cobra.Command, args []string) {
 	// the walkthrough is complete, this blocks and returns.
 	state, err := cli.NewInitModel(cli.InitOpts{
 		ShowWelcome: showWelcome,
+		Event:       cmd.Flag("event").Value.String(),
 	})
 	if err != nil {
 		fmt.Println(cli.RenderError(fmt.Sprintf("Error starting init command: %s", err)) + "\n")
