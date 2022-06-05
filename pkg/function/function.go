@@ -60,10 +60,6 @@ type Function struct {
 	dir string
 }
 
-func (f Function) Dir() string {
-	return f.dir
-}
-
 // Step represents a single unit of code (action) which runs as part of a step function, in a DAG.
 type Step struct {
 	ID      string                 `json:"id"`
@@ -101,6 +97,10 @@ func New() (*Function, error) {
 		ID:    id,
 		Steps: map[string]Step{},
 	}, nil
+}
+
+func (f Function) Dir() string {
+	return f.dir
 }
 
 func (f Function) Slug() string {
@@ -281,17 +281,7 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 }
 
 func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, error) {
-	suffix := "test"
-	if state.IsProd() {
-		suffix = "prod"
-	}
-
-	slug := strings.ToLower(slug.Make(s.ID))
-
-	id := fmt.Sprintf("%s-step-%s-%s", f.ID, slug, suffix)
-	if prefix, err := state.AccountIdentifier(ctx); err == nil && prefix != "" {
-		id = fmt.Sprintf("%s/%s", prefix, id)
-	}
+	id := s.DSN(ctx, f)
 
 	a := inngest.ActionVersion{
 		Name:    s.Name,
@@ -325,6 +315,7 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 		f.Steps[DefaultStepName] = Step{
 			ID:   DefaultStepName,
 			Name: f.Name,
+			Path: "file://.",
 			Runtime: inngest.RuntimeWrapper{
 				Runtime: inngest.RuntimeDocker{},
 			},
@@ -348,6 +339,22 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 	}
 
 	return nil
+}
+
+func (s Step) DSN(ctx context.Context, f Function) string {
+	suffix := "test"
+	if state.IsProd() {
+		suffix = "prod"
+	}
+
+	slug := strings.ToLower(slug.Make(s.ID))
+
+	id := fmt.Sprintf("%s-step-%s-%s", f.ID, slug, suffix)
+	if prefix, err := state.AccountIdentifier(ctx); err == nil && prefix != "" {
+		id = fmt.Sprintf("%s/%s", prefix, id)
+	}
+
+	return id
 }
 
 func randomID() (string, error) {

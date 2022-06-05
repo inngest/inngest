@@ -48,6 +48,7 @@ func doRun(cmd *cobra.Command, args []string) {
 
 	if err = buildImg(cmd.Context(), *fn); err != nil {
 		// This should already have been printed to the terminal.
+		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
 	}
 
@@ -73,12 +74,10 @@ func buildImg(ctx context.Context, fn function.Function) error {
 		BuildOpts:      opts,
 	})
 	if err != nil {
-		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
-		os.Exit(1)
+		return err
 	}
 	if err := tea.NewProgram(ui).Start(); err != nil {
-		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
-		os.Exit(1)
+		return err
 	}
 	return ui.Error()
 }

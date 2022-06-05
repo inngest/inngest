@@ -54,10 +54,15 @@ func (t Template) TemplatedPostSetup(f function.Function) string {
 }
 
 // Render renders the template and all files into the folder specified by function.
-func (t Template) Render(f function.Function) error {
+func (t Template) Render(f function.Function, step function.Step) error {
 	dirname := f.Slug()
 	relative := "./" + dirname
 	root, _ := filepath.Abs(relative)
+
+	stepDir, err := function.PathName(step.Path)
+	if err != nil {
+		return err
+	}
 
 	if _, err := os.Stat(root); err == nil {
 		return fmt.Errorf("%s already exists", dirname)
@@ -108,7 +113,7 @@ func (t Template) Render(f function.Function) error {
 				}
 
 				if len(names) == 0 {
-					return "export type EventTriggers = {};"
+					return "export type EventTriggers = { [key: string]: any };"
 				}
 
 				// Write an enum which joins all event triggers.
@@ -127,6 +132,19 @@ func (t Template) Render(f function.Function) error {
 		},
 	}
 
+	// Create directories for "events" and "steps"
+	if err := upsertDir(filepath.Join(root, "events")); err != nil {
+		return fmt.Errorf("error making event types directory: %w", err)
+	}
+	if err := upsertDir(filepath.Join(root, "steps")); err != nil {
+		return fmt.Errorf("error making steps directory: %w", err)
+	}
+
+	stepRoot := filepath.Join(root, stepDir)
+	if err := os.MkdirAll(stepRoot, 0755); err != nil {
+		return fmt.Errorf("error making step directory: %w", err)
+	}
+
 	// Clone the template dir and run templating on every file.
 	if t.FS != nil {
 		err := fs.WalkDir(t.FS, ".", func(path string, d fs.DirEntry, err error) error {
@@ -139,7 +157,7 @@ func (t Template) Render(f function.Function) error {
 			}
 
 			if d.IsDir() {
-				if err := os.Mkdir(filepath.Join(root, path), 0755); err != nil {
+				if err := os.Mkdir(filepath.Join(stepRoot, path), 0755); err != nil {
 					return err
 				}
 				return nil
@@ -164,7 +182,7 @@ func (t Template) Render(f function.Function) error {
 				return err
 			}
 
-			return os.WriteFile(filepath.Join(root, path), buf.Bytes(), 0644)
+			return os.WriteFile(filepath.Join(stepRoot, path), buf.Bytes(), 0644)
 		})
 		if err != nil {
 			return err
@@ -172,7 +190,6 @@ func (t Template) Render(f function.Function) error {
 	}
 
 	// For each event within the function create a new event file.
-	madeEventFolder := false
 	for n, trigger := range f.Triggers {
 		if trigger.EventTrigger == nil {
 			continue
@@ -191,13 +208,6 @@ func (t Template) Render(f function.Function) error {
 		if err != nil {
 			// XXX: We would like to log this as a warning.
 			continue
-		}
-
-		if !madeEventFolder {
-			if err := os.MkdirAll(filepath.Join(root, "events"), 0755); err != nil {
-				return fmt.Errorf("error making folder for event types: %w", err)
-			}
-			madeEventFolder = true
 		}
 
 		name := fmt.Sprintf("%s.cue", eventFilename(trigger.Event))
@@ -220,6 +230,18 @@ func (t Template) Render(f function.Function) error {
 	}
 
 	return nil
+}
+
+func upsertDir(path string) error {
+	if exists(path) {
+		return nil
+	}
+	return os.MkdirAll(path, 0755)
+}
+
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }
 
 // eventFilename returns a string for the event's filename.  Some events contain forward
