@@ -51,10 +51,16 @@ const (
 
 	runtimeHTTP   = "Call a URL"
 	runtimeDocker = "New function"
+
+	triggerTypeEvent     = "Event based"
+	triggerTypeScheduled = "Scheduled"
 )
 
 type InitOpts struct {
 	ShowWelcome bool
+
+	// Event represents a pre-defined event name to use as the trigger.
+	Event string
 }
 
 // NewInitModel renders the UI for initializing a new function.
@@ -73,17 +79,24 @@ func NewInitModel(o InitOpts) (*initModel, error) {
 		textinput:   textinput.New(),
 		loading:     spinner.New(),
 		transitions: 1,
+
+		event: o.Event,
+	}
+
+	if o.Event != "" {
+		f.event = o.Event
+		f.triggerType = triggerTypeEvent
 	}
 
 	listHeight := height - f.eventBrowserOffset()
 
 	f.triggerList = list.New([]list.Item{
 		initListItem{
-			name:        "Event based",
+			name:        triggerTypeEvent,
 			description: "Called every time a specific event is received",
 		},
 		initListItem{
-			name:        "Scheduled",
+			name:        triggerTypeScheduled,
 			description: "Called automatically on a schedule",
 		},
 	}, list.NewDefaultDelegate(), width, listHeight)
@@ -215,11 +228,11 @@ func (f *initModel) Function(ctx context.Context) (*function.Function, error) {
 	fn.Name = f.name
 
 	switch f.triggerType {
-	case "Event based":
+	case triggerTypeEvent:
 		fn.Triggers = []function.Trigger{
 			{EventTrigger: &function.EventTrigger{Event: f.event, Definition: ed}},
 		}
-	case "Scheduled":
+	case triggerTypeScheduled:
 		fn.Triggers = []function.Trigger{
 			{CronTrigger: &function.CronTrigger{Cron: f.cron}},
 		}
@@ -389,7 +402,16 @@ func (f *initModel) updateName(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok && key.Type == tea.KeyEnter && f.name != "" {
 		f.textinput.Placeholder = eventPlaceholder
 		f.textinput.SetValue("")
-		f.state = stateAskTrigger
+
+		// NOTE: Here we must check if we already have an event specified.  It's valid
+		// to start the TUI with an --event flag, predefining this trigger name.
+		if f.triggerType == "" {
+			f.state = stateAskTrigger
+		} else {
+			f.state = stateAskRuntime
+			// We're skipping two questions.  This isn't that nice.
+			f.transitions += 2
+		}
 	}
 
 	return f, cmd
@@ -513,11 +535,11 @@ func (f *initModel) updateTrigger(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Depending on the trigger, we're going to ask for the event type
 		// or the schedule.
 		switch f.triggerType {
-		case "Event based":
+		case triggerTypeEvent:
 			f.textinput.Placeholder = eventPlaceholder
 			f.state = stateAskEvent
 			f.textinput.SetValue("")
-		case "Scheduled":
+		case triggerTypeScheduled:
 			f.textinput.Placeholder = cronPlaceholder
 			f.state = stateAskCron
 			f.textinput.SetValue("")

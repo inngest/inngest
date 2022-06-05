@@ -27,7 +27,7 @@ func TestInitFunc(t *testing.T) {
 			name: "bare init model",
 			i: &initModel{
 				name:        "test fn",
-				triggerType: "Event based",
+				triggerType: triggerTypeEvent,
 				event:       "test/some-event",
 			},
 			fn: &function.Function{
@@ -40,7 +40,7 @@ func TestInitFunc(t *testing.T) {
 					},
 				},
 				Steps: map[string]function.Step{
-					function.DefaultStepName: function.Step{
+					function.DefaultStepName: {
 						ID:   function.DefaultStepName,
 						Name: "test fn",
 						Runtime: inngest.RuntimeWrapper{
