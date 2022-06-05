@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -25,30 +26,26 @@ type Artifact struct {
 }
 
 func FnBuildOpts(ctx context.Context, f function.Function) ([]BuildOpts, error) {
-	actions, _, err := f.Actions(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	opts := []BuildOpts{}
-	for _, a := range actions {
-		if a.Runtime.RuntimeType() != inngest.RuntimeTypeDocker {
+	for _, step := range f.Steps {
+		var err error
+
+		if step.Runtime.RuntimeType() != inngest.RuntimeTypeDocker {
 			continue
 		}
 
-		s, ok := f.Steps[a.Name]
-		if !ok {
-			return nil, fmt.Errorf("step not found for action: %s", a.Name)
-		}
-
-		path := s.Path
-		if s.Path == "" {
-			path = f.Dir()
+		path := f.Dir()
+		if step.Path != "" {
+			path, err = function.PathName(step.Path)
+			if err != nil {
+				return nil, err
+			}
+			path = filepath.Join(f.Dir(), path)
 		}
 
 		opts = append(opts, BuildOpts{
 			Path: path,
-			Tag:  a.DSN,
+			Tag:  step.DSN(ctx, f),
 		})
 	}
 

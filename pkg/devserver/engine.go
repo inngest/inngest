@@ -122,7 +122,7 @@ func (eng *Engine) SetFunctions(ctx context.Context, functions []*function.Funct
 
 	// Build all function images.
 	if err := eng.buildImages(ctx); err != nil {
-		return err
+		return fmt.Errorf("error building images: %w", err)
 	}
 
 	// If a previous cron manager exists, cancel it.

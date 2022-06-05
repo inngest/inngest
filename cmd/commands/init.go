@@ -74,7 +74,13 @@ func runInit(cmd *cobra.Command, args []string) {
 		// Use a blank template with no fs.FS to render only the JSON into the directory.
 		tpl = &scaffold.Template{}
 	}
-	if err := tpl.Render(*fn); err != nil {
+
+	var step function.Step
+	for _, v := range fn.Steps {
+		step = v
+	}
+
+	if err := tpl.Render(*fn, step); err != nil {
 		fmt.Println(cli.RenderError(fmt.Sprintf("There was an error creating the function: %s", err)) + "\n")
 		return
 	}

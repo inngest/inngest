@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/stretchr/testify/require"
 )
@@ -62,14 +63,26 @@ func TestTemplateRenderTypescript(t *testing.T) {
 		},
 	)
 
+	f.Steps["test"] = function.Step{
+		ID:   "test",
+		Path: "file://./steps/my-test",
+		Name: "A test function 😋",
+		Runtime: inngest.RuntimeWrapper{
+			Runtime: inngest.RuntimeDocker{},
+		},
+		After: []function.After{
+			{Step: inngest.TriggerName},
+		},
+	}
+
 	root, _ := filepath.Abs("./" + f.Slug())
 	os.RemoveAll(root)
 
-	err = tpl.Render(*f)
+	err = tpl.Render(*f, f.Steps["test"])
 	require.NoError(t, err)
 
 	// Expect "types.ts" to contain genned types.
-	byt, err := os.ReadFile(filepath.Join(root, "types.ts"))
+	byt, err := os.ReadFile(filepath.Join(root, "steps", "my-test", "types.ts"))
 	require.NoError(t, err)
 	require.EqualValues(t, expectedTypes, string(byt))
 }
