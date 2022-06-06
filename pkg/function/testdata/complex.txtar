@@ -116,8 +116,7 @@ function: defs.#Function & {
     },
     {
       "outgoing": "first",
-      "incoming": "second",
-      "metadata": {}
+      "incoming": "second"
     }
   ]
 }

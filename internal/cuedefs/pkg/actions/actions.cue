@@ -53,7 +53,7 @@ import (
 
 #RuntimeDocker: {
 	type:    "docker"
-	image:   string
+	image?:  string
 	memory?: >=64 & <=8096
 	entrypoint?: [ ...string]
 }

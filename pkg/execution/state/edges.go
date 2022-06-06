@@ -137,7 +137,7 @@ func (i edgeEvaluator) canTraverseEdge(ctx context.Context, s State, edge innges
 
 	exprdata := i.datagen(ctx, s, edge.WorkflowEdge.Outgoing)
 
-	if edge.WorkflowEdge.Metadata.If != "" {
+	if edge.WorkflowEdge.Metadata != nil && edge.WorkflowEdge.Metadata.If != "" {
 		ok, _, err := i.evaluator(ctx, edge.WorkflowEdge.Metadata.If, exprdata)
 		if err != nil || !ok {
 			return ok, err

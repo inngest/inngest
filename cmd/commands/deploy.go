@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/inngest/client"
 	"github.com/inngest/inngest-cli/inngest/state"
@@ -48,6 +47,25 @@ func deployFunction(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Build all steps.
+	steps, err := dockerdriver.FnBuildOpts(ctx, *fn)
+	if err != nil {
+		return err
+	}
+	ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
+		QuitOnComplete: true,
+		BuildOpts:      steps,
+	})
+	if err != nil {
+		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+		os.Exit(1)
+	}
+	if err := ui.Start(ctx); err != nil {
+		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+		os.Exit(1)
+	}
+
+	// Push each action
 	actions, _, err := fn.Actions(ctx)
 	if err != nil {
 		return err
@@ -99,37 +117,6 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 
 	// Ensure we normalize the DSN before building.
 	a = normalizeDSN(ctx, a)
-
-	tag := a.DSN
-
-	if a.Runtime.RuntimeType() == inngest.RuntimeTypeDocker {
-		fmt.Println(cli.BoldStyle.Render(fmt.Sprintf("Building action %s...", tag)))
-
-		// Build the image.  We always need to do this first to ensure we have
-		// an up-to-date image and checksum for the action.
-		ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
-			QuitOnComplete: true,
-			BuildOpts: []dockerdriver.BuildOpts{
-				dockerdriver.BuildOpts{
-					Path:     ".",
-					Tag:      tag,
-					Platform: "linux/amd64",
-				},
-			},
-		})
-		if err != nil {
-			return err
-		}
-		if err := tea.NewProgram(ui).Start(); err != nil {
-			return err
-		}
-		if ui.Error() != nil {
-			// We don't want to repeat the docker build error in
-			// the UI.
-			return fmt.Errorf("Exiting after a build error")
-		}
-		fmt.Println("")
-	}
 
 	// configure version information, ensuring that we skip redeploying actions that are
 	// already live.
@@ -223,7 +210,7 @@ func configureVersionInfo(ctx context.Context, a inngest.ActionVersion) (inngest
 	}
 
 	// Are the runtimes the same?
-	if a.Runtime.Runtime != found.Runtime.Runtime {
+	if a.Runtime.RuntimeType() != found.Runtime.RuntimeType() {
 		a.Version = &inngest.VersionInfo{
 			Major: found.Version.Major,
 			Minor: found.Version.Minor + 1,

@@ -220,7 +220,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 			{
 				Outgoing: inngest.TriggerName,
 				Incoming: "run-step-trigger",
-				Metadata: inngest.EdgeMetadata{
+				Metadata: &inngest.EdgeMetadata{
 					If: "event.data.run == true && event.data.string == 'yes'",
 				},
 			},
@@ -228,7 +228,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 			{
 				Outgoing: inngest.TriggerName,
 				Incoming: "dont-run-step-trigger",
-				Metadata: inngest.EdgeMetadata{
+				Metadata: &inngest.EdgeMetadata{
 					If: "event.data.run == false || event.data.string != 'yes'",
 				},
 			},
@@ -237,7 +237,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 			{
 				Outgoing: "run-step-trigger",
 				Incoming: "run-step-child",
-				Metadata: inngest.EdgeMetadata{
+				Metadata: &inngest.EdgeMetadata{
 					If: "response.ok == true && response.step == 'run-step-trigger' && event.data.run == true && steps['run-step-trigger'].ok == true",
 				},
 			},
@@ -245,7 +245,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 			{
 				Outgoing: "run-step-trigger",
 				Incoming: "run-step-child",
-				Metadata: inngest.EdgeMetadata{
+				Metadata: &inngest.EdgeMetadata{
 					If: "response.ok != true || response.step != 'run-step-trigger'",
 				},
 			},
