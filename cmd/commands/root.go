@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/inngest/inngest-cli/pkg/cli"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 const (
-	longDescription = `
+	letters = `
     ____                            __
    /  _/___  ____  ____ ____  _____/ /_
    / // __ \/ __ \/ __ '/ _ \/ ___/ __/
@@ -18,6 +19,16 @@ const (
 /___/_/ /_/_/ /_/\__, /\___/____/\__/
                 /____/
 `
+)
+
+var (
+	longDescription = fmt.Sprintf(
+		"%s\n%s\n%s%s\n",
+		cli.TextStyle.Render(letters),
+		cli.TextStyle.Render("Build event-driven queues with zero infra. "),
+		cli.TextStyle.Render("Request features, get help, and chat with us: "),
+		cli.BoldStyle.Render("https://www.inngest.com/discord"),
+	)
 )
 
 func Execute() {
