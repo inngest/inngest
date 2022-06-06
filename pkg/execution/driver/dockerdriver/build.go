@@ -25,7 +25,7 @@ type Artifact struct {
 	Tag  string
 }
 
-func FnBuildOpts(ctx context.Context, f function.Function) ([]BuildOpts, error) {
+func FnBuildOpts(ctx context.Context, f function.Function, args ...string) ([]BuildOpts, error) {
 	opts := []BuildOpts{}
 	for _, step := range f.Steps {
 		var err error
@@ -46,6 +46,7 @@ func FnBuildOpts(ctx context.Context, f function.Function) ([]BuildOpts, error) 
 		opts = append(opts, BuildOpts{
 			Path: path,
 			Tag:  step.DSN(ctx, f),
+			Args: args,
 		})
 	}
 
