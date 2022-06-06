@@ -48,7 +48,7 @@ func deployFunction(cmd *cobra.Command, args []string) error {
 	}
 
 	// Build all steps.
-	steps, err := dockerdriver.FnBuildOpts(ctx, *fn)
+	steps, err := dockerdriver.FnBuildOpts(ctx, *fn, "--platform", "linux/amd64")
 	if err != nil {
 		return err
 	}
