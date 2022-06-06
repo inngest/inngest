@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest/client"
 	"github.com/inngest/inngest-cli/inngest/log"
 	"github.com/mitchellh/go-homedir"
@@ -95,6 +96,15 @@ func Client(ctx context.Context) client.Client {
 		return state.Client
 	}
 	return client.New()
+}
+
+func AccountID(ctx context.Context) uuid.UUID {
+	state, err := GetState(ctx)
+	if err != nil {
+		return uuid.UUID{}
+	}
+
+	return state.Account.ID
 }
 
 func AccountIdentifier(ctx context.Context) (string, error) {

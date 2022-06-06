@@ -21,6 +21,7 @@ require (
 	github.com/hashicorp/terraform v0.15.3
 	github.com/inngest/cuetypescript v0.0.0-20220302153725-a00e933fdf87
 	github.com/inngest/event-schemas v0.0.0-20220323133008-96be406e1ea4
+	github.com/inngest/inngestgo v0.4.0
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/lnquy/cron v1.1.1
 	github.com/mattn/go-isatty v0.0.14

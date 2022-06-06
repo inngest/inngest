@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/inngest/inngest-cli/pkg/api/tel"
 	"github.com/inngest/inngest-cli/pkg/cli"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
@@ -36,6 +37,15 @@ func Execute() {
 		Use:   "inngest",
 		Short: "A serverless event-driven infrastructure platform",
 		Long:  longDescription,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			m := tel.NewMetadata(cmd.Context())
+			m.SetCobraCmd(cmd)
+			tel.Send(cmd.Context(), m)
+		},
+		PersistentPostRun: func(cmd *cobra.Command, args []string) {
+			// Wait for any events to have been sent.
+			tel.Wait()
+		},
 	}
 
 	rootCmd.PersistentFlags().Bool("prod", false, "Use the production environment for the current command.")
