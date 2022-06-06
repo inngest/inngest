@@ -72,19 +72,34 @@ A function can have 1 or more triggers which are defined in the following format
 
 ## Steps
 
-The list of steps is an object, with each step using a unique key `id` and it's own step configuration.
+The list of steps is an object, with each step using a unique key `id` and it's own step configuration. A function can have 1 to n steps. For more information about steps, check out the [Step Functions](/docs/functions/step-functions) documentation.
 
 ```json twoslash
+"steps": {
 // @log: The step id - this must be unique
-"step-1": {
-  "id": "step-1",
+  "step-1": {
+    "id": "step-1",
 // @log: The path to the step's code including a Dockerfile for Docker runtime functions.
-  "path": "file://./steps/send-sms-dispatch",
+    "path": "file://./steps/send-sms-dispatch",
 // @log: A nicely formatted name for the step for logging and UI purposes
-  "name": "Send SMS Dispatch",
+    "name": "Send SMS Dispatch",
 // @log: A runtime declaration instructing Inngest how to execute your function
-  "runtime": {
-    "type": "docker"
+    "runtime": {
+      "type": "docker"
+    }
+  },
+  "step-2": {
+    "id": "step-2",
+    "path": "file://./steps/log-confirmation-for-admin",
+    "name": "Log confirmation for admin",
+// @log: The "after" parameter is used to specify which step to execute this step after. This allows you to chain steps together to create complex DAGs
+    "after": {
+// @log: Step is a string which is the ID of the previous step
+      "step": "step-1",
+// @log: Wait is an optional field that specifies a delay between executing steps, e.g. "24h" or "1h30m"
+    },
+    "runtime": {
+      "type": "docker"
+    }
   }
-}
 ```
