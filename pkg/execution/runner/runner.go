@@ -130,7 +130,7 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 		//
 		// The runner should load all pauses and automatically resume the traversal when a
 		// matching event is received.
-		if next.Metadata.AsyncEdgeMetadata != nil {
+		if next.Metadata != nil && next.Metadata.AsyncEdgeMetadata != nil {
 			am := next.Metadata.AsyncEdgeMetadata
 
 			if am.Event == "" {
@@ -157,7 +157,7 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 		}
 
 		at := time.Now()
-		if next.Metadata.Wait != nil {
+		if next.Metadata != nil && next.Metadata.Wait != nil {
 			dur, err := str2duration.ParseDuration(*next.Metadata.Wait)
 			if err != nil {
 				return fmt.Errorf("invalid wait duration: %s", *next.Metadata.Wait)

@@ -35,12 +35,18 @@ func (l loggingExecutor) Execute(ctx context.Context, id state.Identifier, from 
 			Interface("response", resp).
 			Msg("executed step")
 	} else {
+		retryable := false
+		if resp != nil {
+			retryable = resp.Retryable()
+		}
+
 		l.log.Info().
 			Str("run_id", id.RunID.String()).
 			Str("step", from).
+			Err(err).
 			Interface("response", resp).
-			Bool("retryable", resp.Retryable()).
-			Msg("error executing step step")
+			Bool("retryable", retryable).
+			Msg("error executing step")
 	}
 
 	return resp, err

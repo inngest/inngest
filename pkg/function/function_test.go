@@ -35,7 +35,7 @@ func TestDerivedConfigDefault(t *testing.T) {
 			},
 		},
 	}
-	path := "/Users/johnny/dev/repo/functions/inngest.json"
+	path := "file:///Users/johnny/dev/repo/functions/inngest.json"
 
 	err = fn.canonicalize(context.Background(), path)
 	require.NoError(t, err)
@@ -122,7 +122,6 @@ workflow: workflows.#Workflow & {
   edges: [{
     outgoing: "$trigger"
     incoming: "step-1"
-    metadata: {}
   }]
 }`
 

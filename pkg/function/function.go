@@ -203,7 +203,7 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 		// actions to be defined within a workflow, plus data type changes.
 		var found Step
 		for _, s := range f.Steps {
-			if s.Name == a.Name {
+			if s.DSN(ctx, f) == a.DSN {
 				found = s
 				break
 			}
@@ -237,7 +237,8 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 	avs := []inngest.ActionVersion{}
 	edges := []inngest.Edge{}
 
-	for _, step := range f.Steps {
+	for _, s := range f.Steps {
+		step := s
 		av, err := f.action(ctx, step)
 		if err != nil {
 			return nil, nil, err
@@ -247,7 +248,7 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 		// We support barebones function definitions with a single step.  Any time
 		// a single step is specified without an After block, it's ran automatically
 		// from the trigger.
-		if len(f.Steps) == 1 && len(step.After) == 0 {
+		if len(step.After) == 0 {
 			edges = append(edges, inngest.Edge{
 				Outgoing: inngest.TriggerName,
 				Incoming: step.ID,
@@ -257,13 +258,18 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 
 		// For each of the "after" items, add an edge.
 		for _, after := range step.After {
+			var metadata *inngest.EdgeMetadata
+			if after.Async != nil || after.Wait != nil {
+				metadata = &inngest.EdgeMetadata{
+					Wait:              after.Wait,
+					AsyncEdgeMetadata: after.Async,
+				}
+			}
+
 			edges = append(edges, inngest.Edge{
 				Outgoing: after.Step,
 				Incoming: step.ID,
-				Metadata: inngest.EdgeMetadata{
-					Wait:              after.Wait,
-					AsyncEdgeMetadata: after.Async,
-				},
+				Metadata: metadata,
 			})
 		}
 	}
