@@ -269,7 +269,7 @@ const docsSyntaxHighlightingCSS = css`
     padding-left: 8px;
     width: calc(100% - 19px);
     white-space: pre-wrap;
-    font-size: 12px;
+    /* font-size: 12px; */
     margin: 5px 0 10px;
     opacity: 0.3;
     cursor: default;

@@ -20,13 +20,13 @@ Events ingested into our system have a specific format. Here is the entire paylo
 ```json twoslash
 {
   "name": "ticket.updated",
-  // @log: The event name is required.
+// @log: The event name is required.
   "data": {
     "ticket_id": 189325,
     "comment": "Thanks for sending me the return label!",
     "status": "open"
   },
-  // @log: Data is also required.
+// @log: Data is also required.
   "user": {
     "external_id": 83561,
     "email": "test@example.com"
