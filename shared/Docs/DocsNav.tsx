@@ -8,6 +8,7 @@ import ThemeToggleButton from "../ThemeToggleButton";
 import Button from "../Button";
 import Logo from "../Icons/Logo";
 import Hamburger from "../Icons/Hamburger";
+import Discord from "../Icons/Discord";
 
 /**
  * Creates an array of categories, nested each sub pages under their parent
@@ -70,7 +71,7 @@ const DocsNav: React.FC<{ categories: Categories }> = ({ categories }) => {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Join our Discord
+            <Discord size="16px" /> Join our Discord
           </a>
           <div className="auth-ctas">
             <Button
@@ -286,6 +287,12 @@ const CTAContainer = styled.div`
   }
 
   a {
+    display: flex;
+    align-items: center;
     text-decoration: none;
+  }
+
+  a > svg {
+    margin-right: 10px;
   }
 `;
