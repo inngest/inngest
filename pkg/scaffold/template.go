@@ -76,6 +76,7 @@ func (t Template) Render(f function.Function, step function.Step) error {
 		ID:         f.ID,
 		Name:       f.Name,
 		QuotedName: strings.ReplaceAll(f.Name, `"`, `\"`),
+		SlugName:   slug.Make(f.Name),
 	}
 
 	for _, t := range f.Triggers {
