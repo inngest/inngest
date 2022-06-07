@@ -29,6 +29,7 @@ type tplData struct {
 	ID            string
 	Name          string
 	QuotedName    string
+	SlugName      string
 	EventTriggers []*function.EventTrigger
 }
 
