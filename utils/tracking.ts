@@ -5,6 +5,11 @@ export const trackPageView = (url: string) => {
     ref = urlParams.get("ref");
   } catch (e) {}
 
+  if (typeof window.Inngest === "undefined") {
+    console.warn("Inngest is not initialized");
+    return;
+  }
+
   window.Inngest.event({
     name: "website/page.viewed",
     data: {
