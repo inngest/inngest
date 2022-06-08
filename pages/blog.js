@@ -1,5 +1,6 @@
 import styled from "@emotion/styled";
 import Head from "next/head";
+import { useRouter } from "next/router";
 
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
@@ -8,8 +9,13 @@ import ThemeToggleButton from "../shared/ThemeToggleButton";
 import { Wrapper } from "../shared/blog";
 
 export default function BlogLayout(props) {
+  const router = useRouter();
+  const { showHidden } = router.query;
+
   const content = props.content.map(JSON.parse);
-  const visiblePosts = content.filter((post) => !post.hide);
+  const visiblePosts = showHidden
+    ? content
+    : content.filter((post) => !post.hide);
 
   const focus = visiblePosts.find((c) => c.focus);
   const rest = visiblePosts
