@@ -1,6 +1,6 @@
 <p align="center">
         <br />
-        <img src="https://www.inngest.com/logo-white.svg" alt="Logo" width="140" height="40">
+        <img src="https://www.inngest.com/assets/open-source/open-source-logo.svg" alt="Logo" width="220" height="90">
 </p>
 <p align="center">
         The event-driven queue for any language.<br />
