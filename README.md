@@ -29,7 +29,6 @@ We’re open source, committed to preventing vendor-lock in, using simple standa
 
 - [**Join our community for support, to give us feedback, or chat with us**](https://www.inngest.com/discord).
 - [Docs](https://www.inngest.com/docs)
-- [Get started in 2 minutes](https://www.inngest.com/docs/quick-start)
 - [Read more about our vision and why this project exists]()
 
 <br />
@@ -43,29 +42,15 @@ curl -sfL https://cli.inngest.com/install.sh | sh \
   && sudo mv ./inngest /usr/local/bin/inngest
 ```
 
-**Via the install script**
-
-1. Run `curl -sfL https://cli.inngest.com/install.sh | sh` to automatically download the latest binary for your OS and arch
-2. Move the new `./inngest` file into your `$PATH` (eg. `mv ./inngest /usr/local/bin/`)
-
 **Manually:** by downloading a [pre-compiled binary](https://github.com/inngest/inngest-cli/releases) and placing the binary in your path.
 
 <br />
 
 ## Trying Inngest
 
-First, you need to install the CLI above.  Then, getting started with Inngest locally is simple:
+Once you've installed the CLI, you can run `inngest init` to build new functions,  `inngest run` to test them, and `inngest dev` to run the dev server.
 
-1. Create a new serverless function via `inngest init`.  This creates two things:
-    1. An `inngest.json` config file, which specifies how functions should run (its triggers), throttling, step functions, etc.  [Read the docs on the inngest config](https://www.inngest.com/docs/functions/inngest-json-configuration).
-    2. A blank project for you to edit.
-2. Run `inngest dev` to start a new development server.  This:
-    1. Accepts events via a POST to `http://127.0.0.1:9999/e/$key`
-    2. Automatically runs all functions found in your current directory when events are received (or on a schedule), using our open-source executor with in-memory state.
-
-That’s all you need to do.  You can trigger your background functions by sending events to your dev server, or use `inngest run` to test functions independently with dummy data.  You can deploy your functions to Inngest via `inngest deploy`.  We’re currently working on open-source persistent state, plus the ability to run AWS lambda functions so that you can deploy on prem.
-
-[See our entire roadmap for more info](https://github.com/orgs/inngest/projects/1).
+- [Quick start docs](https://www.inngest.com/docs/quick-start)
 
 <br />
 
