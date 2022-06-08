@@ -16,7 +16,7 @@ import { DocsLayout, DocsContent } from "../docs";
 import { highlight } from "../../utils/code";
 
 export default function DocLayout(props: any) {
-  const scope: DocScope & { categories: Categories } = JSON.parse(
+  const scope: DocScope & { cli: Categories; cloud: Categories } = JSON.parse(
     props.post.scope.json
   );
 
@@ -25,7 +25,7 @@ export default function DocLayout(props: any) {
     scope.description || `Inngest documentation for ${scope.title}`;
 
   return (
-    <DocsLayout categories={scope.categories}>
+    <DocsLayout cli={scope.cli} cloud={scope.cloud}>
       <Head>
         <title>{scope.title} → Inngest docs</title>
         <meta name="description" content={description}></meta>
@@ -105,18 +105,19 @@ export async function getStaticProps({ params }) {
   // These are required here as this function is not included in frontend
   // browser builds.
   const slug = params.slug;
+  const parsedSlug = Array.isArray(slug) ? slug.join("/") : slug;
 
-  const categories = getAllDocs().categories;
-  const docs = getDocs(Array.isArray(slug) ? slug.join("/") : slug);
+  const { cli, cloud } = getAllDocs();
+  const docs = getDocs(parsedSlug);
 
   if (!docs) {
-    throw new Error("unable to find docs for " + slug);
+    throw new Error("unable to find docs for " + parsedSlug);
   }
 
   const { content } = docs;
 
   // Add categories to the scope such that we can show them in the UI.
-  const scope = { ...docs.scope, categories };
+  const scope = { ...docs.scope, cli, cloud };
 
   const post = await serialize(content, {
     scope: { json: JSON.stringify(scope) },

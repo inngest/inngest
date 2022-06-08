@@ -15,6 +15,7 @@ const TOC = {
 };
 
 export type DocScope = {
+  type: "cli" | "cloud";
   // If the slug contains a forward slahs (eg. foo/bar), this page will automatically
   // be nested under the page with a slug of "foo"
   slug: string;
@@ -48,6 +49,7 @@ type Doc = {
   slug: string;
   content: string;
   scope: DocScope;
+  type: "cli" | "cloud";
 };
 
 export type Category = {
@@ -61,7 +63,8 @@ export type Categories = { [title: string]: Category };
 type Docs = {
   docs: { [slug: string]: Doc };
   slugs: string[];
-  categories: Categories;
+  cli: Categories;
+  cloud: Categories;
 };
 
 export const getAllDocs = (() => {
@@ -69,7 +72,9 @@ export const getAllDocs = (() => {
     // docs maps docs by slug
     docs: {},
     slugs: [],
-    categories: {},
+
+    cli: {},
+    cloud: {},
   };
 
   return (): Docs => {
@@ -87,13 +92,13 @@ export const getAllDocs = (() => {
 
     // parseDir is given the current directory path, then returns a function which
     // can read all files from the given basepath and processes the input.
-    const parseDir = (basepath: string) => (fname: string) => {
+    const parseDir = (basepath: string, type: "cli" | "cloud") => (fname: string) => {
       const fullpath = basepath + fname;
 
       if (fs.statSync(fullpath).isDirectory()) {
         // recurse into this directory with a new parse function using the extended
         // path.
-        fs.readdirSync(fullpath).forEach(parseDir(fullpath + "/"));
+        fs.readdirSync(fullpath).forEach(parseDir(fullpath + "/", type));
         return;
       }
 
@@ -104,11 +109,18 @@ export const getAllDocs = (() => {
         return;
       }
 
+      if (type === "cloud" && scope.slug.indexOf("cloud/") !== 0) {
+        // Add a cloud prefix.
+        scope.slug = "cloud/" + scope.slug;
+      }
+
       memoizedDocs.slugs.push("/docs/" + scope.slug);
       memoizedDocs.docs[scope.slug] = {
+        type,
         slug: scope.slug,
         content,
         scope: {
+          type,
           ...scope,
           toc: getHeadings(content),
           reading: readingTime(content),
@@ -117,10 +129,10 @@ export const getAllDocs = (() => {
     };
 
     fs.readdirSync("./pages/docs/_docs/").forEach(
-      parseDir("./pages/docs/_docs/")
+      parseDir("./pages/docs/_docs/", "cli")
     );
 
-    const categories = {};
+    const cli = {};
 
     // Iterate through each docs page and add the category.
     Object.values(memoizedDocs.docs).forEach((d: Doc) => {
@@ -130,24 +142,56 @@ export const getAllDocs = (() => {
       }
 
       // Add category to list.
-      if (!categories[d.scope.category]) {
+      if (!cli[d.scope.category]) {
         const order = TOC.hasOwnProperty(d.scope.category)
           ? TOC[d.scope.category]
           : 100;
         if (order === 100) {
           console.warn("no order for category", d.scope.category);
         }
-        categories[d.scope.category] = {
+        cli[d.scope.category] = {
           title: d.scope.category,
           pages: [d.scope],
           order,
         };
       } else {
-        categories[d.scope.category].pages.push(d.scope);
+        cli[d.scope.category].pages.push(d.scope);
       }
     });
 
-    memoizedDocs.categories = categories;
+    memoizedDocs.cli = cli;
+
+    // Read cloud docs
+
+    fs.readdirSync("./pages/docs/_cloud/").forEach(
+      parseDir("./pages/docs/_cloud/", "cloud")
+    );
+
+    const cloud = {};
+    // Iterate through each docs page and add the category.
+    Object.values(memoizedDocs.docs).forEach((d: Doc) => {
+      if (d.type === "cli") {
+        return;
+      }
+
+      // Add category to list.
+      if (!cloud[d.scope.category]) {
+        const order = TOC.hasOwnProperty(d.scope.category)
+          ? TOC[d.scope.category]
+          : 100;
+        if (order === 100) {
+          console.warn("no order for category", d.scope.category);
+        }
+        cloud[d.scope.category] = {
+          title: d.scope.category,
+          pages: [d.scope],
+          order,
+        };
+      } else {
+        cloud[d.scope.category].pages.push(d.scope);
+      }
+    });
+    memoizedDocs.cloud = cloud;
 
     return memoizedDocs;
   };
@@ -155,6 +199,7 @@ export const getAllDocs = (() => {
 
 export const getDocs = (slug: string): Doc | undefined => {
   const docs = getAllDocs();
+  console.log(docs);
   return docs.docs[slug];
 };
 

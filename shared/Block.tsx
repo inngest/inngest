@@ -1,13 +1,13 @@
-import React from "react"
-import styled from "@emotion/styled"
+import React from "react";
+import styled from "@emotion/styled";
 
 const COLORS = {
   default: "--black",
   primary: "--primary-color",
-}
+};
 
 const Block = styled.div<{
-  color?: "default" | "primary"
+  color?: "default" | "primary";
 }>`
   padding: 2rem;
   background: var(
@@ -23,6 +23,6 @@ const Block = styled.div<{
   p {
     font-family: var(--font);
   }
-`
+`;
 
-export default Block
+export default Block;

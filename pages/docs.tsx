@@ -13,13 +13,13 @@ import { getAllDocs, Categories } from "../utils/docs";
 import docsSyntaxHighlightingCSS from "../shared/syntaxHighlightingCSS";
 
 export async function getStaticProps() {
-  const categories = getAllDocs().categories;
-  return { props: { categories: categories, htmlClassName: "docs" } };
+  const { cli, cloud } = getAllDocs();
+  return { props: { cli: cli, cloud: cloud, htmlClassName: "docs" } };
 }
 
 export default function DocsHome(props) {
   return (
-    <DocsLayout categories={props.categories}>
+    <DocsLayout cli={props.cli} cloud={props.cloud}>
       <Head>
         <title>Inngest → Documentation & Guides</title>
       </Head>
@@ -132,16 +132,16 @@ export default function DocsHome(props) {
   );
 }
 
-export const DocsLayout: React.FC<{ categories: Categories }> = ({
+export const DocsLayout: React.FC<{ cli: Categories; cloud: Categories }> = ({
   children,
-  categories,
+  cli,
+  cloud,
 }) => {
-  const router = useRouter();
   return (
     <>
       <Global styles={DocsGlobalStyles} />
       <DocsWrapper>
-        <DocsNav categories={categories} />
+        <DocsNav cli={cli} cloud={cloud} />
         <Main>{children}</Main>
       </DocsWrapper>
       <Footer />

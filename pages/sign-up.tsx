@@ -165,8 +165,9 @@ const Content = styled.div`
     }
   }
 
-  form, .signup > a {
-    box-shadow: 0 0 80px rgba(255, 255, 255, 0.06)
+  form,
+  .signup > a {
+    box-shadow: 0 0 80px rgba(255, 255, 255, 0.06);
   }
 
   form {

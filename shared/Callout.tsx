@@ -10,7 +10,14 @@ type Props = {
   style?: any;
 };
 
-const Callout: React.FC<Props> = ({ small, heading, cta, link, ctaRef, style }) => {
+const Callout: React.FC<Props> = ({
+  small,
+  heading,
+  cta,
+  link,
+  ctaRef,
+  style,
+}) => {
   return (
     <div className="grid" style={style}>
       <Content className="bg-primary">

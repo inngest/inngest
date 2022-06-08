@@ -36,9 +36,12 @@ const createNestedTOC = (categories: Categories) => {
   });
 };
 
-const DocsNav: React.FC<{ categories: Categories }> = ({ categories }) => {
+const DocsNav: React.FC<{ cli: Categories, cloud: Categories }> = ({ cli, cloud }) => {
   const [isExpanded, setExpanded] = useState(false);
-  const nestedTOC = createNestedTOC(categories);
+  const nestedCLI = createNestedTOC(cli);
+  const nestedCloud = createNestedTOC(cloud);
+
+console.log(nestedCloud, cloud);
 
   return (
     <Sidebar>
@@ -57,9 +60,18 @@ const DocsNav: React.FC<{ categories: Categories }> = ({ categories }) => {
       <Menu isExpanded={isExpanded}>
         <Nav>
           <NavList>
-            {nestedTOC.map((c, idx) => (
-              <DocsNavItem key={`cat-${idx}`} category={c} />
+            {nestedCLI.map((c, idx) => (
+              <DocsNavItem key={`cat-${idx}`} category={c} type="cli" />
             ))}
+
+            <hr />
+
+            <h5>Cloud docs</h5>
+
+            {nestedCloud.map((c, idx) => (
+              <DocsNavItem key={`cat-${idx}`} category={c} type="cloud" />
+            ))}
+
           </NavList>
           <div>
             <ThemeToggleButton />
@@ -94,9 +106,10 @@ const DocsNav: React.FC<{ categories: Categories }> = ({ categories }) => {
 
 export default DocsNav;
 
-const DocsNavItem: React.FC<{ category: Category; doc?: DocScope }> = ({
+const DocsNavItem: React.FC<{ category: Category; doc?: DocScope, type: "cli" | "cloud" }> = ({
   category,
   doc,
+  type,
 }) => {
   const [isExpanded, setExpanded] = useState(false);
   const router = useRouter();
@@ -104,10 +117,13 @@ const DocsNavItem: React.FC<{ category: Category; doc?: DocScope }> = ({
 
   const title = doc ? doc.title : category.title;
   const pages = doc ? doc.pages : category.pages;
-  const isCurrentPage = pathSlug === doc?.slug;
+  const isCurrentPage = pathSlug === doc?.slug && type === doc.type;
+
   const shouldExpand =
     isCurrentPage ||
-    !!(pages || []).find((p) => pathSlug.indexOf(p.slug) === 0);
+    !!(pages || []).find((p) => {
+      return pathSlug.indexOf(p.slug) === 0 && p.type === type;
+    });
 
   useEffect(() => {
     if (shouldExpand) {
@@ -116,6 +132,24 @@ const DocsNavItem: React.FC<{ category: Category; doc?: DocScope }> = ({
   }, [shouldExpand]);
 
   const formattedTitle = title.replace(/`(.+)`/, "<code>$1</code>");
+
+  if (!doc && category && category.title === "") {
+  // If there's no category title, render the pages outright in the menu.
+    return !!pages?.length && (
+        <NavList className="items" isExpanded={true} style={{ margin: 0 }}>
+          {pages
+            .sort((a, b) => a.order - b.order)
+            .map((d) => (
+              <DocsNavItem
+                key={`sub-cat-${d.slug}`}
+                category={category}
+                doc={d}
+                type={type}
+              />
+            ))}
+        </NavList>
+      )
+  }
 
   return (
     <NavItem key={title} isCurrentPage={isCurrentPage}>
@@ -147,6 +181,7 @@ const DocsNavItem: React.FC<{ category: Category; doc?: DocScope }> = ({
                 key={`sub-cat-${d.slug}`}
                 category={category}
                 doc={d}
+                type={type}
               />
             ))}
         </NavList>
@@ -256,6 +291,17 @@ const NavList = styled.ul<{ isExpanded?: boolean }>`
 
   @media (max-width: 800px) {
     font-size: 16px;
+  }
+
+  hr {
+    background: transparent;
+    border: 0 none;
+    border-bottom: 1px solid var(--border-color);
+    margin: 2rem 0 1.5rem;
+  }
+
+  h5 {
+    font-size: .6rem;
   }
 `;
 NavList.defaultProps = {
