@@ -9,9 +9,10 @@ import { Wrapper } from "../shared/blog";
 
 export default function BlogLayout(props) {
   const content = props.content.map(JSON.parse);
+  const visiblePosts = content.filter((post) => !post.hide);
 
-  const focus = content.find((c) => c.focus);
-  const rest = content
+  const focus = visiblePosts.find((c) => c.focus);
+  const rest = visiblePosts
     .filter((c) => !focus || c.slug !== focus.slug)
     .sort((a, z) => z.date.localeCompare(a.date));
 

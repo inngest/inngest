@@ -1,4 +1,5 @@
 ---
+hide: true
 focus: true
 heading: "Introducing Inngest DevServer"
 subtitle: "The first tool purposely designed for event-driven asynchronous system local development"
