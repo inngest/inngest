@@ -106,6 +106,11 @@ func (eng *Engine) Load(ctx context.Context, dir string) error {
 	if err != nil {
 		return err
 	}
+
+	if len(funcs) == 0 {
+		return fmt.Errorf("No functions found in your current directory.  You can create a function by running `inngest init`.")
+	}
+
 	eng.log.Info().Int("len", len(funcs)).Msgf("Found functions")
 
 	return eng.SetFunctions(ctx, funcs)
