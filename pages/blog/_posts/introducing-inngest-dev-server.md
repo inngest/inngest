@@ -1,14 +1,22 @@
 ---
 focus: true
 heading: "Introducing Inngest DevServer"
-subtitle: "The first tool purposely designed for event driven and asynchronous system local development"
+subtitle: "The first tool purposely designed for event-driven asynchronous system local development"
 image: "/assets/blog/introducing-inngest-dev-server/featured-image.jpg"
 date: 2022-06-07
 ---
 
-Let's face it, developing asynchronous parts of your application is harder than it needs to be. If you've ever tried to set up a local development experience for AWS' SQS or Apache Kafka, you know the pain - it's cumbersome, resource intensive, and, real talk, most people just don't do it or even try.
+At Inngest, we think that writing async app logic should be easier than it actually is.
 
-We sought our to design the best developer experience for developing asynchronous code end-to-end, whether it's a full-blown event-driven architecture or building with message queues and workers. We previously have shared about [our super simple `inngest run` command](https://www.inngest.com/docs/using-the-inngest-cli#locally-testing-your-function). Today we're releasing the _Inngest DevServer_ along side [an announcement for our plans to build Inngest in the open](/TODO-LINK-TO-OTHER-POST).
+No matter what background jobs you're writing, if you want it to be reliable you're going to have to pick a (often language specific) queueing system, build out the infrastructure locally, in test, and in prod, write your queues, subscribers, build out workers, and so on. It's quite laborious, to say the least, and once you're done you're very much tied to your chosen implementation.
+
+We've been hard at work building a new platform to make this easier — _an event-driven queue for any language_. We make it simple for you to write delayed or background jobs by triggering serverless functions from events — decoupling your application code from your queue.
+
+And today, we're releasing a 1-1 copy of our executor and runtime for local use, called the Inngest DevServer. We're also building the DevServer in the open — [you can read more here](/blog/open-source-event-driven-queue).
+
+What does that mean? Not to bury the lede: it means you can run one command locally (`inngest dev`) to run a local, in-memory copy of Inngest and never have to worry about setting up queuing infrastructure or workers again.
+
+In this post, we'll walk through the DevServer in more detail and show you it's basic usage.
 
 ## What is the DevServer?
 
