@@ -29,7 +29,7 @@ We’re open source, committed to preventing vendor-lock in, using simple standa
 
 - [**Join our community for support, to give us feedback, or chat with us**](https://www.inngest.com/discord).
 - [Docs](https://www.inngest.com/docs)
-- [Read more about our vision and why this project exists]()
+- [Read more about our vision and why this project exists](https://www.inngest.com/blog/open-source-event-driven-queue)
 
 <br />
 <br />
