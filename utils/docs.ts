@@ -199,7 +199,6 @@ export const getAllDocs = (() => {
 
 export const getDocs = (slug: string): Doc | undefined => {
   const docs = getAllDocs();
-  console.log(docs);
   return docs.docs[slug];
 };
 
