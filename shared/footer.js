@@ -3,6 +3,7 @@ import styled from "@emotion/styled";
 
 import Logo from "./Icons/Logo";
 import Discord from "./Icons/Discord";
+import Github from "./Icons/Github";
 
 const Footer = () => {
   return (
@@ -41,8 +42,8 @@ const Footer = () => {
             <a href={process.env.NEXT_PUBLIC_DISCORD_URL} rel="nofollow">
               <Discord /> Discord
             </a>
-            <a href="https://github.com/inngest" rel="nofollow">
-              Github
+            <a href="https://github.com/inngest/inngest-cli" rel="nofollow">
+              <Github /> Github
             </a>
             <a href="https://twitter.com/inngest" rel="nofollow">
               Twitter

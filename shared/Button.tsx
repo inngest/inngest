@@ -20,7 +20,7 @@ type Props = React.HTMLAttributes<any> & {
   target?: string;
   style?: object;
   className?: string;
-  size?: "small" | "medium";
+  size?: "small" | "medium" | "default";
   children: React.ReactNode;
 };
 
@@ -55,7 +55,7 @@ export default React.forwardRef<HTMLButtonElement, Props>(
         css={[
           kind && kindCSS[kind],
           props.disabled && disabledCSS,
-          props.size && sizeCSS[props.size],
+          props.size !== "default" && sizeCSS[props.size],
         ]}
         {...rest}
         onClick={onClick}

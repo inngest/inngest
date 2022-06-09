@@ -8,7 +8,10 @@ import Button from "../shared/Button";
 import Callout from "../shared/Callout";
 import SectionHeader from "../shared/SectionHeader";
 
+import DiscordCTA from "../shared/Blog/DiscordCTA";
+
 // Icons
+import Github from "../shared/Icons/Github";
 import ClockIcon from "../shared/Icons/Clock";
 import RewindIcon from "../shared/Icons/Replays";
 import PathHorizontalIcon from "../shared/Icons/PathHorizontal";
@@ -62,32 +65,27 @@ export default function Home() {
       <div className="grid hero-grid">
         <Hero className="grid-center-8">
           <div>
-            <h1>
-              Build, test, and ship reactive functions <em>in&nbsp;minutes</em>
-            </h1>
+            <h1>The Anti-Message Queue</h1>
             <p className="hero-subheading">
-              Inngest is an <strong>event-driven serverless platform</strong>{" "}
-              that lets you <strong>focus on your product</strong> by giving you
-              all the tools you need to build, test, and ship reactive
-              serverless functions faster than ever before.
+              Inngest makes it simple for you to write delayed or background
+              jobs by triggering functions from events
             </p>
             <p className="hero-subheading">No infra, no config — just ship.</p>
 
             <div className="hero-ctas">
-              <Button kind="primary" href="/sign-up?ref=home-hero">
-                <span className="button-text-light">{">"}_</span>
-                &nbsp;
-                <span className="button-text-med">Start building</span>
+              <Button
+                size="medium"
+                kind="primary"
+                href="https://github.com/inngest/inngest-cli#installing-inngest"
+              >
+                <Github />
+                <span className="button-text-med">Get the cli</span>
               </Button>
-              <Button kind="outline" href="/docs?ref=home-hero">
+              <Button size="medium" kind="outline" href="/docs?ref=home-hero">
                 Explore docs →
               </Button>
             </div>
           </div>
-          <img
-            src="/assets/preview.svg?v=2022-04-15"
-            alt="Inngest visualization"
-          />
         </Hero>
       </div>
 
@@ -98,11 +96,13 @@ export default function Home() {
         size="large"
         title={
           <>
-            <span className="light-text">We help</span> developers build
-            event-driven, reactive systems — faster & easier than ever.
+            <span className="light-text">Inngest is the</span> fastest way{" "}
+            <span className="light-text">
+              to build&nbsp;background&nbsp;jobs
+            </span>
           </>
         }
-        subtitle="Our CLI and web IDE let you scaffold, develop, test, and deploy serverless functions — without any config:"
+        subtitle="Our CLI and DevServer let you scaffold, develop, test, and deploy serverless functions — without any config:"
       />
 
       <VideoPlayer
@@ -136,19 +136,79 @@ export default function Home() {
           <div className="button-group">
             <Button
               kind="primary"
-              size="small"
-              href="/sign-up?ref=home-vid-cta"
+              size="medium"
+              href="/docs/quick-start?ref=home-vid-cta"
             >
-              <ArrowUpRightIcon /> Start for free
-            </Button>
-            <Button kind="outline" size="small" href="/product">
-              <ArrowUpRightIcon /> How it works
+              <ArrowUpRightIcon /> Read the Quick Start Guide
             </Button>
           </div>
         </div>
       </div>
 
-      <Consulting>
+      <SectionHeader
+        className="use-cases-header"
+        title="Use cases"
+        subtitle="A few examples on how you can leverage Inngest's event-driven queue platform."
+        align="left"
+      />
+
+      <UseCases>
+        <InfoBlock>
+          <h4>Webhooks</h4>
+          <p>
+            Process incoming webhooks as events, getting HA, event typing, and
+            retries for free — no infra needed.
+          </p>
+        </InfoBlock>
+        <InfoBlock>
+          <h4>Background jobs</h4>
+          <p>
+            Run functions as background jobs with a single HTTP request,
+            speeding up your API.
+          </p>
+        </InfoBlock>
+        <InfoBlock>
+          <h4>Coordinated logic</h4>
+          <p>
+            Handle logic based off of a sequence of events without crons,
+            background jobs, and complex state.
+          </p>
+        </InfoBlock>
+        <InfoBlock>
+          <h4>User flows</h4>
+          <p>
+            Implement functionality triggered by user activity automatically, in
+            any language
+          </p>
+        </InfoBlock>
+        <InfoBlock>
+          <h4>Scheduled jobs</h4>
+          <p>
+            Run jobs automatically, on a schedule, with full logs and
+            versioning. And, of course, no infra needed.
+          </p>
+        </InfoBlock>
+        <InfoBlock>
+          <h4>Internal tools</h4>
+          <p>
+            Empower your team to do more with functions built for your team to
+            run, with full audit trails baked in.
+          </p>
+        </InfoBlock>
+        <InfoBlock>
+          <h4>Integrations</h4>
+          <p>
+            Work with integrations automatically triggered by events in a single
+            place — no complex app code necessary.
+          </p>
+        </InfoBlock>
+      </UseCases>
+
+      <div className="discord-cta-wrapper">
+        <DiscordCTA size="small" />
+      </div>
+
+      {/*<Consulting>
         <p>
           <strong>Get started with experts.</strong> We're working with startups
           and engineering teams to consult implement product functionality, no
@@ -174,13 +234,10 @@ export default function Home() {
             </div>
           </div>
         </div>
-      </Consulting>
+      </Consulting>*/}
 
       <SectionContext>
-        <h3>
-          Fast, reliable event-driven systems for all. With powerful
-          functionality out of the box.
-        </h3>
+        <h3>Powerful functionality out of the box.</h3>
         <p className="secondary-text">
           Discover the easiest way to build scalable, complex software — by
           letting us do the infrastructure and platform for you. Here's some of
@@ -282,64 +339,6 @@ export default function Home() {
         style={{ margin: "6rem 0" }}
       />
 
-      <SectionHeader
-        title="Use cases"
-        subtitle="A few examples on how you can leverage Inngest’s event-driven platform."
-        align="left"
-      />
-
-      <UseCases>
-        <InfoBlock>
-          <h4>Webhooks</h4>
-          <p>
-            Process incoming webhooks as events, getting HA, event typing, and
-            retries for free — no infra needed.
-          </p>
-        </InfoBlock>
-        <InfoBlock>
-          <h4>Background jobs</h4>
-          <p>
-            Run functions as background jobs with a single HTTP request,
-            speeding up your API.
-          </p>
-        </InfoBlock>
-        <InfoBlock>
-          <h4>Coordinated logic</h4>
-          <p>
-            Handle logic based off of a sequence of events without crons,
-            background jobs, and complex state.
-          </p>
-        </InfoBlock>
-        <InfoBlock>
-          <h4>User flows</h4>
-          <p>
-            Implement functionality triggered by user activity automatically, in
-            any language
-          </p>
-        </InfoBlock>
-        <InfoBlock>
-          <h4>Scheduled jobs</h4>
-          <p>
-            Run jobs automatically, on a schedule, with full logs and
-            versioning. And, of course, no infra needed.
-          </p>
-        </InfoBlock>
-        <InfoBlock>
-          <h4>Internal tools</h4>
-          <p>
-            Empower your team to do more with functions built for your team to
-            run, with full audit trails baked in.
-          </p>
-        </InfoBlock>
-        <InfoBlock>
-          <h4>Integrations</h4>
-          <p>
-            Work with integrations automatically triggered by events in a single
-            place — no complex app code necessary.
-          </p>
-        </InfoBlock>
-      </UseCases>
-
       {/* NOTE - We'll bring this back when we add the architecture section and we have more space between callouts */}
       {/* <Callout small="Still reading?" ctaRef="home-callout-end" /> */}
 
@@ -364,9 +363,14 @@ const Wrapper = styled.div`
     margin-top: calc(var(--nav-height) * -1);
     background: url(/assets/hero-grid.svg) no-repeat right 10%;
     align-items: center;
-    p {
-      color: #fff;
-    }
+  }
+
+  .use-cases-header {
+    margin-top: 6rem;
+  }
+  .discord-cta-wrapper {
+    margin: 4em auto;
+    max-width: 600px;
   }
 
   .video-player {
@@ -414,14 +418,21 @@ const Consulting = styled.div`
 `;
 
 const Hero = styled.div`
-  padding: 3em 0 4em;
+  padding: 14vh 0 18vh;
 
   display: grid;
   grid-template-columns: repeat(8, 1fr);
+  grid-column-start: 2;
   grid-gap: var(--grid-gap);
 
+  text-align: center;
+
   > div:first-of-type {
-    grid-column: span 5;
+    grid-column: 2/8;
+  }
+
+  h1 {
+    font-size: 3.1rem;
   }
 
   img {
@@ -430,9 +441,10 @@ const Hero = styled.div`
   }
 
   .hero-subheading {
-    margin: 0.5em 0;
-    max-width: 600px;
-    font-size: 1.1rem;
+    margin: 1em auto;
+    max-width: 540px;
+    font-size: 0.9rem;
+    color: var(--font-color-secondary);
   }
 
   .hero-ctas {
@@ -440,9 +452,12 @@ const Hero = styled.div`
   }
 
   .button {
+    display: inline-flex;
     font-family: var(--font-mono);
-    display: inline-block;
     letter-spacing: -0.5px;
+  }
+  .button svg {
+    margin-right: 0.4rem;
   }
   .button-text-light {
     font-weight: 200;
@@ -468,9 +483,8 @@ const Hero = styled.div`
     }
 
     .button {
-      display: flex;
-      align-self: stretch;
-      margin: 0.5rem 0 0 0;
+      margin: 0.5rem !important;
+      /* margin: 0.5rem 0 0 0; */
     }
   }
   @media (max-width: 600px) {
@@ -486,27 +500,13 @@ const Hero = styled.div`
 const SectionContext = styled.div`
   --stripe-color: #15151c;
 
-  /*
-  background: linear-gradient(
-    135deg,
-    var(--stripe-color) 12.5%,
-    var(--bg-color) 12.5%,
-    var(--bg-color) 50%,
-    var(--stripe-color) 50%,
-    var(--stripe-color) 62.5%,
-    var(--bg-color) 62.5%,
-    var(--bg-color) 100%
-  );
-  background-size: 9px 9px;
-*/
-
   margin: 4em auto 3em;
   padding: 1.5em 3em;
   max-width: 30rem;
   text-align: center;
 
   h3 {
-    font-size: 1.1em;
+    font-size: 1.2em;
   }
   p {
     font-size: 0.8em;

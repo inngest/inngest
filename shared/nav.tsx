@@ -4,6 +4,7 @@ import Logo from "../shared/Icons/Logo";
 import Button from "../shared/Button";
 import Hamburger from "../shared/Icons/Hamburger";
 import Discord from "../shared/Icons/Discord";
+import Github from "../shared/Icons/Github";
 
 type Props = {
   nolinks?: boolean;
@@ -40,12 +41,14 @@ const NavContent: React.FC<Props> = (props: Props) => {
           <StyledLink key="pricing" href="/pricing?ref=nav">
             Pricing
           </StyledLink>
-          <StyledLink
-            key="discord"
-            className=""
-            href={process.env.NEXT_PUBLIC_DISCORD_URL}
-          >
+          <StyledLink key="discord" href={process.env.NEXT_PUBLIC_DISCORD_URL}>
             <Discord />
+          </StyledLink>
+          <StyledLink
+            key="github"
+            href="https://github.com/inngest/inngest-cli"
+          >
+            <Github />
           </StyledLink>
         </div>
       )}
@@ -92,11 +95,21 @@ const NavWrapper = styled.nav<{ sticky: boolean }>`
 const Container = styled.div<{ sticky?: boolean }>`
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: auto 1fr auto;
   padding: 0.5rem 0;
 
   font-family: var(--font);
   font-size: 0.9em;
+
+  .logo {
+    // Offset for the g
+    position: relative;
+    top: 3px;
+  }
+
+  svg {
+    max-width: none; // fix reset.css issue on resize
+  }
 
   > div,
   > a {
@@ -111,7 +124,8 @@ const Container = styled.div<{ sticky?: boolean }>`
   }
 
   .links {
-    justify-content: center;
+    margin-left: 2rem;
+    justify-content: start;
   }
   .auth-options {
     justify-content: end;
@@ -139,7 +153,11 @@ const Container = styled.div<{ sticky?: boolean }>`
   }
 
   @media (max-width: 1100px) {
-    grid-template-columns: 1fr 2fr 2fr;
+  }
+  @media (max-width: 1040px) {
+    grid-column: 1 / -1;
+    margin-left: 1rem;
+    margin-right: 1rem;
   }
 
   @media (max-width: 920px) {
@@ -153,6 +171,7 @@ const Container = styled.div<{ sticky?: boolean }>`
 
   @media only screen and (max-width: 800px) {
     grid-template-columns: 1fr 64px;
+    grid-column: 2 / -2;
 
     .auth-options {
       display: none;
