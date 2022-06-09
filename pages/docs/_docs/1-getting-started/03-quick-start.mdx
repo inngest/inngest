@@ -20,7 +20,7 @@ We'll run through:
 - We use buildx to build your images locally, so use a recent version of Docker.
 
 
-## Install the CLI
+## 1. Install the CLI
 
 You can install the CLI by running the following script:
 
@@ -32,20 +32,49 @@ This will place inngest in your $PWD.  Move it into your $PATH to invoke: `sudo 
 
 You can also download [prebuilt binaries](https://github.com/inngest/inngest-cli/releases) from Github or [build from source](https://github.com/inngest/inngest-cli), with Go 1.18+ installed.
 
-## Run the server locally
+## 2. Creating a new function
 
-With the CLI installed, you only need to run `inngest dev` to start the entire local environment.  This environment only persists state in-memory, so is not production ready.
+In order to use the event-driven queue, you'll need functions which are executed - otherwise, the queue does nothing. Functions can be created by running `inngest init`.  You'll be asked the following questions:
 
-When you run the dev server, the command will recursively read your current directory to find all functions (defined by `inngest.json` files.  If one or more functions are found, the dev server will accept events on `http://127.0.0.1:9999`.  If not, the dev server will stop.
+1. **Function name**: This is a human description of the function
+	- In this guide, let's use the name "New payment"
+2. **How should the function run?**: Here, you can specify whether the function is triggered by events or whether it runs via a cron schedule.
+	- Choose "Event based", which means each time an event is received this function will run
+3. **Event trigger**: This is the name of the event that will trigger this function.
+	- Select "stripe/charge.succeeded" by typing and filtering for this event.  This is a built-in event from our Stripe integration, and contains type information for data within the event.
+4. **Do you want to write a new function or call a URL?**: You can invoke an existing serverless function or API, or write new business logic as code. 
+	- Select "New function" to write some new code.
+5. **Which language** would you like to use: This lets you use scaffolds for common languages.
 
-To get started we're going to need to create a function which can be triggered by events.
+After selecting a language the CLI will create a new folder containing your code and config.  You can read more about this in the [functions documentation](/docs/functions/introduction).
+
+For now, this is everything you need to test the function.
+
+## 3. Testing the new function
+
+First, run `cd` to navigate to the function's root directory (`cd ./new-payment`, based off of the function name).
+
+In the function's root directory, run `inngest run` from the CLI.  This will:
+
+- Inspect the function config, at `./inngest.json`.
+- Build your function
+- Parse the function's event definition, then generate mock data for the event's schema
+- Invoke the function with the mock data, showing you the output.
+
+It's possible to pass event data via stdin (`cat {} | inngest.run`), if you have test data.  Any current ENV variables are passed to your function;  secrets are passed as env vars and are fully usable in your code.
+
+That's it!  From here, you can make changes to the code wihtin the function's steps and re-run.  You can also set up a local event-driven queue via the dev server.  When the dev server receives events, it will invoke your functions automatically.
+
+## 4. Run the dev server locally
+
+Run `inngest dev` to start the entire local environment.  With this single command, your server is up and running, ready to listen for events at `http://127.0.0.1:9999`.
+
+When you run the dev server, the command will recursively read your current directory to find all functions (defined by `inngest.json` files).  If one or more functions are found, the dev server will accept events on `http://127.0.0.1:9999`.  If not, the dev server will stop.  Your application can send events to this dev server to trigger these functions in a production-like manner.
+
+This environment only persists state in-memory, so is not production ready.
 
 
-## Creating a new function
 
-Functions can be created by running `inngest init`.
-
-TODO: add more
 
 **Additional tips:**
 
