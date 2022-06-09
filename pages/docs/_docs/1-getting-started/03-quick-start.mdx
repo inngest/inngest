@@ -2,7 +2,7 @@
 category: "Getting started"
 title: "Quick start locally"
 slug: "quick-start"
-order: 4
+order: 1
 ---
 
 This guide will run through setting up your local development version of Inngest's event-driven queue.  By the end of this guide, you'll have a working devlepment server which runs functions in response to custom events.  It'll only take a couple of minutes.
@@ -10,8 +10,9 @@ This guide will run through setting up your local development version of Inngest
 We'll run through:
 
 - Installing the CLI
-- Running the server locally, via `inngest dev`
 - Creating functions, via `inngest init`
+- Testing functions, via `inngest run`
+- Running the server locally, via `inngest dev`
 - Detail on the development lifecycle.
 
 **Prerequisites**
@@ -37,22 +38,25 @@ You can also download [prebuilt binaries](https://github.com/inngest/inngest-cli
 In order to use the event-driven queue, you'll need functions which are executed - otherwise, the queue does nothing. Functions can be created by running `inngest init`.  You'll be asked the following questions:
 
 1. **Function name**: This is a human description of the function
-	- In this guide, let's use the name "New payment"
+	- In this guide, let's use the name "Test func"
 2. **How should the function run?**: Here, you can specify whether the function is triggered by events or whether it runs via a cron schedule.
 	- Choose "Event based", which means each time an event is received this function will run
 3. **Event trigger**: This is the name of the event that will trigger this function.
-	- Select "stripe/charge.succeeded" by typing and filtering for this event.  This is a built-in event from our Stripe integration, and contains type information for data within the event.
+	- We're going to use a custom event: "test/event.received" by typing this event name.  There are also built-in events for common services (which we're expanding).
 4. **Do you want to write a new function or call a URL?**: You can invoke an existing serverless function or API, or write new business logic as code. 
 	- Select "New function" to write some new code.
 5. **Which language** would you like to use: This lets you use scaffolds for common languages.
+	- Let's select Typescript, for now.
 
 After selecting a language the CLI will create a new folder containing your code and config.  You can read more about this in the [functions documentation](/docs/functions/introduction).
 
-For now, this is everything you need to test the function.
+![Creating your function](/assets/docs/getting-started-create.png)
+
+For now, the CLI has created everything you need to test the function.
 
 ## 3. Testing the new function
 
-First, run `cd` to navigate to the function's root directory (`cd ./new-payment`, based off of the function name).
+First, run `cd` to navigate to the function's root directory (`cd ./test-func`, based off of the function name).
 
 In the function's root directory, run `inngest run` from the CLI.  This will:
 
@@ -60,6 +64,10 @@ In the function's root directory, run `inngest run` from the CLI.  This will:
 - Build your function
 - Parse the function's event definition, then generate mock data for the event's schema
 - Invoke the function with the mock data, showing you the output.
+
+Here's what you should see:
+
+![Running your function](/assets/docs/getting-started-run.png)
 
 It's possible to pass event data via stdin (`cat {} | inngest run`), if you have test data.  Any current ENV variables are passed to your function;  secrets are passed as env vars and are fully usable in your code.
 
@@ -71,9 +79,29 @@ Run `inngest dev` to start the entire local environment.  With this single comma
 
 When you run the dev server, the command will recursively read your current directory to find all functions (defined by `inngest.json` files).  If one or more functions are found, the dev server will accept events on `http://127.0.0.1:9999`.  If not, the dev server will stop.  Your application can send events to this dev server to trigger these functions in a production-like manner.
 
+Here's what you should see after running `inngest dev`:
+
+![Inngest dev server running](/assets/docs/getting-started-dev.png)
+
 This environment only persists state in-memory, so is not production ready.
 
+## 5. Sending events to invoke the function
 
+You can test that the dev server invokes your action automatically by sending events to your server:
+
+```bash
+curl -X POST --data '{"name":"test/event.received","data":{"test":true}}' http://127.0.0.1:9999/e/KEY
+```
+
+In production, `KEY` will be replaced by your own "source key".  Here's what happens when the server receives your event:
+
+![Inngest dev server executing](/assets/docs/getting-started-exec.png)
+
+## Summary & next stpes
+
+That's it!  You've created a serverless function triggered by events - a queue without any queues!  Admittedly, the function doesn't do anything interesting yet, but that's up to you :)
+
+Next, read about [events](/docs/event-format-and-structure) and [functions](/docs/functions/introduction) to dive deeper into how things work.
 
 
 **Additional tips:**
