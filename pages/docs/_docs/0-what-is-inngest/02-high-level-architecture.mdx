@@ -20,6 +20,8 @@ Note:  There are more components to the hosted version of Inngest, such as a ver
 
 ## Data flow & sequence
 
+Here's an overview of the sequence of steps Inngest runs through to schedule your functions:
+
 1. Your services, or 3rd party webhooks, send events to the Source API.
 2. The Source API validates and optionally transforms (via WASM-based inline JS) these events, then publishes the events to an internal message queue.
 3. A runner consumes the event from the message queue, checking to see which live functions are triggered by the specific event.
