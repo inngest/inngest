@@ -30,9 +30,8 @@ function MyApp({ Component, pageProps }) {
       <Head>
         <link rel="icon" href="/favicon-may-2022.png" />
       </Head>
-      <PageBanner href="/docs/using-the-inngest-cli?ref=page-banner">
-        Introducing the Inngest CLI: build, test, and ship serverless functions
-        locally
+      <PageBanner href="/blog/open-source-event-driven-queue?ref=page-banner">
+        Announcing our open source plans for the Inngest event-driven queue
       </PageBanner>
       <Component {...pageProps} />
       <Script
