@@ -25,12 +25,13 @@ Note:  There are more components to the hosted version of Inngest, such as a ver
 3. A runner consumes the event from the message queue, checking to see which live functions are triggered by the specific event.
 4. The runner coordinates with the state store to initialize new executions (runs) of each triggered function, via an internal queue.
 5. Shared-nothing workers consume from the queue to execute steps of each function.  Once complete, the state for the function run is updated and the step's children are scheduled.
+6. If a step errors, the runner is responsible for re-scheduling the steps.
 
 **Core implementation details**:
 
 - The message queue can be any message broker, such as NATS, NSQ, Pub/Sub, Kafka, etc.  We abstract over the broker to provide buffering.
 - Functions can be conditionally triggered based off of event data via expressions evaluated with [CEL](https://github.com/google/cel-go)
-- The queue can be any implementation.  We use an internal implementation, and we're open-sourcing implementations for Redis, Postgres, and currently existing systems such as Celery.  The backing implementation doesn't necessarily matter, as we're abstracting the queue via state independently.
+- The queue can be any implementation.  We're open-sourcing implementations for Redis, Postgres, and currently existing systems such as Celery.  The backing implementation doesn't necessarily matter, as Inngest abstracts the queue via state independently.
 - Drivers for tasks can be _asynchronous_.  Some functions may take minutes to run, and we must support long running jobs with unreliable systems.  This is noted within the driver's immediate response, and each driver maintains its own state (eg. a Kuberenetes or Nomad cluster) for which steps are running.  Step responses are recorded via another message queue.
 
 Inngest is offered as a cloud, with an [open-source local implementation for development](https://github.com/inngest/inngest-cli).  We're also implementing a fully self-hostable version of the cloud, with multiple backing state stores (eg. Redis and Postgres).
