@@ -112,7 +112,7 @@ Fundamentally, there are two core pieces to Inngest: _events_ and _functions_. F
 <br />
 
 <p align="center">
-        <img src="https://user-images.githubusercontent.com/306177/172649986-1b3486e8-b848-4b21-bf39-2ca6faf0f933.jpeg" alt="Open Source Architecture" width="660" />
+        <img src="https://user-images.githubusercontent.com/306177/172893034-e3d7bc60-47e8-4feb-8e93-19bdc9fe2237.png" alt="Open Source Architecture" width="660" />
 </p>
 
 Inngest's architecture is made up of 6 core components:
