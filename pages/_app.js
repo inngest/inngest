@@ -40,6 +40,7 @@ function MyApp({ Component, pageProps }) {
         strategy="afterInteractive"
         src="/inngest-sdk.js"
         onLoad={() => {
+          return;
           Inngest.init(process.env.NEXT_PUBLIC_INNGEST_KEY);
           let firstTouch = false;
           const anonId = () => {

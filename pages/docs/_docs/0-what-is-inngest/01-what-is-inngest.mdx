@@ -1,0 +1,29 @@
+---
+category: "What is Inngest?"
+title: "What is Inngest?"
+slug: "what-is-inngest"
+position: 0
+---
+
+Inngest is an **event-driven queue**.  Instead of configuring queues directly with all the associated work, Inngest decouples your queue from your systems by using events. 
+
+## Concepts
+
+Fundamentally, there are two critical concepts to Inngest:
+
+- [**Events**](/docs/event-format-and-structure), which represent something happening in your system (or a 3rd party)
+- [**Functions**](/docs/functions/introduction), which are triggered by events or on a schedule.  They declaratively state how they're triggered, and are fully versioned.
+
+Whenever something happens, like a user signs up, you'll send an event to Inngest.  You can then build functions which are automatically triggered by these events, without writing a single line of code relating to a queue — no workers, no config, no infra.
+
+## Benefits
+
+Decoupling your async work via events has a few benefits.  At a high level, **it's faster and easier** to work with, and has less ops overhead.  You can:
+
+- Deploy your functions independently, without updating core services
+- Add canary or blue-green deploys to any function, out of the box
+- Immediately roll back to a previous function version
+- Re-run past events through functions, even if the function is new
+- Historically test functions with previously received events
+
+There's more that Inngest provides, such as user identification within events for customer-specific audit trails and debugging, or event schemas out of the box.  For now, let's dive into the architecture and then see how to get started within a few minutes.

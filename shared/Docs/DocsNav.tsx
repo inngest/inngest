@@ -66,7 +66,7 @@ console.log(nestedCloud, cloud);
 
             <hr />
 
-            <h5>Cloud docs</h5>
+            <h5>Inngest Cloud</h5>
 
             {nestedCloud.map((c, idx) => (
               <DocsNavItem key={`cat-${idx}`} category={c} type="cloud" />

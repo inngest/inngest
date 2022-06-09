@@ -2,11 +2,22 @@
 category: "What is Inngest?"
 title: "High-level Architecture"
 slug: "high-level-architecture"
-image: /assets/docs/high-level-architecture/high-level-architecture-featured-image.jpg
+image: /assets/docs/os-arch.png
 position: 1
 ---
 
-At a very high level, the Inngest platform is simple to understand. The system is primarily composed of 4 main components: the event stream, the event store, an executor engine and a secure compute layer.
+Inngest is an **event-driven queue**.  Instead of configuring queues, enqueueing in your API, deploying workers, and manually monitoring the backlog, Inngest decouples your queue from your systems by using events. 
+
+Fundamentally, there are two critical concepts to Inngest:
+
+- **Events**, which represent something happening in your system (or a 3rd party)
+- **Functions**, which are triggered by events or on a schedule
+
+Whenever something happens, you can send an event to Inngest.  You can then build functions which are automatically triggered by events.  This has a few benefits:
+
+- Because your core services are only sending events, you don't need to re-deploy these when adding new workers.
+- You can
+
 
 ## Event stream
 

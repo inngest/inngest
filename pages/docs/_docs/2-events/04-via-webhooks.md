@@ -1,5 +1,5 @@
 ---
-category: "Sending Data"
+category: "Events"
 title: "via Webhooks"
 slug: "event-webhooks"
 order: 4

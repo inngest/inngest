@@ -7,7 +7,7 @@
 const TOC = {
   "What is Inngest?": 0,
   "Getting started": 1,
-  "Sending Data": 2,
+  "Events": 2,
   "Working with Events": 3,
   Functions: 4,
   CLI: 5,
