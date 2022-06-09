@@ -36,12 +36,13 @@ const createNestedTOC = (categories: Categories) => {
   });
 };
 
-const DocsNav: React.FC<{ cli: Categories, cloud: Categories }> = ({ cli, cloud }) => {
+const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
+  cli,
+  cloud,
+}) => {
   const [isExpanded, setExpanded] = useState(false);
   const nestedCLI = createNestedTOC(cli);
   const nestedCloud = createNestedTOC(cloud);
-
-console.log(nestedCloud, cloud);
 
   return (
     <Sidebar>
@@ -71,7 +72,6 @@ console.log(nestedCloud, cloud);
             {nestedCloud.map((c, idx) => (
               <DocsNavItem key={`cat-${idx}`} category={c} type="cloud" />
             ))}
-
           </NavList>
           <div>
             <ThemeToggleButton />
@@ -106,11 +106,11 @@ console.log(nestedCloud, cloud);
 
 export default DocsNav;
 
-const DocsNavItem: React.FC<{ category: Category; doc?: DocScope, type: "cli" | "cloud" }> = ({
-  category,
-  doc,
-  type,
-}) => {
+const DocsNavItem: React.FC<{
+  category: Category;
+  doc?: DocScope;
+  type: "cli" | "cloud";
+}> = ({ category, doc, type }) => {
   const [isExpanded, setExpanded] = useState(false);
   const router = useRouter();
   const pathSlug = router.asPath.replace(/^\/docs\//, "");
@@ -134,8 +134,9 @@ const DocsNavItem: React.FC<{ category: Category; doc?: DocScope, type: "cli" | 
   const formattedTitle = title.replace(/`(.+)`/, "<code>$1</code>");
 
   if (!doc && category && category.title === "") {
-  // If there's no category title, render the pages outright in the menu.
-    return !!pages?.length && (
+    // If there's no category title, render the pages outright in the menu.
+    return (
+      !!pages?.length && (
         <NavList className="items" isExpanded={true} style={{ margin: 0 }}>
           {pages
             .sort((a, b) => a.order - b.order)
@@ -149,6 +150,7 @@ const DocsNavItem: React.FC<{ category: Category; doc?: DocScope, type: "cli" | 
             ))}
         </NavList>
       )
+    );
   }
 
   return (
@@ -301,7 +303,7 @@ const NavList = styled.ul<{ isExpanded?: boolean }>`
   }
 
   h5 {
-    font-size: .6rem;
+    font-size: 0.6rem;
   }
 `;
 NavList.defaultProps = {
