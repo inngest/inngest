@@ -26,4 +26,8 @@ Decoupling your async work via events has a few benefits.  At a high level, **it
 - Re-run past events through functions, even if the function is new
 - Historically test functions with previously received events
 
-There's more that Inngest provides, such as user identification within events for customer-specific audit trails and debugging, or event schemas out of the box.  For now, let's dive into the architecture and then see how to get started within a few minutes.
+It's also easier to get started and learn. Eevents are sent via a plain HTTP call, and engineers don't need to concern themselves with queue-specific implementation details.  You only need to know how your function is triggered and the data within that event;  from there, you're only writing your business logic.
+
+There's more that Inngest provides, such as user identification within events for customer-specific audit trails and debugging, or event schemas out of the box.
+
+For now, let's dive into the architecture and then see how to get started within a few minutes.
