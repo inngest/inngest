@@ -44,6 +44,8 @@ This is what we think the system should have:
 
 This is what you get with the existing Inngest platform today, but we want to bring this to more developers through in their local dev experience and allow developers to self-host Inngest system with swappable drivers. Today, we start our open source journey.
 
+> If you're new to Inngest, [read about what Inngest is](/docs/what-is-inngest) or [dive into the architecture and how it works](/docs/high-level-architecture)
+
 ## Why build in the open?
 
 We understand that most times, things built in the open benefit from more eyes and a community. Catching bugs, suggesting improvements or features, and making contributions get amplified and improve the system.

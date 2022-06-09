@@ -125,7 +125,8 @@ const Body = styled.main`
     margin-top: 2rem;
   }
 
-  p {
+  p,
+  blockquote {
     margin: 1.5rem 0;
     line-height: 1.6em;
   }
@@ -146,6 +147,12 @@ const Body = styled.main`
     /* max-height: 300px; */
     margin: 2rem auto 2rem;
     pointer-events: none;
+  }
+
+  blockquote {
+    padding: 0 1.5rem;
+    border-left: 4px solid var(--primary-color);
+    font-style: italic;
   }
 
   p code,
