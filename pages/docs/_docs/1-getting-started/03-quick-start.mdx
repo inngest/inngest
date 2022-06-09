@@ -1,9 +1,52 @@
 ---
 category: "Getting started"
-title: "Quick start"
+title: "Quick start locally"
 slug: "quick-start"
 order: 4
 ---
 
-<div className='tldr'>
-</div>
+This guide will run through setting up your local development version of Inngest's event-driven queue.  By the end of this guide, you'll have a working devlepment server which runs functions in response to custom events.  It'll only take a couple of minutes.
+
+We'll run through:
+
+- Installing the CLI
+- Running the server locally, via `inngest dev`
+- Creating functions, via `inngest init`
+- Detail on the development lifecycle.
+
+**Prerequisites**
+
+- In order to build and run functions, docker must be installed.  It's easy to get started.
+- We use buildx to build your images locally, so use a recent version of Docker.
+
+
+## Install the CLI
+
+You can install the CLI by running the following script:
+
+```
+curl -sfL https://cli.inngest.com/install.sh | sh
+```
+
+This will place inngest in your $PWD.  Move it into your $PATH to invoke: `sudo mv ./inngest /usr/local/bin/inngest`.
+
+You can also download [prebuilt binaries](https://github.com/inngest/inngest-cli/releases) from Github or [build from source](https://github.com/inngest/inngest-cli), with Go 1.18+ installed.
+
+## Run the server locally
+
+With the CLI installed, you only need to run `inngest dev` to start the entire local environment.  This environment only persists state in-memory, so is not production ready.
+
+When you run the dev server, the command will recursively read your current directory to find all functions (defined by `inngest.json` files.  If one or more functions are found, the dev server will accept events on `http://127.0.0.1:9999`.  If not, the dev server will stop.
+
+To get started we're going to need to create a function which can be triggered by events.
+
+
+## Creating a new function
+
+Functions can be created by running `inngest init`.
+
+TODO: add more
+
+**Additional tips:**
+
+- If you're on arm and you're not using Docker for Mac, you should [install the binfmt emulators](https://github.com/tonistiigi/binfmt#installing-emulators) to enable cross-compilation.  This is only required for deploys. 
