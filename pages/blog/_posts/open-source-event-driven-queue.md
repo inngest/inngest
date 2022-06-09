@@ -1,6 +1,5 @@
 ---
 focus: true
-hide: true
 heading: "Open sourcing the anti-message queue"
 subtitle: "We're now building Inngest in the open."
 image: "/assets/blog/open-source-event-driven-queue.jpg"

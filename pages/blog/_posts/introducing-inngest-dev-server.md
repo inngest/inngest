@@ -1,5 +1,4 @@
 ---
-hide: true
 heading: "Introducing Inngest DevServer"
 subtitle: "The first tool purposely designed for event-driven asynchronous system local development"
 image: "/assets/blog/introducing-inngest-dev-server/featured-image.jpg"
@@ -31,7 +30,7 @@ There is no need to run a queue or an event stream and configure publishers or c
 
 ## How does it work?
 
-![Inngest DevServer architecture diagram](/assets/blog/introducing-inngest-dev-server/open-source-architecture.jpg)
+![Inngest DevServer architecture diagram](/assets/blog/introducing-inngest-dev-server/open-source-architecture.png)
 
 Under the hood the DevServer does a few things to make it all come together.
 
