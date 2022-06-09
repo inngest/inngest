@@ -37,6 +37,19 @@ export default function BlogLayout(props) {
             content={`${process.env.NEXT_PUBLIC_HOST}${scope.image}`}
           />
         )}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@inngest" />
+        <meta
+          name="twitter:title"
+          content={`${scope.heading} - Inngest Blog`}
+        />
+        <meta name="twitter:description" content={scope.subtitle} />
+        {!!scope.image && (
+          <meta
+            name="twitter:image"
+            content={`${process.env.NEXT_PUBLIC_HOST}${scope.image}`}
+          />
+        )}
       </Head>
 
       <ThemeToggleButton isFloating={true} />
