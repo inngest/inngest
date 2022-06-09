@@ -41,7 +41,7 @@ First, the DevServer recursively searches your project directory for functions c
 
 Simultaneously, an API server is started on `localhost:9999` (or another port of your choosing). This API matches the production Inngest Source API for ingesting event payloads.
 
-As your application (e.g. a Next.js API or Flask backend) sends an event to the API server, the DevServer finds matching functions within its map of event triggers. Every matching function is then executed in a container, passing the event payload as JSON via `stdin`. Whatever is written to `stdout` or `stderr` is captured as the function's response.
+As your application (e.g. a Next.js API or Flask backend) sends an event to the API server, the DevServer finds matching functions within its map of event triggers. Every matching function is then executed in a container, passing the event payload as JSON via cli args. Whatever is written to `stdout` is captured as the function's response.
 
 The function's response as well as the event payload itself are all written to the DevServer's log output so you can easily see the inputs and outputs of your background tasks.
 
