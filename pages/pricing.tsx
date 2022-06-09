@@ -141,7 +141,7 @@ const PLANS = [
       {
         icon: Language,
         quantity: "Millions",
-        text: "function runs/month",
+        text: "of function runs/month",
       },
       {
         icon: UsersGroup,
@@ -150,7 +150,12 @@ const PLANS = [
       },
       {
         icon: ListCheck,
-        quantity: "6 month",
+        quantity: "6+ month",
+        text: "log retention",
+      },
+      {
+        icon: ListCheck,
+        quantity: "6+ month",
         text: "log retention",
       },
       {
@@ -271,6 +276,14 @@ export default function Pricing() {
               We're currently accepting all events, uncapped. Our "soft" limit
               is 1M events/mo across free and paid plans, and from 50M events/mo
               on custom plans.
+            </p>
+          </div>
+
+          <div onClick={toggleFAQ}>
+            <h3>What's a "function run?"</h3>
+            <p>
+              A run is a single executed step in a function. If your function
+              only has 1 step, it's only 1 run
             </p>
           </div>
 
