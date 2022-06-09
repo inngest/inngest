@@ -21,7 +21,12 @@ const IconList: React.FC<IconListProps> = ({
   items = [],
 }) => {
   return (
-    <List direction={direction} collapseWidth={collapseWidth} size={size}>
+    <List
+      className="icon-list"
+      direction={direction}
+      collapseWidth={collapseWidth}
+      size={size}
+    >
       {items.map((item, idx) => (
         <ListItem key={idx}>
           <IconWrapper circle={circles}>

@@ -12,24 +12,32 @@ import Button from "../shared/Button";
 
 import Workflow from "../shared/Icons/Workflow";
 import Language from "../shared/Icons/Language";
-import Lightning from "../shared/Icons/Lightning";
+import ArrowCaretCircleRight from "../shared/Icons/ArrowCaretCircleRight";
 import Plus from "../shared/Icons/Plus";
 import ListCheck from "../shared/Icons/ListCheck";
 import UserVoice from "../shared/Icons/UserVoice";
 
-const PLANS = {
-  free: {
+import Functions from "../shared/Icons/Play";
+import UsersGroup from "../shared/Icons/UsersGroup";
+
+const PLANS = [
+  {
     name: "Community",
+    cost: "free",
     description: (
       <>
         Powerful enough to be useful, and <strong>always free</strong>. Perfect
         for getting started.
       </>
     ),
+    cta: {
+      href: "/sign-up?ref=pricing-free",
+      text: "Sign up for free →",
+    },
     features: [
       {
-        icon: Workflow,
-        quantity: "5",
+        icon: ArrowCaretCircleRight,
+        quantity: "3",
         text: "functions",
       },
       {
@@ -38,71 +46,76 @@ const PLANS = {
         text: "function runs/month",
       },
       {
-        icon: Lightning,
-        quantity: "Limited",
-        text: "resources & throughput",
-      },
-    ],
-  },
-  pro: {
-    name: "Early Adopter",
-    description: (
-      <>
-        <strong>$20/mo</strong> &nbsp;
-        <small>discounted for being an early supporting member</small>
-      </>
-    ),
-    features: [
-      {
-        icon: Workflow,
-        quantity: "50",
-        text: "functions",
-      },
-      {
-        icon: Language,
-        quantity: "10,000",
-        text: "function runs/month",
-      },
-      {
-        icon: Lightning,
-        quantity: "Generous",
-        text: "resources & throughput",
+        icon: UsersGroup,
+        quantity: "3",
+        text: "seats",
       },
       {
         icon: ListCheck,
         quantity: "1 week",
-        text: "audit & log history",
+        text: "log retention",
       },
     ],
   },
-  advanced: {
-    name: "Advanced",
-    description: <>Powerful access for any scale.</>,
+  {
+    name: "Startup",
+    cost: "$50/mo",
+    description: <>Get to market fast.</>,
+    cta: {
+      href: "/sign-up?ref=pricing-startup",
+      text: "Start building →",
+    },
     features: [
       {
-        icon: Workflow,
-        quantity: "Unlimited",
+        icon: ArrowCaretCircleRight,
+        quantity: "25",
         text: "functions",
       },
       {
         icon: Language,
-        quantity: "Unlimited",
+        quantity: "25,000",
         text: "function runs/month",
       },
       {
-        icon: Lightning,
-        quantity: "Custom",
-        text: "resources & throughput",
+        icon: UsersGroup,
+        quantity: "5",
+        text: "seats",
       },
       {
         icon: ListCheck,
         quantity: "1 month",
-        text: "or more audit & log history",
+        text: "log retention",
+      },
+    ],
+  },
+  {
+    name: "Team",
+    cost: "$200/mo",
+    description: <>More room to grow.</>,
+    cta: {
+      href: "/sign-up?ref=pricing-team",
+      text: "Start building →",
+    },
+    features: [
+      {
+        icon: ArrowCaretCircleRight,
+        quantity: "100",
+        text: "functions",
       },
       {
-        icon: Plus,
-        quantity: "Add-ons",
-        text: "available",
+        icon: Language,
+        quantity: "100,000",
+        text: "function runs/month",
+      },
+      {
+        icon: UsersGroup,
+        quantity: "20",
+        text: "seats",
+      },
+      {
+        icon: ListCheck,
+        quantity: "3 month",
+        text: "log retention",
       },
       {
         icon: UserVoice,
@@ -111,7 +124,43 @@ const PLANS = {
       },
     ],
   },
-};
+  {
+    name: "Custom",
+    cost: "Flexible pricing",
+    description: <>Powerful access for any scale.</>,
+    cta: {
+      href: "/contact?ref=pricing-advanced",
+      text: "Get in touch",
+    },
+    features: [
+      {
+        icon: ArrowCaretCircleRight,
+        quantity: "Custom",
+        text: "functions",
+      },
+      {
+        icon: Language,
+        quantity: "Millions",
+        text: "function runs/month",
+      },
+      {
+        icon: UsersGroup,
+        quantity: "Custom",
+        text: "seats",
+      },
+      {
+        icon: ListCheck,
+        quantity: "6 month",
+        text: "log retention",
+      },
+      {
+        icon: UserVoice,
+        quantity: "Dedicated",
+        text: "support",
+      },
+    ],
+  },
+];
 
 export default function Pricing() {
   const toggleFAQ = (e) => {
@@ -145,69 +194,54 @@ export default function Pricing() {
           <br />
           Powerful functionality.
         </h1>
-        <p>
+        {/* <p>
           Save weeks of development with our event-driven platform.
           <br />
           Get started in seconds for free, with plans that grow as you scale.
-        </p>
+        </p> */}
       </Hero>
 
       <Content>
         <Block color="primary">
           <PlanHeader flexDirection="row">
             <div>
-              <h3>{PLANS.free.name}</h3>
-              <p>{PLANS.free.description}</p>
+              <h3>{PLANS[0].name}</h3>
+              <p>{PLANS[0].description}</p>
             </div>
             <div>
-              <Button
-                kind="outlineHighContrast"
-                href="/sign-up?ref=pricing-free"
-              >
-                Sign up for free →
+              <Button kind="outlineHighContrast" href={PLANS[0].cta.href}>
+                {PLANS[0].cta.text}
               </Button>
             </div>
           </PlanHeader>
-          <IconList collapseWidth={800} items={PLANS.free.features} />
+          <IconList items={PLANS[0].features} />
         </Block>
 
         <Grid>
-          <Block>
-            <PlanHeader flexDirection="column">
-              <h3>{PLANS.pro.name}</h3>
-              <p>{PLANS.pro.description}</p>
-            </PlanHeader>
-            <div style={{ marginBottom: "2rem" }}>
-              <Button kind="primary" href="/sign-up?ref=pricing-early-adopter">
-                Sign up as an early adopter →
+          {PLANS.slice(1).map((plan, idx) => (
+            <PlanBlock key={plan.name}>
+              <PlanHeader flexDirection="column">
+                <div>
+                  <h3>{plan.name}</h3>
+                  <p>{plan.description}</p>
+                  <p className="cost">{plan.cost}</p>
+                </div>
+              </PlanHeader>
+              <IconList direction="vertical" items={plan.features} />
+              <Button kind="outlineHighContrast" href={plan.cta.href}>
+                {plan.cta.text}
               </Button>
-            </div>
-            <IconList direction="vertical" items={PLANS.pro.features} />
-          </Block>
-
-          <Block>
-            <PlanHeader flexDirection="column">
-              <h3>{PLANS.advanced.name}</h3>
-              <p>{PLANS.advanced.description}</p>
-            </PlanHeader>
-            <div style={{ marginBottom: "2rem" }}>
-              <Button kind="primary" href="/contact?ref=pricing-advanced">
-                Contact us →
-              </Button>
-            </div>
-            <IconList direction="vertical" items={PLANS.advanced.features} />
-          </Block>
+            </PlanBlock>
+          ))}
         </Grid>
 
         <AllPlansInfo>
-          All plans include unlimited team members, uncapped events, scheduled
-          functions, audit trails, API access, CD via our CLI, and first-class
-          debugging.
+          All plans include uncapped events per month, scheduled functions,
+          support via Email & Discord.
         </AllPlansInfo>
 
-        <h2 style={{ margin: "2rem 0" }}>FAQs</h2>
-
         <FAQGrid>
+          <h2 style={{ margin: "2rem 0" }}>FAQs</h2>
           <div onClick={toggleFAQ}>
             <h3>What's a "function?"</h3>
             <p>
@@ -224,16 +258,24 @@ export default function Pricing() {
           </div>
 
           <div onClick={toggleFAQ}>
-            <h3>Do you charge for events?</h3>
+            <h3>What languages do you support?</h3>
             <p>
-              We're currently accepting all events, uncapped. Our "soft" limit
-              is 1M events/mo across free and paid plans, and from 50M events/mo
-              on custom plans. We don't throttle you, right now.
+              Every language. Anything that you can put in a Docker container we
+              can run from JavaScript to Go to Python to Perl to Bash.
             </p>
           </div>
 
           <div onClick={toggleFAQ}>
-            <h3>What resources are available?</h3>
+            <h3>Do you charge for events?</h3>
+            <p>
+              We're currently accepting all events, uncapped. Our "soft" limit
+              is 1M events/mo across free and paid plans, and from 50M events/mo
+              on custom plans.
+            </p>
+          </div>
+
+          <div onClick={toggleFAQ}>
+            <h3>What are the resources limits?</h3>
             <p>
               Free accounts are limited to 128mb of ram and a maximum runtime of
               10 seconds per function. Paid accounts can utilize 1GB of ram and
@@ -248,21 +290,12 @@ export default function Pricing() {
             <h3>What if I need to run more functions?</h3>
             <p>
               That's okay! We'll alert you when you're nearing your cap and will
-              throttle your functions after hitting the limit. You can always
-              purchase more capacity, but we won't apply overage fees unless you
-              specify payment caps (coming soon). We dislike surprise costs as
-              much as you.
+              throttle your functions after hitting the limit. You can purchase
+              more capacity at the same rate as your plan includes.
             </p>
-            <p>You can buy an extra 20,000 runs for $10.</p>
-          </div>
-
-          <div onClick={toggleFAQ}>
-            <h3>What are add-ons?</h3>
             <p>
-              Add-ons allow you to customize the functionality of Inngest. For
-              example, you can run the executor on-premise, increase the memory
-              and CPU capabilities of your functions, increase the audit history
-              length, and so on.
+              We also offer overage forgiveness for those times that we all know
+              happen. We dislike surprise costs as much as you.
             </p>
           </div>
 
@@ -282,14 +315,6 @@ export default function Pricing() {
             </p>
           </div>
 
-          {/* <div onClick={toggleFAQ}>
-            <h3>Are there limits to how complex I can make a function?</h3>
-            <p>
-              No, not really. You can chain hundreds of functions in parallel;
-              we'll run it for you.
-            </p>
-          </div> */}
-
           <div onClick={toggleFAQ}>
             <h3>Is there a limit to how often I can run scheduled function?</h3>
             <p>
@@ -302,7 +327,7 @@ export default function Pricing() {
           </div>
 
           <div onClick={toggleFAQ}>
-            <h3>Can I run this on prem?</h3>
+            <h3>Can I self-host Inngest?</h3>
             <p>
               If you'd like to self-host Inngest or the executor platform{" "}
               <a href="/contact">reach out to us with your needs</a>.
@@ -344,7 +369,7 @@ const PlanHeader = styled.div<{
   display: flex;
   flex-direction: ${(props) => props.flexDirection || "row"};
   justify-content: space-between;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 
   @media (max-width: 800px) {
     flex-direction: column;
@@ -353,11 +378,15 @@ const PlanHeader = styled.div<{
   p {
     margin: 1rem 0;
   }
+
+  .cost {
+    font-size: 1.4rem;
+  }
 `;
 
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   grid-gap: 2rem 2rem;
   margin: 2rem 0;
 
@@ -371,16 +400,27 @@ const Grid = styled.div`
   }
 `;
 
+const PlanBlock = styled(Block)`
+  display: flex;
+  flex-direction: column;
+
+  .icon-list {
+    flex-grow: 1;
+    margin-bottom: 2rem;
+  }
+`;
+
 const AllPlansInfo = styled.p`
   margin: 2rem auto 4rem;
-  max-width: 40rem;
+  max-width: 44rem;
   line-height: 1.5rem;
   text-align: center;
 `;
 
 const FAQGrid = styled.div`
   display: grid;
-  margin-bottom: 3rem;
+  max-width: 44rem;
+  margin: 2rem auto 3rem;
 
   div {
     cursor: pointer;
@@ -388,9 +428,13 @@ const FAQGrid = styled.div`
     h3 {
       margin: 1rem 0;
       font-family: var(--font);
+      font-size: 1.2em;
+    }
+    p:not(:last-of-type) {
+      margin-bottom: 1rem;
     }
     p:last-of-type {
-      margin: 0 0 3rem;
+      margin: 0 0 2rem;
     }
 
     & + div {
