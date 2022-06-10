@@ -449,6 +449,8 @@ const Hero = styled.div`
 
   .hero-ctas {
     margin-top: 2em;
+    display: flex;
+    justify-content: center;
   }
 
   .button {
