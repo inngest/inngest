@@ -123,10 +123,6 @@ const Container = styled.div<{ sticky?: boolean }>`
     align-items: center;
   }
 
-  .links {
-    margin-left: 2rem;
-    justify-content: start;
-  }
   .auth-options {
     justify-content: end;
   }
@@ -152,8 +148,6 @@ const Container = styled.div<{ sticky?: boolean }>`
     display: none;
   }
 
-  @media (max-width: 1100px) {
-  }
   @media (max-width: 1040px) {
     grid-column: 1 / -1;
     margin-left: 1rem;
@@ -169,9 +163,20 @@ const Container = styled.div<{ sticky?: boolean }>`
     }
   }
 
+  // Non-mobile nav
+  @media (min-width: 800px) {
+    .links {
+      margin-left: 2rem;
+      justify-content: start;
+    }
+  }
+  // Mobile nav
   @media only screen and (max-width: 800px) {
     grid-template-columns: 1fr 64px;
     grid-column: 2 / -2;
+    // unset
+    margin-left: 0;
+    margin-right: 0;
 
     .auth-options {
       display: none;

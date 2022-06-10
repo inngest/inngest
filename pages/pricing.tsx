@@ -359,12 +359,9 @@ export default function Pricing() {
 }
 
 const Hero = styled.div`
-  position: relative;
-  z-index: 2;
-  overflow: hidden;
+  padding: calc(var(--nav-height) + 10vh) 0 10vh;
+  margin-top: calc(var(--nav-height) * -1);
   text-align: center;
-
-  padding: 10vh 0;
 
   h1 + p {
     font-size: 22px;
