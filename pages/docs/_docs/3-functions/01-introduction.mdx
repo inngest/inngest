@@ -32,6 +32,15 @@ We've designed a fantastic workflow with [our cli](/docs/using-the-inngest-cli) 
 
 ## The function response
 
-Your function should always return a response to `stdout`. You can log anything, but we'll only capture and save the last line of output. The output should be formatted as JSON, but can also be a string. The response is important as it will allow you to understand the behavior of your function.
+Steps in your function should always return a JSON-encoded response to `stdout`;  we'll capture the last line of output.  As we prefer standards over custom implementations, it's best to return an HTTP-like response:
 
-If your funciton has an error, you can throw an error and exit or print your output and return a non-zero exit code. With this, you'll be able to monitor your function's outcome in the Inngest web dashboard.
+```
+{
+  status: 200,
+  body: { ... }, // Your data
+}
+```
+
+This allows us to properly inspect the response, plus the classification of function errors.
+
+Read more about function responses in the function data docs.

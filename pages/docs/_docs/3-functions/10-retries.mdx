@@ -1,0 +1,24 @@
+---
+category: "Functions"
+title: "Retries and failures"
+slug: "functions/retries"
+order: 10
+---
+
+It's inevitable that steps in a function fail.  In many cases - but not always - it's useful to automatically retry the step that errors.  Inngest has this capability built in and, unlike other systems, errors can be customized based off of logic within the steps itself.
+
+## Failure detection
+
+Steps are classified as failed if either of the following conditions are met:
+
+- A step exits with a non-zero status code, as per unix defaults
+- A step returns a non-2xx status code within their [response](/docs/functions/function-input-and-output)
+
+
+## Retry policies
+
+By default, each step is retried 3 times using [exponential backoff](https://github.com/inngest/inngest-cli/blob/main/pkg/backoff/backoff.go) with jitter.
+
+Retries can be customized using the `status` response.  If a step's `status` or `statusCode` contains a 4xx code, **the step will not be retried**.  A 4xx status code indicates a bad request - in which the incoming data must be changed to complete the result.
+
+We're currently working on implementing custom retry policies per steps, documented [in this issue](https://github.com/inngest/inngest-cli/issues/117).

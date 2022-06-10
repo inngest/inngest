@@ -3,3 +3,5 @@
 /docs/event-http-api-and-libraries /docs/sending-data-via-http 301
 /docs/using-the-inngest-cli /docs/cloud/using-the-inngest-cli 302
 /docs/function-ide-guide /docs/cloud/function-ide-guide 302
+
+/docs/functions /docs/functions/introduction 302
