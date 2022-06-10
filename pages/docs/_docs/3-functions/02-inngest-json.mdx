@@ -124,4 +124,9 @@ The list of steps is an object, with each step using a unique key `id` and it's 
   }
 ```
 
-## Drivers
+## Runtimes
+
+Runtimes are defined within each step's configuration.  A runtime specifies _how_ the function runs.  There are multiple runtimes available:
+
+- `docker`: indicates that the step should run code within a container
+- `http`: indicates that the step should execute an HTTP fetch (instead of running code).

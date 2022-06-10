@@ -31,7 +31,7 @@ The input has the following keys:
 
 ## Reading input data
 
-Input data is accessed in different ways, depending on the [driver](/docs/functions/inngest-json-configuration#drivers).
+Input data is accessed in different ways, depending on the [runtime](/docs/functions/inngest-json-configuration#runtimes).
 
 - `docker`: Custom docker-based functions can always read the input as a JSON-encoded string via os.Args, as the first argument.
 - `http`: The input can be read as a JSON-encoded string from the request body.
@@ -41,7 +41,7 @@ These methods were chosen because they're built in to every language - it's a st
 
 ## Writing responses from steps
 
-You can write your step's response depending on the step's driver:
+You can write your step's response depending on the step's runtime:
 
 - `docker`: Print the JSON-encoded response to `stdout`.
 - `http`: write the response as a JSON-encoded object in the response body.
@@ -53,7 +53,7 @@ For standard containers, printing to `stdout` is easy - and is built in to every
 
 When a step completes it can return data that's usable by subsequent steps. The data also indicates how [retries](/docs/functions/retries) should be handled.
 
-In keeping with standards, we recommend returning HTTP-like responses:
+In keeping with standards, we _strongly_ recommend returning HTTP-like responses:
 
 ```json twoslash
 {
