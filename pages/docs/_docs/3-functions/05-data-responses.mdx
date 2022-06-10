@@ -29,8 +29,27 @@ The input has the following keys:
 - `steps`: the output of each completed step, within step functions.  This is a map keyed by step ID.
 - `ctx`: Context for the function.  In the future, this will contain items such as opentelemetry IDs.
 
-## Returning data from steps
+## Reading input data
 
+Input data is accessed in different ways, depending on the [driver](/docs/functions/inngest-json-configuration#drivers).
+
+- `docker`: Custom docker-based functions can always read the input as a JSON-encoded string via os.Args, as the first argument.
+- `http`: The input can be read as a JSON-encoded string from the request body.
+- `lambda`: The input data is read as a normal AWS lambda event.
+
+These methods were chosen because they're built in to every language - it's a standard, and requires no SDK.
+
+## Writing responses from steps
+
+You can write your step's response depending on the step's driver:
+
+- `docker`: Print the JSON-encoded response to `stdout`.
+- `http`: write the response as a JSON-encoded object in the response body.
+- `lambda`: return the response according to the AWS lambda guide.
+
+For standard containers, printing to `stdout` is easy - and is built in to every language, without needing an SDK.
+
+## Response format
 
 When a step completes it can return data that's usable by subsequent steps. The data also indicates how [retries](/docs/functions/retries) should be handled.
 

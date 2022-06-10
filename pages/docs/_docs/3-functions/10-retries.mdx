@@ -14,11 +14,12 @@ Steps are classified as failed if either of the following conditions are met:
 - A step exits with a non-zero status code, as per unix defaults
 - A step returns a non-2xx status code within their [response](/docs/functions/function-input-and-output)
 
-
 ## Retry policies
 
-By default, each step is retried 3 times using [exponential backoff](https://github.com/inngest/inngest-cli/blob/main/pkg/backoff/backoff.go) with jitter.
+By default, each step is retried 3 times using [exponential backoff](https://github.com/inngest/inngest-cli/blob/main/pkg/backoff/backoff.go) with jitter. Retries can be customized using the `status` or `statusCode` response:
 
-Retries can be customized using the `status` response.  If a step's `status` or `statusCode` contains a 4xx code, **the step will not be retried**.  A 4xx status code indicates a bad request - in which the incoming data must be changed to complete the result.
+* `2xx` - Successful: this is not a failure, no retry is necessary
+* `4xx` - Bad request: **this step will not be retried**, as this error is irrecovarble
+* `5xx` - Server error: something temporarily failed.  **This will be retried according to the retry policy (3 times, by default)**.
 
 We're currently working on implementing custom retry policies per steps, documented [in this issue](https://github.com/inngest/inngest-cli/issues/117).
