@@ -33,7 +33,7 @@ The input has the following keys:
 
 Input data is accessed in different ways, depending on the [runtime](/docs/functions/inngest-json-configuration#runtimes).
 
-- `docker`: Custom docker-based functions can always read the input as a JSON-encoded string via os.Args, as the first argument.
+- `docker`: Custom docker-based functions can always read the input as a JSON-encoded string as a command line argument passed to the image's command or entrypoint (e.g. `os.Args[1]` in Go, `process.argv[2]` in Node) 
 - `http`: The input can be read as a JSON-encoded string from the request body.
 - `lambda`: The input data is read as a normal AWS lambda event.
 
