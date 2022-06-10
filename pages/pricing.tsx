@@ -199,30 +199,37 @@ export default function Pricing() {
           <br />
           Powerful functionality.
         </h1>
-        {/* <p>
-          Save weeks of development with our event-driven platform.
-          <br />
-          Get started in seconds for free, with plans that grow as you scale.
-        </p> */}
       </Hero>
 
       <Content>
-        <Block color="primary">
-          <PlanHeader flexDirection="row">
-            <div>
-              <h3>{PLANS[0].name}</h3>
-              <p>{PLANS[0].description}</p>
-            </div>
-            <div>
-              <Button kind="outlineHighContrast" href={PLANS[0].cta.href}>
-                {PLANS[0].cta.text}
-              </Button>
-            </div>
-          </PlanHeader>
-          <IconList items={PLANS[0].features} />
-        </Block>
-
         <Grid>
+          <FreePlanBlock visibleOn="desktop" color="primary">
+            <PlanHeader flexDirection="row">
+              <div>
+                <h3>{PLANS[0].name}</h3>
+                <p>{PLANS[0].description}</p>
+              </div>
+              <div>
+                <Button kind="outlineHighContrast" href={PLANS[0].cta.href}>
+                  {PLANS[0].cta.text}
+                </Button>
+              </div>
+            </PlanHeader>
+            <IconList items={PLANS[0].features} />
+          </FreePlanBlock>
+          <FreePlanBlock visibleOn="mobile" color="primary">
+            <PlanHeader flexDirection="column">
+              <div>
+                <h3>{PLANS[0].name}</h3>
+                <p>{PLANS[0].description}</p>
+              </div>
+            </PlanHeader>
+            <IconList direction="vertical" items={PLANS[0].features} />
+            <Button kind="outlineHighContrast" href={PLANS[0].cta.href}>
+              {PLANS[0].cta.text}
+            </Button>
+          </FreePlanBlock>
+
           {PLANS.slice(1).map((plan, idx) => (
             <PlanBlock key={plan.name}>
               <PlanHeader flexDirection="column">
@@ -381,7 +388,7 @@ const PlanHeader = styled.div<{
   justify-content: space-between;
   margin-bottom: 1.5rem;
 
-  @media (max-width: 800px) {
+  @media (max-width: 1000px) {
     flex-direction: column;
   }
 
@@ -404,8 +411,11 @@ const Grid = styled.div`
     opacity: 0.5;
     font-size: 100%;
   }
+  @media (max-width: 1000px) {
+    grid-template-columns: 1fr 1fr;
+  }
 
-  @media (max-width: 800px) {
+  @media (max-width: 680px) {
     grid-template-columns: 1fr;
   }
 `;
@@ -417,6 +427,23 @@ const PlanBlock = styled(Block)`
   .icon-list {
     flex-grow: 1;
     margin-bottom: 2rem;
+  }
+`;
+
+const FreePlanBlock = styled(PlanBlock)<{ visibleOn: string }>`
+  grid-column: 1 / span 3;
+
+  display: ${({ visibleOn }) => (visibleOn === "desktop" ? "flex" : "none")};
+
+  @media (min-width: 1000px) {
+    .icon-list {
+      margin-bottom: 0;
+    }
+  }
+
+  @media (max-width: 1000px) {
+    display: ${({ visibleOn }) => (visibleOn !== "desktop" ? "flex" : "none")};
+    grid-column: 1;
   }
 `;
 
