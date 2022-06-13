@@ -87,7 +87,9 @@ This environment only persists state in-memory, so is not production ready.
 
 ## 5. Sending events to invoke the function
 
-You can test that the dev server invokes your action automatically by sending events to your server:
+It's important that you can test your application end-to-end locally.  With Inngest, you can set up an entire local environment by running `inngest dev`.
+
+Once the dev server is running you can test your functions by sending events to your server:
 
 ```bash
 curl -X POST --data '{"name":"test/event.received","data":{"test":true}}' http://127.0.0.1:9999/e/KEY
@@ -96,6 +98,9 @@ curl -X POST --data '{"name":"test/event.received","data":{"test":true}}' http:/
 In production, `KEY` will be replaced by your own "source key".  Here's what happens when the server receives your event:
 
 ![Inngest dev server executing](/assets/docs/getting-started-exec.png)
+
+The dev server receives the event, inspects which functions are triggered by the event, and automatically runs the steps in each function for full end-to-end testing.
+
 
 ## Summary & next steps
 
