@@ -21,27 +21,36 @@ export default function DocLayout(props: any) {
   );
 
   const formattedTitle = scope.title.replace(/`(.+)`/, "<code>$1</code>");
+
+  // metadata
+  const titleWithCategory =
+    scope.category !== scope.title
+      ? `${scope.category}: ${scope.title}`
+      : scope.title;
+  const metaTitle = `${titleWithCategory} - Inngest Documentation`;
   const description =
     scope.description || `Inngest documentation for ${scope.title}`;
+  const socialImage = scope.image
+    ? `${process.env.NEXT_PUBLIC_HOST}${scope.image}`
+    : `${process.env.NEXT_PUBLIC_HOST}/api/socialPreviewImage?title=${titleWithCategory}`;
 
   return (
     <DocsLayout cli={scope.cli} cloud={scope.cloud}>
       <Head>
-        <title>{scope.title} → Inngest docs</title>
+        <title>{metaTitle}</title>
         <meta name="description" content={description}></meta>
-        <meta property="og:title" content={`${scope.title} → Inngest docs`} />
+        <meta property="og:title" content={metaTitle} />
         <meta property="og:description" content={description} />
         <meta property="og:type" content="article" />
         <meta
           property="og:url"
           content={`${process.env.NEXT_PUBLIC_HOST}/docs/${scope.slug}`}
         />
-        {!!scope.image && (
-          <meta
-            property="og:image"
-            content={`${process.env.NEXT_PUBLIC_HOST}${scope.image}`}
-          />
-        )}
+        <meta property="og:image" content={socialImage} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@inngest" />
+        <meta name="twitter:title" content={metaTitle} />
+        <meta name="twitter:image" content={socialImage} />
       </Head>
       <DocsContent hasTOC={true}>
         <header>
