@@ -41,7 +41,7 @@ func NewStateManager() Queue {
 	return &mem{
 		state:  map[ulid.ULID]state.State{},
 		pauses: map[uuid.UUID]state.Pause{},
-		lock:   sync.RWMutex{},
+		lock:   &sync.RWMutex{},
 		q:      make(chan QueueItem),
 	}
 }
@@ -51,7 +51,7 @@ type mem struct {
 
 	pauses map[uuid.UUID]state.Pause
 
-	lock sync.RWMutex
+	lock *sync.RWMutex
 
 	q chan QueueItem
 }

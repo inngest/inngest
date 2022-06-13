@@ -28,6 +28,7 @@ func NewInMemoryRunner(sm inmemory.Queue, exec executor.Executor) *InMemoryRunne
 		sm:    sm,
 		exec:  exec,
 		waits: map[ulid.ULID]*sync.WaitGroup{},
+		lock:  &sync.RWMutex{},
 	}
 }
 
@@ -40,6 +41,8 @@ type InMemoryRunner struct {
 	// In a dev server, we want to wait until all current steps of a state.Identifier
 	// are complete.  We create a new waitgroup per identifier to wait for the steps.
 	waits map[ulid.ULID]*sync.WaitGroup
+
+	lock *sync.RWMutex
 }
 
 // NewRun initializes a new run for the given workflow.
@@ -60,12 +63,19 @@ func (i *InMemoryRunner) NewRun(ctx context.Context, f inngest.Workflow, data ma
 
 func (i InMemoryRunner) Enqueue(ctx context.Context, item inmemory.QueueItem, at time.Time) {
 	if _, ok := i.waits[item.ID.RunID]; !ok {
+		i.lock.Lock()
 		i.waits[item.ID.RunID] = &sync.WaitGroup{}
+		i.lock.Unlock()
 	}
 
 	// Add to the waitgroup, ensuring that the runner blocks until the enqueued item
 	// is finished.
-	i.waits[item.ID.RunID].Add(1)
+	i.lock.RLock()
+	wg := i.waits[item.ID.RunID]
+	i.lock.RUnlock()
+
+	wg.Add(1)
+
 	i.sm.Enqueue(item, at)
 }
 
@@ -80,14 +90,25 @@ func (i *InMemoryRunner) Execute(ctx context.Context, id state.Identifier) error
 	}()
 
 	// Wait for all items in the queue to be complete.
-	i.waits[id.RunID].Wait()
+	i.lock.RLock()
+	wg := i.waits[id.RunID]
+	i.lock.RUnlock()
+
+	wg.Wait()
+
 	return err
 }
 
 func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error {
 	defer func() {
+		i.lock.RLock()
 		i.waits[item.ID.RunID].Done()
+		i.lock.RUnlock()
 	}()
+
+	// TODO: This could have been retried due to a state load error after
+	// the particular step's code has ran.  In this case, check that the
+	// function has no output stored.
 
 	resp, err := i.exec.Execute(ctx, item.ID, item.Edge.Incoming)
 	if err != nil {
