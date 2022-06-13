@@ -56,11 +56,14 @@ type Engine struct {
 func NewEngine(l *zerolog.Logger) (*Engine, error) {
 	logger := l.With().Str("caller", "engine").Logger()
 
+	engineLogger := logger.Output(os.Stderr)
+	queueLogger := logger.Output(os.Stderr)
+
 	eng := &Engine{
-		log:           &logger,
+		log:           &engineLogger,
 		EventTriggers: map[string][]function.Function{},
 		al:            actionloader.NewMemoryLoader(),
-		sm:            NewLoggingQueue(l),
+		sm:            NewLoggingQueue(&queueLogger),
 	}
 
 	// Create our drivers.

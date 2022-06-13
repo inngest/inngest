@@ -138,9 +138,29 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 		return nil, err
 	}
 
-	w, err := state.Workflow()
-	if err != nil {
-		return nil, err
+	w := state.Workflow()
+
+	// This could have been retried due to a state load error after
+	// the particular step's code has ran; we need to load state after
+	// each action to properly evaluate the next set of edges.
+	//
+	// To fix this particular consistency issue, always check to see
+	// if there's output stored for this action ID.
+	if resp, _ := state.ActionID(from); resp != nil {
+		// This has already successfully been executed.
+		return &driver.Response{
+			Scheduled: false,
+			Output:    resp,
+			Err:       nil,
+			// TODO: This data isn't necessarily available in the state
+			// store.  Should we mandate that this is saved?
+			//
+			// We're only short-circuiting execution here, which means
+			// everything has been recorded and all logs should be up
+			// to date;  this *shouldn't* be an issue (but... we need
+			// to check).
+			ActionVersion: nil,
+		}, nil
 	}
 
 	resp, err := e.run(ctx, w, id, from, state)
@@ -238,11 +258,16 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		return response, nil
 	}
 
-	// TODO (tonyhb): now that we're returning the response directly, should the runner
-	// which calls the executor manage state?  We could then have a state.State instance
-	// passed into execute, removing the need for this to have a state manager.
-	if _, serr := e.sm.SaveActionOutput(ctx, id, action.ID, response.Output); serr != nil {
-		err = multierror.Append(err, serr)
+	if response.Err == nil {
+		if _, serr := e.sm.SaveActionOutput(ctx, id, action.ID, response.Output); serr != nil {
+			err = multierror.Append(err, serr)
+		}
+
+		// Clear any saved error.  It doesn't necessarily matter if this fails;  we'll
+		// re-run the step and realize that there's output, then skip.  This will leave
+		// a dangling error in state.  To that effect, we ignore errors entirely as it
+		// only causes extra work for benefit.
+		_, _ = e.sm.SaveActionError(ctx, id, action.ID, nil)
 	}
 
 	// Store the output or the error.

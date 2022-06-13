@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
+	"github.com/inngest/inngest-cli/pkg/execution/state/testharness"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,6 +17,10 @@ import (
 
 func newULID() ulid.ULID {
 	return ulid.MustNew(ulid.Now(), rand.Reader)
+}
+
+func TestStateHarness(t *testing.T) {
+	testharness.CheckState(t, NewStateManager())
 }
 
 func TestInMemorySaveOutput(t *testing.T) {
@@ -29,8 +34,8 @@ func TestInMemorySaveOutput(t *testing.T) {
 
 	s, err := sm.Load(ctx, i)
 	assert.Nil(t, err)
-	assert.Equal(t, i.WorkflowID, s.(*memstate).workflowID)
-	assert.Equal(t, i.RunID, s.(*memstate).runID)
+	assert.Equal(t, i.WorkflowID, s.(memstate).workflowID)
+	assert.Equal(t, i.RunID, s.(memstate).runID)
 
 	data := map[string]interface{}{"ok": true}
 	_, err = sm.SaveActionOutput(ctx, i, "1", data)
@@ -38,10 +43,10 @@ func TestInMemorySaveOutput(t *testing.T) {
 
 	s, err = sm.Load(ctx, i)
 	assert.Nil(t, err)
-	assert.Equal(t, i.WorkflowID, s.(*memstate).workflowID)
-	assert.Equal(t, i.RunID, s.(*memstate).runID)
-	assert.Equal(t, 1, len(s.(*memstate).actions))
-	assert.Equal(t, data, s.(*memstate).actions["1"])
+	assert.Equal(t, i.WorkflowID, s.(memstate).workflowID)
+	assert.Equal(t, i.RunID, s.(memstate).runID)
+	assert.Equal(t, 1, len(s.(memstate).actions))
+	assert.Equal(t, data, s.(memstate).actions["1"])
 }
 
 func TestInMemoryPause(t *testing.T) {

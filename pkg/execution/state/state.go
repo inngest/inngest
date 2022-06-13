@@ -55,7 +55,7 @@ type Pause struct {
 type State interface {
 	// Workflow returns the concrete workflow that is being executed
 	// for the given run.
-	Workflow() (inngest.Workflow, error)
+	Workflow() inngest.Workflow
 
 	Identifier() Identifier
 
@@ -66,7 +66,7 @@ type State interface {
 	WorkflowID() uuid.UUID
 
 	// Event is the root data that triggers the workflow, which is typically
-	// an Inngest event.  For scheduled workflows this is a nil map.
+	// an Inngest event.
 	Event() map[string]interface{}
 
 	// Actions returns a map of all output from each individual action.
@@ -79,7 +79,9 @@ type State interface {
 	ActionID(id string) (map[string]interface{}, error)
 
 	// ActionComplete returns whether the action with the given ID has finished,
-	// ie. has completed with data stored in state or has errored.
+	// ie. has completed with data stored in state.
+	//
+	// Note that if an action has errored this should return false.
 	ActionComplete(id string) bool
 }
 
@@ -95,15 +97,27 @@ type Loader interface {
 // a map[string]interface{} containing event data.
 type Mutater interface {
 	// New creates a new state for the given run ID, using the event as the input data for the root workflow.
-	New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, input any) (State, error)
+	New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, input map[string]any) (State, error)
 
 	// SaveActionOutput stores output for a single action within a workflow run.
+	//
+	// This should clear any error that exists for the current action, indicating that
+	// the step is a success.
 	SaveActionOutput(ctx context.Context, i Identifier, actionID string, data map[string]interface{}) (State, error)
 
 	// SaveActionError stores an error for a single action within a workflow run.  This is
 	// considered final, as in the action will not be retried.
+	//
+	// If err is nil, this should clear the error for the saved action.  This indicates
+	// that the action ran, retried then succeeded and an error should not be stored.
+	//
+	// XXX: It might be sensible to store a record of each error that occurred for
+	// every attempt, whilst still being able to distinguish between an eventual success
+	// and a persistent error.
 	SaveActionError(ctx context.Context, i Identifier, actionID string, err error) (State, error)
+}
 
+type PauseMutater interface {
 	// SavePause indicates that the traversal of an edge is paused until some future time.
 	//
 	// The runner which coordinates workflow executions is responsible for managing paused
@@ -124,4 +138,5 @@ type Mutater interface {
 type Manager interface {
 	Loader
 	Mutater
+	PauseMutater
 }

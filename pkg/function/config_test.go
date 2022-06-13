@@ -28,7 +28,8 @@ func TestUnmarshal_testdata(t *testing.T) {
 
 	for _, e := range entries {
 		t.Run(e.Name(), func(t *testing.T) {
-			state.Clear(context.Background())
+			err := state.Clear(context.Background())
+			require.NoError(t, err)
 
 			if !strings.HasSuffix(e.Name(), ".txtar") {
 				return
