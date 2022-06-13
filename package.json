@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build && next-sitemap",
     "start": "next start",
+    "render-social-preview-images": "npx ts-node ./scripts/renderSocialPreviewImages.ts",
     "prettier": "prettier --write --trailing-comma es5 \"pages/**/*.tsx\" \"pages/**/*.js\" \"shared/*.tsx\" \"shared/*.js\"",
     "storybook": "start-storybook -p 6006",
     "build-storybook": "build-storybook"

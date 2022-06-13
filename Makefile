@@ -6,6 +6,7 @@ build: #get-library generate-library
 cloudflare-build:
 	yarn build
 	yarn next export
+	yarn render-social-preview-images
 	cp ./_redirects ./out/_redirects
 
 .PHONY: dirty

@@ -30,9 +30,16 @@ export default function DocLayout(props: any) {
   const metaTitle = `${titleWithCategory} - Inngest Documentation`;
   const description =
     scope.description || `Inngest documentation for ${scope.title}`;
+  // Social preview images are rendered at build time via `yarn render-social-preview-images`, also see Makefile
+  // but are rendered dynamically here to allow for previews
+  const flattenedSlug = scope.slug.replace(/\//, "--");
+  const generatedPreviewImage =
+    process.env.NODE_ENV === "development"
+      ? `${process.env.NEXT_PUBLIC_HOST}/api/socialPreviewImage?title=${titleWithCategory}`
+      : `${process.env.NEXT_PUBLIC_HOST}/assets/social-previews/${flattenedSlug}.png`;
   const socialImage = scope.image
     ? `${process.env.NEXT_PUBLIC_HOST}${scope.image}`
-    : `${process.env.NEXT_PUBLIC_HOST}/api/socialPreviewImage?title=${titleWithCategory}`;
+    : generatedPreviewImage;
 
   return (
     <DocsLayout cli={scope.cli} cloud={scope.cloud}>
