@@ -102,7 +102,7 @@ If you have functions which you want to host on Lambda, that works.  If you have
 
 We’ve been using this for a while and it’s been much easier to develop and deploy our asynchronous tasks.  
 
-While it seems ****like a simple change there’s a lot that’s needed to make the system work.
+While it seems like a simple change there’s a lot that’s needed to make the system work.
 
 We’ve open sourced the execution engine, locally running drivers, in-memory and Redis-backed state, and we’re also open-sourcing an abstraction over many common queueing layers (eg. Celery, Faktory) to make gradual adoption easier.  We’re also open-sourcing new runtime drivers such as an AWS Lambda layer, and we have plans for webassembly adoption in the future.
 
