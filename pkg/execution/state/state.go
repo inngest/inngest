@@ -13,6 +13,12 @@ import (
 var (
 	ErrStepIncomplete = fmt.Errorf("step has not yet completed")
 	ErrPauseNotFound  = fmt.Errorf("pause not found")
+	ErrPauseLeased    = fmt.Errorf("pause already leased")
+)
+
+const (
+	// PauseLeaseDuration is the lifetime that a pause's lease is valid for.
+	PauseLeaseDuration = 5 * time.Second
 )
 
 // Identifier represents the unique identifier for a workflow run.
@@ -44,6 +50,13 @@ type Pause struct {
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout"`
+	// LeasedUntil represents the time that this pause is leased until. If
+	// nil, this pause is not leased.
+	//
+	// A lease allows a single worker to claim a pause while enqueueing the
+	// pause's next step.  After enqueueing, the worker can consume the pause
+	// entirely.
+	LeasedUntil *time.Time `json:"leasedUntil,omitempty"`
 }
 
 // State represents the current state of a workflow.  It is data-structure
@@ -130,7 +143,19 @@ type PauseMutater interface {
 	// leasing or locking mechanism.
 	SavePause(ctx context.Context, p Pause) error
 
-	// ConsumePause consumes a pause by its ID such that it won't be used again.
+	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
+	// we can 'consume' the pause to remove it.
+	//
+	// This prevents a failure mode in which we consume the pause but enqueueing the next
+	// action fails (eg. due to power loss).
+	//
+	// If the given pause has been leased within LeasePauseDuration, this should return an
+	// ErrPauseLeased error.
+	//
+	// See https://github.com/inngest/inngest-cli/issues/123 for more info
+	LeasePause(ctx context.Context, id uuid.UUID) error
+
+	// ConsumePause consumes a pause by its ID such that it can't be used again.
 	ConsumePause(ctx context.Context, id uuid.UUID) error
 }
 

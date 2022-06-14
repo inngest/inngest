@@ -193,6 +193,25 @@ func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
 	return nil
 }
 
+func (m *mem) LeasePause(ctx context.Context, id uuid.UUID) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	pause, ok := m.pauses[id]
+	if !ok || pause.Expires.Before(time.Now()) {
+		return state.ErrPauseNotFound
+	}
+	if pause.LeasedUntil != nil && time.Now().Before(*pause.LeasedUntil) {
+		return state.ErrPauseLeased
+	}
+
+	lease := time.Now().Add(state.PauseLeaseDuration)
+	pause.LeasedUntil = &lease
+	m.pauses[id] = pause
+
+	return nil
+}
+
 func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()

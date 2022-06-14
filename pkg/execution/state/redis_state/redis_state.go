@@ -87,8 +87,8 @@ type KeyGenerator interface {
 	// for given workflow run.
 	Errors(context.Context, state.Identifier) string
 
-	// Pause returns the key used to store an individual pause.
-	Pause(context.Context, state.Pause) string
+	// Pause returns the key used to store an individual pause from its ID.
+	Pause(context.Context, uuid.UUID) string
 }
 
 type mgr struct {
@@ -177,6 +177,8 @@ func (m mgr) metadata(ctx context.Context, id state.Identifier) (*runMetadata, e
 }
 
 func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error) {
+	// TODO: Use a pipeliner to improve speed.
+
 	metadata, err := m.metadata(ctx, id)
 	if err != nil {
 		return nil, err
@@ -270,13 +272,54 @@ func (m mgr) SaveActionError(ctx context.Context, id state.Identifier, actionID 
 }
 
 func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
-	// TODO
-	return nil
+	packed, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	return m.r.SetNX(ctx, m.kf.Pause(ctx, p.ID), packed, time.Until(p.Expires)).Err()
+}
+
+func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
+	key := m.kf.Pause(ctx, id)
+	return m.r.Watch(ctx, func(tx *redis.Tx) error {
+		str, err := tx.Get(ctx, key).Result()
+		if err != nil {
+			if err == redis.Nil {
+				return state.ErrPauseNotFound
+			}
+			return err
+		}
+
+		pause := &state.Pause{}
+		if err := json.Unmarshal([]byte(str), pause); err != nil {
+			return err
+		}
+
+		if pause.LeasedUntil != nil && time.Now().Before(*pause.LeasedUntil) {
+			return state.ErrPauseLeased
+		}
+
+		lease := time.Now().Add(state.PauseLeaseDuration)
+		pause.LeasedUntil = &lease
+
+		packed, err := json.Marshal(pause)
+		return tx.Set(ctx, key, string(packed), time.Until(pause.Expires)).Err()
+	}, key)
 }
 
 func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID) error {
-	// TODO
-	return nil
+	key := m.kf.Pause(ctx, id)
+
+	return m.r.Watch(ctx, func(tx *redis.Tx) error {
+		_, err := tx.Get(ctx, key).Result()
+		if err == redis.Nil {
+			return state.ErrPauseNotFound
+		}
+		if err == nil {
+			return tx.Del(ctx, key).Err()
+		}
+		return err
+	}, key)
 }
 
 func NewRunMetadata(data map[string]string) (*runMetadata, error) {
@@ -344,6 +387,6 @@ func (defaultKeyFunc) Errors(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("%s:errors:%s:%s", keyPrefix, id.WorkflowID, id.RunID)
 }
 
-func (defaultKeyFunc) Pause(ctx context.Context, pause state.Pause) string {
-	return fmt.Sprintf("%s:pause:%s", keyPrefix, pause.ID.String())
+func (defaultKeyFunc) Pause(ctx context.Context, id uuid.UUID) string {
+	return fmt.Sprintf("%s:pause:%s", keyPrefix, id.String())
 }

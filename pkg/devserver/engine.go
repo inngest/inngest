@@ -263,8 +263,8 @@ func (eng *Engine) handlePauses(ctx context.Context, evt *event.Event) error {
 			}
 		}
 
-		// Remove this pause from the state store, as it will be consumed.
-		if err := eng.sm.ConsumePause(ctx, pause.ID); err != nil {
+		// Lease this pause so that only this thread can schedule the execution.
+		if err := eng.sm.LeasePause(ctx, pause.ID); err != nil {
 			return err
 		}
 
@@ -275,6 +275,10 @@ func (eng *Engine) handlePauses(ctx context.Context, evt *event.Event) error {
 				Incoming: pause.Incoming,
 			},
 		}, time.Now())
+
+		if err := eng.sm.ConsumePause(ctx, pause.ID); err != nil {
+			return err
+		}
 	}
 
 	return nil

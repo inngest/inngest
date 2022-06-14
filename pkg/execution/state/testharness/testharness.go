@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
@@ -68,12 +69,16 @@ var (
 
 func CheckState(t *testing.T, m state.Manager) {
 	t.Helper()
+	t.Parallel()
 
 	funcs := map[string]func(t *testing.T, m state.Manager){
 		"New":                         checkNew,
 		"SaveActionOutput":            checkSaveOutput,
 		"SaveActionOutputClearsError": checkSaveOutputClearsError,
 		"SaveActionError":             checkSaveError,
+		"SavePause":                   checkSavePause,
+		"LeasePause":                  checkLeasePause,
+		"ConsumePause":                checkConsumePause,
 	}
 	for name, f := range funcs {
 		t.Run(name, func(t *testing.T) { f(t, m) })
@@ -259,6 +264,122 @@ func checkSaveError(t *testing.T, m state.Manager) {
 	require.EqualValues(t, next.Errors(), reloaded.Errors())
 
 	// XXX: Assert that we can't save an error to an action that has output.
+}
+
+func checkSavePause(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	// Save a pause.
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(5 * time.Second),
+	}
+	err := m.SavePause(ctx, pause)
+	require.NoError(t, err)
+	// TODO: Saving a pause with a past expiry is a noop.
+}
+
+func checkLeasePause(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	// Leasing a non-existent pause should error.
+	err := m.LeasePause(ctx, uuid.New())
+	require.Equal(t, state.ErrPauseNotFound, err, "leasing a non-existent pause should return state.ErrPauseNotFound")
+
+	// Save a pause.
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+	}
+	err = m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	now := time.Now()
+
+	// Leasing the pause should work.
+	err = m.LeasePause(ctx, pause.ID)
+	require.NoError(t, err)
+
+	// And we should not be able to re-lease the pause until the pause lease duration is up.
+	for time.Now().Before(now.Add(state.PauseLeaseDuration)) {
+		err = m.LeasePause(ctx, pause.ID)
+		require.NotNil(t, err, "Re-leasing a pause with a valid lease should error")
+		require.Error(t, state.ErrPauseLeased, err)
+		<-time.After(state.PauseLeaseDuration / 100)
+	}
+
+	// And again, once the lease is up, we should be able to lease the pause.
+	err = m.LeasePause(ctx, pause.ID)
+	require.NoError(t, err)
+
+	//
+	// TODO: Assert that leasing an expired pause fails.
+	//
+
+	pause = state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(10 * time.Millisecond),
+	}
+	<-time.After(15 * time.Millisecond)
+	err = m.LeasePause(ctx, pause.ID)
+	require.NotNil(t, err)
+	require.Error(t, state.ErrPauseNotFound, err)
+}
+
+func checkConsumePause(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	// Consuming a non-existent pause should error.
+	err := m.ConsumePause(ctx, uuid.New())
+	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
+
+	// Save a pause.
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+	}
+	err = m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	// TODO: Do we want to enforce leasing of a pause prior to consuming it?
+
+	// Consuming the pause should work.
+	err = m.ConsumePause(ctx, pause.ID)
+	require.NoError(t, err)
+
+	err = m.ConsumePause(ctx, pause.ID)
+	require.NotNil(t, err)
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	//
+	// Assert that completing a leased pause fails.
+	//
+	pause = state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(10 * time.Millisecond),
+	}
+	<-time.After(15 * time.Millisecond)
+	err = m.ConsumePause(ctx, pause.ID)
+	require.NotNil(t, err, "Consuming an expired pause should error")
+	require.Error(t, state.ErrPauseNotFound, err)
 }
 
 func setup(t *testing.T, m state.Manager) state.State {
