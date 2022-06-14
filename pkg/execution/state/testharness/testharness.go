@@ -263,7 +263,8 @@ func checkSaveError(t *testing.T, m state.Manager) {
 	require.EqualValues(t, next.Actions(), reloaded.Actions())
 	require.EqualValues(t, next.Errors(), reloaded.Errors())
 
-	// XXX: Assert that we can't save an error to an action that has output.
+	// Maybe we also want to assert that we can't save an error to an
+	// action that has output.
 }
 
 func checkSavePause(t *testing.T, m state.Manager) {
@@ -280,7 +281,8 @@ func checkSavePause(t *testing.T, m state.Manager) {
 	}
 	err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
-	// TODO: Saving a pause with a past expiry is a noop.
+
+	// XXX: Saving a pause with a past expiry is a noop.
 }
 
 func checkLeasePause(t *testing.T, m state.Manager) {
@@ -321,7 +323,7 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 
 	//
-	// TODO: Assert that leasing an expired pause fails.
+	// Assert that leasing an expired pause fails.
 	//
 
 	pause = state.Pause{

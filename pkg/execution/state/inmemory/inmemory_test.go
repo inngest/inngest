@@ -14,10 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newULID() ulid.ULID {
-	return ulid.MustNew(ulid.Now(), rand.Reader)
-}
-
 func TestStateHarness(t *testing.T) {
 	testharness.CheckState(t, NewStateManager())
 }

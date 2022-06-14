@@ -119,7 +119,6 @@ func (m mgr) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID
 	}
 
 	err = m.r.Watch(ctx, func(tx *redis.Tx) error {
-
 		// Ensure that the workflow exists within the state store.
 		key := m.kf.Workflow(ctx, workflow.UUID, workflow.Version)
 		val, err := tx.Exists(ctx, key).Uint64()
@@ -177,8 +176,7 @@ func (m mgr) metadata(ctx context.Context, id state.Identifier) (*runMetadata, e
 }
 
 func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error) {
-	// TODO: Use a pipeliner to improve speed.
-
+	// XXX: Use a pipeliner to improve speed.
 	metadata, err := m.metadata(ctx, id)
 	if err != nil {
 		return nil, err
@@ -303,6 +301,9 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 		pause.LeasedUntil = &lease
 
 		packed, err := json.Marshal(pause)
+		if err != nil {
+			return err
+		}
 		return tx.Set(ctx, key, string(packed), time.Until(pause.Expires)).Err()
 	}, key)
 }
