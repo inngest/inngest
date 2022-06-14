@@ -1,9 +1,9 @@
 ---
-focus: false
+focus: true
 heading: "Building an event-driven queue based on common standards"
 subtitle: The design decisions and architecture for a next-gen queuing platform
 image: "/assets/blog/building-event-driven-queue.jpg"
-date: 2022-06-15
+date: 2022-06-14
 ---
 
 At Inngest, we’ve built a next-gen queueing platform for modern development  — it’s event-driven, and (if you want) entirely serverless.  We’d like to talk a little bit about *why* we built this, the benefits, and the process & design decisions of building the system.
