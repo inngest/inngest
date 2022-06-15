@@ -29,6 +29,8 @@ Here's an overview of the sequence of steps Inngest runs through to schedule you
 5. Shared-nothing workers consume from the queue to execute steps of each function.  Once complete, the state for the function run is updated and the step's children are scheduled.
 6. If a step errors, the runner is responsible for re-scheduling the steps.
 
+**Note**: This is all handled for you by Inngest.  You don't need to do _anything_ to run functions:  there are no workers to define, no queues to configure, or services to set up.  You only need to push your functions and events;  the rest automatically happens.
+
 **Core implementation details**:
 
 - The message queue can be any message broker, such as NATS, NSQ, Pub/Sub, Kafka, etc.  We abstract over the broker to provide buffering.
