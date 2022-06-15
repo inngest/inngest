@@ -30,7 +30,10 @@ func (evt *Event) Map() map[string]interface{} {
 		"data": evt.Data,
 		"user": evt.User,
 		"id":   evt.ID,
-		"ts":   evt.Timestamp,
+		// We cast to float64 because marshalling and unmarshalling from
+		// JSON automatically uses float64 as its type;  JS has no notion
+		// of ints.
+		"ts": float64(evt.Timestamp),
 	}
 
 	if evt.Version != "" {

@@ -2,6 +2,7 @@ package mockdriver
 
 import (
 	"context"
+	"sync"
 
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
@@ -21,6 +22,8 @@ type Mock struct {
 
 	// Executed stores which actions were "executed"
 	Executed map[string]inngest.ActionVersion
+
+	lock sync.RWMutex
 }
 
 // RuntimeType fulfiils the inngest.Runtime interface.
@@ -33,6 +36,9 @@ func (m *Mock) RuntimeType() string {
 }
 
 func (m *Mock) Execute(ctx context.Context, state state.State, action inngest.ActionVersion, step inngest.Step) (*driver.Response, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if m.Executed == nil {
 		m.Executed = map[string]inngest.ActionVersion{}
 	}
@@ -42,4 +48,10 @@ func (m *Mock) Execute(ctx context.Context, state state.State, action inngest.Ac
 	response := m.Responses[step.ID]
 	err := m.Errors[step.ID]
 	return &response, err
+}
+
+func (m *Mock) ExecutedLen() int {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	return len(m.Executed)
 }

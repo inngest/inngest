@@ -26,6 +26,12 @@ type Queue interface {
 	Enqueue(item QueueItem, at time.Time)
 
 	// Pauses returns all available pauses.
+	//
+	// This is _not_ the smartest implementation;  most state stores should
+	// return all pauses for a specific event, or for a specific run ID &
+	// step ID combination.
+	//
+	// TODO: Create interfaces for the above methods.
 	Pauses() map[uuid.UUID]state.Pause
 }
 
@@ -41,7 +47,7 @@ func NewStateManager() Queue {
 	return &mem{
 		state:  map[ulid.ULID]state.State{},
 		pauses: map[uuid.UUID]state.Pause{},
-		lock:   sync.RWMutex{},
+		lock:   &sync.RWMutex{},
 		q:      make(chan QueueItem),
 	}
 }
@@ -51,7 +57,7 @@ type mem struct {
 
 	pauses map[uuid.UUID]state.Pause
 
-	lock sync.RWMutex
+	lock *sync.RWMutex
 
 	q chan QueueItem
 }
@@ -68,9 +74,8 @@ func (m *mem) Channel() chan QueueItem {
 }
 
 // New initializes state for a new run using the specifid ID and starting data.
-func (m *mem) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, data any) (state.State, error) {
-	event := data.(map[string]interface{})
-	state := &memstate{
+func (m *mem) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, event map[string]any) (state.State, error) {
+	state := memstate{
 		workflow:   workflow,
 		runID:      runID,
 		workflowID: workflow.UUID,
@@ -102,7 +107,7 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 		return s, nil
 	}
 
-	state := &memstate{
+	state := memstate{
 		workflowID: i.WorkflowID,
 		runID:      i.RunID,
 		event:      map[string]interface{}{},
@@ -120,11 +125,18 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 func (m *mem) SaveActionOutput(ctx context.Context, i state.Identifier, actionID string, data map[string]interface{}) (state.State, error) {
 	s, _ := m.Load(ctx, i)
 
-	state := s.(*memstate)
+	state := s.(memstate)
+
+	// Copy the maps so that any previous state references aren't updated.
+	state.actions = copyMap(state.actions)
+	state.errors = copyMap(state.errors)
+
 	state.actions[actionID] = data
+	delete(state.errors, actionID)
 
 	m.lock.Lock()
 	m.state[i.RunID] = state
+
 	m.lock.Unlock()
 
 	return state, nil
@@ -133,8 +145,17 @@ func (m *mem) SaveActionOutput(ctx context.Context, i state.Identifier, actionID
 func (m *mem) SaveActionError(ctx context.Context, i state.Identifier, actionID string, err error) (state.State, error) {
 	s, _ := m.Load(ctx, i)
 
-	state := s.(*memstate)
-	state.errors[actionID] = err
+	state := s.(memstate)
+
+	// Copy the maps so that any previous state references aren't updated.
+	state.actions = copyMap(state.actions)
+	state.errors = copyMap(state.errors)
+
+	if err == nil {
+		delete(state.errors, actionID)
+	} else {
+		state.errors[actionID] = err
+	}
 
 	m.lock.Lock()
 	m.state[i.RunID] = state
@@ -172,6 +193,25 @@ func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
 	return nil
 }
 
+func (m *mem) LeasePause(ctx context.Context, id uuid.UUID) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	pause, ok := m.pauses[id]
+	if !ok || pause.Expires.Before(time.Now()) {
+		return state.ErrPauseNotFound
+	}
+	if pause.LeasedUntil != nil && time.Now().Before(*pause.LeasedUntil) {
+		return state.ErrPauseLeased
+	}
+
+	lease := time.Now().Add(state.PauseLeaseDuration)
+	pause.LeasedUntil = &lease
+	m.pauses[id] = pause
+
+	return nil
+}
+
 func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -186,67 +226,18 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID) error {
 func (m *mem) Pauses() map[uuid.UUID]state.Pause {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
-	return m.pauses
+
+	// We need to copy the pauses available such that we don't
+	// return the same map to prevent data races.
+	copied := copyMap(m.pauses)
+
+	return copied
 }
 
-type memstate struct {
-	workflow inngest.Workflow
-
-	workflowID uuid.UUID
-	runID      ulid.ULID
-
-	// Event is the root data that triggers the workflow, which is typically
-	// an Inngest event.
-	event map[string]interface{}
-
-	// Actions stores a map of all output from each individual action
-	actions map[string]map[string]interface{}
-
-	// errors stores a map of action errors
-	errors map[string]error
-}
-
-func (s memstate) Identifier() state.Identifier {
-	return state.Identifier{
-		WorkflowID: s.workflowID,
-		RunID:      s.runID,
+func copyMap[K comparable, V any](m map[K]V) map[K]V {
+	copied := map[K]V{}
+	for k, v := range m {
+		copied[k] = v
 	}
-}
-
-func (s memstate) Workflow() (inngest.Workflow, error) {
-	return s.workflow, nil
-}
-
-func (s memstate) WorkflowID() uuid.UUID {
-	return s.workflowID
-}
-
-func (s memstate) RunID() ulid.ULID {
-	return s.runID
-}
-
-func (s memstate) Event() map[string]interface{} {
-	return s.event
-}
-
-func (s memstate) Actions() map[string]map[string]interface{} {
-	return s.actions
-}
-
-func (s memstate) Errors() map[string]error {
-	return s.errors
-}
-
-func (s memstate) ActionID(id string) (map[string]interface{}, error) {
-	data, hasAction := s.Actions()[id]
-	err, hasError := s.Errors()[id]
-	if !hasAction && !hasError {
-		return nil, state.ErrStepIncomplete
-	}
-	return data, err
-}
-
-func (s memstate) ActionComplete(id string) bool {
-	_, err := s.ActionID(id)
-	return err != state.ErrStepIncomplete
+	return copied
 }

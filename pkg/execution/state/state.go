@@ -13,6 +13,12 @@ import (
 var (
 	ErrStepIncomplete = fmt.Errorf("step has not yet completed")
 	ErrPauseNotFound  = fmt.Errorf("pause not found")
+	ErrPauseLeased    = fmt.Errorf("pause already leased")
+)
+
+const (
+	// PauseLeaseDuration is the lifetime that a pause's lease is valid for.
+	PauseLeaseDuration = 5 * time.Second
 )
 
 // Identifier represents the unique identifier for a workflow run.
@@ -44,6 +50,13 @@ type Pause struct {
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout"`
+	// LeasedUntil represents the time that this pause is leased until. If
+	// nil, this pause is not leased.
+	//
+	// A lease allows a single worker to claim a pause while enqueueing the
+	// pause's next step.  After enqueueing, the worker can consume the pause
+	// entirely.
+	LeasedUntil *time.Time `json:"leasedUntil,omitempty"`
 }
 
 // State represents the current state of a workflow.  It is data-structure
@@ -55,7 +68,7 @@ type Pause struct {
 type State interface {
 	// Workflow returns the concrete workflow that is being executed
 	// for the given run.
-	Workflow() (inngest.Workflow, error)
+	Workflow() inngest.Workflow
 
 	Identifier() Identifier
 
@@ -66,7 +79,7 @@ type State interface {
 	WorkflowID() uuid.UUID
 
 	// Event is the root data that triggers the workflow, which is typically
-	// an Inngest event.  For scheduled workflows this is a nil map.
+	// an Inngest event.
 	Event() map[string]interface{}
 
 	// Actions returns a map of all output from each individual action.
@@ -79,7 +92,9 @@ type State interface {
 	ActionID(id string) (map[string]interface{}, error)
 
 	// ActionComplete returns whether the action with the given ID has finished,
-	// ie. has completed with data stored in state or has errored.
+	// ie. has completed with data stored in state.
+	//
+	// Note that if an action has errored this should return false.
 	ActionComplete(id string) bool
 }
 
@@ -95,28 +110,43 @@ type Loader interface {
 // a map[string]interface{} containing event data.
 type Mutater interface {
 	// New creates a new state for the given run ID, using the event as the input data for the root workflow.
-	New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, input any) (State, error)
+	New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, input map[string]any) (State, error)
 
 	// SaveActionOutput stores output for a single action within a workflow run.
+	//
+	// This should clear any error that exists for the current action, indicating that
+	// the step is a success.
 	SaveActionOutput(ctx context.Context, i Identifier, actionID string, data map[string]interface{}) (State, error)
 
-	// SaveActionError stores an error for a single action within a workflow run.  This is
-	// considered final, as in the action will not be retried.
+	// SaveActionError stores an error for a single action within a workflow run.
+	//
+	// XXX: It might be sensible to store a record of each error that occurred for
+	// every attempt, whilst still being able to distinguish between an eventual success
+	// and a persistent error.  See: https://github.com/inngest/inngest-cli/issues/125
+	// for more info.
 	SaveActionError(ctx context.Context, i Identifier, actionID string, err error) (State, error)
+}
 
+type PauseMutater interface {
 	// SavePause indicates that the traversal of an edge is paused until some future time.
 	//
 	// The runner which coordinates workflow executions is responsible for managing paused
 	// DAG executions.
-	//
-	// Note that in production it's likely that you want to coordinate amongst pauses and only
-	// let a pause be used once.  This requires syncing with distributed locks / leases.  This
-	// basic interface does not provide a mechanism for "leasing" a pause temporarily whilst
-	// a step is scheduled.  An implementation may choose to extend this interface with its own
-	// leasing or locking mechanism.
 	SavePause(ctx context.Context, p Pause) error
 
-	// ConsumePause consumes a pause by its ID such that it won't be used again.
+	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
+	// we can 'consume' the pause to remove it.
+	//
+	// This prevents a failure mode in which we consume the pause but enqueueing the next
+	// action fails (eg. due to power loss).
+	//
+	// If the given pause has been leased within LeasePauseDuration, this should return an
+	// ErrPauseLeased error.
+	//
+	// See https://github.com/inngest/inngest-cli/issues/123 for more info
+	LeasePause(ctx context.Context, id uuid.UUID) error
+
+	// ConsumePause consumes a pause by its ID such that it can't be used again.
 	ConsumePause(ctx context.Context, id uuid.UUID) error
 }
 
@@ -124,4 +154,5 @@ type Mutater interface {
 type Manager interface {
 	Loader
 	Mutater
+	PauseMutater
 }

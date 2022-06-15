@@ -178,7 +178,7 @@ func TestExecute_state(t *testing.T) {
 	// An error should be recorded.
 	s, err = sm.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	assert.Equal(t, 2, len(s.Actions()))
+	assert.Equal(t, 1, len(s.Actions()))
 	assert.Equal(t, 1, len(s.Errors()))
 }
 

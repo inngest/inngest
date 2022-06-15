@@ -137,12 +137,11 @@ func (mr *MockStateMockRecorder) RunID() *gomock.Call {
 }
 
 // Workflow mocks base method.
-func (m *MockState) Workflow() (inngest.Workflow, error) {
+func (m *MockState) Workflow() inngest.Workflow {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Workflow")
 	ret0, _ := ret[0].(inngest.Workflow)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	return ret0
 }
 
 // Workflow indicates an expected call of Workflow.

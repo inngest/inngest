@@ -19,6 +19,10 @@ var (
 type Workflow struct {
 	// UUID is a surrogate key.
 	UUID uuid.UUID `json:"-"`
+	// Version represents the workflow version, if this is loaded from a
+	// persistent store.
+	Version int `json:"-"`
+
 	// ID is the immutable human identifier for the workflow.  This acts
 	// similarly to a git repository name;  a single workflow ID can contain
 	// many workflow versions.

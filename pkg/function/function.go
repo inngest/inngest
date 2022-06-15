@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	"github.com/google/uuid"
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest-cli/inngest"
@@ -361,6 +362,12 @@ func (s Step) DSN(ctx context.Context, f Function) string {
 	}
 
 	return id
+}
+
+// DeterministicUUID returns a deterministic V3 UUID based off of the SHA1
+// hash of the function's ID.
+func DeterministicUUID(f Function) uuid.UUID {
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(f.ID))
 }
 
 func randomID() (string, error) {

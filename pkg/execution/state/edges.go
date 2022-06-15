@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"time"
 
@@ -84,10 +83,7 @@ type edgeEvaluator struct {
 }
 
 func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepID string) ([]inngest.Edge, error) {
-	w, err := state.Workflow()
-	if err != nil {
-		return nil, fmt.Errorf("error loading workflow: %w", err)
-	}
+	w := state.Workflow()
 
 	g, err := inngest.NewGraph(w)
 	if err != nil {

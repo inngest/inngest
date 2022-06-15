@@ -56,11 +56,14 @@ type Engine struct {
 func NewEngine(l *zerolog.Logger) (*Engine, error) {
 	logger := l.With().Str("caller", "engine").Logger()
 
+	engineLogger := logger.Output(os.Stderr)
+	queueLogger := logger.Output(os.Stderr)
+
 	eng := &Engine{
-		log:           &logger,
+		log:           &engineLogger,
 		EventTriggers: map[string][]function.Function{},
 		al:            actionloader.NewMemoryLoader(),
-		sm:            NewLoggingQueue(l),
+		sm:            NewLoggingQueue(&queueLogger),
 	}
 
 	// Create our drivers.
@@ -260,8 +263,8 @@ func (eng *Engine) handlePauses(ctx context.Context, evt *event.Event) error {
 			}
 		}
 
-		// Remove this pause from the state store, as it will be consumed.
-		if err := eng.sm.ConsumePause(ctx, pause.ID); err != nil {
+		// Lease this pause so that only this thread can schedule the execution.
+		if err := eng.sm.LeasePause(ctx, pause.ID); err != nil {
 			return err
 		}
 
@@ -272,6 +275,10 @@ func (eng *Engine) handlePauses(ctx context.Context, evt *event.Event) error {
 				Incoming: pause.Incoming,
 			},
 		}, time.Now())
+
+		if err := eng.sm.ConsumePause(ctx, pause.ID); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -322,6 +329,12 @@ func (eng Engine) execute(ctx context.Context, fn *function.Function, evt *event
 	if err != nil {
 		return err
 	}
+
+	// Locally, we want to ensure that each function has its own deterministic
+	// UUID for managing state.
+	//
+	// Using a remote API, this UUID may be a surrogate primary key.
+	flow.UUID = function.DeterministicUUID(*fn)
 
 	id, err := eng.runner.NewRun(ctx, *flow, data)
 	if err != nil {

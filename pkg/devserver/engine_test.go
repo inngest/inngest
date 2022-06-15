@@ -113,7 +113,7 @@ func TestEngine_async(t *testing.T) {
 
 	// Eventually the first step should execute.
 	require.Eventually(t, func() bool {
-		return len(driver.Executed) == 1
+		return driver.ExecutedLen() == 1
 	}, 50*time.Millisecond, 10*time.Millisecond)
 	// Assert that the first step ran.
 	require.Equal(t, "Basic step", driver.Executed["first"].Name)
@@ -147,7 +147,7 @@ func TestEngine_async(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Eventually(t, func() bool {
-		return len(driver.Executed) == 2
+		return driver.ExecutedLen() == 2
 	}, 50*time.Millisecond, 10*time.Millisecond)
 	require.Equal(t, "A step with a wait", driver.Executed["wait-for-evt"].Name)
 }

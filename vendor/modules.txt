@@ -148,6 +148,16 @@ github.com/alecthomas/chroma/lexers/y
 github.com/alecthomas/chroma/lexers/z
 github.com/alecthomas/chroma/quick
 github.com/alecthomas/chroma/styles
+# github.com/alicebob/gopher-json v0.0.0-20200520072559-a9ecdc9d1d3a
+## explicit
+github.com/alicebob/gopher-json
+# github.com/alicebob/miniredis/v2 v2.21.0
+## explicit; go 1.14
+github.com/alicebob/miniredis/v2
+github.com/alicebob/miniredis/v2/geohash
+github.com/alicebob/miniredis/v2/hyperloglog
+github.com/alicebob/miniredis/v2/metro
+github.com/alicebob/miniredis/v2/server
 # github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220418222510-f25a4f6275ed
 ## explicit; go 1.16
 github.com/antlr/antlr4/runtime/Go/antlr
@@ -165,6 +175,9 @@ github.com/aymerick/douceur/parser
 ## explicit; go 1.12
 github.com/bxcodec/faker/v3
 github.com/bxcodec/faker/v3/support/slice
+# github.com/cespare/xxhash/v2 v2.1.2
+## explicit; go 1.11
+github.com/cespare/xxhash/v2
 # github.com/charmbracelet/bubbles v0.10.3
 ## explicit; go 1.13
 github.com/charmbracelet/bubbles/help
@@ -200,6 +213,9 @@ github.com/containerd/containerd/pkg/userns
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f
+## explicit
+github.com/dgryski/go-rendezvous
 # github.com/dlclark/regexp2 v1.4.0
 ## explicit
 github.com/dlclark/regexp2
@@ -310,6 +326,16 @@ github.com/go-git/go-git/v5/utils/merkletrie/filesystem
 github.com/go-git/go-git/v5/utils/merkletrie/index
 github.com/go-git/go-git/v5/utils/merkletrie/internal/frame
 github.com/go-git/go-git/v5/utils/merkletrie/noder
+# github.com/go-redis/redis/v8 v8.11.5
+## explicit; go 1.17
+github.com/go-redis/redis/v8
+github.com/go-redis/redis/v8/internal
+github.com/go-redis/redis/v8/internal/hashtag
+github.com/go-redis/redis/v8/internal/hscan
+github.com/go-redis/redis/v8/internal/pool
+github.com/go-redis/redis/v8/internal/proto
+github.com/go-redis/redis/v8/internal/rand
+github.com/go-redis/redis/v8/internal/util
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
 github.com/gogo/protobuf/proto
@@ -587,6 +613,12 @@ github.com/yuin/goldmark/util
 github.com/yuin/goldmark-emoji
 github.com/yuin/goldmark-emoji/ast
 github.com/yuin/goldmark-emoji/definition
+# github.com/yuin/gopher-lua v0.0.0-20210529063254-f4c35e4016d9
+## explicit; go 1.14
+github.com/yuin/gopher-lua
+github.com/yuin/gopher-lua/ast
+github.com/yuin/gopher-lua/parse
+github.com/yuin/gopher-lua/pm
 # github.com/zclconf/go-cty v1.8.3
 ## explicit; go 1.12
 github.com/zclconf/go-cty/cty
