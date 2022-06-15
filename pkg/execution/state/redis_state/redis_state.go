@@ -122,6 +122,9 @@ func (m mgr) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID
 
 	err = m.r.Watch(ctx, func(tx *redis.Tx) error {
 		// Ensure that the workflow exists within the state store.
+		//
+		// XXX: Could this use SETNX to combine these steps or is it more performant
+		//      not to have to marshal the workflow every new run?
 		key := m.kf.Workflow(ctx, workflow.UUID, workflow.Version)
 		val, err := tx.Exists(ctx, key).Uint64()
 		if err != nil {

@@ -118,15 +118,12 @@ type Mutater interface {
 	// the step is a success.
 	SaveActionOutput(ctx context.Context, i Identifier, actionID string, data map[string]interface{}) (State, error)
 
-	// SaveActionError stores an error for a single action within a workflow run.  This is
-	// considered final, as in the action will not be retried.
-	//
-	// If err is nil, this should clear the error for the saved action.  This indicates
-	// that the action ran, retried then succeeded and an error should not be stored.
+	// SaveActionError stores an error for a single action within a workflow run.
 	//
 	// XXX: It might be sensible to store a record of each error that occurred for
 	// every attempt, whilst still being able to distinguish between an eventual success
-	// and a persistent error.
+	// and a persistent error.  See: https://github.com/inngest/inngest-cli/issues/125
+	// for more info.
 	SaveActionError(ctx context.Context, i Identifier, actionID string, err error) (State, error)
 }
 
