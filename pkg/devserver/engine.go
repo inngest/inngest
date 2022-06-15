@@ -330,6 +330,12 @@ func (eng Engine) execute(ctx context.Context, fn *function.Function, evt *event
 		return err
 	}
 
+	// Locally, we want to ensure that each function has its own deterministic
+	// UUID for managing state.
+	//
+	// Using a remote API, this UUID may be a surrogate primary key.
+	flow.UUID = function.DeterministicUUID(*fn)
+
 	id, err := eng.runner.NewRun(ctx, *flow, data)
 	if err != nil {
 		return fmt.Errorf("error initializing execution: %w", err)
