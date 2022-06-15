@@ -28,7 +28,8 @@ type Opt func(r *mgr)
 
 // New returns a state manager which uses Redis as the backing state store.
 //
-// TODO: Explain approach to storing state.
+// By default, this connects to a local Redis server.  Use WithConnectOpts to
+// change how we connect to Redis.
 func New(opts ...Opt) state.Manager {
 	m := &mgr{
 		kf: defaultKeyFunc{},
@@ -49,6 +50,7 @@ func New(opts ...Opt) state.Manager {
 	return m
 }
 
+// WithConnectOpts allows you to customize the options used to connect to Redis.
 func WithConnectOpts(o redis.Options) Opt {
 	return func(m *mgr) {
 		m.r = redis.NewClient(&o)

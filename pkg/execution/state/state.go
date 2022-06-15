@@ -135,12 +135,6 @@ type PauseMutater interface {
 	//
 	// The runner which coordinates workflow executions is responsible for managing paused
 	// DAG executions.
-	//
-	// Note that in production it's likely that you want to coordinate amongst pauses and only
-	// let a pause be used once.  This requires syncing with distributed locks / leases.  This
-	// basic interface does not provide a mechanism for "leasing" a pause temporarily whilst
-	// a step is scheduled.  An implementation may choose to extend this interface with its own
-	// leasing or locking mechanism.
 	SavePause(ctx context.Context, p Pause) error
 
 	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
