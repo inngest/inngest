@@ -189,6 +189,10 @@ func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	if _, ok := m.pauses[p.ID]; ok {
+		return fmt.Errorf("pause already exists")
+	}
+
 	m.pauses[p.ID] = p
 	return nil
 }
@@ -210,6 +214,28 @@ func (m *mem) LeasePause(ctx context.Context, id uuid.UUID) error {
 	m.pauses[id] = pause
 
 	return nil
+}
+
+func (m *mem) PausesByEvent(ctx context.Context, eventName string) (state.PauseIterator, error) {
+	subset := []*state.Pause{}
+	for _, p := range m.pauses {
+		copied := p
+		if p.Event != nil && *p.Event == eventName {
+			subset = append(subset, &copied)
+		}
+	}
+
+	i := &pauseIterator{pauses: subset}
+	return i, nil
+}
+
+func (m *mem) PauseByStep(ctx context.Context, i state.Identifier, actionID string) (*state.Pause, error) {
+	for _, p := range m.pauses {
+		if p.Identifier.RunID == i.RunID && p.Outgoing == actionID {
+			return &p, nil
+		}
+	}
+	return nil, state.ErrPauseNotFound
 }
 
 func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID) error {

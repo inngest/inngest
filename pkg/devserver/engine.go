@@ -235,13 +235,17 @@ func (eng *Engine) HandleEvent(ctx context.Context, evt *event.Event) error {
 }
 
 func (eng *Engine) handlePauses(ctx context.Context, evt *event.Event) error {
-	for _, pause := range eng.sm.Pauses() {
-		if pause.Event == nil || *pause.Event != evt.Name {
-			continue
-		}
-		if pause.Expires.Before(time.Now()) {
-			continue
-		}
+	if evt == nil {
+		return nil
+	}
+	it, err := eng.sm.PausesByEvent(ctx, evt.Name)
+	if err != nil {
+		return err
+	}
+
+	for it.Next(ctx) {
+		pause := it.Val(ctx)
+
 		if pause.Expression != nil {
 			s, err := eng.sm.Load(ctx, pause.Identifier)
 			if err != nil {
