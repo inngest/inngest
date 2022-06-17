@@ -8,9 +8,10 @@ import (
 )
 
 type Options struct {
-	Port string
-	Log  *zerolog.Logger
-	Dir  string
+	Hostname string
+	Port     string
+	Log      *zerolog.Logger
+	Dir      string
 }
 
 type DevServer struct {
@@ -28,6 +29,7 @@ func NewDevServer(o Options) (DevServer, error) {
 		return DevServer{}, err
 	}
 	api, err := api.NewAPI(api.Options{
+		Hostname:     o.Hostname,
 		Port:         o.Port,
 		EventHandler: eng.HandleEvent,
 		Logger:       o.Log,
