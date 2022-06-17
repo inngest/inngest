@@ -24,15 +24,6 @@ type Queue interface {
 
 	// Enqueue enqueues a new item for scheduling at the specific time.
 	Enqueue(item QueueItem, at time.Time)
-
-	// Pauses returns all available pauses.
-	//
-	// This is _not_ the smartest implementation;  most state stores should
-	// return all pauses for a specific event, or for a specific run ID &
-	// step ID combination.
-	//
-	// TODO: Create interfaces for the above methods.
-	Pauses() map[uuid.UUID]state.Pause
 }
 
 type QueueItem struct {
@@ -217,6 +208,8 @@ func (m *mem) LeasePause(ctx context.Context, id uuid.UUID) error {
 }
 
 func (m *mem) PausesByEvent(ctx context.Context, eventName string) (state.PauseIterator, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	subset := []*state.Pause{}
 	for _, p := range m.pauses {
 		copied := p
@@ -230,6 +223,8 @@ func (m *mem) PausesByEvent(ctx context.Context, eventName string) (state.PauseI
 }
 
 func (m *mem) PauseByStep(ctx context.Context, i state.Identifier, actionID string) (*state.Pause, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	for _, p := range m.pauses {
 		if p.Identifier.RunID == i.RunID && p.Outgoing == actionID {
 			return &p, nil
@@ -247,17 +242,6 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID) error {
 	}
 	delete(m.pauses, id)
 	return nil
-}
-
-func (m *mem) Pauses() map[uuid.UUID]state.Pause {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-
-	// We need to copy the pauses available such that we don't
-	// return the same map to prevent data races.
-	copied := copyMap(m.pauses)
-
-	return copied
 }
 
 func copyMap[K comparable, V any](m map[K]V) map[K]V {
