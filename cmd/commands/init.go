@@ -89,7 +89,7 @@ func runInit(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render(fmt.Sprintf("🎉 Done!  Your project has been created in ./%s", fn.Slug())))
+	fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render(fmt.Sprintf("🎉 Done!  Your function has been created in ./%s", fn.Slug())))
 
 	if tpl.PostSetup != "" {
 		renderer, _ := glamour.NewTermRenderer(

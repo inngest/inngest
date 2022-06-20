@@ -98,13 +98,13 @@ func deployWorkflow(ctx context.Context, fn *function.Function) error {
 		return err
 	}
 
-	fmt.Println(cli.BoldStyle.Render(fmt.Sprintf("Deploying workflow %s...", wflow.Name)))
+	fmt.Println(cli.BoldStyle.Render(fmt.Sprintf("Deploying function %s...", wflow.Name)))
 	v, err := s.Client.DeployWorkflow(ctx, ws.ID, config, true)
 	if err != nil {
-		return fmt.Errorf("failed to deploy workflow: %w", err)
+		return fmt.Errorf("failed to deploy function: %w", err)
 	}
 
-	fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render(fmt.Sprintf("Workflow deployed as version %d", v.Version)))
+	fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render(fmt.Sprintf("Function deployed as version %d", v.Version)))
 	return nil
 }
 
