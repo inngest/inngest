@@ -14,6 +14,7 @@ import (
 type EventHandler func(context.Context, *event.Event) error
 
 type Options struct {
+	Hostname     string
 	Port         string
 	EventHandler EventHandler
 	Logger       *zerolog.Logger
@@ -33,9 +34,10 @@ func NewAPI(o Options) (API, error) {
 	logger := o.Logger.With().Str("caller", "api").Logger()
 
 	api := API{
-		port:    o.Port,
-		handler: o.EventHandler,
-		log:     &logger,
+		hostname: o.Hostname,
+		port:     o.Port,
+		handler:  o.EventHandler,
+		log:      &logger,
 	}
 
 	http.HandleFunc("/", api.HealthCheck)
@@ -46,14 +48,16 @@ func NewAPI(o Options) (API, error) {
 }
 
 type API struct {
-	handler EventHandler
-	port    string
-	log     *zerolog.Logger
+	handler  EventHandler
+	hostname string
+	port     string
+	log      *zerolog.Logger
 }
 
 func (a API) Start(ctx context.Context) error {
-	a.log.Info().Msgf("Starting server on port %s", a.port)
-	return http.ListenAndServe(fmt.Sprintf(":%s", a.port), http.DefaultServeMux)
+	serverUrl := fmt.Sprintf("%s:%s", a.hostname, a.port)
+	a.log.Info().Msgf("Starting server on %s", serverUrl)
+	return http.ListenAndServe(serverUrl, http.DefaultServeMux)
 }
 
 func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
