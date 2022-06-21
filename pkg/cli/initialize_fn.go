@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest-cli/inngest/state"
 	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/inngest/inngest-cli/pkg/scaffold"
+	"github.com/inngest/inngestgo"
 	humancron "github.com/lnquy/cron"
 	cron "github.com/robfig/cron/v3"
 	"golang.org/x/term"
@@ -268,6 +269,21 @@ func (f *initModel) Function(ctx context.Context) (*function.Function, error) {
 
 func (f *initModel) Template() *scaffold.Template {
 	return f.scaffold
+}
+
+func (f *initModel) TelEvent() inngestgo.Event {
+	return inngestgo.Event{
+		Name: "cli/fn.initialized",
+		Data: map[string]interface{}{
+			"trigger":  f.triggerType,
+			"event":    f.event,
+			"cron":     f.cron,
+			"runtime":  f.runtimeType,
+			"language": f.language,
+		},
+		Timestamp: inngestgo.Now(),
+		Version:   "2022-06-21",
+	}
 }
 
 // the Y offset when rendering the event browser.

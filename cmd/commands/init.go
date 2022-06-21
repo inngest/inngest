@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	istate "github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/pkg/api/tel"
 	"github.com/inngest/inngest-cli/pkg/cli"
 	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/inngest/inngest-cli/pkg/scaffold"
@@ -99,6 +100,8 @@ func runInit(cmd *cobra.Command, args []string) {
 		out, _ := renderer.Render(tpl.TemplatedPostSetup(*fn))
 		fmt.Println(out)
 	}
+
+	tel.Send(cmd.Context(), state.TelEvent())
 
 	fmt.Println(cli.TextStyle.Render("For more information, read our documentation at https://www.inngest.com/docs\n"))
 }
