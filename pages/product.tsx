@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import Head from "next/head";
+import Script from "next/script";
+
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import Button from "../shared/Button";
@@ -189,16 +191,12 @@ export default function Home() {
           property="og:description"
           content="Build event serverless event-driven systems in seconds"
         />
-        <link
-          rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.4.0/styles/github-dark.min.css"
-        />
-        <script src="/inngest-sdk.js" defer async></script>
-        <script
+        <Script src="/inngest-sdk.js" defer async></Script>
+        <Script
           defer
           src="https://static.cloudflareinsights.com/beacon.min.js"
           data-cf-beacon='{"token": "e2fa9f28c34844e4a0d29351b8730579"}'
-        ></script>
+        ></Script>
       </Head>
 
       <Nav />

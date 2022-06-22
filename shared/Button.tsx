@@ -113,7 +113,7 @@ const primaryCSS = css`
 
 const outlineCSS = css`
   border: var(--button-border-width) solid var(--stroke-color);
-  color: #fff;
+  color: var(--font-color-primary);
 
   &:hover {
     background-color: rgba(255, 255, 255, 0.1);

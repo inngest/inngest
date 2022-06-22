@@ -18,6 +18,7 @@
   --font-mono: "Roboto Mono", "Fira Mono", monospace;
   --font-heading: var(--font);
 
+
   --black: #040408;
   --black-rgb: 4, 4, 8;
   --gray: #212121;
@@ -124,7 +125,6 @@ h3,
 h1 {
   font-size: 3em;
   line-height: 1.05;
-  padding: 0 0 0.2em;
 }
 
 h2 {

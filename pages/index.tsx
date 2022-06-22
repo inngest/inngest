@@ -1,24 +1,22 @@
 import { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import Head from "next/head";
+import Script from "next/script";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
+import IconList from "../shared/IconList";
 import VideoPlayer from "../shared/VideoPlayer";
 import Button from "../shared/Button";
 import Callout from "../shared/Callout";
-import SectionHeader from "../shared/SectionHeader";
+import ContentBlock from "../shared/ContentBlock";
 
 import DiscordCTA from "../shared/Blog/DiscordCTA";
 
 // Icons
-import Github from "../shared/Icons/Github";
-import ClockIcon from "../shared/Icons/Clock";
-import RewindIcon from "../shared/Icons/Replays";
-import PathHorizontalIcon from "../shared/Icons/PathHorizontal";
-import CheckAllIcon from "../shared/Icons/CheckAll";
-import FileCheckIcon from "../shared/Icons/FileCheck";
-import ArchiveIcon from "../shared/Icons/Archive";
-import ArrowUpRightIcon from "../shared/Icons/ArrowUpRight";
+import Github from "src/shared/Icons/Github";
+import Check from "src/shared/Icons/Check";
+import CLIGradient from "src/shared/Icons/CLIGradient";
+import KeyboardGradient from "src/shared/Icons/KeyboardGradient";
 
 // TODO: move these into env vars
 export const INGEST_KEY =
@@ -48,299 +46,168 @@ export default function Home() {
           property="og:description"
           content="Build event serverless event-driven systems in seconds"
         />
-        <link
-          rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.4.0/styles/github-dark.min.css"
-        />
-        <script src="/inngest-sdk.js" defer async></script>
-        <script
+        <Script src="/inngest-sdk.js" defer async></Script>
+        <Script
           defer
           src="https://static.cloudflareinsights.com/beacon.min.js"
           data-cf-beacon='{"token": "e2fa9f28c34844e4a0d29351b8730579"}'
-        ></script>
+        ></Script>
       </Head>
 
       <Nav />
 
-      <div className="grid hero-grid">
-        <Hero className="grid-center-8">
-          <div>
-            <h1>The Anti-Message Queue</h1>
-            <p className="hero-subheading">
-              Inngest makes it simple for you to write delayed or background
-              jobs by triggering functions from events
-            </p>
-            <p className="hero-subheading">No infra, no config — just ship.</p>
+      <Hero>
+        <h1>Kill Your Queues.</h1>
+        <p className="hero-subheading">
+          Inngest makes it simple for you to write delayed or background jobs by
+          triggering functions from events
+        </p>
+        <p className="hero-subheading">
+          <em>No infra, no config — just ship.</em>
+        </p>
 
-            <div className="hero-ctas">
-              <Button
-                size="medium"
-                kind="primary"
-                href="https://github.com/inngest/inngest-cli#installing-inngest"
-              >
-                <Github />
-                <span className="button-text-med">Get the cli</span>
-              </Button>
-              <Button size="medium" kind="outline" href="/docs?ref=home-hero">
-                Explore docs →
-              </Button>
-            </div>
-          </div>
-        </Hero>
-      </div>
+        <img
+          className="hero-graphic"
+          src="/assets/homepage/hero-graphic-june-2022.png"
+          alt="How Inngest works diagram"
+        />
 
-      <div className="grid-line-horizontal"></div>
+        <IconList
+          direction="vertical"
+          items={[
+            "Simple publishing with HTTP + JSON",
+            "No SDKs needed",
+            "Developer tooling for the entire workflow",
+            "No boilerplate polling code",
+            "Any programming language",
+            "Step function support with DAGs",
+          ].map((text) => ({
+            icon: Check,
+            text,
+          }))}
+        />
 
-      <SectionHeader
-        className="section-header-top"
-        size="large"
-        title={
-          <>
-            <span className="light-text">Inngest is the</span> fastest way{" "}
-            <span className="light-text">
-              to build&nbsp;background&nbsp;jobs
-            </span>
-          </>
-        }
-        subtitle="Our CLI and DevServer let you scaffold, develop, test, and deploy serverless functions — without any config:"
-      />
-
-      <VideoPlayer
-        className="video-player"
-        src="/assets/homepage/init-run-deploy-2022-04-20.mp4"
-        autoPlay={true}
-        duration={53}
-        chapters={[
-          {
-            name: "Build",
-            start: 0,
-          },
-          {
-            name: "Test",
-            start: 20,
-          },
-          {
-            name: "Deploy",
-            start: 29.1,
-          },
-        ]}
-      />
-
-      <SectionHeader
-        title="Developer tooling, built specifically with good UX."
-        subtitle="Everything we craft is to help you ship better and faster."
-      />
-
-      <div className="grid">
-        <div className="grid-center-6 sm-col-8-center">
-          <div className="button-group">
-            <Button
-              kind="primary"
-              size="medium"
-              href="/docs/quick-start?ref=home-vid-cta"
-            >
-              <ArrowUpRightIcon /> Read the Quick Start Guide
-            </Button>
-          </div>
+        <div className="hero-ctas">
+          <Button
+            size="medium"
+            kind="primary"
+            href="https://github.com/inngest/inngest-cli#installing-inngest"
+          >
+            <Github />
+            <span className="button-text-med">Get the cli</span>
+          </Button>
+          <Button size="medium" kind="outline" href="/docs?ref=home-hero">
+            Explore docs →
+          </Button>
         </div>
-      </div>
+      </Hero>
 
-      <SectionHeader
-        className="use-cases-header"
-        title="Use cases"
-        subtitle="A few examples on how you can leverage Inngest's event-driven queue platform."
-        align="left"
-      />
+      <Section>
+        <header>
+          <h2>
+            The Complete Platform For <br />
+            Everything Async
+          </h2>
+          <p className="subheading">
+            Our serverless solution provides everything you need to effortlessly
+            <br />
+            build and manage every type of asynchronous and event-driven job.
+          </p>
+        </header>
 
-      <UseCases>
-        <InfoBlock>
-          <h4>Webhooks</h4>
-          <p>
-            Process incoming webhooks as events, getting HA, event typing, and
-            retries for free — no infra needed.
-          </p>
-        </InfoBlock>
-        <InfoBlock>
-          <h4>Background jobs</h4>
-          <p>
-            Run functions as background jobs with a single HTTP request,
-            speeding up your API.
-          </p>
-        </InfoBlock>
-        <InfoBlock>
-          <h4>Coordinated logic</h4>
-          <p>
-            Handle logic based off of a sequence of events without crons,
-            background jobs, and complex state.
-          </p>
-        </InfoBlock>
-        <InfoBlock>
-          <h4>User flows</h4>
-          <p>
-            Implement functionality triggered by user activity automatically, in
-            any language
-          </p>
-        </InfoBlock>
-        <InfoBlock>
-          <h4>Scheduled jobs</h4>
-          <p>
-            Run jobs automatically, on a schedule, with full logs and
-            versioning. And, of course, no infra needed.
-          </p>
-        </InfoBlock>
-        <InfoBlock>
-          <h4>Internal tools</h4>
-          <p>
-            Empower your team to do more with functions built for your team to
-            run, with full audit trails baked in.
-          </p>
-        </InfoBlock>
-        <InfoBlock>
-          <h4>Integrations</h4>
-          <p>
-            Work with integrations automatically triggered by events in a single
-            place — no complex app code necessary.
-          </p>
-        </InfoBlock>
-      </UseCases>
+        <ContentBlock
+          layout="reverse"
+          heading="No queue required"
+          text={
+            <>
+              Inngest is serverless, requiring absolutely no infrastructure to
+              manage. Use our built-in scalable queuing system.{" "}
+              {/* TODO - Link to something */}
+            </>
+          }
+          // image="/assets/homepage/cli-3-commands.png"
+        />
+        <ContentBlock
+          layout="reverse"
+          heading="A real-time admin UI keeps everyone in the loop"
+          text={
+            <>
+              The Inngest Admin UI brings full transparency to all your
+              asynchronous jobs, so you can stay on top of performance,
+              throughput, and more, without needing to dig through logs.
+            </>
+          }
+          // image="/assets/homepage/cli-3-commands.png"
+        />
+        <ContentBlock
+          layout="reverse"
+          heading="Event-driven, as easy as just sending events!"
+          text={
+            <>
+              We built all the hard stuff so you don’t have to: idempotency,
+              throttling, backoff, retries, replays, job versioning, and so much
+              more. With Inngest, you just write the job and we take care of the
+              rest.
+            </>
+          }
+          // image="/assets/homepage/cli-3-commands.png"
+        />
+      </Section>
+
+      <Section theme="dark">
+        <header>
+          <h2>
+            Build for <u>Builders</u>
+          </h2>
+          <p className="subheading">Write business logic, not boilerplate.</p>
+        </header>
+
+        <ContentBlock
+          heading="Fits your workflow"
+          text={
+            <>
+              Inngest works just like you'd hope — write your jobs alongside
+              your project code, use our CLI to create new functions, mock
+              queues, test and deploy your work manually or automate it with
+              your favorite tool.
+            </>
+          }
+          image="/assets/homepage/cli-3-commands.png"
+          imageSize="full"
+          icon={<CLIGradient />}
+        />
+
+        <ContentBlock
+          layout="reverse"
+          heading="Fully flexible"
+          text={
+            <>
+              Write your jobs in any language or framework, and POST your events
+              in standard JSON. If it runs in Docker, it works with Inngest,
+              with zero vendor-specific libraries or boilerplate code needed.
+            </>
+          }
+          image="/assets/homepage/language-logos.png"
+          icon={<KeyboardGradient />}
+        />
+
+        <ContentBlock
+          heading="Build in Minutes, Not Days"
+          text={
+            <>
+              Zero config from setup to production — with Inngest there's no
+              need to configure or manage queues, event stream topics, workers,
+              or builds. Write jobs, send events, with zero fuss.
+            </>
+          }
+          image="/assets/homepage/payload-and-job-generic.png"
+          icon={<KeyboardGradient />}
+        />
+      </Section>
 
       <div className="discord-cta-wrapper">
         <DiscordCTA size="small" />
       </div>
-
-      {/*<Consulting>
-        <p>
-          <strong>Get started with experts.</strong> We're working with startups
-          and engineering teams to consult implement product functionality, no
-          strings attached.
-        </p>
-        <p className="secondary-text">
-          Let us show you how to build reliable serverless functionality for
-          your product, in minutes. We'll walk through implementation using your
-          product requirements from start to end &mdash; delivering live
-          functionality for your product.
-        </p>
-        <p className="secondary-text">Get in touch:</p>
-        <div className="grid">
-          <div className="grid-center-6 sm-col-8-center">
-            <div className="button-group">
-              <Button
-                kind="primary"
-                size="small"
-                href="https://calendly.com/inngest-thb/30min"
-              >
-                <ArrowUpRightIcon /> Schedule a call
-              </Button>
-            </div>
-          </div>
-        </div>
-      </Consulting>*/}
-
-      <SectionContext>
-        <h3>Powerful functionality out of the box.</h3>
-        <p className="secondary-text">
-          Discover the easiest way to build scalable, complex software — by
-          letting us do the infrastructure and platform for you. Here's some of
-          the features you get for free:
-        </p>
-      </SectionContext>
-
-      {/* Features */}
-      <BoxGrid>
-        <Box>
-          <IconBox>
-            <RewindIcon />
-          </IconBox>
-          <h4>Historical testing</h4>
-          <p>Go one step further than integration tests.</p>
-          <p>
-            <strong>
-              Test your serverless functions with real, historical data before
-              deploying.
-            </strong>{" "}
-            Guarantee that your code works in the real world before it's live.
-          </p>
-        </Box>
-        <Box>
-          <IconBox>
-            <ClockIcon />
-          </IconBox>
-          <h4>Time travel</h4>
-          <p>Never wish you'd built something earlier.</p>
-          <p>
-            Guarantee that your code works in the real world before it's live.
-            Deploy functionality then{" "}
-            <strong>
-              process historic events as if your feature were live in the past
-            </strong>
-            . Never before have you been able to make your team and users this
-            happy.
-          </p>
-        </Box>
-        <Box>
-          <IconBox>
-            <PathHorizontalIcon />
-          </IconBox>
-          <h4>Coordinated functionality</h4>
-          <p>
-            Wave goodbye to messy cron jobs to check whether logic should run.
-          </p>
-          <p>
-            <strong>
-              Chain multiple functions together, only running steps when
-              specific events happen
-            </strong>
-            . Or... don't happen. No spaghetti code required.
-          </p>
-        </Box>
-        <Box>
-          <IconBox>
-            <CheckAllIcon />
-          </IconBox>
-          <h4>Idempotency</h4>
-          <p>No nightmares about building it yourself.</p>
-          <p>
-            <strong>
-              When you need it, ensure that items are processed once
-            </strong>{" "}
-            — and only once. Built in, configurable idempotency for each
-            function allows you to rest easy.
-          </p>
-        </Box>
-        <Box>
-          <IconBox>
-            <FileCheckIcon />
-          </IconBox>
-          <h4>Data Enrichment</h4>
-          <p>Messy data? Don't know what you mean :)</p>
-          <p>
-            <strong>Enrich any event with additional data</strong>, ensuring
-            that your functions, data pipelines, and team have everything they
-            need from the start.
-          </p>
-        </Box>
-        <Box>
-          <IconBox>
-            <ArchiveIcon />
-          </IconBox>
-          <h4>Versioning, audits, rollbacks...</h4>
-          <p>An easy way to answer “why did this happen four weeks ago?”.</p>
-          <p>
-            <strong>See every version of every function</strong>, the exact
-            times each function was live, and which version was used for each
-            event. With immediate rollbacks, when you need it.
-          </p>
-        </Box>
-      </BoxGrid>
-
-      <Callout
-        small="Ready to get started?"
-        ctaRef="home-callout-mid"
-        style={{ margin: "6rem 0" }}
-      />
-
-      {/* NOTE - We'll bring this back when we add the architecture section and we have more space between callouts */}
-      {/* <Callout small="Still reading?" ctaRef="home-callout-end" /> */}
 
       <Footer />
     </Wrapper>
@@ -356,13 +223,6 @@ const Wrapper = styled.div`
   .button-group {
     display: flex;
     justify-content: center;
-  }
-
-  .hero-grid {
-    padding-top: var(--nav-height);
-    margin-top: calc(var(--nav-height) * -1);
-    background: url(/assets/hero-grid.svg) no-repeat right 10%;
-    align-items: center;
   }
 
   .use-cases-header {
@@ -385,66 +245,29 @@ const Wrapper = styled.div`
   }
 `;
 
-const Consulting = styled.div`
-  --stripe-color: #15151c;
-
-  background: linear-gradient(
-    135deg,
-    var(--stripe-color) 0%,
-    var(--bg-color) 12.5%,
-    var(--bg-color) 50%,
-    var(--stripe-color) 15%,
-    var(--stripe-color) 15%,
-    var(--bg-color) 62.5%,
-    var(--bg-color) 100%
-  );
-  background-size: 9px 9px;
-
-  padding: 8vh 0;
-  margin: 10vh 0;
-  border-top: 1px dashed var(--grid-line-color);
-  border-bottom: 1px dashed var(--grid-line-color);
+const Hero = styled.header`
+  padding: 14vh 0 4rem;
   text-align: center;
-
-  p:first-of-type {
-    margin: 0.2rem auto 1rem;
-    font-size: 1.1em;
-  }
-  p {
-    max-width: 800px;
-    margin: 0 auto 2rem;
-    text-align: center;
-  }
-`;
-
-const Hero = styled.div`
-  padding: 14vh 0 18vh;
-
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  grid-column-start: 2;
-  grid-gap: var(--grid-gap);
-
-  text-align: center;
-
-  > div:first-of-type {
-    grid-column: 2/8;
-  }
 
   h1 {
-    font-size: 3.1rem;
-  }
-
-  img {
-    grid-column: span 3;
-    width: 100%;
+    font-size: 4.4rem;
+    margin-bottom: 1.7rem;
   }
 
   .hero-subheading {
     margin: 1em auto;
     max-width: 540px;
-    font-size: 0.9rem;
-    color: var(--font-color-secondary);
+    font-size: 1rem;
+  }
+
+  .hero-graphic {
+    margin: 2.5rem auto;
+    max-width: 748px;
+  }
+
+  .icon-list {
+    margin: 2.5rem auto;
+    max-width: 400px;
   }
 
   .hero-ctas {
@@ -486,7 +309,6 @@ const Hero = styled.div`
 
     .button {
       margin: 0.5rem !important;
-      /* margin: 0.5rem 0 0 0; */
     }
   }
   @media (max-width: 600px) {
@@ -499,49 +321,48 @@ const Hero = styled.div`
   }
 `;
 
-const SectionContext = styled.div`
-  --stripe-color: #15151c;
+const Section = styled.section<{ theme?: "dark" | "light" }>`
+  margin: 0 auto;
+  padding: 5rem 0;
+  background-color: ${({ theme }) =>
+    theme === "dark" ? "var(--black)" : "inherit"};
+  color: ${({ theme }) =>
+    theme === "dark" ? "var(--color-white)" : "inherit"};
 
-  margin: 4em auto 3em;
-  padding: 1.5em 3em;
-  max-width: 30rem;
-  text-align: center;
-
-  h3 {
-    font-size: 1.2em;
-  }
-  p {
-    font-size: 0.8em;
-  }
-`;
-
-const BoxGrid = styled.div`
-  --spacing: 1em;
-
-  display: grid;
-  margin: 2em auto;
-  max-width: var(--max-page-width);
-  grid-template-columns: repeat(3, 1fr);
-  grid-gap: var(--spacing);
-
-  background: radial-gradient(
-    51.4% 51.4% at 50% 50%,
-    var(--bg-primary-highlight) 11.81%,
-    var(--bg-color) 71.75%
-  );
-
-  @media (max-width: 1100px) {
-    margin-left: var(--spacing);
-    margin-right: var(--spacing);
-    grid-template-columns: repeat(2, 1fr);
+  header {
+    text-align: center;
   }
 
-  @media (max-width: 700px) {
-    margin-left: var(--spacing);
-    margin-right: var(--spacing);
-    grid-template-columns: repeat(1, 1fr);
+  h2 {
+    font-size: 2.6rem;
+  }
+
+  .subheading {
+    margin: 1em auto;
+    max-width: 900px;
+    font-size: 1rem;
+    line-height: 1.6em;
   }
 `;
+
+// const ContentBlock = styled.div`
+//   display: flex;
+//   justify-content: center;
+//   margin: 10rem 0;
+
+//   .content {
+//     margin-right: 4.5rem;
+//     max-width: 490px;
+//   }
+
+//   h3 {
+//     margin: 1rem 0;
+//     font-size: 1.6rem;
+//   }
+//   p {
+//     font-size: 0.9rem;
+//   }
+// `;
 
 const InfoBlock = styled.div`
   grid-column: span 1;

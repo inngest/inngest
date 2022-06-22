@@ -30,7 +30,7 @@ const IconList: React.FC<IconListProps> = ({
       {items.map((item, idx) => (
         <ListItem key={idx}>
           <IconWrapper circle={circles}>
-            <item.icon size="1em" color="#fff" />
+            <item.icon size="0.8em" color="#fff" />
           </IconWrapper>
           <span>
             {item.quantity ? (
@@ -57,12 +57,12 @@ const List = styled.ul<{
   display: flex;
   flex-direction: ${(props) =>
     props.direction === "vertical" ? "column" : "row"};
-  font-family: var(--font-mono);
-  font-size: ${(props) => (props.size === "small" ? "0.7em" : "inherit")};
+  /* font-family: var(--font-mono); */
+  font-size: ${(props) => (props.size === "small" ? "0.7rem" : "1rem")};
 
   li + li {
     margin: ${(props) =>
-      props.direction === "vertical" ? "1em 0 0" : "0 0 0 3em"};
+      props.direction === "vertical" ? "0.6rem 0 0" : "0 0 0 3em"};
   }
 
   // Collapse the list at the given screen width
@@ -77,8 +77,8 @@ const List = styled.ul<{
 const ListItem = styled.li`
   display: flex;
   align-items: center;
-  height: 2rem;
   line-height: 1.2rem;
+  height: 1.6rem;
   margin: 0;
   padding: 0;
 `;
@@ -88,9 +88,9 @@ const IconWrapper = styled.div<{ circle: boolean }>`
   justify-content: center;
   align-items: center;
   flex-shrink: 0;
-  height: 1.6em;
-  width: 1.6em;
-  margin-right: 0.5em;
+  height: 1.2em;
+  width: 1.2em;
+  margin-right: 0.8em;
   background: ${(props) => (props.circle ? "var(--primary-color)" : "none")};
   border-radius: 50%;
 `;
