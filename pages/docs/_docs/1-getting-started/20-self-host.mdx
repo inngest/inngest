@@ -1,0 +1,34 @@
+---
+category: "Getting started"
+title: "Self-hosting"
+slug: "self-hosting"
+order: 20
+---
+
+It's possible to self host the components of Inngest, and manage the entire system within your own environment.
+
+## Overview
+
+There are multiple components to Inngest, each of which will need to be created:
+
+**State & infrastructure**
+- The **state store**, which records state for function runs.
+- The **queueing system**, which schedules and invokes particular steps within a function
+- The **messaging system**, which acts as an event bus for incoming events
+- The **config store**, which manages source keys, function metadata, and action metadata
+
+**APIs & Services**
+- The **source API**, which accepts events and publishes them to the messaging system
+- The **runner**, which receives events from the messaging system and enqueues functions
+- The **executor**, which executes individual steps within a function.
+
+## Requirements
+
+The state store, queueing systems, and messaging systems must be highly available.  We have multiple
+drivers for each, and recommend using widely available systems such as hosted, HA Redis, SQS/SNS, or
+Google Pub/Sub.
+
+## Process
+
+For a detailed self-hosting guide, reach out to us at hello@inngest.com for more information, or
+[speak to us on Discord](https://www.inngest.com/discord).

@@ -1,0 +1,57 @@
+---
+category: "Getting started"
+title: "Local development"
+slug: "local-development"
+order: 10
+---
+
+You can install Inngest on your local machine and run a full copy of the Inngest API and executor, emulating a production environment.
+
+## Install the CLI
+
+First, you must install the [Inngest CLI](https://www.github.com/inngest/inngest-cli):
+
+```
+curl -sfL https://cli.inngest.com/install.sh | sh \
+  && sudo mv ./inngest /usr/local/bin/inngest
+```
+
+To verify that Inngest is installed, run `inngest`.  You should see the following output:
+
+```
+ $ inngest
+
+    ____                            __
+   /  _/___  ____  ____ ____  _____/ /_
+   / // __ \/ __ \/ __ '/ _ \/ ___/ __/
+ _/ // / / / / / / /_/ /  __(__  ) /_
+/___/_/ /_/_/ /_/\__, /\___/____/\__/
+                /____/
+
+Build event-driven queues with zero infra.
+Request features, get help, and chat with us: https://www.inngest.com/discord
+
+Usage:
+  inngest [command]
+
+Available Commands:
+  ...
+```
+
+## Run Inngest locally
+
+You can run the Inngest dev server locally with an in-memory state store and queue by running:
+
+```
+$ inngest dev
+```
+
+This boots up an API which listens for events on `http://127.0.0.1:9999`.  When the dev server receives
+events, it will match the event against any functions within your working directory and invoke those
+functions locally.
+
+<!--
+TODO:
+- Using other state stores
+- Running within Docker
+-->
