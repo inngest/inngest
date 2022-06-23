@@ -81,6 +81,12 @@ type Step struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
+// RetryCount returns the number of retries for this step.
+func (s Step) RetryCount() int {
+	// TODO: Implement custom retry policies within config.
+	return 3
+}
+
 type Edge struct {
 	Outgoing string `json:"outgoing"`
 	Incoming string `json:"incoming"`

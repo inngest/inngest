@@ -37,22 +37,14 @@ func (l loggingQueue) Enqueue(item inmemory.QueueItem, at time.Time) {
 	l.Queue.Enqueue(item, at)
 }
 
-func (l loggingQueue) SaveActionOutput(ctx context.Context, i state.Identifier, actionID string, data map[string]interface{}) (state.State, error) {
+func (l loggingQueue) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (state.State, error) {
 	l.log.Info().
 		Str("run_id", i.RunID.String()).
-		Str("step", actionID).
-		Interface("data", data).
-		Msg("recording step output")
+		Str("step", r.Step.ID).
+		Int("attepmt", attempt).
+		Interface("response", r.Output).
+		Err(r.Err).
+		Msg("recording step response")
 
-	return l.Queue.SaveActionOutput(ctx, i, actionID, data)
-}
-
-func (l loggingQueue) SaveActionError(ctx context.Context, i state.Identifier, actionID string, err error) (state.State, error) {
-	l.log.Warn().
-		Str("run_id", i.RunID.String()).
-		Str("step", actionID).
-		Err(err).
-		Msg("recording step error")
-
-	return l.Queue.SaveActionError(ctx, i, actionID, err)
+	return l.Queue.SaveResponse(ctx, i, r, attempt)
 }

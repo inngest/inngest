@@ -67,6 +67,9 @@ func (m *mem) Channel() chan QueueItem {
 // New initializes state for a new run using the specifid ID and starting data.
 func (m *mem) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, event map[string]any) (state.State, error) {
 	state := memstate{
+		metadata: state.Metadata{
+			StartedAt: time.Now(),
+		},
 		workflow:   workflow,
 		runID:      runID,
 		workflowID: workflow.UUID,
@@ -98,7 +101,9 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 		return s, nil
 	}
 
+	// TODO: Return an error.
 	state := memstate{
+		metadata:   state.Metadata{},
 		workflowID: i.WorkflowID,
 		runID:      i.RunID,
 		event:      map[string]interface{}{},
@@ -113,46 +118,67 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 	return state, nil
 }
 
-func (m *mem) SaveActionOutput(ctx context.Context, i state.Identifier, actionID string, data map[string]interface{}) (state.State, error) {
-	s, _ := m.Load(ctx, i)
-
-	state := s.(memstate)
-
-	// Copy the maps so that any previous state references aren't updated.
-	state.actions = copyMap(state.actions)
-	state.errors = copyMap(state.errors)
-
-	state.actions[actionID] = data
-	delete(state.errors, actionID)
-
+func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string) error {
 	m.lock.Lock()
-	m.state[i.RunID] = state
+	defer m.lock.Unlock()
 
-	m.lock.Unlock()
-
-	return state, nil
-}
-
-func (m *mem) SaveActionError(ctx context.Context, i state.Identifier, actionID string, err error) (state.State, error) {
-	s, _ := m.Load(ctx, i)
-
-	state := s.(memstate)
-
-	// Copy the maps so that any previous state references aren't updated.
-	state.actions = copyMap(state.actions)
-	state.errors = copyMap(state.errors)
-
-	if err == nil {
-		delete(state.errors, actionID)
-	} else {
-		state.errors[actionID] = err
+	s, ok := m.state[i.RunID]
+	if !ok {
+		return fmt.Errorf("identifier not found")
 	}
 
-	m.lock.Lock()
-	m.state[i.RunID] = state
-	m.lock.Unlock()
+	instance := s.(memstate)
+	instance.metadata.Pending++
+	m.state[i.RunID] = instance
 
-	return state, nil
+	return nil
+}
+
+func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	s, ok := m.state[i.RunID]
+	if !ok {
+		return fmt.Errorf("identifier not found")
+	}
+
+	instance := s.(memstate)
+	instance.metadata.Pending--
+	m.state[i.RunID] = instance
+
+	return nil
+}
+
+func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (state.State, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	s, ok := m.state[i.RunID]
+	if !ok {
+		return s, fmt.Errorf("identifier not found")
+	}
+	instance := s.(memstate)
+
+	// Copy the maps so that any previous state references aren't updated.
+	instance.actions = copyMap(instance.actions)
+	instance.errors = copyMap(instance.errors)
+
+	if r.Err == nil {
+		instance.actions[r.Step.ID] = r.Output
+		delete(instance.errors, r.Step.ID)
+	} else {
+		instance.errors[r.Step.ID] = r.Err
+	}
+
+	if r.Final() {
+		instance.metadata.Pending--
+	}
+
+	m.state[i.RunID] = instance
+
+	return instance, nil
+
 }
 
 func (m *mem) SavePause(ctx context.Context, p state.Pause) error {

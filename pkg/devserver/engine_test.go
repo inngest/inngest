@@ -8,9 +8,9 @@ import (
 
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/event"
-	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
+	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/inngest/inngest-cli/pkg/logger"
 	"github.com/stretchr/testify/require"
@@ -73,7 +73,7 @@ func TestEngine_async(t *testing.T) {
 
 	// Update the executor to use a mock driver.
 	driver := &mockdriver.Mock{
-		Responses: map[string]driver.Response{
+		Responses: map[string]state.DriverResponse{
 			"first":        {Output: map[string]interface{}{"ok": true}},
 			"wait-for-evt": {Output: map[string]interface{}{"ok": true}},
 		},

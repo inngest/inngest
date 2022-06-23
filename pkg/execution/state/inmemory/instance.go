@@ -20,6 +20,7 @@ import (
 func NewStateInstance(
 	w inngest.Workflow,
 	id state.Identifier,
+	metadata state.Metadata,
 	event map[string]any,
 	actions map[string]map[string]any,
 	errors map[string]error,
@@ -27,6 +28,7 @@ func NewStateInstance(
 	return &memstate{
 		workflow:   w,
 		workflowID: id.WorkflowID,
+		metadata:   metadata,
 		runID:      id.RunID,
 		event:      event,
 		actions:    actions,
@@ -36,6 +38,8 @@ func NewStateInstance(
 
 type memstate struct {
 	workflow inngest.Workflow
+
+	metadata state.Metadata
 
 	workflowID uuid.UUID
 	runID      ulid.ULID
@@ -49,6 +53,10 @@ type memstate struct {
 
 	// errors stores a map of action errors
 	errors map[string]error
+}
+
+func (s memstate) Metadata() state.Metadata {
+	return s.metadata
 }
 
 func (s memstate) Identifier() state.Identifier {

@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 )
 
@@ -15,7 +14,7 @@ type Mock struct {
 	RuntimeName string
 
 	// Responses stores the responses that a driver should return.
-	Responses map[string]driver.Response
+	Responses map[string]state.DriverResponse
 	// Errors stores which steps should return with a driver error, as if
 	// the step wasn't executed.
 	Errors map[string]error
@@ -35,7 +34,7 @@ func (m *Mock) RuntimeType() string {
 	return m.RuntimeName
 }
 
-func (m *Mock) Execute(ctx context.Context, state state.State, action inngest.ActionVersion, step inngest.Step) (*driver.Response, error) {
+func (m *Mock) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, step inngest.Step) (*state.DriverResponse, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 

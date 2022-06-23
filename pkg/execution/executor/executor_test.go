@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
-	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
@@ -115,7 +114,7 @@ func TestExecute_state(t *testing.T) {
 	require.Nil(t, err)
 
 	driver := &mockdriver.Mock{
-		Responses: map[string]driver.Response{
+		Responses: map[string]state.DriverResponse{
 			"1": {Output: map[string]interface{}{"id": 1}},
 			"2": {Output: map[string]interface{}{"id": 2}},
 			"3": {Output: map[string]interface{}{"id": 3}},
@@ -135,7 +134,7 @@ func TestExecute_state(t *testing.T) {
 
 	// Executing the trigger does nothing but validate which descendents from the trigger
 	// in the dag can run.
-	_, err = exec.Execute(ctx, s.Identifier(), inngest.TriggerName)
+	_, err = exec.Execute(ctx, s.Identifier(), inngest.TriggerName, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, len(driver.Executed), 0)
 	// assert.Equal(t, len(available), 2)
@@ -146,7 +145,7 @@ func TestExecute_state(t *testing.T) {
 	assert.Equal(t, 0, len(s.Actions()))
 
 	// Run the first item.
-	_, err = exec.Execute(ctx, s.Identifier(), "1")
+	_, err = exec.Execute(ctx, s.Identifier(), "1", 0)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
 	// assert.Equal(t, 1, len(available))
@@ -160,7 +159,7 @@ func TestExecute_state(t *testing.T) {
 	// Test "scheduled" responses.  The driver should respond with a Scheduled
 	// message, which means that the function has begun execution but no further
 	// actions are available.
-	_, err = exec.Execute(ctx, s.Identifier(), "4")
+	_, err = exec.Execute(ctx, s.Identifier(), "4", 0)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(driver.Executed), "function not executed")
 	// assert.Equal(t, 0, len(available), "incorrect number of functions available")
@@ -171,7 +170,7 @@ func TestExecute_state(t *testing.T) {
 	assert.Equal(t, 0, len(s.Errors()))
 
 	// Test "error" responses
-	_, err = exec.Execute(ctx, s.Identifier(), "5")
+	_, err = exec.Execute(ctx, s.Identifier(), "5", 0)
 	assert.Error(t, err)
 	assert.Equal(t, 3, len(driver.Executed), "function not executed")
 	// assert.Equal(t, 0, len(available), "incorrect number of functions available")
@@ -261,13 +260,25 @@ func TestExecute_edge_expressions(t *testing.T) {
 	require.Nil(t, err)
 
 	driver := &mockdriver.Mock{
-		Responses: map[string]driver.Response{
-			"run-step-trigger": {Output: map[string]interface{}{
-				"ok":   true,
-				"step": "run-step-trigger",
-				"pi":   3.141,
-			}},
-			"run-step-child": {Output: map[string]interface{}{"ok": true, "step": "run-step-child"}},
+		Responses: map[string]state.DriverResponse{
+			"run-step-trigger": {
+				Step: inngest.Step{
+					DSN: "test",
+					ID:  "run-step-trigger",
+				},
+				Output: map[string]interface{}{
+					"ok":   true,
+					"step": "run-step-trigger",
+					"pi":   3.141,
+				},
+			},
+			"run-step-child": {
+				Step: inngest.Step{
+					DSN: "test",
+					ID:  "run-step-child",
+				},
+				Output: map[string]interface{}{"ok": true, "step": "run-step-child"},
+			},
 		},
 	}
 
@@ -278,7 +289,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = exec.Execute(ctx, s.Identifier(), inngest.TriggerName)
+	_, err = exec.Execute(ctx, s.Identifier(), inngest.TriggerName, 0)
 	require.NoError(t, err)
 	require.Equal(t, len(driver.Executed), 0)
 
@@ -294,7 +305,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 	require.ElementsMatch(t, []string{}, availableIDs(edges))
 
 	// Run the next step.
-	response, err := exec.Execute(ctx, s.Identifier(), "run-step-trigger")
+	response, err := exec.Execute(ctx, s.Identifier(), "run-step-trigger", 0)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
 	assert.NoError(t, response.Err)

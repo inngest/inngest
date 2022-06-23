@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	mrand "math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +19,12 @@ import (
 )
 
 var (
+	// n1000 is a workflow created during init() which has 1000 steps and edges.
+	n1000 = inngest.Workflow{
+		Name: "Test workflow",
+		ID:   "1000-steps-87bd12",
+	}
+
 	w = inngest.Workflow{
 		Name: "Test workflow",
 		ID:   "shuffling-sphinx-87bd12",
@@ -68,23 +76,42 @@ var (
 	}
 )
 
+func init() {
+	// Copy the workflow and make 1000 scheduled steps.
+	for i := 1; i <= 1000; i++ {
+		n1000.Steps = append(n1000.Steps, inngest.Step{
+			ID:       fmt.Sprintf("step-%d", i),
+			ClientID: uint(i),
+			Name:     fmt.Sprintf("Step %d", i),
+			DSN:      "test-step",
+		})
+		n1000.Edges = append(n1000.Edges, inngest.Edge{
+			Incoming: inngest.TriggerName,
+			Outgoing: fmt.Sprintf("step-%d", i),
+		})
+	}
+}
+
 func CheckState(t *testing.T, generator func() state.Manager) {
 	t.Helper()
 
 	funcs := map[string]func(t *testing.T, m state.Manager){
-		"New":                             checkNew,
-		"SaveActionOutput":                checkSaveOutput,
-		"SaveActionOutputClearsError":     checkSaveOutputClearsError,
-		"SaveActionError":                 checkSaveError,
-		"SavePause":                       checkSavePause,
-		"LeasePause":                      checkLeasePause,
-		"ConsumePause":                    checkConsumePause,
-		"PausesByEvent/Empty":             checkPausesByEvent_empty,
-		"PausesByEvent/Single":            checkPausesByEvent_single,
-		"PausesByEvent/Multiple":          checkPausesByEvent_multi,
-		"PausesByEvent/ConcurrentCursors": checkPausesByEvent_concurrent,
-		"PausesByEvent/Consumed":          checkPausesByEvent_consumed,
-		"PauseByStep":                     checkPausesByStep,
+		"New":                                checkNew,
+		"Scheduled":                          checkScheduled,
+		"SaveResponse/Output":                checkSaveResponse_output,
+		"SaveResponse/Error":                 checkSaveResponse_error,
+		"SaveResponse/OutputOverwritesError": checkSaveResponse_outputOverwritesError,
+		"SaveResponse/Concurrent":            checkSaveResponse_concurrent,
+		"SavePause":                          checkSavePause,
+		"LeasePause":                         checkLeasePause,
+		"ConsumePause":                       checkConsumePause,
+		"PausesByEvent/Empty":                checkPausesByEvent_empty,
+		"PausesByEvent/Single":               checkPausesByEvent_single,
+		"PausesByEvent/Multiple":             checkPausesByEvent_multi,
+		"PausesByEvent/ConcurrentCursors":    checkPausesByEvent_concurrent,
+		"PausesByEvent/Consumed":             checkPausesByEvent_consumed,
+		"PauseByStep":                        checkPausesByStep,
+		"Metadata/StartedAt":                 checkMetadataStartedAt,
 	}
 	for name, f := range funcs {
 		t.Run(name, func(t *testing.T) {
@@ -110,41 +137,87 @@ func checkNew(t *testing.T, m state.Manager) {
 	require.EqualValues(t, input.Map(), loaded.Event(), "Loaded event does not match input")
 }
 
-func checkSaveOutput(t *testing.T, m state.Manager) {
+func checkScheduled(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
 
-	//
-	// Save some basic output
-	//
-	first := map[string]any{
-		"first": true,
+	wg := &sync.WaitGroup{}
+	for i := 0; i < len(n1000.Steps); i++ {
+		n := i
+		wg.Add(1)
+		go func() {
+			err := m.Scheduled(ctx, s.Identifier(), n1000.Steps[n].ID)
+			wg.Done()
+			require.NoError(t, err)
+		}()
 	}
-	next, err := m.SaveActionOutput(ctx, s.Identifier(), w.Steps[0].ID, first)
+
+	wg.Wait()
+
+	// Load the state again.
+	loaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
+	require.EqualValues(t, len(n1000.Steps), loaded.Metadata().Pending, "Scheduling 1000 steps concurrently should return the correct pending count via metadata")
+}
+
+// checkSaveResponse_output checks the basics of saving output from a response.
+//
+// This asserts that the state store records output for the given step, by saving
+// output for two independent responses.
+func checkSaveResponse_output(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	r := state.DriverResponse{
+		Step: w.Steps[0],
+		Output: map[string]interface{}{
+			"status": float64(200),
+			"body": map[string]any{
+				"ok": true,
+			},
+		},
+	}
+
+	next, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+	require.NoError(t, err)
+	require.NotNil(t, next)
+
+	// Ensure basics haven't changed.
 	require.EqualValues(t, s.Identifier(), next.Identifier())
 	require.EqualValues(t, s.Workflow(), next.Workflow())
 	require.EqualValues(t, s.Event(), next.Event())
+
 	// Assert that the next state has actions set. for the first step.
 	require.Equal(t, 0, len(s.Actions()))
 	require.NotEqualValues(t, s.Actions(), next.Actions())
 	require.Equal(t, 1, len(next.Actions()))
-	require.EqualValues(t, first, next.Actions()[w.Steps[0].ID])
+	require.EqualValues(t, r.Output, next.Actions()[w.Steps[0].ID])
+
 	// Assert that requesting data for the given step ID works as expected.
 	loaded, err := next.ActionID(w.Steps[0].ID)
 	require.NoError(t, err)
-	require.EqualValues(t, first, loaded)
+	require.EqualValues(t, r.Output, loaded)
+
 	// And that we have no state for the second step.
 	require.Empty(t, next.Actions()[w.Steps[1].ID])
+	require.Equal(t, 0, next.Metadata().Pending)
 
 	//
-	// Check that saving a subsequent step saves the next output.
+	// Check that saving a subsequent step saves the next output,
+	// as the second attempt.
 	//
-	second := map[string]any{
-		"another": "yea",
-		"lol":     float64(1),
+	r2 := state.DriverResponse{
+		Step: w.Steps[1],
+		Output: map[string]interface{}{
+			"status": float64(200),
+			"body": map[string]any{
+				"another": "yea",
+				"lol":     float64(1),
+			},
+		},
 	}
-	next, err = m.SaveActionOutput(ctx, s.Identifier(), w.Steps[1].ID, second)
+
+	next, err = m.SaveResponse(ctx, s.Identifier(), r2, 1)
 	require.NoError(t, err)
 	require.EqualValues(t, s.Identifier(), next.Identifier())
 	require.EqualValues(t, s.Workflow(), next.Workflow())
@@ -153,15 +226,22 @@ func checkSaveOutput(t *testing.T, m state.Manager) {
 	require.Equal(t, 0, len(s.Actions()))
 	require.NotEqualValues(t, s.Actions(), next.Actions())
 	require.Equal(t, 2, len(next.Actions()))
-	require.EqualValues(t, first, next.Actions()[w.Steps[0].ID])
-	require.EqualValues(t, second, next.Actions()[w.Steps[1].ID])
+	require.EqualValues(t, r.Output, next.Actions()[w.Steps[0].ID])
+	require.EqualValues(t, r2.Output, next.Actions()[w.Steps[1].ID])
 	// Assert that requesting data for the given step ID works as expected.
 	loaded, err = next.ActionID(w.Steps[0].ID)
 	require.NoError(t, err)
-	require.EqualValues(t, first, loaded)
+	require.EqualValues(t, r.Output, loaded)
 	loaded, err = next.ActionID(w.Steps[1].ID)
 	require.NoError(t, err)
-	require.EqualValues(t, second, loaded)
+	require.EqualValues(t, r2.Output, loaded)
+	// Output shouldn't be finalized until edges are added via the runner.
+	require.Equal(t, 0, next.Metadata().Pending)
+
+	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID)
+	require.NoError(t, err)
+	err = m.Finalized(ctx, s.Identifier(), w.Steps[1].ID)
+	require.NoError(t, err)
 
 	//
 	// Load() the state independently.
@@ -174,11 +254,145 @@ func checkSaveOutput(t *testing.T, m state.Manager) {
 	require.EqualValues(t, next.Actions(), reloaded.Actions())
 	require.EqualValues(t, next.Errors(), reloaded.Errors())
 
-	// TODO: Assert that we cannot save data to a run that does not exist.
-	// TODO: Assert that we cannot save data to a step that doesn't exist.
-	// TODO: Assert that we cannot overwrite data.
+	// Check metadata:  we must have two finalized steps.
+	require.Equal(t, -2, reloaded.Metadata().Pending)
 }
 
+func checkSaveResponse_error(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	r := state.DriverResponse{
+		Step: w.Steps[0],
+		Err:  fmt.Errorf("an absolutely terrible yet intermittent, non-final, retryable error"),
+	}
+	require.True(t, r.Retryable())
+	require.False(t, r.Final())
+
+	next, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+	require.NoError(t, err)
+	require.NotNil(t, next)
+	require.Nil(t, next.Actions()[r.Step.ID])
+	require.Equal(t, r.Err, next.Errors()[r.Step.ID])
+
+	require.Equal(t, 0, next.Metadata().Pending)
+
+	// Overwriting the error by setting as final should work and should
+	// finalize the error.
+	r.SetFinal()
+
+	require.False(t, r.Retryable())
+	require.True(t, r.Final())
+
+	finalized, err := m.SaveResponse(ctx, s.Identifier(), r, 1)
+	require.NoError(t, err)
+	require.Nil(t, finalized.Actions()[r.Step.ID])
+	require.Equal(t, r.Err, finalized.Errors()[r.Step.ID])
+
+	// Next stores an outdated reference
+	require.Equal(t, 0, next.Metadata().Pending)
+	// But finalized should increaase finalized count.
+	require.Equal(t, -1, finalized.Metadata().Pending, "finalized error does not decrease pending count")
+
+	// Finalize via a call to the state store.
+}
+
+func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	stepErr := fmt.Errorf("an absolutely terrible yet intermittent, non-final, retryable error")
+	r := state.DriverResponse{
+		Step: w.Steps[0],
+		Err:  stepErr,
+	}
+	require.True(t, r.Retryable())
+	require.False(t, r.Final())
+
+	next, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+	require.NoError(t, err)
+	require.NotNil(t, next)
+	require.Nil(t, next.Actions()[r.Step.ID])
+	require.Equal(t, r.Err, next.Errors()[r.Step.ID])
+
+	// This is not final
+	require.Equal(t, 0, next.Metadata().Pending)
+
+	r.Err = nil
+	r.Output = map[string]interface{}{
+		"u wot": "m8",
+	}
+	require.False(t, r.Final())
+
+	finalized, err := m.SaveResponse(ctx, s.Identifier(), r, 1)
+	require.NoError(t, err)
+	require.Equal(t, r.Output, finalized.Actions()[r.Step.ID])
+	// The error is still stored.
+	require.Equal(t, stepErr, next.Errors()[r.Step.ID])
+	// Saving output should not finalize.
+	require.Equal(t, 0, finalized.Metadata().Pending)
+
+	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID)
+	require.NoError(t, err)
+
+	reloaded, err := m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	require.Equal(t, -1, reloaded.Metadata().Pending)
+}
+
+func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+	id := s.Identifier()
+
+	wg := &sync.WaitGroup{}
+	for i := 0; i < len(n1000.Steps); i++ {
+		n := i
+		wg.Add(2)
+
+		go func() {
+			err := m.Scheduled(ctx, s.Identifier(), n1000.Steps[n].ID)
+			wg.Done()
+			require.NoError(t, err)
+		}()
+
+		go func() {
+			defer wg.Done()
+			r := state.DriverResponse{
+				Step: n1000.Steps[n],
+				Output: map[string]interface{}{
+					"status": float64(200),
+					"body": map[string]any{
+						"n": n,
+					},
+				},
+			}
+			_, err := m.SaveResponse(ctx, id, r, mrand.Intn(3))
+			require.NoError(t, err)
+			err = m.Finalized(ctx, s.Identifier(), n1000.Steps[n].ID)
+			require.NoError(t, err)
+		}()
+
+	}
+	wg.Wait()
+
+	loaded, err := m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	require.EqualValues(t, 0, loaded.Metadata().Pending, "scheduling and finalizing concurrently should end with 0")
+}
+
+func checkMetadataStartedAt(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	reloaded, err := m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	require.NotNil(t, reloaded)
+
+	require.EqualValues(t, s.Metadata().StartedAt, reloaded.Metadata().StartedAt)
+}
+
+/*
 func checkSaveOutputClearsError(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
@@ -275,6 +489,7 @@ func checkSaveError(t *testing.T, m state.Manager) {
 	// Maybe we also want to assert that we can't save an error to an
 	// action that has output.
 }
+*/
 
 func checkSavePause(t *testing.T, m state.Manager) {
 	ctx := context.Background()

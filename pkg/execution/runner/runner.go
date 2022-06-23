@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/backoff"
-	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
@@ -77,6 +76,7 @@ func (i InMemoryRunner) Enqueue(ctx context.Context, item inmemory.QueueItem, at
 	wg.Add(1)
 
 	i.sm.Enqueue(item, at)
+	i.sm.Scheduled(ctx, item.ID, item.Edge.Incoming)
 }
 
 // Execute runs all available tasks, blocking until terminated.
@@ -106,15 +106,14 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 		i.lock.RUnlock()
 	}()
 
-	resp, err := i.exec.Execute(ctx, item.ID, item.Edge.Incoming)
+	resp, err := i.exec.Execute(ctx, item.ID, item.Edge.Incoming, item.ErrorCount)
 	if err != nil {
 		// If the error is not of type response error, we can assume that this is
 		// always retryable.
-		_, isResponseError := err.(*driver.Response)
+		_, isResponseError := err.(*state.DriverResponse)
 		if (resp != nil && resp.Retryable()) || !isResponseError {
 			next := item
 			next.ErrorCount += 1
-
 			at := backoff.LinearJitterBackoff(next.ErrorCount)
 
 			// XXX: When we add max retries to steps, read the step from the
@@ -122,10 +121,16 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 			//
 			// For now, we retry steps of a function up to 3 times.
 			if next.ErrorCount < 3 {
+				// Retry this item.
 				i.Enqueue(ctx, next, at)
+				return err
 			}
 		}
 
+		// This is a non-retryable error.  Finalize this step.
+		if err := i.sm.Finalized(ctx, item.ID, item.Edge.Incoming); err != nil {
+			return err
+		}
 		return fmt.Errorf("execution error: %s", err)
 	}
 
@@ -149,7 +154,6 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 		// matching event is received.
 		if next.Metadata != nil && next.Metadata.AsyncEdgeMetadata != nil {
 			am := next.Metadata.AsyncEdgeMetadata
-
 			if am.Event == "" {
 				return fmt.Errorf("no async edge event specified")
 			}
@@ -187,6 +191,14 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 			ID:   item.ID,
 			Edge: next,
 		}, at)
+	}
+
+	// Mark this step as finalized.
+	//
+	// This must happen after everything is enqueued, else the scheduled <> finalized count
+	// is out of order.
+	if err := i.sm.Finalized(ctx, item.ID, item.Edge.Incoming); err != nil {
+		return err
 	}
 
 	return nil

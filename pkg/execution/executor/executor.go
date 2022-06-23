@@ -50,10 +50,15 @@ type Executor interface {
 	// trigger, and all functions that are direct children of the trigger will be
 	// scheduled for execution.
 	//
+	// Attempt is the zero-index attempt number for this execution.  The executor
+	// needs knowledge of the attempt number to store the error for each attempt,
+	// and to figure out whether this is the final retry for determining whether
+	// the next error is "finalized".
+	//
 	// It is important for this function to be atomic;  if the function was scheduled
 	// and the context terminates, we must store the output or async data in workflow
 	// state then schedule the child functions else the workflow will terminate early.
-	Execute(ctx context.Context, id state.Identifier, from string) (*driver.Response, error)
+	Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error)
 }
 
 // NewExecutor returns a new executor, responsible for running the specific step of a
@@ -132,13 +137,13 @@ type executor struct {
 // Execute loads a workflow and the current run state, then executes the
 // workflow via an executor.  This returns all available steps we can run from
 // the workflow after the step has been executed.
-func (e *executor) Execute(ctx context.Context, id state.Identifier, from string) (*driver.Response, error) {
-	state, err := e.sm.Load(ctx, id)
+func (e *executor) Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error) {
+	s, err := e.sm.Load(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	w := state.Workflow()
+	w := s.Workflow()
 
 	// This could have been retried due to a state load error after
 	// the particular step's code has ran; we need to load state after
@@ -146,9 +151,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 	//
 	// To fix this particular consistency issue, always check to see
 	// if there's output stored for this action ID.
-	if resp, _ := state.ActionID(from); resp != nil {
+	if resp, _ := s.ActionID(from); resp != nil {
 		// This has already successfully been executed.
-		return &driver.Response{
+		return &state.DriverResponse{
 			Scheduled: false,
 			Output:    resp,
 			Err:       nil,
@@ -163,9 +168,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 		}, nil
 	}
 
-	resp, err := e.run(ctx, w, id, from, state)
+	resp, err := e.run(ctx, w, id, from, s, attempt)
 	if err != nil {
-		// This is likely a driver.Response, which itself includes
+		// This is likely a state.DriverResponse, which itself includes
 		// whether the action can be retried based off of the output.
 		//
 		// The runner is responsible for scheduling jobs and will check
@@ -177,9 +182,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 }
 
 // run executes the step with the given step ID.
-func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, stepID string, s state.State) (*driver.Response, error) {
+func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, stepID string, s state.State, attempt int) (*state.DriverResponse, error) {
 	var (
-		response *driver.Response
+		response *state.DriverResponse
 		err      error
 	)
 
@@ -194,7 +199,7 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 		if step == nil {
 			return nil, fmt.Errorf("unknown vertex: %s", stepID)
 		}
-		response, err = e.executeAction(ctx, id, step)
+		response, err = e.executeAction(ctx, id, step, s, attempt)
 		if err != nil {
 			return nil, err
 		}
@@ -216,7 +221,7 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 	return response, err
 }
 
-func (e *executor) executeAction(ctx context.Context, id state.Identifier, action *inngest.Step) (*driver.Response, error) {
+func (e *executor) executeAction(ctx context.Context, id state.Identifier, action *inngest.Step, s state.State, attempt int) (*state.DriverResponse, error) {
 	definition, err := e.al.Load(ctx, action.DSN, action.Version)
 	if err != nil {
 		return nil, fmt.Errorf("error loading action: %w", err)
@@ -230,15 +235,14 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, definition.Runtime.RuntimeType())
 	}
 
-	state, err := e.sm.Load(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("error loading state: %w", err)
-	}
-
-	response, err := d.Execute(ctx, state, *definition, *action)
-	if err != nil {
+	response, err := d.Execute(ctx, s, *definition, *action)
+	if err != nil || response == nil {
 		return nil, fmt.Errorf("error executing action: %w", err)
 	}
+
+	// Ensure that the step is always set.  This removes the need for drivers to always
+	// set this.
+	response.Step = *action
 
 	if response.ActionVersion == nil {
 		// Set the ActionVersion automatically from the executor, where
@@ -258,23 +262,17 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		return response, nil
 	}
 
-	if response.Err == nil {
-		if _, serr := e.sm.SaveActionOutput(ctx, id, action.ID, response.Output); serr != nil {
-			err = multierror.Append(err, serr)
-		}
-
-		// Clear any saved error.  It doesn't necessarily matter if this fails;  we'll
-		// re-run the step and realize that there's output, then skip.  This will leave
-		// a dangling error in state.  To that effect, we ignore errors entirely as it
-		// only causes extra work for benefit.
-		_, _ = e.sm.SaveActionError(ctx, id, action.ID, nil)
+	if response.Err != nil && (!response.Retryable() || attempt >= action.RetryCount()-1) {
+		// We need to detect whether this error is 'final' here, depending on whether
+		// we've hit the retry count or this error is deemed non-retryable.
+		//
+		// When this error is final, we need to store the error and update the step
+		// as finalized within the state store.
+		response.SetFinal()
 	}
 
-	// Store the output or the error.
-	if response.Err != nil {
-		if _, serr := e.sm.SaveActionError(ctx, id, action.ID, response.Err); serr != nil {
-			err = multierror.Append(err, serr)
-		}
+	if _, serr := e.sm.SaveResponse(ctx, id, *response, attempt); serr != nil {
+		err = multierror.Append(err, serr)
 	}
 
 	return response, err
