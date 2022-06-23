@@ -21,6 +21,7 @@ const ContentBlock: React.FC<{
   );
   return (
     <Block layout={layout} imageSize={imageSize}>
+      <img src={image} className="image-mobile" />
       {layout === "reverse" && imageBox}
       <div className="content">
         {icon ? icon : ""}
@@ -47,6 +48,10 @@ const Block = styled.div<{
   .content {
     grid-column: ${({ layout }) => (layout === "default" ? "2/6" : "6/10")};
     padding: 2rem 0;
+  }
+
+  .image-mobile {
+    display: none;
   }
 
   svg {
@@ -76,6 +81,25 @@ const Block = styled.div<{
     background-repeat: no-repeat;
     background-position: ${({ layout }) =>
       layout === "default" ? "left center" : "right center"};
+  }
+
+  @media (max-width: 800px) {
+    margin: 3rem 10%;
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+
+    .content {
+      grid-column: 1;
+      grid-row: 2;
+      padding-bottom: 0;
+    }
+    // Sizing is easier with an image tag in stacked layouts
+    .image-mobile {
+      display: block;
+    }
+    .image {
+      display: none;
+    }
   }
 `;
 

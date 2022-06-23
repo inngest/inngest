@@ -268,6 +268,8 @@ const Hero = styled.header`
   .icon-list {
     margin: 2.5rem auto;
     max-width: 400px;
+    max-width: fit-content;
+    text-align: left; // In case text wraps
   }
 
   .hero-ctas {
@@ -293,14 +295,19 @@ const Hero = styled.header`
 
   @media (max-width: 800px) {
     grid-template-columns: 1fr;
-    padding: 8vh 0;
+    padding: 8vh 1rem;
 
     > div:first-of-type {
       grid-column: 1;
     }
 
-    img {
-      display: none;
+    .hero-graphic {
+      width: 90%;
+    }
+
+    .icon-list {
+      max-width: fit-content;
+      padding: 0 1rem;
     }
 
     .hero-subheading:last-child {
@@ -342,6 +349,13 @@ const Section = styled.section<{ theme?: "dark" | "light" }>`
     max-width: 900px;
     font-size: 1rem;
     line-height: 1.6em;
+  }
+
+  @media (max-width: 800px) {
+    padding: 4rem 0;
+    header {
+      padding: 0 2rem;
+    }
   }
 `;
 
