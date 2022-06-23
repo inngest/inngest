@@ -43,7 +43,7 @@ const Block = styled.div<{
     11,
     1fr
   ); // 11 so nothing is perfectly down the middle of the page
-  margin: 6rem auto;
+  margin: 4rem auto;
 
   .content {
     grid-column: ${({ layout }) => (layout === "default" ? "2/6" : "6/10")};

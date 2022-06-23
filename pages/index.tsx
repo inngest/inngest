@@ -10,8 +10,6 @@ import Button from "../shared/Button";
 import Callout from "../shared/Callout";
 import ContentBlock from "../shared/ContentBlock";
 
-import DiscordCTA from "../shared/Blog/DiscordCTA";
-
 // Icons
 import Github from "src/shared/Icons/Github";
 import Check from "src/shared/Icons/Check";
@@ -126,7 +124,7 @@ export default function Home() {
               {/* TODO - Link to something */}
             </>
           }
-          // image="/assets/homepage/cli-3-commands.png"
+          image="/assets/homepage/serverless-queue.png"
         />
         <ContentBlock
           layout="reverse"
@@ -138,7 +136,7 @@ export default function Home() {
               throughput, and more, without needing to dig through logs.
             </>
           }
-          // image="/assets/homepage/cli-3-commands.png"
+          image="/assets/homepage/admin-ui-screenshot.png"
         />
         <ContentBlock
           layout="reverse"
@@ -151,7 +149,7 @@ export default function Home() {
               rest.
             </>
           }
-          // image="/assets/homepage/cli-3-commands.png"
+          image="/assets/homepage/checklist-fade.png"
         />
       </Section>
 
@@ -264,7 +262,7 @@ export default function Home() {
         </NextLevelSection>
       </BlackBackgroundWrapper>
 
-      <SocialProof>
+      {/*<SocialProof>
         <blockquote>
           “This is 100% the dev/prod parity that we’re lacking for queue-based
           systems.”
@@ -273,7 +271,7 @@ export default function Home() {
           <img src="/assets/team/dan-f-2022-02-18.jpg" />
           Developer A. - Staff Engineer at XYZ
         </div>
-      </SocialProof>
+        </SocialProof> */}
 
       <ClosingSection>
         <header>

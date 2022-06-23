@@ -31,7 +31,12 @@ const NavContent: React.FC<Props> = (props: Props) => {
 
       {!props.nolinks && (
         <div className="links">
-          {/* <StyledLink href="/library">Library</StyledLink> */}
+          <StyledLink key="hiw" href="/how-it-works?ref=nav">
+            How it works
+          </StyledLink>
+          <StyledLink key="product" href="/product?ref=nav">
+            Product
+          </StyledLink>
           <StyledLink key="docs" href="/docs?ref=nav">
             Docs
           </StyledLink>
@@ -166,7 +171,7 @@ const Container = styled.div<{ sticky?: boolean }>`
   // Non-mobile nav
   @media (min-width: 800px) {
     .links {
-      margin-left: 2rem;
+      margin-left: 1.6rem;
       justify-content: start;
     }
   }
@@ -234,7 +239,7 @@ const Container = styled.div<{ sticky?: boolean }>`
 
 const StyledLink = styled.a`
   display: inline-block;
-  padding: 12px 20px 11px;
+  padding: 0.3rem 0.5rem 0.25rem;
   transition: all 0.2s;
   text-decoration: none;
   border-radius: var(--border-radius);
