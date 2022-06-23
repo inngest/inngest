@@ -31,7 +31,7 @@ type Identifier struct {
 // It pauses a specific workflow run via an Identifier, at a specific step in
 // the function as specified by Target.
 type Pause struct {
-	ID uuid.UUID `json:"token"`
+	ID uuid.UUID `json:"id"`
 	// Identifier is the specific workflow run to resume.  This is required.
 	Identifier Identifier `json:"identifier"`
 	// Outgoing is the parent step for the pause.
@@ -127,6 +127,7 @@ type Mutater interface {
 	SaveActionError(ctx context.Context, i Identifier, actionID string, err error) (State, error)
 }
 
+// PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
 	// SavePause indicates that the traversal of an edge is paused until some future time.
 	//
@@ -150,9 +151,45 @@ type PauseMutater interface {
 	ConsumePause(ctx context.Context, id uuid.UUID) error
 }
 
+// PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
+// is required to fetch pauses to automatically continue workflows.
+type PauseGetter interface {
+	// PausesByEvent returns all pauses for a given event.
+	PausesByEvent(ctx context.Context, eventName string) (PauseIterator, error)
+
+	// PauseByStep returns a specific pause for a given workflow run, from a given step.
+	//
+	// This is required when continuing a step function from an async step, ie. one that
+	// has deferred results which must be continued by resuming the specific pause set
+	// up for the given step ID.
+	PauseByStep(ctx context.Context, i Identifier, actionID string) (*Pause, error)
+}
+
+// PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This
+// ensures that, at scale, all pauses do not need to be loaded into memory.
+type PauseIterator interface {
+	// Next advances the iterator and returns whether the next call to Val will
+	// return a non-nil pause.
+	//
+	// Next should be called prior to any call to the iterator's Val method, after
+	// the iterator has been created.
+	//
+	// The order of the iterator is unspecified.
+	Next(ctx context.Context) bool
+
+	// Val returns the current Pause from the iterator.
+	Val(context.Context) *Pause
+}
+
+// PauseManager manages mutating and fetching pauses from a backend implementation.
+type PauseManager interface {
+	PauseMutater
+	PauseGetter
+}
+
 // Manager represents a state manager which can both load and mutate state.
 type Manager interface {
 	Loader
 	Mutater
-	PauseMutater
+	PauseManager
 }

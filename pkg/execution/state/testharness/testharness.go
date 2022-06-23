@@ -3,6 +3,7 @@ package testharness
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -67,21 +68,29 @@ var (
 	}
 )
 
-func CheckState(t *testing.T, m state.Manager) {
+func CheckState(t *testing.T, generator func() state.Manager) {
 	t.Helper()
-	t.Parallel()
 
 	funcs := map[string]func(t *testing.T, m state.Manager){
-		"New":                         checkNew,
-		"SaveActionOutput":            checkSaveOutput,
-		"SaveActionOutputClearsError": checkSaveOutputClearsError,
-		"SaveActionError":             checkSaveError,
-		"SavePause":                   checkSavePause,
-		"LeasePause":                  checkLeasePause,
-		"ConsumePause":                checkConsumePause,
+		"New":                             checkNew,
+		"SaveActionOutput":                checkSaveOutput,
+		"SaveActionOutputClearsError":     checkSaveOutputClearsError,
+		"SaveActionError":                 checkSaveError,
+		"SavePause":                       checkSavePause,
+		"LeasePause":                      checkLeasePause,
+		"ConsumePause":                    checkConsumePause,
+		"PausesByEvent/Empty":             checkPausesByEvent_empty,
+		"PausesByEvent/Single":            checkPausesByEvent_single,
+		"PausesByEvent/Multiple":          checkPausesByEvent_multi,
+		"PausesByEvent/ConcurrentCursors": checkPausesByEvent_concurrent,
+		"PausesByEvent/Consumed":          checkPausesByEvent_consumed,
+		"PauseByStep":                     checkPausesByStep,
 	}
 	for name, f := range funcs {
-		t.Run(name, func(t *testing.T) { f(t, m) })
+		t.Run(name, func(t *testing.T) {
+			m := generator()
+			f(t, m)
+		})
 	}
 }
 
@@ -382,6 +391,359 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 	err = m.ConsumePause(ctx, pause.ID)
 	require.NotNil(t, err, "Consuming an expired pause should error")
 	require.Error(t, state.ErrPauseNotFound, err)
+}
+
+func checkPausesByEvent_empty(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+
+	iter, err := m.PausesByEvent(ctx, "lol/nothing.my.friend")
+	require.NoError(t, err)
+	require.NotNil(t, iter)
+	require.False(t, iter.Next(ctx))
+	require.Nil(t, iter.Val(ctx))
+}
+
+func checkPausesByEvent_single(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	evtA := "event/a"
+	evtB := "event/...b"
+
+	// Save a pause.
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC(),
+		Event:      &evtA,
+	}
+	err := m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	// Save an unrelated pause to another event.
+	unused := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC(),
+		Event:      &evtB,
+	}
+	err = m.SavePause(ctx, unused)
+	require.NoError(t, err)
+
+	iter, err := m.PausesByEvent(ctx, evtA)
+	require.NoError(t, err)
+	require.NotNil(t, iter)
+	require.True(t, iter.Next(ctx))
+	require.EqualValues(t, &pause, iter.Val(ctx))
+	require.False(t, iter.Next(ctx))
+}
+
+func checkPausesByEvent_multi(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	evtA := "event/a-multi"
+	evtB := "event/unused-plz"
+
+	// Save many a pause.
+	pauses := []state.Pause{}
+	for i := 0; i <= 2000; i++ {
+		p := state.Pause{
+			ID:         uuid.New(),
+			Identifier: s.Identifier(),
+			Outgoing:   inngest.TriggerName,
+			Incoming:   w.Steps[0].ID,
+			Expires:    time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC(),
+			Event:      &evtA,
+		}
+		err := m.SavePause(ctx, p)
+		require.NoError(t, err)
+		pauses = append(pauses, p)
+	}
+
+	// Save an unrelated pause to another event.
+	unused := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   "plz-dont",
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+		Event:      &evtB,
+	}
+	err := m.SavePause(ctx, unused)
+	require.NoError(t, err)
+
+	iter, err := m.PausesByEvent(ctx, evtA)
+	require.NoError(t, err)
+	require.NotNil(t, iter)
+
+	seen := []string{}
+	n := 0
+	for iter.Next(ctx) {
+		result := iter.Val(ctx)
+		require.NotNil(t, result, "Nil pause returned from iterator")
+
+		found := false
+		for _, existing := range pauses {
+			if existing.ID == result.ID {
+				found = true
+				break
+			}
+		}
+
+		byt, _ := json.MarshalIndent(result, "", "  ")
+		require.True(t, found, "iterator returned pause not in event set:\n%v", string(byt))
+		// Some iterators may return the same item multiple times (eg. Redis).
+		// Record the items that were seen.
+		seen = append(seen, result.ID.String())
+		n++
+	}
+
+	// Sanity check number of seen items.
+	require.GreaterOrEqual(t, len(pauses), n, "didn't iterate through all matching pauses")
+	require.GreaterOrEqual(t, len(pauses), len(seen))
+	// Ensure
+	require.GreaterOrEqual(t, n, len(pauses)-1, "Iterator must have returned the correct number of pauses for matching events")
+	// Don't get excessive...
+	require.LessOrEqual(t, n, len(pauses)+2, "Iterator returned too many duplicate items.")
+
+	// Ensure that all IDs were returned.
+	for _, p := range pauses {
+		require.Contains(t, seen, p.ID.String(), "Iterator did not return all pause IDs for multiple events")
+	}
+
+	// Ensure we didn't get the unrelated event.
+	require.NotContains(t, seen, unused.ID)
+}
+
+func checkPausesByEvent_concurrent(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	// Create many pauses, then multiple iterators.
+	evtA := "event/a-multi"
+	pauses := []state.Pause{}
+	for i := 0; i <= 2000; i++ {
+		p := state.Pause{
+			ID:         uuid.New(),
+			Identifier: s.Identifier(),
+			Outgoing:   inngest.TriggerName,
+			Incoming:   w.Steps[0].ID,
+			Expires:    time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC(),
+			Event:      &evtA,
+		}
+		err := m.SavePause(ctx, p)
+		require.NoError(t, err)
+		pauses = append(pauses, p)
+	}
+
+	iterA, err := m.PausesByEvent(ctx, evtA)
+	require.NoError(t, err)
+	require.NotNil(t, iterA)
+
+	// Consume 50% of the iterator.
+	seenA := []string{}
+	a := 0
+	for a <= (len(pauses)/2) && iterA.Next(ctx) {
+		result := iterA.Val(ctx)
+		found := false
+		for _, existing := range pauses {
+			if existing.ID == result.ID {
+				found = true
+				break
+			}
+		}
+		require.True(t, found, "iterator returned pause not in event set")
+		seenA = append(seenA, result.ID.String())
+		a++
+	}
+
+	// Create a new iterator and consume it all.
+	iterB, err := m.PausesByEvent(ctx, evtA)
+	require.NoError(t, err)
+	require.NotNil(t, iterB)
+	seenB := []string{}
+	b := 0
+	for iterB.Next(ctx) {
+		result := iterB.Val(ctx)
+		found := false
+		for _, existing := range pauses {
+			if existing.ID == result.ID {
+				found = true
+				break
+			}
+		}
+		require.True(t, found, "iterator returned pause not in event set")
+		seenB = append(seenB, result.ID.String())
+		b++
+	}
+
+	// Consume the rest of A.
+	for iterA.Next(ctx) {
+		result := iterA.Val(ctx)
+		found := false
+		for _, existing := range pauses {
+			if existing.ID == result.ID {
+				found = true
+				break
+			}
+		}
+		require.True(t, found, "iterator returned pause not in event set")
+		seenA = append(seenA, result.ID.String())
+		a++
+	}
+
+	// Sanity check number of seen items.
+	require.GreaterOrEqual(t, len(pauses), a, "didn't iterate through all of the first concurrent iterator")
+	require.GreaterOrEqual(t, len(pauses), b, "didn't iterate through all of the second concurrent iterator")
+	require.GreaterOrEqual(t, len(pauses), len(seenA))
+	require.GreaterOrEqual(t, len(pauses), len(seenB))
+	require.GreaterOrEqual(t, a, len(pauses)-1, "Iterator must have returned the correct number of pauses for matching events")
+	require.GreaterOrEqual(t, b, len(pauses)-1, "Iterator must have returned the correct number of pauses for matching events")
+
+	// Ensure that all IDs were returned.
+	for _, p := range pauses {
+		require.Contains(t, seenA, p.ID.String(), "Iterator A did not return all pause IDs for multiple events")
+		require.Contains(t, seenB, p.ID.String(), "Iterator B did not return all pause IDs for multiple events")
+	}
+}
+
+func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	evtA := "event/a-multi"
+
+	// Save many a pause.
+	pauses := []state.Pause{}
+	for i := 0; i < 2; i++ {
+		p := state.Pause{
+			ID:         uuid.New(),
+			Identifier: s.Identifier(),
+			Outgoing:   inngest.TriggerName,
+			Incoming:   w.Steps[0].ID,
+			Expires:    time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC(),
+			Event:      &evtA,
+		}
+		err := m.SavePause(ctx, p)
+		require.NoError(t, err)
+		pauses = append(pauses, p)
+	}
+
+	//
+	// Ensure that the iteration shows everything at first.
+	//
+	iter, err := m.PausesByEvent(ctx, evtA)
+	require.NoError(t, err)
+	require.NotNil(t, iter)
+
+	seen := []string{}
+	n := 0
+	for iter.Next(ctx) {
+		result := iter.Val(ctx)
+
+		found := false
+		for _, existing := range pauses {
+			if existing.ID == result.ID {
+				found = true
+				break
+			}
+		}
+
+		byt, _ := json.MarshalIndent(result, "", "  ")
+		require.True(t, found, "iterator returned pause not in event set:\n%v", string(byt))
+		// Some iterators may return the same item multiple times (eg. Redis).
+		// Record the items that were seen.
+		seen = append(seen, result.ID.String())
+		n++
+	}
+
+	// Sanity check number of seen items.
+	require.GreaterOrEqual(t, len(pauses), n, "didn't iterate through all matching pauses")
+	require.GreaterOrEqual(t, len(pauses), len(seen))
+
+	// Consume the first pause, and assert that it doesn't show up in
+	// an iterator.
+	err = m.ConsumePause(ctx, pauses[0].ID)
+	require.NoError(t, err)
+
+	iter, err = m.PausesByEvent(ctx, evtA)
+	require.NoError(t, err)
+	require.NotNil(t, iter)
+
+	seen = []string{}
+	n = 0
+	for iter.Next(ctx) {
+		result := iter.Val(ctx)
+
+		// This should not be the consumed pause.
+		require.NotEqual(t, pauses[0].ID, result.ID, "returned a consumed pause within iterator")
+
+		found := false
+		for _, existing := range pauses {
+			if existing.ID == result.ID {
+				found = true
+				break
+			}
+		}
+
+		byt, _ := json.MarshalIndent(result, "", "  ")
+		require.True(t, found, "iterator returned pause not in event set:\n%v", string(byt))
+		// Some iterators may return the same item multiple times (eg. Redis).
+		// Record the items that were seen.
+		seen = append(seen, result.ID.String())
+		n++
+	}
+
+	// Sanity check number of seen items.
+	require.GreaterOrEqual(t, len(pauses)-1, n, "consumed pause returned within iterator")
+	require.GreaterOrEqual(t, len(pauses)-1, len(seen))
+
+}
+
+func checkPausesByStep(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	// Save a pause.
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC(),
+	}
+	err := m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	second := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   w.Steps[0].ID,
+		Incoming:   w.Steps[1].ID,
+		Expires:    time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC(),
+	}
+	err = m.SavePause(ctx, second)
+	require.NoError(t, err)
+
+	found, err := m.PauseByStep(ctx, s.Identifier(), "none")
+	require.Nil(t, found)
+	require.NotNil(t, err)
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	found, err = m.PauseByStep(ctx, s.Identifier(), inngest.TriggerName)
+	require.Nil(t, err)
+	require.NotNil(t, found)
+	require.EqualValues(t, pause, *found)
+
+	found, err = m.PauseByStep(ctx, s.Identifier(), w.Steps[0].ID)
+	require.Nil(t, err)
+	require.NotNil(t, found)
+	require.EqualValues(t, second, *found)
 }
 
 func setup(t *testing.T, m state.Manager) state.State {

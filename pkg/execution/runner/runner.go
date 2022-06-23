@@ -106,10 +106,6 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 		i.lock.RUnlock()
 	}()
 
-	// TODO: This could have been retried due to a state load error after
-	// the particular step's code has ran.  In this case, check that the
-	// function has no output stored.
-
 	resp, err := i.exec.Execute(ctx, item.ID, item.Edge.Incoming)
 	if err != nil {
 		// If the error is not of type response error, we can assume that this is

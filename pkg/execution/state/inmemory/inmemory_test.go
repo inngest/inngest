@@ -15,7 +15,7 @@ import (
 )
 
 func TestStateHarness(t *testing.T) {
-	testharness.CheckState(t, NewStateManager())
+	testharness.CheckState(t, func() state.Manager { return NewStateManager() })
 }
 
 func TestInMemoryPause(t *testing.T) {
@@ -87,7 +87,7 @@ func TestInMemoryPause(t *testing.T) {
 			t,
 			pre,
 			time.Now().Add(-20*time.Millisecond),
-			2*time.Millisecond,
+			5*time.Millisecond,
 		)
 		require.EqualValues(
 			t,

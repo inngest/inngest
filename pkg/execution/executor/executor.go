@@ -46,9 +46,9 @@ var (
 // action has started.
 type Executor interface {
 	// Execute runs the given function via the execution drivers.  If the
-	// from ID is 0 this is treated as a new workflow invocation from the trigger,
-	// and all functions that are direct children of the trigger will be scheduled
-	// for execution.
+	// from ID is "$trigger" this is treated as a new workflow invocation from the
+	// trigger, and all functions that are direct children of the trigger will be
+	// scheduled for execution.
 	//
 	// It is important for this function to be atomic;  if the function was scheduled
 	// and the context terminates, we must store the output or async data in workflow

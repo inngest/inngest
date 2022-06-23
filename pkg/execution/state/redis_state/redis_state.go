@@ -69,8 +69,7 @@ func WithKeyGenerator(kf KeyGenerator) Opt {
 // as the key for data stored in redis for workflows, events, actions, and
 // errors.
 type KeyGenerator interface {
-	// TODO: Deterministically generate a v5 UUID based off of the name
-	// of the workflow in dev.
+	// Workflow returns the key for the current workflow ID and version.
 	Workflow(ctx context.Context, workflowID uuid.UUID, version int) string
 
 	// RunMetadata stores state regarding the current run identifier, such
@@ -89,8 +88,20 @@ type KeyGenerator interface {
 	// for given workflow run.
 	Errors(context.Context, state.Identifier) string
 
-	// Pause returns the key used to store an individual pause from its ID.
-	Pause(context.Context, uuid.UUID) string
+	// PauseLease stores the key which references a pause's lease.
+	//
+	// This is stored independently as we may store more than one copy of a pause
+	// for easy iteration.
+	PauseLease(context.Context, uuid.UUID) string
+
+	// PauseID returns the key used to store an individual pause from its ID.
+	PauseID(context.Context, uuid.UUID) string
+
+	// PauseEvent returns the key used to store data for
+	PauseEvent(context.Context, string) string
+
+	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
+	PauseStep(context.Context, state.Identifier, string) string
 }
 
 type mgr struct {
@@ -279,53 +290,172 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 	if err != nil {
 		return err
 	}
-	return m.r.SetNX(ctx, m.kf.Pause(ctx, p.ID), packed, time.Until(p.Expires)).Err()
+
+	return m.r.Watch(ctx, func(tx *redis.Tx) error {
+		err := tx.SetNX(ctx, m.kf.PauseID(ctx, p.ID), string(packed), time.Until(p.Expires)).Err()
+		if err != nil {
+			return err
+		}
+
+		// Set a reference to the stored pause within the run-id step-id key.  This allows us
+		// to resume workflows from a given Identifer and Step easily.
+		err = tx.Set(ctx, m.kf.PauseStep(ctx, p.Identifier, p.Outgoing), p.ID.String(), time.Until(p.Expires)).Err()
+		if err != nil {
+			return err
+		}
+
+		// If we have an event, add this to the event's hash, keyed by ID.
+		//
+		// We store all pauses that are triggered by an event in a key containing
+		// the event name, allowing us to easily load all pauses for an event and
+		// easily remove keys once consumed.
+		//
+		// NOTE: Because we return an iterator to this set directly for returning pauses
+		// matching an event, we must store the pause within this event again.
+		if p.Event != nil {
+			if err = tx.HSet(ctx, m.kf.PauseEvent(ctx, *p.Event), map[string]any{
+				p.ID.String(): string(packed),
+			}).Err(); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
 }
 
 func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
-	key := m.kf.Pause(ctx, id)
+	pauseKey := m.kf.PauseID(ctx, id)
+	leaseKey := m.kf.PauseLease(ctx, id)
+	return m.r.Watch(ctx, func(tx *redis.Tx) error {
+		exists, err := tx.Exists(ctx, pauseKey).Uint64()
+		if err != nil {
+			return err
+		}
+		if exists == 0 {
+			return state.ErrPauseNotFound
+		}
+
+		// Fetch the lease
+		str, err := tx.Get(ctx, leaseKey).Result()
+		if err != redis.Nil && err != nil {
+			return err
+		}
+		if str != "" {
+			// We have a lease.
+			leasedUntil, err := time.Parse(time.RFC3339Nano, str)
+			if err != nil {
+				return err
+			}
+
+			if time.Now().Before(leasedUntil) {
+				return state.ErrPauseLeased
+			}
+		}
+
+		// Lease the pause.
+		lease := time.Now().Add(state.PauseLeaseDuration).Format(time.RFC3339Nano)
+		return tx.Set(ctx, leaseKey, lease, time.Until(time.Now().Add(state.PauseLeaseDuration))).Err()
+	}, leaseKey)
+}
+
+func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID) error {
+	key := m.kf.PauseID(ctx, id)
+
 	return m.r.Watch(ctx, func(tx *redis.Tx) error {
 		str, err := tx.Get(ctx, key).Result()
+		if err == redis.Nil {
+			return state.ErrPauseNotFound
+		}
 		if err != nil {
-			if err == redis.Nil {
-				return state.ErrPauseNotFound
-			}
 			return err
 		}
 
 		pause := &state.Pause{}
-		if err := json.Unmarshal([]byte(str), pause); err != nil {
+		if err = json.Unmarshal([]byte(str), pause); err != nil {
 			return err
 		}
-
-		if pause.LeasedUntil != nil && time.Now().Before(*pause.LeasedUntil) {
-			return state.ErrPauseLeased
-		}
-
-		lease := time.Now().Add(state.PauseLeaseDuration)
-		pause.LeasedUntil = &lease
-
-		packed, err := json.Marshal(pause)
-		if err != nil {
+		if err := tx.Del(ctx, key).Err(); err != nil {
 			return err
 		}
-		return tx.Set(ctx, key, string(packed), time.Until(pause.Expires)).Err()
+		if pause.Event != nil {
+			// Remove this from any event, also.
+			return tx.HDel(ctx, m.kf.PauseEvent(ctx, *pause.Event), pause.ID.String()).Err()
+		}
+		return nil
 	}, key)
 }
 
-func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID) error {
-	key := m.kf.Pause(ctx, id)
+// PausesByEvent returns all pauses for a given event.
+func (m mgr) PausesByEvent(ctx context.Context, event string) (state.PauseIterator, error) {
+	cmd := m.r.HScan(ctx, m.kf.PauseEvent(ctx, event), 0, "", 0)
+	if err := cmd.Err(); err != nil {
+		return nil, err
+	}
 
-	return m.r.Watch(ctx, func(tx *redis.Tx) error {
-		_, err := tx.Get(ctx, key).Result()
-		if err == redis.Nil {
-			return state.ErrPauseNotFound
-		}
-		if err == nil {
-			return tx.Del(ctx, key).Err()
-		}
-		return err
-	}, key)
+	i := cmd.Iterator()
+	if i == nil {
+		return nil, fmt.Errorf("unable to create event iterator")
+	}
+
+	return &iter{ri: i}, nil
+}
+
+// PauseByStep returns a specific pause for a given workflow run, from a given step.
+//
+// This is required when continuing a step function from an async step, ie. one that
+// has deferred results which must be continued by resuming the specific pause set
+// up for the given step ID.
+func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID string) (*state.Pause, error) {
+	str, err := m.r.Get(ctx, m.kf.PauseStep(ctx, i, actionID)).Result()
+	if err == redis.Nil {
+		return nil, state.ErrPauseNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := uuid.Parse(str)
+	if err != nil {
+		return nil, err
+	}
+
+	str, err = m.r.Get(ctx, m.kf.PauseID(ctx, id)).Result()
+	if err == redis.Nil {
+		return nil, state.ErrPauseNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	pause := &state.Pause{}
+	err = json.Unmarshal([]byte(str), pause)
+	return pause, err
+}
+
+type iter struct {
+	ri *redis.ScanIterator
+}
+
+func (i *iter) Next(ctx context.Context) bool {
+	return i.ri.Next(ctx)
+}
+
+func (i *iter) Val(ctx context.Context) *state.Pause {
+	// Skip over the key;  we're using HScan which returns key then value.
+	_ = i.ri.Next(ctx)
+
+	val := i.ri.Val()
+	if val == "" {
+		return nil
+	}
+
+	pause := &state.Pause{}
+	if err := json.Unmarshal([]byte(val), pause); err != nil {
+		return nil
+	}
+	return pause
 }
 
 func NewRunMetadata(data map[string]string) (*runMetadata, error) {
@@ -393,6 +523,18 @@ func (defaultKeyFunc) Errors(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("%s:errors:%s:%s", keyPrefix, id.WorkflowID, id.RunID)
 }
 
-func (defaultKeyFunc) Pause(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("%s:pause:%s", keyPrefix, id.String())
+func (defaultKeyFunc) PauseID(ctx context.Context, id uuid.UUID) string {
+	return fmt.Sprintf("%s:pauses:%s", keyPrefix, id.String())
+}
+
+func (defaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) string {
+	return fmt.Sprintf("%s:pause-lease:%s", keyPrefix, id.String())
+}
+
+func (defaultKeyFunc) PauseEvent(ctx context.Context, event string) string {
+	return fmt.Sprintf("%s:pause-events:%s", keyPrefix, event)
+}
+
+func (defaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
+	return fmt.Sprintf("%s:pause-steps:%s-%s", keyPrefix, id.RunID, step)
 }

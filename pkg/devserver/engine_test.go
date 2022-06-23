@@ -119,7 +119,13 @@ func TestEngine_async(t *testing.T) {
 	require.Equal(t, "Basic step", driver.Executed["first"].Name)
 	// And we should have a pause.
 	require.Eventually(t, func() bool {
-		return len(e.sm.Pauses()) == 1
+		n := 0
+		iter, err := e.sm.PausesByEvent(ctx, "test/continue")
+		require.NoError(t, err)
+		for iter.Next(ctx) {
+			n++
+		}
+		return n == 1
 	}, 50*time.Millisecond, 10*time.Millisecond)
 
 	// 3.
@@ -134,7 +140,15 @@ func TestEngine_async(t *testing.T) {
 	require.NoError(t, err)
 	<-time.After(50 * time.Millisecond)
 	require.EqualValues(t, 1, len(driver.Executed))
-	require.EqualValues(t, 1, len(e.sm.Pauses()))
+	require.Eventually(t, func() bool {
+		n := 0
+		iter, err := e.sm.PausesByEvent(ctx, "test/continue")
+		require.NoError(t, err)
+		for iter.Next(ctx) {
+			n++
+		}
+		return n == 1
+	}, 50*time.Millisecond, 10*time.Millisecond)
 
 	// 4.
 	// Finally, assert that sending an event which matches the pause conditions
