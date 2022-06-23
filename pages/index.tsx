@@ -17,6 +17,7 @@ import Github from "src/shared/Icons/Github";
 import Check from "src/shared/Icons/Check";
 import CLIGradient from "src/shared/Icons/CLIGradient";
 import KeyboardGradient from "src/shared/Icons/KeyboardGradient";
+import TrendingUp from "src/shared/Icons/TrendingUp";
 
 // TODO: move these into env vars
 export const INGEST_KEY =
@@ -203,11 +204,97 @@ export default function Home() {
           image="/assets/homepage/payload-and-job-generic.png"
           icon={<KeyboardGradient />}
         />
+
+        <div className="cta-container">
+          <Button href="/product?ref=home-start-building" kind="primary">
+            Start building today
+          </Button>
+        </div>
       </Section>
 
-      <div className="discord-cta-wrapper">
-        <DiscordCTA size="small" />
-      </div>
+      <BlackBackgroundWrapper>
+        <NextLevelSection>
+          <header>
+            <h2>
+              <TrendingUp /> <span className="gradient-text">Next-Level</span>{" "}
+              Async Awesomeness
+            </h2>
+            <p className="subheading">
+              Building the future with event-driven experiences
+            </p>
+          </header>
+
+          <div className="content-grid">
+            <div>
+              <h3>Limitless</h3>
+              <p>
+                Inngest jobs aren't bound by artificial time or isolation
+                constraints. Develop long running, context aware tasks that
+                coordinate and interact to build even the most sophisticated
+                workflows.
+              </p>
+            </div>
+            <div>
+              <h3>Controlled</h3>
+              <p>
+                Our platform enforces data governance and accuracy so you'll
+                immediately know if issues arise. Our detailed audit logs mean
+                you're never in the dark.
+              </p>
+            </div>
+            <div>
+              <h3>Experienced</h3>
+              <p>
+                Our founding team has built high-throughput complex event-driven
+                systems that scale to millions of daily events and we're excited
+                to share with you the reliable performant system we always
+                wished we had.
+              </p>
+            </div>
+          </div>
+
+          <div className="cta-container">
+            <Button
+              href="/product?ref=home-start-building"
+              kind="outlinePrimary"
+            >
+              Take it to the next level <TrendingUp size="1em" />
+            </Button>
+          </div>
+        </NextLevelSection>
+      </BlackBackgroundWrapper>
+
+      <SocialProof>
+        <blockquote>
+          “This is 100% the dev/prod parity that we’re lacking for queue-based
+          systems.”
+        </blockquote>
+        <div className="attribution">
+          <img src="/assets/team/dan-f-2022-02-18.jpg" />
+          Developer A. - Staff Engineer at XYZ
+        </div>
+      </SocialProof>
+
+      <ClosingSection>
+        <header>
+          <h2>Write Code, Not Too Much, Mostly Business Logic</h2>
+          <p className="subheading">
+            Inngest tasks lets you skip the boilerplate and get right to the
+            heart of the matter:
+            <br />
+            writing code that helps your business achieve its goals.
+          </p>
+        </header>
+        <div className="cta-container">
+          <Button
+            href="/product?ref=home-start-building"
+            kind="primary"
+            size="medium"
+          >
+            See Inngest in Action
+          </Button>
+        </div>
+      </ClosingSection>
 
       <Footer />
     </Wrapper>
@@ -342,6 +429,14 @@ const Section = styled.section<{ theme?: "dark" | "light" }>`
 
   h2 {
     font-size: 2.6rem;
+
+    svg {
+      display: inline-block;
+      margin-right: 0.1rem;
+      vertical-align: top;
+      position: relative;
+      top: 0.2rem;
+    }
   }
 
   .subheading {
@@ -351,85 +446,123 @@ const Section = styled.section<{ theme?: "dark" | "light" }>`
     line-height: 1.6em;
   }
 
+  .cta-container {
+    text-align: center;
+
+    .button {
+      display: inline-flex;
+    }
+  }
+
   @media (max-width: 800px) {
     padding: 4rem 0;
     header {
       padding: 0 2rem;
     }
+    h2 {
+      font-size: 2rem;
+
+      svg {
+        display: block;
+        margin: 0 auto;
+      }
+    }
   }
 `;
 
-// const ContentBlock = styled.div`
-//   display: flex;
-//   justify-content: center;
-//   margin: 10rem 0;
-
-//   .content {
-//     margin-right: 4.5rem;
-//     max-width: 490px;
-//   }
-
-//   h3 {
-//     margin: 1rem 0;
-//     font-size: 1.6rem;
-//   }
-//   p {
-//     font-size: 0.9rem;
-//   }
-// `;
-
-const InfoBlock = styled.div`
-  grid-column: span 1;
-
-  p {
-    margin: 0.8em 0;
-    font-size: 0.8em;
-    color: var(--font-color-secondary);
-  }
+const BlackBackgroundWrapper = styled.div`
+  background: linear-gradient(180deg, black 50%, transparent 50%);
 `;
 
-const Box = styled(InfoBlock)`
-  padding: 1em;
-  background-color: var(--bg-color);
-  border-radius: var(--border-radius);
-`;
+const NextLevelSection = styled(Section)`
+  width: 96%;
+  max-width: 1200px;
+  padding: 2.5rem;
 
-const IconBox = styled.div`
-  height: 1.6em;
-  width: 1.6em;
-  margin-bottom: 0.5em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--border-radius);
-  background: var(--primary-color);
+  background: linear-gradient(134.83deg, #f4f4fb 24.75%, #fbfbff 89.21%);
+  box-shadow: 0px 2px 20px rgba(0, 0, 0, 0.25);
+  border-radius: 20px;
 
-  svg {
-    max-width: 0.7em;
-    max-height: 0.7em;
+  .gradient-text {
+    background: linear-gradient(180deg, #5d5fef 0%, #ef5da8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
-`;
 
-const UseCases = styled.div`
-  --spacing: 1em;
-
-  display: grid;
-  margin: 2em auto;
-  max-width: var(--max-page-width);
-  grid-template-columns: repeat(4, 1fr);
-  grid-gap: calc(2 * var(--spacing)) var(--spacing);
-
-  @media (max-width: 1240px) {
-    margin-left: calc(2 * var(--spacing));
-    margin-right: calc(2 * var(--spacing));
-  }
-  @media (max-width: 900px) {
+  .content-grid {
+    display: grid;
     grid-template-columns: repeat(3, 1fr);
+    grid-gap: 2rem;
+    margin: 5rem 0;
+
+    h3 {
+      margin-bottom: 1rem;
+      font-style: italic;
+    }
   }
-  @media (max-width: 700px) {
-    grid-template-columns: repeat(2, 1fr);
+
+  @media (max-width: 960px) {
+    .content-grid {
+      margin: 3rem 0;
+      grid-template-columns: repeat(5, 1fr);
+
+      > div:nth-child(1) {
+        grid-column: 1/4;
+      }
+      > div:nth-child(2) {
+        grid-column: 2/5;
+      }
+      > div:nth-child(3) {
+        grid-column: 3/6;
+      }
+    }
   }
-  @media (max-width: 540px) {
-    grid-template-columns: repeat(1, 1fr);
+  @media (max-width: 800px) {
+    padding: 2rem 1rem;
+    .content-grid {
+      display: flex;
+      padding: 0 1rem;
+      flex-direction: column;
+    }
+  }
+`;
+
+const ClosingSection = styled(Section)`
+  h2 {
+    font-size: 2.1rem;
+  }
+  .cta-container {
+    margin-top: 3rem;
+  }
+`;
+
+const SocialProof = styled.section`
+  max-width: 800px;
+  margin: 20vh auto 10vh;
+  padding: 0 1rem;
+  text-align: center;
+
+  blockquote {
+    font-size: 1.6rem;
+    font-style: italic;
+    font-weight: bold;
+    color: var(--color-gray-purple);
+  }
+  .attribution {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 1rem;
+    font-size: 0.8rem;
+  }
+  img {
+    height: 1.4rem;
+    width: 1.4rem;
+    border-radius: 1rem;
+    margin-right: 0.6rem;
+  }
+
+  @media (max-width: 800px) {
+    margin: 14vh auto 8vh;
   }
 `;

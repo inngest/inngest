@@ -6,6 +6,7 @@ const Kinds = {
   PRIMARY: "primary",
   OUTLINE: "outline",
   OUTLINE_HIGH_CONTRAST: "outlineHighContrast",
+  OUTLINE_PRIMARY: "outlinePrimary",
   BLACK: "black",
 };
 export type Kinds = typeof Kinds[keyof typeof Kinds];
@@ -85,9 +86,12 @@ export const buttonCSS = css`
     margin-left: 16px;
   }
 
-  // Icons - Should be before the text
-  svg {
+  // Icons
+  svg:first-child {
     margin-right: 0.3em;
+  }
+  svg:last-child {
+    margin-left: 0.3em;
   }
 `;
 
@@ -119,6 +123,15 @@ const outlineCSS = css`
     background-color: rgba(255, 255, 255, 0.1);
     /* border-color: var(--stroke-color-light); */
   }
+`;
+
+const outlinePrimaryCSS = css`
+  border: var(--button-border-width) solid #b46ccd;
+
+  background: linear-gradient(180deg, #5d5fef 0%, #ef5da8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 `;
 
 const outlineHighContrastCSS = css`
@@ -153,5 +166,6 @@ const kindCSS: { [item in Kinds]: SerializedStyles } = {
   primary: primaryCSS,
   outline: outlineCSS,
   outlineHighContrast: outlineHighContrastCSS,
+  outlinePrimary: outlinePrimaryCSS,
   black: blackCSS,
 };
