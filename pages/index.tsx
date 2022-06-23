@@ -5,9 +5,8 @@ import Script from "next/script";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import IconList from "../shared/IconList";
-import VideoPlayer from "../shared/VideoPlayer";
 import Button from "../shared/Button";
-import Callout from "../shared/Callout";
+import Section from "../shared/Callout";
 import ContentBlock from "../shared/ContentBlock";
 
 // Icons
@@ -413,61 +412,6 @@ const Hero = styled.header`
   }
 `;
 
-const Section = styled.section<{ theme?: "dark" | "light" }>`
-  margin: 0 auto;
-  padding: 5rem 0;
-  background-color: ${({ theme }) =>
-    theme === "dark" ? "var(--black)" : "inherit"};
-  color: ${({ theme }) =>
-    theme === "dark" ? "var(--color-white)" : "inherit"};
-
-  header {
-    text-align: center;
-  }
-
-  h2 {
-    font-size: 2.6rem;
-
-    svg {
-      display: inline-block;
-      margin-right: 0.1rem;
-      vertical-align: top;
-      position: relative;
-      top: 0.2rem;
-    }
-  }
-
-  .subheading {
-    margin: 1em auto;
-    max-width: 900px;
-    font-size: 1rem;
-    line-height: 1.6em;
-  }
-
-  .cta-container {
-    text-align: center;
-
-    .button {
-      display: inline-flex;
-    }
-  }
-
-  @media (max-width: 800px) {
-    padding: 4rem 0;
-    header {
-      padding: 0 2rem;
-    }
-    h2 {
-      font-size: 2rem;
-
-      svg {
-        display: block;
-        margin: 0 auto;
-      }
-    }
-  }
-`;
-
 const BlackBackgroundWrapper = styled.div`
   background: linear-gradient(180deg, black 50%, transparent 50%);
 `;
@@ -487,42 +431,8 @@ const NextLevelSection = styled(Section)`
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-
-  .content-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-gap: 2rem;
-    margin: 5rem 0;
-
-    h3 {
-      margin-bottom: 1rem;
-      font-style: italic;
-    }
-  }
-
-  @media (max-width: 960px) {
-    .content-grid {
-      margin: 3rem 0;
-      grid-template-columns: repeat(5, 1fr);
-
-      > div:nth-child(1) {
-        grid-column: 1/4;
-      }
-      > div:nth-child(2) {
-        grid-column: 2/5;
-      }
-      > div:nth-child(3) {
-        grid-column: 3/6;
-      }
-    }
-  }
   @media (max-width: 800px) {
     padding: 2rem 1rem;
-    .content-grid {
-      display: flex;
-      padding: 0 1rem;
-      flex-direction: column;
-    }
   }
 `;
 

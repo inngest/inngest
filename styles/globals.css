@@ -26,6 +26,7 @@
   --color-white: #fff;
   --color-iris-60: #A5A6F6;
   --color-iris-100: #5D5FEF;
+  --color-fuschia-100: #EF5DA8;
   --color-gray-purple: #8A8A9D;
 
   --bg-color-d: #0a0a12;
@@ -250,6 +251,18 @@ li > ul {
 
 .full-width {
   width: 100%;
+}
+
+.badge {
+  display: inline-block;
+  vertical-align: middle;
+  padding: 0.2em 0.6em;
+  font-size: 0.7em;
+  text-transform: uppercase;
+  font-weight: bold;
+  color: var(--color-white);
+  border-radius: var(--border-radius);
+  background: var(--green);
 }
 
 /** New grid **/

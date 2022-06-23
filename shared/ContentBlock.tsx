@@ -3,6 +3,7 @@ import styled from "@emotion/styled";
 
 const ContentBlock: React.FC<{
   layout?: "default" | "reverse";
+  preline: string | React.ReactNode;
   heading: string | React.ReactNode;
   text: string | React.ReactNode;
   icon?: React.ReactNode;
@@ -10,6 +11,7 @@ const ContentBlock: React.FC<{
   imageSize?: "default" | "full";
 }> = ({
   layout = "default",
+  preline,
   heading,
   text,
   icon,
@@ -25,6 +27,7 @@ const ContentBlock: React.FC<{
       {layout === "reverse" && imageBox}
       <div className="content">
         {icon ? icon : ""}
+        {preline ? <div className="preline">{preline}</div> : ""}
         <h3>{heading}</h3>
         <p>{text}</p>
       </div>
@@ -55,6 +58,11 @@ const Block = styled.div<{
   }
 
   svg {
+    margin-bottom: 1rem;
+  }
+
+  .preline {
+    font-size: 0.8rem;
     margin-bottom: 1rem;
   }
 
