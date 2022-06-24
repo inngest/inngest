@@ -38,31 +38,48 @@ export default function Home() {
         <header>
           <h2>Start sending events in seconds</h2>
         </header>
-        <div className="content-grid">
-          <div>
-            <img src="/assets/product/queue-checkmark.png" />
-            <h3>No Queues to configure</h3>
-            <p>Create new API keys in a click and start sending events.</p>
-          </div>
-          <div>
-            <img src="/assets/product/queue-checkmark.png" />
-            <h3>No SDKs needed</h3>
-            <p>Send events with just HTTP and JSON.</p>
-          </div>
-          <div>
-            <img src="/assets/product/event-schema-type.png" />
-            <h3>Auto-generated event schemas</h3>
-            <p>
-              Data governance out of the box lets you understand you write
-              predictable background jobs.
-            </p>
-          </div>
+
+        <div className="events-feature-list">
+          {[
+            {
+              image: "/assets/product/queue-checkmark.png",
+              heading: "No Queues to configure",
+              text: "Create a new API key and your good to go.",
+            },
+            {
+              image: "/assets/product/http-request-libs.png",
+              heading: "No SDKs needed",
+              text: "Send events with just HTTP and JSON. Use your standard lib or your favorite request library.",
+            },
+            {
+              image: "/assets/product/event-schema-type.png",
+              heading: "Auto-generated event schemas",
+              text: "Data governance out of the box lets you understand you write predictable background jobs.",
+            },
+          ].map(({ heading, text, image }) => (
+            <>
+              <img src={image} alt={heading} />
+              <div className="events-feature-item">
+                <h3>{heading}</h3>
+                <p>{text}</p>
+              </div>
+            </>
+          ))}
+        </div>
+        <div className="cta-container">
+          <Button
+            href="/docs/event-format-and-structure?ref=product-send-events"
+            kind="outline"
+            size="medium"
+          >
+            Learn about events
+          </Button>
         </div>
       </EventsSection>
 
       <Section>
         <header>
-          <h2>Skip the workers</h2>
+          <h2>Write code, not workers</h2>
         </header>
         <ContentBlock
           heading="Declarative background jobs"
@@ -73,7 +90,8 @@ export default function Home() {
               so you can deploy new functionality any time.
             </>
           }
-          image="/assets/homepage/language-logos.png"
+          image="/assets/product/declarative-functions.png"
+          imageSize="full"
         />
         <ContentBlock
           layout="reverse"
@@ -84,7 +102,7 @@ export default function Home() {
               - Inngest calls your functions when needed.
             </>
           }
-          image="/assets/homepage/language-logos.png"
+          image="/assets/product/no-polling.png"
         />
         <ContentBlock
           heading="Anything that runs in a container"
@@ -107,7 +125,7 @@ export default function Home() {
               conditional workflows.
             </>
           }
-          image="/assets/product/dockerfile.png"
+          image="/assets/product/user-flow.png"
         />
         <ContentBlock
           heading="Versioning built-in"
@@ -119,7 +137,8 @@ export default function Home() {
               deploys.
             </>
           }
-          image="/assets/product/dockerfile.png"
+          image="/assets/product/function-versions.png"
+          imageSize="full"
         />
 
         <div className="everything-else-list">
@@ -372,6 +391,20 @@ const EventsSection = styled(Section)`
     hsl(332deg 30% 95%) 0%,
     hsl(240deg 30% 95%) 100%
   );
+
+  .events-feature-list {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    grid-gap: 0 1rem;
+    align-items: center;
+    max-width: 800px;
+    margin: 2rem auto;
+  }
+  .events-feature-item {
+    h3 {
+      margin-bottom: 1rem;
+    }
+  }
 `;
 
 const PlatformGrid = styled.div`
