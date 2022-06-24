@@ -52,7 +52,7 @@ export default function Home() {
         ></Script>
       </Head>
 
-      <Nav />
+      <Nav sticky={true} />
 
       <Hero>
         <h1>Kill Your Queues.</h1>
@@ -89,13 +89,9 @@ export default function Home() {
           <Button
             size="medium"
             kind="primary"
-            href="https://github.com/inngest/inngest-cli#installing-inngest"
+            href="/sign-up?ref=homepage-hero"
           >
-            <Github />
-            <span className="button-text-med">Get the cli</span>
-          </Button>
-          <Button size="medium" kind="outline" href="/docs?ref=home-hero">
-            Explore docs →
+            Jump Right In
           </Button>
         </div>
       </Hero>
@@ -150,6 +146,14 @@ export default function Home() {
           }
           image="/assets/homepage/checklist-fade.png"
         />
+        <div className="cta-container">
+          <Button
+            href="/product?ref=home-complete-platform"
+            kind="outlinePrimary"
+          >
+            See The Full Picture
+          </Button>
+        </div>
       </Section>
 
       <Section theme="dark">
@@ -204,7 +208,7 @@ export default function Home() {
 
         <div className="cta-container">
           <Button href="/product?ref=home-start-building" kind="primary">
-            Start building today
+            Start Building Today
           </Button>
         </div>
       </Section>
@@ -242,19 +246,16 @@ export default function Home() {
             <div>
               <h3>Experienced</h3>
               <p>
-                Our founding team has built high-throughput complex event-driven
-                systems that scale to millions of daily events and we're excited
-                to share with you the reliable performant system we always
-                wished we had.
+                Our <a href="/about">founding team</a> has built high-throughput
+                complex event-driven systems that scale to millions of daily
+                events and we're excited to share with you the reliable
+                performant system we always wished we had.
               </p>
             </div>
           </div>
 
           <div className="cta-container">
-            <Button
-              href="/product?ref=home-start-building"
-              kind="outlinePrimary"
-            >
+            <Button href="/product?ref=home-next-level" kind="outlinePrimary">
               Take it to the next level <TrendingUp size="1em" />
             </Button>
           </div>
@@ -284,7 +285,7 @@ export default function Home() {
         </header>
         <div className="cta-container">
           <Button
-            href="/product?ref=home-start-building"
+            href="/docs/quick-start?ref=home-inngest-in-action"
             kind="primary"
             size="medium"
           >

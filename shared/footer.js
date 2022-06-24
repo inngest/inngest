@@ -26,10 +26,7 @@ const Footer = () => {
             <p>Product</p>
             <a href="/product?ref=footer">Features</a>
             <a href="/docs?ref=footer">Documentation</a>
-            {/*<a href="/integrations">Integrations</a>*/}
-            <a href="/docs/docs/sending-data-via-inngest-sdks?ref=footer">
-              Libraries & SDKs
-            </a>
+            <a href="/docs/self-hosting?ref=footer">Self-host</a>
             <a
               href="https://typedwebhook.tools?ref=inngest-footer"
               className="typedwebhook-button"

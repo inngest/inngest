@@ -18,7 +18,7 @@ const TEAM = [
   },
   {
     name: "Dan Farrelly",
-    role: "Founding Engineer",
+    role: "Founder",
     bio: "Former CTO at Buffer",
     avatar: "/assets/team/dan-f-2022-02-18.jpg",
   },

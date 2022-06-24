@@ -1,6 +1,8 @@
 import styled from "@emotion/styled";
 import Nav from "../shared/nav";
 import Button from "../shared/Button";
+import IconList from "../shared/IconList";
+import Check from "../shared/Icons/Check";
 import { useState } from "react";
 
 const api = process.env.REACT_APP_API_HOST || "https://api.inngest.com";
@@ -57,17 +59,16 @@ const SignUp = () => {
 
       <Header className="header grid section-header">
         <header className="grid-center-6 text-center">
-          <h2>Sign up to Inngest</h2>
-          <p>Start building event-driven serverless functions in minutes</p>
+          <h2>Sign up for Inngest Cloud</h2>
+          <p>
+            The features and functionality that get out of your way and let you
+            build.
+          </p>
         </header>
-        <div className="grid-line">
-          <span>/01</span>
-        </div>
       </Header>
 
       <Content className="grid section-header">
-        <div className="grid-line" />
-        <div className="col-1" />
+        <div className="col-2" />
         <div className="signup col-4">
           <Button href={apiURL("/v1/login/oauth/github/redirect")} kind="black">
             <img
@@ -121,19 +122,23 @@ const SignUp = () => {
           </form>
         </div>
 
-        <div className="details col-2">
-          <h5>Explore Inngest for free</h5>
-
-          <ul className="check">
-            <li>Serverless function deploys</li>
-            <li>Automatically run functions from events</li>
-            <li>Retries & replays built in</li>
-            <li>Event schemas, auto-gen'd types, and SDKs</li>
-            <li>Unlimited function versions</li>
-          </ul>
+        <div className="details col-3">
+          <h5>Try Inngest for free</h5>
+          <IconList
+            direction="vertical"
+            items={[
+              "No queues to configure",
+              "Full event history",
+              "Serverless functions",
+              "Any programming language",
+              "Step function support with DAGs",
+              "Bring your whole team",
+            ].map((text) => ({
+              icon: Check,
+              text,
+            }))}
+          />
         </div>
-
-        <div className="grid-line" />
       </Content>
     </>
   );
@@ -142,11 +147,11 @@ const SignUp = () => {
 const Header = styled.div`
   > div,
   > header {
-    padding: var(--section-padding) 0;
+    padding: 4rem 0;
   }
 
-  h2 + p {
-    margin: 0;
+  header p {
+    margin-top: 1rem;
   }
 `;
 
@@ -174,7 +179,11 @@ const Content = styled.div`
     margin: 2rem 0 0;
     padding: 2rem;
     border-radius: var(--border-radius);
-    background: rgba(0, 0, 0, 0.4);
+    background: linear-gradient(
+      135deg,
+      hsl(332deg 30% 95%) 0%,
+      hsl(240deg 30% 95%) 100%
+    );
     display: flex;
     flex-direction: column;
   }

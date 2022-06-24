@@ -117,11 +117,10 @@ const primaryCSS = css`
 
 const outlineCSS = css`
   border: var(--button-border-width) solid var(--stroke-color);
-  color: var(--font-color-primary);
+  color: inherit; // use the parent element's color
 
   &:hover {
     background-color: rgba(255, 255, 255, 0.1);
-    /* border-color: var(--stroke-color-light); */
   }
 `;
 

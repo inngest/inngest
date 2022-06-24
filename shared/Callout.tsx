@@ -54,6 +54,7 @@ const Content = styled.div`
   border-top-right-radius: var(--border-radius);
   border-bottom-right-radius: var(--border-radius);
 
+  color: var(--color-white);
   box-shadow: 0 0 4rem rgba(var(--black-rgb), 0.5);
 
   h2 {

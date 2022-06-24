@@ -424,6 +424,12 @@ const PlanBlock = styled(Block)`
   display: flex;
   flex-direction: column;
 
+  background: linear-gradient(
+    135deg,
+    hsl(330deg 82% 10%) 0%,
+    hsl(239deg 82% 10%) 100%
+  );
+
   .icon-list {
     flex-grow: 1;
     margin-bottom: 2rem;
@@ -434,6 +440,17 @@ const FreePlanBlock = styled(PlanBlock)<{ visibleOn: string }>`
   grid-column: 1 / span 3;
 
   display: ${({ visibleOn }) => (visibleOn === "desktop" ? "flex" : "none")};
+
+  color: var(--black);
+  background: linear-gradient(
+    135deg,
+    hsl(332deg 30% 95%) 0%,
+    hsl(240deg 30% 95%) 100%
+  );
+
+  .icon-list svg {
+    color: var(--color-white);
+  }
 
   @media (min-width: 1000px) {
     .icon-list {

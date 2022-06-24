@@ -31,9 +31,9 @@ const NavContent: React.FC<Props> = (props: Props) => {
 
       {!props.nolinks && (
         <div className="links">
-          <StyledLink key="hiw" href="/how-it-works?ref=nav">
+          {/* <StyledLink key="hiw" href="/how-it-works?ref=nav">
             How it works
-          </StyledLink>
+          </StyledLink> */}
           <StyledLink key="product" href="/product?ref=nav">
             Product
           </StyledLink>
@@ -243,8 +243,10 @@ const Container = styled.div<{ sticky?: boolean }>`
 `;
 
 const StyledLink = styled.a`
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   padding: 0.3rem 0.5rem 0.25rem;
+  min-height: calc(1.5em + 0.3rem + 0.25rem); // make icons same height as text
   transition: all 0.2s;
   text-decoration: none;
   border-radius: var(--border-radius);

@@ -13,6 +13,7 @@ const Block = styled.div<{
   background: var(
     ${(props) => (props.color ? COLORS[props.color] : COLORS.default)}
   );
+  color: var(--color-white);
   border-radius: var(--border-radius);
 
   h1,
