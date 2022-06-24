@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 
 const ContentBlock: React.FC<{
   layout?: "default" | "reverse";
-  preline: string | React.ReactNode;
+  preline?: string | React.ReactNode;
   heading: string | React.ReactNode;
   text: string | React.ReactNode;
   icon?: React.ReactNode;

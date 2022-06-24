@@ -6,7 +6,7 @@ import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import IconList from "../shared/IconList";
 import Button from "../shared/Button";
-import Section from "../shared/Callout";
+import Section from "../shared/Section";
 import ContentBlock from "../shared/ContentBlock";
 
 // Icons
