@@ -243,6 +243,7 @@ const StyledLink = styled.a`
   transition: all 0.2s;
   text-decoration: none;
   border-radius: var(--border-radius);
+  white-space: nowrap;
 
   color: var(--font-color-primary);
 
