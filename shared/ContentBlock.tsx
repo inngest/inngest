@@ -54,6 +54,9 @@ const Block = styled.div<{
   }
 
   .image-mobile {
+    margin: 0 auto;
+    max-width: 80%;
+    max-height: 260px;
     display: none;
   }
 

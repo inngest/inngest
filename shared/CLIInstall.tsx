@@ -40,6 +40,7 @@ const CopyButton = styled.button`
   border-radius: var(--border-radius);
   background-color: rgba(7, 7, 7, 0.1);
   border: 0;
+  white-space: nowrap;
 `;
 
 export default CLIInstall;

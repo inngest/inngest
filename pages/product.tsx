@@ -24,7 +24,8 @@ export default function Home() {
       <Nav />
       <Hero>
         <h1>
-          No config. No Infra. <span className="gradient-text">Just Ship.</span>
+          No&nbsp;config. No&nbsp;Infra.{" "}
+          <span className="gradient-text">Just&nbsp;Ship.</span>
         </h1>
         <p>
           The features and functionality that get out of your way and let you
@@ -397,12 +398,25 @@ const EventsSection = styled(Section)`
     grid-template-columns: 300px 1fr;
     grid-gap: 0 1rem;
     align-items: center;
-    max-width: 800px;
+    max-width: 840px;
     margin: 2rem auto;
+    padding: 0 1rem;
   }
   .events-feature-item {
     h3 {
       margin-bottom: 1rem;
+    }
+  }
+
+  @media (max-width: 660px) {
+    .events-feature-list {
+      grid-template-columns: auto;
+      grid-row-gap: 1rem;
+      padding: 0 10%;
+      img {
+        margin: 0 auto;
+        height: 180px;
+      }
     }
   }
 `;
@@ -410,9 +424,14 @@ const EventsSection = styled(Section)`
 const PlatformGrid = styled.div`
   display: grid;
   margin: 3rem auto;
-  max-width: 800px;
+  padding: 0 1rem;
+  max-width: 840px;
   grid-template-columns: 1fr 1fr;
   grid-gap: 1rem;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const PlatformBox = styled.div`
