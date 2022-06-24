@@ -265,6 +265,13 @@ li > ul {
   background: var(--green);
 }
 
+.gradient-text {
+  background: linear-gradient(180deg, #5d5fef 0%, #ef5da8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 /** New grid **/
 
 .grid {

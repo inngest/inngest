@@ -9,6 +9,7 @@ import ContentBlock from "../shared/ContentBlock";
 import IconList from "../shared/IconList";
 import Check from "src/shared/Icons/Check";
 import Button from "src/shared/Button";
+import CLIInstall from "src/shared/CLIInstall";
 
 // TODO: move these into env vars
 export const INGEST_KEY =
@@ -29,28 +30,27 @@ export default function Home() {
           The features and functionality that get out of your way and let you
           build.
         </p>
+
+        <CLIInstall />
       </Hero>
 
-      <Section theme="dark">
+      <EventsSection>
         <header>
           <h2>Start sending events in seconds</h2>
         </header>
         <div className="content-grid">
           <div>
+            <img src="/assets/product/queue-checkmark.png" />
             <h3>No Queues to configure</h3>
-            <p>
-              Create new API keys in a click and send events with HTTP + JSON
-              (No SDKs needed).
-            </p>
+            <p>Create new API keys in a click and start sending events.</p>
           </div>
           <div>
-            <h3>No Queues to configure</h3>
-            <p>
-              Create new API keys in a click and send events with HTTP + JSON
-              (No SDKs needed).
-            </p>
+            <img src="/assets/product/queue-checkmark.png" />
+            <h3>No SDKs needed</h3>
+            <p>Send events with just HTTP and JSON.</p>
           </div>
           <div>
+            <img src="/assets/product/event-schema-type.png" />
             <h3>Auto-generated event schemas</h3>
             <p>
               Data governance out of the box lets you understand you write
@@ -58,7 +58,7 @@ export default function Home() {
             </p>
           </div>
         </div>
-      </Section>
+      </EventsSection>
 
       <Section>
         <header>
@@ -160,14 +160,17 @@ export default function Home() {
             href="/docs/quick-start?ref=product-feature-list"
             kind="primary"
           >
-            Learn how to create a function in 2 minutes
+            Create a function in 2 minutes
           </Button>
         </div>
       </Section>
 
       <Section theme="dark">
         <header>
-          <h2>A CLI designed for your workflow</h2>
+          <h2>
+            <span className="gradient-text">{"\u276f"}</span> A CLI designed for
+            your workflow
+          </h2>
         </header>
         <ContentBlock
           preline={
@@ -182,7 +185,8 @@ export default function Home() {
               generate language types using event schemas.
             </>
           }
-          image="/assets/homepage/language-logos.png"
+          image="/assets/product/cli-init.png"
+          imageSize="full"
         />
         <ContentBlock
           preline={
@@ -197,7 +201,8 @@ export default function Home() {
               using test event payloads generated from event schemas.
             </>
           }
-          image="/assets/homepage/language-logos.png"
+          image="/assets/product/cli-run.png"
+          imageSize="full"
         />
         <ContentBlock
           preline={
@@ -213,7 +218,8 @@ export default function Home() {
               stack end-to-end.
             </>
           }
-          image="/assets/homepage/language-logos.png"
+          image="/assets/product/cli-dev.png"
+          imageSize="full"
         />
         <ContentBlock
           preline={
@@ -228,8 +234,61 @@ export default function Home() {
               your code live to production or a test environment.
             </>
           }
-          image="/assets/homepage/language-logos.png"
+          image="/assets/product/cli-deploy.png"
+          imageSize="full"
         />
+
+        <div className="cta-container">
+          <CLIInstall />
+        </div>
+      </Section>
+
+      <Section>
+        <header>
+          <h2>The Choice is Yours</h2>
+          <p className="subheading">Self-host or lets us do it</p>
+        </header>
+        <PlatformGrid>
+          <PlatformBox>
+            <h3>Cloud</h3>
+            <IconList
+              direction="vertical"
+              items={[
+                "Fully managed for your team",
+                "From idea to production in minutes",
+              ].map((text) => ({
+                icon: Check,
+                text,
+              }))}
+            />
+            <Button
+              href="/sign-up?ref=product-choice"
+              kind="primary"
+              size="medium"
+            >
+              Sign up today
+            </Button>
+          </PlatformBox>
+          <PlatformBox>
+            <h3>Self-hosted</h3>
+            <IconList
+              direction="vertical"
+              items={["Customize for your needs", "Deploy to any cloud"].map(
+                (text) => ({
+                  icon: Check,
+                  text,
+                })
+              )}
+            />
+            <Button
+              href="/docs/self-hosting?ref=product-choice"
+              kind="outline"
+              size="medium"
+            >
+              Learn how
+            </Button>
+          </PlatformBox>
+        </PlatformGrid>
       </Section>
 
       <Footer />
@@ -246,6 +305,7 @@ const Wrapper = styled.div`
     }
     .icon-list {
       margin: 2rem auto;
+      padding: 0 1rem;
       width: fit-content;
     }
   }
@@ -283,6 +343,10 @@ const Hero = styled.div`
     animation: gradient 4s ease infinite;
   }
 
+  .cli-install {
+    margin: 2rem;
+  }
+
   @keyframes gradient {
     0% {
       background-position: 0% 50%;
@@ -296,5 +360,45 @@ const Hero = styled.div`
   }
 
   @media (max-width: 800px) {
+  }
+`;
+
+const EventsSection = styled(Section)`
+  padding-right: 4rem;
+  padding-left: 4rem;
+
+  background: linear-gradient(
+    135deg,
+    hsl(332deg 30% 95%) 0%,
+    hsl(240deg 30% 95%) 100%
+  );
+`;
+
+const PlatformGrid = styled.div`
+  display: grid;
+  margin: 3rem auto;
+  max-width: 800px;
+  grid-template-columns: 1fr 1fr;
+  grid-gap: 1rem;
+`;
+
+const PlatformBox = styled.div`
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  background: linear-gradient(
+    135deg,
+    hsl(332deg 30% 95%) 0%,
+    hsl(240deg 30% 95%) 100%
+  );
+  border-radius: var(--border-radius);
+
+  h3 {
+    font-size: 1.5rem;
+  }
+
+  .icon-list {
+    margin: 1.8rem 0;
+    flex-grow: 1;
   }
 `;

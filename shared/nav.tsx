@@ -13,7 +13,7 @@ type Props = {
 
 const Nav: React.FC<Props> = (props) => {
   return (
-    <NavWrapper sticky={props.sticky} className="grid">
+    <NavWrapper sticky={props.sticky}>
       <NavContent {...props} />
     </NavWrapper>
   );
@@ -22,7 +22,7 @@ const Nav: React.FC<Props> = (props) => {
 const NavContent: React.FC<Props> = (props: Props) => {
   const [show, setShow] = useState(false);
   return (
-    <Container className={["grid-center-8", show ? "show" : ""].join(" ")}>
+    <Container className={[show ? "show" : ""].join(" ")}>
       <div>
         <a href="/?ref=nav">
           <Logo width={115} className="logo" />
@@ -43,7 +43,11 @@ const NavContent: React.FC<Props> = (props: Props) => {
           <StyledLink key="blog" href="/blog?ref=nav">
             Blog
           </StyledLink>
-          <StyledLink key="pricing" href="/pricing?ref=nav">
+          <StyledLink
+            key="pricing"
+            className="links-secondary"
+            href="/pricing?ref=nav"
+          >
             Pricing
           </StyledLink>
           <StyledLink key="discord" href={process.env.NEXT_PUBLIC_DISCORD_URL}>
@@ -93,7 +97,8 @@ const NavWrapper = styled.nav<{ sticky: boolean }>`
   position: ${({ sticky }) => (sticky ? "sticky" : "relative")};
   z-index: 1;
   top: ${({ sticky }) => (sticky ? "0" : "auto")};
-  margin: 1.5rem 0;
+  max-width: 1200px;
+  margin: 1.5rem auto;
   background-color: var(--bg-color);
 `;
 
@@ -101,7 +106,7 @@ const Container = styled.div<{ sticky?: boolean }>`
   z-index: 1;
   display: grid;
   grid-template-columns: auto 1fr auto;
-  padding: 0.5rem 0;
+  padding: 0.5rem 1rem;
 
   font-family: var(--font);
   font-size: 0.9em;
@@ -153,10 +158,10 @@ const Container = styled.div<{ sticky?: boolean }>`
     display: none;
   }
 
-  @media (max-width: 1040px) {
-    grid-column: 1 / -1;
-    margin-left: 1rem;
-    margin-right: 1rem;
+  @media (max-width: 1000px) {
+    .links-secondary {
+      display: none;
+    }
   }
 
   @media (max-width: 920px) {

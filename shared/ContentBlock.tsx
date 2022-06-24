@@ -71,7 +71,7 @@ const Block = styled.div<{
     font-size: 1.6rem;
   }
   p {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
   }
 
   .image {

@@ -127,7 +127,7 @@ export default function Home() {
         />
         <ContentBlock
           layout="reverse"
-          heading="A real-time admin UI keeps everyone in the loop"
+          heading="A real-time admin UI keeps everyone in the&nbsp;loop"
           text={
             <>
               The Inngest Admin UI brings full transparency to all your
@@ -190,7 +190,7 @@ export default function Home() {
         />
 
         <ContentBlock
-          heading="Build in Minutes, Not Days"
+          heading="Build in Minutes, Not&nbsp;Days"
           text={
             <>
               Zero config from setup to production — with Inngest there's no
@@ -425,12 +425,6 @@ const NextLevelSection = styled(Section)`
   box-shadow: 0px 2px 20px rgba(0, 0, 0, 0.25);
   border-radius: 20px;
 
-  .gradient-text {
-    background: linear-gradient(180deg, #5d5fef 0%, #ef5da8 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
   @media (max-width: 800px) {
     padding: 2rem 1rem;
   }

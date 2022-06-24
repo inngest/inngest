@@ -62,7 +62,7 @@ const List = styled.ul<{
 
   li + li {
     margin: ${(props) =>
-      props.direction === "vertical" ? "0.6rem 0 0" : "0 0 0 3em"};
+      props.direction === "vertical" ? "1rem 0 0" : "0 0 0 3em"};
   }
 
   // Collapse the list at the given screen width
@@ -78,7 +78,6 @@ const ListItem = styled.li`
   display: flex;
   align-items: center;
   line-height: 1.2rem;
-  height: 1.6rem;
   margin: 0;
   padding: 0;
 `;

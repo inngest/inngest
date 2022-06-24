@@ -13,7 +13,7 @@ const Section = styled.section<{ theme?: "dark" | "light" }>`
   }
 
   h2 {
-    font-size: 2.6rem;
+    font-size: 2.5rem;
 
     svg {
       display: inline-block;
