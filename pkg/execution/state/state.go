@@ -133,8 +133,25 @@ type State interface {
 
 // Loader allows loading of previously stored state based off of a given Identifier.
 type Loader interface {
+	// Load returns run state for the given identifier.
 	Load(ctx context.Context, i Identifier) (State, error)
+
+	// IsComplete returns whether the given identifier is complete, ie. the
+	// pending count in the identifier's metadata is zero.
+	IsComplete(ctx context.Context, i Identifier) (complete bool, err error)
 }
+
+/*
+// CompleteSubscriber allows users to subscribe to a particular identifier and block
+// until the identifier's pending count reaches zero.
+//
+// This is an optional interface which a state can implement using internal mechanisms
+// to watch keys.  The runner will check to see if the state store implements this interface;
+// if so, it will subscribe to be notified when the function completes.
+type CompleteSubscriber interface {
+	BlockUntilComplete(ctx context.Context, i Identifier) (complete bool, err error)
+}
+*/
 
 // Mutater mutates state for a given identifier, storing the state and returning
 // the new state.

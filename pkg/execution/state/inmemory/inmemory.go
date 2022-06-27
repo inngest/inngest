@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/execution/queue"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 )
@@ -18,18 +19,12 @@ import (
 type Queue interface {
 	// Embed the state.Manager interface for processing state items.
 	state.Manager
+	queue.Queue
 
 	// Channel returns a channel which receives available jobs on the queue.
-	Channel() chan QueueItem
-
-	// Enqueue enqueues a new item for scheduling at the specific time.
-	Enqueue(item QueueItem, at time.Time)
-}
-
-type QueueItem struct {
-	ID         state.Identifier
-	Edge       inngest.Edge
-	ErrorCount int
+	//
+	// This is helpful during testing.
+	Channel() chan queue.Item
 }
 
 // NewStateManager returns a new in-memory queue and state manager for processing
@@ -39,29 +34,53 @@ func NewStateManager() Queue {
 		state:  map[ulid.ULID]state.State{},
 		pauses: map[uuid.UUID]state.Pause{},
 		lock:   &sync.RWMutex{},
-		q:      make(chan QueueItem),
+		q:      make(chan queue.Item),
 	}
 }
 
 type mem struct {
-	state map[ulid.ULID]state.State
-
+	state  map[ulid.ULID]state.State
 	pauses map[uuid.UUID]state.Pause
-
-	lock *sync.RWMutex
-
-	q chan QueueItem
+	lock   *sync.RWMutex
+	q      chan queue.Item
 }
 
-func (m *mem) Enqueue(item QueueItem, at time.Time) {
+func (m *mem) Enqueue(ctx context.Context, item queue.Item, at time.Time) error {
 	go func() {
 		<-time.After(time.Until(at))
 		m.q <- item
 	}()
+	return nil
 }
 
-func (m *mem) Channel() chan QueueItem {
+func (m *mem) Channel() chan queue.Item {
 	return m.q
+}
+
+func (m *mem) IsComplete(ctx context.Context, id state.Identifier) (bool, error) {
+	m.lock.RLock()
+	s, ok := m.state[id.RunID]
+	m.lock.RUnlock()
+	if !ok {
+		// TODO: Return error
+		return false, nil
+	}
+	return s.Metadata().Pending == 0, nil
+}
+
+func (m *mem) Run(ctx context.Context, f func(context.Context, queue.Item) error) error {
+	for {
+		select {
+		case <-ctx.Done():
+			// We are shutting down.
+			return nil
+		case item := <-m.q:
+			if err := f(ctx, item); err != nil {
+				return err
+			}
+		}
+
+	}
 }
 
 // New initializes state for a new run using the specifid ID and starting data.
@@ -191,11 +210,13 @@ func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
 		// we only want this to be scheduled on timeout.
 		if p.OnTimeout {
 			if _, ok := m.pauses[p.ID]; ok {
-				m.Enqueue(QueueItem{
-					ID: p.Identifier,
-					Edge: inngest.Edge{
-						Outgoing: p.Outgoing,
-						Incoming: p.Incoming,
+				_ = m.Enqueue(ctx, queue.Item{
+					Identifier: p.Identifier,
+					Payload: queue.PayloadEdge{
+						Edge: inngest.Edge{
+							Outgoing: p.Outgoing,
+							Incoming: p.Incoming,
+						},
 					},
 				}, time.Now())
 			}

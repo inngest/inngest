@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/execution/queue"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/testharness"
 	"github.com/oklog/ulid/v2"
@@ -95,7 +96,7 @@ func TestInMemoryPause(t *testing.T) {
 				Outgoing: "c",
 				Incoming: "d",
 			},
-			next.Edge,
+			next.Payload.(queue.PayloadEdge).Edge,
 		)
 	case <-time.After(time.Second):
 		t.Fatalf("Didn't receive enqueued item on pause timeout")

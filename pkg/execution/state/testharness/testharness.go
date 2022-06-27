@@ -389,7 +389,7 @@ func checkMetadataStartedAt(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.NotNil(t, reloaded)
 
-	require.EqualValues(t, s.Metadata().StartedAt, reloaded.Metadata().StartedAt)
+	require.EqualValues(t, s.Metadata().StartedAt.UTC(), reloaded.Metadata().StartedAt.UTC())
 }
 
 /*

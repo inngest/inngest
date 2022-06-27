@@ -186,6 +186,14 @@ func (m mgr) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID
 		nil
 }
 
+func (m mgr) IsComplete(ctx context.Context, id state.Identifier) (bool, error) {
+	val, err := m.r.HGet(ctx, m.kf.RunMetadata(ctx, id), "pending").Result()
+	if err != nil {
+		return false, err
+	}
+	return val == "0", nil
+}
+
 func (m mgr) metadata(ctx context.Context, id state.Identifier) (*runMetadata, error) {
 	val, err := m.r.HGetAll(ctx, m.kf.RunMetadata(ctx, id)).Result()
 	if err != nil {
