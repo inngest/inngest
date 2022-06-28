@@ -40,7 +40,7 @@ func Execute() {
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			m := tel.NewMetadata(cmd.Context())
 			m.SetCobraCmd(cmd)
-			tel.Send(cmd.Context(), m)
+			tel.SendMetadata(cmd.Context(), m)
 		},
 		PersistentPostRun: func(cmd *cobra.Command, args []string) {
 			// Wait for any events to have been sent.

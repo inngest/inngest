@@ -44,6 +44,7 @@ func NewMetadata(ctx context.Context) *Metadata {
 		CLIVersion: version.Print(),
 		OS:         runtime.GOOS,
 		AccountID:  accountID,
+		Context:    map[string]any{},
 	}
 }
 
@@ -66,14 +67,18 @@ func (m *Metadata) Event() inngestgo.Event {
 	}
 }
 
-func Send(ctx context.Context, m *Metadata) {
-	if Disabled() || m == nil {
+func SendMetadata(ctx context.Context, m *Metadata) {
+	Send(ctx, m.Event())
+}
+
+func Send(ctx context.Context, e inngestgo.Event) {
+	if Disabled() {
 		return
 	}
 
 	wg.Add(1)
 	go func() {
-		_ = client.Send(ctx, m.Event())
+		_ = client.Send(ctx, e)
 		defer wg.Done()
 	}()
 }
