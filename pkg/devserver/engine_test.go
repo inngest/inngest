@@ -88,6 +88,12 @@ func TestEngine_async(t *testing.T) {
 	e.setExecutor(exec)
 	require.NoError(t, err, "couldn't set mock driver")
 
+	go func() {
+		// Start the engine.
+		err := e.Start(ctx)
+		require.NoError(t, err)
+	}()
+
 	// 1.
 	// Send an event that does nothing, and assert nothing runs.
 	err = e.HandleEvent(ctx, &event.Event{
