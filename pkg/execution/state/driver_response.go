@@ -66,11 +66,17 @@ func (r DriverResponse) Retryable() bool {
 
 	status, ok := r.Output["status"]
 	if !ok {
-		// If actions don't return a status, we assume that they're
-		// always retryable.  We prefer that actions respond with a
-		// { "status": xxx, "body": ... } format to disable retries.
-		return true
+		// Fall back to statusCode for AWS Lambda compatibility in
+		// an attempt to use this field.
+		status, ok = r.Output["statusCode"]
+		if !ok {
+			// If actions don't return a status, we assume that they're
+			// always retryable.  We prefer that actions respond with a
+			// { "status": xxx, "body": ... } format to disable retries.
+			return true
+		}
 	}
+
 	switch v := status.(type) {
 	case float64:
 		if int(v) > 499 {
