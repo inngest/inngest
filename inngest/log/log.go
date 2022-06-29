@@ -13,6 +13,13 @@ const (
 	DefaultLevel = zerolog.InfoLevel
 )
 
+var (
+	prettyFormatter = zerolog.ConsoleWriter{
+		Out:         os.Stderr,
+		FormatLevel: func(i any) string { return "" },
+	}
+)
+
 type loggerKey struct{}
 
 func With(ctx context.Context, logger zerolog.Logger) context.Context {
@@ -33,9 +40,17 @@ func From(ctx context.Context) *zerolog.Logger {
 func New(lvl zerolog.Level) *zerolog.Logger {
 	l := zerolog.New(os.Stderr).Level(lvl).With().Timestamp().Logger()
 	if ttyLogger() {
-		l = l.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+		l = l.Output(prettyFormatter)
 	}
 	return &l
+}
+
+func Copy(l zerolog.Logger) zerolog.Logger {
+	c := l.Output(os.Stderr)
+	if ttyLogger() {
+		c = c.Output(prettyFormatter)
+	}
+	return c
 }
 
 func Default() *zerolog.Logger {

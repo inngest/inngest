@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/inngest/log"
 	"github.com/inngest/inngest-cli/pkg/cli"
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
@@ -57,8 +58,8 @@ type Engine struct {
 func NewEngine(l *zerolog.Logger) (*Engine, error) {
 	logger := l.With().Str("caller", "engine").Logger()
 
-	engineLogger := logger.Output(os.Stderr)
-	queueLogger := logger.Output(os.Stderr)
+	engineLogger := log.Copy(logger)
+	queueLogger := log.Copy(logger)
 
 	eng := &Engine{
 		log:           &engineLogger,

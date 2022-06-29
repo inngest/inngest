@@ -90,14 +90,14 @@ func (d *dockerExec) Execute(ctx context.Context, s state.State, action inngest.
 		Output:        map[string]interface{}{},
 		ActionVersion: action.Version,
 	}
-	if exit != 0 {
-		resp.Err = fmt.Errorf("non-zero status code: %d", exit)
-	}
 
 	if len(byt) == 0 {
 		byt, _ := io.ReadAll(stderr)
 		resp.Output["stderr"] = string(byt)
 		return resp, nil
+	}
+	if exit != 0 {
+		resp.Err = fmt.Errorf("Non-zero status code: %d\nOutput: %s", exit, string(byt))
 	}
 
 	// note: right now we're ignoring timestamps.
