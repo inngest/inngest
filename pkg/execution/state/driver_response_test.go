@@ -78,6 +78,17 @@ func TestDriverResponseRetryable(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "499 status",
+			r: DriverResponse{
+				Output: map[string]interface{}{
+					"hi":     "my g",
+					"status": 499,
+				},
+				Err: fmt.Errorf("some err"),
+			},
+			expected: false,
+		},
+		{
 			name: "5xx json status",
 			r: DriverResponse{
 				Output: unmarshalledFalse,

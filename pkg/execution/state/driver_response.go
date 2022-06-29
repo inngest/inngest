@@ -1,6 +1,8 @@
 package state
 
-import "github.com/inngest/inngest-cli/inngest"
+import (
+	"github.com/inngest/inngest-cli/inngest"
+)
 
 // DriverResponse is returned after a driver executes an action.  This represents any
 // output from running the step, including the output (as a JSON map), the error, and
@@ -71,15 +73,15 @@ func (r DriverResponse) Retryable() bool {
 	}
 	switch v := status.(type) {
 	case float64:
-		if int(v) >= 499 {
+		if int(v) > 499 {
 			return true
 		}
 	case int64:
-		if int(v) >= 499 {
+		if int(v) > 499 {
 			return true
 		}
 	case int:
-		if int(v) >= 499 {
+		if int(v) > 499 {
 			return true
 		}
 	}
