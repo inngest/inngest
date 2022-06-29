@@ -19,10 +19,10 @@ import (
 )
 
 var (
-	// n1000 is a workflow created during init() which has 1000 steps and edges.
-	n1000 = inngest.Workflow{
+	// n100 is a workflow created during init() which has 100 steps and edges.
+	n100 = inngest.Workflow{
 		Name: "Test workflow",
-		ID:   "1000-steps-87bd12",
+		ID:   "100-steps-87bd12",
 	}
 
 	w = inngest.Workflow{
@@ -78,14 +78,14 @@ var (
 
 func init() {
 	// Copy the workflow and make 1000 scheduled steps.
-	for i := 1; i <= 1000; i++ {
-		n1000.Steps = append(n1000.Steps, inngest.Step{
+	for i := 1; i <= 100; i++ {
+		n100.Steps = append(n100.Steps, inngest.Step{
 			ID:       fmt.Sprintf("step-%d", i),
 			ClientID: uint(i),
 			Name:     fmt.Sprintf("Step %d", i),
 			DSN:      "test-step",
 		})
-		n1000.Edges = append(n1000.Edges, inngest.Edge{
+		n100.Edges = append(n100.Edges, inngest.Edge{
 			Incoming: inngest.TriggerName,
 			Outgoing: fmt.Sprintf("step-%d", i),
 		})
@@ -114,10 +114,11 @@ func CheckState(t *testing.T, generator func() state.Manager) {
 		"Metadata/StartedAt":                 checkMetadataStartedAt,
 	}
 	for name, f := range funcs {
-		t.Run(name, func(t *testing.T) {
+		ok := t.Run(name, func(t *testing.T) {
 			m := generator()
 			f(t, m)
 		})
+		require.True(t, ok, name)
 	}
 }
 
@@ -142,11 +143,11 @@ func checkScheduled(t *testing.T, m state.Manager) {
 	s := setup(t, m)
 
 	wg := &sync.WaitGroup{}
-	for i := 0; i < len(n1000.Steps); i++ {
+	for i := 0; i < len(n100.Steps); i++ {
 		n := i
 		wg.Add(1)
 		go func() {
-			err := m.Scheduled(ctx, s.Identifier(), n1000.Steps[n].ID)
+			err := m.Scheduled(ctx, s.Identifier(), n100.Steps[n].ID)
 			wg.Done()
 			require.NoError(t, err)
 		}()
@@ -157,7 +158,7 @@ func checkScheduled(t *testing.T, m state.Manager) {
 	// Load the state again.
 	loaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.EqualValues(t, len(n1000.Steps), loaded.Metadata().Pending, "Scheduling 1000 steps concurrently should return the correct pending count via metadata")
+	require.EqualValues(t, len(n100.Steps), loaded.Metadata().Pending, "Scheduling 100 steps concurrently should return the correct pending count via metadata")
 }
 
 // checkSaveResponse_output checks the basics of saving output from a response.
@@ -346,12 +347,12 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 	id := s.Identifier()
 
 	wg := &sync.WaitGroup{}
-	for i := 0; i < len(n1000.Steps); i++ {
+	for i := 0; i < len(n100.Steps); i++ {
 		n := i
 		wg.Add(2)
 
 		go func() {
-			err := m.Scheduled(ctx, s.Identifier(), n1000.Steps[n].ID)
+			err := m.Scheduled(ctx, s.Identifier(), n100.Steps[n].ID)
 			wg.Done()
 			require.NoError(t, err)
 		}()
@@ -359,7 +360,7 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 		go func() {
 			defer wg.Done()
 			r := state.DriverResponse{
-				Step: n1000.Steps[n],
+				Step: n100.Steps[n],
 				Output: map[string]interface{}{
 					"status": float64(200),
 					"body": map[string]any{
@@ -369,7 +370,7 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 			}
 			_, err := m.SaveResponse(ctx, id, r, mrand.Intn(3))
 			require.NoError(t, err)
-			err = m.Finalized(ctx, s.Identifier(), n1000.Steps[n].ID)
+			err = m.Finalized(ctx, s.Identifier(), n100.Steps[n].ID)
 			require.NoError(t, err)
 		}()
 
