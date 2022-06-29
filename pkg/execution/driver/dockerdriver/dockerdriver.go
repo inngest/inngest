@@ -49,7 +49,7 @@ func (dockerExec) RuntimeType() string {
 	return "docker"
 }
 
-func (d *dockerExec) Execute(ctx context.Context, state state.State, action inngest.ActionVersion, wf inngest.Step) (*driver.Response, error) {
+func (d *dockerExec) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, wf inngest.Step) (*state.DriverResponse, error) {
 	var (
 		h   *handle
 		err error
@@ -66,7 +66,7 @@ func (d *dockerExec) Execute(ctx context.Context, state state.State, action inng
 		})
 	}()
 
-	h, err = d.start(ctx, state, wf)
+	h, err = d.start(ctx, s, wf)
 	if err != nil {
 		return nil, err
 	}
@@ -86,18 +86,18 @@ func (d *dockerExec) Execute(ctx context.Context, state state.State, action inng
 		return nil, fmt.Errorf("error reading docker output: %w", err)
 	}
 
-	resp := &driver.Response{
+	resp := &state.DriverResponse{
 		Output:        map[string]interface{}{},
 		ActionVersion: action.Version,
-	}
-	if exit != 0 {
-		resp.Err = fmt.Errorf("non-zero status code: %d", exit)
 	}
 
 	if len(byt) == 0 {
 		byt, _ := io.ReadAll(stderr)
 		resp.Output["stderr"] = string(byt)
 		return resp, nil
+	}
+	if exit != 0 {
+		resp.Err = fmt.Errorf("Non-zero status code: %d\nOutput: %s", exit, string(byt))
 	}
 
 	// note: right now we're ignoring timestamps.

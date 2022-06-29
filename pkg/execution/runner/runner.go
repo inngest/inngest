@@ -6,18 +6,21 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/backoff"
-	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
+	"github.com/inngest/inngest-cli/pkg/execution/queue"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
 	"github.com/oklog/ulid/v2"
 	"github.com/xhit/go-str2duration/v2"
+)
+
+var (
+	CompletePollInterval = 25 * time.Millisecond
 )
 
 // New returns a new runner which executes workflows in-memory.  This is NOT, EVER, IN
@@ -26,23 +29,23 @@ import (
 func NewInMemoryRunner(sm inmemory.Queue, exec executor.Executor) *InMemoryRunner {
 	return &InMemoryRunner{
 		sm:    sm,
+		queue: sm,
 		exec:  exec,
-		waits: map[ulid.ULID]*sync.WaitGroup{},
-		lock:  &sync.RWMutex{},
 	}
 }
 
 // InMemoryRunner represents a runner which coordinates steps enqueued within an
 // in memory queue, and executing the steps within the executor.
 type InMemoryRunner struct {
-	sm   inmemory.Queue
-	exec executor.Executor
+	sm    state.Manager
+	queue queue.Queue
+	exec  executor.Executor
+}
 
-	// In a dev server, we want to wait until all current steps of a state.Identifier
-	// are complete.  We create a new waitgroup per identifier to wait for the steps.
-	waits map[ulid.ULID]*sync.WaitGroup
-
-	lock *sync.RWMutex
+// Start invokes the queue's Run function blocking and reading items from the queue
+// for processing.
+func (i *InMemoryRunner) Start(ctx context.Context) error {
+	return i.queue.Run(ctx, i.run)
 }
 
 // NewRun initializes a new run for the given workflow.
@@ -53,88 +56,80 @@ func (i *InMemoryRunner) NewRun(ctx context.Context, f inngest.Workflow, data ma
 	}
 	id := state.Identifier()
 
-	i.Enqueue(ctx, inmemory.QueueItem{
-		ID:   id,
-		Edge: inngest.SourceEdge,
+	err = i.Enqueue(ctx, queue.Item{
+		Identifier: id,
+		Payload:    queue.PayloadEdge{Edge: inngest.SourceEdge},
 	}, time.Now())
 
-	return &id, nil
+	return &id, err
 }
 
-func (i InMemoryRunner) Enqueue(ctx context.Context, item inmemory.QueueItem, at time.Time) {
-	if _, ok := i.waits[item.ID.RunID]; !ok {
-		i.lock.Lock()
-		i.waits[item.ID.RunID] = &sync.WaitGroup{}
-		i.lock.Unlock()
-	}
-
-	// Add to the waitgroup, ensuring that the runner blocks until the enqueued item
-	// is finished.
-	i.lock.RLock()
-	wg := i.waits[item.ID.RunID]
-	i.lock.RUnlock()
-
-	wg.Add(1)
-
-	i.sm.Enqueue(item, at)
-}
-
-// Execute runs all available tasks, blocking until terminated.
-func (i *InMemoryRunner) Execute(ctx context.Context, id state.Identifier) error {
-	var err error
-	go func() {
-		for item := range i.sm.Channel() {
-			// We could terminate the executor here on error
-			_ = i.run(ctx, item)
-		}
-	}()
-
-	// Wait for all items in the queue to be complete.
-	i.lock.RLock()
-	wg := i.waits[id.RunID]
-	i.lock.RUnlock()
-
-	wg.Wait()
-
-	return err
-}
-
-func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error {
-	defer func() {
-		i.lock.RLock()
-		i.waits[item.ID.RunID].Done()
-		i.lock.RUnlock()
-	}()
-
-	resp, err := i.exec.Execute(ctx, item.ID, item.Edge.Incoming)
-	if err != nil {
-		// If the error is not of type response error, we can assume that this is
-		// always retryable.
-		_, isResponseError := err.(*driver.Response)
-		if (resp != nil && resp.Retryable()) || !isResponseError {
-			next := item
-			next.ErrorCount += 1
-
-			at := backoff.LinearJitterBackoff(next.ErrorCount)
-
-			// XXX: When we add max retries to steps, read the step from the
-			// state store here to chech for the step's retry data.
-			//
-			// For now, we retry steps of a function up to 3 times.
-			if next.ErrorCount < 3 {
-				i.Enqueue(ctx, next, at)
+// Wait blocks until the given run has finished.
+func (i InMemoryRunner) Wait(ctx context.Context, id state.Identifier) error {
+	// TODO: Implement subscribe if the state store has a subscribe method.
+	for {
+		select {
+		case <-time.After(CompletePollInterval):
+			ok, err := i.sm.IsComplete(ctx, id)
+			if err != nil {
+				return err
 			}
+			if ok {
+				return nil
+			}
+		case <-ctx.Done():
+			return nil
 		}
-
-		return fmt.Errorf("execution error: %s", err)
 	}
+}
 
-	s, err := i.sm.Load(ctx, item.ID)
+func (i InMemoryRunner) Enqueue(ctx context.Context, item queue.Item, at time.Time) error {
+	edge, err := queue.GetEdge(item)
 	if err != nil {
 		return err
 	}
 
-	children, err := state.DefaultEdgeEvaluator.AvailableChildren(ctx, s, item.Edge.Incoming)
+	if err := i.queue.Enqueue(ctx, item, at); err != nil {
+		return err
+	}
+	_ = i.sm.Scheduled(ctx, item.Identifier, edge.Incoming)
+	return nil
+}
+
+// run coordinates the execution of items from the queue.
+func (i *InMemoryRunner) run(ctx context.Context, item queue.Item) error {
+	edge, err := queue.GetEdge(item)
+	if err != nil {
+		return err
+	}
+
+	resp, err := i.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
+	if err != nil {
+		// If the error is not of type response error, we can assume that this is
+		// always retryable.
+		_, isResponseError := err.(*state.DriverResponse)
+		if (resp != nil && resp.Retryable()) || !isResponseError {
+			next := item
+			next.ErrorCount += 1
+			at := backoff.LinearJitterBackoff(next.ErrorCount)
+			if err := i.Enqueue(ctx, next, at); err != nil {
+				return err
+			}
+		}
+
+		// This is a non-retryable error.  Finalize this step.
+		if err := i.sm.Finalized(ctx, item.Identifier, edge.Incoming); err != nil {
+			return err
+		}
+		return fmt.Errorf("execution error: %s", err)
+	}
+
+	s, err := i.sm.Load(ctx, item.Identifier)
+	if err != nil {
+		return err
+	}
+
+	children, err := state.DefaultEdgeEvaluator.AvailableChildren(ctx, s, edge.Incoming)
 	if err != nil {
 		return err
 	}
@@ -149,7 +144,6 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 		// matching event is received.
 		if next.Metadata != nil && next.Metadata.AsyncEdgeMetadata != nil {
 			am := next.Metadata.AsyncEdgeMetadata
-
 			if am.Event == "" {
 				return fmt.Errorf("no async edge event specified")
 			}
@@ -183,10 +177,20 @@ func (i *InMemoryRunner) run(ctx context.Context, item inmemory.QueueItem) error
 		}
 
 		// Enqueue the next child in our in-memory state queue.
-		i.Enqueue(ctx, inmemory.QueueItem{
-			ID:   item.ID,
-			Edge: next,
-		}, at)
+		if err := i.Enqueue(ctx, queue.Item{
+			Identifier: item.Identifier,
+			Payload:    queue.PayloadEdge{Edge: next},
+		}, at); err != nil {
+			return err
+		}
+	}
+
+	// Mark this step as finalized.
+	//
+	// This must happen after everything is enqueued, else the scheduled <> finalized count
+	// is out of order.
+	if err := i.sm.Finalized(ctx, item.Identifier, edge.Incoming); err != nil {
+		return err
 	}
 
 	return nil

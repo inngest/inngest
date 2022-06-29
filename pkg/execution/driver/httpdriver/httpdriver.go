@@ -22,21 +22,21 @@ var (
 	}
 )
 
-func Execute(ctx context.Context, state state.State, action inngest.ActionVersion, step inngest.Step) (*driver.Response, error) {
-	return DefaultExecutor.Execute(ctx, state, action, step)
+func Execute(ctx context.Context, s state.State, action inngest.ActionVersion, step inngest.Step) (*state.DriverResponse, error) {
+	return DefaultExecutor.Execute(ctx, s, action, step)
 }
 
 type executor struct {
 	client *http.Client
 }
 
-func (e executor) Execute(ctx context.Context, state state.State, action inngest.ActionVersion, step inngest.Step) (*driver.Response, error) {
+func (e executor) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, step inngest.Step) (*state.DriverResponse, error) {
 	rt, ok := action.Runtime.Runtime.(inngest.RuntimeHTTP)
 	if !ok {
 		return nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
 	}
 
-	input, err := driver.MarshalV1(state)
+	input, err := driver.MarshalV1(s)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (e executor) Execute(ctx context.Context, state state.State, action inngest
 		err = fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 
-	return &driver.Response{
+	return &state.DriverResponse{
 		Output: map[string]interface{}{
 			"status": resp.StatusCode,
 			"body":   body,

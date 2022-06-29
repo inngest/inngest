@@ -8,11 +8,13 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/inngest/log"
 	"github.com/inngest/inngest-cli/pkg/cli"
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
+	"github.com/inngest/inngest-cli/pkg/execution/queue"
 	"github.com/inngest/inngest-cli/pkg/execution/runner"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
@@ -56,8 +58,8 @@ type Engine struct {
 func NewEngine(l *zerolog.Logger) (*Engine, error) {
 	logger := l.With().Str("caller", "engine").Logger()
 
-	engineLogger := logger.Output(os.Stderr)
-	queueLogger := logger.Output(os.Stderr)
+	engineLogger := log.Copy(logger)
+	queueLogger := log.Copy(logger)
 
 	eng := &Engine{
 		log:           &engineLogger,
@@ -93,6 +95,11 @@ func NewEngine(l *zerolog.Logger) (*Engine, error) {
 func (eng *Engine) setExecutor(e executor.Executor) {
 	eng.exec = e
 	eng.runner = runner.NewInMemoryRunner(eng.sm, eng.exec)
+}
+
+// Start starts the runner, blocking until the context is done.
+func (eng *Engine) Start(ctx context.Context) error {
+	return eng.runner.Start(ctx)
 }
 
 // Load loads all functions and their steps from the given directory into the engine.
@@ -273,12 +280,16 @@ func (eng *Engine) handlePauses(ctx context.Context, evt *event.Event) error {
 		}
 
 		// Schedule an execution from the pause's entrypoint.
-		eng.runner.Enqueue(ctx, inmemory.QueueItem{
-			ID: pause.Identifier,
-			Edge: inngest.Edge{
-				Incoming: pause.Incoming,
+		if err := eng.runner.Enqueue(ctx, queue.Item{
+			Identifier: pause.Identifier,
+			Payload: queue.PayloadEdge{
+				Edge: inngest.Edge{
+					Incoming: pause.Incoming,
+				},
 			},
-		}, time.Now())
+		}, time.Now()); err != nil {
+			return err
+		}
 
 		if err := eng.sm.ConsumePause(ctx, pause.ID); err != nil {
 			return err
@@ -352,7 +363,7 @@ func (eng Engine) execute(ctx context.Context, fn *function.Function, evt *event
 		Logger()
 
 	log.Info().Msg("executing function")
-	if err = eng.runner.Execute(ctx, *id); err != nil {
+	if err = eng.runner.Wait(ctx, *id); err != nil {
 		log.Error().Err(err).Msg("executed function")
 		return err
 	}

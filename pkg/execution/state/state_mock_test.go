@@ -122,6 +122,20 @@ func (mr *MockStateMockRecorder) Identifier() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Identifier", reflect.TypeOf((*MockState)(nil).Identifier))
 }
 
+// Metadata mocks base method.
+func (m *MockState) Metadata() Metadata {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Metadata")
+	ret0, _ := ret[0].(Metadata)
+	return ret0
+}
+
+// Metadata indicates an expected call of Metadata.
+func (mr *MockStateMockRecorder) Metadata() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Metadata", reflect.TypeOf((*MockState)(nil).Metadata))
+}
+
 // RunID mocks base method.
 func (m *MockState) RunID() v2.ULID {
 	m.ctrl.T.Helper()
@@ -225,22 +239,8 @@ func (m *MockMutater) EXPECT() *MockMutaterMockRecorder {
 	return m.recorder
 }
 
-// ConsumePause mocks base method.
-func (m *MockMutater) ConsumePause(ctx context.Context, id uuid.UUID) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ConsumePause", ctx, id)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ConsumePause indicates an expected call of ConsumePause.
-func (mr *MockMutaterMockRecorder) ConsumePause(ctx, id interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConsumePause", reflect.TypeOf((*MockMutater)(nil).ConsumePause), ctx, id)
-}
-
 // New mocks base method.
-func (m *MockMutater) New(ctx context.Context, workflow inngest.Workflow, runID v2.ULID, input any) (State, error) {
+func (m *MockMutater) New(ctx context.Context, workflow inngest.Workflow, runID v2.ULID, input map[string]any) (State, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "New", ctx, workflow, runID, input)
 	ret0, _ := ret[0].(State)
@@ -254,38 +254,88 @@ func (mr *MockMutaterMockRecorder) New(ctx, workflow, runID, input interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "New", reflect.TypeOf((*MockMutater)(nil).New), ctx, workflow, runID, input)
 }
 
-// SaveActionError mocks base method.
-func (m *MockMutater) SaveActionError(ctx context.Context, i Identifier, actionID string, err error) (State, error) {
+// SaveResponse mocks base method.
+func (m *MockMutater) SaveResponse(ctx context.Context, i Identifier, r DriverResponse, attempt int) (State, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveActionError", ctx, i, actionID, err)
+	ret := m.ctrl.Call(m, "SaveResponse", ctx, i, r, attempt)
 	ret0, _ := ret[0].(State)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// SaveActionError indicates an expected call of SaveActionError.
-func (mr *MockMutaterMockRecorder) SaveActionError(ctx, i, actionID, err interface{}) *gomock.Call {
+// SaveResponse indicates an expected call of SaveResponse.
+func (mr *MockMutaterMockRecorder) SaveResponse(ctx, i, r, attempt interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveActionError", reflect.TypeOf((*MockMutater)(nil).SaveActionError), ctx, i, actionID, err)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveResponse", reflect.TypeOf((*MockMutater)(nil).SaveResponse), ctx, i, r, attempt)
 }
 
-// SaveActionOutput mocks base method.
-func (m *MockMutater) SaveActionOutput(ctx context.Context, i Identifier, actionID string, data map[string]interface{}) (State, error) {
+// Scheduled mocks base method.
+func (m *MockMutater) Scheduled(ctx context.Context, i Identifier, step inngest.Step) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveActionOutput", ctx, i, actionID, data)
-	ret0, _ := ret[0].(State)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "Scheduled", ctx, i, step)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
-// SaveActionOutput indicates an expected call of SaveActionOutput.
-func (mr *MockMutaterMockRecorder) SaveActionOutput(ctx, i, actionID, data interface{}) *gomock.Call {
+// Scheduled indicates an expected call of Scheduled.
+func (mr *MockMutaterMockRecorder) Scheduled(ctx, i, step interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveActionOutput", reflect.TypeOf((*MockMutater)(nil).SaveActionOutput), ctx, i, actionID, data)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Scheduled", reflect.TypeOf((*MockMutater)(nil).Scheduled), ctx, i, step)
+}
+
+// MockPauseMutater is a mock of PauseMutater interface.
+type MockPauseMutater struct {
+	ctrl     *gomock.Controller
+	recorder *MockPauseMutaterMockRecorder
+}
+
+// MockPauseMutaterMockRecorder is the mock recorder for MockPauseMutater.
+type MockPauseMutaterMockRecorder struct {
+	mock *MockPauseMutater
+}
+
+// NewMockPauseMutater creates a new mock instance.
+func NewMockPauseMutater(ctrl *gomock.Controller) *MockPauseMutater {
+	mock := &MockPauseMutater{ctrl: ctrl}
+	mock.recorder = &MockPauseMutaterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockPauseMutater) EXPECT() *MockPauseMutaterMockRecorder {
+	return m.recorder
+}
+
+// ConsumePause mocks base method.
+func (m *MockPauseMutater) ConsumePause(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConsumePause", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ConsumePause indicates an expected call of ConsumePause.
+func (mr *MockPauseMutaterMockRecorder) ConsumePause(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConsumePause", reflect.TypeOf((*MockPauseMutater)(nil).ConsumePause), ctx, id)
+}
+
+// LeasePause mocks base method.
+func (m *MockPauseMutater) LeasePause(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LeasePause", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LeasePause indicates an expected call of LeasePause.
+func (mr *MockPauseMutaterMockRecorder) LeasePause(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LeasePause", reflect.TypeOf((*MockPauseMutater)(nil).LeasePause), ctx, id)
 }
 
 // SavePause mocks base method.
-func (m *MockMutater) SavePause(ctx context.Context, p Pause) error {
+func (m *MockPauseMutater) SavePause(ctx context.Context, p Pause) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SavePause", ctx, p)
 	ret0, _ := ret[0].(error)
@@ -293,9 +343,208 @@ func (m *MockMutater) SavePause(ctx context.Context, p Pause) error {
 }
 
 // SavePause indicates an expected call of SavePause.
-func (mr *MockMutaterMockRecorder) SavePause(ctx, p interface{}) *gomock.Call {
+func (mr *MockPauseMutaterMockRecorder) SavePause(ctx, p interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SavePause", reflect.TypeOf((*MockMutater)(nil).SavePause), ctx, p)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SavePause", reflect.TypeOf((*MockPauseMutater)(nil).SavePause), ctx, p)
+}
+
+// MockPauseGetter is a mock of PauseGetter interface.
+type MockPauseGetter struct {
+	ctrl     *gomock.Controller
+	recorder *MockPauseGetterMockRecorder
+}
+
+// MockPauseGetterMockRecorder is the mock recorder for MockPauseGetter.
+type MockPauseGetterMockRecorder struct {
+	mock *MockPauseGetter
+}
+
+// NewMockPauseGetter creates a new mock instance.
+func NewMockPauseGetter(ctrl *gomock.Controller) *MockPauseGetter {
+	mock := &MockPauseGetter{ctrl: ctrl}
+	mock.recorder = &MockPauseGetterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockPauseGetter) EXPECT() *MockPauseGetterMockRecorder {
+	return m.recorder
+}
+
+// PauseByStep mocks base method.
+func (m *MockPauseGetter) PauseByStep(ctx context.Context, i Identifier, actionID string) (*Pause, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PauseByStep", ctx, i, actionID)
+	ret0, _ := ret[0].(*Pause)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PauseByStep indicates an expected call of PauseByStep.
+func (mr *MockPauseGetterMockRecorder) PauseByStep(ctx, i, actionID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PauseByStep", reflect.TypeOf((*MockPauseGetter)(nil).PauseByStep), ctx, i, actionID)
+}
+
+// PausesByEvent mocks base method.
+func (m *MockPauseGetter) PausesByEvent(ctx context.Context, eventName string) (PauseIterator, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PausesByEvent", ctx, eventName)
+	ret0, _ := ret[0].(PauseIterator)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PausesByEvent indicates an expected call of PausesByEvent.
+func (mr *MockPauseGetterMockRecorder) PausesByEvent(ctx, eventName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PausesByEvent", reflect.TypeOf((*MockPauseGetter)(nil).PausesByEvent), ctx, eventName)
+}
+
+// MockPauseIterator is a mock of PauseIterator interface.
+type MockPauseIterator struct {
+	ctrl     *gomock.Controller
+	recorder *MockPauseIteratorMockRecorder
+}
+
+// MockPauseIteratorMockRecorder is the mock recorder for MockPauseIterator.
+type MockPauseIteratorMockRecorder struct {
+	mock *MockPauseIterator
+}
+
+// NewMockPauseIterator creates a new mock instance.
+func NewMockPauseIterator(ctrl *gomock.Controller) *MockPauseIterator {
+	mock := &MockPauseIterator{ctrl: ctrl}
+	mock.recorder = &MockPauseIteratorMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockPauseIterator) EXPECT() *MockPauseIteratorMockRecorder {
+	return m.recorder
+}
+
+// Next mocks base method.
+func (m *MockPauseIterator) Next(ctx context.Context) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Next", ctx)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// Next indicates an expected call of Next.
+func (mr *MockPauseIteratorMockRecorder) Next(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Next", reflect.TypeOf((*MockPauseIterator)(nil).Next), ctx)
+}
+
+// Val mocks base method.
+func (m *MockPauseIterator) Val(arg0 context.Context) *Pause {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Val", arg0)
+	ret0, _ := ret[0].(*Pause)
+	return ret0
+}
+
+// Val indicates an expected call of Val.
+func (mr *MockPauseIteratorMockRecorder) Val(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Val", reflect.TypeOf((*MockPauseIterator)(nil).Val), arg0)
+}
+
+// MockPauseManager is a mock of PauseManager interface.
+type MockPauseManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockPauseManagerMockRecorder
+}
+
+// MockPauseManagerMockRecorder is the mock recorder for MockPauseManager.
+type MockPauseManagerMockRecorder struct {
+	mock *MockPauseManager
+}
+
+// NewMockPauseManager creates a new mock instance.
+func NewMockPauseManager(ctrl *gomock.Controller) *MockPauseManager {
+	mock := &MockPauseManager{ctrl: ctrl}
+	mock.recorder = &MockPauseManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockPauseManager) EXPECT() *MockPauseManagerMockRecorder {
+	return m.recorder
+}
+
+// ConsumePause mocks base method.
+func (m *MockPauseManager) ConsumePause(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConsumePause", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ConsumePause indicates an expected call of ConsumePause.
+func (mr *MockPauseManagerMockRecorder) ConsumePause(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConsumePause", reflect.TypeOf((*MockPauseManager)(nil).ConsumePause), ctx, id)
+}
+
+// LeasePause mocks base method.
+func (m *MockPauseManager) LeasePause(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LeasePause", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LeasePause indicates an expected call of LeasePause.
+func (mr *MockPauseManagerMockRecorder) LeasePause(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LeasePause", reflect.TypeOf((*MockPauseManager)(nil).LeasePause), ctx, id)
+}
+
+// PauseByStep mocks base method.
+func (m *MockPauseManager) PauseByStep(ctx context.Context, i Identifier, actionID string) (*Pause, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PauseByStep", ctx, i, actionID)
+	ret0, _ := ret[0].(*Pause)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PauseByStep indicates an expected call of PauseByStep.
+func (mr *MockPauseManagerMockRecorder) PauseByStep(ctx, i, actionID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PauseByStep", reflect.TypeOf((*MockPauseManager)(nil).PauseByStep), ctx, i, actionID)
+}
+
+// PausesByEvent mocks base method.
+func (m *MockPauseManager) PausesByEvent(ctx context.Context, eventName string) (PauseIterator, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PausesByEvent", ctx, eventName)
+	ret0, _ := ret[0].(PauseIterator)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PausesByEvent indicates an expected call of PausesByEvent.
+func (mr *MockPauseManagerMockRecorder) PausesByEvent(ctx, eventName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PausesByEvent", reflect.TypeOf((*MockPauseManager)(nil).PausesByEvent), ctx, eventName)
+}
+
+// SavePause mocks base method.
+func (m *MockPauseManager) SavePause(ctx context.Context, p Pause) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SavePause", ctx, p)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SavePause indicates an expected call of SavePause.
+func (mr *MockPauseManagerMockRecorder) SavePause(ctx, p interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SavePause", reflect.TypeOf((*MockPauseManager)(nil).SavePause), ctx, p)
 }
 
 // MockManager is a mock of Manager interface.
@@ -335,6 +584,20 @@ func (mr *MockManagerMockRecorder) ConsumePause(ctx, id interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConsumePause", reflect.TypeOf((*MockManager)(nil).ConsumePause), ctx, id)
 }
 
+// LeasePause mocks base method.
+func (m *MockManager) LeasePause(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LeasePause", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LeasePause indicates an expected call of LeasePause.
+func (mr *MockManagerMockRecorder) LeasePause(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LeasePause", reflect.TypeOf((*MockManager)(nil).LeasePause), ctx, id)
+}
+
 // Load mocks base method.
 func (m *MockManager) Load(ctx context.Context, i Identifier) (State, error) {
 	m.ctrl.T.Helper()
@@ -351,7 +614,7 @@ func (mr *MockManagerMockRecorder) Load(ctx, i interface{}) *gomock.Call {
 }
 
 // New mocks base method.
-func (m *MockManager) New(ctx context.Context, workflow inngest.Workflow, runID v2.ULID, input any) (State, error) {
+func (m *MockManager) New(ctx context.Context, workflow inngest.Workflow, runID v2.ULID, input map[string]any) (State, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "New", ctx, workflow, runID, input)
 	ret0, _ := ret[0].(State)
@@ -365,34 +628,34 @@ func (mr *MockManagerMockRecorder) New(ctx, workflow, runID, input interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "New", reflect.TypeOf((*MockManager)(nil).New), ctx, workflow, runID, input)
 }
 
-// SaveActionError mocks base method.
-func (m *MockManager) SaveActionError(ctx context.Context, i Identifier, actionID string, err error) (State, error) {
+// PauseByStep mocks base method.
+func (m *MockManager) PauseByStep(ctx context.Context, i Identifier, actionID string) (*Pause, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveActionError", ctx, i, actionID, err)
-	ret0, _ := ret[0].(State)
+	ret := m.ctrl.Call(m, "PauseByStep", ctx, i, actionID)
+	ret0, _ := ret[0].(*Pause)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// SaveActionError indicates an expected call of SaveActionError.
-func (mr *MockManagerMockRecorder) SaveActionError(ctx, i, actionID, err interface{}) *gomock.Call {
+// PauseByStep indicates an expected call of PauseByStep.
+func (mr *MockManagerMockRecorder) PauseByStep(ctx, i, actionID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveActionError", reflect.TypeOf((*MockManager)(nil).SaveActionError), ctx, i, actionID, err)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PauseByStep", reflect.TypeOf((*MockManager)(nil).PauseByStep), ctx, i, actionID)
 }
 
-// SaveActionOutput mocks base method.
-func (m *MockManager) SaveActionOutput(ctx context.Context, i Identifier, actionID string, data map[string]interface{}) (State, error) {
+// PausesByEvent mocks base method.
+func (m *MockManager) PausesByEvent(ctx context.Context, eventName string) (PauseIterator, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveActionOutput", ctx, i, actionID, data)
-	ret0, _ := ret[0].(State)
+	ret := m.ctrl.Call(m, "PausesByEvent", ctx, eventName)
+	ret0, _ := ret[0].(PauseIterator)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// SaveActionOutput indicates an expected call of SaveActionOutput.
-func (mr *MockManagerMockRecorder) SaveActionOutput(ctx, i, actionID, data interface{}) *gomock.Call {
+// PausesByEvent indicates an expected call of PausesByEvent.
+func (mr *MockManagerMockRecorder) PausesByEvent(ctx, eventName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveActionOutput", reflect.TypeOf((*MockManager)(nil).SaveActionOutput), ctx, i, actionID, data)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PausesByEvent", reflect.TypeOf((*MockManager)(nil).PausesByEvent), ctx, eventName)
 }
 
 // SavePause mocks base method.
@@ -407,4 +670,33 @@ func (m *MockManager) SavePause(ctx context.Context, p Pause) error {
 func (mr *MockManagerMockRecorder) SavePause(ctx, p interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SavePause", reflect.TypeOf((*MockManager)(nil).SavePause), ctx, p)
+}
+
+// SaveResponse mocks base method.
+func (m *MockManager) SaveResponse(ctx context.Context, i Identifier, r DriverResponse, attempt int) (State, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SaveResponse", ctx, i, r, attempt)
+	ret0, _ := ret[0].(State)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SaveResponse indicates an expected call of SaveResponse.
+func (mr *MockManagerMockRecorder) SaveResponse(ctx, i, r, attempt interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveResponse", reflect.TypeOf((*MockManager)(nil).SaveResponse), ctx, i, r, attempt)
+}
+
+// Scheduled mocks base method.
+func (m *MockManager) Scheduled(ctx context.Context, i Identifier, step inngest.Step) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Scheduled", ctx, i, step)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Scheduled indicates an expected call of Scheduled.
+func (mr *MockManagerMockRecorder) Scheduled(ctx, i, step interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Scheduled", reflect.TypeOf((*MockManager)(nil).Scheduled), ctx, i, step)
 }

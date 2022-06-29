@@ -75,9 +75,12 @@ func (r *RunUI) Init() tea.Cmd {
 
 // run performs the running of the function.
 func (r *RunUI) run(ctx context.Context) {
-	if r.sm != nil {
+	if r.id != nil {
 		return
 	}
+
+	ctx, done := context.WithCancel(ctx)
+	defer done()
 
 	al := actionloader.NewMemoryLoader()
 
@@ -123,9 +126,13 @@ func (r *RunUI) run(ctx context.Context) {
 		return
 	}
 
+	go func() {
+		_ = runner.Start(ctx)
+	}()
+
 	r.id = id
 	start := time.Now()
-	if err := runner.Execute(ctx, *id); err != nil {
+	if err := runner.Wait(ctx, *id); err != nil {
 		r.err = err
 	}
 	r.duration = time.Since(start)
@@ -206,7 +213,7 @@ func (r *RunUI) View() string {
 }
 
 func (r *RunUI) RenderState() string {
-	if r.sm == nil || r.id == nil {
+	if r.id == nil {
 		return ""
 	}
 

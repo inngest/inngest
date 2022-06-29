@@ -50,11 +50,18 @@ func NewDevServer(o Options) (DevServer, error) {
 }
 
 func (d DevServer) Start(ctx context.Context) error {
+	go func() {
+		if err := d.Engine.Start(ctx); err != nil {
+			panic("unable to start runner")
+		}
+	}()
+
 	err := d.Engine.Load(ctx, d.dir)
 	if err != nil {
 		d.log.Error().Msg(err.Error())
 		return err
 	}
+
 	err = d.API.Start(ctx)
 	if err != nil {
 		d.log.Error().Msg(err.Error())

@@ -121,7 +121,7 @@ func (m mgr) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID
 	// However, the input event is immutable.
 	metadata := runMetadata{
 		Version:   workflow.Version,
-		CreatedAt: time.Now(),
+		CreatedAt: time.Now().Truncate(time.Second),
 	}
 
 	// We marshal this ahead of creating a redis transaction as it's necessary
@@ -176,11 +176,22 @@ func (m mgr) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID
 	return inmemory.NewStateInstance(
 			workflow,
 			id,
+			state.Metadata{
+				StartedAt: metadata.CreatedAt,
+			},
 			input,
 			map[string]map[string]any{},
 			map[string]error{},
 		),
 		nil
+}
+
+func (m mgr) IsComplete(ctx context.Context, id state.Identifier) (bool, error) {
+	val, err := m.r.HGet(ctx, m.kf.RunMetadata(ctx, id), "pending").Result()
+	if err != nil {
+		return false, err
+	}
+	return val == "0", nil
 }
 
 func (m mgr) metadata(ctx context.Context, id state.Identifier) (*runMetadata, error) {
@@ -254,7 +265,52 @@ func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error)
 		return nil, err
 	}
 
-	return inmemory.NewStateInstance(*w, id, event, actions, errors), nil
+	meta := state.Metadata{
+		StartedAt: metadata.CreatedAt,
+		Pending:   metadata.Pending,
+	}
+
+	return inmemory.NewStateInstance(*w, id, meta, event, actions, errors), nil
+}
+
+func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (state.State, error) {
+	if r.Err == nil {
+		// Save the output.
+		str, err := json.Marshal(r.Output)
+		if err != nil {
+			return nil, err
+		}
+		if err := m.r.HSet(ctx, m.kf.Actions(ctx, i), r.Step.ID, str).Err(); err != nil {
+			return nil, err
+		}
+		return m.Load(ctx, i)
+	}
+
+	// Save the error.
+	err := m.r.Watch(ctx, func(tx *redis.Tx) error {
+		// Save the error.
+		if err := m.r.HSet(ctx, m.kf.Errors(ctx, i), r.Step.ID, r.Err.Error()).Err(); err != nil {
+			return err
+		}
+		if r.Final() {
+			// Increase finalized.
+			return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Err()
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return m.Load(ctx, i)
+}
+
+func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string) error {
+	return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Err()
+}
+
+func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string) error {
+	return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", 1).Err()
 }
 
 func (m mgr) SaveActionOutput(ctx context.Context, id state.Identifier, actionID string, data map[string]interface{}) (state.State, error) {
@@ -481,6 +537,15 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 		return nil, fmt.Errorf("invalid created at stored in run metadata")
 	}
 
+	str, ok = data["pending"]
+	if !ok {
+		return nil, fmt.Errorf("no created at stored in run metadata")
+	}
+	m.Pending, err = strconv.Atoi(str)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pending stored in run metadata")
+	}
+
 	return m, nil
 }
 
@@ -492,12 +557,14 @@ type runMetadata struct {
 	// for the specific run.
 	Version   int       `json:"version"`
 	CreatedAt time.Time `json:"createdAt"`
+	Pending   int       `json:"pending"`
 }
 
 func (r runMetadata) Map() map[string]any {
 	return map[string]any{
 		"version":   r.Version,
 		"createdAt": r.CreatedAt.Format(time.RFC3339),
+		"pending":   r.Pending,
 	}
 }
 

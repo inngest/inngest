@@ -11,9 +11,15 @@ import (
 )
 
 var (
+	// ErrStepIncomplete is returned when requesting output for a step that
+	// has not yet completed.
 	ErrStepIncomplete = fmt.Errorf("step has not yet completed")
-	ErrPauseNotFound  = fmt.Errorf("pause not found")
-	ErrPauseLeased    = fmt.Errorf("pause already leased")
+	// ErrPauseNotFound is returned when attempting to lease or consume a pause
+	// that doesn't exist within the backing state store.
+	ErrPauseNotFound = fmt.Errorf("pause not found")
+	// ErrPauseLeased is returned when attempting to lease a pause that is
+	// already leased by another event.
+	ErrPauseLeased = fmt.Errorf("pause already leased")
 )
 
 const (
@@ -59,6 +65,29 @@ type Pause struct {
 	LeasedUntil *time.Time `json:"leasedUntil,omitempty"`
 }
 
+// Metadata must be stored for each workflow run, allowing the runner to inspect
+// when the execution started, the number of steps enqueued, and the number of
+// steps finalized.
+//
+// Pre-1.0, this is the only way to detect whether a function's execution has
+// finished.  Functions may have many parallel branches with conditional execution.
+// Given this, no single step can tell whether it's the last step within a function.
+type Metadata struct {
+	StartedAt time.Time `json:"startedAt"`
+
+	// Pending is the number of steps that have been enqueued but have
+	// not yet finalized.
+	//
+	// Finalized refers to:
+	// - A step that has errored out and cannot be retried
+	// - A step that has retried a maximum number of times and will not
+	//   further be retried.
+	// - A step that has completed, and has its next steps (children in
+	//   the dag) enqueued. Note that the step must have its children
+	//   enqueued to be considered finalized.
+	Pending int
+}
+
 // State represents the current state of a workflow.  It is data-structure
 // agnostic;  each backing store can change the structure of the state to
 // suit its implementation.
@@ -70,6 +99,10 @@ type State interface {
 	// for the given run.
 	Workflow() inngest.Workflow
 
+	Metadata() Metadata
+
+	// Identifier returns the identifier for this particular run, which
+	// returns the RunID and WorkflowID within a state.Identifier struct.
 	Identifier() Identifier
 
 	// RunID returns the ID for the specific run.
@@ -100,8 +133,25 @@ type State interface {
 
 // Loader allows loading of previously stored state based off of a given Identifier.
 type Loader interface {
+	// Load returns run state for the given identifier.
 	Load(ctx context.Context, i Identifier) (State, error)
+
+	// IsComplete returns whether the given identifier is complete, ie. the
+	// pending count in the identifier's metadata is zero.
+	IsComplete(ctx context.Context, i Identifier) (complete bool, err error)
 }
+
+/*
+// CompleteSubscriber allows users to subscribe to a particular identifier and block
+// until the identifier's pending count reaches zero.
+//
+// This is an optional interface which a state can implement using internal mechanisms
+// to watch keys.  The runner will check to see if the state store implements this interface;
+// if so, it will subscribe to be notified when the function completes.
+type CompleteSubscriber interface {
+	BlockUntilComplete(ctx context.Context, i Identifier) (complete bool, err error)
+}
+*/
 
 // Mutater mutates state for a given identifier, storing the state and returning
 // the new state.
@@ -112,19 +162,25 @@ type Mutater interface {
 	// New creates a new state for the given run ID, using the event as the input data for the root workflow.
 	New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, input map[string]any) (State, error)
 
-	// SaveActionOutput stores output for a single action within a workflow run.
+	// scheduled increases the scheduled count for a run's metadata.
 	//
-	// This should clear any error that exists for the current action, indicating that
-	// the step is a success.
-	SaveActionOutput(ctx context.Context, i Identifier, actionID string, data map[string]interface{}) (State, error)
+	// We need to store the total number of steps enqueued to calculate when a step function
+	// has finished execution.  If the state store is the same as the queuee (eg. an all-in-one
+	// MySQL store) it makes sense to atomically increase this when enqueueing the step.  However,
+	// we must provide compatibility for queues that exist separately to the state store (eg.
+	// SQS, Celery).  In thise cases recording that a step was scheduled is a separate step.
+	Scheduled(ctx context.Context, i Identifier, stepID string) error
 
-	// SaveActionError stores an error for a single action within a workflow run.
+	// Finalized increases the finalized count for a run's metadata.
 	//
-	// XXX: It might be sensible to store a record of each error that occurred for
-	// every attempt, whilst still being able to distinguish between an eventual success
-	// and a persistent error.  See: https://github.com/inngest/inngest-cli/issues/125
-	// for more info.
-	SaveActionError(ctx context.Context, i Identifier, actionID string, err error) (State, error)
+	// This must be called after storing a response and scheduling all child steps.
+	Finalized(ctx context.Context, i Identifier, stepID string) error
+
+	// SaveResponse saves the driver response for the attempt to the backing state store.
+	//
+	// If the response is an error, this must store the error for the specific attempt, allowing
+	// visibility into each error when executing a step.
+	SaveResponse(ctx context.Context, i Identifier, r DriverResponse, attempt int) (State, error)
 }
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.

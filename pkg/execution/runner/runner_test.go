@@ -8,9 +8,10 @@ import (
 
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
-	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
+	"github.com/inngest/inngest-cli/pkg/execution/queue"
+	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
 	"github.com/stretchr/testify/require"
 )
@@ -27,19 +28,25 @@ type stateManager struct {
 }
 
 type enqueued struct {
-	item inmemory.QueueItem
+	item queue.Item
 	at   time.Time
 }
 
-func (m *stateManager) Enqueue(item inmemory.QueueItem, at time.Time) {
+func (m *stateManager) Enqueue(ctx context.Context, item queue.Item, at time.Time) error {
 	m.queue = append(m.queue, enqueued{item: item, at: at})
-	m.Queue.Enqueue(item, at)
+	return m.Queue.Enqueue(ctx, item, at)
 }
 
 func newRunner(t *testing.T, sm inmemory.Queue, d *mockdriver.Mock) *InMemoryRunner {
 	t.Helper()
 
 	al := actionloader.NewMemoryLoader()
+	al.Add(inngest.ActionVersion{
+		DSN: "test",
+		Runtime: inngest.RuntimeWrapper{
+			Runtime: &mockdriver.Mock{},
+		},
+	})
 	al.Add(inngest.ActionVersion{
 		DSN: "step-a",
 		Runtime: inngest.RuntimeWrapper{
@@ -93,15 +100,17 @@ func TestRunner_new(t *testing.T) {
 	// of the dag.
 	item := <-sm.Channel()
 	require.NotNil(t, item)
-	require.EqualValues(t, inmemory.QueueItem{
-		ID:   *id,
-		Edge: inngest.SourceEdge,
+	require.EqualValues(t, queue.Item{
+		Identifier: *id,
+		Payload: queue.PayloadEdge{
+			Edge: inngest.SourceEdge,
+		},
 	}, item)
 }
 
 func TestRunner_run_source(t *testing.T) {
 	driver := &mockdriver.Mock{
-		Responses: map[string]driver.Response{
+		Responses: map[string]state.DriverResponse{
 			"first": {Output: map[string]interface{}{"ok": true}},
 		},
 	}
@@ -137,11 +146,13 @@ func TestRunner_run_source(t *testing.T) {
 
 	// This should have done nothing but enqueue new items.
 	item = <-sm.Channel()
-	require.EqualValues(t, inmemory.QueueItem{
-		ID: *id,
-		Edge: inngest.Edge{
-			Outgoing: inngest.TriggerName,
-			Incoming: "first",
+	require.EqualValues(t, queue.Item{
+		Identifier: *id,
+		Payload: queue.PayloadEdge{
+			Edge: inngest.Edge{
+				Outgoing: inngest.TriggerName,
+				Incoming: "first",
+			},
 		},
 	}, item)
 
@@ -159,7 +170,7 @@ func TestRunner_run_source(t *testing.T) {
 
 func TestRunner_run_retry(t *testing.T) {
 	driver := &mockdriver.Mock{
-		Responses: map[string]driver.Response{
+		Responses: map[string]state.DriverResponse{
 			"first": {Err: fmt.Errorf("some error here")},
 		},
 	}
@@ -190,9 +201,11 @@ func TestRunner_run_retry(t *testing.T) {
 
 	// When making a new run, there's always a trigger in the queue.
 	require.Equal(t, 1, len(sm.queue))
-	AssertLastEnqueued(t, sm, inmemory.QueueItem{
-		ID:   *id,
-		Edge: inngest.SourceEdge,
+	AssertLastEnqueued(t, sm, queue.Item{
+		Identifier: *id,
+		Payload: queue.PayloadEdge{
+			Edge: inngest.SourceEdge,
+		},
 	}, time.Now())
 
 	// Run the trigger.
@@ -202,21 +215,25 @@ func TestRunner_run_retry(t *testing.T) {
 
 	// Assert that the first step is in the queue.
 	require.Equal(t, 2, len(sm.queue))
-	AssertLastEnqueued(t, sm, inmemory.QueueItem{
-		ID: *id,
-		Edge: inngest.Edge{
-			Outgoing: inngest.TriggerName,
-			Incoming: "first",
+	AssertLastEnqueued(t, sm, queue.Item{
+		Identifier: *id,
+		Payload: queue.PayloadEdge{
+			Edge: inngest.Edge{
+				Outgoing: inngest.TriggerName,
+				Incoming: "first",
+			},
 		},
 	}, time.Now())
 
 	// This should have done nothing but enqueue new items.
 	item = <-sm.Channel()
-	require.EqualValues(t, inmemory.QueueItem{
-		ID: *id,
-		Edge: inngest.Edge{
-			Outgoing: inngest.TriggerName,
-			Incoming: "first",
+	require.EqualValues(t, queue.Item{
+		Identifier: *id,
+		Payload: queue.PayloadEdge{
+			Edge: inngest.Edge{
+				Outgoing: inngest.TriggerName,
+				Incoming: "first",
+			},
 		},
 	}, item)
 
@@ -226,17 +243,121 @@ func TestRunner_run_retry(t *testing.T) {
 
 	// Assert that the item was re-enqueued correctly.
 	require.Equal(t, 3, len(sm.queue))
-	AssertLastEnqueued(t, sm, inmemory.QueueItem{
-		ID:         *id,
+	AssertLastEnqueued(t, sm, queue.Item{
+		Identifier: *id,
 		ErrorCount: 1,
-		Edge: inngest.Edge{
-			Outgoing: inngest.TriggerName,
-			Incoming: "first",
+		Payload: queue.PayloadEdge{
+			Edge: inngest.Edge{
+				Outgoing: inngest.TriggerName,
+				Incoming: "first",
+			},
 		},
 	}, time.Now().Add(10*time.Second))
 }
 
-func AssertLastEnqueued(t *testing.T, sm *stateManager, i inmemory.QueueItem, at time.Time) {
+// This test asserts that the scheduled and finalized counts are increased
+// correctly throughout the runner.
+func TestRunStateModification(t *testing.T) {
+	f := inngest.Workflow{
+		Steps: []inngest.Step{
+			{
+				ID:   "a",
+				Name: "a",
+				DSN:  "test",
+			},
+			{
+				ID:   "b",
+				Name: "b",
+				DSN:  "test",
+			},
+			{
+				ID:   "a-run",
+				Name: "a-run",
+				DSN:  "test",
+			},
+			{
+				ID:   "a-ignore",
+				Name: "a-ignore",
+				DSN:  "test",
+			},
+			{
+				ID:   "b-a",
+				Name: "b-a",
+				DSN:  "test",
+			},
+		},
+		Edges: []inngest.Edge{
+			{
+				Outgoing: inngest.TriggerName,
+				Incoming: "a",
+			},
+			{
+				Outgoing: inngest.TriggerName,
+				Incoming: "b",
+			},
+			{
+				Outgoing: "a",
+				Incoming: "a-run",
+				Metadata: &inngest.EdgeMetadata{
+					If: "true == true",
+				},
+			},
+			{
+				Outgoing: "a",
+				Incoming: "a-ignore",
+				Metadata: &inngest.EdgeMetadata{
+					If: "true == false",
+				},
+			},
+			{
+				Outgoing: "b",
+				Incoming: "b-a",
+			},
+		},
+	}
+
+	driver := &mockdriver.Mock{
+		Responses: map[string]state.DriverResponse{
+			"a":        {Output: map[string]interface{}{"status": 200, "body": "a"}},
+			"b":        {Output: map[string]interface{}{"status": 200, "body": "b"}},
+			"b-run":    {Output: map[string]interface{}{"status": 200, "body": "b-run"}},
+			"a-run":    {Output: map[string]interface{}{"status": 200, "body": "a-run"}},
+			"b-a":      {Output: map[string]interface{}{"status": 200, "body": "b-a"}},
+			"a-ignore": {Err: fmt.Errorf("this should never run")},
+		},
+	}
+
+	ctx := context.Background()
+	sm := &stateManager{Queue: inmemory.NewStateManager()}
+	r := newRunner(t, sm, driver)
+
+	id, err := r.NewRun(ctx, f, map[string]interface{}{"input": true})
+	require.NoError(t, err)
+	require.NotNil(t, id)
+
+	s, err := r.sm.Load(ctx, *id)
+	require.NoError(t, err)
+	require.NotNil(t, s)
+
+	// We should have one pending: the trigger.
+	require.Equal(t, 1, s.Metadata().Pending)
+
+	// Run the queue.
+	go func() {
+		err := r.Start(ctx)
+		require.NoError(t, err)
+	}()
+
+	err = r.Wait(ctx, s.Identifier())
+	require.NoError(t, err)
+
+	s, err = r.sm.Load(ctx, *id)
+	require.NoError(t, err)
+	require.NotNil(t, s)
+	require.Equal(t, 0, s.Metadata().Pending)
+}
+
+func AssertLastEnqueued(t *testing.T, sm *stateManager, i queue.Item, at time.Time) {
 	n := len(sm.queue) - 1
 	require.EqualValues(t, sm.queue[n].item, i)
 	// And that it should be ran immediately.

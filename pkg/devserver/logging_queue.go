@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/inngest/inngest-cli/pkg/execution/queue"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
 	"github.com/rs/zerolog"
@@ -26,33 +27,24 @@ type loggingQueue struct {
 	log *zerolog.Logger
 }
 
-func (l loggingQueue) Enqueue(item inmemory.QueueItem, at time.Time) {
+func (l loggingQueue) Enqueue(ctx context.Context, item queue.Item, at time.Time) error {
 	l.log.Info().
-		Str("run_id", item.ID.RunID.String()).
-		Str("step", item.Edge.Incoming).
-		Interface("edge", item.Edge).
+		Str("run_id", item.Identifier.RunID.String()).
+		Interface("payload", item.Payload).
 		Interface("error_count", item.ErrorCount).
 		Interface("at", at).
 		Msg("enqueueing step")
-	l.Queue.Enqueue(item, at)
+	return l.Queue.Enqueue(ctx, item, at)
 }
 
-func (l loggingQueue) SaveActionOutput(ctx context.Context, i state.Identifier, actionID string, data map[string]interface{}) (state.State, error) {
+func (l loggingQueue) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (state.State, error) {
 	l.log.Info().
 		Str("run_id", i.RunID.String()).
-		Str("step", actionID).
-		Interface("data", data).
-		Msg("recording step output")
+		Str("step", r.Step.ID).
+		Int("attepmt", attempt).
+		Interface("response", r.Output).
+		Err(r.Err).
+		Msg("recording step response")
 
-	return l.Queue.SaveActionOutput(ctx, i, actionID, data)
-}
-
-func (l loggingQueue) SaveActionError(ctx context.Context, i state.Identifier, actionID string, err error) (state.State, error) {
-	l.log.Warn().
-		Str("run_id", i.RunID.String()).
-		Str("step", actionID).
-		Err(err).
-		Msg("recording step error")
-
-	return l.Queue.SaveActionError(ctx, i, actionID, err)
+	return l.Queue.SaveResponse(ctx, i, r, attempt)
 }
