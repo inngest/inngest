@@ -1,7 +1,7 @@
 ---
 focus: true
 heading: "Message queue vs message bus: the practical differences"
-subtitle: We explore the difference between queueing systems and message busses.  Hint: event streams aren't queues :)
+subtitle: We explore the difference between queueing systems and message busses
 date: 2022-06-29
 ---
 
