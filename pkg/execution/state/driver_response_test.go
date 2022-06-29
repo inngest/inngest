@@ -78,6 +78,17 @@ func TestDriverResponseRetryable(t *testing.T) {
 			expected: false,
 		},
 		{
+			name: "4xx status in statusCode",
+			r: DriverResponse{
+				Output: map[string]interface{}{
+					"hi":         "my g",
+					"statusCode": 401,
+				},
+				Err: fmt.Errorf("some err"),
+			},
+			expected: false,
+		},
+		{
 			name: "499 status",
 			r: DriverResponse{
 				Output: map[string]interface{}{
@@ -102,6 +113,17 @@ func TestDriverResponseRetryable(t *testing.T) {
 				Output: map[string]interface{}{
 					"hi":     "my g",
 					"status": 500,
+				},
+				Err: fmt.Errorf("some err"),
+			},
+			expected: true,
+		},
+		{
+			name: "5xx statusCode",
+			r: DriverResponse{
+				Output: map[string]interface{}{
+					"hi":         "my g",
+					"statusCode": 500,
 				},
 				Err: fmt.Errorf("some err"),
 			},
