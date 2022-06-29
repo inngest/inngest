@@ -49,7 +49,7 @@ Of course, your action can do anything you need: resize files, run audio-to-text
 
 ## Prerequisites
 
-1. Install inngestctl: ` curl -sfL https://raw.githubusercontent.com/inngest/inngestctl/main/install.sh | sh`
+1. Install inngestctl: `curl -sfL https://cli.inngest.com/install.sh | sh`
 2. Log in to your inngest account via inngestctl: `inngestctl login -u your@email.address`
 
 ## Deploying to Inngest
