@@ -1,10 +1,12 @@
 package function
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/gosimple/slug"
+	"github.com/inngest/inngest-cli/pkg/expressions"
 )
 
 // Trigger represents either an event trigger or a cron trigger.  Only one is valid;  when
@@ -53,6 +55,13 @@ func (e EventTrigger) Validate() error {
 	if e.Event == "" {
 		return fmt.Errorf("An event trigger must specify an event name")
 	}
+
+	if e.Expression != nil {
+		if _, err := expressions.NewExpressionEvaluator(context.Background(), *e.Expression); err != nil {
+			return err
+		}
+	}
+
 	// TODO: (tonyhb) Compile the expression to check for issues.
 	if e.Definition == nil {
 		// TODO: Warn that we have no event definition

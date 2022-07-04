@@ -15,6 +15,7 @@ import (
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/pkg/expressions"
 )
 
 const (
@@ -77,6 +78,8 @@ type After struct {
 	// Wait represents a duration that we should wait before continuing with
 	// this step, eg. "24h" or "1h30m".
 	Wait *string `json:"wait,omitempty"`
+
+	If string `json:"if,omitempty"`
 
 	// Async, when specified, indicates that we must wait for another event
 	// to be received before continuing with this step.  Note that we may
@@ -147,6 +150,13 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 		if !incoming {
 			err = multierror.Append(err, fmt.Errorf("unknown step '%s' for edge '%v'", edge.Incoming, edge))
+		}
+
+		// Ensure that any expressions are also valid.
+		if edge.Metadata != nil && edge.Metadata.If != "" {
+			if _, verr := expressions.NewExpressionEvaluator(ctx, edge.Metadata.If); verr != nil {
+				err = multierror.Append(err, verr)
+			}
 		}
 	}
 
@@ -260,8 +270,9 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 		// For each of the "after" items, add an edge.
 		for _, after := range step.After {
 			var metadata *inngest.EdgeMetadata
-			if after.Async != nil || after.Wait != nil {
+			if after.Async != nil || after.Wait != nil || after.If != "" {
 				metadata = &inngest.EdgeMetadata{
+					If:                after.If,
 					Wait:              after.Wait,
 					AsyncEdgeMetadata: after.Async,
 				}

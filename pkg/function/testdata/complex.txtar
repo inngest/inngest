@@ -10,7 +10,7 @@ function: defs.#Function & {
 	name: "test"
 	triggers: [defs.#EventTrigger & {
 		event:      "test.event"
-		expression: "data.run == true"
+		expression: "event.data.run == true"
 	}]
 	idempotency: "{{ event.data.foo }}"
 	steps: {
@@ -38,7 +38,7 @@ function: defs.#Function & {
   "triggers": [
     {
       "event": "test.event",
-      "expression": "data.run == true"
+      "expression": "event.data.run == true"
     }
   ],
   "idempotency": "{{ event.data.foo }}",
@@ -89,7 +89,7 @@ function: defs.#Function & {
   "triggers": [
     {
       "event": "test.event",
-      "expression": "data.run == true"
+      "expression": "event.data.run == true"
     }
   ],
   "actions": [
