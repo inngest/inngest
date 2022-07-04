@@ -16,7 +16,7 @@ type Trigger struct {
 	*CronTrigger
 }
 
-func (t Trigger) Validate() error {
+func (t Trigger) Validate(ctx context.Context) error {
 	if t.EventTrigger == nil && t.CronTrigger == nil {
 		return fmt.Errorf("A trigger must supply an event name or a cron schedule")
 	}
@@ -24,10 +24,10 @@ func (t Trigger) Validate() error {
 		return fmt.Errorf("A trigger cannot have both an event and a cron trigger")
 	}
 	if t.EventTrigger != nil {
-		return t.EventTrigger.Validate()
+		return t.EventTrigger.Validate(ctx)
 	}
 	if t.CronTrigger != nil {
-		return t.CronTrigger.Validate()
+		return t.CronTrigger.Validate(ctx)
 	}
 	// heh.  this will (should) never happen.
 	return fmt.Errorf("This trigger is neither an event trigger or cron trigger.  This should never happen :D")
@@ -51,18 +51,16 @@ func (e EventTrigger) TitleName() string {
 	return strings.ReplaceAll(strings.Title(words), " ", "")
 }
 
-func (e EventTrigger) Validate() error {
+func (e EventTrigger) Validate(ctx context.Context) error {
 	if e.Event == "" {
 		return fmt.Errorf("An event trigger must specify an event name")
 	}
 
 	if e.Expression != nil {
-		if _, err := expressions.NewExpressionEvaluator(context.Background(), *e.Expression); err != nil {
+		if _, err := expressions.NewExpressionEvaluator(ctx, *e.Expression); err != nil {
 			return err
 		}
 	}
-
-	// TODO: (tonyhb) Compile the expression to check for issues.
 	if e.Definition == nil {
 		// TODO: Warn that we have no event definition
 		return nil
@@ -75,7 +73,7 @@ type CronTrigger struct {
 	Cron string `json:"cron"`
 }
 
-func (c CronTrigger) Validate() error {
+func (c CronTrigger) Validate(ctx context.Context) error {
 	// TODO: Validate cron expression
 	return nil
 }
