@@ -84,7 +84,7 @@ func Start(ctx context.Context, s Server) (err error) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			l.Error().Interface("recover", r).Msg("server recovered")
+			l.Error().Interface("recover", r).Msg("server panicked")
 			cleanup()
 		}
 	}()
