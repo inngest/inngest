@@ -8,7 +8,8 @@
 
 - Added a simple queueing interface to the `execution` package
 - Updated the `inmemory` state package to implement the new queue package
-- Added distributed waitgroups to the `state.Manager` interface.
+- Added expression and cron validation when validating a function
+- Added distributed waitgroups to the `state.Manager` interface
 
 ### Changed
 
