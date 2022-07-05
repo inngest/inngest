@@ -7,6 +7,7 @@ import (
 
 	"github.com/gosimple/slug"
 	"github.com/inngest/inngest-cli/pkg/expressions"
+	cron "github.com/robfig/cron/v3"
 )
 
 // Trigger represents either an event trigger or a cron trigger.  Only one is valid;  when
@@ -74,6 +75,11 @@ type CronTrigger struct {
 }
 
 func (c CronTrigger) Validate(ctx context.Context) error {
-	// TODO: Validate cron expression
+	_, err := cron.
+		NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow).
+		Parse(c.Cron)
+	if err != nil {
+		return fmt.Errorf("'%s' isn't a valid cron schedule", c.Cron)
+	}
 	return nil
 }

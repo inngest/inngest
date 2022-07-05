@@ -12,11 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateExpressions(t *testing.T) {
+func TestValidate(t *testing.T) {
 	tests := []struct {
 		f   Function
 		err error
 	}{
+		// Invalid expression
 		{
 			f: Function{
 				Name: "Foo",
@@ -76,7 +77,49 @@ func TestValidateExpressions(t *testing.T) {
 			},
 			err: fmt.Errorf("undeclared reference to 'lol'"),
 		},
-		// valid.
+		// Invalid cron
+		{
+			f: Function{
+				Name: "Foo",
+				ID:   "well-hello",
+				Triggers: []Trigger{
+					{
+						CronTrigger: &CronTrigger{
+							Cron: "u wot m8",
+						},
+					},
+				},
+			},
+			err: fmt.Errorf("'u wot m8' isn't a valid cron schedule"),
+		},
+		// valid cron
+		{
+			f: Function{
+				Name: "Foo",
+				ID:   "well-hello",
+				Triggers: []Trigger{
+					{
+						CronTrigger: &CronTrigger{
+							Cron: "0 * * * *",
+						},
+					},
+				},
+				Steps: map[string]Step{
+					"id": {
+						ID:   "id",
+						Path: "file://.",
+						Name: "lol",
+						Runtime: inngest.RuntimeWrapper{
+							Runtime: inngest.RuntimeHTTP{
+								URL: "https://www.example.com",
+							},
+						},
+					},
+				},
+			},
+			err: nil,
+		},
+		// valid trigger expression
 		{
 			f: Function{
 				Name: "Foo",
