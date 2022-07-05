@@ -10,8 +10,8 @@ builds:
     binary: inngest
     ldflags:
       - -s -w
-      - -X github.com/inngest/inngest-cli/inngest/version.Version={{.Version}}
-      - -X github.com/inngest/inngest-cli/inngest/version.Hash={{.ShortCommit}}
+      - -X github.com/inngest/inngest/inngest/version.Version={{.Version}}
+      - -X github.com/inngest/inngest/inngest/version.Hash={{.ShortCommit}}
     goos:
       - linux
       - windows
@@ -47,4 +47,4 @@ release:
   # Default is extracted from the origin remote URL or empty if its private hosted.
   github:
     owner: inngest
-    name: inngest-cli
+    name: inngest
