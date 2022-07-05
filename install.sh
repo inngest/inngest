@@ -16,7 +16,7 @@
 set -e
 
 binname="inngest"
-reponame="inngest-cli"
+reponame="inngest"
 base="https://github.com/inngest"
 
 cat /dev/null <<EOF
