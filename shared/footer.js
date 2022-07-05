@@ -39,7 +39,7 @@ const Footer = () => {
             <a href={process.env.NEXT_PUBLIC_DISCORD_URL} rel="nofollow">
               <Discord /> Discord
             </a>
-            <a href="https://github.com/inngest/inngest-cli" rel="nofollow">
+            <a href="https://github.com/inngest/inngest" rel="nofollow">
               <Github /> Github
             </a>
             <a href="https://twitter.com/inngest" rel="nofollow">

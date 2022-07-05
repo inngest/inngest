@@ -9,7 +9,7 @@ In this post we’ll walk through our use of Bubbletea, an elm-inspired TUI inte
 
 ### What we’re building
 
-[We recently revamped our CLI](https://github.com/inngest/inngest-cli), making it easier develop, locally test, and [deploy serverless functions](https://www.inngest.com/). Our product is _just_ different enough to make our init experience require _really good interactivity_. You see, with Inngest functions are triggered by events instead of raw HTTP requests. An event is simple: fundamentally it has a `name` and some `data`. The general idea is that:
+[We recently revamped our CLI](https://github.com/inngest/inngest), making it easier develop, locally test, and [deploy serverless functions](https://www.inngest.com/). Our product is _just_ different enough to make our init experience require _really good interactivity_. You see, with Inngest functions are triggered by events instead of raw HTTP requests. An event is simple: fundamentally it has a `name` and some `data`. The general idea is that:
 
 1. You send us an event
 2. We store it for some amount of time (eg. from weeks to years)
@@ -47,7 +47,7 @@ Because of its architecture, existing components, and ease of styling, Bubbletea
 
 ### Building a TUI-based event browser
 
-Skip ahead: [you can view all of our code in our CLI here](https://github.com/inngest/inngest-cli/blob/main/cmd/commands/init.go). If you’re interested in the conclusions and want to gloss over the step-by-step guide, click here.
+Skip ahead: [you can view all of our code in our CLI here](https://github.com/inngest/inngest/blob/main/cmd/commands/init.go). If you’re interested in the conclusions and want to gloss over the step-by-step guide, click here.
 
 First, we need to launch the CLI, often using arguments, flags, etc. In the Go world, that means that you might well be using Steve Francia’s fantastic Cobra library - [https://github.com/spf13/cobra](https://github.com/spf13/cobra).
 
@@ -411,4 +411,4 @@ After building out our basic UI for creating event-driven serverless functions, 
 
 There are a few gotchas, though. For example, having to handle `SIGINT` or `SIGQUIT` key combos yourself from Bubbletea kind of sucks. You could create a parent state wrapper which wraps your own custom State to listen for this key combo, or trap these signals yourself and quit Bubbletea from the outside. It’s also quite cumbersome to set up the variables to batch your `tea.Cmd` responses from Update. Overall, though, these are absolutely insignificant nits in a very clean and productive framework.
 
-If you're interested in the final result and checking out how our CLI works, [you can see the source here](https://github.com/inngest/inngest-cli). We use it all the time when building new async functionality - it lets us build and test new serverless functions literally in under a minute.
+If you're interested in the final result and checking out how our CLI works, [you can see the source here](https://github.com/inngest/inngest). We use it all the time when building new async functionality - it lets us build and test new serverless functions literally in under a minute.

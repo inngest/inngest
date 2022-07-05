@@ -16,10 +16,10 @@ Steps are classified as failed if either of the following conditions are met:
 
 ## Retry policies
 
-By default, each step is retried 3 times using [exponential backoff](https://github.com/inngest/inngest-cli/blob/main/pkg/backoff/backoff.go) with jitter. Retries can be customized using the `status` or `statusCode` response:
+By default, each step is retried 3 times using [exponential backoff](https://github.com/inngest/inngest/blob/main/pkg/backoff/backoff.go) with jitter. Retries can be customized using the `status` or `statusCode` response:
 
 * `2xx` - Successful: this is not a failure, no retry is necessary
 * `4xx` - Bad request: **this step will not be retried**, as this error is irrecovarble
 * `5xx` - Server error: something temporarily failed.  **This will be retried according to the retry policy (3 times, by default)**.
 
-We're currently working on implementing custom retry policies per steps, documented [in this issue](https://github.com/inngest/inngest-cli/issues/117).
+We're currently working on implementing custom retry policies per steps, documented [in this issue](https://github.com/inngest/inngest/issues/117).

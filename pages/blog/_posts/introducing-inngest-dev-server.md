@@ -45,7 +45,7 @@ As your application (e.g. a Next.js API or Flask backend) sends an event to the 
 
 The function's response as well as the event payload itself are all written to the DevServer's log output so you can easily see the inputs and outputs of your background tasks.
 
-We think that this is a simple, yet powerful, workflow for developers and [the code is fully open source on Github](https://github.com/inngest/inngest-cli) for you to dig even deeper if you want. We've also designed the DevServer so we can add new non-Docker runtimes (_think Lambda_) and we have plans to add many more features in the coming weeks and months ([check out our roadmap here](https://github.com/orgs/inngest/projects/1)).
+We think that this is a simple, yet powerful, workflow for developers and [the code is fully open source on Github](https://github.com/inngest/inngest) for you to dig even deeper if you want. We've also designed the DevServer so we can add new non-Docker runtimes (_think Lambda_) and we have plans to add many more features in the coming weeks and months ([check out our roadmap here](https://github.com/orgs/inngest/projects/1)).
 
 ## How can I get started?
 
@@ -93,7 +93,7 @@ You should now see the event in the DevServer's output and your new function sho
 
 You probably just want to see some real code don't you? We created a demo project with a Next.js backend and a function that sends an SMS via Twilio's API. Check it out here: [github.com/inngest/demo-nextjs-full-stack](https://github.com/inngest/demo-nextjs-full-stack).
 
-You can also view the DevServer's source code from right in our CLI repo: [github.com/inngest/inngest-cli](https://github.com/inngest/inngest-cli).
+You can also view the DevServer's source code from right in our CLI repo: [github.com/inngest/inngest](https://github.com/inngest/inngest).
 
 **Have questions, feedback or ideas? [Join our Discord](https://www.inngest.com/discord)!**
 

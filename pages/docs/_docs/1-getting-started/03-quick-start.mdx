@@ -31,7 +31,7 @@ curl -sfL https://cli.inngest.com/install.sh | sh
 
 This will place inngest in your $PWD.  Move it into your $PATH to invoke: `sudo mv ./inngest /usr/local/bin/inngest`.
 
-You can also download [prebuilt binaries](https://github.com/inngest/inngest-cli/releases) from Github or [build from source](https://github.com/inngest/inngest-cli), with Go 1.18+ installed.
+You can also download [prebuilt binaries](https://github.com/inngest/inngest/releases) from Github or [build from source](https://github.com/inngest/inngest), with Go 1.18+ installed.
 
 ## 2. Creating a new function
 
@@ -43,7 +43,7 @@ In order to use the event-driven queue, you'll need functions which are executed
 	- Choose "Event based", which means each time an event is received this function will run
 3. **Event trigger**: This is the name of the event that will trigger this function.
 	- We're going to use a custom event: "test/event.received" by typing this event name.  There are also built-in events for common services (which we're expanding).
-4. **Do you want to write a new function or call a URL?**: You can invoke an existing serverless function or API, or write new business logic as code. 
+4. **Do you want to write a new function or call a URL?**: You can invoke an existing serverless function or API, or write new business logic as code.
 	- Select "New function" to write some new code.
 5. **Which language** would you like to use: This lets you use scaffolds for common languages.
 	- Let's select Typescript, for now.
@@ -111,4 +111,4 @@ Next, read about [events](/docs/event-format-and-structure) and [functions](/doc
 
 **Additional tips:**
 
-- If you're on ARM and you're **not** using Docker for Mac, you should [install the binfmt emulators](https://github.com/tonistiigi/binfmt#installing-emulators) to enable cross-compilation.  This is only required for deploys. 
+- If you're on ARM and you're **not** using Docker for Mac, you should [install the binfmt emulators](https://github.com/tonistiigi/binfmt#installing-emulators) to enable cross-compilation.  This is only required for deploys.
