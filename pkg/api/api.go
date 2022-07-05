@@ -30,10 +30,10 @@ var (
 	EventPathRegex = regexp.MustCompile("^/e/([a-zA-Z0-9-_]+)$")
 )
 
-func NewAPI(o Options) (API, error) {
+func NewAPI(o Options) (*API, error) {
 	logger := o.Logger.With().Str("caller", "api").Logger()
 
-	api := API{
+	api := &API{
 		hostname: o.Hostname,
 		port:     o.Port,
 		handler:  o.EventHandler,
@@ -52,12 +52,21 @@ type API struct {
 	hostname string
 	port     string
 	log      *zerolog.Logger
+
+	server *http.Server
 }
 
-func (a API) Start(ctx context.Context) error {
-	serverUrl := fmt.Sprintf("%s:%s", a.hostname, a.port)
-	a.log.Info().Msgf("Starting server on %s", serverUrl)
-	return http.ListenAndServe(serverUrl, http.DefaultServeMux)
+func (a *API) Start(ctx context.Context) error {
+	a.server = &http.Server{
+		Addr:    fmt.Sprintf("%s:%s", a.hostname, a.port),
+		Handler: http.DefaultServeMux,
+	}
+	a.log.Info().Str("addr", a.server.Addr).Msg("starting server")
+	return a.server.ListenAndServe()
+}
+
+func (a API) Stop(ctx context.Context) error {
+	return a.server.Shutdown(ctx)
 }
 
 func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {

@@ -15,7 +15,7 @@ type Options struct {
 }
 
 type DevServer struct {
-	API    api.API
+	API    *api.API
 	Engine *Engine
 
 	dir string
