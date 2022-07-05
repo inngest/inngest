@@ -29,6 +29,7 @@ func NewCmdRun() *cobra.Command {
 		Run:     doRun,
 	}
 
+	cmd.Flags().String("event", "", "Specifies the event trigger to use if there are multiple configured")
 	cmd.Flags().Int64Var(&runSeed, "seed", 0, "Sets the seed for deterministically generating random events")
 	return cmd
 }
@@ -52,7 +53,8 @@ func doRun(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	if err = runFunction(cmd.Context(), *fn); err != nil {
+	eventName := cmd.Flag("event").Value.String()
+	if err = runFunction(cmd.Context(), *fn, eventName); err != nil {
 		// This should already have been printed to the terminal.
 		os.Exit(1)
 	}
@@ -83,13 +85,13 @@ func buildImg(ctx context.Context, fn function.Function) error {
 }
 
 // runFunction builds the function's images and runs the function.
-func runFunction(ctx context.Context, fn function.Function) error {
+func runFunction(ctx context.Context, fn function.Function, eventName string) error {
 	if runSeed <= 0 {
 		rand.Seed(time.Now().UnixNano())
 		runSeed = rand.Int63n(1_000_000)
 	}
 
-	evt, err := event(ctx, fn)
+	evt, err := event(ctx, fn, eventName)
 	if err != nil {
 		return err
 	}
@@ -113,7 +115,7 @@ func runFunction(ctx context.Context, fn function.Function) error {
 // event retrieves the event for use within testing the function.  It first checks stdin
 // to see if we're passed an event, or resorts to generating a fake event based off of
 // the function's event type.
-func event(ctx context.Context, fn function.Function) (map[string]interface{}, error) {
+func event(ctx context.Context, fn function.Function, eventName string) (map[string]interface{}, error) {
 	fi, err := os.Stdin.Stat()
 	if err != nil {
 		return nil, err
@@ -129,15 +131,15 @@ func event(ctx context.Context, fn function.Function) (map[string]interface{}, e
 		return data, err
 	}
 
-	return fakeEvent(ctx, fn)
+	return fakeEvent(ctx, fn, eventName)
 }
 
 // fakeEvent finds event triggers within the function definition, then chooses
 // a random trigger from the definitions and generates fake data for the event.
-func fakeEvent(ctx context.Context, fn function.Function) (map[string]interface{}, error) {
+func fakeEvent(ctx context.Context, fn function.Function, eventName string) (map[string]interface{}, error) {
 	evtTriggers := []function.Trigger{}
 	for _, t := range fn.Triggers {
-		if t.EventTrigger != nil {
+		if t.EventTrigger != nil && (eventName == "" || eventName == t.EventTrigger.Event) {
 			evtTriggers = append(evtTriggers, t)
 		}
 	}
