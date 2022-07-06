@@ -5,13 +5,13 @@ import (
 
 	"github.com/inngest/inngest-cli/pkg/api"
 	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/server"
+	"github.com/inngest/inngest-cli/pkg/service"
 	"github.com/spf13/cobra"
 )
 
 const (
 	ServeExecutor = "executor"
-	ServeEventAPI = "events"
+	ServeEventAPI = "events-api"
 )
 
 var (
@@ -22,8 +22,8 @@ var (
 func NewCmdServe() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:       "serve [component]",
-		Short:     "Start an Inngest server",
-		Example:   "inngestctl serve executor",
+		Short:     "Start an Inngest service",
+		Example:   "inngest serve executor",
 		RunE:      serve,
 		Args:      cobra.ExactValidArgs(1),
 		ValidArgs: serveArgs,
@@ -37,7 +37,7 @@ func NewCmdServe() *cobra.Command {
 func serve(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	var s server.Server
+	var s service.Service
 
 	locs := []string{}
 	if serveConf != "" {
@@ -50,10 +50,10 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	switch args[0] {
 	case ServeEventAPI:
-		s = api.NewServer(conf)
+		s = api.NewService(conf)
 	default:
 		return fmt.Errorf("Not implemented")
 	}
 
-	return server.Start(ctx, s)
+	return service.Start(ctx, s)
 }

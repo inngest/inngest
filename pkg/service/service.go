@@ -1,4 +1,4 @@
-package server
+package service
 
 import (
 	"context"
@@ -15,49 +15,51 @@ import (
 var (
 	defaultTimeout = 30 * time.Second
 
-	ErrPreTimeout = fmt.Errorf("server did not pre-up within the given timeout")
+	ErrPreTimeout = fmt.Errorf("service did not pre-up within the given timeout")
 )
 
-// Server represents a basic interface for a long-running server.  By invoking
-// the Start function with a server, we automatically call Pre to initialize
-// the server prior to starting (with a timeout), run the server via Run and listen
-// for termination signals.  These term signals are caught and then the server is
+// Service represents a basic interface for a long-running service.  By invoking
+// the Start function with a service, we automatically call Pre to initialize
+// the service prior to starting (with a timeout), run the service via Run and listen
+// for termination signals.  These term signals are caught and then the service is
 // gracefully shut down via Stop.
-type Server interface {
-	// Name returns the server name
+type Service interface {
+	// Name returns the service name
 	Name() string
 
-	// Pre initialize the server, returning an error if the server is not
+	// Pre initializes the service, returning an error if the service is not
 	// capable of running.
 	Pre(ctx context.Context) error
-	// Run runs the server as a blocking operation
+	// Run runs the service as a blocking operation
 	Run(ctx context.Context) error
-	// Stop is called to gracefully shut down the server.
+	// Stop is called to gracefully shut down the service.
 	Stop(ctx context.Context) error
 }
 
-// StartTimeouter lets a Server define the timeout period when running Pre
+// StartTimeouter lets a Service define the timeout period when running Pre
 type StartTimeouter interface {
+	Service
+
 	StartTimeout() time.Duration
 }
 
-// startTimeout returns the timeout duration used when starting the server.
-// We attempt to typecast the server into a StartTimouter, returning the duration
+// startTimeout returns the timeout duration used when starting the service.
+// We attempt to typecast the service into a StartTimouter, returning the duration
 // provided by this function or the defaultTimeout.
-func startTimeout(s Server) time.Duration {
+func startTimeout(s Service) time.Duration {
 	if t, ok := s.(StartTimeouter); ok {
 		return t.StartTimeout()
 	}
 	return defaultTimeout
 }
 
-// Start runs a server, invoking Pre() to bootstrap the server, then Run()
-// to run the server.
+// Start runs a Service, invoking Pre() to bootstrap the Service, then Run()
+// to run the Service.
 //
 // It blocks until an interrupt/kill signal, or the Run() command errors. We
-// automatically call Stop() when terminating the server.
-func Start(ctx context.Context, s Server) (err error) {
-	l := logger.From(ctx).With().Str("server", s.Name()).Logger()
+// automatically call Stop() when terminating the Service.
+func Start(ctx context.Context, s Service) (err error) {
+	l := logger.From(ctx).With().Str("service", s.Name()).Logger()
 
 	preCh := make(chan error)
 	preCtx, done := context.WithTimeout(ctx, startTimeout(s))
@@ -84,12 +86,12 @@ func Start(ctx context.Context, s Server) (err error) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			l.Error().Interface("recover", r).Msg("server panicked")
+			l.Error().Interface("recover", r).Msg("service panicked")
 			cleanup()
 		}
 	}()
 
-	l.Info().Msg("server starting")
+	l.Info().Msg("service starting")
 	go func() {
 		err = s.Run(runCtx)
 		// Call cleanup, triggering Stop below.  In this case
@@ -105,13 +107,13 @@ func Start(ctx context.Context, s Server) (err error) {
 	case <-runCtx.Done():
 		// Run terminated.
 		if err != nil {
-			l.Error().Err(err).Msg("server errored")
+			l.Error().Err(err).Msg("service errored")
 		} else {
-			l.Warn().Msg("server run finished")
+			l.Warn().Msg("service run finished")
 		}
 	}
 
-	l.Info().Msg("server stopping")
+	l.Info().Msg("service stopping")
 	if stopErr := s.Stop(ctx); stopErr != nil {
 		err = multierror.Append(err, stopErr)
 	}

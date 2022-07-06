@@ -7,10 +7,10 @@ import (
 
 	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/logger"
-	"github.com/inngest/inngest-cli/pkg/server"
+	"github.com/inngest/inngest-cli/pkg/service"
 )
 
-func NewServer(c *config.Config) server.Server {
+func NewService(c *config.Config) service.Service {
 	return &apiServer{
 		config: c,
 	}

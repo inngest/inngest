@@ -24,7 +24,7 @@ func NewCmdDeploy() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy",
 		Short:   "Deploy a function to Inngest",
-		Example: "inngestctl deploy",
+		Example: "inngest deploy",
 		Run:     doDeploy,
 	}
 	return cmd
