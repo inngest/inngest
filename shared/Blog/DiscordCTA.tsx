@@ -13,7 +13,7 @@ const DiscordCTA: React.FC<{ size?: "default" | "small" }> = ({
       <p>Ask questions, give feedback, and share feature requests</p>
       <Button
         href={process.env.NEXT_PUBLIC_DISCORD_URL}
-        kind="outlineHighContrast"
+        kind="outline"
         size={size === "small" ? "medium" : "default"}
       >
         Join our Discord!

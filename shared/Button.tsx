@@ -116,7 +116,7 @@ const primaryCSS = css`
 `;
 
 const outlineCSS = css`
-  border: var(--button-border-width) solid var(--stroke-color);
+  border: var(--button-border-width) solid currentColor;
   color: inherit; // use the parent element's color
 
   &:hover {
@@ -135,7 +135,7 @@ const outlinePrimaryCSS = css`
 
 const outlineHighContrastCSS = css`
   ${outlineCSS}
-  border-color: #fff;
+  border-color: currentColor;
 `;
 
 const blackCSS = css`

@@ -210,7 +210,7 @@ export default function Pricing() {
                 <p>{PLANS[0].description}</p>
               </div>
               <div>
-                <Button kind="outlineHighContrast" href={PLANS[0].cta.href}>
+                <Button kind="outline" href={PLANS[0].cta.href}>
                   {PLANS[0].cta.text}
                 </Button>
               </div>
@@ -225,7 +225,7 @@ export default function Pricing() {
               </div>
             </PlanHeader>
             <IconList direction="vertical" items={PLANS[0].features} />
-            <Button kind="outlineHighContrast" href={PLANS[0].cta.href}>
+            <Button kind="outline" href={PLANS[0].cta.href}>
               {PLANS[0].cta.text}
             </Button>
           </FreePlanBlock>
@@ -240,7 +240,7 @@ export default function Pricing() {
                 </div>
               </PlanHeader>
               <IconList direction="vertical" items={plan.features} />
-              <Button kind="outlineHighContrast" href={plan.cta.href}>
+              <Button kind="outline" href={plan.cta.href}>
                 {plan.cta.text}
               </Button>
             </PlanBlock>
