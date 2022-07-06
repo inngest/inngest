@@ -19,8 +19,9 @@ func defaultConfig() *Config {
 		},
 		EventStream: EventStream{
 			Service: MessagingService{
-				Backend: "inmemory",
-				raw:     json.RawMessage(`{"backend":"inmemory","topic":"events"}`),
+				Backend:  "inmemory",
+				raw:      json.RawMessage(`{"backend":"inmemory","topic":"events"}`),
+				concrete: &InMemoryMessaging{Topic: "events"},
 			},
 		},
 	}
@@ -34,9 +35,16 @@ func TestParse(t *testing.T) {
 		input  []byte
 		config func() *Config
 		err    error
+		// post is a func that can run after unmarshalling, to add any custom predicates.
+		post func(t *testing.T, c *Config)
 	}{
 		{
 			name:   "none",
+			config: defaultConfig,
+		},
+		{
+			name:   "empty json",
+			input:  []byte(`{}`),
 			config: defaultConfig,
 		},
 		{
@@ -70,9 +78,43 @@ config.#Config & {
 			},
 		},
 		{
-			name:   "empty json",
-			input:  []byte(`{}`),
-			config: defaultConfig,
+			name: "nats config, as cue",
+			input: []byte(`package main
+
+import (
+	config "inngest.com/defs/config"
+)
+
+config.#Config & {
+  eventStream: {
+    service: {
+      backend: "nats"
+      topic: "nats-events"
+      serverURL: "http://127.0.0.1:4222"
+    }
+  }
+}
+`),
+			config: func() *Config {
+				c := defaultConfig()
+				// Valid JSON
+				c.EventStream.Service.raw = []byte(`{"backend":"nats","topic":"nats-events","serverURL":"http://127.0.0.1:4222"}`)
+				c.EventStream.Service.Backend = "nats"
+				c.EventStream.Service.concrete = &NATSMessaging{
+					Topic:     "nats-events",
+					ServerURL: "http://127.0.0.1:4222",
+				}
+				return c
+			},
+
+			post: func(t *testing.T, c *Config) {
+				nats, err := c.EventStream.Service.NATS()
+				require.NoError(t, err)
+				require.EqualValues(t, &NATSMessaging{
+					Topic:     "nats-events",
+					ServerURL: "http://127.0.0.1:4222",
+				}, nats)
+			},
 		},
 	}
 
@@ -81,6 +123,10 @@ config.#Config & {
 			config, err := parse(test.input)
 			require.Equal(t, test.err, err)
 			require.EqualValues(t, test.config(), config)
+
+			if test.post != nil {
+				test.post(t, config)
+			}
 		})
 	}
 }

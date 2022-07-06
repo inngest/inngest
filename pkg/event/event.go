@@ -1,5 +1,6 @@
 package event
 
+// Event represents an event sent to Inngest.
 type Event struct {
 	Name string                 `json:"name"`
 	Data map[string]interface{} `json:"data"`

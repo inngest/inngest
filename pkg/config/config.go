@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"encoding/json"
 )
 
 // Load loads the configu from the given locations in order.  If locs is empty,
@@ -47,29 +46,4 @@ type EventAPI struct {
 // EventAPI configures the event stream, which connects events to the execution engine.
 type EventStream struct {
 	Service MessagingService
-}
-
-type MessagingService struct {
-	Backend string
-	raw     json.RawMessage
-}
-
-func (m *MessagingService) UnmarshalJSON(byt []byte) error {
-	m.raw = byt
-	type svc struct {
-		Backend string
-	}
-	data := &svc{}
-	err := json.Unmarshal(byt, data)
-	m.Backend = data.Backend
-	return err
-}
-
-type InMemoryMessaging struct {
-	Topic string
-}
-
-type NATSMessaging struct {
-	Topic     string
-	ServerURL string
 }
