@@ -2,16 +2,23 @@ package api
 
 import (
 	"context"
+	"errors"
+	"net/http"
 
+	"github.com/inngest/inngest-cli/pkg/config"
+	"github.com/inngest/inngest-cli/pkg/logger"
 	"github.com/inngest/inngest-cli/pkg/server"
 )
 
-func NewServer() server.Server {
-	return &apiServer{}
+func NewServer(c *config.Config) server.Server {
+	return &apiServer{
+		config: c,
+	}
 }
 
 type apiServer struct {
-	api *API
+	config *config.Config
+	api    *API
 }
 
 func (a *apiServer) Name() string {
@@ -21,11 +28,12 @@ func (a *apiServer) Name() string {
 func (a *apiServer) Pre(ctx context.Context) error {
 	var err error
 
-	// TODO: Conenct and load ingest keys.
 	a.api, err = NewAPI(Options{
-		Hostname: "localhost",
-		Port:     "8181",
+		Hostname: a.config.EventAPI.Addr,
+		Port:     a.config.EventAPI.Port,
+		Logger:   logger.From(ctx),
 	})
+
 	if err != nil {
 		return err
 	}
@@ -34,10 +42,13 @@ func (a *apiServer) Pre(ctx context.Context) error {
 }
 
 func (a *apiServer) Run(ctx context.Context) error {
-	return a.api.Start(ctx)
+	err := a.api.Start(ctx)
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
 }
 
 func (a *apiServer) Stop(ctx context.Context) error {
-	// Gracefully shut down the server.
 	return a.api.Stop(ctx)
 }

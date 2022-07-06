@@ -11,6 +11,10 @@ func Load(ctx context.Context, locs ...string) (*Config, error) {
 	return loadAll(ctx, locs...)
 }
 
+func Default(ctx context.Context) (*Config, error) {
+	return parse(nil)
+}
+
 // Config represents configuration for running the Inngest services.
 type Config struct {
 	// Log configures the logger used within Inngest services.

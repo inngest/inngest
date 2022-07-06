@@ -14,6 +14,7 @@ import (
 	cueerrors "cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/load"
 	"github.com/inngest/inngest-cli/pkg/cuedefs"
+	"github.com/inngest/inngest-cli/pkg/logger"
 )
 
 var (
@@ -67,7 +68,10 @@ func loadAll(ctx context.Context, locs ...string) (*Config, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("no config file found")
+	logger.From(ctx).Warn().Msg("no config file found in search paths, using default")
+
+	// Return the default config.
+	return parse(nil)
 }
 
 func read(ctx context.Context, path string) (*Config, error) {

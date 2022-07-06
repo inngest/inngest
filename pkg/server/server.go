@@ -78,7 +78,7 @@ func Start(ctx context.Context, s Server) (err error) {
 		}
 	}
 
-	ctx, cleanup := context.WithCancel(context.Background())
+	runCtx, cleanup := context.WithCancel(ctx)
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
 
@@ -91,7 +91,7 @@ func Start(ctx context.Context, s Server) (err error) {
 
 	l.Info().Msg("server starting")
 	go func() {
-		err = s.Run(ctx)
+		err = s.Run(runCtx)
 		// Call cleanup, triggering Stop below.  In this case
 		// we don't need to wait for a signal to terminate.
 		cleanup()
@@ -102,7 +102,7 @@ func Start(ctx context.Context, s Server) (err error) {
 		// Terminating via a signal
 		l.Info().Interface("signal", sig).Msg("received signal")
 		cleanup()
-	case <-ctx.Done():
+	case <-runCtx.Done():
 		// Run terminated.
 		if err != nil {
 			l.Error().Err(err).Msg("server errored")
