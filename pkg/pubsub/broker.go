@@ -129,6 +129,7 @@ func (b *broker) SubscribeN(ctx context.Context, topic string, run PerformFunc, 
 		// to acquire tokens.
 		if err := sem.Acquire(ctx, math.MaxInt64/concurrency); err != nil || ctx.Err() != nil {
 			// The subscription closed.
+			unrecoverableErr = err
 			break
 		}
 

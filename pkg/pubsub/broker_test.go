@@ -75,15 +75,14 @@ func TestSubscribeN(t *testing.T) {
 
 	// i stores how often the run function has been invoked.
 	var i int32
-
-	pauseRun := true
+	var paused int32
 	go func() {
 		// Subscribe in a blocking fashion.
 		run := func(c context.Context, m Message) error {
 			atomic.AddInt32(&i, 1)
 			require.EqualValues(t, sent, m)
 			ok <- m
-			for pauseRun {
+			for atomic.LoadInt32(&paused) == 0 {
 				// Do not allow these funcs to finish.
 				<-time.After(50 * time.Millisecond)
 			}
@@ -124,14 +123,15 @@ func TestSubscribeN(t *testing.T) {
 	}
 
 	<-time.After(2 * time.Second)
-	require.EqualValues(t, 10, i, "Expected run to be invoked 10 times, not running for new events while concurrency is blocked")
+	require.EqualValues(t, 10, atomic.LoadInt32(&i), "Expected run to be invoked 10 times, not running for new events while concurrency is blocked")
 
 	// Unpause the run.
-	pauseRun = false
+	atomic.AddInt32(&paused, 1)
+
 	<-time.After(time.Second)
 
 	// Now they should work, as the first 10 were completed.
-	require.EqualValues(t, 20, i, "Expected run to be invoked 20 times after concurrent capacity was freed")
+	require.EqualValues(t, 20, atomic.LoadInt32(&i), "Expected run to be invoked 20 times after concurrent capacity was freed")
 }
 
 func TestCancellation(t *testing.T) {
@@ -143,7 +143,7 @@ func TestCancellation(t *testing.T) {
 	ok := make(chan Message)
 
 	// Changed when Subscribe finishes in the goroutine.
-	complete := false
+	var complete int32
 
 	// i stores how often the run function has been invoked.
 	var i int32
@@ -156,8 +156,9 @@ func TestCancellation(t *testing.T) {
 			return nil
 		}
 		err = b.Subscribe(ctx, topic, run)
+		require.Error(t, err)
 		require.ErrorIs(t, err, context.Canceled)
-		complete = true
+		atomic.AddInt32(&complete, 1)
 	}()
 
 	// Wait for the subscription.
@@ -180,8 +181,11 @@ func TestCancellation(t *testing.T) {
 	cancel()
 
 	// The Receive batcher... batches, and we need to wait for this.
-	<-time.After(1 * time.Second)
-	require.True(t, complete)
+	now := time.Now()
+	for atomic.LoadInt32(&complete) != 1 && time.Until(now) > (-10*time.Second) {
+		<-time.After(50 * time.Millisecond)
+	}
+	require.EqualValues(t, 1, atomic.LoadInt32(&complete), "Expected subscription to stop within 10 seconds")
 
 	// Send another event, and we should not receive nor increase the counter.
 	err = b.Publish(context.Background(), sent, topic)
