@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/load"
@@ -159,11 +160,14 @@ func prepare(input []byte) (*cue.Instance, error) {
 		if entry.IsDir() {
 			return nil
 		}
+		if strings.HasPrefix(p, "config") {
+			// Config definitions are used to manage services only.
+			return nil
+		}
 		contents, err := cuedefs.FS.ReadFile(p)
 		if err != nil {
 			return err
 		}
-
 		cfg.Overlay[path.Join("/", p)] = load.FromBytes(contents)
 		return nil
 	})

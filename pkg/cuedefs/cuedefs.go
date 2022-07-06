@@ -8,5 +8,5 @@ import "embed"
 
 // FS embeds the cue module and definitions.
 //
-//go:embed cue.mod v1
+//go:embed cue.mod v1 config
 var FS embed.FS

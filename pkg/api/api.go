@@ -70,7 +70,7 @@ func (a API) Stop(ctx context.Context) error {
 }
 
 func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
-	a.log.Debug().Msg("healthcheck")
+	a.log.Trace().Msg("healthcheck")
 	a.writeResponse(w, apiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "OK",
