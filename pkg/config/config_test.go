@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,8 +19,7 @@ func defaultConfig() *Config {
 		EventStream: EventStream{
 			Service: MessagingService{
 				Backend:  "inmemory",
-				raw:      json.RawMessage(`{"backend":"inmemory","topic":"events"}`),
-				concrete: &InMemoryMessaging{Topic: "events"},
+				Concrete: &InMemoryMessaging{Topic: "events"},
 			},
 		},
 	}
@@ -98,9 +96,8 @@ config.#Config & {
 			config: func() *Config {
 				c := defaultConfig()
 				// Valid JSON
-				c.EventStream.Service.raw = []byte(`{"backend":"nats","topic":"nats-events","serverURL":"http://127.0.0.1:4222"}`)
 				c.EventStream.Service.Backend = "nats"
-				c.EventStream.Service.concrete = &NATSMessaging{
+				c.EventStream.Service.Concrete = &NATSMessaging{
 					Topic:     "nats-events",
 					ServerURL: "http://127.0.0.1:4222",
 				}
@@ -108,8 +105,8 @@ config.#Config & {
 			},
 
 			post: func(t *testing.T, c *Config) {
-				nats, err := c.EventStream.Service.NATS()
-				require.NoError(t, err)
+				nats, ok := c.EventStream.Service.Concrete.(*NATSMessaging)
+				require.True(t, ok)
 				require.EqualValues(t, &NATSMessaging{
 					Topic:     "nats-events",
 					ServerURL: "http://127.0.0.1:4222",

@@ -32,7 +32,7 @@ type PerformFunc func(context.Context, Message) error
 
 // Publisher publishes an event to be consumed by one or more subscribers.
 type Publisher interface {
-	Publish(ctx context.Context, m Message, topic string) error
+	Publish(ctx context.Context, topic string, m Message) error
 }
 
 // Subscriber subscribes to a topic to consume events published by a Publisher.

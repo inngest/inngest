@@ -25,7 +25,7 @@ func testbroker(t *testing.T) (*broker, string) {
 	require.NoError(t, err)
 
 	// Create the test topic.
-	err = ps.Publish(ctx, Message{}, topic)
+	err = ps.Publish(ctx, topic, Message{})
 	require.NoError(t, err)
 
 	return ps.(*broker), topic
@@ -54,7 +54,7 @@ func TestBasicPublishSubscribe(t *testing.T) {
 	// XXX: Let's create a way to assert that this is done without timing.
 	<-time.After(time.Second)
 
-	err = b.Publish(ctx, sent, topic)
+	err = b.Publish(ctx, topic, sent)
 	require.NoError(t, err)
 
 	select {
@@ -98,7 +98,7 @@ func TestSubscribeN(t *testing.T) {
 
 	// Send 10 events.
 	for i := 0; i < 10; i++ {
-		err = b.Publish(ctx, sent, topic)
+		err = b.Publish(ctx, topic, sent)
 		require.NoError(t, err)
 	}
 
@@ -118,7 +118,7 @@ func TestSubscribeN(t *testing.T) {
 
 	// Sending 10 more should block.
 	for i := 0; i < 10; i++ {
-		err = b.Publish(ctx, sent, topic)
+		err = b.Publish(ctx, topic, sent)
 		require.NoError(t, err)
 	}
 
@@ -165,7 +165,7 @@ func TestCancellation(t *testing.T) {
 	// XXX: Let's create a way to assert that this is done without timing.
 	<-time.After(time.Second)
 
-	err = b.Publish(ctx, sent, topic)
+	err = b.Publish(ctx, topic, sent)
 	require.NoError(t, err)
 
 	select {
@@ -188,7 +188,7 @@ func TestCancellation(t *testing.T) {
 	require.EqualValues(t, 1, atomic.LoadInt32(&complete), "Expected subscription to stop within 10 seconds")
 
 	// Send another event, and we should not receive nor increase the counter.
-	err = b.Publish(context.Background(), sent, topic)
+	err = b.Publish(context.Background(), topic, sent)
 	require.NoError(t, err)
 
 	<-time.After(time.Second)

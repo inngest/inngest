@@ -21,35 +21,38 @@ const (
 // implementation.
 type TopicURLCreator interface {
 	Backend() string
+
 	TopicURL(topic string, typ URLType) string
+	TopicName() string
 }
 
 // MessagingService represents
 type MessagingService struct {
-	Backend string
-
-	raw      json.RawMessage
-	concrete TopicURLCreator
+	Backend  string
+	Concrete TopicURLCreator
 }
 
 // Set allows users to manually override the concrete backing config,
 // for use within test environments.
 func (m *MessagingService) Set(to TopicURLCreator) {
 	m.Backend = to.Backend()
-	m.concrete = to
+	m.Concrete = to
 }
 
 func (m MessagingService) TopicURL(topic string, typ URLType) string {
-	if m.concrete == nil {
+	if m.Concrete == nil {
 		return ""
 	}
-	return m.concrete.TopicURL(topic, typ)
+	return m.Concrete.TopicURL(topic, typ)
+}
+
+func (m MessagingService) TopicName() string {
+	return m.Concrete.TopicName()
 }
 
 // UnmarshalJSON unmarshals the messaging service, keeping the raw bytes
 // available for unmarshalling depending on the Backend type.
 func (m *MessagingService) UnmarshalJSON(byt []byte) error {
-	m.raw = byt
 	type svc struct {
 		Backend string
 	}
@@ -77,27 +80,8 @@ func (m *MessagingService) UnmarshalJSON(byt []byte) error {
 		return err
 	}
 
-	m.concrete = concrete
+	m.Concrete = concrete
 	return nil
-}
-
-// NATS returns NATSMessaging configuration if the given Backend is
-// "nats".
-func (m MessagingService) NATS() (*NATSMessaging, error) {
-	if m.Backend != "nats" {
-		return nil, fmt.Errorf("messaging service mismatch: request nats, got %s", m.Backend)
-	}
-	c, _ := m.concrete.(*NATSMessaging)
-	return c, nil
-}
-
-// InMemory returns InMemoryMessaging config when the backend is "inmemory".
-func (m MessagingService) InMemory() (*InMemoryMessaging, error) {
-	if m.Backend != "inmemory" {
-		return nil, fmt.Errorf("messaging service mismatch: request inmemory, got %s", m.Backend)
-	}
-	c, _ := m.concrete.(*InMemoryMessaging)
-	return c, nil
 }
 
 // InMemoryMessaging configures the topic for use with an in-memory
@@ -108,6 +92,10 @@ type InMemoryMessaging struct {
 
 func (i InMemoryMessaging) Backend() string {
 	return MessagingInMemory
+}
+
+func (i InMemoryMessaging) TopicName() string {
+	return i.Topic
 }
 
 func (i InMemoryMessaging) TopicURL(topic string, typ URLType) string {
@@ -125,6 +113,10 @@ func (n NATSMessaging) Backend() string {
 	return MessagingNATS
 }
 
+func (n NATSMessaging) TopicName() string {
+	return n.Topic
+}
+
 func (n NATSMessaging) TopicURL(topic string, typ URLType) string {
 	// Unfortunately, NATS uses an environment variable to configure the
 	// remote URL.  This is hacky, but we set the remote URL prior to
@@ -140,6 +132,10 @@ type GCPPubSubMessaging struct {
 
 func (g GCPPubSubMessaging) Backend() string {
 	return MessagingGCPPubSub
+}
+
+func (g GCPPubSubMessaging) TopicName() string {
+	return g.Topic
 }
 
 func (g GCPPubSubMessaging) TopicURL(topic string, typ URLType) string {

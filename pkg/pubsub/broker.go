@@ -48,7 +48,7 @@ type broker struct {
 // Publish publishes an event on the given topic.  It does not check that a subscriber exists
 // to the topic before sending, nor does it check that the topic/queue exists on the backend
 // implementation.
-func (b *broker) Publish(ctx context.Context, m Message, topic string) error {
+func (b *broker) Publish(ctx context.Context, topic string, m Message) error {
 	t, err := b.openPublishTopic(ctx, topic)
 	if err != nil {
 		return err
