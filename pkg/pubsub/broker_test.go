@@ -156,8 +156,7 @@ func TestCancellation(t *testing.T) {
 			return nil
 		}
 		err = b.Subscribe(ctx, topic, run)
-		require.Error(t, err)
-		require.ErrorIs(t, err, context.Canceled)
+		require.NoError(t, err)
 		atomic.AddInt32(&complete, 1)
 	}()
 

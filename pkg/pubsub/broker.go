@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -84,7 +85,8 @@ func (b *broker) Subscribe(ctx context.Context, topic string, run PerformFunc) e
 }
 
 // Subscribe subscribes to the given topic and runs the passed function each time
-// an event is received.  It blocks until the given context is cancelled.
+// an event is received.  It blocks until the given context is cancelled, and returns
+// a nil error when shutting down from a cancelled context.
 func (b *broker) SubscribeN(ctx context.Context, topic string, run PerformFunc, concurrency int64) error {
 	url := b.conf.TopicURL(topic, config.URLTypeSubscribe)
 
@@ -160,7 +162,6 @@ func (b *broker) SubscribeN(ctx context.Context, topic string, run PerformFunc, 
 
 			// Run the message only if we've decoded items.
 			err := run(ctx, *m)
-
 			if err == nil {
 				msg.Ack()
 				return
@@ -172,6 +173,14 @@ func (b *broker) SubscribeN(ctx context.Context, topic string, run PerformFunc, 
 				msg.Ack() // Unfortunately have to ack these if its not nackable.
 			}
 		}(msg)
+	}
+
+	if errors.Is(unrecoverableErr, context.Canceled) {
+		// There's no need to error here, and an implicit race on sem acquisition
+		// in which we only set the ctx cancelled error if it came from sem.Acquire,
+		// not if ctx.Err is done.
+		// We don't want to return an error either way.
+		return nil
 	}
 
 	return unrecoverableErr
