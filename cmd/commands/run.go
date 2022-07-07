@@ -25,7 +25,7 @@ func NewCmdRun() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "run",
 		Short:   "Run a serverless function locally",
-		Example: "inngestctl run",
+		Example: "inngest run",
 		Run:     doRun,
 	}
 
