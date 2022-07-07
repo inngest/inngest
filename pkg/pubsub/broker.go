@@ -49,7 +49,7 @@ type broker struct {
 // to the topic before sending, nor does it check that the topic/queue exists on the backend
 // implementation.
 func (b *broker) Publish(ctx context.Context, m Message, topic string) error {
-	t, err := b.openTopic(ctx, topic)
+	t, err := b.openPublishTopic(ctx, topic)
 	if err != nil {
 		return err
 	}
@@ -77,6 +77,8 @@ func (b *broker) Publish(ctx context.Context, m Message, topic string) error {
 	return nil
 }
 
+// Subscribe subscribes to a topic, invoking the given run function consecutively
+// in a single threaded manner each time an event is received.
 func (b *broker) Subscribe(ctx context.Context, topic string, run PerformFunc) error {
 	return b.SubscribeN(ctx, topic, run, 1)
 }
@@ -84,7 +86,7 @@ func (b *broker) Subscribe(ctx context.Context, topic string, run PerformFunc) e
 // Subscribe subscribes to the given topic and runs the passed function each time
 // an event is received.  It blocks until the given context is cancelled.
 func (b *broker) SubscribeN(ctx context.Context, topic string, run PerformFunc, concurrency int64) error {
-	url := b.conf.TopicURL(topic)
+	url := b.conf.TopicURL(topic, config.URLTypeSubscribe)
 
 	subs, err := b.mux.OpenSubscription(ctx, url)
 	if err != nil {
@@ -175,10 +177,10 @@ func (b *broker) SubscribeN(ctx context.Context, topic string, run PerformFunc, 
 	return unrecoverableErr
 }
 
-// openTopic calls pubsub.OpenTopic once for a given event for publishing.
+// openPublishTopic calls pubsub.OpenTopic once for a given event for publishing.
 // It caches the opened *pubsub.Topic inside a map on the manager.
-func (b *broker) openTopic(ctx context.Context, topic string) (*pubsub.Topic, error) {
-	url := b.conf.TopicURL(topic)
+func (b *broker) openPublishTopic(ctx context.Context, topic string) (*pubsub.Topic, error) {
+	url := b.conf.TopicURL(topic, config.URLTypePublish)
 
 	b.tl.RLock()
 	existing, ok := b.topics[url]

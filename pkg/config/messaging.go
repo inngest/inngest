@@ -3,18 +3,25 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 )
 
+type URLType string
+
 const (
-	MessagingInMemory = "inmemory"
-	MessagingNATS     = "nats"
+	MessagingInMemory  = "inmemory"
+	MessagingNATS      = "nats"
+	MessagingGCPPubSub = "gcp-pubsub"
+
+	URLTypePublish   URLType = "publish"
+	URLTypeSubscribe URLType = "subscribe"
 )
 
 // TopicURLCreator creates pub/sub topic URLs for the given backend
 // implementation.
 type TopicURLCreator interface {
 	Backend() string
-	TopicURL(topic string) string
+	TopicURL(topic string, typ URLType) string
 }
 
 // MessagingService represents
@@ -32,11 +39,11 @@ func (m *MessagingService) Set(to TopicURLCreator) {
 	m.concrete = to
 }
 
-func (m MessagingService) TopicURL(topic string) string {
+func (m MessagingService) TopicURL(topic string, typ URLType) string {
 	if m.concrete == nil {
 		return ""
 	}
-	return m.concrete.TopicURL(topic)
+	return m.concrete.TopicURL(topic, typ)
 }
 
 // UnmarshalJSON unmarshals the messaging service, keeping the raw bytes
@@ -60,6 +67,8 @@ func (m *MessagingService) UnmarshalJSON(byt []byte) error {
 		concrete = &InMemoryMessaging{}
 	case MessagingNATS:
 		concrete = &NATSMessaging{}
+	case MessagingGCPPubSub:
+		concrete = &GCPPubSubMessaging{}
 	default:
 		return fmt.Errorf("unknown messaging backend: %s", m.Backend)
 	}
@@ -91,6 +100,8 @@ func (m MessagingService) InMemory() (*InMemoryMessaging, error) {
 	return c, nil
 }
 
+// InMemoryMessaging configures the topic for use with an in-memory
+// pubsub backend.
 type InMemoryMessaging struct {
 	Topic string
 }
@@ -99,10 +110,12 @@ func (i InMemoryMessaging) Backend() string {
 	return MessagingInMemory
 }
 
-func (i InMemoryMessaging) TopicURL(topic string) string {
+func (i InMemoryMessaging) TopicURL(topic string, typ URLType) string {
 	return fmt.Sprintf("mem://%s", topic)
 }
 
+// NATSMessaging configures the NATS server URL and topic for use with
+// a NATS messaging backend.
 type NATSMessaging struct {
 	Topic     string
 	ServerURL string
@@ -112,6 +125,27 @@ func (n NATSMessaging) Backend() string {
 	return MessagingNATS
 }
 
-func (n NATSMessaging) TopicURL(topic string) string {
-	return ""
+func (n NATSMessaging) TopicURL(topic string, typ URLType) string {
+	// Unfortunately, NATS uses an environment variable to configure the
+	// remote URL.  This is hacky, but we set the remote URL prior to
+	// connecting to any queues here.
+	os.Setenv("NATS_SERVER_URL", n.ServerURL)
+	return fmt.Sprintf("nats://%s", topic)
+}
+
+type GCPPubSubMessaging struct {
+	Project string
+	Topic   string
+}
+
+func (g GCPPubSubMessaging) Backend() string {
+	return MessagingGCPPubSub
+}
+
+func (g GCPPubSubMessaging) TopicURL(topic string, typ URLType) string {
+	if typ == URLTypePublish {
+		return fmt.Sprintf("gcppubsub://projects/%s/topics/%s", g.Project, g.Topic)
+	}
+
+	return fmt.Sprintf("gcppubsub://projects/%s/subscriptions/%s", g.Project, g.Topic)
 }
