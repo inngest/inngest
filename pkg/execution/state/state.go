@@ -19,7 +19,8 @@ var (
 	ErrPauseNotFound = fmt.Errorf("pause not found")
 	// ErrPauseLeased is returned when attempting to lease a pause that is
 	// already leased by another event.
-	ErrPauseLeased = fmt.Errorf("pause already leased")
+	ErrPauseLeased      = fmt.Errorf("pause already leased")
+	ErrIdentifierExists = fmt.Errorf("identifier already exists")
 )
 
 const (
@@ -31,6 +32,17 @@ const (
 type Identifier struct {
 	WorkflowID uuid.UUID `json:"workflowID"`
 	RunID      ulid.ULID `json:"runID"`
+	// Key represents a unique idempotency key used to deduplicate this
+	// workflow run amongst other runs for the same workflow.
+	Key string `json:"key:"`
+}
+
+func (i Identifier) IdempotencyKey() string {
+	key := i.Key
+	if i.Key == "" {
+		key = i.RunID.String()
+	}
+	return fmt.Sprintf("%s:%s", i.WorkflowID, key)
 }
 
 // Pause allows steps of a function to be paused until some time in the future.
@@ -159,8 +171,12 @@ type CompleteSubscriber interface {
 // It accepst any starting state as its input.  This is usually, and locally in dev,
 // a map[string]interface{} containing event data.
 type Mutater interface {
+
 	// New creates a new state for the given run ID, using the event as the input data for the root workflow.
-	New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, input map[string]any) (State, error)
+	//
+	// If the IdempotencyKey within Identifier already exists, the state implementation should return
+	// ErrIdentifierExists.
+	New(ctx context.Context, workflow inngest.Workflow, i Identifier, input map[string]any) (State, error)
 
 	// scheduled increases the scheduled count for a run's metadata.
 	//

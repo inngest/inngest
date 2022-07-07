@@ -50,11 +50,16 @@ func (i *InMemoryRunner) Start(ctx context.Context) error {
 
 // NewRun initializes a new run for the given workflow.
 func (i *InMemoryRunner) NewRun(ctx context.Context, f inngest.Workflow, data map[string]interface{}) (*state.Identifier, error) {
-	state, err := i.sm.New(ctx, f, ulid.MustNew(ulid.Now(), rand.Reader), data)
+
+	id := state.Identifier{
+		WorkflowID: f.UUID,
+		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+	}
+
+	_, err := i.sm.New(ctx, f, id, data)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing new run: %w", err)
 	}
-	id := state.Identifier()
 
 	err = i.Enqueue(ctx, queue.Item{
 		Identifier: id,
