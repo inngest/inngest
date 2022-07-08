@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -130,4 +131,53 @@ func TestPreTimeout(t *testing.T) {
 	err := Start(context.Background(), m)
 	require.Error(t, err)
 	require.ErrorContains(t, err, ErrPreTimeout.Error())
+}
+
+func TestStartAll(t *testing.T) {
+	var invocations int32
+	m := mockserver{
+		pre: func(ctx context.Context) error { return nil },
+		run: func(ctx context.Context) error {
+			atomic.AddInt32(&invocations, 1)
+			<-time.After(500 * time.Millisecond)
+			return nil
+		},
+		stop: func(ctx context.Context) error { return nil },
+	}
+	now := time.Now()
+	err := StartAll(context.Background(), m, m, m)
+	require.NoError(t, err)
+	require.WithinDuration(t, time.Now(), now.Add(500*time.Millisecond), 10*time.Millisecond)
+	require.Equal(t, int32(3), atomic.LoadInt32(&invocations))
+}
+
+// TestSingleSvcError ensures that all services shut down if one service errors.
+func TestSingleSvcError(t *testing.T) {
+	var invocations int32
+	var stops int32
+	m := mockserver{
+		pre: func(ctx context.Context) error { return nil },
+		run: func(ctx context.Context) error {
+			atomic.AddInt32(&invocations, 1)
+			if atomic.LoadInt32(&invocations) == 1 {
+				// The first service should error.
+				<-time.After(500 * time.Millisecond)
+				return fmt.Errorf("boo")
+			}
+			//The others should run.
+			<-time.After(time.Minute)
+			return nil
+		},
+		stop: func(ctx context.Context) error {
+			atomic.AddInt32(&stops, 1)
+			return nil
+		},
+	}
+	now := time.Now()
+	err := StartAll(context.Background(), m, m, m)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "boo")
+	require.WithinDuration(t, time.Now(), now.Add(500*time.Millisecond), 10*time.Millisecond)
+	require.Equal(t, int32(3), atomic.LoadInt32(&invocations))
+	require.Equal(t, int32(3), atomic.LoadInt32(&stops))
 }
