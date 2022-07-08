@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
+	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/queue"
@@ -40,7 +40,7 @@ func (m *stateManager) Enqueue(ctx context.Context, item queue.Item, at time.Tim
 func newRunner(t *testing.T, sm inmemory.Queue, d *mockdriver.Mock) *InMemoryRunner {
 	t.Helper()
 
-	al := actionloader.NewMemoryLoader()
+	al := coredata.NewInMemoryActionLoader()
 	al.Add(inngest.ActionVersion{
 		DSN: "test",
 		Runtime: inngest.RuntimeWrapper{

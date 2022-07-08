@@ -151,9 +151,12 @@ func (s *svc) initializeCrons(ctx context.Context) error {
 				continue
 			}
 			_, err := s.cronmanager.AddFunc(t.Cron, func() {
-				s.initialize(ctx, fn, event.Event{
+				err := s.initialize(ctx, fn, event.Event{
 					Name: "inngest/scheduled.timer",
 				})
+				if err != nil {
+					logger.From(ctx).Error().Err(err).Msg("error initializing scheduled function")
+				}
 			})
 			if err != nil {
 				return err

@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
+	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
@@ -24,7 +24,7 @@ func TestNewExecutor(t *testing.T) {
 
 	sm := inmemory.NewStateManager()
 
-	al := actionloader.NewMemoryLoader()
+	al := coredata.NewInMemoryActionLoader()
 
 	exec, err = NewExecutor(
 		WithStateManager(sm),
@@ -38,7 +38,7 @@ func TestExecute_state(t *testing.T) {
 	ctx := context.Background()
 	sm := inmemory.NewStateManager()
 
-	al := actionloader.NewMemoryLoader()
+	al := coredata.NewInMemoryActionLoader()
 	al.Add(inngest.ActionVersion{
 		DSN: "test",
 		Runtime: inngest.RuntimeWrapper{
@@ -191,7 +191,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 	ctx := context.Background()
 	sm := inmemory.NewStateManager()
 
-	al := actionloader.NewMemoryLoader()
+	al := coredata.NewInMemoryActionLoader()
 	al.Add(inngest.ActionVersion{
 		DSN: "test",
 		Runtime: inngest.RuntimeWrapper{
