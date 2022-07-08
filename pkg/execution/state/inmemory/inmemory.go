@@ -12,6 +12,8 @@ import (
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 )
 
+var singleton *mem
+
 // Queue is a simplistic, **non production ready** queue for processing steps
 // of functions, keepign the queue in-memory with zero persistence.  It is used
 // to simulate a production environment for local testing.
@@ -24,6 +26,13 @@ type Queue interface {
 	//
 	// This is helpful during testing.
 	Channel() chan queue.Item
+}
+
+func NewSingletonStateManager() Queue {
+	if singleton == nil {
+		singleton = NewStateManager().(*mem)
+	}
+	return singleton
 }
 
 // NewStateManager returns a new in-memory queue and state manager for processing
@@ -114,10 +123,10 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 	m.lock.RUnlock()
 
 	if ok {
+		// TODO: Return an error.
 		return s, nil
 	}
 
-	// TODO: Return an error.
 	state := memstate{
 		metadata:   state.Metadata{},
 		identifier: i,

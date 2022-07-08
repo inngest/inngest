@@ -29,7 +29,7 @@ type Opt func(r *mgr)
 //
 // By default, this connects to a local Redis server.  Use WithConnectOpts to
 // change how we connect to Redis.
-func New(opts ...Opt) state.Manager {
+func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 	m := &mgr{
 		kf: defaultKeyFunc{},
 	}
@@ -46,7 +46,7 @@ func New(opts ...Opt) state.Manager {
 		})
 	}
 
-	return m
+	return m, m.r.Ping(ctx).Err()
 }
 
 // WithConnectOpts allows you to customize the options used to connect to Redis.
