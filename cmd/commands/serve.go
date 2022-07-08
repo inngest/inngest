@@ -50,7 +50,7 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	switch args[0] {
 	case ServeEventAPI:
-		s = api.NewService(conf)
+		s = api.NewService(*conf)
 	default:
 		return fmt.Errorf("Not implemented")
 	}

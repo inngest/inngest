@@ -9,6 +9,7 @@ import (
 
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
 )
 
 type EventHandler func(context.Context, *event.Event) error
@@ -118,16 +119,23 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	eg := &errgroup.Group{}
 	for _, evt := range events {
 		copied := evt
-		go func(e event.Event) {
-			a.log.Info().Str("event", e.Name).
-				Interface("payload", e).
-				Msg("received event")
-			if err := a.handler(r.Context(), &e); err != nil {
-				a.log.Error().Msg(err.Error())
+		eg.Go(func() error {
+			if err := a.handler(r.Context(), copied); err != nil {
+				a.log.Error().Str("event", copied.Name).Err(err).Msg("error handling event")
+				return err
 			}
-		}(*copied)
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		a.writeResponse(w, apiResponse{
+			StatusCode: http.StatusBadRequest,
+			Error:      err.Error(),
+		})
 	}
 
 	a.writeResponse(w, apiResponse{
