@@ -10,7 +10,6 @@ import (
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/execution/queue"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
-	"github.com/oklog/ulid/v2"
 )
 
 // Queue is a simplistic, **non production ready** queue for processing steps
@@ -31,7 +30,7 @@ type Queue interface {
 // functions in-memory, for development and testing only.
 func NewStateManager() Queue {
 	return &mem{
-		state:  map[ulid.ULID]state.State{},
+		state:  map[string]state.State{},
 		pauses: map[uuid.UUID]state.Pause{},
 		lock:   &sync.RWMutex{},
 		q:      make(chan queue.Item),
@@ -39,7 +38,7 @@ func NewStateManager() Queue {
 }
 
 type mem struct {
-	state  map[ulid.ULID]state.State
+	state  map[string]state.State
 	pauses map[uuid.UUID]state.Pause
 	lock   *sync.RWMutex
 	q      chan queue.Item
@@ -59,7 +58,7 @@ func (m *mem) Channel() chan queue.Item {
 
 func (m *mem) IsComplete(ctx context.Context, id state.Identifier) (bool, error) {
 	m.lock.RLock()
-	s, ok := m.state[id.RunID]
+	s, ok := m.state[id.IdempotencyKey()]
 	m.lock.RUnlock()
 	if !ok {
 		// TODO: Return error
@@ -84,36 +83,34 @@ func (m *mem) Run(ctx context.Context, f func(context.Context, queue.Item) error
 }
 
 // New initializes state for a new run using the specifid ID and starting data.
-func (m *mem) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, event map[string]any) (state.State, error) {
-	state := memstate{
+func (m *mem) New(ctx context.Context, workflow inngest.Workflow, id state.Identifier, event map[string]any) (state.State, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	s := memstate{
 		metadata: state.Metadata{
 			StartedAt: time.Now(),
 		},
 		workflow:   workflow,
-		runID:      runID,
-		workflowID: workflow.UUID,
+		identifier: id,
 		event:      event,
 		actions:    map[string]map[string]interface{}{},
 		errors:     map[string]error{},
 	}
 
-	m.lock.RLock()
-	if _, ok := m.state[runID]; ok {
-		return nil, fmt.Errorf("run ID already exists: %s", runID)
+	if _, ok := m.state[id.IdempotencyKey()]; ok {
+		return nil, state.ErrIdentifierExists
 	}
-	m.lock.RUnlock()
 
-	m.lock.Lock()
-	m.state[runID] = state
-	m.lock.Unlock()
+	m.state[id.IdempotencyKey()] = s
 
-	return state, nil
+	return s, nil
 
 }
 
 func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error) {
 	m.lock.RLock()
-	s, ok := m.state[i.RunID]
+	s, ok := m.state[i.IdempotencyKey()]
 	m.lock.RUnlock()
 
 	if ok {
@@ -123,15 +120,14 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 	// TODO: Return an error.
 	state := memstate{
 		metadata:   state.Metadata{},
-		workflowID: i.WorkflowID,
-		runID:      i.RunID,
+		identifier: i,
 		event:      map[string]interface{}{},
 		actions:    map[string]map[string]interface{}{},
 		errors:     map[string]error{},
 	}
 
 	m.lock.Lock()
-	m.state[i.RunID] = state
+	m.state[i.IdempotencyKey()] = state
 	m.lock.Unlock()
 
 	return state, nil
@@ -141,14 +137,14 @@ func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string) 
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	s, ok := m.state[i.RunID]
+	s, ok := m.state[i.IdempotencyKey()]
 	if !ok {
 		return fmt.Errorf("identifier not found")
 	}
 
 	instance := s.(memstate)
 	instance.metadata.Pending++
-	m.state[i.RunID] = instance
+	m.state[i.IdempotencyKey()] = instance
 
 	return nil
 }
@@ -157,14 +153,14 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string) 
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	s, ok := m.state[i.RunID]
+	s, ok := m.state[i.IdempotencyKey()]
 	if !ok {
 		return fmt.Errorf("identifier not found")
 	}
 
 	instance := s.(memstate)
 	instance.metadata.Pending--
-	m.state[i.RunID] = instance
+	m.state[i.IdempotencyKey()] = instance
 
 	return nil
 }
@@ -173,7 +169,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	s, ok := m.state[i.RunID]
+	s, ok := m.state[i.IdempotencyKey()]
 	if !ok {
 		return s, fmt.Errorf("identifier not found")
 	}
@@ -194,7 +190,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 		instance.metadata.Pending--
 	}
 
-	m.state[i.RunID] = instance
+	m.state[i.IdempotencyKey()] = instance
 
 	return instance, nil
 

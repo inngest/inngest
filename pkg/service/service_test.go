@@ -49,13 +49,13 @@ func (m mockserver) StartTimeout() time.Duration {
 func TestStart(t *testing.T) {
 	m := mockserver{
 		pre:  func(ctx context.Context) error { return nil },
-		run:  func(ctx context.Context) error { <-time.After(50 * time.Millisecond); return nil },
+		run:  func(ctx context.Context) error { <-time.After(500 * time.Millisecond); return nil },
 		stop: func(ctx context.Context) error { return nil },
 	}
 	now := time.Now()
 	err := Start(context.Background(), m)
 	require.NoError(t, err)
-	require.WithinDuration(t, time.Now(), now.Add(50*time.Millisecond), 5*time.Millisecond)
+	require.WithinDuration(t, time.Now(), now.Add(500*time.Millisecond), 10*time.Millisecond)
 }
 
 func TestSigint(t *testing.T) {

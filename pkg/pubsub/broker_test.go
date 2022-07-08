@@ -169,7 +169,7 @@ func TestCancellation(t *testing.T) {
 
 	select {
 	case <-time.After(1 * time.Second):
-		t.Fail()
+		t.Fatal()
 	case received := <-ok:
 		require.EqualValues(t, sent, received)
 	}
