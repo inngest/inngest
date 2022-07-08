@@ -12,7 +12,6 @@ import (
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
-	"github.com/oklog/ulid/v2"
 )
 
 const (
@@ -72,6 +71,9 @@ type KeyGenerator interface {
 	// Workflow returns the key for the current workflow ID and version.
 	Workflow(ctx context.Context, workflowID uuid.UUID, version int) string
 
+	// Idempotency stores the idempotency key for atomic lookup.
+	Idempotency(context.Context, state.Identifier) string
+
 	// RunMetadata stores state regarding the current run identifier, such
 	// as the workflow version, the time the run started, etc.
 	RunMetadata(context.Context, state.Identifier) string
@@ -109,12 +111,7 @@ type mgr struct {
 	r  *redis.Client
 }
 
-func (m mgr) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID, input map[string]any) (state.State, error) {
-	id := state.Identifier{
-		WorkflowID: workflow.UUID,
-		RunID:      runID,
-	}
-
+func (m mgr) New(ctx context.Context, workflow inngest.Workflow, id state.Identifier, input map[string]any) (state.State, error) {
 	// TODO: We could probably optimize the commands here by storing the event
 	// within run metadata.  We want step output (actions) and errors to be
 	// their own redis hash for fast inserts (HSET on individual step results).
@@ -130,6 +127,8 @@ func (m mgr) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID
 	if err != nil {
 		return nil, err
 	}
+
+	ikey := m.kf.Idempotency(ctx, id)
 
 	err = m.r.Watch(ctx, func(tx *redis.Tx) error {
 		// Ensure that the workflow exists within the state store.
@@ -152,6 +151,14 @@ func (m mgr) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID
 			}
 		}
 
+		set, err := tx.SetNX(ctx, ikey, "", 0).Result()
+		if err != nil {
+			return err
+		}
+		if !set {
+			return state.ErrIdentifierExists
+		}
+
 		// Save metadata about this particular run.
 		if err := tx.HSet(ctx, m.kf.RunMetadata(ctx, id), metadata.Map()).Err(); err != nil {
 			return err
@@ -165,8 +172,8 @@ func (m mgr) New(ctx context.Context, workflow inngest.Workflow, runID ulid.ULID
 		}
 
 		return nil
-	})
 
+	}, ikey)
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
@@ -570,8 +577,12 @@ func (r runMetadata) Map() map[string]any {
 
 type defaultKeyFunc struct{}
 
+func (defaultKeyFunc) Idempotency(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:key:%s", keyPrefix, id.IdempotencyKey())
+}
+
 func (defaultKeyFunc) RunMetadata(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:metadata:%s:%s", keyPrefix, id.WorkflowID, id.RunID)
+	return fmt.Sprintf("%s:metadata:%s", keyPrefix, id.RunID)
 }
 
 func (defaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int) string {

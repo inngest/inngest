@@ -16,14 +16,20 @@ import (
 )
 
 func TestStateHarness(t *testing.T) {
-	testharness.CheckState(t, func() state.Manager { return NewStateManager() })
+	testharness.CheckState(t, func() (state.Manager, func()) {
+		return NewStateManager(), func() {}
+	})
 }
 
 func TestInMemoryPause(t *testing.T) {
 	ctx := context.Background()
 	sm := NewStateManager()
 
-	s, err := sm.New(ctx, inngest.Workflow{}, ulid.MustNew(ulid.Now(), rand.Reader), map[string]any{})
+	id := state.Identifier{
+		RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+	}
+
+	s, err := sm.New(ctx, inngest.Workflow{}, id, map[string]any{})
 	require.NoError(t, err)
 
 	pauseID := uuid.New()

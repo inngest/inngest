@@ -169,7 +169,9 @@ func decode(i *cue.Instance) (*Config, error) {
 	}
 
 	if err := def.Validate(cue.Final(), cue.Concrete(true)); err != nil {
-		return nil, fmt.Errorf("config is not valid: %w", err)
+		buf := &bytes.Buffer{}
+		cueerrors.Print(buf, err, nil)
+		return nil, fmt.Errorf("config is invalid: %s", buf.String())
 	}
 
 	c := &Config{}

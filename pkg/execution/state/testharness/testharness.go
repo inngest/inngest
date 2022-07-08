@@ -7,6 +7,7 @@ import (
 	"fmt"
 	mrand "math/rand"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,7 +94,9 @@ func init() {
 	}
 }
 
-func CheckState(t *testing.T, generator func() state.Manager) {
+type Generator func() (sm state.Manager, cleanup func())
+
+func CheckState(t *testing.T, gen Generator) {
 	t.Helper()
 
 	funcs := map[string]func(t *testing.T, m state.Manager){
@@ -112,11 +116,13 @@ func CheckState(t *testing.T, generator func() state.Manager) {
 		"PausesByEvent/Consumed":             checkPausesByEvent_consumed,
 		"PauseByStep":                        checkPausesByStep,
 		"Metadata/StartedAt":                 checkMetadataStartedAt,
+		"Idempotency":                        checkIdempotency,
 	}
 	for name, f := range funcs {
 		ok := t.Run(name, func(t *testing.T) {
-			m := generator()
+			m, cleanup := gen()
 			f(t, m)
+			cleanup()
 		})
 		require.True(t, ok, name)
 	}
@@ -392,105 +398,6 @@ func checkMetadataStartedAt(t *testing.T, m state.Manager) {
 
 	require.EqualValues(t, s.Metadata().StartedAt.UTC(), reloaded.Metadata().StartedAt.UTC())
 }
-
-/*
-func checkSaveOutputClearsError(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	s := setup(t, m)
-
-	//
-	// Save an error.
-	//
-	inputErr := fmt.Errorf("this is temporary, don't sweat it my friend")
-	next, err := m.SaveActionError(ctx, s.Identifier(), w.Steps[0].ID, inputErr)
-	require.NoError(t, err)
-	require.EqualValues(t, s.Identifier(), next.Identifier())
-	require.EqualValues(t, s.Workflow(), next.Workflow())
-	require.EqualValues(t, s.Event(), next.Event())
-	// Assert that the next state has an error and no action
-	require.Equal(t, 1, len(next.Errors()))
-	require.Equal(t, 0, len(next.Actions()))
-	require.EqualValues(t, inputErr, next.Errors()[w.Steps[0].ID])
-	require.False(t, next.ActionComplete(w.Steps[0].ID))
-
-	//
-	// Assert that saving output to a previously errored function clears
-	// the action error.
-	//
-	output := map[string]any{
-		"wut": "the",
-		"gosh": map[string]any{
-			"darn": "doot",
-		},
-	}
-	next, err = m.SaveActionOutput(ctx, s.Identifier(), w.Steps[0].ID, output)
-	require.NoError(t, err)
-	require.EqualValues(t, s.Identifier(), next.Identifier())
-	require.EqualValues(t, s.Workflow(), next.Workflow())
-	require.EqualValues(t, s.Event(), next.Event())
-	// Assert that the next state _now_ has an action and no error.
-	require.Equal(t, 0, len(next.Errors()))
-	require.Equal(t, 1, len(next.Actions()))
-	require.Empty(t, next.Errors()[w.Steps[0].ID])
-	require.EqualValues(t, output, next.Actions()[w.Steps[0].ID])
-	require.True(t, next.ActionComplete(w.Steps[0].ID))
-}
-
-func checkSaveError(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	s := setup(t, m)
-
-	//
-	// Save an error
-	//
-	inputErr := fmt.Errorf("an terrible, unlucky, impossible to debug error. woe betide the SRE who gets this :(")
-	next, err := m.SaveActionError(ctx, s.Identifier(), w.Steps[0].ID, inputErr)
-	require.NoError(t, err)
-	require.EqualValues(t, s.Identifier(), next.Identifier())
-	require.EqualValues(t, s.Workflow(), next.Workflow())
-	require.EqualValues(t, s.Event(), next.Event())
-	// Assert that the next state has actions set. for the first step.
-	require.Equal(t, 0, len(s.Actions()))
-	require.EqualValues(t, s.Actions(), next.Actions())
-	require.Equal(t, 0, len(next.Actions()))
-	// Assert that we have an error saved for the first step.
-	require.Equal(t, 1, len(next.Errors()))
-	require.EqualValues(t, inputErr, next.Errors()[w.Steps[0].ID])
-	// Assert that loading this step produces an error.
-	output, err := next.ActionID(w.Steps[0].ID)
-	require.Empty(t, output)
-	require.EqualValues(t, inputErr, err)
-	// This action is not complete.
-	require.False(t, next.ActionComplete(w.Steps[0].ID))
-
-	//
-	// Overwrite the error, as if an action retried.
-	//
-	inputErr = fmt.Errorf("wow, another one?!")
-	next, err = m.SaveActionError(ctx, s.Identifier(), w.Steps[0].ID, inputErr)
-	require.NoError(t, err)
-	require.EqualValues(t, inputErr, next.Errors()[w.Steps[0].ID])
-	require.False(t, next.ActionComplete(w.Steps[0].ID))
-
-	//
-	// Save an error to the new action.
-	//
-
-	//
-	// Load() the state independently.
-	//
-	reloaded, err := m.Load(ctx, s.Identifier())
-	require.NoError(t, err)
-	require.EqualValues(t, next.Identifier(), reloaded.Identifier())
-	require.EqualValues(t, next.Workflow(), reloaded.Workflow())
-	require.EqualValues(t, next.Event(), reloaded.Event())
-	require.EqualValues(t, next.Actions(), reloaded.Actions())
-	require.EqualValues(t, next.Errors(), reloaded.Errors())
-
-	// Maybe we also want to assert that we can't save an error to an
-	// action that has output.
-}
-*/
 
 func checkSavePause(t *testing.T, m state.Manager) {
 	ctx := context.Background()
@@ -962,10 +869,54 @@ func checkPausesByStep(t *testing.T, m state.Manager) {
 	require.EqualValues(t, second, *found)
 }
 
+func checkIdempotency(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+
+	// Create 100 new functions concurrently.
+	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{
+		WorkflowID: w.UUID,
+		RunID:      runID,
+		Key:        runID.String(),
+	}
+	data := input.Map()
+
+	var errCount int32
+	var okCount int32
+	wg := &sync.WaitGroup{}
+	for i := 0; i < 100; i++ {
+		copiedID := id
+		wg.Add(1)
+		go func() {
+			// Create a new Run ID each time
+			copiedID.RunID = ulid.MustNew(ulid.Now(), rand.Reader)
+			_, err := m.New(ctx, w, copiedID, data)
+			if err == nil {
+				atomic.AddInt32(&okCount, 1)
+			} else {
+				atomic.AddInt32(&errCount, 1)
+				assert.ErrorIs(t, err, state.ErrIdentifierExists)
+			}
+
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	assert.Equal(t, int32(1), atomic.LoadInt32(&okCount), "Must have saved the run ID once")
+	assert.Equal(t, int32(99), atomic.LoadInt32(&errCount), "Must have errored 99 times when the run ID exists")
+}
+
 func setup(t *testing.T, m state.Manager) state.State {
 	ctx := context.Background()
 	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
-	id := ulid.MustNew(ulid.Now(), rand.Reader)
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{
+		WorkflowID: w.UUID,
+		RunID:      runID,
+		Key:        runID.String(),
+	}
 
 	s, err := m.New(ctx, w, id, input.Map())
 	require.NoError(t, err)
