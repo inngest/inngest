@@ -176,5 +176,7 @@ func fakeEvent(ctx context.Context, fn function.Function, eventName string) (map
 	mapped := map[string]interface{}{}
 	err = val.Decode(&mapped)
 
+	mapped["ts"] = time.Now().UnixMilli()
+
 	return mapped, err
 }
