@@ -9,7 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
+	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/runner"
@@ -82,7 +82,7 @@ func (r *RunUI) run(ctx context.Context) {
 	ctx, done := context.WithCancel(ctx)
 	defer done()
 
-	al := actionloader.NewMemoryLoader()
+	al := coredata.NewInMemoryActionLoader()
 
 	// Add all action definitions from the function into the action loader.
 	flow, err := r.fn.Workflow(ctx)

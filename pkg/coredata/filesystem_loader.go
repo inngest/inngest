@@ -1,0 +1,215 @@
+package coredata
+
+import (
+	"context"
+	"fmt"
+	"path/filepath"
+	"sort"
+	"sync"
+
+	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest-cli/pkg/logger"
+	"golang.org/x/sync/errgroup"
+)
+
+// NewFSLoader returns an ExecutionLoader which reads functions from the given
+// path, recursively.
+func NewFSLoader(ctx context.Context, path string) (ExecutionLoader, error) {
+	// XXX: This should probably be a singleton;  this is primarily used
+	// for the dev server.  in this case, a single process hosts the
+	// runner and the executor together - and we don't want to process
+	// the directory multiple times within the same pid.
+	abspath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	loader := &FSLoader{root: abspath}
+	if err := loader.ReadDir(ctx); err != nil {
+		return nil, err
+	}
+	return loader, nil
+}
+
+// FSLoader is a function and action loader which returns functions and actions
+// by reading the given filesystem path recursively, loading functions and actions
+// from function definitions.
+//
+// This should be initialized via the NewFSLoader function.
+type FSLoader struct {
+	// embed the in-memory action loader for querying action versions found within
+	// functions.
+	*memactionloader
+
+	// root stores the root path used when searching the filesystem.
+	root string
+
+	// functions stores all functions which were found within the given filesystem.
+	functions []function.Function
+
+	// actions stores all actions parsed and read from functions within the filesystem.
+	actions []inngest.ActionVersion
+}
+
+func (f *FSLoader) Functions(ctx context.Context) ([]function.Function, error) {
+	return f.functions, nil
+}
+
+func (f *FSLoader) FunctionsScheduled(ctx context.Context) ([]function.Function, error) {
+	fns := []function.Function{}
+	for _, fn := range f.functions {
+		for _, t := range fn.Triggers {
+			if t.CronTrigger != nil {
+				fns = append(fns, fn)
+				break
+			}
+		}
+	}
+	return fns, nil
+}
+
+func (f *FSLoader) FunctionsByTrigger(ctx context.Context, eventName string) ([]function.Function, error) {
+	fns := []function.Function{}
+	for _, fn := range f.functions {
+		for _, t := range fn.Triggers {
+			if t.EventTrigger != nil && t.Event == eventName {
+				fns = append(fns, fn)
+				break
+			}
+		}
+	}
+	return fns, nil
+}
+
+// ReadDir recursively reads the root directory, loading all functions
+// into the loader.
+func (f *FSLoader) ReadDir(ctx context.Context) error {
+	logger.From(ctx).
+		Debug().
+		Str("dir", f.root).
+		Msg("scanning directory for functions")
+
+	var err error
+
+	f.functions = []function.Function{}
+	f.actions = []inngest.ActionVersion{}
+
+	fns, err := function.LoadRecursive(ctx, f.root)
+	for _, fn := range fns {
+		f.functions = append(f.functions, *fn)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Validate all functions.
+	eg := &errgroup.Group{}
+	for _, fn := range f.functions {
+		copied := fn
+		eg.Go(func() error {
+			return copied.Validate(ctx)
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+
+	for _, fn := range f.functions {
+		actions, _, _ := fn.Actions(ctx)
+		f.actions = append(f.actions, actions...)
+	}
+
+	// recreate the in-memory action loader.
+	f.memactionloader = &memactionloader{
+		Actions: make(map[string][]inngest.ActionVersion),
+		lock:    &sync.RWMutex{},
+	}
+	for _, a := range f.actions {
+		f.memactionloader.Add(a)
+	}
+
+	logger.From(ctx).
+		Debug().
+		Int("len", len(f.functions)).
+		Msg("added functions")
+
+	return nil
+}
+
+func NewInMemoryActionLoader() *memactionloader {
+	return &memactionloader{
+		Actions: make(map[string][]inngest.ActionVersion),
+		lock:    &sync.RWMutex{},
+	}
+}
+
+// memactionloader is an in-memory ActionLoader.  This is used within
+// the FSLoader to initialize and add actions from functions when loaded.
+type memactionloader struct {
+	// actions stores all parsed actions, mapped by DSN to a slice representing each
+	// action version.
+	Actions map[string][]inngest.ActionVersion
+	lock    *sync.RWMutex
+}
+
+// add adds an action to the in-memory action loader.
+func (l *memactionloader) Add(action inngest.ActionVersion) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	if _, ok := l.Actions[action.DSN]; !ok {
+		l.Actions[action.DSN] = []inngest.ActionVersion{action}
+		return
+	}
+	l.Actions[action.DSN] = append(l.Actions[action.DSN], action)
+	l.sortActions()
+}
+
+// sortActions sorts the actions for easy qeurying with version constraints.
+func (l *memactionloader) sortActions() {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	for dsn, actions := range l.Actions {
+		copied := actions
+		sort.SliceStable(copied, func(i, j int) bool {
+			a, b := copied[i], copied[j]
+			return a.Version.Major >= b.Version.Major && a.Version.Minor > b.Version.Minor
+		})
+		l.Actions[dsn] = copied
+	}
+}
+
+// Action returns an action given its DSN and optional version constraint.
+// This fulfils the Action function within the ActionLoader interface.
+func (l memactionloader) Action(ctx context.Context, dsn string, version *inngest.VersionConstraint) (*inngest.ActionVersion, error) {
+	l.lock.RLock()
+	defer l.lock.RUnlock()
+
+	actions, ok := l.Actions[dsn]
+	if !ok {
+		return nil, fmt.Errorf("action not found: %s", dsn)
+	}
+
+	if version == nil || version.Major == nil {
+		// Always use the latest version and discard minor versions.
+		return &actions[0], nil
+	}
+
+	for _, a := range actions {
+		if a.Version.Major != *version.Major {
+			continue
+		}
+		if version.Minor == nil {
+			// Return the latest minor from this major version, which is first
+			// as the slice is sorted.
+			return &a, nil
+		}
+		if a.Version.Minor == *version.Minor {
+			return &a, nil
+		}
+	}
+
+	return nil, fmt.Errorf("action not found: %s", dsn)
+}
