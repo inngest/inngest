@@ -1,5 +1,6 @@
 package devserver
 
+/*
 import (
 	"bytes"
 	"context"
@@ -175,3 +176,4 @@ func TestEngine_async(t *testing.T) {
 func strptr(s string) *string {
 	return &s
 }
+*/

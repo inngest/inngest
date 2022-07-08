@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
+	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 )
@@ -93,7 +93,7 @@ type ExecutorOpt func(m Executor) error
 
 // WithActionLoader sets the action loader to use when retrieving function definitions
 // in a workflow.
-func WithActionLoader(al actionloader.ActionLoader) ExecutorOpt {
+func WithActionLoader(al coredata.ExecutionActionLoader) ExecutorOpt {
 	return func(e Executor) error {
 		e.(*executor).al = al
 		return nil
@@ -130,7 +130,7 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	sm             state.Manager
-	al             actionloader.ActionLoader
+	al             coredata.ExecutionActionLoader
 	runtimeDrivers map[string]driver.Driver
 }
 
@@ -222,7 +222,7 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 }
 
 func (e *executor) executeAction(ctx context.Context, id state.Identifier, action *inngest.Step, s state.State, attempt int) (*state.DriverResponse, error) {
-	definition, err := e.al.Load(ctx, action.DSN, action.Version)
+	definition, err := e.al.Action(ctx, action.DSN, action.Version)
 	if err != nil {
 		return nil, fmt.Errorf("error loading action: %w", err)
 	}

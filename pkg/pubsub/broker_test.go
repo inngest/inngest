@@ -21,7 +21,7 @@ func testbroker(t *testing.T) (*broker, string) {
 	// Configure the broker to use an in-memory implementation.
 	c := &config.MessagingService{}
 	c.Set(config.InMemoryMessaging{Topic: topic})
-	ps, err := NewPublishSubscriber(ctx, c)
+	ps, err := NewPublishSubscriber(ctx, *c)
 	require.NoError(t, err)
 
 	// Create the test topic.
