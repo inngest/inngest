@@ -34,7 +34,7 @@ type Identifier struct {
 	RunID      ulid.ULID `json:"runID"`
 	// Key represents a unique idempotency key used to deduplicate this
 	// workflow run amongst other runs for the same workflow.
-	Key string `json:"key:"`
+	Key string `json:"key"`
 }
 
 func (i Identifier) IdempotencyKey() string {
