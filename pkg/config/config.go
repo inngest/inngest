@@ -22,6 +22,11 @@ type Config struct {
 	EventAPI EventAPI
 	// EventAPI configures the event stream, which connects events to the execution engine.
 	EventStream EventStream
+	// Queue configures the backing queue, used to enqueue function steps
+	// for execution.
+	Queue Queue
+	// State configures the execution state store.
+	State State
 }
 
 // Log configures the logger used within Inngest services.
@@ -46,4 +51,12 @@ type EventAPI struct {
 // EventAPI configures the event stream, which connects events to the execution engine.
 type EventStream struct {
 	Service MessagingService
+}
+
+type Queue struct {
+	Service QueueService
+}
+
+type State struct {
+	Service StateService
 }

@@ -7,6 +7,7 @@ import (
 )
 
 func defaultConfig() *Config {
+	// The default config is created via Cue's default parameters.
 	base := &Config{
 		Log: Log{
 			Level:  "info",
@@ -20,6 +21,18 @@ func defaultConfig() *Config {
 			Service: MessagingService{
 				Backend:  "inmemory",
 				Concrete: &InMemoryMessaging{Topic: "events"},
+			},
+		},
+		Queue: Queue{
+			Service: QueueService{
+				Backend:  "inmemory",
+				Concrete: &InMemoryQueue{},
+			},
+		},
+		State: State{
+			Service: StateService{
+				Backend:  "inmemory",
+				Concrete: &InMemoryState{},
 			},
 		},
 	}
@@ -84,7 +97,7 @@ import (
 )
 
 config.#Config & {
-  eventStream: {
+  eventstream: {
     service: {
       backend: "nats"
       topic: "nats-events"
