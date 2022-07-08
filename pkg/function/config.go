@@ -105,6 +105,9 @@ func LoadRecursive(ctx context.Context, dir string) ([]*Function, error) {
 //
 // This validates the function after parsing, returning any validation errors.
 func Unmarshal(ctx context.Context, input []byte, path string) (*Function, error) {
+	cuedefs.Lock()
+	defer cuedefs.Unlock()
+
 	// Note that cue is a superset of JSON;  we can parse the input using our cue definition
 	// for both a JSON and Cue input.
 	instance, err := prepare(input)

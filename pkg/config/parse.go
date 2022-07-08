@@ -88,6 +88,9 @@ func read(ctx context.Context, path string) (*Config, error) {
 }
 
 func parse(input []byte) (*Config, error) {
+	cuedefs.Lock()
+	defer cuedefs.Unlock()
+
 	i, err := prepare(input)
 	if err != nil {
 		return nil, err
