@@ -84,6 +84,7 @@ func (s *svc) Pre(ctx context.Context) error {
 		WithRuntimeDrivers(
 			dd,
 		),
+		WithLogger(logger.From(ctx)),
 	)
 	if err != nil {
 		return err
@@ -94,7 +95,11 @@ func (s *svc) Pre(ctx context.Context) error {
 
 func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
-	return s.queue.Run(ctx, s.handleQueueItem)
+	return s.queue.Run(ctx, func(ctx context.Context, item queue.Item) error {
+		// Don't stop the service on errors.
+		_ = s.handleQueueItem(ctx, item)
+		return nil
+	})
 }
 
 func (s *svc) Stop(ctx context.Context) error {
@@ -113,8 +118,6 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 	resp, err := s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
 	if err != nil {
-		l.Error().Err(err).Msg("error executing step")
-
 		// If the error is not of type response error, we can assume that this is
 		// always retryable.
 		_, isResponseError := err.(*state.DriverResponse)
@@ -122,12 +125,15 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 			next := item
 			next.ErrorCount += 1
 			at := backoff.LinearJitterBackoff(next.ErrorCount)
+			l.Info().Interface("edge", next).Time("at", at).Msg("enqueueing retry")
 			if err := s.queue.Enqueue(ctx, next, at); err != nil {
 				return err
 			}
+			return nil
 		}
 
 		// This is a non-retryable error.  Finalize this step.
+		l.Warn().Interface("edge", edge).Msg("step permanently failed")
 		if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming); err != nil {
 			return err
 		}

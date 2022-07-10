@@ -149,7 +149,7 @@ type executor struct {
 // the workflow after the step has been executed.
 func (e *executor) Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error) {
 	if e.log != nil {
-		e.log.Info().
+		e.log.Debug().
 			Str("run_id", id.RunID.String()).
 			Str("step", from).
 			Int("attempt", attempt).
@@ -200,7 +200,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 			e.log.Info().
 				Str("run_id", id.RunID.String()).
 				Str("step", from).
-				Bool("scheduled", resp.Scheduled).
 				Msg("executed step")
 		} else {
 			retryable := false
@@ -208,11 +207,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 				retryable = resp.Retryable()
 			}
 
-			e.log.Info().
+			e.log.Error().
 				Str("run_id", id.RunID.String()).
 				Str("step", from).
 				Err(err).
-				Interface("response", resp).
 				Bool("retryable", retryable).
 				Msg("error executing step")
 		}
@@ -285,7 +283,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	}
 
 	if e.log != nil {
-		e.log.Debug().
+		e.log.Info().
 			Str("dsn", definition.DSN).
 			Interface("version", definition.Version).
 			Interface("scopes", definition.Scopes).

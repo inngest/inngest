@@ -67,17 +67,17 @@ func (s svc) Name() string {
 func (s *svc) Pre(ctx context.Context) error {
 	var err error
 
-	s.pubsub, err = pubsub.NewPublishSubscriber(ctx, s.config.EventStream.Service)
-	if err != nil {
-		return err
-	}
-
 	if s.data == nil {
 		// TODO: Enable postgres, mysql, and redis-backed execution loaders.
 		s.data, err = coredata.NewFSLoader(ctx, ".")
 		if err != nil {
 			return err
 		}
+	}
+
+	s.pubsub, err = pubsub.NewPublishSubscriber(ctx, s.config.EventStream.Service)
+	if err != nil {
+		return err
 	}
 
 	s.state, err = statefactory.NewState(ctx, s.config.State)
