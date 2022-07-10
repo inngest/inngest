@@ -19,13 +19,24 @@ import (
 	"github.com/xhit/go-str2duration/v2"
 )
 
-func NewService(config config.Config) service.Service {
-	return &svc{config: config}
+type Opt func(s *svc)
+
+func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
+	return func(s *svc) {
+		s.data = l
+	}
+}
+
+func NewService(c config.Config, opts ...Opt) service.Service {
+	svc := &svc{config: c}
+	for _, o := range opts {
+		o(svc)
+	}
+	return svc
 }
 
 type svc struct {
 	config config.Config
-
 	// data provides the ability to load action versions when running steps.
 	data coredata.ExecutionLoader
 	// state allows us to record step results
@@ -43,9 +54,11 @@ func (s *svc) Name() string {
 func (s *svc) Pre(ctx context.Context) error {
 	var err error
 
-	s.data, err = coredata.NewFSLoader(ctx, ".")
-	if err != nil {
-		return err
+	if s.data == nil {
+		s.data, err = coredata.NewFSLoader(ctx, ".")
+		if err != nil {
+			return err
+		}
 	}
 
 	s.state, err = statefactory.NewState(ctx, s.config.State)

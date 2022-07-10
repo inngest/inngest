@@ -28,8 +28,20 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-func NewService(c config.Config) service.Service {
-	return &svc{config: c}
+type Opt func(s *svc)
+
+func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
+	return func(s *svc) {
+		s.data = l
+	}
+}
+
+func NewService(c config.Config, opts ...Opt) service.Service {
+	svc := &svc{config: c}
+	for _, o := range opts {
+		o(svc)
+	}
+	return svc
 }
 
 type svc struct {
@@ -60,10 +72,12 @@ func (s *svc) Pre(ctx context.Context) error {
 		return err
 	}
 
-	// TODO: Enable postgres, mysql, and redis-backed execution loaders.
-	s.data, err = coredata.NewFSLoader(ctx, ".")
-	if err != nil {
-		return err
+	if s.data == nil {
+		// TODO: Enable postgres, mysql, and redis-backed execution loaders.
+		s.data, err = coredata.NewFSLoader(ctx, ".")
+		if err != nil {
+			return err
+		}
 	}
 
 	s.state, err = statefactory.NewState(ctx, s.config.State)

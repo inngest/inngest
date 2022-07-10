@@ -2,18 +2,76 @@ package devserver
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"github.com/inngest/inngest-cli/pkg/api"
+	"github.com/inngest/inngest-cli/pkg/cli"
 	"github.com/inngest/inngest-cli/pkg/config"
+	"github.com/inngest/inngest-cli/pkg/coredata"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/runner"
+	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/inngest/inngest-cli/pkg/service"
 )
 
 // Create and start a new dev server (API, Exectutor, State, Logger, etc.)
 func NewDevServer(ctx context.Context, c config.Config) error {
+	// Create a new filesystem loader.
+	el, err := coredata.NewFSLoader(ctx, ".")
+	if err != nil {
+		return err
+	}
+
+	funcs, err := el.Functions(ctx)
+	if err != nil {
+		return err
+	}
+
+	// For each function, build the image.
+	if err := buildImages(ctx, funcs); err != nil {
+		return err
+	}
+
 	api := api.NewService(c)
-	runner := runner.NewService(c)
-	exec := executor.NewService(c)
+	runner := runner.NewService(c, runner.WithExecutionLoader(el))
+	exec := executor.NewService(c, executor.WithExecutionLoader(el))
 	return service.StartAll(ctx, api, runner, exec)
+}
+
+// buildImages builds all images hosted within the engine.  This iterates through all
+// functions discovered during Load.
+func buildImages(ctx context.Context, funcs []function.Function) error {
+	opts := []dockerdriver.BuildOpts{}
+
+	for _, fn := range funcs {
+		steps, err := dockerdriver.FnBuildOpts(ctx, fn)
+		if err != nil {
+			return err
+		}
+		opts = append(opts, steps...)
+	}
+
+	if len(opts) == 0 {
+		return nil
+	}
+
+	ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
+		QuitOnComplete: true,
+		BuildOpts:      opts,
+	})
+	if err != nil {
+		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+		os.Exit(1)
+	}
+	// calling Start on our UI instance invokes either a pretty TTY output
+	// via tea, or renders output as JSON directly depending on the global
+	// JSON flag.
+	if err := ui.Start(ctx); err != nil {
+		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+		os.Exit(1)
+	}
+
+	return ui.Error()
 }
