@@ -109,7 +109,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		return err
 	}
 
-	l.Info().Interface("edge", edge).Msg("dequeueing step")
+	l.Info().Interface("edge", edge).Msg("processing step")
 
 	resp, err := s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
 	if err != nil {
