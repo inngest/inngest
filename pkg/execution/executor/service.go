@@ -9,7 +9,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/backoff"
 	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/coredata"
-	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
+	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/queue"
 	"github.com/inngest/inngest-cli/pkg/execution/queue/queuefactory"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
@@ -71,18 +71,22 @@ func (s *svc) Pre(ctx context.Context) error {
 		return err
 	}
 
-	// Create our drivers.
-	dd, err := dockerdriver.New()
-	if err != nil {
-		return err
+	// Create drivers based off of the available config
+	var drivers = []driver.Driver{}
+	for _, driverConfig := range s.config.Execution.Drivers {
+		d, err := driverConfig.NewDriver()
+		if err != nil {
+			return err
+		}
+		drivers = append(drivers, d)
 	}
 
-	// TODO: Configure executor & drivers via config.
+	// XXX: Configure executor & drivers via config.
 	s.exec, err = NewExecutor(
 		WithActionLoader(s.data),
 		WithStateManager(s.state),
 		WithRuntimeDrivers(
-			dd,
+			drivers...,
 		),
 		WithLogger(logger.From(ctx)),
 	)

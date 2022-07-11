@@ -1,6 +1,10 @@
 package httpdriver
 
-import "github.com/inngest/inngest-cli/pkg/config/registration"
+import (
+	"github.com/inngest/inngest-cli/pkg/execution/driver"
+
+	"github.com/inngest/inngest-cli/pkg/config/registration"
+)
 
 func init() {
 	registration.RegisterDriverConfig(&Config{})
@@ -17,3 +21,7 @@ func (Config) RuntimeName() string { return "http" }
 func (Config) DriverName() string { return "http" }
 
 func (Config) UnmarshalJSON(b []byte) error { return nil }
+
+func (c Config) NewDriver() (driver.Driver, error) {
+	return DefaultExecutor, nil
+}

@@ -30,6 +30,11 @@ type executor struct {
 	client *http.Client
 }
 
+// RuntimeType fulfiils the inngest.Runtime interface.
+func (e executor) RuntimeType() string {
+	return "http"
+}
+
 func (e executor) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, step inngest.Step) (*state.DriverResponse, error) {
 	rt, ok := action.Runtime.Runtime.(inngest.RuntimeHTTP)
 	if !ok {

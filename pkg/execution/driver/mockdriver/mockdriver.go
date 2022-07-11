@@ -6,6 +6,7 @@ import (
 
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/config/registration"
+	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 )
 
@@ -71,3 +72,7 @@ func (Config) RuntimeName() string { return RuntimeName }
 func (Config) DriverName() string { return RuntimeName }
 
 func (c Config) UnmarshalJSON(b []byte) error { return nil }
+
+func (c Config) NewDriver() (driver.Driver, error) {
+	return &Mock{}, nil
+}

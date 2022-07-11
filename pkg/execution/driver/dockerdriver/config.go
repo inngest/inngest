@@ -1,7 +1,9 @@
 package dockerdriver
 
 import (
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/inngest/inngest-cli/pkg/config/registration"
+	"github.com/inngest/inngest-cli/pkg/execution/driver"
 )
 
 func init() {
@@ -12,6 +14,31 @@ func init() {
 // services via config.cue
 type Config struct {
 	Host *string
+}
+
+func (c Config) NewDriver() (driver.Driver, error) {
+	var (
+		client *docker.Client
+		err    error
+	)
+
+	if c.Host == nil {
+		if client, err = docker.NewClientFromEnv(); err != nil {
+			return nil, err
+		}
+	} else {
+		if client, err = docker.NewClient(*c.Host); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := client.Ping(); err != nil {
+		return nil, err
+	}
+
+	return &dockerExec{
+		client: client,
+	}, nil
 }
 
 // RuntimeName returns the runtime field that should invoke this driver.

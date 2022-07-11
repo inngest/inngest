@@ -2,6 +2,8 @@ package registration
 
 import (
 	"fmt"
+
+	"github.com/inngest/inngest-cli/pkg/execution/driver"
 )
 
 var (
@@ -23,7 +25,7 @@ func RegisterDriverConfig(c DriverConfig) error {
 
 // DriverConfig is an interface used to determine driver config structs.
 type DriverConfig interface {
-	// json.Unmarshaler
+	NewDriver() (driver.Driver, error)
 
 	// DriverName returns the name of the specific driver.
 	DriverName() string
