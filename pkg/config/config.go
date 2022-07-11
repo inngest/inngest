@@ -28,6 +28,8 @@ type Config struct {
 	Log Log
 	// EventAPI configures the event API service.
 	EventAPI EventAPI
+	// CoreAPI configures the core API service.
+	CoreAPI CoreAPI
 	// Execution configures the executor, which invokes actions and steps.
 	Execution Execution
 	// EventAPI configures the event stream, which connects events to the execution engine.
@@ -58,6 +60,13 @@ type EventAPI struct {
 	Port int
 	// MaxSize represents the max size of events ingested, in bytes.
 	MaxSize int
+}
+
+type CoreAPI struct {
+	// Addr is the IP to bind to, eg. "0.0.0.0" or "127.0.0.1"
+	Addr string
+	// Port is the port to use, defaulting to 8288.
+	Port int
 }
 
 // EventAPI configures the event stream, which connects events to the execution engine.

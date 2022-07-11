@@ -5,6 +5,7 @@ import (
 
 	"github.com/inngest/inngest-cli/pkg/api"
 	"github.com/inngest/inngest-cli/pkg/config"
+	"github.com/inngest/inngest-cli/pkg/coreapi"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/runner"
 	"github.com/inngest/inngest-cli/pkg/service"
@@ -15,11 +16,12 @@ const (
 	ServeExecutor = "executor"
 	ServeRunner   = "runner"
 	ServeEventAPI = "events-api"
+	ServeCoreAPI  = "core-api"
 )
 
 var (
 	serveConf = ""
-	serveArgs = []string{ServeExecutor, ServeRunner, ServeEventAPI}
+	serveArgs = []string{ServeExecutor, ServeRunner, ServeEventAPI, ServeCoreAPI}
 )
 
 func NewCmdServe() *cobra.Command {
@@ -58,6 +60,8 @@ func serve(cmd *cobra.Command, args []string) error {
 			svc = append(svc, runner.NewService(*conf))
 		case ServeExecutor:
 			svc = append(svc, executor.NewService(*conf))
+		case ServeCoreAPI:
+			svc = append(svc, coreapi.NewService(*conf))
 		default:
 			return fmt.Errorf("Not implemented")
 		}

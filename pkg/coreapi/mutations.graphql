@@ -1,0 +1,46 @@
+scalar Time
+scalar Environment
+scalar Runtime
+
+type Mutation {
+  deployFunction(input: DeployFunctionInput!): FunctionVersion
+
+  upsertActionVersion(input: UpsertActionVersionInput!): ActionVersion
+}
+
+input DeployFunctionInput {
+  env: Environment
+  config: String!
+  live: Boolean
+}
+
+type FunctionVersion {
+  functionId: ID!
+  version: Int!
+  config: String!
+
+  validFrom: Time
+  validTo: Time
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+input UpsertActionVersionInput {
+  config: String!
+  dsn: String
+  versionMajor: Int
+  versionMinor: Int
+  enabled: Boolean
+}
+
+type ActionVersion {
+  dsn: String!
+  versionMajor: Int!
+  versionMinor: Int!
+  createdAt: Time!
+  validFrom: Time
+  validTo: Time
+  runtime: Runtime!
+  #runtimeData: Map!
+  config: String!
+}
