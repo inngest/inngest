@@ -23,6 +23,10 @@ func defaultConfig() *Config {
 			Port:    8288,
 			MaxSize: 524288,
 		},
+		CoreAPI: CoreAPI{
+			Addr: "0.0.0.0",
+			Port: 8300,
+		},
 		Execution: Execution{
 			Drivers: map[string]registration.DriverConfig{
 				"docker": &dockerdriver.Config{},

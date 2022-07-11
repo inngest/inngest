@@ -1,0 +1,20 @@
+schema:
+ - "pkg/coreapi/*.graphql"
+
+exec:
+  filename: pkg/coreapi/generated/generated.go
+  package: generated
+
+model:
+  filename: pkg/coreapi/graph/models/models_gen.go
+  package: models
+
+resolver:
+  filename: pkg/coreapi/graph/resolvers/resolver.go
+  type: Resolver
+
+struct_tag: json
+
+models:
+  DSN:
+    model: github.com/inngest/inngest-cli/pkg/coreapi/graph/models.ActionVersion

@@ -28,3 +28,24 @@ type ExecutionActionLoader interface {
 	// versions within the constraint are nil we must return the latest version available.
 	Action(ctx context.Context, dsn string, version *inngest.VersionConstraint) (*inngest.ActionVersion, error)
 }
+
+type APILoader interface {
+	APIFunctionLoader
+	APIActionLoader
+}
+
+type FunctionVersion struct {
+}
+
+type APIFunctionLoader interface {
+	// Create a new function
+	CreateFunctionVersion(ctx context.Context, f function.Function, live bool) (FunctionVersion, error)
+}
+type APIActionLoader interface {
+	// Find a given action by an exact version number
+	ActionVersion(ctx context.Context, dsn string, versionInfo inngest.VersionInfo) (inngest.ActionVersion, error)
+	// Create a a new action version
+	CreateActionVersion(ctx context.Context, av inngest.ActionVersion) (inngest.ActionVersion, error)
+	// Update an action version, e.g.
+	UpdateActionVersion(ctx context.Context, av inngest.ActionVersion) (inngest.ActionVersion, error)
+}

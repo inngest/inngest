@@ -18,6 +18,12 @@ package config
 		maxSize: >=1024 | *(512 * 1024)
 	}
 
+	// CoreAPI is used to configure the API for manging the system
+	coreAPI: {
+		addr: string | *"0.0.0.0"
+		port: >0 & <=65535 | *8300
+	}
+
 	execution: {
 		// Enable drivers for given runtimes within this array.  The key
 		// is the runtime name specified within steps of a function, and
@@ -127,7 +133,7 @@ package config
 // StateServices as the backend to host state.
 #StateService: #InmemState | #RedisState
 
-// InmemState stores state in memory, local to each process.  This should only 
+// InmemState stores state in memory, local to each process.  This should only
 // be used for development or testing, but never for production.
 #InmemState: {
 	backend: "inmemory"

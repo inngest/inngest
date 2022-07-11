@@ -12,3 +12,6 @@ snapshot:
 
 build:
 	goreleaser build
+
+gql:
+	go run github.com/99designs/gqlgen --verbose --config ./pkg/coreapi/gqlgen.yml
