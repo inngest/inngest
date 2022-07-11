@@ -13,6 +13,37 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// FSLoader is a function and action loader which returns functions and actions
+// by reading the given filesystem path recursively, loading functions and actions
+// from function definitions.
+//
+// This should be initialized via the NewFSLoader function.
+type FSLoader struct {
+	*MemoryExecutionLoader
+
+	// root stores the root path used when searching the filesystem.
+	root string
+}
+
+// ReadDir recursively reads the root directory, loading all functions
+// into the loader.
+func (f *FSLoader) ReadDir(ctx context.Context) error {
+	logger.From(ctx).
+		Debug().
+		Str("dir", f.root).
+		Msg("scanning directory for functions")
+
+	fns, err := function.LoadRecursive(ctx, f.root)
+	if err != nil {
+		return err
+	}
+	for _, fn := range fns {
+		f.functions = append(f.functions, *fn)
+	}
+
+	return f.MemoryExecutionLoader.SetFunctions(ctx, fns)
+}
+
 // NewFSLoader returns an ExecutionLoader which reads functions from the given
 // path, recursively.
 func NewFSLoader(ctx context.Context, path string) (ExecutionLoader, error) {
@@ -24,25 +55,19 @@ func NewFSLoader(ctx context.Context, path string) (ExecutionLoader, error) {
 	if err != nil {
 		return nil, err
 	}
-	loader := &FSLoader{root: abspath}
+	loader := &FSLoader{root: abspath, MemoryExecutionLoader: &MemoryExecutionLoader{}}
 	if err := loader.ReadDir(ctx); err != nil {
 		return nil, err
 	}
 	return loader, nil
 }
 
-// FSLoader is a function and action loader which returns functions and actions
-// by reading the given filesystem path recursively, loading functions and actions
-// from function definitions.
-//
-// This should be initialized via the NewFSLoader function.
-type FSLoader struct {
+// MmeoryExecutionLoader is a function and action loader which returns data from
+// in-memory state.
+type MemoryExecutionLoader struct {
 	// embed the in-memory action loader for querying action versions found within
 	// functions.
 	*memactionloader
-
-	// root stores the root path used when searching the filesystem.
-	root string
 
 	// functions stores all functions which were found within the given filesystem.
 	functions []function.Function
@@ -51,13 +76,52 @@ type FSLoader struct {
 	actions []inngest.ActionVersion
 }
 
-func (f *FSLoader) Functions(ctx context.Context) ([]function.Function, error) {
-	return f.functions, nil
+func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*function.Function) error {
+	m.functions = []function.Function{}
+	m.actions = []inngest.ActionVersion{}
+
+	// Validate all functions.
+	eg := &errgroup.Group{}
+	for _, fn := range f {
+		copied := fn
+		eg.Go(func() error {
+			return copied.Validate(ctx)
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+
+	for _, fn := range f {
+		actions, _, _ := fn.Actions(ctx)
+		m.actions = append(m.actions, actions...)
+		m.functions = append(m.functions, *fn)
+	}
+
+	// recreate the in-memory action loader.
+	m.memactionloader = &memactionloader{
+		Actions: make(map[string][]inngest.ActionVersion),
+		lock:    &sync.RWMutex{},
+	}
+	for _, a := range m.actions {
+		m.memactionloader.Add(a)
+	}
+
+	logger.From(ctx).
+		Debug().
+		Int("len", len(m.functions)).
+		Msg("added functions")
+
+	return nil
 }
 
-func (f *FSLoader) FunctionsScheduled(ctx context.Context) ([]function.Function, error) {
+func (m *MemoryExecutionLoader) Functions(ctx context.Context) ([]function.Function, error) {
+	return m.functions, nil
+}
+
+func (m *MemoryExecutionLoader) FunctionsScheduled(ctx context.Context) ([]function.Function, error) {
 	fns := []function.Function{}
-	for _, fn := range f.functions {
+	for _, fn := range m.functions {
 		for _, t := range fn.Triggers {
 			if t.CronTrigger != nil {
 				fns = append(fns, fn)
@@ -68,9 +132,9 @@ func (f *FSLoader) FunctionsScheduled(ctx context.Context) ([]function.Function,
 	return fns, nil
 }
 
-func (f *FSLoader) FunctionsByTrigger(ctx context.Context, eventName string) ([]function.Function, error) {
+func (m *MemoryExecutionLoader) FunctionsByTrigger(ctx context.Context, eventName string) ([]function.Function, error) {
 	fns := []function.Function{}
-	for _, fn := range f.functions {
+	for _, fn := range m.functions {
 		for _, t := range fn.Triggers {
 			if t.EventTrigger != nil && t.Event == eventName {
 				fns = append(fns, fn)
@@ -79,62 +143,6 @@ func (f *FSLoader) FunctionsByTrigger(ctx context.Context, eventName string) ([]
 		}
 	}
 	return fns, nil
-}
-
-// ReadDir recursively reads the root directory, loading all functions
-// into the loader.
-func (f *FSLoader) ReadDir(ctx context.Context) error {
-	logger.From(ctx).
-		Debug().
-		Str("dir", f.root).
-		Msg("scanning directory for functions")
-
-	var err error
-
-	f.functions = []function.Function{}
-	f.actions = []inngest.ActionVersion{}
-
-	fns, err := function.LoadRecursive(ctx, f.root)
-	for _, fn := range fns {
-		f.functions = append(f.functions, *fn)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	// Validate all functions.
-	eg := &errgroup.Group{}
-	for _, fn := range f.functions {
-		copied := fn
-		eg.Go(func() error {
-			return copied.Validate(ctx)
-		})
-	}
-	if err := eg.Wait(); err != nil {
-		return err
-	}
-
-	for _, fn := range f.functions {
-		actions, _, _ := fn.Actions(ctx)
-		f.actions = append(f.actions, actions...)
-	}
-
-	// recreate the in-memory action loader.
-	f.memactionloader = &memactionloader{
-		Actions: make(map[string][]inngest.ActionVersion),
-		lock:    &sync.RWMutex{},
-	}
-	for _, a := range f.actions {
-		f.memactionloader.Add(a)
-	}
-
-	logger.From(ctx).
-		Debug().
-		Int("len", len(f.functions)).
-		Msg("added functions")
-
-	return nil
 }
 
 func NewInMemoryActionLoader() *memactionloader {

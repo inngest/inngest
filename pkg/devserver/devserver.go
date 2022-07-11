@@ -34,9 +34,14 @@ func NewDevServer(ctx context.Context, c config.Config) error {
 		return err
 	}
 
+	return newDevServer(ctx, c, el)
+}
+
+func newDevServer(ctx context.Context, c config.Config, el coredata.ExecutionLoader) error {
 	api := api.NewService(c)
 	runner := runner.NewService(c, runner.WithExecutionLoader(el))
 	exec := executor.NewService(c, executor.WithExecutionLoader(el))
+
 	return service.StartAll(ctx, api, runner, exec)
 }
 
