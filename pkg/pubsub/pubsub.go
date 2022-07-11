@@ -6,12 +6,12 @@ import (
 	"time"
 )
 
-// Message represents an event sent across the pub/sub system
+// Message represents an event sent across the pub/sub system.
 type Message struct {
-	Name      string
-	Version   string
-	Data      json.RawMessage
-	Timestamp time.Time
+	Name      string    `json:"name"`
+	Version   string    `json:"v"`
+	Data      string    `json:"data"`
+	Timestamp time.Time `json:"ts"`
 }
 
 func (m Message) Encode() ([]byte, error) {

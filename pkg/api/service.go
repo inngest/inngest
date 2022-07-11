@@ -90,7 +90,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) error {
 			// TODO: Move this into a const.
 			Name:      "event/event.received",
 			Version:   "2022-07-01.01",
-			Data:      byt,
+			Data:      string(byt),
 			Timestamp: time.Now(),
 		},
 	)

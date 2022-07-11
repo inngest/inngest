@@ -28,7 +28,7 @@ type Config struct {
 	Log Log
 	// EventAPI configures the event API service.
 	EventAPI EventAPI
-	//
+	// Execution configures the executor, which invokes actions and steps.
 	Execution Execution
 	// EventAPI configures the event stream, which connects events to the execution engine.
 	EventStream EventStream
@@ -75,7 +75,8 @@ type State struct {
 
 type Execution struct {
 	// Drivers represents all drivers enabled.
-	Drivers map[string]registration.DriverConfig
+	Drivers   map[string]registration.DriverConfig
+	LogOutput bool
 }
 
 func (e *Execution) UnmarshalJSON(byt []byte) error {

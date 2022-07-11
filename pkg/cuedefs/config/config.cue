@@ -36,6 +36,11 @@ package config
 			docker: #DockerDriver
 			http:   #HTTPDriver
 		}
+
+		// logOutput logs output from steps within logs.  This may
+		// result in large logs and sensitive data being printed
+		// to stderr, and is only intended for development.
+		logOutput: bool | *false
 	}
 
 	// eventstream is used to configure the event stream pub/sub implementation.  This
@@ -58,8 +63,8 @@ package config
 	}
 }
 
-// @TODO: "inmemory" | "aws-sqs" | "gcp-pubsub" | "nats" | "redis" | *"inmemory"
-#MessagingService: #InmemMessaging | #NATSMessaging
+// @TODO: Add custom redis driver, add Kafka.
+#MessagingService: #InmemMessaging | #NATSMessaging | #SQSMessaging | #GCPPubSubMessaging
 
 // InmemMessaging defines configuration for an in-memory based event queue.  This is
 // only usable for single-container testing;  in-memory implementations only share
@@ -74,6 +79,22 @@ package config
 	backend:   "nats"
 	topic:     string
 	serverURL: string
+}
+
+// GCPPubSubMessaging defines configuration for using GCP's Pub/Sub as a
+// backing event stream.
+#GCPPubSubMessaging: {
+	backend: "gcp-pubsub"
+	project: string
+	topic:   string
+}
+
+// SQSMessaging defines configuration for using SQS as a backing event stream.
+#SQSMessaging: {
+	backend:   "aws-sqs"
+	region:    string
+	accountID: string
+	topic:     string
 }
 
 // # Queues

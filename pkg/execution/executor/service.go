@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -45,6 +46,8 @@ type svc struct {
 	queue queue.Queue
 	// exec runs the specific actions.
 	exec Executor
+
+	wg sync.WaitGroup
 }
 
 func (s *svc) Name() string {
@@ -81,7 +84,6 @@ func (s *svc) Pre(ctx context.Context) error {
 		drivers = append(drivers, d)
 	}
 
-	// XXX: Configure executor & drivers via config.
 	s.exec, err = NewExecutor(
 		WithActionLoader(s.data),
 		WithStateManager(s.state),
@@ -89,6 +91,7 @@ func (s *svc) Pre(ctx context.Context) error {
 			drivers...,
 		),
 		WithLogger(logger.From(ctx)),
+		WithConfig(s.config.Execution),
 	)
 	if err != nil {
 		return err
@@ -101,13 +104,19 @@ func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
 	return s.queue.Run(ctx, func(ctx context.Context, item queue.Item) error {
 		// Don't stop the service on errors.
+		s.wg.Add(1)
+		defer s.wg.Done()
 		err := s.handleQueueItem(ctx, item)
-		logger.From(ctx).Error().Err(err).Interface("item", item).Msg("critical error handling queue item")
+		if err != nil {
+			logger.From(ctx).Error().Err(err).Interface("item", item).Msg("critical error handling queue item")
+		}
 		return nil
 	})
 }
 
 func (s *svc) Stop(ctx context.Context) error {
+	// Wait for all in-flight queue runs to finish
+	s.wg.Wait()
 	return nil
 }
 
@@ -162,6 +171,8 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	if err != nil {
 		return err
 	}
+
+	l.Trace().Int("len", len(children)).Msg("evaluated children")
 
 	for _, next := range children {
 		// We want to wait for another event to come in to traverse this edge within the DAG.

@@ -15,6 +15,7 @@ const (
 	MessagingInMemory  = "inmemory"
 	MessagingNATS      = "nats"
 	MessagingGCPPubSub = "gcp-pubsub"
+	MessagingSQS       = "aws-sqs"
 
 	URLTypePublish   URLType = "publish"
 	URLTypeSubscribe URLType = "subscribe"
@@ -75,6 +76,8 @@ func (m *MessagingService) UnmarshalJSON(byt []byte) error {
 		concrete = &NATSMessaging{}
 	case MessagingGCPPubSub:
 		concrete = &GCPPubSubMessaging{}
+	case MessagingSQS:
+		concrete = &SQSMessaging{}
 	default:
 		return fmt.Errorf("unknown messaging backend: %s", m.Backend)
 	}
@@ -150,4 +153,28 @@ func (g GCPPubSubMessaging) TopicURL(topic string, typ URLType) string {
 	}
 
 	return fmt.Sprintf("gcppubsub://projects/%s/subscriptions/%s", g.Project, g.Topic)
+}
+
+type SQSMessaging struct {
+	Region    string
+	AccountID string
+	Topic     string
+}
+
+func (s SQSMessaging) Backend() string {
+	return MessagingSQS
+}
+
+func (s SQSMessaging) TopicName() string {
+	return s.Topic
+}
+
+func (s SQSMessaging) TopicURL(topic string, typ URLType) string {
+	return fmt.Sprintf(
+		"awssqs://sqs.%s.amazonaws.com/%s/%s?region=%s",
+		s.Region,
+		s.AccountID,
+		s.Topic,
+		s.Region,
+	)
 }

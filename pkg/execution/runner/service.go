@@ -110,11 +110,9 @@ func (s *svc) Pre(ctx context.Context) error {
 
 func (s *svc) Run(ctx context.Context) error {
 	l := logger.From(ctx)
-
 	l.Info().
 		Str("topic", s.config.EventStream.Service.TopicName()).
 		Msg("subscribing to events")
-
 	err := s.pubsub.Subscribe(ctx, s.config.EventStream.Service.TopicName(), s.handleMessage)
 	if err != nil {
 		return err
@@ -188,7 +186,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	}
 
 	evt := &event.Event{}
-	if err := json.Unmarshal(m.Data, evt); err != nil {
+	if err := json.Unmarshal([]byte(m.Data), evt); err != nil {
 		return fmt.Errorf("error unmarshalling event: %w", err)
 	}
 
