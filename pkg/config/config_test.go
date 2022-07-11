@@ -14,8 +14,15 @@ func defaultConfig() *Config {
 			Format: "json",
 		},
 		EventAPI: EventAPI{
-			Addr: "0.0.0.0",
-			Port: "8288",
+			Addr:    "0.0.0.0",
+			Port:    "8288",
+			MaxSize: 524288,
+		},
+		Execution: Execution{
+			Drivers: map[string]DriverConfig{
+				"docker": &DockerDriver{},
+				"http":   &HTTPDriver{},
+			},
 		},
 		EventStream: EventStream{
 			Service: MessagingService{
