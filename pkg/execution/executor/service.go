@@ -122,7 +122,15 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 	resp, err := s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
 	if err != nil {
-		// If the error is not of type response error, we can assume that this is
+		// The executor usually returns a state.DriverResponse if the step's
+		// response was an error.  In this case, the executor itself handles
+		// whether the step has been retried the max amount of times, as the
+		// executor has the workflow & step config.
+		//
+		// Accordingly, we check if the driver's response is retryable here;
+		// this will let us know whether we can re-enqueue.
+		//
+		// If the error is not of type response error, we assume the step is
 		// always retryable.
 		_, isResponseError := err.(*state.DriverResponse)
 		if (resp != nil && resp.Retryable()) || !isResponseError {
