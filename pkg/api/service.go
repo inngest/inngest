@@ -81,7 +81,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) error {
 		return err
 	}
 
-	logger.From(ctx).Debug().Str("event", e.Name).Str("id", e.ID).Msg("publishing event")
+	l.Debug().Str("event", e.Name).Str("id", e.ID).Msg("publishing event")
 
 	return a.publisher.Publish(
 		ctx,

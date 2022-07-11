@@ -101,7 +101,8 @@ func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
 	return s.queue.Run(ctx, func(ctx context.Context, item queue.Item) error {
 		// Don't stop the service on errors.
-		_ = s.handleQueueItem(ctx, item)
+		err := s.handleQueueItem(ctx, item)
+		logger.From(ctx).Error().Err(err).Interface("item", item).Msg("critical error handling queue item")
 		return nil
 	})
 }
@@ -149,7 +150,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming); err != nil {
 			return err
 		}
-		return fmt.Errorf("execution error: %s", err)
+		return nil
 	}
 
 	run, err := s.state.Load(ctx, item.Identifier)
