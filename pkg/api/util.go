@@ -10,9 +10,9 @@ import (
 )
 
 type apiResponse struct {
-	StatusCode int
-	Message    string
-	Error      string
+	StatusCode int    `json:"status"`
+	Message    string `json:"message"`
+	Error      string `json:"error,omitempty"`
 }
 
 func parseBody(body []byte) ([]*event.Event, error) {
@@ -29,37 +29,23 @@ func parseBody(body []byte) ([]*event.Event, error) {
 
 	evt := &event.Event{}
 	if err := json.Unmarshal(body, evt); err != nil {
-		// XXX: respond with error JSON.  If maxlen return a specific error.
 		return nil, err
 	}
+
 	return []*event.Event{evt}, nil
 }
 
 func (a API) writeResponse(w http.ResponseWriter, h apiResponse) {
 	w.WriteHeader(h.StatusCode)
 
-	body := map[string]string{}
-
-	if h.Message != "" {
-		body["message"] = h.Message
-	}
-
-	if h.Error != "" {
-		a.log.Error().Msg(h.Error)
-		body["error"] = h.Error
-	}
-
-	byt, err := json.Marshal(body)
+	byt, err := json.Marshal(h)
 	if err != nil {
 		fmt.Println("Error marshalling response:", err)
 	}
+
 	_, err = w.Write(byt)
 	if err != nil {
 		fmt.Println("Error writing response:", err)
 	}
-}
-
-func BasicEventHandler(*event.Event) error {
-	// TODO - Send to executor
-	return nil
+	_, _ = w.Write([]byte("\n"))
 }

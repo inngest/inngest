@@ -5,19 +5,26 @@ import (
 	"sync"
 
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/config/registration"
+	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 )
+
+func init() {
+	registration.RegisterDriverConfig(&Config{})
+}
 
 const RuntimeName = "mock"
 
 type Mock struct {
-	RuntimeName string
-
 	// Responses stores the responses that a driver should return.
 	Responses map[string]state.DriverResponse
+
 	// Errors stores which steps should return with a driver error, as if
 	// the step wasn't executed.
 	Errors map[string]error
+
+	RuntimeName string
 
 	// Executed stores which actions were "executed"
 	Executed map[string]inngest.ActionVersion
@@ -53,4 +60,30 @@ func (m *Mock) ExecutedLen() int {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	return len(m.Executed)
+}
+
+// Config represents driver configuration for use when configuring hosted
+// services via config.cue
+type Config struct {
+	Responses map[string]state.DriverResponse
+
+	// driver stores the driver once, as a singleton per config instance.
+	driver driver.Driver
+}
+
+// RuntimeName returns the runtime field that should invoke this driver.
+func (Config) RuntimeName() string { return RuntimeName }
+
+// DriverName returns the name of this driver
+func (Config) DriverName() string { return RuntimeName }
+
+func (c Config) UnmarshalJSON(b []byte) error { return nil }
+
+func (c *Config) NewDriver() (driver.Driver, error) {
+	if c.driver == nil {
+		c.driver = &Mock{
+			Responses: c.Responses,
+		}
+	}
+	return c.driver, nil
 }

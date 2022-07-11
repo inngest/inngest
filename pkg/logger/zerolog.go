@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	DefaultLevel = zerolog.InfoLevel
+	DefaultLevel = zerolog.DebugLevel
 )
 
 type loggerKey struct{}
@@ -44,8 +44,7 @@ func New(lvl zerolog.Level) *zerolog.Logger {
 
 	if !viper.GetBool("json") {
 		l = l.Output(zerolog.ConsoleWriter{
-			Out:         os.Stderr,
-			FormatLevel: func(i interface{}) string { return "" },
+			Out: os.Stderr,
 		})
 	}
 

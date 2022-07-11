@@ -10,15 +10,51 @@ package config
 	// EventAPI is used to configure the API for listening to events.
 	eventAPI: {
 		addr: string | *"0.0.0.0"
-		port: string | *"8288"
+		port: >0 & <=65535 | *8288
+
+		// maxSize represents the maximum size of events read by the
+		// event API.  Any events over this size limit will be rejected
+		// with an HTTP 413 (Request Entity Too Large).
+		maxSize: >=1024 | *(512 * 1024)
 	}
 
-	// eventStream is used to configure the event stream pub/sub implementation.  This
+	execution: {
+		// Enable drivers for given runtimes within this array.  The key
+		// is the runtime name specified within steps of a function, and
+		// the value is the specific driver to use for these runtimes.
+		//
+		// This allows you to build and specify alternate drivers for each
+		// runtime, eg. a Kubernetes driver for the docker runtime.
+		//
+		// By default, enable the docker and HTTP drivers for the docker and
+		// HTTP runtimes respectively.
+		drivers: {
+			// For each runtime, specify a driver which has its own name.
+			[runtime=_]: #Driver & {name: string}
+		} | *{
+
+			docker: #DockerDriver
+			http:   #HTTPDriver
+		}
+	}
+
+	// eventstream is used to configure the event stream pub/sub implementation.  This
 	// pub-sub stream is used to send and receive events between the event API and the
 	// executors which initialize and work with events.
-	eventStream: {
+	eventstream: {
 		// Default to an in-memory pubsub using the "events" topic.
 		service: #MessagingService | *{backend: "inmemory", topic: "events"}
+		// This struct is retained for any shared settings
+	}
+
+	queue: {
+		service: #QueueService | *{backend: "inmemory"}
+		// This struct is retained for any shared settings
+	}
+
+	state: {
+		service: #StateService | *{backend: "inmemory"}
+		// This struct is retained for any shared settings
 	}
 }
 
@@ -38,4 +74,60 @@ package config
 	backend:   "nats"
 	topic:     string
 	serverURL: string
+}
+
+// # Queues
+//
+
+// @TODO: Add SQS.
+#QueueService: #InmemQueue
+
+#InmemQueue: {
+	backend: "inmemory"
+}
+
+// # State
+//
+// State stores distributed state when running functions.  You can choose one of
+// StateServices as the backend to host state.
+#StateService: #InmemState | #RedisState
+
+// InmemState stores state in memory, local to each process.  This should only 
+// be used for development or testing, but never for production.
+#InmemState: {
+	backend: "inmemory"
+}
+
+// RedisState uses Redis as the backend state store.
+#RedisState: {
+	backend: "redis"
+
+	host:        string | *"localhost"
+	port:        >0 & <=65535 | *6379
+	db:          >=0 | *0
+	username?:   string
+	password?:   string
+	maxRetries?: >=-1 | *3
+	poolSize?:   >=1
+}
+
+// Drivers handle execution of each step within a function.
+#Driver: #DockerDriver | #MockDriver | #HTTPDriver
+
+// DockerDriver runs docker containers _synchronously_ on the given host.
+// If no host is specified, we default to the $DOCKER_HOST environment variable,
+// which uses the local machine if not set.
+#DockerDriver: {
+	name:  "docker"
+	host?: string
+}
+
+// MockDriver is used in testing to mock and stub function executions.  You
+// almost certainly do not need to include this in your config.
+#MockDriver: {
+	name: "mock"
+}
+
+#HTTPDriver: {
+	name: "http"
 }

@@ -16,17 +16,17 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-func NewPublisher(ctx context.Context, c *config.MessagingService) (Publisher, error) {
+func NewPublisher(ctx context.Context, c config.MessagingService) (Publisher, error) {
 	return NewPublishSubscriber(ctx, c)
 }
 
-func NewSubscriber(ctx context.Context, c *config.MessagingService) (Subscriber, error) {
+func NewSubscriber(ctx context.Context, c config.MessagingService) (Subscriber, error) {
 	return NewPublishSubscriber(ctx, c)
 }
 
-func NewPublishSubscriber(ctx context.Context, c *config.MessagingService) (PublishSubscriber, error) {
+func NewPublishSubscriber(ctx context.Context, c config.MessagingService) (PublishSubscriber, error) {
 	b := &broker{
-		conf:   *c,
+		conf:   c,
 		topics: map[string]*pubsub.Topic{},
 		tl:     &sync.RWMutex{},
 		mux:    pubsub.DefaultURLMux(),

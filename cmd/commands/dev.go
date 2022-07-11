@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/devserver"
-	log "github.com/inngest/inngest-cli/pkg/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -25,18 +25,14 @@ func NewCmdDev() *cobra.Command {
 
 func doDev(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	devserver, err := devserver.NewDevServer(devserver.Options{
-		Hostname: cmd.Flag("host").Value.String(),
-		Port:     cmd.Flag("port").Value.String(),
-		Dir:      cmd.Flag("dir").Value.String(),
-		Log:      log.Default(),
-	})
+	conf, err := config.Default(ctx)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	err = devserver.Start(ctx)
+	err = devserver.NewDevServer(ctx, *conf)
 	if err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }

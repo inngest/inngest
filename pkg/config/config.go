@@ -2,6 +2,14 @@ package config
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+
+	// Import the default drivers, queues, and state stores.
+	"github.com/inngest/inngest-cli/pkg/config/registration"
+	_ "github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
+	_ "github.com/inngest/inngest-cli/pkg/execution/driver/httpdriver"
+	_ "github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 )
 
 // Load loads the configu from the given locations in order.  If locs is empty,
@@ -17,11 +25,18 @@ func Default(ctx context.Context) (*Config, error) {
 // Config represents configuration for running the Inngest services.
 type Config struct {
 	// Log configures the logger used within Inngest services.
-	Log Log `json:"log"`
+	Log Log
 	// EventAPI configures the event API service.
 	EventAPI EventAPI
+	//
+	Execution Execution
 	// EventAPI configures the event stream, which connects events to the execution engine.
 	EventStream EventStream
+	// Queue configures the backing queue, used to enqueue function steps
+	// for execution.
+	Queue Queue
+	// State configures the execution state store.
+	State State
 }
 
 // Log configures the logger used within Inngest services.
@@ -29,7 +44,7 @@ type Log struct {
 	// Level configures the log level.  Valid choices are:
 	// "trace", "debug", "info", "warn", or "error".  The default
 	// is "info".
-	Level string `json:"level"`
+	Level string
 	// Format configures the log format.  Currently, only "json"
 	// is supported and is the default.
 	Format string
@@ -40,10 +55,77 @@ type EventAPI struct {
 	// Addr is the IP to bind to, eg. "0.0.0.0" or "127.0.0.1"
 	Addr string
 	// Port is the port to use, defaulting to 8288.
-	Port string
+	Port int
+	// MaxSize represents the max size of events ingested, in bytes.
+	MaxSize int
 }
 
 // EventAPI configures the event stream, which connects events to the execution engine.
 type EventStream struct {
 	Service MessagingService
+}
+
+type Queue struct {
+	Service QueueService
+}
+
+type State struct {
+	Service StateService
+}
+
+type Execution struct {
+	// Drivers represents all drivers enabled.
+	Drivers map[string]registration.DriverConfig
+}
+
+func (e *Execution) UnmarshalJSON(byt []byte) error {
+	type drivers struct {
+		Drivers map[string]unmarshalDriver
+	}
+	names := &drivers{}
+	if err := json.Unmarshal(byt, names); err != nil {
+		return err
+	}
+
+	e.Drivers = map[string]registration.DriverConfig{}
+
+	for runtime, driver := range names.Drivers {
+		iface, ok := registration.RegisteredDrivers()[driver.Name]
+		if !ok {
+			return fmt.Errorf("unknown driver: %s", driver.Name)
+		}
+		if err := json.Unmarshal(driver.Raw, iface); err != nil {
+			return err
+		}
+
+		res, _ := iface.(registration.DriverConfig)
+		if runtime != res.RuntimeName() {
+			// Ensure the driver can run the given runtime.
+			return fmt.Errorf("driver %s is not valid for runtime %s", driver.Name, runtime)
+		}
+
+		e.Drivers[runtime] = res
+	}
+
+	return nil
+}
+
+// unmarshalDriver is used to help unmarshal drivers into their
+// concrete structs.
+type unmarshalDriver struct {
+	Name string
+	Raw  json.RawMessage
+}
+
+func (u *unmarshalDriver) UnmarshalJSON(b []byte) error {
+	type driver struct {
+		Name string
+	}
+	d := &driver{}
+	if err := json.Unmarshal(b, d); err != nil {
+		return err
+	}
+	u.Name = d.Name
+	u.Raw = b
+	return nil
 }

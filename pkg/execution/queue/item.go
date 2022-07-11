@@ -13,12 +13,12 @@ import (
 // such as a job identifier.
 type Item struct {
 	// Identifier represents the unique workflow ID and run ID for the current job.
-	Identifier state.Identifier
+	Identifier state.Identifier `json:"identifier"`
 	// ErrorCount stores the total number of errors that this job has currently procesed.
-	ErrorCount int
+	ErrorCount int `json:"errorCount"`
 	// Payload stores item-specific data for use when processing the item.  For example,
 	// this may contain the function's edge for running a step.
-	Payload any
+	Payload any `json:"payload"`
 }
 
 // GetEdge returns the edge from the enqueued item, if the payload is of type PayloadEdge.
@@ -34,5 +34,5 @@ func GetEdge(i Item) (*inngest.Edge, error) {
 // PayloadEdge is the payload stored when enqueueing an edge traversal to execute
 // the incoming step of the edge.
 type PayloadEdge struct {
-	Edge inngest.Edge
+	Edge inngest.Edge `json:"edge"`
 }

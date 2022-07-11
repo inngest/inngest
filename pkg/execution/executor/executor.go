@@ -6,9 +6,10 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/execution/actionloader"
+	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
+	"github.com/rs/zerolog"
 )
 
 var (
@@ -93,7 +94,7 @@ type ExecutorOpt func(m Executor) error
 
 // WithActionLoader sets the action loader to use when retrieving function definitions
 // in a workflow.
-func WithActionLoader(al actionloader.ActionLoader) ExecutorOpt {
+func WithActionLoader(al coredata.ExecutionActionLoader) ExecutorOpt {
 	return func(e Executor) error {
 		e.(*executor).al = al
 		return nil
@@ -104,6 +105,13 @@ func WithActionLoader(al actionloader.ActionLoader) ExecutorOpt {
 func WithStateManager(sm state.Manager) ExecutorOpt {
 	return func(e Executor) error {
 		e.(*executor).sm = sm
+		return nil
+	}
+}
+
+func WithLogger(l *zerolog.Logger) ExecutorOpt {
+	return func(e Executor) error {
+		e.(*executor).log = l
 		return nil
 	}
 }
@@ -129,8 +137,10 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 
 // executor represents a built-in executor for running workflows.
 type executor struct {
+	log *zerolog.Logger
+
 	sm             state.Manager
-	al             actionloader.ActionLoader
+	al             coredata.ExecutionActionLoader
 	runtimeDrivers map[string]driver.Driver
 }
 
@@ -138,6 +148,14 @@ type executor struct {
 // workflow via an executor.  This returns all available steps we can run from
 // the workflow after the step has been executed.
 func (e *executor) Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error) {
+	if e.log != nil {
+		e.log.Debug().
+			Str("run_id", id.RunID.String()).
+			Str("step", from).
+			Int("attempt", attempt).
+			Msg("executing step")
+	}
+
 	s, err := e.sm.Load(ctx, id)
 	if err != nil {
 		return nil, err
@@ -152,6 +170,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 	// To fix this particular consistency issue, always check to see
 	// if there's output stored for this action ID.
 	if resp, _ := s.ActionID(from); resp != nil {
+		if e.log != nil {
+			e.log.Warn().
+				Str("run_id", id.RunID.String()).
+				Str("step", from).
+				Int("attempt", attempt).
+				Msg("step already executed")
+		}
 		// This has already successfully been executed.
 		return &state.DriverResponse{
 			Scheduled: false,
@@ -169,6 +194,28 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 	}
 
 	resp, err := e.run(ctx, w, id, from, s, attempt)
+
+	if e.log != nil {
+		if err == nil {
+			e.log.Info().
+				Str("run_id", id.RunID.String()).
+				Str("step", from).
+				Msg("executed step")
+		} else {
+			retryable := false
+			if resp != nil {
+				retryable = resp.Retryable()
+			}
+
+			e.log.Error().
+				Str("run_id", id.RunID.String()).
+				Str("step", from).
+				Err(err).
+				Bool("retryable", retryable).
+				Msg("error executing step")
+		}
+	}
+
 	if err != nil {
 		// This is likely a state.DriverResponse, which itself includes
 		// whether the action can be retried based off of the output.
@@ -222,7 +269,7 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 }
 
 func (e *executor) executeAction(ctx context.Context, id state.Identifier, action *inngest.Step, s state.State, attempt int) (*state.DriverResponse, error) {
-	definition, err := e.al.Load(ctx, action.DSN, action.Version)
+	definition, err := e.al.Action(ctx, action.DSN, action.Version)
 	if err != nil {
 		return nil, fmt.Errorf("error loading action: %w", err)
 	}
@@ -233,6 +280,16 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	d, ok := e.runtimeDrivers[definition.Runtime.RuntimeType()]
 	if !ok {
 		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, definition.Runtime.RuntimeType())
+	}
+
+	if e.log != nil {
+		e.log.Info().
+			Str("dsn", definition.DSN).
+			Interface("version", definition.Version).
+			Interface("scopes", definition.Scopes).
+			Str("run_id", id.RunID.String()).
+			Str("step", action.ID).
+			Msg("executing action")
 	}
 
 	response, err := d.Execute(ctx, s, *definition, *action)

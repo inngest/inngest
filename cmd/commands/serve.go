@@ -5,18 +5,21 @@ import (
 
 	"github.com/inngest/inngest-cli/pkg/api"
 	"github.com/inngest/inngest-cli/pkg/config"
+	"github.com/inngest/inngest-cli/pkg/execution/executor"
+	"github.com/inngest/inngest-cli/pkg/execution/runner"
 	"github.com/inngest/inngest-cli/pkg/service"
 	"github.com/spf13/cobra"
 )
 
 const (
 	ServeExecutor = "executor"
+	ServeRunner   = "runner"
 	ServeEventAPI = "events-api"
 )
 
 var (
 	serveConf = ""
-	serveArgs = []string{ServeExecutor, ServeEventAPI}
+	serveArgs = []string{ServeExecutor, ServeRunner, ServeEventAPI}
 )
 
 func NewCmdServe() *cobra.Command {
@@ -25,7 +28,7 @@ func NewCmdServe() *cobra.Command {
 		Short:     "Start an Inngest service",
 		Example:   "inngest serve executor",
 		RunE:      serve,
-		Args:      cobra.ExactValidArgs(1),
+		Args:      cobra.OnlyValidArgs,
 		ValidArgs: serveArgs,
 	}
 
@@ -37,8 +40,6 @@ func NewCmdServe() *cobra.Command {
 func serve(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	var s service.Service
-
 	locs := []string{}
 	if serveConf != "" {
 		locs = []string{serveConf}
@@ -48,12 +49,19 @@ func serve(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	switch args[0] {
-	case ServeEventAPI:
-		s = api.NewService(conf)
-	default:
-		return fmt.Errorf("Not implemented")
+	svc := []service.Service{}
+	for _, name := range args {
+		switch name {
+		case ServeEventAPI:
+			svc = append(svc, api.NewService(*conf))
+		case ServeRunner:
+			svc = append(svc, runner.NewService(*conf))
+		case ServeExecutor:
+			svc = append(svc, executor.NewService(*conf))
+		default:
+			return fmt.Errorf("Not implemented")
+		}
 	}
 
-	return service.Start(ctx, s)
+	return service.StartAll(ctx, svc...)
 }

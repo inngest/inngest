@@ -3,23 +3,46 @@ package config
 import (
 	"testing"
 
+	"github.com/inngest/inngest-cli/pkg/config/registration"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/httpdriver"
 	"github.com/stretchr/testify/require"
 )
 
 func defaultConfig() *Config {
+	// The default config is created via Cue's default parameters.
 	base := &Config{
 		Log: Log{
 			Level:  "info",
 			Format: "json",
 		},
 		EventAPI: EventAPI{
-			Addr: "0.0.0.0",
-			Port: "8288",
+			Addr:    "0.0.0.0",
+			Port:    8288,
+			MaxSize: 524288,
+		},
+		Execution: Execution{
+			Drivers: map[string]registration.DriverConfig{
+				"docker": &dockerdriver.Config{},
+				"http":   &httpdriver.Config{},
+			},
 		},
 		EventStream: EventStream{
 			Service: MessagingService{
 				Backend:  "inmemory",
 				Concrete: &InMemoryMessaging{Topic: "events"},
+			},
+		},
+		Queue: Queue{
+			Service: QueueService{
+				Backend:  "inmemory",
+				Concrete: &InMemoryQueue{},
+			},
+		},
+		State: State{
+			Service: StateService{
+				Backend:  "inmemory",
+				Concrete: &InMemoryState{},
 			},
 		},
 	}
@@ -84,7 +107,7 @@ import (
 )
 
 config.#Config & {
-  eventStream: {
+  eventstream: {
     service: {
       backend: "nats"
       topic: "nats-events"

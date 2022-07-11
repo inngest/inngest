@@ -1,9 +1,12 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+
+	"gocloud.dev/pubsub"
 )
 
 type URLType string
@@ -99,7 +102,10 @@ func (i InMemoryMessaging) TopicName() string {
 }
 
 func (i InMemoryMessaging) TopicURL(topic string, typ URLType) string {
-	return fmt.Sprintf("mem://%s", topic)
+	// Ensure that this topic is created locally.
+	url := fmt.Sprintf("mem://%s", topic)
+	_, _ = pubsub.OpenTopic(context.Background(), url)
+	return url
 }
 
 // NATSMessaging configures the NATS server URL and topic for use with
