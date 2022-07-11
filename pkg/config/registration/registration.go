@@ -1,8 +1,6 @@
 package registration
 
 import (
-	"fmt"
-
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
 )
 
@@ -15,12 +13,9 @@ func RegisteredDrivers() map[string]interface{} {
 	return registeredDrivers
 }
 
-func RegisterDriverConfig(c DriverConfig) error {
-	if _, ok := registeredDrivers[c.DriverName()]; ok {
-		return fmt.Errorf("driver already registered: %s", c.DriverName())
-	}
+func RegisterDriverConfig(c DriverConfig) {
+	// Overwrite any previous drivers.
 	registeredDrivers[c.DriverName()] = c
-	return nil
 }
 
 // DriverConfig is an interface used to determine driver config structs.

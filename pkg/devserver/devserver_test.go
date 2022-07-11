@@ -107,8 +107,8 @@ func TestEngine_async(t *testing.T) {
 			"application/json",
 			buf,
 		)
-		defer resp.Body.Close()
 		require.NoError(t, err)
+		defer resp.Body.Close()
 		require.Equal(t, 200, resp.StatusCode)
 		return err
 	}
