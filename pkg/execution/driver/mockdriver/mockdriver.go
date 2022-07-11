@@ -5,8 +5,13 @@ import (
 	"sync"
 
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/config/registration"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 )
+
+func init() {
+	registration.RegisterDriverConfig(Config{})
+}
 
 const RuntimeName = "mock"
 
@@ -54,3 +59,15 @@ func (m *Mock) ExecutedLen() int {
 	defer m.lock.RUnlock()
 	return len(m.Executed)
 }
+
+// Config represents driver configuration for use when configuring hosted
+// services via config.cue
+type Config struct{}
+
+// RuntimeName returns the runtime field that should invoke this driver.
+func (Config) RuntimeName() string { return RuntimeName }
+
+// DriverName returns the name of this driver
+func (Config) DriverName() string { return RuntimeName }
+
+func (c Config) UnmarshalJSON(b []byte) error { return nil }

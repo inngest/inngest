@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	// Import the default drivers, queues, and state stores.
+	"github.com/inngest/inngest-cli/pkg/config/registration"
+	_ "github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
+	_ "github.com/inngest/inngest-cli/pkg/execution/driver/httpdriver"
+	_ "github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 )
 
 // Load loads the configu from the given locations in order.  If locs is empty,
@@ -69,7 +75,7 @@ type State struct {
 
 type Execution struct {
 	// Drivers represents all drivers enabled.
-	Drivers map[string]DriverConfig
+	Drivers map[string]registration.DriverConfig
 }
 
 func (e *Execution) UnmarshalJSON(byt []byte) error {
@@ -81,30 +87,45 @@ func (e *Execution) UnmarshalJSON(byt []byte) error {
 		return err
 	}
 
-	e.Drivers = map[string]DriverConfig{}
+	e.Drivers = map[string]registration.DriverConfig{}
 
-	// TODO: Move to registering driver config in init, vs
-	// hard coding.
 	for runtime, driver := range names.Drivers {
-		var def interface{}
-
-		switch driver.Name {
-		case "docker":
-			def = &DockerDriver{}
-		case "mock":
-			def = &MockDriver{}
-		case "http":
-			def = &HTTPDriver{}
-		default:
-			return fmt.Errorf("unknown driver name: %s", driver.Name)
+		iface, ok := registration.RegisteredDrivers()[driver.Name]
+		if !ok {
+			return fmt.Errorf("unknown driver: %s", driver.Name)
 		}
-
-		if err := json.Unmarshal(driver.Raw, def); err != nil {
+		if err := json.Unmarshal(driver.Raw, iface); err != nil {
 			return err
 		}
 
-		e.Drivers[runtime] = def.(DriverConfig)
+		res, _ := iface.(registration.DriverConfig)
+		if runtime != res.RuntimeName() {
+			// Ensure the driver can run the given runtime.
+			return fmt.Errorf("driver %s is not valid for runtime %s", driver.Name, runtime)
+		}
+
+		e.Drivers[runtime] = res
 	}
 
+	return nil
+}
+
+// unmarshalDriver is used to help unmarshal drivers into their
+// concrete structs.
+type unmarshalDriver struct {
+	Name string
+	Raw  json.RawMessage
+}
+
+func (u *unmarshalDriver) UnmarshalJSON(b []byte) error {
+	type driver struct {
+		Name string
+	}
+	d := &driver{}
+	if err := json.Unmarshal(b, d); err != nil {
+		return err
+	}
+	u.Name = d.Name
+	u.Raw = b
 	return nil
 }

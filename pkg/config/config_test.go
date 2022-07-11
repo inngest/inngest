@@ -3,6 +3,9 @@ package config
 import (
 	"testing"
 
+	"github.com/inngest/inngest-cli/pkg/config/registration"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/httpdriver"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,9 +22,9 @@ func defaultConfig() *Config {
 			MaxSize: 524288,
 		},
 		Execution: Execution{
-			Drivers: map[string]DriverConfig{
-				"docker": &DockerDriver{},
-				"http":   &HTTPDriver{},
+			Drivers: map[string]registration.DriverConfig{
+				"docker": &dockerdriver.Config{},
+				"http":   &httpdriver.Config{},
 			},
 		},
 		EventStream: EventStream{
