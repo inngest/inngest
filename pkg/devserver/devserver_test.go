@@ -40,7 +40,7 @@ func TestEngine_async(t *testing.T) {
 	conf.Execution.Drivers = map[string]registration.DriverConfig{
 		"mock": mock,
 	}
-	conf.EventAPI.Port = "47192"
+	conf.EventAPI.Port = 47192
 
 	// Fetch the in-memory state store singleton.
 	sm := inmemory.NewSingletonStateManager()
@@ -103,7 +103,7 @@ func TestEngine_async(t *testing.T) {
 		require.NoError(t, err)
 		buf := bytes.NewBuffer(byt)
 		resp, err := http.Post(
-			fmt.Sprintf("http://127.0.0.1:%s/e/key", conf.EventAPI.Port),
+			fmt.Sprintf("http://127.0.0.1:%d/e/key", conf.EventAPI.Port),
 			"application/json",
 			buf,
 		)

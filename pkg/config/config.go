@@ -55,7 +55,7 @@ type EventAPI struct {
 	// Addr is the IP to bind to, eg. "0.0.0.0" or "127.0.0.1"
 	Addr string
 	// Port is the port to use, defaulting to 8288.
-	Port string
+	Port int
 	// MaxSize represents the max size of events ingested, in bytes.
 	MaxSize int
 }

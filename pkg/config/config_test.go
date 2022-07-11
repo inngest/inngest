@@ -18,7 +18,7 @@ func defaultConfig() *Config {
 		},
 		EventAPI: EventAPI{
 			Addr:    "0.0.0.0",
-			Port:    "8288",
+			Port:    8288,
 			MaxSize: 524288,
 		},
 		Execution: Execution{

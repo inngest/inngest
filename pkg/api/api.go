@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
@@ -15,16 +16,16 @@ import (
 type EventHandler func(context.Context, *event.Event) error
 
 type Options struct {
-	Hostname     string
-	Port         string
+	Config config.Config
+
 	EventHandler EventHandler
 	Logger       *zerolog.Logger
 }
 
 const (
-	// MaxSize represents the maximum size of the event payload we process,
+	// DefaultMaxSize represents the maximum size of the event payload we process,
 	// currently 256KB.
-	MaxSize = 256 * 1024
+	DefaultMaxSize = 256 * 1024
 )
 
 var (
@@ -34,11 +35,14 @@ var (
 func NewAPI(o Options) (*API, error) {
 	logger := o.Logger.With().Str("caller", "api").Logger()
 
+	if o.Config.EventAPI.MaxSize == 0 {
+		o.Config.EventAPI.MaxSize = DefaultMaxSize
+	}
+
 	api := &API{
-		hostname: o.Hostname,
-		port:     o.Port,
-		handler:  o.EventHandler,
-		log:      &logger,
+		config:  o.Config,
+		handler: o.EventHandler,
+		log:     &logger,
 	}
 
 	http.HandleFunc("/", api.HealthCheck)
@@ -49,17 +53,17 @@ func NewAPI(o Options) (*API, error) {
 }
 
 type API struct {
-	handler  EventHandler
-	hostname string
-	port     string
-	log      *zerolog.Logger
+	config config.Config
+
+	handler EventHandler
+	log     *zerolog.Logger
 
 	server *http.Server
 }
 
 func (a *API) Start(ctx context.Context) error {
 	a.server = &http.Server{
-		Addr:    fmt.Sprintf("%s:%s", a.hostname, a.port),
+		Addr:    fmt.Sprintf("%s:%d", a.config.EventAPI.Addr, a.config.EventAPI.Port),
 		Handler: http.DefaultServeMux,
 	}
 	a.log.Info().Str("addr", a.server.Addr).Msg("starting server")
@@ -81,10 +85,10 @@ func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
 func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	if r.ContentLength > MaxSize {
+	if r.ContentLength > int64(a.config.EventAPI.MaxSize) {
 		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusRequestEntityTooLarge,
-			Error:      "Payload larger than maximum allowed 256KB",
+			Error:      "Payload larger than maximum allowed",
 		})
 		return
 	}
@@ -98,10 +102,9 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// noop on the key for now
-	// key := matches[1]
+	// TODO: Implement key matching from core data loader.
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, MaxSize))
+	body, err := io.ReadAll(io.LimitReader(r.Body, int64(a.config.EventAPI.MaxSize)))
 	if err != nil {
 		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusBadRequest,

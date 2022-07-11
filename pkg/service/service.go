@@ -30,7 +30,8 @@ type Service interface {
 	// Pre initializes the service, returning an error if the service is not
 	// capable of running.
 	Pre(ctx context.Context) error
-	// Run runs the service as a blocking operation
+	// Run runs the service as a blocking operation, until the given context
+	// is cancelled.
 	Run(ctx context.Context) error
 	// Stop is called to gracefully shut down the service.
 	Stop(ctx context.Context) error

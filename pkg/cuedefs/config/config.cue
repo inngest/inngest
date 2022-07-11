@@ -10,7 +10,7 @@ package config
 	// EventAPI is used to configure the API for listening to events.
 	eventAPI: {
 		addr: string | *"0.0.0.0"
-		port: string | *"8288"
+		port: >0 & <=65535 | *8288
 
 		// maxSize represents the maximum size of events read by the
 		// event API.  Any events over this size limit will be rejected

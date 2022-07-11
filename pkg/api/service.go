@@ -36,8 +36,7 @@ func (a *apiServer) Pre(ctx context.Context) error {
 	var err error
 
 	a.api, err = NewAPI(Options{
-		Hostname:     a.config.EventAPI.Addr,
-		Port:         a.config.EventAPI.Port,
+		Config:       a.config,
 		Logger:       logger.From(ctx),
 		EventHandler: a.handleEvent,
 	})
