@@ -130,9 +130,12 @@ func Start(ctx context.Context, s Service) (err error) {
 		}
 	}()
 
+	runErr := make(chan error)
 	l.Info().Msg("service starting")
 	go func() {
-		err = s.Run(runCtx)
+		err := s.Run(runCtx)
+		// Communicate this error to the outer select.
+		runErr <- err
 		// Call cleanup, triggering Stop below.  In this case
 		// we don't need to wait for a signal to terminate.
 		cleanup()
@@ -143,13 +146,15 @@ func Start(ctx context.Context, s Service) (err error) {
 		// Terminating via a signal
 		l.Info().Interface("signal", sig).Msg("received signal")
 		cleanup()
-	case <-runCtx.Done():
-		// Run terminated.
+	case err = <-runErr:
+		// Run terminated.  Fetch the error from the goroutine.
 		if err != nil {
 			l.Error().Err(err).Msg("service errored")
 		} else {
-			l.Warn().Msg("service run finished")
+			l.Warn().Msg("service run stopped")
 		}
+	case <-runCtx.Done():
+		l.Warn().Msg("service run stopped")
 	}
 
 	// Create a new context here with a separate timeout.  This ensures that
@@ -159,7 +164,7 @@ func Start(ctx context.Context, s Service) (err error) {
 	stopCtx, stopDone := context.WithTimeout(context.Background(), stopTimeout(s))
 	defer stopDone()
 	go func() {
-		l.Info().Msg("service stopping")
+		l.Info().Msg("service cleaning up")
 		if err := s.Stop(stopCtx); err != nil && err != context.Canceled {
 			stopCh <- err
 			return
@@ -168,7 +173,7 @@ func Start(ctx context.Context, s Service) (err error) {
 	}()
 	select {
 	case <-stopCtx.Done():
-		l.Error().Msg("service did not stop within timeout")
+		l.Error().Msg("service did not clean up within timeout")
 		return err
 	case stopErr := <-stopCh:
 		if stopErr != nil {
