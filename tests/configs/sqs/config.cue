@@ -13,6 +13,10 @@ config.#Config & {
 		level:  "trace"
 	}
 
+	eventAPI: {
+		addr: "127.0.0.1"
+	}
+
 	execution: {
 		drivers: {
 			docker: config.#DockerDriver
