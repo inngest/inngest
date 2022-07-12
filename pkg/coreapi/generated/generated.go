@@ -90,7 +90,8 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Config func(childComplexity int) int
+		ActionVersion func(childComplexity int, query models.ActionVersionQuery) int
+		Config        func(childComplexity int) int
 	}
 }
 
@@ -101,6 +102,7 @@ type MutationResolver interface {
 }
 type QueryResolver interface {
 	Config(ctx context.Context) (*models.Config, error)
+	ActionVersion(ctx context.Context, query models.ActionVersionQuery) (*models.ActionVersion, error)
 }
 
 type executableSchema struct {
@@ -301,6 +303,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.UpdateActionVersion(childComplexity, args["input"].(models.UpdateActionVersionInput)), true
 
+	case "Query.actionVersion":
+		if e.complexity.Query.ActionVersion == nil {
+			break
+		}
+
+		args, err := ec.field_Query_actionVersion_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.ActionVersion(childComplexity, args["query"].(models.ActionVersionQuery)), true
+
 	case "Query.config":
 		if e.complexity.Query.Config == nil {
 			break
@@ -316,6 +330,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	rc := graphql.GetOperationContext(ctx)
 	ec := executionContext{rc, e}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputActionVersionQuery,
 		ec.unmarshalInputCreateActionVersionInput,
 		ec.unmarshalInputDeployFunctionInput,
 		ec.unmarshalInputUpdateActionVersionInput,
@@ -416,22 +431,10 @@ input UpdateActionVersionInput {
   versionMinor: Int!
   enabled: Boolean
 }
-
-type ActionVersion {
-  dsn: String!
-  name: String!
-  versionMajor: Int!
-  versionMinor: Int!
-  createdAt: Time!
-  validFrom: Time
-  validTo: Time
-  runtime: Runtime!
-  #runtimeData: Map!
-  config: String!
-}
 `, BuiltIn: false},
 	{Name: "../schema.graphql", Input: `type Query {
   config: Config
+  actionVersion(query: ActionVersionQuery!): ActionVersion
 }
 
 type Config {
@@ -449,6 +452,25 @@ type ExecutionDriversConfig {
 type ExecutionDockerDriverConfig {
   registry: String
   namespace: String
+}
+
+input ActionVersionQuery {
+  dsn: String!
+  versionMajor: Int
+  versionMinor: Int
+}
+
+type ActionVersion {
+  dsn: String!
+  name: String!
+  versionMajor: Int!
+  versionMinor: Int!
+  createdAt: Time!
+  validFrom: Time
+  validTo: Time
+  runtime: Runtime!
+  #runtimeData: Map!
+  config: String!
 }
 `, BuiltIn: false},
 }
@@ -515,6 +537,21 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		}
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_actionVersion_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 models.ActionVersionQuery
+	if tmp, ok := rawArgs["query"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("query"))
+		arg0, err = ec.unmarshalNActionVersionQuery2githubᚗcomᚋinngestᚋinngestᚑcliᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐActionVersionQuery(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["query"] = arg0
 	return args, nil
 }
 
@@ -1720,6 +1757,78 @@ func (ec *executionContext) fieldContext_Query_config(ctx context.Context, field
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Config", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_actionVersion(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_actionVersion(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().ActionVersion(rctx, fc.Args["query"].(models.ActionVersionQuery))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.ActionVersion)
+	fc.Result = res
+	return ec.marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚑcliᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐActionVersion(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_actionVersion(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "dsn":
+				return ec.fieldContext_ActionVersion_dsn(ctx, field)
+			case "name":
+				return ec.fieldContext_ActionVersion_name(ctx, field)
+			case "versionMajor":
+				return ec.fieldContext_ActionVersion_versionMajor(ctx, field)
+			case "versionMinor":
+				return ec.fieldContext_ActionVersion_versionMinor(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_ActionVersion_createdAt(ctx, field)
+			case "validFrom":
+				return ec.fieldContext_ActionVersion_validFrom(ctx, field)
+			case "validTo":
+				return ec.fieldContext_ActionVersion_validTo(ctx, field)
+			case "runtime":
+				return ec.fieldContext_ActionVersion_runtime(ctx, field)
+			case "config":
+				return ec.fieldContext_ActionVersion_config(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ActionVersion", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_actionVersion_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -3626,6 +3735,50 @@ func (ec *executionContext) fieldContext___Type_specifiedByURL(ctx context.Conte
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputActionVersionQuery(ctx context.Context, obj interface{}) (models.ActionVersionQuery, error) {
+	var it models.ActionVersionQuery
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"dsn", "versionMajor", "versionMinor"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "dsn":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("dsn"))
+			it.Dsn, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "versionMajor":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("versionMajor"))
+			it.VersionMajor, err = ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "versionMinor":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("versionMinor"))
+			it.VersionMinor, err = ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateActionVersionInput(ctx context.Context, obj interface{}) (models.CreateActionVersionInput, error) {
 	var it models.CreateActionVersionInput
 	asMap := map[string]interface{}{}
@@ -4091,6 +4244,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
+		case "actionVersion":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_actionVersion(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
 		case "__type":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
@@ -4431,6 +4604,11 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 // endregion **************************** object.gotpl ****************************
 
 // region    ***************************** type.gotpl *****************************
+
+func (ec *executionContext) unmarshalNActionVersionQuery2githubᚗcomᚋinngestᚋinngestᚑcliᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐActionVersionQuery(ctx context.Context, v interface{}) (models.ActionVersionQuery, error) {
+	res, err := ec.unmarshalInputActionVersionQuery(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
 
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
@@ -4872,6 +5050,22 @@ func (ec *executionContext) marshalOFunctionVersion2ᚖgithubᚗcomᚋinngestᚋ
 		return graphql.Null
 	}
 	return ec._FunctionVersion(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v interface{}) (*int, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalInt(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.SelectionSet, v *int) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	res := graphql.MarshalInt(*v)
+	return res
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v interface{}) (*string, error) {

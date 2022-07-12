@@ -127,9 +127,3 @@ type VersionConstraint struct {
 	Major *uint `json:"version,omitempty"`
 	Minor *uint `json:"minor,omitempty"`
 }
-
-// VersionExact is created when the system requires exact matches, not a range
-type VersionExact struct {
-	Major uint `json:"version"`
-	Minor uint `json:"minor"`
-}

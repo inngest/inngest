@@ -22,6 +22,23 @@ func internalToGraphQLModel(av client.ActionVersion) *models.ActionVersion {
 	}
 }
 
+func (r *queryResolver) ActionVersion(ctx context.Context, query models.ActionVersionQuery) (*models.ActionVersion, error) {
+	vc := &inngest.VersionConstraint{}
+	if query.VersionMajor != nil {
+		major := uint(*query.VersionMajor)
+		vc.Major = &major
+		if query.VersionMinor != nil {
+			minor := uint(*query.VersionMinor)
+			vc.Minor = &minor
+		}
+	}
+	av, err := r.APILoader.ActionVersion(ctx, query.Dsn, vc)
+	if err != nil {
+		return nil, err
+	}
+	return internalToGraphQLModel(av), nil
+}
+
 func (r *mutationResolver) CreateActionVersion(ctx context.Context, input models.CreateActionVersionInput) (*models.ActionVersion, error) {
 	// TODO - Do we need additional validation beyond parsing the cue string?
 	parsed, err := cuedefs.ParseAction(input.Config)
@@ -36,7 +53,7 @@ func (r *mutationResolver) CreateActionVersion(ctx context.Context, input models
 }
 
 func (r *mutationResolver) UpdateActionVersion(ctx context.Context, input models.UpdateActionVersionInput) (*models.ActionVersion, error) {
-	version := inngest.VersionExact{
+	version := inngest.VersionInfo{
 		Major: uint(input.VersionMajor),
 		Minor: uint(input.VersionMinor),
 	}

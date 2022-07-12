@@ -1,5 +1,6 @@
 type Query {
   config: Config
+  actionVersion(query: ActionVersionQuery!): ActionVersion
 }
 
 type Config {
@@ -17,4 +18,23 @@ type ExecutionDriversConfig {
 type ExecutionDockerDriverConfig {
   registry: String
   namespace: String
+}
+
+input ActionVersionQuery {
+  dsn: String!
+  versionMajor: Int
+  versionMinor: Int
+}
+
+type ActionVersion {
+  dsn: String!
+  name: String!
+  versionMajor: Int!
+  versionMinor: Int!
+  createdAt: Time!
+  validFrom: Time
+  validTo: Time
+  runtime: Runtime!
+  #runtimeData: Map!
+  config: String!
 }

@@ -35,16 +35,3 @@ input UpdateActionVersionInput {
   versionMinor: Int!
   enabled: Boolean
 }
-
-type ActionVersion {
-  dsn: String!
-  name: String!
-  versionMajor: Int!
-  versionMinor: Int!
-  createdAt: Time!
-  validFrom: Time
-  validTo: Time
-  runtime: Runtime!
-  #runtimeData: Map!
-  config: String!
-}

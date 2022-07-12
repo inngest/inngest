@@ -45,9 +45,9 @@ type APIActionLoader interface {
 	// Embed the read methods of the ExecutionActionLoader
 	ExecutionActionLoader
 	// Find a given action by an exact version number
-	ActionVersion(ctx context.Context, dsn string, version inngest.VersionExact) (client.ActionVersion, error)
+	ActionVersion(ctx context.Context, dsn string, version *inngest.VersionConstraint) (client.ActionVersion, error)
 	// Create a a new action version
 	CreateActionVersion(ctx context.Context, av inngest.ActionVersion) (client.ActionVersion, error)
 	// Update an action version, e.g. when updating a Docker image has been successfully pushed to the registry
-	UpdateActionVersion(ctx context.Context, dsn string, version inngest.VersionExact, enabled bool) (client.ActionVersion, error)
+	UpdateActionVersion(ctx context.Context, dsn string, version inngest.VersionInfo, enabled bool) (client.ActionVersion, error)
 }
