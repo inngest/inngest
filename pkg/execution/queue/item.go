@@ -3,6 +3,7 @@ package queue
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 )
@@ -35,4 +36,10 @@ func GetEdge(i Item) (*inngest.Edge, error) {
 // the incoming step of the edge.
 type PayloadEdge struct {
 	Edge inngest.Edge `json:"edge"`
+}
+
+// PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.
+// a future task to check whether an event has been received yet.
+type PayloadPauseTimeout struct {
+	PauseID uuid.UUID `json:"pauseID"`
 }

@@ -206,29 +206,6 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 }
 
 func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
-	go func() {
-		<-time.After(time.Until(p.Expires))
-		m.lock.Lock()
-		defer m.lock.Unlock()
-		// If the pause exists, it can't have been consumed
-		// and is therefore timed out.  Enqueue the edge as
-		// we only want this to be scheduled on timeout.
-		if p.OnTimeout {
-			if _, ok := m.pauses[p.ID]; ok {
-				_ = m.Enqueue(ctx, queue.Item{
-					Identifier: p.Identifier,
-					Payload: queue.PayloadEdge{
-						Edge: inngest.Edge{
-							Outgoing: p.Outgoing,
-							Incoming: p.Incoming,
-						},
-					},
-				}, time.Now())
-			}
-		}
-		delete(m.pauses, p.ID)
-	}()
-
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -285,13 +262,26 @@ func (m *mem) PauseByStep(ctx context.Context, i state.Identifier, actionID stri
 	return nil, state.ErrPauseNotFound
 }
 
+func (m *mem) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	pause, ok := m.pauses[id]
+	if !ok {
+		return nil, state.ErrPauseNotFound
+	}
+
+	return &pause, nil
+}
+
 func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if pause, ok := m.pauses[id]; !ok || pause.Expires.Before(time.Now()) {
+	if _, ok := m.pauses[id]; !ok {
 		return state.ErrPauseNotFound
 	}
+
 	delete(m.pauses, id)
 	return nil
 }

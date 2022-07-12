@@ -172,7 +172,6 @@ func (m mgr) New(ctx context.Context, workflow inngest.Workflow, id state.Identi
 		}
 
 		return nil
-
 	}, ikey)
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
@@ -355,14 +354,26 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 	}
 
 	return m.r.Watch(ctx, func(tx *redis.Tx) error {
-		err := tx.SetNX(ctx, m.kf.PauseID(ctx, p.ID), string(packed), time.Until(p.Expires)).Err()
+		err := tx.SetNX(
+			ctx,
+			m.kf.PauseID(ctx, p.ID),
+			string(packed),
+			// Add at least 10 minutes to this pause, allowing us to process the
+			// pause by ID for 10 minutes past expiry.
+			time.Until(p.Expires)+(10*time.Minute),
+		).Err()
 		if err != nil {
 			return err
 		}
 
 		// Set a reference to the stored pause within the run-id step-id key.  This allows us
 		// to resume workflows from a given Identifer and Step easily.
-		err = tx.Set(ctx, m.kf.PauseStep(ctx, p.Identifier, p.Outgoing), p.ID.String(), time.Until(p.Expires)).Err()
+		err = tx.Set(
+			ctx,
+			m.kf.PauseStep(ctx, p.Identifier, p.Outgoing),
+			p.ID.String(),
+			time.Until(p.Expires),
+		).Err()
 		if err != nil {
 			return err
 		}
@@ -463,6 +474,19 @@ func (m mgr) PausesByEvent(ctx context.Context, event string) (state.PauseIterat
 	}
 
 	return &iter{ri: i}, nil
+}
+
+func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) {
+	str, err := m.r.Get(ctx, m.kf.PauseID(ctx, id)).Result()
+	if err == redis.Nil {
+		return nil, state.ErrPauseNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	pause := &state.Pause{}
+	err = json.Unmarshal([]byte(str), pause)
+	return pause, err
 }
 
 // PauseByStep returns a specific pause for a given workflow run, from a given step.
