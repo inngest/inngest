@@ -9,6 +9,9 @@ import (
 	"github.com/inngest/inngest-cli/pkg/execution/runner"
 	"github.com/inngest/inngest-cli/pkg/service"
 	"github.com/spf13/cobra"
+
+	// Import the default drivers, queues, and state stores.
+	_ "github.com/inngest/inngest-cli/pkg/config/defaults"
 )
 
 const (

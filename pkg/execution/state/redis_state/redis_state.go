@@ -10,17 +10,60 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/config/registration"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
 )
 
 const (
-	keyPrefix = "inngest:state"
-
 	// defaultExpiry is used as a placeholder while we configure open-source
 	// workflow timeouts.  Right now, data stored in redis never has a TTL.
 	defaultExpiry = 0
 )
+
+func init() {
+	registration.RegisterState(&Config{})
+}
+
+// Config registers the configuration for the in-memory state store,
+// and provides a factory for the state manager based off of the config.
+type Config struct {
+	Host       string
+	Port       int
+	DB         int
+	Username   string
+	Password   string
+	MaxRetries *int
+	PoolSize   *int
+
+	KeyPrefix string
+}
+
+func (c Config) StateName() string { return "redis" }
+
+func (c Config) Manager(ctx context.Context) (state.Manager, error) {
+	return New(
+		ctx,
+		WithConnectOpts(c.ConnectOpts()),
+		WithKeyGenerator(defaultKeyFunc{prefix: c.KeyPrefix}),
+	)
+}
+
+func (c Config) ConnectOpts() redis.Options {
+	opts := redis.Options{
+		Addr:     fmt.Sprintf("%s:%d", c.Host, c.Port),
+		DB:       c.DB,
+		Username: c.Username,
+		Password: c.Password,
+	}
+	if c.MaxRetries != nil {
+		opts.MaxRetries = *c.MaxRetries
+	}
+	if c.PoolSize != nil {
+		opts.PoolSize = *c.PoolSize
+	}
+	return opts
+}
 
 // Opt represents an option to use when creating a redis-backed state store.
 type Opt func(r *mgr)
@@ -599,44 +642,46 @@ func (r runMetadata) Map() map[string]any {
 	}
 }
 
-type defaultKeyFunc struct{}
-
-func (defaultKeyFunc) Idempotency(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:key:%s", keyPrefix, id.IdempotencyKey())
+type defaultKeyFunc struct {
+	prefix string
 }
 
-func (defaultKeyFunc) RunMetadata(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:metadata:%s", keyPrefix, id.RunID)
+func (d defaultKeyFunc) Idempotency(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:key:%s", d.prefix, id.IdempotencyKey())
 }
 
-func (defaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int) string {
-	return fmt.Sprintf("%s:workflows:%s-%d", keyPrefix, id, version)
+func (d defaultKeyFunc) RunMetadata(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:metadata:%s", d.prefix, id.RunID)
 }
 
-func (defaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:events:%s:%s", keyPrefix, id.WorkflowID, id.RunID)
+func (d defaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int) string {
+	return fmt.Sprintf("%s:workflows:%s-%d", d.prefix, id, version)
 }
 
-func (defaultKeyFunc) Actions(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:actions:%s:%s", keyPrefix, id.WorkflowID, id.RunID)
+func (d defaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:events:%s:%s", d.prefix, id.WorkflowID, id.RunID)
 }
 
-func (defaultKeyFunc) Errors(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:errors:%s:%s", keyPrefix, id.WorkflowID, id.RunID)
+func (d defaultKeyFunc) Actions(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:actions:%s:%s", d.prefix, id.WorkflowID, id.RunID)
 }
 
-func (defaultKeyFunc) PauseID(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("%s:pauses:%s", keyPrefix, id.String())
+func (d defaultKeyFunc) Errors(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:errors:%s:%s", d.prefix, id.WorkflowID, id.RunID)
 }
 
-func (defaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("%s:pause-lease:%s", keyPrefix, id.String())
+func (d defaultKeyFunc) PauseID(ctx context.Context, id uuid.UUID) string {
+	return fmt.Sprintf("%s:pauses:%s", d.prefix, id.String())
 }
 
-func (defaultKeyFunc) PauseEvent(ctx context.Context, event string) string {
-	return fmt.Sprintf("%s:pause-events:%s", keyPrefix, event)
+func (d defaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) string {
+	return fmt.Sprintf("%s:pause-lease:%s", d.prefix, id.String())
 }
 
-func (defaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
-	return fmt.Sprintf("%s:pause-steps:%s-%s", keyPrefix, id.RunID, step)
+func (d defaultKeyFunc) PauseEvent(ctx context.Context, event string) string {
+	return fmt.Sprintf("%s:pause-events:%s", d.prefix, event)
+}
+
+func (d defaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
+	return fmt.Sprintf("%s:pause-steps:%s-%s", d.prefix, id.RunID, step)
 }

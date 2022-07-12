@@ -16,9 +16,11 @@ import (
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
-	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
 	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/stretchr/testify/require"
+
+	// Import the default drivers, queues, and state stores.
+	_ "github.com/inngest/inngest-cli/pkg/config/defaults"
 )
 
 // TestEngine_async asserst that the engine coordinates events between the runner, executor, and
@@ -43,7 +45,8 @@ func TestEngine_async(t *testing.T) {
 	conf.EventAPI.Port = 47192
 
 	// Fetch the in-memory state store singleton.
-	sm := inmemory.NewSingletonStateManager()
+	sm, err := conf.State.Service.Concrete.Manager(ctx)
+	require.NoError(t, err)
 
 	el := &coredata.MemoryExecutionLoader{}
 	err = el.SetFunctions(ctx, []*function.Function{

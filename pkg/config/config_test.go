@@ -6,6 +6,8 @@ import (
 	"github.com/inngest/inngest-cli/pkg/config/registration"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest-cli/pkg/execution/queue/inmemoryqueue"
+	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,13 +38,13 @@ func defaultConfig() *Config {
 		Queue: Queue{
 			Service: QueueService{
 				Backend:  "inmemory",
-				Concrete: &InMemoryQueue{},
+				Concrete: &inmemoryqueue.Config{},
 			},
 		},
 		State: State{
 			Service: StateService{
 				Backend:  "inmemory",
-				Concrete: &InMemoryState{},
+				Concrete: &inmemory.Config{},
 			},
 		},
 	}

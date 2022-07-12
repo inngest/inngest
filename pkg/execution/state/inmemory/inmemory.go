@@ -8,41 +8,40 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/execution/queue"
+	"github.com/inngest/inngest-cli/pkg/config/registration"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 )
 
-var singleton *mem
-
-// Queue is a simplistic, **non production ready** queue for processing steps
-// of functions, keepign the queue in-memory with zero persistence.  It is used
-// to simulate a production environment for local testing.
-type Queue interface {
-	// Embed the state.Manager interface for processing state items.
-	state.Manager
-	queue.Queue
-
-	// Channel returns a channel which receives available jobs on the queue.
-	//
-	// This is helpful during testing.
-	Channel() chan queue.Item
+func init() {
+	registration.RegisterState(&Config{})
 }
 
-func NewSingletonStateManager() Queue {
-	if singleton == nil {
-		singleton = NewStateManager().(*mem)
+// Config registers the configuration for the in-memory state store,
+// and provides a factory for the state manager based off of the config.
+type Config struct {
+	l   sync.Mutex
+	mem *mem
+}
+
+func (c *Config) StateName() string { return "inmemory" }
+
+func (c *Config) Manager(ctx context.Context) (state.Manager, error) {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	if c.mem == nil {
+		c.mem = NewStateManager().(*mem)
 	}
-	return singleton
+	return c.mem, nil
 }
 
 // NewStateManager returns a new in-memory queue and state manager for processing
 // functions in-memory, for development and testing only.
-func NewStateManager() Queue {
+func NewStateManager() state.Manager {
 	return &mem{
 		state:  map[string]state.State{},
 		pauses: map[uuid.UUID]state.Pause{},
 		lock:   &sync.RWMutex{},
-		q:      make(chan queue.Item),
 	}
 }
 
@@ -50,19 +49,6 @@ type mem struct {
 	state  map[string]state.State
 	pauses map[uuid.UUID]state.Pause
 	lock   *sync.RWMutex
-	q      chan queue.Item
-}
-
-func (m *mem) Enqueue(ctx context.Context, item queue.Item, at time.Time) error {
-	go func() {
-		<-time.After(time.Until(at))
-		m.q <- item
-	}()
-	return nil
-}
-
-func (m *mem) Channel() chan queue.Item {
-	return m.q
 }
 
 func (m *mem) IsComplete(ctx context.Context, id state.Identifier) (bool, error) {
@@ -74,21 +60,6 @@ func (m *mem) IsComplete(ctx context.Context, id state.Identifier) (bool, error)
 		return false, nil
 	}
 	return s.Metadata().Pending == 0, nil
-}
-
-func (m *mem) Run(ctx context.Context, f func(context.Context, queue.Item) error) error {
-	for {
-		select {
-		case <-ctx.Done():
-			// We are shutting down.
-			return nil
-		case item := <-m.q:
-			if err := f(ctx, item); err != nil {
-				return err
-			}
-		}
-
-	}
 }
 
 // New initializes state for a new run using the specifid ID and starting data.

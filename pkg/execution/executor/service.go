@@ -12,9 +12,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/queue"
-	"github.com/inngest/inngest-cli/pkg/execution/queue/queuefactory"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
-	"github.com/inngest/inngest-cli/pkg/execution/state/statefactory"
 	"github.com/inngest/inngest-cli/pkg/logger"
 	"github.com/inngest/inngest-cli/pkg/service"
 	"github.com/xhit/go-str2duration/v2"
@@ -64,12 +62,12 @@ func (s *svc) Pre(ctx context.Context) error {
 		}
 	}
 
-	s.state, err = statefactory.NewState(ctx, s.config.State)
+	s.state, err = s.config.State.Service.Concrete.Manager(ctx)
 	if err != nil {
 		return err
 	}
 
-	s.queue, err = queuefactory.NewQueue(ctx, s.config.Queue)
+	s.queue, err = s.config.Queue.Service.Concrete.Queue()
 	if err != nil {
 		return err
 	}
@@ -116,6 +114,7 @@ func (s *svc) Run(ctx context.Context) error {
 		}
 
 		if err != nil {
+			// TODO: Re-enqueue this item.
 			logger.From(ctx).Error().Err(err).Interface("item", item).Msg("critical error handling queue item")
 		}
 		return nil

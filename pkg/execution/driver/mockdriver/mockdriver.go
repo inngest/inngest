@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	registration.RegisterDriverConfig(&Config{})
+	registration.RegisterDriver(&Config{})
 }
 
 const RuntimeName = "mock"
@@ -65,6 +65,7 @@ func (m *Mock) ExecutedLen() int {
 // Config represents driver configuration for use when configuring hosted
 // services via config.cue
 type Config struct {
+	l         sync.Mutex
 	Responses map[string]state.DriverResponse
 
 	// driver stores the driver once, as a singleton per config instance.
@@ -72,14 +73,17 @@ type Config struct {
 }
 
 // RuntimeName returns the runtime field that should invoke this driver.
-func (Config) RuntimeName() string { return RuntimeName }
+func (*Config) RuntimeName() string { return RuntimeName }
 
 // DriverName returns the name of this driver
-func (Config) DriverName() string { return RuntimeName }
+func (*Config) DriverName() string { return RuntimeName }
 
-func (c Config) UnmarshalJSON(b []byte) error { return nil }
+func (c *Config) UnmarshalJSON(b []byte) error { return nil }
 
 func (c *Config) NewDriver() (driver.Driver, error) {
+	c.l.Lock()
+	defer c.l.Unlock()
+
 	if c.driver == nil {
 		c.driver = &Mock{
 			Responses: c.Responses,

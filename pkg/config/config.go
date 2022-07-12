@@ -5,11 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	// Import the default drivers, queues, and state stores.
 	"github.com/inngest/inngest-cli/pkg/config/registration"
-	_ "github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
-	_ "github.com/inngest/inngest-cli/pkg/execution/driver/httpdriver"
-	_ "github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 )
 
 // Load loads the configu from the given locations in order.  If locs is empty,
