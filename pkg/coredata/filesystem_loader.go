@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/function"
@@ -145,11 +146,42 @@ func (m *MemoryExecutionLoader) FunctionsByTrigger(ctx context.Context, eventNam
 	return fns, nil
 }
 
-func NewInMemoryActionLoader() *memactionloader {
-	return &memactionloader{
-		Actions: make(map[string][]inngest.ActionVersion),
-		lock:    &sync.RWMutex{},
+type MemoryAPIFunctionLoader struct {
+	*MemoryExecutionLoader
+}
+
+func NewInMemoryAPIFunctionLoader() *MemoryAPIFunctionLoader {
+	loader := &MemoryAPIFunctionLoader{}
+	loader.MemoryExecutionLoader = &MemoryExecutionLoader{}
+	loader.memactionloader = NewInMemoryActionLoader()
+	return loader
+}
+
+func (m *MemoryAPIFunctionLoader) CreateFunctionVersion(ctx context.Context, f function.Function, live bool) (function.FunctionVersion, error) {
+	if err := f.Validate(ctx); err != nil {
+		return function.FunctionVersion{}, err
 	}
+
+	fv := function.FunctionVersion{
+		FunctionID: f.ID,
+		Version:    uint(1),
+		Function:   f,
+		ValidFrom:  time.Now(),
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+
+	return fv, nil
+}
+
+type MemoryAPILoader struct {
+	*MemoryAPIFunctionLoader
+}
+
+func NewInMemoryAPILoader() *MemoryAPILoader {
+	l := &MemoryAPILoader{}
+	l.MemoryAPIFunctionLoader = NewInMemoryAPIFunctionLoader()
+	return l
 }
 
 // memactionloader is an in-memory ActionLoader.  This is used within
@@ -159,6 +191,13 @@ type memactionloader struct {
 	// action version.
 	Actions map[string][]inngest.ActionVersion
 	lock    *sync.RWMutex
+}
+
+func NewInMemoryActionLoader() *memactionloader {
+	return &memactionloader{
+		Actions: make(map[string][]inngest.ActionVersion),
+		lock:    &sync.RWMutex{},
+	}
 }
 
 // add adds an action to the in-memory action loader.
@@ -174,7 +213,7 @@ func (l *memactionloader) Add(action inngest.ActionVersion) {
 	l.sortActions()
 }
 
-// sortActions sorts the actions for easy qeurying with version constraints.
+// sortActions sorts the actions for easy querying with version constraints.
 func (l *memactionloader) sortActions() {
 	l.lock.Lock()
 	defer l.lock.Unlock()

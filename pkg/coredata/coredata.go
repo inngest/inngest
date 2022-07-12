@@ -31,15 +31,14 @@ type ExecutionActionLoader interface {
 
 type APILoader interface {
 	APIFunctionLoader
-	APIActionLoader
-}
-
-type FunctionVersion struct {
+	// APIActionLoader
 }
 
 type APIFunctionLoader interface {
+	// Embed the read methods of the ExecutionFunctionLoader
+	ExecutionFunctionLoader
 	// Create a new function
-	CreateFunctionVersion(ctx context.Context, f function.Function, live bool) (FunctionVersion, error)
+	CreateFunctionVersion(ctx context.Context, f function.Function, live bool) (function.FunctionVersion, error)
 }
 type APIActionLoader interface {
 	// Find a given action by an exact version number
