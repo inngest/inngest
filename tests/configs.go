@@ -11,6 +11,7 @@ import (
 
 	"github.com/inngest/inngest-cli/pkg/config"
 	_ "github.com/inngest/inngest-cli/pkg/config/defaults"
+	"github.com/joho/godotenv"
 )
 
 // parseConfigs reads all functions from "./configs"
@@ -74,9 +75,13 @@ func (c *Config) Up(ctx context.Context) error {
 	}
 	fmt.Println("> Running serve")
 
+	// Attempt to read the env file present.
+	_ = godotenv.Load(filepath.Join(c.dir, "env"))
+
 	// Run Inngest as an all-in-one server using this config.
 	c.out = &bytes.Buffer{}
 	c.inngest = exec.CommandContext(ctx, "inngest", "serve", "-c", filepath.Join(c.dir, "config.cue"), "runner", "executor", "events-api")
+	c.inngest.Env = os.Environ()
 	c.inngest.Stderr = c.out
 	c.inngest.Stdout = c.out
 	if err := c.inngest.Start(); err != nil {
