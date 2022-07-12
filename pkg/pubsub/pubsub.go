@@ -9,7 +9,7 @@ import (
 // Message represents an event sent across the pub/sub system.
 type Message struct {
 	Name      string    `json:"name"`
-	Version   string    `json:"v"`
+	Version   int       `json:"v"`
 	Data      string    `json:"data"`
 	Timestamp time.Time `json:"ts"`
 }

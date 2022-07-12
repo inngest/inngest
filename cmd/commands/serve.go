@@ -2,6 +2,8 @@ package commands
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/inngest/inngest-cli/pkg/api"
 	"github.com/inngest/inngest-cli/pkg/config"
@@ -29,8 +31,8 @@ func NewCmdServe() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:       "serve [component]",
 		Short:     "Start an Inngest service",
-		Example:   "inngest serve executor",
-		RunE:      serve,
+		Example:   fmt.Sprintf("inngest serve %s", strings.Join(serveArgs, " ")),
+		Run:       serve,
 		Args:      cobra.OnlyValidArgs,
 		ValidArgs: serveArgs,
 	}
@@ -40,7 +42,7 @@ func NewCmdServe() *cobra.Command {
 	return cmd
 }
 
-func serve(cmd *cobra.Command, args []string) error {
+func serve(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 
 	locs := []string{}
@@ -49,7 +51,8 @@ func serve(cmd *cobra.Command, args []string) error {
 	}
 	conf, err := config.Load(ctx, locs...)
 	if err != nil {
-		return err
+		fmt.Println(err.Error())
+		os.Exit(1)
 	}
 
 	svc := []service.Service{}
@@ -62,9 +65,13 @@ func serve(cmd *cobra.Command, args []string) error {
 		case ServeExecutor:
 			svc = append(svc, executor.NewService(*conf))
 		default:
-			return fmt.Errorf("Not implemented")
+			fmt.Println("Not implemented")
+			os.Exit(1)
 		}
 	}
 
-	return service.StartAll(ctx, svc...)
+	if err := service.StartAll(ctx, svc...); err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 }

@@ -91,10 +91,10 @@ package config
 
 // SQSMessaging defines configuration for using SQS as a backing event stream.
 #SQSMessaging: {
-	backend:   "aws-sqs"
-	region:    string
-	accountID: string
-	topic:     string
+	backend:  "aws-sqs"
+	queueURL: string
+	region:   string
+	topic:    string
 }
 
 // # Queues
@@ -108,12 +108,14 @@ package config
 }
 
 #SQSQueue: {
-	backend:   "aws-sqs"
-	region:    string
-	accountID: string
+	backend: "aws-sqs"
+
+	queueURL: string
+	region:   string
 	// Topic stores the topic for all queue-related items.  This must be its
 	// own unique topic for processing enqueued steps.
 	topic: string
+
 	// concurrency specifies how many concurrent queue items - and therefore
 	// function steps - can be handled in parallel.
 	concurrency: >=1 | *10

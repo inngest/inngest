@@ -101,23 +101,27 @@ func (s *svc) Pre(ctx context.Context) error {
 func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
 	return s.queue.Run(ctx, func(ctx context.Context, item queue.Item) error {
+
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()
 
 		var err error
-		switch item.Payload.(type) {
-		case queue.PayloadEdge:
+		switch item.Kind {
+		case queue.KindEdge:
 			err = s.handleQueueItem(ctx, item)
-		case queue.PayloadPauseTimeout:
+		case queue.KindPause:
 			err = s.handlePauseTimeout(ctx, item)
+		default:
+			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
 
 		if err != nil {
 			// TODO: Re-enqueue this item.
 			logger.From(ctx).Error().Err(err).Interface("item", item).Msg("critical error handling queue item")
 		}
-		return nil
+
+		return err
 	})
 }
 
@@ -220,6 +224,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 				// pause still exists at this time and has not been comsumed we will
 				// continue traversing this edge.
 				if err := s.queue.Enqueue(ctx, queue.Item{
+					Kind:       queue.KindPause,
 					Identifier: item.Identifier,
 					Payload:    queue.PayloadPauseTimeout{PauseID: pauseID},
 				}, expires); err != nil {
@@ -242,6 +247,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		l.Info().Str("outgoing", next.Outgoing).Time("at", at).Msg("scheduling next step")
 		// Enqueue the next child in our queue.
 		if err := s.queue.Enqueue(ctx, queue.Item{
+			Kind:       queue.KindEdge,
 			Identifier: item.Identifier,
 			Payload:    queue.PayloadEdge{Edge: next},
 		}, at); err != nil {
@@ -286,6 +292,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	// Enqueue the next job to run.  We could handle this in the
 	// same thread, but its safer to enable retries by re-enqueueing.
 	if err := s.queue.Enqueue(ctx, queue.Item{
+		Kind:       queue.KindEdge,
 		Identifier: item.Identifier,
 		Payload:    queue.PayloadEdge{Edge: pause.Edge()},
 	}, time.Now()); err != nil {

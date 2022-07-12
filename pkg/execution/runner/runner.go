@@ -272,6 +272,10 @@ func (s *svc) functions(ctx context.Context, evt event.Event) error {
 				// want multiple matching triggers to run the function more than once.
 				err := s.initialize(ctx, copied, evt)
 				if err != nil {
+					logger.From(ctx).Error().
+						Err(err).
+						Str("function", copied.ID).
+						Msg("error initializing fn")
 					errs = multierror.Append(errs, err)
 				}
 				return
@@ -365,6 +369,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 		if err := s.queue.Enqueue(
 			ctx,
 			queue.Item{
+				Kind:       queue.KindEdge,
 				Identifier: pause.Identifier,
 				Payload: queue.PayloadEdge{
 					Edge: inngest.Edge{
@@ -411,13 +416,20 @@ func (s *svc) initialize(ctx context.Context, fn function.Function, evt event.Ev
 		Key:        evt.ID,
 	}
 
+	logger.From(ctx).Debug().Str("function", fn.ID).Msg("initializing fn")
+
 	if _, err := s.state.New(ctx, *flow, id, evt.Map()); err != nil {
-		return err
+		return fmt.Errorf("error creating run state: %w", err)
 	}
 
 	// Enqueue running this from the source.
-	return s.queue.Enqueue(ctx, queue.Item{
+	err = s.queue.Enqueue(ctx, queue.Item{
+		Kind:       queue.KindEdge,
 		Identifier: id,
 		Payload:    queue.PayloadEdge{Edge: inngest.SourceEdge},
 	}, time.Now())
+	if err != nil {
+		return fmt.Errorf("error enqueuing function: %w", err)
+	}
+	return nil
 }

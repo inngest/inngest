@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -12,6 +13,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/config/registration"
 	"github.com/inngest/inngest-cli/pkg/execution/queue"
+	"github.com/inngest/inngest-cli/pkg/logger"
 	"github.com/inngest/inngest-cli/pkg/pubsub"
 )
 
@@ -20,25 +22,32 @@ func init() {
 }
 
 type Config struct {
-	Region    string
-	AccountID string
-	Topic     string
+	Region   string
+	QueueURL string
+	Topic    string
 	// Concurrency represents the number of items to process concurrently.
 	Concurrency int
 }
 
-func (c Config) QueueURL() string {
-	return fmt.Sprintf("https://sqs.%s.amazonaws.com/%s/%s", c.Region, c.AccountID, c.Topic)
-}
-
-func (Config) QueueName() string { return "sqs" }
+func (Config) QueueName() string { return "aws-sqs" }
 
 func (c *Config) Queue() (queue.Queue, error) {
-	i := &impl{
-		config: *c,
+	url, err := url.Parse(c.QueueURL)
+	if err != nil {
+		return nil, err
 	}
 
-	err := i.connect(context.Background())
+	i := &impl{
+		config:   *c,
+		urlQuery: url.Query(),
+	}
+
+	// Remove this, so that we don't have query strings in our url
+	// when manually sending.
+	url.RawQuery = ""
+	i.url = url.String()
+
+	err = i.connect(context.Background())
 	return i, err
 }
 
@@ -53,15 +62,38 @@ func (c *Config) Consumer() (queue.Consumer, error) {
 type impl struct {
 	config Config
 
+	// qURL is the parsed and formatted queue URL with no
+	// query strings
+	url      string
+	urlQuery url.Values
+
 	sess *session.Session
 	sqs  *sqs.SQS
 }
 
 func (i *impl) connect(ctx context.Context) error {
 	var err error
-	i.sess, err = session.NewSession(&aws.Config{
+
+	sessionCfg := &aws.Config{
 		Region: aws.String(i.config.Region),
-	})
+	}
+
+	// Handle sessions, including endpoints, using a similar
+	// strategy to gocloud.
+	for param, values := range i.urlQuery {
+		value := values[0]
+		switch param {
+		case "region":
+			if i.config.Region != "" && value != i.config.Region {
+				return fmt.Errorf("Conflicting regions in config and queue URL")
+			}
+			sessionCfg.Region = aws.String(value)
+		case "endpoint":
+			sessionCfg.Endpoint = aws.String(value)
+		}
+	}
+
+	i.sess, err = session.NewSession(sessionCfg)
 	if err != nil {
 		return err
 	}
@@ -75,9 +107,9 @@ func (i impl) Enqueue(ctx context.Context, item queue.Item, at time.Time) error 
 		At:   at,
 		Item: item,
 	}
-	byt, err := json.Marshal(item)
+	byt, err := json.Marshal(w)
 	if err != nil {
-		return nil
+		return fmt.Errorf("error marshalling sqs queue wrapper: %w", err)
 	}
 
 	// Wrap this in a pubsub.Message, allowing us to use the message fields
@@ -85,19 +117,24 @@ func (i impl) Enqueue(ctx context.Context, item queue.Item, at time.Time) error 
 	// wrapper.
 	msg := pubsub.Message{
 		Name:      "queue/item",
-		Version:   "1",
 		Data:      string(byt),
 		Timestamp: at,
 	}
-	byt, err = json.Marshal(msg)
+	payload, err := json.Marshal(msg)
 	if err != nil {
-		return nil
+		return fmt.Errorf("error marshalling sqs queue message: %w", err)
 	}
+
+	logger.From(ctx).
+		Trace().
+		Interface("delay", w.DelaySeconds()).
+		Interface("payload", msg).
+		Msg("enqueued step via sqs")
 
 	_, err = i.sqs.SendMessage(&sqs.SendMessageInput{
 		DelaySeconds: w.DelaySeconds(),
-		MessageBody:  aws.String(string(byt)),
-		QueueUrl:     aws.String(i.config.QueueURL()),
+		MessageBody:  aws.String(string(payload)),
+		QueueUrl:     aws.String(i.url),
 	})
 
 	return err
@@ -107,9 +144,9 @@ func (i impl) Enqueue(ctx context.Context, item queue.Item, at time.Time) error 
 func (i impl) Run(ctx context.Context, f func(context.Context, queue.Item) error) error {
 	// We can use our pubsub broker logic here, as SQS is a supported backend.
 	sqsConf := config.SQSMessaging{
-		Region:    i.config.Region,
-		AccountID: i.config.AccountID,
-		Topic:     i.config.Topic,
+		Region:   i.config.Region,
+		Topic:    i.config.Topic,
+		QueueURL: i.config.QueueURL,
 	}
 	conf := config.MessagingService{
 		Backend:  sqsConf.Backend(),
@@ -117,10 +154,9 @@ func (i impl) Run(ctx context.Context, f func(context.Context, queue.Item) error
 	}
 	sub, err := pubsub.NewSubscriber(ctx, conf)
 	if err != nil {
-		return err
+		return fmt.Errorf("error opening sqs queue: %w", err)
 	}
 	return sub.SubscribeN(ctx, i.config.Topic, func(ctx context.Context, m pubsub.Message) error {
-		// TODO: Handle the incoming message here.
 		if m.Name != "queue/item" {
 			return fmt.Errorf("unknown queue event type: %s", m.Name)
 		}
@@ -129,6 +165,12 @@ func (i impl) Run(ctx context.Context, f func(context.Context, queue.Item) error
 		if err := json.Unmarshal([]byte(m.Data), w); err != nil {
 			return fmt.Errorf("error unmarshalling queue item: %w", err)
 		}
+
+		logger.From(ctx).
+			Trace().
+			Interface("delay", w.DelaySeconds()).
+			Interface("payload", w).
+			Msg("received step via sqs")
 
 		if w.At.After(time.Now()) {
 			// Re-enqueue this at a future time.

@@ -9,7 +9,9 @@ import (
 
 	"github.com/inngest/inngest-cli/inngest/log"
 	"github.com/inngest/inngest-cli/pkg/config"
+	"github.com/inngest/inngest-cli/pkg/logger"
 	"gocloud.dev/pubsub"
+	_ "gocloud.dev/pubsub/awssnssqs"
 	_ "gocloud.dev/pubsub/gcppubsub"
 	_ "gocloud.dev/pubsub/mempubsub"
 	_ "gocloud.dev/pubsub/natspubsub"
@@ -67,7 +69,7 @@ func (b *broker) Publish(ctx context.Context, topic string, m Message) error {
 		Body: body,
 		Metadata: map[string]string{
 			"name":    m.Name,
-			"version": m.Version,
+			"version": fmt.Sprintf("%d", m.Version),
 		},
 	}
 
@@ -90,6 +92,7 @@ func (b *broker) Subscribe(ctx context.Context, topic string, run PerformFunc) e
 // an event is received.  It blocks until the given context is cancelled, and returns
 // a nil error when shutting down from a cancelled context.
 func (b *broker) SubscribeN(ctx context.Context, topic string, run PerformFunc, concurrency int64) error {
+
 	url := b.conf.TopicURL(topic, config.URLTypeSubscribe)
 
 	subs, err := b.mux.OpenSubscription(ctx, url)
@@ -154,12 +157,14 @@ func (b *broker) SubscribeN(ctx context.Context, topic string, run PerformFunc, 
 
 			m := &Message{}
 			if err := m.Decode(msg.Body); err != nil {
-				// TODO: log.
+				logger.From(ctx).Error().Err(err).Msg("error decoding pubsub message")
+
 				if msg.Nackable() {
 					msg.Nack()
 				} else {
 					msg.Ack() // Unfortunately have to ack these if its not nackable.
 				}
+				return
 			}
 
 			// Run the message only if we've decoded items.
