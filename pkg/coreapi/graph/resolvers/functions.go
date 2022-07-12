@@ -3,11 +3,11 @@ package resolvers
 import (
 	"context"
 
-	model "github.com/inngest/inngest-cli/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest-cli/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest-cli/pkg/function"
 )
 
-func (r *mutationResolver) DeployFunction(ctx context.Context, input model.DeployFunctionInput) (*model.FunctionVersion, error) {
+func (r *mutationResolver) DeployFunction(ctx context.Context, input models.DeployFunctionInput) (*models.FunctionVersion, error) {
 	// Parse function CUE or JSON string
 	f, err := function.Unmarshal(ctx, []byte(input.Config), "")
 	if err != nil {
@@ -25,7 +25,7 @@ func (r *mutationResolver) DeployFunction(ctx context.Context, input model.Deplo
 		return nil, err
 	}
 
-	return &model.FunctionVersion{
+	return &models.FunctionVersion{
 		FunctionID: fv.FunctionID,
 		Version:    int(fv.Version),
 		Config:     string(config),

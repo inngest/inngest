@@ -8,6 +8,7 @@ import (
 
 type ActionVersion struct {
 	Dsn          string     `json:"dsn"`
+	Name         string     `json:"name"`
 	VersionMajor int        `json:"versionMajor"`
 	VersionMinor int        `json:"versionMinor"`
 	CreatedAt    time.Time  `json:"createdAt"`
@@ -19,6 +20,10 @@ type ActionVersion struct {
 
 type Config struct {
 	Execution *ExecutionConfig `json:"execution"`
+}
+
+type CreateActionVersionInput struct {
+	Config string `json:"config"`
 }
 
 type DeployFunctionInput struct {
@@ -50,10 +55,9 @@ type FunctionVersion struct {
 	UpdatedAt  time.Time  `json:"updatedAt"`
 }
 
-type UpsertActionVersionInput struct {
-	Config       string  `json:"config"`
-	Dsn          *string `json:"dsn"`
-	VersionMajor *int    `json:"versionMajor"`
-	VersionMinor *int    `json:"versionMinor"`
-	Enabled      *bool   `json:"enabled"`
+type UpdateActionVersionInput struct {
+	Dsn          string `json:"dsn"`
+	VersionMajor int    `json:"versionMajor"`
+	VersionMinor int    `json:"versionMinor"`
+	Enabled      *bool  `json:"enabled"`
 }

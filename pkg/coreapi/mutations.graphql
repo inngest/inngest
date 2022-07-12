@@ -5,7 +5,8 @@ scalar Runtime
 type Mutation {
   deployFunction(input: DeployFunctionInput!): FunctionVersion
 
-  upsertActionVersion(input: UpsertActionVersionInput!): ActionVersion
+  createActionVersion(input: CreateActionVersionInput!): ActionVersion
+  updateActionVersion(input: UpdateActionVersionInput!): ActionVersion
 }
 
 input DeployFunctionInput {
@@ -25,16 +26,19 @@ type FunctionVersion {
   updatedAt: Time!
 }
 
-input UpsertActionVersionInput {
+input CreateActionVersionInput {
   config: String!
-  dsn: String
-  versionMajor: Int
-  versionMinor: Int
+}
+input UpdateActionVersionInput {
+  dsn: String!
+  versionMajor: Int!
+  versionMinor: Int!
   enabled: Boolean
 }
 
 type ActionVersion {
   dsn: String!
+  name: String!
   versionMajor: Int!
   versionMinor: Int!
   createdAt: Time!

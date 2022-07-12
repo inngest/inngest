@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/inngest/client"
 	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/inngest/inngest-cli/pkg/logger"
 	"golang.org/x/sync/errgroup"
@@ -146,44 +147,6 @@ func (m *MemoryExecutionLoader) FunctionsByTrigger(ctx context.Context, eventNam
 	return fns, nil
 }
 
-type MemoryAPIFunctionLoader struct {
-	*MemoryExecutionLoader
-}
-
-func NewInMemoryAPIFunctionLoader() *MemoryAPIFunctionLoader {
-	loader := &MemoryAPIFunctionLoader{}
-	loader.MemoryExecutionLoader = &MemoryExecutionLoader{}
-	loader.memactionloader = NewInMemoryActionLoader()
-	return loader
-}
-
-func (m *MemoryAPIFunctionLoader) CreateFunctionVersion(ctx context.Context, f function.Function, live bool) (function.FunctionVersion, error) {
-	if err := f.Validate(ctx); err != nil {
-		return function.FunctionVersion{}, err
-	}
-
-	fv := function.FunctionVersion{
-		FunctionID: f.ID,
-		Version:    uint(1),
-		Function:   f,
-		ValidFrom:  time.Now(),
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
-	}
-
-	return fv, nil
-}
-
-type MemoryAPILoader struct {
-	*MemoryAPIFunctionLoader
-}
-
-func NewInMemoryAPILoader() *MemoryAPILoader {
-	l := &MemoryAPILoader{}
-	l.MemoryAPIFunctionLoader = NewInMemoryAPIFunctionLoader()
-	return l
-}
-
 // memactionloader is an in-memory ActionLoader.  This is used within
 // the FSLoader to initialize and add actions from functions when loaded.
 type memactionloader struct {
@@ -259,4 +222,108 @@ func (l memactionloader) Action(ctx context.Context, dsn string, version *innges
 	}
 
 	return nil, fmt.Errorf("action not found: %s", dsn)
+}
+
+type MemoryAPIFunctionLoader struct {
+	*MemoryExecutionLoader
+}
+
+func NewInMemoryAPIFunctionLoader() *MemoryAPIFunctionLoader {
+	loader := &MemoryAPIFunctionLoader{}
+	loader.MemoryExecutionLoader = &MemoryExecutionLoader{}
+	return loader
+}
+
+func (m *MemoryAPIFunctionLoader) CreateFunctionVersion(ctx context.Context, f function.Function, live bool) (function.FunctionVersion, error) {
+	if err := f.Validate(ctx); err != nil {
+		return function.FunctionVersion{}, err
+	}
+
+	fv := function.FunctionVersion{
+		FunctionID: f.ID,
+		Version:    uint(1),
+		Function:   f,
+		ValidFrom:  time.Now(),
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+
+	return fv, nil
+}
+
+type MemoryAPILoader struct {
+	*MemoryAPIFunctionLoader
+	*MemoryAPIActionLoader
+}
+
+func NewInMemoryAPILoader() *MemoryAPILoader {
+	l := &MemoryAPILoader{}
+	l.MemoryAPIFunctionLoader = NewInMemoryAPIFunctionLoader()
+	l.MemoryAPIActionLoader = NewInMemoryAPIActionLoader()
+	return l
+}
+
+type MemoryAPIActionLoader struct {
+	*memactionloader
+}
+
+func NewInMemoryAPIActionLoader() *MemoryAPIActionLoader {
+	l := &MemoryAPIActionLoader{}
+	l.memactionloader = NewInMemoryActionLoader()
+	return l
+}
+
+func (m *MemoryAPIActionLoader) ActionVersion(ctx context.Context, dsn string, version inngest.VersionExact) (client.ActionVersion, error) {
+	// NOTE - use constraint so we can re-use m.Action for now
+	vc := &inngest.VersionConstraint{
+		Major: &version.Major,
+		Minor: &version.Minor,
+	}
+	av, err := m.Action(ctx, dsn, vc)
+	if err != nil {
+		return client.ActionVersion{}, err
+	}
+	clientActionVersion := client.ActionVersion{
+		ActionVersion: *av,
+		Name:          av.Name,
+		DSN:           av.DSN,
+		Config:        "",
+	}
+	return clientActionVersion, nil
+}
+func (m *MemoryAPIActionLoader) CreateActionVersion(ctx context.Context, av inngest.ActionVersion) (client.ActionVersion, error) {
+	// Stub out with existing method
+	m.Add(av)
+	newActionVersion := client.ActionVersion{
+		ActionVersion: av,
+		Name:          av.Name,
+		DSN:           av.DSN,
+		Config:        "",
+	}
+	return newActionVersion, nil
+}
+func (m *MemoryAPIActionLoader) UpdateActionVersion(ctx context.Context, dsn string, version inngest.VersionExact, enabled bool) (client.ActionVersion, error) {
+	// NOTE - use constraint so we can re-use m.Action for now
+	vc := &inngest.VersionConstraint{
+		Major: &version.Major,
+		Minor: &version.Minor,
+	}
+	existing, err := m.Action(ctx, dsn, vc)
+	if err != nil {
+		return client.ActionVersion{}, err
+	}
+
+	updatedActionVersion := client.ActionVersion{
+		ActionVersion: *existing,
+		Name:          existing.Name,
+		DSN:           existing.DSN,
+		Config:        "",
+	}
+	if enabled {
+		now := time.Now()
+		updatedActionVersion.ValidFrom = &now
+	}
+	// TODO - Add imageSha256 to be sent to function and set
+
+	return updatedActionVersion, nil
 }
