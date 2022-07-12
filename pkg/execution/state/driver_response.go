@@ -4,6 +4,10 @@ import (
 	"github.com/inngest/inngest-cli/inngest"
 )
 
+type Retryable interface {
+	Retryable() bool
+}
+
 // DriverResponse is returned after a driver executes an action.  This represents any
 // output from running the step, including the output (as a JSON map), the error, and
 // whether the driver's response is "scheduled", eg. the driver is running the job

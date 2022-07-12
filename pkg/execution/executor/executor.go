@@ -203,7 +203,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 	}
 
 	resp, err := e.run(ctx, w, id, from, s, attempt)
-
 	if e.log != nil {
 		var (
 			l   *zerolog.Event
@@ -268,7 +267,8 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 			}
 		}
 		if step == nil {
-			return nil, fmt.Errorf("unknown vertex: %s", stepID)
+			// This isn't fixable.
+			return nil, newFinalError(fmt.Errorf("unknown vertex: %s", stepID))
 		}
 		response, err = e.executeAction(ctx, id, step, s, attempt)
 		if err != nil {
@@ -357,4 +357,25 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	}
 
 	return response, err
+}
+
+type execError struct {
+	err   error
+	final bool
+}
+
+func (e execError) Unwrap() error {
+	return e.err
+}
+
+func (e execError) Error() string {
+	return e.err.Error()
+}
+
+func (e execError) Retryable() bool {
+	return !e.final
+}
+
+func newFinalError(err error) error {
+	return execError{err: err, final: true}
 }

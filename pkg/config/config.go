@@ -72,12 +72,13 @@ type State struct {
 type Execution struct {
 	// Drivers represents all drivers enabled.
 	Drivers   map[string]registration.DriverConfig
-	LogOutput bool
+	LogOutput bool `json:"logOutput"`
 }
 
 func (e *Execution) UnmarshalJSON(byt []byte) error {
 	type drivers struct {
-		Drivers map[string]unmarshalDriver
+		Drivers   map[string]unmarshalDriver
+		LogOutput bool
 	}
 	names := &drivers{}
 	if err := json.Unmarshal(byt, names); err != nil {
@@ -85,6 +86,7 @@ func (e *Execution) UnmarshalJSON(byt []byte) error {
 	}
 
 	e.Drivers = map[string]registration.DriverConfig{}
+	e.LogOutput = names.LogOutput
 
 	for runtime, driver := range names.Drivers {
 		iface, ok := registration.RegisteredDrivers()[driver.Name]

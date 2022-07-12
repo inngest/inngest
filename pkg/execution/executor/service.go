@@ -141,7 +141,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 	l.Info().Interface("edge", edge).Msg("processing step")
 
-	resp, err := s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
+	_, err = s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
 	if err != nil {
 		// The executor usually returns a state.DriverResponse if the step's
 		// response was an error.  In this case, the executor itself handles
@@ -153,8 +153,8 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		//
 		// If the error is not of type response error, we assume the step is
 		// always retryable.
-		_, isResponseError := err.(*state.DriverResponse)
-		if (resp != nil && resp.Retryable()) || !isResponseError {
+		retry, isRetryable := err.(state.Retryable)
+		if (isRetryable && retry.Retryable()) || !isRetryable {
 			next := item
 			next.ErrorCount += 1
 			at := backoff.LinearJitterBackoff(next.ErrorCount)
