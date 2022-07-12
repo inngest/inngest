@@ -2,7 +2,6 @@ package pubsub
 
 import (
 	"context"
-	"encoding/json"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -36,7 +35,7 @@ func TestBasicPublishSubscribe(t *testing.T) {
 	b, topic := testbroker(t)
 	ctx := context.Background()
 
-	sent := Message{Name: "basic", Data: json.RawMessage("{}")}
+	sent := Message{Name: "basic", Data: "{}"}
 	ok := make(chan Message)
 
 	go func() {
@@ -70,7 +69,7 @@ func TestSubscribeN(t *testing.T) {
 	b, topic := testbroker(t)
 	ctx := context.Background()
 
-	sent := Message{Name: "basic", Data: json.RawMessage("{}")}
+	sent := Message{Name: "basic", Data: "{}"}
 	ok := make(chan Message)
 
 	// i stores how often the run function has been invoked.
@@ -139,7 +138,7 @@ func TestCancellation(t *testing.T) {
 	b, topic := testbroker(t)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	sent := Message{Name: "basic", Data: json.RawMessage("{}")}
+	sent := Message{Name: "basic", Data: "{}"}
 	ok := make(chan Message)
 
 	// Changed when Subscribe finishes in the goroutine.

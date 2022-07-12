@@ -13,7 +13,7 @@ import (
 // an event in the future.
 type DriverResponse struct {
 	// Step represents the step that this response is for.
-	Step inngest.Step
+	Step inngest.Step `json:"step"`
 
 	// Scheduled, if set to true, represents that the action has been
 	// scheduled and will run asynchronously.  The output is not available.

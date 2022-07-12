@@ -42,7 +42,9 @@ type broker struct {
 	topics map[string]*pubsub.Topic
 	// tl locks topics within the broker.
 	tl *sync.RWMutex
-	// mux...
+	// mux is the concrete mux router which each implementation is registered
+	// to.  This handles processing topic URLs (mem://, redis://) with the correct
+	// driver.
 	mux *pubsub.URLMux
 }
 

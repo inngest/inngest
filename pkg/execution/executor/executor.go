@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
@@ -116,6 +117,13 @@ func WithLogger(l *zerolog.Logger) ExecutorOpt {
 	}
 }
 
+func WithConfig(c config.Execution) ExecutorOpt {
+	return func(e Executor) error {
+		e.(*executor).config = c
+		return nil
+	}
+}
+
 // WithRuntimeDrivers specifies the drivers available to use when executing steps
 // of a function.
 //
@@ -137,7 +145,8 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 
 // executor represents a built-in executor for running workflows.
 type executor struct {
-	log *zerolog.Logger
+	log    *zerolog.Logger
+	config config.Execution
 
 	sm             state.Manager
 	al             coredata.ExecutionActionLoader
@@ -196,24 +205,39 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 	resp, err := e.run(ctx, w, id, from, s, attempt)
 
 	if e.log != nil {
+		var (
+			l   *zerolog.Event
+			msg string
+		)
+		// We want a different log level depending on whether this step
+		// errored.
 		if err == nil {
-			e.log.Info().
-				Str("run_id", id.RunID.String()).
-				Str("step", from).
-				Msg("executed step")
+			l = e.log.Info()
+			msg = "executed step"
 		} else {
 			retryable := false
 			if resp != nil {
 				retryable = resp.Retryable()
 			}
+			l = e.log.Error().Err(err).Bool("retryable", retryable)
+			msg = "error executing step"
+		}
+		l.Str("run_id", id.RunID.String()).Str("step", from).Msg(msg)
 
-			e.log.Error().
+		if e.config.LogOutput && resp != nil {
+			// Log the output separately, highlighting it with
+			// a different caller.  This lets users scan for
+			// output easily, and if we build a TUI to filter on
+			// caller to show only step outputs, etc.
+			e.log.Info().
+				Str("caller", "output").
+				Interface("response", resp).
+				Interface("output", resp.Output).
 				Str("run_id", id.RunID.String()).
 				Str("step", from).
-				Err(err).
-				Bool("retryable", retryable).
-				Msg("error executing step")
+				Msg("step output")
 		}
+
 	}
 
 	if err != nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/runner"
 	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest-cli/pkg/logger"
 	"github.com/inngest/inngest-cli/pkg/service"
 )
 
@@ -32,6 +33,12 @@ func NewDevServer(ctx context.Context, c config.Config) error {
 	// For each function, build the image.
 	if err := buildImages(ctx, funcs); err != nil {
 		return err
+	}
+
+	// The dev server _always_ logs output for development.
+	if !c.Execution.LogOutput {
+		logger.From(ctx).Info().Msg("overriding config to log step output within dev server")
+		c.Execution.LogOutput = true
 	}
 
 	return newDevServer(ctx, c, el)
