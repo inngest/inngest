@@ -71,7 +71,7 @@ func loadAll(ctx context.Context, locs ...string) (*Config, error) {
 	logger.From(ctx).Warn().Msg("no config file found in search paths, using default")
 
 	// Return the default config.
-	return parse(nil)
+	return Parse(nil)
 }
 
 func read(ctx context.Context, path string) (*Config, error) {
@@ -84,10 +84,11 @@ func read(ctx context.Context, path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return parse(byt)
+	return Parse(byt)
 }
 
-func parse(input []byte) (*Config, error) {
+// parse parses configuration and returns the parsed config.
+func Parse(input []byte) (*Config, error) {
 	cuedefs.Lock()
 	defer cuedefs.Unlock()
 
@@ -181,6 +182,11 @@ func decode(i *cue.Instance) (*Config, error) {
 	if err := def.Decode(c); err != nil {
 		return nil, fmt.Errorf("error decoding config: %w", err)
 	}
+
+	// Ensure we set log levels and formats here, globally.
+	// XXX: This could/should be refactored;  this is messy (but minimal impact rn).
+	logger.SetLevel(c.Log.Level)
+	logger.SetFormat(c.Log.Format)
 
 	return c, nil
 }

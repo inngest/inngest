@@ -9,9 +9,7 @@ import (
 	"os"
 	"time"
 
-	"cuelang.org/go/cue"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/inngest/event-schemas/pkg/fakedata"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/cli"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
@@ -30,6 +28,7 @@ func NewCmdRun() *cobra.Command {
 	}
 
 	cmd.Flags().String("event", "", "Specifies the event trigger to use if there are multiple configured")
+	cmd.Flags().Bool("event-only", false, "Prints the generated event to use without running the function")
 	cmd.Flags().Int64Var(&runSeed, "seed", 0, "Sets the seed for deterministically generating random events")
 	return cmd
 }
@@ -44,6 +43,13 @@ func doRun(cmd *cobra.Command, args []string) {
 	if err != nil {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
+		return
+	}
+
+	if cmd.Flag("event-only").Value.String() == "true" {
+		evt, _ := fakeEvent(cmd.Context(), *fn, "")
+		out, _ := json.Marshal(evt)
+		fmt.Println(string(out))
 		return
 	}
 
@@ -137,46 +143,11 @@ func event(ctx context.Context, fn function.Function, eventName string) (map[str
 // fakeEvent finds event triggers within the function definition, then chooses
 // a random trigger from the definitions and generates fake data for the event.
 func fakeEvent(ctx context.Context, fn function.Function, eventName string) (map[string]interface{}, error) {
-	evtTriggers := []function.Trigger{}
+	triggers := []function.Trigger{}
 	for _, t := range fn.Triggers {
 		if t.EventTrigger != nil && (eventName == "" || eventName == t.EventTrigger.Event) {
-			evtTriggers = append(evtTriggers, t)
+			triggers = append(triggers, t)
 		}
 	}
-
-	if len(evtTriggers) == 0 {
-		return map[string]interface{}{}, nil
-	}
-
-	rng := rand.New(rand.NewSource(runSeed))
-
-	i := rng.Intn(len(evtTriggers))
-	if evtTriggers[i].EventTrigger.Definition == nil {
-		return map[string]interface{}{}, nil
-	}
-
-	def, err := evtTriggers[i].EventTrigger.Definition.Cue()
-	if err != nil {
-		return nil, err
-	}
-
-	r := &cue.Runtime{}
-	inst, err := r.Compile(".", def)
-	if err != nil {
-		return nil, err
-	}
-
-	fakedata.DefaultOptions.Rand = rng
-
-	val, err := fakedata.Fake(ctx, inst.Value())
-	if err != nil {
-		return nil, err
-	}
-
-	mapped := map[string]interface{}{}
-	err = val.Decode(&mapped)
-
-	mapped["ts"] = time.Now().UnixMilli()
-
-	return mapped, err
+	return function.GenerateTriggerData(ctx, runSeed, triggers)
 }

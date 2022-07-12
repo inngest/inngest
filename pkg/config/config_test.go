@@ -142,7 +142,7 @@ config.#Config & {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			config, err := parse(test.input)
+			config, err := Parse(test.input)
 			require.Equal(t, test.err, err)
 			require.EqualValues(t, test.config(), config)
 

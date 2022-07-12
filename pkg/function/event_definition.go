@@ -1,6 +1,7 @@
 package function
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -52,21 +53,21 @@ type EventDefinition struct {
 }
 
 // Validate attempts to parse the event definition and reports any errors.
-func (ed *EventDefinition) Validate() error {
-	if err := ed.createCueType(); err != nil {
+func (ed *EventDefinition) Validate(ctx context.Context) error {
+	if err := ed.createCueType(ctx); err != nil {
 		return err
 	}
 	return nil
 }
 
 // createCueType converts the Def input into Cue.
-func (ed *EventDefinition) createCueType() error {
+func (ed *EventDefinition) createCueType(ctx context.Context) error {
 	if ed.cueType != "" {
 		// This has already been completed.
 		return nil
 	}
 
-	if file, _ := PathName(ed.Def); file != "" {
+	if file, _ := PathName(ctx, ed.Def); file != "" {
 		// The event definition is stored within a file.
 		file, err := filepath.Abs(file)
 		if err != nil {
@@ -97,14 +98,14 @@ func (ed *EventDefinition) createCueType() error {
 }
 
 // Cue returns the Cue type definition of the event.
-func (ed *EventDefinition) Cue() (string, error) {
-	err := ed.createCueType()
+func (ed *EventDefinition) Cue(ctx context.Context) (string, error) {
+	err := ed.createCueType(ctx)
 	return ed.cueType, err
 }
 
 // Typescript returns the Typescript definition of the event.
-func (ed *EventDefinition) Typescript() (string, error) {
-	if err := ed.createCueType(); err != nil {
+func (ed *EventDefinition) Typescript(ctx context.Context) (string, error) {
+	if err := ed.createCueType(ctx); err != nil {
 		return "", err
 	}
 
@@ -118,7 +119,7 @@ func (ed *EventDefinition) Typescript() (string, error) {
 }
 
 // JSONSchema returns the JSON Schema for the event.
-func (ed *EventDefinition) JSONSchema() (map[string]interface{}, error) {
+func (ed *EventDefinition) JSONSchema(ctx context.Context) (map[string]interface{}, error) {
 	// If the original event definition is JSON-schema, don't convert:
 	// straight up return it.  Cue has _somewhat_ lossy support for JSON-schema:
 	// we know that it doesn't support the "additionalProperties" field for object
@@ -129,7 +130,7 @@ func (ed *EventDefinition) JSONSchema() (map[string]interface{}, error) {
 		return data, err
 	}
 
-	if err := ed.createCueType(); err != nil {
+	if err := ed.createCueType(ctx); err != nil {
 		return nil, err
 	}
 
