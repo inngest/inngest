@@ -11,13 +11,14 @@ import (
 	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/coreapi/generated"
 	"github.com/inngest/inngest-cli/pkg/coreapi/graph/resolvers"
+	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/rs/zerolog"
 )
 
 type Options struct {
-	Config config.Config
-
-	Logger *zerolog.Logger
+	Config    config.Config
+	Logger    *zerolog.Logger
+	APILoader coredata.APILoader
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
@@ -28,7 +29,9 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 		log:    &logger,
 	}
 
-	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{}}))
+	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
+		APILoader: o.APILoader,
+	}}))
 
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	http.Handle("/query", srv)
@@ -40,6 +43,7 @@ type CoreAPI struct {
 	config config.Config
 	log    *zerolog.Logger
 	server *http.Server
+	loader coredata.APILoader
 }
 
 func (a *CoreAPI) Start(ctx context.Context) error {

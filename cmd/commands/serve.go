@@ -8,6 +8,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/api"
 	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/coreapi"
+	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/runner"
 	"github.com/inngest/inngest-cli/pkg/service"
@@ -67,7 +68,11 @@ func serve(cmd *cobra.Command, args []string) {
 		case ServeExecutor:
 			svc = append(svc, executor.NewService(*conf))
 		case ServeCoreAPI:
-			svc = append(svc, coreapi.NewService(*conf))
+			// TEMP TESTING
+			al := coredata.NewInMemoryAPILoader()
+			svc = append(svc,
+				coreapi.NewService(*conf, coreapi.WithAPILoader(al)),
+			)
 		default:
 			fmt.Println("Not implemented")
 			os.Exit(1)

@@ -6,33 +6,49 @@ import (
 	"net/http"
 
 	"github.com/inngest/inngest-cli/pkg/config"
+	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/logger"
 	"github.com/inngest/inngest-cli/pkg/service"
 )
 
-func NewService(c config.Config) service.Service {
-	return &coreApiServer{
-		config: c,
+type Opt func(s *svc)
+
+func NewService(c config.Config, opts ...Opt) service.Service {
+	svc := &svc{config: c}
+	for _, o := range opts {
+		o(svc)
+	}
+	return svc
+}
+
+func WithAPILoader(l coredata.APILoader) func(s *svc) {
+	return func(s *svc) {
+		s.data = l
 	}
 }
 
-type coreApiServer struct {
+type svc struct {
 	config config.Config
 	api    *CoreAPI
+	// data provides the ability to write and load data
+	data coredata.APILoader
 }
 
-func (a *coreApiServer) Name() string {
+func (s *svc) Name() string {
 	return "coreapi"
 }
 
-func (a *coreApiServer) Pre(ctx context.Context) error {
+func (s *svc) Pre(ctx context.Context) (err error) {
 	// TODO - Connect to coredata database
-	// TODO - Configure API with correct ports, etc., set up routes
-	var err error
+	if s.data == nil {
+		s.data = coredata.NewInMemoryAPILoader()
+	}
 
-	a.api, err = NewCoreApi(Options{
-		Config: a.config,
-		Logger: logger.From(ctx),
+	// TODO - Configure API with correct ports, etc., set up routes
+	s.api, err = NewCoreApi(Options{
+		Config:    s.config,
+		Logger:    logger.From(ctx),
+		APILoader: s.data,
 	})
 
 	if err != nil {
@@ -41,15 +57,14 @@ func (a *coreApiServer) Pre(ctx context.Context) error {
 	return nil
 }
 
-func (a *coreApiServer) Run(ctx context.Context) error {
-	// TODO - Start API server
-	err := a.api.Start(ctx)
+func (s *svc) Run(ctx context.Context) error {
+	err := s.api.Start(ctx)
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
 	return err
 }
-func (a *coreApiServer) Stop(ctx context.Context) error {
+func (s *svc) Stop(ctx context.Context) error {
 	// TODO - Gracefully shut down server, remove connection to coredata database
-	return a.api.Stop(ctx)
+	return s.api.Stop(ctx)
 }
