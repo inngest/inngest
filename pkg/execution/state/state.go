@@ -58,6 +58,16 @@ type Pause struct {
 	Incoming string `json:"incoming"`
 	// Expires is a time at which the pause can no longer be resumed.  This
 	// gives each pause of a function a TTL.  This is required.
+	//
+	// NOTE: the pause should remain within the backing state store for
+	// some perioud after the expiry time for checking timeout branches:
+	//
+	// If this pause has its OnTimeout flag set to true, we only traverse
+	// the edge if the event *has not* been received.  In order to check
+	// this, we enqueue a job that executes on the pause timeout:  if the
+	// pause has not yet been consumed we can safely assume the event was
+	// not received.  Therefore, we must be able to load the pause for some
+	// time after timeout.
 	Expires time.Time `json:"expires"`
 	// Event is an optional event that can resume the pause automatically,
 	// often paired with an expression.
@@ -75,6 +85,13 @@ type Pause struct {
 	// pause's next step.  After enqueueing, the worker can consume the pause
 	// entirely.
 	LeasedUntil *time.Time `json:"leasedUntil,omitempty"`
+}
+
+func (p Pause) Edge() inngest.Edge {
+	return inngest.Edge{
+		Outgoing: p.Outgoing,
+		Incoming: p.Incoming,
+	}
 }
 
 // Metadata must be stored for each workflow run, allowing the runner to inspect
@@ -171,7 +188,6 @@ type CompleteSubscriber interface {
 // It accepst any starting state as its input.  This is usually, and locally in dev,
 // a map[string]interface{} containing event data.
 type Mutater interface {
-
 	// New creates a new state for the given run ID, using the event as the input data for the root workflow.
 	//
 	// If the IdempotencyKey within Identifier already exists, the state implementation should return
@@ -219,7 +235,8 @@ type PauseMutater interface {
 	// See https://github.com/inngest/inngest-cli/issues/123 for more info
 	LeasePause(ctx context.Context, id uuid.UUID) error
 
-	// ConsumePause consumes a pause by its ID such that it can't be used again.
+	// ConsumePause consumes a pause by its ID such that it can't be used again and
+	// will not be returned from any query.
 	ConsumePause(ctx context.Context, id uuid.UUID) error
 }
 
@@ -235,6 +252,12 @@ type PauseGetter interface {
 	// has deferred results which must be continued by resuming the specific pause set
 	// up for the given step ID.
 	PauseByStep(ctx context.Context, i Identifier, actionID string) (*Pause, error)
+
+	// PauseByID returns a given pause by pause ID.  This must return expired pauses
+	// that have not yet been consumed in order to properly handle timeouts.
+	//
+	// This should not return consumed pauses.
+	PauseByID(ctx context.Context, pauseID uuid.UUID) (*Pause, error)
 }
 
 // PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This

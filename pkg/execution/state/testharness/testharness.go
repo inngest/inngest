@@ -115,6 +115,7 @@ func CheckState(t *testing.T, gen Generator) {
 		"PausesByEvent/ConcurrentCursors":    checkPausesByEvent_concurrent,
 		"PausesByEvent/Consumed":             checkPausesByEvent_consumed,
 		"PauseByStep":                        checkPausesByStep,
+		"PauseByID":                          checkPauseByID,
 		"Metadata/StartedAt":                 checkMetadataStartedAt,
 		"Idempotency":                        checkIdempotency,
 	}
@@ -443,11 +444,11 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 
 	// And we should not be able to re-lease the pause until the pause lease duration is up.
-	for time.Now().Before(now.Add(state.PauseLeaseDuration)) {
+	for time.Now().Before(now.Add(state.PauseLeaseDuration - (5 * time.Millisecond))) {
 		err = m.LeasePause(ctx, pause.ID)
 		require.NotNil(t, err, "Re-leasing a pause with a valid lease should error")
 		require.Error(t, state.ErrPauseLeased, err)
-		<-time.After(state.PauseLeaseDuration / 100)
+		<-time.After(state.PauseLeaseDuration / 50)
 	}
 
 	// And again, once the lease is up, we should be able to lease the pause.
@@ -467,8 +468,8 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 	}
 	<-time.After(15 * time.Millisecond)
 	err = m.LeasePause(ctx, pause.ID)
-	require.NotNil(t, err)
-	require.Error(t, state.ErrPauseNotFound, err)
+	require.NotNil(t, err, "Leasing an expired pause should fail")
+	require.Error(t, state.ErrPauseNotFound, err, "Leasing an expired pause should fail with ErrPauseNotFound")
 }
 
 func checkConsumePause(t *testing.T, m state.Manager) {
@@ -489,8 +490,6 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 	}
 	err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
-
-	// TODO: Do we want to enforce leasing of a pause prior to consuming it?
 
 	// Consuming the pause should work.
 	err = m.ConsumePause(ctx, pause.ID)
@@ -867,6 +866,47 @@ func checkPausesByStep(t *testing.T, m state.Manager) {
 	require.Nil(t, err)
 	require.NotNil(t, found)
 	require.EqualValues(t, second, *found)
+}
+
+func checkPauseByID(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	// Save a pause.
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC(),
+	}
+	err := m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	found, err := m.PauseByID(ctx, pause.ID)
+	require.Nil(t, err)
+	require.EqualValues(t, pause, *found)
+
+	<-time.After(time.Second * 3)
+
+	// Still found.
+	found, err = m.PauseByID(ctx, pause.ID)
+	require.Nil(t, err, "PauseByID should return expired but unconsumed pauses")
+	require.EqualValues(t, pause, *found)
+
+	// Consume.
+	err = m.ConsumePause(ctx, pause.ID)
+	require.Nil(t, err, "Consuming an expired pause should work")
+
+	found, err = m.PauseByID(ctx, pause.ID)
+	require.Nil(t, found, "PauseByID should not return consumed pauses")
+	require.NotNil(t, err)
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	found, err = m.PauseByID(ctx, uuid.New())
+	require.Nil(t, found, "PauseByID should not return random IDs")
+	require.NotNil(t, err)
+	require.Error(t, state.ErrPauseNotFound, err)
 }
 
 func checkIdempotency(t *testing.T, m state.Manager) {

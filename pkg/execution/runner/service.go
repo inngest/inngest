@@ -297,6 +297,13 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 	for iter.Next(ctx) {
 		pause := iter.Val(ctx)
 
+		// NOTE: Some pauses may be nil or expired, as the iterator may take
+		// time to process.  We handle that here and assume that the event
+		// did not occur in time.
+		if pause == nil || pause.Expires.Before(time.Now()) {
+			continue
+		}
+
 		logger.From(ctx).Trace().
 			Str("pause_id", pause.ID.String()).
 			Msg("handling pause")
@@ -322,6 +329,14 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 					Str("expression", *pause.Expression).
 					Msg("expression false")
 				continue
+			}
+		}
+
+		if pause.OnTimeout {
+			// Delete this pause, as an event has occured which matches
+			// the timeout.
+			if err := s.state.ConsumePause(ctx, pause.ID); err != nil {
+				return err
 			}
 		}
 
