@@ -18,6 +18,12 @@ type ActionVersion struct {
 	Config       string     `json:"config"`
 }
 
+type ActionVersionQuery struct {
+	Dsn          string `json:"dsn"`
+	VersionMajor *int   `json:"versionMajor"`
+	VersionMinor *int   `json:"versionMinor"`
+}
+
 type Config struct {
 	Execution *ExecutionConfig `json:"execution"`
 }

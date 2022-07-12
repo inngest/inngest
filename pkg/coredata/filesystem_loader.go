@@ -273,12 +273,7 @@ func NewInMemoryAPIActionLoader() *MemoryAPIActionLoader {
 	return l
 }
 
-func (m *MemoryAPIActionLoader) ActionVersion(ctx context.Context, dsn string, version inngest.VersionExact) (client.ActionVersion, error) {
-	// NOTE - use constraint so we can re-use m.Action for now
-	vc := &inngest.VersionConstraint{
-		Major: &version.Major,
-		Minor: &version.Minor,
-	}
+func (m *MemoryAPIActionLoader) ActionVersion(ctx context.Context, dsn string, vc *inngest.VersionConstraint) (client.ActionVersion, error) {
 	av, err := m.Action(ctx, dsn, vc)
 	if err != nil {
 		return client.ActionVersion{}, err
@@ -302,7 +297,7 @@ func (m *MemoryAPIActionLoader) CreateActionVersion(ctx context.Context, av inng
 	}
 	return newActionVersion, nil
 }
-func (m *MemoryAPIActionLoader) UpdateActionVersion(ctx context.Context, dsn string, version inngest.VersionExact, enabled bool) (client.ActionVersion, error) {
+func (m *MemoryAPIActionLoader) UpdateActionVersion(ctx context.Context, dsn string, version inngest.VersionInfo, enabled bool) (client.ActionVersion, error) {
 	// NOTE - use constraint so we can re-use m.Action for now
 	vc := &inngest.VersionConstraint{
 		Major: &version.Major,
