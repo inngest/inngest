@@ -3,7 +3,6 @@ package coreapi
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/handler"
@@ -33,6 +32,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 		APILoader: o.APILoader,
 	}}))
 
+	// TODO - Add option for enabling GraphQL Playground
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	http.Handle("/query", srv)
 
@@ -43,7 +43,6 @@ type CoreAPI struct {
 	config config.Config
 	log    *zerolog.Logger
 	server *http.Server
-	loader coredata.APILoader
 }
 
 func (a *CoreAPI) Start(ctx context.Context) error {
@@ -52,7 +51,8 @@ func (a *CoreAPI) Start(ctx context.Context) error {
 		Handler: http.DefaultServeMux,
 	}
 
-	log.Printf("connect to http://%s/ for GraphQL playground", a.server.Addr)
+	// Todo only show this if playground is enabled in config
+	a.log.Info().Msgf("connect to http://%s/ for GraphQL playground", a.server.Addr)
 
 	a.log.Info().Str("addr", a.server.Addr).Msg("starting server")
 	return a.server.ListenAndServe()

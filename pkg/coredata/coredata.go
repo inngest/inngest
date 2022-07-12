@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/inngest/client"
 	"github.com/inngest/inngest-cli/pkg/function"
 )
 
@@ -31,7 +32,7 @@ type ExecutionActionLoader interface {
 
 type APILoader interface {
 	APIFunctionLoader
-	// APIActionLoader
+	APIActionLoader
 }
 
 type APIFunctionLoader interface {
@@ -41,10 +42,12 @@ type APIFunctionLoader interface {
 	CreateFunctionVersion(ctx context.Context, f function.Function, live bool) (function.FunctionVersion, error)
 }
 type APIActionLoader interface {
+	// Embed the read methods of the ExecutionActionLoader
+	ExecutionActionLoader
 	// Find a given action by an exact version number
-	ActionVersion(ctx context.Context, dsn string, versionInfo inngest.VersionInfo) (inngest.ActionVersion, error)
+	ActionVersion(ctx context.Context, dsn string, version inngest.VersionExact) (client.ActionVersion, error)
 	// Create a a new action version
-	CreateActionVersion(ctx context.Context, av inngest.ActionVersion) (inngest.ActionVersion, error)
-	// Update an action version, e.g.
-	UpdateActionVersion(ctx context.Context, av inngest.ActionVersion) (inngest.ActionVersion, error)
+	CreateActionVersion(ctx context.Context, av inngest.ActionVersion) (client.ActionVersion, error)
+	// Update an action version, e.g. when updating a Docker image has been successfully pushed to the registry
+	UpdateActionVersion(ctx context.Context, dsn string, version inngest.VersionExact, enabled bool) (client.ActionVersion, error)
 }
