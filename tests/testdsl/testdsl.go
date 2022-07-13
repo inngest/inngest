@@ -115,6 +115,15 @@ func RequireOutput(output string) Proc {
 	}
 }
 
+func RequireNoOutput(output string) Proc {
+	return func(ctx context.Context, td *TestData) error {
+		if err := requireOutput(ctx, td, output); err == nil {
+			return fmt.Errorf("output found: %s", output)
+		}
+		return nil
+	}
+}
+
 func RequireOutputWithin(output string, within time.Duration) Proc {
 	return func(ctx context.Context, td *TestData) error {
 		fmt.Printf("> Checking output within %s: %s\n", within, output)
@@ -152,33 +161,35 @@ func requireOutput(ctx context.Context, td *TestData, output string) error {
 }
 
 func requireLogFields(ctx context.Context, td *TestData, kv map[string]any) error {
+	// Unfortunately, fields will be marshalled as JSON and values here will likely
+	// be ints.  Marshal to/from JSON to ensure types match.
+	byt, err := json.Marshal(kv)
+	if err != nil {
+		return err
+	}
+	kv = map[string]any{}
+	err = json.Unmarshal(byt, &kv)
+	if err != nil {
+		return err
+	}
+
 	for _, line := range strings.Split(td.Out.String(), "\n") {
 		data := map[string]any{}
 		_ = json.Unmarshal([]byte(line), &data)
 
-		// Iterate through each line, and search for each key/value
-		present := true
+		var found int
 		for field, val := range data {
-			// Assume that this is found, then if any key isn't found we set
-			// this to false, which will be retained after this loop.
-			present = true
-
-			// Ensure that each KV is found.  If not, break.
-			found := false
 			for searchKey, searchVal := range kv {
 				if field == searchKey && reflect.DeepEqual(val, searchVal) {
-					found = true
+					found++
 					break
 				}
 			}
-			if !found {
-				present = false
-				continue
+			if found == len(kv) {
+				return nil
 			}
 		}
-		if present {
-			return nil
-		}
 	}
+
 	return fmt.Errorf("fields not found: %s", kv)
 }

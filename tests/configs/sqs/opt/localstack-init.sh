@@ -1,2 +1,2 @@
-awslocal sqs create-queue --queue-name events
-awslocal sqs create-queue --queue-name steps
+awslocal sqs create-queue --queue-name only-sqs-events
+awslocal sqs create-queue --queue-name only-sqs-steps

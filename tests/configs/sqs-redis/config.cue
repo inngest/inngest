@@ -17,6 +17,13 @@ config.#Config & {
 		addr: "127.0.0.1"
 	}
 
+	state: {
+		service: config.#RedisState & {
+			host: "127.0.0.1"
+			port: 6379
+		}
+	}
+
 	execution: {
 		drivers: {
 			docker: config.#DockerDriver
@@ -27,7 +34,7 @@ config.#Config & {
 
 	eventstream: {
 		service: config.#SQSMessaging & {
-			queueURL: "http://localhost:4566/000000000000/only-sqs-events?endpoint=http://localhost:4566"
+			queueURL: "http://localhost:4566/000000000000/sqs-redis-events?endpoint=http://localhost:4566"
 			region:   "us-east-1"
 			topic:    "events"
 		}
@@ -35,7 +42,7 @@ config.#Config & {
 
 	queue: {
 		service: config.#SQSQueue & {
-			queueURL: "http://localhost:4566/000000000000/only-sqs-steps?endpoint=http://localhost:4566"
+			queueURL: "http://localhost:4566/000000000000/sqs-redis-steps?endpoint=http://localhost:4566"
 			region:   "us-east-1"
 			topic:    "steps"
 		}

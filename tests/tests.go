@@ -8,13 +8,68 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/inngest/inngest-cli/pkg/coredata"
+	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
-// Invoke via: gp run ./*.go -test.v
+// Invoke via: go run ./*.go -test.v
 func main() {
 	ctx := context.Background()
+
+	// Ensure that all images within `tests/fns` have been built.
+	if err := build(ctx); err != nil {
+		panic(fmt.Sprintf("error building images: %s", err))
+	}
+
 	do(ctx)
+}
+
+func build(ctx context.Context) error {
+	fmt.Println("Building images...")
+	// Create a new filesystem loader.
+	el, err := coredata.NewFSLoader(ctx, ".")
+	if err != nil {
+		return err
+	}
+
+	funcs, err := el.Functions(ctx)
+	if err != nil {
+		return err
+	}
+
+	opts := []dockerdriver.BuildOpts{}
+	for _, fn := range funcs {
+		steps, err := dockerdriver.FnBuildOpts(ctx, fn)
+		if err != nil {
+			return err
+		}
+		opts = append(opts, steps...)
+	}
+
+	if len(opts) == 0 {
+		return nil
+	}
+
+	eg := errgroup.Group{}
+	for _, opt := range opts {
+		copied := opt
+		eg.Go(func() error {
+			fmt.Printf("Building %s\n", copied.Path)
+			b, err := dockerdriver.NewBuilder(ctx, copied)
+			if err != nil {
+				return err
+			}
+			if err := b.Start(); err != nil {
+				return err
+			}
+			return b.Wait()
+		})
+	}
+
+	fmt.Println("")
+	return eg.Wait()
 }
 
 func do(ctx context.Context) {
