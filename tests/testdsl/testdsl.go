@@ -92,17 +92,17 @@ func RequireLogField(name, value string) Proc {
 
 func RequireLogFields(fields map[string]any) Proc {
 	return func(ctx context.Context, td *TestData) error {
-		fmt.Printf("> Checking log fields: %s\n", fields)
+		fmt.Printf("> Checking log fields: %v\n", fields)
 		return requireLogFields(ctx, td, fields)
 	}
 }
 
 func RequireLogFieldsWithin(fields map[string]any, t time.Duration) Proc {
 	return func(ctx context.Context, td *TestData) error {
-		fmt.Printf("> Checking log fields within %s: %s\n", t, fields)
+		fmt.Printf("> Checking log fields within %s: %v\n", t, fields)
 		return timeout(t, func() error {
 			if err := requireLogFields(ctx, td, fields); err != nil {
-				return fmt.Errorf("Could not find fields: %s", fields)
+				return fmt.Errorf("Could not find fields: %v", fields)
 			}
 			return nil
 		})
