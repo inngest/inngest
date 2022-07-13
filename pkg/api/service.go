@@ -89,7 +89,6 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) error {
 		pubsub.Message{
 			// TODO: Move this into a const.
 			Name:      "event/event.received",
-			Version:   "2022-07-01.01",
 			Data:      string(byt),
 			Timestamp: time.Now(),
 		},

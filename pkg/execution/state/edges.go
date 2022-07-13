@@ -2,11 +2,13 @@ package state
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/expressions"
+	"github.com/inngest/inngest-cli/pkg/logger"
 )
 
 var (
@@ -85,6 +87,10 @@ type edgeEvaluator struct {
 func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepID string) ([]inngest.Edge, error) {
 	w := state.Workflow()
 
+	if len(w.Steps) == 0 {
+		return nil, fmt.Errorf("empty workflow returned from state")
+	}
+
 	g, err := inngest.NewGraph(w)
 	if err != nil {
 		return nil, err
@@ -93,11 +99,14 @@ func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepI
 	// Handle the outgoing edges from this particular node.
 	edges := g.From(stepID)
 	if len(edges) == 0 {
+		logger.From(ctx).Trace().Msg("no child edges available")
 		return nil, nil
 	}
 
 	future := []inngest.Edge{}
 	for _, edge := range edges {
+		logger.From(ctx).Trace().Interface("edge", edge.WorkflowEdge).Msg("evaluating child edge")
+
 		ok, err := i.canTraverseEdge(ctx, state, edge)
 		if err != nil {
 			return nil, err
@@ -127,18 +136,29 @@ func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepI
 // asynchronous edges which wait for an event mathing a condition to be traversed (at some
 // point in the future, with a TTL).
 func (i edgeEvaluator) canTraverseEdge(ctx context.Context, s State, edge inngest.GraphEdge) (bool, error) {
+	l := logger.From(ctx).With().Interface("edge", edge.WorkflowEdge).Logger()
+
 	if edge.Outgoing.ID() != inngest.TriggerName && !s.ActionComplete(edge.Outgoing.ID()) {
+		l.Trace().Bool("traverse", false).Msg("edge incomplete")
 		return false, nil
 	}
 
 	exprdata := i.datagen(ctx, s, edge.WorkflowEdge.Outgoing)
 
 	if edge.WorkflowEdge.Metadata != nil && edge.WorkflowEdge.Metadata.If != "" {
+		l.Trace().Str("expression", edge.WorkflowEdge.Metadata.If).Msg("evaluating edge expression")
+
 		ok, _, err := i.evaluator(ctx, edge.WorkflowEdge.Metadata.If, exprdata)
 		if err != nil || !ok {
+			l.Trace().
+				Bool("traverse", false).
+				Str("expression", edge.WorkflowEdge.Metadata.If).
+				Err(err).
+				Msg("expression false")
 			return ok, err
 		}
 	}
 
+	l.Trace().Bool("traverse", true).Msg("edge traversable")
 	return true, nil
 }

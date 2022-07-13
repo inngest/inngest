@@ -91,20 +91,34 @@ package config
 
 // SQSMessaging defines configuration for using SQS as a backing event stream.
 #SQSMessaging: {
-	backend:   "aws-sqs"
-	region:    string
-	accountID: string
-	topic:     string
+	backend:  "aws-sqs"
+	queueURL: string
+	region:   string
+	topic:    string
 }
 
 // # Queues
 //
 
 // @TODO: Add SQS.
-#QueueService: #InmemQueue
+#QueueService: #InmemQueue | #SQSQueue
 
 #InmemQueue: {
 	backend: "inmemory"
+}
+
+#SQSQueue: {
+	backend: "aws-sqs"
+
+	queueURL: string
+	region:   string
+	// Topic stores the topic for all queue-related items.  This must be its
+	// own unique topic for processing enqueued steps.
+	topic: string
+
+	// concurrency specifies how many concurrent queue items - and therefore
+	// function steps - can be handled in parallel.
+	concurrency: >=1 | *10
 }
 
 // # State
@@ -130,6 +144,9 @@ package config
 	password?:   string
 	maxRetries?: >=-1 | *3
 	poolSize?:   >=1
+
+	// keyPrefix is the prefix used for all redis keys stored
+	keyPrefix: string | *"inngest:state"
 }
 
 // Drivers handle execution of each step within a function.

@@ -5,11 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	// Import the default drivers, queues, and state stores.
 	"github.com/inngest/inngest-cli/pkg/config/registration"
-	_ "github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
-	_ "github.com/inngest/inngest-cli/pkg/execution/driver/httpdriver"
-	_ "github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 )
 
 // Load loads the configu from the given locations in order.  If locs is empty,
@@ -19,7 +15,7 @@ func Load(ctx context.Context, locs ...string) (*Config, error) {
 }
 
 func Default(ctx context.Context) (*Config, error) {
-	return parse(nil)
+	return Parse(nil)
 }
 
 // Config represents configuration for running the Inngest services.
@@ -76,12 +72,13 @@ type State struct {
 type Execution struct {
 	// Drivers represents all drivers enabled.
 	Drivers   map[string]registration.DriverConfig
-	LogOutput bool
+	LogOutput bool `json:"logOutput"`
 }
 
 func (e *Execution) UnmarshalJSON(byt []byte) error {
 	type drivers struct {
-		Drivers map[string]unmarshalDriver
+		Drivers   map[string]unmarshalDriver
+		LogOutput bool
 	}
 	names := &drivers{}
 	if err := json.Unmarshal(byt, names); err != nil {
@@ -89,6 +86,7 @@ func (e *Execution) UnmarshalJSON(byt []byte) error {
 	}
 
 	e.Drivers = map[string]registration.DriverConfig{}
+	e.LogOutput = names.LogOutput
 
 	for runtime, driver := range names.Drivers {
 		iface, ok := registration.RegisteredDrivers()[driver.Name]

@@ -9,13 +9,14 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/inngest/inngest-cli/pkg/api"
+	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/coredata"
-	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/runner"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
-	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
 	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest-cli/pkg/service"
 	"github.com/muesli/reflow/wrap"
 	"golang.org/x/term"
 )
@@ -52,7 +53,8 @@ type RunUI struct {
 	err error
 
 	// sm is the state manager used for the execution.
-	sm inmemory.Queue
+	sm state.Manager
+
 	// id is the identifier for the execution, once started.
 	id *state.Identifier
 
@@ -82,61 +84,30 @@ func (r *RunUI) run(ctx context.Context) {
 	ctx, done := context.WithCancel(ctx)
 	defer done()
 
-	al := coredata.NewInMemoryActionLoader()
-
-	// Add all action definitions from the function into the action loader.
-	flow, err := r.fn.Workflow(ctx)
-	if err != nil {
+	el := &coredata.MemoryExecutionLoader{}
+	if err := el.SetFunctions(ctx, []*function.Function{&r.fn}); err != nil {
 		r.err = err
 		return
 	}
-	avs, _, _ := r.fn.Actions(ctx)
-	for _, a := range avs {
-		al.Add(a)
-	}
 
-	// Create a new state manager.
-	r.sm = inmemory.NewStateManager()
-
-	// Create our drivers.
-	dd, err := dockerdriver.New()
-	if err != nil {
-		r.err = fmt.Errorf("error creating docker driver: %w", err)
-		return
-	}
-
-	// Create an executor with the state manager and drivers.
-	exec, err := executor.NewExecutor(
-		executor.WithStateManager(r.sm),
-		executor.WithActionLoader(al),
-		executor.WithRuntimeDrivers(
-			dd,
-		),
-	)
-	if err != nil {
-		r.err = fmt.Errorf("error creating executor: %w", err)
-		return
-	}
-
-	// Create a high-level runner, which executes our functions.
-	runner := runner.NewInMemoryRunner(r.sm, exec)
-	id, err := runner.NewRun(ctx, *flow, r.event)
-	if err != nil {
-		r.err = fmt.Errorf("error creating new run: %s", err)
-		return
-	}
-
+	c, _ := config.Default(ctx)
+	api := api.NewService(*c)
+	runner := runner.NewService(*c, runner.WithExecutionLoader(el))
+	exec := executor.NewService(*c, executor.WithExecutionLoader(el))
 	go func() {
-		_ = runner.Start(ctx)
+		_ = service.StartAll(ctx, api, runner, exec)
 	}()
 
-	r.id = id
-	start := time.Now()
-	if err := runner.Wait(ctx, *id); err != nil {
-		r.err = err
-	}
-	r.duration = time.Since(start)
-	r.done = true
+	// TODO: Run and wait for the function to finish.
+	/*
+		r.id = id
+		start := time.Now()
+		if err := runner.Wait(ctx, *id); err != nil {
+			r.err = err
+		}
+		r.duration = time.Since(start)
+		r.done = true
+	*/
 }
 
 func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

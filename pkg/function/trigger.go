@@ -3,9 +3,13 @@ package function
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
+	"time"
 
+	"cuelang.org/go/cue"
 	"github.com/gosimple/slug"
+	"github.com/inngest/event-schemas/pkg/fakedata"
 	"github.com/inngest/inngest-cli/pkg/expressions"
 	cron "github.com/robfig/cron/v3"
 )
@@ -66,7 +70,8 @@ func (e EventTrigger) Validate(ctx context.Context) error {
 		// TODO: Warn that we have no event definition
 		return nil
 	}
-	return e.Definition.Validate()
+
+	return e.Definition.Validate(ctx)
 }
 
 // CronTrigger is a trigger which invokes the function on a CRON schedule.
@@ -82,4 +87,51 @@ func (c CronTrigger) Validate(ctx context.Context) error {
 		return fmt.Errorf("'%s' isn't a valid cron schedule", c.Cron)
 	}
 	return nil
+}
+
+// GenerateTriggerData generates deterministic random data from a single
+// event trigger given the list of triggers.  The selected trigger must
+// contain a cue schema definition.
+func GenerateTriggerData(ctx context.Context, seed int64, triggers []Trigger) (map[string]interface{}, error) {
+	evtTriggers := []Trigger{}
+	for _, t := range triggers {
+		if t.EventTrigger != nil {
+			evtTriggers = append(evtTriggers, t)
+		}
+	}
+
+	if len(evtTriggers) == 0 {
+		return map[string]interface{}{}, nil
+	}
+
+	rng := rand.New(rand.NewSource(seed))
+	i := rng.Intn(len(evtTriggers))
+	if evtTriggers[i].EventTrigger.Definition == nil {
+		return map[string]interface{}{}, nil
+	}
+
+	def, err := evtTriggers[i].EventTrigger.Definition.Cue(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	r := &cue.Runtime{}
+	inst, err := r.Compile(".", def)
+	if err != nil {
+		return nil, err
+	}
+
+	fakedata.DefaultOptions.Rand = rng
+
+	val, err := fakedata.Fake(ctx, inst.Value())
+	if err != nil {
+		return nil, err
+	}
+
+	mapped := map[string]interface{}{}
+	err = val.Decode(&mapped)
+
+	mapped["ts"] = time.Now().UnixMilli()
+
+	return mapped, err
 }

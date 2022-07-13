@@ -1,0 +1,24 @@
+{
+  "name": "Basic single step",
+  "id": "ultimate-urchin-215fa3",
+  "triggers": [
+    {
+      "event": "basic/single-step",
+      "definition": {
+        "format": "cue",
+        "synced": true,
+        "def": "file://./events/basic-single-step.cue"
+      }
+    }
+  ],
+  "steps": {
+    "basic-step-1": {
+      "id": "basic-step-1",
+      "path": "file://./steps/step-1",
+      "name": "Single step",
+      "runtime": {
+        "type": "docker"
+      }
+    }
+  }
+}

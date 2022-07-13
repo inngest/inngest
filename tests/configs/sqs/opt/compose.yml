@@ -1,0 +1,13 @@
+version: "3.7"
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack_main
+    ports:
+      - '4510-4599:4510-4599'
+      - '12121:12121'
+      - '5678'
+    environment:
+      - DEFAULT_REGION=us-east-1
+    volumes:
+      - './localstack-init.sh:/docker-entrypoint-initaws.d/init.sh'

@@ -1,5 +1,6 @@
 package runner
 
+/*
 import (
 	"context"
 	"fmt"
@@ -7,12 +8,16 @@ import (
 	"time"
 
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/pkg/api"
+	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/queue"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
+	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest-cli/pkg/service"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,49 +42,31 @@ func (m *stateManager) Enqueue(ctx context.Context, item queue.Item, at time.Tim
 	return m.Queue.Enqueue(ctx, item, at)
 }
 
-func newRunner(t *testing.T, sm inmemory.Queue, d *mockdriver.Mock) *InMemoryRunner {
+func newRunner(t *testing.T, ctx context.Context, conf *config.Config, f function.Function) {
 	t.Helper()
 
-	al := coredata.NewInMemoryActionLoader()
-	al.Add(inngest.ActionVersion{
-		DSN: "test",
-		Runtime: inngest.RuntimeWrapper{
-			Runtime: &mockdriver.Mock{},
-		},
-	})
-	al.Add(inngest.ActionVersion{
-		DSN: "step-a",
-		Runtime: inngest.RuntimeWrapper{
-			Runtime: &mockdriver.Mock{},
-		},
-	})
-	al.Add(inngest.ActionVersion{
-		DSN: "step-b",
-		Runtime: inngest.RuntimeWrapper{
-			Runtime: &mockdriver.Mock{},
-		},
-	})
-
-	if d == nil {
-		d = &mockdriver.Mock{}
-	}
-
-	exec, err := executor.NewExecutor(
-		executor.WithStateManager(sm),
-		executor.WithActionLoader(al),
-		executor.WithRuntimeDrivers(d),
-	)
+	el := &coredata.MemoryExecutionLoader{}
+	err := el.SetFunctions(ctx, []*function.Function{&f})
 	require.NoError(t, err)
 
-	return NewInMemoryRunner(sm, exec)
+	go func() {
+		// Start the engine.
+		api := api.NewService(*conf)
+		runner := NewService(*conf, WithExecutionLoader(el))
+		exec := executor.NewService(*conf, executor.WithExecutionLoader(el))
+		err = service.StartAll(ctx, api, runner, exec)
+		require.NoError(t, err)
+	}()
 }
 
 func TestRunner_new(t *testing.T) {
 	ctx := context.Background()
-	sm := &stateManager{Queue: inmemory.NewStateManager()}
-	r := newRunner(t, sm, nil)
+	conf, err := config.Default(ctx)
+	require.NoError(t, err)
 
-	f := inngest.Workflow{}
+	newRunner(t, ctx, conf, function.Function{
+	})
+
 	data := map[string]interface{}{
 		"yea": "yea",
 	}
@@ -363,3 +350,4 @@ func AssertLastEnqueued(t *testing.T, sm *stateManager, i queue.Item, at time.Ti
 	// And that it should be ran immediately.
 	require.WithinDuration(t, at, sm.queue[n].at, time.Second)
 }
+*/

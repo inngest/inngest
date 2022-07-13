@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/inngest/inngest-cli/pkg/config/registration"
 )
 
 type StateService struct {
 	Backend  string
-	Concrete interface{}
+	Concrete registration.StateConfig
 }
 
 // UnmarshalJSON unmarshals the messaging service, keeping the raw bytes
@@ -24,45 +24,14 @@ func (s *StateService) UnmarshalJSON(byt []byte) error {
 	}
 	s.Backend = data.Backend
 
-	switch s.Backend {
-	case "inmemory":
-		s.Concrete = &InMemoryState{}
-	case "redis":
-		s.Concrete = &RedisState{}
-	default:
+	iface, ok := registration.RegisteredStates()[s.Backend]
+	if !ok {
 		return fmt.Errorf("unknown state backend: %s", s.Backend)
 	}
-
-	return json.Unmarshal(byt, s.Concrete)
-}
-
-type InMemoryState struct{}
-
-type RedisState struct {
-	Host       string
-	Port       int
-	DB         int
-	Username   string
-	Password   string
-	MaxRetries *int
-	PoolSize   *int
-}
-
-func (r *RedisState) ConnectOpts() redis.Options {
-	opts := redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", r.Host, r.Port),
-		DB:       r.DB,
-		Username: r.Username,
-		Password: r.Password,
+	if err := json.Unmarshal(byt, iface); err != nil {
+		return err
 	}
+	s.Concrete = iface.(registration.StateConfig)
 
-	if r.MaxRetries != nil {
-		opts.MaxRetries = *r.MaxRetries
-	}
-
-	if r.PoolSize != nil {
-		opts.PoolSize = *r.PoolSize
-	}
-
-	return opts
+	return nil
 }

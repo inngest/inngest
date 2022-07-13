@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"gocloud.dev/pubsub"
 )
@@ -156,9 +157,9 @@ func (g GCPPubSubMessaging) TopicURL(topic string, typ URLType) string {
 }
 
 type SQSMessaging struct {
-	Region    string
-	AccountID string
-	Topic     string
+	Region   string
+	Topic    string
+	QueueURL string
 }
 
 func (s SQSMessaging) Backend() string {
@@ -170,11 +171,21 @@ func (s SQSMessaging) TopicName() string {
 }
 
 func (s SQSMessaging) TopicURL(topic string, typ URLType) string {
+	// Replace https:// with awssqs://
+	url := strings.Replace(s.QueueURL, "https://", "awssqs://", 1)
+	url = strings.Replace(url, "http://", "awssqs://", 1)
+
+	if strings.Contains(url, "?") {
+		return fmt.Sprintf(
+			"%s&region=%s",
+			url,
+			s.Region,
+		)
+	}
+
 	return fmt.Sprintf(
-		"awssqs://sqs.%s.amazonaws.com/%s/%s?region=%s",
-		s.Region,
-		s.AccountID,
-		s.Topic,
+		"%s?region=%s",
+		url,
 		s.Region,
 	)
 }

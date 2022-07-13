@@ -36,7 +36,7 @@ func FnBuildOpts(ctx context.Context, f function.Function, args ...string) ([]Bu
 
 		path := f.Dir()
 		if step.Path != "" {
-			path, err = function.PathName(step.Path)
+			path, err = function.PathName(ctx, step.Path)
 			if err != nil {
 				return nil, err
 			}

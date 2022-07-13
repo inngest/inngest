@@ -3,11 +3,13 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/inngest/inngest-cli/pkg/config/registration"
 )
 
 type QueueService struct {
 	Backend  string
-	Concrete interface{}
+	Concrete registration.QueueConfig
 }
 
 // UnmarshalJSON unmarshals the messaging service, keeping the raw bytes
@@ -22,14 +24,15 @@ func (q *QueueService) UnmarshalJSON(byt []byte) error {
 	}
 	q.Backend = data.Backend
 
-	switch q.Backend {
-	case "inmemory":
-		q.Concrete = &InMemoryQueue{}
-	default:
+	iface, ok := registration.RegisteredQueues()[q.Backend]
+	if !ok {
 		return fmt.Errorf("unknown queue backend: %s", q.Backend)
 	}
 
+	if err := json.Unmarshal(byt, iface); err != nil {
+		return err
+	}
+	q.Concrete = iface.(registration.QueueConfig)
+
 	return nil
 }
-
-type InMemoryQueue struct{}

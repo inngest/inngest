@@ -1,0 +1,23 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  install:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
+      - name: Install CLI
+        run: |
+          go build -o ./inngest-bin ./cmd/main.go
+          mv ./inngest-bin /usr/local/bin/inngest
+      - name: Run E2E tests
+        run: make e2e

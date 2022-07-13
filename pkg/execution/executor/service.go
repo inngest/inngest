@@ -12,9 +12,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/queue"
-	"github.com/inngest/inngest-cli/pkg/execution/queue/queuefactory"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
-	"github.com/inngest/inngest-cli/pkg/execution/state/statefactory"
 	"github.com/inngest/inngest-cli/pkg/logger"
 	"github.com/inngest/inngest-cli/pkg/service"
 	"github.com/xhit/go-str2duration/v2"
@@ -64,12 +62,13 @@ func (s *svc) Pre(ctx context.Context) error {
 		}
 	}
 
-	s.state, err = statefactory.NewState(ctx, s.config.State)
+	s.state, err = s.config.State.Service.Concrete.Manager(ctx)
 	if err != nil {
 		return err
 	}
 
-	s.queue, err = queuefactory.NewQueue(ctx, s.config.Queue)
+	logger.From(ctx).Info().Str("backend", s.config.Queue.Service.Backend).Msg("starting queue")
+	s.queue, err = s.config.Queue.Service.Concrete.Queue()
 	if err != nil {
 		return err
 	}
@@ -108,17 +107,21 @@ func (s *svc) Run(ctx context.Context) error {
 		defer s.wg.Done()
 
 		var err error
-		switch item.Payload.(type) {
-		case queue.PayloadEdge:
+		switch item.Kind {
+		case queue.KindEdge:
 			err = s.handleQueueItem(ctx, item)
-		case queue.PayloadPauseTimeout:
+		case queue.KindPause:
 			err = s.handlePauseTimeout(ctx, item)
+		default:
+			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
 
 		if err != nil {
+			// TODO: Re-enqueue this item.
 			logger.From(ctx).Error().Err(err).Interface("item", item).Msg("critical error handling queue item")
 		}
-		return nil
+
+		return err
 	})
 }
 
@@ -138,7 +141,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 	l.Info().Interface("edge", edge).Msg("processing step")
 
-	resp, err := s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
+	_, err = s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
 	if err != nil {
 		// The executor usually returns a state.DriverResponse if the step's
 		// response was an error.  In this case, the executor itself handles
@@ -150,8 +153,8 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		//
 		// If the error is not of type response error, we assume the step is
 		// always retryable.
-		_, isResponseError := err.(*state.DriverResponse)
-		if (resp != nil && resp.Retryable()) || !isResponseError {
+		retry, isRetryable := err.(state.Retryable)
+		if (isRetryable && retry.Retryable()) || !isRetryable {
 			next := item
 			next.ErrorCount += 1
 			at := backoff.LinearJitterBackoff(next.ErrorCount)
@@ -221,6 +224,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 				// pause still exists at this time and has not been comsumed we will
 				// continue traversing this edge.
 				if err := s.queue.Enqueue(ctx, queue.Item{
+					Kind:       queue.KindPause,
 					Identifier: item.Identifier,
 					Payload:    queue.PayloadPauseTimeout{PauseID: pauseID},
 				}, expires); err != nil {
@@ -243,6 +247,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		l.Info().Str("outgoing", next.Outgoing).Time("at", at).Msg("scheduling next step")
 		// Enqueue the next child in our queue.
 		if err := s.queue.Enqueue(ctx, queue.Item{
+			Kind:       queue.KindEdge,
 			Identifier: item.Identifier,
 			Payload:    queue.PayloadEdge{Edge: next},
 		}, at); err != nil {
@@ -287,6 +292,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	// Enqueue the next job to run.  We could handle this in the
 	// same thread, but its safer to enable retries by re-enqueueing.
 	if err := s.queue.Enqueue(ctx, queue.Item{
+		Kind:       queue.KindEdge,
 		Identifier: item.Identifier,
 		Payload:    queue.PayloadEdge{Edge: pause.Edge()},
 	}, time.Now()); err != nil {

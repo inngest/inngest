@@ -6,6 +6,8 @@ import (
 	"github.com/inngest/inngest-cli/pkg/config/registration"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest-cli/pkg/execution/queue/inmemoryqueue"
+	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,13 +38,13 @@ func defaultConfig() *Config {
 		Queue: Queue{
 			Service: QueueService{
 				Backend:  "inmemory",
-				Concrete: &InMemoryQueue{},
+				Concrete: &inmemoryqueue.Config{},
 			},
 		},
 		State: State{
 			Service: StateService{
 				Backend:  "inmemory",
-				Concrete: &InMemoryState{},
+				Concrete: &inmemory.Config{},
 			},
 		},
 	}
@@ -140,7 +142,7 @@ config.#Config & {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			config, err := parse(test.input)
+			config, err := Parse(test.input)
 			require.Equal(t, test.err, err)
 			require.EqualValues(t, test.config(), config)
 

@@ -20,6 +20,7 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().String("host", "", "host to run the API on")
 	cmd.Flags().StringP("port", "p", "9999", "port to run the API on")
 	cmd.Flags().String("dir", ".", "directory to load functions from")
+
 	return cmd
 }
 
