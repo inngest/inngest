@@ -16,11 +16,15 @@ import (
 type FunctionVersion struct {
 	FunctionID string
 	Version    uint
-	Function   Function
-	ValidFrom  time.Time
-	ValidTo    time.Time
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+
+	// Function config is loaded as a config string then parsed into a Function struct
+	Config   string
+	Function Function
+
+	ValidFrom *time.Time
+	ValidTo   *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // ActionVersions provide the action configuration for each step of the function with the exact version

@@ -239,15 +239,15 @@ func (m *MemoryAPIFunctionLoader) CreateFunctionVersion(ctx context.Context, f f
 		return function.FunctionVersion{}, err
 	}
 
+	now := time.Now()
 	fv := function.FunctionVersion{
 		FunctionID: f.ID,
 		Version:    uint(1),
 		Function:   f,
-		ValidFrom:  time.Now(),
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
+		ValidFrom:  &now,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
-
 	return fv, nil
 }
 

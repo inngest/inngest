@@ -51,16 +51,6 @@ type ExecutionDriversConfig struct {
 	Docker *ExecutionDockerDriverConfig `json:"docker"`
 }
 
-type FunctionVersion struct {
-	FunctionID string     `json:"functionId"`
-	Version    int        `json:"version"`
-	Config     string     `json:"config"`
-	ValidFrom  *time.Time `json:"validFrom"`
-	ValidTo    *time.Time `json:"validTo"`
-	CreatedAt  time.Time  `json:"createdAt"`
-	UpdatedAt  time.Time  `json:"updatedAt"`
-}
-
 type UpdateActionVersionInput struct {
 	Dsn          string `json:"dsn"`
 	VersionMajor int    `json:"versionMajor"`

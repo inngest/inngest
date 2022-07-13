@@ -16,5 +16,5 @@ resolver:
 struct_tag: json
 
 models:
-  DSN:
-    model: github.com/inngest/inngest-cli/pkg/coreapi/graph/models.ActionVersion
+  FunctionVersion:
+    model: github.com/inngest/inngest-cli/pkg/function.FunctionVersion
