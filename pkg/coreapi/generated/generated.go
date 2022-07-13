@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
+	"github.com/inngest/inngest-cli/inngest/client"
 	"github.com/inngest/inngest-cli/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest-cli/pkg/function"
 	gqlparser "github.com/vektah/gqlparser/v2"
@@ -38,7 +38,6 @@ type Config struct {
 }
 
 type ResolverRoot interface {
-	FunctionVersion() FunctionVersionResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 }
@@ -50,9 +49,8 @@ type ComplexityRoot struct {
 	ActionVersion struct {
 		Config       func(childComplexity int) int
 		CreatedAt    func(childComplexity int) int
-		Dsn          func(childComplexity int) int
+		DSN          func(childComplexity int) int
 		Name         func(childComplexity int) int
-		Runtime      func(childComplexity int) int
 		ValidFrom    func(childComplexity int) int
 		ValidTo      func(childComplexity int) int
 		VersionMajor func(childComplexity int) int
@@ -98,17 +96,14 @@ type ComplexityRoot struct {
 	}
 }
 
-type FunctionVersionResolver interface {
-	Version(ctx context.Context, obj *function.FunctionVersion) (int, error)
-}
 type MutationResolver interface {
 	DeployFunction(ctx context.Context, input models.DeployFunctionInput) (*function.FunctionVersion, error)
-	CreateActionVersion(ctx context.Context, input models.CreateActionVersionInput) (*models.ActionVersion, error)
-	UpdateActionVersion(ctx context.Context, input models.UpdateActionVersionInput) (*models.ActionVersion, error)
+	CreateActionVersion(ctx context.Context, input models.CreateActionVersionInput) (*client.ActionVersion, error)
+	UpdateActionVersion(ctx context.Context, input models.UpdateActionVersionInput) (*client.ActionVersion, error)
 }
 type QueryResolver interface {
 	Config(ctx context.Context) (*models.Config, error)
-	ActionVersion(ctx context.Context, query models.ActionVersionQuery) (*models.ActionVersion, error)
+	ActionVersion(ctx context.Context, query models.ActionVersionQuery) (*client.ActionVersion, error)
 }
 
 type executableSchema struct {
@@ -141,11 +136,11 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		return e.complexity.ActionVersion.CreatedAt(childComplexity), true
 
 	case "ActionVersion.dsn":
-		if e.complexity.ActionVersion.Dsn == nil {
+		if e.complexity.ActionVersion.DSN == nil {
 			break
 		}
 
-		return e.complexity.ActionVersion.Dsn(childComplexity), true
+		return e.complexity.ActionVersion.DSN(childComplexity), true
 
 	case "ActionVersion.name":
 		if e.complexity.ActionVersion.Name == nil {
@@ -153,13 +148,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.ActionVersion.Name(childComplexity), true
-
-	case "ActionVersion.runtime":
-		if e.complexity.ActionVersion.Runtime == nil {
-			break
-		}
-
-		return e.complexity.ActionVersion.Runtime(childComplexity), true
 
 	case "ActionVersion.validFrom":
 		if e.complexity.ActionVersion.ValidFrom == nil {
@@ -417,20 +405,10 @@ input DeployFunctionInput {
   live: Boolean
 }
 
-type FunctionVersion {
-  functionId: ID!
-  version: Int!
-  config: String!
-
-  validFrom: Time
-  validTo: Time
-  createdAt: Time!
-  updatedAt: Time!
-}
-
 input CreateActionVersionInput {
   config: String!
 }
+
 input UpdateActionVersionInput {
   dsn: String!
   versionMajor: Int!
@@ -438,12 +416,18 @@ input UpdateActionVersionInput {
   enabled: Boolean
 }
 `, BuiltIn: false},
-	{Name: "../schema.graphql", Input: `type Query {
+	{Name: "../query.graphql", Input: `type Query {
   config: Config
   actionVersion(query: ActionVersionQuery!): ActionVersion
 }
 
-type Config {
+input ActionVersionQuery {
+  dsn: String!
+  versionMajor: Int
+  versionMinor: Int
+}
+`, BuiltIn: false},
+	{Name: "../schema.graphql", Input: `type Config {
   execution: ExecutionConfig
 }
 
@@ -460,12 +444,6 @@ type ExecutionDockerDriverConfig {
   namespace: String
 }
 
-input ActionVersionQuery {
-  dsn: String!
-  versionMajor: Int
-  versionMinor: Int
-}
-
 type ActionVersion {
   dsn: String!
   name: String!
@@ -474,9 +452,18 @@ type ActionVersion {
   createdAt: Time!
   validFrom: Time
   validTo: Time
-  runtime: Runtime!
-  #runtimeData: Map!
   config: String!
+}
+
+type FunctionVersion {
+  functionId: ID!
+  version: Int!
+  config: String!
+
+  validFrom: Time
+  validTo: Time
+  createdAt: Time!
+  updatedAt: Time!
 }
 `, BuiltIn: false},
 }
@@ -599,7 +586,7 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
-func (ec *executionContext) _ActionVersion_dsn(ctx context.Context, field graphql.CollectedField, obj *models.ActionVersion) (ret graphql.Marshaler) {
+func (ec *executionContext) _ActionVersion_dsn(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ActionVersion_dsn(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -613,7 +600,7 @@ func (ec *executionContext) _ActionVersion_dsn(ctx context.Context, field graphq
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Dsn, nil
+		return obj.DSN, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -643,7 +630,7 @@ func (ec *executionContext) fieldContext_ActionVersion_dsn(ctx context.Context, 
 	return fc, nil
 }
 
-func (ec *executionContext) _ActionVersion_name(ctx context.Context, field graphql.CollectedField, obj *models.ActionVersion) (ret graphql.Marshaler) {
+func (ec *executionContext) _ActionVersion_name(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ActionVersion_name(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -687,7 +674,7 @@ func (ec *executionContext) fieldContext_ActionVersion_name(ctx context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _ActionVersion_versionMajor(ctx context.Context, field graphql.CollectedField, obj *models.ActionVersion) (ret graphql.Marshaler) {
+func (ec *executionContext) _ActionVersion_versionMajor(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ActionVersion_versionMajor(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -701,7 +688,7 @@ func (ec *executionContext) _ActionVersion_versionMajor(ctx context.Context, fie
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.VersionMajor, nil
+		return obj.VersionMajor()
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -713,16 +700,16 @@ func (ec *executionContext) _ActionVersion_versionMajor(ctx context.Context, fie
 		}
 		return graphql.Null
 	}
-	res := resTmp.(int)
+	res := resTmp.(uint)
 	fc.Result = res
-	return ec.marshalNInt2int(ctx, field.Selections, res)
+	return ec.marshalNInt2uint(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_ActionVersion_versionMajor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ActionVersion",
 		Field:      field,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
@@ -731,7 +718,7 @@ func (ec *executionContext) fieldContext_ActionVersion_versionMajor(ctx context.
 	return fc, nil
 }
 
-func (ec *executionContext) _ActionVersion_versionMinor(ctx context.Context, field graphql.CollectedField, obj *models.ActionVersion) (ret graphql.Marshaler) {
+func (ec *executionContext) _ActionVersion_versionMinor(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ActionVersion_versionMinor(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -745,7 +732,7 @@ func (ec *executionContext) _ActionVersion_versionMinor(ctx context.Context, fie
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.VersionMinor, nil
+		return obj.VersionMinor()
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -757,16 +744,16 @@ func (ec *executionContext) _ActionVersion_versionMinor(ctx context.Context, fie
 		}
 		return graphql.Null
 	}
-	res := resTmp.(int)
+	res := resTmp.(uint)
 	fc.Result = res
-	return ec.marshalNInt2int(ctx, field.Selections, res)
+	return ec.marshalNInt2uint(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_ActionVersion_versionMinor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "ActionVersion",
 		Field:      field,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
@@ -775,7 +762,7 @@ func (ec *executionContext) fieldContext_ActionVersion_versionMinor(ctx context.
 	return fc, nil
 }
 
-func (ec *executionContext) _ActionVersion_createdAt(ctx context.Context, field graphql.CollectedField, obj *models.ActionVersion) (ret graphql.Marshaler) {
+func (ec *executionContext) _ActionVersion_createdAt(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ActionVersion_createdAt(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -801,9 +788,9 @@ func (ec *executionContext) _ActionVersion_createdAt(ctx context.Context, field 
 		}
 		return graphql.Null
 	}
-	res := resTmp.(time.Time)
+	res := resTmp.(*time.Time)
 	fc.Result = res
-	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+	return ec.marshalNTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_ActionVersion_createdAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -819,7 +806,7 @@ func (ec *executionContext) fieldContext_ActionVersion_createdAt(ctx context.Con
 	return fc, nil
 }
 
-func (ec *executionContext) _ActionVersion_validFrom(ctx context.Context, field graphql.CollectedField, obj *models.ActionVersion) (ret graphql.Marshaler) {
+func (ec *executionContext) _ActionVersion_validFrom(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ActionVersion_validFrom(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -860,7 +847,7 @@ func (ec *executionContext) fieldContext_ActionVersion_validFrom(ctx context.Con
 	return fc, nil
 }
 
-func (ec *executionContext) _ActionVersion_validTo(ctx context.Context, field graphql.CollectedField, obj *models.ActionVersion) (ret graphql.Marshaler) {
+func (ec *executionContext) _ActionVersion_validTo(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ActionVersion_validTo(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -901,51 +888,7 @@ func (ec *executionContext) fieldContext_ActionVersion_validTo(ctx context.Conte
 	return fc, nil
 }
 
-func (ec *executionContext) _ActionVersion_runtime(ctx context.Context, field graphql.CollectedField, obj *models.ActionVersion) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ActionVersion_runtime(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Runtime, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNRuntime2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ActionVersion_runtime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ActionVersion",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Runtime does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ActionVersion_config(ctx context.Context, field graphql.CollectedField, obj *models.ActionVersion) (ret graphql.Marshaler) {
+func (ec *executionContext) _ActionVersion_config(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ActionVersion_config(ctx, field)
 	if err != nil {
 		return graphql.Null
@@ -1266,7 +1209,7 @@ func (ec *executionContext) _FunctionVersion_version(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FunctionVersion().Version(rctx, obj)
+		return obj.Version, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1278,17 +1221,17 @@ func (ec *executionContext) _FunctionVersion_version(ctx context.Context, field 
 		}
 		return graphql.Null
 	}
-	res := resTmp.(int)
+	res := resTmp.(uint)
 	fc.Result = res
-	return ec.marshalNInt2int(ctx, field.Selections, res)
+	return ec.marshalNInt2uint(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_FunctionVersion_version(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "FunctionVersion",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
 		},
@@ -1601,9 +1544,9 @@ func (ec *executionContext) _Mutation_createActionVersion(ctx context.Context, f
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*models.ActionVersion)
+	res := resTmp.(*client.ActionVersion)
 	fc.Result = res
-	return ec.marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚑcliᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐActionVersion(ctx, field.Selections, res)
+	return ec.marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚑcliᚋinngestᚋclientᚐActionVersion(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_createActionVersion(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1628,8 +1571,6 @@ func (ec *executionContext) fieldContext_Mutation_createActionVersion(ctx contex
 				return ec.fieldContext_ActionVersion_validFrom(ctx, field)
 			case "validTo":
 				return ec.fieldContext_ActionVersion_validTo(ctx, field)
-			case "runtime":
-				return ec.fieldContext_ActionVersion_runtime(ctx, field)
 			case "config":
 				return ec.fieldContext_ActionVersion_config(ctx, field)
 			}
@@ -1673,9 +1614,9 @@ func (ec *executionContext) _Mutation_updateActionVersion(ctx context.Context, f
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*models.ActionVersion)
+	res := resTmp.(*client.ActionVersion)
 	fc.Result = res
-	return ec.marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚑcliᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐActionVersion(ctx, field.Selections, res)
+	return ec.marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚑcliᚋinngestᚋclientᚐActionVersion(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_updateActionVersion(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1700,8 +1641,6 @@ func (ec *executionContext) fieldContext_Mutation_updateActionVersion(ctx contex
 				return ec.fieldContext_ActionVersion_validFrom(ctx, field)
 			case "validTo":
 				return ec.fieldContext_ActionVersion_validTo(ctx, field)
-			case "runtime":
-				return ec.fieldContext_ActionVersion_runtime(ctx, field)
 			case "config":
 				return ec.fieldContext_ActionVersion_config(ctx, field)
 			}
@@ -1790,9 +1729,9 @@ func (ec *executionContext) _Query_actionVersion(ctx context.Context, field grap
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*models.ActionVersion)
+	res := resTmp.(*client.ActionVersion)
 	fc.Result = res
-	return ec.marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚑcliᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐActionVersion(ctx, field.Selections, res)
+	return ec.marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚑcliᚋinngestᚋclientᚐActionVersion(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_actionVersion(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1817,8 +1756,6 @@ func (ec *executionContext) fieldContext_Query_actionVersion(ctx context.Context
 				return ec.fieldContext_ActionVersion_validFrom(ctx, field)
 			case "validTo":
 				return ec.fieldContext_ActionVersion_validTo(ctx, field)
-			case "runtime":
-				return ec.fieldContext_ActionVersion_runtime(ctx, field)
 			case "config":
 				return ec.fieldContext_ActionVersion_config(ctx, field)
 			}
@@ -3831,7 +3768,7 @@ func (ec *executionContext) unmarshalInputDeployFunctionInput(ctx context.Contex
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("env"))
-			it.Env, err = ec.unmarshalOEnvironment2ᚖstring(ctx, v)
+			it.Env, err = ec.unmarshalOEnvironment2ᚖgithubᚗcomᚋinngestᚋinngestᚑcliᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEnvironment(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -3919,7 +3856,7 @@ func (ec *executionContext) unmarshalInputUpdateActionVersionInput(ctx context.C
 
 var actionVersionImplementors = []string{"ActionVersion"}
 
-func (ec *executionContext) _ActionVersion(ctx context.Context, sel ast.SelectionSet, obj *models.ActionVersion) graphql.Marshaler {
+func (ec *executionContext) _ActionVersion(ctx context.Context, sel ast.SelectionSet, obj *client.ActionVersion) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, actionVersionImplementors)
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
@@ -3970,13 +3907,6 @@ func (ec *executionContext) _ActionVersion(ctx context.Context, sel ast.Selectio
 
 			out.Values[i] = ec._ActionVersion_validTo(ctx, field, obj)
 
-		case "runtime":
-
-			out.Values[i] = ec._ActionVersion_runtime(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		case "config":
 
 			out.Values[i] = ec._ActionVersion_config(ctx, field, obj)
@@ -4114,34 +4044,21 @@ func (ec *executionContext) _FunctionVersion(ctx context.Context, sel ast.Select
 			out.Values[i] = ec._FunctionVersion_functionId(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
+				invalids++
 			}
 		case "version":
-			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._FunctionVersion_version(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
+			out.Values[i] = ec._FunctionVersion_version(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
 			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
-
-			})
 		case "config":
 
 			out.Values[i] = ec._FunctionVersion_config(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
+				invalids++
 			}
 		case "validFrom":
 
@@ -4156,14 +4073,14 @@ func (ec *executionContext) _FunctionVersion(ctx context.Context, sel ast.Select
 			out.Values[i] = ec._FunctionVersion_createdAt(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
+				invalids++
 			}
 		case "updatedAt":
 
 			out.Values[i] = ec._FunctionVersion_updatedAt(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
+				invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -4684,13 +4601,13 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 	return res
 }
 
-func (ec *executionContext) unmarshalNRuntime2string(ctx context.Context, v interface{}) (string, error) {
-	res, err := graphql.UnmarshalString(v)
+func (ec *executionContext) unmarshalNInt2uint(ctx context.Context, v interface{}) (uint, error) {
+	res, err := graphql.UnmarshalUint(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNRuntime2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
-	res := graphql.MarshalString(v)
+func (ec *executionContext) marshalNInt2uint(ctx context.Context, sel ast.SelectionSet, v uint) graphql.Marshaler {
+	res := graphql.MarshalUint(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -4721,6 +4638,27 @@ func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v in
 
 func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel ast.SelectionSet, v time.Time) graphql.Marshaler {
 	res := graphql.MarshalTime(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNTime2ᚖtimeᚐTime(ctx context.Context, v interface{}) (*time.Time, error) {
+	res, err := graphql.UnmarshalTime(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNTime2ᚖtimeᚐTime(ctx context.Context, sel ast.SelectionSet, v *time.Time) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	res := graphql.MarshalTime(*v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -4987,7 +4925,7 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
-func (ec *executionContext) marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚑcliᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐActionVersion(ctx context.Context, sel ast.SelectionSet, v *models.ActionVersion) graphql.Marshaler {
+func (ec *executionContext) marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚑcliᚋinngestᚋclientᚐActionVersion(ctx context.Context, sel ast.SelectionSet, v *client.ActionVersion) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -5027,19 +4965,20 @@ func (ec *executionContext) marshalOConfig2ᚖgithubᚗcomᚋinngestᚋinngest�
 	return ec._Config(ctx, sel, v)
 }
 
-func (ec *executionContext) unmarshalOEnvironment2ᚖstring(ctx context.Context, v interface{}) (*string, error) {
+func (ec *executionContext) unmarshalOEnvironment2ᚖgithubᚗcomᚋinngestᚋinngestᚑcliᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEnvironment(ctx context.Context, v interface{}) (*models.Environment, error) {
 	if v == nil {
 		return nil, nil
 	}
-	res, err := graphql.UnmarshalString(v)
+	tmp, err := graphql.UnmarshalString(v)
+	res := models.Environment(tmp)
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOEnvironment2ᚖstring(ctx context.Context, sel ast.SelectionSet, v *string) graphql.Marshaler {
+func (ec *executionContext) marshalOEnvironment2ᚖgithubᚗcomᚋinngestᚋinngestᚑcliᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEnvironment(ctx context.Context, sel ast.SelectionSet, v *models.Environment) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	res := graphql.MarshalString(*v)
+	res := graphql.MarshalString(string(*v))
 	return res
 }
 

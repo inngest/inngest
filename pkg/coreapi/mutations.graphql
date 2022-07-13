@@ -15,20 +15,10 @@ input DeployFunctionInput {
   live: Boolean
 }
 
-type FunctionVersion {
-  functionId: ID!
-  version: Int!
-  config: String!
-
-  validFrom: Time
-  validTo: Time
-  createdAt: Time!
-  updatedAt: Time!
-}
-
 input CreateActionVersionInput {
   config: String!
 }
+
 input UpdateActionVersionInput {
   dsn: String!
   versionMajor: Int!
