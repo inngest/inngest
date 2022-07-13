@@ -7,7 +7,15 @@ import (
 	"github.com/inngest/inngest-cli/pkg/function"
 )
 
-func (r *mutationResolver) DeployFunction(ctx context.Context, input models.DeployFunctionInput) (*models.FunctionVersion, error) {
+type functionVersionResolver struct{ *Resolver }
+
+// Convert uint to int
+func (r *functionVersionResolver) Version(ctx context.Context, obj *function.FunctionVersion) (int, error) {
+	return int(obj.Version), nil
+}
+
+// Deploy a function creating a new function version
+func (r *mutationResolver) DeployFunction(ctx context.Context, input models.DeployFunctionInput) (*function.FunctionVersion, error) {
 	// Parse function CUE or JSON string
 	f, err := function.Unmarshal(ctx, []byte(input.Config), "")
 	if err != nil {
@@ -25,13 +33,6 @@ func (r *mutationResolver) DeployFunction(ctx context.Context, input models.Depl
 		return nil, err
 	}
 
-	return &models.FunctionVersion{
-		FunctionID: fv.FunctionID,
-		Version:    int(fv.Version),
-		Config:     string(config),
-		ValidFrom:  &fv.ValidFrom,
-		ValidTo:    &fv.ValidTo,
-		CreatedAt:  fv.CreatedAt,
-		UpdatedAt:  fv.UpdatedAt,
-	}, nil
+	fv.Config = string(config)
+	return &fv, nil
 }
