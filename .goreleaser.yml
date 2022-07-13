@@ -52,7 +52,7 @@ docker_manifests:
     image_templates:
       - inngest/inngest:{{ .Tag }}-amd64
       - inngest/inngest:{{ .Tag }}-arm64v8
-  - name_template: inngest/inngest:{{ .Major }}
+  - name_template: inngest/inngest:v{{ .Major }}
     image_templates:
       - inngest/inngest:v{{ .Major }}-amd64
       - inngest/inngest:v{{ .Major }}-arm64v8
