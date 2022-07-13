@@ -73,6 +73,7 @@ func (s *svc) Pre(ctx context.Context) error {
 		}
 	}
 
+	logger.From(ctx).Info().Str("backend", s.config.Queue.Service.Backend).Msg("starting event stream")
 	s.pubsub, err = pubsub.NewPublishSubscriber(ctx, s.config.EventStream.Service)
 	if err != nil {
 		return err
@@ -83,6 +84,7 @@ func (s *svc) Pre(ctx context.Context) error {
 		return err
 	}
 
+	logger.From(ctx).Info().Str("backend", s.config.Queue.Service.Backend).Msg("starting queue")
 	s.queue, err = s.config.Queue.Service.Concrete.Queue()
 	if err != nil {
 		return err

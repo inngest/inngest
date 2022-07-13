@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -68,7 +69,8 @@ func SendTrigger(ctx context.Context, td *TestData) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("invalid status code sending event: %d", resp.StatusCode)
+		byt, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("invalid status code sending event: %d\nResponse: %s", resp.StatusCode, string(byt))
 	}
 	return nil
 }

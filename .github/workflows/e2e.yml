@@ -20,5 +20,4 @@ jobs:
           go build -o ./inngest-bin ./cmd/main.go
           mv ./inngest-bin /usr/local/bin/inngest
       - name: Run E2E tests
-        run: |
-          go test ./tests -v -tags integration
+        run: make e2e

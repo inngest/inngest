@@ -6,74 +6,64 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"testing"
 
-	"github.com/hashicorp/go-multierror"
-	"golang.org/x/sync/errgroup"
+	"github.com/stretchr/testify/require"
 )
 
+// Invoke via: gp run ./*.go -test.v
 func main() {
-	// 1. Read configs
-	// 2. For each config, set up the service
-	// 3. For each function, set up the function
-	// 4. Run the function, assert output.
 	ctx := context.Background()
-	if err := do(ctx); err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
+	do(ctx)
 }
 
-func do(ctx context.Context) error {
+func do(ctx context.Context) {
+	testing.Init()
+
 	cfgs, err := parseConfigs(ctx)
 	if err != nil {
-		return err
+		panic(err.Error())
 	}
 
 	fns, err := parseFns(ctx)
 	if err != nil {
-		return err
+		panic(err.Error())
 	}
 
-	var errs error
+	tests := []testing.InternalTest{}
 
 	for _, cfg := range cfgs {
-		fmt.Println("\n**Running", filepath.Base(cfg.dir)+"**\n")
-		cmdCtx, done := context.WithCancel(ctx)
-		if err := cfg.Up(cmdCtx); err != nil {
-			done()
-			errs = multierror.Append(
-				errs,
-				fmt.Errorf("%s failed: %w", filepath.Base(cfg.dir), err),
-			)
-			continue
-		}
-
+		copiedCfg := *cfg
 		// Run each test.
-		eg := &errgroup.Group{}
 		for _, item := range fns {
-			fn := item
-			eg.Go(func() error {
-				return fn.Test(ctx, *cfg)
+			copiedFn := *item
+			fn := &copiedFn
+
+			// Create a new test for each cfg/fn pair
+			tests = append(tests, testing.InternalTest{
+				Name: fmt.Sprintf("%s/%s", filepath.Base(copiedCfg.dir), filepath.Base(fn.dir)),
+				F: func(t *testing.T) {
+					fmt.Println("")
+					cmdCtx, done := context.WithCancel(ctx)
+					defer done()
+
+					// TODO: Instead of exec-ing the service, run the services locally
+					// then profile.
+					err := copiedCfg.Up(cmdCtx)
+					require.NoError(t, err)
+
+					err = fn.Test(ctx, copiedCfg)
+					fmt.Println("")
+					require.NoError(t, err, "Output:\n%s", copiedCfg.out.String())
+				},
 			})
+
 		}
-
-		if err := eg.Wait(); err != nil {
-			done()
-			errs = multierror.Append(
-				errs,
-				fmt.Errorf("%s failed: %w", filepath.Base(cfg.dir), err),
-			)
-
-			// Carry on for the next config test.
-			continue
-		}
-		fmt.Println("\n**Finished", filepath.Base(cfg.dir)+"**\n")
-
-		done()
-		_ = cfg.Wait()
 	}
 
-	return errs
+	t := &TestDeps{}
+	m := testing.MainStart(t, tests, nil, nil, nil)
+	os.Exit(m.Run())
 }
 
 type cmdError struct {

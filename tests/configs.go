@@ -79,11 +79,17 @@ func (c *Config) Up(ctx context.Context) error {
 	_ = godotenv.Load(filepath.Join(c.dir, "env"))
 
 	// Run Inngest as an all-in-one server using this config.
-	c.out = &bytes.Buffer{}
+	buf := &bytes.Buffer{}
+
+	// This would allow us to stream output to stderr by changing inngest.Stderr to
+	// the multiwriter.
+	// w := io.MultiWriter(buf, os.Stderr)
+
+	c.out = buf
 	c.inngest = exec.CommandContext(ctx, "inngest", "serve", "-c", filepath.Join(c.dir, "config.cue"), "runner", "executor", "events-api")
 	c.inngest.Env = os.Environ()
-	c.inngest.Stderr = c.out
-	c.inngest.Stdout = c.out
+	c.inngest.Stderr = buf
+	c.inngest.Stdout = buf
 	if err := c.inngest.Start(); err != nil {
 		return err
 	}
