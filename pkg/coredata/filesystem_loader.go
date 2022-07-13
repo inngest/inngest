@@ -234,11 +234,10 @@ func NewInMemoryAPIFunctionLoader() *MemoryAPIFunctionLoader {
 	return loader
 }
 
-func (m *MemoryAPIFunctionLoader) CreateFunctionVersion(ctx context.Context, f function.Function, live bool) (function.FunctionVersion, error) {
+func (m *MemoryAPIFunctionLoader) CreateFunctionVersion(ctx context.Context, f function.Function, live bool, env string) (function.FunctionVersion, error) {
 	if err := f.Validate(ctx); err != nil {
 		return function.FunctionVersion{}, err
 	}
-
 	now := time.Now()
 	fv := function.FunctionVersion{
 		FunctionID: f.ID,

@@ -388,11 +388,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "../mutations.graphql", Input: `scalar Time
-scalar Environment
-scalar Runtime
-
-type Mutation {
+	{Name: "../mutations.graphql", Input: `type Mutation {
   deployFunction(input: DeployFunctionInput!): FunctionVersion
 
   createActionVersion(input: CreateActionVersionInput!): ActionVersion
@@ -427,7 +423,13 @@ input ActionVersionQuery {
   versionMinor: Int
 }
 `, BuiltIn: false},
-	{Name: "../schema.graphql", Input: `type Config {
+	{Name: "../schema.graphql", Input: `scalar Time
+"""
+The environment for the function to be run: ` + "`" + `"prod"` + "`" + ` or ` + "`" + `"test"` + "`" + `
+"""
+scalar Environment
+
+type Config {
   execution: ExecutionConfig
 }
 

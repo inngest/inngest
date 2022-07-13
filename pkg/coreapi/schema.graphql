@@ -1,3 +1,9 @@
+scalar Time
+"""
+The environment for the function to be run: `"prod"` or `"test"`
+"""
+scalar Environment
+
 type Config {
   execution: ExecutionConfig
 }
