@@ -23,6 +23,8 @@ func main() {
 		panic(fmt.Sprintf("error building images: %s", err))
 	}
 
+	fmt.Println("")
+	fmt.Println("")
 	do(ctx)
 }
 
@@ -68,7 +70,6 @@ func build(ctx context.Context) error {
 		})
 	}
 
-	fmt.Println("")
 	return eg.Wait()
 }
 

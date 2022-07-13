@@ -117,6 +117,7 @@ func RequireOutput(output string) Proc {
 
 func RequireNoOutput(output string) Proc {
 	return func(ctx context.Context, td *TestData) error {
+		fmt.Printf("> Checking for no output containing: %s\n", output)
 		if err := requireOutput(ctx, td, output); err == nil {
 			return fmt.Errorf("output found: %s", output)
 		}
