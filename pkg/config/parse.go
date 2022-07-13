@@ -68,6 +68,10 @@ func loadAll(ctx context.Context, locs ...string) (*Config, error) {
 		}
 	}
 
+	if os.Getenv("INNGEST_CONFIG") != "" {
+		return Parse([]byte(os.Getenv("INNGEST_CONFIG")))
+	}
+
 	logger.From(ctx).Warn().Msg("no config file found in search paths, using default")
 
 	// Return the default config.

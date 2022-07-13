@@ -15,6 +15,9 @@ package config
 		// maxSize represents the maximum size of events read by the
 		// event API.  Any events over this size limit will be rejected
 		// with an HTTP 413 (Request Entity Too Large).
+		//
+		// NOTE: Some event stream implementations have their own limits
+		// (eg. SQS is 256kb).
 		maxSize: >=1024 | *(512 * 1024)
 	}
 
