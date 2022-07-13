@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
+	"github.com/inngest/inngest-cli/pkg/logger"
 	"github.com/rs/zerolog"
 )
 
@@ -293,6 +294,15 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 }
 
 func (e *executor) executeAction(ctx context.Context, id state.Identifier, action *inngest.Step, s state.State, attempt int) (*state.DriverResponse, error) {
+	var l *zerolog.Logger
+	if e.log != nil {
+		log := e.log.With().
+			Str("run_id", id.RunID.String()).
+			Str("step", action.ID).
+			Logger()
+		l = &log
+	}
+
 	definition, err := e.al.Action(ctx, action.DSN, action.Version)
 	if err != nil {
 		return nil, fmt.Errorf("error loading action: %w", err)
@@ -306,13 +316,11 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, definition.Runtime.RuntimeType())
 	}
 
-	if e.log != nil {
-		e.log.Info().
-			Str("dsn", definition.DSN).
+	if l != nil {
+		l.Info().
 			Interface("version", definition.Version).
 			Interface("scopes", definition.Scopes).
-			Str("run_id", id.RunID.String()).
-			Str("step", action.ID).
+			Str("dsn", definition.DSN).
 			Msg("executing action")
 	}
 
@@ -352,7 +360,14 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		response.SetFinal()
 	}
 
+	if l != nil {
+		logger.From(ctx).Trace().Msg("saving response to state")
+	}
+
 	if _, serr := e.sm.SaveResponse(ctx, id, *response, attempt); serr != nil {
+		if l != nil {
+			logger.From(ctx).Error().Err(err).Msg("unable to save state")
+		}
 		err = multierror.Append(err, serr)
 	}
 

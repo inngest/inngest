@@ -34,20 +34,17 @@ func Do(ctx context.Context) testdsl.Chain {
 		}, 5*time.Millisecond),
 		testdsl.RequireLogFieldsWithin(map[string]any{
 			"caller":  "executor",
-			"message": "received step via sqs",
-		}, 5*time.Millisecond),
-		testdsl.RequireLogFieldsWithin(map[string]any{
-			"caller":  "executor",
 			"step":    "basic-step-1",
 			"message": "executing step",
-		}, 5*time.Millisecond),
+		}, time.Second),
 		testdsl.RequireLogFieldsWithin(map[string]any{
 			"caller": "output",
-			"response": map[string]any{
+			"output": map[string]any{
 				"body":   "basic/single-step",
 				"status": 200,
 			},
 			"message": "step output",
-		}, 5*time.Millisecond),
+		}, time.Second),
+		testdsl.RequireNoOutput(`"error"`),
 	}
 }
