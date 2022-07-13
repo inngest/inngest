@@ -30,6 +30,13 @@ dockers:
     image_templates:
     - "inngest/inngest:latest-amd64"
     - "inngest/inngest:{{ .Tag }}-amd64"
+   build_flag_templates:
+    - "--pull"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.title={{.ProjectName}}"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+    - "--platform=linux/arm64"
   - id: inngest-arm64
     goos: linux
     goarch: arm64
@@ -39,6 +46,13 @@ dockers:
     image_templates:
     - "inngest/inngest:latest-arm64v8"
     - "inngest/inngest:{{ .Tag }}-arm64v8"
+   build_flag_templates:
+    - "--pull"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.title={{.ProjectName}}"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+    - "--platform=linux/amd64"
 docker_manifests:
   - name_template: inngest/inngest:latest
     image_templates:
