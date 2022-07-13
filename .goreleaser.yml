@@ -44,23 +44,22 @@ dockers:
     - "inngest/inngest:v{{ .Major }}-arm64v8"
     - "inngest/inngest:v{{ .Major }}.{{ .Minor }}-arm64v8"
 docker_manifests:
-  # https://goreleaser.com/customization/docker_manifest/
-  - name_template: inngest/inngest:{{ .Tag }}
-    image_templates:
-      - inngest/inngest:{{ .Version }}-amd64
-      - inngest/inngest:{{ .Version }}-arm64v8
-  - name_template: inngest/inngest:{{ .Major }}
-    image_templates:
-      - inngest/inngest:{{ .Version }}-amd64
-      - inngest/inngest:{{ .Version }}-arm64v8
-  - name_template: inngest/inngest:{{ .Major }}.{{ .Minor }}
-    image_templates:
-      - inngest/inngest:{{ .Version }}-amd64
-      - inngest/inngest:{{ .Version }}-arm64v8
   - name_template: inngest/inngest:latest
     image_templates:
       - inngest/inngest:latest-amd64
       - inngest/inngest:latest-arm64v8
+  - name_template: inngest/inngest:{{ .Tag }}
+    image_templates:
+      - inngest/inngest:{{ .Tag }}-amd64
+      - inngest/inngest:{{ .Tag }}-arm64v8
+  - name_template: inngest/inngest:{{ .Major }}
+    image_templates:
+      - inngest/inngest:v{{ .Major }}-amd64
+      - inngest/inngest:v{{ .Major }}-arm64v8
+  - name_template: inngest/inngest:v{{ .Major }}.{{ .Minor }}
+    image_templates:
+      - inngest/inngest:v{{ .Version }}.{{ Minor }}-amd64
+      - inngest/inngest:v{{ .Version }}.{{ Minor }}-arm64v8
 
 archives:
   - replacements:
