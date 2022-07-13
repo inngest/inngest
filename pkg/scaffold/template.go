@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -56,11 +57,14 @@ func (t Template) TemplatedPostSetup(f function.Function) string {
 
 // Render renders the template and all files into the folder specified by function.
 func (t Template) Render(f function.Function, step function.Step) error {
+	// TODO: Add context.
+	ctx := context.Background()
+
 	dirname := f.Slug()
 	relative := "./" + dirname
 	root, _ := filepath.Abs(relative)
 
-	stepDir, err := function.PathName(step.Path)
+	stepDir, err := function.PathName(ctx, step.Path)
 	if err != nil {
 		return err
 	}
@@ -102,7 +106,7 @@ func (t Template) Render(f function.Function, step function.Step) error {
 					if t.Definition == nil {
 						continue
 					}
-					ts, err := t.Definition.Typescript()
+					ts, err := t.Definition.Typescript(ctx)
 					if err != nil {
 						continue
 					}
@@ -206,7 +210,7 @@ func (t Template) Render(f function.Function, step function.Step) error {
 			}
 		}
 
-		cue, err := trigger.Definition.Cue()
+		cue, err := trigger.Definition.Cue(ctx)
 		if err != nil {
 			// XXX: We would like to log this as a warning.
 			continue

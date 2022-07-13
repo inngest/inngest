@@ -26,6 +26,7 @@ require (
 	github.com/inngest/event-schemas v0.0.0-20220323133008-96be406e1ea4
 	github.com/inngest/inngestgo v0.4.0
 	github.com/jedib0t/go-pretty/v6 v6.3.0
+	github.com/joho/godotenv v1.3.0
 	github.com/lnquy/cron v1.1.1
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mitchellh/go-homedir v1.1.0

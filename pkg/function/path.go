@@ -1,7 +1,9 @@
 package function
 
 import (
+	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -16,9 +18,13 @@ var (
 )
 
 // PathName returns the path as defined with the "file://" prefix removed.
-func PathName(path string) (string, error) {
+func PathName(ctx context.Context, path string) (string, error) {
+	var prefix string
+	if ctx.Value(pathCtxKey) != nil {
+		prefix = ctx.Value(pathCtxKey).(string)
+	}
 	if !strings.HasPrefix(path, FilePrefix) {
 		return "", ErrNoPath
 	}
-	return strings.Replace(path, FilePrefix, "", 1), nil
+	return filepath.Join(prefix, strings.Replace(path, FilePrefix, "", 1)), nil
 }

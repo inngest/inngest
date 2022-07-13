@@ -67,6 +67,7 @@ func (s *svc) Pre(ctx context.Context) error {
 		return err
 	}
 
+	logger.From(ctx).Info().Str("backend", s.config.Queue.Service.Backend).Msg("starting queue")
 	s.queue, err = s.config.Queue.Service.Concrete.Queue()
 	if err != nil {
 		return err
@@ -101,7 +102,6 @@ func (s *svc) Pre(ctx context.Context) error {
 func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
 	return s.queue.Run(ctx, func(ctx context.Context, item queue.Item) error {
-
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()

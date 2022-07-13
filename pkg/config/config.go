@@ -15,7 +15,7 @@ func Load(ctx context.Context, locs ...string) (*Config, error) {
 }
 
 func Default(ctx context.Context) (*Config, error) {
-	return parse(nil)
+	return Parse(nil)
 }
 
 // Config represents configuration for running the Inngest services.

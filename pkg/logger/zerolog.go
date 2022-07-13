@@ -13,6 +13,20 @@ const (
 	DefaultLevel = zerolog.DebugLevel
 )
 
+var (
+	logLevel, logFormat string
+)
+
+// SetLevel sets the default log level.
+func SetLevel(to string) {
+	logLevel = to
+}
+
+// SetLogLevel sets the default log level.
+func SetFormat(to string) {
+	logFormat = to
+}
+
 type loggerKey struct{}
 
 // With sets a logger in the context for future use.  This allows functions
@@ -42,7 +56,7 @@ func From(ctx context.Context) *zerolog.Logger {
 func New(lvl zerolog.Level) *zerolog.Logger {
 	l := zerolog.New(os.Stderr).Level(lvl).With().Timestamp().Logger()
 
-	if !viper.GetBool("json") {
+	if !viper.GetBool("json") && logFormat != "json" {
 		l = l.Output(zerolog.ConsoleWriter{
 			Out: os.Stderr,
 		})
@@ -53,10 +67,10 @@ func New(lvl zerolog.Level) *zerolog.Logger {
 
 // Default returns a new logger with no context, set to the default level.
 func Default() *zerolog.Logger {
-	if os.Getenv("LOG_LEVEL") == "" {
+	if logLevel == "" {
 		return New(DefaultLevel)
 	}
-	lvl, err := zerolog.ParseLevel(os.Getenv("LOG_LEVEL"))
+	lvl, err := zerolog.ParseLevel(logLevel)
 	if err != nil {
 		panic(err)
 	}
@@ -66,7 +80,7 @@ func Default() *zerolog.Logger {
 func Buffered(buf io.Writer) *zerolog.Logger {
 	l := zerolog.New(buf).Level(DefaultLevel).With().Timestamp().Logger()
 
-	if !viper.GetBool("json") {
+	if !viper.GetBool("json") && logFormat != "json" {
 		l = l.Output(zerolog.ConsoleWriter{
 			Out:         buf,
 			FormatLevel: func(i interface{}) string { return "" },

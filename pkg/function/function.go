@@ -18,6 +18,12 @@ import (
 	"github.com/inngest/inngest-cli/pkg/expressions"
 )
 
+var (
+	// pathCtxKey stores the function path within context,
+	// necessary for validation.
+	pathCtxKey = struct{}{}
+)
+
 const (
 	DefaultStepName = "step-1"
 )
@@ -113,6 +119,9 @@ func (f Function) Slug() string {
 
 // Validate returns an error if the function definition is invalid.
 func (f Function) Validate(ctx context.Context) error {
+	// Store the fn path in context for validating triggers.
+	ctx = context.WithValue(ctx, pathCtxKey, f.dir)
+
 	var err error
 	if f.ID == "" {
 		err = multierror.Append(err, fmt.Errorf("A function ID is required"))
@@ -315,6 +324,12 @@ func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, er
 }
 
 func (f *Function) canonicalize(ctx context.Context, path string) error {
+	f.dir = path
+	// dir should point to the dir, not the file.
+	if strings.HasSuffix(path, "inngest.json") || strings.HasSuffix(path, "inngest.cue") {
+		f.dir = filepath.Dir(path)
+	}
+
 	if f.Idempotency != nil {
 		// Replace the throttle field with idempotency.
 		f.Throttle = &inngest.Throttle{
@@ -342,17 +357,6 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 					Step: inngest.TriggerName,
 				},
 			},
-		}
-	}
-
-	// Ensure any relative file:// paths are absolute
-	dir := filepath.Dir(path)
-	for _, trigger := range f.Triggers {
-		if trigger.EventTrigger != nil && trigger.EventTrigger.Definition != nil {
-			if strings.HasPrefix(trigger.EventTrigger.Definition.Def, FilePrefix) {
-				abs := strings.Replace(trigger.EventTrigger.Definition.Def, FilePrefix+".", "file://"+dir, 1)
-				trigger.EventTrigger.Definition.Def = abs
-			}
 		}
 	}
 
