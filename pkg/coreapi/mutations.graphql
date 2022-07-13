@@ -1,7 +1,3 @@
-scalar Time
-scalar Environment
-scalar Runtime
-
 type Mutation {
   deployFunction(input: DeployFunctionInput!): FunctionVersion
 

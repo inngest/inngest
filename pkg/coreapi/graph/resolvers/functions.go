@@ -15,7 +15,7 @@ func (r *mutationResolver) DeployFunction(ctx context.Context, input models.Depl
 		return nil, err
 	}
 
-	fv, err := r.APILoader.CreateFunctionVersion(ctx, *f, *input.Live)
+	fv, err := r.APILoader.CreateFunctionVersion(ctx, *f, *input.Live, input.Env.String())
 	if err != nil {
 		return nil, err
 	}

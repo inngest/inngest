@@ -39,7 +39,7 @@ type APIFunctionLoader interface {
 	// Embed the read methods of the ExecutionFunctionLoader
 	ExecutionFunctionLoader
 	// Create a new function
-	CreateFunctionVersion(ctx context.Context, f function.Function, live bool) (function.FunctionVersion, error)
+	CreateFunctionVersion(ctx context.Context, f function.Function, live bool, env string) (function.FunctionVersion, error)
 }
 type APIActionLoader interface {
 	// Embed the read methods of the ExecutionActionLoader
