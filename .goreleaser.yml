@@ -36,7 +36,7 @@ dockers:
     - "--label=org.opencontainers.image.title={{.ProjectName}}"
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
     - "--label=org.opencontainers.image.version={{.Version}}"
-    - "--platform=linux/arm64"
+    - "--platform=linux/amd64"
   - id: inngest-arm64
     goos: linux
     goarch: arm64
@@ -52,7 +52,7 @@ dockers:
     - "--label=org.opencontainers.image.title={{.ProjectName}}"
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
     - "--label=org.opencontainers.image.version={{.Version}}"
-    - "--platform=linux/amd64"
+    - "--platform=linux/arm64"
 docker_manifests:
   - name_template: inngest/inngest:latest
     image_templates:
