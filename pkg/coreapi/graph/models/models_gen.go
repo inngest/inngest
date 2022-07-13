@@ -2,22 +2,6 @@
 
 package models
 
-import (
-	"time"
-)
-
-type ActionVersion struct {
-	Dsn          string     `json:"dsn"`
-	Name         string     `json:"name"`
-	VersionMajor int        `json:"versionMajor"`
-	VersionMinor int        `json:"versionMinor"`
-	CreatedAt    time.Time  `json:"createdAt"`
-	ValidFrom    *time.Time `json:"validFrom"`
-	ValidTo      *time.Time `json:"validTo"`
-	Runtime      string     `json:"runtime"`
-	Config       string     `json:"config"`
-}
-
 type ActionVersionQuery struct {
 	Dsn          string `json:"dsn"`
 	VersionMajor *int   `json:"versionMajor"`
@@ -33,9 +17,9 @@ type CreateActionVersionInput struct {
 }
 
 type DeployFunctionInput struct {
-	Env    *string `json:"env"`
-	Config string  `json:"config"`
-	Live   *bool   `json:"live"`
+	Env    *Environment `json:"env"`
+	Config string       `json:"config"`
+	Live   *bool        `json:"live"`
 }
 
 type ExecutionConfig struct {

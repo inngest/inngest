@@ -7,13 +7,6 @@ import (
 	"github.com/inngest/inngest-cli/pkg/function"
 )
 
-type functionVersionResolver struct{ *Resolver }
-
-// Convert uint to int
-func (r *functionVersionResolver) Version(ctx context.Context, obj *function.FunctionVersion) (int, error) {
-	return int(obj.Version), nil
-}
-
 // Deploy a function creating a new function version
 func (r *mutationResolver) DeployFunction(ctx context.Context, input models.DeployFunctionInput) (*function.FunctionVersion, error) {
 	// Parse function CUE or JSON string

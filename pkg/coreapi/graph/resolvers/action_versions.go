@@ -9,20 +9,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/coreapi/graph/models"
 )
 
-func internalToGraphQLModel(av client.ActionVersion) *models.ActionVersion {
-	return &models.ActionVersion{
-		Dsn:          av.DSN,
-		Name:         av.Name,
-		VersionMajor: int(av.Version.Major),
-		VersionMinor: int(av.Version.Minor),
-		Config:       av.Config,
-		ValidFrom:    av.ValidFrom,
-		ValidTo:      av.ValidTo,
-		// TODO - Add missing fields to client model
-	}
-}
-
-func (r *queryResolver) ActionVersion(ctx context.Context, query models.ActionVersionQuery) (*models.ActionVersion, error) {
+func (r *queryResolver) ActionVersion(ctx context.Context, query models.ActionVersionQuery) (*client.ActionVersion, error) {
 	vc := &inngest.VersionConstraint{}
 	if query.VersionMajor != nil {
 		major := uint(*query.VersionMajor)
@@ -36,10 +23,10 @@ func (r *queryResolver) ActionVersion(ctx context.Context, query models.ActionVe
 	if err != nil {
 		return nil, err
 	}
-	return internalToGraphQLModel(av), nil
+	return &av, nil
 }
 
-func (r *mutationResolver) CreateActionVersion(ctx context.Context, input models.CreateActionVersionInput) (*models.ActionVersion, error) {
+func (r *mutationResolver) CreateActionVersion(ctx context.Context, input models.CreateActionVersionInput) (*client.ActionVersion, error) {
 	// TODO - Do we need additional validation beyond parsing the cue string?
 	parsed, err := cuedefs.ParseAction(input.Config)
 	if err != nil {
@@ -49,10 +36,10 @@ func (r *mutationResolver) CreateActionVersion(ctx context.Context, input models
 	if err != nil {
 		return nil, err
 	}
-	return internalToGraphQLModel(created), nil
+	return &created, nil
 }
 
-func (r *mutationResolver) UpdateActionVersion(ctx context.Context, input models.UpdateActionVersionInput) (*models.ActionVersion, error) {
+func (r *mutationResolver) UpdateActionVersion(ctx context.Context, input models.UpdateActionVersionInput) (*client.ActionVersion, error) {
 	version := inngest.VersionInfo{
 		Major: uint(input.VersionMajor),
 		Minor: uint(input.VersionMinor),
@@ -61,5 +48,5 @@ func (r *mutationResolver) UpdateActionVersion(ctx context.Context, input models
 	if err != nil {
 		return nil, err
 	}
-	return internalToGraphQLModel(updated), nil
+	return &updated, nil
 }

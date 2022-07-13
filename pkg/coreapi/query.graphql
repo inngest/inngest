@@ -1,0 +1,10 @@
+type Query {
+  config: Config
+  actionVersion(query: ActionVersionQuery!): ActionVersion
+}
+
+input ActionVersionQuery {
+  dsn: String!
+  versionMajor: Int
+  versionMinor: Int
+}

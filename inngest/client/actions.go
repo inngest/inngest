@@ -29,7 +29,15 @@ type ActionVersion struct {
 	Config      string
 	ValidFrom   *time.Time
 	ValidTo     *time.Time
+	CreatedAt   *time.Time
 	ImageSha256 *string
+}
+
+func (av ActionVersion) VersionMajor() (uint, error) {
+	return av.Version.Major, nil
+}
+func (av ActionVersion) VersionMinor() (uint, error) {
+	return av.Version.Minor, nil
 }
 
 func (c httpClient) Action(ctx context.Context, dsn string, v *inngest.VersionInfo) (*ActionVersion, error) {
