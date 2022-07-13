@@ -30,7 +30,7 @@ dockers:
     image_templates:
     - "inngest/inngest:latest-amd64"
     - "inngest/inngest:{{ .Tag }}-amd64"
-   build_flag_templates:
+    build_flag_templates:
     - "--pull"
     - "--label=org.opencontainers.image.created={{.Date}}"
     - "--label=org.opencontainers.image.title={{.ProjectName}}"
@@ -46,7 +46,7 @@ dockers:
     image_templates:
     - "inngest/inngest:latest-arm64v8"
     - "inngest/inngest:{{ .Tag }}-arm64v8"
-   build_flag_templates:
+    build_flag_templates:
     - "--pull"
     - "--label=org.opencontainers.image.created={{.Date}}"
     - "--label=org.opencontainers.image.title={{.ProjectName}}"
