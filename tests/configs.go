@@ -69,7 +69,7 @@ func (c *Config) Validate(ctx context.Context) error {
 func (c *Config) Up(ctx context.Context) error {
 	// Run start.sh, to pre-up the config.
 	fmt.Println("> Running start.sh")
-	start := exec.Command("/bin/sh", "-c", fmt.Sprintf("cd %s && ./start.sh", c.dir))
+	start := exec.Command("/bin/bash", "-c", fmt.Sprintf("cd %s && ./start.sh", c.dir))
 	if out, err := start.CombinedOutput(); err != nil {
 		return cmdError{err: fmt.Errorf("error running start.sh: %w", err), out: out}
 	}

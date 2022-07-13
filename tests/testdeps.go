@@ -29,12 +29,11 @@ func (TestDeps) MatchString(pat, str string) (result bool, err error) {
 	return matchRe.MatchString(str), nil
 }
 
-func (TestDeps) StartCPUProfile(w io.Writer) error { return pprof.StartCPUProfile(w) }
-func (TestDeps) StopCPUProfile()                   { pprof.StopCPUProfile() }
-func (TestDeps) ImportPath() string                { return "" }
-
 //func (TestDeps) StartTestLog(io.Writer)                                     {}
 //func (TestDeps) StopTestLog() error                                         { return nil }
+func (TestDeps) StartCPUProfile(w io.Writer) error                          { return pprof.StartCPUProfile(w) }
+func (TestDeps) StopCPUProfile()                                            { pprof.StopCPUProfile() }
+func (TestDeps) ImportPath() string                                         { return "" }
 func (TestDeps) RunFuzzWorker(fn func(corpusEntry corpusEntry) error) error { return nil }
 func (TestDeps) ReadCorpus(string, []reflect.Type) ([]corpusEntry, error)   { return nil, nil }
 func (TestDeps) SetPanicOnExit0(bool)                                       {}
