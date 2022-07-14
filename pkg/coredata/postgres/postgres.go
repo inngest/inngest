@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	registration.RegisterDataStore(&Config{})
+	registration.RegisterDataStore(func() any { return &Config{} })
 }
 
 // Config registers the configuration for the PostgreSQL data store

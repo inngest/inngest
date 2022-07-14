@@ -24,10 +24,11 @@ func (s *DataStoreService) UnmarshalJSON(byt []byte) error {
 	}
 	s.Backend = data.Backend
 
-	iface, ok := registration.RegisteredDataStores()[s.Backend]
+	f, ok := registration.RegisteredDataStores()[s.Backend]
 	if !ok {
 		return fmt.Errorf("unknown datastore backend: %s", s.Backend)
 	}
+	iface := f()
 	if err := json.Unmarshal(byt, iface); err != nil {
 		return err
 	}
