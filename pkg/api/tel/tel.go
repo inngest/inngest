@@ -89,5 +89,8 @@ func Wait() {
 
 // Disabled returns whether telemetry is disabled.
 func Disabled() bool {
+	if version.Version == "dev" && version.Hash == "" {
+		return false
+	}
 	return os.Getenv("DO_NOT_TRACK") != ""
 }
