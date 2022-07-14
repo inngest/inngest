@@ -180,7 +180,7 @@ package config
 
 #Postgres: {
 	backend: "postgres"
-	URI:     string | *"postgres://localhost/test"
+	URI:     string | *"postgres://localhost:5432/postgres?sslmode=disable"
 }
 
 // Drivers handle execution of each step within a function.
