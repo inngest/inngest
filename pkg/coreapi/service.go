@@ -31,7 +31,7 @@ type svc struct {
 	config config.Config
 	api    *CoreAPI
 	// data provides the ability to write and load data
-	data coredata.APILoader
+	data coredata.ReadWriter
 }
 
 func (s *svc) Name() string {
@@ -39,9 +39,9 @@ func (s *svc) Name() string {
 }
 
 func (s *svc) Pre(ctx context.Context) (err error) {
-	// TODO - Connect to coredata database
-	if s.data == nil {
-		s.data = coredata.NewInMemoryAPILoader()
+	s.data, err = s.config.DataStore.Service.Concrete.ReadWriter(ctx)
+	if err != nil {
+		return err
 	}
 
 	// TODO - Configure API with correct ports, etc., set up routes

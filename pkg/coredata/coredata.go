@@ -8,6 +8,11 @@ import (
 	"github.com/inngest/inngest-cli/pkg/function"
 )
 
+type ReadWriter interface {
+	// TODO - Rename interfaces to Reader/Writer format and re-organize functions and embeds
+	APILoader
+}
+
 // ExecutionLoader is an interface which specifies all functions required to run
 // workers and executors.
 type ExecutionLoader interface {
@@ -31,19 +36,15 @@ type ExecutionActionLoader interface {
 }
 
 type APILoader interface {
-	APIFunctionLoader
+	APIFunctionWriter
 	APIActionLoader
 }
 
-type APIFunctionLoader interface {
-	// Embed the read methods of the ExecutionFunctionLoader
-	ExecutionFunctionLoader
+type APIFunctionWriter interface {
 	// Create a new function
 	CreateFunctionVersion(ctx context.Context, f function.Function, live bool, env string) (function.FunctionVersion, error)
 }
 type APIActionLoader interface {
-	// Embed the read methods of the ExecutionActionLoader
-	ExecutionActionLoader
 	// Find a given action by an exact version number
 	ActionVersion(ctx context.Context, dsn string, version *inngest.VersionConstraint) (client.ActionVersion, error)
 	// Create a a new action version
