@@ -11,6 +11,9 @@ cloud.google.com/go/iam
 ## explicit; go 1.15
 cloud.google.com/go/pubsub/apiv1
 cloud.google.com/go/pubsub/internal
+# contrib.go.opencensus.io/integrations/ocsql v0.1.7
+## explicit
+contrib.go.opencensus.io/integrations/ocsql
 # cuelang.org/go v0.4.2
 ## explicit; go 1.13
 cuelang.org/go/cue
@@ -653,6 +656,11 @@ github.com/klauspost/compress/huff0
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
+# github.com/lib/pq v1.10.4
+## explicit; go 1.13
+github.com/lib/pq
+github.com/lib/pq/oid
+github.com/lib/pq/scram
 # github.com/lnquy/cron v1.1.1
 ## explicit; go 1.11
 github.com/lnquy/cron
@@ -901,6 +909,7 @@ gocloud.dev/internal/oc
 gocloud.dev/internal/openurl
 gocloud.dev/internal/retry
 gocloud.dev/internal/useragent
+gocloud.dev/postgres
 gocloud.dev/pubsub
 gocloud.dev/pubsub/awssnssqs
 gocloud.dev/pubsub/batcher

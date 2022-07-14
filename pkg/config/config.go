@@ -35,6 +35,8 @@ type Config struct {
 	Queue Queue
 	// State configures the execution state store.
 	State State
+	// DataStore configures the persisted data for the system
+	DataStore DataStore
 }
 
 // Log configures the logger used within Inngest services.
@@ -76,6 +78,10 @@ type Queue struct {
 
 type State struct {
 	Service StateService
+}
+
+type DataStore struct {
+	Service DataStoreService
 }
 
 type Execution struct {
