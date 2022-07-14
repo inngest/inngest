@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/inngest/state"
 	"github.com/inngest/inngest-cli/internal/cuedefs"
@@ -346,6 +347,33 @@ func TestFunctionActions_single(t *testing.T) {
 	require.Equal(t, 1, len(edges))
 	require.Equal(t, inngest.TriggerName, edges[0].Outgoing)
 	require.Equal(t, "single", edges[0].Incoming)
+}
+
+func TestDeterministicUUID(t *testing.T) {
+	tests := []struct {
+		f Function
+		e uuid.UUID
+	}{
+		{
+			f: Function{
+				ID: "hello",
+			},
+			e: uuid.UUID{0x4d, 0x71, 0xd0, 0x3f, 0xf1, 0x9b, 0x5d, 0x9e, 0x85, 0x23, 0x96, 0x28, 0xba, 0x18, 0x6, 0x3c},
+		},
+		{
+			f: Function{
+				ID: "magic-whirl-8156df",
+			},
+			e: uuid.UUID{0x6d, 0x59, 0x9b, 0x84, 0xcf, 0x3a, 0x5c, 0x89, 0x9d, 0x12, 0xaf, 0xa8, 0xa, 0xf, 0x50, 0xc8},
+		},
+	}
+
+	for _, test := range tests {
+		out := DeterministicUUID(test.f)
+		out2 := DeterministicUUID(test.f)
+		require.Equal(t, test.e, out)
+		require.Equal(t, test.e, out2)
+	}
 }
 
 func strptr(s string) *string {
