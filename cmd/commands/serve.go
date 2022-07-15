@@ -21,7 +21,7 @@ import (
 const (
 	ServeExecutor = "executor"
 	ServeRunner   = "runner"
-	ServeEventAPI = "events-api"
+	ServeEventAPI = "event-api"
 	ServeCoreAPI  = "core-api"
 )
 
@@ -47,6 +47,15 @@ func NewCmdServe() *cobra.Command {
 
 func serve(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
+
+	if len(args) == 0 {
+		fmt.Println("\nYou must supply one of the following services to serve:")
+		for _, svc := range serveArgs {
+			fmt.Printf("\t%s\n", svc)
+		}
+		fmt.Println("")
+		os.Exit(1)
+	}
 
 	locs := []string{}
 	if serveConf != "" {

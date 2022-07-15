@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"testing"
 
 	"github.com/inngest/inngest-cli/pkg/config/registration"
@@ -8,6 +9,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/queue/inmemoryqueue"
 	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
+	"github.com/inngest/inngest-cli/pkg/execution/state/redis_state"
 	"github.com/stretchr/testify/require"
 )
 
@@ -142,10 +144,53 @@ config.#Config & {
 				}, nats)
 			},
 		},
+		{
+			name: "redis state config, with env vars",
+			input: []byte(`package main
+
+import (
+	config "inngest.com/defs/config"
+)
+
+config.#Config & {
+  state: {
+    service: {
+      backend: "redis"
+      host: "${TEST_ENV}"
+    }
+  }
+}
+`),
+			config: func() *Config {
+				c := defaultConfig()
+				// Valid JSON
+				c.State.Service.Backend = "redis"
+				c.State.Service.Concrete = &redis_state.Config{
+					Host:      "test-env",
+					Port:      6379,
+					KeyPrefix: "inngest:state",
+				}
+				return c
+			},
+
+			post: func(t *testing.T, c *Config) {
+				redis, ok := c.State.Service.Concrete.(*redis_state.Config)
+				require.True(t, ok)
+				require.EqualValues(t, &redis_state.Config{
+					Host:      "test-env",
+					Port:      6379,
+					KeyPrefix: "inngest:state",
+				}, redis)
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+
+			os.Clearenv()
+			os.Setenv("TEST_ENV", "test-env")
+
 			config, err := Parse(test.input)
 			require.Equal(t, test.err, err)
 			require.EqualValues(t, test.config(), config)
