@@ -12,7 +12,9 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/load"
+	"cuelang.org/go/encoding/gocode/gocodec"
 	"github.com/inngest/inngest-cli/pkg/cuedefs"
 )
 
@@ -227,3 +229,39 @@ func parse(i *cue.Instance) (*Function, error) {
 
 	return f, nil
 }
+
+func formatCue(fn Function) (string, error) {
+	var r cue.Runtime
+	codec := gocodec.New(&r, nil)
+	v, err := codec.Decode(fn)
+	if err != nil {
+		return "", err
+	}
+
+	syn := v.Syntax(
+		cue.Docs(true),
+		cue.Attributes(true),
+		cue.Optional(true),
+		cue.Definitions(true),
+		cue.ResolveReferences(true),
+		cue.Final(),
+	)
+	out, err := format.Node(
+		syn,
+		format.Simplify(),
+		format.TabIndent(false),
+		format.UseSpaces(2),
+	)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf(fnTpl, string(out)), nil
+}
+
+const fnTpl = `package main
+
+import (
+	defs "inngest.com/defs/v1"
+)
+
+function: defs.#Function & %s`
