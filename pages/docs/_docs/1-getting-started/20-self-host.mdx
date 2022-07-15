@@ -83,6 +83,28 @@ with example configuration files in two places:
 - [Example hosting stacks have configuration files](https://github.com/inngest/inngest/tree/main/hosting-stacks)
 - [Each end-to-end test has example configuration files](https://github.com/inngest/inngest/tree/main/tests/configs)
 
+**Environment variables**
+
+Config can contain environment variables for interpolation.  An example:
+
+```
+package main
+
+import (
+	config "inngest.com/defs/config"
+)
+
+config.#Config & {
+  state: {
+    service: {
+      backend: "redis"
+      // REDIS_HOST will be replaced with the environment variable's value.
+      host: "${REDIS_HOST}"
+    }
+  }
+}
+```
+
 ## Example self-hosting stacks
 
 We have example self-hosting stacks documented within our CLI repo.  These document a range of self
