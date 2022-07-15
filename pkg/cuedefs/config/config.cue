@@ -150,9 +150,9 @@ package config
 	// will override any of the options provided below.
 	dsn?: string
 
-	host?:       string | *"localhost"
-	port?:       >0 & <=65535 | *6379
-	db?:         >=0 | *0
+	host:        string | *"localhost"
+	port:        >0 & <=65535 | *6379
+	db:          >=0 | *0
 	username?:   string
 	password?:   string
 	maxRetries?: >=-1 | *3
