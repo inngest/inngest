@@ -28,6 +28,10 @@ func init() {
 // Config registers the configuration for the in-memory state store,
 // and provides a factory for the state manager based off of the config.
 type Config struct {
+	// DSN contains the entire configuration in a single string, if
+	// provided (eg. redis://user:pass@host:port/db)
+	DSN *string
+
 	Host       string
 	Port       int
 	DB         int
@@ -42,14 +46,23 @@ type Config struct {
 func (c Config) StateName() string { return "redis" }
 
 func (c Config) Manager(ctx context.Context) (state.Manager, error) {
+	opts, err := c.ConnectOpts()
+	if err != nil {
+		return nil, err
+	}
+
 	return New(
 		ctx,
-		WithConnectOpts(c.ConnectOpts()),
+		WithConnectOpts(*opts),
 		WithKeyGenerator(defaultKeyFunc{prefix: c.KeyPrefix}),
 	)
 }
 
-func (c Config) ConnectOpts() redis.Options {
+func (c Config) ConnectOpts() (*redis.Options, error) {
+	if c.DSN != nil {
+		return redis.ParseURL(*c.DSN)
+	}
+
 	opts := redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", c.Host, c.Port),
 		DB:       c.DB,
@@ -62,7 +75,7 @@ func (c Config) ConnectOpts() redis.Options {
 	if c.PoolSize != nil {
 		opts.PoolSize = *c.PoolSize
 	}
-	return opts
+	return &opts, nil
 }
 
 // Opt represents an option to use when creating a redis-backed state store.

@@ -146,9 +146,13 @@ package config
 #RedisState: {
 	backend: "redis"
 
-	host:        string | *"localhost"
-	port:        >0 & <=65535 | *6379
-	db:          >=0 | *0
+	// If DSN is supplied (eg. redis://user:pass@host:port/db), this
+	// will override any of the options provided below.
+	dsn?: string
+
+	host?:       string | *"localhost"
+	port?:       >0 & <=65535 | *6379
+	db?:         >=0 | *0
 	username?:   string
 	password?:   string
 	maxRetries?: >=-1 | *3
