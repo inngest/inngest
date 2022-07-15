@@ -117,6 +117,11 @@ func (f Function) Slug() string {
 	return strings.ToLower(slug.Make(f.Name))
 }
 
+// MarshalCUE formats a function into canonical cue configuration.
+func (f Function) MarshalCUE() ([]byte, error) {
+	return formatCue(f)
+}
+
 // Validate returns an error if the function definition is invalid.
 func (f Function) Validate(ctx context.Context) error {
 	// Store the fn path in context for validating triggers.

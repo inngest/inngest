@@ -147,6 +147,11 @@ func MarshalJSON(f Function) ([]byte, error) {
 	return json.MarshalIndent(f, "", "  ")
 }
 
+// MarshalCUE formats a function into canonical cue configuration.
+func MarshalCUE(f Function) ([]byte, error) {
+	return formatCue(f)
+}
+
 // prepare generates a cue instance for the configuration.
 func prepare(input []byte) (*cue.Instance, error) {
 	cfg := &load.Config{
@@ -230,12 +235,12 @@ func parse(i *cue.Instance) (*Function, error) {
 	return f, nil
 }
 
-func formatCue(fn Function) (string, error) {
+func formatCue(fn Function) ([]byte, error) {
 	var r cue.Runtime
 	codec := gocodec.New(&r, nil)
 	v, err := codec.Decode(fn)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	syn := v.Syntax(
@@ -253,9 +258,9 @@ func formatCue(fn Function) (string, error) {
 		format.UseSpaces(2),
 	)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return fmt.Sprintf(fnTpl, string(out)), nil
+	return []byte(fmt.Sprintf(fnTpl, string(out))), nil
 }
 
 const fnTpl = `package main

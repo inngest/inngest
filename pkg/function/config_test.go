@@ -257,7 +257,7 @@ function: defs.#Function & {
     }]
   }
 }`
-	require.Equal(t, expected, str)
+	require.Equal(t, []byte(expected), str)
 
 	// Ensure parsing this works.
 	f2, err := Unmarshal(ctx, []byte(str), ".")
