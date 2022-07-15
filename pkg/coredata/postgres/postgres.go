@@ -3,13 +3,17 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/inngest/client"
+	"github.com/inngest/inngest-cli/internal/cuedefs"
 	"github.com/inngest/inngest-cli/pkg/config/registration"
 	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/lib/pq"
 	pg "gocloud.dev/postgres"
 )
 
@@ -56,6 +60,28 @@ func New(ctx context.Context, URI string) (coredata.ReadWriter, error) {
 // TODO Add method to close the db connection
 
 var (
+	// action_versions
+	sqlFindExactMatchingActionVersion string = `
+		SELECT action_dsn, version_major, version_minor, config, valid_from, valid_to, created_at
+		FROM action_versions
+		WHERE action_dsn = $1 and version_major = $2 and version_minor = $3`
+	sqlFindLatestMajorActionVersion string = `
+		SELECT action_dsn, version_major, version_minor, config, valid_from, valid_to, created_at
+		FROM action_versions
+		WHERE action_dsn = $1 and version_major = $2
+		ORDER BY version_minor DESC
+		LIMIT 1`
+	sqlFindLatestActionVersion string = `
+		SELECT action_dsn, version_major, version_minor, config, valid_from, valid_to, created_at
+		FROM action_versions
+		WHERE action_dsn = $1
+		ORDER BY version_major, version_minor DESC
+		LIMIT 1`
+	sqlInsertActionVersion string = `
+		INSERT INTO action_versions (action_dsn, version_major, version_minor, config)
+		VALUES ($1, $2, $3, $4)
+		RETURNING action_dsn, version_major, version_minor, config, valid_from, valid_to, created_at`
+
 	// functions
 	sqlInsertFunction string = `
 		INSERT INTO functions (function_id, name)
@@ -179,12 +205,86 @@ func (rw *ReadWriter) CreateFunctionVersion(ctx context.Context, f function.Func
 
 	return fv, nil
 }
+
 func (rw *ReadWriter) ActionVersion(ctx context.Context, dsn string, version *inngest.VersionConstraint) (client.ActionVersion, error) {
-	return client.ActionVersion{}, nil
+	av := client.ActionVersion{}
+	v := inngest.VersionInfo{}
+
+	var row *sql.Row
+	if version.Major == nil && version.Minor == nil {
+		// No version constraint - get the latest
+		row = rw.db.QueryRowContext(ctx, sqlFindLatestActionVersion, dsn)
+	} else if version.Major != nil && version.Minor == nil {
+		// No minor version constraint - get the latest matching the major version
+		row = rw.db.QueryRowContext(ctx, sqlFindLatestMajorActionVersion, dsn, version.Major)
+	} else if version.Major != nil && version.Minor != nil {
+		// Exact constraint - get the exact match
+		row = rw.db.QueryRowContext(ctx, sqlFindExactMatchingActionVersion, dsn, version.Major, version.Minor)
+	}
+
+	err := row.Scan(&av.DSN, &v.Major, &v.Minor, &av.Config, &av.ValidFrom, &av.ValidTo, &av.CreatedAt)
+	if err != nil && err != sql.ErrNoRows {
+		return client.ActionVersion{}, err
+	}
+	if err == sql.ErrNoRows {
+		return client.ActionVersion{}, errors.New("matching action version not found")
+	}
+	av.Version = &v
+
+	return av, nil
 }
+
 func (rw *ReadWriter) CreateActionVersion(ctx context.Context, av inngest.ActionVersion) (client.ActionVersion, error) {
-	return client.ActionVersion{}, nil
+	config, err := cuedefs.FormatAction(av)
+	if err != nil {
+		return client.ActionVersion{}, err
+	}
+
+	created := client.ActionVersion{
+		ActionVersion: av,
+	}
+
+	// NOTE - We do not allow valid_from to be set when creating a version as the client needs to push a container image
+	// to the registry before calling UpdateActionVersion
+	err = rw.db.QueryRowContext(ctx, sqlInsertActionVersion, av.DSN, av.Version.Major, av.Version.Minor, config).
+		Scan(&created.DSN, &created.Version.Major, &created.Version.Minor, &created.Config,
+			&created.ValidFrom, &created.ValidTo, &created.CreatedAt)
+	if err != nil {
+		if err, ok := err.(*pq.Error); ok && err.Code.Name() == "unique_violation" {
+			return client.ActionVersion{},
+				fmt.Errorf("existing action version found for %s:%d-%d", av.DSN, av.Version.Major, av.Version.Minor)
+		}
+		return client.ActionVersion{}, err
+	}
+
+	return created, nil
 }
 func (rw *ReadWriter) UpdateActionVersion(ctx context.Context, dsn string, version inngest.VersionInfo, enabled bool) (client.ActionVersion, error) {
-	return client.ActionVersion{}, nil
+
+	vc := &inngest.VersionConstraint{Major: &version.Major, Minor: &version.Minor}
+	existing, err := rw.ActionVersion(ctx, dsn, vc)
+	if err != nil {
+		return client.ActionVersion{}, errors.New("no existing action version to update")
+	}
+	// If it has already been enabled, the operation has already been performed
+	if existing.ValidFrom != nil {
+		return existing, nil
+	}
+
+	sqlUpdateActionVersionValidFrom := `
+		UPDATE action_versions
+		SET valid_from = $4
+		WHERE action_dsn = $1 and version_major = $2 and version_minor = $3
+		RETURNING action_dsn, version_major, version_minor, config, valid_from, valid_to, created_at`
+	av := client.ActionVersion{}
+	v := inngest.VersionInfo{}
+
+	err = rw.db.QueryRowContext(ctx, sqlUpdateActionVersionValidFrom, dsn, version.Major, version.Minor, time.Now()).
+		Scan(&av.DSN, &v.Major, &v.Minor, &av.Config, &av.ValidFrom, &av.ValidTo, &av.CreatedAt)
+	if err != nil {
+		return client.ActionVersion{}, err
+	}
+	av.Version = &v
+
+	return av, nil
 }
