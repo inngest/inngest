@@ -93,10 +93,13 @@ func read(ctx context.Context, path string) (*Config, error) {
 
 // parse parses configuration and returns the parsed config.
 func Parse(input []byte) (*Config, error) {
+	// We want to interpolate environment variables within our configuration file.
+	str := os.ExpandEnv(string(input))
+
 	cuedefs.Lock()
 	defer cuedefs.Unlock()
 
-	i, err := prepare(input)
+	i, err := prepare([]byte(str))
 	if err != nil {
 		return nil, err
 	}

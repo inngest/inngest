@@ -244,7 +244,7 @@ resource "aws_ecs_task_definition" "eventapi" {
       cpu       = 512
       memory    = 1024
       essential = true
-      command   = ["inngest", "serve", "events-api"]
+      command   = ["inngest", "serve", "event-api"]
       portMappings = [
         {
           containerPort = 80
