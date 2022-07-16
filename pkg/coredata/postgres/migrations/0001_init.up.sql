@@ -31,11 +31,15 @@ CREATE TABLE function_triggers (
   event_name character varying(255),
   schedule character varying(50),
   -- only 1 schedule trigger may exist for a given function. those will have blank event_names
-  PRIMARY KEY (function_id, event_name)
+  PRIMARY KEY (function_id)
 );
 
 ALTER TABLE ONLY function_triggers
   ADD CONSTRAINT function_triggers_function_id FOREIGN KEY (function_id) REFERENCES functions(function_id) ON DELETE CASCADE;
+
+CREATE INDEX function_triggers_event_name ON function_triggers (event_name);
+CREATE INDEX function_triggers_schedule ON function_triggers (schedule) WHERE schedule IS NOT NULL;
+
 
 -- function_versions is a store of immutable configurations for a given function.
 -- config is a serialized cue configuration instructing how the step function should run
