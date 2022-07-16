@@ -225,3 +225,42 @@ func TestUnmarshal(t *testing.T) {
 		require.Nil(t, f, i.name)
 	}
 }
+
+func TestFormatCue(t *testing.T) {
+	// Parse input JSON
+	ctx := context.Background()
+	input := `{"id":"wut", "name":"test", triggers: [{ "event": "test.event" }] }`
+	f, err := Unmarshal(ctx, []byte(input), ".")
+	require.Nil(t, err)
+	str, err := formatCue(*f)
+	require.Nil(t, err)
+
+	expected := `package main
+
+import (
+	defs "inngest.com/defs/v1"
+)
+
+function: defs.#Function & {
+  name: "test"
+  id:   "wut"
+  triggers: [{
+    event: "test.event"
+  }]
+  steps: "step-1": {
+    id:   "step-1"
+    path: "file://."
+    name: "test"
+    runtime: type: "docker"
+    after: [{
+      step: "$trigger"
+    }]
+  }
+}`
+	require.Equal(t, []byte(expected), str)
+
+	// Ensure parsing this works.
+	f2, err := Unmarshal(ctx, []byte(str), ".")
+	require.Nil(t, err)
+	require.EqualValues(t, *f, *f2)
+}
