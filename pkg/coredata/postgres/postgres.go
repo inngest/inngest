@@ -88,6 +88,23 @@ var (
 		VALUES ($1, $2)`
 
 	// function_versions
+	sqlFindAllLiveFunctionVersions string = `
+		SELECT f.function_id, fv.version, fv.config
+		FROM functions f
+		JOIN function_versions fv on f.function_id = fv.function_id
+		WHERE fv.valid_from is not null and fv.valid_to is null`
+	sqlFindAllScheduledFunctions string = `
+		SELECT f.function_id, fv.version, fv.config
+		FROM functions f
+		JOIN function_versions fv on f.function_id = fv.function_id
+		JOIN function_triggers ft on f.function_id = ft.function_id
+		WHERE ft.schedule is not null fv.valid_from is not null and fv.valid_to is null`
+	sqlFindAllFunctionsByEvent string = `
+		SELECT f.function_id, fv.version, fv.config
+		FROM functions f
+		JOIN function_versions fv on f.function_id = fv.function_id
+		JOIN function_triggers ft on f.function_id = ft.function_id
+		WHERE ft.event_name = $1 and fv.valid_from is not null and fv.valid_to is null`
 	sqlFindLatestFunctionVersion string = `
 		SELECT f.function_id, COALESCE(version,0)
 		FROM functions f
@@ -132,6 +149,8 @@ func (rw *ReadWriter) CreateFunctionVersion(ctx context.Context, f function.Func
 	if err != nil && err != sql.ErrNoRows {
 		return function.FunctionVersion{}, err
 	}
+
+	// TODO - Diff the existing function vs. the new function and only add new version if it has changed
 
 	tx, err := rw.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -206,6 +225,55 @@ func (rw *ReadWriter) CreateFunctionVersion(ctx context.Context, f function.Func
 	return fv, nil
 }
 
+func rowsToFunctions(ctx context.Context, rows *sql.Rows) ([]function.Function, error) {
+	fns := []function.Function{}
+
+	for rows.Next() {
+		fv := function.FunctionVersion{}
+		err := rows.Scan(&fv.FunctionID, &fv.Version, &fv.Config)
+		if err != nil {
+			return []function.Function{}, err
+		}
+		// Parse the cue string
+		fn, err := function.Unmarshal(ctx, []byte(fv.Config), "")
+		if err != nil {
+			return nil, err
+		}
+		fns = append(fns, *fn)
+	}
+	// check any rows during iteration
+	err := rows.Err()
+	if err != nil {
+		return []function.Function{}, err
+	}
+	return fns, nil
+}
+
+func (rw *ReadWriter) Functions(ctx context.Context) ([]function.Function, error) {
+	rows, err := rw.db.QueryContext(ctx, sqlFindAllLiveFunctionVersions)
+	if err != nil {
+		return []function.Function{}, err
+	}
+	defer rows.Close()
+	return rowsToFunctions(ctx, rows)
+}
+func (rw *ReadWriter) FunctionsScheduled(ctx context.Context) ([]function.Function, error) {
+	rows, err := rw.db.QueryContext(ctx, sqlFindAllScheduledFunctions)
+	if err != nil {
+		return []function.Function{}, err
+	}
+	defer rows.Close()
+	return rowsToFunctions(ctx, rows)
+}
+func (rw *ReadWriter) FunctionsByTrigger(ctx context.Context, eventName string) ([]function.Function, error) {
+	rows, err := rw.db.QueryContext(ctx, sqlFindAllFunctionsByEvent, eventName)
+	if err != nil {
+		return []function.Function{}, err
+	}
+	defer rows.Close()
+	return rowsToFunctions(ctx, rows)
+}
+
 func (rw *ReadWriter) ActionVersion(ctx context.Context, dsn string, version *inngest.VersionConstraint) (client.ActionVersion, error) {
 	av := client.ActionVersion{}
 	v := inngest.VersionInfo{}
@@ -232,6 +300,19 @@ func (rw *ReadWriter) ActionVersion(ctx context.Context, dsn string, version *in
 	av.Version = &v
 
 	return av, nil
+}
+
+func (rw *ReadWriter) Action(ctx context.Context, dsn string, version *inngest.VersionConstraint) (*inngest.ActionVersion, error) {
+	av, err := rw.ActionVersion(ctx, dsn, version)
+	if err != nil {
+		return nil, err
+	}
+
+	parsed, err := cuedefs.ParseAction(av.Config)
+	if err != nil {
+		return nil, err
+	}
+	return parsed, nil
 }
 
 func (rw *ReadWriter) CreateActionVersion(ctx context.Context, av inngest.ActionVersion) (client.ActionVersion, error) {
