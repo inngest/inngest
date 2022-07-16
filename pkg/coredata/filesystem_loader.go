@@ -224,17 +224,17 @@ func (l memactionloader) Action(ctx context.Context, dsn string, version *innges
 	return nil, fmt.Errorf("action not found: %s", dsn)
 }
 
-type MemoryAPIFunctionLoader struct {
+type MemoryAPIFunctionWriter struct {
 	*MemoryExecutionLoader
 }
 
-func NewInMemoryAPIFunctionLoader() *MemoryAPIFunctionLoader {
-	loader := &MemoryAPIFunctionLoader{}
+func NewInMemoryAPIFunctionWriter() *MemoryAPIFunctionWriter {
+	loader := &MemoryAPIFunctionWriter{}
 	loader.MemoryExecutionLoader = &MemoryExecutionLoader{}
 	return loader
 }
 
-func (m *MemoryAPIFunctionLoader) CreateFunctionVersion(ctx context.Context, f function.Function, live bool, env string) (function.FunctionVersion, error) {
+func (m *MemoryAPIFunctionWriter) CreateFunctionVersion(ctx context.Context, f function.Function, live bool, env string) (function.FunctionVersion, error) {
 	now := time.Now()
 	fv := function.FunctionVersion{
 		FunctionID: f.ID,
@@ -247,14 +247,14 @@ func (m *MemoryAPIFunctionLoader) CreateFunctionVersion(ctx context.Context, f f
 	return fv, nil
 }
 
-type MemoryAPILoader struct {
-	*MemoryAPIFunctionLoader
+type MemoryAPIReadWriter struct {
+	*MemoryAPIFunctionWriter
 	*MemoryAPIActionLoader
 }
 
-func NewInMemoryAPILoader() *MemoryAPILoader {
-	l := &MemoryAPILoader{}
-	l.MemoryAPIFunctionLoader = NewInMemoryAPIFunctionLoader()
+func NewInMemoryAPIReadWriter() *MemoryAPIReadWriter {
+	l := &MemoryAPIReadWriter{}
+	l.MemoryAPIFunctionWriter = NewInMemoryAPIFunctionWriter()
 	l.MemoryAPIActionLoader = NewInMemoryAPIActionLoader()
 	return l
 }
