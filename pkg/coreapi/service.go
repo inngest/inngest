@@ -21,9 +21,9 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 	return svc
 }
 
-func WithAPILoader(l coredata.APILoader) func(s *svc) {
+func WithAPIReadWriter(rw coredata.APIReadWriter) func(s *svc) {
 	return func(s *svc) {
-		s.data = l
+		s.data = rw
 	}
 }
 
@@ -31,7 +31,7 @@ type svc struct {
 	config config.Config
 	api    *CoreAPI
 	// data provides the ability to write and load data
-	data coredata.ReadWriter
+	data coredata.APIReadWriter
 }
 
 func (s *svc) Name() string {
@@ -46,9 +46,9 @@ func (s *svc) Pre(ctx context.Context) (err error) {
 
 	// TODO - Configure API with correct ports, etc., set up routes
 	s.api, err = NewCoreApi(Options{
-		Config:    s.config,
-		Logger:    logger.From(ctx),
-		APILoader: s.data,
+		Config:        s.config,
+		Logger:        logger.From(ctx),
+		APIReadWriter: s.data,
 	})
 
 	if err != nil {
