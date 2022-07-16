@@ -15,9 +15,9 @@ import (
 )
 
 type Options struct {
-	Config    config.Config
-	Logger    *zerolog.Logger
-	APILoader coredata.APILoader
+	Config        config.Config
+	Logger        *zerolog.Logger
+	APIReadWriter coredata.APIReadWriter
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
@@ -29,7 +29,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	}
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
-		APILoader: o.APILoader,
+		APIReadWriter: o.APIReadWriter,
 	}}))
 
 	// TODO - Add option for enabling GraphQL Playground

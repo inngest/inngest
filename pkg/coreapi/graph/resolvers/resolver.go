@@ -8,7 +8,7 @@ import (
 )
 
 type Resolver struct {
-	APILoader coredata.APILoader
+	APIReadWriter coredata.APIReadWriter
 }
 
 // Mutation returns generated.MutationResolver implementation.
