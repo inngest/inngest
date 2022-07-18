@@ -28,7 +28,8 @@
       "extensions": [
         "golang.Go",
         "brody715.vscode-cuelang",
-        "HashiCorp.terraform"
+        "HashiCorp.terraform",
+        "HashiCorp.HCL"
       ]
     }
   },
