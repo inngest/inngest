@@ -99,12 +99,11 @@ var (
 		JOIN function_versions fv on f.function_id = fv.function_id
 		JOIN function_triggers ft on f.function_id = ft.function_id
 		WHERE ft.schedule is not null fv.valid_from is not null and fv.valid_to is null`
-	sqlFindAllFunctionsByEvent string = `
-		SELECT f.function_id, fv.version, fv.config
-		FROM functions f
-		JOIN function_versions fv on f.function_id = fv.function_id
-		JOIN function_triggers ft on f.function_id = ft.function_id
-		WHERE ft.event_name = $1 and fv.valid_from is not null and fv.valid_to is null`
+	sqlFindAllValidFunctionsByEvent string = `
+		SELECT fv.function_id, fv.version, fv.config
+		FROM function_triggers ft
+		JOIN function_versions fv on fv.function_id = ft.function_id and fv.version = ft.version
+		WHERE ft.event_name = $1 and fv.valid_from is not null and fv.valid_to is null;`
 	sqlFindLatestFunctionVersion string = `
 		SELECT f.function_id, COALESCE(version,0)
 		FROM functions f
@@ -123,14 +122,11 @@ var (
 
 	// function_triggers
 	sqlInsertEventTrigger string = `
-		INSERT INTO function_triggers (function_id, event_name)
-		VALUES ($1, $2)`
+		INSERT INTO function_triggers (function_id, version, event_name)
+		VALUES ($1, $2, $3)`
 	sqlInsertScheduleTrigger string = `
-		INSERT INTO function_triggers (function_id, schedule)
-		VALUES ($1, $2)`
-	sqlDeleteTriggers string = `
-		DELETE FROM function_triggers
-		WHERE function_id=$1`
+		INSERT INTO function_triggers (function_id, version, schedule)
+		VALUES ($1, $2, $3)`
 )
 
 // CreateFunctionVersion creates the function, ensures function_triggers are up to date,
@@ -150,6 +146,9 @@ func (rw *ReadWriter) CreateFunctionVersion(ctx context.Context, f function.Func
 		return function.FunctionVersion{}, err
 	}
 
+	// Bump the version - existingVersion is 0 if no rows are found (via COALESCE)
+	newFunctionVersion := uint(existingVersion + 1)
+
 	// TODO - Diff the existing function vs. the new function and only add new version if it has changed
 
 	tx, err := rw.db.BeginTx(ctx, nil)
@@ -166,35 +165,25 @@ func (rw *ReadWriter) CreateFunctionVersion(ctx context.Context, f function.Func
 		}
 	}
 
-	// For live functions, we must update the function triggers and make the previous version as no longer valid
-	if live {
-		// Clear any old triggers and create the current ones - this is simpler than finding which ones need to be deleted/created
-		_, err := tx.ExecContext(ctx, sqlDeleteTriggers, f.ID)
+	// Create all function_triggers for the new version
+	for _, trigger := range f.Triggers {
+		var err error
+		if trigger.EventTrigger != nil {
+			_, err = tx.ExecContext(ctx, sqlInsertEventTrigger, f.ID, newFunctionVersion, trigger.Event)
+		} else if trigger.CronTrigger != nil {
+			_, err = tx.ExecContext(ctx, sqlInsertScheduleTrigger, f.ID, newFunctionVersion, trigger.Cron)
+		}
 		if err != nil {
 			return function.FunctionVersion{}, err
 		}
+	}
 
-		// Insert the currently valid triggers
-		for _, trigger := range f.Triggers {
-			var err error
-			if trigger.EventTrigger != nil {
-				_, err = tx.ExecContext(ctx, sqlInsertEventTrigger, f.ID, trigger.Event)
-			} else if trigger.CronTrigger != nil {
-				_, err = tx.ExecContext(ctx, sqlInsertScheduleTrigger, f.ID, trigger.Cron)
-			}
-			if err != nil {
-				return function.FunctionVersion{}, err
-			}
+	// For live functions, we must make the previous version as no longer valid
+	if live && existingVersion != 0 {
+		_, err := tx.ExecContext(ctx, sqlUpdateFunctionVersionValidTo, f.ID, existingVersion, now)
+		if err != nil {
+			return function.FunctionVersion{}, err
 		}
-
-		// Make prior version no longer valid if there is a previous version
-		if existingVersion != 0 {
-			_, err := tx.ExecContext(ctx, sqlUpdateFunctionVersionValidTo, f.ID, existingVersion, now)
-			if err != nil {
-				return function.FunctionVersion{}, err
-			}
-		}
-
 	}
 
 	// Create the function version
@@ -204,7 +193,7 @@ func (rw *ReadWriter) CreateFunctionVersion(ctx context.Context, f function.Func
 	}
 	fv := function.FunctionVersion{
 		FunctionID: f.ID,
-		Version:    uint(existingVersion + 1),
+		Version:    newFunctionVersion,
 		Config:     string(config),
 		Function:   f,
 	}
@@ -266,7 +255,7 @@ func (rw *ReadWriter) FunctionsScheduled(ctx context.Context) ([]function.Functi
 	return rowsToFunctions(ctx, rows)
 }
 func (rw *ReadWriter) FunctionsByTrigger(ctx context.Context, eventName string) ([]function.Function, error) {
-	rows, err := rw.db.QueryContext(ctx, sqlFindAllFunctionsByEvent, eventName)
+	rows, err := rw.db.QueryContext(ctx, sqlFindAllValidFunctionsByEvent, eventName)
 	if err != nil {
 		return []function.Function{}, err
 	}
