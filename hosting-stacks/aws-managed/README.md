@@ -1,7 +1,6 @@
 # AWS Managed Stack
 
 This is an **example** stack hosted on AWS which uses the following services:
-
 | Inngest service  | AWS component | Why | Potential other choices |
 | ---              | ---           | --- | --- |
 | **Event API**    | ECS           | A simple managed service | EKS, EC2 |
@@ -48,3 +47,34 @@ we will update this stack to incorporate a basic RDS/Aurora machine to store
 function & action state.
 
 This also doesn't provide VPC or NAT configuration for machines.
+
+### Benchmarks
+
+A single ECS instance with 1GB ram and 512 CPU (0.5/vCPU) has the following event
+ingestion benchmarks:
+
+**110 requests/second:**
+
+```
+     http_req_duration..............: min=6.32ms  med=7.71ms  avg=8.84ms  max=80.61ms  p(99)=32.86ms  p(99.9)=74.57ms
+     http_req_failed................: 0.00%  ✓ 0
+     http_reqs......................: 1113   111.211444/s
+```
+
+**300 requests/second:**
+
+```
+     http_req_duration..............: min=6.76ms  med=91.72ms avg=83.18ms max=277.32ms p(99)=187.25ms p(99.9)=199.77ms
+     http_req_failed................: 0.00%  ✓ 0
+     http_reqs......................: 6009   299.721533/s
+```
+
+Latency increases with CPU load;  it's possible to handle 100 requests/second with a p99 latency of 30ms,
+or 300 requests/second with a p99 latency of 187ms.
+
+We recommend 1GB ram / 0.5 vCPU for each ~100 requests/second within the events API.
+
+The runner can handle ~100 requests/second with 1GB ram / 0.5 vCPU under light load (ie. < 5% of events
+which trigger functions).  We recommend having at least 2x the number of runner services than you do
+event API services;  runner services have higher CPU load executing expressions and querying functions
+to run.
