@@ -25,7 +25,11 @@
       },
 
       // Add the IDs of extensions you want installed when the container is created.
-      "extensions": ["golang.Go", "nickgo.cuelang", "HashiCorp.terraform"]
+      "extensions": [
+        "golang.Go",
+        "brody715.vscode-cuelang",
+        "HashiCorp.terraform"
+      ]
     }
   },
 
