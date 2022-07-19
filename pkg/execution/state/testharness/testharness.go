@@ -131,7 +131,16 @@ func CheckState(t *testing.T, gen Generator) {
 
 func checkNew(t *testing.T, m state.Manager) {
 	ctx := context.Background()
-	s := setup(t, m)
+	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{
+		WorkflowID: w.UUID,
+		RunID:      runID,
+		Key:        runID.String(),
+	}
+
+	s, err := m.New(ctx, w, id, input.Map())
+	require.NoError(t, err)
 
 	found := s.Workflow()
 	require.EqualValues(t, w, found, "Returned workflow does not match input")
@@ -143,6 +152,9 @@ func checkNew(t *testing.T, m state.Manager) {
 	found = loaded.Workflow()
 	require.EqualValues(t, w, found, "Loaded workflow does not match input")
 	require.EqualValues(t, input.Map(), loaded.Event(), "Loaded event does not match input")
+
+	metadata := loaded.Metadata()
+	require.Equal(t, 1, metadata.Pending, "New should set pending count to 1")
 }
 
 func checkScheduled(t *testing.T, m state.Manager) {
@@ -960,5 +972,11 @@ func setup(t *testing.T, m state.Manager) state.State {
 
 	s, err := m.New(ctx, w, id, input.Map())
 	require.NoError(t, err)
+
+	// We assume that the trigger has been handled and is not
+	// part of the pending count when calling setup.
+	err = m.Finalized(ctx, id, inngest.TriggerName)
+	require.NoError(t, err)
+
 	return s
 }

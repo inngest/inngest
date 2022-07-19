@@ -85,6 +85,10 @@ type PayloadEdge struct {
 
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.
 // a future task to check whether an event has been received yet.
+//
+// This is always enqueued from any async match;  we must correctly decrement the
+// pending count in cases where the event is not received.
 type PayloadPauseTimeout struct {
-	PauseID uuid.UUID `json:"pauseID"`
+	PauseID   uuid.UUID `json:"pauseID"`
+	OnTimeout bool      `json:"onTimeout"`
 }

@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	registration.RegisterDriver(&Config{})
+	registration.RegisterDriver(func() any { return &Config{} })
 }
 
 const RuntimeName = "mock"

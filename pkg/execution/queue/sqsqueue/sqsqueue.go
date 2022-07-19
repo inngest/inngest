@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	registration.RegisterQueue(&Config{})
+	registration.RegisterQueue(func() any { return &Config{} })
 }
 
 type Config struct {

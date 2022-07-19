@@ -24,10 +24,11 @@ func (s *StateService) UnmarshalJSON(byt []byte) error {
 	}
 	s.Backend = data.Backend
 
-	iface, ok := registration.RegisteredStates()[s.Backend]
+	f, ok := registration.RegisteredStates()[s.Backend]
 	if !ok {
 		return fmt.Errorf("unknown state backend: %s", s.Backend)
 	}
+	iface := f()
 	if err := json.Unmarshal(byt, iface); err != nil {
 		return err
 	}

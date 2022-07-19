@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	registration.RegisterDriver(&Config{})
+	registration.RegisterDriver(func() any { return &Config{} })
 }
 
 // Config represents driver configuration for use when configuring hosted

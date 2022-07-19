@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,9 +10,9 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/inngest/inngest-cli/pkg/api"
 	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/coredata"
+	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/runner"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
@@ -22,17 +23,19 @@ import (
 )
 
 type RunUIOpts struct {
-	Event    map[string]interface{}
-	Seed     int64
-	Function function.Function
+	Event     event.Event
+	Seed      int64
+	Function  function.Function
+	LogBuffer *bytes.Buffer
 }
 
 func NewRunUI(ctx context.Context, opts RunUIOpts) (*RunUI, error) {
 	r := &RunUI{
-		ctx:   ctx,
-		event: opts.Event,
-		seed:  opts.Seed,
-		fn:    opts.Function,
+		ctx:    ctx,
+		event:  opts.Event,
+		seed:   opts.Seed,
+		fn:     opts.Function,
+		logBuf: opts.LogBuffer,
 	}
 	return r, nil
 }
@@ -44,7 +47,8 @@ type RunUI struct {
 	ctx context.Context
 
 	// event stores the event data used as a trigger for the function.
-	event map[string]interface{}
+	event event.Event
+
 	// seed is the seed used to generate fake data
 	seed int64
 	// function is the function definition.
@@ -60,7 +64,12 @@ type RunUI struct {
 
 	// duration stores how long the function took to execute.
 	duration time.Duration
-	done     bool
+
+	done bool
+
+	// logBuf stores the output of the logger, if we want to display this in
+	// the UI (which we currently dont)
+	logBuf *bytes.Buffer
 }
 
 // Error returns the error from building or running the function, if part of the process failed.
@@ -77,37 +86,72 @@ func (r *RunUI) Init() tea.Cmd {
 
 // run performs the running of the function.
 func (r *RunUI) run(ctx context.Context) {
-	if r.id != nil {
-		return
-	}
-
-	ctx, done := context.WithCancel(ctx)
-	defer done()
-
 	el := &coredata.MemoryExecutionLoader{}
 	if err := el.SetFunctions(ctx, []*function.Function{&r.fn}); err != nil {
+		// This is a render loop, so store the error in our mutable state
+		// for the View() function to render to the UI.
 		r.err = err
 		return
 	}
 
 	c, _ := config.Default(ctx)
-	api := api.NewService(*c)
-	runner := runner.NewService(*c, runner.WithExecutionLoader(el))
+	// Create a singleton queue for initializing the fn.
+	q, err := c.Queue.Service.Concrete.Producer()
+	if err != nil {
+		r.err = err
+		return
+	}
+	// Return the in-memory state manager that was created from our
+	// derived default config.
+	//
+	// NOTE: Each individual config struct returns a singleton in-memory
+	// service, given the config struct has not been copied.
+	r.sm, r.err = c.State.Service.Concrete.Manager(ctx)
+	if r.err != nil {
+		return
+	}
+
+	// In order to execute the function we need to create a new executor
+	// service to execute the steps of our function.  We'll manually initialize
+	// a new function run.
 	exec := executor.NewService(*c, executor.WithExecutionLoader(el))
 	go func() {
-		_ = service.StartAll(ctx, api, runner, exec)
+		if err := service.Start(ctx, exec); err != nil {
+			r.err = err
+			r.done = true
+			return
+		}
 	}()
 
-	// TODO: Run and wait for the function to finish.
-	/*
-		r.id = id
-		start := time.Now()
-		if err := runner.Wait(ctx, *id); err != nil {
-			r.err = err
+	// XXX: We need to define a readiness check with each of our services,
+	// then wait here for the readiness check to pass.
+
+	r.id, err = runner.Initialize(ctx, r.fn, r.event, r.sm, q)
+	if err != nil {
+		r.err = err
+		return
+	}
+	if r.id == nil {
+		r.err = fmt.Errorf("no run id created")
+		return
+	}
+
+	for !r.done {
+		var run state.State
+
+		run, r.err = r.sm.Load(ctx, *r.id)
+		if r.err != nil {
+			return
 		}
-		r.duration = time.Since(start)
-		r.done = true
-	*/
+
+		meta := run.Metadata()
+		if meta.Pending == 0 {
+			r.duration = time.Since(meta.StartedAt)
+			r.done = true
+			return
+		}
+		<-time.After(time.Millisecond)
+	}
 }
 
 func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

@@ -128,6 +128,8 @@ type State interface {
 	// for the given run.
 	Workflow() inngest.Workflow
 
+	// Metadata returns the run metadata, including the started at time
+	// as well as the pending count.
 	Metadata() Metadata
 
 	// Identifier returns the identifier for this particular run, which
