@@ -68,7 +68,7 @@ func Load(ctx context.Context, dir string) (*Function, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Unmarshal(ctx, byt, abs)
+	return Unmarshal(ctx, byt, json)
 }
 
 func LoadRecursive(ctx context.Context, dir string) ([]*Function, error) {

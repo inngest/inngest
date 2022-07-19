@@ -249,7 +249,6 @@ func (s *svc) functions(ctx context.Context, evt event.Event) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-
 			for _, t := range copied.Triggers {
 				if t.EventTrigger == nil || t.Event != evt.Name {
 					// This isn't triggered by an event, so we skip this trigger entirely.
@@ -397,10 +396,22 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 }
 
 func (s *svc) initialize(ctx context.Context, fn function.Function, evt event.Event) error {
+	logger.From(ctx).Debug().Str("function", fn.ID).Msg("initializing fn")
+	_, err := Initialize(ctx, fn, evt, s.state, s.queue)
+	return err
+}
+
+// Initialize creates a new funciton run identifier for the given workflow and
+// event, stores this in our state store, then enqueues a new function run
+// within the given queue for execution.
+//
+// This is a separate, exported function so that it can be used from this service
+// and also from eg. the run command.
+func Initialize(ctx context.Context, fn function.Function, evt event.Event, s state.Manager, q queue.Producer) (*state.Identifier, error) {
 	// XXX: This could/should be memoized.
 	flow, err := fn.Workflow(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	zero := uuid.UUID{}
@@ -418,20 +429,19 @@ func (s *svc) initialize(ctx context.Context, fn function.Function, evt event.Ev
 		Key:        evt.ID,
 	}
 
-	logger.From(ctx).Debug().Str("function", fn.ID).Msg("initializing fn")
-
-	if _, err := s.state.New(ctx, *flow, id, evt.Map()); err != nil {
-		return fmt.Errorf("error creating run state: %w", err)
+	if _, err := s.New(ctx, *flow, id, evt.Map()); err != nil {
+		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 
 	// Enqueue running this from the source.
-	err = s.queue.Enqueue(ctx, queue.Item{
+	err = q.Enqueue(ctx, queue.Item{
 		Kind:       queue.KindEdge,
 		Identifier: id,
 		Payload:    queue.PayloadEdge{Edge: inngest.SourceEdge},
 	}, time.Now())
 	if err != nil {
-		return fmt.Errorf("error enqueuing function: %w", err)
+		return &id, fmt.Errorf("error enqueuing function: %w", err)
 	}
-	return nil
+
+	return &id, nil
 }

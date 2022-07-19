@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,8 +13,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/cli"
+	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest-cli/pkg/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -43,13 +46,6 @@ func doRun(cmd *cobra.Command, args []string) {
 	if err != nil {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
-		return
-	}
-
-	if cmd.Flag("event-only").Value.String() == "true" {
-		evt, _ := fakeEvent(cmd.Context(), *fn, "")
-		out, _ := json.Marshal(evt)
-		fmt.Println(string(out))
 		return
 	}
 
@@ -97,16 +93,26 @@ func runFunction(ctx context.Context, fn function.Function, eventName string) er
 		runSeed = rand.Int63n(1_000_000)
 	}
 
-	evt, err := event(ctx, fn, eventName)
+	evt, err := generateEvent(ctx, fn, eventName)
 	if err != nil {
 		return err
 	}
 
+	// NOTE: The runner, executor, etc. uses logger from context.  Bubbletea
+	// REALLY doesnt like it when you start logging to stderr/stdout;  it controls
+	// the output.
+	//
+	// Here, we must create a new logger which writes to a buffer.
+	buf := bytes.NewBuffer(nil)
+	log := logger.Buffered(buf)
+	ctx = logger.With(ctx, *log)
+
 	// Run the function.
 	ui, err := cli.NewRunUI(ctx, cli.RunUIOpts{
-		Function: fn,
-		Event:    evt,
-		Seed:     runSeed,
+		Function:  fn,
+		Event:     evt,
+		Seed:      runSeed,
+		LogBuffer: buf,
 	})
 	if err != nil {
 		return err
@@ -118,13 +124,13 @@ func runFunction(ctx context.Context, fn function.Function, eventName string) er
 	return ui.Error()
 }
 
-// event retrieves the event for use within testing the function.  It first checks stdin
+// generateEvent retrieves the event for use within testing the function.  It first checks stdin
 // to see if we're passed an event, or resorts to generating a fake event based off of
 // the function's event type.
-func event(ctx context.Context, fn function.Function, eventName string) (map[string]interface{}, error) {
+func generateEvent(ctx context.Context, fn function.Function, eventName string) (event.Event, error) {
 	fi, err := os.Stdin.Stat()
 	if err != nil {
-		return nil, err
+		return event.Event{}, err
 	}
 	if (fi.Mode() & os.ModeCharDevice) == 0 {
 		// Read stdin
@@ -132,7 +138,7 @@ func event(ctx context.Context, fn function.Function, eventName string) (map[str
 		scanner.Scan()
 		evt := scanner.Bytes()
 
-		data := map[string]interface{}{}
+		data := event.Event{}
 		err := json.Unmarshal(evt, &data)
 		return data, err
 	}
@@ -142,7 +148,7 @@ func event(ctx context.Context, fn function.Function, eventName string) (map[str
 
 // fakeEvent finds event triggers within the function definition, then chooses
 // a random trigger from the definitions and generates fake data for the event.
-func fakeEvent(ctx context.Context, fn function.Function, eventName string) (map[string]interface{}, error) {
+func fakeEvent(ctx context.Context, fn function.Function, eventName string) (event.Event, error) {
 	triggers := []function.Trigger{}
 	for _, t := range fn.Triggers {
 		if t.EventTrigger != nil && (eventName == "" || eventName == t.EventTrigger.Event) {

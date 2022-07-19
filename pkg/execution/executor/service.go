@@ -117,7 +117,6 @@ func (s *svc) Run(ctx context.Context) error {
 		}
 
 		if err != nil {
-			// TODO: Re-enqueue this item.
 			logger.From(ctx).Error().Err(err).Interface("item", item).Msg("critical error handling queue item")
 		}
 
@@ -203,6 +202,12 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 				return fmt.Errorf("error parsing async edge ttl '%s': %w", am.TTL, err)
 			}
 
+			// This should also increase the waitgroup count, as we have an
+			// edge that is outstanding.
+			if err := s.state.Scheduled(ctx, item.Identifier, next.Incoming); err != nil {
+				return err
+			}
+
 			pauseID := uuid.New()
 			expires := time.Now().Add(dur)
 			err = s.state.SavePause(ctx, state.Pause{
@@ -219,19 +224,19 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 				return fmt.Errorf("error saving edge pause: %w", err)
 			}
 
-			if am.OnTimeout {
-				// Enqueue a timeout.  This will be handled within our queue;  if the
-				// pause still exists at this time and has not been comsumed we will
-				// continue traversing this edge.
-				if err := s.queue.Enqueue(ctx, queue.Item{
-					Kind:       queue.KindPause,
-					Identifier: item.Identifier,
-					Payload:    queue.PayloadPauseTimeout{PauseID: pauseID},
-				}, expires); err != nil {
-					return err
-				}
+			// Enqueue a timeout.  This will be handled within our queue;  if the
+			// pause still exists at this time and has not been comsumed we will
+			// continue traversing this edge if OnTimeout is true.
+			if err := s.queue.Enqueue(ctx, queue.Item{
+				Kind:       queue.KindPause,
+				Identifier: item.Identifier,
+				Payload: queue.PayloadPauseTimeout{
+					PauseID:   pauseID,
+					OnTimeout: am.OnTimeout,
+				},
+			}, expires); err != nil {
+				return err
 			}
-
 			continue
 		}
 
@@ -245,12 +250,27 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		}
 
 		l.Info().Str("outgoing", next.Outgoing).Time("at", at).Msg("scheduling next step")
+
 		// Enqueue the next child in our queue.
 		if err := s.queue.Enqueue(ctx, queue.Item{
 			Kind:       queue.KindEdge,
 			Identifier: item.Identifier,
 			Payload:    queue.PayloadEdge{Edge: next},
 		}, at); err != nil {
+			return err
+		}
+
+		// Increase the waitgroup counter.
+		// Unfortunately, the backing queue and the state store may be different
+		// backing services.  Therefore, we can never guarantee that enqueueing an
+		// item increases the scheduled count.
+		//
+		// Hopefully, if the backing implementation is the same (eg. a database which
+		// hosts the queue and the state store), Enqueue increases the pending count
+		// and this is a no-op - things should be atomic where possible.
+		//
+		// TODO: Add a unit test to ensure WG is 0 at the end of execution.
+		if err := s.state.Scheduled(ctx, item.Identifier, next.Outgoing); err != nil {
 			return err
 		}
 	}
@@ -268,6 +288,8 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 }
 
 func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
+	l := logger.From(ctx).With().Str("run_id", item.Identifier.RunID.String()).Logger()
+
 	pauseTimeout, ok := item.Payload.(queue.PayloadPauseTimeout)
 	if !ok {
 		return fmt.Errorf("unable to get pause timeout form queue item: %T", item.Payload)
@@ -276,6 +298,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	pause, err := s.state.PauseByID(ctx, pauseTimeout.PauseID)
 	if err == state.ErrPauseNotFound {
 		// This pause has been consumed.
+		l.Debug().Interface("pause", pauseTimeout).Msg("consumed pause timeout ignored")
 		return nil
 	}
 	if err != nil {
@@ -289,14 +312,23 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return fmt.Errorf("error consuming timeout pause: %w", err)
 	}
 
-	// Enqueue the next job to run.  We could handle this in the
-	// same thread, but its safer to enable retries by re-enqueueing.
-	if err := s.queue.Enqueue(ctx, queue.Item{
-		Kind:       queue.KindEdge,
-		Identifier: item.Identifier,
-		Payload:    queue.PayloadEdge{Edge: pause.Edge()},
-	}, time.Now()); err != nil {
-		return fmt.Errorf("error enqueueing timeout step: %w", err)
+	if pauseTimeout.OnTimeout {
+		l.Info().Interface("pause", pauseTimeout).Interface("edge", pause.Edge()).Msg("scheduling pause timeout step")
+		// Enqueue the next job to run.  We could handle this in the
+		// same thread, but its safer to enable retries by re-enqueueing.
+		if err := s.queue.Enqueue(ctx, queue.Item{
+			Kind:       queue.KindEdge,
+			Identifier: item.Identifier,
+			Payload:    queue.PayloadEdge{Edge: pause.Edge()},
+		}, time.Now()); err != nil {
+			return fmt.Errorf("error enqueueing timeout step: %w", err)
+		}
+	} else {
+		l.Info().Interface("pause", pauseTimeout).Interface("edge", pause.Edge()).Msg("ignoring pause timeout")
+		// Finalize this action without it running.
+		if err := s.state.Finalized(ctx, item.Identifier, pause.Edge().Incoming); err != nil {
+			return err
+		}
 	}
 
 	return nil

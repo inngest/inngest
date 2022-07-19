@@ -54,10 +54,13 @@ func SendTrigger(ctx context.Context, td *TestData) error {
 	fmt.Println("> Sending trigger")
 
 	var err error
-	td.TriggerData, err = function.GenerateTriggerData(ctx, time.Now().Unix(), td.Fn.Triggers)
+	evt, err := function.GenerateTriggerData(ctx, time.Now().Unix(), td.Fn.Triggers)
 	if err != nil {
 		return fmt.Errorf("error generating trigger data: %w", err)
 	}
+
+	td.TriggerData = evt.Map()
+
 	byt, _ := json.Marshal(td.TriggerData)
 	resp, err := http.Post(
 		fmt.Sprintf("http://%s:%d/e/key", td.Config.EventAPI.Addr, td.Config.EventAPI.Port),

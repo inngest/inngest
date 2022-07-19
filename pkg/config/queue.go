@@ -24,11 +24,12 @@ func (q *QueueService) UnmarshalJSON(byt []byte) error {
 	}
 	q.Backend = data.Backend
 
-	iface, ok := registration.RegisteredQueues()[q.Backend]
+	f, ok := registration.RegisteredQueues()[q.Backend]
 	if !ok {
 		return fmt.Errorf("unknown queue backend: %s", q.Backend)
 	}
 
+	iface := f()
 	if err := json.Unmarshal(byt, iface); err != nil {
 		return err
 	}

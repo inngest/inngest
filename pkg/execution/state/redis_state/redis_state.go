@@ -22,7 +22,7 @@ const (
 )
 
 func init() {
-	registration.RegisterState(&Config{})
+	registration.RegisterState(func() any { return &Config{} })
 }
 
 // Config registers the configuration for the in-memory state store,
@@ -175,6 +175,7 @@ func (m mgr) New(ctx context.Context, workflow inngest.Workflow, id state.Identi
 	metadata := runMetadata{
 		Version:   workflow.Version,
 		CreatedAt: time.Now().Truncate(time.Second),
+		Pending:   1,
 	}
 
 	// We marshal this ahead of creating a redis transaction as it's necessary

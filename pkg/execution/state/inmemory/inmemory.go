@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	registration.RegisterState(&Config{})
+	registration.RegisterState(func() any { return &Config{} })
 }
 
 // Config registers the configuration for the in-memory state store,
@@ -70,6 +70,7 @@ func (m *mem) New(ctx context.Context, workflow inngest.Workflow, id state.Ident
 	s := memstate{
 		metadata: state.Metadata{
 			StartedAt: time.Now(),
+			Pending:   1,
 		},
 		workflow:   workflow,
 		identifier: id,

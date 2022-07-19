@@ -3,7 +3,7 @@ package config
 // Config defines the top-level config for all services.
 #Config: {
 	log: {
-		level:  ("trace" | "debug" | "info" | "warn") | *"info"
+		level:  ("trace" | "debug" | "info" | "warn" | "error") | *"info"
 		format: "json" | *"json"
 	}
 

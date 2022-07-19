@@ -98,14 +98,15 @@ func (e *Execution) UnmarshalJSON(byt []byte) error {
 	e.LogOutput = names.LogOutput
 
 	for runtime, driver := range names.Drivers {
-		iface, ok := registration.RegisteredDrivers()[driver.Name]
+		f, ok := registration.RegisteredDrivers()[driver.Name]
 		if !ok {
 			return fmt.Errorf("unknown driver: %s", driver.Name)
 		}
+
+		iface := f()
 		if err := json.Unmarshal(driver.Raw, iface); err != nil {
 			return err
 		}
-
 		res, _ := iface.(registration.DriverConfig)
 		if runtime != res.RuntimeName() {
 			// Ensure the driver can run the given runtime.

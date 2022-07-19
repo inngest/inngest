@@ -10,40 +10,43 @@ import (
 
 var (
 	// registeredDrivers stores all registered driver configurations.
-	registeredDrivers = map[string]any{}
+	registeredDrivers = map[string]func() any{}
 
-	registeredQueues = map[string]any{}
+	registeredQueues = map[string]func() any{}
 
-	registeredStates = map[string]any{}
+	registeredStates = map[string]func() any{}
 )
 
-func RegisteredDrivers() map[string]any {
+func RegisteredDrivers() map[string]func() any {
 	return registeredDrivers
 }
 
-func RegisteredQueues() map[string]any {
+func RegisteredQueues() map[string]func() any {
 	return registeredQueues
 }
 
-func RegisteredStates() map[string]any {
+func RegisteredStates() map[string]func() any {
 	return registeredStates
 }
 
 // RegisterDriver registers a driver's configuration for use with
 // self-hosted services.
-func RegisterDriver(c DriverConfig) {
+func RegisterDriver(f func() any) {
 	// Overwrite any previous drivers.
-	registeredDrivers[c.DriverName()] = c
+	driver := f().(DriverConfig)
+	registeredDrivers[driver.DriverName()] = f
 }
 
 // RegisterQueue registers a queue for use within self hosted services/
-func RegisterQueue(c QueueConfig) {
-	registeredQueues[c.QueueName()] = c
+func RegisterQueue(f func() any) {
+	driver := f().(QueueConfig)
+	registeredQueues[driver.QueueName()] = f
 }
 
 // RegisterState registers a state manager for use within self hosted services/
-func RegisterState(c StateConfig) {
-	registeredStates[c.StateName()] = c
+func RegisterState(f func() any) {
+	driver := f().(StateConfig)
+	registeredStates[driver.StateName()] = f
 }
 
 // DriverConfig is an interface used to determine driver config structs.

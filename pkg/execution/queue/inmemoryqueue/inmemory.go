@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	registration.RegisterQueue(&Config{})
+	registration.RegisterQueue(func() any { return &Config{} })
 }
 
 type Config struct {
@@ -18,6 +18,11 @@ type Config struct {
 
 	// mem stores a pointer to memory, acting as a singleton per Config
 	// instance created.
+	//
+	// We need to create "local" singletons per config struct in order to
+	// parallelize and unit test these correctly;  with a global singleton
+	// we may have unexpected data within our in-memory queue during parallel
+	// tests.
 	mem *mem
 }
 
@@ -32,6 +37,7 @@ func (c *Config) Queue() (queue.Queue, error) {
 			q: make(chan queue.Item),
 		}
 	}
+
 	return c.mem, nil
 }
 
