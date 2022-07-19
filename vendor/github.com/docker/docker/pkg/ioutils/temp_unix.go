@@ -1,11 +1,10 @@
-//go:build !windows
 // +build !windows
 
 package ioutils // import "github.com/docker/docker/pkg/ioutils"
 
-import "os"
+import "io/ioutil"
 
-// TempDir on Unix systems is equivalent to os.MkdirTemp.
+// TempDir on Unix systems is equivalent to ioutil.TempDir.
 func TempDir(dir, prefix string) (string, error) {
-	return os.MkdirTemp(dir, prefix)
+	return ioutil.TempDir(dir, prefix)
 }
