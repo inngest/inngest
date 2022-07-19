@@ -29,7 +29,6 @@
         "golang.Go",
         "brody715.vscode-cuelang",
         "HashiCorp.terraform",
-        "HashiCorp.HCL",
         "ms-azuretools.vscode-docker"
       ]
     }
