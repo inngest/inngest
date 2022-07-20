@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,14 +22,14 @@ func TestActions(t *testing.T) {
 				ID:   "first",
 				Name: "first",
 				Runtime: inngest.RuntimeWrapper{
-					Runtime: &mockdriver.Mock{},
+					Runtime: &stubdriver{},
 				},
 			},
 			"second": {
 				ID:   "second",
 				Name: "second",
 				Runtime: inngest.RuntimeWrapper{
-					Runtime: &mockdriver.Mock{},
+					Runtime: &stubdriver{},
 				},
 			},
 		},
