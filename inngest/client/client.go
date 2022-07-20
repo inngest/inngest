@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/oklog/ulid/v2"
 )
 
 // Client implements all functionality necessary to communicate with
@@ -23,6 +24,8 @@ type Client interface {
 
 	AllEvents(ctx context.Context, query *EventQuery) ([]Event, error)
 	Events(ctx context.Context, query *EventQuery, cursor *Cursor) (*PaginatedEvents, error)
+	RecentRun(ctx context.Context, workspaceID uuid.UUID, eventID ulid.ULID) (*ArchivedEvent, error)
+	RecentRuns(ctx context.Context, workspaceID uuid.UUID, eventName string, count int) ([]ArchivedEvent, error)
 
 	// Workflows lists all workflows in a given workspace
 	Workflows(ctx context.Context, workspaceID uuid.UUID) ([]Workflow, error)
