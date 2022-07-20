@@ -180,11 +180,7 @@ package config
 
 #Postgres: {
 	backend: "postgres"
-<<<<<<< HEAD
 	URI:     string | *"postgres://localhost:5432/postgres?sslmode=disable"
-=======
-	URI:     string | *"postgres://localhost/test"
->>>>>>> 4827d0e (Add Postgres DataStore. Add DataStore config.)
 }
 
 // Drivers handle execution of each step within a function.
