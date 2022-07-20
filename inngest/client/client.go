@@ -24,8 +24,8 @@ type Client interface {
 
 	AllEvents(ctx context.Context, query *EventQuery) ([]Event, error)
 	Events(ctx context.Context, query *EventQuery, cursor *Cursor) (*PaginatedEvents, error)
-	RecentRun(ctx context.Context, workspaceID uuid.UUID, eventID ulid.ULID) (*ArchivedEvent, error)
-	RecentRuns(ctx context.Context, workspaceID uuid.UUID, eventName string, count int) ([]ArchivedEvent, error)
+	RecentEvent(ctx context.Context, workspaceID uuid.UUID, eventID ulid.ULID) (*ArchivedEvent, error)
+	RecentEvents(ctx context.Context, workspaceID uuid.UUID, eventName string, count int64) ([]ArchivedEvent, error)
 
 	// Workflows lists all workflows in a given workspace
 	Workflows(ctx context.Context, workspaceID uuid.UUID) ([]Workflow, error)

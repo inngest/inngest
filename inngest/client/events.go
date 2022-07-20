@@ -39,9 +39,11 @@ type EventVersion struct {
 }
 
 type ArchivedEvent struct {
-	Id    string
-	Name  string
-	Event string
+	ID        string `json:"id,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Event     string `json:"event,omitempty"`
+	Timestamp string `json:"occurredAt,omitempty"`
+	Version   string `json:"version,omitempty"`
 }
 
 type EventQuery struct {
@@ -127,9 +129,9 @@ func (c httpClient) AllEvents(ctx context.Context, query *EventQuery) ([]Event, 
 	return evts, nil
 }
 
-func (c httpClient) RecentRun(ctx context.Context, workspaceID uuid.UUID, eventID ulid.ULID) (*ArchivedEvent, error) {
+func (c httpClient) RecentEvent(ctx context.Context, workspaceID uuid.UUID, eventID ulid.ULID) (*ArchivedEvent, error) {
 	query := `
-		query RecentRun($workspaceId: ID!, $archivedEventId: ULID!) {
+		query RecentEvent($workspaceId: ID!, $archivedEventId: ULID!) {
 			workspace(id: $workspaceId) {
 				archivedEvent(id: $archivedEventId) {
 					id
@@ -163,6 +165,44 @@ func (c httpClient) RecentRun(ctx context.Context, workspaceID uuid.UUID, eventI
 
 }
 
-func (c httpClient) RecentRuns(ctx context.Context, workspaceID uuid.UUID, eventName string, count int) ([]ArchivedEvent, error) {
-	return nil, nil
+func (c httpClient) RecentEvents(ctx context.Context, workspaceID uuid.UUID, eventName string, count int64) ([]ArchivedEvent, error) {
+	query := `
+		query RecentEvents($workspaceId: ID!, $name: String!, $count: Int) {
+			workspace(id: $workspaceId) {
+				event(name: $name) {
+					recent(count: $count) {
+						id
+						name
+						event
+						occurredAt
+						version
+					}
+				}
+			}
+		}
+	`
+
+	type response struct {
+		Workspace struct {
+			Event struct {
+				Recent []ArchivedEvent
+			}
+		}
+	}
+
+	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{
+		"workspaceId": workspaceID,
+		"name":        eventName,
+		"count":       count,
+	}})
+	if err != nil {
+		return nil, err
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		return nil, fmt.Errorf("error unmarshalling response: %w", err)
+	}
+
+	return data.Workspace.Event.Recent, nil
 }
