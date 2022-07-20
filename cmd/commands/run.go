@@ -21,6 +21,7 @@ import (
 )
 
 var runSeed int64
+var replayCount int64
 
 func NewCmdRun() *cobra.Command {
 	cmd := &cobra.Command{
@@ -33,6 +34,10 @@ func NewCmdRun() *cobra.Command {
 	cmd.Flags().String("event", "", "Specifies the event trigger to use if there are multiple configured")
 	cmd.Flags().Bool("event-only", false, "Prints the generated event to use without running the function")
 	cmd.Flags().Int64Var(&runSeed, "seed", 0, "Sets the seed for deterministically generating random events")
+	cmd.Flags().BoolP("replay", "r", false, "Enables replay mode to replay real recent events")
+	cmd.Flags().Int64VarP(&replayCount, "count", "c", 10, "Number of events to replay in replay mode")
+	cmd.Flags().StringP("event-id", "e", "", "Specifies a specific event to replay in replay mode")
+
 	return cmd
 }
 
