@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -23,7 +25,7 @@ import (
 )
 
 type RunUIOpts struct {
-	Event     event.Event
+	Events    []event.Event
 	Seed      int64
 	Function  function.Function
 	LogBuffer *bytes.Buffer
@@ -32,7 +34,7 @@ type RunUIOpts struct {
 func NewRunUI(ctx context.Context, opts RunUIOpts) (*RunUI, error) {
 	r := &RunUI{
 		ctx:    ctx,
-		event:  opts.Event,
+		events: opts.Events,
 		seed:   opts.Seed,
 		fn:     opts.Function,
 		logBuf: opts.LogBuffer,
@@ -47,29 +49,34 @@ type RunUI struct {
 	ctx context.Context
 
 	// event stores the event data used as a trigger for the function.
-	event event.Event
+	events []event.Event
 
 	// seed is the seed used to generate fake data
 	seed int64
 	// function is the function definition.
 	fn function.Function
 
-	err error
+	err  error
+	done bool
+
+	runs []RunUIExecution
 
 	// sm is the state manager used for the execution.
 	sm state.Manager
 
-	// id is the identifier for the execution, once started.
-	id *state.Identifier
-
-	// duration stores how long the function took to execute.
-	duration time.Duration
-
-	done bool
-
 	// logBuf stores the output of the logger, if we want to display this in
 	// the UI (which we currently dont)
 	logBuf *bytes.Buffer
+}
+
+type RunUIExecution struct {
+	// id is the identifier for the execution, once started.
+	id    *state.Identifier
+	event *event.Event
+	// duration stores how long the function took to execute.
+	// duration time.Duration
+	done bool
+	// err      error
 }
 
 // Error returns the error from building or running the function, if part of the process failed.
@@ -118,7 +125,6 @@ func (r *RunUI) run(ctx context.Context) {
 	go func() {
 		if err := service.Start(ctx, exec); err != nil {
 			r.err = err
-			r.done = true
 			return
 		}
 	}()
@@ -126,32 +132,52 @@ func (r *RunUI) run(ctx context.Context) {
 	// XXX: We need to define a readiness check with each of our services,
 	// then wait here for the readiness check to pass.
 
-	r.id, err = runner.Initialize(ctx, r.fn, r.event, r.sm, q)
-	if err != nil {
-		r.err = err
-		return
-	}
-	if r.id == nil {
-		r.err = fmt.Errorf("no run id created")
-		return
+	var wg sync.WaitGroup
+
+	for _, evt := range r.events {
+		wg.Add(1)
+
+		go func(event event.Event) {
+			defer wg.Done()
+
+			runId, err := runner.Initialize(ctx, r.fn, event, r.sm, q)
+			if err != nil {
+				r.err = err
+				return
+			}
+			if runId == nil {
+				r.err = fmt.Errorf("no run id created")
+				return
+			}
+
+			done := false
+
+			r.runs = append(r.runs, RunUIExecution{
+				id:    runId,
+				done:  false,
+				event: &event,
+			})
+
+			for !done {
+				var run state.State
+
+				run, r.err = r.sm.Load(ctx, *runId)
+				if r.err != nil {
+					return
+				}
+
+				meta := run.Metadata()
+				if meta.Pending == 0 {
+					done = true
+					return
+				}
+				<-time.After(time.Millisecond)
+			}
+		}(evt)
 	}
 
-	for !r.done {
-		var run state.State
-
-		run, r.err = r.sm.Load(ctx, *r.id)
-		if r.err != nil {
-			return
-		}
-
-		meta := run.Metadata()
-		if meta.Pending == 0 {
-			r.duration = time.Since(meta.StartedAt)
-			r.done = true
-			return
-		}
-		<-time.After(time.Millisecond)
-	}
+	wg.Wait()
+	r.done = true
 }
 
 func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -171,14 +197,14 @@ func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if r.done || r.duration != 0 || r.err != nil {
+	if r.done || r.err != nil {
 		// The fn has ran.
 		cmds = append(cmds, tea.Quit)
 	}
 
 	// Tick while the executor runs.
 	cmds = append(cmds, tea.Tick(25*time.Millisecond, func(t time.Time) tea.Msg {
-		if r.done || r.duration != 0 || r.err != nil {
+		if r.done || r.err != nil {
 			return tea.Quit
 		}
 		return nil
@@ -192,21 +218,43 @@ func (r *RunUI) View() string {
 
 	s := &strings.Builder{}
 
+	runCount := len(r.runs)
+	hasMultipleRuns := runCount > 1
+
 	if r.seed > 0 {
 		s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function using seed "))
 		s.WriteString(BoldStyle.Copy().Render(fmt.Sprintf("%d", r.seed)))
 		s.WriteString("\n")
-	} else {
+	} else if hasMultipleRuns {
 		s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function..."))
+		s.WriteString("\n\n")
+	} else {
+		s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render(fmt.Sprintf("Running your function with %d recent events...", runCount)))
 		s.WriteString("\n\n")
 	}
 
-	input, _ := json.Marshal(r.event)
-	s.WriteString(FeintStyle.Render("Input:") + "\n")
-	s.WriteString(TextStyle.Copy().Foreground(Feint).Render(wrap.String(string(input), width)))
-	s.WriteString("\n\n")
+	if hasMultipleRuns {
+		for i, run := range r.runs {
+			input, _ := json.Marshal(run.event)
+			s.WriteString(BoldStyle.Render("Run #" + strconv.Itoa(i+1) + ": " + run.event.ID + "\n"))
+			s.WriteString(FeintStyle.Render("Input:") + string(input) + "\n")
+			s.WriteString(FeintStyle.Render("Output:") + r.RenderState(run) + "\n\n")
+		}
+	} else if runCount > 0 {
+		run := r.runs[0]
 
-	s.WriteString(r.RenderState())
+		input, _ := json.Marshal(run.event)
+		s.WriteString(FeintStyle.Render("Input:") + "\n")
+		s.WriteString(TextStyle.Copy().Foreground(Feint).Render(wrap.String(string(input), width)))
+		s.WriteString("\n\n")
+		s.WriteString(FeintStyle.Render("Input:") + "\n")
+		s.WriteString(r.RenderState(run))
+	} else {
+		// nothing has happened yet
+		return s.String()
+	}
+
+	// s.WriteString(r.RenderState())
 
 	if r.err != nil {
 		s.WriteString(RenderError("There was an error running your function: "+r.err.Error()) + "\n")
@@ -218,24 +266,24 @@ func (r *RunUI) View() string {
 		return s.String()
 	}
 
-	s.WriteString(
-		BoldStyle.Copy().Foreground(Green).Padding(0, 0, 1, 0).Render(
-			fmt.Sprintf("Function complete in %.2f seconds", r.duration.Seconds()),
-		),
-	)
+	// s.WriteString(
+	// 	BoldStyle.Copy().Foreground(Green).Padding(0, 0, 1, 0).Render(
+	// 		fmt.Sprintf("Function complete in %.2f seconds", r.duration.Seconds()),
+	// 	),
+	// )
 
 	return s.String()
 }
 
-func (r *RunUI) RenderState() string {
-	if r.id == nil {
-		return ""
-	}
+func (r *RunUI) RenderState(run RunUIExecution) string {
+	// if r.id == nil {
+	// 	return ""
+	// }
 
 	width, _, _ := term.GetSize(int(os.Stdout.Fd()))
 	s := &strings.Builder{}
 
-	state, err := r.sm.Load(context.Background(), *r.id)
+	state, err := r.sm.Load(context.Background(), *run.id)
 	if err != nil {
 		s.WriteString(RenderError("There was an error loading state: "+err.Error()) + "\n")
 		return s.String()

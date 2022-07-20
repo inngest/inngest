@@ -6,12 +6,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest-cli/inngest/state"
 	"github.com/inngest/inngest-cli/pkg/cli"
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
@@ -37,6 +36,7 @@ func NewCmdRun() *cobra.Command {
 	cmd.Flags().BoolP("replay", "r", false, "Enables replay mode to replay real recent events")
 	cmd.Flags().Int64VarP(&replayCount, "count", "c", 10, "Number of events to replay in replay mode")
 	cmd.Flags().StringP("event-id", "e", "", "Specifies a specific event to replay in replay mode")
+	cmd.Flags().StringP("trigger", "t", "", "Specifies a the trigger you wish to retrieve events for in replay mode")
 
 	return cmd
 }
@@ -54,6 +54,13 @@ func doRun(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	if cmd.Flag("event-only").Value.String() == "true" {
+		evt, _ := fakeEvent(cmd.Context(), *fn, "")
+		out, _ := json.Marshal(evt)
+		fmt.Println(string(out))
+		return
+	}
+
 	if err = buildImg(cmd.Context(), *fn); err != nil {
 		// This should already have been printed to the terminal.
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
@@ -61,9 +68,19 @@ func doRun(cmd *cobra.Command, args []string) {
 	}
 
 	eventName := cmd.Flag("event").Value.String()
-	if err = runFunction(cmd.Context(), *fn, eventName); err != nil {
-		// This should already have been printed to the terminal.
-		os.Exit(1)
+	if cmd.Flag("replay").Value.String() == "true" {
+		// ctx := cmd.Context()
+
+		// TODO implement event-id handling
+		if err = runFunction(cmd.Context(), *fn, eventName, replayCount); err != nil {
+			os.Exit(1)
+		}
+	} else {
+
+		if err = runFunction(cmd.Context(), *fn, eventName, 0); err != nil {
+			// This should already have been printed to the terminal.
+			os.Exit(1)
+		}
 	}
 }
 
@@ -92,15 +109,28 @@ func buildImg(ctx context.Context, fn function.Function) error {
 }
 
 // runFunction builds the function's images and runs the function.
-func runFunction(ctx context.Context, fn function.Function, eventName string) error {
-	if runSeed <= 0 {
-		rand.Seed(time.Now().UnixNano())
-		runSeed = rand.Int63n(1_000_000)
-	}
+func runFunction(ctx context.Context, fn function.Function, eventName string, recentEvents int64) error {
+	// if runSeed <= 0 {
+	// 	rand.Seed(time.Now().UnixNano())
+	// 	runSeed = rand.Int63n(1_000_000)
+	// }
 
-	evt, err := generateEvent(ctx, fn, eventName)
-	if err != nil {
-		return err
+	var evts []event.Event
+	var err error
+
+	if replayCount < 1 {
+		fmt.Println("Generating events...")
+		evts, err = generateEvents(ctx, fn, eventName)
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Println("Replaying recent events")
+		evts, err = fetchRecentEvents(ctx, eventName, recentEvents)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Got", len(evts), "events")
 	}
 
 	// NOTE: The runner, executor, etc. uses logger from context.  Bubbletea
@@ -115,13 +145,14 @@ func runFunction(ctx context.Context, fn function.Function, eventName string) er
 	// Run the function.
 	ui, err := cli.NewRunUI(ctx, cli.RunUIOpts{
 		Function:  fn,
-		Event:     evt,
+		Events:    evts,
 		Seed:      runSeed,
 		LogBuffer: buf,
 	})
 	if err != nil {
 		return err
 	}
+
 	if err := tea.NewProgram(ui).Start(); err != nil {
 		return err
 	}
@@ -132,10 +163,10 @@ func runFunction(ctx context.Context, fn function.Function, eventName string) er
 // generateEvent retrieves the event for use within testing the function.  It first checks stdin
 // to see if we're passed an event, or resorts to generating a fake event based off of
 // the function's event type.
-func generateEvent(ctx context.Context, fn function.Function, eventName string) (event.Event, error) {
+func generateEvents(ctx context.Context, fn function.Function, eventName string) ([]event.Event, error) {
 	fi, err := os.Stdin.Stat()
 	if err != nil {
-		return event.Event{}, err
+		return []event.Event{}, err
 	}
 	if (fi.Mode() & os.ModeCharDevice) == 0 {
 		// Read stdin
@@ -145,10 +176,15 @@ func generateEvent(ctx context.Context, fn function.Function, eventName string) 
 
 		data := event.Event{}
 		err := json.Unmarshal(evt, &data)
-		return data, err
+		return []event.Event{data}, err
 	}
 
-	return fakeEvent(ctx, fn, eventName)
+	fakedEvent, err := fakeEvent(ctx, fn, eventName)
+	if err != nil {
+		return nil, err
+	}
+
+	return []event.Event{fakedEvent}, nil
 }
 
 // fakeEvent finds event triggers within the function definition, then chooses
@@ -161,4 +197,42 @@ func fakeEvent(ctx context.Context, fn function.Function, eventName string) (eve
 		}
 	}
 	return function.GenerateTriggerData(ctx, runSeed, triggers)
+}
+
+func fetchRecentEvents(ctx context.Context, eventName string, count int64) ([]event.Event, error) {
+	fmt.Println("Hit fetchRecentEvents")
+	s := state.RequireState(ctx)
+
+	ws, err := state.Workspace(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("Got workspace:", ws.ID.String(), eventName)
+
+	archivedEvents, err := s.Client.RecentEvents(ctx, ws.ID, eventName, count)
+	if err != nil {
+		fmt.Println("Oof error", err)
+		return nil, err
+	}
+
+	fmt.Println("Got", len(archivedEvents), "events")
+
+	events := []event.Event{}
+
+	for _, archivedEvent := range archivedEvents {
+		data := &map[string]interface{}{}
+
+		if err := json.Unmarshal([]byte(archivedEvent.Event), &data); err != nil {
+			return nil, err
+		}
+
+		events = append(events, event.Event{
+			ID:   archivedEvent.ID,
+			Name: archivedEvent.Name,
+			Data: *data,
+		})
+	}
+
+	return events, nil
 }
