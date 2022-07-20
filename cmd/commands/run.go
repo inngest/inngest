@@ -49,6 +49,13 @@ func doRun(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	if cmd.Flag("event-only").Value.String() == "true" {
+		evt, _ := fakeEvent(cmd.Context(), *fn, "")
+		out, _ := json.Marshal(evt)
+		fmt.Println(string(out))
+		return
+	}
+
 	if err = buildImg(cmd.Context(), *fn); err != nil {
 		// This should already have been printed to the terminal.
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
