@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/event"
@@ -29,15 +29,17 @@ type RunUIOpts struct {
 	Seed      int64
 	Function  function.Function
 	LogBuffer *bytes.Buffer
+	Verbose   bool
 }
 
 func NewRunUI(ctx context.Context, opts RunUIOpts) (*RunUI, error) {
 	r := &RunUI{
-		ctx:    ctx,
-		events: opts.Events,
-		seed:   opts.Seed,
-		fn:     opts.Function,
-		logBuf: opts.LogBuffer,
+		ctx:     ctx,
+		events:  opts.Events,
+		seed:    opts.Seed,
+		fn:      opts.Function,
+		logBuf:  opts.LogBuffer,
+		verbose: opts.Verbose,
 	}
 	return r, nil
 }
@@ -67,6 +69,8 @@ type RunUI struct {
 	// logBuf stores the output of the logger, if we want to display this in
 	// the UI (which we currently dont)
 	logBuf *bytes.Buffer
+
+	verbose bool
 }
 
 type RunUIExecution struct {
@@ -75,9 +79,15 @@ type RunUIExecution struct {
 	event *event.Event
 	// duration stores how long the function took to execute.
 	// duration time.Duration
-	done bool
+	done *bool
 	// err      error
 }
+
+var runsStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#fbbf24")).Padding(0, 1)
+var passStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#84cc16")).Padding(0, 1)
+var failStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#b91c1c")).Padding(0, 1)
+
+const sidePadding = 7
 
 // Error returns the error from building or running the function, if part of the process failed.
 func (r *RunUI) Error() error {
@@ -152,13 +162,15 @@ func (r *RunUI) run(ctx context.Context) {
 
 			done := false
 
-			r.runs = append(r.runs, RunUIExecution{
+			execution := RunUIExecution{
 				id:    runId,
-				done:  false,
+				done:  &done,
 				event: &event,
-			})
+			}
 
-			for !done {
+			r.runs = append(r.runs, execution)
+
+			for !*execution.done {
 				var run state.State
 
 				run, r.err = r.sm.Load(ctx, *runId)
@@ -166,12 +178,11 @@ func (r *RunUI) run(ctx context.Context) {
 					return
 				}
 
-				meta := run.Metadata()
-				if meta.Pending == 0 {
-					done = true
+				if run.Metadata().Pending == 0 || len(run.Errors()) > 0 {
+					*execution.done = true
 					return
 				}
-				<-time.After(time.Millisecond)
+				<-time.After(time.Millisecond * 5)
 			}
 		}(evt)
 	}
@@ -222,27 +233,27 @@ func (r *RunUI) View() string {
 	hasMultipleRuns := runCount > 1
 
 	if r.seed > 0 {
-		s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function using seed "))
+		s.WriteString("Running your function using seed ")
 		s.WriteString(BoldStyle.Copy().Render(fmt.Sprintf("%d", r.seed)))
-		s.WriteString("\n")
+		s.WriteString("\n\n")
 	} else if hasMultipleRuns {
-		s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function..."))
+		s.WriteString(fmt.Sprintf("Running your function with %d recent events...", runCount))
 		s.WriteString("\n\n")
 	} else {
-		s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render(fmt.Sprintf("Running your function with %d recent events...", runCount)))
+		s.WriteString("Running your function...")
 		s.WriteString("\n\n")
 	}
 
 	if hasMultipleRuns {
-		for i, run := range r.runs {
-			input, _ := json.Marshal(run.event)
-			s.WriteString(BoldStyle.Render("Run #" + strconv.Itoa(i+1) + ": " + run.event.ID + "\n"))
-			s.WriteString(FeintStyle.Render("Input:") + string(input) + "\n")
-			s.WriteString(FeintStyle.Render("Output:") + r.RenderState(run) + "\n\n")
+		for _, run := range r.runs {
+			s.WriteString(r.RenderState(run) + "\n")
 		}
+
+		s.WriteString("\n")
 	} else if runCount > 0 {
 		run := r.runs[0]
 
+		// TODO RenderState should handle this with verbose:true
 		input, _ := json.Marshal(run.event)
 		s.WriteString(FeintStyle.Render("Input:") + "\n")
 		s.WriteString(TextStyle.Copy().Foreground(Feint).Render(wrap.String(string(input), width)))
@@ -254,8 +265,6 @@ func (r *RunUI) View() string {
 		return s.String()
 	}
 
-	// s.WriteString(r.RenderState())
-
 	if r.err != nil {
 		s.WriteString(RenderError("There was an error running your function: "+r.err.Error()) + "\n")
 		return s.String()
@@ -266,6 +275,7 @@ func (r *RunUI) View() string {
 		return s.String()
 	}
 
+	// TODO Still want this
 	// s.WriteString(
 	// 	BoldStyle.Copy().Foreground(Green).Padding(0, 0, 1, 0).Render(
 	// 		fmt.Sprintf("Function complete in %.2f seconds", r.duration.Seconds()),
@@ -276,9 +286,9 @@ func (r *RunUI) View() string {
 }
 
 func (r *RunUI) RenderState(run RunUIExecution) string {
-	// if r.id == nil {
-	// 	return ""
-	// }
+	if run.id == nil {
+		return ""
+	}
 
 	width, _, _ := term.GetSize(int(os.Stdout.Fd()))
 	s := &strings.Builder{}
@@ -289,33 +299,38 @@ func (r *RunUI) RenderState(run RunUIExecution) string {
 		return s.String()
 	}
 
-	output := state.Actions()
+	// TODO Render output in verbose mode
+	// output := state.Actions()
 	errors := state.Errors()
+	metadata := state.Metadata()
+	done := *run.done
+	passed := done && len(errors) == 0
+	failed := done && len(errors) > 0
 
-	s.WriteString(BoldStyle.Render("Output") + "\n")
-	if len(output) == 0 {
-		s.WriteString(FeintStyle.Render("No output yet.") + "\n")
-	}
-	for id, data := range output {
-		byt, _ := json.Marshal(data)
-		s.WriteString(BoldStyle.Render(fmt.Sprintf("Step '%s'", id)))
-		s.WriteString(": \n")
-		s.WriteString(wrap.String(string(byt), width))
-		s.WriteString("\n")
-	}
+	status := runsStyle.Render("RUNS")
+	runId := run.event.ID
+	info := FeintStyle.Render(fmt.Sprintf("%d step(s) running", metadata.Pending))
 
-	s.WriteString("\n")
-	s.WriteString(BoldStyle.Render("Errors") + "\n")
-
-	if len(errors) == 0 {
-		s.WriteString(FeintStyle.Render("No errors 🥳") + "\n")
-	}
-	for id, err := range errors {
-		s.WriteString(BoldStyle.Render(fmt.Sprintf("Step '%s'", id)))
-		s.WriteString(": " + wrap.String(err.Error(), width))
-		s.WriteString("\n")
+	if passed {
+		status = passStyle.Render("PASS")
+		info = FeintStyle.Render("No errors")
+	} else if failed {
+		status = failStyle.Render("FAIL")
+		info = FeintStyle.Render(fmt.Sprintf("%d error(s)", len(errors)))
 	}
 
-	s.WriteString("\n")
+	s.WriteString(strings.Join([]string{status, runId, info}, " "))
+
+	if failed {
+		input, _ := json.Marshal(run.event)
+		s.WriteString(TextStyle.Copy().PaddingLeft(sidePadding).Render("\n\nInput:\n" + FeintStyle.Render(wrap.String(string(input), width-sidePadding))))
+
+		for _, err := range errors {
+			s.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).PaddingLeft(sidePadding).Render(wrap.String(err.Error(), width-sidePadding)))
+		}
+	}
+
+	// TODO }else{ Render IO in verbose mode
+
 	return s.String()
 }

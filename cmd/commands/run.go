@@ -68,16 +68,17 @@ func doRun(cmd *cobra.Command, args []string) {
 	}
 
 	eventName := cmd.Flag("event").Value.String()
+	hasVerboseFlag := cmd.Flag("verbose").Value.String() == "true"
 	if cmd.Flag("replay").Value.String() == "true" {
 		// ctx := cmd.Context()
 
 		// TODO implement event-id handling
-		if err = runFunction(cmd.Context(), *fn, eventName, replayCount); err != nil {
+		if err = runFunction(cmd.Context(), *fn, eventName, replayCount, hasVerboseFlag); err != nil {
 			os.Exit(1)
 		}
 	} else {
 
-		if err = runFunction(cmd.Context(), *fn, eventName, 0); err != nil {
+		if err = runFunction(cmd.Context(), *fn, eventName, 0, hasVerboseFlag); err != nil {
 			// This should already have been printed to the terminal.
 			os.Exit(1)
 		}
@@ -109,7 +110,7 @@ func buildImg(ctx context.Context, fn function.Function) error {
 }
 
 // runFunction builds the function's images and runs the function.
-func runFunction(ctx context.Context, fn function.Function, eventName string, recentEvents int64) error {
+func runFunction(ctx context.Context, fn function.Function, eventName string, recentEvents int64, verboseFlag bool) error {
 	// if runSeed <= 0 {
 	// 	rand.Seed(time.Now().UnixNano())
 	// 	runSeed = rand.Int63n(1_000_000)
@@ -145,6 +146,7 @@ func runFunction(ctx context.Context, fn function.Function, eventName string, re
 		Events:    evts,
 		Seed:      runSeed,
 		LogBuffer: buf,
+		Verbose:   verboseFlag || len(evts) == 1,
 	})
 	if err != nil {
 		return err
