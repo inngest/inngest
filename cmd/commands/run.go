@@ -136,6 +136,8 @@ func runFunction(ctx context.Context, fn function.Function, triggerName string, 
 	var evts []event.Event
 	var err error
 
+	usingGeneratedEvent := false
+
 	if opts.fetchEventId != nil {
 		evt, err := fetchEvent(ctx, *opts.fetchEventId)
 		if err != nil {
@@ -148,7 +150,7 @@ func runFunction(ctx context.Context, fn function.Function, triggerName string, 
 			return err
 		}
 	} else {
-		evts, err = generateEvents(ctx, fn, eventName)
+		usingGeneratedEvent = true
 		evts, err = generateEvents(ctx, fn, triggerName)
 		if err != nil {
 			return err
@@ -164,7 +166,7 @@ func runFunction(ctx context.Context, fn function.Function, triggerName string, 
 	log := logger.Buffered(buf)
 	ctx = logger.With(ctx, *log)
 
-	if runSeed <= 0 {
+	if usingGeneratedEvent && runSeed <= 0 {
 		rand.Seed(time.Now().UnixNano())
 		runSeed = rand.Int63n(1_000_000)
 	}
