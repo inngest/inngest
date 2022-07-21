@@ -90,8 +90,6 @@ var runsStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#fffff
 var passStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#84cc16")).Padding(0, 1)
 var failStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#b91c1c")).Padding(0, 1)
 
-const sidePadding = 4
-
 // Error returns the error from building or running the function, if part of the process failed.
 func (r *RunUI) Error() error {
 	return r.err
@@ -126,8 +124,9 @@ func (r *RunUI) run(ctx context.Context) {
 	//
 	// NOTE: Each individual config struct returns a singleton in-memory
 	// service, given the config struct has not been copied.
-	r.sm, r.err = c.State.Service.Concrete.Manager(ctx)
-	if r.err != nil {
+	r.sm, err = c.State.Service.Concrete.Manager(ctx)
+	if err != nil {
+		r.err = err
 		return
 	}
 
@@ -153,7 +152,9 @@ func (r *RunUI) run(ctx context.Context) {
 		go func(event event.Event) {
 			defer wg.Done()
 
-			runId, err := runner.Initialize(ctx, r.fn, event, r.sm, q)
+			var runId *state.Identifier
+
+			runId, err = runner.Initialize(ctx, r.fn, event, r.sm, q)
 			if err != nil {
 				r.err = err
 				return
@@ -178,8 +179,9 @@ func (r *RunUI) run(ctx context.Context) {
 			for !*execution.done {
 				var run state.State
 
-				run, r.err = r.sm.Load(ctx, *runId)
-				if r.err != nil {
+				run, err = r.sm.Load(ctx, *runId)
+				if err != nil {
+					r.err = err
 					return
 				}
 
@@ -200,8 +202,15 @@ func (r *RunUI) run(ctx context.Context) {
 					}
 				}
 
-				if run.Metadata().Pending == 0 || len(run.Errors()) > 0 {
+				hasErrors := len(run.Errors()) > 0
+
+				if run.Metadata().Pending == 0 || hasErrors {
+					if hasErrors {
+						r.err = fmt.Errorf("run failed")
+					}
+
 					*execution.done = true
+
 					return
 				}
 				<-time.After(time.Millisecond * 5)
@@ -230,14 +239,14 @@ func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if r.done || r.err != nil {
+	if r.done {
 		// The fn has ran.
 		cmds = append(cmds, tea.Quit)
 	}
 
 	// Tick while the executor runs.
 	cmds = append(cmds, tea.Tick(25*time.Millisecond, func(t time.Time) tea.Msg {
-		if r.done || r.err != nil {
+		if r.done {
 			return tea.Quit
 		}
 		return nil
@@ -266,21 +275,12 @@ func (r *RunUI) View() string {
 		s.WriteString("\n\n")
 	}
 
-	if hasMultipleRuns {
+	if len(r.runs) > 0 {
 		for _, run := range r.runs {
 			s.WriteString(r.RenderState(run) + "\n")
 		}
-	} else if runCount > 0 {
-		// Force verbose mode if there is only one run.
-		r.verbose = true
-		s.WriteString(r.RenderState(r.runs[0]) + "\n")
 	} else {
 		// nothing has happened yet
-		return s.String()
-	}
-
-	if r.err != nil {
-		s.WriteString(RenderError("There was an error running your function: "+r.err.Error()) + "\n")
 		return s.String()
 	}
 
@@ -340,13 +340,13 @@ func (r *RunUI) RenderState(run RunUIExecution) string {
 	if failed || r.verbose {
 		input, _ := json.Marshal(run.event)
 		s.WriteString("\n\n")
-		s.WriteString(TextStyle.Copy().PaddingLeft(sidePadding).Render("Input:") + "\n")
-		s.WriteString(FeintStyle.Render(wrap.String(string(input), width-sidePadding)))
+		s.WriteString(TextStyle.Copy().Render("Input:") + "\n")
+		s.WriteString(FeintStyle.Render(wrap.String(string(input), width)))
 	}
 
 	if failed {
 		for _, err := range errors {
-			s.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).PaddingLeft(sidePadding).Render(wrap.String(err.Error(), width-sidePadding)) + "\n")
+			s.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Render(wrap.String(err.Error(), width)) + "\n")
 		}
 	} else if r.verbose {
 		output := state.Actions()
@@ -356,8 +356,8 @@ func (r *RunUI) RenderState(run RunUIExecution) string {
 
 			if data != nil {
 				byt, _ := json.Marshal(data)
-				s.WriteString("\n\n" + BoldStyle.PaddingLeft(sidePadding).Render(fmt.Sprintf("Step '%s' output:", key)) + "\n")
-				s.WriteString(FeintStyle.PaddingLeft(sidePadding).Render((wrap.String(string(byt), width-sidePadding))))
+				s.WriteString("\n\n" + BoldStyle.Render(fmt.Sprintf("Step '%s' output:", key)) + "\n")
+				s.WriteString(FeintStyle.Render((wrap.String(string(byt), width))))
 			}
 		}
 
