@@ -145,6 +145,24 @@ func runFunction(ctx context.Context, fn function.Function, triggerName string, 
 		}
 		evts = []event.Event{*evt}
 	} else if opts.fetchRecentEvents > 0 {
+		// We need there to be one trigger name here; if we haven't been given one,
+		// we might be able to find it in the function definition.
+		if triggerName == "" {
+			if len(fn.Triggers) == 0 {
+				return fmt.Errorf("no trigger specified and no triggers found in function")
+			}
+
+			if len(fn.Triggers) > 1 {
+				return fmt.Errorf("no trigger specified and multiple triggers found in function; provide a single trigger with the --trigger flag")
+			}
+
+			triggerName = fn.Triggers[0].Event
+
+			if triggerName == "" {
+				return fmt.Errorf("no trigger specified and could not find trigger in function definition")
+			}
+		}
+
 		evts, err = fetchRecentEvents(ctx, triggerName, int64(opts.fetchRecentEvents))
 		if err != nil {
 			return err
