@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/backoff"
 	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/coredata"
+	inmemorydatastore "github.com/inngest/inngest-cli/pkg/coredata/inmemory"
 	"github.com/inngest/inngest-cli/pkg/execution/driver"
 	"github.com/inngest/inngest-cli/pkg/execution/queue"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
@@ -56,7 +57,7 @@ func (s *svc) Pre(ctx context.Context) error {
 	var err error
 
 	if s.data == nil {
-		s.data, err = coredata.NewFSLoader(ctx, ".")
+		s.data, err = inmemorydatastore.NewFSLoader(ctx, ".")
 		if err != nil {
 			return err
 		}

@@ -11,7 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/coredata"
+	inmemorydatastore "github.com/inngest/inngest-cli/pkg/coredata/inmemory"
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/runner"
@@ -86,7 +86,7 @@ func (r *RunUI) Init() tea.Cmd {
 
 // run performs the running of the function.
 func (r *RunUI) run(ctx context.Context) {
-	el := &coredata.MemoryExecutionLoader{}
+	el := &inmemorydatastore.MemoryExecutionLoader{}
 	if err := el.SetFunctions(ctx, []*function.Function{&r.fn}); err != nil {
 		// This is a render loop, so store the error in our mutable state
 		// for the View() function to render to the UI.

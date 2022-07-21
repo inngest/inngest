@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/inngest/inngest-cli/pkg/coredata"
+	inmemorydatastore "github.com/inngest/inngest-cli/pkg/coredata/inmemory"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -31,7 +31,7 @@ func main() {
 func build(ctx context.Context) error {
 	fmt.Println("Building images...")
 	// Create a new filesystem loader.
-	el, err := coredata.NewFSLoader(ctx, ".")
+	el, err := inmemorydatastore.NewFSLoader(ctx, ".")
 	if err != nil {
 		return err
 	}

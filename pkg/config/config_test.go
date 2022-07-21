@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/inngest/inngest-cli/pkg/config/registration"
+	inmemorydatastore "github.com/inngest/inngest-cli/pkg/coredata/inmemory"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/queue/inmemoryqueue"
@@ -51,6 +52,12 @@ func defaultConfig() *Config {
 			Service: StateService{
 				Backend:  "inmemory",
 				Concrete: &inmemory.Config{},
+			},
+		},
+		DataStore: DataStore{
+			Service: DataStoreService{
+				Backend:  "inmemory",
+				Concrete: &inmemorydatastore.Config{},
 			},
 		},
 	}
