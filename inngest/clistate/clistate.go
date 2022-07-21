@@ -1,4 +1,4 @@
-package state
+package clistate
 
 import (
 	"context"
@@ -26,6 +26,20 @@ var (
 const (
 	SettingRanInit = "ranInit"
 )
+
+func init() {
+	ctx := context.Background()
+	state, err := GetState(ctx)
+	// Always create a new client ID when the CLI runs.
+	if err == ErrNoState {
+		_ = State{ClientID: uuid.New()}.Persist(ctx)
+	}
+	// Ensure we have a client ID.
+	if state.ClientID == uuid.Nil {
+		state.ClientID = uuid.New()
+		state.Persist(ctx)
+	}
+}
 
 func SaveSetting(ctx context.Context, key string, value interface{}) error {
 	s, _ := GetState(ctx)
@@ -60,6 +74,7 @@ func Clear(ctx context.Context) error {
 type State struct {
 	client.Client `json:"-"`
 
+	ClientID    uuid.UUID              `json:"clientID"`
 	Credentials []byte                 `json:"credentials"`
 	Account     client.Account         `json:"account"`
 	Settings    map[string]interface{} `json:"settings"`

@@ -18,7 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/inngest/client"
-	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/inngest/inngest-cli/pkg/scaffold"
 	"github.com/inngest/inngestgo"
@@ -858,11 +858,11 @@ func fetchEvents() ([]client.Event, error) {
 	defer done()
 
 	var workspaceID *uuid.UUID
-	if w, err := state.Workspace(ctx); err == nil {
+	if w, err := clistate.Workspace(ctx); err == nil {
 		workspaceID = &w.ID
 	}
 
-	c := state.Client(ctx)
+	c := clistate.Client(ctx)
 	evts, err := c.AllEvents(ctx, &client.EventQuery{
 		WorkspaceID: workspaceID,
 	})

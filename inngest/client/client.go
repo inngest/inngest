@@ -2,9 +2,6 @@ package client
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"os"
 
@@ -18,6 +15,10 @@ type Client interface {
 	Credentials() []byte
 
 	Login(ctx context.Context, email, password string) ([]byte, error)
+
+	StartDeviceLogin(ctx context.Context, clientID uuid.UUID) (*StartDeviceLoginResponse, error)
+	PollDeviceLogin(ctx context.Context, clientID uuid.UUID, deviceCode uuid.UUID) (*DeviceLoginResponse, error)
+
 	Account(ctx context.Context) (*Account, error)
 	Workspaces(ctx context.Context) ([]Workspace, error)
 
@@ -102,43 +103,4 @@ type httpClient struct {
 
 func (c httpClient) Credentials() []byte {
 	return c.creds
-}
-
-func (c httpClient) Login(ctx context.Context, email, password string) ([]byte, error) {
-	input := map[string]string{
-		"email":    email,
-		"password": password,
-	}
-	buf := jsonBuffer(ctx, input)
-
-	req, err := c.NewRequest(http.MethodPost, "/v1/login", buf)
-	if err != nil {
-		return nil, fmt.Errorf("error creating login request: %s", err)
-	}
-
-	resp, err := c.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error performing login request: %s", err)
-	}
-	defer resp.Body.Close()
-	byt, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading response: %s", err)
-	}
-
-	type response struct {
-		Message string
-		JWT     string
-	}
-
-	r := &response{}
-	if err = json.Unmarshal(byt, r); err != nil {
-		return nil, fmt.Errorf("invalid json response: %w: \n%s", err, string(byt))
-	}
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%s", r.Message)
-	}
-
-	return []byte(r.JWT), nil
 }

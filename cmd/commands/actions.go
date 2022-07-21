@@ -6,7 +6,7 @@ import (
 
 	"github.com/inngest/inngest-cli/cmd/commands/internal/actions"
 	"github.com/inngest/inngest-cli/inngest/client"
-	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/pkg/cli"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/mitchellh/go-homedir"
@@ -35,7 +35,7 @@ func runActionDeploy(cmd *cobra.Command, args []string) {
 	// This is a legacy command for deployin action from ./action.cue
 	// configuration files.
 	ctx := cmd.Context()
-	state := state.RequireState(ctx)
+	state := clistate.RequireState(ctx)
 
 	if len(args) == 0 {
 		fmt.Println(cli.RenderError("No configuration provided"))
