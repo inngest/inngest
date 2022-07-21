@@ -119,18 +119,15 @@ func runFunction(ctx context.Context, fn function.Function, eventName string, re
 	var err error
 
 	if replayCount < 1 {
-		fmt.Println("Generating events...")
 		evts, err = generateEvents(ctx, fn, eventName)
 		if err != nil {
 			return err
 		}
 	} else {
-		fmt.Println("Replaying recent events")
 		evts, err = fetchRecentEvents(ctx, eventName, recentEvents)
 		if err != nil {
 			return err
 		}
-		fmt.Println("Got", len(evts), "events")
 	}
 
 	// NOTE: The runner, executor, etc. uses logger from context.  Bubbletea
@@ -200,7 +197,6 @@ func fakeEvent(ctx context.Context, fn function.Function, eventName string) (eve
 }
 
 func fetchRecentEvents(ctx context.Context, eventName string, count int64) ([]event.Event, error) {
-	fmt.Println("Hit fetchRecentEvents")
 	s := state.RequireState(ctx)
 
 	ws, err := state.Workspace(ctx)
@@ -208,15 +204,11 @@ func fetchRecentEvents(ctx context.Context, eventName string, count int64) ([]ev
 		return nil, err
 	}
 
-	fmt.Println("Got workspace:", ws.ID.String(), eventName)
-
 	archivedEvents, err := s.Client.RecentEvents(ctx, ws.ID, eventName, count)
 	if err != nil {
 		fmt.Println("Oof error", err)
 		return nil, err
 	}
-
-	fmt.Println("Got", len(archivedEvents), "events")
 
 	events := []event.Event{}
 
