@@ -221,16 +221,23 @@ func fetchRecentEvents(ctx context.Context, eventName string, count int64) ([]ev
 	events := []event.Event{}
 
 	for _, archivedEvent := range archivedEvents {
-		data := &map[string]interface{}{}
+		type evtData struct {
+			Data map[string]interface{}
+			Name string
+			ts   int64
+		}
 
-		if err := json.Unmarshal([]byte(archivedEvent.Event), &data); err != nil {
+		evt := &evtData{}
+
+		if err := json.Unmarshal([]byte(archivedEvent.Event), &evt); err != nil {
 			return nil, err
 		}
 
 		events = append(events, event.Event{
-			ID:   archivedEvent.ID,
-			Name: archivedEvent.Name,
-			Data: *data,
+			ID:        archivedEvent.ID,
+			Name:      archivedEvent.Name,
+			Data:      evt.Data,
+			Timestamp: evt.ts,
 		})
 	}
 
