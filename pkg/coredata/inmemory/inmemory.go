@@ -1,4 +1,4 @@
-package coredata
+package inmemory
 
 import (
 	"context"
@@ -10,10 +10,31 @@ import (
 
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/inngest/client"
+	"github.com/inngest/inngest-cli/pkg/config/registration"
+	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/inngest/inngest-cli/pkg/logger"
 	"golang.org/x/sync/errgroup"
 )
+
+func init() {
+	registration.RegisterDataStore(func() any { return &Config{} })
+}
+
+type Config struct{}
+
+func (c Config) DataStoreName() string {
+	return "inmemory"
+}
+
+func (c Config) ReadWriter(ctx context.Context) (coredata.ReadWriter, error) {
+	return &ReadWriter{}, nil
+}
+
+type ReadWriter struct {
+	MemoryExecutionLoader
+	MemoryAPIReadWriter
+}
 
 // FSLoader is a function and action loader which returns functions and actions
 // by reading the given filesystem path recursively, loading functions and actions
@@ -48,7 +69,7 @@ func (f *FSLoader) ReadDir(ctx context.Context) error {
 
 // NewFSLoader returns an ExecutionLoader which reads functions from the given
 // path, recursively.
-func NewFSLoader(ctx context.Context, path string) (ExecutionLoader, error) {
+func NewFSLoader(ctx context.Context, path string) (coredata.ExecutionLoader, error) {
 	// XXX: This should probably be a singleton;  this is primarily used
 	// for the dev server.  in this case, a single process hosts the
 	// runner and the executor together - and we don't want to process
@@ -64,7 +85,7 @@ func NewFSLoader(ctx context.Context, path string) (ExecutionLoader, error) {
 	return loader, nil
 }
 
-// MmeoryExecutionLoader is a function and action loader which returns data from
+// MemoryExecutionLoader is a function and action loader which returns data from
 // in-memory state.
 type MemoryExecutionLoader struct {
 	// embed the in-memory action loader for querying action versions found within

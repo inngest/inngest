@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/cli"
 	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/coredata"
+	inmemorydatastore "github.com/inngest/inngest-cli/pkg/coredata/inmemory"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/executor"
 	"github.com/inngest/inngest-cli/pkg/execution/runner"
@@ -20,7 +21,7 @@ import (
 // Create and start a new dev server (API, Exectutor, State, Logger, etc.)
 func NewDevServer(ctx context.Context, c config.Config, dir string) error {
 	// Create a new filesystem loader.
-	el, err := coredata.NewFSLoader(ctx, dir)
+	el, err := inmemorydatastore.NewFSLoader(ctx, dir)
 	if err != nil {
 		return err
 	}
