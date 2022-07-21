@@ -10,6 +10,7 @@ import (
 
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/inngest/client"
+	"github.com/inngest/inngest-cli/internal/cuedefs"
 	"github.com/inngest/inngest-cli/pkg/config/registration"
 	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/function"
@@ -28,12 +29,19 @@ func (c Config) DataStoreName() string {
 }
 
 func (c Config) ReadWriter(ctx context.Context) (coredata.ReadWriter, error) {
-	return &ReadWriter{}, nil
+	return New(ctx)
 }
 
 type ReadWriter struct {
-	MemoryExecutionLoader
-	MemoryAPIReadWriter
+	*MemoryAPIReadWriter
+	*MemoryExecutionLoader
+}
+
+func New(ctx context.Context) (*ReadWriter, error) {
+	return &ReadWriter{
+		MemoryAPIReadWriter:   NewInMemoryAPIReadWriter(),
+		MemoryExecutionLoader: &MemoryExecutionLoader{},
+	}, nil
 }
 
 // FSLoader is a function and action loader which returns functions and actions
@@ -199,9 +207,6 @@ func (l *memactionloader) Add(action inngest.ActionVersion) {
 
 // sortActions sorts the actions for easy querying with version constraints.
 func (l *memactionloader) sortActions() {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
 	for dsn, actions := range l.Actions {
 		copied := actions
 		sort.SliceStable(copied, func(i, j int) bool {
@@ -274,10 +279,10 @@ type MemoryAPIReadWriter struct {
 }
 
 func NewInMemoryAPIReadWriter() *MemoryAPIReadWriter {
-	l := &MemoryAPIReadWriter{}
-	l.MemoryAPIFunctionWriter = NewInMemoryAPIFunctionWriter()
-	l.MemoryAPIActionLoader = NewInMemoryAPIActionLoader()
-	return l
+	return &MemoryAPIReadWriter{
+		MemoryAPIFunctionWriter: NewInMemoryAPIFunctionWriter(),
+		MemoryAPIActionLoader:   NewInMemoryAPIActionLoader(),
+	}
 }
 
 type MemoryAPIActionLoader struct {
@@ -285,9 +290,9 @@ type MemoryAPIActionLoader struct {
 }
 
 func NewInMemoryAPIActionLoader() *MemoryAPIActionLoader {
-	l := &MemoryAPIActionLoader{}
-	l.memactionloader = NewInMemoryActionLoader()
-	return l
+	return &MemoryAPIActionLoader{
+		memactionloader: NewInMemoryActionLoader(),
+	}
 }
 
 func (m *MemoryAPIActionLoader) ActionVersion(ctx context.Context, dsn string, vc *inngest.VersionConstraint) (client.ActionVersion, error) {
@@ -304,13 +309,17 @@ func (m *MemoryAPIActionLoader) ActionVersion(ctx context.Context, dsn string, v
 	return clientActionVersion, nil
 }
 func (m *MemoryAPIActionLoader) CreateActionVersion(ctx context.Context, av inngest.ActionVersion) (client.ActionVersion, error) {
+	config, err := cuedefs.FormatAction(av)
+	if err != nil {
+		return client.ActionVersion{}, err
+	}
 	// Stub out with existing method
 	m.Add(av)
 	newActionVersion := client.ActionVersion{
 		ActionVersion: av,
 		Name:          av.Name,
 		DSN:           av.DSN,
-		Config:        "",
+		Config:        config,
 	}
 	return newActionVersion, nil
 }

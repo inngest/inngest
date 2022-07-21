@@ -169,16 +169,17 @@ package config
 
 // # DataStore
 //
-// DataStore stores the persisted data for the system.
-#DataStoreService: #Postgres //#InmemStore | #Postgres
+// DataStore stores the persisted system data including Functions and Actions versions
+#DataStoreService: #InmemDataStore | #PostgresDataStore
 
-// InmemStore stores data in memory, local to each process. This should only
+// InmemDataStore stores data in memory, local to each process. This should only
 // be used for development or testing, never for production.
-// #InmemStore: {
-//  backend: "inmemory"
-// }
+#InmemDataStore: {
+	backend: "inmemory"
+}
 
-#Postgres: {
+// PostgresDataStore uses PostgreSQL
+#PostgresDataStore: {
 	backend: "postgres"
 	URI:     string | *"postgres://localhost:5432/postgres?sslmode=disable"
 }
