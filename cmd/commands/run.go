@@ -239,7 +239,6 @@ func fetchRecentEvents(ctx context.Context, triggerName string, count int64) ([]
 
 	archivedEvents, err := s.Client.RecentEvents(ctx, ws.ID, triggerName, count)
 	if err != nil {
-		fmt.Println("Oof error", err)
 		return nil, err
 	}
 
