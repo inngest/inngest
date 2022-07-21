@@ -43,7 +43,7 @@ type ReadWriter struct {
 	db *sql.DB
 }
 
-func New(ctx context.Context, URI string) (coredata.ReadWriter, error) {
+func New(ctx context.Context, URI string) (*ReadWriter, error) {
 	rw := &ReadWriter{}
 	db, err := pg.Open(ctx, URI)
 	if err != nil {
@@ -57,6 +57,10 @@ func New(ctx context.Context, URI string) (coredata.ReadWriter, error) {
 	return rw, nil
 }
 
+func (rw ReadWriter) Close() error {
+	return rw.db.Close()
+}
+
 // TODO Add method to close the db connection
 
 var (
@@ -65,21 +69,31 @@ var (
 		SELECT action_dsn, version_major, version_minor, config, valid_from, valid_to, created_at
 		FROM action_versions
 		WHERE action_dsn = $1 and version_major = $2 and version_minor = $3`
-	sqlFindLatestMajorActionVersion string = `
+	sqlFindLatestValidMajorActionVersion string = `
 		SELECT action_dsn, version_major, version_minor, config, valid_from, valid_to, created_at
 		FROM action_versions
-		WHERE action_dsn = $1 and version_major = $2
+		WHERE action_dsn = $1 and version_major = $2 and valid_from is not null and valid_to is null
 		ORDER BY version_minor DESC
 		LIMIT 1`
-	sqlFindLatestActionVersion string = `
+	sqlFindLatestValidActionVersion string = `
 		SELECT action_dsn, version_major, version_minor, config, valid_from, valid_to, created_at
 		FROM action_versions
-		WHERE action_dsn = $1
+		WHERE action_dsn = $1 and valid_from is not null and valid_to is null
 		ORDER BY version_major, version_minor DESC
 		LIMIT 1`
 	sqlInsertActionVersion string = `
 		INSERT INTO action_versions (action_dsn, version_major, version_minor, config)
 		VALUES ($1, $2, $3, $4)
+		RETURNING action_dsn, version_major, version_minor, config, valid_from, valid_to, created_at`
+	sqlUpdateActionVersionValidFrom string = `
+		UPDATE action_versions
+		SET valid_from = $4
+		WHERE action_dsn = $1 and version_major = $2 and version_minor = $3
+		RETURNING action_dsn, version_major, version_minor, config, valid_from, valid_to, created_at`
+	sqlUpdateActionVersionValidTo string = `
+		UPDATE action_versions
+		SET valid_to = $4
+		WHERE action_dsn = $1 and version_major = $2 and version_minor = $3
 		RETURNING action_dsn, version_major, version_minor, config, valid_from, valid_to, created_at`
 
 	// functions
@@ -269,11 +283,11 @@ func (rw *ReadWriter) ActionVersion(ctx context.Context, dsn string, version *in
 
 	var row *sql.Row
 	if version.Major == nil && version.Minor == nil {
-		// No version constraint - get the latest
-		row = rw.db.QueryRowContext(ctx, sqlFindLatestActionVersion, dsn)
+		// No version constraint - get the latest valid
+		row = rw.db.QueryRowContext(ctx, sqlFindLatestValidActionVersion, dsn)
 	} else if version.Major != nil && version.Minor == nil {
-		// No minor version constraint - get the latest matching the major version
-		row = rw.db.QueryRowContext(ctx, sqlFindLatestMajorActionVersion, dsn, version.Major)
+		// No minor version constraint - get the latest valid matching the major version
+		row = rw.db.QueryRowContext(ctx, sqlFindLatestValidMajorActionVersion, dsn, version.Major)
 	} else if version.Major != nil && version.Minor != nil {
 		// Exact constraint - get the exact match
 		row = rw.db.QueryRowContext(ctx, sqlFindExactMatchingActionVersion, dsn, version.Major, version.Minor)
@@ -314,6 +328,10 @@ func (rw *ReadWriter) CreateActionVersion(ctx context.Context, av inngest.Action
 		ActionVersion: av,
 	}
 
+	if created.Version == nil {
+		return client.ActionVersion{}, errors.New("version must not be empty")
+	}
+
 	// NOTE - We do not allow valid_from to be set when creating a version as the client needs to push a container image
 	// to the registry before calling UpdateActionVersion
 	err = rw.db.QueryRowContext(ctx, sqlInsertActionVersion, av.DSN, av.Version.Major, av.Version.Minor, config).
@@ -336,25 +354,30 @@ func (rw *ReadWriter) UpdateActionVersion(ctx context.Context, dsn string, versi
 	if err != nil {
 		return client.ActionVersion{}, errors.New("no existing action version to update")
 	}
-	// If it has already been enabled, the operation has already been performed
-	if existing.ValidFrom != nil {
+	// if it's already been enabled, or we should not enable, just return
+	if (existing.ValidFrom != nil && enabled) || (existing.ValidFrom == nil && !enabled) {
 		return existing, nil
 	}
 
-	sqlUpdateActionVersionValidFrom := `
-		UPDATE action_versions
-		SET valid_from = $4
-		WHERE action_dsn = $1 and version_major = $2 and version_minor = $3
-		RETURNING action_dsn, version_major, version_minor, config, valid_from, valid_to, created_at`
 	av := client.ActionVersion{}
 	v := inngest.VersionInfo{}
 
-	err = rw.db.QueryRowContext(ctx, sqlUpdateActionVersionValidFrom, dsn, version.Major, version.Minor, time.Now()).
-		Scan(&av.DSN, &v.Major, &v.Minor, &av.Config, &av.ValidFrom, &av.ValidTo, &av.CreatedAt)
-	if err != nil {
-		return client.ActionVersion{}, err
+	// Set the valid from or valid to depending on enabled
+	if existing.ValidFrom == nil && enabled {
+		err = rw.db.QueryRowContext(ctx, sqlUpdateActionVersionValidFrom, dsn, version.Major, version.Minor, time.Now()).
+			Scan(&av.DSN, &v.Major, &v.Minor, &av.Config, &av.ValidFrom, &av.ValidTo, &av.CreatedAt)
+		if err != nil {
+			return client.ActionVersion{}, err
+		}
+	} else if existing.ValidFrom != nil && !enabled {
+		err = rw.db.QueryRowContext(ctx, sqlUpdateActionVersionValidTo, dsn, version.Major, version.Minor, time.Now()).
+			Scan(&av.DSN, &v.Major, &v.Minor, &av.Config, &av.ValidFrom, &av.ValidTo, &av.CreatedAt)
+		if err != nil {
+			return client.ActionVersion{}, err
+		}
 	}
-	av.Version = &v
 
+	// Set the Version
+	av.Version = &v
 	return av, nil
 }
