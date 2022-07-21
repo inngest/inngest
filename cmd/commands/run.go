@@ -6,7 +6,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngest-cli/inngest"
@@ -16,11 +18,18 @@ import (
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/inngest/inngest-cli/pkg/logger"
+	"github.com/oklog/ulid/v2"
 	"github.com/spf13/cobra"
 )
 
 var runSeed int64
 var replayCount int64
+
+type runFunctionOpts struct {
+	fetchRecentEvents int64
+	verbose           bool
+	fetchEventId      *ulid.ULID
+}
 
 func NewCmdRun() *cobra.Command {
 	cmd := &cobra.Command{
@@ -69,19 +78,33 @@ func doRun(cmd *cobra.Command, args []string) {
 
 	eventName := cmd.Flag("event").Value.String()
 	hasVerboseFlag := cmd.Flag("verbose").Value.String() == "true"
-	if cmd.Flag("replay").Value.String() == "true" {
-		// ctx := cmd.Context()
+	isReplayMode := cmd.Flag("replay").Value.String() == "true"
 
-		// TODO implement event-id handling
-		if err = runFunction(cmd.Context(), *fn, eventName, replayCount, hasVerboseFlag); err != nil {
+	var fetchRecentEventCount int64 = 0
+
+	if isReplayMode {
+		fetchRecentEventCount = replayCount
+	}
+
+	opts := runFunctionOpts{
+		fetchRecentEvents: fetchRecentEventCount,
+		verbose:           hasVerboseFlag,
+	}
+
+	rawEventId := cmd.Flag("event-id").Value.String()
+
+	if rawEventId != "" {
+		eventId, err := ulid.ParseStrict(rawEventId)
+		if err != nil {
+			fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 			os.Exit(1)
 		}
-	} else {
 
-		if err = runFunction(cmd.Context(), *fn, eventName, 0, hasVerboseFlag); err != nil {
-			// This should already have been printed to the terminal.
-			os.Exit(1)
-		}
+		opts.fetchEventId = &eventId
+	}
+
+	if err = runFunction(cmd.Context(), *fn, eventName, opts); err != nil {
+		os.Exit(1)
 	}
 }
 
@@ -110,22 +133,23 @@ func buildImg(ctx context.Context, fn function.Function) error {
 }
 
 // runFunction builds the function's images and runs the function.
-func runFunction(ctx context.Context, fn function.Function, eventName string, recentEvents int64, verboseFlag bool) error {
-	// if runSeed <= 0 {
-	// 	rand.Seed(time.Now().UnixNano())
-	// 	runSeed = rand.Int63n(1_000_000)
-	// }
-
+func runFunction(ctx context.Context, fn function.Function, eventName string, opts runFunctionOpts) error {
 	var evts []event.Event
 	var err error
 
-	if replayCount < 1 {
-		evts, err = generateEvents(ctx, fn, eventName)
+	if opts.fetchEventId != nil {
+		evt, err := fetchEvent(ctx, *opts.fetchEventId)
+		if err != nil {
+			return err
+		}
+		evts = []event.Event{*evt}
+	} else if opts.fetchRecentEvents > 0 {
+		evts, err = fetchRecentEvents(ctx, eventName, int64(opts.fetchRecentEvents))
 		if err != nil {
 			return err
 		}
 	} else {
-		evts, err = fetchRecentEvents(ctx, eventName, recentEvents)
+		evts, err = generateEvents(ctx, fn, eventName)
 		if err != nil {
 			return err
 		}
@@ -140,13 +164,18 @@ func runFunction(ctx context.Context, fn function.Function, eventName string, re
 	log := logger.Buffered(buf)
 	ctx = logger.With(ctx, *log)
 
+	if runSeed <= 0 {
+		rand.Seed(time.Now().UnixNano())
+		runSeed = rand.Int63n(1_000_000)
+	}
+
 	// Run the function.
 	ui, err := cli.NewRunUI(ctx, cli.RunUIOpts{
 		Function:  fn,
 		Events:    evts,
 		Seed:      runSeed,
 		LogBuffer: buf,
-		Verbose:   verboseFlag || len(evts) == 1,
+		Verbose:   opts.verbose || len(evts) == 1,
 	})
 	if err != nil {
 		return err
@@ -236,4 +265,37 @@ func fetchRecentEvents(ctx context.Context, eventName string, count int64) ([]ev
 	}
 
 	return events, nil
+}
+
+func fetchEvent(ctx context.Context, eventId ulid.ULID) (*event.Event, error) {
+	s := state.RequireState(ctx)
+
+	ws, err := state.Workspace(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	archivedEvent, err := s.Client.RecentEvent(ctx, ws.ID, eventId)
+	if err != nil {
+		return nil, err
+	}
+
+	type evtData struct {
+		Data map[string]interface{}
+		Name string
+		ts   int64
+	}
+
+	evt := &evtData{}
+
+	if err := json.Unmarshal([]byte(archivedEvent.Event), &evt); err != nil {
+		return nil, err
+	}
+
+	return &event.Event{
+		ID:        archivedEvent.ID,
+		Name:      archivedEvent.Name,
+		Data:      evt.Data,
+		Timestamp: evt.ts,
+	}, nil
 }
