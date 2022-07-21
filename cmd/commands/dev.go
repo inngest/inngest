@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/devserver"
@@ -31,7 +32,21 @@ func doDev(cmd *cobra.Command, args []string) {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	err = devserver.NewDevServer(ctx, *conf)
+
+	port, err := strconv.Atoi(cmd.Flag("port").Value.String())
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+	conf.EventAPI.Port = port
+
+	host := cmd.Flag("host").Value.String()
+	if host != "" {
+		conf.EventAPI.Addr = host
+	}
+	dir := cmd.Flag("dir").Value.String()
+
+	err = devserver.NewDevServer(ctx, *conf, dir)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
