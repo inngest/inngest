@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest-cli/pkg/config"
 	_ "github.com/inngest/inngest-cli/pkg/config/defaults"
 	"github.com/inngest/inngest-cli/pkg/coredata"
+	inmemorydatastore "github.com/inngest/inngest-cli/pkg/coredata/inmemory"
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/queue"
@@ -153,7 +154,7 @@ func prepare(ctx context.Context, t *testing.T, f function.Function) prepared {
 	require.NoError(t, err)
 
 	// Create a new execution environment.
-	al := &coredata.MemoryExecutionLoader{}
+	al := &inmemorydatastore.MemoryExecutionLoader{}
 	err = al.SetFunctions(ctx, []*function.Function{&f})
 	require.NoError(t, err)
 
