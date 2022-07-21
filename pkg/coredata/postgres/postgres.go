@@ -164,7 +164,6 @@ func (rw *ReadWriter) CreateFunctionVersion(ctx context.Context, f function.Func
 	if err != nil {
 		return function.FunctionVersion{}, err
 	}
-	defer func() { _ = tx.Rollback() }()
 
 	// We confirm there is no existing row in the functions table before creating one
 	if existingFunctionID == "" {
@@ -219,6 +218,9 @@ func (rw *ReadWriter) CreateFunctionVersion(ctx context.Context, f function.Func
 	}
 
 	if err = tx.Commit(); err != nil {
+		if err = tx.Rollback(); err != nil {
+			return function.FunctionVersion{}, err
+		}
 		return function.FunctionVersion{}, err
 	}
 
