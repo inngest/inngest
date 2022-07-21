@@ -111,7 +111,10 @@ func setup() func() error {
 func TestMain(m *testing.M) {
 	teardown := setup()
 	code := m.Run()
-	teardown()
+	err := teardown()
+	if err != nil {
+		fmt.Println(err)
+	}
 	os.Exit(code)
 }
 
