@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/internal/cuedefs"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/stretchr/testify/require"
@@ -166,7 +166,7 @@ func TestValidate(t *testing.T) {
 // TestDerivedConfigDefault asserts that the derived config for simple, default workflows
 // is correct.
 func TestDerivedConfigDefault(t *testing.T) {
-	err := state.Clear(context.Background())
+	err := clistate.Clear(context.Background())
 	require.NoError(t, err)
 
 	expr := "event.version >= 2"
@@ -288,7 +288,7 @@ workflow: workflows.#Workflow & {
 
 // TestEventDefinitionAbsolutePath asserts that the event definition file path is not relative
 func TestEventDefinitionAbsolutePath(t *testing.T) {
-	err := state.Clear(context.Background())
+	err := clistate.Clear(context.Background())
 	require.NoError(t, err)
 
 	expr := "event.version >= 2"

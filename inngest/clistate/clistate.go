@@ -33,11 +33,12 @@ func init() {
 	// Always create a new client ID when the CLI runs.
 	if err == ErrNoState {
 		_ = State{ClientID: uuid.New()}.Persist(ctx)
+		return
 	}
 	// Ensure we have a client ID.
 	if state.ClientID == uuid.Nil {
 		state.ClientID = uuid.New()
-		state.Persist(ctx)
+		_ = state.Persist(ctx)
 	}
 }
 
@@ -66,7 +67,7 @@ func GetSetting(ctx context.Context, key string) interface{} {
 }
 
 func Clear(ctx context.Context) error {
-	return (State{}).Persist(ctx)
+	return (State{ClientID: uuid.New()}).Persist(ctx)
 }
 
 // State persists across each cli invokation, allowing functionality such as workspace
