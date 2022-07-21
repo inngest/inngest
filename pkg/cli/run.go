@@ -80,14 +80,17 @@ type RunUIExecution struct {
 	// duration stores how long the function took to execute.
 	// duration time.Duration
 	done *bool
-	// err      error
+
+	// Stores the order in which executions outputs were seen, in order to display
+	// the appropriate output in the UI.
+	seenOutput *[]string
 }
 
 var runsStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#fbbf24")).Padding(0, 1)
 var passStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#84cc16")).Padding(0, 1)
 var failStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#b91c1c")).Padding(0, 1)
 
-const sidePadding = 7
+const sidePadding = 4
 
 // Error returns the error from building or running the function, if part of the process failed.
 func (r *RunUI) Error() error {
@@ -161,11 +164,13 @@ func (r *RunUI) run(ctx context.Context) {
 			}
 
 			done := false
+			seenOutput := []string{}
 
 			execution := RunUIExecution{
-				id:    runId,
-				done:  &done,
-				event: &event,
+				id:         runId,
+				done:       &done,
+				event:      &event,
+				seenOutput: &seenOutput,
 			}
 
 			r.runs = append(r.runs, execution)
@@ -176,6 +181,23 @@ func (r *RunUI) run(ctx context.Context) {
 				run, r.err = r.sm.Load(ctx, *runId)
 				if r.err != nil {
 					return
+				}
+
+				output := run.Actions()
+
+				for id := range output {
+					haveSeenKey := false
+
+					for _, seenKey := range seenOutput {
+						if seenKey == id {
+							haveSeenKey = true
+							break
+						}
+					}
+
+					if !haveSeenKey {
+						seenOutput = append(seenOutput, id)
+					}
 				}
 
 				if run.Metadata().Pending == 0 || len(run.Errors()) > 0 {
@@ -225,7 +247,7 @@ func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (r *RunUI) View() string {
-	width, _, _ := term.GetSize(int(os.Stdout.Fd()))
+	// width, _, _ := term.GetSize(int(os.Stdout.Fd()))
 
 	s := &strings.Builder{}
 
@@ -248,18 +270,10 @@ func (r *RunUI) View() string {
 		for _, run := range r.runs {
 			s.WriteString(r.RenderState(run) + "\n")
 		}
-
-		s.WriteString("\n")
 	} else if runCount > 0 {
-		run := r.runs[0]
-
-		// TODO RenderState should handle this with verbose:true
-		input, _ := json.Marshal(run.event)
-		s.WriteString(FeintStyle.Render("Input:") + "\n")
-		s.WriteString(TextStyle.Copy().Foreground(Feint).Render(wrap.String(string(input), width)))
-		s.WriteString("\n\n")
-		s.WriteString(FeintStyle.Render("Input:") + "\n")
-		s.WriteString(r.RenderState(run))
+		// Force verbose mode if there is only one run.
+		r.verbose = true
+		s.WriteString(r.RenderState(r.runs[0]) + "\n")
 	} else {
 		// nothing has happened yet
 		return s.String()
@@ -273,6 +287,10 @@ func (r *RunUI) View() string {
 	if !r.done {
 		// We have't ran the action yet.
 		return s.String()
+	}
+
+	if !r.verbose {
+		s.WriteString("\n")
 	}
 
 	// TODO Still want this
@@ -299,38 +317,52 @@ func (r *RunUI) RenderState(run RunUIExecution) string {
 		return s.String()
 	}
 
-	// TODO Render output in verbose mode
-	// output := state.Actions()
 	errors := state.Errors()
 	metadata := state.Metadata()
 	done := *run.done
 	passed := done && len(errors) == 0
 	failed := done && len(errors) > 0
 
-	status := runsStyle.Render("RUNS")
+	status := runsStyle.Render("RUNNING")
 	runId := run.event.ID
 	info := FeintStyle.Render(fmt.Sprintf("%d step(s) running", metadata.Pending))
 
 	if passed {
-		status = passStyle.Render("PASS")
+		status = passStyle.Render("SUCCESS")
 		info = FeintStyle.Render("No errors")
 	} else if failed {
-		status = failStyle.Render("FAIL")
+		status = failStyle.Render("FAILURE")
 		info = FeintStyle.Render(fmt.Sprintf("%d error(s)", len(errors)))
 	}
 
 	s.WriteString(strings.Join([]string{status, runId, info}, " "))
 
-	if failed {
+	if failed || r.verbose {
 		input, _ := json.Marshal(run.event)
-		s.WriteString(TextStyle.Copy().PaddingLeft(sidePadding).Render("\n\nInput:\n" + FeintStyle.Render(wrap.String(string(input), width-sidePadding))))
-
-		for _, err := range errors {
-			s.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).PaddingLeft(sidePadding).Render(wrap.String(err.Error(), width-sidePadding)))
-		}
+		s.WriteString("\n\n")
+		s.WriteString(TextStyle.Copy().PaddingLeft(sidePadding).Render("Input:") + "\n")
+		s.WriteString(FeintStyle.Render(wrap.String(string(input), width-sidePadding)))
 	}
 
-	// TODO }else{ Render IO in verbose mode
+	if failed {
+		for _, err := range errors {
+			s.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).PaddingLeft(sidePadding).Render(wrap.String(err.Error(), width-sidePadding)) + "\n")
+		}
+	} else if r.verbose {
+		output := state.Actions()
+
+		for _, key := range *run.seenOutput {
+			data := output[key]
+
+			if data != nil {
+				byt, _ := json.Marshal(data)
+				s.WriteString("\n\n" + BoldStyle.PaddingLeft(sidePadding).Render(fmt.Sprintf("Step '%s' output:", key)) + "\n")
+				s.WriteString(FeintStyle.PaddingLeft(sidePadding).Render((wrap.String(string(byt), width-sidePadding))))
+			}
+		}
+
+		s.WriteString("\n")
+	}
 
 	return s.String()
 }
