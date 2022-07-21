@@ -39,13 +39,12 @@ func NewCmdRun() *cobra.Command {
 		Run:     doRun,
 	}
 
-	cmd.Flags().String("event", "", "Specifies the event trigger to use if there are multiple configured")
+	cmd.Flags().StringP("trigger", "t", "", "Specifies the event trigger to use if there are multiple configured")
 	cmd.Flags().Bool("event-only", false, "Prints the generated event to use without running the function")
 	cmd.Flags().Int64Var(&runSeed, "seed", 0, "Sets the seed for deterministically generating random events")
 	cmd.Flags().BoolP("replay", "r", false, "Enables replay mode to replay real recent events")
 	cmd.Flags().Int64VarP(&replayCount, "count", "c", 10, "Number of events to replay in replay mode")
 	cmd.Flags().StringP("event-id", "e", "", "Specifies a specific event to replay in replay mode")
-	cmd.Flags().StringP("trigger", "t", "", "Specifies a the trigger you wish to retrieve events for in replay mode")
 
 	return cmd
 }
@@ -76,7 +75,7 @@ func doRun(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	eventName := cmd.Flag("event").Value.String()
+	triggerName := cmd.Flag("trigger").Value.String()
 	hasVerboseFlag := cmd.Flag("verbose").Value.String() == "true"
 	isReplayMode := cmd.Flag("replay").Value.String() == "true"
 
@@ -103,7 +102,7 @@ func doRun(cmd *cobra.Command, args []string) {
 		opts.fetchEventId = &eventId
 	}
 
-	if err = runFunction(cmd.Context(), *fn, eventName, opts); err != nil {
+	if err = runFunction(cmd.Context(), *fn, triggerName, opts); err != nil {
 		os.Exit(1)
 	}
 }
@@ -133,7 +132,7 @@ func buildImg(ctx context.Context, fn function.Function) error {
 }
 
 // runFunction builds the function's images and runs the function.
-func runFunction(ctx context.Context, fn function.Function, eventName string, opts runFunctionOpts) error {
+func runFunction(ctx context.Context, fn function.Function, triggerName string, opts runFunctionOpts) error {
 	var evts []event.Event
 	var err error
 
@@ -144,12 +143,13 @@ func runFunction(ctx context.Context, fn function.Function, eventName string, op
 		}
 		evts = []event.Event{*evt}
 	} else if opts.fetchRecentEvents > 0 {
-		evts, err = fetchRecentEvents(ctx, eventName, int64(opts.fetchRecentEvents))
+		evts, err = fetchRecentEvents(ctx, triggerName, int64(opts.fetchRecentEvents))
 		if err != nil {
 			return err
 		}
 	} else {
 		evts, err = generateEvents(ctx, fn, eventName)
+		evts, err = generateEvents(ctx, fn, triggerName)
 		if err != nil {
 			return err
 		}
@@ -191,7 +191,7 @@ func runFunction(ctx context.Context, fn function.Function, eventName string, op
 // generateEvent retrieves the event for use within testing the function.  It first checks stdin
 // to see if we're passed an event, or resorts to generating a fake event based off of
 // the function's event type.
-func generateEvents(ctx context.Context, fn function.Function, eventName string) ([]event.Event, error) {
+func generateEvents(ctx context.Context, fn function.Function, triggerName string) ([]event.Event, error) {
 	fi, err := os.Stdin.Stat()
 	if err != nil {
 		return []event.Event{}, err
@@ -207,7 +207,7 @@ func generateEvents(ctx context.Context, fn function.Function, eventName string)
 		return []event.Event{data}, err
 	}
 
-	fakedEvent, err := fakeEvent(ctx, fn, eventName)
+	fakedEvent, err := fakeEvent(ctx, fn, triggerName)
 	if err != nil {
 		return nil, err
 	}
@@ -217,17 +217,17 @@ func generateEvents(ctx context.Context, fn function.Function, eventName string)
 
 // fakeEvent finds event triggers within the function definition, then chooses
 // a random trigger from the definitions and generates fake data for the event.
-func fakeEvent(ctx context.Context, fn function.Function, eventName string) (event.Event, error) {
+func fakeEvent(ctx context.Context, fn function.Function, triggerName string) (event.Event, error) {
 	triggers := []function.Trigger{}
 	for _, t := range fn.Triggers {
-		if t.EventTrigger != nil && (eventName == "" || eventName == t.EventTrigger.Event) {
+		if t.EventTrigger != nil && (triggerName == "" || triggerName == t.EventTrigger.Event) {
 			triggers = append(triggers, t)
 		}
 	}
 	return function.GenerateTriggerData(ctx, runSeed, triggers)
 }
 
-func fetchRecentEvents(ctx context.Context, eventName string, count int64) ([]event.Event, error) {
+func fetchRecentEvents(ctx context.Context, triggerName string, count int64) ([]event.Event, error) {
 	s := state.RequireState(ctx)
 
 	ws, err := state.Workspace(ctx)
@@ -235,7 +235,7 @@ func fetchRecentEvents(ctx context.Context, eventName string, count int64) ([]ev
 		return nil, err
 	}
 
-	archivedEvents, err := s.Client.RecentEvents(ctx, ws.ID, eventName, count)
+	archivedEvents, err := s.Client.RecentEvents(ctx, ws.ID, triggerName, count)
 	if err != nil {
 		fmt.Println("Oof error", err)
 		return nil, err
