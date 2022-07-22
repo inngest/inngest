@@ -12,7 +12,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/pkg/cli"
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
@@ -163,9 +163,9 @@ func generatedEventLoader(ctx context.Context, fn function.Function, triggerName
 // Returns a loader that fetches a particular event specified by `eventId`.
 func singleReplayEventLoader(ctx context.Context, eventId *ulid.ULID) func() ([]event.Event, error) {
 	return func() ([]event.Event, error) {
-		s := state.RequireState(ctx)
+		s := clistate.RequireState(ctx)
 
-		ws, err := state.Workspace(ctx)
+		ws, err := clistate.Workspace(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -200,9 +200,9 @@ func multiReplayEventLoader(ctx context.Context, triggerName string, count int64
 			return nil, fmt.Errorf("count must be >0")
 		}
 
-		s := state.RequireState(ctx)
+		s := clistate.RequireState(ctx)
 
-		ws, err := state.Workspace(ctx)
+		ws, err := clistate.Workspace(ctx)
 		if err != nil {
 			return nil, err
 		}
