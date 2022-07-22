@@ -20,7 +20,11 @@ $ inngest run
 
 Here, the CLI uses the event triggers defined in the [`inngest.json|cue`](/docs/functions/inngest-json-configuration) file and generates fake events based on the schema.
 
-<!-- A callout block here stating that you can specify `inngest run --seed` would be ace -->
+<aside>
+  <p>
+    <strong>Tip:</strong> Provide <code>--seed [integer]</code> to generate an event with the same data repeatedly.
+  </p>
+</aside>
 
 Dummy data is excellent for testing that your function handles the incoming schema but may not be ideal for functions with many conditional steps, where your actual data shines.
 
@@ -43,7 +47,12 @@ $ inngest run --replay
 <!-- I like the term "ecosystem", but it's probably a bit inaccurate (and not used anywhere else). -->
 Replaying is incredibly useful to ensure that a change to a function works as expected or when creating brand new functions based on existing events in your ecosystem. You can be sure your functions will run as expected in production without code ever leaving your machine.
 
-<!-- A callout to mention it'll default to your test workspace; provide --prod for prod -->
+<!-- We need to link to what a workspace is here -->
+<aside>
+  <p>
+    <strong>Tip:</strong> By default, we'll look for events from your test workspace. Add <code>--prod</code> to replay events from your production workspace instead.
+  </p>
+</aside>
 
 <details>
   <summary><strong>See it in action</strong></summary>
