@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/internal/cuedefs"
 	"github.com/inngest/inngest-cli/pkg/cli"
+	"github.com/inngest/inngest-cli/pkg/coredata"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest-cli/pkg/function"
 	"github.com/spf13/cobra"
@@ -33,13 +34,13 @@ func NewCmdDeploy() *cobra.Command {
 func doDeploy(cmd *cobra.Command, args []string) {
 	fmt.Println(cli.EnvString())
 
-	if err := deployFunction(cmd, args); err != nil {
+	if err := deploy(cmd, args); err != nil {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
 	}
 }
 
-func deployFunction(cmd *cobra.Command, args []string) error {
+func deploy(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
 	fn, err := function.Load(ctx, ".")
@@ -77,7 +78,33 @@ func deployFunction(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	return deployWorkflow(ctx, fn)
+	return deployFunction(ctx, fn)
+}
+
+func deployFunction(ctx context.Context, fn *function.Function) error {
+	s := clistate.RequireState(ctx)
+	if s.Client.IsCloudAPI() {
+		return deployWorkflow(ctx, fn)
+	}
+
+	config, err := function.MarshalCUE(*fn)
+	if err != nil {
+		return fmt.Errorf("failed to serialize function %w", err)
+	}
+
+	env := "test"
+	if clistate.IsProd() {
+		env = "prod"
+	}
+
+	fmt.Println(cli.BoldStyle.Render(fmt.Sprintf("Deploying function %s...", fn.Name)))
+	fv, err := s.Client.DeployFunction(ctx, string(config), env, true)
+	if err != nil {
+		return fmt.Errorf("failed to deploy function: %w", err)
+	}
+
+	fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render(fmt.Sprintf("Function deployed as version %d", fv.Version)))
+	return nil
 }
 
 func deployWorkflow(ctx context.Context, fn *function.Function) error {
@@ -170,13 +197,11 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 
 // normalizeDSN ensures that the action DSN has an account identifier prefix added.
 func normalizeDSN(ctx context.Context, a inngest.ActionVersion) inngest.ActionVersion {
-	state := clistate.RequireState(ctx)
-	// Add your account identifier locally, before finding action versions.
-	prefix := ""
-	if state.Account.Identifier.Domain == nil {
-		prefix = state.Account.Identifier.DSNPrefix
-	} else {
-		prefix = *state.Account.Identifier.Domain
+	// We first assume there is state or an environment variable set
+	prefix, err := clistate.AccountIdentifier(ctx)
+	if err != nil || err == clistate.ErrNoState {
+		// If there is no state, we use this method to display an error and exit
+		_ = clistate.RequireState(ctx)
 	}
 	if !strings.Contains(a.DSN, "/") {
 		a.DSN = fmt.Sprintf("%s/%s", prefix, a.DSN)
@@ -189,10 +214,11 @@ func configureVersionInfo(ctx context.Context, a inngest.ActionVersion) (inngest
 
 	// If we're publishing a specific version, attempt to find it.  Else, load the latest
 	// action version.  This automatically happens depending on whether a.Version is nil.
-	found, err := state.Action(ctx, a.DSN, a.Version)
+	found, err := state.Client.Action(ctx, a.DSN, a.Version)
+
 	// When deploying without specifying an action, allow "action not found"
 	// errors.
-	if a.Version == nil && err != nil && err.Error() == "action not found" {
+	if a.Version == nil && err != nil && (err.Error() == "action not found" || err.Error() == coredata.ErrActionVersionNotFound.Error()) {
 		a.Version = &inngest.VersionInfo{
 			Major: 1,
 			Minor: 1,

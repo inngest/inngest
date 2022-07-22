@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	DefaultRegistryHost = "registry.inngest.com"
+	DefaultRegistryHost   = "registry.inngest.com"
+	DockerHubRegistryHost = "https://index.docker.io/v1/"
 )
 
 // Digest returns the image digest for a given action.
@@ -56,6 +57,21 @@ func Push(ctx context.Context, a inngest.ActionVersion, creds []byte) (string, e
 	}
 
 	image := fmt.Sprintf("%s/%s", host, a.DSN)
+	auth := docker.AuthConfiguration{
+		Username: "jwt",
+		Password: string(creds),
+	}
+
+	// XXX: Need to handle formatting more consistency and remove specific cases
+	if host == DockerHubRegistryHost {
+		image = a.DSN
+		dockerConfig, err := docker.NewAuthConfigurationsFromCredsHelpers(host)
+		if err != nil {
+			return "", err
+		}
+		auth = *dockerConfig
+	}
+
 	err = c.TagImage(imageTag, docker.TagImageOptions{
 		Repo: image,
 		Tag:  a.Version.Tag(),
@@ -69,10 +85,7 @@ func Push(ctx context.Context, a inngest.ActionVersion, creds []byte) (string, e
 		Tag:          a.Version.Tag(),
 		Registry:     host,
 		OutputStream: os.Stderr,
-	}, docker.AuthConfiguration{
-		Username: "jwt",
-		Password: string(creds),
-	})
+	}, auth)
 
 	return id, err
 }

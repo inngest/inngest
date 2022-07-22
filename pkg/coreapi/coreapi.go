@@ -33,8 +33,8 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	}}))
 
 	// TODO - Add option for enabling GraphQL Playground
-	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	http.Handle("/query", srv)
+	http.Handle("/", playground.Handler("GraphQL playground", "/gql"))
+	http.Handle("/gql", srv)
 
 	return a, nil
 }

@@ -2,3 +2,5 @@ cmd/cmd
 target/
 dist/
 testfns/
+
+main

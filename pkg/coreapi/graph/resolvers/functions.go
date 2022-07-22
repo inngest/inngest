@@ -25,8 +25,7 @@ func (r *mutationResolver) DeployFunction(ctx context.Context, input models.Depl
 		return nil, err
 	}
 
-	// TODO convert function to cue config
-	config, err := function.MarshalJSON(fv.Function)
+	config, err := function.MarshalCUE(fv.Function)
 	if err != nil {
 		return nil, err
 	}
