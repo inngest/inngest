@@ -12,7 +12,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/pkg/cli"
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
@@ -53,12 +53,14 @@ func NewCmdRun() *cobra.Command {
 }
 
 func doRun(cmd *cobra.Command, args []string) {
+	ctx := cmd.Context()
+
 	path := "."
 	if len(args) == 1 {
 		path = args[0]
 	}
 
-	fn, err := function.Load(cmd.Context(), path)
+	fn, err := function.Load(ctx, path)
 	if err != nil {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
@@ -66,13 +68,13 @@ func doRun(cmd *cobra.Command, args []string) {
 	}
 
 	if cmd.Flag("event-only").Value.String() == "true" {
-		evt, _ := fakeEvent(cmd.Context(), *fn, "")
+		evt, _ := fakeEvent(ctx, *fn, "")
 		out, _ := json.Marshal(evt)
 		fmt.Println(string(out))
 		return
 	}
 
-	if err = buildImg(cmd.Context(), *fn); err != nil {
+	if err = buildImg(ctx, *fn); err != nil {
 		// This should already have been printed to the terminal.
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
@@ -81,34 +83,27 @@ func doRun(cmd *cobra.Command, args []string) {
 	triggerName := cmd.Flag("trigger").Value.String()
 	hasVerboseFlag := cmd.Flag("verbose").Value.String() == "true"
 	isReplayMode := cmd.Flag("replay").Value.String() == "true"
-
-	var fetchRecentEventCount int64 = 0
-
-	if isReplayMode {
-		fetchRecentEventCount = replayCount
-	}
-
-	var fetchEventId *ulid.ULID
 	rawEventId := cmd.Flag("event-id").Value.String()
 
-	if rawEventId != "" {
-		eventId, err := ulid.ParseStrict(rawEventId)
-		if err != nil {
-			fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
-			os.Exit(1)
-		}
-
-		fetchEventId = &eventId
+	// In order to improve the dev UX, if there's no trigger provided we should
+	// inspect the function and check to see if the fn only has one trigger.  If
+	// so, use that trigger - it's the only option.
+	if triggerName == "" && len(fn.Triggers) == 1 && fn.Triggers[0].EventTrigger != nil {
+		triggerName = fn.Triggers[0].Event
 	}
 
-	ctx := cmd.Context()
 	eventFunc := generatedEventLoader(ctx, *fn, triggerName)
-
 	if isReplayMode {
-		if fetchEventId != nil {
-			eventFunc = singleReplayEventLoader(ctx, fetchEventId)
-		} else {
-			eventFunc = multiReplayEventLoader(ctx, triggerName, fetchRecentEventCount)
+		// Replay N events.
+		eventFunc = multiReplayEventLoader(ctx, triggerName, replayCount)
+		if rawEventId != "" {
+			// We're fetching a single ID.
+			id, err := ulid.ParseStrict(rawEventId)
+			if err != nil {
+				fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+				os.Exit(1)
+			}
+			eventFunc = singleReplayEventLoader(ctx, &id)
 		}
 	}
 
@@ -117,7 +112,8 @@ func doRun(cmd *cobra.Command, args []string) {
 		eventFunc: eventFunc,
 	}
 
-	if err = runFunction(cmd.Context(), *fn, opts); err != nil {
+	if err = runFunction(ctx, *fn, opts); err != nil {
+		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 		os.Exit(1)
 	}
 }
@@ -163,9 +159,9 @@ func generatedEventLoader(ctx context.Context, fn function.Function, triggerName
 // Returns a loader that fetches a particular event specified by `eventId`.
 func singleReplayEventLoader(ctx context.Context, eventId *ulid.ULID) func() ([]event.Event, error) {
 	return func() ([]event.Event, error) {
-		s := state.RequireState(ctx)
+		s := clistate.RequireState(ctx)
 
-		ws, err := state.Workspace(ctx)
+		ws, err := clistate.Workspace(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -200,9 +196,9 @@ func multiReplayEventLoader(ctx context.Context, triggerName string, count int64
 			return nil, fmt.Errorf("count must be >0")
 		}
 
-		s := state.RequireState(ctx)
+		s := clistate.RequireState(ctx)
 
-		ws, err := state.Workspace(ctx)
+		ws, err := clistate.Workspace(ctx)
 		if err != nil {
 			return nil, err
 		}

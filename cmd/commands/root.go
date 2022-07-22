@@ -50,7 +50,7 @@ func Execute() {
 
 	rootCmd.PersistentFlags().Bool("prod", false, "Use the production environment for the current command.")
 	rootCmd.PersistentFlags().Bool("json", false, "Output logs as JSON.  Set to true if stdout is not a TTY.")
-	rootCmd.PersistentFlags().Bool("verbose", false, "Enable verbose logging.")
+	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose logging.")
 
 	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
 		panic(err)
