@@ -26,9 +26,19 @@ var runSeed int64
 var replayCount int64
 
 type runFunctionOpts struct {
+	// If in replay mode, this is the number of recent events to fetch.
 	fetchRecentEvents int64
-	verbose           bool
-	fetchEventId      *ulid.ULID
+
+	// If true, prints extra information about step input/output to stdout during
+	// a function's run.
+	verbose bool
+
+	// If non-empty, this is a specific event ID to fetch and replay.
+	fetchEventId *ulid.ULID
+
+	// If non-empty, this is the name of the event trigger to use. If this is not
+	// provided, we will try to infer the trigger from the function definition.
+	triggerName string
 }
 
 func NewCmdRun() *cobra.Command {
@@ -88,6 +98,7 @@ func doRun(cmd *cobra.Command, args []string) {
 	opts := runFunctionOpts{
 		fetchRecentEvents: fetchRecentEventCount,
 		verbose:           hasVerboseFlag,
+		triggerName:       triggerName,
 	}
 
 	rawEventId := cmd.Flag("event-id").Value.String()
@@ -102,7 +113,7 @@ func doRun(cmd *cobra.Command, args []string) {
 		opts.fetchEventId = &eventId
 	}
 
-	if err = runFunction(cmd.Context(), *fn, triggerName, opts); err != nil {
+	if err = runFunction(cmd.Context(), *fn, opts); err != nil {
 		os.Exit(1)
 	}
 }
@@ -132,19 +143,25 @@ func buildImg(ctx context.Context, fn function.Function) error {
 }
 
 // runFunction builds the function's images and runs the function.
-func runFunction(ctx context.Context, fn function.Function, triggerName string, opts runFunctionOpts) error {
+func runFunction(ctx context.Context, fn function.Function, opts runFunctionOpts) error {
 	var evts []event.Event
 	var err error
 
+	// We need to understand later if we're using a generated event so we can
+	// appropriately set a random seed if none has been provided.
 	usingGeneratedEvent := false
 
 	if opts.fetchEventId != nil {
+		// We're replaying a specific event, so let's fetch it.
 		evt, err := fetchEvent(ctx, *opts.fetchEventId)
 		if err != nil {
 			return err
 		}
 		evts = []event.Event{*evt}
 	} else if opts.fetchRecentEvents > 0 {
+		// Here we're replaying at least 1 recent event.
+		triggerName := opts.triggerName
+
 		// We need there to be one trigger name here; if we haven't been given one,
 		// we might be able to find it in the function definition.
 		if triggerName == "" {
@@ -168,8 +185,9 @@ func runFunction(ctx context.Context, fn function.Function, triggerName string, 
 			return err
 		}
 	} else {
+		// We're not replaying, so use a generated event instead.
 		usingGeneratedEvent = true
-		evts, err = generateEvents(ctx, fn, triggerName)
+		evts, err = generateEvents(ctx, fn, opts.triggerName)
 		if err != nil {
 			return err
 		}
@@ -247,7 +265,18 @@ func fakeEvent(ctx context.Context, fn function.Function, triggerName string) (e
 	return function.GenerateTriggerData(ctx, runSeed, triggers)
 }
 
+// Fetch `count` latest `triggerName` events from the event store.
+//
+// Requires triggerName is not empty, and count is >0.
 func fetchRecentEvents(ctx context.Context, triggerName string, count int64) ([]event.Event, error) {
+	if triggerName == "" {
+		return nil, fmt.Errorf("triggerName is required")
+	}
+
+	if count <= 0 {
+		return nil, fmt.Errorf("count must be >0")
+	}
+
 	s := state.RequireState(ctx)
 
 	ws, err := state.Workspace(ctx)
@@ -286,6 +315,7 @@ func fetchRecentEvents(ctx context.Context, triggerName string, count int64) ([]
 	return events, nil
 }
 
+// Fetch a single event from the event store, with ID `eventId`.
 func fetchEvent(ctx context.Context, eventId ulid.ULID) (*event.Event, error) {
 	s := state.RequireState(ctx)
 
