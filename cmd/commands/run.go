@@ -308,7 +308,8 @@ func fetchRecentEvents(ctx context.Context, triggerName string, count int64) ([]
 		type evtData struct {
 			Data map[string]interface{}
 			Name string
-			ts   int64
+			Ts   int64
+			User map[string]interface{}
 		}
 
 		evt := &evtData{}
@@ -321,7 +322,9 @@ func fetchRecentEvents(ctx context.Context, triggerName string, count int64) ([]
 			ID:        archivedEvent.ID,
 			Name:      archivedEvent.Name,
 			Data:      evt.Data,
-			Timestamp: evt.ts,
+			Timestamp: evt.Ts,
+			Version:   archivedEvent.Version,
+			User:      evt.User,
 		})
 	}
 
@@ -349,7 +352,8 @@ func fetchEvent(ctx context.Context, eventId ulid.ULID) (*event.Event, error) {
 	type evtData struct {
 		Data map[string]interface{}
 		Name string
-		ts   int64
+		Ts   int64
+		User map[string]interface{}
 	}
 
 	evt := &evtData{}
@@ -362,6 +366,8 @@ func fetchEvent(ctx context.Context, eventId ulid.ULID) (*event.Event, error) {
 		ID:        archivedEvent.ID,
 		Name:      archivedEvent.Name,
 		Data:      evt.Data,
-		Timestamp: evt.ts,
+		Timestamp: evt.Ts,
+		Version:   archivedEvent.Version,
+		User:      evt.User,
 	}, nil
 }
