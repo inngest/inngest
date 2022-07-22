@@ -9,7 +9,6 @@ import (
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/inngest/state"
 	"github.com/inngest/inngest-cli/internal/cuedefs"
-	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/stretchr/testify/require"
 )
 
@@ -333,7 +332,7 @@ func TestFunctionActions_single(t *testing.T) {
 				ID:   "single",
 				Name: "single",
 				Runtime: inngest.RuntimeWrapper{
-					Runtime: &mockdriver.Mock{},
+					Runtime: &stubdriver{},
 				},
 			},
 		},

@@ -8,6 +8,11 @@ import (
 	"github.com/inngest/inngest-cli/pkg/function"
 )
 
+type ReadWriter interface {
+	APIReadWriter
+	ExecutionLoader
+}
+
 // ExecutionLoader is an interface which specifies all functions required to run
 // workers and executors.
 type ExecutionLoader interface {
@@ -30,22 +35,21 @@ type ExecutionActionLoader interface {
 	Action(ctx context.Context, dsn string, version *inngest.VersionConstraint) (*inngest.ActionVersion, error)
 }
 
-type APILoader interface {
-	APIFunctionLoader
-	APIActionLoader
+type APIReadWriter interface {
+	APIFunctionWriter
+	APIActionReader
+	APIActionWriter
 }
 
-type APIFunctionLoader interface {
-	// Embed the read methods of the ExecutionFunctionLoader
-	ExecutionFunctionLoader
+type APIFunctionWriter interface {
 	// Create a new function
 	CreateFunctionVersion(ctx context.Context, f function.Function, live bool, env string) (function.FunctionVersion, error)
 }
-type APIActionLoader interface {
-	// Embed the read methods of the ExecutionActionLoader
-	ExecutionActionLoader
+type APIActionReader interface {
 	// Find a given action by an exact version number
 	ActionVersion(ctx context.Context, dsn string, version *inngest.VersionConstraint) (client.ActionVersion, error)
+}
+type APIActionWriter interface {
 	// Create a a new action version
 	CreateActionVersion(ctx context.Context, av inngest.ActionVersion) (client.ActionVersion, error)
 	// Update an action version, e.g. when updating a Docker image has been successfully pushed to the registry

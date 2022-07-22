@@ -320,6 +320,9 @@ func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, er
 		DSN:     id,
 		Runtime: s.Runtime,
 	}
+	if s.Runtime.Runtime == nil {
+		return a, fmt.Errorf("no runtime specified")
+	}
 	if s.Runtime.RuntimeType() != "http" {
 		// Non-HTTP actions can read secrets;  http actions are external APIs and so
 		// don't need secret access.

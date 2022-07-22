@@ -12,7 +12,7 @@ import (
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/config/registration"
-	"github.com/inngest/inngest-cli/pkg/coredata"
+	inmemorydatastore "github.com/inngest/inngest-cli/pkg/coredata/inmemory"
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
@@ -48,7 +48,7 @@ func TestEngine_async(t *testing.T) {
 	sm, err := conf.State.Service.Concrete.Manager(ctx)
 	require.NoError(t, err)
 
-	el := &coredata.MemoryExecutionLoader{}
+	el := &inmemorydatastore.MemoryExecutionLoader{}
 	err = el.SetFunctions(ctx, []*function.Function{
 		{
 			Name: "test fn",

@@ -70,6 +70,11 @@ package config
 		service: #StateService | *{backend: "inmemory"}
 		// This struct is retained for any shared settings
 	}
+
+	datastore: {
+		service: #DataStoreService | *{backend: "inmemory"}
+		// This struct is retained for any shared settings
+	}
 }
 
 // @TODO: Add custom redis driver, add Kafka.
@@ -160,6 +165,23 @@ package config
 
 	// keyPrefix is the prefix used for all redis keys stored
 	keyPrefix: string | *"inngest:state"
+}
+
+// # DataStore
+//
+// DataStore stores the persisted system data including Functions and Actions versions
+#DataStoreService: #InmemDataStore | #PostgresDataStore
+
+// InmemDataStore stores data in memory, local to each process. This should only
+// be used for development or testing, never for production.
+#InmemDataStore: {
+	backend: "inmemory"
+}
+
+// PostgresDataStore uses PostgreSQL
+#PostgresDataStore: {
+	backend: "postgres"
+	URI:     string | *"postgres://localhost:5432/postgres?sslmode=disable"
 }
 
 // Drivers handle execution of each step within a function.

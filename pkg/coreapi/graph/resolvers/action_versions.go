@@ -19,7 +19,7 @@ func (r *queryResolver) ActionVersion(ctx context.Context, query models.ActionVe
 			vc.Minor = &minor
 		}
 	}
-	av, err := r.APILoader.ActionVersion(ctx, query.Dsn, vc)
+	av, err := r.APIReadWriter.ActionVersion(ctx, query.Dsn, vc)
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +32,7 @@ func (r *mutationResolver) CreateActionVersion(ctx context.Context, input models
 	if err != nil {
 		return nil, err
 	}
-	created, err := r.APILoader.CreateActionVersion(ctx, *parsed)
+	created, err := r.APIReadWriter.CreateActionVersion(ctx, *parsed)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (r *mutationResolver) UpdateActionVersion(ctx context.Context, input models
 		Major: uint(input.VersionMajor),
 		Minor: uint(input.VersionMinor),
 	}
-	updated, err := r.APILoader.UpdateActionVersion(ctx, input.Dsn, version, *input.Enabled)
+	updated, err := r.APIReadWriter.UpdateActionVersion(ctx, input.Dsn, version, *input.Enabled)
 	if err != nil {
 		return nil, err
 	}

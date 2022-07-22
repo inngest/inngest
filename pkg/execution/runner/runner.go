@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/pkg/config"
 	"github.com/inngest/inngest-cli/pkg/coredata"
+	inmemorydatastore "github.com/inngest/inngest-cli/pkg/coredata/inmemory"
 	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/inngest/inngest-cli/pkg/execution/queue"
 	"github.com/inngest/inngest-cli/pkg/execution/state"
@@ -67,7 +68,7 @@ func (s *svc) Pre(ctx context.Context) error {
 
 	if s.data == nil {
 		// TODO: Enable postgres, mysql, and redis-backed execution loaders.
-		s.data, err = coredata.NewFSLoader(ctx, ".")
+		s.data, err = inmemorydatastore.NewFSLoader(ctx, ".")
 		if err != nil {
 			return err
 		}
