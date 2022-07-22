@@ -5,12 +5,76 @@ slug: "cli/run"
 order: 2
 ---
 
-The `inngest run` command is used to execute your funciton locally against test event payloads.
+<!-- It would be good if this could include "generated event payloads [using Cue schemas]" -->
+We can use the `inngest run` command to execute your function locally against generated event payloads, specific events from the past, or a number of recent events.
 
-The cli uses the event triggers as defined in the `inngest.json|cue` file and generates fake events based of the event schema.
+We make it easy to test your function locally, not just against dummy data but also _real production data_ in your dev environment. This functionality helps identify potential breaking changes _before_ you make them or gives you confidence that a dangerous change does indeed still work.
 
-## Usage
+## Run your function with dummy data
 
-```
+In its most basic form, you can use `inngest run` to run your function locally against dummy data generated from your event's schema.
+
+```sh
 $ inngest run
+```
+
+Here, the CLI uses the event triggers defined in the [`inngest.json|cue`](/docs/functions/inngest-json-configuration) file and generates fake events based on the event schema.
+
+<!-- A callout block here stating that you can specify `inngest run --seed` would be ace -->
+
+Dummy data is excellent for testing that your function handles the incoming schema but may not be ideal for functions with many conditional steps, where your actual data shines.
+
+<!-- We could display these all the time? -->
+<!-- I'm thinking many GIFs all going on a page is pretty 🤮 -->
+<details>
+  <summary><strong>See it in action</strong></summary>
+
+  ![Running a function with a generated event](/assets/docs/inngest-run/replay-generated.gif)
+</details>
+
+## Replay past events
+
+The true power of `inngest run` is the ability to replay past events from either your production or test workspaces.
+
+```sh
+$ inngest run --replay
+```
+
+<!-- I like the term "ecosystem", but it's probably a bit inaccurate (and not used anywhere else). -->
+This is fantastically useful not only to ensure that a change to a function works as expected, but also when creating brand new functions based on existing events in your ecosystem; you can be sure they'll run as expected in production without code ever leaving your machine.
+
+<!-- A callout to mention it'll default to your test workspace; provide --prod for prod -->
+
+<details>
+  <summary><strong>See it in action</strong></summary>
+
+  ![Running a function with past events](/assets/docs/inngest-run/replay-past.gif)
+</details>
+
+Replaying provides a couple of extra flags for customising the events that will be run.
+
+<!-- Need a link to explain what a trigger is. Could link to inngest.json|cue for now? -->
+Note that currently if your function reacts to more than one trigger, you must provide which trigger you want to replay using `--trigger [my-trigger]`
+
+```sh
+# Run your function with the last 20 events
+$ inngest run --replay [-c/--count] 20
+
+# Run your function with recent events from a specific trigger
+$ inngest run --replay --trigger stripe/customer.created
+```
+
+## Replay a specific event
+
+<!-- Link here to understand _how they know an event had a problem_. -->
+<!-- Dashboard? Alerting? Viewing outputs/errors? -->
+If you find an event that was causing problems for your function - or where the output wasn't quite as expected - you can choose to replay that specific event to ensure that the code change you're making is going to fix the issue.
+
+<!-- Too much? 😅 -->
+No more testing in production! 🥳
+
+<!-- Definitely need to explain where to find this ID. -->
+
+```sh
+$ inngest run --replay --event-id 01G8BG4FT7CZVAD38D4RJNGTT1
 ```
