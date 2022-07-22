@@ -157,6 +157,11 @@ func runFunction(ctx context.Context, fn function.Function, opts runFunctionOpts
 		if err != nil {
 			return err
 		}
+
+		if evt == nil {
+			return fmt.Errorf("event not found: %s", *opts.fetchEventId)
+		}
+
 		evts = []event.Event{*evt}
 	} else if opts.fetchRecentEvents > 0 {
 		// Here we're replaying at least 1 recent event.
@@ -184,12 +189,20 @@ func runFunction(ctx context.Context, fn function.Function, opts runFunctionOpts
 		if err != nil {
 			return err
 		}
+
+		if len(evts) == 0 {
+			return fmt.Errorf("no events found for trigger %s", triggerName)
+		}
 	} else {
 		// We're not replaying, so use a generated event instead.
 		usingGeneratedEvent = true
 		evts, err = generateEvents(ctx, fn, opts.triggerName)
 		if err != nil {
 			return err
+		}
+
+		if len(evts) == 0 {
+			return fmt.Errorf("no events could be generated")
 		}
 	}
 
@@ -327,6 +340,10 @@ func fetchEvent(ctx context.Context, eventId ulid.ULID) (*event.Event, error) {
 	archivedEvent, err := s.Client.RecentEvent(ctx, ws.ID, eventId)
 	if err != nil {
 		return nil, err
+	}
+
+	if archivedEvent == nil {
+		return nil, nil
 	}
 
 	type evtData struct {
