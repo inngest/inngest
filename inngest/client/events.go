@@ -47,28 +47,14 @@ type ArchivedEvent struct {
 	Version   string `json:"version,omitempty"`
 }
 
-type archivedEventData struct {
-	Data map[string]interface{}
-	Name string
-	Ts   int64
-	User map[string]interface{}
-}
-
 func (e ArchivedEvent) MarshalToEvent() (*event.Event, error) {
-	evt := &archivedEventData{}
+	evt := &event.Event{}
 
-	if err := json.Unmarshal([]byte(e.Event), &evt); err != nil {
+	if err := json.Unmarshal([]byte(e.Event), evt); err != nil {
 		return nil, err
 	}
 
-	return &event.Event{
-		ID:        e.ID,
-		Name:      e.Name,
-		Data:      evt.Data,
-		Timestamp: evt.Ts,
-		Version:   e.Version,
-		User:      evt.User,
-	}, nil
+	return evt, nil
 }
 
 type EventQuery struct {
