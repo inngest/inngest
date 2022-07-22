@@ -26,19 +26,21 @@ var runSeed int64
 var replayCount int64
 
 type runFunctionOpts struct {
+	eventFunc func() ([]event.Event, error)
+
 	// If in replay mode, this is the number of recent events to fetch.
-	fetchRecentEvents int64
+	// fetchRecentEvents int64
 
 	// If true, prints extra information about step input/output to stdout during
 	// a function's run.
 	verbose bool
 
 	// If non-empty, this is a specific event ID to fetch and replay.
-	fetchEventId *ulid.ULID
+	// fetchEventId *ulid.ULID
 
 	// If non-empty, this is the name of the event trigger to use. If this is not
 	// provided, we will try to infer the trigger from the function definition.
-	triggerName string
+	// triggerName string
 }
 
 func NewCmdRun() *cobra.Command {
@@ -95,12 +97,7 @@ func doRun(cmd *cobra.Command, args []string) {
 		fetchRecentEventCount = replayCount
 	}
 
-	opts := runFunctionOpts{
-		fetchRecentEvents: fetchRecentEventCount,
-		verbose:           hasVerboseFlag,
-		triggerName:       triggerName,
-	}
-
+	var fetchEventId *ulid.ULID
 	rawEventId := cmd.Flag("event-id").Value.String()
 
 	if rawEventId != "" {
@@ -110,11 +107,97 @@ func doRun(cmd *cobra.Command, args []string) {
 			os.Exit(1)
 		}
 
-		opts.fetchEventId = &eventId
+		fetchEventId = &eventId
+	}
+
+	ctx := cmd.Context()
+	var eventFunc func() ([]event.Event, error)
+
+	if isReplayMode {
+		if fetchEventId != nil {
+			eventFunc = singleReplayEventLoader(ctx, fetchEventId)
+		} else {
+			eventFunc = multiReplayEventLoader(ctx, triggerName, fetchRecentEventCount)
+		}
+	} else {
+		eventFunc = generatedEventLoader()
+	}
+
+	opts := runFunctionOpts{
+		verbose:   hasVerboseFlag,
+		eventFunc: eventFunc,
 	}
 
 	if err = runFunction(cmd.Context(), *fn, opts); err != nil {
 		os.Exit(1)
+	}
+}
+
+func singleReplayEventLoader(ctx context.Context, eventId *ulid.ULID) func() ([]event.Event, error) {
+	return func() ([]event.Event, error) {
+		s := state.RequireState(ctx)
+
+		ws, err := state.Workspace(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		archivedEvent, err := s.Client.RecentEvent(ctx, ws.ID, *eventId)
+		if err != nil {
+			return nil, err
+		}
+
+		if archivedEvent == nil {
+			return nil, fmt.Errorf("no events found for event ID %s", eventId)
+		}
+
+		evt, err := archivedEvent.MarshalToEvent()
+		if err != nil {
+			return nil, err
+		}
+
+		return []event.Event{*evt}, nil
+	}
+}
+
+func multiReplayEventLoader(ctx context.Context, triggerName string, count int64) func() ([]event.Event, error) {
+	return func() ([]event.Event, error) {
+		if triggerName == "" {
+			return nil, fmt.Errorf("triggerName is required")
+		}
+
+		if count <= 0 {
+			return nil, fmt.Errorf("count must be >0")
+		}
+
+		s := state.RequireState(ctx)
+
+		ws, err := state.Workspace(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		archivedEvents, err := s.Client.RecentEvents(ctx, ws.ID, triggerName, count)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(archivedEvents) == 0 {
+			return nil, fmt.Errorf("no events found for trigger %s", triggerName)
+		}
+
+		events := []event.Event{}
+
+		for _, archivedEvent := range archivedEvents {
+			evt, err := archivedEvent.MarshalToEvent()
+			if err != nil {
+				return nil, err
+			}
+
+			events = append(events, *evt)
+		}
+
+		return events, nil
 	}
 }
 
@@ -144,12 +227,10 @@ func buildImg(ctx context.Context, fn function.Function) error {
 
 // runFunction builds the function's images and runs the function.
 func runFunction(ctx context.Context, fn function.Function, opts runFunctionOpts) error {
-	var evts []event.Event
-	var err error
-
-	// We need to understand later if we're using a generated event so we can
-	// appropriately set a random seed if none has been provided.
-	usingGeneratedEvent := false
+	evts, err := opts.eventFunc()
+	if err != nil {
+		return err
+	}
 
 	if opts.fetchEventId != nil {
 		// We're replaying a specific event, so let's fetch it.
@@ -276,98 +357,4 @@ func fakeEvent(ctx context.Context, fn function.Function, triggerName string) (e
 		}
 	}
 	return function.GenerateTriggerData(ctx, runSeed, triggers)
-}
-
-// Fetch `count` latest `triggerName` events from the event store.
-//
-// Requires triggerName is not empty, and count is >0.
-func fetchRecentEvents(ctx context.Context, triggerName string, count int64) ([]event.Event, error) {
-	if triggerName == "" {
-		return nil, fmt.Errorf("triggerName is required")
-	}
-
-	if count <= 0 {
-		return nil, fmt.Errorf("count must be >0")
-	}
-
-	s := state.RequireState(ctx)
-
-	ws, err := state.Workspace(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	archivedEvents, err := s.Client.RecentEvents(ctx, ws.ID, triggerName, count)
-	if err != nil {
-		return nil, err
-	}
-
-	events := []event.Event{}
-
-	for _, archivedEvent := range archivedEvents {
-		type evtData struct {
-			Data map[string]interface{}
-			Name string
-			Ts   int64
-			User map[string]interface{}
-		}
-
-		evt := &evtData{}
-
-		if err := json.Unmarshal([]byte(archivedEvent.Event), &evt); err != nil {
-			return nil, err
-		}
-
-		events = append(events, event.Event{
-			ID:        archivedEvent.ID,
-			Name:      archivedEvent.Name,
-			Data:      evt.Data,
-			Timestamp: evt.Ts,
-			Version:   archivedEvent.Version,
-			User:      evt.User,
-		})
-	}
-
-	return events, nil
-}
-
-// Fetch a single event from the event store, with ID `eventId`.
-func fetchEvent(ctx context.Context, eventId ulid.ULID) (*event.Event, error) {
-	s := state.RequireState(ctx)
-
-	ws, err := state.Workspace(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	archivedEvent, err := s.Client.RecentEvent(ctx, ws.ID, eventId)
-	if err != nil {
-		return nil, err
-	}
-
-	if archivedEvent == nil {
-		return nil, nil
-	}
-
-	type evtData struct {
-		Data map[string]interface{}
-		Name string
-		Ts   int64
-		User map[string]interface{}
-	}
-
-	evt := &evtData{}
-
-	if err := json.Unmarshal([]byte(archivedEvent.Event), &evt); err != nil {
-		return nil, err
-	}
-
-	return &event.Event{
-		ID:        archivedEvent.ID,
-		Name:      archivedEvent.Name,
-		Data:      evt.Data,
-		Timestamp: evt.Ts,
-		Version:   archivedEvent.Version,
-		User:      evt.User,
-	}, nil
 }

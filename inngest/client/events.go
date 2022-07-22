@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest-cli/pkg/event"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -44,6 +45,30 @@ type ArchivedEvent struct {
 	Event     string `json:"event,omitempty"`
 	Timestamp string `json:"occurredAt,omitempty"`
 	Version   string `json:"version,omitempty"`
+}
+
+type archivedEventData struct {
+	Data map[string]interface{}
+	Name string
+	Ts   int64
+	User map[string]interface{}
+}
+
+func (e ArchivedEvent) MarshalToEvent() (*event.Event, error) {
+	evt := &archivedEventData{}
+
+	if err := json.Unmarshal([]byte(e.Event), &evt); err != nil {
+		return nil, err
+	}
+
+	return &event.Event{
+		ID:        e.ID,
+		Name:      e.Name,
+		Data:      evt.Data,
+		Timestamp: evt.Ts,
+		Version:   e.Version,
+		User:      evt.User,
+	}, nil
 }
 
 type EventQuery struct {
