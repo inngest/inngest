@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
-	istate "github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/pkg/api/tel"
 	"github.com/inngest/inngest-cli/pkg/cli"
 	"github.com/inngest/inngest-cli/pkg/function"
@@ -38,7 +38,7 @@ func runInit(cmd *cobra.Command, args []string) {
 	}
 
 	showWelcome := true
-	if setting, ok := istate.GetSetting(cmd.Context(), istate.SettingRanInit).(bool); ok {
+	if setting, ok := clistate.GetSetting(cmd.Context(), clistate.SettingRanInit).(bool); ok {
 		// only show the welcome if we haven't ran init
 		showWelcome = !setting
 	}
@@ -71,7 +71,7 @@ func runInit(cmd *cobra.Command, args []string) {
 
 	// Save a setting which indicates that we've ran init successfully.
 	// This is used to prevent us from showing the welcome message on subsequent runs.
-	_ = istate.SaveSetting(cmd.Context(), istate.SettingRanInit, true)
+	_ = clistate.SaveSetting(cmd.Context(), clistate.SettingRanInit, true)
 
 	// If we have a template, render that.
 	tpl := state.Template()

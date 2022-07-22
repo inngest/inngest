@@ -1,4 +1,4 @@
-package state
+package clistate
 
 import (
 	"context"
@@ -27,6 +27,21 @@ const (
 	SettingRanInit = "ranInit"
 )
 
+func init() {
+	ctx := context.Background()
+	state, err := GetState(ctx)
+	// Always create a new client ID when the CLI runs.
+	if err == ErrNoState {
+		_ = State{ClientID: uuid.New()}.Persist(ctx)
+		return
+	}
+	// Ensure we have a client ID.
+	if state.ClientID == uuid.Nil {
+		state.ClientID = uuid.New()
+		_ = state.Persist(ctx)
+	}
+}
+
 func SaveSetting(ctx context.Context, key string, value interface{}) error {
 	s, _ := GetState(ctx)
 	if s == nil {
@@ -52,7 +67,7 @@ func GetSetting(ctx context.Context, key string) interface{} {
 }
 
 func Clear(ctx context.Context) error {
-	return (State{}).Persist(ctx)
+	return (State{ClientID: uuid.New()}).Persist(ctx)
 }
 
 // State persists across each cli invokation, allowing functionality such as workspace
@@ -60,6 +75,7 @@ func Clear(ctx context.Context) error {
 type State struct {
 	client.Client `json:"-"`
 
+	ClientID    uuid.UUID              `json:"clientID"`
 	Credentials []byte                 `json:"credentials"`
 	Account     client.Account         `json:"account"`
 	Settings    map[string]interface{} `json:"settings"`

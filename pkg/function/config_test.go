@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/txtar"
 )
@@ -28,7 +28,7 @@ func TestUnmarshal_testdata(t *testing.T) {
 
 	for _, e := range entries {
 		t.Run(e.Name(), func(t *testing.T) {
-			err := state.Clear(context.Background())
+			err := clistate.Clear(context.Background())
 			require.NoError(t, err)
 
 			if !strings.HasSuffix(e.Name(), ".txtar") {

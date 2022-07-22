@@ -8,15 +8,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest-cli/inngest/client"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/inngest/log"
-	"github.com/inngest/inngest-cli/inngest/state"
 )
 
 // findWorkflow finds a workflow given a UUID or a UUID prefix.
 func findWorkflow(ctx context.Context, idOrPrefix string) (*client.Workflow, error) {
-	s := state.RequireState(ctx)
+	s := clistate.RequireState(ctx)
 
-	ws, err := state.Workspace(ctx)
+	ws, err := clistate.Workspace(ctx)
 	if err != nil {
 		return nil, err
 	}

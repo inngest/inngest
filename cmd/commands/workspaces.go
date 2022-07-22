@@ -2,8 +2,8 @@ package commands
 
 import (
 	"github.com/inngest/inngest-cli/cmd/commands/internal/table"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/inngest/log"
-	"github.com/inngest/inngest-cli/inngest/state"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +29,7 @@ func NewCmdWorkspaces() *cobra.Command {
 func listWorkspaces(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 
-	state := state.RequireState(ctx)
+	state := clistate.RequireState(ctx)
 	flows, err := state.Client.Workspaces(ctx)
 	if err != nil {
 		log.From(ctx).Fatal().Err(err).Msg("unable to fetch workspaces")

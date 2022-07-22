@@ -2,11 +2,11 @@ package cli
 
 import (
 	"github.com/charmbracelet/lipgloss"
-	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 )
 
 func EnvString() string {
-	prod := state.IsProd()
+	prod := clistate.IsProd()
 
 	var env string
 	prefix := lipgloss.NewStyle().Bold(true).Padding(0, 1, 0, 0).Render("Environment:")

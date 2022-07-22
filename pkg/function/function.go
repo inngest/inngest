@@ -14,7 +14,7 @@ import (
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/pkg/expressions"
 )
 
@@ -373,14 +373,14 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 
 func (s Step) DSN(ctx context.Context, f Function) string {
 	suffix := "test"
-	if state.IsProd() {
+	if clistate.IsProd() {
 		suffix = "prod"
 	}
 
 	slug := strings.ToLower(slug.Make(s.ID))
 
 	id := fmt.Sprintf("%s-step-%s-%s", f.ID, slug, suffix)
-	if prefix, err := state.AccountIdentifier(ctx); err == nil && prefix != "" {
+	if prefix, err := clistate.AccountIdentifier(ctx); err == nil && prefix != "" {
 		id = fmt.Sprintf("%s/%s", prefix, id)
 	}
 

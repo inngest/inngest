@@ -8,7 +8,7 @@ import (
 
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/inngest/client"
-	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/internal/cuedefs"
 	"github.com/inngest/inngest-cli/pkg/cli"
 	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
@@ -81,9 +81,9 @@ func deployFunction(cmd *cobra.Command, args []string) error {
 }
 
 func deployWorkflow(ctx context.Context, fn *function.Function) error {
-	s := state.RequireState(ctx)
+	s := clistate.RequireState(ctx)
 
-	ws, err := state.Workspace(ctx)
+	ws, err := clistate.Workspace(ctx)
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func deployWorkflow(ctx context.Context, fn *function.Function) error {
 func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 	var err error
 
-	state := state.RequireState(ctx)
+	state := clistate.RequireState(ctx)
 
 	// Ensure we normalize the DSN before building.
 	a = normalizeDSN(ctx, a)
@@ -170,7 +170,7 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 
 // normalizeDSN ensures that the action DSN has an account identifier prefix added.
 func normalizeDSN(ctx context.Context, a inngest.ActionVersion) inngest.ActionVersion {
-	state := state.RequireState(ctx)
+	state := clistate.RequireState(ctx)
 	// Add your account identifier locally, before finding action versions.
 	prefix := ""
 	if state.Account.Identifier.Domain == nil {
@@ -185,7 +185,7 @@ func normalizeDSN(ctx context.Context, a inngest.ActionVersion) inngest.ActionVe
 }
 
 func configureVersionInfo(ctx context.Context, a inngest.ActionVersion) (inngest.ActionVersion, error) {
-	state := state.RequireState(ctx)
+	state := clistate.RequireState(ctx)
 
 	// If we're publishing a specific version, attempt to find it.  Else, load the latest
 	// action version.  This automatically happens depending on whether a.Version is nil.

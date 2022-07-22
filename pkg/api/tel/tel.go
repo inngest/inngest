@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/inngest/inngest-cli/inngest/state"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/inngest/version"
 	"github.com/inngest/inngestgo"
 	"github.com/spf13/cobra"
@@ -37,7 +37,7 @@ type Metadata struct {
 
 func NewMetadata(ctx context.Context) *Metadata {
 	var accountID string
-	if state, err := state.GetState(ctx); err == nil {
+	if state, err := clistate.GetState(ctx); err == nil {
 		accountID = state.Account.ID.String()
 	}
 	return &Metadata{

@@ -10,8 +10,8 @@ import (
 
 	"github.com/inngest/inngest-cli/cmd/commands/internal/table"
 	"github.com/inngest/inngest-cli/cmd/commands/internal/workflows"
+	"github.com/inngest/inngest-cli/inngest/clistate"
 	"github.com/inngest/inngest-cli/inngest/log"
-	"github.com/inngest/inngest-cli/inngest/state"
 	"github.com/inngest/inngest-cli/internal/cuedefs"
 	"github.com/spf13/cobra"
 	"golang.org/x/text/language"
@@ -38,9 +38,9 @@ func NewCmdWorkflows() *cobra.Command {
 		Short: "Lists workflows within the current workspace, defaulting to live workflows.  Use --all for all workflows.",
 		Run: func(cmd *cobra.Command, args []string) {
 			ctx := cmd.Context()
-			s := state.RequireState(ctx)
+			s := clistate.RequireState(ctx)
 
-			ws, err := state.Workspace(ctx)
+			ws, err := clistate.Workspace(ctx)
 			if err != nil {
 				log.From(ctx).Fatal().Err(err).Msg("No workspace selected")
 			}
@@ -178,9 +178,9 @@ func NewCmdWorkflows() *cobra.Command {
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			ctx := cmd.Context()
-			s := state.RequireState(ctx)
+			s := clistate.RequireState(ctx)
 
-			ws, err := state.Workspace(ctx)
+			ws, err := clistate.Workspace(ctx)
 			if err != nil {
 				log.From(ctx).Fatal().Err(err).Msg("No workspace selected")
 			}
@@ -264,9 +264,9 @@ func NewCmdWorkflows() *cobra.Command {
 				return err
 			}
 
-			s := state.RequireState(ctx)
+			s := clistate.RequireState(ctx)
 
-			ws, err := state.Workspace(ctx)
+			ws, err := clistate.Workspace(ctx)
 			if err != nil {
 				log.From(ctx).Fatal().Err(err).Msg("No workspace selected")
 			}
