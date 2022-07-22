@@ -111,7 +111,7 @@ func doRun(cmd *cobra.Command, args []string) {
 	}
 
 	ctx := cmd.Context()
-	var eventFunc func() ([]event.Event, error)
+	eventFunc := generatedEventLoader(ctx, *fn, triggerName)
 
 	if isReplayMode {
 		if fetchEventId != nil {
@@ -119,8 +119,6 @@ func doRun(cmd *cobra.Command, args []string) {
 		} else {
 			eventFunc = multiReplayEventLoader(ctx, triggerName, fetchRecentEventCount)
 		}
-	} else {
-		eventFunc = generatedEventLoader()
 	}
 
 	opts := runFunctionOpts{
@@ -133,6 +131,45 @@ func doRun(cmd *cobra.Command, args []string) {
 	}
 }
 
+// Returns a loader that creates a single generated `triggerName` event, or a
+// random triggering event from the function definition if `triggerName` is
+// empty.
+//
+// Will also attempt to read an event from stdin.
+func generatedEventLoader(ctx context.Context, fn function.Function, triggerName string) func() ([]event.Event, error) {
+	return func() ([]event.Event, error) {
+		// If we're generating an event and haven't been given a random seed,
+		// generate one now.
+		if runSeed <= 0 {
+			rand.Seed(time.Now().UnixNano())
+			runSeed = rand.Int63n(1_000_000)
+		}
+
+		fi, err := os.Stdin.Stat()
+		if err != nil {
+			return []event.Event{}, err
+		}
+		if (fi.Mode() & os.ModeCharDevice) == 0 {
+			// Read stdin
+			scanner := bufio.NewScanner(os.Stdin)
+			scanner.Scan()
+			evt := scanner.Bytes()
+
+			data := event.Event{}
+			err := json.Unmarshal(evt, &data)
+			return []event.Event{data}, err
+		}
+
+		fakedEvent, err := fakeEvent(ctx, fn, triggerName)
+		if err != nil {
+			return nil, err
+		}
+
+		return []event.Event{fakedEvent}, nil
+	}
+}
+
+// Returns a loader that fetches a particular event specified by `eventId`.
 func singleReplayEventLoader(ctx context.Context, eventId *ulid.ULID) func() ([]event.Event, error) {
 	return func() ([]event.Event, error) {
 		s := state.RequireState(ctx)
@@ -160,6 +197,8 @@ func singleReplayEventLoader(ctx context.Context, eventId *ulid.ULID) func() ([]
 	}
 }
 
+// Returns a loader that fetches multiple recent `triggerName` events, up to a
+// maximum of `count`.
 func multiReplayEventLoader(ctx context.Context, triggerName string, count int64) func() ([]event.Event, error) {
 	return func() ([]event.Event, error) {
 		if triggerName == "" {
@@ -232,61 +271,6 @@ func runFunction(ctx context.Context, fn function.Function, opts runFunctionOpts
 		return err
 	}
 
-	if opts.fetchEventId != nil {
-		// We're replaying a specific event, so let's fetch it.
-		evt, err := fetchEvent(ctx, *opts.fetchEventId)
-		if err != nil {
-			return err
-		}
-
-		if evt == nil {
-			return fmt.Errorf("event not found: %s", *opts.fetchEventId)
-		}
-
-		evts = []event.Event{*evt}
-	} else if opts.fetchRecentEvents > 0 {
-		// Here we're replaying at least 1 recent event.
-		triggerName := opts.triggerName
-
-		// We need there to be one trigger name here; if we haven't been given one,
-		// we might be able to find it in the function definition.
-		if triggerName == "" {
-			if len(fn.Triggers) == 0 {
-				return fmt.Errorf("no trigger specified and no triggers found in function")
-			}
-
-			if len(fn.Triggers) > 1 {
-				return fmt.Errorf("no trigger specified and multiple triggers found in function; provide a single trigger with the --trigger flag")
-			}
-
-			triggerName = fn.Triggers[0].Event
-
-			if triggerName == "" {
-				return fmt.Errorf("no trigger specified and could not find trigger in function definition")
-			}
-		}
-
-		evts, err = fetchRecentEvents(ctx, triggerName, int64(opts.fetchRecentEvents))
-		if err != nil {
-			return err
-		}
-
-		if len(evts) == 0 {
-			return fmt.Errorf("no events found for trigger %s", triggerName)
-		}
-	} else {
-		// We're not replaying, so use a generated event instead.
-		usingGeneratedEvent = true
-		evts, err = generateEvents(ctx, fn, opts.triggerName)
-		if err != nil {
-			return err
-		}
-
-		if len(evts) == 0 {
-			return fmt.Errorf("no events could be generated")
-		}
-	}
-
 	// NOTE: The runner, executor, etc. uses logger from context.  Bubbletea
 	// REALLY doesnt like it when you start logging to stderr/stdout;  it controls
 	// the output.
@@ -295,11 +279,6 @@ func runFunction(ctx context.Context, fn function.Function, opts runFunctionOpts
 	buf := bytes.NewBuffer(nil)
 	log := logger.Buffered(buf)
 	ctx = logger.With(ctx, *log)
-
-	if usingGeneratedEvent && runSeed <= 0 {
-		rand.Seed(time.Now().UnixNano())
-		runSeed = rand.Int63n(1_000_000)
-	}
 
 	// Run the function.
 	ui, err := cli.NewRunUI(ctx, cli.RunUIOpts{
@@ -318,33 +297,6 @@ func runFunction(ctx context.Context, fn function.Function, opts runFunctionOpts
 	}
 	// So we can exit with a non-zero code.
 	return ui.Error()
-}
-
-// generateEvent retrieves the event for use within testing the function.  It first checks stdin
-// to see if we're passed an event, or resorts to generating a fake event based off of
-// the function's event type.
-func generateEvents(ctx context.Context, fn function.Function, triggerName string) ([]event.Event, error) {
-	fi, err := os.Stdin.Stat()
-	if err != nil {
-		return []event.Event{}, err
-	}
-	if (fi.Mode() & os.ModeCharDevice) == 0 {
-		// Read stdin
-		scanner := bufio.NewScanner(os.Stdin)
-		scanner.Scan()
-		evt := scanner.Bytes()
-
-		data := event.Event{}
-		err := json.Unmarshal(evt, &data)
-		return []event.Event{data}, err
-	}
-
-	fakedEvent, err := fakeEvent(ctx, fn, triggerName)
-	if err != nil {
-		return nil, err
-	}
-
-	return []event.Event{fakedEvent}, nil
 }
 
 // fakeEvent finds event triggers within the function definition, then chooses
