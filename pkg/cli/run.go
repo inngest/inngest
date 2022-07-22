@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/inngest/inngest-cli/pkg/config"
 	inmemorydatastore "github.com/inngest/inngest-cli/pkg/coredata/inmemory"
 	"github.com/inngest/inngest-cli/pkg/event"
@@ -23,19 +25,21 @@ import (
 )
 
 type RunUIOpts struct {
-	Event     event.Event
+	Events    []event.Event
 	Seed      int64
 	Function  function.Function
 	LogBuffer *bytes.Buffer
+	Verbose   bool
 }
 
 func NewRunUI(ctx context.Context, opts RunUIOpts) (*RunUI, error) {
 	r := &RunUI{
-		ctx:    ctx,
-		event:  opts.Event,
-		seed:   opts.Seed,
-		fn:     opts.Function,
-		logBuf: opts.LogBuffer,
+		ctx:     ctx,
+		events:  opts.Events,
+		seed:    opts.Seed,
+		fn:      opts.Function,
+		logBuf:  opts.LogBuffer,
+		verbose: opts.Verbose,
 	}
 	return r, nil
 }
@@ -46,31 +50,65 @@ type RunUI struct {
 	// used when running the function to capture cnacellation signals.
 	ctx context.Context
 
-	// event stores the event data used as a trigger for the function.
-	event event.Event
+	// events stores the event data used as triggers for the function(s).
+	events []event.Event
 
 	// seed is the seed used to generate fake data
 	seed int64
+
 	// function is the function definition.
 	fn function.Function
 
+	// An error that has occurred while setting up or running the function(s).
+	// The process does not exit on this error; it will be used to decide status
+	// code returns.
 	err error
+
+	// Represents whether or not all functions and steps have finished running.
+	// This is used to determine when to end the Bubbletea process.
+	done bool
+
+	// runs is the list of function executions that are occurring. It is used to
+	// store the state of each particular execution to display in the UI.
+	runs []RunUIExecution
 
 	// sm is the state manager used for the execution.
 	sm state.Manager
 
-	// id is the identifier for the execution, once started.
-	id *state.Identifier
-
-	// duration stores how long the function took to execute.
-	duration time.Duration
-
-	done bool
-
 	// logBuf stores the output of the logger, if we want to display this in
 	// the UI (which we currently dont)
 	logBuf *bytes.Buffer
+
+	// Used to decide whether to print more information when running the command.
+	verbose bool
 }
+
+type RunUIExecution struct {
+	// id is the identifier for the execution, once started.
+	id *state.Identifier
+
+	// event is the event that was used to trigger the execution.
+	event *event.Event
+
+	// When true, the function run and all of its steps have either completed or
+	// errored.
+	done *bool
+
+	// Stores the order in which executions outputs were seen, in order to display
+	// the appropriate output in the UI.
+	seenOutput *[]string
+}
+
+// A style for the label to show that a function is running.
+var runsStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#fbbf24")).Padding(0, 1)
+
+// A style for the label to show that all of a function's steps have
+// successfully run.
+var passStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#84cc16")).Padding(0, 1)
+
+// A style for the label to show that at least one of a function's steps  has
+// failed to run.
+var failStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#b91c1c")).Padding(0, 1)
 
 // Error returns the error from building or running the function, if part of the process failed.
 func (r *RunUI) Error() error {
@@ -106,8 +144,9 @@ func (r *RunUI) run(ctx context.Context) {
 	//
 	// NOTE: Each individual config struct returns a singleton in-memory
 	// service, given the config struct has not been copied.
-	r.sm, r.err = c.State.Service.Concrete.Manager(ctx)
-	if r.err != nil {
+	r.sm, err = c.State.Service.Concrete.Manager(ctx)
+	if err != nil {
+		r.err = err
 		return
 	}
 
@@ -118,7 +157,6 @@ func (r *RunUI) run(ctx context.Context) {
 	go func() {
 		if err := service.Start(ctx, exec); err != nil {
 			r.err = err
-			r.done = true
 			return
 		}
 	}()
@@ -126,32 +164,94 @@ func (r *RunUI) run(ctx context.Context) {
 	// XXX: We need to define a readiness check with each of our services,
 	// then wait here for the readiness check to pass.
 
-	r.id, err = runner.Initialize(ctx, r.fn, r.event, r.sm, q)
-	if err != nil {
-		r.err = err
-		return
-	}
-	if r.id == nil {
-		r.err = fmt.Errorf("no run id created")
-		return
+	var wg sync.WaitGroup
+
+	// Loop over our given events and create a new run for each one.
+	for _, evt := range r.events {
+		wg.Add(1)
+
+		go func(event event.Event) {
+			defer wg.Done()
+
+			var runId *state.Identifier
+
+			runId, err = runner.Initialize(ctx, r.fn, event, r.sm, q)
+			if err != nil {
+				r.err = err
+				return
+			}
+			if runId == nil {
+				r.err = fmt.Errorf("no run id created")
+				return
+			}
+
+			done := false
+			seenOutput := []string{}
+
+			execution := RunUIExecution{
+				id:         runId,
+				done:       &done,
+				event:      &event,
+				seenOutput: &seenOutput,
+			}
+
+			r.runs = append(r.runs, execution)
+
+			// A clunky loop to watch for the completion of the run.
+			for !*execution.done {
+				var run state.State
+
+				run, err = r.sm.Load(ctx, *runId)
+				if err != nil {
+					r.err = err
+					return
+				}
+
+				output := run.Actions()
+
+				// If we have output, we may be displaying this in stdout.
+				// We receive output as a map[string], so here we store the order in
+				// which we have originally seen any new keys to ensure the render loop
+				// displays the output in a consistent order.
+				for id := range output {
+					haveSeenKey := false
+
+					for _, seenKey := range seenOutput {
+						if seenKey == id {
+							haveSeenKey = true
+							break
+						}
+					}
+
+					if !haveSeenKey {
+						seenOutput = append(seenOutput, id)
+					}
+				}
+
+				hasErrors := len(run.Errors()) > 0
+
+				if run.Metadata().Pending == 0 || hasErrors {
+					// If we're here, either all of the function's steps have completed
+					// successfully, or at least one of them has errored.
+					//
+					// Either way, we're counting this run as complete and returning an
+					// error for it if it had errors so we can return a non-zero status
+					// code.
+					if hasErrors {
+						r.err = fmt.Errorf("run failed")
+					}
+
+					*execution.done = true
+
+					return
+				}
+				<-time.After(time.Millisecond * 5)
+			}
+		}(evt)
 	}
 
-	for !r.done {
-		var run state.State
-
-		run, r.err = r.sm.Load(ctx, *r.id)
-		if r.err != nil {
-			return
-		}
-
-		meta := run.Metadata()
-		if meta.Pending == 0 {
-			r.duration = time.Since(meta.StartedAt)
-			r.done = true
-			return
-		}
-		<-time.After(time.Millisecond)
-	}
+	wg.Wait()
+	r.done = true
 }
 
 func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -171,14 +271,14 @@ func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if r.done || r.duration != 0 || r.err != nil {
+	if r.done {
 		// The fn has ran.
 		cmds = append(cmds, tea.Quit)
 	}
 
 	// Tick while the executor runs.
 	cmds = append(cmds, tea.Tick(25*time.Millisecond, func(t time.Time) tea.Msg {
-		if r.done || r.duration != 0 || r.err != nil {
+		if r.done {
 			return tea.Quit
 		}
 		return nil
@@ -188,28 +288,29 @@ func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (r *RunUI) View() string {
-	width, _, _ := term.GetSize(int(os.Stdout.Fd()))
-
 	s := &strings.Builder{}
 
+	runCount := len(r.runs)
+	hasMultipleRuns := runCount > 1
+
 	if r.seed > 0 {
-		s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function using seed "))
+		s.WriteString("Running your function using seed ")
 		s.WriteString(BoldStyle.Copy().Render(fmt.Sprintf("%d", r.seed)))
-		s.WriteString("\n")
+		s.WriteString("\n\n")
+	} else if hasMultipleRuns {
+		s.WriteString(fmt.Sprintf("Running your function with %d recent events...", runCount))
+		s.WriteString("\n\n")
 	} else {
-		s.WriteString(TextStyle.Copy().Padding(1, 0, 0, 0).Render("Running your function..."))
+		s.WriteString("Running your function...")
 		s.WriteString("\n\n")
 	}
 
-	input, _ := json.Marshal(r.event)
-	s.WriteString(FeintStyle.Render("Input:") + "\n")
-	s.WriteString(TextStyle.Copy().Foreground(Feint).Render(wrap.String(string(input), width)))
-	s.WriteString("\n\n")
-
-	s.WriteString(r.RenderState())
-
-	if r.err != nil {
-		s.WriteString(RenderError("There was an error running your function: "+r.err.Error()) + "\n")
+	if len(r.runs) > 0 {
+		for _, run := range r.runs {
+			s.WriteString(r.RenderState(run) + "\n")
+		}
+	} else {
+		// nothing has happened yet
 		return s.String()
 	}
 
@@ -218,56 +319,77 @@ func (r *RunUI) View() string {
 		return s.String()
 	}
 
-	s.WriteString(
-		BoldStyle.Copy().Foreground(Green).Padding(0, 0, 1, 0).Render(
-			fmt.Sprintf("Function complete in %.2f seconds", r.duration.Seconds()),
-		),
-	)
+	if !r.verbose {
+		s.WriteString("\n")
+	}
 
 	return s.String()
 }
 
-func (r *RunUI) RenderState() string {
-	if r.id == nil {
+// Renders the UI for a particular given `run`.
+func (r *RunUI) RenderState(run RunUIExecution) string {
+	if run.id == nil {
 		return ""
 	}
 
 	width, _, _ := term.GetSize(int(os.Stdout.Fd()))
 	s := &strings.Builder{}
 
-	state, err := r.sm.Load(context.Background(), *r.id)
+	state, err := r.sm.Load(context.Background(), *run.id)
 	if err != nil {
 		s.WriteString(RenderError("There was an error loading state: "+err.Error()) + "\n")
 		return s.String()
 	}
 
-	output := state.Actions()
 	errors := state.Errors()
+	metadata := state.Metadata()
+	done := *run.done
+	passed := done && len(errors) == 0
+	failed := done && len(errors) > 0
 
-	s.WriteString(BoldStyle.Render("Output") + "\n")
-	if len(output) == 0 {
-		s.WriteString(FeintStyle.Render("No output yet.") + "\n")
+	status := runsStyle.Render("RUNNING")
+	runId := run.event.ID
+	info := FeintStyle.Render(fmt.Sprintf("%d step(s) running", metadata.Pending))
+
+	if passed {
+		status = passStyle.Render("SUCCESS")
+		info = FeintStyle.Render("No errors")
+		// TODO Log the duration of the run here too
+	} else if failed {
+		status = failStyle.Render("FAILURE")
+		info = FeintStyle.Render(fmt.Sprintf("%d error(s)", len(errors)))
 	}
-	for id, data := range output {
-		byt, _ := json.Marshal(data)
-		s.WriteString(BoldStyle.Render(fmt.Sprintf("Step '%s'", id)))
-		s.WriteString(": \n")
-		s.WriteString(wrap.String(string(byt), width))
+
+	s.WriteString(strings.Join([]string{status, runId, info}, " "))
+
+	// Now we've rendered a simple line for the run, decide whether we want to
+	// log input/output data too.
+	if failed || r.verbose {
+		input, _ := json.Marshal(run.event)
+		s.WriteString("\n\n")
+		s.WriteString(TextStyle.Copy().Render("Input:") + "\n")
+		s.WriteString(FeintStyle.Render(wrap.String(string(input), width)))
+	}
+
+	if failed {
+		for _, err := range errors {
+			s.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Render(wrap.String(err.Error(), width)) + "\n")
+		}
+	} else if r.verbose {
+		output := state.Actions()
+
+		for _, key := range *run.seenOutput {
+			data := output[key]
+
+			if data != nil {
+				byt, _ := json.Marshal(data)
+				s.WriteString("\n\n" + BoldStyle.Render(fmt.Sprintf("Step '%s' output:", key)) + "\n")
+				s.WriteString(FeintStyle.Render((wrap.String(string(byt), width))))
+			}
+		}
+
 		s.WriteString("\n")
 	}
 
-	s.WriteString("\n")
-	s.WriteString(BoldStyle.Render("Errors") + "\n")
-
-	if len(errors) == 0 {
-		s.WriteString(FeintStyle.Render("No errors 🥳") + "\n")
-	}
-	for id, err := range errors {
-		s.WriteString(BoldStyle.Render(fmt.Sprintf("Step '%s'", id)))
-		s.WriteString(": " + wrap.String(err.Error(), width))
-		s.WriteString("\n")
-	}
-
-	s.WriteString("\n")
 	return s.String()
 }
