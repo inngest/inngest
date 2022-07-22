@@ -20,7 +20,26 @@ import UserVoice from "../shared/Icons/UserVoice";
 import Functions from "../shared/Icons/Play";
 import UsersGroup from "../shared/Icons/UsersGroup";
 
-const PLANS = [
+type Plan = {
+  name: string;
+  cost: string;
+  description: React.ReactFragment | string;
+  cta: {
+    href: string;
+    text: string;
+  };
+  features: {
+    icon: React.FC<any>;
+    quantity: string;
+    text: string;
+  }[];
+  resources: {
+    ram: string;
+    maxRuntime: string;
+  };
+};
+
+const PLANS: Plan[] = [
   {
     name: "Community",
     cost: "free",
@@ -56,6 +75,10 @@ const PLANS = [
         text: "log retention",
       },
     ],
+    resources: {
+      ram: "256mb",
+      maxRuntime: "15 min",
+    },
   },
   {
     name: "Startup",
@@ -87,6 +110,10 @@ const PLANS = [
         text: "log retention",
       },
     ],
+    resources: {
+      ram: "1GB",
+      maxRuntime: "6 hours",
+    },
   },
   {
     name: "Team",
@@ -123,6 +150,10 @@ const PLANS = [
         text: "support",
       },
     ],
+    resources: {
+      ram: "1GB",
+      maxRuntime: "6 hours",
+    },
   },
   {
     name: "Custom",
@@ -164,6 +195,10 @@ const PLANS = [
         text: "support",
       },
     ],
+    resources: {
+      ram: "up to 16GB",
+      maxRuntime: "6+ hours",
+    },
   },
 ];
 
@@ -247,10 +282,30 @@ export default function Pricing() {
           ))}
         </Grid>
 
-        <AllPlansInfo>
+        <SectionInfo>
           All plans include uncapped events per month, scheduled functions,
           support via Email & Discord.
-        </AllPlansInfo>
+        </SectionInfo>
+
+        <SectionHeader>
+          <h2>Resource limits</h2>
+          <SectionInfo>Bring any workload</SectionInfo>
+        </SectionHeader>
+
+        <ComparisonTable>
+          <div key={"headers"} className="plan-column">
+            <div>&nbsp;</div>
+            <div className="table-header">Memory</div>
+            <div className="table-header">Max runtime</div>
+          </div>
+          {PLANS.map((plan) => (
+            <div key={plan.name} className="plan-column">
+              <div className="table-header">{plan.name}</div>
+              <div>{plan.resources.ram}</div>
+              <div>{plan.resources.maxRuntime}</div>
+            </div>
+          ))}
+        </ComparisonTable>
 
         <FAQGrid>
           <h2 style={{ margin: "2rem 0" }}>FAQs</h2>
@@ -295,14 +350,10 @@ export default function Pricing() {
           </div>
 
           <div onClick={toggleFAQ}>
-            <h3>What are the resources limits?</h3>
+            <h3>What if I need higher resource limits?</h3>
             <p>
-              Free accounts are limited to 128mb of ram and a maximum runtime of
-              10 seconds per function. Paid accounts can utilize 1GB of ram and
-              have a runtime limit of 60 seconds per function. Advanced accounts
-              can use up to 16GB of ram and can run functions for up to 6 hours;
-              if you need this functionality{" "}
-              <a href="/contact">get in touch with us</a>.
+              If you need something more than what is listed above or something
+              custom, <a href="/contact">get in touch with us</a>.
             </p>
           </div>
 
@@ -464,11 +515,36 @@ const FreePlanBlock = styled(PlanBlock)<{ visibleOn: string }>`
   }
 `;
 
-const AllPlansInfo = styled.p`
-  margin: 2rem auto 4rem;
+const SectionHeader = styled.div`
+  margin: 4rem 0 2rem;
+  text-align: center;
+`;
+
+const SectionInfo = styled.p`
+  margin: 1rem auto;
   max-width: 44rem;
   line-height: 1.5rem;
   text-align: center;
+`;
+
+const ComparisonTable = styled.div`
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-gap: 1rem;
+  max-width: 840px;
+  padding: 1rem 1.4rem;
+  margin: 1rem auto;
+  border: 1px solid var(--stroke-color);
+  border-radius: var(--border-radius);
+
+  .table-header {
+    font-family: var(--font);
+    font-weight: bold;
+  }
+  .plan-column {
+    display: grid;
+    grid-row-gap: 1rem;
+  }
 `;
 
 const FAQGrid = styled.div`
