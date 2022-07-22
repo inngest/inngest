@@ -26,21 +26,12 @@ var runSeed int64
 var replayCount int64
 
 type runFunctionOpts struct {
+	// A function that loads the events to be run locally.
 	eventFunc func() ([]event.Event, error)
-
-	// If in replay mode, this is the number of recent events to fetch.
-	// fetchRecentEvents int64
 
 	// If true, prints extra information about step input/output to stdout during
 	// a function's run.
 	verbose bool
-
-	// If non-empty, this is a specific event ID to fetch and replay.
-	// fetchEventId *ulid.ULID
-
-	// If non-empty, this is the name of the event trigger to use. If this is not
-	// provided, we will try to infer the trigger from the function definition.
-	// triggerName string
 }
 
 func NewCmdRun() *cobra.Command {
