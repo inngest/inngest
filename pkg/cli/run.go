@@ -50,17 +50,26 @@ type RunUI struct {
 	// used when running the function to capture cnacellation signals.
 	ctx context.Context
 
-	// event stores the event data used as a trigger for the function.
+	// events stores the event data used as triggers for the function(s).
 	events []event.Event
 
 	// seed is the seed used to generate fake data
 	seed int64
+
 	// function is the function definition.
 	fn function.Function
 
-	err  error
+	// An error that has occurred while setting up or running the function(s).
+	// The process does not exit on this error; it will be used to decide status
+	// code returns.
+	err error
+
+	// Represents whether or not all functions and steps have finished running.
+	// This is used to determine when to end the Bubbletea process.
 	done bool
 
+	// runs is the list of function executions that are occurring. It is used to
+	// store the state of each particular execution to display in the UI.
 	runs []RunUIExecution
 
 	// sm is the state manager used for the execution.
@@ -70,15 +79,19 @@ type RunUI struct {
 	// the UI (which we currently dont)
 	logBuf *bytes.Buffer
 
+	// Used to decide whether to print more information when running the command.
 	verbose bool
 }
 
 type RunUIExecution struct {
 	// id is the identifier for the execution, once started.
-	id    *state.Identifier
+	id *state.Identifier
+
+	// event is the event that was used to trigger the execution.
 	event *event.Event
-	// duration stores how long the function took to execute.
-	// duration time.Duration
+
+	// When true, the function run and all of its steps have either completed or
+	// errored.
 	done *bool
 
 	// Stores the order in which executions outputs were seen, in order to display
@@ -86,8 +99,15 @@ type RunUIExecution struct {
 	seenOutput *[]string
 }
 
+// A style for the label to show that a function is running.
 var runsStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#fbbf24")).Padding(0, 1)
+
+// A style for the label to show that all of a function's steps have
+// successfully run.
 var passStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#84cc16")).Padding(0, 1)
+
+// A style for the label to show that at least one of a function's steps  has
+// failed to run.
 var failStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#b91c1c")).Padding(0, 1)
 
 // Error returns the error from building or running the function, if part of the process failed.
@@ -146,6 +166,7 @@ func (r *RunUI) run(ctx context.Context) {
 
 	var wg sync.WaitGroup
 
+	// Loop over our given events and create a new run for each one.
 	for _, evt := range r.events {
 		wg.Add(1)
 
@@ -176,6 +197,7 @@ func (r *RunUI) run(ctx context.Context) {
 
 			r.runs = append(r.runs, execution)
 
+			// A clunky loop to watch for the completion of the run.
 			for !*execution.done {
 				var run state.State
 
@@ -187,6 +209,10 @@ func (r *RunUI) run(ctx context.Context) {
 
 				output := run.Actions()
 
+				// If we have output, we may be displaying this in stdout.
+				// We receive output as a map[string], so here we store the order in
+				// which we have originally seen any new keys to ensure the render loop
+				// displays the output in a consistent order.
 				for id := range output {
 					haveSeenKey := false
 
@@ -205,6 +231,12 @@ func (r *RunUI) run(ctx context.Context) {
 				hasErrors := len(run.Errors()) > 0
 
 				if run.Metadata().Pending == 0 || hasErrors {
+					// If we're here, either all of the function's steps have completed
+					// successfully, or at least one of them has errored.
+					//
+					// Either way, we're counting this run as complete and returning an
+					// error for it if it had errors so we can return a non-zero status
+					// code.
 					if hasErrors {
 						r.err = fmt.Errorf("run failed")
 					}
@@ -256,8 +288,6 @@ func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (r *RunUI) View() string {
-	// width, _, _ := term.GetSize(int(os.Stdout.Fd()))
-
 	s := &strings.Builder{}
 
 	runCount := len(r.runs)
@@ -293,16 +323,10 @@ func (r *RunUI) View() string {
 		s.WriteString("\n")
 	}
 
-	// TODO Still want this
-	// s.WriteString(
-	// 	BoldStyle.Copy().Foreground(Green).Padding(0, 0, 1, 0).Render(
-	// 		fmt.Sprintf("Function complete in %.2f seconds", r.duration.Seconds()),
-	// 	),
-	// )
-
 	return s.String()
 }
 
+// Renders the UI for a particular given `run`.
 func (r *RunUI) RenderState(run RunUIExecution) string {
 	if run.id == nil {
 		return ""
@@ -330,6 +354,7 @@ func (r *RunUI) RenderState(run RunUIExecution) string {
 	if passed {
 		status = passStyle.Render("SUCCESS")
 		info = FeintStyle.Render("No errors")
+		// TODO Log the duration of the run here too
 	} else if failed {
 		status = failStyle.Render("FAILURE")
 		info = FeintStyle.Render(fmt.Sprintf("%d error(s)", len(errors)))
@@ -337,6 +362,8 @@ func (r *RunUI) RenderState(run RunUIExecution) string {
 
 	s.WriteString(strings.Join([]string{status, runId, info}, " "))
 
+	// Now we've rendered a simple line for the run, decide whether we want to
+	// log input/output data too.
 	if failed || r.verbose {
 		input, _ := json.Marshal(run.event)
 		s.WriteString("\n\n")

@@ -165,7 +165,7 @@ func (c httpClient) RecentEvent(ctx context.Context, workspaceID uuid.UUID, even
 
 }
 
-func (c httpClient) RecentEvents(ctx context.Context, workspaceID uuid.UUID, eventName string, count int64) ([]ArchivedEvent, error) {
+func (c httpClient) RecentEvents(ctx context.Context, workspaceID uuid.UUID, triggerName string, count int64) ([]ArchivedEvent, error) {
 	query := `
 		query RecentEvents($workspaceId: ID!, $name: String!, $count: Int) {
 			workspace(id: $workspaceId) {
@@ -192,7 +192,7 @@ func (c httpClient) RecentEvents(ctx context.Context, workspaceID uuid.UUID, eve
 
 	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{
 		"workspaceId": workspaceID,
-		"name":        eventName,
+		"name":        triggerName,
 		"count":       count,
 	}})
 	if err != nil {
