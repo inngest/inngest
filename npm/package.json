@@ -1,0 +1,38 @@
+{
+  "name": "@inngest/cli",
+  "version": "",
+  "description": "The event-driven queue for any language.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "scripts": {
+    "prepublishOnly": "mkdir bin && touch bin/inngest",
+    "postinstall": "node postinstall.js",
+    "build": "tsc"
+  },
+  "bin": {
+    "inngest": "./bin/inngest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inngest/inngest.git"
+  },
+  "homepage": "https://github.com/inngest/inngest",
+  "files": [
+    "bin",
+    "LICENSE.md",
+    "postinstall.js"
+  ],
+  "volta": {
+    "node": "16.16.0"
+  },
+  "dependencies": {
+    "request": "2.88.2",
+    "tar": "6.1.11",
+    "unzipper": "0.10.11"
+  },
+  "devDependencies": {
+    "@types/request": "2.48.8",
+    "@types/tar": "6.1.1",
+    "@types/unzipper": "0.10.5",
+    "typescript": "4.7.4"
+  }
+}
