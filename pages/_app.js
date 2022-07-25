@@ -42,18 +42,22 @@ function MyApp({ Component, pageProps }) {
         onLoad={() => {
           Inngest.init(process.env.NEXT_PUBLIC_INNGEST_KEY);
           let firstTouch = false;
+          const setCookie = (id) => {
+            // Set to inngest.com for testing
+            const domain =
+              process.env.NODE_ENV === "production" ? "inngest.com" : "";
+            document.cookie = `inngest-anon-id=${id};max-age=31536000;path=/;domain=${domain};SameSite=Strict;Secure`;
+          };
           const anonId = () => {
             let id = window.localStorage.getItem("inngest-anon-id");
             firstTouch = !id;
             if (!id) {
               id = uuid();
-              // Set to inngest.com for testing
-              const domain =
-                process.env.NODE_ENV === "production" ? "inngest.com" : "";
-              // Store in cookie for oauth, LS for session
-              document.cookie = `inngest-anon-id=${id};max-age=31536000;path=/;domain=${domain};SameSite=Strict`;
+              // Store in LS for session
               window.localStorage.setItem("inngest-anon-id", id);
             }
+            // Store in cookie for oauth
+            setCookie(id);
             return id;
           };
           let ref = null;
