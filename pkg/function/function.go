@@ -368,6 +368,17 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 		}
 	}
 
+	for n, s := range f.Steps {
+		if len(s.After) == 0 {
+			s.After = []After{
+				{
+					Step: inngest.TriggerName,
+				},
+			}
+			f.Steps[n] = s
+		}
+	}
+
 	return nil
 }
 
