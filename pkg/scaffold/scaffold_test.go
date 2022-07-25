@@ -16,6 +16,14 @@ var fixtures fs.FS
 
 func init() {
 	var err error
+
+	// Also set the CacheDir to the same directory as the local fixtures.
+	// This is a bit of a hack, but it's the easiest way to test the scaffold
+	// using both `fs.FS` and `os` for Windows compatibility.
+	//
+	// See https://github.com/inngest/inngest/pull/188
+	CacheDir = filepath.Join(".", "scaffold_fixtures")
+
 	fixtures, err = fs.Sub(dir, filepath.Join(".", "scaffold_fixtures"))
 	if err != nil {
 		panic(err)
