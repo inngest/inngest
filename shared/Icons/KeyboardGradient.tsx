@@ -73,8 +73,8 @@ const KeyboardGradient = ({ size = "56" }: IconProps) => (
         y2="56"
         gradientUnits="userSpaceOnUse"
       >
-        <stop stop-color="#3C8CE7" />
-        <stop offset="1" stop-color="#00EAFF" />
+        <stop stopColor="#3C8CE7" />
+        <stop offset="1" stopColor="#00EAFF" />
       </linearGradient>
     </defs>
   </svg>

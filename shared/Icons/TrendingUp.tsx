@@ -32,8 +32,8 @@ const TrendingUp = ({ size = "1em", fill = "currentColor" }: IconProps) => (
         y2="31.1668"
         gradientUnits="userSpaceOnUse"
       >
-        <stop stop-color="#5D5FEF" />
-        <stop offset="1" stop-color="#EF5DA8" />
+        <stop stopColor="#5D5FEF" />
+        <stop offset="1" stopColor="#EF5DA8" />
       </linearGradient>
       <linearGradient
         id="paint1_linear_781_2282"
@@ -43,8 +43,8 @@ const TrendingUp = ({ size = "1em", fill = "currentColor" }: IconProps) => (
         y2="23.8335"
         gradientUnits="userSpaceOnUse"
       >
-        <stop stop-color="#5D5FEF" />
-        <stop offset="1" stop-color="#EF5DA8" />
+        <stop stopColor="#5D5FEF" />
+        <stop offset="1" stopColor="#EF5DA8" />
       </linearGradient>
     </defs>
   </svg>
