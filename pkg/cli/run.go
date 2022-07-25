@@ -12,10 +12,13 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/function"
@@ -30,6 +33,7 @@ type RunUIOpts struct {
 	Function  function.Function
 	LogBuffer *bytes.Buffer
 	Verbose   bool
+	DebugID   *uuid.UUID
 }
 
 func NewRunUI(ctx context.Context, opts RunUIOpts) (*RunUI, error) {
@@ -40,6 +44,7 @@ func NewRunUI(ctx context.Context, opts RunUIOpts) (*RunUI, error) {
 		fn:      opts.Function,
 		logBuf:  opts.LogBuffer,
 		verbose: opts.Verbose,
+		debugID: opts.DebugID,
 	}
 	return r, nil
 }
@@ -75,12 +80,20 @@ type RunUI struct {
 	// sm is the state manager used for the execution.
 	sm state.Manager
 
+	q queue.Queue
+
 	// logBuf stores the output of the logger, if we want to display this in
 	// the UI (which we currently dont)
 	logBuf *bytes.Buffer
 
 	// Used to decide whether to print more information when running the command.
 	verbose bool
+
+	// debugID stores the debug ID used when running in debug mode.  Debug mode
+	// pauses on each edge until we manually continue.
+	debugID *uuid.UUID
+	// debugPauses stores all available debug pauses.
+	debugPauses []*state.Pause
 }
 
 type RunUIExecution struct {
@@ -124,6 +137,7 @@ func (r *RunUI) Init() tea.Cmd {
 
 // run performs the running of the function.
 func (r *RunUI) run(ctx context.Context) {
+	var err error
 	el := &inmemorydatastore.MemoryExecutionLoader{}
 	if err := el.SetFunctions(ctx, []*function.Function{&r.fn}); err != nil {
 		// This is a render loop, so store the error in our mutable state
@@ -139,7 +153,7 @@ func (r *RunUI) run(ctx context.Context) {
 	}
 
 	// Create a singleton queue for initializing the fn.
-	q, err := c.Queue.Service.Concrete.Producer()
+	r.q, err = c.Queue.Service.Concrete.Queue()
 	if err != nil {
 		r.err = err
 		return
@@ -180,7 +194,7 @@ func (r *RunUI) run(ctx context.Context) {
 
 			var runId *state.Identifier
 
-			runId, err = runner.Initialize(ctx, r.fn, event, r.sm, q)
+			runId, err = runner.Initialize(ctx, r.fn, event, r.sm, r.q)
 			if err != nil {
 				r.err = err
 				return
@@ -234,7 +248,6 @@ func (r *RunUI) run(ctx context.Context) {
 				}
 
 				hasErrors := len(run.Errors()) > 0
-
 				if run.Metadata().Pending == 0 || hasErrors {
 					// If we're here, either all of the function's steps have completed
 					// successfully, or at least one of them has errored.
@@ -269,6 +282,9 @@ func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyCtrlBackslash:
 			return r, tea.Quit
+		case tea.KeyEnter:
+			// TODO: Consume the selected pause.
+			return r, nil
 		}
 		if msg.String() == "q" {
 			return r, tea.Quit
@@ -282,8 +298,37 @@ func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Tick while the executor runs.
 	cmds = append(cmds, tea.Tick(25*time.Millisecond, func(t time.Time) tea.Msg {
+		ctx := context.Background()
+
 		if r.done {
 			return tea.Quit
+		}
+
+		if r.debugID != nil && len(r.runs) > 0 {
+			// If the number of pauses equals the number of outstanding items in this
+			// function, there's no need to query again;  it only messes with allocations.
+			// Check how many pauses we have outstanding.
+			runID := r.runs[0]
+			s, err := r.sm.Load(ctx, *runID.id)
+			if err != nil {
+				r.err = err
+				return nil
+			}
+			if s.Metadata().Pending == len(r.debugPauses) {
+				return nil
+			}
+
+			// Update the pauses here.  It doesn't matter that this updates pointers;
+			// we tick anyways.
+			it, _ := r.sm.PausesByEvent(ctx, inngest.DebugEvent)
+			pauses := []*state.Pause{}
+			for it.Next(ctx) {
+				pause := it.Val(ctx)
+				if pause.Expression != nil && strings.Contains(*pause.Expression, r.debugID.String()) {
+					pauses = append(pauses, pause)
+				}
+			}
+			r.debugPauses = pauses
 		}
 		return nil
 	}))
@@ -298,7 +343,7 @@ func (r *RunUI) View() string {
 	hasMultipleRuns := runCount > 1
 
 	if r.seed > 0 {
-		s.WriteString("Running your function using seed ")
+		s.WriteString("\nRunning your function using seed ")
 		s.WriteString(BoldStyle.Copy().Render(fmt.Sprintf("%d", r.seed)))
 		s.WriteString("\n\n")
 	} else if hasMultipleRuns {
@@ -339,6 +384,7 @@ func (r *RunUI) RenderState(run RunUIExecution) string {
 
 	errors := state.Errors()
 	metadata := state.Metadata()
+
 	done := *run.done
 	passed := done && len(errors) == 0
 	failed := done && len(errors) > 0
@@ -366,12 +412,12 @@ func (r *RunUI) RenderState(run RunUIExecution) string {
 		s.WriteString(TextStyle.Copy().Render("Input:") + "\n")
 		s.WriteString(FeintStyle.Render(wrap.String(string(input), width)))
 	}
-
 	if failed {
 		for _, err := range errors {
 			s.WriteString("\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Render(wrap.String(err.Error(), width)) + "\n")
 		}
-	} else if r.verbose {
+	}
+	if failed || r.verbose {
 		output := state.Actions()
 
 		for _, key := range *run.seenOutput {
@@ -385,6 +431,13 @@ func (r *RunUI) RenderState(run RunUIExecution) string {
 		}
 
 		s.WriteString("\n")
+	}
+
+	if r.debugID != nil {
+		s.WriteString("\n")
+		for _, pause := range r.debugPauses {
+			s.WriteString(fmt.Sprintf("Paused on %s\n", pause.Incoming))
+		}
 	}
 
 	return s.String()

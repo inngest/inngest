@@ -11,6 +11,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/inngest/clistate"
 	"github.com/inngest/inngest/pkg/cli"
@@ -32,6 +33,10 @@ type runFunctionOpts struct {
 	// If true, prints extra information about step input/output to stdout during
 	// a function's run.
 	verbose bool
+
+	// debugID, if set, signals the debugging session that we use
+	// within the run.
+	debugID *uuid.UUID
 }
 
 func NewCmdRun() *cobra.Command {
@@ -48,6 +53,7 @@ func NewCmdRun() *cobra.Command {
 	cmd.Flags().Int64VarP(&replayCount, "count", "c", 10, "Number of events to replay in replay mode")
 	cmd.Flags().StringP("event-id", "e", "", "Specifies a specific event to replay in replay mode")
 	cmd.Flags().BoolP("snapshot", "s", false, "Returns found or generated events as JSON instead of running them")
+	cmd.Flags().BoolP("debug", "d", false, "Enables debug mode, breaking before each step in the function")
 
 	return cmd
 }
@@ -74,6 +80,27 @@ func doRun(cmd *cobra.Command, args []string) {
 			// This should already have been printed to the terminal.
 			fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 			os.Exit(1)
+		}
+	}
+
+	var debugID *uuid.UUID
+	if cmd.Flag("debug").Value.String() == "true" {
+		id := uuid.New()
+		debugID = &id
+		// We've enabled debug mode.  In this case, we're going
+		// to replace each edge in the function with an async edge,
+		// waiting for a debug/continue event to... continue.
+		for n, s := range fn.Steps {
+			for i, after := range s.After {
+				match := fmt.Sprintf("async.data.debug_id = %s && async.data.outgoing == %s && async.data.incoming == %s", debugID, after.Step, s.ID)
+				after.Async = &inngest.AsyncEdgeMetadata{
+					Event: inngest.DebugEvent,
+					Match: &match,
+					TTL:   inngest.DebugTimeout.String(),
+				}
+				s.After[i] = after
+			}
+			fn.Steps[n] = s
 		}
 	}
 
@@ -117,6 +144,7 @@ func doRun(cmd *cobra.Command, args []string) {
 	opts := runFunctionOpts{
 		verbose:   hasVerboseFlag,
 		eventFunc: eventFunc,
+		debugID:   debugID,
 	}
 
 	if err = runFunction(ctx, *fn, opts); err != nil {
@@ -296,11 +324,11 @@ func runFunction(ctx context.Context, fn function.Function, opts runFunctionOpts
 		Seed:      runSeed,
 		LogBuffer: buf,
 		Verbose:   opts.verbose || len(evts) == 1,
+		DebugID:   opts.debugID,
 	})
 	if err != nil {
 		return err
 	}
-
 	if err := tea.NewProgram(ui).Start(); err != nil {
 		return err
 	}
