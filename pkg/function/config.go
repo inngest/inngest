@@ -22,6 +22,11 @@ var (
 	ErrNotFound = fmt.Errorf("No inngest file could be found.")
 )
 
+const (
+	cueConfigName  = "inngest.cue"
+	jsonConfigName = "inngest.json"
+)
+
 // Load loads the inngest function from the given directory.  It searches for both inngest.cue
 // and inngest.json as both are supported.  If neither exist, this returns ErrNotFound.
 func Load(ctx context.Context, dir string) (*Function, error) {
@@ -44,31 +49,65 @@ func Load(ctx context.Context, dir string) (*Function, error) {
 	}
 
 	// Then attempt to find inngest.cue, the canonical reference.
-	cue := filepath.Join(abs, "inngest.cue")
-	if _, err := os.Stat(cue); err == nil {
-		// The cue file exists.
-		byt, err := os.ReadFile(cue)
-		if err != nil {
-			return nil, err
-		}
-		return Unmarshal(ctx, byt, cue)
-	}
-
-	// Finally, use inngest.json in the given dir.
-	json := filepath.Join(abs, "inngest.json")
-	if _, err := os.Stat(json); err != nil {
-		// This doesn't exist.  Return ErrNotFound.
-		if os.IsNotExist(err) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-
-	byt, err := os.ReadFile(json)
+	cue, byt, err := findFileUp(filepath.Join(abs, cueConfigName))
 	if err != nil {
 		return nil, err
 	}
-	return Unmarshal(ctx, byt, json)
+	if cue != "" {
+		return Unmarshal(ctx, byt, cue)
+	}
+
+	json, byt, err := findFileUp(filepath.Join(abs, jsonConfigName))
+	if err != nil {
+		return nil, err
+	}
+	if json != "" {
+		return Unmarshal(ctx, byt, json)
+	}
+
+	return nil, ErrNotFound
+}
+
+// Finds a file at the given `path``, iterating up through the directory tree
+// until it finds the file or reaches the root.
+//
+// Returns the final path and the file contents.
+//
+// Will return an error if reading a file errored, but will return empty values
+// if no file could be found.
+func findFileUp(path string) (string, []byte, error) {
+	prevPath := ""
+	targetPath := path
+	fileName := filepath.Base(path)
+
+	for {
+		// This will resolve to the same dir if we're at the root.
+		// At this point, we've exhausted all options, so return empty values.
+		if targetPath == prevPath {
+			return "", nil, nil
+		}
+
+		if _, err := os.Stat(targetPath); err != nil {
+			// Is the error isn't something other than lack of existence, we should
+			// error now.
+			if !os.IsNotExist(err) {
+				return "", nil, err
+			}
+
+			// If we're here, the file doesn't exist, so continue.
+			prevPath = targetPath
+			targetPath = filepath.Join(filepath.Dir(prevPath), "..", fileName)
+			continue
+		}
+
+		// Stat succeeded, so let's try reading the file
+		byt, err := os.ReadFile(targetPath)
+		if err != nil {
+			return "", nil, err
+		}
+
+		return targetPath, byt, nil
+	}
 }
 
 func LoadRecursive(ctx context.Context, dir string) ([]*Function, error) {
@@ -84,7 +123,7 @@ func LoadRecursive(ctx context.Context, dir string) ([]*Function, error) {
 		if f.IsDir() {
 			return nil
 		}
-		if f.Name() != "inngest.cue" && f.Name() != "inngest.json" {
+		if f.Name() != cueConfigName && f.Name() != jsonConfigName {
 			return nil
 		}
 		function, err := Load(ctx, path)
