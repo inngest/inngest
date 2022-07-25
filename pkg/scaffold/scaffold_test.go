@@ -30,6 +30,6 @@ func TestParse(t *testing.T) {
 	require.Equal(t, 2, len(mapping.Languages["typescript"]))
 
 	for _, v := range mapping.Languages["typescript"] {
-		require.NotNil(t, v.FS)
+		require.NotEmpty(t, v.root)
 	}
 }
