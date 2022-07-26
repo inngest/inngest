@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/function"
 )
 
 type TestData struct {

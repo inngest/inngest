@@ -10,8 +10,8 @@ import (
 	"cuelang.org/go/cue"
 	"github.com/gosimple/slug"
 	"github.com/inngest/event-schemas/pkg/fakedata"
-	"github.com/inngest/inngest-cli/pkg/event"
-	"github.com/inngest/inngest-cli/pkg/expressions"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/expressions"
 	cron "github.com/robfig/cron/v3"
 )
 

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest-cli/pkg/logger"
+	"github.com/inngest/inngest/pkg/logger"
 	"golang.org/x/sync/errgroup"
 )
 

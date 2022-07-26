@@ -7,10 +7,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/inngest/inngest-cli/inngest/client"
-	"github.com/inngest/inngest-cli/inngest/clistate"
-	"github.com/inngest/inngest-cli/inngest/log"
-	"github.com/inngest/inngest-cli/pkg/cli"
+	"github.com/inngest/inngest/inngest/client"
+	"github.com/inngest/inngest/inngest/clistate"
+	"github.com/inngest/inngest/inngest/log"
+	"github.com/inngest/inngest/pkg/cli"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/inngest/inngest-cli/pkg/function"
-	"github.com/inngest/inngest-cli/tests/testdsl"
+	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/tests/testdsl"
 
-	_ "github.com/inngest/inngest-cli/tests/fns/basic-single-step"
+	_ "github.com/inngest/inngest/tests/fns/basic-single-step"
 )
 
 // parseFns reads all functions from "./fns"

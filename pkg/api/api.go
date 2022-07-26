@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/event"
+	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 )

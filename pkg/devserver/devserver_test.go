@@ -9,18 +9,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/config/registration"
-	inmemorydatastore "github.com/inngest/inngest-cli/pkg/coredata/inmemory"
-	"github.com/inngest/inngest-cli/pkg/event"
-	"github.com/inngest/inngest-cli/pkg/execution/driver/mockdriver"
-	"github.com/inngest/inngest-cli/pkg/execution/state"
-	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/config/registration"
+	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/driver/mockdriver"
+	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/function"
 	"github.com/stretchr/testify/require"
 
 	// Import the default drivers, queues, and state stores.
-	_ "github.com/inngest/inngest-cli/pkg/config/defaults"
+	_ "github.com/inngest/inngest/pkg/config/defaults"
 )
 
 // TestEngine_async asserst that the engine coordinates events between the runner, executor, and

@@ -11,8 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
-	"github.com/inngest/inngest-cli/pkg/logger"
+	"github.com/inngest/inngest/pkg/execution/driver/dockerdriver"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/spf13/viper"
 )
 

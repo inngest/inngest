@@ -4,13 +4,13 @@ import (
 	"os"
 	"testing"
 
-	"github.com/inngest/inngest-cli/pkg/config/registration"
-	inmemorydatastore "github.com/inngest/inngest-cli/pkg/coredata/inmemory"
-	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
-	"github.com/inngest/inngest-cli/pkg/execution/driver/httpdriver"
-	"github.com/inngest/inngest-cli/pkg/execution/queue/inmemoryqueue"
-	"github.com/inngest/inngest-cli/pkg/execution/state/inmemory"
-	"github.com/inngest/inngest-cli/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/config/registration"
+	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/execution/driver/dockerdriver"
+	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/execution/queue/inmemoryqueue"
+	"github.com/inngest/inngest/pkg/execution/state/inmemory"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/stretchr/testify/require"
 )
 

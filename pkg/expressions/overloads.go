@@ -12,7 +12,7 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter/functions"
 	"github.com/google/cel-go/parser"
-	"github.com/inngest/inngest-cli/pkg/dateutil"
+	"github.com/inngest/inngest/pkg/dateutil"
 	str2duration "github.com/xhit/go-str2duration/v2"
 	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"

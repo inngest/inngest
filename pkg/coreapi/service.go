@@ -5,10 +5,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/coredata"
-	"github.com/inngest/inngest-cli/pkg/logger"
-	"github.com/inngest/inngest-cli/pkg/service"
+	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
 )
 
 type Opt func(s *svc)

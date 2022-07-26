@@ -14,9 +14,9 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/gosimple/slug"
-	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/execution/driver"
-	"github.com/inngest/inngest-cli/pkg/execution/state"
+	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/state"
 )
 
 // New returns a basic docker implementation for running containers within a workflow.  This

@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/cel-go/interpreter"
 	"github.com/google/cel-go/interpreter/functions"
-	"github.com/inngest/inngest-cli/pkg/dateutil"
+	"github.com/inngest/inngest/pkg/dateutil"
 )
 
 // timeDecorator returns a decorator for inspecting times used within an expression

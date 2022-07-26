@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/inngest/inngest-cli/inngest/version"
+	"github.com/inngest/inngest/inngest/version"
 )
 
 // DoGQL makes a gql request and returns the response

@@ -3,10 +3,10 @@ package registration
 import (
 	"context"
 
-	"github.com/inngest/inngest-cli/pkg/coredata"
-	"github.com/inngest/inngest-cli/pkg/execution/driver"
-	"github.com/inngest/inngest-cli/pkg/execution/queue"
-	"github.com/inngest/inngest-cli/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 )
 
 var (

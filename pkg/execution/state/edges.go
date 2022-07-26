@@ -6,9 +6,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/expressions"
-	"github.com/inngest/inngest-cli/pkg/logger"
+	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/logger"
 )
 
 var (

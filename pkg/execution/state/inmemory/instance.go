@@ -2,8 +2,8 @@ package inmemory
 
 import (
 	"github.com/google/uuid"
-	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/execution/state"
+	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 )
 

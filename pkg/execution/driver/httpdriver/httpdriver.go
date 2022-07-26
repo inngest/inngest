@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/execution/driver"
-	"github.com/inngest/inngest-cli/pkg/execution/state"
+	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/state"
 )
 
 var (

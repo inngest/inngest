@@ -10,8 +10,8 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest-cli/inngest/client"
-	"github.com/inngest/inngest-cli/inngest/log"
+	"github.com/inngest/inngest/inngest/client"
+	"github.com/inngest/inngest/inngest/log"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/inngest/inngest-cli/pkg/event"
+	"github.com/inngest/inngest/pkg/event"
 )
 
 type apiResponse struct {
