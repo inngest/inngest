@@ -1,8 +1,8 @@
 ---
-heading: "Inngest: OS v0.5.0 released"
+heading: "Inngest: OS v0.5 released"
 subtitle: This release contains exciting new functionality, including replay and our self-hosting services 
 date: 2022-07-26
-image: "/img/globe.png"
+image: "/assets/blog/release-v0.5.0.jpg"
 ---
 
 [Inngest v0.5.0 is here](https://www.github.com/inngest/inngest)!  This release contains *exciting* new functionality to improve your lives as a developer, as well as routine improvements.  Some of the highlights which we’ll dive into:
