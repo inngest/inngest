@@ -12,13 +12,14 @@ environment.
 
 There are multiple components to Inngest, each of which will need to be created:
 
-- The **state system**, which records state for function runs.
+- The **state system**, which records state for function runs
 - The **queueing system**, which schedules and invokes particular steps within a function
 - The **messaging system**, which acts as an event bus for incoming events
-- The **config service**, which manages source keys, function metadata, and action metadata
-- The **event service**, which accepts events and publishes them to the messaging system
+- The **data store**, which is a persisted data store for function & action version metadata
+- The **core api service**, which manages source keys, function metadata, and action metadata
+- The **event api service**, which accepts events and publishes them to the messaging system
 - The **runner service**, which receives events from the messaging system and enqueues functions
-- The **executor service**, which executes individual steps within a function.
+- The **executor service**, which executes individual steps within a function
 
 You can read more about the architecture of Inngest in our
 [architecture docs](/docs/high-level-architecture).
@@ -28,7 +29,7 @@ You can read more about the architecture of Inngest in our
 
 **Backing systems**
 
-The state systems, queueing systems, and messaging systems must be highly available.  We have multiple
+The state systems, queueing systems, messaging systems, and data store must be highly available.  We have multiple
 drivers for each, and recommend using widely available systems such as hosted Redis, SQS/SNS, or
 Google Pub/Sub.
 
@@ -40,7 +41,7 @@ There are two primary factors which determine the resources that your services n
   and CPU required for the event API, runner, and state store.
 - **Function execution**;  the frequency and intensity of the functions you execute.  Long running,
   demanding functions require a greater reserve of CPU and RAM for allocation within executors. Many
-  short running functions per second adds load to your state store.  
+  short running functions per second adds load to your state store.
 
 **Ports and networking**
 
