@@ -48,66 +48,71 @@ func Load(ctx context.Context, dir string) (*Function, error) {
 		}
 	}
 
-	// Then attempt to find inngest.cue, the canonical reference.
-	cue, byt, err := findFileUp(filepath.Join(abs, cueConfigName))
+	// Then attempt to find inngest.cue|json, the canonical reference.
+	configPath, byt, err := findConfigFileUp(abs)
 	if err != nil {
 		return nil, err
 	}
-	if cue != "" {
-		return Unmarshal(ctx, byt, cue)
-	}
-
-	json, byt, err := findFileUp(filepath.Join(abs, jsonConfigName))
-	if err != nil {
-		return nil, err
-	}
-	if json != "" {
-		return Unmarshal(ctx, byt, json)
+	if configPath != "" {
+		return Unmarshal(ctx, byt, configPath)
 	}
 
 	return nil, ErrNotFound
 }
 
-// Finds a file at the given `path``, iterating up through the directory tree
-// until it finds the file or reaches the root.
+// Finds an Inngest config file at the given `path``, iterating up through the
+// directory tree until it finds a file or reaches the root.
 //
 // Returns the final path and the file contents.
 //
 // Will return an error if reading a file errored, but will return empty values
 // if no file could be found.
-func findFileUp(path string) (string, []byte, error) {
-	prevPath := ""
-	targetPath := path
-	fileName := filepath.Base(path)
+func findConfigFileUp(path string) (string, []byte, error) {
+	prevDir := ""
+	targetDir := path
+	foundPath := ""
 
 	for {
 		// This will resolve to the same dir if we're at the root.
 		// At this point, we've exhausted all options, so return empty values.
-		if targetPath == prevPath {
+		if targetDir == prevDir {
 			return "", nil, nil
 		}
 
-		if _, err := os.Stat(targetPath); err != nil {
-			// Is the error isn't something other than lack of existence, we should
-			// error now.
+		cueConfigPath := filepath.Join(targetDir, cueConfigName)
+		_, err := os.Stat(cueConfigPath)
+		if err != nil {
 			if !os.IsNotExist(err) {
 				return "", nil, err
 			}
-
-			// If we're here, the file doesn't exist, so continue.
-			prevPath = targetPath
-			targetPath = filepath.Join(filepath.Dir(prevPath), "..", fileName)
-			continue
+		} else {
+			foundPath = cueConfigPath
+			break
 		}
 
-		// Stat succeeded, so let's try reading the file
-		byt, err := os.ReadFile(targetPath)
+		jsonConfigPath := filepath.Join(targetDir, jsonConfigName)
+		_, err = os.Stat(jsonConfigPath)
 		if err != nil {
-			return "", nil, err
+			if !os.IsNotExist(err) {
+				return "", nil, err
+			}
+		} else {
+			foundPath = jsonConfigPath
+			break
 		}
 
-		return targetPath, byt, nil
+		// If we're here, no config files could be found in this dir, so move up.
+		prevDir = targetDir
+		targetDir = filepath.Join(targetDir, "..")
 	}
+
+	// If we're here, we've found a file that looks correct; let's try to read it.
+	byt, err := os.ReadFile(foundPath)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return foundPath, byt, nil
 }
 
 func LoadRecursive(ctx context.Context, dir string) ([]*Function, error) {
