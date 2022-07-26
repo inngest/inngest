@@ -1,5 +1,5 @@
 {
-  "name": "@inngest/cli",
+  "name": "inngest-cli",
   "version": "",
   "description": "The event-driven queue for any language.",
   "license": "SEE LICENSE IN LICENSE.md",
