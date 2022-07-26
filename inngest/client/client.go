@@ -10,10 +10,15 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+const (
+	InngestCloudAPI = "https://api.inngest.com"
+)
+
 // Client implements all functionality necessary to communicate with
 // the inngest server.
 type Client interface {
 	Credentials() []byte
+	IsCloudAPI() bool
 
 	Login(ctx context.Context, email, password string) ([]byte, error)
 
@@ -41,6 +46,9 @@ type Client interface {
 	// DeployWorflow idempotently deploys a workflow, by default as a draft.  Set live to true to deploy as the live version.
 	DeployWorkflow(ctx context.Context, workspaceID uuid.UUID, config string, live bool) (*WorkflowVersion, error)
 
+	// DeployFunction deploys a function for a given environment. Live determines if the function is a draft or live.
+	DeployFunction(ctx context.Context, config string, env string, live bool) (*FunctionVersion, error)
+
 	// Action returns a single action by DSN.  If no version is specified, this will return the latest
 	// major/minor version.  If a major version is supplied with no minor version, this will return the
 	// latest minor version for the gievn major version.  If both are supplied, this will return the
@@ -57,15 +65,22 @@ type Client interface {
 type ClientOpt func(Client) Client
 
 func New(opts ...ClientOpt) Client {
-	api := "https://api.inngest.com"
+	api := InngestCloudAPI
 	if os.Getenv("INNGEST_API") != "" {
 		api = os.Getenv("INNGEST_API")
 	}
+	// XXX: this enables us to use different queries for the self hosted API & the Cloud API
+	// until we meet full compatibility
+	isCloudAPI := true
+	if api != InngestCloudAPI && api != "http://localhost:8090" {
+		isCloudAPI = false
+	}
 
 	c := &httpClient{
-		Client: http.DefaultClient,
-		api:    api,
-		ingest: "https://inn.gs",
+		Client:     http.DefaultClient,
+		api:        api,
+		isCloudAPI: isCloudAPI,
+		ingest:     "https://inn.gs",
 	}
 
 	for _, o := range opts {
@@ -101,11 +116,16 @@ func WithCredentials(creds []byte) ClientOpt {
 type httpClient struct {
 	*http.Client
 
-	api    string
-	ingest string
-	creds  []byte
+	api        string
+	isCloudAPI bool
+	ingest     string
+	creds      []byte
 }
 
 func (c httpClient) Credentials() []byte {
 	return c.creds
+}
+
+func (c httpClient) IsCloudAPI() bool {
+	return c.isCloudAPI
 }

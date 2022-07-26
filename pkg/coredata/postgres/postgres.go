@@ -297,7 +297,7 @@ func (rw *ReadWriter) ActionVersion(ctx context.Context, dsn string, version *in
 		return client.ActionVersion{}, err
 	}
 	if err == sql.ErrNoRows {
-		return client.ActionVersion{}, errors.New("matching action version not found")
+		return client.ActionVersion{}, coredata.ErrActionVersionNotFound
 	}
 	av.Version = &v
 
@@ -323,9 +323,8 @@ func (rw *ReadWriter) CreateActionVersion(ctx context.Context, av inngest.Action
 		return client.ActionVersion{}, err
 	}
 
-	created := client.ActionVersion{
-		ActionVersion: av,
-	}
+	created := client.ActionVersion{}
+	created.ActionVersion = av
 
 	if created.Version == nil {
 		return client.ActionVersion{}, errors.New("version must not be empty")

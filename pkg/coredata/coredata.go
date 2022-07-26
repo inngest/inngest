@@ -2,6 +2,7 @@ package coredata
 
 import (
 	"context"
+	"errors"
 
 	"github.com/inngest/inngest-cli/inngest"
 	"github.com/inngest/inngest-cli/inngest/client"
@@ -55,3 +56,5 @@ type APIActionWriter interface {
 	// Update an action version, e.g. when updating a Docker image has been successfully pushed to the registry
 	UpdateActionVersion(ctx context.Context, dsn string, version inngest.VersionInfo, enabled bool) (client.ActionVersion, error)
 }
+
+var ErrActionVersionNotFound error = errors.New("action version not found")

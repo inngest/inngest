@@ -50,17 +50,36 @@ func (c httpClient) Action(ctx context.Context, dsn string, v *inngest.VersionIn
 	query := `
 	  query ($dsn: String!, $major: Int, $minor: Int) {
 	    action(dsn: $dsn) {
-	      dsn name tagline
-	      version(major: $major, minor: $minor) {
-	        dsn
-		name
-		validFrom
-		validTo
-		imageSha256
-		config
-	      }
-            }
-          }`
+			dsn name tagline
+			version(major: $major, minor: $minor) {
+				dsn
+				name
+				validFrom
+				validTo
+				imageSha256
+				config
+			}
+		}
+	}`
+
+	if !c.isCloudAPI {
+		query = `
+			query ($dsn: String!, $major: Int, $minor: Int) {
+				actionVersion(query: {
+					dsn: $dsn
+					versionMajor: $major
+					versionMinor: $minor
+				}) {
+					dsn
+					name
+					versionMajor
+					versionMinor
+					validFrom
+					validTo
+					config
+				}
+			}`
+	}
 
 	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{
 		"dsn":   dsn,
@@ -69,6 +88,24 @@ func (c httpClient) Action(ctx context.Context, dsn string, v *inngest.VersionIn
 	}})
 	if err != nil {
 		return nil, err
+	}
+
+	// TODO(df) make sure this works
+	if !c.isCloudAPI {
+		type response struct {
+			ActionVersion *ActionVersion
+		}
+		data := &response{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			return nil, fmt.Errorf("error unmarshalling response: %w", err)
+		}
+		parsed, err := cuedefs.ParseAction(data.ActionVersion.Config)
+		if err != nil {
+			return nil, err
+		}
+		av := data.ActionVersion
+		av.ActionVersion = *parsed
+		return av, nil
 	}
 
 	type response struct {
@@ -136,11 +173,36 @@ func (c httpClient) CreateAction(ctx context.Context, input string) (*Action, er
             }
           }`
 
+	if !c.isCloudAPI {
+		query = `
+			mutation CreateAction($config: String!) {
+				createActionVersion(input: {
+					config: $config
+				}) {
+					dsn name
+				}
+			}`
+	}
+
 	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{
 		"config": input,
 	}})
 	if err != nil {
 		return nil, err
+	}
+
+	if !c.isCloudAPI {
+		type response struct {
+			CreateActionVersion *ActionVersion
+		}
+		data := &response{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			return nil, fmt.Errorf("error unmarshalling response: %w", err)
+		}
+		return &Action{
+			DSN:  data.CreateActionVersion.DSN,
+			Name: data.CreateActionVersion.Name,
+		}, nil
 	}
 
 	type response struct {
@@ -162,24 +224,36 @@ type ActionVersionQualifier struct {
 }
 
 func (c httpClient) UpdateActionVersion(ctx context.Context, v ActionVersionQualifier, enabled bool) (*ActionVersion, error) {
-	query := `
+	fields := "dsn name versionMajor versionMinor validFrom validTo config"
+	query := fmt.Sprintf(`
 	  mutation UpdateActionVersion($version: ActionVersionQualifier!, $enabled: Boolean!) {
 	    updateActionVersion(version: $version, enabled: $enabled) {
-		versionMajor
-		versionMinor
-		validFrom
-		validTo
-		config
-		name
-		dsn
-		imageSha256
+			%s imageSha256
             }
-          }`
-
-	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: map[string]interface{}{
+          }`, fields)
+	variables := map[string]interface{}{
 		"version": v,
 		"enabled": enabled,
-	}})
+	}
+
+	if !c.isCloudAPI {
+		query = fmt.Sprintf(`
+			mutation CreateAction($dsn: String!, $versionMajor: Int!, $versionMinor: Int!, $enabled: Boolean!) {
+				updateActionVersion(input: {
+					dsn: $dsn, versionMajor: $versionMajor, versionMinor: $versionMinor, enabled: $enabled
+				}) {
+					%s
+				}
+			}`, fields)
+		variables = map[string]interface{}{
+			"dsn":          v.DSN,
+			"versionMajor": v.VersionMajor,
+			"versionMinor": v.VersionMinor,
+			"enabled":      enabled,
+		}
+	}
+
+	resp, err := c.DoGQL(ctx, Params{Query: query, Variables: variables})
 	if err != nil {
 		return nil, err
 	}
