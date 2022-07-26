@@ -1,5 +1,5 @@
+import fetch, { Response } from "node-fetch";
 import path from "path";
-import request from "request";
 import tar from "tar";
 import unzipper from "unzipper";
 import { URL } from "url";
@@ -89,27 +89,25 @@ function downloadBinary(
    * The URL to download the binary from.
    */
   url: URL
-): Promise<request.Request> {
+): Promise<Response> {
   /**
    * Using `new Promise()` here so that we can use listeners when dealing with
    * the request in order to ensure it's valid without using the body.
    */
-  return new Promise((resolve, reject) => {
-    const req = request({ uri: url.href });
+  return new Promise(async (resolve, reject) => {
+    fetch(url.href, {
+      redirect: "follow",
+    })
+      .then((res) => {
+        if (res.status !== 200) {
+          throw new Error(
+            `Error downloading binary; invalid response status code: ${res.status}`
+          );
+        }
 
-    req.on("response", (res) => {
-      if (res.statusCode !== 200) {
-        return reject(
-          new Error(
-            `Error downloading binary; invalid response status code: ${res.statusCode}`
-          )
-        );
-      }
-
-      resolve(req);
-    });
-
-    req.on("error", reject);
+        resolve(res);
+      })
+      .catch(reject);
   });
 }
 
@@ -123,7 +121,7 @@ function pipeBinaryToInstallLocation(
   /**
    * The unused request to download a binary.
    */
-  req: request.Request,
+  res: Response,
 
   /**
    * The original URL used to access the binary.
@@ -136,13 +134,9 @@ function pipeBinaryToInstallLocation(
   originalUrl: URL
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const onErr = (err: Error) => {
-      console.error("Error unpackaining binary:", err);
-      req.destroy();
-      reject(err);
-    };
-
-    req.on("error", onErr);
+    if (!res.body) {
+      return reject(new Error("No body to pipe"));
+    }
 
     const targetPath = path.resolve("./bin");
 
@@ -153,25 +147,22 @@ function pipeBinaryToInstallLocation(
      * Bit messy having them inline, but all of this is only running once, so
      * it's fine to keep them here and in context.
      */
-    const strategies: Record<
-      KnownExtension,
-      (onErr: (err: Error) => void) => void
-    > = {
+    const strategies: Record<KnownExtension, () => void> = {
       [KnownExtension.Tar]: () => {
         const untar = tar.extract({ cwd: targetPath });
 
-        untar.on("error", onErr);
+        untar.on("error", reject);
         untar.on("end", () => resolve());
 
-        req.pipe(untar);
+        res.body?.pipe(untar);
       },
       [KnownExtension.Zip]: () => {
         const unzip = unzipper.Extract({ path: targetPath });
 
-        unzip.on("error", onErr);
+        unzip.on("error", reject);
         unzip.on("close", () => resolve());
 
-        req.pipe(unzip);
+        res.body?.pipe(unzip);
       },
     };
 
@@ -183,10 +174,10 @@ function pipeBinaryToInstallLocation(
     }) || [, null];
 
     if (!strategy) {
-      return onErr(new Error("Unsupported extension"));
+      return reject(new Error("Unsupported extension"));
     }
 
-    strategy(onErr);
+    strategy();
   });
 }
 
@@ -203,9 +194,7 @@ function pipeBinaryToInstallLocation(
     const req = await downloadBinary(binaryUrl);
     await pipeBinaryToInstallLocation(req, binaryUrl);
   } catch (err) {
-    /**
-     * We assume that the thing that threw has already logged a specific error.
-     */
+    console.error(err);
     process.exit(1);
   }
 })();

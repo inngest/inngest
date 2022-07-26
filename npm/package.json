@@ -25,11 +25,12 @@
     "node": "16.16.0"
   },
   "dependencies": {
-    "request": "2.88.2",
+    "node-fetch": "2.6.7",
     "tar": "6.1.11",
     "unzipper": "0.10.11"
   },
   "devDependencies": {
+    "@types/node-fetch": "2.6.2",
     "@types/request": "2.48.8",
     "@types/tar": "6.1.1",
     "@types/unzipper": "0.10.5",
