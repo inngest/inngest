@@ -2,8 +2,8 @@ package dockerdriver
 
 import (
 	docker "github.com/fsouza/go-dockerclient"
-	"github.com/inngest/inngest-cli/pkg/config/registration"
-	"github.com/inngest/inngest-cli/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/execution/driver"
 )
 
 func init() {

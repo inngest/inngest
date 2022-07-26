@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/inngest/inngest-cli/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/config/registration"
 )
 
 // Load loads the configu from the given locations in order.  If locs is empty,

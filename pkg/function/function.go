@@ -13,9 +13,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/inngest/clistate"
-	"github.com/inngest/inngest-cli/pkg/expressions"
+	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/inngest/clistate"
+	"github.com/inngest/inngest/pkg/expressions"
 )
 
 var (
@@ -334,7 +334,7 @@ func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, er
 func (f *Function) canonicalize(ctx context.Context, path string) error {
 	f.dir = path
 	// dir should point to the dir, not the file.
-	if strings.HasSuffix(path, "inngest.json") || strings.HasSuffix(path, "inngest.cue") {
+	if strings.HasSuffix(path, jsonConfigName) || strings.HasSuffix(path, cueConfigName) {
 		f.dir = filepath.Dir(path)
 	}
 
@@ -365,6 +365,17 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 					Step: inngest.TriggerName,
 				},
 			},
+		}
+	}
+
+	for n, s := range f.Steps {
+		if len(s.After) == 0 {
+			s.After = []After{
+				{
+					Step: inngest.TriggerName,
+				},
+			}
+			f.Steps[n] = s
 		}
 	}
 

@@ -10,11 +10,11 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
-	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/config/registration"
-	"github.com/inngest/inngest-cli/pkg/execution/queue"
-	"github.com/inngest/inngest-cli/pkg/logger"
-	"github.com/inngest/inngest-cli/pkg/pubsub"
+	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/pubsub"
 )
 
 func init() {

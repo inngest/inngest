@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/inngest/inngest-cli/tests/testdsl"
+	"github.com/inngest/inngest/tests/testdsl"
 )
 
 func init() {

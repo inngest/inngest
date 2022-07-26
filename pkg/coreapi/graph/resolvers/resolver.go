@@ -3,8 +3,8 @@ package resolvers
 // THIS CODE IS A STARTING POINT ONLY. IT WILL NOT BE UPDATED WITH SCHEMA CHANGES.
 
 import (
-	"github.com/inngest/inngest-cli/pkg/coreapi/generated"
-	"github.com/inngest/inngest-cli/pkg/coredata"
+	"github.com/inngest/inngest/pkg/coreapi/generated"
+	"github.com/inngest/inngest/pkg/coredata"
 )
 
 type Resolver struct {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	inmemorydatastore "github.com/inngest/inngest-cli/pkg/coredata/inmemory"
-	"github.com/inngest/inngest-cli/pkg/execution/driver/dockerdriver"
+	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/execution/driver/dockerdriver"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )

@@ -675,6 +675,9 @@ github.com/jmespath/go-jmespath
 # github.com/joho/godotenv v1.3.0
 ## explicit
 github.com/joho/godotenv
+# github.com/karrick/godirwalk v1.17.0
+## explicit; go 1.13
+github.com/karrick/godirwalk
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 ## explicit
 github.com/kballard/go-shellquote

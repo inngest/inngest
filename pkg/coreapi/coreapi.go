@@ -7,10 +7,10 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
-	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/coreapi/generated"
-	"github.com/inngest/inngest-cli/pkg/coreapi/graph/resolvers"
-	"github.com/inngest/inngest-cli/pkg/coredata"
+	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/coreapi/generated"
+	"github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
+	"github.com/inngest/inngest/pkg/coredata"
 	"github.com/rs/zerolog"
 )
 
@@ -33,8 +33,8 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	}}))
 
 	// TODO - Add option for enabling GraphQL Playground
-	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	http.Handle("/query", srv)
+	http.Handle("/", playground.Handler("GraphQL playground", "/gql"))
+	http.Handle("/gql", srv)
 
 	return a, nil
 }

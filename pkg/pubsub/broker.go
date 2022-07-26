@@ -7,9 +7,9 @@ import (
 	"math"
 	"sync"
 
-	"github.com/inngest/inngest-cli/inngest/log"
-	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/logger"
+	"github.com/inngest/inngest/inngest/log"
+	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/logger"
 	"gocloud.dev/pubsub"
 	_ "gocloud.dev/pubsub/awssnssqs"
 	_ "gocloud.dev/pubsub/gcppubsub"

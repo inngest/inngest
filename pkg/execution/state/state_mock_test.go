@@ -10,7 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
-	inngest "github.com/inngest/inngest-cli/inngest"
+	inngest "github.com/inngest/inngest/inngest"
 	v2 "github.com/oklog/ulid/v2"
 )
 

@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/inngest/clistate"
-	"github.com/inngest/inngest-cli/internal/cuedefs"
+	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/inngest/clistate"
+	"github.com/inngest/inngest/internal/cuedefs"
 	"github.com/stretchr/testify/require"
 )
 

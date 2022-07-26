@@ -3,7 +3,7 @@ package resolvers
 import (
 	"context"
 
-	model "github.com/inngest/inngest-cli/pkg/coreapi/graph/models"
+	model "github.com/inngest/inngest/pkg/coreapi/graph/models"
 )
 
 func (r *queryResolver) Config(ctx context.Context) (*model.Config, error) {

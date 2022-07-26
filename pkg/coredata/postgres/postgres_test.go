@@ -10,8 +10,8 @@ import (
 	"time"
 
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
-	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/function"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
 	pg "gocloud.dev/postgres"

@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/coredata"
-	"github.com/inngest/inngest-cli/pkg/execution/driver"
-	"github.com/inngest/inngest-cli/pkg/execution/state"
-	"github.com/inngest/inngest-cli/pkg/logger"
+	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/rs/zerolog"
 )
 

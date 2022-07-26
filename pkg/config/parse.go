@@ -13,8 +13,8 @@ import (
 	"cuelang.org/go/cue"
 	cueerrors "cuelang.org/go/cue/errors"
 	"cuelang.org/go/cue/load"
-	"github.com/inngest/inngest-cli/pkg/cuedefs"
-	"github.com/inngest/inngest-cli/pkg/logger"
+	"github.com/inngest/inngest/pkg/cuedefs"
+	"github.com/inngest/inngest/pkg/logger"
 )
 
 var (

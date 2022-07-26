@@ -10,8 +10,8 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest-cli/inngest/client"
-	"github.com/inngest/inngest-cli/inngest/log"
+	"github.com/inngest/inngest/inngest/client"
+	"github.com/inngest/inngest/inngest/log"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
@@ -124,6 +124,10 @@ func AccountID(ctx context.Context) uuid.UUID {
 }
 
 func AccountIdentifier(ctx context.Context) (string, error) {
+	if os.Getenv("INNGEST_DSN_PREFIX") != "" {
+		return os.Getenv("INNGEST_DSN_PREFIX"), nil
+	}
+
 	state, err := GetState(ctx)
 	if err != nil {
 		return "", err
@@ -191,7 +195,7 @@ func Workspace(ctx context.Context) (client.Workspace, error) {
 			return ws, nil
 		}
 	}
-	return client.Workspace{}, fmt.Errorf("No workspace found")
+	return client.Workspace{}, fmt.Errorf("no workspace found")
 }
 
 func RequireState(ctx context.Context) *State {

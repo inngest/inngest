@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest-cli/pkg/config"
+	"github.com/inngest/inngest/pkg/config"
 	"github.com/stretchr/testify/require"
 )
 

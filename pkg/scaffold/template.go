@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,7 +13,8 @@ import (
 
 	"github.com/gosimple/slug"
 	"github.com/inngest/cuetypescript"
-	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest/pkg/function"
+	"github.com/karrick/godirwalk"
 )
 
 type Template struct {
@@ -22,8 +22,7 @@ type Template struct {
 	Description string
 	Targets     []string
 	PostSetup   string
-
-	FS fs.FS
+	root        string
 }
 
 type tplData struct {
@@ -152,43 +151,47 @@ func (t Template) Render(f function.Function, step function.Step) error {
 	}
 
 	// Clone the template dir and run templating on every file.
-	if t.FS != nil {
-		err := fs.WalkDir(t.FS, ".", func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-
-			if path == "." {
-				return nil
-			}
-
-			if d.IsDir() {
-				if err := os.Mkdir(filepath.Join(stepRoot, path), 0755); err != nil {
+	if t.root != "" {
+		err := godirwalk.Walk(t.root, &godirwalk.Options{
+			Callback: func(absPath string, d *godirwalk.Dirent) error {
+				path, err := filepath.Rel(t.root, absPath)
+				if err != nil {
 					return err
 				}
-				return nil
-			}
 
-			file, err := t.FS.Open(path)
-			if err != nil {
-				return err
-			}
-			contents, err := io.ReadAll(file)
-			if err != nil {
-				return err
-			}
+				if path == "." {
+					return nil
+				}
 
-			tpl, err := template.New(path).Funcs(funcMap).Parse(string(contents))
-			if err != nil {
-				return err
-			}
+				if d.IsDir() {
+					if err := os.Mkdir(filepath.Join(stepRoot, path), 0755); err != nil {
+						return err
+					}
+					return nil
+				}
 
-			buf := &bytes.Buffer{}
-			if err := tpl.Execute(buf, data); err != nil {
-				return err
-			}
+				file, err := os.Open(absPath)
+				if err != nil {
+					return err
+				}
+				contents, err := io.ReadAll(file)
+				if err != nil {
+					return err
+				}
 
-			return os.WriteFile(filepath.Join(stepRoot, path), buf.Bytes(), 0644)
+				tpl, err := template.New(path).Funcs(funcMap).Parse(string(contents))
+				if err != nil {
+					return err
+				}
+
+				buf := &bytes.Buffer{}
+				if err := tpl.Execute(buf, data); err != nil {
+					return err
+				}
+
+				return os.WriteFile(filepath.Join(stepRoot, path), buf.Bytes(), 0644)
+			},
+			Unsorted: false,
 		})
 		if err != nil {
 			return err

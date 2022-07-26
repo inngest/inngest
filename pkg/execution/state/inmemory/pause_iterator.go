@@ -3,7 +3,7 @@ package inmemory
 import (
 	"context"
 
-	"github.com/inngest/inngest-cli/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state"
 )
 
 type pauseIterator struct {
