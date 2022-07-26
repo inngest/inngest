@@ -69,11 +69,7 @@ func parse(ctx context.Context, dirfs fs.FS) (*Mapping, error) {
 		}
 
 		// Add the data dir as the root.
-		rootFS, err := fs.Sub(dirfs, filepath.Join(".", parts[0], parts[1], "data"))
-		if err != nil {
-			return err
-		}
-		t.FS = rootFS
+		t.root = filepath.Join(CacheDir, filepath.Join(".", parts[0], parts[1], "data"))
 
 		language := parts[0]
 		m.Languages[language] = append(m.Languages[language], t)
