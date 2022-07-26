@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/inngest/client"
-	"github.com/inngest/inngest-cli/internal/cuedefs"
-	"github.com/inngest/inngest-cli/pkg/config/registration"
-	"github.com/inngest/inngest-cli/pkg/coredata"
-	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/inngest/client"
+	"github.com/inngest/inngest/internal/cuedefs"
+	"github.com/inngest/inngest/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/function"
 	"github.com/lib/pq"
 	pg "gocloud.dev/postgres"
 )

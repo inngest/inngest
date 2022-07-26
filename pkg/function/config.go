@@ -15,7 +15,7 @@ import (
 	"cuelang.org/go/cue/format"
 	"cuelang.org/go/cue/load"
 	"cuelang.org/go/encoding/gocode/gocodec"
-	"github.com/inngest/inngest-cli/pkg/cuedefs"
+	"github.com/inngest/inngest/pkg/cuedefs"
 )
 
 var (

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest/inngest"
 )
 
 // FunctionVersion represents a given version of a function stored or used by the Inngest system

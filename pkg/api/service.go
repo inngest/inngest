@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/event"
-	"github.com/inngest/inngest-cli/pkg/logger"
-	"github.com/inngest/inngest-cli/pkg/pubsub"
-	"github.com/inngest/inngest-cli/pkg/service"
+	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/pubsub"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/oklog/ulid/v2"
 )
 

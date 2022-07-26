@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	docker "github.com/fsouza/go-dockerclient"
-	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest/inngest"
 )
 
 const (

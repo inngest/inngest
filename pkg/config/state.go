@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/inngest/inngest-cli/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/config/registration"
 )
 
 type StateService struct {

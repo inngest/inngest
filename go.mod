@@ -1,4 +1,4 @@
-module github.com/inngest/inngest-cli
+module github.com/inngest/inngest
 
 go 1.18
 

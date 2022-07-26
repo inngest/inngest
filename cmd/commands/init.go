@@ -7,11 +7,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
-	"github.com/inngest/inngest-cli/inngest/clistate"
-	"github.com/inngest/inngest-cli/pkg/api/tel"
-	"github.com/inngest/inngest-cli/pkg/cli"
-	"github.com/inngest/inngest-cli/pkg/function"
-	"github.com/inngest/inngest-cli/pkg/scaffold"
+	"github.com/inngest/inngest/inngest/clistate"
+	"github.com/inngest/inngest/pkg/api/tel"
+	"github.com/inngest/inngest/pkg/cli"
+	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/scaffold"
 	"github.com/spf13/cobra"
 )
 

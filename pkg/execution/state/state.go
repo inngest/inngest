@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest/inngest"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -234,7 +234,7 @@ type PauseMutater interface {
 	// If the given pause has been leased within LeasePauseDuration, this should return an
 	// ErrPauseLeased error.
 	//
-	// See https://github.com/inngest/inngest-cli/issues/123 for more info
+	// See https://github.com/inngest/inngest/issues/123 for more info
 	LeasePause(ctx context.Context, id uuid.UUID) error
 
 	// ConsumePause consumes a pause by its ID such that it can't be used again and

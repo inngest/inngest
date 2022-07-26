@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest/inngest"
 	"github.com/stretchr/testify/require"
 )
 

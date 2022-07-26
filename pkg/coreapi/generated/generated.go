@@ -13,9 +13,9 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
-	"github.com/inngest/inngest-cli/inngest/client"
-	"github.com/inngest/inngest-cli/pkg/coreapi/graph/models"
-	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest/inngest/client"
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/function"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 )

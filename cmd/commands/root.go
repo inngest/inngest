@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/inngest/inngest-cli/pkg/api/tel"
-	"github.com/inngest/inngest-cli/pkg/cli"
+	"github.com/inngest/inngest/pkg/api/tel"
+	"github.com/inngest/inngest/pkg/cli"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

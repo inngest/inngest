@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/inngest/inngest-cli/pkg/config"
-	_ "github.com/inngest/inngest-cli/pkg/config/defaults"
+	"github.com/inngest/inngest/pkg/config"
+	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/joho/godotenv"
 )
 

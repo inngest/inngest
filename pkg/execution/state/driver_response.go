@@ -1,7 +1,7 @@
 package state
 
 import (
-	"github.com/inngest/inngest-cli/inngest"
+	"github.com/inngest/inngest/inngest"
 )
 
 type Retryable interface {

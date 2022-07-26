@@ -3,8 +3,8 @@ package resolvers
 import (
 	"context"
 
-	"github.com/inngest/inngest-cli/pkg/coreapi/graph/models"
-	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/function"
 )
 
 // Deploy a function creating a new function version

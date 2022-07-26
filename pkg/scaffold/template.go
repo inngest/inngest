@@ -13,7 +13,7 @@ import (
 
 	"github.com/gosimple/slug"
 	"github.com/inngest/cuetypescript"
-	"github.com/inngest/inngest-cli/pkg/function"
+	"github.com/inngest/inngest/pkg/function"
 	"github.com/karrick/godirwalk"
 )
 

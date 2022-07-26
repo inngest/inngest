@@ -5,8 +5,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/devserver"
+	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/spf13/cobra"
 )
 

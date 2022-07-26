@@ -13,9 +13,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest-cli/inngest"
-	"github.com/inngest/inngest-cli/inngest/clistate"
-	"github.com/inngest/inngest-cli/pkg/expressions"
+	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/inngest/clistate"
+	"github.com/inngest/inngest/pkg/expressions"
 )
 
 var (

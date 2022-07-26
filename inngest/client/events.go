@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest-cli/pkg/event"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/oklog/ulid/v2"
 )
 

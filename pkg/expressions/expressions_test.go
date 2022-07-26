@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest-cli/pkg/event"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/stretchr/testify/require"
 )
 

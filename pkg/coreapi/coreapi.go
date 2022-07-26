@@ -7,10 +7,10 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
-	"github.com/inngest/inngest-cli/pkg/config"
-	"github.com/inngest/inngest-cli/pkg/coreapi/generated"
-	"github.com/inngest/inngest-cli/pkg/coreapi/graph/resolvers"
-	"github.com/inngest/inngest-cli/pkg/coredata"
+	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/coreapi/generated"
+	"github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
+	"github.com/inngest/inngest/pkg/coredata"
 	"github.com/rs/zerolog"
 )
 
