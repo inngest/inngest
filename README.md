@@ -112,25 +112,26 @@ Fundamentally, there are two core pieces to Inngest: _events_ and _functions_. F
 <br />
 
 <p align="center">
-        <img src="https://user-images.githubusercontent.com/306177/172893034-e3d7bc60-47e8-4feb-8e93-19bdc9fe2237.png" alt="Open Source Architecture" width="660" />
+  <img src=".github/assets/architecture-0.5.0.png" alt="Open Source Architecture" width="660" />
 </p>
 
 Inngest's architecture is made up of 6 core components:
 
-- **Source API** receives events from clients through a simple POST request, pushing them to the **message queue**.
-- **Message Queue** acts as an event stream between the **API** and the **Runner**, buffering incoming messages to ensure QoS before passing messages to be executed.<br />
-  _note: to simplify local environments this is currently absent from the DevServer, but will be included in self-hosting releases as part of the roadmap._
+- **Event API** receives events from clients through a simple POST request, pushing them to the **message queue**.
+- **Event Stream** acts as a buffer between the **API** and the **Runner**, buffering incoming messages to ensure QoS before passing messages to be executed.<br />
 - A **Runner** coordinates the execution of functions and a specific run’s **State**. When a new function execution is required, this schedules running the function’s steps from the trigger via the **executor.** Upon each step’s completion, this schedules execution of subsequent steps via iterating through the function’s **Edges.**
-- **Executor** manages executing the individual steps of a function, via _drivers_ for each step’s runtime. It loads the specific code to execute via an **Action Loader.** It also interfaces over the **State** store to save action data as each finishes or fails.
+- **Executor** manages executing the individual steps of a function, via _drivers_ for each step’s runtime. It loads the specific code to execute via the **DataStore.** It also interfaces over the **State** store to save action data as each finishes or fails.
   - **Drivers** run the specific action code for a step, eg. within Docker or WASM. This allows us to support a variety of runtimes.
 - **State** stores data about events and given function runs, including the outputs and errors of individual actions, and what’s enqueued for the future.
-- **Action Loader** loads and returns action definitions for use by the **Executor**. The source can be from disk, memory, or another persisted state.
+- **DataStore** stores persisted system data including Functions and Actions version metadata.
+- **Core API** is the main interface for writing to the DataStore. The CLI uses this to deploy new funtions and manage other key resources.
 
 And, in this CLI:
 
-- The **DevServer** combines all of the components and basic drivers for each into a single system which loads all functions on disk, handles incoming events via the API and executes functions, all returning a readable output to the developer.
+- The **DevServer** combines all of the components and basic drivers for each into a single system which loads all functions on disk, handles incoming events via the API and executes functions, all returning a readable output to the developer. (_Note - the DevServer does not run a Core API as functions are loaded directly from disk_)
 
-To learn how these components all work together, [check out the in-depth architecture doc](/docs/ARCHITECTURE.md).
+To learn how these components all work together, [check out the in-depth architecture doc](To learn how these components all work together, [check out the in-depth architecture doc](/docs/ARCHITECTURE.md). For specific information on how the DevServer works and how it compares to production [read this doc](/docs/DEVSERVER_ARCHITECTURE.md).
+).
 
 <br />
 
