@@ -2,19 +2,20 @@
 category: "What is Inngest?"
 title: "High-level Architecture"
 slug: "high-level-architecture"
-image: /assets/docs/high-level-architecture/open-source-architecture.png
+image: /assets/docs/high-level-architecture/open-source-architecture-v0.5.0.png
 position: 1
 ---
 
-At a high level, Inngest comprises 6 core services:
+At a high level, Inngest comprises 7 core services:
 
-- A **Source API** receives events from clients through a simple POST request, pushing them to the message queue.
-- The **Message Queue** acts as an event stream between the API and the Runner, buffering incoming messages to ensure QoS before passing messages to be executed.
-- A **Runner** coordinates the execution of functions and a specific run’s State. When a new function execution is required, this schedules running the function’s steps from the trigger via the executor. Upon each step’s completion, this schedules execution of subsequent steps via iterating through the function’s Edges.
-- The **Executor** manages executing the individual steps of a function, via drivers for each step’s runtime. It loads the specific code to execute via an Action Loader. It also interfaces over the State store to save action data as each finishes or fails.
+- A **Event API** receives events from clients through a simple POST request, pushing them to the message queue.
+- The **Event Stream** acts as buffer between the API and the Runner, buffering incoming messages to ensure QoS before passing messages to be executed.
+- A **Runner** coordinates the execution of functions and a specific run's State. When a new function execution is required, this schedules running the function’s steps from the trigger via the executor. Upon each step’s completion, this schedules execution of subsequent steps via iterating through the function’s Edges.
+- The **Executor** manages executing the individual steps of a function, via drivers for each step's runtime. It loads the specific code to execute via an Action Loader. It also interfaces over the State store to save action data as each finishes or fails.
   - Within the executor, **drivers** run the specific action code for a step based off of the runtime, eg. within Docker or WASM
-- **State** stores data about events and given function runs, including the outputs and errors of individual actions, and what’s enqueued for the future.  It's also responsible for fetching the function DAG (described as workflows).
-- The **Action Loader** loads and returns action definitions for use by the Executor. The source can be from disk, memory, or another persisted state.
+- **State** stores data about events and given function runs, including the outputs and errors of individual actions, and what's enqueued for the future.  It's also responsible for fetching the function DAG (described as workflows).
+- The **DataStore** stores persisted system data including Functions and Actions versions.
+- The **Core API** is the main interface for writing to the **DataStore**. The CLI uses this to deploy new funtions and manage other key resources.
 
 Note:  There are more components to the hosted version of Inngest, such as a versioned workflow manager with bitemporality.  We'll be incorporating these into the open-source platform.
 
@@ -22,8 +23,8 @@ Note:  There are more components to the hosted version of Inngest, such as a ver
 
 Here's an overview of the sequence of steps Inngest runs through to schedule your functions:
 
-1. Your services, or 3rd party webhooks, send events to the Source API.
-2. The Source API validates and optionally transforms (via WASM-based inline JS) these events, then publishes the events to an internal message queue.
+1. Your services, or 3rd party webhooks, send events to the Event API.
+2. The Event API validates and optionally transforms (via WASM-based inline JS) these events, then publishes the events to an internal message queue.
 3. A runner consumes the event from the message queue, checking to see which live functions are triggered by the specific event.
 4. The runner coordinates with the state store to initialize new executions (runs) of each triggered function, via an internal queue.
 5. Shared-nothing workers consume from the queue to execute steps of each function.  Once complete, the state for the function run is updated and the step's children are scheduled.
