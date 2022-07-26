@@ -51,7 +51,7 @@ async function getBinaryUrl(): Promise<URL> {
   const { arch, platform } = getArchPlatform();
 
   const targetUrl = new URL(
-    `https://github.com/inngest/inngest/releases/download/v${version}/inngest_${version}_${platform.platform}_${arch}${platform.extension}`
+    `https://cli.inngest.com/artifact/v${version}/inngest_${version}_${platform.platform}_${arch}${platform.extension}`
   );
 
   return targetUrl;
