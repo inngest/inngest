@@ -240,16 +240,21 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 		//
 		// Should the constraint be hard-coded to the latest one here? When would I
 		// specify a range instead? Or is that not yet a feature?
-		w.Steps = append(w.Steps, inngest.Step{
+		step := inngest.Step{
 			ClientID: uint(n) + 1,
 			ID:       found.ID,
 			Name:     a.Name,
 			DSN:      a.DSN,
-			Version: &inngest.VersionConstraint{
+		}
+
+		if a.Version != nil {
+			step.Version = &inngest.VersionConstraint{
 				Major: &a.Version.Major,
 				Minor: &a.Version.Minor,
-			},
-		})
+			}
+		}
+
+		w.Steps = append(w.Steps, step)
 	}
 
 	w.Edges = edges
@@ -334,6 +339,14 @@ func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, er
 		DSN:     id,
 		Runtime: s.Runtime,
 	}
+
+	if s.Version != nil {
+		a.Version = &inngest.VersionInfo{
+			Major: *s.Version.Major,
+			Minor: *s.Version.Minor,
+		}
+	}
+
 	if s.Runtime.Runtime == nil {
 		return a, fmt.Errorf("no runtime specified")
 	}
@@ -393,10 +406,13 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 			return err
 		}
 
-		// TODO: This doesn't work; `version.Version` isn't populated.
-		s.Version = &inngest.VersionConstraint{
-			Major: &version.Version.Major,
-			Minor: &version.Version.Minor,
+		if version.Version != nil {
+			s.Version = &inngest.VersionConstraint{
+				Major: &version.Version.Major,
+				Minor: &version.Version.Minor,
+			}
+
+			f.Steps[n] = s
 		}
 
 		if len(s.After) == 0 {
