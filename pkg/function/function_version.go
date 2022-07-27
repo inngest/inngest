@@ -1,10 +1,7 @@
 package function
 
 import (
-	"context"
 	"time"
-
-	"github.com/inngest/inngest/inngest"
 )
 
 // FunctionVersion represents a given version of a function stored or used by the Inngest system
@@ -25,24 +22,4 @@ type FunctionVersion struct {
 	ValidTo   *time.Time
 	CreatedAt time.Time
 	UpdatedAt time.Time
-}
-
-// ActionVersions provide the action configuration for each step of the function with the exact version
-// of a given Action used
-func (fv *FunctionVersion) Actions(ctx context.Context) ([]inngest.ActionVersion, []inngest.Edge, error) {
-	avs, edges, err := fv.Function.Actions(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	// ActionVersions for a given function are currently defaulted to use the major version of 1 and the
-	// minor version of the function version. This will be changed in the future to enable sharing of
-	// action versions across functions
-	for i := range avs {
-		av := &avs[i]
-		av.Version = &inngest.VersionInfo{
-			Major: 1,
-			Minor: fv.Version,
-		}
-	}
-	return avs, edges, nil
 }
