@@ -72,15 +72,31 @@ func deploy(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	for _, a := range actions {
-		if err := deployAction(ctx, a); err != nil {
-			return err
-		}
+	dsnToKeySteps := make(map[string]string)
+
+	for key, step := range fn.Steps {
+		dsnToKeySteps[step.DSN(ctx, *fn)] = key
 	}
 
-	// TODO: Update steps with desired action version
-	//
-	// I think this is done now within `Function.Workflow()`
+	for _, a := range actions {
+		actionVersion, err := deployAction(ctx, a)
+		if err != nil {
+			return err
+		}
+
+		// TODO: Move this to a dedicated function.
+		step, ok := fn.Steps[dsnToKeySteps[actionVersion.DSN]]
+		if !ok {
+			return fmt.Errorf("failed to find step for action %s", actionVersion.DSN)
+		}
+
+		step.Version = &inngest.VersionConstraint{
+			Major: &actionVersion.Version.Major,
+			Minor: &actionVersion.Version.Minor,
+		}
+
+		fn.Steps[dsnToKeySteps[actionVersion.DSN]] = step
+	}
 
 	return deployFunction(ctx, fn)
 }
