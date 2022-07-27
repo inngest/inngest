@@ -49,13 +49,13 @@ func deploy(cmd *cobra.Command, args []string) error {
 	}
 
 	// Build all steps.
-	steps, err := dockerdriver.FnBuildOpts(ctx, *fn, "--platform", "linux/amd64")
+	buildOpts, err := dockerdriver.FnBuildOpts(ctx, *fn, "--platform", "linux/amd64")
 	if err != nil {
 		return err
 	}
 	ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
 		QuitOnComplete: true,
-		BuildOpts:      steps,
+		BuildOpts:      buildOpts,
 	})
 	if err != nil {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
