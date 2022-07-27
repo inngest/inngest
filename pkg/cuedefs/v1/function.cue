@@ -27,7 +27,7 @@ package v1
 	// Event is the name of the event that triggers the function.
 	event: string
 
-	// Expression allows you to write custom expressions for specifying conditions 
+	// Expression allows you to write custom expressions for specifying conditions
 	//  for the trigger.  For example, you may want a function to run if an order
 	// is above a specific value (eg. "event.data.total >= 500"), or if the event
 	// is a specific version (eg. "event.version >= '2').
@@ -81,6 +81,11 @@ package v1
 	// If more than one item is supplied in this array, the step will run multiple times after
 	// each preceeding step finishes.
 	after: [...#After]
+
+	actionVersion?: {
+		major?: uint
+		minor?: uint
+	}
 }
 
 #After: {
@@ -95,7 +100,7 @@ package v1
 	wait?: string
 
 	// async allows you to specify an event that must be received within a specific
-	// amount of time (ttl) to continue with the specified step. 
+	// amount of time (ttl) to continue with the specified step.
 	async?: {
 		ttl:    string
 		event:  string
