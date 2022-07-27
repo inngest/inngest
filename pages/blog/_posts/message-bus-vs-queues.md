@@ -1,5 +1,4 @@
 ---
-focus: true
 heading: "Message queue vs message bus: the practical differences"
 subtitle: We explore the difference between queueing systems and message busses
 image: "/assets/blog/queue-vs-bus.png"

@@ -63,6 +63,7 @@ export default function BlogLayout(props) {
           <Header>
             <h1>{scope.heading}</h1>
             <p className="blog-byline">
+              {!!scope.author ? <>{scope.author} &middot; </> : ""}
               {scope.humanDate} &middot; {scope.reading.text}
             </p>
           </Header>
