@@ -141,7 +141,7 @@ func deployWorkflow(ctx context.Context, fn *function.Function) error {
 
 // deployAction deploys a given action to Inngest, creating a new version, pushing the image,
 // the setting the action to "published" once pushed.
-func deployAction(ctx context.Context, a inngest.ActionVersion) error {
+func deployAction(ctx context.Context, a inngest.ActionVersion) (inngest.ActionVersion, error) {
 	var err error
 
 	state := clistate.RequireState(ctx)
@@ -154,22 +154,22 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 	a, err = configureVersionInfo(ctx, a)
 	if err == ErrAlreadyDeployed {
 		fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render("This action has already been deployed."))
-		return nil
+		return a, nil
 	}
 	if err != nil {
-		return fmt.Errorf("error preparing action: %w", err)
+		return a, fmt.Errorf("error preparing action: %w", err)
 	}
 
 	config, err := cuedefs.FormatAction(a)
 	if err != nil {
-		return err
+		return a, err
 	}
 
 	fmt.Println(cli.BoldStyle.Render(fmt.Sprintf("Deploying action version %s...", a.Version.String())))
 
 	// Create the action in the API.
 	if _, err = state.Client.CreateAction(ctx, config); err != nil {
-		return fmt.Errorf("error creating action: %w", err)
+		return a, fmt.Errorf("error creating action: %w", err)
 	}
 
 	if a.Runtime.RuntimeType() == inngest.RuntimeTypeDocker {
@@ -177,10 +177,10 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 		switch a.Runtime.RuntimeType() {
 		case "docker":
 			if _, err = dockerdriver.Push(ctx, a, state.Client.Credentials()); err != nil {
-				return fmt.Errorf("error pushing action: %w", err)
+				return a, fmt.Errorf("error pushing action: %w", err)
 			}
 		default:
-			return fmt.Errorf("unknown runtime type: %s", a.Runtime.RuntimeType())
+			return a, fmt.Errorf("unknown runtime type: %s", a.Runtime.RuntimeType())
 		}
 
 		// Publish
@@ -195,7 +195,7 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 		fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render("Action deployed"))
 	}
 
-	return err
+	return a, err
 
 }
 
@@ -238,6 +238,10 @@ func configureVersionInfo(ctx context.Context, a inngest.ActionVersion) (inngest
 	if a.Version != nil && found != nil && err == nil {
 		return a, fmt.Errorf("Version %s of the action already exists", a.Version.String())
 	}
+
+	// Set the version to the found action version.
+	// We will update this below if it needs doing.
+	a.Version = found.Version
 
 	// Are the runtimes the same?
 	if a.Runtime.RuntimeType() != found.Runtime.RuntimeType() {
