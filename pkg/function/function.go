@@ -70,11 +70,12 @@ type Function struct {
 
 // Step represents a single unit of code (action) which runs as part of a step function, in a DAG.
 type Step struct {
-	ID      string                 `json:"id"`
-	Path    string                 `json:"path"`
-	Name    string                 `json:"name"`
-	Runtime inngest.RuntimeWrapper `json:"runtime"`
-	After   []After                `json:"after,omitempty"`
+	ID      string                     `json:"id"`
+	Path    string                     `json:"path"`
+	Name    string                     `json:"name"`
+	Runtime inngest.RuntimeWrapper     `json:"runtime"`
+	After   []After                    `json:"after,omitempty"`
+	Version *inngest.VersionConstraint `json:"version,omitempty"`
 }
 
 type After struct {

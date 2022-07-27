@@ -82,7 +82,7 @@ package v1
 	// each preceeding step finishes.
 	after: [...#After]
 
-	actionVersion?: {
+	version?: {
 		major?: uint
 		minor?: uint
 	}
