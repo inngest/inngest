@@ -78,6 +78,10 @@ func deploy(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// TODO: Update steps with desired action version
+	//
+	// I think this is done now within `Function.Workflow()`
+
 	return deployFunction(ctx, fn)
 }
 
