@@ -41,7 +41,7 @@ func TestActions(t *testing.T) {
 		Function: fn,
 		Version:  2,
 	}
-	avs, _, err := fv.Actions(context.Background())
+	avs, _, err := fv.Function.Actions(context.Background())
 	require.NoError(t, err)
 
 	require.NotNil(t, avs[0].Version)
