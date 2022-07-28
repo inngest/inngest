@@ -235,11 +235,6 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 			}
 		}
 
-		// TODO: I think I set the step versions here as I'm going, and hard-code
-		// the version constraints to the action version.
-		//
-		// Should the constraint be hard-coded to the latest one here? When would I
-		// specify a range instead? Or is that not yet a feature?
 		step := inngest.Step{
 			ClientID: uint(n) + 1,
 			ID:       found.ID,
