@@ -75,8 +75,19 @@ func TestUnmarshal_testdata(t *testing.T) {
 func TestUnmarshal(t *testing.T) {
 	ctx := context.Background()
 
-	var majorVersion uint = 2
-	var minorVersion uint = 3
+	var uint1 uint = 1
+	var uint2 uint = 2
+	var uint3 uint = 3
+
+	version23 := &inngest.VersionConstraint{
+		Major: &uint2,
+		Minor: &uint3,
+	}
+
+	version11 := &inngest.VersionConstraint{
+		Major: &uint1,
+		Minor: &uint1,
+	}
 
 	valid := []struct {
 		name     string
@@ -105,6 +116,7 @@ func TestUnmarshal(t *testing.T) {
 								Step: inngest.TriggerName,
 							},
 						},
+						Version: version11,
 					},
 				},
 				dir: "/dir",
@@ -153,10 +165,7 @@ func TestUnmarshal(t *testing.T) {
 								Step: inngest.TriggerName,
 							},
 						},
-						Version: &inngest.VersionConstraint{
-							Major: &majorVersion,
-							Minor: &minorVersion,
-						},
+						Version: version23,
 					},
 				},
 				dir: "/dir",
@@ -191,6 +200,7 @@ func TestUnmarshal(t *testing.T) {
 								Step: inngest.TriggerName,
 							},
 						},
+						Version: version11,
 					},
 				},
 				dir: "/dir",
@@ -230,6 +240,7 @@ func TestUnmarshal(t *testing.T) {
 								Step: inngest.TriggerName,
 							},
 						},
+						Version: version11,
 					},
 				},
 				dir: "/dir",
@@ -287,10 +298,7 @@ func TestUnmarshal(t *testing.T) {
 								Step: inngest.TriggerName,
 							},
 						},
-						Version: &inngest.VersionConstraint{
-							Major: &majorVersion,
-							Minor: &minorVersion,
-						},
+						Version: version23,
 					},
 				},
 				dir: "/dir",
@@ -372,6 +380,10 @@ function: defs.#Function & {
     after: [{
       step: "$trigger"
     }]
+    version: {
+      version: 1
+      minor:   1
+    }
   }
 }`
 	require.Equal(t, []byte(expected), str)
