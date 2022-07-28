@@ -74,6 +74,10 @@ func TestUnmarshal_testdata(t *testing.T) {
 // the correct struct defintions or errors.
 func TestUnmarshal(t *testing.T) {
 	ctx := context.Background()
+
+	var majorVersion uint = 2
+	var minorVersion uint = 3
+
 	valid := []struct {
 		name     string
 		input    string
@@ -100,6 +104,58 @@ func TestUnmarshal(t *testing.T) {
 							{
 								Step: inngest.TriggerName,
 							},
+						},
+					},
+				},
+				dir: "/dir",
+			},
+		},
+		{
+			name: "simplest json defintion with step version constraints",
+			input: `{
+				"id": "wut",
+				"name": "test",
+				"triggers": [{ "event": "test.event" }],
+				"steps": {
+					"step-1": {
+						"id": "step-1",
+						"path": "file://.",
+						"name": "test",
+						"runtime": { "type": "docker" },
+						"after": [
+							{
+								"step": "$trigger"
+							}
+						],
+						"version": {
+							"version": 2,
+							"minor": 3
+						}
+					}
+				}
+			}`,
+			expected: Function{
+				Name: "test",
+				ID:   "wut",
+				Triggers: []Trigger{
+					{EventTrigger: &EventTrigger{Event: "test.event"}},
+				},
+				Steps: map[string]Step{
+					DefaultStepName: {
+						ID:   DefaultStepName,
+						Name: "test",
+						Path: "file://.",
+						Runtime: inngest.RuntimeWrapper{
+							Runtime: inngest.RuntimeDocker{},
+						},
+						After: []After{
+							{
+								Step: inngest.TriggerName,
+							},
+						},
+						Version: &inngest.VersionConstraint{
+							Major: &majorVersion,
+							Minor: &minorVersion,
 						},
 					},
 				},
