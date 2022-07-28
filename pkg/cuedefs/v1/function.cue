@@ -82,6 +82,8 @@ package v1
 	// each preceeding step finishes.
 	after: [...#After]
 
+	// version is the version constraint for the step when resolving the action to
+	// run.
 	version?: {
 		version?: uint
 		minor?:   uint
