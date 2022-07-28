@@ -370,6 +370,9 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 		// This assumes that we're writing a single step function using
 		// custom code with the docker executor, and that the code is
 		// in the current directory.
+		var majorVersion uint = 1
+		var minorVersion uint = 1
+
 		f.Steps = map[string]Step{}
 		f.Steps[DefaultStepName] = Step{
 			ID:   DefaultStepName,
@@ -382,6 +385,10 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 				{
 					Step: inngest.TriggerName,
 				},
+			},
+			Version: &inngest.VersionConstraint{
+				Major: &majorVersion,
+				Minor: &minorVersion,
 			},
 		}
 	}
