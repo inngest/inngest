@@ -330,10 +330,6 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, error) {
 	id := s.DSN(ctx, f)
 
-	// TODO: I think I need to somehow add the Version here.
-	//
-	// This will populate `Function.Actions()` with versions too, which I want.
-	// I need to figure out how to know what version an action is here.
 	a := inngest.ActionVersion{
 		Name:    s.Name,
 		DSN:     id,
@@ -396,11 +392,6 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 	}
 
 	for n, s := range f.Steps {
-		// TODO: I can add a version constraint to each step here based on the
-		// action version.
-		//
-		// I need to be able to fetch it somehow. Where is a place that fetches
-		// actions right now with a version that I can investigate?
 		version, err := f.action(ctx, s)
 		if err != nil {
 			return err
