@@ -235,6 +235,67 @@ func TestUnmarshal(t *testing.T) {
 				dir: "/dir",
 			},
 		},
+		{
+			name: "simplest cue definition with step version constraints",
+			input: `
+			package whatevs
+
+			import (
+				defs "inngest.com/defs/v1"
+			)
+
+			function: defs.#Function & {
+				id:   "hellz-yea"
+				name: "test"
+				triggers: [{
+					event: "test.event"
+				}]
+				steps: {
+					"step-1": {
+						id:   "step-1"
+						path: "file://."
+						name: "test"
+						runtime: {"type": "docker"}
+						after: [
+							{
+								step: "$trigger"
+							},
+						]
+						version: {
+							version: 2
+							minor:   3
+						}
+					}
+				}
+			}`,
+			expected: Function{
+				Name: "test",
+				ID:   "hellz-yea",
+				Triggers: []Trigger{
+					{EventTrigger: &EventTrigger{Event: "test.event"}},
+				},
+				Steps: map[string]Step{
+					DefaultStepName: {
+						ID:   DefaultStepName,
+						Name: "test",
+						Path: "file://.",
+						Runtime: inngest.RuntimeWrapper{
+							Runtime: inngest.RuntimeDocker{},
+						},
+						After: []After{
+							{
+								Step: inngest.TriggerName,
+							},
+						},
+						Version: &inngest.VersionConstraint{
+							Major: &majorVersion,
+							Minor: &minorVersion,
+						},
+					},
+				},
+				dir: "/dir",
+			},
+		},
 	}
 
 	for _, i := range valid {
