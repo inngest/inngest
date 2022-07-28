@@ -83,8 +83,8 @@ package v1
 	after: [...#After]
 
 	version?: {
-		major?: uint
-		minor?: uint
+		version?: uint
+		minor?:   uint
 	}
 }
 
