@@ -53,10 +53,14 @@ type WrapperProps = {
 };
 
 const Wrapper = styled.div<WrapperProps>`
-  background: var(--black);
-  light-theme & {
-    background: transparent;
-  }
+  ${(props) =>
+    props.inline
+      ? "background: transparent;"
+      : `background: var(--black);
+
+  .light-theme & {
+    background: var(--color-white);
+  }`}
 
   padding: ${(props) => (props.inline ? "0" : "1.5rem")};
   border-radius: var(--border-radius);
