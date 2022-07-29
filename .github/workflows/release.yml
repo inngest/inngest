@@ -20,6 +20,18 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.18
+      - name: Set up Node/npm
+        uses: actions/setup-node@v3
+        with:
+          cache: 'npm'
+          node-version: 16
+      - name: Make sure npm can deploy
+        working-directory: npm
+        run: |
+          npm ci
+          npm run build
+        env:
+          SKIP_POSTINSTALL: true
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -34,3 +46,10 @@ jobs:
           args: release --rm-dist --debug
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Release to npm
+        run: |
+          npm config set git-tag-version false
+          npm version ${{ github.ref_name }}
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
