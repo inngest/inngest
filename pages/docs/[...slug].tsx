@@ -12,6 +12,7 @@ import {
   Categories,
   Headings,
 } from "../../utils/docs";
+import Code from "src/shared/Code";
 import { DocsLayout, DocsContent } from "../docs";
 import { highlight } from "../../utils/code";
 
@@ -74,7 +75,11 @@ export default function DocLayout(props: any) {
             />
           )}
         </header>
-        <MDXRemote compiledSource={props.post.compiledSource} scope={scope} />
+        <MDXRemote
+          compiledSource={props.post.compiledSource}
+          scope={scope}
+          components={{ Code: Code }}
+        />
         {/* TODO: Add a prev / next button */}
       </DocsContent>
       <aside>
