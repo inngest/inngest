@@ -15,7 +15,7 @@ Replay allows you to battle-test local code against your real production data to
 
 ## Zero-effort testing
 
-The ability to replay events is an often-touted feature of many queueing systems, but it's never easy to achieve. Enter Inngest Replays.
+The ability to replay events is an often-touted feature of many queueing systems, but it's never easy to achieve without a tonne of hand-rolled code. Enter Inngest Replays.
 
 ```bash
 $ inngest run --replay
