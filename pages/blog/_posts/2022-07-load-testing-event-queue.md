@@ -19,7 +19,7 @@ One of the classics is `ab` — [ApacheBench](https://www.notion.so/Load-testing
 - [https://github.com/wg/wrk](https://github.com/wg/wrk), one of the early event-loop based systems from 2013.  This can generate *significant* load, and comes with Lua scripting.  It really set the stage for…
 - [https://github.com/grafana/k6](https://github.com/grafana/k6), a modern load testing tool written in Go, capable of generating load with complex requests defined in JS-based scripts, with many metric options
 
-The easiest *modern* benchmarking tool to set up and use (in our opinion) is k6.io.  We’ll dive in to a *basic* load testing **test using K6, showing how we used it to test our events API for our event-driven queue.
+The easiest *modern* benchmarking tool to set up and use (in our opinion) is k6.io.  We’ll dive in to a *basic* load test using K6, showing how we used it to test our events API for our event-driven queue.
 
 ## About K6
 
