@@ -1,111 +1,87 @@
-<p align="center">
-        <br />
-        <img src="https://www.inngest.com/assets/open-source/open-source-logo.svg" alt="Logo" width="220" height="90">
-</p>
-<p align="center">
-        The event-driven queue for any language.<br />
-        Created for rapid development speed and a delightful experience.
-</p>
+# Inngest
+
+![Latest release](https://img.shields.io/github/v/release/inngest/inngest?include_prereleases&sort=semver)
+![Test Status](https://img.shields.io/github/workflow/status/inngest/inngest/Go/main?label=tests)
+![Discord](https://img.shields.io/discord/842170679536517141?label=discord)
+![Twitter Follow](https://img.shields.io/twitter/follow/inngest?style=social)
+
+Inngest is an open-source, event-driven platform which makes it easy for developers to build, test, and deploy serverless functions without worrying about infrastructure, queues, or stateful services.
+
+Using Inngest, you can write and deploy serverless step functions which are triggered by events without writing any boilerplate code or infra. Learn more at https://www.inngest.com.
+
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Project Architecture](#project-architecture)
+- [Community](#community)
 
 <br />
 
 ## Overview
 
-Inngest makes it simple for you to write delayed or background jobs by triggering functions from events — decoupling your code from your queue.
+Inngest makes it simple for you to write delayed or background jobs by triggering functions from events — decoupling your code from your application.
 
-At a very high level, Inngest does two things:
+- You send events from your application via HTTP (or via third party webhooks, e.g. Stripe)
+- Inngest runs your serverless functions that are configured to be triggered by those events, either immediately, or delayed.
 
-- Ingest events from your systems (pun _very_ much intended)
-- Triggers serverless functions in response to specific events — in the background, either immediately or delayed.
+Inngest abstracts the complex parts of building a robust, reliable, and scalable architecture away from you so you can focus on writing amazing code and building applications for your users.
 
-By building this way, you:
+We created Inngest to bring the benefits of event-driven systems to all developers, without having to write any code themselves. We believe that:
 
-- Can deploy new functionality immediately, without modifying your app.
-- Never have to create individual queues, workers, dispatchers, or queue-specific infrastructure again.
-- Get a ton of extra features, such as event schemas, retries, historical replays, blue-green deploys, instant rollbacks, step functions, coordinated functionality etc. for free, without modifying any of your app.
-- Decouple your application code from your infrastructure
+- Event-driven systems should be _easy_ to build and adopt
+- Event-driven systems are better than regular, procedural systems and queues
+- Developer experience matters
+- Serverless scheduling enables scalable, reliable systems that are both cheaper and better for compliance
 
-We’re open source, committed to preventing vendor-lock in, using simple standards, and build in the open (we like collaboration). Sound interesting?
-
-- [**Join our community for support, to give us feedback, or chat with us**](https://www.inngest.com/discord).
-- [Docs](https://www.inngest.com/docs)
-- [Read more about our vision and why this project exists](https://www.inngest.com/blog/open-source-event-driven-queue)
+[Read more about our vision and why this project exists](https://www.inngest.com/blog/open-source-event-driven-queue)
 
 <br />
-<br />
 
-## Installing Inngest
+## Quick Start
 
-Quick start - this downloads inngest for your os+arch into ./inngest:
+1. Install the Inngest CLI to get started:
 
-```
+```bash
 curl -sfL https://cli.inngest.com/install.sh | sh \
   && sudo mv ./inngest /usr/local/bin/inngest
+# or via npm
+npm install -g inngest-cli
 ```
 
-**Manually:** by downloading a [pre-compiled binary](https://github.com/inngest/inngest-cli/releases) and placing the binary in your path.
+2.  Create a new function. It will prompt you to select a programming language and what event will trigger your function. Optionally use the `--trigger` flag to specify the event name:
+
+```shell
+inngest init --trigger demo/event.sent
+```
+
+3. Run your new hello world function with dummy data:
+
+```shell
+inngest run
+```
+
+4. Run the Inngest DevServer. This starts a local "Event API" which can receive events. When events are received, functions with matching triggers will automatically be run. Optionally use the `-p` flag to specify the sport for the Event API.
+
+```shell
+inngest dev -p 9999
+```
+
+5. Send events to the DevServer. Send right from your application using HTTP + JSON or simply, as a curl with a dummy key of `KEY`.
+
+```shell
+curl -X POST --data '{"name":"demo/event.sent","data":{"test":true}}' http://127.0.0.1:9999/e/KEY
+```
+
+That's it - your hello world function should run automatically! When you `inngest deploy` your function to Inngest Cloud or your self-hosted Inngest. Here are some more resources to get you going:
+
+- [Full Quick Start Guide](https://www.inngest.com/docs/quick-start?ref=github)
+- [Function arguments & responses](https://www.inngest.com/docs/functions/function-input-and-output?ref=github)
+- [Sending Events to Inngest](https://www.inngest.com/docs/event-format-and-structure?ref=github)
+- [Inngest Cloud: Managing Secrets](https://www.inngest.com/docs/cloud/managing-secrets?ref=github)
+- [Self-hosting Inngest](https://www.inngest.com/docs/self-hosting?ref=github)
 
 <br />
 
-## Trying Inngest
-
-Once you've installed the CLI, you can run `inngest init` to build new functions, `inngest run` to test them, and `inngest dev` to run the dev server.
-
-- [Quick start docs](https://www.inngest.com/docs/quick-start)
-
-<br />
-
-## Example usage
-
-**Send events** to trigger background jobs anywhere in your own app:
-
-```tsx
-const host = "http://..."; // The inngest server.
-
-// Send events via a single HTTP POST using any language.  Here's JS:
-await fetch(host, {
-  method: "POST",
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify({
-    name: "user/signed.up",
-    data: { id: user.id },
-    user: { external_id: user.id },
-  }),
-});
-```
-
-**Run a function** whenever `user/signed.up` is received (created via `inngest init`):
-
-```tsx
-import type { EventTriggers } from "./types";
-
-export async function run({ event }: { event: EventTriggers }) {
-  const { id } = event.data; // The event data sent above.
-
-  // You can do anything here:  add the user to Stripe, Zendesk, LaunchDarkly,
-  // send welcome emails, start a drip campaign - whatever you'd do
-  // in the background.
-  return { status: 200 };
-}
-```
-
-```json
-{
-  "name": "Post-signup",
-  "id": "abstract-nitty-a14c1d",
-  "triggers": [{ "event": "user/signed.up" }]
-}
-```
-
-**Deploy the function:**
-
-```tsx
-inngest deploy
-```
-
-<br />
-
-## Architecture
+## Project Architecture
 
 Fundamentally, there are two core pieces to Inngest: _events_ and _functions_. Functions have several sub-components for managing complex functionality (eg. steps, edges, triggers), but high level an event triggers a function, much like you schedule a job via an RPC call to a queue. Except, in Inngest, **functions are declarative**. They specify which events they react to, their schedules and delays, and the steps in their sequence.
 
@@ -135,24 +111,15 @@ To learn how these components all work together, [check out the in-depth archite
 
 <br />
 
-### Docs & Roadmap
+## Community
 
-- [You can read our docs here](https://www.inngest.com/docs)
-- [Our public roadmap is part of the Inngest organization here](https://github.com/orgs/inngest/projects/1/)
+- [**Join our online community for support, to give us feedback, or chat with us**](https://www.inngest.com/discord).
+- [Post a question or idea to our Github discussion board](https://github.com/orgs/inngest/discussions)
+- [Read the documentation](https://www.inngest.com/docs)
+- [Explore our public roadmap](https://github.com/orgs/inngest/projects/1/)
+- [Follow us on Twitter](https://twitter.com/inngest)
+- [Join our mailing list](https://www.inngest.com/mailing-list) for release notes and project updates
 
-<br />
-
-### Need help?
-
-We want to make it as easy as possible for people to write complex async functionality. If you’re stuck, have an idea, or a feature request we’d love to hear from you. We welcome all questions and contributions!
-
-- **[Join our Discord community](https://www.inngest.com/discord)**, for live support and to chat with our engineers. You can also give us real-time feedback. It’s very much appreciated, and the best and fastest way to get involved.
-  - We’ll also copy questions from here into an FAQ, and use the discussions to update our docs 😊
-- **[Twitter](https://twitter.com/inngest)** and our **mailing list** for news and updates (eg. new drivers, releases, etc.)
-- **Github issues**, for feedback, feature requests, and bugs. Thank you in advance! 🙏
-
-<br />
-
-### Contributing
+## Contributing
 
 We’re excited to embrace the community! We’re happy for any and all contributions, whether they’re feature requests, ideas, bug reports, or PRs. While we’re open source, we don’t have expectations that people do our work for us — so any contributions are indeed very much appreciated. Feel free to hack on anything and submit a PR.
