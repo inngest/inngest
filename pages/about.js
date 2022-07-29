@@ -40,23 +40,20 @@ const INVESTORS = [
   },
 ];
 
+export async function getStaticProps() {
+  return {
+    props: {
+      meta: {
+        title: "About Us",
+        description: MISSION,
+      },
+    },
+  };
+}
+
 export default function Home() {
   return (
     <Page>
-      <Head>
-        <title>Inngest: About Us</title>
-        <meta property="og:title" content="Inngest" />
-        <meta property="og:url" content="https://www.inngest.com" />
-        <meta property="og:image" content="/logo.svg" />
-        <meta property="og:description" content={MISSION} />
-        <script src="/inngest-sdk.js"></script>
-        <script
-          defer
-          src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon='{"token": "e2fa9f28c34844e4a0d29351b8730579"}'
-        ></script>
-      </Head>
-
       <Nav />
 
       <Hero className="hero">
@@ -76,7 +73,7 @@ export default function Home() {
         <Grid>
           {TEAM.map((person) => {
             return (
-              <Block>
+              <Block key={person.name}>
                 <Avatar src={person.avatar} />
                 <h3>{person.name}</h3>
                 <p>
@@ -92,7 +89,7 @@ export default function Home() {
         <Grid>
           {INVESTORS.map((investor) => {
             return (
-              <InvestorBlock>
+              <InvestorBlock key={investor.name}>
                 <img
                   src={investor.logo}
                   alt={investor.name}

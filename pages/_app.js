@@ -26,10 +26,39 @@ function MyApp({ Component, pageProps }) {
       router.events.off("routeChangeComplete", handleRouteChange);
     };
   }, [router.events]);
+
   return (
     <>
       <Head>
-        <link rel="icon" href="/favicon-may-2022.png" />
+        {pageProps?.meta?.title && (
+          <>
+            <title>Inngest → {pageProps.meta.title}</title>
+            <meta
+              property="og:title"
+              content={`Inngest - ${pageProps.meta.title}`}
+            />
+          </>
+        )}
+        {pageProps?.meta?.description && (
+          <>
+            <meta
+              name="description"
+              content={pageProps.meta.description}
+            ></meta>
+            <meta
+              property="og:description"
+              content={pageProps.meta.description}
+            />
+          </>
+        )}
+        <meta
+          property="og:image"
+          content={pageProps?.meta?.image || "/assets/img/og-image-default.jpg"}
+        />
+        <meta
+          property="og:url"
+          content={`https://www.inngest.com${router.pathname}`}
+        />
       </Head>
       <PageBanner href="/blog/open-source-event-driven-queue?ref=page-banner">
         Announcing our open source plans for the Inngest event-driven queue
