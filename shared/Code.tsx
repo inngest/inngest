@@ -29,7 +29,7 @@ const Code: React.FC<Props> = (props) => {
         </ul>
       )}
       <pre>
-        <Highlight language={HIJS_LANGUAGES[selected.toLowerCase()]}>
+        <Highlight language={HIJS_LANGUAGES[selected.toLowerCase()] || "bash"}>
           {props.code[selected]}
         </Highlight>
       </pre>
