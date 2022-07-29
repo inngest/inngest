@@ -46,7 +46,6 @@ jobs:
           args: release --rm-dist --debug
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # TODO This step needs an NPM_TOKEN secret adding
       - name: Release to npm
         run: |
           npm config set git-tag-version false
