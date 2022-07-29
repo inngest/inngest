@@ -74,6 +74,21 @@ func TestUnmarshal_testdata(t *testing.T) {
 // the correct struct defintions or errors.
 func TestUnmarshal(t *testing.T) {
 	ctx := context.Background()
+
+	var uint1 uint = 1
+	var uint2 uint = 2
+	var uint3 uint = 3
+
+	version23 := &inngest.VersionConstraint{
+		Major: &uint2,
+		Minor: &uint3,
+	}
+
+	version11 := &inngest.VersionConstraint{
+		Major: &uint1,
+		Minor: &uint1,
+	}
+
 	valid := []struct {
 		name     string
 		input    string
@@ -101,6 +116,56 @@ func TestUnmarshal(t *testing.T) {
 								Step: inngest.TriggerName,
 							},
 						},
+						Version: version11,
+					},
+				},
+				dir: "/dir",
+			},
+		},
+		{
+			name: "simplest json defintion with step version constraints",
+			input: `{
+				"id": "wut",
+				"name": "test",
+				"triggers": [{ "event": "test.event" }],
+				"steps": {
+					"step-1": {
+						"id": "step-1",
+						"path": "file://.",
+						"name": "test",
+						"runtime": { "type": "docker" },
+						"after": [
+							{
+								"step": "$trigger"
+							}
+						],
+						"version": {
+							"version": 2,
+							"minor": 3
+						}
+					}
+				}
+			}`,
+			expected: Function{
+				Name: "test",
+				ID:   "wut",
+				Triggers: []Trigger{
+					{EventTrigger: &EventTrigger{Event: "test.event"}},
+				},
+				Steps: map[string]Step{
+					DefaultStepName: {
+						ID:   DefaultStepName,
+						Name: "test",
+						Path: "file://.",
+						Runtime: inngest.RuntimeWrapper{
+							Runtime: inngest.RuntimeDocker{},
+						},
+						After: []After{
+							{
+								Step: inngest.TriggerName,
+							},
+						},
+						Version: version23,
 					},
 				},
 				dir: "/dir",
@@ -135,6 +200,7 @@ func TestUnmarshal(t *testing.T) {
 								Step: inngest.TriggerName,
 							},
 						},
+						Version: version11,
 					},
 				},
 				dir: "/dir",
@@ -174,6 +240,65 @@ func TestUnmarshal(t *testing.T) {
 								Step: inngest.TriggerName,
 							},
 						},
+						Version: version11,
+					},
+				},
+				dir: "/dir",
+			},
+		},
+		{
+			name: "simplest cue definition with step version constraints",
+			input: `
+			package whatevs
+
+			import (
+				defs "inngest.com/defs/v1"
+			)
+
+			function: defs.#Function & {
+				id:   "hellz-yea"
+				name: "test"
+				triggers: [{
+					event: "test.event"
+				}]
+				steps: {
+					"step-1": {
+						id:   "step-1"
+						path: "file://."
+						name: "test"
+						runtime: {"type": "docker"}
+						after: [
+							{
+								step: "$trigger"
+							},
+						]
+						version: {
+							version: 2
+							minor:   3
+						}
+					}
+				}
+			}`,
+			expected: Function{
+				Name: "test",
+				ID:   "hellz-yea",
+				Triggers: []Trigger{
+					{EventTrigger: &EventTrigger{Event: "test.event"}},
+				},
+				Steps: map[string]Step{
+					DefaultStepName: {
+						ID:   DefaultStepName,
+						Name: "test",
+						Path: "file://.",
+						Runtime: inngest.RuntimeWrapper{
+							Runtime: inngest.RuntimeDocker{},
+						},
+						After: []After{
+							{
+								Step: inngest.TriggerName,
+							},
+						},
+						Version: version23,
 					},
 				},
 				dir: "/dir",
@@ -255,6 +380,10 @@ function: defs.#Function & {
     after: [{
       step: "$trigger"
     }]
+    version: {
+      version: 1
+      minor:   1
+    }
   }
 }`
 	require.Equal(t, []byte(expected), str)
