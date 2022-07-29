@@ -188,6 +188,9 @@ func TestDerivedConfigDefault(t *testing.T) {
 	}
 	path := "file:///Users/johnny/dev/repo/functions/inngest.json"
 
+	var majorVersion uint = 1
+	var minorVersion uint = 1
+
 	err = fn.canonicalize(context.Background(), path)
 	require.NoError(t, err)
 
@@ -197,6 +200,10 @@ func TestDerivedConfigDefault(t *testing.T) {
 		Scopes: []string{"secret:read:*"},
 		Runtime: inngest.RuntimeWrapper{
 			Runtime: inngest.RuntimeDocker{},
+		},
+		Version: &inngest.VersionInfo{
+			Major: 1,
+			Minor: 1,
 		},
 	}
 
@@ -210,6 +217,10 @@ action: actions.#Action
 action: {
   dsn:  "magical-id-step-step-1-test"
   name: "Foo"
+  version: {
+    major: 1
+    minor: 1
+  }
   scopes: ["secret:read:*"]
   runtime: type: "docker"
 }`
@@ -241,6 +252,10 @@ action: {
 				ClientID: 1,
 				Name:     expectedActionVersion.Name,
 				DSN:      expectedActionVersion.DSN,
+				Version: &inngest.VersionConstraint{
+					Major: &majorVersion,
+					Minor: &minorVersion,
+				},
 			},
 		},
 		Edges: []inngest.Edge{
@@ -269,6 +284,10 @@ workflow: workflows.#Workflow & {
     clientID: 1
     name:     "Foo"
     dsn:      "magical-id-step-step-1-test"
+    version: {
+      version: 1
+      minor:   1
+    }
   }]
   edges: [{
     outgoing: "$trigger"

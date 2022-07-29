@@ -49,13 +49,13 @@ func deploy(cmd *cobra.Command, args []string) error {
 	}
 
 	// Build all steps.
-	steps, err := dockerdriver.FnBuildOpts(ctx, *fn, "--platform", "linux/amd64")
+	buildOpts, err := dockerdriver.FnBuildOpts(ctx, *fn, "--platform", "linux/amd64")
 	if err != nil {
 		return err
 	}
 	ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
 		QuitOnComplete: true,
-		BuildOpts:      steps,
+		BuildOpts:      buildOpts,
 	})
 	if err != nil {
 		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
@@ -72,10 +72,30 @@ func deploy(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	dsnToKeySteps := make(map[string]string)
+
+	for key, step := range fn.Steps {
+		dsnToKeySteps[step.DSN(ctx, *fn)] = key
+	}
+
 	for _, a := range actions {
-		if err := deployAction(ctx, a); err != nil {
+		actionVersion, err := deployAction(ctx, a)
+		if err != nil {
 			return err
 		}
+
+		// TODO: Move this to a dedicated function.
+		step, ok := fn.Steps[dsnToKeySteps[actionVersion.DSN]]
+		if !ok {
+			return fmt.Errorf("failed to find step for action %s", actionVersion.DSN)
+		}
+
+		step.Version = &inngest.VersionConstraint{
+			Major: &actionVersion.Version.Major,
+			Minor: &actionVersion.Version.Minor,
+		}
+
+		fn.Steps[dsnToKeySteps[actionVersion.DSN]] = step
 	}
 
 	return deployFunction(ctx, fn)
@@ -137,7 +157,7 @@ func deployWorkflow(ctx context.Context, fn *function.Function) error {
 
 // deployAction deploys a given action to Inngest, creating a new version, pushing the image,
 // the setting the action to "published" once pushed.
-func deployAction(ctx context.Context, a inngest.ActionVersion) error {
+func deployAction(ctx context.Context, a inngest.ActionVersion) (inngest.ActionVersion, error) {
 	var err error
 
 	state := clistate.RequireState(ctx)
@@ -150,22 +170,22 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 	a, err = configureVersionInfo(ctx, a)
 	if err == ErrAlreadyDeployed {
 		fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render("This action has already been deployed."))
-		return nil
+		return a, nil
 	}
 	if err != nil {
-		return fmt.Errorf("error preparing action: %w", err)
+		return a, fmt.Errorf("error preparing action: %w", err)
 	}
 
 	config, err := cuedefs.FormatAction(a)
 	if err != nil {
-		return err
+		return a, err
 	}
 
 	fmt.Println(cli.BoldStyle.Render(fmt.Sprintf("Deploying action version %s...", a.Version.String())))
 
 	// Create the action in the API.
 	if _, err = state.Client.CreateAction(ctx, config); err != nil {
-		return fmt.Errorf("error creating action: %w", err)
+		return a, fmt.Errorf("error creating action: %w", err)
 	}
 
 	if a.Runtime.RuntimeType() == inngest.RuntimeTypeDocker {
@@ -173,10 +193,10 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 		switch a.Runtime.RuntimeType() {
 		case "docker":
 			if _, err = dockerdriver.Push(ctx, a, state.Client.Credentials()); err != nil {
-				return fmt.Errorf("error pushing action: %w", err)
+				return a, fmt.Errorf("error pushing action: %w", err)
 			}
 		default:
-			return fmt.Errorf("unknown runtime type: %s", a.Runtime.RuntimeType())
+			return a, fmt.Errorf("unknown runtime type: %s", a.Runtime.RuntimeType())
 		}
 
 		// Publish
@@ -191,7 +211,7 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) error {
 		fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render("Action deployed"))
 	}
 
-	return err
+	return a, err
 
 }
 
@@ -234,6 +254,10 @@ func configureVersionInfo(ctx context.Context, a inngest.ActionVersion) (inngest
 	if a.Version != nil && found != nil && err == nil {
 		return a, fmt.Errorf("Version %s of the action already exists", a.Version.String())
 	}
+
+	// Set the version to the found action version.
+	// We will update this below if it needs doing.
+	a.Version = found.Version
 
 	// Are the runtimes the same?
 	if a.Runtime.RuntimeType() != found.Runtime.RuntimeType() {
