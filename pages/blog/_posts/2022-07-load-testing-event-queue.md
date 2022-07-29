@@ -1,6 +1,6 @@
 ---
 focus: false
-heading: "Load testing an event-driven message queue (w/ k6)"
+heading: "Load testing an event-driven message queue"
 subtitle: How to quickly run load tests on event-driven queues via K6
 image: "/assets/blog/k6-load-test.png"
 date: 2022-07-29
