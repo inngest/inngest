@@ -11,7 +11,7 @@ Building an event-driven system can be challenging: how do you know your code wi
 
 Replay allows you to battle-test local code against your real production data to avoid breaking changes and gives you confidence when deploying minor fixes or huge refactors.
 
-**[GIF]**
+![An example of CLI replays running](/assets/blog/introducing-cli-replays/top-example.gif)
 
 ## Zero-effort testing
 
