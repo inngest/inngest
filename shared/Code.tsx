@@ -1,10 +1,15 @@
-import React, { useState } from "react";
 import styled from "@emotion/styled";
+import React, { useState } from "react";
 import Highlight from "react-highlight.js";
 
 type Props = {
   code: { [language: string]: string };
   selected?: string;
+
+  /**
+   * If `true`, will render the code blocks in a more compact format.
+   */
+  inline?: boolean;
 };
 
 const HIJS_LANGUAGES = {
@@ -18,7 +23,7 @@ const Code: React.FC<Props> = (props) => {
   const [selected, setSelected] = useState(props.selected || langs[0]);
 
   return (
-    <Wrapper>
+    <Wrapper inline={props.inline}>
       {langs.length > 1 && (
         <ul>
           {langs.map((lang: string) => (
@@ -39,9 +44,21 @@ const Code: React.FC<Props> = (props) => {
 
 export default Code;
 
-const Wrapper = styled.div`
+type WrapperProps = {
+  /**
+   * If `true`, render the wrapper in a more compact format; less padding,
+   * smaller font sizes.
+   */
+  inline?: boolean;
+};
+
+const Wrapper = styled.div<WrapperProps>`
   background: var(--black);
-  padding: 1.5em;
+  light-theme & {
+    background: transparent;
+  }
+
+  padding: ${(props) => (props.inline ? "0" : "1.5rem")};
   border-radius: var(--border-radius);
   font-family: var(--font-mono);
 
@@ -52,10 +69,21 @@ const Wrapper = styled.div`
     color: var(--green);
   }
 
+  ${(props) =>
+    props.inline
+      ? `
+  pre {
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    margin: 0.25rem 0 0;
+    padding: 0;
+  }`
+      : ""}
+
   ul {
     list-style: none;
     display: flex;
-    margin: 0 0 1.5rem;
+    margin: ${(props) => (props.inline ? "0" : "0 0 1.5rem")};
     padding: 0;
     font-size: 0.8rem;
   }
@@ -64,12 +92,13 @@ const Wrapper = styled.div`
     padding: 0.2rem 0.6rem;
     border: 0;
     background: transparent;
-    color: #c4c4c4;
+    color: #8c8989;
     border-radius: var(--border-radius);
     font-weight: bold;
 
     &:hover {
       background: rgba(var(--primary-color-rgb), 0.3);
+      color: var(--color-white);
     }
   }
 
