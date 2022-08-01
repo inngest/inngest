@@ -43,11 +43,11 @@ func NewCmdRun() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("trigger", "t", "", "Specifies the event trigger to use if there are multiple configured")
-	cmd.Flags().Bool("event-only", false, "Prints the generated event to use without running the function")
 	cmd.Flags().Int64Var(&runSeed, "seed", 0, "Sets the seed for deterministically generating random events")
 	cmd.Flags().BoolP("replay", "r", false, "Enables replay mode to replay real recent events")
 	cmd.Flags().Int64VarP(&replayCount, "count", "c", 10, "Number of events to replay in replay mode")
 	cmd.Flags().StringP("event-id", "e", "", "Specifies a specific event to replay in replay mode")
+	cmd.Flags().BoolP("snapshot", "s", false, "Returns found or generated events as JSON instead of running them")
 
 	return cmd
 }
@@ -67,17 +67,14 @@ func doRun(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	if cmd.Flag("event-only").Value.String() == "true" {
-		evt, _ := fakeEvent(ctx, *fn, "")
-		out, _ := json.Marshal(evt)
-		fmt.Println(string(out))
-		return
-	}
+	snapshotMode := cmd.Flag("snapshot").Value.String() == "true"
 
-	if err = buildImg(ctx, *fn); err != nil {
-		// This should already have been printed to the terminal.
-		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
-		os.Exit(1)
+	if !snapshotMode {
+		if err = buildImg(ctx, *fn); err != nil {
+			// This should already have been printed to the terminal.
+			fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+			os.Exit(1)
+		}
 	}
 
 	triggerName := cmd.Flag("trigger").Value.String()
@@ -105,6 +102,16 @@ func doRun(cmd *cobra.Command, args []string) {
 			}
 			eventFunc = singleReplayEventLoader(ctx, &id)
 		}
+	}
+
+	if cmd.Flag("snapshot").Value.String() == "true" {
+		err := snapshotEvents(ctx, eventFunc)
+		if err != nil {
+			fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+			os.Exit(1)
+		}
+
+		os.Exit(0)
 	}
 
 	opts := runFunctionOpts{
@@ -311,4 +318,20 @@ func fakeEvent(ctx context.Context, fn function.Function, triggerName string) (e
 		}
 	}
 	return function.GenerateTriggerData(ctx, runSeed, triggers)
+}
+
+func snapshotEvents(ctx context.Context, eventFunc func() ([]event.Event, error)) error {
+	events, err := eventFunc()
+	if err != nil {
+		return err
+	}
+
+	json, err := json.MarshalIndent(events, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(json))
+
+	return nil
 }
