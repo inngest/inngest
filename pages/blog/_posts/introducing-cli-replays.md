@@ -21,7 +21,7 @@ The ability to replay events is an often-touted feature of many queueing systems
 $ inngest run --replay
 ```
 
-With a simple command, we'll build your code, pull real recent events from your ecosystem, and test your function against them. You can instantly prove that your change will work in production without the code ever leaving your machine.
+With a simple command, we'll build your code, pull real recent events from your Inngest Cloud account, and test your function against them. You can instantly prove that your change will work in production before you even commit your code.
 
 We've found it particularly useful when bootstrapping new functions triggered by existing events, as you have an instant feedback loop while developing. Write code once, deploy once, done!
 
