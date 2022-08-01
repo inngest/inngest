@@ -139,12 +139,27 @@ func generatedEventLoader(ctx context.Context, fn function.Function, triggerName
 		if (fi.Mode() & os.ModeCharDevice) == 0 {
 			// Read stdin
 			scanner := bufio.NewScanner(os.Stdin)
-			scanner.Scan()
-			evt := scanner.Bytes()
 
-			data := event.Event{}
-			err := json.Unmarshal(evt, &data)
-			return []event.Event{data}, err
+			var input []byte
+			for scanner.Scan() {
+				line := scanner.Bytes()
+				if len(line) == 0 {
+					break
+				}
+				input = append(input, line...)
+			}
+
+			multipleEvents := []event.Event{}
+			err := json.Unmarshal(input, &multipleEvents)
+			if err != nil {
+				// If we couldn't parse multiple events, try a single event instead.
+				singleEvent := event.Event{}
+				err := json.Unmarshal(input, &singleEvent)
+
+				return []event.Event{singleEvent}, err
+			}
+
+			return multipleEvents, nil
 		}
 
 		fakedEvent, err := fakeEvent(ctx, fn, triggerName)
