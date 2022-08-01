@@ -14,7 +14,7 @@ You might say the *core* use case of queues and event driven systems is to incre
 
 Every time you’re building interconnected systems (eg. HTTP or gRPC APIs) it’s good to know your metrics and limits.  To do that, you’ll be reaching for a load testing or *benchmarking* tool.
 
-One of the classics is `ab` — [ApacheBench](https://www.notion.so/Load-testing-an-event-driven-message-queue-w-k6-555ee98bffd54e0c9159e11339551785), designed to test Apache servers.  Long gone are the days where people reach for Apache and good ol’ GCI-BIN.  Nowadays, most people are using HTTP2/QuiC and, accordingly, there are more modern tools available to benchmark.  Some of the examples:
+One of the classics is `ab` — [ApacheBench](https://httpd.apache.org/docs/2.4/programs/ab.html), designed to test Apache servers.  Long gone are the days where people reach for Apache and good ol’ GCI-BIN.  Nowadays, most people are using HTTP2/QuiC and, accordingly, there are more modern tools available to benchmark.  Some of the examples:
 
 - [https://github.com/wg/wrk](https://github.com/wg/wrk), one of the early event-loop based systems from 2013.  This can generate *significant* load, and comes with Lua scripting.  It really set the stage for…
 - [https://github.com/grafana/k6](https://github.com/grafana/k6), a modern load testing tool written in Go, capable of generating load with complex requests defined in JS-based scripts, with many metric options
@@ -88,7 +88,7 @@ k6 run --vus 25 --duration 30s ./post.js  13.30s user 6.14s system 63% cpu 30.57
 
 By default, this shows you the p90 and p95 latencies for the requests sent — [though this is easy to customize, including streaming output (as events) to different services](https://k6.io/docs/getting-started/results-output/).
 
-Honestly, the [K6 documentation](https://www.notion.so/Reactive-Summit-2022-Proposal-1c03fa8c63d84ea58175ad4cb2282109) is some of the best documentation online we’ve seen.  I’d highly recommend a quick browse through to understand all of the options available.
+Honestly, the [K6 documentation](https://k6.io/docs/) is some of the best documentation online we’ve seen.  I’d highly recommend a quick browse through to understand all of the options available.
 
 ### Setting up the infra for real-world tests
 
