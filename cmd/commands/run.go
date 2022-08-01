@@ -132,13 +132,6 @@ func doRun(cmd *cobra.Command, args []string) {
 // Will also attempt to read an event from stdin.
 func generatedEventLoader(ctx context.Context, fn function.Function, triggerName string) func() ([]event.Event, error) {
 	return func() ([]event.Event, error) {
-		// If we're generating an event and haven't been given a random seed,
-		// generate one now.
-		if runSeed <= 0 {
-			rand.Seed(time.Now().UnixNano())
-			runSeed = rand.Int63n(1_000_000)
-		}
-
 		fi, err := os.Stdin.Stat()
 		if err != nil {
 			return []event.Event{}, err
@@ -167,6 +160,13 @@ func generatedEventLoader(ctx context.Context, fn function.Function, triggerName
 			}
 
 			return multipleEvents, nil
+		}
+
+		// If we're generating an event and haven't been given a random seed,
+		// generate one now.
+		if runSeed <= 0 {
+			rand.Seed(time.Now().UnixNano())
+			runSeed = rand.Int63n(1_000_000)
 		}
 
 		fakedEvent, err := fakeEvent(ctx, fn, triggerName)
