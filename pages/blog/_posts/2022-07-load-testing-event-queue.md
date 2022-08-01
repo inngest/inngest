@@ -27,7 +27,7 @@ K6 is a Go-based load testing tool which makes performance testing, well, easy. 
 
 Here’s an example test which submits a small JSON payload to an API:
 
-```go
+```javascript
 import http from 'k6/http';
 
 export default function () {
