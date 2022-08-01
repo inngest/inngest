@@ -3,7 +3,7 @@ focus: false
 heading: "Load testing an event-driven message queue"
 subtitle: How to quickly run load tests on event-driven queues via K6
 image: "/assets/blog/k6-load-test.png"
-date: 2022-07-29
+date: 2022-08-01
 ---
 
 Inngest is an *event-driven queue*.  It differs from typical queues (like SQS, Celery) because it accepts JSON events via HTTP to triggers functions, and it lets you do novel things like data governance with event schemas, proper function versioning, historical event replay, user attribution, or blue green deploys — stuff we’ve come to expect from modern tooling.
