@@ -6,8 +6,8 @@ import { useLocalStorage } from "react-use";
  * AB experiments with keys as experiment names and values as the variants.
  */
 const abExperiments = {
-  header: ["kill-queues-headline", "event-driven-headerline"],
-  footer: ["removed", "highlighted"],
+  // header: ["kill-queues-headline", "event-driven-headerline"],
+  // footer: ["removed", "highlighted"],
 } as const;
 
 /**
