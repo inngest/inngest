@@ -1,5 +1,5 @@
 import deterministicSplit from "deterministic-split";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "react-use";
 
 /**
@@ -39,5 +39,25 @@ export const useAbTest = <T extends keyof typeof abExperiments>(
     ) as typeof abExperiments[T][number];
   }, [anonId, experimentName]);
 
-  return [variant];
+  /**
+   * Whenever the variant and fetched and used, send an event to mark that this
+   * has happened.
+   */
+  useEffect(() => {
+    window.Inngest.event({
+      name: "app/experiment.viewed",
+      data: {
+        anonymous_id: anonId,
+        experiment: experimentName,
+        variant,
+      },
+    });
+  }, [variant, anonId, experimentName]);
+
+  return {
+    /**
+     * The variant of the given experiment for this user.
+     */
+    variant,
+  };
 };
