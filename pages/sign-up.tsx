@@ -20,7 +20,7 @@ const SignUp = () => {
   const [error, setError] = useState<string>(null);
   const { anonId } = useAnonId();
 
-  const anonID = window.localStorage.getItem("inngest-anon-id") || "";
+  const anonID = globalThis?.localStorage?.getItem("inngest-anon-id") || "";
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
