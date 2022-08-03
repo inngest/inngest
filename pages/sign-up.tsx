@@ -4,6 +4,7 @@ import Button from "../shared/Button";
 import IconList from "../shared/IconList";
 import Check from "../shared/Icons/Check";
 import { useState } from "react";
+import { useAnonId } from "src/shared/trackingHooks";
 
 const api = process.env.NEXT_PUBLIC_API_HOST || "https://api.inngest.com";
 const appURL = process.env.NEXT_PUBLIC_APP_HOST || "https://app.inngest.com";
@@ -17,12 +18,11 @@ const SignUp = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>(null);
+  const { anonId } = useAnonId();
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setLoading(true);
-
-    let anonId = window.localStorage.getItem("inngest-anon-id");
 
     let result;
     try {
