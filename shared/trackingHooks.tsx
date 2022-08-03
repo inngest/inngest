@@ -7,8 +7,8 @@ import { v4 as uuid } from "uuid";
  * AB experiments with keys as experiment names and values as the variants.
  */
 const abExperiments = {
-  // header: ["kill-queues-headline", "event-driven-headerline"],
-  // footer: ["removed", "highlighted"],
+  // e.g. "2022-01-01-experiment-name": ["variant-1", "variant-2"]
+  "2022-08-03-headline": ["kill-queues", "you-send-events"],
 } as const;
 
 /**
@@ -42,6 +42,10 @@ export const useAbTest = <T extends keyof typeof abExperiments>(
   const { anonId } = useAnonId();
 
   const variant = useMemo(() => {
+    // for server side rendering, always render the first variant
+    if (typeof window === "undefined") {
+      return abExperiments[experimentName][0];
+    }
     return deterministicSplit(
       `${anonId}_${experimentName}`,
       abExperiments[experimentName]
@@ -53,14 +57,17 @@ export const useAbTest = <T extends keyof typeof abExperiments>(
    * has happened.
    */
   useEffect(() => {
-    window.Inngest.event({
-      name: "app/experiment.viewed",
-      data: {
-        anonymous_id: anonId,
-        experiment: experimentName,
-        variant,
-      },
-    });
+    // Inngest is undefined on server side during local dev
+    if (window?.Inngest) {
+      window.Inngest.event({
+        name: "app/experiment.viewed",
+        data: {
+          anonymous_id: anonId,
+          experiment: experimentName,
+          variant,
+        },
+      });
+    }
   }, [variant, anonId, experimentName]);
 
   return {

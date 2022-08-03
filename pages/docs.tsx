@@ -368,7 +368,7 @@ const FeaturedDoc = styled.div`
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
 
-  > h3:first-child {
+  > h3:first-of-type {
     margin-top: 0;
   }
 

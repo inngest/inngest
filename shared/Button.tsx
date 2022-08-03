@@ -87,10 +87,10 @@ export const buttonCSS = css`
   }
 
   // Icons
-  svg:first-child {
+  svg:first-of-type {
     margin-right: 0.3em;
   }
-  svg:last-child {
+  svg:last-of-type {
     margin-left: 0.3em;
   }
 `;
