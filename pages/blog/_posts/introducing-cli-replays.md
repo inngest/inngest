@@ -3,7 +3,7 @@ focus: false
 heading: "Introducing CLI Replays"
 subtitle: Battle-test your local code with real production events.
 image: "/assets/blog/introducing-cli-replays/header.jpg"
-date: 2022-07-29
+date: 2022-08-03
 author: Jack Williams
 ---
 
