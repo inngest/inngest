@@ -202,6 +202,17 @@ const PLANS: Plan[] = [
   },
 ];
 
+export async function getStaticProps() {
+  return {
+    props: {
+      meta: {
+        title: "Pricing",
+        description: "Simple pricing. Powerful functionality.",
+      },
+    },
+  };
+}
+
 export default function Pricing() {
   const toggleFAQ = (e) => {
     e.currentTarget.classList.toggle("active");
@@ -209,23 +220,6 @@ export default function Pricing() {
 
   return (
     <>
-      <Head>
-        <title>Inngest → programmable event platform pricing</title>
-        <meta property="og:title" content="Inngest" />
-        <meta property="og:url" content="https://www.inngest.com" />
-        <meta property="og:image" content="/logo.svg" />
-        <meta
-          property="og:description"
-          content="Build event serverless event-driven systems in seconds"
-        />
-        <script src="/inngest-sdk.js"></script>
-        <script
-          defer
-          src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon='{"token": "e2fa9f28c34844e4a0d29351b8730579"}'
-        ></script>
-      </Head>
-
       <Nav />
 
       <Hero>

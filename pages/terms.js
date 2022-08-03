@@ -3,29 +3,20 @@ import Head from "next/head";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 
-export default function Home() {
+export async function getStaticProps() {
+  return {
+    props: {
+      meta: {
+        title: "Terms",
+        description: "Inngest's terms and conditions",
+      },
+    },
+  };
+}
+
+export default function Terms() {
   return (
     <>
-      <Head>
-        <title>
-          Inngest → serverless event-driven & scheduled workflow automation
-          platform for developers & operators
-        </title>
-        <meta property="og:title" content="Inngest" />
-        <meta property="og:url" content="https://www.inngest.com" />
-        <meta property="og:image" content="/logo.svg" />
-        <meta
-          property="og:description"
-          content="Build, run, operate, and analyze your workflows in minutes."
-        />
-        <script src="/inngest-sdk.js"></script>
-        <script
-          defer
-          src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon='{"token": "e2fa9f28c34844e4a0d29351b8730579"}'
-        ></script>
-      </Head>
-
       <Nav />
 
       <Content>

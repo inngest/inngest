@@ -14,6 +14,17 @@ import { useState } from "react";
 const CONTACT_KEY =
   "Z-ymc97Dae8u4HHybHknc4DGRb51u6NnTOUaW-qG71ah1ZqsJfRcI6SaHg5APWutNcnMcaN3oZrZky-VQxBIyw";
 
+export async function getStaticProps() {
+  return {
+    props: {
+      meta: {
+        title: "Contact Us",
+        description: "Build event serverless event-driven systems in seconds",
+      },
+    },
+  };
+}
+
 export default function Contact() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -39,22 +50,6 @@ export default function Contact() {
 
   return (
     <>
-      <Head>
-        <title>Inngest → contact us</title>
-        <meta property="og:title" content="Inngest" />
-        <meta property="og:url" content="https://www.inngest.com" />
-        <meta property="og:image" content="/logo.svg" />
-        <meta
-          property="og:description"
-          content="Build event serverless event-driven systems in seconds"
-        />
-        <script
-          defer
-          src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon='{"token": "e2fa9f28c34844e4a0d29351b8730579"}'
-        ></script>
-      </Head>
-
       <Nav />
 
       <Hero>

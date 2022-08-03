@@ -5,3 +5,5 @@ declare global {
     Inngest: any;
   }
 }
+
+declare module "deterministic-split";

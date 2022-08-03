@@ -23,35 +23,22 @@ export const INGEST_KEY =
 // test key
 // export const INGEST_KEY = 'MnzaTCk7Se8i74hA141bZGS-NY9P39RSzYFbxanIHyV2VDNu1fwrns2xBQCEGdIb9XRPtzbp0zdRPjtnA1APTQ';
 
+export async function getStaticProps() {
+  return {
+    props: {
+      meta: {
+        title: "The Serverless Event-Driven Queue",
+        description:
+          "Inngest makes it simple for you to write delayed or background jobs by triggering functions from events",
+        image: "/assets/img/og-image-default.jpg",
+      },
+    },
+  };
+}
+
 export default function Home() {
   return (
     <Wrapper className="home">
-      <Head>
-        <title>
-          Inngest → build serverless event-driven functions in minutes
-        </title>
-        <meta
-          property="og:title"
-          content="Inngest - build serverless event-driven functions in minutes"
-        />
-        <meta
-          property="og:description"
-          content="Create, deploy, and monitor event-driven serverless functions with confidence."
-        />
-        <meta property="og:url" content="https://www.inngest.com" />
-        <meta property="og:image" content="/logo.svg" />
-        <meta
-          property="og:description"
-          content="Build event serverless event-driven systems in seconds"
-        />
-        <Script src="/inngest-sdk.js" defer async></Script>
-        <Script
-          defer
-          src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon='{"token": "e2fa9f28c34844e4a0d29351b8730579"}'
-        ></Script>
-      </Head>
-
       <Nav sticky={true} />
 
       <Hero>

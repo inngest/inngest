@@ -8,6 +8,11 @@ module.exports = {
         permanent: true,
       },
       {
+        source: "/mailing-list",
+        destination: "http://eepurl.com/hI3dCr",
+        permanent: true,
+      },
+      {
         source: "/docs",
         destination: "/docs/what-is-inngest",
         permanent: false,

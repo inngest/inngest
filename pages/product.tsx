@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import styled from "@emotion/styled";
+import Head from "next/head";
 
 import Nav from "../shared/nav";
 import Footer from "../shared/footer";
@@ -17,6 +18,19 @@ export const INGEST_KEY =
 
 // test key
 // export const INGEST_KEY = 'MnzaTCk7Se8i74hA141bZGS-NY9P39RSzYFbxanIHyV2VDNu1fwrns2xBQCEGdIb9XRPtzbp0zdRPjtnA1APTQ';
+
+export async function getStaticProps() {
+  return {
+    props: {
+      meta: {
+        title: "Product - Features & Functionality",
+        description:
+          "The features and functionality that get out of your way and let you build.",
+        image: "/assets/product/queue-checkmark.png",
+      },
+    },
+  };
+}
 
 export default function Home() {
   return (

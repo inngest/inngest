@@ -7,10 +7,16 @@ export default class MyDocument extends Document {
     return (
       <Html className={"OK"}>
         <Head>
+          <link rel="icon" href="/favicon-may-2022.png" />
           <link
             rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.4.0/styles/github-dark.min.css"
           />
+          <script
+            defer
+            src="https://static.cloudflareinsights.com/beacon.min.js"
+            data-cf-beacon='{"token": "e2fa9f28c34844e4a0d29351b8730579"}'
+          ></script>
         </Head>
         <body className="light-theme XYZ">
           <script
