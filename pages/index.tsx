@@ -1,7 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import styled from "@emotion/styled";
-import Head from "next/head";
-import Script from "next/script";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import IconList from "../shared/IconList";
@@ -15,7 +13,7 @@ import Check from "src/shared/Icons/Check";
 import CLIGradient from "src/shared/Icons/CLIGradient";
 import KeyboardGradient from "src/shared/Icons/KeyboardGradient";
 import TrendingUp from "src/shared/Icons/TrendingUp";
-import { useAbTest } from "src/shared/trackingHooks";
+import { Experiment } from "src/shared/Experiment";
 
 // TODO: move these into env vars
 export const INGEST_KEY =
@@ -37,36 +35,26 @@ export async function getStaticProps() {
   };
 }
 
-const Experiment = ({
-  show,
-  children,
-}: {
-  show: boolean;
-  children: React.ReactNode;
-}) => {
-  if (!show) {
-    return null;
-  }
-  return <>{children}</>;
-};
-
 export default function Home() {
-  const { variant } = useAbTest("2022-08-03-headline");
   return (
     <Wrapper className="home">
       <Nav sticky={true} />
 
       <Hero>
         <h1>
-          {variant === "kill-queues" ? (
-            "Kill Your Queues."
-          ) : (
-            <>
-              You Send Events.
-              <br />
-              We Run Your Code.
-            </>
-          )}
+          <Experiment
+            experiment="2022-08-03-headline"
+            variants={{
+              "kill-queues": "Kill Your Queues",
+              "you-send-events": (
+                <>
+                  You Send Events.
+                  <br />
+                  We Run Your Code.
+                </>
+              ),
+            }}
+          />
         </h1>
         <p className="hero-subheading">
           Inngest makes it simple for you to write delayed or background jobs by
@@ -76,19 +64,24 @@ export default function Home() {
           <em>No infra, no config — just ship.</em>
         </p>
 
-        <img
-          key="kill-queues"
-          style={{ display: variant === "kill-queues" ? "block" : "none" }}
-          className="hero-graphic"
-          src="/assets/homepage/hero-graphic-june-2022.png"
-          alt="How Inngest works diagram"
-        />
-        <img
-          key="you-send-events"
-          style={{ display: variant === "kill-queues" ? "none" : "block" }}
-          className="hero-graphic"
-          src="/assets/homepage/hero-graphic-simplified-aug-2022.png"
-          alt="How Inngest works diagram"
+        <Experiment
+          experiment="2022-08-03-headline"
+          variants={{
+            "kill-queues": (
+              <img
+                className="hero-graphic"
+                src="/assets/homepage/hero-graphic-june-2022.png"
+                alt="How Inngest works diagram"
+              />
+            ),
+            "you-send-events": (
+              <img
+                className="hero-graphic"
+                src="/assets/homepage/hero-graphic-simplified-aug-2022.png"
+                alt="How Inngest works diagram"
+              />
+            ),
+          }}
         />
 
         <IconList

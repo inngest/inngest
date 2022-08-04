@@ -6,7 +6,7 @@ import { v4 as uuid } from "uuid";
 /**
  * AB experiments with keys as experiment names and values as the variants.
  */
-const abExperiments = {
+export const abExperiments = {
   // e.g. "2022-01-01-experiment-name": ["variant-1", "variant-2"]
   "2022-08-03-headline": ["kill-queues", "you-send-events"],
 } as const;
