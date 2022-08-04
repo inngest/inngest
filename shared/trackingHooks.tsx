@@ -26,9 +26,18 @@ export const useAnonId = (): { anonId: string; existing: boolean } => {
   }
   return {
     anonId,
-    existing: false,
+    existing: true,
   };
 };
+
+// If we call useAbTest in multiple places in one page,
+// we should only track it once per experiment.
+const tracked: { [key: string]: boolean } = Object.keys(abExperiments).reduce(
+  (acc, key) => {
+    return { ...acc, [key]: false };
+  },
+  {}
+);
 
 /**
  * Fetch the user's current variant for a particular AB experiment.
@@ -58,7 +67,7 @@ export const useAbTest = <T extends keyof typeof abExperiments>(
    */
   useEffect(() => {
     // Inngest is undefined on server side during local dev
-    if (window?.Inngest) {
+    if (window?.Inngest && !tracked[experimentName]) {
       window.Inngest.event({
         name: "app/experiment.viewed",
         data: {
@@ -67,6 +76,7 @@ export const useAbTest = <T extends keyof typeof abExperiments>(
           variant,
         },
       });
+      tracked[experimentName] = true;
     }
   }, [variant, anonId, experimentName]);
 

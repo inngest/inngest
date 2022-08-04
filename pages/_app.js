@@ -2,7 +2,6 @@ import React, { useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import Script from "next/script";
-import { v4 as uuid } from "uuid";
 import { trackPageView } from "../utils/tracking";
 import { useAnonId } from "../shared/trackingHooks";
 import "../styles/globals.css";
@@ -11,6 +10,8 @@ import PageBanner from "../shared/PageBanner";
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
+  const { anonId, existing } = useAnonId();
+
   useEffect(() => {
     if (pageProps.htmlClassName) {
       document.getElementsByTagName("html")[0].className =
@@ -27,8 +28,6 @@ function MyApp({ Component, pageProps }) {
       router.events.off("routeChangeComplete", handleRouteChange);
     };
   }, [router.events]);
-
-  const { anonId, existing } = useAnonId();
 
   return (
     <>
@@ -68,11 +67,12 @@ function MyApp({ Component, pageProps }) {
       </PageBanner>
       <Component {...pageProps} />
       <Script
-        id="js-inngest-sdk"
+        id="js-inngest-sdk-script"
         strategy="afterInteractive"
         src="/inngest-sdk.js"
         onLoad={() => {
           Inngest.init(process.env.NEXT_PUBLIC_INNGEST_KEY);
+          Inngest.identify({ anonymous_id: anonId });
           // The hook should tell us if the anon id is an existing one, or it's just been set
           const firstTouch = !existing;
           let ref = null;
@@ -80,7 +80,6 @@ function MyApp({ Component, pageProps }) {
             const urlParams = new URLSearchParams(window.location.search);
             ref = urlParams.get("ref");
           } catch (e) {}
-          Inngest.identify({ anonymous_id: anonId });
           // See tracking for next/link based transitions in tracking.ts
           Inngest.event({
             name: "website/page.viewed",
@@ -89,6 +88,14 @@ function MyApp({ Component, pageProps }) {
               ref: ref,
             },
           });
+          if (typeof window !== "undefined" && window._inngestQueue.length) {
+            window._inngestQueue.forEach((p) => {
+              // Prevent the double tracking of page views b/c routeChangeComplete
+              // is unpredictable.
+              if (p.name === "website/page.viewed") return;
+              Inngest.event(p);
+            });
+          }
         }}
       />
       <script

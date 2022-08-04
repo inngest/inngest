@@ -17,6 +17,19 @@ export default class MyDocument extends Document {
             src="https://static.cloudflareinsights.com/beacon.min.js"
             data-cf-beacon='{"token": "e2fa9f28c34844e4a0d29351b8730579"}'
           ></script>
+          <script
+            // We use a simple array queue to send any events after the SDK is loaded
+            // These are sent onLoad where the script is loaded in _app.js
+            type="text/javascript"
+            dangerouslySetInnerHTML={{
+              __html: `
+                window._inngestQueue = [];
+                if (typeof window.Inngest === "undefined") {
+                  window.Inngest = { event: function(p){ window._inngestQueue.push(p); } };
+                }
+              `,
+            }}
+          />
         </Head>
         <body className="light-theme XYZ">
           <script
