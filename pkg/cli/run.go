@@ -132,7 +132,12 @@ func (r *RunUI) run(ctx context.Context) {
 		return
 	}
 
-	c, _ := config.Default(ctx)
+	c, err := config.Dev(ctx)
+	if err != nil {
+		r.err = err
+		return
+	}
+
 	// Create a singleton queue for initializing the fn.
 	q, err := c.Queue.Service.Concrete.Producer()
 	if err != nil {
@@ -242,7 +247,6 @@ func (r *RunUI) run(ctx context.Context) {
 					}
 
 					*execution.done = true
-
 					return
 				}
 				<-time.After(time.Millisecond * 5)

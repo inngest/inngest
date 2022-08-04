@@ -14,6 +14,8 @@ func init() {
 // services via config.cue
 type Config struct {
 	Host *string
+
+	Network string
 }
 
 func (c Config) NewDriver() (driver.Driver, error) {
@@ -38,6 +40,7 @@ func (c Config) NewDriver() (driver.Driver, error) {
 
 	return &dockerExec{
 		client: client,
+		config: &c,
 	}, nil
 }
 
