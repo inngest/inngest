@@ -1,3 +1,4 @@
+import React, { useEffect } from "react";
 import { abExperiments, useAbTest } from "./trackingHooks";
 
 interface ExperimentProps<T extends keyof typeof abExperiments> {
@@ -26,7 +27,33 @@ export const Experiment = <T extends keyof typeof abExperiments>(
   const { variant } = useAbTest(props.experiment);
 
   const isSsr = typeof window === "undefined";
-  if (isSsr) return null;
+  if (isSsr) return <>{props.variants[variant]}</>;
 
   return <>{props.variants[variant]}</>;
+};
+
+/**
+ * FadeIn a nested component quickly after loading the page
+ * to prevent a flash of an experiment variation that the user
+ * isn't meant to see. This should wrap the parent components
+ * where <Experiment> is used.
+ */
+export const FadeIn = ({ children }) => {
+  const [isVisible, setVisible] = React.useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setVisible(true);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div
+      style={{
+        transition: "opacity 100ms ease-in",
+        opacity: isVisible ? 1 : 0,
+      }}
+    >
+      {children}
+    </div>
+  );
 };

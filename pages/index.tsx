@@ -13,7 +13,7 @@ import Check from "src/shared/Icons/Check";
 import CLIGradient from "src/shared/Icons/CLIGradient";
 import KeyboardGradient from "src/shared/Icons/KeyboardGradient";
 import TrendingUp from "src/shared/Icons/TrendingUp";
-import { Experiment } from "src/shared/Experiment";
+import { Experiment, FadeIn } from "src/shared/Experiment";
 
 // TODO: move these into env vars
 export const INGEST_KEY =
@@ -41,73 +41,75 @@ export default function Home() {
       <Nav sticky={true} />
 
       <Hero>
-        <h1>
+        <FadeIn>
+          <h1>
+            <Experiment
+              experiment="2022-08-03-headline"
+              variants={{
+                "kill-queues": "Kill Your Queues",
+                "you-send-events": (
+                  <>
+                    You Send Events.
+                    <br />
+                    We Run Your Code.
+                  </>
+                ),
+              }}
+            />
+          </h1>
+          <p className="hero-subheading">
+            Inngest makes it simple for you to write delayed or background jobs
+            by triggering functions from events
+          </p>
+          <p className="hero-subheading">
+            <em>No infra, no config — just ship.</em>
+          </p>
+
           <Experiment
             experiment="2022-08-03-headline"
             variants={{
-              "kill-queues": "Kill Your Queues",
+              "kill-queues": (
+                <img
+                  className="hero-graphic"
+                  src="/assets/homepage/hero-graphic-june-2022.png"
+                  alt="How Inngest works diagram"
+                />
+              ),
               "you-send-events": (
-                <>
-                  You Send Events.
-                  <br />
-                  We Run Your Code.
-                </>
+                <img
+                  className="hero-graphic"
+                  src="/assets/homepage/hero-graphic-simplified-aug-2022.png"
+                  alt="How Inngest works diagram"
+                />
               ),
             }}
           />
-        </h1>
-        <p className="hero-subheading">
-          Inngest makes it simple for you to write delayed or background jobs by
-          triggering functions from events
-        </p>
-        <p className="hero-subheading">
-          <em>No infra, no config — just ship.</em>
-        </p>
 
-        <Experiment
-          experiment="2022-08-03-headline"
-          variants={{
-            "kill-queues": (
-              <img
-                className="hero-graphic"
-                src="/assets/homepage/hero-graphic-june-2022.png"
-                alt="How Inngest works diagram"
-              />
-            ),
-            "you-send-events": (
-              <img
-                className="hero-graphic"
-                src="/assets/homepage/hero-graphic-simplified-aug-2022.png"
-                alt="How Inngest works diagram"
-              />
-            ),
-          }}
-        />
+          <IconList
+            direction="vertical"
+            items={[
+              "Simple publishing with HTTP + JSON",
+              "No SDKs needed",
+              "Developer tooling for the entire workflow",
+              "No boilerplate polling code",
+              "Any programming language",
+              "Step function support with DAGs",
+            ].map((text) => ({
+              icon: Check,
+              text,
+            }))}
+          />
 
-        <IconList
-          direction="vertical"
-          items={[
-            "Simple publishing with HTTP + JSON",
-            "No SDKs needed",
-            "Developer tooling for the entire workflow",
-            "No boilerplate polling code",
-            "Any programming language",
-            "Step function support with DAGs",
-          ].map((text) => ({
-            icon: Check,
-            text,
-          }))}
-        />
-
-        <div className="hero-ctas">
-          <Button
-            size="medium"
-            kind="primary"
-            href="/sign-up?ref=homepage-hero"
-          >
-            Jump Right In
-          </Button>
-        </div>
+          <div className="hero-ctas">
+            <Button
+              size="medium"
+              kind="primary"
+              href="/sign-up?ref=homepage-hero"
+            >
+              Jump Right In
+            </Button>
+          </div>
+        </FadeIn>
       </Hero>
 
       <Section>
