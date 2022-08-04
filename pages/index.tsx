@@ -67,6 +67,7 @@ export default function Home() {
 
           <Experiment
             experiment="2022-08-03-headline"
+            isImage={true}
             variants={{
               "kill-queues": (
                 <img

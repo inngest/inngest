@@ -12,6 +12,11 @@ interface ExperimentProps<T extends keyof typeof abExperiments> {
    * must be accounted for.
    */
   variants: Record<typeof abExperiments[T][number], React.ReactNode>;
+
+  /**
+   * Images should not be rendered on the server as React won't update the attributes correctly
+   */
+  isImage?: boolean;
 }
 
 /**
@@ -27,7 +32,7 @@ export const Experiment = <T extends keyof typeof abExperiments>(
   const { variant } = useAbTest(props.experiment);
 
   const isSsr = typeof window === "undefined";
-  if (isSsr) return <>{props.variants[variant]}</>;
+  if (isSsr && props.isImage) return null;
 
   return <>{props.variants[variant]}</>;
 };
