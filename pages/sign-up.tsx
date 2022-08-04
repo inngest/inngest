@@ -20,8 +20,6 @@ const SignUp = () => {
   const [error, setError] = useState<string>(null);
   const { anonId } = useAnonId();
 
-  const anonID = globalThis?.localStorage?.getItem("inngest-anon-id") || "";
-
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -34,7 +32,7 @@ const SignUp = () => {
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ email, password, anon_id: anonID }),
+        body: JSON.stringify({ email, password, anon_id: anonId }),
       });
     } catch (e) {
       setError("There was an error signing you up.  Please try again.");
@@ -75,7 +73,10 @@ const SignUp = () => {
       <Content className="grid section-header">
         <div className="col-2" />
         <div className="signup col-4">
-          <Button href={apiURL(`/v1/login/oauth/github/redirect?anonid=${anonID}`)} kind="black">
+          <Button
+            href={apiURL(`/v1/login/oauth/github/redirect?anonid=${anonId}`)}
+            kind="black"
+          >
             <img
               src="https://app.inngest.com/assets/gh-mark.png"
               alt="GitHub"
@@ -86,7 +87,10 @@ const SignUp = () => {
             </span>
           </Button>
 
-          <Button href={apiURL(`/v1/login/oauth/google/redirect?anonid=${anonID}`)} kind="black">
+          <Button
+            href={apiURL(`/v1/login/oauth/google/redirect?anonid=${anonId}`)}
+            kind="black"
+          >
             <img
               src="https://app.inngest.com/assets/icons/google.svg"
               alt="Google"

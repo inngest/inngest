@@ -1,6 +1,7 @@
 import deterministicSplit from "deterministic-split";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "react-use";
+import { v4 as uuid } from "uuid";
 
 /**
  * AB experiments with keys as experiment names and values as the variants.
@@ -13,11 +14,19 @@ const abExperiments = {
 /**
  * Fetch and return the user's anonymous ID.
  */
-export const useAnonId = () => {
-  const [anonId] = useLocalStorage<string>("inngest-anon-id");
-
+export const useAnonId = (): { anonId: string; existing: boolean } => {
+  const [anonId, setAnonId] = useLocalStorage<string>("inngest-anon-id");
+  if (!anonId) {
+    const id = uuid();
+    setAnonId(id);
+    return {
+      anonId: id,
+      existing: false,
+    };
+  }
   return {
     anonId,
+    existing: false,
   };
 };
 

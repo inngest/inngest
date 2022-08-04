@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import Script from "next/script";
 import { v4 as uuid } from "uuid";
 import { trackPageView } from "../utils/tracking";
+import { useAnonId } from "../shared/trackingHooks";
 import "../styles/globals.css";
 
 import PageBanner from "../shared/PageBanner";
@@ -26,6 +27,8 @@ function MyApp({ Component, pageProps }) {
       router.events.off("routeChangeComplete", handleRouteChange);
     };
   }, [router.events]);
+
+  const { anonId, existing } = useAnonId();
 
   return (
     <>
@@ -70,31 +73,14 @@ function MyApp({ Component, pageProps }) {
         src="/inngest-sdk.js"
         onLoad={() => {
           Inngest.init(process.env.NEXT_PUBLIC_INNGEST_KEY);
-          let firstTouch = false;
-          const setCookie = (id) => {
-            // Set to inngest.com for testing
-            const domain =
-              process.env.NODE_ENV === "production" ? "inngest.com" : "";
-            document.cookie = `inngest-anon-id=${id};max-age=31536000;path=/;domain=${domain};SameSite=Strict;Secure`;
-          };
-          const anonId = () => {
-            let id = window.localStorage.getItem("inngest-anon-id");
-            firstTouch = !id;
-            if (!id) {
-              id = uuid();
-              // Store in LS for session
-              window.localStorage.setItem("inngest-anon-id", id);
-            }
-            // Store in cookie for oauth
-            setCookie(id);
-            return id;
-          };
+          // The hook should tell us if the anon id is an existing one, or it's just been set
+          const firstTouch = !existing;
           let ref = null;
           try {
             const urlParams = new URLSearchParams(window.location.search);
             ref = urlParams.get("ref");
           } catch (e) {}
-          Inngest.identify({ anonymous_id: anonId() });
+          Inngest.identify({ anonymous_id: anonId });
           // See tracking for next/link based transitions in tracking.ts
           Inngest.event({
             name: "website/page.viewed",
