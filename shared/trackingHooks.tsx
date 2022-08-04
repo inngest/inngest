@@ -69,7 +69,7 @@ export const useAbTest = <T extends keyof typeof abExperiments>(
     // Inngest is undefined on server side during local dev
     if (window?.Inngest && !tracked[experimentName]) {
       window.Inngest.event({
-        name: "app/experiment.viewed",
+        name: "website/experiment.viewed",
         data: {
           anonymous_id: anonId,
           experiment: experimentName,
