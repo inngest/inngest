@@ -273,7 +273,7 @@ export default function Home() {
 
           <div className="cta-container">
             <Button href="/product?ref=home-next-level" kind="outlinePrimary">
-              Take it to the next level <TrendingUp size="1em" />
+              <span>Take it to the next level</span> <TrendingUp size="1em" />
             </Button>
           </div>
         </NextLevelSection>

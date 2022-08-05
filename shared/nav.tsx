@@ -5,6 +5,7 @@ import Button from "../shared/Button";
 import Hamburger from "../shared/Icons/Hamburger";
 import Discord from "../shared/Icons/Discord";
 import Github from "../shared/Icons/Github";
+import MediaPlay from "../shared/Icons/MediaPlay";
 
 type Props = {
   nolinks?: boolean;
@@ -56,6 +57,20 @@ const NavContent: React.FC<Props> = (props: Props) => {
           <StyledLink key="github" href="https://github.com/inngest/inngest">
             <Github />
           </StyledLink>
+          <Button
+            href="/demo?ref=nav"
+            className="button"
+            kind="primary"
+            style={{
+              padding: "0.3rem 0.8rem",
+              border: "0",
+              background:
+                "#523895 linear-gradient(307deg, #4136ba 0%, #8b3c68 100%);",
+            }}
+          >
+            <MediaPlay />
+            Watch Demo
+          </Button>
         </div>
       )}
 

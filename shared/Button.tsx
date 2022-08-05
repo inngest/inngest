@@ -87,10 +87,11 @@ export const buttonCSS = css`
   }
 
   // Icons
-  svg:first-of-type {
+  svg:nth-child(1) {
     margin-right: 0.3em;
   }
-  svg:last-of-type {
+  svg:nth-child(2) {
+    // use a span tag for the text when the icon is on the right
     margin-left: 0.3em;
   }
 `;
