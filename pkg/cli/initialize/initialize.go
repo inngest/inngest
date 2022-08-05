@@ -103,9 +103,14 @@ func NewInitModel(o InitOpts) (*initModel, error) {
 	}
 	if o.URL != "" {
 		f.runtimeType = runtimeHTTP
+		// This is already done.
+		f.state = stateDone
 	}
 	if o.Language != "" {
 		f.runtimeType = runtimeDocker
+		// We can't be done here as we need the scaffolds to update.
+		// This is handled during Update();  once scaffolds have loaded
+		// we'll call quit and move the state to done.
 	}
 
 	listHeight := height - f.eventBrowserOffset()
