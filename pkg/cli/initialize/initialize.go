@@ -103,8 +103,6 @@ func NewInitModel(o InitOpts) (*initModel, error) {
 	}
 	if o.URL != "" {
 		f.runtimeType = runtimeHTTP
-		// This is already done.
-		f.state = stateDone
 	}
 	if o.Language != "" {
 		f.runtimeType = runtimeDocker
@@ -395,12 +393,11 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// If we already have a language selected, ensure that we select
 		// this specific scaffold.
+		//
 		// If we've attempted to update the scaffolds but have zero languages available,
 		// quit early.
 		if f.language != "" && len(f.scaffolds.Languages[f.language]) == 1 {
 			f.scaffold = &f.scaffolds.Languages[f.language][0]
-			f.state = stateDone
-			return f, tea.Quit
 		}
 
 	case []client.Event:
@@ -430,10 +427,13 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Ensure we update the current question.
 	if f.question != nil {
 		_, cmd = f.question.Update(f, msg)
-		if f.question.Answered(f) {
-			f.transitions++
-			f.question = f.question.Next(f)
-		}
+		cmds = append(cmds, cmd)
+	}
+
+	// We may be skipping more than one question (eg. if the language is specified,
+	// we'll skip the trigger question and language).  Skip all if possible.
+	for f.question != nil && f.question.Answered(f) {
+		f.question = f.question.Next(f)
 	}
 
 	// This is a separate if, as we want to capture the next question from
@@ -441,7 +441,8 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	//
 	// We only quit if scaffolds have updated, which ensures that we've
 	// selected the correct scaffold for our language.
-	if f.question == nil && f.scaffold != nil {
+	_, fErr := f.Function(context.Background())
+	if f.question == nil && f.scaffoldDone == true && fErr == nil {
 		f.state = stateDone
 		return f, tea.Quit
 	}
