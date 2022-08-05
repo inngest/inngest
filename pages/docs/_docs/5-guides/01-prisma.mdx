@@ -1,0 +1,233 @@
+---
+category: "Guides"
+title: "Running Prisma background jobs"
+slug: "guides/prisma-background-jobs"
+order: 1
+---
+
+This guide will walk through creating background jobs using the [Prisma ORM](https://www.prisma.io/) and TypeScript.  It’s *really* common that background jobs require external state, and to do that you’ll often need to access your database.
+
+By the end of this guide, you’ll have a fully working serverless Prisma background job using Typescript, which is locally tested and ready to deploy.  You'll also be able to turn this into a scheduled job within minutes.
+
+## Guide contents
+
+- A short primer to background jobs
+- Creating a new background job
+- Writing the Prisma background job code
+    - Referencing the database connection URL
+- Testing locally
+- Sending events from your app
+- Deploying to test and production
+
+## A short primer to background jobs
+
+Background jobs, as you might expect, run code in the background.  If you’re building an Express API, you’ll need background jobs so that:
+
+- Your API can return as fast as possible
+- You can handle long-running tasks separately via your API
+- You can handle intermittent failures nicely (background jobs automatically retry)
+
+You’ll also need background jobs and a queue for handling incoming webhooks, as webhooks often need a success response within seconds before the incoming request is retried.  Read our [guide on webhooks at scale](https://www.inngest.com/blog/open-source-event-driven-queue?ref=page-banner) for more info on... managing webhooks at scale!
+
+So, how do you build these background jobs?  Typically, you’d have to build and maintain a *queue*, then deploy stateful services or lambdas which are triggered by this queue.  This is hard to test, complex to build, and hard to run locally.
+
+Using Inngest, you can get all of this with zero code, so that you can focus only on your actual logic.  It’s much easier, as it lets you:
+
+- Create and test background jobs locally
+- Trigger background jobs via a single HTTP request, no infrastructure required
+- Log, test, monitor, and version your jobs easily
+
+Let’s get started.
+
+## Creating a new background job
+
+Firstly, we need to create a new function which runs our code.  In order to do this, run:
+
+```go
+inngest init --name "Prisma background job" --language typescript
+```
+
+We’re pre-filling our function name here, and we’re specifying that we’re writing Typescript when we build the function.  The only questions you’ll need to answer are:
+
+- **“How should the function run?”**: Whether this job should run on a schedule, or it should be run *on demand* by an event:
+    - Choose “**event based**”, meaning that this background function will be ran every time your account receives a specific event
+- **“Event trigger”**: The event name that should trigger this job.
+    - For this guide, choose `**stripe/charge.succeeded**`.  This is a pre-defined event that’s generated any time a Stripe customer is charged, and already has an event schema. Because you can test Inngest functions locally, you don’t need to link a Stripe account for this guide.
+
+### Generated files
+
+When you create a function via `inngest init` we create:
+
+- An `inngest.json` file, which defines the function configuration
+- A `steps` directory, which contains code for each step of the function
+- An `events` directory, which contains schemas for any event triggers.
+
+Functions are always *step functions*, even if you only want to run a single step.  This lets you grow into building complex multi-language workflows in the future.  For more information on building step functions read the step function documentation.
+
+That’s it — your function will have been generated in the `./prisma-background-job` directory! Let’s dive into writing the code that connects to your database.
+
+## Writing the Prisma background job code
+
+Let’s write our business logic within the first (and only) step of our function.  There are multiple steps we’ll run through:
+
+1. Generating the Prisma schema
+2. Writing the payment to our database
+
+You can explore the complete example on GitHub here.
+
+**Generating the Prisma schema**
+
+Each step directory is it’s own isolated package.  We’ll first need to install Prisma within step 1:
+
+```bash
+cd ./steps/step-1
+npm install prisma --save-dev
+npm install @prisma/client
+```
+
+**Ensuring the schema always builds with the function**
+
+There’s one last thing we want to do:  before building and bundling our function’s code to run, ensure that we always generate the Prisma schema.  This is required because Prisma uses native linked objects to connect to your database.  Let’s modify `package.json` to add a `prebuild` step to `package.json`:
+
+```tsx
+{
+  "scripts": {
+    // Add "prebuild" to scripts.
+    "prebuild": "prisma generate --schema=./schema.prisma",
+    // ...
+  },
+  // ...
+}
+```
+
+We’ll also need to create the schema we’ll use to connect to the database. Here’s the schema we’re using for this guide:
+
+```go
+// This schema is defined within our step:
+//
+// ./steps/step-1/schema.prisma
+
+datasource db {
+  provider = "postgres"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  // We want the output to be included within ./src/generated, as
+  // this is bundled into the final sent image.
+  //
+  // This is different to installing the generated client in node_modules.
+  output          = "./src/generated/client"
+  binaryTargets   = ["native"]
+  previewFeatures = ["interactiveTransactions"]
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  email     String   @unique
+  name      String
+  age       Int
+  country   String
+  charges  Charge[]
+}
+
+model Charge {
+  id         Int      @id @default(autoincrement())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     Int      @unique
+  externalId String   @unique
+  amount     Int
+  createdAt  DateTime @default(now())
+}
+```
+
+We can run prisma to generate our schema within our step:
+
+```bash
+npx prisma generate --schema=./schema.prisma
+```
+
+This generates a package we can import within `src/index.ts` . Let’s update the step’s code to use this package, find the user that made the payment, then save the payment to the database:
+
+```typescript
+import type { Args } from "./types";
+import { PrismaClient } from './generated/client'
+
+const prisma = new PrismaClient();
+
+export async function run({ event }: Args) {
+  // The email field is either `event.user.email` or the receipt email.
+  //
+  // Note that Inngest creates Typescript types for each event you receive.
+  const email = event.user.email || event.data.data.object.receipt_email;
+
+  // Find the user.
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (user === null) {
+    // Return an error which indicates that this user was not found.  This marks
+    // the function as errored and allows you to handle these edge cases.
+    return { status: 404, error: "This email was not found", email };
+  }
+
+  const charge = await prisma.charge.create({
+    data: {
+      userId: user.id,
+      externalId: event.data.data.object.id,
+      amount: event.data.data.object.amount,
+      createdAt: new Date(event.data.created),
+    },
+  });
+
+  // Return both the user and charge.  These will be accessible by
+  // future steps, if you add steps to this function.
+  return {
+    status: 200,
+    body: {
+      user,
+      charge,
+    }
+  };
+}
+```
+
+This function uses the email from the Stripe webhook to load our user, then saves charge information to the database.  Done!
+
+## Testing the background job locally
+
+You can test Inngest’s functions locally, ensuring your function works as expected.
+
+Prisma uses the `DATABASE_URL` environment variable to connect to your database, so we’re also going to need to this in when testing.  To test and run your function, type:
+
+```bash
+DATABASE_URL=postgres://postgres:password@127.0.0.1 **inngest run**
+```
+
+This will generate fake data based off of the event schema, then pass this data through to your function.  You should see your function running!
+
+## Deploying
+
+**Deploying the function**
+
+With your function working locally, the last step is to deploy it to the test environment and production.  Within Inngest, it’s possible to do this in a single command:
+
+```bash
+inngest deploy          # deploys to test, by default
+inngest deploy --prod   # deploys to production
+```
+
+This will package up your function, ship it to inngest, and automatically link the function to the `stripe/charge.succeeded` event so that the function is automatically called every time this event is received — all without managing any infra.
+
+**Adding secrets**
+
+You’re going to need to add the DATABASE_URL secret to your Inngest account by browsing to [https://app.inngest.com/secrets](https://app.inngest.com/secrets) and adding a new secret.
+
+**Connecting to Stripe**
+
+To receive these events in your account, you can connect your stripe account via Oauth by creating a new “source” ([https://app.inngest.com/sources/new#Stripe](https://app.inngest.com/sources/new#Stripe)).  This will link your Stripe account so that Inngest automatically receives events as they happen.
+
+Alternatively, you can send your own events from [your own apps](https://www.inngest.com/docs/sending-data-via-inngest-sdks) or [any webhook](https://www.inngest.com/docs/event-webhooks) and run any function automatically.
