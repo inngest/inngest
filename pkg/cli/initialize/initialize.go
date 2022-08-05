@@ -442,7 +442,7 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// We only quit if scaffolds have updated, which ensures that we've
 	// selected the correct scaffold for our language.
 	_, fErr := f.Function(context.Background())
-	if f.question == nil && f.scaffoldDone == true && fErr == nil {
+	if f.question == nil && f.scaffoldDone && fErr == nil {
 		f.state = stateDone
 		return f, tea.Quit
 	}
