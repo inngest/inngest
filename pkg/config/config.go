@@ -8,6 +8,24 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 )
 
+const devConfig = `package main
+
+import (
+	config "inngest.com/defs/config"
+)
+
+config.#Config & {
+	execution: {
+		drivers: {
+			http:   config.#HTTPDriver
+			docker: config.#DockerDriver & {
+				network: "host"
+			}
+		}
+	}
+}
+`
+
 // Load loads the configu from the given locations in order.  If locs is empty,
 // we use the default locations of "./inngest.(cue|json)" and "/etc/inngest.(cue|json)".
 func Load(ctx context.Context, locs ...string) (*Config, error) {
@@ -16,6 +34,10 @@ func Load(ctx context.Context, locs ...string) (*Config, error) {
 
 func Default(ctx context.Context) (*Config, error) {
 	return Parse(nil)
+}
+
+func Dev(ctx context.Context) (*Config, error) {
+	return Parse([]byte(devConfig))
 }
 
 // Config represents configuration for running the Inngest services.

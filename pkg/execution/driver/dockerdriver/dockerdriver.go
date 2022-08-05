@@ -39,6 +39,7 @@ func New() (driver.Driver, error) {
 
 type dockerExec struct {
 	client *docker.Client
+	config *Config
 }
 
 type handle struct {
@@ -153,6 +154,10 @@ func (d *dockerExec) startOpts(ctx context.Context, state state.State, wa innges
 	name := fmt.Sprintf("%s-%s-%s", state.RunID(), slug.Make(wa.Name), hex.EncodeToString(byt))
 	return docker.CreateContainerOptions{
 		Name: name,
+		HostConfig: &docker.HostConfig{
+			// This driver uses net mode host.
+			NetworkMode: d.config.Network,
+		},
 		Config: &docker.Config{
 			Image: wa.DSN,
 			Cmd:   []string{string(marshalled)},

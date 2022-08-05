@@ -193,6 +193,13 @@ package config
 #DockerDriver: {
 	name:  "docker"
 	host?: string
+
+	// network represents the network name to bind to.  Within `inngest run`
+	// and `inngest dev` this is automatically set to "host", ensuring containers
+	// run with access to localhost.
+	//
+	// This is not set by default when self-hosting via `inngest serve`.
+	network?: string | "host"
 }
 
 // MockDriver is used in testing to mock and stub function executions.  You

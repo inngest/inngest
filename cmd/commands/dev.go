@@ -27,7 +27,7 @@ func NewCmdDev() *cobra.Command {
 
 func doDev(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
-	conf, err := config.Default(ctx)
+	conf, err := config.Dev(ctx)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
