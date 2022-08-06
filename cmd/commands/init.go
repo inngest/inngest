@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/inngest/clistate"
 	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/cli"
+	"github.com/inngest/inngest/pkg/cli/initialize"
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/scaffold"
 	"github.com/spf13/cobra"
@@ -23,7 +24,11 @@ func NewCmdInit() *cobra.Command {
 		Run:     runInit,
 	}
 
-	cmd.Flags().String("trigger", "", "An optional event name which triggers the function")
+	cmd.Flags().String("event", "", "An optional event name which triggers the function")
+	cmd.Flags().String("cron", "", "An optional cron schedule to use as the function trigger")
+	cmd.Flags().StringP("name", "n", "", "The function name")
+	cmd.Flags().String("language", "", "The language to use within your project")
+	cmd.Flags().String("url", "", "The URL to hit, if this function calls an external API")
 
 	return cmd
 }
@@ -45,9 +50,13 @@ func runInit(cmd *cobra.Command, args []string) {
 
 	// Create a new TUI which walks through questions for creating a function.  Once
 	// the walkthrough is complete, this blocks and returns.
-	state, err := cli.NewInitModel(cli.InitOpts{
+	state, err := initialize.NewInitModel(initialize.InitOpts{
 		ShowWelcome: showWelcome,
-		Event:       cmd.Flag("trigger").Value.String(),
+		Event:       cmd.Flag("event").Value.String(),
+		Cron:        cmd.Flag("cron").Value.String(),
+		Name:        cmd.Flag("name").Value.String(),
+		Language:    cmd.Flag("language").Value.String(),
+		URL:         cmd.Flag("url").Value.String(),
 	})
 	if err != nil {
 		fmt.Println(cli.RenderError(fmt.Sprintf("Error starting init command: %s", err)) + "\n")
