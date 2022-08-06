@@ -2,8 +2,10 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
+	"sort"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/alecthomas/chroma/quick"
 	"github.com/charmbracelet/bubbles/key"
@@ -19,7 +21,83 @@ var (
 	newEventDescription = "A new event you're typing *right now*"
 )
 
-func NewEventBrowser(width, height int, evts []client.Event, showNewEvent bool) (*EventBrowser, error) {
+type EventList struct {
+	l   sync.Mutex
+	all map[string]Event
+
+	sorted []Event
+}
+
+// Set replaces the stored event entirely
+func (e *EventList) Set(evt Event) {
+	e.l.Lock()
+	defer e.l.Unlock()
+	if e.all == nil {
+		e.all = map[string]Event{}
+	}
+	e.all[evt.Event.Name] = evt
+	// Horribly inefficient, but re-sort.
+	e.Sort()
+}
+
+// Add adds an event to the list for the given workspace, upserting and merging
+// the available workspace to the existing event list.
+func (e *EventList) Add(evt client.Event, workspace *client.Workspace) {
+	e.l.Lock()
+	defer e.l.Unlock()
+
+	if e.all == nil {
+		e.all = map[string]Event{}
+	}
+	if _, ok := e.all[evt.Name]; !ok {
+		e.all[evt.Name] = Event{
+			Event: evt,
+		}
+	}
+
+	found := e.all[evt.Name]
+	if workspace == nil {
+		found.Public = true
+	} else {
+		found.Workspaces = append(found.Workspaces, *workspace)
+	}
+	e.all[evt.Name] = found
+}
+
+func (e *EventList) Sort() {
+	e.sorted = make([]Event, len(e.all))
+	n := 0
+	for _, evt := range e.all {
+		e.sorted[n] = evt
+		n++
+	}
+	sort.Slice(e.sorted, func(i, j int) bool {
+		return e.sorted[i].Event.Name < e.sorted[j].Event.Name
+	})
+}
+
+func (e *EventList) List() []Event {
+	return e.sorted
+}
+
+// All returns all events.  This is not thread safe when adding events
+// to the list and should be used when all events are loaded.
+func (e *EventList) All() map[string]Event {
+	return e.all
+}
+
+// Event lists the actual event and all workspaces that include this event.
+type Event struct {
+	// TODO: how do we want to handle multiple versions within the event browser?  plus
+	// version discrepancies across workspaces.
+
+	// event stores the client event.
+	client.Event
+	Public     bool
+	Workspaces []client.Workspace
+}
+
+func NewEventBrowser(width, height int, evts *EventList, showNewEvent bool) (*EventBrowser, error) {
 	delegate := list.NewDefaultDelegate()
 	delegate.SetSpacing(1)
 	l := list.New([]list.Item{}, delegate, listWidth, height)
@@ -30,6 +108,10 @@ func NewEventBrowser(width, height int, evts []client.Event, showNewEvent bool) 
 
 	v := viewport.New(width, height)
 	v.KeyMap = viewportKeyMap()
+
+	if evts == nil {
+		evts = &EventList{}
+	}
 
 	return &EventBrowser{
 		width:        width,
@@ -51,7 +133,7 @@ type EventBrowser struct {
 	// Whether to show a "new event" if the prefix doesn't match.
 	showNewEvent bool
 
-	schemas []client.Event
+	schemas *EventList
 	prefix  string
 
 	// Renders the list on the left.
@@ -102,7 +184,7 @@ func (e *EventBrowser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // Selected returns the selected event via the list, or nil if no event is selected.
-func (e EventBrowser) Selected() *client.Event {
+func (e EventBrowser) Selected() *Event {
 	if e.list.SelectedItem() == nil {
 		return nil
 	}
@@ -115,32 +197,34 @@ func (e *EventBrowser) UpdatePrefix(s string) {
 	e.prefix = s
 }
 
-func (e *EventBrowser) SetEvents(evts []client.Event) {
+func (e *EventBrowser) SetEvents(evts *EventList) {
+	if evts == nil {
+		evts = &EventList{}
+	}
 	e.schemas = evts
 }
 
 // View renders the list.
 func (e *EventBrowser) View() string {
-
 	// Filter the events by prefix.
 	filtered := e.schemas
 	if e.prefix != "" {
-		filtered = []client.Event{}
-		for _, evt := range e.schemas {
-			if strings.HasPrefix(strings.ToLower(evt.Name), strings.ToLower(e.prefix)) {
-				filtered = append(filtered, evt)
+		filtered = &EventList{}
+		for _, evt := range e.schemas.sorted {
+			if strings.HasPrefix(strings.ToLower(evt.Event.Name), strings.ToLower(e.prefix)) {
+				filtered.Set(evt)
 			}
 		}
 	}
 
 	// Render the event viewer.
-	var selectedEvent *client.Event
+	var selectedEvent *Event
 	if e.list.SelectedItem() != nil {
 		s := e.list.SelectedItem().(eventListItem)
 		selectedEvent = &s.e
 	}
 
-	if len(filtered) == 1 && filtered[0].Name == e.prefix {
+	if filtered != nil && len(filtered.sorted) == 1 && filtered.sorted[0].Event.Name == e.prefix {
 		// Ensure the item is selected if we have one match.
 		e.list.Select(0)
 	}
@@ -151,7 +235,7 @@ func (e *EventBrowser) View() string {
 	//
 	// We use len(filtered) here instead of selectedEvent so that we can show newly
 	// filtered events when text is deleted via backspace.
-	if e.prefix != "" && len(filtered) == 0 && !e.showNewEvent {
+	if e.prefix != "" && len(filtered.sorted) == 0 && !e.showNewEvent {
 		msg := TextStyle.Copy().Foreground(Feint).Render("No event matched ")
 		msg += BoldStyle.Copy().Render(e.prefix)
 		msg += TextStyle.Copy().Foreground(Feint).Render(".  The function will be triggered using this unseen event.")
@@ -168,11 +252,11 @@ func (e *EventBrowser) View() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, list, detail)
 }
 
-func (e *EventBrowser) renderList(schemas []client.Event) string {
+func (e *EventBrowser) renderList(schemas *EventList) string {
 	var found bool
-	items := make([]list.Item, len(schemas))
-	for n, evt := range schemas {
-		if evt.Name == e.prefix {
+	items := make([]list.Item, len(schemas.sorted))
+	for n, evt := range schemas.sorted {
+		if evt.Event.Name == e.prefix {
 			found = true
 		}
 		items[n] = eventListItem{e: evt}
@@ -183,9 +267,11 @@ func (e *EventBrowser) renderList(schemas []client.Event) string {
 	if e.showNewEvent && e.prefix != "" && !found {
 		items = append([]list.Item{
 			eventListItem{
-				e: client.Event{
-					Name:        e.prefix,
-					Description: newEventDescription,
+				e: Event{
+					Event: client.Event{
+						Name:        e.prefix,
+						Description: newEventDescription,
+					},
 				},
 			},
 		}, items...)
@@ -199,7 +285,7 @@ func (e *EventBrowser) renderList(schemas []client.Event) string {
 	return left
 }
 
-func (e *EventBrowser) renderDetail(selected *client.Event) string {
+func (e *EventBrowser) renderDetail(selected *Event) string {
 	// This is the outer box.
 	panel := lipgloss.NewStyle().
 		Width(e.width - listWidth - 8). // list padding + inner padding
@@ -226,22 +312,30 @@ func (e *EventBrowser) renderDetail(selected *client.Event) string {
 
 // eventListItem renders an event in the list.
 type eventListItem struct {
-	e client.Event
+	e Event
 }
 
 func (i eventListItem) Title() string       { return i.e.Name }
 func (i eventListItem) FilterValue() string { return i.e.Name }
 func (i eventListItem) Description() string {
-	if i.e.Description == "" {
-		if !i.e.FirstSeen.IsZero() {
-			return "First seen " + i.e.FirstSeen.Format(time.Stamp)
-		}
-		if i.e.IntegrationName != "" {
-			return "Via an integration"
-		}
-		return "-"
+	if len(i.e.Workspaces) == 0 && i.e.Public {
+		return "Via an integration"
 	}
-	return i.e.Description
+	if len(i.e.Workspaces) == 0 {
+		return "An unknown event"
+	}
+
+	workspaces := []string{}
+	for _, w := range i.e.Workspaces {
+		if w.Test {
+			workspaces = append(workspaces, "test")
+		} else {
+			workspaces = append(workspaces, "prod")
+		}
+	}
+
+	sort.Strings(workspaces)
+	return fmt.Sprintf("Seen on %s", strings.Join(workspaces, ", "))
 }
 
 func listKeyMap() list.KeyMap {
