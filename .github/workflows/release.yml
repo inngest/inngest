@@ -29,7 +29,7 @@ jobs:
       - name: Make sure npm can deploy
         working-directory: npm
         run: |
-          npm install
+          npm install --ignore-scripts
           npm run build
           npm ci
         env:
@@ -56,3 +56,4 @@ jobs:
           npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
