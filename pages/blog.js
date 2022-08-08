@@ -4,9 +4,9 @@ import { useRouter } from "next/router";
 
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
-import Content from "../shared/content";
 import ThemeToggleButton from "../shared/ThemeToggleButton";
 import { Wrapper } from "../shared/blog";
+import Tags from "../shared/blog/Tags";
 
 export default function BlogLayout(props) {
   const router = useRouter();
@@ -52,7 +52,9 @@ export default function BlogLayout(props) {
             <FocusPost href={`/blog/${focus.slug}`}>
               <div className="post-text">
                 <h2>{focus.heading}</h2>
-                <p className="byline">{focus.humanDate}</p>
+                <p className="byline">
+                  {focus.humanDate} <Tags tags={focus.tags} />
+                </p>
                 <p>{focus.subtitle}</p>
               </div>
               {focus.image && <img src={focus.image} />}
@@ -69,7 +71,9 @@ export default function BlogLayout(props) {
                 {item.image && <img src={item.image} />}
                 <div className="post-text">
                   <h2>{item.heading}</h2>
-                  <p className="byline">{item.humanDate}</p>
+                  <p className="byline">
+                    {item.humanDate} <Tags tags={item.tags} />
+                  </p>
                   <p>{item.subtitle}</p>
                 </div>
               </PreviousPost>
@@ -99,6 +103,11 @@ export async function getStaticProps() {
     data.reading = readingTime(content);
     data.humanDate = data.date.toLocaleDateString();
     data.slug = fname.replace(/.mdx?/, "");
+
+    data.tags =
+      typeof data.tags === "string"
+        ? data.tags.split(",").map((t) => t.trim())
+        : data.tags;
 
     // Disregard content, as the snippet for the blog list should be in
     // the frontmatter.  Only reply with the frontmatter as a JSON string,

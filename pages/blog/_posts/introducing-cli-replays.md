@@ -5,6 +5,7 @@ subtitle: Battle-test your local code with real production events.
 image: "/assets/blog/introducing-cli-replays/header.jpg"
 date: 2022-08-03
 author: Jack Williams
+tags: new-feature
 ---
 
 Building an event-driven system can be challenging: how do you know your code will run as expected once it's deployed? With the release of [v0.5.0](/blog/release-v0-5-0?ref=blog-introducing-cli-replays), we're excited to launch `inngest run --replay`.

@@ -10,6 +10,7 @@ import syntaxHighlightingCSS from "../../shared/syntaxHighlightingCSS";
 import { Wrapper } from "../../shared/blog";
 import { highlight } from "../../utils/code";
 import ThemeToggleButton from "../../shared/ThemeToggleButton";
+import Tags from "../../shared/blog/Tags";
 
 // MDX Components
 import DiscordCTA from "../../shared/Blog/DiscordCTA";
@@ -65,6 +66,7 @@ export default function BlogLayout(props) {
             <p className="blog-byline">
               {!!scope.author ? <>{scope.author} &middot; </> : ""}
               {scope.humanDate} &middot; {scope.reading.text}
+              <Tags tags={scope.tags} />
             </p>
           </Header>
 
@@ -264,6 +266,11 @@ export async function getStaticProps({ params }) {
   data.reading = readingTime(content);
   // Format the reading date.
   data.humanDate = data.date.toLocaleDateString();
+
+  data.tags =
+    data.tags && typeof data.tags === "string"
+      ? data.tags.split(",").map((tag) => tag.trim())
+      : data.tags;
 
   // type Post = {
   //   compiledSource: string,
