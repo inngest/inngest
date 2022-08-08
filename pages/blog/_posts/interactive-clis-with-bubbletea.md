@@ -15,7 +15,7 @@ In this post we’ll walk through our use of Bubbletea, an elm-inspired TUI inte
 2. We store it for some amount of time (eg. from weeks to years)
 3. We instantly trigger your serverless function, using the event as the payload
 
-By using an _event_ instead of directly calling your functions we can do a bunch for you: fully type your payloads, enforce schemas, build audit trails, automatically retry functions, replay with historic events, coordinate between events in step functions... everything that was previously _really_ hard to build becomes simple (and free if you want to use us — sign up here).
+By using an _event_ instead of directly calling your functions we can do a bunch for you: fully type your payloads, enforce schemas, build audit trails, automatically retry functions, [replay with historic events](/blog/introducing-cli-replays?ref=blog-bubbletea), coordinate between events in step functions... everything that was previously _really_ hard to build becomes simple (and free if you want to use us — sign up here).
 
 Fully typing your payloads is important. It means we can build a _really good dev experience_ by ensuring that all data matches a schema, generating fake data for local testing, etc.
 

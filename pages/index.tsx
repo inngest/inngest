@@ -156,9 +156,10 @@ export default function Home() {
           text={
             <>
               We built all the hard stuff so you don’t have to: idempotency,
-              throttling, backoff, retries, replays, job versioning, and so much
-              more. With Inngest, you just write the job and we take care of the
-              rest.
+              throttling, backoff, retries,{" "}
+              <a href="/blog/introducing-cli-replays?ref=homepage">replays</a>,
+              job versioning, and so much more. With Inngest, you just write the
+              job and we take care of the rest.
             </>
           }
           image="/assets/homepage/checklist-fade.png"
