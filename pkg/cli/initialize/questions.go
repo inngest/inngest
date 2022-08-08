@@ -232,16 +232,18 @@ func renderEvent(m *initModel) string {
 		cli.BoldStyle.Render(fmt.Sprintf("%d. Event trigger:", m.transitions)) +
 			cli.TextStyle.Copy().Foreground(cli.Feint).Render(" (enter to continue)") + "\n",
 	)
-	b.WriteString(m.textinput.View() + "\n\n\n")
+	b.WriteString(m.textinput.View() + "\n")
 
 	if m.eventFetchError != nil {
-		b.WriteString("\n" + cli.RenderWarning(fmt.Sprintf("We couldn't fetch your latest events from our API: %s", m.eventFetchError)) + "\n")
+		b.WriteString("\n" + cli.RenderWarning(m.eventFetchError.Error()) + "\n\n")
 	}
 
 	if m.height < 20 {
 		b.WriteString("\n" + cli.RenderWarning("Your TTY doesn't have enough height to render the event browser") + "\n")
 		return b.String()
 	}
+
+	b.WriteString("\n")
 
 	// Render two columns of text.
 	headerMsg := lipgloss.JoinVertical(lipgloss.Center,

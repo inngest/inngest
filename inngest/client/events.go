@@ -11,6 +11,11 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+var (
+	SchemaSourceCustom      = "custom"
+	SchemaSourceIntegration = "integration"
+)
+
 type PaginatedEvents struct {
 	Page struct {
 		Cursor string

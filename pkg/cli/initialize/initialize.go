@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/inngest/client"
 	"github.com/inngest/inngest/inngest/clistate"
@@ -22,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/scaffold"
 	"github.com/inngest/inngestgo"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/term"
 )
 
@@ -80,7 +79,7 @@ func NewInitModel(o InitOpts) (*initModel, error) {
 		width:       width,
 		height:      height,
 		showWelcome: o.ShowWelcome,
-		events:      []client.Event{},
+		events:      nil,
 		textinput:   textinput.New(),
 		loading:     spinner.New(),
 		transitions: 1,
@@ -195,7 +194,7 @@ type initModel struct {
 	// scaffold is the scaffold selected by the user
 	scaffold *scaffold.Template
 
-	events          []client.Event
+	events          *cli.EventList
 	eventFetchError error
 
 	humanCron string
@@ -238,14 +237,14 @@ func (f *initModel) Function(ctx context.Context) (*function.Function, error) {
 	// Attempt to find the schema that matches this event, and dump the
 	// cue schema inside the function.
 	var ed *function.EventDefinition
-	for _, e := range f.events {
-		if e.Name == f.event && len(e.Versions) > 0 {
+
+	if f.events != nil {
+		if evt, ok := f.events.All()[f.event]; ok && len(evt.Event.Versions) > 0 {
 			ed = &function.EventDefinition{
 				Format: function.FormatCue,
 				Synced: true,
-				Def:    e.Versions[0].CueType,
+				Def:    evt.Event.Versions[0].CueType,
 			}
-			break
 		}
 	}
 
@@ -340,9 +339,6 @@ func (f *initModel) Init() tea.Cmd {
 			if err != nil {
 				f.eventFetchError = err
 			}
-			sort.Slice(schemas, func(i, j int) bool {
-				return schemas[i].Name < schemas[j].Name
-			})
 			f.events = schemas
 			return f.events
 		},
@@ -400,7 +396,7 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			f.scaffold = &f.scaffolds.Languages[f.language][0]
 		}
 
-	case []client.Event:
+	case *cli.EventList:
 		// We have received the events that are available for the current user. Set
 		// the events in the event browser.
 		f.browser.SetEvents(f.events)
@@ -516,24 +512,62 @@ func (f *initModel) renderWelcome() string {
 	return dialog
 }
 
-func fetchEvents() ([]client.Event, error) {
+// fetchEvents fetches all public events and events from each workspace.
+func fetchEvents() (*cli.EventList, error) {
 	ctx, done := context.WithTimeout(context.Background(), 20*time.Second)
 	defer done()
 
-	var workspaceID *uuid.UUID
-	if w, err := clistate.Workspace(ctx); err == nil {
-		workspaceID = &w.ID
-	}
+	var eg errgroup.Group
 
 	c := clistate.Client(ctx)
-	evts, err := c.AllEvents(ctx, &client.EventQuery{
-		WorkspaceID: workspaceID,
-	})
+	evts := &cli.EventList{}
+
+	// Fetch events from every workspace.
+	workspaces, err := clistate.Client(ctx).Workspaces(ctx)
 	if err != nil {
-		// Attempt to fetch unauthed events.
-		return c.AllEvents(ctx, nil)
+		// If this is an unauthorized error we can ignore it.
+		if !strings.Contains(err.Error(), "unauthorized") {
+			return nil, err
+		}
+		err = fmt.Errorf("You're not logged in so we're only showing public events")
 	}
-	return evts, nil
+
+	eg.Go(func() error {
+		// Find all public events.
+		loaded, err := c.AllEvents(ctx, &client.EventQuery{
+			SchemaSource: &client.SchemaSourceIntegration,
+		})
+		if err != nil {
+			return err
+		}
+		for _, e := range loaded {
+			evts.Add(e, nil)
+		}
+		return nil
+	})
+
+	for _, ws := range workspaces {
+		w := ws
+		eg.Go(func() error {
+			loaded, err := c.AllEvents(ctx, &client.EventQuery{
+				WorkspaceID: &w.ID,
+			})
+			if err != nil {
+				return err
+			}
+			for _, e := range loaded {
+				evts.Add(e, &w)
+			}
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+
+	evts.Sort()
+	return evts, err
 }
 
 type initListItem struct {
