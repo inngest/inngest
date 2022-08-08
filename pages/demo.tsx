@@ -13,8 +13,9 @@ export async function getStaticProps() {
   return {
     props: {
       meta: {
-        title: "Pricing",
-        description: "Simple pricing. Powerful functionality.",
+        title: "Product Demo Video",
+        description:
+          "Learn how you can create, test and deploy functions in minutes",
       },
     },
   };
