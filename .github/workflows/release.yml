@@ -24,12 +24,14 @@ jobs:
         uses: actions/setup-node@v3
         with:
           cache: 'npm'
+          cache-dependency-path: npm/package-lock.json
           node-version: 16
       - name: Make sure npm can deploy
         working-directory: npm
         run: |
-          npm ci
+          npm install
           npm run build
+          npm ci
         env:
           SKIP_POSTINSTALL: true
       - name: Login to Docker Hub
@@ -47,6 +49,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Release to npm
+        working-directory: npm
         run: |
           npm config set git-tag-version false
           npm version ${{ github.ref_name }}
