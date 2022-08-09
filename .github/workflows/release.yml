@@ -29,9 +29,8 @@ jobs:
       - name: Make sure npm can deploy
         working-directory: npm
         run: |
-          npm install --ignore-scripts
-          npm run build
           npm ci
+          npm run build
         env:
           SKIP_POSTINSTALL: true
       - name: Login to Docker Hub
