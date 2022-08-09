@@ -23,7 +23,6 @@ jobs:
       - name: Set up Node/npm
         uses: actions/setup-node@v3
         with:
-          cache: 'npm'
           node-version: 16
       - name: Make sure npm can deploy
         working-directory: npm
