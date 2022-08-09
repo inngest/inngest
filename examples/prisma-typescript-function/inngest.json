@@ -1,0 +1,24 @@
+{
+  "name": "Prisma background job",
+  "id": "cute-troll-547a93",
+  "triggers": [
+    {
+      "event": "stripe/charge.succeeded",
+      "definition": {
+        "format": "cue",
+        "synced": true,
+        "def": "file://./events/stripe-charge-succeeded.cue"
+      }
+    }
+  ],
+  "steps": {
+    "step-1": {
+      "id": "step-1",
+      "path": "file://./steps/step-1",
+      "name": "Prisma background job",
+      "runtime": {
+        "type": "docker"
+      }
+    }
+  }
+}
