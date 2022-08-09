@@ -24,11 +24,9 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 16
-      - name: Make sure npm can deploy
+      - name: Install npm dependencies
         working-directory: npm
-        run: |
-          npm ci
-          npm run build
+        run: npm ci
         env:
           SKIP_POSTINSTALL: true
       - name: Login to Docker Hub
@@ -48,6 +46,7 @@ jobs:
       - name: Release to npm
         working-directory: npm
         run: |
+          npm run build
           npm config set git-tag-version false
           npm version ${{ github.ref_name }}
           npm publish --access public
