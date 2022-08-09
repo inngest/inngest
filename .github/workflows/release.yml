@@ -22,9 +22,7 @@ jobs:
           go-version: 1.18
       - name: Set up Node/npm
         uses: actions/setup-node@v3
-        working-directory: npm
         with:
-          registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
           node-version: 16
       - name: Make sure npm can deploy
