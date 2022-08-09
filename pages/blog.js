@@ -6,7 +6,7 @@ import Footer from "../shared/footer";
 import Nav from "../shared/nav";
 import ThemeToggleButton from "../shared/ThemeToggleButton";
 import { Wrapper } from "../shared/blog";
-import Tags from "../shared/blog/Tags";
+import Tags from "../shared/Blog/Tags";
 
 export default function BlogLayout(props) {
   const router = useRouter();

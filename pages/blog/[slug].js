@@ -10,7 +10,7 @@ import syntaxHighlightingCSS from "../../shared/syntaxHighlightingCSS";
 import { Wrapper } from "../../shared/blog";
 import { highlight } from "../../utils/code";
 import ThemeToggleButton from "../../shared/ThemeToggleButton";
-import Tags from "../../shared/blog/Tags";
+import Tags from "../../shared/Blog/Tags";
 
 // MDX Components
 import DiscordCTA from "../../shared/Blog/DiscordCTA";
