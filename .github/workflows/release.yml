@@ -23,15 +23,12 @@ jobs:
       - name: Set up Node/npm
         uses: actions/setup-node@v3
         with:
-          cache: 'npm'
-          cache-dependency-path: npm/package-lock.json
           node-version: 16
       - name: Make sure npm can deploy
         working-directory: npm
         run: |
-          npm install --ignore-scripts
-          npm run build
           npm ci
+          npm run build
         env:
           SKIP_POSTINSTALL: true
       - name: Login to Docker Hub
@@ -56,4 +53,3 @@ jobs:
           npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
