@@ -2,7 +2,7 @@
 heading: "Inngest: OS v0.5.2 released"
 subtitle: Our next release improving rollbacks and developer UX
 date: 2022-08-09
-image: "/assets/blog/release-v0.5.2.jpg"
+image: "/assets/blog/release-v0.5.0.jpg"
 tags: release-notes
 ---
 [Inngest v0.5.2 is here](https://github.com/inngest/inngest/releases)!  This patch introduces a few new pieces of functionality, as well as various fixes and improvements.  The key pieces are:
@@ -24,7 +24,7 @@ We’ve updated our function configuration format to make rollbacks *stricter �
 
 Using `inngest init` is the easiest way to create new serverless functions.  You’ll often want to create a function which responds to an event that you’ve already processed within your account.  In the latest version, `inngest init` automatically fetches every event you’ve seen in your account so that you can create new functions that run any time these events are seen again in the future.
 
-![v0.5.2](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/223a7cad-598b-4d83-8ed3-a581c5ae5461/Screen_Recording_2022-08-08_at_10.38.59.mov.gif)
+![v0.5.2](/assets/blog/init-0.5.2.gif)
 
 We’re using the new init flags and process in our guide to running [Prisma.js background jobs](https://www.inngest.com/docs/guides/prisma-background-jobs).
 
