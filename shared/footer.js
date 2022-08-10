@@ -25,6 +25,7 @@ const Footer = () => {
           <div>
             <p>Product</p>
             <a href="/product?ref=footer">Features</a>
+            <a href="/uses/serverless-node-background-jobs">For node</a>
             <a href="/docs?ref=footer">Documentation</a>
             <a href="/docs/self-hosting?ref=footer">Self-host</a>
             <a
