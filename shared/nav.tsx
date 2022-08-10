@@ -10,6 +10,8 @@ import MediaPlay from "../shared/Icons/MediaPlay";
 type Props = {
   nolinks?: boolean;
   sticky?: boolean;
+
+  nodemo?: boolean;
 };
 
 const Nav: React.FC<Props> = (props) => {
@@ -57,20 +59,23 @@ const NavContent: React.FC<Props> = (props: Props) => {
           <StyledLink key="github" href="https://github.com/inngest/inngest">
             <Github />
           </StyledLink>
-          <Button
-            href="/demo?ref=nav"
-            className="button"
-            kind="primary"
-            style={{
-              padding: "0.3rem 0.8rem",
-              border: "0",
-              background:
-                "#523895 linear-gradient(307deg, #4136ba 0%, #8b3c68 100%);",
-            }}
-          >
-            <MediaPlay />
-            Watch Demo
-          </Button>
+
+          {!props.nodemo && (
+            <Button
+              href="/demo?ref=nav"
+              className="button"
+              kind="primary"
+              style={{
+                padding: "0.3rem 0.8rem",
+                border: "0",
+                background:
+                  "#523895 linear-gradient(307deg, #4136ba 0%, #8b3c68 100%);",
+              }}
+            >
+              <MediaPlay />
+              Watch Demo
+            </Button>
+          )}
         </div>
       )}
 

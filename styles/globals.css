@@ -2,6 +2,10 @@
 @import url("https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap");
 @import url("/assets/fonts.css");
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /** Standard **/
 
 @supports (font-variation-settings: normal) {
@@ -126,11 +130,13 @@ h3,
 
 h1 {
   font-size: 3em;
+  font-weight: bold;
   line-height: 1.05;
 }
 
 h2 {
   font-size: 1.8rem;
+  font-weight: bold;
   line-height: 1.2;
 }
 
@@ -274,7 +280,7 @@ li > ul {
 
 /** New grid **/
 
-.grid {
+.reg-grid {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
   grid-gap: var(--grid-gap);

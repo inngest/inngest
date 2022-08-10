@@ -81,6 +81,7 @@ export const buttonCSS = css`
   text-align: center;
   transition: all 0.3s;
   white-space: nowrap;
+  font-size: 0.9rem;
 
   & + .button {
     margin-left: 16px;
