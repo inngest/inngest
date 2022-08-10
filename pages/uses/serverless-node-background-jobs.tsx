@@ -1,27 +1,42 @@
 import styled from "@emotion/styled";
-import React from "react";
+import React, { useState } from "react";
 import Button from "src/shared/Button";
 import Nav from "src/shared/nav";
 import Footer from "src/shared/footer";
+import Play from "src/shared/Icons/Play";
 
 export default function Template() {
+  const [demo, setDemo] = useState(false);
+
   return (
     <div>
       <Nav sticky={true} nodemo />
       <div className="container mx-auto py-32 flex flex-row">
         <div className="basis-1/2 px-6">
           <h1>Serverless background jobs for Node & Deno</h1>
-          <p className="pt-6">
+          <p className="pt-6 subheading">
             Build, test, then deploy background jobs and scheduled tasks without
             worrying about infrastructure or queues — so you can focus on your
             product.
           </p>
-          <div className="flex flex-row py-12">
-            <Button kind="primary">Sign up</Button>
-            <Button kind="outline">Read the docs</Button>
+          <div className="flex flex-row pt-12">
+            <Button kind="primary" href="/sign-up?ref=js-hero">
+              Sign up
+            </Button>
+            <Button kind="outline" href="/docs?ref=js-hero">
+              Read the docs
+            </Button>
           </div>
         </div>
-        <div className="basis-1/2 px-6">img</div>
+        <VidPlaceholder className="basis-1/2 px-6 flex items-center">
+          <button
+            className="flex items-center justify-center"
+            onClick={() => setDemo(true)}
+          >
+            <Play outline={false} fill="var(--primary-color)" size={80} />
+          </button>
+          <img src="/assets/homepage/cli-3-commands.png" />
+        </VidPlaceholder>
       </div>
 
       <div className="container mx-auto">
@@ -31,11 +46,12 @@ export default function Template() {
           single CLI built for developer productivity.
         </p>
 
-        <Developers className="grid grid-cols-2 gap-8">
+        <Developers className="grid grid-cols-2 gap-8 gap-y-16">
           <div className="flex flex-col justify-center">
-            <img src="https://via.placeholder.com/900x450" />
+            <img src="/assets/product/cli-init.png" />
           </div>
           <div className="flex flex-col justify-center">
+            <small>Designed for ease of use</small>
             <h3 className="pb-2">
               Simple development: <code>inngest init</code>
             </h3>
@@ -45,29 +61,41 @@ export default function Template() {
               single command scaffolds the entire serverless function ready to
               test.
             </p>
+            <ul className="space-y-1">
+              <li>Create scheduled or background jobs</li>
+              <li>Easily build complex step functions using any languages</li>
+            </ul>
           </div>
 
           <div className="flex flex-col justify-center">
-            <img src="https://via.placeholder.com/900x450" />
+            <img src="/assets/product/cli-run.png" />
           </div>
           <div className="flex flex-col justify-center">
+            <small>Designed for local development</small>
             <h3 className="pb-2">
               Local testing: <code>inngest run</code>
             </h3>
             <p>
               Test your functions locally with a single command, using randomly
-              generated data or real production data via replay.
+              generated data or real production data via replay, then run a real
+              job queue in your project with zero infra via{" "}
+              <code>inngest dev</code>.
             </p>
             <ul className="space-y-1">
-              <li>Local testing without any setup</li>
+              <li>Locally run without any setup</li>
               <li>Test with real production data</li>
+              <li>
+                Local UI with step function debugger <small>Coming soon</small>
+              </li>
             </ul>
           </div>
 
           <div className="flex flex-col justify-center">
-            <img src="https://via.placeholder.com/900x450" />
+            <img src="/assets/product/cli-deploy.png" />
           </div>
+
           <div className="flex flex-col justify-center">
+            <small>Designed to scale</small>
             <h3 className="pb-2">
               One-command deploy: <code>inngest deploy</code>
             </h3>
@@ -78,7 +106,8 @@ export default function Template() {
             </p>
             <ul className="space-y-1">
               <li>CI/CD built in</li>
-              <li>CI/CD built in</li>
+              <li>Immediate rollbacks</li>
+              <li>Deploy functions as internal tools</li>
             </ul>
           </div>
         </Developers>
@@ -86,11 +115,15 @@ export default function Template() {
 
       <div className="container mx-auto flex py-32 justify-center">
         <div className="flex flex-col justify-center align-center text-center pr-24">
-          <p>“Sooooo much easier than AWS”</p>
+          <p>
+            <i>“Sooooo much easier than AWS”</i>
+          </p>
           <small>Between</small>
         </div>
         <div>
-          <Button kind="primary">Start building today</Button>
+          <Button kind="primary" href="/sign-up?ref=collab">
+            Start building today
+          </Button>
         </div>
       </div>
 
@@ -153,8 +186,8 @@ export default function Template() {
           <div className="flex">
             <div className="basis-1/2 flex flex-col justify-center pr-8">
               <h2 className="pb-6">
-                Fully serverlesss, locally testable,
-                made&nbsp;for&nbsp;collaboration.
+                Fully serverlesss, locally testable, made
+                for&nbsp;collaboration.
               </h2>
               <p>
                 People use Inngest to reliably run background work, serverless
@@ -165,12 +198,14 @@ export default function Template() {
                 Common examples include webhook management, background jobs,
                 scheduled tasks, and end-to-end automation.
               </p>
-              <div>
-                <Button kind="primary">Start building today</Button>
+              <div className="flex">
+                <Button kind="primary" href="/sign-up?ref=js-mid">
+                  Start building today
+                </Button>
               </div>
             </div>
-            <div className="pl-8">
-              <img src="https://via.placeholder.com/900x550" />
+            <div className="basis-1/2 pl-8">
+              <img src="/assets/homepage/admin-ui-screenshot.png" />
             </div>
           </div>
         </div>
@@ -181,19 +216,27 @@ export default function Template() {
           Invoke many background functions with a single HTTP POST
         </h2>
         <p className="max-w-2xl mx-auto pb-12">
-          Inngest’s core difference is that it’s event-driven. Send a single
-          JSON event to Inngest and run any number of functions automatically,
-          and we’ll statically type-check the JSON payload then store each event
-          for logging and backtesting.
+          Inngest’s core difference is that it’s <i>event-driven</i>. Send a
+          single JSON event to Inngest and run any number of functions
+          automatically, and we’ll statically type-check the JSON payload then
+          store each event for logging and backtesting. It's way better than
+          old-school RPC.
         </p>
+
+        {/*
         <div
           className="aspect-video max-w-4xl mx-auto"
           style={{ background: "#ccc" }}
         />
+        */}
 
         <div className="flex justify-center pt-12">
-          <Button kind="primary">Sign up</Button>
-          <Button kind="outline">Read the docs</Button>
+          <Button kind="primary" href="/sign-up?ref=js-footer">
+            Sign up
+          </Button>
+          <Button kind="outline" href="/docs?ref=js-footer">
+            Read the docs
+          </Button>
         </div>
       </div>
 
@@ -206,14 +249,61 @@ export default function Template() {
       </Quote>
 
       <Footer />
+
+      {demo && (
+        <Demo
+          className="flex justify-center items-center"
+          onClick={() => {
+            setDemo(false);
+          }}
+        >
+          <div className="container aspect-video mx-auto max-w-2xl flex">
+            <iframe
+              src="https://www.youtube.com/embed/qVXzYBcJmGU?autoplay=1"
+              title="Inngest Product Demo"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="flex-1"
+            ></iframe>
+          </div>
+        </Demo>
+      )}
     </div>
   );
 }
+
+const VidPlaceholder = styled.div`
+  position: relative;
+
+  button {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    svg {
+      box-shadow: 0 0 40px var(--primary-color);
+      border-radius: 60px;
+      transition: all 0.3s;
+    }
+
+    &:hover svg {
+      box-shadow: 0 0 80px 20px var(--primary-color);
+    }
+  }
+`;
 
 const Developers = styled.div`
   h3 code {
     color: var(--color-iris-60);
     margin-left: 0.25rem;
+  }
+
+  div > small {
+    font-weight: bold;
+    opacity: 0.4;
   }
 `;
 
@@ -232,7 +322,7 @@ const Features = styled.div`
   }
   &:before {
     background: var(--bg-feint-color) url(/assets/grid-bg.png) repeat 0 0;
-    opacity: 0.6;
+    opacity: 0.8;
   }
   &:after {
     background: radial-gradient(
@@ -245,13 +335,14 @@ const Features = styled.div`
     position: relative;
     z-index: 1;
   }
+
+  .subheading {
+    color: #556987;
+  }
 `;
 
 const FeatureGrid = styled.div`
   text-align: center;
-
-  > div {
-  }
 
   h3 {
     font-weight: normal;
@@ -272,5 +363,20 @@ const Quote = styled.div`
   p {
     opacity: 0.7;
     font-size: 0.8rem;
+  }
+`;
+
+const Demo = styled.div`
+  position: fixed;
+  top: 0;
+  z-index: 10;
+  left: 0;
+  width: 100%;
+  max-width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+
+  > div {
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
   }
 `;

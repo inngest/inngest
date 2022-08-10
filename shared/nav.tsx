@@ -112,15 +112,17 @@ const NavContent: React.FC<Props> = (props: Props) => {
 
 const NavWrapper = styled.nav<{ sticky: boolean }>`
   position: ${({ sticky }) => (sticky ? "sticky" : "relative")};
-  z-index: 1;
+  z-index: 2;
   top: ${({ sticky }) => (sticky ? "0" : "auto")};
-  max-width: 1200px;
   margin: 1.5rem auto;
   background-color: var(--bg-color);
 `;
 
 const Container = styled.div<{ sticky?: boolean }>`
-  z-index: 1;
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+  z-index: 2;
   display: grid;
   grid-template-columns: auto 1fr auto;
   padding: 0.5rem 1rem;

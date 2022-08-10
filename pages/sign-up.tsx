@@ -60,7 +60,7 @@ const SignUp = () => {
     <>
       <Nav nolinks />
 
-      <Header className="header grid section-header">
+      <Header className="header reg-grid section-header">
         <header className="grid-center-6 text-center">
           <h2>Sign up for Inngest Cloud</h2>
           <p>
@@ -70,7 +70,7 @@ const SignUp = () => {
         </header>
       </Header>
 
-      <Content className="grid section-header">
+      <Content className="reg-grid section-header">
         <div className="col-2" />
         <div className="signup col-4">
           <Button
