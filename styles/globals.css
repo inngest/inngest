@@ -46,6 +46,7 @@
   --font-color-primary: var(--color-white);
   --font-color-secondary: #acb2c2;
   --link-color: #dfe2e9;
+  --bg-feint-color: #f7f8f9;
 
   --box-shadow: 0 1px 1rem 1rem rgba(255, 255, 255, 0.1);
 

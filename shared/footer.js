@@ -7,7 +7,7 @@ import Github from "./Icons/Github";
 
 const Footer = () => {
   return (
-    <Wrapper className="grid">
+    <Wrapper className="reg-grid">
       <div className="grid-center-6">
         <div className="four-cols">
           <a href="https://www.inngest.com">

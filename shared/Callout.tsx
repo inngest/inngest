@@ -19,7 +19,7 @@ const Callout: React.FC<Props> = ({
   style,
 }) => {
   return (
-    <div className="grid" style={style}>
+    <div className="reg-grid" style={style}>
       <Content className="bg-primary">
         <div>
           <span>{small || "Now with zero yaml ;-)"}</span>
