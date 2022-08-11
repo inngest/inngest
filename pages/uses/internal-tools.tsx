@@ -21,10 +21,10 @@ export default function Template() {
             and ship using the most advanced tooling platform available.
           </p>
           <div className="flex flex-row justify-center pt-12">
-            <Button kind="primary" href="/sign-up?ref=js-hero">
+            <Button kind="primary" href="/sign-up?ref=tools">
               Sign up
             </Button>
-            <Button kind="outline" href="/contact?ref=js-hero">
+            <Button kind="outline" href="/contact?ref=tools">
               Get a demo
             </Button>
           </div>
@@ -91,7 +91,7 @@ export default function Template() {
           <small>Between</small>
         </div>
         <div>
-          <Button kind="primary" href="/sign-up?ref=collab">
+          <Button kind="primary" href="/sign-up?ref=tools">
             Start building today
           </Button>
         </div>
@@ -134,10 +134,10 @@ export default function Template() {
         </div>
 
         <div className="flex justify-center pt-12">
-          <Button kind="primary" href="/sign-up?ref=js-footer">
+          <Button kind="primary" href="/sign-up?ref=tools">
             Sign up
           </Button>
-          <Button kind="outline" href="/docs?ref=js-footer">
+          <Button kind="outline" href="/docs?ref=tools">
             Read the docs
           </Button>
         </div>
