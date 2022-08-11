@@ -142,6 +142,84 @@ func RequireOutputWithin(output string, within time.Duration) Proc {
 	}
 }
 
+func RequireStepRetries(step string, count int) Proc {
+	return func(ctx context.Context, td *TestData) error {
+		var backoffTime uint
+
+		for i := 0; i < count; i++ {
+			fmt.Printf("> Checking step %s performs retry %d of %d\n", step, i+1, count)
+
+			backoffTime = uint(10) << i
+
+			fmt.Printf("\t> Checking attempt #%d executes (waiting %d seconds)\n", i+1, backoffTime)
+			if err := timeout(time.Second*time.Duration(backoffTime), func() error {
+				return requireLogFields(ctx, td, map[string]any{
+					"caller":  "executor",
+					"step":    step,
+					"message": "executing step",
+					"attempt": i,
+				})
+			}); err != nil {
+				return err
+			}
+
+			if i+1 < count {
+				fmt.Printf("\t> Checking attempt #%d queues a retry\n", i+1)
+				if err := timeout(time.Second*5, func() error {
+					return requireLogFields(ctx, td, map[string]any{
+						"caller":  "executor",
+						"message": "enqueueing retry",
+						"edge": map[string]any{
+							"errorCount": i + 1,
+							"payload": map[string]any{
+								"edge": map[string]any{
+									"incoming": step,
+								},
+							},
+						},
+					})
+				}); err != nil {
+					return err
+				}
+			}
+		}
+
+		fmt.Printf("> Checking step %s permanently failed after %d retries (waiting %d seconds)\n", step, count, backoffTime)
+		if err := timeout(time.Second*time.Duration(backoffTime), func() error {
+			return requireLogFields(ctx, td, map[string]any{
+				"caller":  "executor",
+				"message": "step permanently failed",
+				"edge": map[string]any{
+					"incoming": step,
+				},
+			})
+		}); err != nil {
+			return err
+		}
+
+		// Finally, check that the step did not have more retries than it was
+		// allowed before it failed.
+		if err := timeout(time.Second, func() error {
+			return requireLogFields(ctx, td, map[string]any{
+				"caller":  "executor",
+				"message": "enqueueing retry",
+				"edge": map[string]any{
+					"errorCount": count + 1,
+					"payload": map[string]any{
+						"edge": map[string]any{
+							"incoming": step,
+						},
+					},
+				},
+			})
+		}); err == nil {
+			return fmt.Errorf("step %s had more retries than allowed", step)
+		}
+
+		return nil
+	}
+}
+
 // timeout is a helper for timeout funcs.
 func timeout(t time.Duration, f func() error) error {
 	timeout := time.After(t)
