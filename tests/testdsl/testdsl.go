@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/function"
 )
@@ -181,19 +182,33 @@ func requireLogFields(ctx context.Context, td *TestData, kv map[string]any) erro
 		data := map[string]any{}
 		_ = json.Unmarshal([]byte(line), &data)
 
-		var found int
-		for field, val := range data {
-			for searchKey, searchVal := range kv {
-				if field == searchKey && reflect.DeepEqual(val, searchVal) {
-					found++
-					break
-				}
-			}
-			if found == len(kv) {
-				return nil
-			}
+		found := cmpPartial(kv, data)
+
+		if found {
+			return nil
 		}
 	}
 
 	return fmt.Errorf("fields not found: %s", kv)
+}
+
+func cmpPartial(expectedPartial, actual map[string]interface{}) bool {
+	var found int
+
+	for field, val := range actual {
+		for searchKey, searchVal := range expectedPartial {
+			if field == searchKey {
+				if (reflect.ValueOf(searchVal).Kind() == reflect.Map && cmpPartial(searchVal.(map[string]any), val.(map[string]any))) || cmp.Equal(val, searchVal) {
+					found++
+					break
+				}
+			}
+		}
+
+		if found == len(expectedPartial) {
+			return true
+		}
+	}
+
+	return false
 }
