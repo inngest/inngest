@@ -52,8 +52,8 @@ export default function Contact() {
     <>
       <Nav />
 
-      <Hero>
-        <h1>Contact us</h1>
+      <Hero className="pt-16 pb-12">
+        <h1 className="pb-4">Contact us</h1>
         <p>
           How can we help you?
           <br /> Reach out to us by live chat,{" "}
@@ -114,8 +114,6 @@ const Hero = styled.div`
   overflow: hidden;
   text-align: center;
 
-  padding: 10vh 0;
-
   h1 + p {
     font-size: 22px;
     line-height: 1.45;
@@ -127,7 +125,8 @@ const Inner = styled.div`
   form {
     border: 1px solid #ffffff19;
     border-radius: 7px;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--bg-color-d);
+    color: #fff;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
     padding: 0 2rem 2rem;
     max-width: 600px;
