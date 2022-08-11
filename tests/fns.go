@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/tests/testdsl"
 
 	_ "github.com/inngest/inngest/tests/fns/basic-single-step"
+	_ "github.com/inngest/inngest/tests/fns/retries-go"
 )
 
 // parseFns reads all functions from "./fns"
