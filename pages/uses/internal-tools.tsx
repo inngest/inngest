@@ -99,33 +99,36 @@ export default function Template() {
 
       <div className="container mx-auto text-center pt-6">
         <h2 className="max-w-lg mx-auto pb-6">
-          Connect to anything,<br />
+          Connect to anything,
+          <br />
           automate everything
         </h2>
         <p className="max-w-2xl mx-auto pb-24">
-          Craft step functions which connect multiple systems and database to automate internal processes.  Automate processes with triggers driven by external systems.
+          Craft step functions which connect multiple systems and database to
+          automate internal processes. Automate processes with triggers driven
+          by external systems.
         </p>
 
-        <div
-          className="relative aspect-video max-w-4xl mx-auto"
-        >
-          <img src="/assets/escalation.jpg" alt="Dashboard" 
+        <div className="relative aspect-video max-w-4xl mx-auto">
+          <img
+            src="/assets/escalation.jpg"
+            alt="Dashboard"
             className="drop-shadow-2xl rounded"
             style={{ boxShadow: "0 0 40px rgba(0, 0, 0, 0.3)" }}
           />
 
           <Logos>
             <Slack className="rounded mx-auto">
-              <img src="/assets/ui-assets/source-logos/slack.svg" width="96"/>
+              <img src="/assets/ui-assets/source-logos/slack.svg" width="96" />
               <img src="/assets/ui-assets/approve.png" className="approve" />
             </Slack>
             <div className="flex py-2">
-            <Stripe className="rounded mr-2">
-              <img src="/assets/ui-assets/source-logos/stripe-color.svg" />
-            </Stripe>
-            <Mailchimp className="rounded">
-              <img src="/assets/ui-assets/source-logos/mailchimp-black.png" />
-            </Mailchimp>
+              <Stripe className="rounded mr-2">
+                <img src="/assets/ui-assets/source-logos/stripe-color.svg" />
+              </Stripe>
+              <Mailchimp className="rounded">
+                <img src="/assets/ui-assets/source-logos/mailchimp-black.png" />
+              </Mailchimp>
             </div>
           </Logos>
         </div>
@@ -141,9 +144,7 @@ export default function Template() {
       </div>
 
       <Quote className="container mx-auto max-w-xl pt-24 text-center space-y-3">
-        <q>
-          This is 100% the dev/prod parity that we’re lacking
-        </q>
+        <q>This is 100% the dev/prod parity that we’re lacking</q>
         <p>Staff Engineer at Buffer</p>
       </Quote>
 
