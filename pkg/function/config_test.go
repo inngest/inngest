@@ -381,8 +381,8 @@ function: defs.#Function & {
       step: "$trigger"
     }]
     version: {
-      version: 1
-      minor:   1
+      major: 1
+      minor: 1
     }
   }
 }`
