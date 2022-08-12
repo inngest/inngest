@@ -88,6 +88,10 @@ package v1
 		version?: uint
 		minor?:   uint
 	}
+
+	retries: {
+		attempts: >=0 & <=20 | *3
+	}
 }
 
 #After: {
