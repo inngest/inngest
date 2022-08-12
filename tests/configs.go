@@ -86,7 +86,7 @@ func (c *Config) Up(ctx context.Context) error {
 	// w := io.MultiWriter(buf, os.Stderr)
 
 	c.out = buf
-	c.inngest = exec.CommandContext(ctx, "inngest", "serve", "-c", filepath.Join(c.dir, "config.cue"), "runner", "executor", "event-api")
+	c.inngest = exec.CommandContext(ctx, "go", "run", "../cmd/main.go", "serve", "-c", filepath.Join(c.dir, "config.cue"), "runner", "executor", "event-api")
 	c.inngest.Env = os.Environ()
 	c.inngest.Stderr = buf
 	c.inngest.Stdout = buf
