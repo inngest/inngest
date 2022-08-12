@@ -63,8 +63,8 @@ import (
 	// input to work, eg. what data to transform, what email template to use, etc.
 	metadata?: [string]: _
 
-	retries: {
-		attempts: >=0 & <=20 | *3
+	retries?: {
+		attempts?: int & >=0 & <=20
 	}
 }
 
