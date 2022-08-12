@@ -5,6 +5,18 @@ import Nav from "src/shared/nav";
 import Footer from "src/shared/footer";
 import Play from "src/shared/Icons/Play";
 
+export async function getStaticProps() {
+  return {
+    props: {
+      meta: {
+        title: "Serverless background jobs for Node & Deno",
+        description:
+          "Build, test, then deploy background jobs and scheduled tasks without worrying about infrastructure or queues — so you can focus on your product.",
+      },
+    },
+  };
+}
+
 export default function Template() {
   const [demo, setDemo] = useState(false);
 

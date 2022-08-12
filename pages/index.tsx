@@ -28,7 +28,7 @@ export async function getStaticProps() {
   return {
     props: {
       meta: {
-        title: "The Serverless Event-Driven Queue",
+        title: "You Send Events. We Run Your Code.",
         description:
           "Inngest makes it simple for you to write delayed or background jobs by triggering functions from events",
         image: "/assets/img/og-image-default.jpg",

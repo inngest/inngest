@@ -5,6 +5,18 @@ import Nav from "src/shared/nav";
 import Footer from "src/shared/footer";
 import { Code, Eye, Activity } from "react-feather";
 
+export async function getStaticProps() {
+  return {
+    props: {
+      meta: {
+        title: "Internal tools, solved in seconds",
+        description:
+          "Build and deploy internal apps using any language, with full audit trails, human in the loop tasks, and automated flows. Build and ship using the most advanced tooling platform available.",
+      },
+    },
+  };
+}
+
 export default function Template() {
   const [demo, setDemo] = useState(false);
 

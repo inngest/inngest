@@ -29,18 +29,20 @@ function MyApp({ Component, pageProps }) {
     };
   }, [router.events]);
 
+  const metaTitle =
+    pageProps?.meta?.title || "You Send Events. We Run Your Code.";
+  // Warn during local dev
+  if (!pageProps?.meta?.title && process.env.NODE_ENV !== "production") {
+    console.warn(
+      "WARNING: meta tags are not set for this page, please set via getStaticProps"
+    );
+  }
+
   return (
     <>
       <Head>
-        {pageProps?.meta?.title && (
-          <>
-            <title>Inngest → {pageProps.meta.title}</title>
-            <meta
-              property="og:title"
-              content={`Inngest - ${pageProps.meta.title}`}
-            />
-          </>
-        )}
+        <title>Inngest → {metaTitle}</title>
+        <meta property="og:title" content={`Inngest - ${metaTitle}`} />
         {pageProps?.meta?.description && (
           <>
             <meta
