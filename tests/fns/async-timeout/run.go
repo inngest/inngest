@@ -20,14 +20,14 @@ func Do(ctx context.Context) testdsl.Chain {
 			"caller":   "runner",
 			"message":  "initializing fn",
 			"function": "async-timeout-fn-id",
-		}, 10*time.Millisecond),
+		}, testdsl.DefaultDuration),
 
 		// The function should run within 10ms.
 		testdsl.RequireLogFieldsWithin(map[string]any{
 			"caller":   "runner",
 			"message":  "initializing fn",
 			"function": "async-timeout-fn-id",
-		}, 10*time.Millisecond),
+		}, testdsl.DefaultDuration),
 
 		// The trigger should run.
 		testdsl.RequireTriggerExecution,
@@ -52,7 +52,7 @@ func Do(ctx context.Context) testdsl.Chain {
 				"message": "executing step",
 				"step":    "step-1",
 			},
-			10*time.Millisecond,
+			testdsl.DefaultDuration,
 		),
 	}
 }

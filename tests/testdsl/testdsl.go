@@ -19,6 +19,14 @@ import (
 	"github.com/inngest/inngest/pkg/function"
 )
 
+var (
+	// DefaultDuration represents the default duration between steps.  This
+	// is 50ms as localstack, our SQS mock, is very slow.
+	//
+	// TODO: Change this based off of the config we're using.
+	DefaultDuration = 500 * time.Millisecond
+)
+
 type TestData struct {
 	Fn          *function.Function
 	TriggerData map[string]any
@@ -112,7 +120,7 @@ func RequireTriggerExecution(ctx context.Context, td *TestData) error {
 			"message": "executing step",
 			"step":    inngest.TriggerName,
 		},
-		20*time.Millisecond,
+		DefaultDuration,
 	)(ctx, td)
 }
 
