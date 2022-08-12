@@ -62,8 +62,8 @@ function MyApp({ Component, pageProps }) {
           content={`https://www.inngest.com${router.pathname}`}
         />
       </Head>
-      <PageBanner href="/blog/open-source-event-driven-queue?ref=page-banner">
-        Announcing our open source plans for the Inngest event-driven queue
+      <PageBanner href="/docs/guides/prisma-background-jobs?ref=page-banner">
+        New Guide: Running Background Jobs with Prisma ORM + TypeScript
       </PageBanner>
       <Component {...pageProps} />
       <Script
