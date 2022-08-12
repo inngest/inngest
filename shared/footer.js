@@ -8,25 +8,16 @@ import Github from "./Icons/Github";
 const Footer = () => {
   return (
     <Wrapper className="reg-grid">
-      <div className="grid-center-6">
+      <div className="grid-center-8">
         <div className="four-cols">
           <a href="https://www.inngest.com">
             <Logo height={30} />
           </a>
         </div>
-        <div className="four-cols">
-          <div>
-            <p>Company</p>
-            <a href="/about">About</a>
-            <a href="/blog">Blog</a>
-            {/*<a href="/careers">Careers</a>*/}
-            <a href="/contact">Contact Us</a>
-          </div>
+        <div className="five-cols">
           <div>
             <p>Product</p>
             <a href="/product?ref=footer">Features</a>
-            <a href="/uses/serverless-node-background-jobs">For node</a>
-            <a href="/uses/internal-tools">Internal tools</a>
             <a href="/docs?ref=footer">Documentation</a>
             <a href="/docs/self-hosting?ref=footer">Self-host</a>
             <a
@@ -35,6 +26,20 @@ const Footer = () => {
             >
               TypedWebhook.tools
             </a>
+          </div>
+          <div>
+            <p>Use Cases</p>
+            <a href="/uses/serverless-node-background-jobs?ref=footer">
+              Node.js background jobs
+            </a>
+            <a href="/uses/internal-tools?ref=footer">Internal tools</a>
+          </div>
+          <div>
+            <p>Company</p>
+            <a href="/about">About</a>
+            <a href="/blog">Blog</a>
+            {/*<a href="/careers">Careers</a>*/}
+            <a href="/contact">Contact Us</a>
           </div>
           <div>
             <p>Community</p>
