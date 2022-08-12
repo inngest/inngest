@@ -79,11 +79,15 @@ type Step struct {
 	DSN      string                 `json:"dsn"`
 	Version  *VersionConstraint     `json:"version,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Retries  *RetryOptions          `json:"retries,omitempty"`
 }
 
 // RetryCount returns the number of retries for this step.
 func (s Step) RetryCount() int {
-	// TODO: Implement custom retry policies within config.
+	if s.Retries != nil && s.Retries.Attempts != nil {
+		return *s.Retries.Attempts
+	}
+
 	return 3
 }
 
