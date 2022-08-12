@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
@@ -13,7 +13,9 @@ import Check from "src/shared/Icons/Check";
 import CLIGradient from "src/shared/Icons/CLIGradient";
 import KeyboardGradient from "src/shared/Icons/KeyboardGradient";
 import TrendingUp from "src/shared/Icons/TrendingUp";
-import { Experiment, FadeIn } from "src/shared/Experiment";
+import Play from "src/shared/Icons/Play";
+import { trackDemoView } from "src/utils/tracking";
+// import { Experiment, FadeIn } from "src/shared/Experiment";
 
 // TODO: move these into env vars
 export const INGEST_KEY =
@@ -36,81 +38,70 @@ export async function getStaticProps() {
 }
 
 export default function Home() {
+  const [demo, setDemo] = useState(false);
+
+  useEffect(() => {
+    trackDemoView();
+  }, [demo]);
+
   return (
     <Wrapper className="home">
       <Nav sticky={true} />
 
       <Hero>
-        <FadeIn>
-          <h1>
-            <Experiment
-              experiment="2022-08-03-headline"
-              variants={{
-                "kill-queues": "Kill Your Queues",
-                "you-send-events": (
-                  <>
-                    You Send Events.
-                    <br />
-                    We Run Your Code.
-                  </>
-                ),
-              }}
-            />
-          </h1>
-          <p className="hero-subheading">
-            Inngest makes it simple for you to write delayed or background jobs
-            by triggering functions from events
-          </p>
-          <p className="hero-subheading">
-            <em>No infra, no config — just ship.</em>
-          </p>
+        <h1>
+          You Send Events.
+          <br />
+          We Run Your Code.
+        </h1>
+        <p className="hero-subheading">
+          Inngest makes it simple for you to write delayed or background jobs by
+          triggering functions from events
+        </p>
+        <p className="hero-subheading">
+          <em>No infra, no config — just ship.</em>
+        </p>
 
-          <Experiment
-            experiment="2022-08-03-headline"
-            isImage={true}
-            variants={{
-              "kill-queues": (
-                <img
-                  className="hero-graphic"
-                  src="/assets/homepage/hero-graphic-june-2022.png"
-                  alt="How Inngest works diagram"
-                />
-              ),
-              "you-send-events": (
-                <img
-                  className="hero-graphic"
-                  src="/assets/homepage/hero-graphic-simplified-aug-2022.png"
-                  alt="How Inngest works diagram"
-                />
-              ),
-            }}
-          />
+        <VidPlaceholder className="basis-1/2 px-6 flex items-center">
+          <button
+            className="flex items-center justify-center"
+            onClick={() => setDemo(true)}
+          >
+            <Play outline={false} fill="var(--primary-color)" size={80} />
+          </button>
+          <img src="/assets/homepage/cli-3-commands.png" />
+        </VidPlaceholder>
 
-          <IconList
-            direction="vertical"
-            items={[
-              "Simple publishing with HTTP + JSON",
-              "No SDKs needed",
-              "Developer tooling for the entire workflow",
-              "No boilerplate polling code",
-              "Any programming language",
-              "Step function support with DAGs",
-            ].map((text) => ({
-              icon: Check,
-              text,
-            }))}
-          />
+        <IconList
+          direction="vertical"
+          items={[
+            "Simple publishing with HTTP + JSON",
+            "No SDKs needed",
+            "Developer tooling for the entire workflow",
+            "No boilerplate polling code",
+            "Any programming language",
+            "Step function support with DAGs",
+          ].map((text) => ({
+            icon: Check,
+            text,
+          }))}
+        />
 
-          <div className="hero-ctas">
-            <Button
-              size="medium"
-              kind="primary"
-              href="/sign-up?ref=homepage-hero"
-            >
-              Jump Right In
-            </Button>
-          </div>
-        </FadeIn>
+        <img
+          className="hero-graphic"
+          src="/assets/homepage/hero-graphic-simplified-aug-2022.png"
+          alt="How Inngest works diagram"
+        />
+
+        <div className="hero-ctas">
+          <Button
+            size="medium"
+            kind="primary"
+            href="/sign-up?ref=homepage-hero"
+          >
+            Jump Right In
+          </Button>
+        </div>
       </Hero>
 
       <Section>
@@ -313,6 +304,26 @@ export default function Home() {
       </ClosingSection>
 
       <Footer />
+
+      {demo && (
+        <Demo
+          className="flex justify-center items-center"
+          onClick={() => {
+            setDemo(false);
+          }}
+        >
+          <div className="container aspect-video mx-auto max-w-2xl flex">
+            <iframe
+              src="https://www.youtube.com/embed/qVXzYBcJmGU?autoplay=1"
+              title="Inngest Product Demo"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="flex-1"
+            ></iframe>
+          </div>
+        </Demo>
+      )}
     </Wrapper>
   );
 }
@@ -349,11 +360,11 @@ const Wrapper = styled.div`
 `;
 
 const Hero = styled.header`
-  padding: 14vh 0 4rem;
+  padding: 10vh 0 4rem;
   text-align: center;
 
   h1 {
-    font-size: 4.4rem;
+    font-size: 4rem;
     margin-bottom: 1.7rem;
   }
 
@@ -431,6 +442,30 @@ const Hero = styled.header`
   }
 `;
 
+const VidPlaceholder = styled.div`
+  position: relative;
+  max-width: 800px;
+  margin: 0 auto;
+
+  button {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    svg {
+      box-shadow: 0 0 40px var(--primary-color);
+      border-radius: 60px;
+      transition: all 0.3s;
+    }
+
+    &:hover svg {
+      box-shadow: 0 0 80px 20px var(--primary-color);
+    }
+  }
+`;
+
 const BlackBackgroundWrapper = styled.div`
   background: linear-gradient(180deg, black 50%, transparent 50%);
 `;
@@ -485,5 +520,20 @@ const SocialProof = styled.section`
 
   @media (max-width: 800px) {
     margin: 14vh auto 8vh;
+  }
+`;
+
+const Demo = styled.div`
+  position: fixed;
+  top: 0;
+  z-index: 10;
+  left: 0;
+  width: 100%;
+  max-width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+
+  > div {
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
   }
 `;
