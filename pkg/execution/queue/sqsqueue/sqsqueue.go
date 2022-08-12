@@ -172,7 +172,9 @@ func (i impl) Run(ctx context.Context, f func(context.Context, queue.Item) error
 			Interface("payload", w).
 			Msg("received step via sqs")
 
-		if w.At.After(time.Now()) {
+		// SQS has second granularity, so truncate to the
+		// nearest second.
+		if w.At.Truncate(time.Second).After(time.Now()) {
 			// Re-enqueue this at a future time.
 			return i.Enqueue(ctx, w.Item, w.At)
 		}
@@ -201,7 +203,7 @@ type Wrapper struct {
 }
 
 func (m Wrapper) DelaySeconds() *int64 {
-	diff := time.Until(m.At)
+	diff := time.Until(m.At.Truncate(time.Second))
 	if diff <= 0 {
 		return nil
 	}
