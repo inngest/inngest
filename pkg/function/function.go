@@ -76,6 +76,7 @@ type Step struct {
 	Runtime inngest.RuntimeWrapper     `json:"runtime"`
 	After   []After                    `json:"after,omitempty"`
 	Version *inngest.VersionConstraint `json:"version,omitempty"`
+	Retries *inngest.RetryOptions      `json:"retries,omitempty"`
 }
 
 type After struct {

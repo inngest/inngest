@@ -89,8 +89,8 @@ package v1
 		minor?:   uint
 	}
 
-	retries: {
-		attempts: >=0 & <=20 | *3
+	retries?: {
+		attempts?: int & >=0 & <=20
 	}
 }
 

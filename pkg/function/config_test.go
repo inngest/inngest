@@ -75,6 +75,7 @@ func TestUnmarshal_testdata(t *testing.T) {
 func TestUnmarshal(t *testing.T) {
 	ctx := context.Background()
 
+	var int1 int = 1
 	var uint1 uint = 1
 	var uint2 uint = 2
 	var uint3 uint = 3
@@ -166,6 +167,56 @@ func TestUnmarshal(t *testing.T) {
 							},
 						},
 						Version: version23,
+					},
+				},
+				dir: "/dir",
+			},
+		},
+		{
+			name: "simplest json defintion with step retry attempts",
+			input: `{
+				"id": "wut",
+				"name": "test",
+				"triggers": [{ "event": "test.event" }],
+				"steps": {
+					"step-1": {
+						"id": "step-1",
+						"path": "file://.",
+						"name": "test",
+						"runtime": { "type": "docker" },
+						"after": [
+							{
+								"step": "$trigger"
+							}
+						],
+						"retries": {
+							"attempts": 1
+						}
+					}
+				}
+			}`,
+			expected: Function{
+				Name: "test",
+				ID:   "wut",
+				Triggers: []Trigger{
+					{EventTrigger: &EventTrigger{Event: "test.event"}},
+				},
+				Steps: map[string]Step{
+					DefaultStepName: {
+						ID:   DefaultStepName,
+						Name: "test",
+						Path: "file://.",
+						Runtime: inngest.RuntimeWrapper{
+							Runtime: inngest.RuntimeDocker{},
+						},
+						After: []After{
+							{
+								Step: inngest.TriggerName,
+							},
+						},
+						Retries: &inngest.RetryOptions{
+							Attempts: &int1,
+						},
 					},
 				},
 				dir: "/dir",

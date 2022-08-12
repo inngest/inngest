@@ -127,3 +127,9 @@ type VersionConstraint struct {
 	Major *uint `json:"version,omitempty"`
 	Minor *uint `json:"minor,omitempty"`
 }
+
+// RetryOptions represents configuration for how to retry.
+type RetryOptions struct {
+	// Attempts is the maximum number of times to retry.
+	Attempts *int `json:"attempts,omitempty"`
+}
