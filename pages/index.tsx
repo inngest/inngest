@@ -41,7 +41,9 @@ export default function Home() {
   const [demo, setDemo] = useState(false);
 
   useEffect(() => {
-    trackDemoView();
+    if (demo === true) {
+      trackDemoView();
+    }
   }, [demo]);
 
   return (
