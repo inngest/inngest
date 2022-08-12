@@ -241,6 +241,7 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 			ID:       found.ID,
 			Name:     a.Name,
 			DSN:      a.DSN,
+			Retries:  a.Retries,
 		}
 
 		if a.Version != nil {
@@ -330,6 +331,7 @@ func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, er
 		Name:    s.Name,
 		DSN:     id,
 		Runtime: s.Runtime,
+		Retries: s.Retries,
 	}
 
 	if s.Version != nil {
