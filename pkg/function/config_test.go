@@ -140,7 +140,7 @@ func TestUnmarshal(t *testing.T) {
 							}
 						],
 						"version": {
-							"version": 2,
+							"major": 2,
 							"minor": 3
 						}
 					}
@@ -273,7 +273,7 @@ func TestUnmarshal(t *testing.T) {
 							},
 						]
 						version: {
-							version: 2
+							major:   2
 							minor:   3
 						}
 					}
@@ -381,8 +381,8 @@ function: defs.#Function & {
       step: "$trigger"
     }]
     version: {
-      version: 1
-      minor:   1
+      major: 1
+      minor: 1
     }
   }
 }`

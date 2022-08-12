@@ -285,8 +285,8 @@ workflow: workflows.#Workflow & {
     name:     "Foo"
     dsn:      "magical-id-step-step-1-test"
     version: {
-      version: 1
-      minor:   1
+      major: 1
+      minor: 1
     }
   }]
   edges: [{
