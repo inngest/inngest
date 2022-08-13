@@ -211,5 +211,9 @@ func (m Wrapper) DelaySeconds() *int64 {
 		return aws.Int64(15 * 60)
 	}
 	secs := int64(diff.Seconds())
+	if secs < 0 {
+		// Ensure that we always round up.
+		secs = 1
+	}
 	return &secs
 }
