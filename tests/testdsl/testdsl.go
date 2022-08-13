@@ -27,10 +27,15 @@ var (
 	DefaultDuration = 500 * time.Millisecond
 )
 
+type Buffer interface {
+	io.ReadWriter
+	fmt.Stringer
+}
+
 type TestData struct {
 	Fn          *function.Function
 	TriggerData map[string]any
-	Out         *bytes.Buffer
+	Out         Buffer
 
 	Config config.Config
 }

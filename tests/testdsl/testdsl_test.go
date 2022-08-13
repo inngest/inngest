@@ -3,6 +3,7 @@ package testdsl
 import (
 	"bytes"
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -81,7 +82,7 @@ func TestRequireLogFields(t *testing.T) {
 
 func TestRequireNoLogFieldsWithin(t *testing.T) {
 	ctx := context.Background()
-	buf := bytes.NewBuffer(nil)
+	buf := &parallelBuf{}
 
 	// Send "fail" within 1 second
 	go func() {
@@ -113,4 +114,33 @@ func TestRequireNoLogFieldsWithin(t *testing.T) {
 	err = proc(ctx, data)
 	require.Nil(t, err)
 	require.Equal(t, 5, int(time.Since(now).Seconds()))
+}
+
+type parallelBuf struct {
+	bytes.Buffer
+	m sync.RWMutex
+}
+
+func (b *parallelBuf) Read(p []byte) (n int, err error) {
+	b.m.RLock()
+	defer b.m.RUnlock()
+	return b.Buffer.Read(p)
+}
+
+func (b *parallelBuf) Write(p []byte) (n int, err error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.Buffer.Write(p)
+}
+
+func (b *parallelBuf) WriteString(s string) (n int, err error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.Buffer.WriteString(s)
+}
+
+func (b *parallelBuf) String() string {
+	b.m.RLock()
+	defer b.m.RUnlock()
+	return b.Buffer.String()
 }
