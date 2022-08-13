@@ -105,7 +105,7 @@ func do(ctx context.Context) {
 					defer done()
 
 					defer func() {
-						_ = copiedCfg.inngest.Process.Kill()
+						copiedCfg.Kill()
 					}()
 
 					// TODO: Instead of exec-ing the service, run the services locally

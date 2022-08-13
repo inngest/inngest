@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/inngest/inngest/pkg/config"
@@ -87,6 +88,7 @@ func (c *Config) Up(ctx context.Context) error {
 
 	c.out = buf
 	c.inngest = exec.CommandContext(ctx, "go", "run", "../cmd/main.go", "serve", "-c", filepath.Join(c.dir, "config.cue"), "runner", "executor", "event-api")
+	c.inngest.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	c.inngest.Env = os.Environ()
 	c.inngest.Stderr = buf
 	c.inngest.Stdout = buf
@@ -108,14 +110,25 @@ func (c *Config) Up(ctx context.Context) error {
 		case <-timeout:
 			return cmdError{err: fmt.Errorf("inngest didn't start within timeout"), out: c.out.Bytes()}
 		case <-ctx.Done():
+			c.Kill()
 			return nil
 		}
 	}
 }
 
+func (c *Config) Kill() {
+	if c.inngest == nil {
+		return
+	}
+	pgid, err := syscall.Getpgid(c.inngest.Process.Pid)
+	if err != nil {
+		panic(err)
+	}
+	_ = syscall.Kill(-pgid, syscall.SIGKILL)
+}
+
 func (c *Config) Wait() error {
 	if c.inngest != nil {
-		// TODO: Handle ctx cnacellation nicely
 		return c.inngest.Wait()
 	}
 	return nil
