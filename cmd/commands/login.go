@@ -18,6 +18,7 @@ import (
 var (
 	username string
 	password string
+	token    string
 )
 
 func NewCmdLogin() *cobra.Command {
@@ -28,15 +29,19 @@ func NewCmdLogin() *cobra.Command {
 	}
 	login.Flags().StringVarP(&username, "username", "u", "", "Username (email address).  If blank will use a device login flow.")
 	login.Flags().StringVarP(&password, "password", "p", "", "Password (optional, only used when username is provided and read from TTY if blank)")
+	login.Flags().StringVarP(&token, "token", "t", "", "Token (optional, if specified will log in using a static API key)")
 	return login
 }
 
 func doLogin(cmd *cobra.Command, args []string) {
-	if username == "" {
-		// With no username provided, do the device auth flow.
-		deviceAuth(cmd.Context())
+	ctx := cmd.Context()
+
+	if username != "" {
+		userPassAuth(ctx)
+	} else if token != "" {
+		tokenAuth(ctx)
 	} else {
-		userPassAuth(cmd.Context())
+		deviceAuth(ctx)
 	}
 
 	if err := fetchAccount(cmd.Context()); err != nil {
@@ -46,6 +51,16 @@ func doLogin(cmd *cobra.Command, args []string) {
 
 	fmt.Println(cli.BoldStyle.Render("Logged in."))
 	fmt.Println("")
+}
+
+func tokenAuth(ctx context.Context) {
+	state := clistate.RequireState(ctx)
+	state.Credentials = []byte(token)
+
+	if err := state.Persist(ctx); err != nil {
+		fmt.Println(cli.RenderError(fmt.Sprintf("Unable to log in: %s", err)))
+		os.Exit(1)
+	}
 }
 
 func deviceAuth(ctx context.Context) {
