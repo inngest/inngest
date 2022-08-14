@@ -25,6 +25,7 @@ var (
 
 const (
 	SettingRanInit = "ranInit"
+	EnvApiKey      = "INNGEST_API_KEY"
 )
 
 func init() {
@@ -156,6 +157,13 @@ func GetState(ctx context.Context) (*State, error) {
 	state := &State{}
 	if err := json.Unmarshal(byt, state); err != nil {
 		return nil, fmt.Errorf("invalid state file: %w", err)
+	}
+
+	// If we've been given an API key to use, use that instead of whatever we find
+	// in the config file above.
+	envApiKey := os.Getenv(EnvApiKey)
+	if envApiKey != "" {
+		state.Credentials = []byte(envApiKey)
 	}
 
 	// add the client using our stored credentials.
