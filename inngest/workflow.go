@@ -128,7 +128,7 @@ type AsyncEdgeMetadata struct {
 // - Minor versions are backwards compatible improvements, fixes, or additions.  We
 //   automatically use the latest minor version within every step function.
 type VersionConstraint struct {
-	Major *uint `json:"version,omitempty"`
+	Major *uint `json:"major,omitempty"`
 	Minor *uint `json:"minor,omitempty"`
 }
 

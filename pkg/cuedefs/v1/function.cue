@@ -85,8 +85,8 @@ package v1
 	// version is the version constraint for the step when resolving the action to
 	// run.
 	version?: {
-		version?: uint
-		minor?:   uint
+		major?: uint
+		minor?: uint
 	}
 
 	retries?: {
