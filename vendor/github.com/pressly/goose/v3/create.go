@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"text/template"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type tmplVars struct {
@@ -59,12 +61,12 @@ func CreateWithTemplate(db *sql.DB, dir string, tmpl *template.Template, name, m
 
 	path := filepath.Join(dir, filename)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		return fmt.Errorf("failed to create migration file: %w", err)
+		return errors.Wrap(err, "failed to create migration file")
 	}
 
 	f, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("failed to create migration file: %w", err)
+		return errors.Wrap(err, "failed to create migration file")
 	}
 	defer f.Close()
 
@@ -73,7 +75,7 @@ func CreateWithTemplate(db *sql.DB, dir string, tmpl *template.Template, name, m
 		CamelName: camelCase(name),
 	}
 	if err := tmpl.Execute(f, vars); err != nil {
-		return fmt.Errorf("failed to execute tmpl: %w", err)
+		return errors.Wrap(err, "failed to execute tmpl")
 	}
 
 	log.Printf("Created new file: %s\n", f.Name())

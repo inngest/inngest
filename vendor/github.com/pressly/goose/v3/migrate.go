@@ -2,13 +2,14 @@ package goose
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"io/fs"
 	"path"
 	"runtime"
 	"sort"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -155,7 +156,7 @@ func collectMigrationsFS(fsys fs.FS, dirpath string, current, target int64) (Mig
 	for _, file := range sqlMigrationFiles {
 		v, err := NumericComponent(file)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse SQL migration file %q: %w", file, err)
+			return nil, err
 		}
 		if versionFilter(v, current, target) {
 			migration := &Migration{Version: v, Next: -1, Previous: -1, Source: file}
@@ -167,7 +168,7 @@ func collectMigrationsFS(fsys fs.FS, dirpath string, current, target int64) (Mig
 	for _, migration := range registeredGoMigrations {
 		v, err := NumericComponent(migration.Source)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse go migration file %q: %w", migration.Source, err)
+			return nil, err
 		}
 		if versionFilter(v, current, target) {
 			migrations = append(migrations, migration)
@@ -255,7 +256,7 @@ func EnsureDBVersion(db *sql.DB) (int64, error) {
 	for rows.Next() {
 		var row MigrationRecord
 		if err = rows.Scan(&row.VersionID, &row.IsApplied); err != nil {
-			return 0, fmt.Errorf("failed to scan row: %w", err)
+			return 0, errors.Wrap(err, "failed to scan row")
 		}
 
 		// have we already marked this version to be skipped?
@@ -280,7 +281,7 @@ func EnsureDBVersion(db *sql.DB) (int64, error) {
 		toSkip = append(toSkip, row.VersionID)
 	}
 	if err := rows.Err(); err != nil {
-		return 0, fmt.Errorf("failed to get next row: %w", err)
+		return 0, errors.Wrap(err, "failed to get next row")
 	}
 
 	return 0, ErrNoNextVersion

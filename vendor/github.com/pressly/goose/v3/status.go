@@ -2,9 +2,10 @@ package goose
 
 import (
 	"database/sql"
-	"fmt"
 	"path/filepath"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // Status prints the status of all migrations.
@@ -15,7 +16,7 @@ func Status(db *sql.DB, dir string, opts ...OptionsFunc) error {
 	}
 	migrations, err := CollectMigrations(dir, minVersion, maxVersion)
 	if err != nil {
-		return fmt.Errorf("failed to collect migrations: %w", err)
+		return errors.Wrap(err, "failed to collect migrations")
 	}
 	if option.noVersioning {
 		log.Println("    Applied At                  Migration")
@@ -28,14 +29,14 @@ func Status(db *sql.DB, dir string, opts ...OptionsFunc) error {
 
 	// must ensure that the version table exists if we're running on a pristine DB
 	if _, err := EnsureDBVersion(db); err != nil {
-		return fmt.Errorf("failed to ensure DB version: %w", err)
+		return errors.Wrap(err, "failed to ensure DB version")
 	}
 
 	log.Println("    Applied At                  Migration")
 	log.Println("    =======================================")
 	for _, migration := range migrations {
 		if err := printMigrationStatus(db, migration.Version, filepath.Base(migration.Source)); err != nil {
-			return fmt.Errorf("failed to print status: %w", err)
+			return errors.Wrap(err, "failed to print status")
 		}
 	}
 
@@ -49,7 +50,7 @@ func printMigrationStatus(db *sql.DB, version int64, script string) error {
 
 	err := db.QueryRow(q, version).Scan(&row.TStamp, &row.IsApplied)
 	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("failed to query the latest migration: %w", err)
+		return errors.Wrap(err, "failed to query the latest migration")
 	}
 
 	var appliedAt string
