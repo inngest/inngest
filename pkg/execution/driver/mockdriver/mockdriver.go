@@ -70,15 +70,15 @@ type Config struct {
 
 	// driver stores the driver once, as a singleton per config instance.
 	driver driver.Driver
+
+	Driver string
 }
 
 // RuntimeName returns the runtime field that should invoke this driver.
-func (*Config) RuntimeName() string { return RuntimeName }
+func (c *Config) RuntimeName() string { return c.Driver }
 
 // DriverName returns the name of this driver
 func (*Config) DriverName() string { return RuntimeName }
-
-func (c *Config) UnmarshalJSON(b []byte) error { return nil }
 
 func (c *Config) NewDriver() (driver.Driver, error) {
 	c.l.Lock()
@@ -86,7 +86,8 @@ func (c *Config) NewDriver() (driver.Driver, error) {
 
 	if c.driver == nil {
 		c.driver = &Mock{
-			Responses: c.Responses,
+			Responses:   c.Responses,
+			RuntimeName: c.Driver,
 		}
 	}
 	return c.driver, nil

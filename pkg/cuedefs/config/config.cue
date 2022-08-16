@@ -205,7 +205,8 @@ package config
 // MockDriver is used in testing to mock and stub function executions.  You
 // almost certainly do not need to include this in your config.
 #MockDriver: {
-	name: "mock"
+	name:    "mock"
+	driver?: string | *"mock"
 }
 
 #HTTPDriver: {
