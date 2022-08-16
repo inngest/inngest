@@ -289,8 +289,6 @@ func runFunction(ctx context.Context, fn function.Function, opts runFunctionOpts
 	log := logger.Buffered(buf)
 	ctx = logger.With(ctx, *log)
 
-	fmt.Println("RUNNING")
-
 	// Run the function.
 	ui, err := cli.NewRunUI(ctx, cli.RunUIOpts{
 		Function:  fn,

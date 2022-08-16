@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 
 	"cuelang.org/go/cue"
@@ -71,9 +70,9 @@ func Prepare(input []byte) (*cue.Instance, error) {
 
 		// We'll join this using the OS-specific path separator;  for some reason fs.WalkDir
 		// doesn't respect os-specific separators and always uses forward slashes.
-		p = filepath.Join(strings.Split(p, "/")...)
+		p = filepath.FromSlash(p)
 
-		// Always add a root slash prior to the overlat.
+		// Always add a root slash prior to the overlay.
 		cfg.Overlay[string(filepath.Separator)+p] = load.FromBytes(contents)
 
 		// And, Cue on windows is odd, and requires a C:\ prefix to our files _in addition to_
