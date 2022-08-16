@@ -120,7 +120,7 @@ func doRun(cmd *cobra.Command, args []string) {
 	}
 
 	if err = runFunction(ctx, *fn, opts); err != nil {
-		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+		// Already printed.
 		os.Exit(1)
 	}
 }
@@ -288,6 +288,8 @@ func runFunction(ctx context.Context, fn function.Function, opts runFunctionOpts
 	buf := bytes.NewBuffer(nil)
 	log := logger.Buffered(buf)
 	ctx = logger.With(ctx, *log)
+
+	fmt.Println("RUNNING")
 
 	// Run the function.
 	ui, err := cli.NewRunUI(ctx, cli.RunUIOpts{

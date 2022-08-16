@@ -1,19 +1,15 @@
 package function
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
-	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/format"
-	"cuelang.org/go/cue/load"
 	"cuelang.org/go/encoding/gocode/gocodec"
 	"github.com/inngest/inngest/pkg/cuedefs"
 )
@@ -60,7 +56,7 @@ func Load(ctx context.Context, dir string) (*Function, error) {
 	return nil, ErrNotFound
 }
 
-// Finds an Inngest config file at the given `path``, iterating up through the
+// Finds an Inngest config file at the given `path“, iterating up through the
 // directory tree until it finds a file or reaches the root.
 //
 // Returns the final path and the file contents.
@@ -198,54 +194,7 @@ func MarshalCUE(f Function) ([]byte, error) {
 
 // prepare generates a cue instance for the configuration.
 func prepare(input []byte) (*cue.Instance, error) {
-	cfg := &load.Config{
-		Overlay:    map[string]load.Source{},
-		Dir:        "/",
-		ModuleRoot: "/",
-		Package:    "inngest.com/defs",
-		Stdin:      bytes.NewBuffer(input),
-	}
-
-	// Add each of the embedded cue files from our definitions to our config.
-	err := fs.WalkDir(cuedefs.FS, ".", func(p string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		if strings.HasPrefix(p, "config") {
-			// Config definitions are used to manage services only.
-			return nil
-		}
-		contents, err := cuedefs.FS.ReadFile(p)
-		if err != nil {
-			return err
-		}
-		cfg.Overlay[path.Join("/", p)] = load.FromBytes(contents)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Add the input.
-	builds := load.Instances([]string{"-"}, cfg)
-	if len(builds) != 1 {
-		return nil, fmt.Errorf("unexpected cue build instances generated: %d", len(builds))
-	}
-
-	if builds[0].Err != nil {
-		return nil, fmt.Errorf("error loading instance: %w", builds[0].Err)
-	}
-
-	r := &cue.Runtime{}
-	inst, err := r.Build(builds[0])
-	if err != nil {
-		return nil, fmt.Errorf("error building instance: %w", err)
-	}
-
-	return inst, nil
+	return cuedefs.Prepare(input)
 }
 
 // parse attempts to parse the input within a cue instance.
