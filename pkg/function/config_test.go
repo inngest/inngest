@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -119,7 +120,7 @@ func TestUnmarshal(t *testing.T) {
 						Version: version11,
 					},
 				},
-				dir: "/dir",
+				dir: filepath.FromSlash("/dir"),
 			},
 		},
 		{
@@ -168,7 +169,7 @@ func TestUnmarshal(t *testing.T) {
 						Version: version23,
 					},
 				},
-				dir: "/dir",
+				dir: filepath.FromSlash("/dir"),
 			},
 		},
 		{
@@ -203,7 +204,7 @@ func TestUnmarshal(t *testing.T) {
 						Version: version11,
 					},
 				},
-				dir: "/dir",
+				dir: filepath.FromSlash("/dir"),
 			},
 		},
 		{
@@ -243,7 +244,7 @@ func TestUnmarshal(t *testing.T) {
 						Version: version11,
 					},
 				},
-				dir: "/dir",
+				dir: filepath.FromSlash("/dir"),
 			},
 		},
 		{
@@ -301,7 +302,7 @@ func TestUnmarshal(t *testing.T) {
 						Version: version23,
 					},
 				},
-				dir: "/dir",
+				dir: filepath.FromSlash("/dir"),
 			},
 		},
 	}
