@@ -10,10 +10,134 @@ import (
 
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/inngest/clistate"
-	"github.com/karrick/godirwalk"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/txtar"
 )
+
+const exampleTxtar = `
+-- function.json --
+{
+  "name": "test",
+  "id": "some-id",
+  "triggers": [
+    {
+      "event": "test.event",
+      "expression": "event.data.run == true"
+    }
+  ],
+  "idempotency": "{{ event.data.foo }}",
+  "throttle": {
+    "count": 1,
+    "period": "24h",
+    "key": "{{ event.data.foo }}"
+  },
+  "steps": {
+    "first": {
+      "id": "first",
+      "path": "",
+      "name": "My first func",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "$trigger",
+          "wait": "5m"
+        }
+      ]
+    },
+    "second": {
+      "id": "second",
+      "path": "",
+      "name": "A second func that does something cool!",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "first"
+        }
+      ]
+    }
+  }
+}
+-- input --
+package main
+
+import (
+        defs "inngest.com/defs/v1"
+)
+
+function: defs.#Function & {
+        id:   "some-id"
+        name: "test"
+        triggers: [defs.#EventTrigger & {
+                event:      "test.event"
+                expression: "event.data.run == true"
+        }]
+        idempotency: "{{ event.data.foo }}"
+        steps: {
+                first: {
+                        name: "My first func"
+                        runtime: defs.#RuntimeDocker
+                        after: [{
+                                step: "$trigger"
+                                wait: "5m"
+                        }]
+                }
+                second: {
+                        name: "A second func that does something cool!"
+                        runtime: defs.#RuntimeDocker
+                        after: [{
+                                step: "first"
+                        }]
+                }
+        }
+}
+-- workflow.json --
+{
+  "id": "some-id",
+  "name": "test",
+  "throttle": {
+    "count": 1,
+    "period": "24h",
+    "key": "{{ event.data.foo }}"
+  },
+  "triggers": [
+    {
+      "event": "test.event",
+      "expression": "event.data.run == true"
+    }
+  ],
+  "actions": [
+    {
+      "id": "first",
+      "clientID": 1,
+      "name": "My first func",
+      "dsn": "some-id-step-first-test"
+    },
+    {
+      "id": "second",
+      "clientID": 2,
+      "name": "A second func that does something cool!",
+      "dsn": "some-id-step-second-test"
+    }
+  ],
+  "edges": [
+    {
+      "outgoing": "$trigger",
+      "incoming": "first",
+      "metadata": {
+        "wait": "5m"
+      }
+    },
+    {
+      "outgoing": "first",
+      "incoming": "second"
+    }
+  ]
+}
+`
 
 func TestUnmarshal_testdata(t *testing.T) {
 	ctx := context.Background()
@@ -24,59 +148,45 @@ func TestUnmarshal_testdata(t *testing.T) {
 		workflow []byte
 	}
 
-	err := godirwalk.Walk(filepath.FromSlash("./testdata"), &godirwalk.Options{
-		Callback: func(absPath string, d *godirwalk.Dirent) error {
-			t.Run(absPath, func(t *testing.T) {
-				err := clistate.Clear(context.Background())
-				require.NoError(t, err)
-
-				if !strings.HasSuffix(absPath, ".txtar") {
-					return
-				}
-
-				fmt.Println("Reading: ", absPath)
-
-				archive, err := txtar.ParseFile(absPath)
-				if err != nil {
-					require.NoError(t, err)
-				}
-
-				fmt.Println(string(archive.Comment))
-
-				td := testdata{}
-				for _, f := range archive.Files {
-					switch f.Name {
-					case "input":
-						td.input = f.Data
-					case "function.json":
-						td.function = f.Data
-					case "workflow.json":
-						td.workflow = f.Data
-					}
-				}
-
-				require.NotEmpty(t, td.input)
-				require.NotEmpty(t, td.function)
-				require.NotEmpty(t, td.workflow)
-
-				fn, err := Unmarshal(ctx, td.input, "/dir/inngest.json")
-				require.NoError(t, err)
-
-				marshalled, err := json.MarshalIndent(fn, "", "  ")
-				require.NoError(t, err)
-				require.EqualValues(t, strings.TrimSpace(string(td.function)), string(marshalled))
-
-				flow, err := fn.Workflow(context.Background())
-				require.NoError(t, err)
-
-				marshalled, err = json.MarshalIndent(flow, "", "  ")
-				require.NoError(t, err)
-				require.EqualValues(t, strings.TrimSpace(string(td.workflow)), string(marshalled))
-			})
-			return nil
-		},
-	})
+	err := clistate.Clear(context.Background())
 	require.NoError(t, err)
+
+	archive := txtar.Parse([]byte(exampleTxtar))
+	if err != nil {
+		require.NoError(t, err)
+	}
+
+	fmt.Println(string(archive.Comment))
+
+	td := testdata{}
+	for _, f := range archive.Files {
+		switch f.Name {
+		case "input":
+			td.input = f.Data
+		case "function.json":
+			td.function = f.Data
+		case "workflow.json":
+			td.workflow = f.Data
+		}
+	}
+
+	require.NotEmpty(t, td.input)
+	require.NotEmpty(t, td.function)
+	require.NotEmpty(t, td.workflow)
+
+	fn, err := Unmarshal(ctx, td.input, "/dir/inngest.json")
+	require.NoError(t, err)
+
+	marshalled, err := json.MarshalIndent(fn, "", "  ")
+	require.NoError(t, err)
+	require.EqualValues(t, strings.TrimSpace(string(td.function)), string(marshalled))
+
+	flow, err := fn.Workflow(context.Background())
+	require.NoError(t, err)
+
+	marshalled, err = json.MarshalIndent(flow, "", "  ")
+	require.NoError(t, err)
+	require.EqualValues(t, strings.TrimSpace(string(td.workflow)), string(marshalled))
 }
 
 // TestUnmarshal asserts that unmarshalling a function definition works as expected, producing
