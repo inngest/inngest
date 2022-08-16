@@ -51,7 +51,7 @@ Here's an example configuration file with all three expressions:
       "after": [
         {
           "step": "step-1",
-// @log: This edge expression indicates that step-2 should only run if the the output of the previous step (step-1) contains the data body.email which matches 'hello@example.com'.  If the step doesn't respond with this data, step-2 will not run.
+// @log: This step expression indicates that step-2 should only run if the the output of the previous step (step-1) contains the data body.email which matches 'hello@example.com'.  If the step doesn't respond with this data, step-2 will not run.
           "if": "steps['step-1'].body.email == 'hello@example.com'"
         }
       ]
@@ -105,6 +105,30 @@ The following variables are available within trigger expressions:
   the user ordered more than 1 product: <br />
   `event.data.amount >= 100 && size(event.data.items) > 1`
 
+
+```json twoslash
+{
+  "name": "Create coupon for valued orders",
+  "id": "my-function-ede40d",
+  "triggers": [
+    {
+      "event": "shop/checkout.complete",
+      "expression": "event.data.amount >= 100 && size(event.data.items) > 1"
+    }
+  ],
+  "steps": {
+    "coupon": {
+      "id": "coupon",
+      "path": "file://./steps/create-coupon",
+      "name": "Create coupon",
+      "runtime": {
+        "type": "docker"
+      }
+    }
+  }
+}
+```
+
 ## Step expressions
 
 Step expressions allow you to conditionally run steps within a step function.
@@ -129,7 +153,45 @@ steps.
 **Examples**
 
 - Only continuing if a step with the ID `checkStatus` returns "delinquent": <br />
-  `steps["checkStatus"] == "delinquent"`
+  `steps["checkStatus"].body.status == "delinquent"`
+
+```json twoslash
+{
+  "name": "Send SMS Dispatch",
+  "id": "my-function-ede40d",
+  "triggers": [
+    {
+      "event": "api/response.received",
+    }
+  ],
+
+  "steps": {
+    "checkStatus": {
+      "id": "checkStatus",
+      "path": "file://./steps/send-sms-dispatch",
+      "name": "Send SMS Dispatch",
+      "runtime": {
+        "type": "docker"
+      }
+    },
+
+    "step-2": {
+      "id": "step-2",
+      "path": "file://./steps/my-second-step",
+      "name": "Another step",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "step-1",
+          "if": "steps['checkStatus'].body.status == 'delinquent'"
+        }
+      ]
+    }
+  }
+}
+```
 
 ## Asynchronous (async) expressions
 
@@ -156,6 +218,37 @@ and the incoming async event's data.
   `async.data.cart_id == event.data.cart_id`
 - When a task is created, wait for the same task to be completed: <br />
   `async.data.task_id == event.data.task_id && async.data.action == 'completed'`
+
+```json twoslash
+{
+  "name": "Wait for task completion",
+  "id": "my-function-ede40d",
+  "triggers": [
+    { "event": "api/task.created" }
+  ],
+
+  "steps": {
+    "complete": {
+      "id": "complete",
+      "path": "file://./steps/send-sms-dispatch",
+      "name": "Send SMS Dispatch",
+      "runtime": {
+        "type": "docker"
+      }
+      "after": [
+        {
+          "step": "$trigger",
+          "async": {
+            "event": "api/task.updated",
+            "ttl": "1w",
+            "match": "async.data.task_id == event.data.task_id"
+          }
+        }
+      ]
+    }
+  }
+}
+```
 
 ## Functions and helpers
 
