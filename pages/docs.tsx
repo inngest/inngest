@@ -255,6 +255,11 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
     margin: 1.5em 0;
   }
 
+  ul {
+    list-style-type: disc;
+    margin-left: 1rem;
+  }
+
   aside,
   video {
     margin: 1em 0;

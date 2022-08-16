@@ -94,9 +94,6 @@ const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
             >
               Sign up for free
             </Button>
-            <a className="auth-login" href={process.env.NEXT_PUBLIC_LOGIN_URL}>
-              Log in
-            </a>
           </div>
         </CTAContainer>
       </Menu>
@@ -200,7 +197,7 @@ const Sidebar = styled.div`
   position: sticky;
   top: 0px;
   height: 100vh;
-  overflow: scroll;
+  overflow-y: auto;
   border-right: 1px solid var(--border-color);
   background-color: var(--bg-color);
 
@@ -258,6 +255,10 @@ const Menu = styled.div<{ isExpanded: boolean }>`
     margin-top: 1em;
     display: ${({ isExpanded }) => (isExpanded ? "block" : "none")};
     overflow: scroll;
+  }
+
+  ul ul {
+    margin-bottom: 1.5rem;
   }
 `;
 
