@@ -3,22 +3,19 @@ package function
 import (
 	"context"
 	"encoding/json"
-	"log"
-	"os"
-	"path"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/inngest/clistate"
+	"github.com/karrick/godirwalk"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/txtar"
 )
 
 func TestUnmarshal_testdata(t *testing.T) {
-	entries, err := os.ReadDir("./testdata")
-	require.NoError(t, err)
 	ctx := context.Background()
 
 	type testdata struct {
@@ -27,48 +24,59 @@ func TestUnmarshal_testdata(t *testing.T) {
 		workflow []byte
 	}
 
-	for _, e := range entries {
-		t.Run(e.Name(), func(t *testing.T) {
-			err := clistate.Clear(context.Background())
-			require.NoError(t, err)
+	err := godirwalk.Walk(filepath.FromSlash("./testdata"), &godirwalk.Options{
+		Callback: func(absPath string, d *godirwalk.Dirent) error {
+			t.Run(absPath, func(t *testing.T) {
+				err := clistate.Clear(context.Background())
+				require.NoError(t, err)
 
-			if !strings.HasSuffix(e.Name(), ".txtar") {
-				return
-			}
-
-			archive, err := txtar.ParseFile(path.Join("./testdata", e.Name()))
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			td := testdata{}
-			for _, f := range archive.Files {
-				switch f.Name {
-				case "input":
-					td.input = f.Data
-				case "function.json":
-					td.function = f.Data
-				case "workflow.json":
-					td.workflow = f.Data
+				if !strings.HasSuffix(absPath, ".txtar") {
+					return
 				}
-			}
 
-			fn, err := Unmarshal(ctx, td.input, "/dir/inngest.json")
-			require.NoError(t, err)
+				fmt.Println("Reading: ", absPath)
 
-			marshalled, err := json.MarshalIndent(fn, "", "  ")
-			require.NoError(t, err)
-			require.EqualValues(t, strings.TrimSpace(string(td.function)), string(marshalled))
+				archive, err := txtar.ParseFile(absPath)
+				if err != nil {
+					require.NoError(t, err)
+				}
 
-			flow, err := fn.Workflow(context.Background())
-			require.NoError(t, err)
+				fmt.Println(string(archive.Comment))
 
-			marshalled, err = json.MarshalIndent(flow, "", "  ")
-			require.NoError(t, err)
-			require.EqualValues(t, strings.TrimSpace(string(td.workflow)), string(marshalled))
-		})
-	}
+				td := testdata{}
+				for _, f := range archive.Files {
+					switch f.Name {
+					case "input":
+						td.input = f.Data
+					case "function.json":
+						td.function = f.Data
+					case "workflow.json":
+						td.workflow = f.Data
+					}
+				}
 
+				require.NotEmpty(t, td.input)
+				require.NotEmpty(t, td.function)
+				require.NotEmpty(t, td.workflow)
+
+				fn, err := Unmarshal(ctx, td.input, "/dir/inngest.json")
+				require.NoError(t, err)
+
+				marshalled, err := json.MarshalIndent(fn, "", "  ")
+				require.NoError(t, err)
+				require.EqualValues(t, strings.TrimSpace(string(td.function)), string(marshalled))
+
+				flow, err := fn.Workflow(context.Background())
+				require.NoError(t, err)
+
+				marshalled, err = json.MarshalIndent(flow, "", "  ")
+				require.NoError(t, err)
+				require.EqualValues(t, strings.TrimSpace(string(td.workflow)), string(marshalled))
+			})
+			return nil
+		},
+	})
+	require.NoError(t, err)
 }
 
 // TestUnmarshal asserts that unmarshalling a function definition works as expected, producing

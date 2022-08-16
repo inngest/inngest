@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	timeout = 50 * time.Millisecond
-	buffer  = 10 * time.Millisecond
+	timeout = 100 * time.Millisecond
+	buffer  = 25 * time.Millisecond
 )
 
 type prepared struct {

@@ -147,6 +147,8 @@ func LoadRecursive(ctx context.Context, dir string) ([]*Function, error) {
 //
 // This validates the function after parsing, returning any validation errors.
 func Unmarshal(ctx context.Context, input []byte, path string) (*Function, error) {
+	path = filepath.FromSlash(path)
+
 	cuedefs.Lock()
 	defer cuedefs.Unlock()
 

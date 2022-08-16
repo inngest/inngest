@@ -9,6 +9,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -78,7 +79,22 @@ func Prepare(input []byte) (*cue.Instance, error) {
 		// And, Cue on windows is odd, and requires a C:\ prefix to our files _in addition to_
 		// root slashes.
 		if runtime.GOOS == "windows" {
-			cfg.Overlay[`C:\`+p] = load.FromBytes(contents)
+			path, err := os.Executable()
+			if err != nil {
+				return err
+			}
+
+			// Get the current disk, then use this as a prefix.
+			disk := path[0:3] + p
+			cfg.Overlay[disk] = load.FromBytes(contents)
+
+			// This is the logic which Cue uses, which may
+			// result in a different root disk than the OS
+			// executable.  This defers to syscall.FullPath
+			// to return a disk prefix.
+			abs, _ := filepath.Abs(string(filepath.Separator))
+			cleaned := filepath.Clean(abs + p)
+			cfg.Overlay[cleaned] = load.FromBytes(contents)
 		}
 
 		return nil

@@ -1,36 +1,3 @@
--- input --
-package main
-
-import (
-	defs "inngest.com/defs/v1"
-)
-
-function: defs.#Function & {
-	id:   "some-id"
-	name: "test"
-	triggers: [defs.#EventTrigger & {
-		event:      "test.event"
-		expression: "event.data.run == true"
-	}]
-	idempotency: "{{ event.data.foo }}"
-	steps: {
-		first: {
-			name: "My first func"
-			runtime: defs.#RuntimeDocker
-			after: [{
-				step: "$trigger"
-				wait: "5m"
-			}]
-		}
-		second: {
-			name: "A second func that does something cool!"
-			runtime: defs.#RuntimeDocker
-			after: [{
-				step: "first"
-			}]
-		}
-	}
-}
 -- function.json --
 {
   "name": "test",
@@ -76,6 +43,39 @@ function: defs.#Function & {
       ]
     }
   }
+}
+-- input --
+package main
+
+import (
+	defs "inngest.com/defs/v1"
+)
+
+function: defs.#Function & {
+	id:   "some-id"
+	name: "test"
+	triggers: [defs.#EventTrigger & {
+		event:      "test.event"
+		expression: "event.data.run == true"
+	}]
+	idempotency: "{{ event.data.foo }}"
+	steps: {
+		first: {
+			name: "My first func"
+			runtime: defs.#RuntimeDocker
+			after: [{
+				step: "$trigger"
+				wait: "5m"
+			}]
+		}
+		second: {
+			name: "A second func that does something cool!"
+			runtime: defs.#RuntimeDocker
+			after: [{
+				step: "first"
+			}]
+		}
+	}
 }
 -- workflow.json --
 {
