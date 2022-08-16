@@ -485,7 +485,7 @@ Returns the size of the current data.  This returns the total number of items
 within an array, or the length of a string.
 
 ```
-size([1, 2, 3, 4, 5]) == 5
+size([0, 8, 2]) == 3
 ```
 
 ```
