@@ -186,6 +186,8 @@ steps.
         {
           "step": "step-1",
           "if": "steps['checkStatus'].body.status == 'delinquent'"
+	  // NOTE: This could be written as `response.body.status == 'delinquent'`,
+	  // as `response` always represents the parent step that just ran.
         }
       ]
     }
