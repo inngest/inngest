@@ -120,7 +120,7 @@ func doRun(cmd *cobra.Command, args []string) {
 	}
 
 	if err = runFunction(ctx, *fn, opts); err != nil {
-		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+		// Already printed.
 		os.Exit(1)
 	}
 }

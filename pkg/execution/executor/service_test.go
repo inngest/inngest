@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	timeout = 50 * time.Millisecond
-	buffer  = 10 * time.Millisecond
+	timeout = 200 * time.Millisecond
+	buffer  = 50 * time.Millisecond
 )
 
 type prepared struct {
@@ -143,7 +143,25 @@ func prepare(ctx context.Context, t *testing.T, f function.Function) prepared {
 	t.Helper()
 
 	// Create a new state manager and queue, in-memory
-	c, err := config.Default(ctx)
+	c, err := config.Parse([]byte(`package main
+
+import (
+	config "inngest.com/defs/config"
+)
+
+config.#Config & {
+	execution: {
+		drivers: {
+			http: config.#MockDriver & {
+				driver: "http"
+			}
+			docker: config.#MockDriver & {
+				driver: "docker"
+			}
+		}
+	}
+}`))
+
 	require.NoError(t, err)
 	sm, err := c.State.Service.Concrete.Manager(ctx)
 	require.NoError(t, err)

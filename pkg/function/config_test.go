@@ -3,9 +3,8 @@ package function
 import (
 	"context"
 	"encoding/json"
-	"log"
-	"os"
-	"path"
+	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -15,9 +14,132 @@ import (
 	"golang.org/x/tools/txtar"
 )
 
+const exampleTxtar = `
+-- function.json --
+{
+  "name": "test",
+  "id": "some-id",
+  "triggers": [
+    {
+      "event": "test.event",
+      "expression": "event.data.run == true"
+    }
+  ],
+  "idempotency": "{{ event.data.foo }}",
+  "throttle": {
+    "count": 1,
+    "period": "24h",
+    "key": "{{ event.data.foo }}"
+  },
+  "steps": {
+    "first": {
+      "id": "first",
+      "path": "",
+      "name": "My first func",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "$trigger",
+          "wait": "5m"
+        }
+      ]
+    },
+    "second": {
+      "id": "second",
+      "path": "",
+      "name": "A second func that does something cool!",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "first"
+        }
+      ]
+    }
+  }
+}
+-- input --
+package main
+
+import (
+        defs "inngest.com/defs/v1"
+)
+
+function: defs.#Function & {
+        id:   "some-id"
+        name: "test"
+        triggers: [defs.#EventTrigger & {
+                event:      "test.event"
+                expression: "event.data.run == true"
+        }]
+        idempotency: "{{ event.data.foo }}"
+        steps: {
+                first: {
+                        name: "My first func"
+                        runtime: defs.#RuntimeDocker
+                        after: [{
+                                step: "$trigger"
+                                wait: "5m"
+                        }]
+                }
+                second: {
+                        name: "A second func that does something cool!"
+                        runtime: defs.#RuntimeDocker
+                        after: [{
+                                step: "first"
+                        }]
+                }
+        }
+}
+-- workflow.json --
+{
+  "id": "some-id",
+  "name": "test",
+  "throttle": {
+    "count": 1,
+    "period": "24h",
+    "key": "{{ event.data.foo }}"
+  },
+  "triggers": [
+    {
+      "event": "test.event",
+      "expression": "event.data.run == true"
+    }
+  ],
+  "actions": [
+    {
+      "id": "first",
+      "clientID": 1,
+      "name": "My first func",
+      "dsn": "some-id-step-first-test"
+    },
+    {
+      "id": "second",
+      "clientID": 2,
+      "name": "A second func that does something cool!",
+      "dsn": "some-id-step-second-test"
+    }
+  ],
+  "edges": [
+    {
+      "outgoing": "$trigger",
+      "incoming": "first",
+      "metadata": {
+        "wait": "5m"
+      }
+    },
+    {
+      "outgoing": "first",
+      "incoming": "second"
+    }
+  ]
+}
+`
+
 func TestUnmarshal_testdata(t *testing.T) {
-	entries, err := os.ReadDir("./testdata")
-	require.NoError(t, err)
 	ctx := context.Background()
 
 	type testdata struct {
@@ -26,48 +148,45 @@ func TestUnmarshal_testdata(t *testing.T) {
 		workflow []byte
 	}
 
-	for _, e := range entries {
-		t.Run(e.Name(), func(t *testing.T) {
-			err := clistate.Clear(context.Background())
-			require.NoError(t, err)
+	err := clistate.Clear(context.Background())
+	require.NoError(t, err)
 
-			if !strings.HasSuffix(e.Name(), ".txtar") {
-				return
-			}
-
-			archive, err := txtar.ParseFile(path.Join("./testdata", e.Name()))
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			td := testdata{}
-			for _, f := range archive.Files {
-				switch f.Name {
-				case "input":
-					td.input = f.Data
-				case "function.json":
-					td.function = f.Data
-				case "workflow.json":
-					td.workflow = f.Data
-				}
-			}
-
-			fn, err := Unmarshal(ctx, td.input, "/dir/inngest.json")
-			require.NoError(t, err)
-
-			marshalled, err := json.MarshalIndent(fn, "", "  ")
-			require.NoError(t, err)
-			require.EqualValues(t, strings.TrimSpace(string(td.function)), string(marshalled))
-
-			flow, err := fn.Workflow(context.Background())
-			require.NoError(t, err)
-
-			marshalled, err = json.MarshalIndent(flow, "", "  ")
-			require.NoError(t, err)
-			require.EqualValues(t, strings.TrimSpace(string(td.workflow)), string(marshalled))
-		})
+	archive := txtar.Parse([]byte(exampleTxtar))
+	if err != nil {
+		require.NoError(t, err)
 	}
 
+	fmt.Println(string(archive.Comment))
+
+	td := testdata{}
+	for _, f := range archive.Files {
+		switch f.Name {
+		case "input":
+			td.input = f.Data
+		case "function.json":
+			td.function = f.Data
+		case "workflow.json":
+			td.workflow = f.Data
+		}
+	}
+
+	require.NotEmpty(t, td.input)
+	require.NotEmpty(t, td.function)
+	require.NotEmpty(t, td.workflow)
+
+	fn, err := Unmarshal(ctx, td.input, "/dir/inngest.json")
+	require.NoError(t, err)
+
+	marshalled, err := json.MarshalIndent(fn, "", "  ")
+	require.NoError(t, err)
+	require.EqualValues(t, strings.TrimSpace(string(td.function)), string(marshalled))
+
+	flow, err := fn.Workflow(context.Background())
+	require.NoError(t, err)
+
+	marshalled, err = json.MarshalIndent(flow, "", "  ")
+	require.NoError(t, err)
+	require.EqualValues(t, strings.TrimSpace(string(td.workflow)), string(marshalled))
 }
 
 // TestUnmarshal asserts that unmarshalling a function definition works as expected, producing
@@ -119,7 +238,7 @@ func TestUnmarshal(t *testing.T) {
 						Version: version11,
 					},
 				},
-				dir: "/dir",
+				dir: filepath.FromSlash("/dir"),
 			},
 		},
 		{
@@ -168,7 +287,7 @@ func TestUnmarshal(t *testing.T) {
 						Version: version23,
 					},
 				},
-				dir: "/dir",
+				dir: filepath.FromSlash("/dir"),
 			},
 		},
 		{
@@ -203,7 +322,7 @@ func TestUnmarshal(t *testing.T) {
 						Version: version11,
 					},
 				},
-				dir: "/dir",
+				dir: filepath.FromSlash("/dir"),
 			},
 		},
 		{
@@ -243,7 +362,7 @@ func TestUnmarshal(t *testing.T) {
 						Version: version11,
 					},
 				},
-				dir: "/dir",
+				dir: filepath.FromSlash("/dir"),
 			},
 		},
 		{
@@ -301,7 +420,7 @@ func TestUnmarshal(t *testing.T) {
 						Version: version23,
 					},
 				},
-				dir: "/dir",
+				dir: filepath.FromSlash("/dir"),
 			},
 		},
 	}

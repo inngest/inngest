@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/inngest/inngest/inngest"
@@ -84,7 +85,13 @@ func TestTemplateRenderTypescript(t *testing.T) {
 	// Expect "types.ts" to contain genned types.
 	byt, err := os.ReadFile(filepath.Join(root, "steps", "my-test", "types.ts"))
 	require.NoError(t, err)
-	require.EqualValues(t, expectedTypes, string(byt))
+
+	// For compatibility, we're going to replace windows newlines with
+	// just newlines here.
+	out := strings.TrimSpace(string(byt))
+	out = strings.ReplaceAll(out, "\r\n", "\n")
+
+	require.EqualValues(t, strings.TrimSpace(expectedTypes), out)
 }
 
 var expectedTypes = `// Generated via inngest init

@@ -275,7 +275,7 @@ func (r *RunUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if r.done {
+	if r.done || r.err != nil {
 		// The fn has ran.
 		cmds = append(cmds, tea.Quit)
 	}
@@ -313,18 +313,10 @@ func (r *RunUI) View() string {
 		for _, run := range r.runs {
 			s.WriteString(r.RenderState(run) + "\n")
 		}
-	} else {
-		// nothing has happened yet
-		return s.String()
 	}
 
-	if !r.done {
-		// We have't ran the action yet.
-		return s.String()
-	}
-
-	if !r.verbose {
-		s.WriteString("\n")
+	if r.err != nil {
+		s.WriteString(RenderError(r.err.Error()) + "\n")
 	}
 
 	return s.String()
