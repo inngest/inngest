@@ -532,6 +532,10 @@ github.com/go-git/go-git/v5/utils/merkletrie/filesystem
 github.com/go-git/go-git/v5/utils/merkletrie/index
 github.com/go-git/go-git/v5/utils/merkletrie/internal/frame
 github.com/go-git/go-git/v5/utils/merkletrie/noder
+# github.com/go-ole/go-ole v1.2.6
+## explicit; go 1.12
+github.com/go-ole/go-ole
+github.com/go-ole/go-ole/oleutil
 # github.com/go-redis/redis/v8 v8.11.5
 ## explicit; go 1.17
 github.com/go-redis/redis/v8
@@ -825,6 +829,13 @@ github.com/sahilm/fuzzy
 # github.com/sergi/go-diff v1.1.0
 ## explicit; go 1.12
 github.com/sergi/go-diff/diffmatchpatch
+# github.com/shirou/gopsutil v3.21.11+incompatible
+## explicit
+github.com/shirou/gopsutil/cpu
+github.com/shirou/gopsutil/internal/common
+github.com/shirou/gopsutil/mem
+github.com/shirou/gopsutil/net
+github.com/shirou/gopsutil/process
 # github.com/sirupsen/logrus v1.8.1
 ## explicit; go 1.13
 github.com/sirupsen/logrus
@@ -862,6 +873,12 @@ github.com/stretchr/testify/require
 # github.com/subosito/gotenv v1.2.0
 ## explicit
 github.com/subosito/gotenv
+# github.com/tklauser/go-sysconf v0.3.10
+## explicit; go 1.13
+github.com/tklauser/go-sysconf
+# github.com/tklauser/numcpus v0.4.0
+## explicit; go 1.11
+github.com/tklauser/numcpus
 # github.com/urfave/cli/v2 v2.8.1
 ## explicit; go 1.18
 github.com/urfave/cli/v2
@@ -908,6 +925,9 @@ github.com/yuin/gopher-lua
 github.com/yuin/gopher-lua/ast
 github.com/yuin/gopher-lua/parse
 github.com/yuin/gopher-lua/pm
+# github.com/yusufpapurcu/wmi v1.2.2
+## explicit; go 1.16
+github.com/yusufpapurcu/wmi
 # github.com/zclconf/go-cty v1.8.3
 ## explicit; go 1.12
 github.com/zclconf/go-cty/cty

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shirou/gopsutil/process"
 	"github.com/stretchr/testify/require"
 )
 
@@ -77,11 +78,14 @@ func TestSigint(t *testing.T) {
 	}()
 
 	<-time.After(50 * time.Millisecond)
-	err := syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+	// XXX: We use gopsutil for support on linux and windows.
+	p, err := process.NewProcess(int32(syscall.Getpid()))
+	require.NoError(t, err)
+	err = p.Terminate()
 	require.NoError(t, err)
 
 	wg.Wait()
-	require.WithinDuration(t, time.Now(), now.Add(50*time.Millisecond), 5*time.Millisecond)
+	require.WithinDuration(t, time.Now(), now.Add(50*time.Millisecond), 10*time.Millisecond)
 }
 
 func TestSigterm(t *testing.T) {
@@ -102,11 +106,13 @@ func TestSigterm(t *testing.T) {
 	}()
 
 	<-time.After(50 * time.Millisecond)
-	err := syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+	p, err := process.NewProcess(int32(syscall.Getpid()))
+	require.NoError(t, err)
+	err = p.Terminate()
 	require.NoError(t, err)
 
 	wg.Wait()
-	require.WithinDuration(t, time.Now(), now.Add(50*time.Millisecond), 5*time.Millisecond)
+	require.WithinDuration(t, time.Now(), now.Add(50*time.Millisecond), 10*time.Millisecond)
 }
 
 func TestPreError(t *testing.T) {
