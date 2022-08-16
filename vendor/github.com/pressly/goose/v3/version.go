@@ -2,7 +2,8 @@ package goose
 
 import (
 	"database/sql"
-	"fmt"
+
+	"github.com/pkg/errors"
 )
 
 // Version prints the current version of the database.
@@ -15,7 +16,7 @@ func Version(db *sql.DB, dir string, opts ...OptionsFunc) error {
 		var current int64
 		migrations, err := CollectMigrations(dir, minVersion, maxVersion)
 		if err != nil {
-			return fmt.Errorf("failed to collect migrations: %w", err)
+			return errors.Wrap(err, "failed to collect migrations")
 		}
 		if len(migrations) > 0 {
 			current = migrations[len(migrations)-1].Version

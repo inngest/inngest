@@ -785,8 +785,8 @@ github.com/opencontainers/go-digest
 ## explicit
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.1.2
-## explicit; go 1.16
+# github.com/opencontainers/runc v1.0.3
+## explicit; go 1.13
 github.com/opencontainers/runc/libcontainer/user
 # github.com/pelletier/go-toml v1.9.4
 ## explicit; go 1.12
@@ -797,8 +797,8 @@ github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
-# github.com/pressly/goose/v3 v3.6.1
-## explicit; go 1.17
+# github.com/pressly/goose/v3 v3.5.3
+## explicit; go 1.16
 github.com/pressly/goose/v3
 # github.com/protocolbuffers/txtpbfmt v0.0.0-20201118171849-f6a6b3f636fc
 ## explicit; go 1.13
