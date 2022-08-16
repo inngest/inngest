@@ -163,24 +163,26 @@ func RequireStepRetries(step string, count int) Proc {
 				return err
 			}
 
-			if i+1 < count {
-				fmt.Printf("\t> Checking attempt #%d queues a retry\n", i+1)
-				if err := timeout(time.Second*5, func() error {
-					return requireLogFields(ctx, td, map[string]any{
-						"caller":  "executor",
-						"message": "enqueueing retry",
-						"edge": map[string]any{
-							"errorCount": i + 1,
-							"payload": map[string]any{
-								"edge": map[string]any{
-									"incoming": step,
-								},
+			if i+1 >= count {
+				continue
+			}
+
+			fmt.Printf("\t> Checking attempt #%d queues a retry\n", i+1)
+			if err := timeout(time.Second*5, func() error {
+				return requireLogFields(ctx, td, map[string]any{
+					"caller":  "executor",
+					"message": "enqueueing retry",
+					"edge": map[string]any{
+						"errorCount": i + 1,
+						"payload": map[string]any{
+							"edge": map[string]any{
+								"incoming": step,
 							},
 						},
-					})
-				}); err != nil {
-					return err
-				}
+					},
+				})
+			}); err != nil {
+				return err
 			}
 		}
 
