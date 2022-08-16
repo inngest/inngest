@@ -14,7 +14,7 @@ Functions can have expressions in many places:
   conditions
 - **Step expressions** add conditional checks that must pass before continuing to
   the next step
-- **Asynchronous expressions** allow you to pause in between steps until a
+- **Asynchronous (async) expressions** allow you to pause in between steps until a
   new event is received that match a specific condition.
 
 Here's an example configuration file with all three expressions:
@@ -257,10 +257,14 @@ there are many helper functions available.
 
 **Index**
 
+`all`<br />
 `contains`<br />
 `date`<br />
 `endsWith`<br />
+`exists`<br />
+`filter`<br />
 `lowercase`<br />
+`map`<br />
 `matches`<br />
 `now`<br />
 `now_minus`<br />
@@ -268,6 +272,21 @@ there are many helper functions available.
 `size`<br />
 `startsWith`<br />
 `uppercase`<br />
+
+<br />
+
+**`[].all`**
+
+Checks that each item of an array matches a sub-expression.  To check that only
+some elements match, use `exists`.
+
+```
+[1, 2, 3].all(x, x >= 1)
+```
+
+```
+["some", "long", "words"].all(word, size(word) > 3)
+```
 
 <br />
 
@@ -324,6 +343,17 @@ event.data.email.endsWith("@gmail.com")
 
 <br />
 
+**`[].exists`**
+
+Checks that at least one item of an array matches a sub-expression.  To check
+that all elements match, use `all`.
+
+```
+[100, 195, 2599].exists(price, price > 999)
+```
+
+<br />
+
 **`lowercase`**
 
 Converts a UTF-8 string to lowercase
@@ -331,6 +361,53 @@ Converts a UTF-8 string to lowercase
 ```
 lowercase("SUBMARINE") == "submarine"
 ```
+<br />
+
+**`[].map`**
+
+Iterates through an array and applies a function, returning the result.
+
+```
+[1, 2, 3].map(x, x * 2) == [2, 4, 6]
+```
+
+```
+["some", "long", "words"].map(word, uppercase(word)) == ["SOME", "LONG", WORDS"]
+```
+
+<br />
+
+**`[].filter`**
+
+Returns all items of an array that match a sub-expression.
+
+```
+[12, 24, 199].filter(price, price < 100) == [12, 24]
+```
+
+<br />
+
+**`lowercase`**
+
+Converts a UTF-8 string to lowercase
+
+```
+lowercase("SUBMARINE") == "submarine"
+```
+<br />
+
+**`[].map`**
+
+Iterates through an array and applies a function, returning the result.
+
+```
+[1, 2, 3].map(x, x * 2) == [2, 4, 6]
+```
+
+```
+["some", "long", "words"].map(word, uppercase(word)) == ["SOME", "LONG", WORDS"]
+```
+
 
 <br />
 
