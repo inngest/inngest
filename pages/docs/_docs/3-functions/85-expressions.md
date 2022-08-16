@@ -83,26 +83,261 @@ Here's an example configuration file with all three expressions:
 
 ## Trigger expressions
 
-Trigger expressions allow you to run your function based off of conditionally
-checking the incoming event data.
+Trigger expressions allow you to conditionally run your function based off of
+data within the event.
 
-#### Available data
+Note that all trigger expressions are ran prior to executing functions.  If an
+event does not match the expression the function and its steps will not run and
+you will not be charged.
+
+**Available data**
+
+The following variables are available within trigger expressions: 
 
 - `event`: The event data.
 
+
+**Examples**
+
+- You only want to run a function if a GitHub CI check failed: <br />
+  `event.data.workflow_job.status == 'failed'`
+- You only want to send users a coupon code if their order was over $100, and
+  the user ordered more than 1 product: <br />
+  `event.data.amount >= 100 && size(event.data.items) > 1`
+
 ## Step expressions
 
-Edges can
+Step expressions allow you to conditionally run steps within a step function.
+
+This pattern allows you to branch over individual steps of a function, instead
+of writing one single complex step which has nested logic.  This provides
+several benefits:
+
+- Each step does exactly one thing, reducing complexity
+- Steps can be handled in parallel
+- Individual steps can be retried on intermittent errors
+
+Step expressions have access to the event, plus the output of all previous
+steps.
 
 **Available data**
 
-## Asynchronous expressions
-what
+- `event`: The event data.
+- `steps`: The output of previously completed steps, as a map keyed by step ID.
+- `response`: A shortcut for the output of the parent step
+
+**Examples**
+
+- Only continuing if a step with the ID `checkStatus` returns "delinquent": <br />
+  `steps["checkStatus"] == "delinquent"`
+
+## Asynchronous (async) expressions
+
+Asynchronous (async) expressions let you pause a running function, wait for a new event
+to be received, then test the new event to match an expression before resuming
+the function.
+
+This allows you to build complex user journeys, approval logic, human-in-the-loop
+steps and request-reply functionality without managing orchestration.
+
+Async expressions have access to the original event data, all completed step data,
+and the incoming async event's data.
 
 **Available data**
 
-what
+- `event`: The event data for the event which triggered the function.
+- `steps`: The output of previously completed steps, as a map keyed by step ID.
+- `async`: The data of the new event which can resume the workflow.
+
+**Examples**
+
+- When a user adds an item to the cart, wait for the *same* user to check out
+  before continuing: <br />
+  `async.data.cart_id == event.data.cart_id`
+- When a task is created, wait for the same task to be completed: <br />
+  `async.data.task_id == event.data.task_id && async.data.action == 'completed'`
 
 ## Functions and helpers
 
-what
+While the expression language is not a fully featured programming language,
+there are many helper functions available.
+
+**Index**
+
+`contains`<br />
+`date`<br />
+`endsWith`<br />
+`lowercase`<br />
+`matches`<br />
+`now`<br />
+`now_minus`<br />
+`now_plus`<br />
+`size`<br />
+`startsWith`<br />
+`uppercase`<br />
+
+<br />
+
+**`contains`**
+
+Checks whether a string contains data.  Examples:
+
+```
+"submarine".contains("sub") == true
+```
+
+```
+event.data.name.contains(steps["my-step"].output)
+```
+
+
+<br />
+
+**`date`**
+
+Converts a string date into a timestamp for comparison.  Valid formats are
+RFC3339, ISO8601, RFC1123, RFC822, RFC850, YYYY-MM-DD, Unix timestamps,
+Millisecond timestamps, and unix dates.  Each format will be attempted until
+a matching format is found.
+
+Parsing a YYYY-MM-DD date:
+```
+date("2021-05-08") < now() == true
+```
+
+Parsing a millisecond unix timestamp:
+```
+date(1660678425172) < now() == true
+```
+
+Parsing a date within event data:
+```
+date(event.data.next_visit) > now_plus("24h")
+```
+
+<br />
+
+**`endsWith`**
+
+Checks whether a string ends with another string.  Examples:
+
+```
+"submarine".endsWith("marine") == true
+```
+
+```
+event.data.email.endsWith("@gmail.com")
+```
+
+<br />
+
+**`lowercase`**
+
+Converts a UTF-8 string to lowercase
+
+```
+lowercase("SUBMARINE") == "submarine"
+```
+
+<br />
+
+**`matches`**
+
+Matches a string against a regular expression
+
+```
+"my long string".matches('^\w+$') == true
+```
+
+<br />
+
+**`now`**
+
+Returns the current time
+
+```
+now()
+```
+
+<br />
+
+**`now_minus`**
+
+Returns the current time minus a given duration.  Any duration greater than "h"
+ignores DST changes and leap seconds.
+
+Available durations:
+- `ms`: milliseconds
+- `s`: seconds
+- `m`: minutes
+- `h`: hours
+- `d`: days (24 hours)
+- `w`: weeks (7 * 24 hours)
+
+```
+now_minus("1m30s") // now minus 1m30s
+```
+
+```
+now_minus("1w") // now minus 1 week 
+```
+
+<br />
+
+**`now_plus`**
+
+Returns the current time plus a given duration.  Any duration greater than "h"
+ignores DST changes and leap seconds.
+
+Available durations:
+- `ms`: milliseconds
+- `s`: seconds
+- `m`: minutes
+- `h`: hours
+- `d`: days (24 hours)
+- `w`: weeks (7 * 24 hours)
+
+```
+now_plus("1m30s") // now plus 1m30s
+```
+
+```
+now_plus("1w") // now plus 1 week 
+```
+
+<br />
+
+**`size`**
+
+Returns the size of the current data.  This returns the total number of items
+within an array, or the length of a string.
+
+```
+size([1, 2, 3, 4, 5]) == 5
+```
+
+```
+size("abc") == 3
+```
+
+<br />
+
+**`startsWith`**
+
+Checks whether a string starts with another string
+
+```
+"submarine".startsWith("sub") == true
+```
+
+```
+"example@example.com".startsWith("example") == true
+```
+
+**`uppercase`**
+
+Converts a UTF-8 string to uppercase
+
+```
+uppercase("submarine") == "SUBMARINE"
+```
