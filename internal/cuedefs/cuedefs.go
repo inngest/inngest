@@ -35,8 +35,8 @@ var (
 // so that they can be referenced by cue files.
 func internalPackageLoader() (*load.Config, error) {
 	cfg := &load.Config{
-		Dir:        "/",
-		ModuleRoot: "/",
+		Dir:        string(filepath.Separator),
+		ModuleRoot: string(filepath.Separator),
 		Overlay:    map[string]load.Source{},
 	}
 
