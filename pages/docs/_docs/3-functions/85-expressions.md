@@ -298,11 +298,11 @@ Available durations:
 - `w`: weeks (7 * 24 hours)
 
 ```
-now_plus("1m30s") // now plus 1m30s
+now_plus("12h30m") // now plus 12 hours 30 minutes
 ```
 
 ```
-now_plus("1w") // now plus 1 week 
+now_plus("1h") // now plus 1 hour 
 ```
 
 <br />
