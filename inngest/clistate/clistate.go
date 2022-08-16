@@ -25,7 +25,7 @@ var (
 
 const (
 	SettingRanInit = "ranInit"
-	EnvApiKey      = "INNGEST_API_KEY"
+	EnvApiKey      = "INNGEST_AUTH_TOKEN"
 )
 
 func init() {
