@@ -8,13 +8,13 @@ import (
 )
 
 func init() {
-	testdsl.Register("basic-single-step", Do)
+	testdsl.Register(Do)
 }
 
 func Do(ctx context.Context) testdsl.Chain {
 	return testdsl.Chain{
 		testdsl.SendTrigger,
-		testdsl.RequireOutputWithin("received message", 500*time.Millisecond),
+		testdsl.RequireReceiveTrigger,
 
 		// Ensure API publishes event.
 		testdsl.RequireLogFields(map[string]any{

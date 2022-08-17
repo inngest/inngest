@@ -94,14 +94,19 @@ func do(ctx context.Context) {
 		for _, item := range fns {
 			copiedFn := *item
 			fn := &copiedFn
+			name := fmt.Sprintf("%s-%s", filepath.Base(copiedCfg.dir), filepath.Base(fn.dir))
 
 			// Create a new test for each cfg/fn pair
 			tests = append(tests, testing.InternalTest{
-				Name: fmt.Sprintf("%s/%s", filepath.Base(copiedCfg.dir), filepath.Base(fn.dir)),
+				Name: name,
 				F: func(t *testing.T) {
 					fmt.Println("")
 					cmdCtx, done := context.WithCancel(ctx)
 					defer done()
+
+					defer func() {
+						_ = copiedCfg.inngest.Process.Kill()
+					}()
 
 					// TODO: Instead of exec-ing the service, run the services locally
 					// then profile.

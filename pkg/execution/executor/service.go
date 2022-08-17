@@ -209,6 +209,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 				return err
 			}
 
+			l.Debug().Interface("edge", next).Msg("saving pause")
 			pauseID := uuid.New()
 			expires := time.Now().Add(dur)
 			err = s.state.SavePause(ctx, state.Pause{
@@ -225,6 +226,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 				return fmt.Errorf("error saving edge pause: %w", err)
 			}
 
+			l.Debug().Interface("edge", next).Msg("scheduling pause timeout")
 			// Enqueue a timeout.  This will be handled within our queue;  if the
 			// pause still exists at this time and has not been comsumed we will
 			// continue traversing this edge if OnTimeout is true.

@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/function"
 )
@@ -28,7 +31,18 @@ type TestData struct {
 var registered map[string]Root
 
 // Register registers a new test DSL chain
-func Register(dir string, r Root) {
+func Register(r Root) {
+
+	// file should contain the full filepath of the calling file which
+	// is registering the test.  We can use this to figure out the directory
+	// the test is in.
+	_, file, _, ok := runtime.Caller(1)
+	if !ok {
+		panic("unable to determine directory")
+	}
+	// Get the directory name of the registering function.
+	dir := filepath.Base(filepath.Dir(file))
+
 	if registered == nil {
 		registered = map[string]Root{}
 	}
@@ -79,12 +93,27 @@ func SendTrigger(ctx context.Context, td *TestData) error {
 	return nil
 }
 
+// RequireReceiveTrigger asserts that we received the trigger within the default amount of time.
+func RequireReceiveTrigger(ctx context.Context, td *TestData) error {
+	return RequireOutputWithin("received message", 500*time.Millisecond)(ctx, td)
+}
+
 func Wait(t time.Duration) Proc {
 	return func(ctx context.Context, td *TestData) error {
 		fmt.Printf("> Waiting %s\n", t.String())
 		<-time.After(t)
 		return nil
 	}
+}
+
+func RequireTriggerExecution(ctx context.Context, td *TestData) error {
+	return RequireLogFieldsWithin(
+		map[string]any{
+			"message": "executing step",
+			"step":    inngest.TriggerName,
+		},
+		20*time.Millisecond,
+	)(ctx, td)
 }
 
 func RequireLogField(name, value string) Proc {
@@ -110,6 +139,34 @@ func RequireLogFieldsWithin(fields map[string]any, t time.Duration) Proc {
 			}
 			return nil
 		})
+	}
+}
+
+func RequireNoLogFields(fields map[string]any) Proc {
+	return func(ctx context.Context, td *TestData) error {
+		fmt.Printf("> Checking for no log fields: %v\n", fields)
+		if err := requireLogFields(ctx, td, fields); err == nil {
+			return fmt.Errorf("log fields found: %s", fields)
+		}
+		return nil
+	}
+}
+
+// RequireNoLogFieldsWithin ensures that the logs do not contain the specified fields
+// within the given amount of time.
+func RequireNoLogFieldsWithin(fields map[string]any, t time.Duration) Proc {
+	return func(ctx context.Context, td *TestData) error {
+		fmt.Printf("> Checking for no log fields: %v\n", fields)
+		err := timeout(t, func() error {
+			if err := requireLogFields(ctx, td, fields); err != nil {
+				return fmt.Errorf("Could not find fields: %v", fields)
+			}
+			return nil
+		})
+		if err == nil {
+			return fmt.Errorf("log fields found: %s", fields)
+		}
+		return nil
 	}
 }
 

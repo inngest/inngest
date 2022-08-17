@@ -67,7 +67,6 @@ func (s *svc) Pre(ctx context.Context) error {
 	var err error
 
 	if s.data == nil {
-		// TODO: Enable postgres, mysql, and redis-backed execution loaders.
 		s.data, err = inmemorydatastore.NewFSLoader(ctx, ".")
 		if err != nil {
 			return err

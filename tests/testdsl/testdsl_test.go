@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -76,4 +77,40 @@ func TestRequireLogFields(t *testing.T) {
 			require.NotNil(t, err)
 		}
 	}
+}
+
+func TestRequireNoLogFieldsWithin(t *testing.T) {
+	ctx := context.Background()
+	buf := bytes.NewBuffer(nil)
+
+	// Send "fail" within 1 second
+	go func() {
+		<-time.After(time.Second)
+		_, _ = buf.WriteString(`{"fail":true}`)
+	}()
+
+	// Ensure that fail is found within ~500ms
+	now := time.Now()
+	data := &TestData{Out: buf}
+	proc := RequireNoLogFieldsWithin(
+		map[string]any{
+			"fail": true,
+		},
+		2*time.Second,
+	)
+	err := proc(ctx, data)
+	require.NotNil(t, err)
+	require.Equal(t, 1, int(time.Since(now).Seconds()))
+
+	// Ensure that success isn't found within 5 seconds.
+	now = time.Now()
+	proc = RequireNoLogFieldsWithin(
+		map[string]any{
+			"success": true,
+		},
+		5*time.Second,
+	)
+	err = proc(ctx, data)
+	require.Nil(t, err)
+	require.Equal(t, 5, int(time.Since(now).Seconds()))
 }
