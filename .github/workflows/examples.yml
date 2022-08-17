@@ -1,0 +1,16 @@
+name: Trigger example changes
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'examples/**'
+
+jobs:
+  deploy-website:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -X POST "${{ env.WEBSITE_CLOUDFLARE_DEPLOY_HOOK }}" -v
+        env:
+          WEBSITE_CLOUDFLARE_DEPLOY_HOOK: ${{ secrets.WEBSITE_CLOUDFLARE_DEPLOY_HOOK }}
