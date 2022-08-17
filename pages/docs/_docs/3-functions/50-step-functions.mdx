@@ -5,4 +5,83 @@ slug: "functions/step-functions"
 order: 50
 ---
 
-_Documentation coming soon! In the mean time, if you're interested, ping us on Discord and we'll get you started_
+Inngest allows you to extend functions with multiple steps.  Each step within a
+function is its own individual unit of code.  They can be written in any
+language, are retried independently on intermittent external failures, and many
+steps can run in parallel.
+
+This documentation introduces high level step-function features, example
+step function configuration, and advanced use cases.
+
+## High level features
+
+- Each step is an individual unit of code, written in any language
+- Steps are retried independently of each other, on external failures
+- Steps can run in parallel
+- Each step can access output from prior steps
+- Steps can pause functions until specific matching events are received
+
+## Example confifugration
+
+This configuration shows a basic function with two steps running in _sequence_.
+The first step runs immediately after the function is triggered.  The second
+step runs after the first step has successfully completed.
+
+```json twoslash
+{
+  "name": "test",
+  "id": "improved-chamois-c592a7",
+  "triggers": [
+    {
+      "event": "github/delete",
+      "definition": {
+        "format": "cue",
+        "synced": true,
+        "def": "file://./events/github-delete.cue"
+      }
+    }
+  ],
+  "steps": {
+    "step-1": {
+      "id": "step-1",
+      "path": "file://./steps/step-1",
+      "name": "test",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [{
+// @log: This step runs automatically at the start of the function when it's triggered.  When "after" is ommitted, the step automatically runs immediately after starting the function.
+        "step": "$trigger"
+      }]
+    },
+
+// @log: This second step will run after the first step completes, in sequence.  It can read all of the first step's response within the arguments passed to the step.
+    "step-2": {
+      "id": "step-2",
+      "path": "file://./steps/step-2",
+      "name": "test",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [{
+        "step": "step-1"
+      }]
+    }
+  }
+}
+
+```
+
+In this example, the second step can access the event data _and_ the output
+from the first step's execution.  If the first step replies with our [suggested
+response](/docs/functions/function-input-and-output), the second step will
+receive the following:
+
+```
+{
+  "event": { ... } // Event data
+  "steps": {
+    "step-1": { ... } // The output of step 1
+  }
+}
+```
