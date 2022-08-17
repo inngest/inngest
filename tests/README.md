@@ -14,23 +14,23 @@ You can use any inngest function to test.
 ## Running tests
 
 ```
-go run *.go -test.v
+go run . -test.v
 ```
 
 Filtering:
 
 ```
-go run *.go -test.v -test.run ${regex}
+go run . -test.v -test.run ${regex}
 ```
 
 For example, to run `async-timeout` against immemory:
 
 ```
-go run *.go -test.v -test.run inmemory-async
+go run . -test.v -test.run inmemory-async
 ```
 
 Or for all inmemory tests only:
 
 ```
-go run *.go -test.v -test.run inmemory
+go run . -test.v -test.run inmemory
 ```
