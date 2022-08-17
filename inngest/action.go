@@ -38,6 +38,8 @@ type ActionVersion struct {
 	// Runtime specifies which language/runtime is being used for this action.  This is decoded
 	// via the GetRuntime() function call, as we need a specific decoder to
 	Runtime RuntimeWrapper `json:"runtime"`
+
+	Retries *RetryOptions `json:"retries,omitempty"`
 }
 
 type VersionInfo struct {

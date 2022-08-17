@@ -62,6 +62,10 @@ import (
 	// Metadata about how the action will be used.  Each action requires custom
 	// input to work, eg. what data to transform, what email template to use, etc.
 	metadata?: [string]: _
+
+	retries?: {
+		attempts?: int & >=0 & <=20
+	}
 }
 
 #Edge: {

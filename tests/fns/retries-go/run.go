@@ -1,4 +1,4 @@
-package basic_test
+package retries_go_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	testdsl.Register("basic-single-step", Do)
+	testdsl.Register("retries-go", Do)
 }
 
 func Do(ctx context.Context) testdsl.Chain {
@@ -19,32 +19,25 @@ func Do(ctx context.Context) testdsl.Chain {
 		// Ensure API publishes event.
 		testdsl.RequireLogFields(map[string]any{
 			"caller":  "api",
-			"event":   "basic/single-step",
+			"event":   "basic/single-step-retries",
 			"message": "publishing event",
 		}),
+
 		// Ensure runner consumes event.
 		testdsl.RequireLogFieldsWithin(map[string]any{
 			"caller":  "runner",
-			"event":   "basic/single-step",
+			"event":   "basic/single-step-retries",
 			"message": "received message",
 		}, 5*time.Millisecond),
 		testdsl.RequireLogFieldsWithin(map[string]any{
 			"caller":  "runner",
 			"message": "initializing fn",
 		}, 5*time.Millisecond),
-		testdsl.RequireLogFieldsWithin(map[string]any{
-			"caller":  "executor",
-			"step":    "basic-step-1",
-			"message": "executing step",
-		}, time.Second*2),
-		testdsl.RequireLogFieldsWithin(map[string]any{
-			"caller": "output",
-			"output": map[string]any{
-				"body":   "basic/single-step",
-				"status": 200,
-			},
-			"message": "step output",
-		}, time.Second*2),
-		testdsl.RequireNoOutput(`"error"`),
+
+		// Ensure retries per step are adhered to
+		testdsl.RequireStepRetries("step-custom-retries-high", 4),
+		testdsl.RequireStepRetries("step-default-retries", 3),
+		testdsl.RequireStepRetries("step-custom-retries-low", 1),
+		testdsl.RequireStepRetries("step-custom-retries-none", 0),
 	}
 }
