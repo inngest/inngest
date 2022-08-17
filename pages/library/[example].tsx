@@ -50,14 +50,14 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
     throw new Error("Could not find example");
   }
 
-  const exampleContents = await reqWithSchema(
+  const example = await reqWithSchema(
     `https://api.github.com/repos/inngest/inngest/git/trees/${target.sha}`,
     z.object({
       tree: z.array(treeSchema),
     })
   );
 
-  const inngestJsonNode = exampleContents.tree.find(
+  const inngestJsonNode = example.tree.find(
     ({ path, type }) => path === "inngest.json" && type === "blob"
   );
 
