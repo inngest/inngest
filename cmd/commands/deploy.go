@@ -23,8 +23,9 @@ var (
 
 func NewCmdDeploy() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "deploy",
+		Use:     "deploy [dir]",
 		Short:   "Deploy a function to Inngest",
+		Long:    "Deploy a function to Inngest.\n\nIf no directory is provided, the we'll attempt to deploy a function in the current directory, or look for an Inngest config file in a parent directory.\n\nIf a direcotry is provided, we'll attempt to recursively find and deploy all functions in that directory.",
 		Example: "inngest deploy",
 		Run:     doDeploy,
 	}
@@ -43,62 +44,93 @@ func doDeploy(cmd *cobra.Command, args []string) {
 func deploy(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	fn, err := function.Load(ctx, ".")
-	if err != nil {
-		return err
+	givenDir := ""
+	if len(args) > 0 {
+		givenDir = args[0]
 	}
 
-	// Build all steps.
-	buildOpts, err := dockerdriver.FnBuildOpts(ctx, *fn, "--platform", "linux/amd64")
-	if err != nil {
-		return err
-	}
-	ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
-		QuitOnComplete: true,
-		BuildOpts:      buildOpts,
-	})
-	if err != nil {
-		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
-		os.Exit(1)
-	}
-	if err := ui.Start(ctx); err != nil {
-		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
-		os.Exit(1)
-	}
+	var fns []*function.Function
+	var err error
 
-	// Push each action
-	actions, _, err := fn.Actions(ctx)
-	if err != nil {
-		return err
-	}
-
-	dsnToKeySteps := make(map[string]string)
-
-	for key, step := range fn.Steps {
-		dsnToKeySteps[step.DSN(ctx, *fn)] = key
-	}
-
-	for _, a := range actions {
-		actionVersion, err := deployAction(ctx, a)
+	if givenDir != "" {
+		fns, err = function.LoadRecursive(ctx, givenDir)
+		if err != nil {
+			return err
+		}
+	} else {
+		fn, err := function.Load(ctx, ".")
 		if err != nil {
 			return err
 		}
 
-		// TODO: Move this to a dedicated function.
-		step, ok := fn.Steps[dsnToKeySteps[actionVersion.DSN]]
-		if !ok {
-			return fmt.Errorf("failed to find step for action %s", actionVersion.DSN)
-		}
-
-		step.Version = &inngest.VersionConstraint{
-			Major: &actionVersion.Version.Major,
-			Minor: &actionVersion.Version.Minor,
-		}
-
-		fn.Steps[dsnToKeySteps[actionVersion.DSN]] = step
+		fns = []*function.Function{fn}
 	}
 
-	return deployFunction(ctx, fn)
+	funcNames := make([]string, 0, len(fns))
+
+	for _, fn := range fns {
+		funcNames = append(funcNames, fn.Name)
+	}
+
+	fmt.Println("Deploying", len(fns), "function(s):", strings.Join(funcNames, ", "))
+
+	for _, fn := range fns {
+		// Build all steps.
+		buildOpts, err := dockerdriver.FnBuildOpts(ctx, *fn, "--platform", "linux/amd64")
+		if err != nil {
+			return err
+		}
+		ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
+			QuitOnComplete: true,
+			BuildOpts:      buildOpts,
+		})
+		if err != nil {
+			fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+			os.Exit(1)
+		}
+		if err := ui.Start(ctx); err != nil {
+			fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+			os.Exit(1)
+		}
+
+		// Push each action
+		actions, _, err := fn.Actions(ctx)
+		if err != nil {
+			return err
+		}
+
+		dsnToKeySteps := make(map[string]string)
+
+		for key, step := range fn.Steps {
+			dsnToKeySteps[step.DSN(ctx, *fn)] = key
+		}
+
+		for _, a := range actions {
+			actionVersion, err := deployAction(ctx, a)
+			if err != nil {
+				return err
+			}
+
+			// TODO: Move this to a dedicated function.
+			step, ok := fn.Steps[dsnToKeySteps[actionVersion.DSN]]
+			if !ok {
+				return fmt.Errorf("failed to find step for action %s", actionVersion.DSN)
+			}
+
+			step.Version = &inngest.VersionConstraint{
+				Major: &actionVersion.Version.Major,
+				Minor: &actionVersion.Version.Minor,
+			}
+
+			fn.Steps[dsnToKeySteps[actionVersion.DSN]] = step
+		}
+
+		if err := deployFunction(ctx, fn); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func deployFunction(ctx context.Context, fn *function.Function) error {
