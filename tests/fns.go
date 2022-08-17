@@ -11,6 +11,7 @@ import (
 
 	_ "github.com/inngest/inngest/tests/fns/async-timeout"
 	_ "github.com/inngest/inngest/tests/fns/basic-single-step"
+	_ "github.com/inngest/inngest/tests/fns/event-trigger-expression"
 	_ "github.com/inngest/inngest/tests/fns/retries-go"
 )
 
