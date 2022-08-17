@@ -14,7 +14,7 @@ const Footer = () => {
             <Logo height={30} />
           </a>
         </div>
-        <div className="five-cols">
+        <div className="four-cols">
           <div>
             <p>Product</p>
             <a href="/product?ref=footer">Features</a>
@@ -33,6 +33,9 @@ const Footer = () => {
               Node.js background jobs
             </a>
             <a href="/uses/internal-tools?ref=footer">Internal tools</a>
+            <a href="/uses/user-journey-automation?ref=footer">
+              User Journey Automation
+            </a>
           </div>
           <div>
             <p>Company</p>
@@ -53,15 +56,13 @@ const Footer = () => {
               Twitter
             </a>
           </div>
-          <div>
-            <p>Legal</p>
-            <a href="/privacy">Privacy</a>
-            <a href="/terms">Terms and Conditions</a>
-            <a href="/security">Security</a>
-          </div>
+          <div></div>
         </div>
-        <div className="four-cols">
-          <small>© {new Date().getFullYear()} Inngest Inc</small>
+        <div className="footer-small-print flex flex-column gap-4">
+          <div>© {new Date().getFullYear()} Inngest Inc</div>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms and Conditions</a>
+          <a href="/security">Security</a>
         </div>
       </div>
     </Wrapper>
@@ -90,9 +91,15 @@ const Wrapper = styled.div`
     font-size: 1rem;
   }
 
-  small {
-    opacity: 0.5;
-    margin: 3vh 0 0;
+  .footer-small-print {
+    margin-top: 3vh;
+    font-size: 0.8em;
+    color: var(--font-color-secondary);
+
+    a {
+      margin: 0;
+      color: var(--font-color-secondary);
+    }
   }
 
   .logo {

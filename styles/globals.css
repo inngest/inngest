@@ -93,10 +93,6 @@ body.light-theme {
   font-family: var(--font);
 }
 
-/* .home p {
-  color: var(--font-color-secondary);
-} */
-
 p + p {
   margin-top: 1.5rem;
 }
@@ -272,11 +268,47 @@ li > ul {
   background: var(--green);
 }
 
+/** Gradients */
 .gradient-text {
-  background: linear-gradient(180deg, #5d5fef 0%, #ef5da8 100%);
+  --from-color: #5d5fef;
+  --to-color: #ef5da8;
+  background: linear-gradient(180deg, var(--from-color) 0%, var(--to-color) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+.gradient-text-ltr {
+  background: linear-gradient(90deg, var(--from-color) 0%, var(--to-color) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.gradient-from-cyan {
+  --from-color: #06b6d4;
+}
+.gradient-from-blue {
+  --from-color: #3b82f6;
+}
+.gradient-from-iris-60 {
+  --from-color: var(--color-iris-60);
+}
+.gradient-from-pink {
+  --from-color: var(--color-fuschia-100);
+}
+.gradient-to-cyan {
+  --to-color: #06b6d4;
+}
+.gradient-to-blue {
+  --to-color: #3b82f6;
+}
+.gradient-to-pink {
+  --to-color: var(--color-fuschia-100);
+}
+.gradient-to-orange {
+  --to-color: #fb923c;
+}
+.hero-gradient {
+  background: linear-gradient(180deg, var(--bg-color) 0%, #fafdff 70%, #fbefff 100%);
 }
 
 /** New grid **/
@@ -488,4 +520,51 @@ ul.check li {
 
 .react-flow__edge-path {
   stroke: var(--black) !important;
+}
+
+/** Alternating backgrounds */
+.alt-bg-0 {
+  background: #ecfeff url(/assets/grid-radial-texture.svg) no-repeat center;
+  background-size: 150%;
+}
+.alt-bg-1 {
+  background: #fff1f2 url(/assets/grid-radial-texture.svg) no-repeat center;
+  background-size: 150%;
+}
+.alt-bg-2 {
+  background: #e0f2fe url(/assets/grid-radial-texture.svg) no-repeat center;
+  background-size: 150%;
+}
+.alt-bg-3 {
+  background: #fefce8 url(/assets/grid-radial-texture.svg) no-repeat center;
+  background-size: 150%;
+}
+
+.background-grid-texture {
+  background-image: url(/assets/grid-radial-texture.svg);
+  background-repeat: no-repeat;
+  background-size: 100%;
+  background-position: center;
+}
+
+/** Tailwind complimentary bits */
+.text-color-iris-100 {
+  color: var(--color-iris-100);
+}
+.text-color-gray-purple {
+  color: var(--color-gray-purple);
+}
+.border-color-iris-60 {
+  border-color: var(--color-iris-60);
+}
+.underline-offset-6 {
+  text-underline-offset: 6px;
+}
+@media (min-width: 1024px) {
+  .lg\:order-1 {
+    order: 1;
+  }
+  .lg\:order-2 {
+    order: 2;
+  }
 }
