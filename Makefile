@@ -5,7 +5,7 @@ test:
 	golangci-lint run
 
 e2e:
-	cd ./tests && go run ./*.go -test.v
+	cd ./tests && go run . -test.v
 
 snapshot:
 	goreleaser release --snapshot --skip-publish --rm-dist

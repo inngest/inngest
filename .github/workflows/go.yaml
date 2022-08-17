@@ -23,6 +23,7 @@ jobs:
         with:
           version: v1.46.2
           skip-go-installation: true
+          args: --skip-files="configs_unix|configs_windows"
   test:
     strategy:
       matrix:

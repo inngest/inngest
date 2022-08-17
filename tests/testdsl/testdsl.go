@@ -16,6 +16,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/function"
 )
 
@@ -87,23 +88,28 @@ func SendTrigger(ctx context.Context, td *TestData) error {
 		return fmt.Errorf("error generating trigger data: %w", err)
 	}
 
-	td.TriggerData = evt.Map()
+	return SendEvent(evt)(ctx, td)
+}
 
-	byt, _ := json.Marshal(td.TriggerData)
-	resp, err := http.Post(
-		fmt.Sprintf("http://%s:%d/e/key", td.Config.EventAPI.Addr, td.Config.EventAPI.Port),
-		"application/json",
-		bytes.NewBuffer(byt),
-	)
-	if err != nil {
-		return fmt.Errorf("error sending event: %w", err)
+func SendEvent(e event.Event) Proc {
+	return func(ctx context.Context, td *TestData) error {
+		td.TriggerData = e.Map()
+		byt, _ := json.Marshal(e)
+		resp, err := http.Post(
+			fmt.Sprintf("http://%s:%d/e/key", td.Config.EventAPI.Addr, td.Config.EventAPI.Port),
+			"application/json",
+			bytes.NewBuffer(byt),
+		)
+		if err != nil {
+			return fmt.Errorf("error sending event: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			byt, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("invalid status code sending event: %d\nResponse: %s", resp.StatusCode, string(byt))
+		}
+		return nil
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		byt, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("invalid status code sending event: %d\nResponse: %s", resp.StatusCode, string(byt))
-	}
-	return nil
 }
 
 // RequireReceiveTrigger asserts that we received the trigger within the default amount of time.
