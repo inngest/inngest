@@ -124,6 +124,20 @@ The list of steps is an object, with each step using a unique key `id` and it's 
   }
 ```
 
+## Waits
+
+You can specify that steps should run after a `wait`, eg. to schedule a step to execute
+10 minutes after the trigger you can specify `"wait": "10m"` within the after JSON block.
+
+## Event coordination 
+
+You can also pause functions in between steps by specifing an `async` block.  The async
+block halts a function, sets up a temporary trigger which listens for the specified event,
+and automatically resumes the function when a matching event is received.
+
+Using this functionality it's possible to easily build flows that model complex user
+journeys, such as retention flows, drip campaigns, etc.
+
 ## Runtimes
 
 Runtimes are defined within each step's configuration.  A runtime specifies _how_ the function runs.  There are multiple runtimes available:
