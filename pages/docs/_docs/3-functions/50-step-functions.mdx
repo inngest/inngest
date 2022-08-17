@@ -20,6 +20,8 @@ step function configuration, and advanced use cases.
 - Steps can run in parallel
 - Each step can access output from prior steps
 - Steps can pause functions until specific matching events are received
+- Steps can be re-used, shared, and composed between functions, eg. for sending
+  emails or SMS messages
 
 ## Example confifugration
 
@@ -74,8 +76,8 @@ step runs after the first step has successfully completed.
 
 In this example, the second step can access the event data _and_ the output
 from the first step's execution.  If the first step replies with our [suggested
-response](/docs/functions/function-input-and-output), the second step will
-receive the following:
+response](/docs/functions/function-input-and-output), **the second step will
+receive the following**:
 
 ```
 {
@@ -85,3 +87,13 @@ receive the following:
   }
 }
 ```
+
+## Adding steps to functions
+
+To add a step to a function, create a new JSON block for each step within the
+`steps` section of your function's configuration file, with `path` pointing
+to the step's code.
+
+Coming soon, you'll be able to use the CLI to automatically scaffold new steps
+within your function using our
+[library of scaffolds](https://github.com/inngest/scaffolds).
