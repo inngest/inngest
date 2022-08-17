@@ -19,6 +19,7 @@ const blobSchema = z.object({
 interface Props {
   name: string;
   description?: string;
+  readme?: string;
 }
 
 export default function LibraryExamplePage(props: Props) {
@@ -80,11 +81,24 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
       )
     );
 
-  // TODO Also grab and return a README if it's there.
+  let readme: string | undefined;
+  const readmeNode = example.tree.find(
+    ({ path, type }) => path === "README.md" && type === "blob"
+  );
+
+  if (readmeNode.url) {
+    const readmeRaw = await reqWithSchema(readmeNode.url, blobSchema);
+
+    readme =
+      readmeRaw.encoding === "base64"
+        ? Buffer.from(readmeRaw.content, "base64").toString()
+        : readmeRaw.content;
+  }
 
   return {
     props: {
       ...inngestJson,
+      readme,
       meta: {
         title: `Example: ${inngestJson.name}`,
         description: inngestJson.description || "Some default meta description",
