@@ -29,13 +29,16 @@ export default function LibraryExamplePage(props: Props) {
 export const getStaticPaths: GetStaticPaths = async () => {
   const examplesContents = await getExamplesContents();
 
-  const paths = examplesContents.tree.reduce((acc, { path, sha }) => {
-    if (!sha) {
-      return acc;
-    }
+  const paths = examplesContents.tree.reduce<{ params: { example: string } }[]>(
+    (acc, { path, sha }) => {
+      if (!sha) {
+        return acc;
+      }
 
-    return [...acc, { params: { example: path } }];
-  }, []);
+      return [...acc, { params: { example: path } }];
+    },
+    []
+  );
 
   return { paths, fallback: false };
 };
@@ -44,10 +47,10 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
   const examplesContents = await getExamplesContents();
 
   const target = examplesContents.tree.find(
-    ({ path }) => path === ctx.params.example
+    ({ path }) => path === ctx.params?.example
   );
 
-  if (!target.sha) {
+  if (!target?.sha) {
     throw new Error("Could not find example");
   }
 
@@ -62,7 +65,7 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
     ({ path, type }) => path === "inngest.json" && type === "blob"
   );
 
-  if (!inngestJsonNode.url) {
+  if (!inngestJsonNode?.url) {
     throw new Error("Could not find inngest.json in example");
   }
 
@@ -81,18 +84,19 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
       )
     );
 
-  let readme: string | undefined;
+  let readme: string | null = null;
   const readmeNode = example.tree.find(
     ({ path, type }) => path === "README.md" && type === "blob"
   );
 
-  if (readmeNode.url) {
+  if (readmeNode?.url) {
     const readmeRaw = await reqWithSchema(readmeNode.url, blobSchema);
 
     readme =
-      readmeRaw.encoding === "base64"
+      (readmeRaw.encoding === "base64"
         ? Buffer.from(readmeRaw.content, "base64").toString()
-        : readmeRaw.content;
+        : readmeRaw.content
+      ).trim() || null;
   }
 
   return {
@@ -146,7 +150,7 @@ const getExamplesContents = async () => {
     ({ path, type }) => path === "examples" && type === "tree"
   );
 
-  if (!examplesPath.url) {
+  if (!examplesPath?.url) {
     throw new Error("Could not find examples path");
   }
 
