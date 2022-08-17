@@ -67,7 +67,6 @@ func (s *svc) Pre(ctx context.Context) error {
 	var err error
 
 	if s.data == nil {
-		// TODO: Enable postgres, mysql, and redis-backed execution loaders.
 		s.data, err = inmemorydatastore.NewFSLoader(ctx, ".")
 		if err != nil {
 			return err
@@ -259,7 +258,9 @@ func (s *svc) functions(ctx context.Context, evt event.Event) error {
 				if t.Expression != nil {
 					// Execute expressions here, ensuring that each function is only triggered
 					// under the correct conditions.
-					ok, _, evalerr := expressions.Evaluate(ctx, *t.Expression, evtMap)
+					ok, _, evalerr := expressions.Evaluate(ctx, *t.Expression, map[string]interface{}{
+						"event": evtMap,
+					})
 					if evalerr != nil {
 						errs = multierror.Append(errs, evalerr)
 						continue

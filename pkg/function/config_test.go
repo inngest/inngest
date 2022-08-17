@@ -338,7 +338,7 @@ func TestUnmarshal(t *testing.T) {
 						},
 					},
 				},
-				dir: "/dir",
+				dir: filepath.FromSlash("/dir"),
 			},
 		},
 		{

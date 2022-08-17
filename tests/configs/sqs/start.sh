@@ -12,3 +12,5 @@ for i in {1..120}; do
 	fi;
 	sleep 1;
 done
+
+sleep 1;

@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	testdsl.Register("retries-go", Do)
+	testdsl.Register(Do)
 }
 
 func Do(ctx context.Context) testdsl.Chain {

@@ -9,7 +9,9 @@ import (
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/tests/testdsl"
 
+	_ "github.com/inngest/inngest/tests/fns/async-timeout"
 	_ "github.com/inngest/inngest/tests/fns/basic-single-step"
+	_ "github.com/inngest/inngest/tests/fns/event-trigger-expression"
 	_ "github.com/inngest/inngest/tests/fns/retries-go"
 )
 
@@ -37,17 +39,14 @@ type Fn struct {
 }
 
 func (f *Fn) Validate(ctx context.Context) error {
-	config, err := os.ReadFile(filepath.Join(f.dir, "inngest.json"))
-	if err != nil {
-		return err
-	}
-	f.fn, err = function.Unmarshal(ctx, config, f.dir)
+	var err error
+	f.fn, err = function.Load(ctx, f.dir)
 	if err != nil {
 		return err
 	}
 
 	if root := testdsl.ForDir(filepath.Base(f.dir)); root == nil {
-		return fmt.Errorf("unable to find root test DSL proc for fn: %s", f.dir)
+		return fmt.Errorf("Unable to find root test DSL proc for fn: %s.  Did you add the test to tests/fns.go as an import?", f.dir)
 	}
 	return nil
 }

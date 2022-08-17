@@ -3,7 +3,9 @@ package testdsl
 import (
 	"bytes"
 	"context"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -76,4 +78,69 @@ func TestRequireLogFields(t *testing.T) {
 			require.NotNil(t, err)
 		}
 	}
+}
+
+func TestRequireNoLogFieldsWithin(t *testing.T) {
+	ctx := context.Background()
+	buf := &parallelBuf{}
+
+	// Send "fail" within 1 second
+	go func() {
+		<-time.After(time.Second)
+		_, _ = buf.WriteString(`{"fail":true}`)
+	}()
+
+	// Ensure that fail is found within ~500ms
+	now := time.Now()
+	data := &TestData{Out: buf}
+	proc := RequireNoLogFieldsWithin(
+		map[string]any{
+			"fail": true,
+		},
+		2*time.Second,
+	)
+	err := proc(ctx, data)
+	require.NotNil(t, err)
+	require.Equal(t, 1, int(time.Since(now).Seconds()))
+
+	// Ensure that success isn't found within 5 seconds.
+	now = time.Now()
+	proc = RequireNoLogFieldsWithin(
+		map[string]any{
+			"success": true,
+		},
+		5*time.Second,
+	)
+	err = proc(ctx, data)
+	require.Nil(t, err)
+	require.Equal(t, 5, int(time.Since(now).Seconds()))
+}
+
+type parallelBuf struct {
+	bytes.Buffer
+	m sync.RWMutex
+}
+
+func (b *parallelBuf) Read(p []byte) (n int, err error) {
+	b.m.RLock()
+	defer b.m.RUnlock()
+	return b.Buffer.Read(p)
+}
+
+func (b *parallelBuf) Write(p []byte) (n int, err error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.Buffer.Write(p)
+}
+
+func (b *parallelBuf) WriteString(s string) (n int, err error) {
+	b.m.Lock()
+	defer b.m.Unlock()
+	return b.Buffer.WriteString(s)
+}
+
+func (b *parallelBuf) String() string {
+	b.m.RLock()
+	defer b.m.RUnlock()
+	return b.Buffer.String()
 }

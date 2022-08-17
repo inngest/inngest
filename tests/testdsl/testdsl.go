@@ -7,19 +7,36 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/function"
 )
+
+var (
+	// DefaultDuration represents the default duration between steps.  This
+	// is 50ms as localstack, our SQS mock, is very slow.
+	//
+	// TODO: Change this based off of the config we're using.
+	DefaultDuration = 500 * time.Millisecond
+)
+
+type Buffer interface {
+	io.ReadWriter
+	fmt.Stringer
+}
 
 type TestData struct {
 	Fn          *function.Function
 	TriggerData map[string]any
-	Out         *bytes.Buffer
+	Out         Buffer
 
 	Config config.Config
 }
@@ -28,7 +45,18 @@ type TestData struct {
 var registered map[string]Root
 
 // Register registers a new test DSL chain
-func Register(dir string, r Root) {
+func Register(r Root) {
+
+	// file should contain the full filepath of the calling file which
+	// is registering the test.  We can use this to figure out the directory
+	// the test is in.
+	_, file, _, ok := runtime.Caller(1)
+	if !ok {
+		panic("unable to determine directory")
+	}
+	// Get the directory name of the registering function.
+	dir := filepath.Base(filepath.Dir(file))
+
 	if registered == nil {
 		registered = map[string]Root{}
 	}
@@ -60,23 +88,33 @@ func SendTrigger(ctx context.Context, td *TestData) error {
 		return fmt.Errorf("error generating trigger data: %w", err)
 	}
 
-	td.TriggerData = evt.Map()
+	return SendEvent(evt)(ctx, td)
+}
 
-	byt, _ := json.Marshal(td.TriggerData)
-	resp, err := http.Post(
-		fmt.Sprintf("http://%s:%d/e/key", td.Config.EventAPI.Addr, td.Config.EventAPI.Port),
-		"application/json",
-		bytes.NewBuffer(byt),
-	)
-	if err != nil {
-		return fmt.Errorf("error sending event: %w", err)
+func SendEvent(e event.Event) Proc {
+	return func(ctx context.Context, td *TestData) error {
+		td.TriggerData = e.Map()
+		byt, _ := json.Marshal(e)
+		resp, err := http.Post(
+			fmt.Sprintf("http://%s:%d/e/key", td.Config.EventAPI.Addr, td.Config.EventAPI.Port),
+			"application/json",
+			bytes.NewBuffer(byt),
+		)
+		if err != nil {
+			return fmt.Errorf("error sending event: %w", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			byt, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("invalid status code sending event: %d\nResponse: %s", resp.StatusCode, string(byt))
+		}
+		return nil
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		byt, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("invalid status code sending event: %d\nResponse: %s", resp.StatusCode, string(byt))
-	}
-	return nil
+}
+
+// RequireReceiveTrigger asserts that we received the trigger within the default amount of time.
+func RequireReceiveTrigger(ctx context.Context, td *TestData) error {
+	return RequireOutputWithin("received message", 500*time.Millisecond)(ctx, td)
 }
 
 func Wait(t time.Duration) Proc {
@@ -85,6 +123,16 @@ func Wait(t time.Duration) Proc {
 		<-time.After(t)
 		return nil
 	}
+}
+
+func RequireTriggerExecution(ctx context.Context, td *TestData) error {
+	return RequireLogFieldsWithin(
+		map[string]any{
+			"message": "executing step",
+			"step":    inngest.TriggerName,
+		},
+		DefaultDuration,
+	)(ctx, td)
 }
 
 func RequireLogField(name, value string) Proc {
@@ -110,6 +158,34 @@ func RequireLogFieldsWithin(fields map[string]any, t time.Duration) Proc {
 			}
 			return nil
 		})
+	}
+}
+
+func RequireNoLogFields(fields map[string]any) Proc {
+	return func(ctx context.Context, td *TestData) error {
+		fmt.Printf("> Checking for no log fields: %v\n", fields)
+		if err := requireLogFields(ctx, td, fields); err == nil {
+			return fmt.Errorf("log fields found: %s", fields)
+		}
+		return nil
+	}
+}
+
+// RequireNoLogFieldsWithin ensures that the logs do not contain the specified fields
+// within the given amount of time.
+func RequireNoLogFieldsWithin(fields map[string]any, t time.Duration) Proc {
+	return func(ctx context.Context, td *TestData) error {
+		fmt.Printf("> Checking for no log fields: %v\n", fields)
+		err := timeout(t, func() error {
+			if err := requireLogFields(ctx, td, fields); err != nil {
+				return fmt.Errorf("Could not find fields: %v", fields)
+			}
+			return nil
+		})
+		if err == nil {
+			return fmt.Errorf("log fields found: %s", fields)
+		}
+		return nil
 	}
 }
 
