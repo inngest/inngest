@@ -88,6 +88,64 @@ receive the following**:
 }
 ```
 
+## After configuration
+
+The full spec for the `after` field is defined within the [function spec
+here](https://github.com/inngest/inngest/blob/main/pkg/cuedefs/v1/function.cue#L93-L114):
+
+```json
+#After: {
+	// step is the step that must complete in order to run the next step,
+	// or the "$trigger" if this step runs immediately.
+	step: string | "$trigger"
+
+	// if defines an expression which must evaluate to true in order to run
+	// the next step.
+	if?: string
+
+	// wait allows you to delay a step from running for a set amount of time, eg.
+	// to delay a step from running you can set wait to "10m".  This will enqueue
+	// the step to run after 10 minutes.
+	wait?: string
+
+	// async allows you to specify an event that must be received within a specific
+	// amount of time (ttl) to continue with the specified step.
+	async?: {
+		// event specifies the event name that must be received in order to
+		// continue an event
+		event:  string
+		// ttl is the maximum wait time to wait for the event to be received to
+		// continue the function
+		ttl:    string
+		// match defines an expression that must evaluate to true, using the async
+		// event data, in order continue the function
+		match?: string
+		// onTimeout specifies that this step should be executed on timeout only,
+		// if the event is not received within the TTL.
+		onTimeout?: bool
+	}
+}
+```
+
+**`if`** 
+
+You can specify an [expression](/docs/functions/expressions) which must evaluate to
+true in order for the step to be invoked.
+
+**`wait`** 
+
+You can specify that steps should run after a `wait`, eg. to schedule a step to execute
+10 minutes after the trigger you can specify `"wait": "10m"` within the after JSON block.
+
+**`async`** 
+
+You can also pause functions in between steps by specifing an `async` block.  The async
+block halts a function, sets up a temporary trigger which listens for the specified event,
+and automatically resumes the function when a matching event is received.
+
+Using this functionality it's possible to easily build flows that model complex user
+journeys, such as retention flows, drip campaigns, etc.
+
 ## Adding steps to functions
 
 To add a step to a function, create a new JSON block for each step within the
