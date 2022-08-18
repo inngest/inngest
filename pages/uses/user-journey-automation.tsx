@@ -131,7 +131,7 @@ export default function Template() {
             <h1 style={{ position: "relative", zIndex: 1 }}>
               Automate{" "}
               <span className="gradient-text-ltr gradient-from-iris-60 gradient-to-cyan">
-                User Journeys
+                User&nbsp;Journeys
               </span>
               <br />
               in Minutes.
@@ -181,7 +181,7 @@ export default function Template() {
               <StepGrid
                 key={`steps-${i}`}
                 cols={e.steps.length}
-                className="py-6"
+                className="my-6"
               >
                 {e.steps.map((s, j) => (
                   <Step key={`step-${j}`}>
@@ -207,7 +207,7 @@ export default function Template() {
           <div className="text-center px-6 max-xl mx-auto py-16">
             <h2 className="text-4xl font-normal	">How Inngest Works</h2>
           </div>
-          <div className="grid grid-cols-3 gap-16 items-start py-6">
+          <div className="grid md:grid-cols-3 gap-6 md:gap-16 items-start py-6">
             <div>
               <h3 className="text-lg mb-2">Select your event trigger</h3>
               <p className="my-0">
@@ -231,7 +231,7 @@ export default function Template() {
               </p>
             </div>
           </div>
-          <StepGrid cols={3} className="py-6">
+          <StepGrid cols={3} className="my-6">
             <Step key="left">
               <div className="icon">
                 <Zap />
@@ -339,6 +339,20 @@ const StepGrid = styled.div<{ cols: number | string }>`
     content: "";
     width: 100%;
     top: 50%;
+  }
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+    grid-gap: 1rem;
+
+    &::before {
+      border-top: none;
+      border-left: 2px dotted #b1a7b7;
+      width: 1px;
+      top: 0px;
+      left: 50%;
+      height: 100%;
+    }
   }
 `;
 
