@@ -6,6 +6,7 @@ import { GetStaticPaths, GetStaticProps } from "next";
 import Button from "src/shared/Button";
 import { CommandSnippet } from "src/shared/CommandSnippet";
 import Footer from "src/shared/footer";
+import Github from "src/shared/Icons/Github";
 import Nav from "src/shared/nav";
 import { z } from "zod";
 
@@ -51,8 +52,10 @@ export default function LibraryExamplePage(props: Props) {
               kind="outline"
               href={`https://github.com/inngest/inngest/tree/main/examples/${props.id}`}
               target="_blank"
+              className="flex flex-row items-center justify-center space-x-1"
             >
-              Explore the code
+              <Github />
+              <div>Explore the code</div>
             </Button>
           </div>
         </div>
