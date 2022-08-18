@@ -1,4 +1,6 @@
+import Fuse from "fuse.js";
 import { GetStaticProps } from "next";
+import { useMemo, useState } from "react";
 import Button from "src/shared/Button";
 import Nav from "src/shared/nav";
 import { getExamples } from "./[example]";
@@ -12,6 +14,24 @@ export const getStaticProps: GetStaticProps = async () => {
 };
 
 export default function LibraryExamplesPage(props: Props) {
+  const [search, setSearch] = useState("");
+  const trimmedSearch = useMemo(() => search.trim(), [search]);
+
+  const fuse = useMemo(() => {
+    return new Fuse(props.examples, {
+      keys: ["name", "description"],
+      findAllMatches: true,
+    });
+  }, [props.examples]);
+
+  const examples = useMemo(() => {
+    if (!trimmedSearch) {
+      return props.examples;
+    }
+
+    return fuse.search(trimmedSearch).map(({ item }) => item);
+  }, [fuse, trimmedSearch]);
+
   return (
     <div>
       <Nav sticky nodemo />
@@ -27,11 +47,13 @@ export default function LibraryExamplesPage(props: Props) {
           type="text"
           placeholder="Search..."
           className="w-full bg-gray-100 border border-gray-200"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
       <div className="container mx-auto px-12 pb-12 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12">
-        {props.examples.map((example) => (
+        {examples.map((example) => (
           <div
             key={example.id}
             className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2"
