@@ -42,7 +42,6 @@ function MyApp({ Component, pageProps }) {
     <>
       <Head>
         <title>Inngest → {metaTitle}</title>
-        <meta property="og:title" content={`Inngest - ${metaTitle}`} />
         {pageProps?.meta?.description && (
           <>
             <meta
@@ -63,6 +62,7 @@ function MyApp({ Component, pageProps }) {
           property="og:url"
           content={`https://www.inngest.com${router.pathname}`}
         />
+        <meta property="og:title" content={`Inngest - ${metaTitle}`} />
       </Head>
       <PageBanner href="/docs/guides/prisma-background-jobs?ref=page-banner">
         New Guide: Running Background Jobs with Prisma ORM + TypeScript
