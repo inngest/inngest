@@ -120,8 +120,19 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
       ).trim() || null;
   }
 
+  // Set a base URL for if using relative links in the README.md file
+  const baseUrl = "https://raw.githubusercontent.com/inngest/inngest/main/";
+
   // TODO Moev this to the if; just testing here
-  readme = marked.parse(readme);
+  readme = marked.parse(
+    readme.replaceAll(".github/assets/", `${baseUrl}/.github/assets/`),
+    {
+      baseUrl: "https://raw.githubusercontent.com/inngest/inngest/main/",
+      gfm: true,
+      breaks: true,
+      headerIds: true,
+    }
+  );
 
   return {
     props: {
