@@ -37,6 +37,7 @@
     "dagre": "^0.8.5",
     "deterministic-split": "^1.0.4",
     "fs": "^0.0.1-security",
+    "fuse.js": "^6.6.2",
     "gray-matter": "^4.0.3",
     "inngest-sdk": "^1.0.1",
     "lodash.debounce": "^4.0.8",
