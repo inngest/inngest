@@ -56,7 +56,7 @@ func runInit(cmd *cobra.Command, args []string) {
 	var err error
 
 	if template != "" {
-		err = cloneTemplate(ctx, template)
+		err = cloneTemplate(ctx, template, cmd.Flag("name").Value.String())
 	} else {
 		err = createNewFunction(ctx, cmd)
 	}
@@ -67,17 +67,24 @@ func runInit(cmd *cobra.Command, args []string) {
 	}
 }
 
-func cloneTemplate(ctx context.Context, template string) error {
-	// template = [repo]#[path]
-	// ask for =  [fn-name]
-	//
-	// git clone https://[repo].git --depth 1 --no-checkout [fn-name]
-	// cd [fn-name]
-	// git sparse-checkout set [path] --cone
-	// cp -r [path]/* .
-	// rm -r examples/
+// TODO Perform a sparse checkout if possible
+func cloneTemplate(ctx context.Context, template string, name string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
 
-	fnName := "foo"
+	if name == "" {
+		fmt.Println("Function name:")
+		fmt.Scanln(&name)
+	}
+
+	targetDir := filepath.Join(cwd, name)
+
+	if _, err := os.Stat(targetDir); !os.IsNotExist(err) {
+		return fmt.Errorf("%s already exists", targetDir)
+	}
+
 	repo, examplePath, _ := strings.Cut(template, "#")
 	tmpPath, err := os.MkdirTemp("", "inngest-template-*")
 	if err != nil {
@@ -85,20 +92,16 @@ func cloneTemplate(ctx context.Context, template string) error {
 	}
 
 	cloneCmd := exec.Command("git", "clone", "https://"+repo+".git", "--depth", "1", tmpPath)
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
 	err = cloneCmd.Run()
 	if err != nil {
 		return err
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	targetDir := filepath.Join(cwd, fnName)
-
 	onlyOwnerWrite := 0755
-	if err = os.MkdirAll(targetDir, fs.FileMode(onlyOwnerWrite)); err != nil {
+	// Create every directory up-to-but-not-including the target dir
+	if err = os.MkdirAll(filepath.Dir(targetDir), fs.FileMode(onlyOwnerWrite)); err != nil {
 		return err
 	}
 
@@ -111,6 +114,8 @@ func cloneTemplate(ctx context.Context, template string) error {
 	if err != nil {
 		fmt.Println("\n" + cli.RenderWarning(fmt.Sprintf("Failed to remove temporary dir after copy: %s", err)) + "\n")
 	}
+
+	fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render(fmt.Sprintf("🎉 Done!  Your function has been created in ./%s", name)))
 
 	return nil
 }
