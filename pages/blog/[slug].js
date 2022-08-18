@@ -299,5 +299,12 @@ export async function getStaticProps({ params }) {
       rehypePlugins: [rehypeSlug],
     },
   });
-  return { props: { post } };
+  return {
+    props: {
+      post,
+      meta: {
+        disabled: true,
+      },
+    },
+  };
 }

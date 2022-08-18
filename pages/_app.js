@@ -32,37 +32,49 @@ function MyApp({ Component, pageProps }) {
   const metaTitle =
     pageProps?.meta?.title || "You Send Events. We Run Your Code.";
   // Warn during local dev
-  if (!pageProps?.meta?.title && process.env.NODE_ENV !== "production") {
+  if (
+    !pageProps.disabled &&
+    !pageProps?.meta?.title &&
+    process.env.NODE_ENV !== "production"
+  ) {
     console.warn(
       "WARNING: meta tags are not set for this page, please set via getStaticProps"
     );
   }
+  const disableMetadata = pageProps?.meta?.disabled === true;
 
   return (
     <>
       <Head>
-        <title>Inngest → {metaTitle}</title>
-        {pageProps?.meta?.description && (
+        {/* Sections of the site like the blog and docs set these using different data */}
+        {!disableMetadata && (
           <>
+            <title>Inngest → {metaTitle}</title>
+            {pageProps?.meta?.description && (
+              <>
+                <meta
+                  name="description"
+                  content={pageProps.meta.description}
+                ></meta>
+                <meta
+                  property="og:description"
+                  content={pageProps.meta.description}
+                />
+              </>
+            )}
             <meta
-              name="description"
-              content={pageProps.meta.description}
-            ></meta>
-            <meta
-              property="og:description"
-              content={pageProps.meta.description}
+              property="og:image"
+              content={
+                pageProps?.meta?.image || "/assets/img/og-image-default.jpg"
+              }
             />
+            <meta
+              property="og:url"
+              content={`https://www.inngest.com${router.pathname}`}
+            />
+            <meta property="og:title" content={`Inngest - ${metaTitle}`} />
           </>
         )}
-        <meta
-          property="og:image"
-          content={pageProps?.meta?.image || "/assets/img/og-image-default.jpg"}
-        />
-        <meta
-          property="og:url"
-          content={`https://www.inngest.com${router.pathname}`}
-        />
-        <meta property="og:title" content={`Inngest - ${metaTitle}`} />
       </Head>
       <PageBanner href="/docs/guides/prisma-background-jobs?ref=page-banner">
         New Guide: Running Background Jobs with Prisma ORM + TypeScript
