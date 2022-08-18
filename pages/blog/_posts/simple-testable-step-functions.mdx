@@ -1,0 +1,141 @@
+---
+focus: true
+heading: "Locally testable step functions made simple"
+subtitle: "We're excited to release support for step functions which can run any language, all locally testable."
+image: "/assets/blog/run-nextjs-functions-in-the-background/featured-image.jpg"
+date: 2022-08-18
+---
+
+Serverless functions are fantastic for reducing your operational burden. For a long time, though, they’ve been limited to more basic API handlers, or small scripts that don’t live within your core infrastructure.  Anything more complex requires orchestration or heading into the complexity of AWS’ step functions.
+
+**With our latest release we’re excited to launch language-agnostic, locally testable step functions**.  You can now compose complex sequences of logic as [DAGs](https://en.wikipedia.org/wiki/Directed_acyclic_graph) — using any language, without any infrastructure, queues, state, or config.
+
+Let’s show you an example, then talk about their uses, benefits and how they work — plus our future plans for things like integrating webassembly and a local step-over debugger.
+
+## A quick example
+
+An example is worth far more than a description.  Here’s an example sign-up flow function definition, which: sends a welcome email;  adds the user to stripe (for non-free plans);  analyzes the signup’s company info;  then depending on the analysis sends a message in slack.
+
+We’re using a sign-up flow because it’s familiar to *everyone* but you can do anything you need here — whether that’s data pipelines, user journeys, managing webhooks, complex queue pipelines, etc.
+
+Here’s the step function flow and it’s configuration:
+
+![step-fns.png](/assets/blog/step-fns.png)
+
+```json
+ {
+  "name": "Sign-up flow",
+  "id": "improved-chamois-c592a7",
+  "triggers": [
+    { "event": "auth0/user.created" }
+  ],
+  "steps": {
+
+    "welcome": {
+      "id": "welcome",
+      "name": "Send a welcome email",
+      // The path links to the source code for the step.
+      "path": "file://./steps/welcome",
+      "runtime": {
+        // This lets us run steps in eg. webassembly also.
+        "type": "docker"
+      },
+      "after": [{
+        "step": "$trigger"
+      }]
+    },
+
+    "stripe": {
+      "id": "stripe",
+      "name": "Add the user to stripe",
+      "path": "file://./steps/stripe",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [{
+        "step": "welcome",
+        "if": "event.data.plan != 'free'"
+      }]
+    },
+
+    "enrich": {
+      "id": "enrich",
+      "name": "Enrich signup data",
+      "path": "file://./steps/enrich",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [{
+        "step": "welcome"
+      }]
+    },
+
+    "notify": {
+      "id": "notify",
+      "name": "Notify sales team",
+      "path": "file://./steps/slack",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [{
+        "step": "enrich",
+        "if": "steps.enrich.value >= 1000"
+      }]
+    }
+  }
+}
+```
+
+In this example we’re defining a function that’s [triggered by an Auth0 event](https://www.inngest.com/docs/functions/introduction#the-trigger) (really, it can be an API call, an integration, a webhook, a schedule, Kafka, etc.).  Then we’re defining each step, and the order of operations.
+
+Step functions here try to avoid complexity:  in this example they simply say the step they run after, and an optional expression which will be evaluated to conditionally run based off of the event data *and* the output of previous steps.
+
+If you’re interested you can [dive straight into our docs for more info](https://www.inngest.com/docs/functions/step-functions).
+
+## Locally test step functions
+
+Best of all, it’s possible to locally test these functions using our CLI with a single command: `inngest run`.  This builds each step, then executes the function locally using the same execution engine that runs in production.  No more hours-long feedback loops as you deploy things in your cloud!
+
+![Running actions](http://deb.shared:3000/assets/docs/inngest-run/replay-generated.gif)
+
+## The benefits:  best practices
+
+Step functions have a lot of benefits over simple serverless functions or queues as they enforce **best practices** which are common within traditional engineering.
+
+For one, by splitting logic up into steps, you’re **reducing complexity** of each part — which makes things easier to write, test, debug, and deploy.
+
+They’re also more **reliable**.  Each step is retried independently on failure, so other parts of the pipeline aren’t impacted if there are intermittent external errors other parts of the pipeline aren’t impacted.
+
+Each step is **reusable**.  You can call shared code from many functions, just like you would from a library.  We’re also planning to release an extensive library of open-source steps so that you can plug and play common features like sending messages via email, SMS, Slack, etc, data analysis, and API integrations (if there’s stuff you want to see, [drop us a note in discord](https://www.inngest.com/discord) or a [GitHub issue](https://github.com/inngest/inngest/issues)).
+
+And finally, by moving your logic outside of your critical path you’re making sure your API responds as fast as possible, reducing any latency by offloading unnecessary applications.
+
+## Powerful features
+
+We’ve also added some powerful features to our step functions under the hood.
+
+The main killer feature is **event coordination:  the ability to pause your step function until specific events are received (or not), then automatically resume.**  The easiest example here is cart abandonment:
+
+![step-fns-timeout.png](/assets/blog/step-fns-timeout.png)
+
+<aside>
+<p>💡 Event coordination unlocks powerful functionality such as:</p>
+
+<p>Run a function when a user adds a product to their cart (`cart/product.added`), then wait for the checkout event *from the same user* for up to 24 hours.  If this isn’t received, send the user a discount.</p>
+
+</aside>
+
+You can declaratively specify the events that must occur between each step of a function with zero orchestration, coordination, or infrastructure.  This lets you build billion dollar functionality in minutes that you get with Braze or Segment — without other tools.
+
+## Future plans
+
+This is the initial release of step functions, and we have lots of future plans:
+
+- A step-over debugger built into our local CLI, allowing you to inspect and manipulate function state as you develop
+- `Promise.all`-like functionality, allowing you to run steps only after many previous steps have finished
+- A library of open-source reusable steps, allowing you to build out functionality without writing a line of code
+
+You can try out step functions for free by grabbing our CLI and [signing up for an account](https://www.inngest.com/sign-up?ref=step-fns-post).
+
+We’d also love to hear your [feedback, thoughts, and requests via Github issues](https://www.github.com/inngest/inngest) or by [hopping into our discord to chat with us](https://www.inngest.com/discord).  Finally, the source code for this is [freely available in our CLI](https://www.github.com/inngest/inngest).%
+

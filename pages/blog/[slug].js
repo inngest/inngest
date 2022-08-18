@@ -147,6 +147,16 @@ const Body = styled.main`
     line-height: 1.6em;
   }
 
+  aside {
+    padding: 1.4em 1.5em;
+    border: 1px solid var(--stroke-color);
+    border-radius: var(--border-radius);
+    background: var(--highlight-color);
+
+    p:first-of-type { margin-top: 0; }
+    p:last-of-type { margin-bottom: 0; }
+  }
+
   ol,
   ul {
     margin: 1.5rem 0;
@@ -208,6 +218,11 @@ const Body = styled.main`
       transparent
     );
     background-size: 5px 5px;
+  }
+
+  ul {
+    list-style-type: disc;
+    margin-left: 1rem;
   }
 
   @media (max-width: 800px) {
