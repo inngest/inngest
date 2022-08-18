@@ -50,6 +50,7 @@ export default function LibraryExamplePage(props: Props) {
             <Button
               kind="outline"
               href={`https://github.com/inngest/inngest/tree/main/examples/${props.id}`}
+              target="_blank"
             >
               Explore the code
             </Button>
