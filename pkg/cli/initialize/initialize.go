@@ -396,11 +396,8 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	)
 
 	// Base stuff we should always run.
-	if !f.scaffoldDone {
-		// Spin the scaffolding spinner if we're waiting.
-		f.loading, cmd = f.loading.Update(msg)
-		cmds = append(cmds, cmd)
-	}
+	f.loading, cmd = f.loading.Update(msg)
+	cmds = append(cmds, cmd)
 
 	if f.scaffoldDone && f.scaffolds == nil {
 		f.scaffolds, _ = scaffold.Parse(context.Background())
@@ -521,6 +518,11 @@ func (f *initModel) View() string {
 		q = q.Next(f)
 	}
 
+	// Render loading if we're waiting for a clone to complete
+	if f.cloningTemplate {
+		b.WriteString(f.renderCloningTemplate())
+	}
+
 	// If we have no workflow name, ask for it.
 	if f.state == stateQuestions && f.question != nil {
 		b.WriteString(f.question.Render(f))
@@ -542,6 +544,22 @@ func (f *initModel) renderIntro(welcome bool) string {
 	b.WriteString("\n")
 	b.WriteString(cli.TextStyle.Copy().Foreground(cli.Feint).Render("Answer these questions to get started."))
 	b.WriteString("\n\n")
+	return b.String()
+}
+
+// Returns a string status regarding template cloning progress, success, or
+// failure.
+func (f *initModel) renderCloningTemplate() string {
+	b := &strings.Builder{}
+
+	if f.clonedTemplate {
+		b.WriteString(fmt.Sprintf("Cloned template: %s\n", f.template))
+	} else if f.CloneError != nil {
+		b.WriteString(fmt.Sprintf("Failed to clone template: %s\n", f.template))
+	} else {
+		b.WriteString(fmt.Sprintf("%s Cloning template...\n", f.loading.View()))
+	}
+
 	return b.String()
 }
 
@@ -586,10 +604,7 @@ func (f *initModel) cloneTemplate(ctx context.Context) tea.Cmd {
 		}
 
 		cloneCmd := exec.Command("git", "clone", "https://"+repo+".git", "--depth", "1", tmpPath)
-		// cloneCmd.Stdout = os.Stdout
-		// cloneCmd.Stderr = os.Stderr
-		err = cloneCmd.Run()
-		if err != nil {
+		if err = cloneCmd.Run(); err != nil {
 			return cloneError{err}
 		}
 
