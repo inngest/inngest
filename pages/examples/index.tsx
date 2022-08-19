@@ -141,6 +141,7 @@ export const getExamples = async () => {
           tree: z.array(treeSchema),
           name: z.string(),
           description: z.string().optional(),
+          tags: z.array(z.string()).optional(),
         })
         .parse({
           ...JSON.parse(
