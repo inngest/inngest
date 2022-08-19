@@ -3,8 +3,11 @@ package initialize
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -66,6 +69,8 @@ type InitOpts struct {
 
 	// URL represents a pre-defined URL to hit
 	URL string
+
+	Template string
 }
 
 // NewInitModel renders the UI for initializing a new function.
@@ -92,6 +97,7 @@ func NewInitModel(o InitOpts) (*initModel, error) {
 		language: o.Language,
 		url:      o.URL,
 		state:    stateQuestions,
+		template: o.Template,
 	}
 
 	if o.Cron != "" {
@@ -193,6 +199,11 @@ type initModel struct {
 	language string
 	// scaffold is the scaffold selected by the user
 	scaffold *scaffold.Template
+	// template is the remote GitHub-hosted template to use
+	template        string
+	cloningTemplate bool
+	clonedTemplate  bool
+	CloneError      error
 
 	events          *cli.EventList
 	eventFetchError error
@@ -234,6 +245,29 @@ func (f *initModel) DidQuitEarly() bool {
 // Function returns the formatted function given answers from the TUI state.
 // This returns an error if the function is not valid.
 func (f *initModel) Function(ctx context.Context) (*function.Function, error) {
+	// If this is a template, load the function from the created template
+	if f.template != "" && f.name != "" {
+		if f.CloneError != nil {
+			return nil, f.CloneError
+		}
+
+		if f.clonedTemplate {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return nil, err
+			}
+
+			targetDir := filepath.Join(cwd, f.name)
+
+			fn, err := function.Load(ctx, targetDir)
+			if err != nil {
+				return nil, err
+			}
+
+			return fn, fn.Validate(ctx)
+		}
+	}
+
 	// Attempt to find the schema that matches this event, and dump the
 	// cue schema inside the function.
 	var ed *function.EventDefinition
@@ -432,6 +466,19 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		f.question = f.question.Next(f)
 	}
 
+	shouldCloneTemplate := f.template != "" && f.name != ""
+	if shouldCloneTemplate && !f.cloningTemplate {
+		f.cloningTemplate = true
+
+		go func(f *initModel) {
+			f.CloneError = f.cloneTemplate(context.Background())
+			if f.CloneError == nil {
+				f.clonedTemplate = true
+			}
+			f.state = stateDone
+		}(f)
+	}
+
 	// This is a separate if, as we want to capture the next question from
 	// the above transition.
 	//
@@ -510,6 +557,61 @@ func (f *initModel) renderWelcome() string {
 		lipgloss.WithWhitespaceForeground(lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#333333"}),
 	)
 	return dialog
+}
+
+// TODO Perform a sparse checkout if possible
+func (f *initModel) cloneTemplate(ctx context.Context) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	targetDir := filepath.Join(cwd, f.name)
+
+	if _, err := os.Stat(targetDir); !os.IsNotExist(err) {
+		return fmt.Errorf("%s already exists", targetDir)
+	}
+
+	repo, examplePath, _ := strings.Cut(f.template, "#")
+	tmpPath, err := os.MkdirTemp("", "inngest-template-*")
+	if err != nil {
+		return err
+	}
+
+	cloneCmd := exec.Command("git", "clone", "https://"+repo+".git", "--depth", "1", tmpPath)
+	// cloneCmd.Stdout = os.Stdout
+	// cloneCmd.Stderr = os.Stderr
+	err = cloneCmd.Run()
+	if err != nil {
+		return err
+	}
+
+	onlyOwnerWrite := 0755
+	// Create every directory up-to-but-not-including the target dir
+	if err = os.MkdirAll(filepath.Dir(targetDir), fs.FileMode(onlyOwnerWrite)); err != nil {
+		return err
+	}
+
+	err = os.Rename(filepath.Join(tmpPath, examplePath), targetDir)
+	if err != nil {
+		return fmt.Errorf("Error moving template from temp directory: %s", err)
+	}
+
+	err = os.RemoveAll(tmpPath)
+	if err != nil {
+		fmt.Println("\n" + cli.RenderWarning(fmt.Sprintf("Failed to remove temporary dir after copy: %s", err)) + "\n")
+	}
+
+	fn, err := function.Load(ctx, targetDir)
+	if err != nil {
+		return err
+	}
+
+	if err = fn.Validate(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // fetchEvents fetches all public events and events from each workspace.

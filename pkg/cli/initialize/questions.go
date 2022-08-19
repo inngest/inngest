@@ -43,6 +43,10 @@ var (
 			return m, cmd
 		},
 		next: func(m *initModel) InitQuestion {
+			if m.template != "" {
+				return nil
+			}
+
 			return questionTrigger
 		},
 	}
