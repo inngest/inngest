@@ -2,6 +2,7 @@ import Fuse from "fuse.js";
 import { GetStaticProps } from "next";
 import { useMemo, useState } from "react";
 import Button from "src/shared/Button";
+import Footer from "src/shared/footer";
 import Nav from "src/shared/nav";
 import { reqWithSchema } from "src/utils/fetch";
 import { z } from "zod";
@@ -41,7 +42,7 @@ export default function LibraryExamplesPage(props: Props) {
         </div>
       </div>
 
-      <div className="container mx-auto max-w-lg mb-12 px-12">
+      <div className="container mx-auto max-w-lg mb-6 px-12">
         <input
           type="text"
           placeholder="Search..."
@@ -51,25 +52,28 @@ export default function LibraryExamplesPage(props: Props) {
         />
       </div>
 
-      <div className="container mx-auto px-12 pb-12 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12">
-        {examples.map((example) => (
-          <div
-            key={example.id}
-            className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2"
-          >
-            <div className="font-semibold">{example.name}</div>
-            <div>{example.description}</div>
-            <Button
-              kind="outline"
-              size="medium"
-              className="inline-block"
-              href={`/examples/${example.id}?ref=examples`}
+      <div className="background-grid-texture">
+        <div className="container mx-auto p-12 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12">
+          {examples.map((example) => (
+            <div
+              key={example.id}
+              className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-white"
             >
-              Explore
-            </Button>
-          </div>
-        ))}
+              <div className="font-semibold">{example.name}</div>
+              <div>{example.description}</div>
+              <Button
+                kind="outline"
+                size="medium"
+                className="inline-block"
+                href={`/examples/${example.id}?ref=examples`}
+              >
+                Explore
+              </Button>
+            </div>
+          ))}
+        </div>
       </div>
+      <Footer />
     </div>
   );
 }
