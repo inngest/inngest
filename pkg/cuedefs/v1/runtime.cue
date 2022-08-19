@@ -3,7 +3,8 @@ package v1
 #Runtime: #RuntimeDocker | #RuntimeHTTP
 
 #RuntimeDocker: {
-	type: "docker"
+	type:       "docker"
+	dockerfile: string | *""
 }
 
 #RuntimeHTTP: {
