@@ -147,7 +147,7 @@ export async function getStaticProps({ params }) {
       rehypePlugins: [rehypeSlug],
     },
   });
-  return { props: { post, htmlClassName: "docs" } };
+  return { props: { post, htmlClassName: "docs", meta: { disabled: true } } };
 }
 
 const TOC = styled.nav<{ isExpanded: boolean }>`

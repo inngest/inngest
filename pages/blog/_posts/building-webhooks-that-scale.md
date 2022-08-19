@@ -1,5 +1,5 @@
 ---
-focus: true
+focus: false
 heading: "Building Webhooks That Scale"
 subtitle: Lessons learned scaling webhooks to millions of requests a day
 image: "/assets/blog/building-webhooks-that-scale/hero-image.jpg"

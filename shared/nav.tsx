@@ -112,7 +112,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
 
 const NavWrapper = styled.nav<{ sticky: boolean }>`
   position: ${({ sticky }) => (sticky ? "sticky" : "relative")};
-  z-index: 2;
+  z-index: 20;
   top: ${({ sticky }) => (sticky ? "0" : "auto")};
   margin: 1.5rem auto;
   background-color: var(--bg-color);
@@ -122,7 +122,7 @@ const Container = styled.div<{ sticky?: boolean }>`
   position: relative;
   max-width: 1200px;
   margin: 0 auto;
-  z-index: 2;
+  z-index: 40;
   display: grid;
   grid-template-columns: auto 1fr auto;
   padding: 0.5rem 1rem;
@@ -134,6 +134,7 @@ const Container = styled.div<{ sticky?: boolean }>`
     // Offset for the g
     position: relative;
     top: 3px;
+    z-index: 20;
   }
 
   svg {
