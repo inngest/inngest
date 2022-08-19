@@ -36,16 +36,32 @@ func NewCmdInit() *cobra.Command {
 }
 
 func runInit(cmd *cobra.Command, args []string) {
-	if _, err := function.Load(cmd.Context(), "."); err == nil {
-		// XXX: We can't both SilenceUsage and SilenceError, so we handle error checking inside
-		// the init function here.
-		fmt.Println("\n" + cli.RenderError("An inngest project already exists in this directory.  Remove the inngest file to continue.") + "\n")
-		os.Exit(1)
-		return
+	ctx := cmd.Context()
+	name := cmd.Flag("name").Value.String()
+
+	// If we've been given a name this early, try to ensure we're not going to be
+	// targeting an existing function.
+	if name != "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Println("\n" + cli.RenderError("Could not get current working directory") + "\n")
+			os.Exit(1)
+			return
+		}
+
+		checkDir := filepath.Join(cwd, name)
+
+		if _, err := function.Load(ctx, checkDir); err == nil {
+			// XXX: We can't both SilenceUsage and SilenceError, so we handle error checking inside
+			// the init function here.
+			fmt.Println("\n" + cli.RenderError("An inngest project already exists in this directory.  Remove the inngest file to continue.") + "\n")
+			os.Exit(1)
+			return
+		}
 	}
 
 	showWelcome := true
-	if setting, ok := clistate.GetSetting(cmd.Context(), clistate.SettingRanInit).(bool); ok {
+	if setting, ok := clistate.GetSetting(ctx, clistate.SettingRanInit).(bool); ok {
 		// only show the welcome if we haven't ran init
 		showWelcome = !setting
 	}
@@ -58,7 +74,7 @@ func runInit(cmd *cobra.Command, args []string) {
 		ShowWelcome: showWelcome,
 		Event:       cmd.Flag("event").Value.String(),
 		Cron:        cmd.Flag("cron").Value.String(),
-		Name:        cmd.Flag("name").Value.String(),
+		Name:        name,
 		Language:    cmd.Flag("language").Value.String(),
 		URL:         cmd.Flag("url").Value.String(),
 		Template:    template,
@@ -82,7 +98,7 @@ func runInit(cmd *cobra.Command, args []string) {
 	}
 
 	// Get the function from the state.
-	fn, err := state.Function(cmd.Context())
+	fn, err := state.Function(ctx)
 	if err != nil {
 		fmt.Println(cli.RenderError(fmt.Sprintf("There was an error creating the function: %s", err)) + "\n")
 		return
@@ -90,7 +106,7 @@ func runInit(cmd *cobra.Command, args []string) {
 
 	// Save a setting which indicates that we've ran init successfully.
 	// This is used to prevent us from showing the welcome message on subsequent runs.
-	_ = clistate.SaveSetting(cmd.Context(), clistate.SettingRanInit, true)
+	_ = clistate.SaveSetting(ctx, clistate.SettingRanInit, true)
 
 	// If we have a template, render that.
 	tpl := state.Template()
@@ -134,7 +150,7 @@ func runInit(cmd *cobra.Command, args []string) {
 		fmt.Println(out)
 	}
 
-	tel.Send(cmd.Context(), state.TelEvent())
+	tel.Send(ctx, state.TelEvent())
 
 	fmt.Println(cli.TextStyle.Render("For more information, read our documentation at https://www.inngest.com/docs\n"))
 }
