@@ -253,7 +253,7 @@ func (f *initModel) DidQuitEarly() bool {
 // This returns an error if the function is not valid.
 func (f *initModel) Function(ctx context.Context) (*function.Function, error) {
 	// If this is a template, load the function from the created template
-	if f.template != "" && f.name != "" {
+	if f.shouldCloneTemplate() {
 		if f.CloneError != nil {
 			return nil, f.CloneError
 		}
