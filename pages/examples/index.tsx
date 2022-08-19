@@ -1,7 +1,7 @@
 import Fuse from "fuse.js";
 import { GetStaticProps } from "next";
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import Button from "src/shared/Button";
 import Footer from "src/shared/footer";
 import Nav from "src/shared/nav";
 import { reqWithSchema } from "src/utils/fetch";
@@ -35,41 +35,50 @@ export default function LibraryExamplesPage(props: Props) {
   return (
     <div>
       <Nav sticky nodemo />
-      <div className="container mx-auto pt-32 pb-24 flex flex-row">
-        <div className="text-center px-6 max-w-4xl mx-auto flex flex-col space-y-6">
-          <h1>Examples</h1>
-          <p className="subheading">...</p>
+      <div className="hero-gradient">
+        <div className="container mx-auto pt-32 pb-24 flex flex-row">
+          <div className="text-center px-6 max-w-4xl mx-auto flex flex-col space-y-6">
+            <h1>
+              <span className="gradient-text">Build fast</span> with re-usable
+              examples
+            </h1>
+            <p className="subheading max-w-lg mx-auto">
+              Re-usable functions to get started building with Inngest - explore
+              the code or instantly deploy to your Inngest Cloud account.
+            </p>
+          </div>
         </div>
-      </div>
-
-      <div className="container mx-auto max-w-lg mb-6 px-12">
-        <input
-          type="text"
-          placeholder="Search..."
-          className="w-full bg-gray-100 border border-gray-200"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="max-w-lg px-12 pb-6 mx-auto">
+          <input
+            type="text"
+            placeholder="Search..."
+            className="w-full bg-white shadow-lg border border-gray-200"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="background-grid-texture">
         <div className="container mx-auto p-12 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12">
           {examples.map((example) => (
-            <div
+            <Link
               key={example.id}
-              className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-white"
+              href={`/examples/${example.id}?ref=examples`}
+              passHref
             >
-              <div className="font-semibold">{example.name}</div>
-              <div>{example.description}</div>
-              <Button
-                kind="outline"
-                size="medium"
-                className="inline-block"
-                href={`/examples/${example.id}?ref=examples`}
-              >
-                Explore
-              </Button>
-            </div>
+              <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-white transition-all transform hover:scale-105 hover:shadow-lg">
+                <div className="font-semibold text-black">{example.name}</div>
+                {example.description ? (
+                  <div className="font-xs text-gray-600">
+                    {example.description}
+                  </div>
+                ) : null}
+                <a className="text-blue-500 font-semibold text-right">
+                  Explore →
+                </a>
+              </a>
+            </Link>
           ))}
         </div>
       </div>
@@ -144,7 +153,10 @@ export const getExamples = async () => {
           id: z.string(),
           tree: z.array(treeSchema),
           name: z.string(),
-          description: z.string().optional(),
+          description: z
+            .string()
+            .optional()
+            .default("A serverless Prisma background job using TypeScript."),
           tags: z.array(z.string()).optional(),
         })
         .parse({

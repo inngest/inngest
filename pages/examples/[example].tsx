@@ -2,6 +2,8 @@ import styled from "@emotion/styled";
 import shuffle from "lodash.shuffle";
 import { marked } from "marked";
 import { GetStaticPaths, GetStaticProps } from "next";
+import Link from "next/link";
+import { useMemo } from "react";
 import Button from "src/shared/Button";
 import { CommandSnippet } from "src/shared/CommandSnippet";
 import Footer from "src/shared/footer";
@@ -19,6 +21,12 @@ interface Props {
 }
 
 export default function LibraryExamplePage(props: Props) {
+  const nextExamples = useMemo(() => {
+    return shuffle(props.examples)
+      .filter(({ id }) => id !== props.id)
+      .slice(0, 3);
+  }, [props.examples]);
+
   return (
     <div>
       <Nav sticky nodemo />
@@ -46,26 +54,60 @@ export default function LibraryExamplePage(props: Props) {
           </div>
         </div>
       </div>
-
-      <div className="pb-24 flex items-center justify-center">
-        {props.readme ? (
+      {props.readme ? (
+        <div className="mx-auto max-w-2xl pb-24 flex items-center justify-center">
           <div
-            className="prose"
+            className="prose px-6 prose-a:text-[#5d5fef] max-w-none w-full"
             dangerouslySetInnerHTML={{ __html: props.readme }}
           />
-        ) : null}
-      </div>
-      <Highlights>
-        <div className="container mx-auto p-12 grid grid-cols-3 gap-12">
-          {shuffle(props.examples)
-            .slice(0, 3)
-            .map((example) => (
-              <div>
-                {example.name} - {example.description}
-              </div>
-            ))}
         </div>
-      </Highlights>
+      ) : null}
+      {nextExamples.length ? (
+        <Highlights>
+          <div className="container mx-auto p-12">
+            <h2>More examples</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12 mt-4">
+              {nextExamples.map((example) => (
+                <div>
+                  <Link
+                    key={example.id}
+                    href={`/examples/${example.id}?ref=examples/${props.id}`}
+                    passHref
+                  >
+                    <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-black transition-all transform hover:scale-105 hover:shadow-lg">
+                      <div className="font semi-bold text-white">
+                        {example.name}
+                      </div>
+                      {example.description ? (
+                        <div className="font-xs text-gray-200">
+                          {example.description}
+                        </div>
+                      ) : null}
+                      <a className="text-blue-500 font-semibold text-right">
+                        Explore →
+                      </a>
+                    </a>
+                  </Link>
+                </div>
+              ))}
+            </div>
+            <div className="w-full flex items-center justify-center mt-10">
+              <Button
+                kind="primary"
+                href={`/examples?ref=examples/${props.id}`}
+              >
+                See all examples
+              </Button>
+            </div>
+          </div>
+        </Highlights>
+      ) : props.readme ? (
+        <div className="w-full flex items-center justify-center">
+          <Button kind="primary" href={`/examples?ref=examples/${props.id}`}>
+            See all examples
+          </Button>
+        </div>
+      ) : null}
       <Footer />
     </div>
   );
