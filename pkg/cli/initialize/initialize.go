@@ -258,21 +258,23 @@ func (f *initModel) Function(ctx context.Context) (*function.Function, error) {
 			return nil, f.CloneError
 		}
 
-		if f.clonedTemplate {
-			cwd, err := os.Getwd()
-			if err != nil {
-				return nil, err
-			}
-
-			targetDir := filepath.Join(cwd, f.name)
-
-			fn, err := function.Load(ctx, targetDir)
-			if err != nil {
-				return nil, err
-			}
-
-			return fn, fn.Validate(ctx)
+		if !f.clonedTemplate {
+			return nil, fmt.Errorf("template not yet cloned")
 		}
+
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+
+		targetDir := filepath.Join(cwd, f.name)
+
+		fn, err := function.Load(ctx, targetDir)
+		if err != nil {
+			return nil, err
+		}
+
+		return fn, fn.Validate(ctx)
 	}
 
 	// Attempt to find the schema that matches this event, and dump the
