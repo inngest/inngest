@@ -115,6 +115,8 @@ func runInit(cmd *cobra.Command, args []string) {
 		tpl = &scaffold.Template{}
 	}
 
+	// Templating should only be done against scaffolds; cloned templates should
+	// be left alone as these will have already cloned and created the directory.
 	if template == "" {
 		var step function.Step
 		for _, v := range fn.Steps {

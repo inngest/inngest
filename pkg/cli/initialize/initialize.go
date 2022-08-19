@@ -70,6 +70,7 @@ type InitOpts struct {
 	// URL represents a pre-defined URL to hit
 	URL string
 
+	// Template represents the GitHub-hosted template to clone
 	Template string
 }
 
@@ -160,7 +161,10 @@ func NewInitModel(o InitOpts) (*initModel, error) {
 	return f, nil
 }
 
+// cloneSucceeded is a tea.Msg sent when a template clone succeeds.
 type cloneSucceeded bool
+
+// cloneError is a tea.Msg sent when a template clone fails.
 type cloneError struct{ err error }
 
 // initModel represehts the survey state when creating a new function.
@@ -449,6 +453,7 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		f.width = msg.Width
 		f.height = msg.Height
 		f.browser.UpdateSize(f.width, f.height-f.eventBrowserOffset()-2)
+
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyCtrlBackslash:
@@ -476,8 +481,8 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		f.question = f.question.Next(f)
 	}
 
-	shouldCloneTemplate := f.template != "" && f.name != ""
-	if shouldCloneTemplate && !f.cloningTemplate {
+	// If we're ready to clone template, trigger it.
+	if f.shouldCloneTemplate() && !f.cloningTemplate {
 		f.cloningTemplate = true
 		cmds = append(cmds, f.cloneTemplate(context.Background()))
 	}
@@ -583,7 +588,9 @@ func (f *initModel) renderWelcome() string {
 	return dialog
 }
 
-// TODO Perform a sparse checkout if possible
+// Returns a tea.Cmd that will clone the template found in the initModel in to
+// a temporary directory, check it's validity, then move it to the target
+// directory given the initModel name.
 func (f *initModel) cloneTemplate(ctx context.Context) tea.Cmd {
 	return func() tea.Msg {
 		cwd, err := os.Getwd()
@@ -756,4 +763,10 @@ func humanizeDuration(duration time.Duration) string {
 	}
 
 	return strings.Join(parts, " ")
+}
+
+// Returns whether we should be - and can - clone a template based on current
+// input.
+func (f *initModel) shouldCloneTemplate() bool {
+	return f.template != "" && f.name != ""
 }
