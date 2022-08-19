@@ -593,6 +593,19 @@ func (f *initModel) cloneTemplate(ctx context.Context) tea.Cmd {
 			return cloneError{err}
 		}
 
+		// Now we've cloned, let's ensure the example path we've found is a valid
+		// function to ensure people can't just use this to accidentally git clone
+		// something that then doesn't work with inngest.
+		tmpExamplePath := filepath.Join(tmpPath, examplePath)
+		fn, err := function.Load(ctx, tmpExamplePath)
+		if err != nil {
+			return cloneError{err}
+		}
+
+		if err = fn.Validate(ctx); err != nil {
+			return cloneError{err}
+		}
+
 		onlyOwnerWrite := 0755
 		// Create every directory up-to-but-not-including the target dir
 		if err = os.MkdirAll(filepath.Dir(targetPath), fs.FileMode(onlyOwnerWrite)); err != nil {
