@@ -160,6 +160,9 @@ func NewInitModel(o InitOpts) (*initModel, error) {
 	return f, nil
 }
 
+type cloneSucceeded bool
+type cloneError struct{ err error }
+
 // initModel represehts the survey state when creating a new function.
 type initModel struct {
 	// The width of the terminal.  Necessary for styling content such
@@ -435,6 +438,16 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// the events in the event browser.
 		f.browser.SetEvents(f.events)
 
+	case cloneSucceeded:
+		f.clonedTemplate = true
+		f.state = stateDone
+		return f, tea.Quit
+
+	case cloneError:
+		f.CloneError = msg.err
+		f.state = stateDone
+		return f, tea.Quit
+
 	case tea.WindowSizeMsg:
 		f.width = msg.Width
 		f.height = msg.Height
@@ -469,14 +482,7 @@ func (f *initModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	shouldCloneTemplate := f.template != "" && f.name != ""
 	if shouldCloneTemplate && !f.cloningTemplate {
 		f.cloningTemplate = true
-
-		go func(f *initModel) {
-			f.CloneError = f.cloneTemplate(context.Background())
-			if f.CloneError == nil {
-				f.clonedTemplate = true
-			}
-			f.state = stateDone
-		}(f)
+		cmds = append(cmds, f.cloneTemplate(context.Background()))
 	}
 
 	// This is a separate if, as we want to capture the next question from
@@ -560,58 +566,60 @@ func (f *initModel) renderWelcome() string {
 }
 
 // TODO Perform a sparse checkout if possible
-func (f *initModel) cloneTemplate(ctx context.Context) error {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
+func (f *initModel) cloneTemplate(ctx context.Context) tea.Cmd {
+	return func() tea.Msg {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return cloneError{err}
+		}
+
+		targetPath := filepath.Join(cwd, f.name)
+
+		if _, err := os.Stat(targetPath); !os.IsNotExist(err) {
+			return cloneError{fmt.Errorf("%s already exists", targetPath)}
+		}
+
+		repo, examplePath, _ := strings.Cut(f.template, "#")
+		tmpPath, err := os.MkdirTemp("", "inngest-template-*")
+		if err != nil {
+			return cloneError{err}
+		}
+
+		cloneCmd := exec.Command("git", "clone", "https://"+repo+".git", "--depth", "1", tmpPath)
+		// cloneCmd.Stdout = os.Stdout
+		// cloneCmd.Stderr = os.Stderr
+		err = cloneCmd.Run()
+		if err != nil {
+			return cloneError{err}
+		}
+
+		onlyOwnerWrite := 0755
+		// Create every directory up-to-but-not-including the target dir
+		if err = os.MkdirAll(filepath.Dir(targetPath), fs.FileMode(onlyOwnerWrite)); err != nil {
+			return cloneError{err}
+		}
+
+		err = os.Rename(filepath.Join(tmpPath, examplePath), targetPath)
+		if err != nil {
+			return cloneError{fmt.Errorf("Error moving template from temp directory: %s", err)}
+		}
+
+		err = os.RemoveAll(tmpPath)
+		if err != nil {
+			fmt.Println("\n" + cli.RenderWarning(fmt.Sprintf("Failed to remove temporary dir after copy: %s", err)) + "\n")
+		}
+
+		fn, err = function.Load(ctx, targetPath)
+		if err != nil {
+			return cloneError{err}
+		}
+
+		if err = fn.Validate(ctx); err != nil {
+			return cloneError{err}
+		}
+
+		return cloneSucceeded(true)
 	}
-
-	targetDir := filepath.Join(cwd, f.name)
-
-	if _, err := os.Stat(targetDir); !os.IsNotExist(err) {
-		return fmt.Errorf("%s already exists", targetDir)
-	}
-
-	repo, examplePath, _ := strings.Cut(f.template, "#")
-	tmpPath, err := os.MkdirTemp("", "inngest-template-*")
-	if err != nil {
-		return err
-	}
-
-	cloneCmd := exec.Command("git", "clone", "https://"+repo+".git", "--depth", "1", tmpPath)
-	// cloneCmd.Stdout = os.Stdout
-	// cloneCmd.Stderr = os.Stderr
-	err = cloneCmd.Run()
-	if err != nil {
-		return err
-	}
-
-	onlyOwnerWrite := 0755
-	// Create every directory up-to-but-not-including the target dir
-	if err = os.MkdirAll(filepath.Dir(targetDir), fs.FileMode(onlyOwnerWrite)); err != nil {
-		return err
-	}
-
-	err = os.Rename(filepath.Join(tmpPath, examplePath), targetDir)
-	if err != nil {
-		return fmt.Errorf("Error moving template from temp directory: %s", err)
-	}
-
-	err = os.RemoveAll(tmpPath)
-	if err != nil {
-		fmt.Println("\n" + cli.RenderWarning(fmt.Sprintf("Failed to remove temporary dir after copy: %s", err)) + "\n")
-	}
-
-	fn, err := function.Load(ctx, targetDir)
-	if err != nil {
-		return err
-	}
-
-	if err = fn.Validate(ctx); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // fetchEvents fetches all public events and events from each workspace.
