@@ -1,5 +1,4 @@
 import styled from "@emotion/styled";
-import fetch from "cross-fetch";
 import shuffle from "lodash.shuffle";
 import { marked } from "marked";
 import { GetStaticPaths, GetStaticProps } from "next";
@@ -8,21 +7,8 @@ import { CommandSnippet } from "src/shared/CommandSnippet";
 import Footer from "src/shared/footer";
 import Github from "src/shared/Icons/Github";
 import Nav from "src/shared/nav";
-import { z } from "zod";
-
-const miniCache: Record<string, any> = {};
-
-const treeSchema = z.object({
-  path: z.string(),
-  sha: z.string().or(z.null()),
-  type: z.union([z.literal("blob"), z.literal("tree"), z.literal("commit")]),
-  url: z.string(),
-});
-
-const blobSchema = z.object({
-  content: z.string(),
-  encoding: z.union([z.literal("utf-8"), z.literal("base64")]),
-});
+import { reqWithSchema } from "src/utils/fetch";
+import { blobSchema, getExamples } from ".";
 
 interface Props {
   id: string;
@@ -145,124 +131,6 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
       },
     },
   };
-};
-
-const reqWithSchema = async <T extends z.ZodTypeAny>(
-  url: string,
-  schema: T
-): Promise<z.output<T>> => {
-  const json =
-    miniCache[url] ||
-    (await fetch(url, {
-      headers: {
-        "User-Agent": "inngest",
-
-        /**
-         * If a `GITHUB_TOKEN` env var is available, use it here in order to
-         * increase the rate limit allowance.
-         *
-         * GitHub Action runners get 1,000 requests per hour. A single deploy
-         * here uses a maximum of (3 + 3n) requests, where n is the number of
-         * examples.
-         *
-         * e.g. a single deploy of 3 examples can use up to a total of 9
-         * requests.
-         *
-         * Using a set token here allows us up to 15,000 requests per hour. If
-         * we hit that limit, we can add a pre-build step to clone the repo and
-         * change how this data is fetched.
-         */
-        Authorization: process.env.GITHUB_TOKEN
-          ? `token ${process.env.GITHUB_TOKEN}`
-          : "",
-      },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        miniCache[url] = data;
-        return data;
-      }));
-
-  try {
-    return schema.parse(json);
-  } catch (err) {
-    console.error("Error reading json:", json, err);
-    throw err;
-  }
-};
-
-export const getExamples = async () => {
-  const latestCommit = await reqWithSchema(
-    "https://api.github.com/repos/inngest/inngest/commits/main",
-    z.object({
-      commit: z.object({ tree: z.object({ url: z.string() }) }),
-    })
-  );
-
-  const commitContents = await reqWithSchema(
-    latestCommit.commit.tree.url,
-    z.object({
-      tree: z.array(treeSchema),
-    })
-  );
-
-  const examplesPath = commitContents.tree.find(
-    ({ path, type }) => path === "examples" && type === "tree"
-  );
-
-  if (!examplesPath?.url) {
-    throw new Error("Could not find examples path");
-  }
-
-  const examplesTree = await reqWithSchema(
-    examplesPath.url,
-    z.object({
-      tree: z.array(treeSchema),
-    })
-  );
-
-  const exampleNodes = examplesTree.tree.filter(({ type }) => type === "tree");
-
-  const examples = await Promise.all(
-    exampleNodes.map(async (node) => {
-      const example = await reqWithSchema(
-        node.url,
-        z.object({ tree: z.array(treeSchema) })
-      );
-
-      const inngestJsonNode = example.tree.find(
-        ({ path, type }) => path === "inngest.json" && type === "blob"
-      );
-
-      if (!inngestJsonNode?.url) {
-        throw new Error("Could not find inngest.json in example");
-      }
-
-      const inngestJsonRaw = await reqWithSchema(
-        inngestJsonNode.url,
-        blobSchema
-      );
-
-      return z
-        .object({
-          id: z.string(),
-          tree: z.array(treeSchema),
-          name: z.string(),
-          description: z.string().optional(),
-        })
-        .parse({
-          ...JSON.parse(
-            inngestJsonRaw.encoding === "base64"
-              ? Buffer.from(inngestJsonRaw.content, "base64").toString()
-              : inngestJsonRaw.content
-          ),
-          id: node.path,
-          tree: example.tree,
-        });
-    })
-  );
-
-  return examples;
 };
 
 const Highlights = styled.div`

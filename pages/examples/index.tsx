@@ -3,15 +3,14 @@ import { GetStaticProps } from "next";
 import { useMemo, useState } from "react";
 import Button from "src/shared/Button";
 import Nav from "src/shared/nav";
-import { getExamples } from "./[example]";
+import { reqWithSchema } from "src/utils/fetch";
+import { z } from "zod";
+
+const miniCache: Record<string, any> = {};
 
 interface Props {
   examples: Awaited<ReturnType<typeof getExamples>>;
 }
-
-export const getStaticProps: GetStaticProps = async () => {
-  return { props: { examples: await getExamples() } };
-};
 
 export default function LibraryExamplesPage(props: Props) {
   const [search, setSearch] = useState("");
@@ -74,3 +73,98 @@ export default function LibraryExamplesPage(props: Props) {
     </div>
   );
 }
+
+export const getStaticProps: GetStaticProps = async () => {
+  return { props: { examples: await getExamples() } };
+};
+
+export const getExamples = async () => {
+  const latestCommit = await reqWithSchema(
+    "https://api.github.com/repos/inngest/inngest/commits/main",
+    z.object({
+      commit: z.object({ tree: z.object({ url: z.string() }) }),
+    }),
+    miniCache
+  );
+
+  const commitContents = await reqWithSchema(
+    latestCommit.commit.tree.url,
+    z.object({
+      tree: z.array(treeSchema),
+    }),
+    miniCache
+  );
+
+  const examplesPath = commitContents.tree.find(
+    ({ path, type }) => path === "examples" && type === "tree"
+  );
+
+  if (!examplesPath?.url) {
+    throw new Error("Could not find examples path");
+  }
+
+  const examplesTree = await reqWithSchema(
+    examplesPath.url,
+    z.object({
+      tree: z.array(treeSchema),
+    }),
+    miniCache
+  );
+
+  const exampleNodes = examplesTree.tree.filter(({ type }) => type === "tree");
+
+  const examples = await Promise.all(
+    exampleNodes.map(async (node) => {
+      const example = await reqWithSchema(
+        node.url,
+        z.object({ tree: z.array(treeSchema) }),
+        miniCache
+      );
+
+      const inngestJsonNode = example.tree.find(
+        ({ path, type }) => path === "inngest.json" && type === "blob"
+      );
+
+      if (!inngestJsonNode?.url) {
+        throw new Error("Could not find inngest.json in example");
+      }
+
+      const inngestJsonRaw = await reqWithSchema(
+        inngestJsonNode.url,
+        blobSchema,
+        miniCache
+      );
+
+      return z
+        .object({
+          id: z.string(),
+          tree: z.array(treeSchema),
+          name: z.string(),
+          description: z.string().optional(),
+        })
+        .parse({
+          ...JSON.parse(
+            inngestJsonRaw.encoding === "base64"
+              ? Buffer.from(inngestJsonRaw.content, "base64").toString()
+              : inngestJsonRaw.content
+          ),
+          id: node.path,
+          tree: example.tree,
+        });
+    })
+  );
+
+  return examples;
+};
+
+const treeSchema = z.object({
+  path: z.string(),
+  sha: z.string().or(z.null()),
+  type: z.union([z.literal("blob"), z.literal("tree"), z.literal("commit")]),
+  url: z.string(),
+});
+
+export const blobSchema = z.object({
+  content: z.string(),
+  encoding: z.union([z.literal("utf-8"), z.literal("base64")]),
+});
