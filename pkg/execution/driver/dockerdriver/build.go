@@ -43,10 +43,21 @@ func FnBuildOpts(ctx context.Context, f function.Function, args ...string) ([]Bu
 			path = filepath.Join(f.Dir(), path)
 		}
 
+		rt, ok := step.Runtime.Runtime.(inngest.RuntimeDocker)
+		if !ok {
+			return nil, fmt.Errorf("failed to parse runtime configuration")
+		}
+		dockerfile := ""
+		if rt.Dockerfile != "" {
+			dockerfile = filepath.Join(path, rt.Dockerfile)
+			path = filepath.Dir(dockerfile)
+		}
+
 		opts = append(opts, BuildOpts{
-			Path: path,
-			Tag:  step.DSN(ctx, f),
-			Args: args,
+			Path:       path,
+			Dockerfile: dockerfile,
+			Tag:        step.DSN(ctx, f),
+			Args:       args,
 		})
 	}
 
@@ -55,9 +66,10 @@ func FnBuildOpts(ctx context.Context, f function.Function, args ...string) ([]Bu
 
 // BuildOpts represents options for a single docker build, using buildx.
 type BuildOpts struct {
-	Path string
-	Tag  string
-	Args []string
+	Path       string
+	Tag        string
+	Dockerfile string
+	Args       []string
 
 	Platform string
 }
@@ -155,6 +167,9 @@ func (b Builder) Output(n int) string {
 func NewBuilder(ctx context.Context, opts BuildOpts) (*Builder, error) {
 	if opts.Tag != "" {
 		opts.Args = append(opts.Args, "-t", opts.Tag)
+	}
+	if opts.Dockerfile != "" {
+		opts.Args = append(opts.Args, "-f", opts.Dockerfile)
 	}
 	if opts.Path != "" {
 		opts.Args = append(opts.Args, opts.Path)
