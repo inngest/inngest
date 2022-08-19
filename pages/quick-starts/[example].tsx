@@ -39,8 +39,11 @@ export default function LibraryExamplePage(props: Props) {
             copy
           />
           <div className="flex flex-row justify-center">
-            <Button kind="primary" href={`/examples?ref=examples/${props.id}`}>
-              See more examples
+            <Button
+              kind="primary"
+              href={`/quick-starts?ref=quick-starts/${props.id}`}
+            >
+              See more quickstarts
             </Button>
             <Button
               kind="outline"
@@ -65,13 +68,13 @@ export default function LibraryExamplePage(props: Props) {
       {nextExamples.length ? (
         <Highlights>
           <div className="container mx-auto p-12">
-            <h2>More examples</h2>
+            <h2>More quickstarts</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12 mt-4">
               {nextExamples.map((example) => (
                 <div>
                   <Link
                     key={example.id}
-                    href={`/examples/${example.id}?ref=examples/${props.id}`}
+                    href={`/quick-starts/${example.id}?ref=quick-starts/${props.id}`}
                     passHref
                   >
                     <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-black transition-all transform hover:scale-105 hover:shadow-lg">
@@ -94,17 +97,20 @@ export default function LibraryExamplePage(props: Props) {
             <div className="w-full flex items-center justify-center mt-10">
               <Button
                 kind="primary"
-                href={`/examples?ref=examples/${props.id}`}
+                href={`/quick-starts?ref=quick-starts/${props.id}`}
               >
-                See all examples
+                See all quickstarts
               </Button>
             </div>
           </div>
         </Highlights>
       ) : props.readme ? (
         <div className="w-full flex items-center justify-center">
-          <Button kind="primary" href={`/examples?ref=examples/${props.id}`}>
-            See all examples
+          <Button
+            kind="primary"
+            href={`/quick-starts?ref=quick-starts/${props.id}`}
+          >
+            See all quickstarts
           </Button>
         </div>
       ) : null}

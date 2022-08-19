@@ -39,12 +39,11 @@ export default function LibraryExamplesPage(props: Props) {
         <div className="container mx-auto pt-32 pb-24 flex flex-row">
           <div className="text-center px-6 max-w-4xl mx-auto flex flex-col space-y-6">
             <h1>
-              <span className="gradient-text">Build fast</span> with re-usable
-              examples
+              Start building <span className="gradient-text">in seconds</span>
             </h1>
             <p className="subheading max-w-lg mx-auto">
-              Re-usable functions to get started building with Inngest - explore
-              the code or instantly deploy to your Inngest Cloud account.
+              Use our ready-to-deploy pre-built functions for inspiration or as
+              a starting point for your own project.
             </p>
           </div>
         </div>
@@ -64,7 +63,7 @@ export default function LibraryExamplesPage(props: Props) {
           {examples.map((example) => (
             <Link
               key={example.id}
-              href={`/examples/${example.id}?ref=examples`}
+              href={`/quick-starts/${example.id}?ref=quick-starts`}
               passHref
             >
               <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-white transition-all transform hover:scale-105 hover:shadow-lg">
