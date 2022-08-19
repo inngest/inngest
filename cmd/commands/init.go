@@ -129,16 +129,20 @@ func runInit(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Println(cli.RenderError(fmt.Sprintf("Error getting current directory: %s", err)) + "\n")
-		return
-	}
+	slug := fn.Slug()
 
-	slug, err := filepath.Rel(cwd, fn.Dir())
-	if err != nil {
-		fmt.Println(cli.RenderError(fmt.Sprintf("Error getting relative path: %s", err)) + "\n")
-		return
+	if template != "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Println(cli.RenderError(fmt.Sprintf("Error getting current directory: %s", err)) + "\n")
+			return
+		}
+
+		slug, err = filepath.Rel(cwd, fn.Dir())
+		if err != nil {
+			fmt.Println(cli.RenderError(fmt.Sprintf("Error getting relative path: %s", err)) + "\n")
+			return
+		}
 	}
 
 	fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render(fmt.Sprintf("🎉 Done!  Your function has been created in ./%s", slug)))
