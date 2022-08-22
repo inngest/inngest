@@ -277,6 +277,8 @@ func buildImg(ctx context.Context, fn function.Function) error {
 func runFunction(ctx context.Context, fn function.Function, opts runFunctionOpts) error {
 	evts, err := opts.eventFunc()
 	if err != nil {
+		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+
 		return err
 	}
 
