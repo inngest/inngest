@@ -40,7 +40,11 @@ func Do(ctx context.Context) testdsl.Chain {
 		testdsl.RequireLogFieldsWithin(map[string]any{
 			"caller": "output",
 			"output": map[string]any{
-				"body":   "basic/single-step",
+				"body": map[string]any{
+					"event": "basic/single-step",
+					// assert that .env was read accurately.
+					"env": "bar please",
+				},
 				"status": 200,
 			},
 			"message": "step output",

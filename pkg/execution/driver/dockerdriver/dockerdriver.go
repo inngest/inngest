@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/function/env"
 )
 
 // New returns a basic docker implementation for running containers within a workflow.  This
@@ -40,6 +41,8 @@ func New() (driver.Driver, error) {
 type dockerExec struct {
 	client *docker.Client
 	config *Config
+
+	envreader env.EnvReader
 }
 
 type handle struct {
@@ -48,6 +51,13 @@ type handle struct {
 
 func (dockerExec) RuntimeType() string {
 	return "docker"
+}
+
+// SetEnvReader fulfils the driver.EnvManager interface, allowing the docker driver
+// to read env variables for each function ran.  This is used within the dev server
+// for local management of secrets during development.
+func (d *dockerExec) SetEnvReader(r env.EnvReader) {
+	d.envreader = r
 }
 
 func (d *dockerExec) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, wf inngest.Step) (*state.DriverResponse, error) {
@@ -152,6 +162,18 @@ func (d *dockerExec) startOpts(ctx context.Context, state state.State, wa innges
 		return docker.CreateContainerOptions{}, fmt.Errorf("error generating ID: %w", err)
 	}
 	name := fmt.Sprintf("%s-%s-%s", state.RunID(), slug.Make(wa.Name), hex.EncodeToString(byt))
+
+	env := os.Environ()
+	if d.envreader != nil {
+		parsed := d.envreader.Read(ctx, state.Workflow().ID)
+		if parsed != nil {
+			env = []string{}
+			for k, v := range parsed {
+				env = append(env, fmt.Sprintf("%s=%s", k, v))
+			}
+		}
+	}
+
 	return docker.CreateContainerOptions{
 		Name: name,
 		HostConfig: &docker.HostConfig{
@@ -161,8 +183,7 @@ func (d *dockerExec) startOpts(ctx context.Context, state state.State, wa innges
 		Config: &docker.Config{
 			Image: wa.DSN,
 			Cmd:   []string{string(marshalled)},
-			// Add all env vars from the local machine
-			Env: os.Environ(),
+			Env:   env,
 		},
 	}, nil
 }
