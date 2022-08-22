@@ -48,6 +48,7 @@
     "next": "12.1.0",
     "next-mdx-remote": "^3.0.8",
     "next-sitemap": "^1.9.12",
+    "next-usequerystate": "^1.7.2",
     "postcss": "^8.4.16",
     "prettier": "^2.4.0",
     "quickjs-emscripten": "^0.13.0",
