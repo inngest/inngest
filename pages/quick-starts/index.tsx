@@ -1,7 +1,8 @@
 import Fuse from "fuse.js";
 import { GetStaticProps } from "next";
+import { queryTypes, useQueryState } from "next-usequerystate";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Footer from "src/shared/footer";
 import Nav from "src/shared/nav";
 import { reqWithSchema } from "src/utils/fetch";
@@ -14,15 +15,34 @@ interface Props {
 }
 
 export default function LibraryExamplesPage(props: Props) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useQueryState(
+    "search",
+    queryTypes.string.withDefault("")
+  );
   const trimmedSearch = useMemo(() => search.trim(), [search]);
+  const [rawActiveTags, setActiveTags] = useQueryState(
+    "tags",
+    queryTypes.array(queryTypes.string).withDefault([])
+  );
+
+  const activeTags = useMemo(() => {
+    return rawActiveTags.filter((tag) => Boolean(tag.trim()));
+  }, [rawActiveTags]);
 
   const fuse = useMemo(() => {
-    return new Fuse(props.examples, {
-      keys: ["name", "description"],
+    let data = props.examples;
+
+    if (activeTags.length) {
+      data = data.filter((example) =>
+        activeTags.every((tag) => example.tags.includes(tag))
+      );
+    }
+
+    return new Fuse(data, {
+      keys: ["name", "description", "tags"],
       findAllMatches: true,
     });
-  }, [props.examples]);
+  }, [props.examples, activeTags]);
 
   const examples = useMemo(() => {
     if (!trimmedSearch) {
@@ -59,7 +79,37 @@ export default function LibraryExamplesPage(props: Props) {
       </div>
 
       <div className="background-grid-texture">
-        <div className="container mx-auto p-12 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12">
+        <div className="px-12 py-6 max-auto flex flex-row items-center justify-center">
+          <div className="italic text-xs text-gray-500 flex flex-row items-center justify-center">
+            Showing {!trimmedSearch && !activeTags.length ? "all " : ""}
+            {examples.length} quick-starts
+            {trimmedSearch ? ` matching "${trimmedSearch}"` : ""}
+            {activeTags.length ? (
+              <>
+                {" "}
+                with tags:{" "}
+                {activeTags.map((tag) => (
+                  <Tag
+                    key={tag}
+                    name={tag}
+                    onSelect={() => {
+                      setActiveTags((currTags) => {
+                        if (currTags.includes(tag)) {
+                          return currTags.filter((t) => t !== tag);
+                        }
+
+                        return [...currTags, tag];
+                      });
+                    }}
+                  />
+                ))}
+              </>
+            ) : (
+              ""
+            )}
+          </div>
+        </div>
+        <div className="container mx-auto px-12 pb-12 pt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12">
           {examples.map((example) => (
             <Link
               key={example.id}
@@ -67,10 +117,29 @@ export default function LibraryExamplesPage(props: Props) {
               passHref
             >
               <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-white transition-all transform hover:scale-105 hover:shadow-lg">
-                <div className="font-semibold text-black">{example.name}</div>
+                <div className="text-black">{example.name}</div>
                 {example.description ? (
-                  <div className="font-xs text-gray-600">
+                  <div className="text-sm text-gray-500">
                     {example.description}
+                  </div>
+                ) : null}
+                {example.tags.length ? (
+                  <div className="flex flex-row flex-wrap space-x-1">
+                    {example.tags.map((tag) => (
+                      <Tag
+                        key={tag}
+                        name={tag}
+                        onSelect={() => {
+                          setActiveTags((currTags) => {
+                            if (currTags.includes(tag)) {
+                              return currTags.filter((t) => t !== tag);
+                            }
+
+                            return [...currTags, tag];
+                          });
+                        }}
+                      />
+                    ))}
                   </div>
                 ) : null}
                 <a className="text-blue-500 font-semibold text-right">
@@ -85,6 +154,27 @@ export default function LibraryExamplesPage(props: Props) {
     </div>
   );
 }
+
+interface TagProps {
+  name: string;
+  onSelect?: () => void;
+}
+
+const Tag: React.FC<TagProps> = ({ name, onSelect }) => {
+  return (
+    <div
+      key={name}
+      className="uppercase text-[0.7rem] px-1 bg-blue-100/50 text-blue-500 hover:bg-blue-100 hover:text-blue-600 transition rounded cursor-pointer ml-1"
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onSelect();
+      }}
+    >
+      {name}
+    </div>
+  );
+};
 
 export const getStaticProps: GetStaticProps = async () => {
   return { props: { examples: await getExamples() } };
@@ -155,8 +245,13 @@ export const getExamples = async () => {
           description: z
             .string()
             .optional()
+            // TODO Remove
             .default("A serverless Prisma background job using TypeScript."),
-          tags: z.array(z.string()).optional(),
+          tags: z
+            .array(z.string())
+            .optional()
+            // TODO Remove
+            .default(["typescript", "prisma", "database"]),
         })
         .parse({
           ...JSON.parse(
