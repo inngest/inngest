@@ -1,6 +1,3 @@
 export default function UseCases() {
-return (
-<div>
-</div>
-)
+  return <div></div>;
 }

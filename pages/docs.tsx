@@ -1,7 +1,6 @@
 import Link from "next/link";
 import React from "react";
 import Head from "next/head";
-import { useRouter } from "next/router";
 import styled from "@emotion/styled";
 import { Global, css } from "@emotion/react";
 
@@ -23,110 +22,161 @@ export default function DocsHome(props) {
       <Head>
         <title>Inngest → Documentation & Guides</title>
       </Head>
-      <DocsContent hasTOC={false}>
+      <DocsContent hasTOC={false} className="pb-16">
         <Hero>
-          <h1>Introduction to Inngest</h1>
+          <h1>Inngest documentation</h1>
+          <p>
+            This documentation will help you become an expert in event-driven
+            serverless functions within minutes.
+          </p>
         </Hero>
 
-        <p>
-          The Inngest platform allows you to easily build, deploy, and manage{" "}
-          <strong>serverless functions</strong> that run whenever events happen,
-          from any source (SDKs, APIs, webhooks, or pub/sub).
-          {/* TODO - Link to future docs */}
-        </p>
-        <p>
-          Inngest's tooling makes developers lives easier: get auto-typed
-          events, develop & test serverless functions locally, backtest using
-          historical data, release with full version histories, apply immediate
-          rollbacks, and get full observability, metrics, monitoring, and audit
-          trails out of the box. Inngest's serverless platform allows anyone to
-          build event-driven software that scales.
-        </p>
+        <h2>Quick start</h2>
 
-        <h2>What is Inngest?</h2>
-        <p>
-          Inngest is an <strong>event-driven serverless platform</strong> that
-          lets you <strong>focus on your product</strong> by giving you all the
-          tools you need to build, test, and ship reactive serverless functions
-          faster than ever before.
-        </p>
-        <p>
-          We've taken our experience building systems for event-driven
-          architecture and async workloads and created a platform that allows
-          you to run any serverless function that reacts to events. Inngest can
-          be used in place of an event bus or message queue as well as the
-          runtime for your event consumers or workers.
-        </p>
-        <p>
-          Inngest allows you to build complex applications without all of the
-          boilerplate and endless infrastructure configuration. No need to waste
-          time writing boilerplate consumer code or polling logic. Don't waste
-          time configuring retry policies, dead letter queues, or other
-          infrastructure.
-        </p>
-
-        <p>
-          Leave the boring stuff to us and focus on shipping amazing products,
-          getting your idea to market faster than ever before.
-        </p>
-
-        <p>
-          Check out our quick start guides below or read more about{" "}
-          <Link href="/docs/high-level-architecture">
-            the system architecture here
-          </Link>
-          .
-        </p>
-
-        <h2>Quick start guides</h2>
-
-        <FeaturedDocs>
-          <FeaturedDoc>
-            <h3>Learn our cli in 2 minutes</h3>
-            <p>
-              Use the Inngest CLI to build, test, and deploy functions in any
-              language.
+        <div className="grid pt-4 grid-cols-3 gap-4">
+          <a
+            href="/"
+            className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white"
+          >
+            <p className="text-base my-2">🚀 Installation</p>
+            <p className="text-slate-600">
+              Get up and running with the CLI in seconds. You'll have a full
+              local development environment ready to go.
             </p>
-
-            <Link href="/docs/using-the-inngest-cli?ref=docs-home">
-              <Button kind="primary" size="small">
-                <ArrowUpRightIcon /> Read the guide
-              </Button>
-            </Link>
-          </FeaturedDoc>
-
-          <FeaturedDoc>
-            <h3>Use our browser IDE</h3>
-            <p>
-              Create, test and deploy functions right from your browser. No
-              install needed.
+          </a>
+          <a
+            href="/"
+            className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white"
+          >
+            <p className="text-base my-2">👩‍💻 Writing & running fns</p>
+            <p className="text-slate-600">
+              Write and locally run your first function using any language and
+              the CLI, triggered automatically by events
             </p>
+          </a>
+          <a className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white">
+            <p className="text-base my-2">🚢 Deploying</p>
+            <p className="text-slate-600">
+              Learn how to deply your functions to production instantly, without
+              managing infrastructure
+            </p>
+          </a>
+        </div>
 
-            <Link href="/docs/function-ide-guide?ref=docs-home">
-              <Button kind="primary" size="small">
-                <ArrowUpRightIcon /> Read the guide
-              </Button>
-            </Link>
-          </FeaturedDoc>
-        </FeaturedDocs>
+        <h2 className="pt-8">What is Inngest?</h2>
 
-        <h2>Learn the key concepts</h2>
+        <p>
+          Inngest is an open-source, event-driven platform which makes it easy
+          for developers to build, test, and deploy scheduled tasks and
+          background functions — without worrying about infrastructure, queues,
+          or stateful services.
+        </p>
+        <p>
+          Using Inngest, you can write and deploy serverless step functions
+          which are triggered by events or on a schedule without writing any
+          boilerplate code or infra.
+        </p>
+
+        <h2 className="pt-8">Key features</h2>
+        <ul>
+          <li>CLI with developer-friendly APIs and local testing</li>
+          <li>Stateless serverless step functions which run any language</li>
+          <li>
+            Complex functionality built in, such as event replay, canary
+            deploys, version management and git integration
+          </li>
+          <li>Event coordination for building complex interactive functions</li>
+          <li>Event governance, schemas, and forwarding out of the box</li>
+        </ul>
+
+        <h2 className="pt-8">Use cases</h2>
+        <p>
+          Inngest users are typically developers and data engineers. They use
+          Inngest to reliably run background work, serverless functions, and
+          scheduled jobs across for a variety of use cases. Common examples
+          include:
+        </p>
 
         <ul>
           <li>
-            <Link href="/docs/quick-start">Quick start</Link>
+            <p>
+              <b>Reliably managing incoming webhooks without infrastructure</b>
+              <br />
+              Inngest handles any number of incoming webhooks at scale with zero
+              infra, and idempotently schedules serverless functions to respond
+              to webhooks without any configuration.
+            </p>
           </li>
           <li>
-            <Link href="/docs/event-format-and-structure">Event format</Link>
+            <p>
+              <b>Serverless background jobs</b>
+              <br />
+              Inngest schedules background jobs from in-app events without any
+              infrastructure, safely managing retries, queues, rolling deploys,
+              function versioning, and event versioning automatically.
+            </p>
           </li>
           <li>
-            <Link href="/docs/event-user-audit-trails">
-              Event user attribution
-            </Link>
+            <p>
+              <b>Internal tools</b>
+              <br />
+              Automate internal processes with versioned step functions written
+              in any language, and connect functions to external platforms such
+              as Retool.
+            </p>
+          </li>
+          <li>
+            <p>
+              <b>Managing complex data pipelines</b>
+              <br />
+              Inngest can run complex data pipelines using a mixture of
+              languages on a schedule or in realtime, with full local testing
+              and reproducibility built in.
+            </p>
+          </li>
+          <li>
+            <p>
+              <b>Building event-driven systems</b>
+              <br />
+              Developers can send and subscribe to a variety of internal and
+              external events, creating complex event-driven architectures
+              without worrying about infrastructure, SDKs, and boilerplate.
+            </p>
+          </li>
+          <li>
+            <p>
+              <b>Real-time sync</b>
+              <br />
+              Inngest can integrate with a variety of platforms to enable
+              real-time ETL and real-time reverse ETL.
+            </p>
+          </li>
+          <li>
+            <p>
+              <b>Data warehousing & event federation</b>
+              <br />
+              Inngest can aggregate events from a variety of sources, forwarding
+              them to data warehouses and other systems in addition to running
+              application logic.
+            </p>
           </li>
         </ul>
 
-        {/* Start building for free callout */}
+        <h2 className="pt-8">Ready to get started?</h2>
+        <p className="pb-4">
+          Learn how to install our CLI and write your first serverless function
+          in minutes, then get started with our cloud and deploy your functions
+          for free
+        </p>
+
+        <Button
+          kind="primary"
+          size="small"
+          href="/sign-up?ref=docs-started"
+          style={{ display: "inline-block" }}
+        >
+          Get started
+        </Button>
       </DocsContent>
     </DocsLayout>
   );
@@ -205,8 +255,8 @@ const Hero = styled.div`
 export const DocsContent = styled.article<{ hasTOC: boolean }>`
   --base-size: 16px;
 
-  max-width: 720px;
-  margin: 0 auto;
+  max-width: 900px;
+
   padding-bottom: 10vh;
   font-size: 16px;
 
@@ -239,15 +289,17 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
   h3 {
     font-size: 1.3em;
   }
-  p,
+
+  p:not([class*="text-base"]),
   ol,
   ul,
   li {
     font-size: 16px;
-  }
-  p {
-    margin: 1em 0;
     line-height: 1.7em;
+  }
+
+  p:not([class*="my-"]) {
+    margin: 1em 0;
   }
 
   ol,
@@ -362,6 +414,12 @@ const FeaturedDocs = styled.section`
   @media (max-width: 600px) {
     grid-template-columns: 1fr;
   }
+`;
+
+const Quickstart = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1em;
 `;
 
 const FeaturedDoc = styled.div`

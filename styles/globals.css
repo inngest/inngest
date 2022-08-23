@@ -68,6 +68,11 @@
   font-size: 20px;
   font-family: var(--font);
   color: var(--font-color-primary);
+
+}
+
+* {
+  transition: box-shadow .3s;
 }
 
 body.light-theme {
@@ -102,6 +107,10 @@ li + li {
 
 a {
   color: var(--link-color);
+}
+
+.color-inherit {
+  color: inherit !important;
 }
 
 html,

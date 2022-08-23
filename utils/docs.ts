@@ -137,7 +137,7 @@ export const getAllDocs = (() => {
     // Iterate through each docs page and add the category.
     Object.values(memoizedDocs.docs).forEach((d: Doc) => {
       if (!d.scope.category) {
-        console.warn("no category for doc", JSON.stringify(d.scope));
+        // console.warn("no category for doc", JSON.stringify(d.scope));
         return;
       }
 
@@ -147,7 +147,7 @@ export const getAllDocs = (() => {
           ? TOC[d.scope.category]
           : 100;
         if (order === 100) {
-          console.warn("no order for category", d.scope.category);
+          // console.warn("no order for category", d.scope.category);
         }
         cli[d.scope.category] = {
           title: d.scope.category,
@@ -180,7 +180,7 @@ export const getAllDocs = (() => {
           ? TOC[d.scope.category]
           : 100;
         if (order === 100) {
-          console.warn("no order for category", d.scope.category);
+          // console.warn("no order for category", d.scope.category);
         }
         cloud[d.scope.category] = {
           title: d.scope.category,

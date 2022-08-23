@@ -154,8 +154,12 @@ const Body = styled.main`
     border-radius: var(--border-radius);
     background: var(--highlight-color);
 
-    p:first-of-type { margin-top: 0; }
-    p:last-of-type { margin-bottom: 0; }
+    p:first-of-type {
+      margin-top: 0;
+    }
+    p:last-of-type {
+      margin-bottom: 0;
+    }
   }
 
   ol,

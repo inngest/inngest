@@ -15,8 +15,9 @@ export default function BlogLayout(props) {
   const content = props.content.map(JSON.parse);
   const visiblePosts = showHidden
     ? content
-    : content.filter((post) => !post.hide)
-    .sort((a, z) => z.date.localeCompare(a.date));
+    : content
+        .filter((post) => !post.hide)
+        .sort((a, z) => z.date.localeCompare(a.date));
 
   const focus = visiblePosts.find((c) => c.focus);
   const rest = visiblePosts
