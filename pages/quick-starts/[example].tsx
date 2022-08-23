@@ -159,7 +159,9 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
 
   // TODO Moev this to the if; just testing here
   readme = marked.parse(
-    readme.replaceAll(".github/assets/", `${baseUrl}/.github/assets/`),
+    readme
+      .replaceAll(".github/assets/", `${baseUrl}/.github/assets/`)
+      .replace(/(^#.*\n+)/, ""),
     {
       baseUrl: "https://raw.githubusercontent.com/inngest/inngest/main/",
       gfm: true,
