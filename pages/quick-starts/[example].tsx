@@ -12,6 +12,7 @@ import Github from "src/shared/Icons/Github";
 import Nav from "src/shared/nav";
 import { reqWithSchema } from "src/utils/fetch";
 import { blobSchema, getExamples } from ".";
+import hljs from "highlight.js";
 
 interface Props {
   id: string;
@@ -173,6 +174,10 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
       breaks: true,
       headerIds: true,
       renderer,
+      highlight(code, lang) {
+        const language = hljs.getLanguage(lang) ? lang : "plaintext";
+        return hljs.highlight(code, { language }).value;
+      },
     }
   );
 
