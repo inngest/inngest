@@ -176,8 +176,10 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
       examples,
       readme,
       meta: {
-        title: `Example: ${example.name}`,
-        description: example.description || "Some default meta description",
+        title: `Quickstart: ${example.name}`,
+        description:
+          example.description ||
+          `Get started using Inngest immediately with the ${example.name} quickstart.`,
       },
     },
   };
