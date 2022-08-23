@@ -15,7 +15,9 @@ func main() {
 	actionsdk.WriteResult(&actionsdk.Result{
 		Body: map[string]string{
 			"event": args.Event.Name,
-			"env":   os.Getenv("FOO"),
+			"FOO":   os.Getenv("FOO"),
+			"QUOTE": os.Getenv("QUOTE"),
+			"CERT":  os.Getenv("CERT"),
 		},
 		Status: 200,
 	})
