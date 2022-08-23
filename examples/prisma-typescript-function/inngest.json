@@ -1,5 +1,7 @@
 {
-  "name": "Prisma background job",
+  "name": "Update your Prisma database from Stripe events",
+  "description": "Create a record in Prisma when a Stripe webhook is received.",
+  "tags": ["typescript", "prisma", "stripe"],
   "id": "cute-troll-547a93",
   "triggers": [
     {

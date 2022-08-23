@@ -1,161 +1,117 @@
-# Example Smart Drip Activation Email Campaign
+# Update your Prisma database from Stripe events
 
-This example Inngest function defines a drip campaign that sends a new user a **targeted**
-email _if_ they have _not_ already performed the action that the email is suggesting they do.
-Imagine this flow for an application:
+<!-- Insert a short summary of the function. It should be no longer than a single paragraph -->
+Run a background job using the [Prisma ORM](https://www.prisma.io/) and [TypeScript](https://www.typescriptlang.org/) to create a new entry in the database when a webhook is received from [Stripe](https://stripe.com/).
 
+➡️ Check out the related guide: [Running Prisma background jobs](https://www.inngest.com/docs/guides/prisma-background-jobs)
+
+<!-- Define a flowchart to visually show how the function will work -->
+<!-- https://mermaid.live/ is a great tool for this, and docs are at https://mermaid-js.github.io/mermaid/#/flowchart -->
 ```mermaid
 graph LR
-Source[Your app] -->|app/user.signup event| Inngest(Inngest)
-Inngest --> Day(app/reservation.booked<br>received or 1 day elapsed)
-Day -->|app/reservation.booked| Nothing(Do nothing)
-Day -->|1 day elapsed| Email[Send email]
+Stripe -->|stripe/charge.succeeded| Inngest(Inngest)
+Inngest -->|Triggers| step1[steps/step-1]
 
-classDef inngest fill:#fff,stroke:#4636f5
-classDef user fill:#4636f5,color:white,stroke:#4636f5
+classDef in fill:#4636f5,color:white,stroke:#4636f5;
+classDef inngest fill:white,color:black,stroke:#4636f5,stroke-width:3px;
+classDef out fill:white,color:black,stroke:#4636f5,stroke-dasharray: 5 5,stroke-width:3px;
 
-class Source,Email user
-class Inngest,Day,Nothing inngest
+class Stripe in;
+class Inngest,step1 inngest;
 ```
 
-1. User signed up
-2. If the user _**has not**_ activated within 1 day:
-   - ➡️ Send them an email to guide them to take that action
-3. If the user _**has**_ activated:
-   - 👍 Don't do anything - They already figured it out!
+1. Stripe sends `stripe/charge.succeeded` webhook
+2. If the relevant user **is not found** in the database:
+  - ⚠️ Return `404` and doesn't retry, allowing you to handle the edge case
+3. If the relevant user **is found** in the database:
+  - ✅ Create a new charge record
 
-## Guide
+<!-- To go along with the visual diagram, you can optionally add some numbered steps here to show the same flow -->
+<!-- This may not always be required or appropriate, e.g. if there are some async actions happening -->
 
-- [Function configuration](#function-configuration)
-- [Function code](#function-code)
-- [Sending events from your app](#sending-events-from-your-app)
-- [Deploying to Inngest Cloud](#deploying-to-inngest-cloud)
+## Contents
 
-### Function configuration
+<!-- A table of contents for your example, covering a few key areas -->
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Code](#code)
+- [Triggering the function](#triggering-the-function)
 
-The function definition is annotated to show how the above is defined in config:
+## Usage
 
-1. After the `app/user.signup` event is received...
-2. Wait up to 1 day (`1d`) for the user to activate (`app/reservation.booked`)...
-3. If they have not triggered the activation event (`app/reservation.booked`)...
-4. Send an email via Sendgrid
+<!-- A quick view of how to get started with the template. -->
+<!-- The CLI can guide them -->
+Use this quickstart with a single CLI command to get started! The CLI will then guide you through running, testing, and deploying to [Inngest Cloud](https//inngest.com/sign-up?ref=github-example).
 
-```json
+```sh
+npx inngest-cli init --template github.com/inngest/inngest#examples/prisma-typescript-function
+```
+
+Next, check out how to [👉 trigger the function](#triggering-the-function).
+
+## Configuration
+
+<!-- An annotated version of the `inngest.json|cue` file to help the user firm up the understanding of how the config works.-->
+
+Below is the annotated function definition (found at [inngest.json](/inngest.json)) to show how the above is defined in config.
+
+```jsonc
 {
-  "name": "activation-drip-email",
-  "id": "exciting-dogfish-63761d",
+  "name": "Prisma background job",
+  "description": "Create a record in Prisma when a Stripe webhook is received.",
+  "tags": ["typescript", "prisma", "stripe"],
+  "id": "cute-troll-547a93",
   "triggers": [
     {
-      // When this event is received by Inngest, it will start the function
-      "event": "app/user.signup",
+      /**
+       * When this event is recieved by Inngest, it will start the function
+       */
+      "event": "stripe/charge.succeeded",
       "definition": {
         "format": "cue",
-        // The file that declares the event schema that your app will send to Inngest
-        "def": "file://./events/app-user.signup.cue"
+        "synced": true,
+
+        /**
+         * The file that declares the event schema that your app will send to
+         * Inngest.
+         */
+        "def": "file://./events/stripe-charge-succeeded.cue"
       }
     }
   ],
   "steps": {
     "step-1": {
-      // This step will only be run "after" the below condition is true
+      /**
+       * This step defines to "after" block, so will be run as soon as the
+       * trigger above is received.
+       */
       "id": "step-1",
-      // This is the directory where your code will be including it's Dockerfile
-      "path": "file://./steps/1d-send-email",
-      "name": "activation-drip-email",
+      /**
+       * This is the directory where your code will be, including its Dockerfile
+       */
+      "path": "file://./steps/step-1",
+      "name": "Prisma background job",
       "runtime": {
         "type": "docker"
-      },
-      // The "after" block lists conditions that will trigger the step to be run
-      "after": [
-        {
-          // "$trigger" means this will happen directly after the above event
-          // trigger: "app/user.signup"
-          "step": "$trigger",
-          // This is an asynchronous condition that will wait up to 1 day (1d)
-          // for the "app/reservation.booked" asynchronous event to be received
-          // The "match" checks that both events (the initial "event" and the
-          // "async" event) contain the same user id ("external_id").
-          "async": {
-            "event": "app/reservation.booked",
-            "match": "async.user.external_id == event.user.external_id",
-            "ttl": "1d",
-            "onTimeout": true
-          }
-        }
-      ]
+      }
     }
   }
 }
-```
-
-### Function code
-
-All of the code for the function that sends the email to SendGrid, is
-within the `steps/1d-send-email/src/index.ts` file. This code will be passed
-the `app/user.signup` event if the 1 day timeout has been reached before
-any `app/reservation.booked` email is received.
-
-➡️ [Check out `index.ts`](/steps/1d-send-email/src/index.ts)
-
-### Sending events from your app
-
-Imagine a JavaScript application, using the [Inngest library](https://github.com/inngest/inngest-js#readme) in your `/signup` endpoint you can add the following code:
-
-```js
-import { Inngest } from "inngest";
-
-// POST myapp.com/signup
-export default function signup(req, res) {
-  const user = await createUser(req.body.email, req.body.password);
-
-  // Send an event to Inngest
-  // You can get a Source Key from the sources section of the Inngest app
-  const inngest = new Inngest(process.env.INNGEST_SOURCE_API_KEY);
-  await inngest.send({
-    name: "app/user.signup",
-    data: { city: req.body.city /* e.g. "Detroit" */ },
-    user: {
-      external_id: user.id,
-      email: user.email,
-    },
-  });
-
-  res.redirect("/app")
-}
-```
-
-And in your code that hands where the user is considered "activated", add the other event:
-
-```js
-import { Inngest } from "inngest";
-
-// POST myapp.com/bookReservation
-export default function bookReservation(req, res) {
-  const user = await getUserFromSession(req)
-  const reservation = await createReservation(user, req.body.restaurantId, req.body.timestamp);
-
-  // Send an event to Inngest
-  const inngest = new Inngest(process.env.INNGEST_SOURCE_API_KEY);
-  await inngest.send({
-    name: "app/reservation.booked",
-    data: { restaurant: req.body.restaurantId },
-    user: {
-      external_id: user.id,
-    },
-  });
-
-  res.redirect("/app")
-}
-```
-
-### Deploying to Inngest Cloud
-
-With an [Inngest Cloud account created](https://inngest.com/sign-up?ref=github-example-drip), use the Inngest CLI to deploy your function:
 
 ```
-npm install -g inngest-cli
-inngest login
-inngest deploy
-```
 
-Done! Now send the events from your application and you'll see the events and function output in the Inngest web app.
+## Code
+
+This function has a single step: `steps/step-1`, which is triggered by the `stripe/charge.succeeded` event.
+
+<!-- A brief summary of where to find the various steps in the code and any other interesting configuration -->
+- ➡️ [**steps/step-1/**](/steps/step-1)
+  > Finds the relevant user in the database and creates a new charge record if it could be found.
+
+## Triggering the function
+
+<!-- Instructions for how the user should trigger the function from their infrastructure (or source) -->
+
+To receive Stripe events in your Inngest account, you can connect Stripe via OAuth. To do this, [create a new Source](https://app.inngest.com/sources/new#Stripe). This will link your Stripe and Inngest accounts so that we can automatically receive events as they happen.
+
+Alternatively, you can send your own events from [your own apps](https://www.inngest.com/docs/sending-data-via-inngest-sdks) or [any webhook](https://www.inngest.com/docs/event-webhooks) and run any function automatically.
