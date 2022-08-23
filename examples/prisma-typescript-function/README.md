@@ -22,9 +22,9 @@ class Inngest,step1 inngest;
 
 1. Stripe sends `stripe/charge.succeeded` webhook
 2. If the relevant user **is not found** in the database:
-  - ⚠️ Return `404` and doesn't retry, allowing you to handle the edge case
+   - ⚠️ Return `404` and doesn't retry, allowing you to handle the edge case
 3. If the relevant user **is found** in the database:
-  - ✅ Create a new charge record
+   - ✅ Create a new charge record
 
 <!-- To go along with the visual diagram, you can optionally add some numbered steps here to show the same flow -->
 <!-- This may not always be required or appropriate, e.g. if there are some async actions happening -->
