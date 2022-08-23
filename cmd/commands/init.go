@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
@@ -29,24 +30,43 @@ func NewCmdInit() *cobra.Command {
 	cmd.Flags().StringP("name", "n", "", "The function name")
 	cmd.Flags().String("language", "", "The language to use within your project")
 	cmd.Flags().String("url", "", "The URL to hit, if this function calls an external API")
+	cmd.Flags().StringP("template", "t", "", "The template to use for the function")
 
 	return cmd
 }
 
 func runInit(cmd *cobra.Command, args []string) {
-	if _, err := function.Load(cmd.Context(), "."); err == nil {
-		// XXX: We can't both SilenceUsage and SilenceError, so we handle error checking inside
-		// the init function here.
-		fmt.Println("\n" + cli.RenderError("An inngest project already exists in this directory.  Remove the inngest file to continue.") + "\n")
-		os.Exit(1)
-		return
+	ctx := cmd.Context()
+	name := cmd.Flag("name").Value.String()
+
+	// If we've been given a name this early, try to ensure we're not going to be
+	// targeting an existing function.
+	if name != "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Println("\n" + cli.RenderError("Could not get current working directory") + "\n")
+			os.Exit(1)
+			return
+		}
+
+		checkDir := filepath.Join(cwd, name)
+
+		if _, err := function.Load(ctx, checkDir); err == nil {
+			// XXX: We can't both SilenceUsage and SilenceError, so we handle error checking inside
+			// the init function here.
+			fmt.Println("\n" + cli.RenderError("An inngest project already exists in this directory.  Remove the inngest file to continue.") + "\n")
+			os.Exit(1)
+			return
+		}
 	}
 
 	showWelcome := true
-	if setting, ok := clistate.GetSetting(cmd.Context(), clistate.SettingRanInit).(bool); ok {
+	if setting, ok := clistate.GetSetting(ctx, clistate.SettingRanInit).(bool); ok {
 		// only show the welcome if we haven't ran init
 		showWelcome = !setting
 	}
+
+	template := cmd.Flag("template").Value.String()
 
 	// Create a new TUI which walks through questions for creating a function.  Once
 	// the walkthrough is complete, this blocks and returns.
@@ -54,9 +74,10 @@ func runInit(cmd *cobra.Command, args []string) {
 		ShowWelcome: showWelcome,
 		Event:       cmd.Flag("event").Value.String(),
 		Cron:        cmd.Flag("cron").Value.String(),
-		Name:        cmd.Flag("name").Value.String(),
+		Name:        name,
 		Language:    cmd.Flag("language").Value.String(),
 		URL:         cmd.Flag("url").Value.String(),
+		Template:    template,
 	})
 	if err != nil {
 		fmt.Println(cli.RenderError(fmt.Sprintf("Error starting init command: %s", err)) + "\n")
@@ -71,8 +92,13 @@ func runInit(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	if state.CloneError != nil {
+		fmt.Println(cli.RenderError(fmt.Sprintf("Error cloning template: %s", state.CloneError)) + "\n")
+		return
+	}
+
 	// Get the function from the state.
-	fn, err := state.Function(cmd.Context())
+	fn, err := state.Function(ctx)
 	if err != nil {
 		fmt.Println(cli.RenderError(fmt.Sprintf("There was an error creating the function: %s", err)) + "\n")
 		return
@@ -80,7 +106,7 @@ func runInit(cmd *cobra.Command, args []string) {
 
 	// Save a setting which indicates that we've ran init successfully.
 	// This is used to prevent us from showing the welcome message on subsequent runs.
-	_ = clistate.SaveSetting(cmd.Context(), clistate.SettingRanInit, true)
+	_ = clistate.SaveSetting(ctx, clistate.SettingRanInit, true)
 
 	// If we have a template, render that.
 	tpl := state.Template()
@@ -89,17 +115,37 @@ func runInit(cmd *cobra.Command, args []string) {
 		tpl = &scaffold.Template{}
 	}
 
-	var step function.Step
-	for _, v := range fn.Steps {
-		step = v
+	// Templating should only be done against scaffolds; cloned templates should
+	// be left alone as these will have already cloned and created the directory.
+	if template == "" {
+		var step function.Step
+		for _, v := range fn.Steps {
+			step = v
+		}
+
+		if err := tpl.Render(*fn, step); err != nil {
+			fmt.Println(cli.RenderError(fmt.Sprintf("There was an error creating the function: %s", err)) + "\n")
+			return
+		}
 	}
 
-	if err := tpl.Render(*fn, step); err != nil {
-		fmt.Println(cli.RenderError(fmt.Sprintf("There was an error creating the function: %s", err)) + "\n")
-		return
+	slug := fn.Slug()
+
+	if template != "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Println(cli.RenderError(fmt.Sprintf("Error getting current directory: %s", err)) + "\n")
+			return
+		}
+
+		slug, err = filepath.Rel(cwd, fn.Dir())
+		if err != nil {
+			fmt.Println(cli.RenderError(fmt.Sprintf("Error getting relative path: %s", err)) + "\n")
+			return
+		}
 	}
 
-	fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render(fmt.Sprintf("🎉 Done!  Your function has been created in ./%s", fn.Slug())))
+	fmt.Println(cli.BoldStyle.Copy().Foreground(cli.Green).Render(fmt.Sprintf("🎉 Done!  Your function has been created in ./%s", slug)))
 
 	if tpl.PostSetup != "" {
 		renderer, _ := glamour.NewTermRenderer(
@@ -110,7 +156,7 @@ func runInit(cmd *cobra.Command, args []string) {
 		fmt.Println(out)
 	}
 
-	tel.Send(cmd.Context(), state.TelEvent())
+	tel.Send(ctx, state.TelEvent())
 
 	fmt.Println(cli.TextStyle.Render("For more information, read our documentation at https://www.inngest.com/docs\n"))
 }
