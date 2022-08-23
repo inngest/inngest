@@ -3,6 +3,7 @@ import shuffle from "lodash.shuffle";
 import { marked } from "marked";
 import { GetStaticPaths, GetStaticProps } from "next";
 import Link from "next/link";
+import Script from "next/script";
 import { useMemo } from "react";
 import Button from "src/shared/Button";
 import { CommandSnippet } from "src/shared/CommandSnippet";
@@ -29,6 +30,10 @@ export default function LibraryExamplePage(props: Props) {
 
   return (
     <div>
+      <Script
+        src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"
+        strategy="beforeInteractive"
+      />
       <Nav sticky nodemo />
       <div className="container mx-auto pt-32 pb-24 flex flex-row">
         <div className="text-center px-6 max-w-4xl mx-auto flex flex-col space-y-6">
@@ -167,6 +172,7 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
       gfm: true,
       breaks: true,
       headerIds: true,
+      renderer,
     }
   );
 
@@ -189,3 +195,13 @@ const Highlights = styled.div`
   background: var(--bg-color-d);
   color: #fff;
 `;
+
+const renderer = new marked.Renderer();
+const defaultCodeRenderer = renderer.code.bind(renderer);
+renderer.code = function (code, language) {
+  if (language !== "mermaid") {
+    return defaultCodeRenderer(code, language);
+  }
+
+  return `<div class="mermaid">${code}</div>`;
+};
