@@ -4,7 +4,7 @@ import { marked } from "marked";
 import { GetStaticPaths, GetStaticProps } from "next";
 import Link from "next/link";
 import Script from "next/script";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Button from "src/shared/Button";
 import { CommandSnippet } from "src/shared/CommandSnippet";
 import Footer from "src/shared/footer";
@@ -23,6 +23,16 @@ interface Props {
 }
 
 export default function LibraryExamplePage(props: Props) {
+  const [loadingMermaid, setLoadingMermaid] = useState(true);
+
+  useEffect(() => {
+    // @ts-ignore
+    if (typeof mermaid !== "undefined") {
+      // @ts-ignore
+      mermaid?.contentLoaded();
+    }
+  }, [loadingMermaid, props.readme]);
+
   const nextExamples = useMemo(() => {
     return shuffle(props.examples)
       .filter(({ id }) => id !== props.id)
@@ -33,7 +43,15 @@ export default function LibraryExamplePage(props: Props) {
     <div>
       <Script
         src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"
-        strategy="beforeInteractive"
+        onLoad={() => {
+          // Ignoring as we don't have (or really need) global typing for
+          // mermaid.
+          // @ts-ignore
+          mermaid.initialize({ startOnLoad: true });
+
+          // Set this to force a re-render
+          setLoadingMermaid(false);
+        }}
       />
       <Nav sticky nodemo />
       <div className="container mx-auto pt-32 pb-24 flex flex-row">
