@@ -34,6 +34,7 @@
     "autoprefixer": "^10.4.8",
     "babel-loader": "^8.2.3",
     "cronstrue": "^1.117.0",
+    "cross-fetch": "^3.1.5",
     "dagre": "^0.8.5",
     "deterministic-split": "^1.0.4",
     "fs": "^0.0.1-security",
@@ -74,12 +75,11 @@
     "tailwindcss": "^3.1.8",
     "typescript": "^4.3.5",
     "urql": "^2.0.5",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2",
+    "zod": "^3.18.0"
   },
   "devDependencies": {
     "@types/lodash.shuffle": "^4.2.7",
-    "@types/marked": "^4.0.5",
-    "cross-fetch": "^3.1.5",
-    "zod": "^3.18.0"
+    "@types/marked": "^4.0.5"
   }
 }
