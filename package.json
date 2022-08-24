@@ -28,6 +28,7 @@
     "@storybook/addon-links": "^6.4.19",
     "@storybook/react": "^6.4.19",
     "@storybook/testing-library": "^0.0.9",
+    "@tailwindcss/typography": "^0.5.4",
     "@tonyhb/rs-templating": "^0.1.7",
     "@types/react": "^17.0.14",
     "autoprefixer": "^10.4.8",
@@ -36,15 +37,19 @@
     "dagre": "^0.8.5",
     "deterministic-split": "^1.0.4",
     "fs": "^0.0.1-security",
+    "fuse.js": "^6.6.2",
     "gray-matter": "^4.0.3",
+    "highlight.js": "^11.6.0",
     "inngest-sdk": "^1.0.1",
     "lodash.debounce": "^4.0.8",
+    "lodash.shuffle": "^4.2.0",
     "lodash.throttle": "^4.1.1",
     "marked": "^4.0.10",
     "monaco-editor": "^0.28.1",
     "next": "12.1.0",
     "next-mdx-remote": "^3.0.8",
     "next-sitemap": "^1.9.12",
+    "next-usequerystate": "^1.7.2",
     "postcss": "^8.4.16",
     "prettier": "^2.4.0",
     "quickjs-emscripten": "^0.13.0",
@@ -70,5 +75,11 @@
     "typescript": "^4.3.5",
     "urql": "^2.0.5",
     "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "@types/lodash.shuffle": "^4.2.7",
+    "@types/marked": "^4.0.5",
+    "cross-fetch": "^3.1.5",
+    "zod": "^3.18.0"
   }
 }
