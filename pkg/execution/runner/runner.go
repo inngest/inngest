@@ -258,7 +258,7 @@ func (s *svc) functions(ctx context.Context, evt event.Event) error {
 				if t.Expression != nil {
 					// Execute expressions here, ensuring that each function is only triggered
 					// under the correct conditions.
-					ok, _, evalerr := expressions.Evaluate(ctx, *t.Expression, map[string]interface{}{
+					ok, _, evalerr := expressions.EvaluateBoolean(ctx, *t.Expression, map[string]interface{}{
 						"event": evtMap,
 					})
 					if evalerr != nil {
@@ -324,7 +324,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			// Add the async event data to the expression
 			data["async"] = evtMap
 			// Compile and run the expression.
-			ok, _, err := expressions.Evaluate(ctx, *pause.Expression, data)
+			ok, _, err := expressions.EvaluateBoolean(ctx, *pause.Expression, data)
 			if err != nil {
 				return err
 			}

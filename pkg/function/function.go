@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/inngest/clistate"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/xhit/go-str2duration/v2"
 )
 
 var (
@@ -169,10 +170,23 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 
 		// Ensure that any expressions are also valid.
-		if edge.Metadata != nil && edge.Metadata.If != "" {
+		if edge.Metadata == nil {
+			continue
+		}
+		if edge.Metadata.If != "" {
 			if _, verr := expressions.NewExpressionEvaluator(ctx, edge.Metadata.If); verr != nil {
 				err = multierror.Append(err, verr)
 			}
+		}
+		if edge.Metadata.Wait != nil {
+			// Ensure that this is a valid duration or expression.
+			if _, err := str2duration.ParseDuration(*edge.Metadata.Wait); err == nil {
+				continue
+			}
+			if _, err := expressions.NewExpressionEvaluator(ctx, *edge.Metadata.Wait); err == nil {
+				continue
+			}
+			err = multierror.Append(err, fmt.Errorf("Unable to parse wait as a duration or expression: %s", *edge.Metadata.Wait))
 		}
 	}
 

@@ -17,7 +17,7 @@ var (
 	// edge expressions.
 	DefaultEdgeEvaluator = edgeEvaluator{
 		datagen:   EdgeExpressionData,
-		evaluator: expressions.Evaluate,
+		evaluator: expressions.EvaluateBoolean,
 	}
 )
 
@@ -67,7 +67,7 @@ type EdgeEvaluator interface {
 func NewEdgeEvaluator(eval Evaluator, datagen EdgeExpressionDataGen) EdgeEvaluator {
 	// TODO (tonyhb): clean this up with options.
 	if eval == nil {
-		eval = expressions.Evaluate
+		eval = expressions.EvaluateBoolean
 	}
 	if datagen == nil {
 		datagen = EdgeExpressionData

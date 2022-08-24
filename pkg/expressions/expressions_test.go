@@ -787,6 +787,19 @@ func TestEvaluateExpression(t *testing.T) {
 			// no error, but it doesn't match.
 			"",
 		},
+		// Event data time manipulation
+		{
+			"date(event.from) + duration('6h35m10s') == date('2020-01-01T18:35:10')",
+			map[string]interface{}{
+				"event": map[string]any{
+					"from": "2020-01-01T12:00:00",
+				},
+			},
+			true,
+			nil,
+			false,
+			"",
+		},
 	}
 
 	for n, test := range tests {
@@ -970,7 +983,7 @@ func BenchmarkEvaluate(b *testing.B) {
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		expr, err := NewExpressionEvaluator(ctx, expression)
+		expr, err := NewBooleanEvaluator(ctx, expression)
 		if err != nil {
 			b.Fatalf("unknown error in benchmark: %s", err)
 		}
@@ -1000,7 +1013,7 @@ func BenchmarkEvaluateParallel(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			expr, _ := NewExpressionEvaluator(ctx, expression)
+			expr, _ := NewBooleanEvaluator(ctx, expression)
 			res, _, err := expr.Evaluate(ctx, data)
 			if err != nil {
 				b.Fatalf("unknown error in benchmark: %s", err)
