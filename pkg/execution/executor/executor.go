@@ -231,7 +231,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 			// caller to show only step outputs, etc.
 			e.log.Info().
 				Str("caller", "output").
-				Interface("response", resp).
 				Interface("output", resp.Output).
 				Str("run_id", id.RunID.String()).
 				Str("step", from).

@@ -14,12 +14,20 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/function/env"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/xhit/go-str2duration/v2"
 )
 
 type Opt func(s *svc)
+
+// WithEnvReader sets the EnvReader within the service.
+func WithEnvReader(r env.EnvReader) func(s *svc) {
+	return func(s *svc) {
+		s.envreader = r
+	}
+}
 
 func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
 	return func(s *svc) {
@@ -45,6 +53,8 @@ type svc struct {
 	queue queue.Queue
 	// exec runs the specific actions.
 	exec Executor
+	// envreader allows reading .env variables for each function.
+	envreader env.EnvReader
 
 	wg sync.WaitGroup
 }
@@ -57,7 +67,18 @@ func (s *svc) Pre(ctx context.Context) error {
 	var err error
 
 	if s.data == nil {
-		s.data, err = inmemorydatastore.NewFSLoader(ctx, ".")
+		l, err := inmemorydatastore.NewFSLoader(ctx, ".")
+		if err != nil {
+			return err
+		}
+		s.data = l
+
+		// Allow .env readers when using the FS loader only.
+		fns, err := l.Functions(ctx)
+		if err != nil {
+			return err
+		}
+		s.envreader, err = env.NewReader(fns)
 		if err != nil {
 			return err
 		}
@@ -81,6 +102,13 @@ func (s *svc) Pre(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+
+		if d, ok := d.(driver.EnvManager); ok {
+			// If this driver reads environment variables, set the
+			// env reader appropriately.
+			d.SetEnvReader(s.envreader)
+		}
+
 		drivers = append(drivers, d)
 	}
 
