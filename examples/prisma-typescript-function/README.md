@@ -53,7 +53,7 @@ Next, check out how to [👉 trigger the function](#triggering-the-function).
 
 <!-- An annotated version of the `inngest.json|cue` file to help the user firm up the understanding of how the config works.-->
 
-Below is the annotated function definition (found at [inngest.json](/inngest.json)) to show how the above is defined in config.
+Below is the annotated function definition (found at [inngest.json](inngest.json)) to show how the above is defined in config.
 
 ```jsonc
 {
@@ -105,7 +105,7 @@ Below is the annotated function definition (found at [inngest.json](/inngest.jso
 This function has a single step: `steps/step-1`, which is triggered by the `stripe/charge.succeeded` event.
 
 <!-- A brief summary of where to find the various steps in the code and any other interesting configuration -->
-- ➡️ [**steps/step-1/**](/steps/step-1)
+- ➡️ [**steps/step-1/**](steps/step-1)
   > Finds the relevant user in the database and creates a new charge record if it could be found.
 
 ## Triggering the function
