@@ -58,10 +58,12 @@ export default function LibraryExamplePage(props: Props) {
         <div className="text-center px-6 max-w-4xl mx-auto flex flex-col space-y-6">
           <h1>{props.name}</h1>
           <p className="subheading">{props.description}</p>
-          <CommandSnippet
-            command={`npx inngest-cli init --template github.com/inngest/inngest#examples/${props.id}`}
-            copy
-          />
+          <div>
+            <CommandSnippet
+              command={`npx inngest-cli init --template github.com/inngest/inngest#examples/${props.id}`}
+              copy
+            />
+          </div>
           <div className="flex flex-row justify-center">
             <Button
               kind="primary"
