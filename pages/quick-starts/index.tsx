@@ -242,16 +242,8 @@ export const getExamples = async () => {
           id: z.string(),
           tree: z.array(treeSchema),
           name: z.string(),
-          description: z
-            .string()
-            .optional()
-            // TODO Remove
-            .default("A serverless Prisma background job using TypeScript."),
-          tags: z
-            .array(z.string())
-            .optional()
-            // TODO Remove
-            .default(["typescript", "prisma", "database"]),
+          description: z.string().optional(),
+          tags: z.array(z.string()).optional(),
         })
         .parse({
           ...JSON.parse(
