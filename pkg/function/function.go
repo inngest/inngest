@@ -355,7 +355,7 @@ func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, er
 func (f *Function) canonicalize(ctx context.Context, path string) error {
 	f.dir = path
 	// dir should point to the dir, not the file.
-	if strings.HasSuffix(path, jsonConfigName) || strings.HasSuffix(path, cueConfigName) {
+	if strings.HasSuffix(path, JsonConfigName) || strings.HasSuffix(path, cueConfigName) {
 		f.dir = filepath.Dir(path)
 	}
 
