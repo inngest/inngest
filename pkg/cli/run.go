@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/function/env"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/muesli/reflow/wrap"
 	"golang.org/x/term"
@@ -155,10 +156,16 @@ func (r *RunUI) run(ctx context.Context) {
 		return
 	}
 
+	envreader, _ := env.NewReader([]function.Function{r.fn})
+
 	// In order to execute the function we need to create a new executor
 	// service to execute the steps of our function.  We'll manually initialize
 	// a new function run.
-	exec := executor.NewService(*c, executor.WithExecutionLoader(el))
+	exec := executor.NewService(
+		*c,
+		executor.WithExecutionLoader(el),
+		executor.WithEnvReader(envreader),
+	)
 	go func() {
 		if err := service.Start(ctx, exec); err != nil {
 			r.err = err

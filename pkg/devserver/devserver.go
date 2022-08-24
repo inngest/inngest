@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/function/env"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 )
@@ -46,9 +47,23 @@ func NewDevServer(ctx context.Context, c config.Config, dir string) error {
 }
 
 func newDevServer(ctx context.Context, c config.Config, el coredata.ExecutionLoader) error {
+	funcs, err := el.Functions(ctx)
+	if err != nil {
+		return err
+	}
+	envreader, err := env.NewReader(funcs)
+	if err != nil {
+		return err
+	}
+
 	api := api.NewService(c)
 	runner := runner.NewService(c, runner.WithExecutionLoader(el))
-	exec := executor.NewService(c, executor.WithExecutionLoader(el))
+	exec := executor.NewService(
+		c,
+		executor.WithExecutionLoader(el),
+		executor.WithEnvReader(envreader),
+	)
+
 	return service.StartAll(ctx, api, runner, exec)
 }
 
