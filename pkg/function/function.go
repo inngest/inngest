@@ -101,7 +101,7 @@ type After struct {
 
 // New returns a new, empty function with a randomly generated ID.
 func New() (*Function, error) {
-	id, err := randomID()
+	id, err := RandomID()
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +446,7 @@ func DeterministicUUID(f Function) uuid.UUID {
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(f.ID))
 }
 
-func randomID() (string, error) {
+func RandomID() (string, error) {
 	// Generate a 6 character long hex string.  This is the suffix to
 	// our DSN prefix, which decreases the chance of collosion by 1/16,777,216.
 	// This makes the total chance of collisions from an _empty_ keyspace
