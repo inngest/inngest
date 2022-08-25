@@ -1,0 +1,198 @@
+---
+category: "Guides"
+title: "Trigger your code directly from Retool"
+slug: "guides/trigger-your-code-from-retool"
+order: 2
+---
+
+Internal tools are a pain to build and maintain. Fortunately, [Retool](https://retool.com/) has helped tons of companies reduce the burden. Retool primarily focuses on building dashboards and forms and it integrates well with several databases and cloud APIs.
+
+Often though, there are actions that your support or customer success team needs to perform that are too complex for Retool built-in features. You may have even written some of necessary code in your application, but you can't easily run it from Retool.
+
+## The problem
+
+Let's say you have an integration built in your application and you backend code imports a bunch of data from that third party. The third party API or your backend may have went down for a few hours and you may have missing data for certain user. When someone reaches out to support, you may need to re-run that import script to backfill the missing data.
+
+<!-- TBD diagram? -->
+
+We're going to walk through how you can do this so your team can trigger important scripts right from your Retool app. This guide assumes you have a basic experience building forms with Retool (*If you don't, check out [this great guide](https://docs.retool.com/docs/create-forms-using-form-component)*).
+
+## The plan
+
+The goal is to enable your team to trigger a script anytime they click a button in Retool. To achieve this we will:
+
+1. Create a Retool button that sends an event to Inngest
+2. Package up the script into an Inngest function
+3. Configure the function to run when that event is received
+4. See how it works end to end.
+
+## Sending an event from Retool
+
+To send data from Retool, we'll need to set up a “[Resource](https://docs.retool.com/docs/resources)” first. On your Resources tab in Retool, click “Create New” then select “Resource.” Then select “Rest API.” Now jump over to the Inngest Cloud dashboard and create a new Source using the “Add Source” button and selecting “API” ([direct link](/test/sources/new?ref=retool-guide#API)). Copy your brand new key and in the Retool dashboard, prefix your key with the Inngest Source API URL and path: `https://inn.gs/e/`
+
+```shell
+https://inn.gs/e/<YOUR-COPIED-SOURCE-API-KEY>
+```
+
+Your new resource will look like this. When it does, click “Create resource.”
+
+![Inngest Retool resource screenshot](/assets/guides/trigger-your-code-from-retool/retool-resource.png)
+
+Now, let's head to the Retool app that you want to add the button form to. Let's say you have already built out the following form called `runBackfillForm` with a single input called `userId` and a submit button:
+
+![Retool form screenshot](/assets/guides/trigger-your-code-from-retool/retool-form.png)
+
+Next, create a new “Resource query” from the “Code” panel at the bottom left (use the + button). Let's name our new query `sendBackfillRequested` and select our new “Inngest” resource from the drop down. Update the “Action type” to a `POST` request. In the “Body” section, we need add the data that we want to send to Inngest. Inngest events require a name and some data as JSON. It's useful to prefix your event names to group them, here we'll call our event `"retool/backfill.requested"` and we'll pass the user id from the form and for future auditing purposes, the email of the current Retool user on your team:
+
+```json
+{ "user_id": "{{runBackfillForm.data.userId}}", "agent_id": "{{current_user.email}}" }
+```
+
+At the end, your resource query will look like this. Let's save it then click “Run” to test it.
+
+![Retool resource query screenshot](/assets/guides/trigger-your-code-from-retool/retool-resource-query.png)
+
+In the Inngest Cloud dashboard's “Events” tab, you should see a brand new `retool/backfill.requested` event. Click on the event and you should be able to select the payload that we just sent.
+
+![Inngest Cloud dashboard view event payload](/assets/guides/trigger-your-code-from-retool/inngest-view-event-payload.gif)
+
+Now that we've verified the data is sent over to Inngest, you can attach the resource query as an event handler to the submit button. Select the “Default” interaction type and click “+ Add” to select our resource query `sendBackfillRequested`. For fun, you can add an `isFetching` to show loading.
+
+![Retool form submit button event handler](/assets/guides/trigger-your-code-from-retool/retool-resource-query.png)
+
+We're halfway there - with this in place any agent from our team can trigger this event as needed.
+
+## Preparing our script
+
+Heading over to our application code, we'll assume you are familiar with writing a `Dockerfile` or that you already have one in your project, otherwise, [you can check out the example repo here](https://github.com/inngest/example-monorepo) to see the final result. Let's create a new directory for our function from your project root:
+
+```shell
+mkdir -p functions/run-backfill
+```
+
+Create a file in this directory to run you code, for this example we'll use JavaScript (Node.js) - `index.js` . In this code, will be our Inngest function: it imports the existing backfill code, parses the event payload from args, runs the backfill, then logs the output as JSON using an http status code to tell Inngest [if it should be retried or not](/docs/functions/retries?ref=retool-guide).
+
+```js
+const { runBackfillForUser } = require("../../lib/backfill-scripts");
+
+const { event } = JSON.parse(process.argv.pop());
+
+const result = runBackfillForUser(event.data.user_id);
+
+console.log(JSON.stringify({
+  status: result.ok ? 200 : 500,
+  message: `Ran backfill for user ${event.data.user_id}`,
+}));
+```
+
+Essentially, this is what an Inngest function is, it receives a JSON payload via args, it runs some code then whatever is logged last to `stdout` is captured as the result of the function. No SDKs or libraries needed.
+
+## Configuring our script to run
+
+Every Inngest function requires an `inngest.json` configuration file which tells Inngest when and how to run the function. We'll create this file in our `functions/run-backfill` directory. At a basic level it has 3 parts:
+
+**Function metadata**
+
+The function needs a `name` and a unique `id` - the `id` cannot change.
+
+```json
+{
+  "name": "Run User Backfill",
+  "id": "run-user-backfill",
+```
+
+**Event trigger**
+
+Use the event name as the trigger. Events can have multiple triggers, but we only need one.
+
+```json
+  "triggers": [
+    { "event": "retool/backfill.requested" }
+  ],
+```
+
+**Function Steps**
+
+Every function can have `n` number of steps [enabling complex and powerful functions](/docs/functions/step-functions?ref=retool-guide), but we only need one for our function. `steps` is an object with keys that match the `id` of the step. We'll give it a name and specify some `runtime` information including the path to our `dockerfile` in our parent directory.
+
+```json
+  "steps": {
+    "backfill": {
+      "id": "backfill",
+      "name": "Backfill User Data",
+      "runtime": {
+        "type": "docker",
+        "dockerfile": "../../Dockerfile.backfill"
+      }
+    }
+  }
+}
+```
+
+**Dockerfile**
+
+We already assume you have a Dockerfile to work from, but for clarity, here's our basic Dockerfile that runs our our backfill script. This needs to be in the project root directory so our `index.js` function file can access the files in the `./lib` dir.
+
+```docker
+FROM node:16.15-stretch-slim
+WORKDIR /opt/
+COPY . .
+RUN npm install --production
+ENTRYPOINT ["node", "./functions/backfill-user-data/index.js"]
+```
+
+<details>
+  <summary><strong>See the full <code>inngest.json</code> file</strong></summary>
+
+```json
+{
+  "name": "Run User Backfill",
+  "id": "run-user-backfill",
+  "triggers": [
+    { "event": "retool/backfill.requested" }
+  ],
+  "steps": {
+    "backfill": {
+      "id": "backfill",
+      "name": "Backfill User Data",
+      "runtime": {
+        "type": "docker",
+        "dockerfile": "../../Dockerfile.backfill"
+      }
+    }
+  }
+}
+}
+```
+
+</details>
+
+<!-- FUTURE: Add info on Inngest run -->
+
+## Pushing the function live to Inngest Cloud
+
+Now, all you need to do is run `inngest deploy --prod` from your function's directory and it will build and push your function live. If you created your Inngest Source in the step above in with “Test” mode enabled in the dashboard, you do not need the `--prod` flag for this command.
+
+When you visit the Inngest Cloud dashboard's “Functions” tab, you should see your newly deployed function, ready to receive events!
+
+<aside>
+👋 You'll want to take this opportunity to add any necessary environment variables as secrets via the Inngest “Secrets Manager”: <a href="https://app.inngest.com/secrets">app.inngest.com/secrets</a>
+</aside>
+
+![Inngest Cloud dashboard view deployed function](/assets/guides/trigger-your-code-from-retool/inngest-deployed-function.png)
+
+## Bringing it all together
+
+Now that our code is pushed to production and we've set the secrets that we need, let's test it end to end.
+
+![Retool submit form](/assets/guides/trigger-your-code-from-retool/retool-submit-form.gif)
+
+And a few seconds later in the Inngest cloud dashboard:
+
+![Inngest cloud dashboard view function output](/assets/guides/trigger-your-code-from-retool/inngest-view-function-output.gif)
+
+Fantastic. We've now used our Retool form to trigger a backfill script on-demand with no infrastructure required to setup. Every time your support team needs to trigger this script, they can do it and ensure your users are happy.
+
+## Over to you
+
+You now know how to get some existing code from your application shipped to Inngest and triggered right from Retool with a full audit trail of who triggered it, for what user and full logs. There was no need to set up a more complex infrastructure with a queue or new endpoint on your production API - Just push your code to Inngest and send an event from Retool - done and dusted.

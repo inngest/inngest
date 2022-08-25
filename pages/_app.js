@@ -76,8 +76,8 @@ function MyApp({ Component, pageProps }) {
           </>
         )}
       </Head>
-      <PageBanner href="/docs/guides/prisma-background-jobs?ref=page-banner">
-        New Guide: Running Background Jobs with Prisma ORM + TypeScript
+      <PageBanner href="/docs/guides/trigger-your-code-from-retool?ref=page-banner">
+        New guide: Trigger your existing code to run right from Retool
       </PageBanner>
       <Component {...pageProps} />
       <Script
