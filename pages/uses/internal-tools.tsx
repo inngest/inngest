@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import Button from "src/shared/Button";
 import Nav from "src/shared/nav";
 import Footer from "src/shared/footer";
+import GraphicCallout from "src/shared/GraphicCallout";
 import { Code, Eye, Activity } from "react-feather";
 
 export async function getStaticProps() {
@@ -108,6 +109,20 @@ export default function Template() {
           </Button>
         </div>
       </div>
+
+      <GraphicCallout
+        heading="Trigger your code directly from Retool"
+        description="See how you can easily run existing code and scripts right from Retool with the power and flexibility of Inngest"
+        image="/assets/use-cases/guide-retool-inngest.png"
+        cta={{
+          href: "/docs/guides/trigger-your-code-from-retool?ref=user-journey-graphic-callout",
+          text: "Read the guide",
+        }}
+        style={{
+          backgroundImage:
+            "linear-gradient(135deg, rgba(171, 220, 255, 0.5) 0%, rgba(3, 150, 255, 0.5) 100%);",
+        }}
+      />
 
       <div className="container mx-auto text-center pt-6">
         <h2 className="max-w-lg mx-auto pb-6">

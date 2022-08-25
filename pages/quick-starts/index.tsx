@@ -196,14 +196,26 @@ export const getStaticProps: GetStaticProps = async () => {
   };
 };
 
+const CommitsResponseObj = z.object({
+  commit: z.object({ tree: z.object({ url: z.string() }) }),
+});
+type CommitsResponse = z.infer<typeof CommitsResponseObj>;
+
 export const getExamples = async () => {
-  const latestCommit = await reqWithSchema(
-    "https://api.github.com/repos/inngest/inngest/commits/main",
-    z.object({
-      commit: z.object({ tree: z.object({ url: z.string() }) }),
-    }),
-    miniCache
-  );
+  let latestCommit: CommitsResponse;
+  try {
+    latestCommit = await reqWithSchema(
+      "https://api.github.com/repos/inngest/inngest/commits/main",
+      CommitsResponseObj,
+      miniCache
+    );
+  } catch (err) {
+    // Use https://github.com/settings/tokens to generate token w/ "public_repo" and "repo:status" scopes
+    // and set locally in .env.local file
+    throw new Error(
+      "Invalid response from Github API. Potential rate limit issue, set GITHUB_TOKEN with personal access token to proceed"
+    );
+  }
 
   const commitContents = await reqWithSchema(
     latestCommit.commit.tree.url,

@@ -1,20 +1,16 @@
 import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
+
 import Footer from "../shared/footer";
 import Nav from "../shared/nav";
-import IconList from "../shared/IconList";
-import Button from "../shared/Button";
-import Section from "../shared/Section";
-import ContentBlock from "../shared/ContentBlock";
+import Hero from "src/shared/Hero";
+import Examples from "src/shared/Examples";
+import HowItWorks from "src/shared/HowItWorks";
+import FeatureCallouts from "src/shared/FeatureCallouts";
+import DemoBlock from "src/shared/DemoBlock";
+import GraphicCallout from "src/shared/GraphicCallout";
 
-// Icons
-import Github from "src/shared/Icons/Github";
-import Check from "src/shared/Icons/Check";
-import CLIGradient from "src/shared/Icons/CLIGradient";
-import KeyboardGradient from "src/shared/Icons/KeyboardGradient";
-import TrendingUp from "src/shared/Icons/TrendingUp";
-import Play from "src/shared/Icons/Play";
-import { trackDemoView } from "src/utils/tracking";
+import Section from "../shared/Section";
 // import { Experiment, FadeIn } from "src/shared/Experiment";
 
 // TODO: move these into env vars
@@ -30,250 +26,280 @@ export async function getStaticProps() {
       meta: {
         title: "You Send Events. We Run Your Code.",
         description:
-          "Inngest makes it simple for you to write delayed or background jobs by triggering functions from events",
+          "Quickly build, test and deploy code that runs in response to events or on a schedule — without spending any time on infrastructure.",
         image: "/assets/img/og-image-default.jpg",
       },
     },
   };
 }
 
+// TODO - Use different examples for various use case, perhaps cycling through them
+const examples = [
+  {
+    title: "Handle failed payments", // Alt: Handle involuntary churn
+    steps: [
+      {
+        icon: "/icons/brands/stripe.jpg",
+        description: "Stripe Webhook Trigger",
+        action: (
+          <>
+            When <code>charge.failed</code> is received
+          </>
+        ),
+      },
+      {
+        icon: "/icons/brands/mongodb.svg",
+        description: "Run custom code",
+        action: "Downgrade the user's plan in the database",
+      },
+      {
+        icon: "/icons/brands/intercom.png",
+        description: "Run custom code",
+        action: "Notify Customer Success team in Intercom",
+      },
+    ],
+  },
+  {
+    title: "Intelligent activation drip campaign",
+    steps: [
+      {
+        icon: "/icons/webhook.svg",
+        description: "Custom Event",
+        action: "When a user signs up",
+      },
+      {
+        icon: "/icons/delay.png",
+        description: "Delay",
+        action: "Wait 24 hours",
+      },
+      {
+        icon: "/icons/conditional.webp",
+        description: "Conditional logic",
+        action: "If user does not activate",
+      },
+      {
+        icon: "/icons/brands/sendgrid.png",
+        description: "Run custom code",
+        action: "Send onboarding email",
+      },
+    ],
+  },
+  {
+    title: "Running scripts from internal tools",
+    steps: [
+      {
+        icon: "/icons/brands/retool.jpg",
+        description: "Retool Resource Request",
+        action: "When a form is submitted",
+      },
+      {
+        icon: "/icons/brands/javascript.png",
+        description: "Run custom code",
+        action: "Run a backfill of user data",
+      },
+    ],
+  },
+];
+
+const useCases = [
+  {
+    icon: "/assets/homepage/icon-user-journey.png",
+    href: "/uses/user-journey-automation?ref=homepage",
+    title: "User Journey Automation",
+    description:
+      "User-behavior driven flows for your product that are triggered by events sent from your app or third party integrations.",
+  },
+  {
+    icon: "/assets/homepage/icon-background-jobs.png",
+    href: "/uses/serverless-node-background-jobs?ref=homepage",
+    title: "Background Jobs",
+    description:
+      "Build, test, then deploy background jobs and scheduled tasks without worrying about infrastructure or queues — so you can focus on your product.",
+  },
+  {
+    icon: "/assets/homepage/icon-internal-tools.png",
+    href: "/uses/internal-tools?ref=homepage",
+    title: "Internal Tools",
+    description:
+      "Create internal apps using any language, with full audit trails, human in the loop tasks, and automated flows.",
+  },
+];
+
 export default function Home() {
-  const [demo, setDemo] = useState(false);
-
-  useEffect(() => {
-    if (demo === true) {
-      trackDemoView();
-    }
-  }, [demo]);
-
   return (
     <Wrapper className="home">
       <Nav sticky={true} />
 
-      <Hero>
-        <h1>
-          You Send Events.
-          <br />
-          We Run Your Code.
-        </h1>
-        <p className="hero-subheading">
-          Inngest makes it simple for you to write delayed or background jobs by
-          triggering functions from events
-        </p>
-        <p className="hero-subheading">
-          <em>No infra, no config — just ship.</em>
-        </p>
-
-        <VidPlaceholder className="basis-1/2 px-6 flex items-center">
-          <button
-            className="flex items-center justify-center"
-            onClick={() => setDemo(true)}
-          >
-            <Play outline={false} fill="var(--primary-color)" size={80} />
-          </button>
-          <img src="/assets/homepage/cli-3-commands.png" />
-        </VidPlaceholder>
-
-        <IconList
-          direction="vertical"
-          items={[
-            "Simple publishing with HTTP + JSON",
-            "No SDKs needed",
-            "Developer tooling for the entire workflow",
-            "No boilerplate polling code",
-            "Any programming language",
-            "Step function support with DAGs",
-          ].map((text) => ({
-            icon: Check,
-            text,
-          }))}
-        />
-
-        <img
-          className="hero-graphic"
-          src="/assets/homepage/hero-graphic-simplified-aug-2022.png"
-          alt="How Inngest works diagram"
-        />
-
-        <div className="hero-ctas">
-          <Button
-            size="medium"
-            kind="primary"
-            href="/sign-up?ref=homepage-hero"
-          >
-            Jump Right In
-          </Button>
-        </div>
-      </Hero>
-
-      <Section>
-        <header>
-          <h2>
-            The Complete Platform For <br />
-            Everything Async
-          </h2>
-          <p className="subheading">
-            Our serverless solution provides everything you need to effortlessly
+      <Hero
+        headline={
+          <>
+            Build
             <br />
-            build and manage every type of asynchronous and event-driven job.
-          </p>
-        </header>
+            <TextSlider
+              strings={[
+                "User Journeys",
+                "Webhooks",
+                "Internal Tools",
+                "Background Jobs",
+              ]}
+            />
+            <br />
+            in Minutes
+          </>
+        }
+        subheadline={
+          <>
+            Inngest is a developer platform for building, testing and deploying
+            code that runs in response to events or on a schedule — without
+            spending any time on infrastructure.
+          </>
+        }
+        primaryCTA={{
+          href: "/sign-up?ref=homepage-hero",
+          text: "Get started for free →",
+        }}
+        secondaryCTA={{
+          href: "/docs?ref=homepage-hero",
+          text: "Read the docs",
+        }}
+      />
 
-        <ContentBlock
-          layout="reverse"
-          heading="No queue required"
-          text={
-            <>
-              Inngest is serverless, requiring absolutely no infrastructure to
-              manage. Use our built-in scalable queuing system.{" "}
-              {/* TODO - Link to something */}
-            </>
-          }
-          image="/assets/homepage/serverless-queue.png"
-        />
-        <ContentBlock
-          layout="reverse"
-          heading="A real-time admin UI keeps everyone in the&nbsp;loop"
-          text={
-            <>
-              The Inngest Admin UI brings full transparency to all your
-              asynchronous jobs, so you can stay on top of performance,
-              throughput, and more, without needing to dig through logs.
-            </>
-          }
-          image="/assets/homepage/admin-ui-screenshot.png"
-        />
-        <ContentBlock
-          layout="reverse"
-          heading="Event-driven, as easy as just sending events!"
-          text={
-            <>
-              We built all the hard stuff so you don’t have to: idempotency,
-              throttling, backoff, retries,{" "}
-              <a href="/blog/introducing-cli-replays?ref=homepage">replays</a>,
-              job versioning, and so much more. With Inngest, you just write the
-              job and we take care of the rest.
-            </>
-          }
-          image="/assets/homepage/checklist-fade.png"
-        />
-        <div className="cta-container">
-          <Button
-            href="/product?ref=home-complete-platform"
-            kind="outlinePrimary"
-          >
-            See The Full Picture
-          </Button>
-        </div>
-      </Section>
+      <HowItWorks />
 
-      <Section theme="dark">
-        <header>
-          <h2>
-            Build for <u>Builders</u>
+      <Examples
+        heading={
+          <>
+            How Customers Use Us In{" "}
+            <span className="underline italic text-green-700 decoration-wavy decoration-sky-500 underline-offset-6">
+              The Real World
+            </span>
+          </>
+        }
+        examples={examples}
+        cta={{
+          href: "/quick-starts?ref=homepage-examples",
+          text: "Check out our project quick starts →",
+        }}
+      />
+
+      <div className="container mx-auto max-w-5xl my-24">
+        <div className="text-center px-6 max-w-2xl mx-auto">
+          <h2 className="text-4xl mb-6">
+            <span className="gradient-text gradient-text-ltr gradient-from-pink gradient-to-orange">
+              Why
+            </span>{" "}
+            use Inngest?
           </h2>
-          <p className="subheading">Write business logic, not boilerplate.</p>
-        </header>
-
-        <ContentBlock
-          heading="Fits your workflow"
-          text={
-            <>
-              Inngest works just like you'd hope — write your jobs alongside
-              your project code, use our CLI to create new functions, mock
-              queues, test and deploy your work manually or automate it with
-              your favorite tool.
-            </>
-          }
-          image="/assets/homepage/cli-3-commands.png"
-          imageSize="full"
-          icon={<CLIGradient />}
-        />
-
-        <ContentBlock
-          layout="reverse"
-          heading="Fully flexible"
-          text={
-            <>
-              Write your jobs in any language or framework, and POST your events
-              in standard JSON. If it runs in Docker, it works with Inngest,
-              with zero vendor-specific libraries or boilerplate code needed.
-            </>
-          }
-          image="/assets/homepage/language-logos.png"
-          icon={<KeyboardGradient />}
-        />
-
-        <ContentBlock
-          heading="Build in Minutes, Not&nbsp;Days"
-          text={
-            <>
-              Zero config from setup to production — with Inngest there's no
-              need to configure or manage queues, event stream topics, workers,
-              or builds. Write jobs, send events, with zero fuss.
-            </>
-          }
-          image="/assets/homepage/payload-and-job-generic.png"
-          icon={<KeyboardGradient />}
-        />
-
-        <div className="cta-container">
-          <Button href="/product?ref=home-start-building" kind="primary">
-            Start Building Today
-          </Button>
+          <p className="text-md">
+            Inngest has helped engineering teams save months of dev time
+            building out their products.
+          </p>
+          <p className="text-md">
+            Inngest enables developers to quickly build out functionality
+            without having to spend time or money on infrastructure and setting
+            up queues, workers, retry policies, or logging. Our platform gives
+            you the tooling and observability to fix issues fast, and Inngest's
+            step functions enable complex workflows without having to manage
+            state.
+          </p>
         </div>
-      </Section>
+      </div>
 
-      <BlackBackgroundWrapper>
-        <NextLevelSection>
-          <header>
-            <h2>
-              <TrendingUp /> <span className="gradient-text">Next-Level</span>{" "}
-              Async Awesomeness
-            </h2>
-            <p className="subheading">
-              Building the future with event-driven experiences
-            </p>
-          </header>
+      {/* Use cases */}
+      <div className="container mx-auto max-w-5xl mt-24 mb-36">
+        <div className="text-center px-6 max-xl mx-auto pb-16">
+          <h2 className="text-4xl">
+            Your{" "}
+            <span className="gradient-text gradient-text-ltr gradient-from-cyan gradient-to-blue">
+              Solution
+            </span>{" "}
+            for...
+          </h2>
+        </div>
+        {/* Change this grid as we add more use cases */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mx-6 max-w-5xl">
+          {useCases.map((u, i) => (
+            <a
+              key={`use-case-anchor-${i}`}
+              href={u.href}
+              className={`bg-light-gray p-8 rounded-lg text-almost-black transition ease-in-out duration-200 hover:-translate-y-1`}
+            >
+              <div className="mb-6">
+                <h3 className="text-2xl mb-6">
+                  <img
+                    className="inline-flex mr-2"
+                    src={u.icon}
+                    style={{ maxWidth: "28px" }}
+                  />
+                  {u.title}
+                </h3>
+              </div>
+              <p>{u.description}</p>
+            </a>
+          ))}
+        </div>
+      </div>
 
-          <div className="content-grid">
-            <div>
-              <h3>Limitless</h3>
-              <p>
-                Inngest jobs aren't bound by artificial time or isolation
-                constraints. Develop long running, context aware tasks that
-                coordinate and interact to build even the most sophisticated
-                workflows.
-              </p>
-            </div>
-            <div>
-              <h3>Controlled</h3>
-              <p>
-                Our platform enforces data governance and accuracy so you'll
-                immediately know if issues arise. Our detailed audit logs mean
-                you're never in the dark.
-              </p>
-            </div>
-            <div>
-              <h3>Experienced</h3>
-              <p>
-                Our <a href="/about">founding team</a> has built high-throughput
-                complex event-driven systems that scale to millions of daily
-                events and we're excited to share with you the reliable
-                performant system we always wished we had.
-              </p>
-            </div>
-          </div>
+      <FeatureCallouts
+        heading={
+          <>
+            Build powerful functionality
+            <br />
+            <span className="gradient-text gradient-text-ltr gradient-from-cyan gradient-to-pink">
+              without the overhead
+            </span>
+          </>
+        }
+        backgrounds="gray"
+        features={[
+          {
+            topic: "Event Bus",
+            title: "Send data and view full history",
+            description:
+              "Publish your events and view full logs of events including the payload, event schema, and what functions it triggered.",
+            image: "/assets/screenshots/dashboard-events.png",
+          },
+          {
+            topic: "Developer UX",
+            title: "Intuitive Developer Tooling",
+            description:
+              "A CLI that gets out your way and makes the hard stuff easy. Create, test, and deploy functions in minutes.",
+            image: "/assets/homepage/cli-3-commands.png",
+          },
+          {
+            topic: "Out-of-the-box Power",
+            title: "Conditional Logic, Delays, & Automate Retries",
+            description:
+              "Use minimal declarative configuration to create complex flows that can delay for days, conditionally run based on data, and automatically retry failed functions.",
+            image: "/assets/use-cases/conditional-logic.png",
+            // TODO - Link to features page section
+          },
+          {
+            topic: "Step Functions",
+            title: "Chain Functions Together",
+            description:
+              "Break your code into logical steps and run them in parallel, in sequence, or conditionally based on the output of previous steps.",
+            image: "/assets/use-cases/step-function.png",
+            // TODO - Link to features page section on step functions
+          },
+        ]}
+        cta={{
+          href: "/sign-up?ref=homepage-features",
+          text: "Get started building now →",
+        }}
+      />
 
-          <div className="cta-container">
-            <Button href="/product?ref=home-next-level" kind="outlinePrimary">
-              <span>Take it to the next level</span> <TrendingUp size="1em" />
-            </Button>
-          </div>
-        </NextLevelSection>
-      </BlackBackgroundWrapper>
+      <GraphicCallout
+        heading="Open Source"
+        description="Inngest's core is open source, giving you piece of mind."
+        image="/assets/screenshots/github-repo-inngest-top-left.png"
+        cta={{
+          href: "https://github.com/inngest/inngest?ref=inngest-homepage",
+          text: "Star the repo",
+        }}
+      />
 
-      {/*<SocialProof>
+      {/* <SocialProof>
         <blockquote>
           “This is 100% the dev/prod parity that we’re lacking for queue-based
           systems.”
@@ -284,48 +310,12 @@ export default function Home() {
         </div>
         </SocialProof> */}
 
-      <ClosingSection>
-        <header>
-          <h2>Write Code, Not Too Much, Mostly Business Logic</h2>
-          <p className="subheading">
-            Inngest tasks lets you skip the boilerplate and get right to the
-            heart of the matter:
-            <br />
-            writing code that helps your business achieve its goals.
-          </p>
-        </header>
-        <div className="cta-container">
-          <Button
-            href="/docs/quick-start?ref=home-inngest-in-action"
-            kind="primary"
-            size="medium"
-          >
-            See Inngest in Action
-          </Button>
-        </div>
-      </ClosingSection>
+      <DemoBlock
+        headline="Inngest provides the tools for any automation"
+        description="Skip the boilerplate and get right to the heart of the matter: writing code that helps your business achieve its goals."
+      />
 
       <Footer />
-
-      {demo && (
-        <Demo
-          className="flex justify-center items-center"
-          onClick={() => {
-            setDemo(false);
-          }}
-        >
-          <div className="container aspect-video mx-auto max-w-2xl flex">
-            <iframe
-              src="https://www.youtube.com/embed/qVXzYBcJmGU?autoplay=1"
-              title="Inngest Product Demo"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="flex-1"
-            ></iframe>
-          </div>
-        </Demo>
-      )}
     </Wrapper>
   );
 }
@@ -361,7 +351,7 @@ const Wrapper = styled.div`
   }
 `;
 
-const Hero = styled.header`
+const HeroX = styled.header`
   padding: 10vh 0 4rem;
   text-align: center;
 
@@ -537,5 +527,88 @@ const Demo = styled.div`
 
   > div {
     box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
+  }
+`;
+
+const TextSlider = ({ strings = [] }) => {
+  const [index, setIndex] = useState(0);
+
+  const DELAY = 3000;
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIndex((i) => (i + 1) % strings.length);
+    }, DELAY);
+    return () => clearInterval(interval);
+  }, []);
+
+  const classes = [
+    "gradient-from-iris-60 gradient-to-cyan",
+    "gradient-from-cyan gradient-to-pink",
+    "gradient-from-pink gradient-to-orange",
+    "gradient-from-orange gradient-to-red",
+  ];
+
+  return (
+    <TextSliderContainer>
+      <span style={{ position: "relative" }}>
+        <TextSliderElements>
+          {strings.map((s, i) => (
+            <TextSliderString
+              key={`string-${i}`}
+              className={`gradient-text-ltr ${classes[i]} ${
+                index === i
+                  ? "active"
+                  : index - 1 === i || (index === 0 && i === strings.length - 1)
+                  ? "previous"
+                  : "upcoming"
+              }`}
+            >
+              {s}
+            </TextSliderString>
+          ))}
+        </TextSliderElements>
+      </span>
+    </TextSliderContainer>
+  );
+};
+
+const TextSliderContainer = styled.span`
+  position: relative;
+`;
+const TextSliderPlaceholder = styled.span`
+  visibility: hidden;
+  z-index: -10;
+`;
+const TextSliderElements = styled.span`
+  position: relative;
+  z-index: 1;
+  top: 12%;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  white-space: nowrap;
+  height: 100%;
+  align-items: start;
+  transition: all ease-out 200ms;
+`;
+const TextSliderString = styled.span`
+  position: absolute;
+  top: 0px;
+  width: 600px;
+  width: 100%;
+  text-align: center;
+  transition: all cubic-bezier(0.32, 0.8, 0.87, 0.85) 200ms;
+  opacity: 0;
+
+  &.active {
+    opacity: 1;
+  }
+  &.previous {
+    transform: translateX(-100%) translateY(-50%) scale(10%);
+  }
+  &.upcoming {
+    transform: translateX(100%);
   }
 `;

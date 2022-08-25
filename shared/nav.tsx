@@ -40,7 +40,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
             <div className="rounded-lg w-96 grid grid-cols-12">
               <div className="col-span-7 primary-links pt-6 pb-2 px-2">
                 <span className="text-slate-400 px-4">Product</span>
-                <a href="/product" className="rounded-lg p-4">
+                <a href="/product?ref=nav" className="rounded-lg p-4">
                   <p>Functions</p>
                   <p className="pt-1 text-slate-400">
                     <small>
@@ -48,7 +48,10 @@ const NavContent: React.FC<Props> = (props: Props) => {
                     </small>
                   </p>
                 </a>
-                <a href="/features/data-governance" className="rounded-lg p-4">
+                <a
+                  href="/features/data-governance?ref=nav"
+                  className="rounded-lg p-4"
+                >
                   <p>Data governance</p>
                   <p className="pt-1 text-slate-400">
                     <small>
@@ -61,16 +64,19 @@ const NavContent: React.FC<Props> = (props: Props) => {
               <div className="secondary-links col-span-5 bg-slate-100 pt-6 pb-3 px-2 text-xs">
                 <span className="text-slate-400 px-4">Use cases</span>
                 <a
-                  href="/uses/serverless-node-background-jobs"
+                  href="/uses/serverless-node-background-jobs?ref=nav"
                   className="rounded-lg px-4 py-3"
                 >
                   Background and scheduled jobs
                 </a>
-                <a href="/uses/internal-tools" className="rounded-lg px-4 py-3">
+                <a
+                  href="/uses/internal-tools?ref=nav"
+                  className="rounded-lg px-4 py-3"
+                >
                   Internal tools
                 </a>
                 <a
-                  href="/uses/user-journey-automation"
+                  href="/uses/user-journey-automation?ref=nav"
                   className="rounded-lg px-4 py-3"
                 >
                   User journey automation
@@ -84,7 +90,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
             </StyledLink>
             <div className="rounded-lg w-56 ">
               <div className="primary-links py-2 px-2">
-                <a href="/docs" className="rounded-lg p-4">
+                <a href="/docs?ref=nav" className="rounded-lg p-4">
                   <p>Docs</p>
                   <p className="pt-1 text-slate-400">
                     <small>
@@ -93,7 +99,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
                     </small>
                   </p>
                 </a>
-                <a href="/quick-starts" className="rounded-lg p-4">
+                <a href="/quick-starts?ref=nav" className="rounded-lg p-4">
                   <p>Quick starts</p>
                   <p className="pt-1 text-slate-400">
                     <small>

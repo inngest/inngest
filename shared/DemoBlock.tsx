@@ -22,32 +22,33 @@ export default function DemoBlock({
   }, [demo]);
 
   return (
-    <div className="container mx-auto max-w-4xl pt-12 px-6 lg:px-2 flex flex-col lg:flex-row gap-8 border-t-2">
-      <div className="basis-1/4" style={{ minWidth: "260px" }}>
-        <h2 className="text-lg font-normal mb-6">{headline}</h2>
-        <Button kind="primary" size="medium" href="/sign-up?ref=demo-section">
-          Start building
-        </Button>
-      </div>
-      <div className="basis-3/4">
-        <p className="text-md pb-6 text-color-gray-purple">{description}</p>
-        <VidPlaceholder
-          className="flex items-center cursor-pointer"
-          onClick={() => setDemo(true)}
-        >
-          <button
-            className="flex items-center justify-center"
+    <div className="container mx-auto max-w-5xl px-12">
+      <div className="pt-8 px-2 flex flex-col md:flex-row gap-8 border-t-2">
+        <div className="basis-1/4" style={{ minWidth: "260px" }}>
+          <h2 className="text-lg font-normal mb-6">{headline}</h2>
+          <Button kind="primary" size="medium" href="/sign-up?ref=demo-section">
+            Start building
+          </Button>
+        </div>
+        <div className="basis-3/4">
+          <p className="text-md pb-6 text-color-gray-purple">{description}</p>
+          <VidPlaceholder
+            className="flex items-center cursor-pointer"
             onClick={() => setDemo(true)}
           >
-            <Play outline={false} fill="var(--primary-color)" size={80} />
-          </button>
-          <img
-            src="/assets/demo/twilio-sms-demo-preview.jpg"
-            className="rounded-md border-2 border-color-iris-60"
-          />
-        </VidPlaceholder>
+            <button
+              className="flex items-center justify-center"
+              onClick={() => setDemo(true)}
+            >
+              <Play outline={false} fill="var(--primary-color)" size={80} />
+            </button>
+            <img
+              src="/assets/demo/twilio-sms-demo-preview.jpg"
+              className="rounded-md border-2 border-color-iris-60"
+            />
+          </VidPlaceholder>
+        </div>
       </div>
-
       <DemoModal show={demo} onClickClose={() => setDemo(false)} />
     </div>
   );
