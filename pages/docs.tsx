@@ -48,7 +48,7 @@ export default function DocsHome(props) {
             href="/docs/writing-and-running-fuctions"
             className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white"
           >
-            <p className="text-base my-2">👩‍💻 Writing & running fns</p>
+            <p className="text-base my-2">👩‍💻 Writing & running functions</p>
             <p className="text-slate-600">
               Write and locally run your first function using any language and
               the CLI, triggered automatically by events
@@ -88,14 +88,14 @@ export default function DocsHome(props) {
             deploys, version management and git integration
           </li>
           <li>Event coordination for building complex interactive functions</li>
-          <li>Event governance, schemas, and forwarding out of the box</li>
+          <li>Event & data governance, schemas, and forwarding out of the box</li>
         </ul>
 
         <h2 className="pt-4">Use cases</h2>
         <p>
           Inngest users are typically developers and data engineers. They use
           Inngest to reliably run background work, serverless functions, and
-          scheduled jobs across for a variety of use cases. Common examples
+          scheduled jobs across a variety of use cases. Common examples
           include:
         </p>
 
@@ -132,7 +132,7 @@ export default function DocsHome(props) {
               <b>Managing complex data pipelines</b>
               <br />
               Inngest can run complex data pipelines using a mixture of
-              languages on a schedule or in realtime, with full local testing
+              languages on a schedule or in real-time, with full local testing
               and reproducibility built in.
             </p>
           </li>
