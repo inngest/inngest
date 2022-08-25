@@ -78,7 +78,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		// Build all steps.
 		buildOpts, err := dockerdriver.FnBuildOpts(ctx, *fn, "--platform", "linux/amd64")
 		if err != nil {
-			return err
+			return fmt.Errorf("Failed to deploy function \"%s\": %s", fn.Name, err)
 		}
 		ui, err := cli.NewBuilder(ctx, cli.BuilderUIOpts{
 			QuitOnComplete: true,
@@ -96,7 +96,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		// Push each action
 		actions, _, err := fn.Actions(ctx)
 		if err != nil {
-			return err
+			return fmt.Errorf("Failed to deploy function \"%s\": %s", fn.Name, err)
 		}
 
 		dsnToKeySteps := make(map[string]string)
@@ -108,13 +108,13 @@ func deploy(cmd *cobra.Command, args []string) error {
 		for _, a := range actions {
 			actionVersion, err := deployAction(ctx, a)
 			if err != nil {
-				return err
+				return fmt.Errorf("Failed to deploy function \"%s\": %s", fn.Name, err)
 			}
 
 			// TODO: Move this to a dedicated function.
 			step, ok := fn.Steps[dsnToKeySteps[actionVersion.DSN]]
 			if !ok {
-				return fmt.Errorf("failed to find step for action %s", actionVersion.DSN)
+				return fmt.Errorf("Failed to deploy function \"%s\": failed to find step for action %s", fn.Name, actionVersion.DSN)
 			}
 
 			step.Version = &inngest.VersionConstraint{
@@ -126,7 +126,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		}
 
 		if err := deployFunction(ctx, fn); err != nil {
-			return err
+			return fmt.Errorf("Failed to deploy function \"%s\": %s", fn.Name, err)
 		}
 	}
 
