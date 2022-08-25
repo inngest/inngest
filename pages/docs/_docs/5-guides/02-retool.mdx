@@ -2,6 +2,7 @@
 category: "Guides"
 title: "Trigger your code directly from Retool"
 slug: "guides/trigger-your-code-from-retool"
+image: /assets/guides/trigger-your-code-from-retool/retool-inngest-featured-image.jpg
 order: 2
 ---
 
@@ -172,6 +173,10 @@ ENTRYPOINT ["node", "./functions/backfill-user-data/index.js"]
 ## Pushing the function live to Inngest Cloud
 
 Now, all you need to do is run `inngest deploy --prod` from your function's directory and it will build and push your function live. If you created your Inngest Source in the step above in with “Test” mode enabled in the dashboard, you do not need the `--prod` flag for this command.
+
+<aside>
+⭐️ This requires the <a href="/docs/cli/installation?ref=retool-guide">Inngest CLI v0.5.6</a> or greater
+</aside>
 
 When you visit the Inngest Cloud dashboard's “Functions” tab, you should see your newly deployed function, ready to receive events!
 
