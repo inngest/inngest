@@ -14,7 +14,7 @@ function MyApp({ Component, pageProps }) {
   const { anonId, existing } = useAnonId();
 
   useEffect(() => {
-    fullstory.init({ orgID: "o-1CVB8R-na1" });
+    fullstory.init({ orgId: "o-1CVB8R-na1" });
 
     if (pageProps.htmlClassName) {
       document.getElementsByTagName("html")[0].className =
