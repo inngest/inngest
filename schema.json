@@ -113,7 +113,7 @@
       "type": "object",
       "properties": {
         "step": {
-          "oneOf": [{ "const": "$trigger" }, { "type": "string" }],
+          "oneOf": [{ "type": "string" }],
           "description": "The step that must complete in order to run the next step, or \"$trigger\" if this step runs immediately upon receiving a trigger.",
           "examples": ["$trigger"]
         },
