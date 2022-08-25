@@ -80,6 +80,31 @@ export default function DocLayout(props: any) {
           scope={scope}
           components={{ Code: Code }}
         />
+
+        <FooterLinks className="grid sm:grid-cols-1 md:grid-cols-2 gap-4 py-8">
+          <div>
+            {props.prev && (
+              <a
+                href={props.prev.slug}
+                className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white"
+              >
+                <small>Previous</small>
+                {props.prev.scope.title}
+              </a>
+            )}
+          </div>
+          <div>
+            {props.next && (
+              <a
+                href={props.next.slug}
+                className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white text-right"
+              >
+                <small>Next</small>
+                {props.next.scope.title}
+              </a>
+            )}
+          </div>
+        </FooterLinks>
         {/* TODO: Add a prev / next button */}
       </DocsContent>
       <aside>
@@ -130,6 +155,17 @@ export async function getStaticProps({ params }) {
 
   const { cli, cloud } = getAllDocs();
   const docs = getDocs(parsedSlug);
+  const all = getAllDocs();
+
+  // Find next and previous articles based off of slug order.
+  const [next, prev] = (() => {
+    const idx = all.slugs.findIndex((s) => s === "/docs/" + parsedSlug);
+    const nextSlug = all.slugs[idx + 1];
+    const prevSlug = all.slugs[idx - 1];
+    const next = nextSlug ? all.docs[nextSlug.substring(6)] : null;
+    const prev = prevSlug ? all.docs[prevSlug.substring(6)] : null;
+    return [next, prev];
+  })();
 
   if (!docs) {
     throw new Error("unable to find docs for " + parsedSlug);
@@ -147,7 +183,16 @@ export async function getStaticProps({ params }) {
       rehypePlugins: [rehypeSlug],
     },
   });
-  return { props: { post, htmlClassName: "docs", meta: { disabled: true } } };
+
+  return {
+    props: {
+      post,
+      next,
+      prev,
+      htmlClassName: "docs",
+      meta: { disabled: true },
+    },
+  };
 }
 
 const TOC = styled.nav<{ isExpanded: boolean }>`
@@ -202,5 +247,14 @@ const TOC = styled.nav<{ isExpanded: boolean }>`
   }
   @media (max-width: 800px) {
     display: none;
+  }
+`;
+
+const FooterLinks = styled.div`
+  a {
+    display: block;
+    small {
+      display: block;
+    }
   }
 `;

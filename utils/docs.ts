@@ -62,6 +62,7 @@ export type Categories = { [title: string]: Category };
 
 type Docs = {
   docs: { [slug: string]: Doc };
+  // TODO: Is this an ordered set?
   slugs: string[];
   cli: Categories;
   cloud: Categories;
@@ -85,6 +86,16 @@ export const getAllDocs = (() => {
       // memoizing in dev means you need to restart the server to see changes
       return memoizedDocs;
     }
+
+    // Reset this locally during development.
+    memoizedDocs = {
+      // docs maps docs by slug
+      docs: {},
+      slugs: [],
+
+      cli: {},
+      cloud: {},
+    };
 
     const fs = require("fs");
     const matter = require("gray-matter");
@@ -168,6 +179,7 @@ export const getAllDocs = (() => {
     );
 
     const cloud = {};
+
     // Iterate through each docs page and add the category.
     Object.values(memoizedDocs.docs).forEach((d: Doc) => {
       if (d.type === "cli") {
@@ -193,6 +205,21 @@ export const getAllDocs = (() => {
     });
     memoizedDocs.cloud = cloud;
 
+    // And finally, order the slugs according to the category
+    // order then the page order.
+    // 
+    // In order to do this, we're going to sort categories and
+    // then iterate through each doc within those categories
+    // in order, pushing the slugs to a new sorted array.
+    const sorted: Array<string> = [];
+
+    [...Object.values(memoizedDocs.cli), ...Object.values(memoizedDocs.cloud)].
+      sort((a, b) => a.order - b.order).
+      forEach((category) => {
+        category.pages.forEach(p => sorted.push("/docs/" + p.slug));
+      });
+
+    memoizedDocs.slugs = sorted;
     return memoizedDocs;
   };
 })();
