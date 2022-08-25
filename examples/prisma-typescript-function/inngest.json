@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/inngest/inngest/main/schema.json",
   "name": "Update your Prisma database from Stripe events",
   "description": "Create a record in Prisma when a Stripe webhook is received.",
   "tags": ["typescript", "prisma", "stripe"],
