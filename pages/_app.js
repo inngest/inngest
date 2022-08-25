@@ -5,6 +5,7 @@ import Script from "next/script";
 import { trackPageView } from "../utils/tracking";
 import { useAnonId } from "../shared/trackingHooks";
 import "../styles/globals.css";
+import * as fullstory from '@fullstory/browser';
 
 import PageBanner from "../shared/PageBanner";
 
@@ -13,6 +14,8 @@ function MyApp({ Component, pageProps }) {
   const { anonId, existing } = useAnonId();
 
   useEffect(() => {
+    fullstory.init({ orgID: "o-1CVB8R-na1" });
+
     if (pageProps.htmlClassName) {
       document.getElementsByTagName("html")[0].className =
         pageProps.htmlClassName;
