@@ -273,9 +273,9 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 		at := time.Now()
 		if next.Metadata != nil && next.Metadata.Wait != nil {
-			dur, err := str2duration.ParseDuration(*next.Metadata.Wait)
+			dur, err := ParseWait(ctx, *next.Metadata.Wait, run)
 			if err != nil {
-				return fmt.Errorf("invalid wait duration: %s", *next.Metadata.Wait)
+				return err
 			}
 			at = at.Add(dur)
 		}
