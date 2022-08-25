@@ -57,13 +57,13 @@ const Section = styled.section<{ theme?: "dark" | "light" }>`
       margin: 3rem 0;
       grid-template-columns: repeat(5, 1fr);
 
-      > div:nth-child(1) {
+      > div:nth-of-type(1) {
         grid-column: 1/4;
       }
-      > div:nth-child(2) {
+      > div:nth-of-type(2) {
         grid-column: 2/5;
       }
-      > div:nth-child(3) {
+      > div:nth-of-type(3) {
         grid-column: 3/6;
       }
     }

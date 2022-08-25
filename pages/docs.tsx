@@ -33,9 +33,9 @@ export default function DocsHome(props) {
 
         <h2>Quick start</h2>
 
-        <div className="grid pt-4 grid-cols-3 gap-4">
+        <div className="grid pt-4 gap-4 sm:grid-cols-1 xl:grid-cols-3">
           <a
-            href="/"
+            href="/docs/installation"
             className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white"
           >
             <p className="text-base my-2">🚀 Installation</p>
@@ -45,7 +45,7 @@ export default function DocsHome(props) {
             </p>
           </a>
           <a
-            href="/"
+            href="/docs/writing-and-running-fuctions"
             className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white"
           >
             <p className="text-base my-2">👩‍💻 Writing & running fns</p>
@@ -54,7 +54,9 @@ export default function DocsHome(props) {
               the CLI, triggered automatically by events
             </p>
           </a>
-          <a className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white">
+          <a
+            href="/docs/deploying-fuctions"
+          className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white">
             <p className="text-base my-2">🚢 Deploying</p>
             <p className="text-slate-600">
               Learn how to deply your functions to production instantly, without
@@ -63,7 +65,7 @@ export default function DocsHome(props) {
           </a>
         </div>
 
-        <h2 className="pt-8">What is Inngest?</h2>
+        <h2 className="pt-6">What is Inngest?</h2>
 
         <p>
           Inngest is an open-source, event-driven platform which makes it easy
@@ -77,7 +79,7 @@ export default function DocsHome(props) {
           boilerplate code or infra.
         </p>
 
-        <h2 className="pt-8">Key features</h2>
+        <h2 className="pt-4">Key features</h2>
         <ul>
           <li>CLI with developer-friendly APIs and local testing</li>
           <li>Stateless serverless step functions which run any language</li>
@@ -89,7 +91,7 @@ export default function DocsHome(props) {
           <li>Event governance, schemas, and forwarding out of the box</li>
         </ul>
 
-        <h2 className="pt-8">Use cases</h2>
+        <h2 className="pt-4">Use cases</h2>
         <p>
           Inngest users are typically developers and data engineers. They use
           Inngest to reliably run background work, serverless functions, and
@@ -162,7 +164,7 @@ export default function DocsHome(props) {
           </li>
         </ul>
 
-        <h2 className="pt-8">Ready to get started?</h2>
+        <h2 className="pt-4">Ready to get started?</h2>
         <p className="pb-4">
           Learn how to install our CLI and write your first serverless function
           in minutes, then get started with our cloud and deploy your functions
@@ -216,7 +218,7 @@ const DocsWrapper = styled.div`
   display: grid;
   min-height: 100vh;
   grid-template-columns: 17em auto;
-  gap: 4em;
+  gap: 4em 6em;
   padding-right: 4em;
   font-size: 0.7rem;
   border-bottom: 1px solid var(--border-color);
@@ -307,10 +309,13 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
     margin: 1.5em 0;
   }
 
+  ol ul { margin: .25rem 0 0 1.5rem; }
+
   ul {
     list-style-type: disc;
     margin-left: 1rem;
   }
+  ol { list-style-type: number }
 
   aside,
   video {

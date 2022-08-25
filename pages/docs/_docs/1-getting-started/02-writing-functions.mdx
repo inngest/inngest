@@ -1,41 +1,24 @@
 ---
 category: "Getting started"
-title: "Quick start"
-slug: "quick-start"
-order: 1
+title: "Writing and running functions"
+slug: "writing-and-running-fuctions"
+order: 5
 ---
 
-This guide will run through setting up your local development version of Inngest's event-driven queue.  By the end of this guide, you'll have a working devlepment server which runs functions in response to custom events.  It'll only take a couple of minutes.
+Follow along to learn how to:
 
-We'll run through:
+- Create new functions
+- Test and run functions locally
+- Set up an entire test environment for end to end testing
 
-- Installing the CLI
-- Creating functions, via `inngest init`
-- Testing functions, via `inngest run`
-- Running the server locally, via `inngest dev`
-- Detail on the development lifecycle.
-
-**Prerequisites**
-
-- In order to build and run functions, docker must be installed.  It's easy to get started.
-- We use buildx to build your images locally, so use a recent version of Docker.
+With a few simple commands you'll have a full serverless function running locally.  Once
+you have it set up, you can continue to develop and test your function locally then deploy
+it when it's finished.
 
 
-## 1. Install the CLI
+## Creating a function
 
-You can install the CLI by running the following script:
-
-```
-curl -sfL https://cli.inngest.com/install.sh | sh
-```
-
-This will place inngest in your $PWD.  Move it into your $PATH to invoke: `sudo mv ./inngest /usr/local/bin/inngest`.
-
-You can also download [prebuilt binaries](https://github.com/inngest/inngest/releases) from Github or [build from source](https://github.com/inngest/inngest), with Go 1.18+ installed.
-
-## 2. Creating a new function
-
-In order to use the event-driven queue, you'll need functions which are executed - otherwise, the queue does nothing. Functions can be created by running `inngest init`.  You'll be asked the following questions:
+Functions can be created by running <b>`inngest init`</b>.  You'll be asked the following questions:
 
 1. **Function name**: This is a human description of the function
 	- In this guide, let's use the name "Test func"
@@ -52,9 +35,16 @@ After selecting a language the CLI will create a new folder containing your code
 
 ![Creating your function](/assets/docs/getting-started-create.png)
 
-For now, the CLI has created everything you need to test the function.
+For now, the CLI has created everything you need to test the function.  Your new
+folder will contain:
 
-## 3. Testing the new function
+- `./inngest.json`, which configures the function,
+- `./steps/`, which holds code for each step of your function
+- `./events/`, which contains type definitions for the event that triggers this function
+
+Code that you write will go inside of `./steps/`.  A function starts with a single step, but you can add as many as you like to create complex flows of logic.
+
+## Running the function locally
 
 First, run `cd` to navigate to the function's root directory (`cd ./test-func`, based off of the function name).
 
@@ -69,11 +59,11 @@ Here's what you should see:
 
 ![Running your function](/assets/docs/getting-started-run.png)
 
-It's possible to pass event data via stdin (`echo '{}' | inngest run`), if you have test data.  Any current ENV variables are passed to your function;  secrets are passed as env vars and are fully usable in your code.
+It's possible to pass event data via stdin (`echo '{}' | inngest run`) if you have specific data to test with.  You can use a `.env` file in your folder to pass environment variables and secrets to your code.
 
 That's it!  From here, you can make changes to the code within the function's steps and re-run.  You can also set up a local event-driven queue via the dev server.  When the dev server receives events, it will invoke your functions automatically.
 
-## 4. Run the dev server locally
+## Testing the function via events
 
 Run `inngest dev` to start the entire local environment.  With this single command, your server is up and running, ready to listen for events at `http://127.0.0.1:9999`.
 
@@ -83,11 +73,7 @@ Here's what you should see after running `inngest dev`:
 
 ![Inngest dev server running](/assets/docs/getting-started-dev.png)
 
-This environment only persists state in-memory, so is not production ready.
-
-## 5. Sending events to invoke the function
-
-It's important that you can test your application end-to-end locally.  With Inngest, you can set up an entire local environment by running `inngest dev`.
+This environment only persists state in-memory so is not production ready - it's so that you can test your application end-to-end locally.  With Inngest, you can set up an entire local environment by running `inngest dev`.
 
 Once the dev server is running you can test your functions by sending events to your server:
 
@@ -95,7 +81,7 @@ Once the dev server is running you can test your functions by sending events to 
 curl -X POST --data '{"name":"test/event.received","data":{"test":true}}' http://127.0.0.1:9999/e/KEY
 ```
 
-In production, `KEY` will be replaced by your own "source key".  Here's what happens when the server receives your event:
+In production, `KEY` will be replaced by your own "event key".  Here's what happens when the server receives your event:
 
 ![Inngest dev server executing](/assets/docs/getting-started-exec.png)
 
@@ -108,7 +94,9 @@ That's it!  You've created a serverless function triggered by events - a queue w
 
 Next, read about [events](/docs/event-format-and-structure) and [functions](/docs/functions/introduction) to dive deeper into how things work.
 
+<br />
 
 **Additional tips:**
 
+- You need to have Docker installed to build and run functions.
 - If you're on ARM and you're **not** using Docker for Mac, you should [install the binfmt emulators](https://github.com/tonistiigi/binfmt#installing-emulators) to enable cross-compilation.  This is only required for deploys.

@@ -1,0 +1,30 @@
+---
+category: "Getting started"
+title: "Installation"
+slug: "installation"
+order: 1
+---
+
+Inngest is available as a self-contained binary, via NPM, or can be built form source.
+
+Inngest itself relies on [buildx](https://docs.docker.com/build/buildx/) to create cross-platform containers, so Docker itself must be installed.
+
+<h2 className="pt-4">Installing via NPM</h2>
+
+Run the following to install the Inngest CLI globally:
+
+```
+npm install -g inngest-cli
+```
+
+<h2 className="pt-8">Downloading the binary</h2>
+
+Run the following to download the latest version of the Inngest CLI to your current working directory: 
+
+```
+curl -sfL https://cli.inngest.com/install.sh | sh
+```
+
+This will place inngest in your $PWD.  Move it into your $PATH to invoke: `sudo mv ./inngest /usr/local/bin/inngest`.
+
+You can also download [prebuilt binaries](https://github.com/inngest/inngest/releases) from Github or [build from source](https://github.com/inngest/inngest), with Go 1.18+ installed.

@@ -44,6 +44,8 @@ const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
   const nestedCLI = createNestedTOC(cli);
   const nestedCloud = createNestedTOC(cloud);
 
+  const router = useRouter();
+
   return (
     <Sidebar>
       <div className="sidebar-header">
@@ -61,6 +63,13 @@ const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
       <Menu isExpanded={isExpanded}>
         <Nav>
           <NavList>
+    <NavItem isCurrentPage={router.asPath === "/docs"}>
+            <Link href="/docs/">
+              <a
+                className="docs-page"
+              >Welcome</a>
+            </Link>
+            </NavItem>
             {nestedCLI.map((c, idx) => (
               <DocsNavItem key={`cat-${idx}`} category={c} type="cli" />
             ))}

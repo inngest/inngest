@@ -88,10 +88,10 @@ export const buttonCSS = css`
   }
 
   // Icons
-  svg:nth-child(1) {
+  svg:nth-of-type(1) {
     margin-right: 0.3em;
   }
-  svg:nth-child(2) {
+  svg:nth-of-type(2) {
     // use a span tag for the text when the icon is on the right
     margin-left: 0.3em;
   }
