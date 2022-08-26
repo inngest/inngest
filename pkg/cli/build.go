@@ -36,6 +36,13 @@ func NewBuilder(ctx context.Context, opts BuilderUIOpts) (*BuilderUI, error) {
 	for _, opt := range opts.BuildOpts {
 		b, err := dockerdriver.NewBuilder(ctx, opt)
 		if err != nil {
+			// If we're returning an error, err on the side of caution and assume that
+			// the user may not have Docker installed.
+			//
+			// Provide some simple hints to point to user towards installing Docker,
+			// and ideally our justification for requiring it.
+			fmt.Println("\n" + RenderWarning("Looks like there was a problem loading Docker.\n\nDocker is a required dependency for the CLI in order to build, run, and deploy your functions.\n\nYou can find more information on installing Docker on your system here: https://docs.docker.com/get-docker/."))
+
 			return nil, err
 		}
 		instances = append(instances, &instance{
