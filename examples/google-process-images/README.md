@@ -28,7 +28,7 @@ class Alert,Process out;
 1. `user/profile.photo.uploaded` event is received
 2. ➡️ Run [steps/safety-check](steps/safety-check) to check image safety
 3. If image **is** deemed safe:
-   - ✅➡️ Run [steps/process](steps/process) to create different image sizes
+   - ✅➡️ Run [steps/process](steps/process) to create different image sizes and upload them to Google Cloud Storage
 4. If image **is not** deemed safe:
    - ⚠️➡️ Run [steps/alert](steps/alert) to warn that the user has uploaded something unsafe
 
@@ -47,7 +47,7 @@ class Alert,Process out;
 Use this quickstart with a single CLI command to get started! The CLI will then guide you through running, testing, and deploying to [Inngest Cloud](https//inngest.com/sign-up?ref=github-example).
 
 ```sh
-npx inngest-cli init --template github.com/inngest/inngest#examples/foo
+npx inngest-cli init --template github.com/inngest/inngest#examples/google-process-images
 ```
 
 Next, check out how to [👉 trigger the function](#triggering-the-function).
@@ -58,15 +58,70 @@ Next, check out how to [👉 trigger the function](#triggering-the-function).
 
 Below is the annotated function definition (found at [inngest.json](/inngest.json)) to show how the above is defined in config.
 
-```json
+```jsonc
 {
-  "name": "foo",
-  "id": "foo",
-  "triggers": [{
-    /// When this event is received by Inngest, it will start the function
-    "event": "...
-  }]
+  "$schema": "https://raw.githubusercontent.com/inngest/inngest/ad725bb6ca2b3846d412beb6ea8046e27a233154/schema.json",
+  "name": "Process new profile photos with Google",
+  "description": "Use the Google Cloud Vision API and Sharp to check images are safe and convert them to a variety of sizes.",
+  "tags": ["typescript", "google"],
+  "id": "free-doe-5f3107",
+  "triggers": [
+    {
+      // When this event is received, we'll trigger our function
+      "event": "user/profile.photo.uploaded",
+      "definition": {
+        "format": "cue",
+        "synced": false,
+        "def": "file://./events/user-profile-photo-uploaded.cue"
+      }
+    }
+  ],
+  "steps": {
+    /**
+     * Safety Check is the first step to run. It doesn't define an `after`
+     * block, so will default to `{"step":"$trigger"}`.
+     */
+    "safety-check": {
+      "id": "safety-check",
+      "name": "Safety Check",
+      "path": "file://./steps/safety-check",
+      "runtime": {"type": "docker"}
+    },
+    /**
+     * Process is one of the two steps that can run after the Safety Check. It
+     * will run after that step if the output is that the image is deemed safe.
+     */
+    "process": {
+      "id": "process",
+      "name": "Process Images",
+      "path": "file://./steps/process",
+      "runtime": { "type": "docker" },
+      "after": [
+        {
+          "step": "safety-check",
+          "if": "steps['safety-check'].body.isSafe == true"
+        }
+      ]
+    },
+    /**
+     * Alert is the other step that can run after the Safety Check. It will run
+     * after that step if the output is that the image is deemed unsafe.
+     */
+    "alert": {
+      "id": "alert",
+      "name": "Alert",
+      "path": "file://./steps/alert",
+      "runtime": { "type": "docker" },
+      "after": [
+        {
+          "step": "safety-check",
+          "if": "steps['safety-check'].body.isSafe != true"
+        }
+      ]
+    }
+  }
 }
+
 ```
 
 ## Code
@@ -74,8 +129,12 @@ Below is the annotated function definition (found at [inngest.json](/inngest.jso
 This function has only a single step: `steps/hello`, which is triggered by the `user/hello` event.
 
 <!-- A brief summary of where to find the various steps in the code and any other interesting configuration -->
-- ➡️ [**steps/hello/**](/steps/hello)
-  > Says hello and does the things and stuff.
+- ➡️ [**steps/safety-check/**](steps/safety-check)
+  > Using the `url` found in the event, this step will pass it to the Google Cloud Vision API to see if it is deemed safe. If the image is safe, `isSafe: true` will be passed as output to the next step. Otherwise, we'll pass `isSafe: false`.
+- ➡️ [**steps/process/**](steps/process)
+  > This step will run after [steps/safety-check](steps/safety-check) if the output is `isSafe: true`. It will stream the `url` from the event, pipe it to an image resizer, then pipe it to Google Cloud Storage. It outputs the created thumbnail URLs.
+- ➡️ [**steps/alert/**](steps/alert)
+  > If [steps/safety-check](steps/safety-check) returned `isSafe: false`, this step will run and output the user that uploaded the unsafe image. You could use this to push a notification to moderators or to flag the account for review.
 
 ## Triggering the function
 
