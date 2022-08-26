@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/inngest/inngest/5dd7643fe952b3dddfe577b171a394bf509bed55/schema.json",
+  "$schema": "https://raw.githubusercontent.com/inngest/inngest/main/schema.json",
   "name": "Process new profile photos with Google",
   "description": "Use the Google Cloud Vision API and Sharp to check images are safe and convert them to a variety of sizes.",
   "tags": ["typescript", "google"],
