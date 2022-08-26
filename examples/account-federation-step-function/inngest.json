@@ -1,0 +1,37 @@
+{
+  "name": "Account federation step function",
+  "id": "gentle-katydid-de85f5",
+  "triggers": [
+    {
+      "event": "auth/account.created",
+      "definition": {
+        "format": "cue",
+        "synced": false,
+        "def": "{\n\tname: \"auth/account.created\"\n\tdata: {\n\t\t// Data contains all of the information from the associated event.  This is an\n\t\t// example event that is created when a user signs up.\n\t\taccount_id:  string\n\t\tmethod:      string\n\t\tplan_name:   string\n\t\tsubscribed?: bool\n\t}\n\tuser: {\n\t\t// This object contains information for user attribution, allowing us to assign\n\t\t// the event and associated function runs to this specific user.  This allows us\n\t\t// to do fun things like user-specific debugging, or create K/V stores per user\n\t\t// for use in future functions.\n\t\temail:       string\n\t\texternal_id: string\n\t\tplan_name:   string\n\t}\n\tv:  \"1\"\n\tts: int\n}\n"
+      }
+    }
+  ],
+  "steps": {
+    "add-to-intercom": {
+      "id": "add-to-intercom",
+      "path": "file://steps/add-to-intercom",
+      "name": "Add to intercom",
+      "runtime": {
+        "type": "docker"
+      }
+    },
+    "send-to-slack": {
+      "id": "send-to-slack",
+      "path": "file://steps/send-to-slack",
+      "name": "Send to slack",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "$trigger"
+        }
+      ]
+    }
+  }
+}
