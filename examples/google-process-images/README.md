@@ -1,9 +1,8 @@
 # Process images with Google Cloud and Sharp
 
 <!-- Insert a short summary of the function. It should be no longer than a single paragraph -->
-Respond to a `user/hello` event and output a `"Hello, [name]!"` message.
 
-When a `user/profile.photo.uploaded` event is received, check that the uploaded image is safe using Google's Cloud Vision API, then process the images to create a variety of sizes.
+When a `user/profile.photo.uploaded` event is received, check that the uploaded image is safe using the [Google Cloud Vision API](https://cloud.google.com/vision), then resize the images using [Sharp](https://www.npmjs.com/package/sharp) create a variety of thumbnails.
 
 <!-- Define a flowchart to visually show how the function will work -->
 <!-- https://mermaid.live/ is a great tool for this, and docs are at https://mermaid-js.github.io/mermaid/#/flowchart -->
@@ -38,6 +37,7 @@ class Alert,Process out;
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Code](#code)
+- [Testing](#testing)
 - [Triggering the function](#triggering-the-function)
 
 ## Usage
@@ -50,7 +50,7 @@ Use this quickstart with a single CLI command to get started! The CLI will then 
 npx inngest-cli init --template github.com/inngest/inngest#examples/google-process-images
 ```
 
-Next, check out how to [👉 trigger the function](#triggering-the-function).
+Next, check out how to [👉 test the function](#testing).
 
 ## Configuration
 
@@ -136,33 +136,65 @@ This function has only a single step: `steps/hello`, which is triggered by the `
 - ➡️ [**steps/alert/**](steps/alert)
   > If [steps/safety-check](steps/safety-check) returned `isSafe: false`, this step will run and output the user that uploaded the unsafe image. You could use this to push a notification to moderators or to flag the account for review.
 
+## Testing
+
+All Inngest functions can be run and tested locally with data from production, snapshots, or generated events. We'll assume you've already cloned the quick-start using the command below.
+
+```sh
+npx inngest-cli init --template github.com/inngest/inngest#examples/google-process-images
+```
+
+For this quick-start, we're interacting with two Google APIs: [Google Cloud Vision API](https://cloud.google.com/vision) and [Google Cloud Storage](https://cloud.google.com/storage).
+
+- If you don't have a Google Cloud Platform account yet, see [Getting Started with Google Cloud Platform](https://console.cloud.google.com/getting-started)
+- Enable **Cloud Storage** - https://console.cloud.google.com/apis/library/storage-component.googleapis.com
+- Head over to [Quickstart: Setup the Vision API](https://cloud.google.com/vision/docs/setup) to get started and create a service account
+- Add your service account `.json` file as a local secret using `.env` files
+    ```
+    node -e "console.log(\"GOOGLE_SERVICE_ACCOUNT=\'\" + JSON.stringify(require(\"./key.json\")) + \"\'\")" > .env
+    ```
+- ✅ Run `inngest run`
+
+The final command, `inngest run`, will generate test data based on the event's schema (`user/profile.photo.uploaded`). To try this out with some real images, we could:
+
+- `inngest run --snapshot > snapshot.json`
+  > Snapshot the generated event data and place it in a file called `snapshot.json`.
+- Edit `snapshot.json` and change the `url`
+  > You can set it to any public URL to test whether or not it's detected as safe.
+- `cat snapshot.json | inngest run`
+  > Use the edited snapshot data to test your function.
+
+## Deploying
+
+Deploying to Inngest Cloud is super simple using `inngest deploy`.
+
+- Head over to [Managing Secrets](https://www.inngest.com/docs/cloud/managing-secrets) to see how to add a secret as `GOOGLE_SERVICE_ACCOUNT` to your Inngest Cloud account
+- Run `inngest deploy --prod` (or just `inngest deploy` for test env)
+
 ## Triggering the function
 
 <!-- Instructions for how the user should trigger the function from their infrastructure (or source) -->
 
 Let's imagine a JavaScript application using the [Inngest JS SDK](https://github.com/inngest/inngest-js#readme).
 
-In your `/signup` endpoint, you could add the following code:
+In your `POST /photos` endpoint, you could add the following code:
 
 ```js
 import { Inngest } from "inngest";
 
-// POST myapp.com/signup
-export default function signup(req, res) {
-  const user = await createUser(req.body.email, req.body.password);
+// POST myapp.com/photos
+export default function uploadPhoto(req, res) {
+  const url = await handlePhotoUpload(req);
+  const { email, id: external_id } = req.ctx.user;
 
   // Send an event to Inngest
   // You can get a Source Key from the sources section of the Inngest app
   const inngest = new Inngest(process.env.INNGEST_SOURCE_API_KEY);
-  await inngest.send({
-    name: "app/user.signup",
-    data: { city: req.body.city /* e.g. "Detroit" */ },
-    user: {
-      external_id: user.id,
-      email: user.email,
-    },
-  });
 
-  res.redirect("/app")
+  await inngest.send({
+    name: "user/profile.photo.uploaded",
+    data: { url },
+    user: { external_id, email },
+  });
 }
 ```
