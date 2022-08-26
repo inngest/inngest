@@ -30,11 +30,30 @@ var (
 	ErrInvalidResult = errors.New("expression errored")
 )
 
-// Evaluable represents a cacheable, goroutine safe manager for evaluating a single
+// Evaluator represents a cacheable, goroutine safe manager for evaluating a single
 // precompiled expression with arbitrary data.
-type Evaluable interface {
+type Evaluator interface {
 	// Evaluate tests the incoming Data against the expression that is
-	// stored within the Evaluable implementation.
+	// stored within the BooleanEvaluator implementation.
+	//
+	// Attributes that are present within the expression but missing from the
+	// data should be treated as null values;  the expression must not error.
+	Evaluate(ctx context.Context, data *Data) (interface{}, *time.Time, error)
+
+	// UsedAttributes returns the attributes that are referenced within the
+	// expression.
+	UsedAttributes(ctx context.Context) *UsedAttributes
+
+	// FilteredAttributes filters the given data to contain only attributes
+	// referenced from the expression.
+	FilteredAttributes(ctx context.Context, data *Data) *Data
+}
+
+// BooleanEvaluator representsn Evaluator which evaluates an expression returning
+// booleans only.
+type BooleanEvaluator interface {
+	// Evaluate tests the incoming Data against the expression that is
+	// stored within the BooleanEvaluator implementation.
 	//
 	// Attributes that are present within the expression but missing from the
 	// data should be treated as null values;  the expression must not error.
@@ -51,7 +70,7 @@ type Evaluable interface {
 
 // Evaluate is a helper function to create a new, cached expression evaluator to evaluate
 // the given data immediately.
-func Evaluate(ctx context.Context, expression string, input map[string]interface{}) (bool, *time.Time, error) {
+func Evaluate(ctx context.Context, expression string, input map[string]interface{}) (interface{}, *time.Time, error) {
 	eval, err := NewExpressionEvaluator(ctx, expression)
 	if err != nil {
 		return false, nil, err
@@ -60,10 +79,19 @@ func Evaluate(ctx context.Context, expression string, input map[string]interface
 	return eval.Evaluate(ctx, data)
 }
 
-// NewExpressionEvaluator returns a new Evaluable instance for a given expression. The
+func EvaluateBoolean(ctx context.Context, expression string, input map[string]interface{}) (bool, *time.Time, error) {
+	eval, err := NewBooleanEvaluator(ctx, expression)
+	if err != nil {
+		return false, nil, err
+	}
+	data := NewData(input)
+	return eval.Evaluate(ctx, data)
+}
+
+// NewExpressionEvaluator returns a new BooleanEvaluator instance for a given expression. The
 // instance can be used across many goroutines to evaluate the expression against any
 // data. The Evaluable instance is loaded from the cache, or is cached if not found.
-func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluable, error) {
+func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, error) {
 	e, err := env()
 	if err != nil {
 		return nil, err
@@ -87,6 +115,27 @@ func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluable, 
 	return eval, nil
 }
 
+func NewBooleanEvaluator(ctx context.Context, expression string) (BooleanEvaluator, error) {
+	e, err := NewExpressionEvaluator(ctx, expression)
+	return booleanEvaluator{Evaluator: e}, err
+}
+
+type booleanEvaluator struct {
+	Evaluator
+}
+
+func (b booleanEvaluator) Evaluate(ctx context.Context, data *Data) (bool, *time.Time, error) {
+	val, time, err := b.Evaluator.Evaluate(ctx, data)
+	if err != nil {
+		return false, time, err
+	}
+	result, ok := val.(bool)
+	if !ok {
+		return false, nil, errors.Wrapf(ErrInvalidResult, "returned type %T (%s)", val, val)
+	}
+	return result, time, err
+}
+
 type expressionEvaluator struct {
 	// TODO: Refactor unknownEval to remove the need tor attr.Eval(activation),
 	// and make dateRefs thread safe.  We can then place a cel.Program on the
@@ -107,7 +156,7 @@ type expressionEvaluator struct {
 // Evaluate compiles an expression string against a set of variables, returning whether the
 // expression evaluates to true, the next earliest time to re-test the evaluation (if dates are
 // compared), and any errors.
-func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (bool, *time.Time, error) {
+func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interface{}, *time.Time, error) {
 	if data == nil {
 		return false, nil, nil
 	}
@@ -136,6 +185,7 @@ func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (bool, *
 	}
 
 	result, _, err := program.Eval(act)
+
 	if result == nil {
 		return false, nil, ErrNoResult
 	}
@@ -152,14 +202,9 @@ func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (bool, *
 		return false, nil, fmt.Errorf("error evaluating expression '%s': %w", e.expression, err)
 	}
 
-	b, ok := result.Value().(bool)
-	if !ok {
-		return false, nil, errors.Wrapf(ErrInvalidResult, "returned type %T (%s)", result, result)
-	}
-
 	// Find earliest date that we need to test against.
 	earliest := tr.Next()
-	return b, earliest, nil
+	return result.Value(), earliest, nil
 }
 
 // UsedAttributes returns the attributes used within the expression.
