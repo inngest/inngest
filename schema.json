@@ -166,7 +166,12 @@
         "type": { "const": "docker" },
         "image": { "type": "string" },
         "memory": { "type": "integer", "minimum": 64, "maximum": 8096 },
-        "entrypoint": { "type": "array", "items": { "type": "string" } }
+        "entrypoint": { "type": "array", "items": { "type": "string" } },
+        "dockerfile": {
+          "type": "string",
+          "description": "The path of the Dockerfile to use to build this step, relative to the step's root directory. Defaults to './Dockerfile'.",
+          "default": "./Dockerfile"
+        }
       },
       "required": ["type"]
     },
