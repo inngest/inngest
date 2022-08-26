@@ -208,7 +208,18 @@ func deployAction(ctx context.Context, a inngest.ActionVersion) (inngest.ActionV
 		return a, fmt.Errorf("error preparing action: %w", err)
 	}
 
-	config, err := cuedefs.FormatAction(a)
+	// XXX: Remove the dockerfile field from the runtime struct b/c the action shouldn't need this info
+	clean := a
+	rt, ok := clean.Runtime.Runtime.(inngest.RuntimeDocker)
+	if !ok {
+		return a, fmt.Errorf("failed to parse runtime")
+	}
+	clean.Runtime.Runtime = inngest.RuntimeDocker{
+		Entrypoint: rt.Entrypoint,
+		Memory:     rt.Memory,
+	}
+
+	config, err := cuedefs.FormatAction(clean)
 	if err != nil {
 		return a, err
 	}
