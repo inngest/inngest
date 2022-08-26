@@ -17,7 +17,10 @@ const baseThumbnails: (Partial<Thumbnail> & Pick<Thumbnail, "size">)[] = [
   { size: 250 },
 ];
 
-const gcs = new Storage();
+const gcs = new Storage({
+  credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT as string),
+});
+
 const bucket = gcs.bucket("test-bucket");
 
 export async function run({
