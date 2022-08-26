@@ -15,4 +15,4 @@ RUN npm install --production
 COPY --from=builder /opt/build /opt/build
 # The flag lets us use imports without .js extensions, making the transition between
 # TS and JS easy.
-ENTRYPOINT ["node", "--es-module-specifier-resolution=node", "./build/_init.js"]
+ENTRYPOINT ["node", "./build/_init.js"]
