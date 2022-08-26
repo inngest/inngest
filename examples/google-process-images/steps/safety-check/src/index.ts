@@ -15,28 +15,28 @@ export async function run({
   const detections = result.safeSearchAnnotation;
 
   if (!detections) {
-    throw new Error("Could not make any detections for image");
+    return {
+      status: 500,
+      error: "Could not make any detections for image",
+      result,
+    };
   }
 
-  // console.log(`Detections for image "${url}" for user "${email}":`, detections);
-
   const thresholds: typeof detections["adult"][] = [
-    google.cloud.vision.v1.Likelihood.POSSIBLE,
-    google.cloud.vision.v1.Likelihood.LIKELY,
-    google.cloud.vision.v1.Likelihood.VERY_LIKELY,
+    "POSSIBLE",
+    "LIKELY",
+    "VERY_LIKELY",
   ];
 
   const isSafe =
     !thresholds.includes(detections.adult) &&
     !thresholds.includes(detections.violence);
 
-  // console.log("isSafe:", isSafe);
-
   return {
     status: 200,
     body: {
       isSafe: isSafe,
-      url,
+      detections,
     },
   };
 }
