@@ -44,7 +44,7 @@ func TestInitFunc(t *testing.T) {
 						ID:   function.DefaultStepName,
 						Name: "test fn",
 						Path: function.DefaultStepPath,
-						Runtime: inngest.RuntimeWrapper{
+						Runtime: &inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeDocker{},
 						},
 					},

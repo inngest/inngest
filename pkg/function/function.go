@@ -5,8 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	petname "github.com/dustinkirkland/golang-petname"
@@ -14,7 +17,6 @@ import (
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/inngest/clistate"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/xhit/go-str2duration/v2"
 )
@@ -69,17 +71,6 @@ type Function struct {
 	dir string
 }
 
-// Step represents a single unit of code (action) which runs as part of a step function, in a DAG.
-type Step struct {
-	ID      string                     `json:"id"`
-	Path    string                     `json:"path"`
-	Name    string                     `json:"name"`
-	Runtime inngest.RuntimeWrapper     `json:"runtime"`
-	After   []After                    `json:"after,omitempty"`
-	Version *inngest.VersionConstraint `json:"version,omitempty"`
-	Retries *inngest.RetryOptions      `json:"retries,omitempty"`
-}
-
 type After struct {
 	// Step represents the step name to run after.
 	Step string `json:"step,omitempty"`
@@ -112,10 +103,12 @@ func New() (*Function, error) {
 	}, nil
 }
 
+// Dir returns the absolute directory that this function is written to
 func (f Function) Dir() string {
 	return f.dir
 }
 
+// Slug returns the function slug
 func (f Function) Slug() string {
 	return strings.ToLower(slug.Make(f.Name))
 }
@@ -341,10 +334,14 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, error) {
 	id := s.DSN(ctx, f)
 
+	if s.Runtime == nil {
+		s.Runtime = &defaultRuntime
+	}
+
 	a := inngest.ActionVersion{
 		Name:    s.Name,
 		DSN:     id,
-		Runtime: s.Runtime,
+		Runtime: *s.Runtime,
 		Retries: s.Retries,
 	}
 
@@ -392,12 +389,10 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 
 		f.Steps = map[string]Step{}
 		f.Steps[DefaultStepName] = Step{
-			ID:   DefaultStepName,
-			Name: f.Name,
-			Path: "file://.",
-			Runtime: inngest.RuntimeWrapper{
-				Runtime: inngest.RuntimeDocker{},
-			},
+			ID:      DefaultStepName,
+			Name:    f.Name,
+			Path:    "file://.",
+			Runtime: &defaultRuntime,
 			After: []After{
 				{
 					Step: inngest.TriggerName,
@@ -411,6 +406,11 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 	}
 
 	for n, s := range f.Steps {
+		if s.Runtime == nil {
+			s.Runtime = DefaultRuntime()
+			f.Steps[n] = s
+		}
+
 		version, err := f.action(ctx, s)
 		if err != nil {
 			return err
@@ -438,20 +438,118 @@ func (f *Function) canonicalize(ctx context.Context, path string) error {
 	return nil
 }
 
-func (s Step) DSN(ctx context.Context, f Function) string {
-	suffix := "test"
-	if clistate.IsProd() {
-		suffix = "prod"
+// WriteToDisk writes the function and associated event schemas to disk.
+//
+// When we read a function's `inngest` configuration file, we parse the
+// event schemas from the triggers and add the definitions to the parsed
+// struct.
+//
+// This function creates an interim function definition file which has
+// simplified definitions for writing a consistent, small configuration
+// file.
+//
+// In essence, this performs the _opposite_ of canonicalization: instead
+// of adding defaults we remove them so that defaults aren't included
+// within the JSON file.
+func (f Function) WriteToDisk(ctx context.Context) error {
+	// For new functions, dir might be empty.
+	if f.dir == "" {
+		dirname := f.Slug()
+		relative := "./" + dirname
+		f.dir, _ = filepath.Abs(relative)
 	}
 
-	slug := strings.ToLower(slug.Make(s.ID))
-
-	id := fmt.Sprintf("%s-step-%s-%s", f.ID, slug, suffix)
-	if prefix, err := clistate.AccountIdentifier(ctx); err == nil && prefix != "" {
-		id = fmt.Sprintf("%s/%s", prefix, id)
+	if err := f.writeTriggersToDisk(ctx); err != nil {
+		return err
 	}
 
-	return id
+	// If Idempotency is set we don't need a throttle;  it's implied, and
+	// we can remove this from the config.
+	if f.Idempotency != nil {
+		f.Throttle = nil
+	}
+
+	for n, s := range f.Steps {
+		// If this is a basic docker runtime we can omit it.
+		if s.Runtime != nil {
+			ok := reflect.DeepEqual(*s.Runtime, defaultRuntime)
+			if ok {
+				// Remove this from the step.
+				s.Runtime = nil
+				f.Steps[n] = s
+			}
+		}
+
+		// If this step is "after" and it has no metadata, name, expression, etc.
+		// we can also omit this.
+		if len(s.After) == 1 {
+			ok := reflect.DeepEqual(s.After[0], defaultAfter)
+			if ok {
+				// Remove this from the step.
+				s.After = nil
+				f.Steps[n] = s
+			}
+		}
+	}
+
+	byt, err := MarshalJSON(f)
+	if err != nil {
+		return fmt.Errorf("Step '%s' already exists in this function", f.ID)
+	}
+
+	if err := os.WriteFile(filepath.Join(f.Dir(), "inngest.json"), byt, 0644); err != nil {
+		return fmt.Errorf("Step '%s' already exists in this function", f.ID)
+	}
+
+	return nil
+}
+
+func (f Function) writeTriggersToDisk(ctx context.Context) error {
+	if err := upsertDir(filepath.Join(f.dir, "events")); err != nil {
+		return fmt.Errorf("error making events directory: %w", err)
+	}
+
+	// For each event within the function create a new event file.
+	for n, trigger := range f.Triggers {
+		if trigger.EventTrigger == nil {
+			continue
+		}
+
+		if trigger.EventTrigger.Definition == nil || trigger.EventTrigger.Definition.Def == "" {
+			// Use an empty event format.
+			trigger.EventTrigger.Definition = &EventDefinition{
+				Format: FormatCue,
+				Synced: false,
+				Def:    fmt.Sprintf(evtDefinition, strconv.Quote(trigger.Event)),
+			}
+		}
+
+		cue, err := trigger.Definition.Cue(ctx)
+		if err != nil {
+			// XXX: We would like to log this as a warning.
+			continue
+		}
+
+		name := fmt.Sprintf("%s.cue", slug.Make(trigger.Event))
+		path := filepath.Join(f.dir, "events", name)
+		if err := os.WriteFile(path, []byte(cue), 0644); err != nil {
+			return fmt.Errorf("error writing event definition: %w", err)
+		}
+		f.Triggers[n].Definition.Def = fmt.Sprintf("file://./events/%s", name)
+	}
+	return nil
+}
+
+func upsertDir(path string) error {
+	if exists(path) {
+		return nil
+	}
+	return os.MkdirAll(path, 0755)
+}
+
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }
 
 // DeterministicUUID returns a deterministic V3 UUID based off of the SHA1

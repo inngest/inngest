@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"text/template"
 
@@ -54,19 +53,23 @@ func (t Template) TemplatedPostSetup(f function.Function) string {
 	return buf.String()
 }
 
-// Render renders the template and all files into the folder specified by function.
-func (t Template) Render(f function.Function, step function.Step) error {
-	// TODO: Add context.
-	ctx := context.Background()
+func (t Template) Root(f function.Function) string {
+	if f.Dir() != "" {
+		// This already exists;  return the function dir.
+		return f.Dir()
+	}
 
+	// We're making a new dir.
 	dirname := f.Slug()
 	relative := "./" + dirname
 	root, _ := filepath.Abs(relative)
+	return root
+}
 
-	stepDir, err := function.PathName(ctx, step.Path)
-	if err != nil {
-		return err
-	}
+// RenderNew creates a new function when no files exist.
+func (t Template) RenderNew(ctx context.Context, f function.Function) error {
+	dirname := f.Slug()
+	root := t.Root(f)
 
 	if _, err := os.Stat(root); err == nil {
 		return fmt.Errorf("%s already exists", dirname)
@@ -76,20 +79,36 @@ func (t Template) Render(f function.Function, step function.Step) error {
 		return fmt.Errorf("error creating function directory: %w", err)
 	}
 
+	for _, s := range f.Steps {
+		if err := t.RenderStep(ctx, f, s); err != nil {
+			return err
+		}
+	}
+
+	return f.WriteToDisk(ctx)
+}
+
+// Render renders the template and all files into the folder specified by function.
+func (t Template) RenderStep(ctx context.Context, f function.Function, step function.Step) error {
+	root := t.Root(f)
+
+	stepDir, err := function.PathName(ctx, step.Path)
+	if err != nil {
+		return err
+	}
+
 	data := tplData{
 		ID:         f.ID,
 		Name:       f.Name,
 		QuotedName: strings.ReplaceAll(f.Name, `"`, `\"`),
 		SlugName:   slug.Make(f.Name),
 	}
-
 	for _, t := range f.Triggers {
 		if t.EventTrigger == nil {
 			continue
 		}
 		data.EventTriggers = append(data.EventTriggers, t.EventTrigger)
 	}
-
 	funcMap := template.FuncMap{
 		// The name "title" is what the function will be called in the template text.
 		"EventTypes": func(language string) string {
@@ -137,10 +156,6 @@ func (t Template) Render(f function.Function, step function.Step) error {
 		},
 	}
 
-	// Create directories for "events" and "steps"
-	if err := upsertDir(filepath.Join(root, "events")); err != nil {
-		return fmt.Errorf("error making event types directory: %w", err)
-	}
 	if err := upsertDir(filepath.Join(root, "steps")); err != nil {
 		return fmt.Errorf("error making steps directory: %w", err)
 	}
@@ -197,47 +212,6 @@ func (t Template) Render(f function.Function, step function.Step) error {
 			return err
 		}
 	}
-
-	// For each event within the function create a new event file.
-	for n, trigger := range f.Triggers {
-		if trigger.EventTrigger == nil {
-			continue
-		}
-
-		if trigger.EventTrigger.Definition == nil || trigger.EventTrigger.Definition.Def == "" {
-			// Use an empty event format.
-			trigger.EventTrigger.Definition = &function.EventDefinition{
-				Format: function.FormatCue,
-				Synced: false,
-				Def:    fmt.Sprintf(evtDefinition, strconv.Quote(trigger.Event)),
-			}
-		}
-
-		cue, err := trigger.Definition.Cue(ctx)
-		if err != nil {
-			// XXX: We would like to log this as a warning.
-			continue
-		}
-
-		name := fmt.Sprintf("%s.cue", eventFilename(trigger.Event))
-		path := filepath.Join(root, "events", name)
-		if err := os.WriteFile(path, []byte(cue), 0644); err != nil {
-			return fmt.Errorf("error writing event definition: %w", err)
-		}
-		f.Triggers[n].Definition.Def = fmt.Sprintf("file://./events/%s", name)
-	}
-
-	// Once complete, state should contain everything we need to create our
-	// function file.
-	byt, err := function.MarshalJSON(f)
-	if err != nil {
-		return fmt.Errorf("error creating JSON: %s", err)
-	}
-
-	if err := os.WriteFile(filepath.Join(root, "inngest.json"), byt, 0644); err != nil {
-		return fmt.Errorf("Error writing inngest.json: %s", err)
-	}
-
 	return nil
 }
 
@@ -252,21 +226,3 @@ func exists(path string) bool {
 	_, err := os.Stat(path)
 	return !os.IsNotExist(err)
 }
-
-// eventFilename returns a string for the event's filename.  Some events contain forward
-// slashes (eg. stripe/customer.created).  These slashes cannot be in a filename, and are
-// escpaed.
-func eventFilename(evt string) string {
-	return slug.Make(evt)
-}
-
-const evtDefinition = `{
-  name: %s
-  data: {
-    // Your event data should go here.
-  },
-  user: {
-    // Any user information for audit trails, eg. email, external_id, should go here.
-  },
-  v: "1", // A sortable version
-}`

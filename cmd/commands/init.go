@@ -118,12 +118,7 @@ func runInit(cmd *cobra.Command, args []string) {
 	// Templating should only be done against scaffolds; cloned templates should
 	// be left alone as these will have already cloned and created the directory.
 	if template == "" {
-		var step function.Step
-		for _, v := range fn.Steps {
-			step = v
-		}
-
-		if err := tpl.Render(*fn, step); err != nil {
+		if err := tpl.RenderNew(ctx, *fn); err != nil {
 			fmt.Println(cli.RenderError(fmt.Sprintf("There was an error creating the function: %s", err)) + "\n")
 			return
 		}

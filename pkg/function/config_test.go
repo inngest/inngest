@@ -228,7 +228,7 @@ func TestUnmarshal(t *testing.T) {
 						ID:   DefaultStepName,
 						Name: "test",
 						Path: "file://.",
-						Runtime: inngest.RuntimeWrapper{
+						Runtime: &inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeDocker{},
 						},
 						After: []After{
@@ -277,7 +277,7 @@ func TestUnmarshal(t *testing.T) {
 						ID:   DefaultStepName,
 						Name: "test",
 						Path: "file://.",
-						Runtime: inngest.RuntimeWrapper{
+						Runtime: &inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeDocker{},
 						},
 						After: []After{
@@ -325,7 +325,7 @@ func TestUnmarshal(t *testing.T) {
 						ID:   DefaultStepName,
 						Name: "test",
 						Path: "file://.",
-						Runtime: inngest.RuntimeWrapper{
+						Runtime: &inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeDocker{},
 						},
 						After: []After{
@@ -362,7 +362,7 @@ func TestUnmarshal(t *testing.T) {
 						ID:   DefaultStepName,
 						Name: "test",
 						Path: "file://.",
-						Runtime: inngest.RuntimeWrapper{
+						Runtime: &inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeDocker{},
 						},
 						After: []After{
@@ -402,7 +402,7 @@ func TestUnmarshal(t *testing.T) {
 						ID:   DefaultStepName,
 						Name: "test",
 						Path: "file://.",
-						Runtime: inngest.RuntimeWrapper{
+						Runtime: &inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeDocker{},
 						},
 						After: []After{
@@ -460,7 +460,7 @@ func TestUnmarshal(t *testing.T) {
 						ID:   DefaultStepName,
 						Name: "test",
 						Path: "file://.",
-						Runtime: inngest.RuntimeWrapper{
+						Runtime: &inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeDocker{},
 						},
 						After: []After{

@@ -60,6 +60,23 @@ func (ed *EventDefinition) Validate(ctx context.Context) error {
 	return nil
 }
 
+func (ed *EventDefinition) readDefinition(ctx context.Context) (string, error) {
+	file, _ := PathName(ctx, ed.Def)
+	if file == "" {
+		return ed.Def, nil
+	}
+	// The event definition is stored within a file.
+	file, err := filepath.Abs(file)
+	if err != nil {
+		return "", fmt.Errorf("error finding event definition: %w", err)
+	}
+	byt, err := os.ReadFile(file)
+	if err != nil {
+		return "", fmt.Errorf("error reading event definition '%s': %w", file, err)
+	}
+	return string(byt), nil
+}
+
 // createCueType converts the Def input into Cue.
 func (ed *EventDefinition) createCueType(ctx context.Context) error {
 	if ed.cueType != "" {
@@ -67,26 +84,18 @@ func (ed *EventDefinition) createCueType(ctx context.Context) error {
 		return nil
 	}
 
-	if file, _ := PathName(ctx, ed.Def); file != "" {
-		// The event definition is stored within a file.
-		file, err := filepath.Abs(file)
-		if err != nil {
-			return fmt.Errorf("error finding event definition: %w", err)
-		}
-		byt, err := os.ReadFile(file)
-		if err != nil {
-			return fmt.Errorf("error reading event definition '%s': %w", file, err)
-		}
-		ed.Def = string(byt)
+	def, err := ed.readDefinition(ctx)
+	if err != nil {
+		return nil
 	}
 
 	switch ed.Format {
 	case FormatCue:
-		ed.cueType = string(ed.Def)
+		ed.cueType = string(def)
 		return nil
 	case FormatJSONSchema:
 		// Convert JSON schema to cue, then store our canonical cue representation.
-		cue, err := jsonschema.UnmarshalString(string(ed.Def))
+		cue, err := jsonschema.UnmarshalString(string(def))
 		if err != nil {
 			return fmt.Errorf("error converting json-schema definition: %w", err)
 		}
@@ -122,11 +131,15 @@ func (ed *EventDefinition) Typescript(ctx context.Context) (string, error) {
 func (ed *EventDefinition) JSONSchema(ctx context.Context) (map[string]interface{}, error) {
 	// If the original event definition is JSON-schema, don't convert:
 	// straight up return it.  Cue has _somewhat_ lossy support for JSON-schema:
-	// we know that it doesn't support the "additionalProperties" field for object
-	// definitions.
+	// it doesn't support the "additionalProperties" field for object
+	// definitions, and there may be other unsupported fields supported.
 	if ed.Format == FormatJSONSchema {
+		def, err := ed.readDefinition(ctx)
+		if err != nil {
+			return nil, err
+		}
 		data := map[string]interface{}{}
-		err := json.Unmarshal([]byte(ed.Def), &data)
+		err = json.Unmarshal([]byte(def), &data)
 		return data, err
 	}
 
@@ -144,3 +157,15 @@ func (ed *EventDefinition) JSONSchema(ctx context.Context) (map[string]interface
 
 	return schemas.Find("InngestEvent"), nil
 }
+
+// evtDefinition is a blank event definition
+const evtDefinition = `{
+  name: %s
+  data: {
+    // Your event data should go here.
+  },
+  user: {
+    // Any user information for audit trails, eg. email, external_id, should go here.
+  },
+  v: "1", // A sortable version
+}`

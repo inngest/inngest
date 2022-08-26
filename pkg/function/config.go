@@ -28,7 +28,7 @@ const (
 func Load(ctx context.Context, dir string) (*Function, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to load function: %w", err)
 	}
 
 	// First attempt to read the specific file given to us.
@@ -38,7 +38,7 @@ func Load(ctx context.Context, dir string) (*Function, error) {
 			// The cue file exists.
 			byt, err := os.ReadFile(abs)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("Failed to load function: %w", err)
 			}
 			return Unmarshal(ctx, byt, abs)
 		}
@@ -47,7 +47,7 @@ func Load(ctx context.Context, dir string) (*Function, error) {
 	// Then attempt to find inngest.cue|json, the canonical reference.
 	configPath, byt, err := findConfigFileUp(abs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to load function: %w", err)
 	}
 	if configPath != "" {
 		return Unmarshal(ctx, byt, configPath)

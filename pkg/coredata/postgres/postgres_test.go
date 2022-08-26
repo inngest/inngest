@@ -396,7 +396,7 @@ func createFunctionWithTriggers(id string, triggers []function.Trigger) function
 
 				ID:   "step-1",
 				Name: "Step #1",
-				Runtime: inngest.RuntimeWrapper{
+				Runtime: &inngest.RuntimeWrapper{
 					Runtime: inngest.RuntimeDocker{},
 				},
 			},

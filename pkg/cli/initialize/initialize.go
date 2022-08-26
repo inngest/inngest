@@ -317,7 +317,7 @@ func (f *initModel) Function(ctx context.Context) (*function.Function, error) {
 			ID:   function.DefaultStepName,
 			Name: fn.Name,
 			Path: function.DefaultStepPath,
-			Runtime: inngest.RuntimeWrapper{
+			Runtime: &inngest.RuntimeWrapper{
 				Runtime: inngest.RuntimeHTTP{
 					URL: f.url,
 				},
@@ -325,12 +325,10 @@ func (f *initModel) Function(ctx context.Context) (*function.Function, error) {
 		}
 	} else {
 		fn.Steps[function.DefaultStepName] = function.Step{
-			ID:   function.DefaultStepName,
-			Name: fn.Name,
-			Path: function.DefaultStepPath,
-			Runtime: inngest.RuntimeWrapper{
-				Runtime: inngest.RuntimeDocker{},
-			},
+			ID:      function.DefaultStepName,
+			Name:    fn.Name,
+			Path:    function.DefaultStepPath,
+			Runtime: function.DefaultRuntime(),
 		}
 	}
 
