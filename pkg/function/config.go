@@ -19,7 +19,7 @@ var (
 )
 
 const (
-	cueConfigName  = "inngest.cue"
+	CueConfigName  = "inngest.cue"
 	JsonConfigName = "inngest.json"
 )
 
@@ -75,7 +75,7 @@ func findConfigFileUp(path string) (string, []byte, error) {
 			return "", nil, nil
 		}
 
-		cueConfigPath := filepath.Join(targetDir, cueConfigName)
+		cueConfigPath := filepath.Join(targetDir, CueConfigName)
 		_, err := os.Stat(cueConfigPath)
 		if err != nil {
 			if !os.IsNotExist(err) {
@@ -124,7 +124,7 @@ func LoadRecursive(ctx context.Context, dir string) ([]*Function, error) {
 		if f.IsDir() {
 			return nil
 		}
-		if f.Name() != cueConfigName && f.Name() != JsonConfigName {
+		if f.Name() != CueConfigName && f.Name() != JsonConfigName {
 			return nil
 		}
 		function, err := Load(ctx, path)
