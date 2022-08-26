@@ -11,6 +11,14 @@
     }
   ],
   "steps": {
+    "add-to-close-io": {
+      "id": "add-to-close-io",
+      "path": "file://steps/add-to-close-io",
+      "name": "Add to Close.io",
+      "runtime": {
+        "type": "docker"
+      }
+    },
     "add-to-intercom": {
       "id": "add-to-intercom",
       "path": "file://steps/add-to-intercom",
