@@ -58,6 +58,7 @@ func (r *RuntimeWrapper) UnmarshalJSON(b []byte) error {
 type RuntimeDocker struct {
 	Entrypoint []string `json:"entrypoint,omitempty"`
 	Memory     *int     `json:"memory"`
+	Dockerfile string   `json:"dockerfile,omitempty"`
 }
 
 // MarshalJSON implements the JSON marshal interface so that cue can format this
@@ -68,6 +69,9 @@ func (r RuntimeDocker) MarshalJSON() ([]byte, error) {
 	}
 	if len(r.Entrypoint) > 0 {
 		data["entrypoint"] = r.Entrypoint
+	}
+	if r.Dockerfile != "" {
+		data["dockerfile"] = r.Dockerfile
 	}
 	return json.Marshal(data)
 }
