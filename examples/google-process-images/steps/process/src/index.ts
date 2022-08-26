@@ -111,7 +111,9 @@ export async function run({
   const uploads = await Promise.all(
     thumbnails.map(
       ({ uploadStream, resizer, storageRef }) =>
-        new Promise((resolve, reject) => {
+        new Promise<string>((resolve, reject) => {
+          resizer.on("error", reject);
+
           uploadStream
             .on("finish", () => resolve(storageRef.publicUrl()))
             .on("error", reject);
