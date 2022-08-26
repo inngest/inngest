@@ -1,4 +1,4 @@
-import { Storage } from "@google-cloud/storage";
+import { File, Storage } from "@google-cloud/storage";
 import fetch, { Response } from "node-fetch";
 import sharp from "sharp";
 import { Writable } from "stream";
@@ -7,8 +7,9 @@ import type { Args } from "./types";
 
 interface Thumbnail {
   size: number;
+  storageRef: File;
   uploadStream: Writable;
-  pipeline: Writable;
+  resizer: Writable;
 }
 
 const baseThumbnails: (Partial<Thumbnail> & Pick<Thumbnail, "size">)[] = [
@@ -21,7 +22,7 @@ const gcs = new Storage({
   credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT as string),
 });
 
-const bucket = gcs.bucket("test-bucket");
+const bucket = gcs.bucket("example_bucket_inngest");
 
 export async function run({
   event: {
@@ -53,15 +54,24 @@ export async function run({
    * the request through.
    */
   const thumbnails: Thumbnail[] = baseThumbnails.map(({ size }) => {
-    const uploadStream = bucket
-      .file(`${ulid()}_${size}x${size}.png`)
-      .createWriteStream({ metadata: { contentType: "image/png" } });
-    const pipeline = sharp().resize(size).png().pipe(uploadStream);
+    const storageRef = bucket.file(`${ulid()}_${size}x${size}.png`);
+    const uploadStream = storageRef.createWriteStream({
+      metadata: { contentType: "image/png" },
+    });
+    const resizer = sharp()
+      .resize({
+        width: size,
+        height: size,
+        fit: sharp.fit.cover,
+        position: sharp.strategy.entropy,
+      })
+      .png();
 
     return {
       size,
+      storageRef,
       uploadStream,
-      pipeline,
+      resizer,
     };
   });
 
@@ -70,11 +80,21 @@ export async function run({
    */
   const uploads = await Promise.all(
     thumbnails.map(
-      ({ size, uploadStream, pipeline }) =>
+      ({ uploadStream, resizer, storageRef }) =>
         new Promise((resolve, reject) => {
-          uploadStream.on("finish", resolve).on("error", reject);
-          res.body!.pipe(pipeline);
+          uploadStream
+            .on("finish", () => resolve(storageRef.publicUrl()))
+            .on("error", reject);
+
+          res.body!.pipe(resizer).pipe(uploadStream);
         })
     )
   );
+
+  return {
+    status: 200,
+    body: {
+      uploads,
+    },
+  };
 }
