@@ -5,8 +5,9 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"path"
+	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -63,10 +64,32 @@ func internalPackageLoader() (*load.Config, error) {
 		// This ensures that we can reference any of or packages via "inngest.com/workflows",
 		// for example.
 		p = strings.ReplaceAll(p, "pkg/", "") // "inngest.com/workflows", vs "inngest.com/pkg/workflows"
-		root := path.Join("/", "cue.mod", "pkg", packageName, p)
+		root := filepath.Join(string(filepath.Separator), "cue.mod", "pkg", packageName, p)
 
 		// Add this file to the cue loader so that it can be read.
 		cfg.Overlay[root] = load.FromBytes(contents)
+
+		// And, Cue on windows is odd, and requires a C:\ prefix to our files _in addition to_
+		// root slashes.
+		if runtime.GOOS == "windows" {
+			path, err := os.Executable()
+			if err != nil {
+				return err
+			}
+
+			// Get the current disk, then use this as a prefix.
+			disk := path[0:3] + root
+			cfg.Overlay[disk] = load.FromBytes(contents)
+
+			// This is the logic which Cue uses, which may
+			// result in a different root disk than the OS
+			// executable.  This defers to syscall.FullPath
+			// to return a disk prefix.
+			abs, _ := filepath.Abs(string(filepath.Separator))
+			cleaned := filepath.Clean(abs + root)
+			cfg.Overlay[cleaned] = load.FromBytes(contents)
+		}
+
 		return nil
 	})
 
