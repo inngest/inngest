@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/actionsdk"
 	sendgrid "github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
@@ -62,6 +64,28 @@ func Run(ctx context.Context) (int, error) {
 		if err := Send(ctx, s); err != nil {
 			return n, err
 		}
+
+		// Send a "summary/user.fetched" event to Inngest.  We can
+		// then create a new function that is triggered by this event
+		// to send the email vs doing it here.
+		//
+		// This gives logs per-user, allows retries per-user, and allows
+		// us to handle SendAt natively via waits within our function:
+		// https://www.inngest.com/docs/functions/step-functions#after-configuration
+		inngestgo.NewClient(os.Getenv("INNGEST_EVENT_KEY")).Send(ctx, inngestgo.Event{
+			Name: "summary/user.fetched",
+			Data: map[string]any{
+				"name":    s.Name,
+				"email":   s.Email,
+				"usage":   s.Usage,
+				"notes":   s.Notes,
+				"send_at": s.SendAt,
+			},
+			User: map[string]any{
+				"email": s.Email,
+				"name":  s.Name,
+			},
+		})
 	}
 
 	return len(all), nil
@@ -76,6 +100,8 @@ type Summary struct {
 	Email string
 	Usage int
 	Notes string
+	// SendAt allows us to record local preferences for timezones.
+	SendAt time.Time
 }
 
 // NewSummaryFetcher returns a SummaryFetcher used to send all summaries.
@@ -98,6 +124,7 @@ func Send(ctx context.Context, s Summary) error {
 	e := mail.NewV3MailInit(from, Subject, to)
 	e.SetTemplateID(TemplateID)
 	e.AddPersonalizations(p)
+	e.SetSendAt(int(s.SendAt.Unix()))
 
 	client := sendgrid.NewSendClient(os.Getenv("SENDGRID_API_KEY"))
 	if _, err := client.Send(e); err != nil {

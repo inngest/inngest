@@ -7,9 +7,9 @@
     }
   ],
   "steps": {
-    "step-1": {
-      "id": "step-1",
-      "path": "file://./steps/step-1",
+    "run": {
+      "id": "run",
+      "path": "file://./steps/run",
       "name": "Weekly summary email",
       "runtime": {
         "type": "docker"
