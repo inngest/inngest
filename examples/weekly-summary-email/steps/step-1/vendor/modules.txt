@@ -1,0 +1,14 @@
+# github.com/inngest/inngestgo v0.4.2
+## explicit; go 1.16
+github.com/inngest/inngestgo/actionsdk
+# github.com/sendgrid/rest v2.6.9+incompatible
+## explicit
+github.com/sendgrid/rest
+# github.com/sendgrid/sendgrid-go v3.11.1+incompatible
+## explicit
+github.com/sendgrid/sendgrid-go
+github.com/sendgrid/sendgrid-go/helpers/mail
+# github.com/stretchr/testify v1.8.0
+## explicit; go 1.13
+# golang.org/x/net v0.0.0-20220826154423-83b083e8dc8b
+## explicit; go 1.17

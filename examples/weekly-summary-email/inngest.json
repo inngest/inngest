@@ -1,0 +1,19 @@
+{
+  "name": "Weekly summary email",
+  "id": "enough-boar-589f6a",
+  "triggers": [
+    {
+      "cron": "0 9 * * 1"
+    }
+  ],
+  "steps": {
+    "step-1": {
+      "id": "step-1",
+      "path": "file://./steps/step-1",
+      "name": "Weekly summary email",
+      "runtime": {
+        "type": "docker"
+      }
+    }
+  }
+}
