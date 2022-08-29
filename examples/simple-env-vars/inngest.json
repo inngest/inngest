@@ -1,0 +1,63 @@
+{
+  "name": "simple-env-vars",
+  "id": "direct-narwhal-196e41",
+  "triggers": [
+    {
+      "event": "demo/event.sent",
+      "definition": {
+        "format": "cue",
+        "synced": true,
+        "def": "{\n  data: {\n    message: string\n  }\n  ts:   int\n  name: string\n}"
+      }
+    }
+  ],
+  "steps": {
+    "golang": {
+      "id": "golang",
+      "path": "file://steps/golang",
+      "name": "golang",
+      "runtime": {
+        "type": "docker"
+      }
+    },
+    "javascript": {
+      "id": "javascript",
+      "path": "file://steps/javascript",
+      "name": "simple-env-vars",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "$trigger"
+        }
+      ]
+    },
+    "python": {
+      "id": "python",
+      "path": "file://steps/python",
+      "name": "python",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "$trigger"
+        }
+      ]
+    },
+    "typescript": {
+      "id": "typescript",
+      "path": "file://steps/typescript",
+      "name": "typescript",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "$trigger"
+        }
+      ]
+    }
+  }
+}
