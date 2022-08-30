@@ -333,7 +333,6 @@ func renderSchedule(m *initModel) string {
 	if !m.nextCron.IsZero() {
 		b.WriteString("\n")
 		dur := humanizeDuration(time.Until(m.nextCron))
-
 		if m.humanCron != "" {
 			b.WriteString(cli.TextStyle.Copy().Foreground(cli.Feint).Bold(true).Render(m.humanCron) + ". ")
 		}
@@ -359,7 +358,7 @@ func updateSchedule(m *initModel, msg tea.Msg) (tea.Model, tea.Cmd) {
 	} else {
 		m.cronError = nil
 		if desc, err := humancron.NewDescriptor(); err == nil {
-			m.humanCron, _ = desc.ToDescription(m.cron, humancron.Locale_en)
+			m.humanCron, _ = desc.ToDescription(value, humancron.Locale_en)
 		}
 		m.nextCron = schedule.Next(time.Now())
 	}
