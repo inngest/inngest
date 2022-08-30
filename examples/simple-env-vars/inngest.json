@@ -7,7 +7,7 @@
       "definition": {
         "format": "cue",
         "synced": true,
-        "def": "{\n  data: {\n    message: string\n  }\n  ts:   int\n  name: string\n}"
+        "def": "file://./events/demo-event-sent.cue"
       }
     }
   ],
