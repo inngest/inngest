@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "lib": ["ES6"],
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "types": ["node", "jest"],
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true
+  }
+}

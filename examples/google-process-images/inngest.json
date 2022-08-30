@@ -1,0 +1,56 @@
+{
+  "$schema": "https://raw.githubusercontent.com/inngest/inngest/main/schema.json",
+  "name": "Process new profile photos with Google",
+  "description": "Use the Google Cloud Vision API and Sharp to check images are safe and convert them to a variety of sizes.",
+  "tags": ["typescript", "google"],
+  "id": "free-doe-5f3107",
+  "triggers": [
+    {
+      "event": "user/profile.photo.uploaded",
+      "definition": {
+        "format": "cue",
+        "synced": false,
+        "def": "file://./events/user-profile-photo-uploaded.cue"
+      }
+    }
+  ],
+  "steps": {
+    "safety-check": {
+      "id": "safety-check",
+      "name": "Safety Check",
+      "path": "file://./steps/safety-check",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "$trigger"
+        }
+      ]
+    },
+    "process": {
+      "id": "process",
+      "name": "Process Images",
+      "path": "file://./steps/process",
+      "runtime": { "type": "docker" },
+      "after": [
+        {
+          "step": "safety-check",
+          "if": "steps['safety-check'].body.isSafe == true"
+        }
+      ]
+    },
+    "alert": {
+      "id": "alert",
+      "name": "Alert",
+      "path": "file://./steps/alert",
+      "runtime": { "type": "docker" },
+      "after": [
+        {
+          "step": "safety-check",
+          "if": "steps['safety-check'].body.isSafe != true"
+        }
+      ]
+    }
+  }
+}
