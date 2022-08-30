@@ -1,0 +1,254 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/Function",
+  "required": ["id", "name", "triggers"],
+  "title": "Inngest Config",
+  "description": "An Inngest config file to deploy and run functions.",
+  "definitions": {
+    "Function": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "The schema used for the Inngest config file."
+        },
+        "name": {
+          "type": "string",
+          "description": "The friendly name of the function as it will appear in the Inngest Cloud dashboard.",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "description": "A unique ID for the function.",
+          "minLength": 1
+        },
+        "triggers": {
+          "description": "An array of methods by which the defined steps are invoked.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/Trigger"
+          }
+        },
+        "steps": {
+          "type": "object",
+          "description": "A function can have > 1 step, which is an individual \"action\" called in a DAG.",
+          "additionalProperties": { "$ref": "#/definitions/Step" }
+        },
+        "idempotency": {
+          "type": "string",
+          "description": "Idempotency allows the specification of an idempotency key using event data.\n\nIf specified, this overrides the throttle object."
+        },
+        "throttle": {
+          "type": "object",
+          "description": "Allows you to throttle workflows, only running them a given number of times (count) per period. THis can optionally incldue a throttle key, which is used to further constrain throttling similar to idempotency.",
+          "additionalProperties": false,
+          "properties": {
+            "key": { "type": "string" },
+            "count": { "type": "integer", "minimum": 1, "default": 1 },
+            "period": { "type": "string" }
+          },
+          "required": ["count", "period"]
+        }
+      },
+      "title": "Function"
+    },
+    "Step": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string",
+          "default": "",
+          "description": "Represents the location on disk for the step definition. A single function may have >1 Docker-based step. This lists the directory which contains the step.",
+          "format": "^file://",
+          "minLength": 8,
+          "examples": ["file://./steps/step-1"]
+        },
+        "name": {
+          "type": "string",
+          "default": ""
+        },
+        "runtime": {
+          "$ref": "#/definitions/Runtime",
+          "description": "Represents how the function is executed. Each runtime specifies data necessary for executing the image, e.g. if this is an externally-hosted, serverless function via an API, this will include the URL to use in order to invoke the function."
+        },
+        "after": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/After" },
+          "description": "Specifies that this step should run after each of the following steps. If more than one item is supplied in this array, the step will run multiple times after each preceeding step finishes."
+        },
+        "version": {
+          "type": "object",
+          "description": "An optional version constraint for the step when resolving the action to run.",
+          "properties": {
+            "major": { "type": "integer", "minimum": 1 },
+            "minor": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "retries": {
+          "type": "object",
+          "description": "Configuration for retrying this particular step if it fails.",
+          "properties": {
+            "attempts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20,
+              "default": 3,
+              "description": "The number of retry attempts before the function run is considered failed. Defaults to 3."
+            }
+          }
+        }
+      },
+      "required": ["id", "runtime", "after"],
+      "title": "Step",
+      "description": "A step is a single action within a function. An action is an individual unit of code which is scheduled as part of the function execution."
+    },
+    "After": {
+      "title": "After",
+      "type": "object",
+      "properties": {
+        "step": {
+          "oneOf": [{ "type": "string" }],
+          "description": "The step that must complete in order to run the next step, or \"$trigger\" if this step runs immediately upon receiving a trigger.",
+          "examples": ["$trigger"]
+        },
+        "if": {
+          "type": "string",
+          "description": "An expression used to conditionally run this step, allowing you to write complex logic to manage your function execution.",
+          "examples": [
+            "event.data.status == 200",
+            "steps['step-1'].body.email == 'hello@example.com'",
+            "async.user.id == event.user.id"
+          ]
+        },
+        "wait": {
+          "type": "string",
+          "description": "Delay a step from running for a set amount of time, e.g. to delay a step from running you can set wait to \"10m\". This will enqueue the step to run after 10 minutes.",
+          "examples": ["5ms", "10s", "20m", "24h", "2d", "1w"]
+        },
+        "async": {
+          "description": "Specify an event that must be received within a specific amount of time (`ttl`) to continue with the specified step.",
+          "type": "object",
+          "properties": {
+            "ttl": {
+              "type": "string",
+              "examples": ["5ms", "10s", "20m", "24h", "2d", "1w"]
+            },
+            "event": { "type": "string", "examples": ["test/event.sent"] },
+            "match": { "type": "string" },
+            "onTimeout": {
+              "type": "boolean",
+              "description": "Specify that this edge should be traversed on timeout only, i.e. if the event is not received within the `ttl`."
+            }
+          },
+          "required": ["event", "ttl"]
+        }
+      },
+      "required": ["step"]
+    },
+    "Runtime": {
+      "oneOf": [
+        { "$ref": "#/definitions/RuntimeDocker" },
+        { "$ref": "#/definitions/RuntimeHTTP" }
+      ],
+      "title": "Runtime"
+    },
+    "RuntimeDocker": {
+      "title": "RuntimeDocker",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "docker" },
+        "image": { "type": "string" },
+        "memory": { "type": "integer", "minimum": 64, "maximum": 8096 },
+        "entrypoint": { "type": "array", "items": { "type": "string" } },
+        "dockerfile": {
+          "type": "string",
+          "description": "The path of the Dockerfile to use to build this step, relative to the step's root directory. Defaults to './Dockerfile'.",
+          "default": "./Dockerfile"
+        }
+      },
+      "required": ["type"]
+    },
+    "RuntimeHTTP": {
+      "title": "RuntimeHTTP",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "http" },
+        "url": { "type": "string" }
+      },
+      "required": ["type", "url"]
+    },
+    "Trigger": {
+      "oneOf": [
+        { "$ref": "#/definitions/EventTrigger" },
+        { "$ref": "#/definitions/CronTrigger" }
+      ],
+      "title": "Trigger"
+    },
+    "EventTrigger": {
+      "title": "EventTrigger",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event": {
+          "type": "string",
+          "description": "Event is the name of the event that triggers the function."
+        },
+        "expression": {
+          "type": "string",
+          "description": "Expression allows you to write custom expressions for specifying conditions for the trigger.  For example, you may want a function to run if an order is above a specific value (eg. `\"event.data.total >= 500\"`), or if the event is a specific version (eg. `\"event.version >= '2'\"`)."
+        },
+        "definition": {
+          "$ref": "#/definitions/EventDefinition"
+        }
+      },
+      "required": ["event"]
+    },
+    "CronTrigger": {
+      "title": "CronTrigger",
+      "type": "object",
+      "properties": {
+        "cron": {
+          "type": "string"
+        }
+      },
+      "required": ["cron"]
+    },
+    "EventDefinition": {
+      "type": "object",
+      "description": "Definition stores the type definitions for the event. Inngest is fully typed, and events may come from integrations with built-in event schemas or from your own API. In many cases you'll write functions with events which are not yet stored within Inngest.  We allow you to store a type for the event directly here.",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "oneOf": [{ "const": "cue" }, { "const": "json-schema" }]
+        },
+        "synced": {
+          "type": "boolean",
+          "description": "Whether this is synced within Inngest. This allows us to always fetch the latest version of an event."
+        },
+        "def": {
+          "oneOf": [
+            { "type": "string", "pattern": "^file://" },
+            {
+              "type": "object",
+              "additionalProperties": true
+            }
+          ],
+          "description": "The definition may be a cue type embedded within the definition, or it may be a JSON object representing a JSON schema. If this is a string, it is assumed that this represents a filepath to load the definition from."
+        }
+      },
+      "dependentRequired": {
+        "def": ["format"]
+      },
+      "required": ["format", "def", "synced"],
+      "title": "EventDefinition"
+    }
+  }
+}

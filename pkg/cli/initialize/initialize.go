@@ -23,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/scaffold"
 	"github.com/inngest/inngestgo"
+	"github.com/tidwall/sjson"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/term"
 )
@@ -623,11 +624,47 @@ func (f *initModel) cloneTemplate(ctx context.Context) tea.Cmd {
 		tmpExamplePath := filepath.Join(tmpPath, examplePath)
 		fn, err := function.Load(ctx, tmpExamplePath)
 		if err != nil {
-			return cloneError{err}
+			return cloneError{fmt.Errorf("couldn't find valid function; are you sure this is an Inngest function? %s", err)}
 		}
 
+		// Set a new unique ID and name for the function
+		newFnId, err := function.RandomID()
+		if err != nil {
+			return cloneError{fmt.Errorf("error creating new function ID: %s", err)}
+		}
+
+		fn.ID = newFnId
+		fn.Name = f.name
+
+		// Now we've made changes, validate that everything is still fine
 		if err = fn.Validate(ctx); err != nil {
-			return cloneError{err}
+			return cloneError{fmt.Errorf("error validating function; are you sure this is an Inngest function? %s", err)}
+		}
+
+		// Make changes to the ID and Name in `inngest.json` in the tmp dir.
+		// We do this directly (not via `function.MarshalJSON`) as we want to
+		// preserve as much as possible of the original config file.
+		//
+		// If we overwrite using `function.MarshalJSON`, it may alter the structure
+		// which may be confusing for users.
+		tmpConfigPath := filepath.Join(tmpExamplePath, function.JsonConfigName)
+		byt, err := os.ReadFile(tmpConfigPath)
+		if err != nil {
+			return cloneError{fmt.Errorf("error reading config file: %s", err)}
+		}
+
+		val, err := sjson.Set(string(byt), "name", fn.Name)
+		if err != nil {
+			return cloneError{fmt.Errorf("could not set new function name: %s", err)}
+		}
+
+		val, err = sjson.Set(val, "id", fn.ID)
+		if err != nil {
+			return cloneError{fmt.Errorf("could not set new function ID: %s", err)}
+		}
+
+		if err := os.WriteFile(filepath.Join(tmpExamplePath, "inngest.json"), []byte(val), 0644); err != nil {
+			return cloneError{fmt.Errorf("error writing inngest.json: %s", err)}
 		}
 
 		onlyOwnerWrite := 0755
