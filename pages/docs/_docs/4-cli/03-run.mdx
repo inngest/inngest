@@ -96,3 +96,38 @@ $ inngest run --replay --event-id 01G8BG4FT7CZVAD38D4RJNGTT1
 
   ![Running a function with a specific event](/assets/docs/inngest-run/replay-specific.gif)
 </details>
+
+## Run with local data
+
+Events are [always JSON](/docs/event-format-and-structure), meaning it's easy to save an event's data locally and use it when testing via `inngest run`.
+
+Pipe a JSON event (or an array of JSON events) into the command to run your functions with that data.
+
+```sh
+$ cat snapshot.json | inngest run
+```
+
+<details>
+  <summary><strong>See it in action</strong></summary>
+
+  ![Running a function with snapshot data](/assets/docs/inngest-run/replay-snapshot.gif)
+</details>
+
+You can create a snapshot by adding the `--snapshot` flag to any of the above commands, for example:
+
+```sh
+# Snapshot the last 20 events
+$ inngest run --replay -c 20 --snapshot > snapshot.json
+
+# Snapshot 5 generated events
+$ inngest run -c 5 --snapshot > snapshot.json
+
+# Snapshot a single known problem event
+$ inngest run --replay --event-id 01G8BG4FT7CZVAD38D4RJNGTT1 --snapshot
+```
+
+<aside>
+  <p>
+    <strong>Tip:</strong> When creating a new function, snapshot some dummy data using <code>inngest run --snapshot</code>, then edit the created JSON to provide realistic local use cases.
+  </p>
+</aside>
