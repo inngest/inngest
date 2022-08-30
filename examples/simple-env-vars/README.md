@@ -58,7 +58,7 @@ inngest run
 
 Below is the annotated function definition (found at [inngest.json](/inngest.json)) to show how the above is defined in config.
 
-```json
+```jsonc
 {
   "name": "simple-env-vars",
   "id": "direct-narwhal-196e41",
