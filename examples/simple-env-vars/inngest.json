@@ -20,19 +20,6 @@
         "type": "docker"
       }
     },
-    "javascript": {
-      "id": "javascript",
-      "path": "file://steps/javascript",
-      "name": "simple-env-vars",
-      "runtime": {
-        "type": "docker"
-      },
-      "after": [
-        {
-          "step": "$trigger"
-        }
-      ]
-    },
     "python": {
       "id": "python",
       "path": "file://steps/python",
