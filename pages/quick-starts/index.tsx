@@ -111,42 +111,44 @@ export default function LibraryExamplesPage(props: Props) {
         </div>
         <div className="container mx-auto px-12 pb-12 pt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12">
           {examples.map((example) => (
-            <Link
-              key={example.id}
-              href={`/quick-starts/${example.id}?ref=quick-starts`}
-              passHref
-            >
-              <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-white transition-all transform hover:scale-105 hover:shadow-lg">
-                <div className="text-black">{example.name}</div>
-                {example.description ? (
-                  <div className="text-sm text-gray-500">
-                    {example.description}
-                  </div>
-                ) : null}
-                {example.tags.length ? (
-                  <div className="flex flex-row flex-wrap space-x-1">
-                    {example.tags.map((tag) => (
-                      <Tag
-                        key={tag}
-                        name={tag}
-                        onSelect={() => {
-                          setActiveTags((currTags) => {
-                            if (currTags.includes(tag)) {
-                              return currTags.filter((t) => t !== tag);
-                            }
+            <div>
+              <Link
+                key={example.id}
+                href={`/quick-starts/${example.id}?ref=quick-starts`}
+                passHref
+              >
+                <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-white transition-all transform hover:scale-105 hover:shadow-lg">
+                  <div className="text-black">{example.name}</div>
+                  {example.description ? (
+                    <div className="text-sm text-gray-500">
+                      {example.description}
+                    </div>
+                  ) : null}
+                  {example.tags.length ? (
+                    <div className="flex flex-row flex-wrap space-x-1">
+                      {example.tags.map((tag) => (
+                        <Tag
+                          key={tag}
+                          name={tag}
+                          onSelect={() => {
+                            setActiveTags((currTags) => {
+                              if (currTags.includes(tag)) {
+                                return currTags.filter((t) => t !== tag);
+                              }
 
-                            return [...currTags, tag];
-                          });
-                        }}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-                <a className="text-blue-500 font-semibold text-right">
-                  Explore →
+                              return [...currTags, tag];
+                            });
+                          }}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  <a className="text-blue-500 font-semibold text-right">
+                    Explore →
+                  </a>
                 </a>
-              </a>
-            </Link>
+              </Link>
+            </div>
           ))}
         </div>
       </div>
