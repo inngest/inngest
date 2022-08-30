@@ -19,8 +19,8 @@ var (
 )
 
 const (
-	cueConfigName  = "inngest.cue"
-	jsonConfigName = "inngest.json"
+	CueConfigName  = "inngest.cue"
+	JsonConfigName = "inngest.json"
 )
 
 // Load loads the inngest function from the given directory.  It searches for both inngest.cue
@@ -75,7 +75,7 @@ func findConfigFileUp(path string) (string, []byte, error) {
 			return "", nil, nil
 		}
 
-		cueConfigPath := filepath.Join(targetDir, cueConfigName)
+		cueConfigPath := filepath.Join(targetDir, CueConfigName)
 		_, err := os.Stat(cueConfigPath)
 		if err != nil {
 			if !os.IsNotExist(err) {
@@ -86,7 +86,7 @@ func findConfigFileUp(path string) (string, []byte, error) {
 			break
 		}
 
-		jsonConfigPath := filepath.Join(targetDir, jsonConfigName)
+		jsonConfigPath := filepath.Join(targetDir, JsonConfigName)
 		_, err = os.Stat(jsonConfigPath)
 		if err != nil {
 			if !os.IsNotExist(err) {
@@ -124,7 +124,7 @@ func LoadRecursive(ctx context.Context, dir string) ([]*Function, error) {
 		if f.IsDir() {
 			return nil
 		}
-		if f.Name() != cueConfigName && f.Name() != jsonConfigName {
+		if f.Name() != CueConfigName && f.Name() != JsonConfigName {
 			return nil
 		}
 		function, err := Load(ctx, path)
