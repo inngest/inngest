@@ -1,6 +1,8 @@
 {
-  "name": "simple-env-vars",
+  "name": "Using environment variables",
   "id": "direct-narwhal-196e41",
+  "description": "Use .env files to populate environment variables for local testing.",
+  "tags": ["simple", "secrets", "golang", "python", "typescript"],
   "triggers": [
     {
       "event": "demo/event.sent",
