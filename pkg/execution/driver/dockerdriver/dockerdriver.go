@@ -163,7 +163,7 @@ func (d *dockerExec) startOpts(ctx context.Context, state state.State, wa innges
 	}
 	name := fmt.Sprintf("%s-%s-%s", state.RunID(), slug.Make(wa.Name), hex.EncodeToString(byt))
 
-	env := os.Environ()
+	env := []string{}
 	if d.envreader != nil {
 		parsed := d.envreader.Read(ctx, state.Workflow().ID)
 		if parsed != nil {
