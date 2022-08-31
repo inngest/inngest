@@ -168,7 +168,12 @@ export default function DocsHome(props) {
         <p className="pb-4">
           Learn how to install our CLI and write your first serverless function
           in minutes, then get started with our cloud and deploy your functions
-          for free
+          for free!
+        </p>
+        <p className="pb-4">
+          We've also curated a number of ready-to-deploy, pre-built functions
+          that we call "quick-starts" - you can use them as inspiration or as a
+          starting point for your own project.
         </p>
 
         <Button
@@ -178,6 +183,15 @@ export default function DocsHome(props) {
           style={{ display: "inline-block" }}
         >
           Get started
+        </Button>
+
+        <Button
+          kind="black"
+          size="small"
+          href="/quick-starts?ref=docs-started"
+          style={{ display: "inline-block" }}
+        >
+          See quick-starts
         </Button>
       </DocsContent>
     </DocsLayout>
