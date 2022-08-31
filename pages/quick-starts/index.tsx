@@ -88,9 +88,10 @@ export default function LibraryExamplesPage(props: Props) {
               <>
                 {" "}
                 with tags:{" "}
-                {activeTags.map((tag) => (
-                  <Tag
-                    key={tag}
+                <span className="flex flex-row gap-1">
+                  {activeTags.map((tag) => (
+                    <Tag
+                      key={tag}
                     name={tag}
                     onSelect={() => {
                       setActiveTags((currTags) => {
@@ -100,9 +101,10 @@ export default function LibraryExamplesPage(props: Props) {
 
                         return [...currTags, tag];
                       });
-                    }}
-                  />
-                ))}
+                      }}
+                    />
+                  ))}
+                </span>
               </>
             ) : (
               ""
@@ -125,7 +127,7 @@ export default function LibraryExamplesPage(props: Props) {
                     </div>
                   ) : null}
                   {example.tags.length ? (
-                    <div className="flex flex-row flex-wrap space-x-1">
+                    <div className="flex flex-row flex-wrap gap-1">
                       {example.tags.map((tag) => (
                         <Tag
                           key={tag}
@@ -167,7 +169,7 @@ const Tag: React.FC<TagProps> = ({ name, onSelect }) => {
   return (
     <div
       key={name}
-      className="uppercase text-[0.7rem] px-1 bg-blue-100/50 text-blue-500 hover:bg-blue-100 hover:text-blue-600 transition rounded cursor-pointer ml-1"
+      className="uppercase text-[0.7rem] px-1 bg-blue-100/50 text-blue-500 hover:bg-blue-100 hover:text-blue-600 transition rounded cursor-pointer"
       onClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
