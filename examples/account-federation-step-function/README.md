@@ -10,14 +10,15 @@ graph LR
 Source[Your app] -->|"auth/account.created<br>'data': {...}"| Inngest(Inngest)
 Inngest -->|Triggers| Intercom(steps/add-to-intercom)
 Inngest -->|Triggers| Slack(steps/send-to-slack)
+Inngest -->|Triggers| Close(steps/add-to-close-io)
 
 classDef in fill:#4636f5,color:white,stroke:#4636f5;
 classDef inngest fill:white,color:black,stroke:#4636f5,stroke-width:3px;
 classDef out fill:white,color:black,stroke:#4636f5,stroke-dasharray: 5 5,stroke-width:3px;
 
 class Source in;
-class Inngest,Intercom,Slack inngest;
-class Output out;Step
+class Inngest,Intercom,Slack,Close inngest;
+class Output out;
 ```
 
 1. When a user registers an account, the `auth/account.created` event is sent to Inngest
@@ -49,7 +50,7 @@ Use this quickstart with a single CLI command to get started! The CLI will then 
 Via the CLI:
 
 ```sh
-inngest-cli init --template github.com/inngest/inngest#examples/account-federation
+inngest init --template github.com/inngest/inngest#examples/account-federation
 ```
 
 Via NPX:
@@ -73,7 +74,7 @@ Below is the annotated function definition (found at [inngest.json](/inngest.jso
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/inngest/inngest/ad725bb6ca2b3846d412beb6ea8046e27a233154/schema.json",
+  "$schema": "https://raw.githubusercontent.com/inngest/inngest/main/schema.json",
   "name": "Add new users to external systems",
   "description": "Run a step function to add newly created users to all external systems at once",
   "tags": ["typescript", "auth", "step function"],
@@ -105,7 +106,15 @@ Below is the annotated function definition (found at [inngest.json](/inngest.jso
       "after": [
         { "step": "$trigger" }
       ]
-    }
+    },
+    "add-to-close-io": {
+      "id": "add-to-close-io",
+      "path": "file://steps/add-to-close-io",
+      "name": "Add to Close.io",
+      "runtime": {
+        "type": "docker"
+      }
+    },
   }
 }
 ```

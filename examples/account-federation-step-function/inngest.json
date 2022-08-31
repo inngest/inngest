@@ -1,5 +1,9 @@
 {
-  "name": "Account federation step function",
+  "$schema": "https://raw.githubusercontent.com/inngest/inngest/main/schema.json",
+  "description": "Run a step function to add newly created users to all external systems at once",
+  "tags": ["typescript", "auth", "step function"],
+
+  "name": "Add new users to external systems",
   "id": "gentle-katydid-de85f5",
   "triggers": [
     {
