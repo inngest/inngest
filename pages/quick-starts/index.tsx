@@ -29,28 +29,30 @@ export default function LibraryExamplesPage(props: Props) {
     return rawActiveTags.filter((tag) => Boolean(tag.trim()));
   }, [rawActiveTags]);
 
-  const fuse = useMemo(() => {
-    let data = props.examples;
-
+  const filteredExamples = useMemo(() => {
     if (activeTags.length) {
-      data = data.filter((example) =>
+      return props.examples.filter((example) =>
         activeTags.every((tag) => example.tags.includes(tag))
       );
     }
 
-    return new Fuse(data, {
+    return props.examples;
+  }, [activeTags, props.examples]);
+
+  const fuse = useMemo(() => {
+    return new Fuse(filteredExamples, {
       keys: ["name", "description", "tags"],
       findAllMatches: true,
     });
-  }, [props.examples, activeTags]);
+  }, [filteredExamples]);
 
   const examples = useMemo(() => {
     if (!trimmedSearch) {
-      return props.examples;
+      return filteredExamples;
     }
 
     return fuse.search(trimmedSearch).map(({ item }) => item);
-  }, [fuse, trimmedSearch]);
+  }, [fuse, trimmedSearch, filteredExamples]);
 
   return (
     <div>
@@ -92,15 +94,15 @@ export default function LibraryExamplesPage(props: Props) {
                   {activeTags.map((tag) => (
                     <Tag
                       key={tag}
-                    name={tag}
-                    onSelect={() => {
-                      setActiveTags((currTags) => {
-                        if (currTags.includes(tag)) {
-                          return currTags.filter((t) => t !== tag);
-                        }
+                      name={tag}
+                      onSelect={() => {
+                        setActiveTags((currTags) => {
+                          if (currTags.includes(tag)) {
+                            return currTags.filter((t) => t !== tag);
+                          }
 
-                        return [...currTags, tag];
-                      });
+                          return [...currTags, tag];
+                        });
                       }}
                     />
                   ))}
