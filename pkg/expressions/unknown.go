@@ -198,6 +198,11 @@ func (t *argColl) Add(vals ...ref.Val) {
 		// Store the arguments in order (left and right hand side of operators)
 		t.arguments = append(t.arguments, val)
 
+		if val == nil {
+			// XXX: We should probably handle this differently
+			continue
+		}
+
 		typ := val.Type()
 		coll, ok := t.types[typ]
 		if !ok {

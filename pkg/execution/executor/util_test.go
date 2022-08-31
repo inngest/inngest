@@ -21,7 +21,11 @@ func TestParseWait(t *testing.T) {
 		map[string]any{
 			"data": time.Now().Format(time.RFC3339),
 		},
-		nil,
+		map[string]map[string]any{
+			"step-1": map[string]any{
+				"wait": time.Now().Format(time.RFC3339),
+			},
+		},
 		nil,
 	)
 
@@ -47,11 +51,23 @@ func TestParseWait(t *testing.T) {
 			duration: (time.Minute * 45) + (time.Second * 30),
 			err:      nil,
 		},
+		// step output
+		{
+			wait:     "date(steps['step-1'].wait) + duration('30s')",
+			duration: (time.Second * 30),
+			err:      nil,
+		},
+		// response
+		{
+			wait:     "date(response.wait) + duration('45m30s')",
+			duration: (time.Minute * 45) + (time.Second * 30),
+			err:      nil,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.wait, func(t *testing.T) {
-			duration, err := ParseWait(ctx, test.wait, state)
+			duration, err := ParseWait(ctx, test.wait, state, "step-1")
 			require.NoError(t, err)
 			require.WithinDuration(
 				t,
