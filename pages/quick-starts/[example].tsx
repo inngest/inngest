@@ -97,13 +97,13 @@ export default function LibraryExamplePage(props: Props) {
             <h2>More quickstarts</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12 mt-4">
               {nextExamples.map((example) => (
-                <div>
+                <div className="w-full h-full flex flex-col">
                   <Link
                     key={example.id}
                     href={`/quick-starts/${example.id}?ref=quick-starts/${props.id}`}
                     passHref
                   >
-                    <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-black transition-all transform hover:scale-105 hover:shadow-lg">
+                    <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-black transition-all transform hover:scale-105 hover:shadow-lg flex-1">
                       <div className="font semi-bold text-white">
                         {example.name}
                       </div>
@@ -112,6 +112,7 @@ export default function LibraryExamplePage(props: Props) {
                           {example.description}
                         </div>
                       ) : null}
+                      <div className="flex-1" />
                       <a className="text-blue-500 font-semibold text-right">
                         Explore →
                       </a>
