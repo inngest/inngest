@@ -184,7 +184,16 @@ const Tag: React.FC<TagProps> = ({ name, onSelect }) => {
 };
 
 export const getStaticProps: GetStaticProps = async () => {
-  return { props: { examples: await getExamples() } };
+  return {
+    props: {
+      examples: await getExamples(),
+      meta: {
+        title: "Quickstarts - Start building in seconds",
+        description:
+          "Use our ready-to-deploy, pre-built functions for inspiration or as a starting point for your own project.",
+      },
+    },
+  };
 };
 
 export const getExamples = async () => {
