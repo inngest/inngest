@@ -1,0 +1,52 @@
+{
+  "name": "Using environment variables",
+  "id": "direct-narwhal-196e41",
+  "description": "Use .env files to populate environment variables for local testing.",
+  "tags": ["simple", "secrets", "golang", "python", "typescript"],
+  "triggers": [
+    {
+      "event": "demo/event.sent",
+      "definition": {
+        "format": "cue",
+        "synced": true,
+        "def": "file://./events/demo-event-sent.cue"
+      }
+    }
+  ],
+  "steps": {
+    "golang": {
+      "id": "golang",
+      "path": "file://steps/golang",
+      "name": "golang",
+      "runtime": {
+        "type": "docker"
+      }
+    },
+    "python": {
+      "id": "python",
+      "path": "file://steps/python",
+      "name": "python",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "$trigger"
+        }
+      ]
+    },
+    "typescript": {
+      "id": "typescript",
+      "path": "file://steps/typescript",
+      "name": "typescript",
+      "runtime": {
+        "type": "docker"
+      },
+      "after": [
+        {
+          "step": "$trigger"
+        }
+      ]
+    }
+  }
+}
