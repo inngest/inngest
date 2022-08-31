@@ -273,7 +273,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 		at := time.Now()
 		if next.Metadata != nil && next.Metadata.Wait != nil {
-			dur, err := ParseWait(ctx, *next.Metadata.Wait, run)
+			dur, err := ParseWait(ctx, *next.Metadata.Wait, run, edge.Incoming)
 			if err != nil {
 				return err
 			}

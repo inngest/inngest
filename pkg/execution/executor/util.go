@@ -10,13 +10,13 @@ import (
 	"github.com/xhit/go-str2duration/v2"
 )
 
-func ParseWait(ctx context.Context, wait string, s state.State) (time.Duration, error) {
+func ParseWait(ctx context.Context, wait string, s state.State, outgoingID string) (time.Duration, error) {
 	// Attempt to parse a basic duration.
 	if dur, err := str2duration.ParseDuration(wait); err == nil {
 		return dur, nil
 	}
 
-	data := state.EdgeExpressionData(ctx, s, "")
+	data := state.EdgeExpressionData(ctx, s, outgoingID)
 
 	// Attempt to parse an expression, eg. "date(event.data.from) - duration(1h)"
 	out, _, err := expressions.Evaluate(ctx, wait, data)
