@@ -5,7 +5,7 @@ COPY . .
 ARG TARGETARCH
 ARG TARGETOS
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    GOFLAGS=-mod=vendor GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /go/bin/main cmd/main.go
+    GOFLAGS=-mod=vendor GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /go/bin/main ./cmd/
 
 
 FROM alpine:3.15 AS step

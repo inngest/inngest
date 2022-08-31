@@ -1,4 +1,8 @@
 {
+  "$schema": "https://raw.githubusercontent.com/inngest/inngest/main/schema.json",
+  "description": "Send your users a weekly summary email every Monday via a scheduled function and Sendgrid",
+  "tags": ["scheduled function", "parent function", "sendgrid", "golang"],
+
   "name": "Weekly summary email",
   "id": "enough-boar-589f6a",
   "triggers": [

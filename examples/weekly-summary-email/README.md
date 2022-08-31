@@ -42,7 +42,7 @@ Use this quickstart with a single CLI command to get started! The CLI will then 
 Via the CLI:
 
 ```sh
-inngest-cli init --template github.com/inngest/inngest#examples/weekly-summary-email
+inngest init --template github.com/inngest/inngest#examples/weekly-summary-email
 ```
 
 Via NPX:
