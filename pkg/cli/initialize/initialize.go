@@ -663,8 +663,18 @@ func (f *initModel) cloneTemplate(ctx context.Context) tea.Cmd {
 			return cloneError{fmt.Errorf("could not set new function ID: %s", err)}
 		}
 
-		if err := os.WriteFile(filepath.Join(tmpExamplePath, "inngest.json"), []byte(val), 0644); err != nil {
-			return cloneError{fmt.Errorf("error writing inngest.json: %s", err)}
+		val, err = sjson.Delete(val, "description")
+		if err != nil {
+			return cloneError{fmt.Errorf("could not remove description")}
+		}
+
+		val, err = sjson.Delete(val, "tags")
+		if err != nil {
+			return cloneError{fmt.Errorf("could not remove tags")}
+		}
+
+		if err := os.WriteFile(filepath.Join(tmpExamplePath, function.JsonConfigName), []byte(val), 0644); err != nil {
+			return cloneError{fmt.Errorf("error writing %s: %s", function.JsonConfigName, err)}
 		}
 
 		onlyOwnerWrite := 0755
