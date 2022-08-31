@@ -111,13 +111,13 @@ export default function LibraryExamplesPage(props: Props) {
         </div>
         <div className="container mx-auto px-12 pb-12 pt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12">
           {examples.map((example) => (
-            <div>
+            <div className="flex flex-col w-full h-full">
               <Link
                 key={example.id}
                 href={`/quick-starts/${example.id}?ref=quick-starts`}
                 passHref
               >
-                <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-white transition-all transform hover:scale-105 hover:shadow-lg">
+                <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-white transition-all transform hover:scale-105 hover:shadow-lg flex-1">
                   <div className="text-black">{example.name}</div>
                   {example.description ? (
                     <div className="text-sm text-gray-500">
@@ -143,6 +143,7 @@ export default function LibraryExamplesPage(props: Props) {
                       ))}
                     </div>
                   ) : null}
+                  <div className="flex-1" />
                   <a className="text-blue-500 font-semibold text-right">
                     Explore →
                   </a>
