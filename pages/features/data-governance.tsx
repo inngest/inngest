@@ -136,7 +136,7 @@ export default function () {
       </div>
       <p className="text-center pt-6 text-xs text-slate-500">{hoverVal || (<>&nbsp;</>)}</p>
 
-      <div className="container mx-auto grid grid-cols-2 gap-16 pt-48">
+      <div className="container mx-auto grid grid-cols-2 gap-16 pt-44">
         <div>
           <h3 className="pb-4">Develop without errors</h3>
           <p style={{ margin: 0 }} className="pt-3">
@@ -155,7 +155,7 @@ export default function () {
         </div>
 
         <div className="flex align-center justify-center">
-          <img src="/assets/overview-simplified.svg" alt="Inngest overview" />
+          <img src="/assets/overview-simplified.svg" alt="Inngest overview" height="auto" className="self-center" />
         </div>
       </div>
 
@@ -176,29 +176,35 @@ export default function () {
         </div>
       </div>
 
-      <div className="container mx-auto grid grid-cols-3 gap-16 pt-48">
-        <div>
-          <h3 className="pb-4">Powerful</h3>
-          <p>
-            Transform and enrich data on-the-fly, ensuring your data is as clean
-            and powerful as possible. See an entire overview of what each event
-            does in your system — no documenting required.
-          </p>
-        </div>
-        <div>
-          <h3 className="pb-4">Flexible</h3>
-          <p>
-            Create unlimited event versions with a full changelog, ensuring your
-            event registry can adapt to your business needs as you grow.
-          </p>
-        </div>
-        <div>
-          <h3 className="pb-4">Reliable</h3>
-          <p>
-            Store invalid data that doesn’t match your version schema in
-            quarantine for debugging and fixing, ensuring <i>all</i> data is
-            clean.
-          </p>
+      <div className="container mx-auto">
+        <div className="p-20 mt-24 rounded-xl bg-slate-100">
+          <h2 className="mb-2">Develop faster and safer</h2>
+          <p>Use our platform to rapidly build functionality driven by events, with zero infrastructure and full end-to-end safety.</p>
+          <div className="grid lg:grid-cols-3 gap-16 mt-20">
+            <div>
+              <h3 className="pb-4">Powerful</h3>
+              <p>
+                Transform and enrich data on-the-fly, ensuring your data is as clean
+                and powerful as possible. See an entire overview of what each event
+                does in your system — no documenting required.
+              </p>
+            </div>
+            <div>
+              <h3 className="pb-4">Flexible</h3>
+              <p>
+                Create unlimited event versions with a full changelog, ensuring your
+                event registry can adapt to your business needs as you grow.
+              </p>
+            </div>
+            <div>
+              <h3 className="pb-4">Reliable</h3>
+              <p>
+                Store invalid data that doesn’t match your version schema in
+                quarantine for debugging and fixing, ensuring <i>all</i> data is
+                clean.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
