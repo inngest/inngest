@@ -68,7 +68,7 @@ func TestTemplateRenderTypescript(t *testing.T) {
 		ID:   "test",
 		Path: "file://./steps/my-test",
 		Name: "A test function 😋",
-		Runtime: inngest.RuntimeWrapper{
+		Runtime: &inngest.RuntimeWrapper{
 			Runtime: inngest.RuntimeDocker{},
 		},
 		After: []function.After{
@@ -79,7 +79,7 @@ func TestTemplateRenderTypescript(t *testing.T) {
 	root, _ := filepath.Abs("./" + f.Slug())
 	os.RemoveAll(root)
 
-	err = tpl.Render(*f, f.Steps["test"])
+	err = tpl.RenderNew(context.Background(), *f)
 	require.NoError(t, err)
 
 	// Expect "types.ts" to contain genned types.

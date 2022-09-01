@@ -50,13 +50,13 @@ var (
 		Steps: map[string]function.Step{
 			"1": {
 				ID: "1",
-				Runtime: inngest.RuntimeWrapper{
+				Runtime: &inngest.RuntimeWrapper{
 					Runtime: &mockdriver.Mock{},
 				},
 			},
 			"2": {
 				ID: "2",
-				Runtime: inngest.RuntimeWrapper{
+				Runtime: &inngest.RuntimeWrapper{
 					Runtime: &mockdriver.Mock{},
 				},
 				After: []function.After{
@@ -65,7 +65,7 @@ var (
 			},
 			"3": {
 				ID: "3",
-				Runtime: inngest.RuntimeWrapper{
+				Runtime: &inngest.RuntimeWrapper{
 					Runtime: &mockdriver.Mock{},
 				},
 				After: []function.After{
@@ -89,7 +89,7 @@ var (
 		Steps: map[string]function.Step{
 			"1": {
 				ID: "1",
-				Runtime: inngest.RuntimeWrapper{
+				Runtime: &inngest.RuntimeWrapper{
 					Runtime: &mockdriver.Mock{},
 				},
 				After: []function.After{
@@ -104,7 +104,7 @@ var (
 			},
 			"2": {
 				ID: "2",
-				Runtime: inngest.RuntimeWrapper{
+				Runtime: &inngest.RuntimeWrapper{
 					Runtime: &mockdriver.Mock{},
 				},
 				After: []function.After{
@@ -122,7 +122,7 @@ var (
 			},
 			"3": {
 				ID: "3",
-				Runtime: inngest.RuntimeWrapper{
+				Runtime: &inngest.RuntimeWrapper{
 					Runtime: &mockdriver.Mock{},
 				},
 				After: []function.After{

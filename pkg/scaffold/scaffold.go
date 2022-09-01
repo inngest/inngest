@@ -26,7 +26,11 @@ type Mapping struct {
 }
 
 func Parse(ctx context.Context) (*Mapping, error) {
-	return parse(ctx, os.DirFS(CacheDir))
+	mapping, err := parse(ctx, os.DirFS(CacheDir))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse scaffolds: %w", err)
+	}
+	return mapping, nil
 }
 
 func parse(ctx context.Context, dirfs fs.FS) (*Mapping, error) {

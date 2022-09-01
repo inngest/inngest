@@ -64,7 +64,7 @@ func TestEngine_async(t *testing.T) {
 				"first": {
 					ID:   "first",
 					Name: "Basic step",
-					Runtime: inngest.RuntimeWrapper{
+					Runtime: &inngest.RuntimeWrapper{
 						Runtime: &mockdriver.Mock{},
 					},
 					After: []function.After{
@@ -76,7 +76,7 @@ func TestEngine_async(t *testing.T) {
 				"wait-for-evt": {
 					ID:   "wait-for-evt",
 					Name: "A step with a wait",
-					Runtime: inngest.RuntimeWrapper{
+					Runtime: &inngest.RuntimeWrapper{
 						Runtime: &mockdriver.Mock{},
 					},
 					After: []function.After{

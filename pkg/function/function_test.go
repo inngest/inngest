@@ -51,7 +51,7 @@ func TestValidate(t *testing.T) {
 						ID:   "id",
 						Path: "file://.",
 						Name: "lol",
-						Runtime: inngest.RuntimeWrapper{
+						Runtime: &inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeHTTP{
 								URL: "https://www.example.com",
 							},
@@ -61,7 +61,7 @@ func TestValidate(t *testing.T) {
 						ID:   "next",
 						Path: "file://.",
 						Name: "lol",
-						Runtime: inngest.RuntimeWrapper{
+						Runtime: &inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeHTTP{
 								URL: "https://www.example.com",
 							},
@@ -109,7 +109,7 @@ func TestValidate(t *testing.T) {
 						ID:   "id",
 						Path: "file://.",
 						Name: "lol",
-						Runtime: inngest.RuntimeWrapper{
+						Runtime: &inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeHTTP{
 								URL: "https://www.example.com",
 							},
@@ -137,7 +137,7 @@ func TestValidate(t *testing.T) {
 						ID:   "id",
 						Path: "file://.",
 						Name: "lol",
-						Runtime: inngest.RuntimeWrapper{
+						Runtime: &inngest.RuntimeWrapper{
 							Runtime: inngest.RuntimeHTTP{
 								URL: "https://www.example.com",
 							},
@@ -350,7 +350,7 @@ func TestFunctionActions_single(t *testing.T) {
 			"single": {
 				ID:   "single",
 				Name: "single",
-				Runtime: inngest.RuntimeWrapper{
+				Runtime: &inngest.RuntimeWrapper{
 					Runtime: &stubdriver{},
 				},
 			},
