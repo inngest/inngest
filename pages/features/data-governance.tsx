@@ -1,3 +1,4 @@
+import React from "react";
 import Nav from "../../shared/nav";
 import Tag from "../../shared/Tag";
 import styled from "@emotion/styled";
@@ -5,6 +6,16 @@ import Button from "src/shared/Button";
 import Footer from "src/shared/footer";
 
 export default function () {
+  const [hoverVal, setHoverVal] = React.useState("");
+
+  const hover = (e: React.SyntheticEvent<HTMLDivElement>) => {
+    const str = (e.target as HTMLDivElement).getAttribute("data-hover");
+    if (typeof str === "string") {
+      setHoverVal(str);
+    }
+    console.log(e.target);
+  }
+
   return (
     <div>
       <Nav sticky={true} />
@@ -19,7 +30,15 @@ export default function () {
               every platform, everywhere it's used.
             </p>
 
-            <Button kind="primary" href="/sign-up" size="medium" style={{ display: "inline-block" }} className="mt-4">Get started for free</Button>
+            <Button
+              kind="primary"
+              href="/sign-up"
+              size="medium"
+              style={{ display: "inline-block" }}
+              className="mt-4"
+            >
+              Get started for free
+            </Button>
           </div>
           <div className="xl:col-span-1 lg:col-span-2">{/*TODO: Image */}</div>
         </div>
@@ -30,8 +49,10 @@ export default function () {
           <Tag>Feature highlights</Tag>
         </div>
       </div>
-      <div className="container mx-auto max-w-4xl grid lg:grid-cols-5 pt-16 text-center lg:px-0 sm:px-6">
-        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4">
+      <div className="container mx-auto max-w-4xl grid lg:grid-cols-5 pt-16 text-center lg:px-0 sm:px-6 feature-highlights" onMouseOver={hover} onMouseLeave={() => setHoverVal("")}>
+        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
+        data-hover="Write custom transforms to adapt data as it's processed"
+        >
           <svg
             width="24"
             height="24"
@@ -47,7 +68,9 @@ export default function () {
 
           <p className="pt-4">Inline JavaScript (ES6+) transforms</p>
         </div>
-        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4">
+        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
+        data-hover="Version each event with its own schema to control your data as it changes over time"
+        >
           <svg
             width="24"
             height="24"
@@ -62,7 +85,9 @@ export default function () {
 
           <p className="pt-4">Event versioning and&nbsp;management</p>
         </div>
-        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4">
+        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
+        data-hover="Enforce schemas for each event, and store invalid events in quarantine for inspection and post-processing"
+        >
           <svg
             width="24"
             height="24"
@@ -76,7 +101,9 @@ export default function () {
           </svg>
           <p className="pt-4">Event schemas with data quarantine</p>
         </div>
-        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4">
+        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
+        data-hover="Enrich data via external APIs using any programming language"
+        >
           <svg
             width="24"
             height="24"
@@ -90,7 +117,9 @@ export default function () {
           </svg>
           <p className="pt-4">Enrichment via external&nbsp;APIs</p>
         </div>
-        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4">
+        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
+        data-hover="Proactively alert when events become anomalous or have invalid data, without any setup"
+        >
           <svg
             width="24"
             height="24"
@@ -105,6 +134,7 @@ export default function () {
           <p className="pt-4">Alerting and error reporting&nbsp;built-in</p>
         </div>
       </div>
+      <p className="text-center pt-6 text-xs text-slate-500">{hoverVal || (<>&nbsp;</>)}</p>
 
       <div className="container mx-auto grid grid-cols-2 gap-16 pt-48">
         <div>
@@ -113,28 +143,36 @@ export default function () {
             <strong>
               We automatically type-check and validate events sent to Inngest
             </strong>
-            , ensuring your functionality is always called correctly.  You
-            can be sure that your functions are always called with the correct
-            arguments, and that data for the rest of your team is correct. 
+            , ensuring your functionality is always called correctly. You can be
+            sure that your functions are always called with the correct
+            arguments, and that data for the rest of your team is correct.
           </p>
           <p style={{ margin: 0 }} className="pt-3">
             And if your data is wrong we'll place your events in quarantine,
-            allowing you to fix them and re-process your business logic &mdash; for
-            the easiest and safest recover ever.
+            allowing you to fix them and re-process your business logic &mdash;
+            for the easiest and safest recover ever.
           </p>
         </div>
 
-        <div style={{ background: "#eee" }}></div>
+        <div className="flex align-center justify-center">
+          <img src="/assets/overview-simplified.svg" alt="Inngest overview" />
+        </div>
       </div>
-
 
       <div className="container mx-auto mt-48 py-16 text-center background-grid-texture">
         <h3 className="pb-2">Examples, patterns, and guides</h3>
-        <p>Explore a suite of fully-built examples, plus patterns and guides for building rich, reliable functionality</p>
+        <p>
+          Explore a suite of fully-built examples, plus patterns and guides for
+          building rich, reliable functionality
+        </p>
 
         <div className="flex justify-center pt-12">
-          <Button kind="outline" href="/quick-starts">View examples</Button>
-          <Button kind="outline" href="/docs">View docs</Button>
+          <Button kind="outline" href="/quick-starts">
+            View examples
+          </Button>
+          <Button kind="outline" href="/docs">
+            View docs
+          </Button>
         </div>
       </div>
 
