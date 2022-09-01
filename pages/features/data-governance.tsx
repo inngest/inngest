@@ -1,7 +1,6 @@
 import React from "react";
 import Nav from "../../shared/nav";
 import Tag from "../../shared/Tag";
-import styled from "@emotion/styled";
 import Button from "src/shared/Button";
 import Footer from "src/shared/footer";
 
@@ -11,9 +10,10 @@ export default function () {
   const hover = (e: React.SyntheticEvent<HTMLDivElement>) => {
     const str = (e.target as HTMLDivElement).getAttribute("data-hover");
     if (typeof str === "string") {
+      // Only set hover value if we're targeting the div element.
+      // This is emptied via onMouseLeave within the parent container.
       setHoverVal(str);
     }
-    console.log(e.target);
   }
 
   return (
