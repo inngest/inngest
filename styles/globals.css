@@ -23,7 +23,7 @@
   --font-heading: var(--font);
 
 
-  --black: #040408;
+  --black: #2E2E38;
   --black-rgb: 4, 4, 8;
   --gray: #212121;
   --green: #16a973;
@@ -32,6 +32,7 @@
   --color-iris-100: #5D5FEF;
   --color-fuschia-100: #EF5DA8;
   --color-gray-purple: #8A8A9D;
+  --color-light-purple: #D1D1FA;
 
   --bg-color-d: #0a0a12;
   --bg-color-l: #fbfbff;
@@ -47,6 +48,7 @@
   --font-color-secondary: #acb2c2;
   --link-color: #dfe2e9;
   --bg-feint-color: #f7f8f9;
+
 
   --box-shadow: 0 1px 1rem 1rem rgba(255, 255, 255, 0.1);
 
@@ -81,7 +83,7 @@ body.light-theme {
   --highlight-color: #ffffff;
   --stroke-color: #D3D3DF;
   --stroke-color-light: #80848e;
-  --font-color-primary: #070707;
+  --font-color-primary: #2E2E38;
   --font-color-secondary: #8F8F9D;
   --link-color: var(--color-iris-100);
 
@@ -576,4 +578,25 @@ ul.check li {
   .lg\:order-2 {
     order: 2;
   }
+}
+
+/** New designs **/
+.center-dash-purple {
+  position: relative;
+}
+.center-dash-purple * {
+  position: relative;
+  z-index: 1;
+}
+.center-dash-purple:before {
+  z-index: 0;
+  position: absolute;
+  content: "";
+  display: block;
+  width: 100%;
+  border-bottom: 2px dashed var(--color-light-purple);
+  top: 50%;
+  margin-top: 1px;
+  width: 100%;
+  opacity: .5;
 }

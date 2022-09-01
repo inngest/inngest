@@ -25,7 +25,7 @@ const Nav: React.FC<Props> = (props) => {
 const NavContent: React.FC<Props> = (props: Props) => {
   const [show, setShow] = useState(false);
   return (
-    <Container className={[show ? "show" : ""].join(" ")}>
+    <Container className={`container mx-auto ${show && "show"}`}>
       <div>
         <a href="/?ref=nav">
           <Logo width={115} className="logo" />
@@ -59,23 +59,6 @@ const NavContent: React.FC<Props> = (props: Props) => {
           <StyledLink key="github" href="https://github.com/inngest/inngest">
             <Github />
           </StyledLink>
-
-          {!props.nodemo && (
-            <Button
-              href="/demo?ref=nav"
-              className="button"
-              kind="primary"
-              style={{
-                padding: "0.3rem 0.8rem",
-                border: "0",
-                background:
-                  "#523895 linear-gradient(307deg, #4136ba 0%, #8b3c68 100%);",
-              }}
-            >
-              <MediaPlay />
-              Watch Demo
-            </Button>
-          )}
         </div>
       )}
 
@@ -114,18 +97,18 @@ const NavWrapper = styled.nav<{ sticky: boolean }>`
   position: ${({ sticky }) => (sticky ? "sticky" : "relative")};
   z-index: 20;
   top: ${({ sticky }) => (sticky ? "0" : "auto")};
-  margin: 1.5rem auto;
+  margin: 0 auto 1.5rem;
   background-color: var(--bg-color);
+  box-shadow: 0 0 100px rgba(0, 0, 0, 0.07);
 `;
 
 const Container = styled.div<{ sticky?: boolean }>`
   position: relative;
-  max-width: 1200px;
   margin: 0 auto;
   z-index: 40;
   display: grid;
+  padding: 1rem 0;
   grid-template-columns: auto 1fr auto;
-  padding: 0.5rem 1rem;
 
   font-family: var(--font);
   font-size: 0.9em;
@@ -265,7 +248,7 @@ const Container = styled.div<{ sticky?: boolean }>`
 const StyledLink = styled.a`
   display: inline-flex;
   align-items: center;
-  padding: 0.3rem 0.5rem 0.25rem;
+  padding: 0.3rem 0.6rem 0.25rem;
   min-height: calc(1.5em + 0.3rem + 0.25rem); // make icons same height as text
   transition: all 0.2s;
   text-decoration: none;
@@ -276,6 +259,9 @@ const StyledLink = styled.a`
 
   &:hover {
     background: #2f6d9d11;
+  }
+  & + & {
+    margin-left: 0.6rem;
   }
 `;
 

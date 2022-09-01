@@ -56,7 +56,8 @@ export default function DocsHome(props) {
           </a>
           <a
             href="/docs/deploying-fuctions"
-          className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white">
+            className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white"
+          >
             <p className="text-base my-2">🚢 Deploying</p>
             <p className="text-slate-600">
               Learn how to deply your functions to production instantly, without
@@ -88,15 +89,16 @@ export default function DocsHome(props) {
             deploys, version management and git integration
           </li>
           <li>Event coordination for building complex interactive functions</li>
-          <li>Event & data governance, schemas, and forwarding out of the box</li>
+          <li>
+            Event & data governance, schemas, and forwarding out of the box
+          </li>
         </ul>
 
         <h2 className="pt-4">Use cases</h2>
         <p>
           Inngest users are typically developers and data engineers. They use
           Inngest to reliably run background work, serverless functions, and
-          scheduled jobs across a variety of use cases. Common examples
-          include:
+          scheduled jobs across a variety of use cases. Common examples include:
         </p>
 
         <ul>
@@ -323,13 +325,17 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
     margin: 1.5em 0;
   }
 
-  ol ul { margin: .25rem 0 0 1.5rem; }
+  ol ul {
+    margin: 0.25rem 0 0 1.5rem;
+  }
 
   ul {
     list-style-type: disc;
     margin-left: 1rem;
   }
-  ol { list-style-type: number }
+  ol {
+    list-style-type: number;
+  }
 
   aside,
   video {

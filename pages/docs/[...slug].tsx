@@ -223,9 +223,10 @@ const TOC = styled.nav<{ isExpanded: boolean }>`
     }
   }
 
-  ol, ol ul {
+  ol,
+  ol ul {
     padding: 0;
-    margin: 0
+    margin: 0;
   }
   li {
     list-style: none;

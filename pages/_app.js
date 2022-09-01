@@ -5,7 +5,7 @@ import Script from "next/script";
 import { trackPageView } from "../utils/tracking";
 import { useAnonId } from "../shared/trackingHooks";
 import "../styles/globals.css";
-import * as fullstory from '@fullstory/browser';
+import * as fullstory from "@fullstory/browser";
 
 import PageBanner from "../shared/PageBanner";
 
