@@ -1,14 +1,16 @@
 import Nav from "../../shared/nav";
 import Tag from "../../shared/Tag";
 import styled from "@emotion/styled";
+import Button from "src/shared/Button";
+import Footer from "src/shared/footer";
 
 export default function () {
   return (
     <div>
       <Nav sticky={true} />
       <div className="container mx-auto py-24">
-        <div className="grid grid-cols-2">
-          <div className="col-span-1">
+        <div className="grid xl:grid-cols-2 lg:grid-cols-5">
+          <div className="xl:col-span-1 lg:col-span-3">
             <Tag className="mb-4">Data governance</Tag>
             <h1>Guarantee good data, everywhere.</h1>
             <p className="py-4 font-lg">
@@ -16,8 +18,10 @@ export default function () {
               enrich data as it’s processed — ensuring your data is correct in
               every platform, everywhere it's used.
             </p>
+
+            <Button kind="primary" href="/sign-up" size="medium" style={{ display: "inline-block" }} className="mt-4">Get started for free</Button>
           </div>
-          <div className="col-span-1">{/*TODO: Image */}</div>
+          <div className="xl:col-span-1 lg:col-span-2">{/*TODO: Image */}</div>
         </div>
       </div>
 
@@ -26,8 +30,8 @@ export default function () {
           <Tag>Feature highlights</Tag>
         </div>
       </div>
-      <div className="container mx-auto max-w-4xl grid grid-cols-5 pt-16 text-center gap-6">
-        <div className="flex flex-col items-center">
+      <div className="container mx-auto max-w-4xl grid lg:grid-cols-5 pt-16 text-center lg:px-0 sm:px-6">
+        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4">
           <svg
             width="24"
             height="24"
@@ -43,7 +47,7 @@ export default function () {
 
           <p className="pt-4">Inline JavaScript (ES6+) transforms</p>
         </div>
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4">
           <svg
             width="24"
             height="24"
@@ -58,7 +62,7 @@ export default function () {
 
           <p className="pt-4">Event versioning and&nbsp;management</p>
         </div>
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4">
           <svg
             width="24"
             height="24"
@@ -70,9 +74,9 @@ export default function () {
               fill="#070707"
             />
           </svg>
-          <p className="pt-4">Data quarantine with schema validation</p>
+          <p className="pt-4">Event schemas with data quarantine</p>
         </div>
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4">
           <svg
             width="24"
             height="24"
@@ -86,7 +90,7 @@ export default function () {
           </svg>
           <p className="pt-4">Enrichment via external&nbsp;APIs</p>
         </div>
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4">
           <svg
             width="24"
             height="24"
@@ -106,20 +110,32 @@ export default function () {
         <div>
           <h3 className="pb-4">Develop without errors</h3>
           <p style={{ margin: 0 }} className="pt-3">
-            We{" "}
             <strong>
-              automatically type-check and validate events sent to Inngest
+              We automatically type-check and validate events sent to Inngest
             </strong>
-            , ensuring your functionality is always called correctly.
+            , ensuring your functionality is always called correctly.  You
+            can be sure that your functions are always called with the correct
+            arguments, and that data for the rest of your team is correct. 
           </p>
           <p style={{ margin: 0 }} className="pt-3">
             And if your data is wrong we'll place your events in quarantine,
-            allowing you to fix them and re-process your business logic. Easiest
-            fixing ever.
+            allowing you to fix them and re-process your business logic &mdash; for
+            the easiest and safest recover ever.
           </p>
         </div>
 
         <div style={{ background: "#eee" }}></div>
+      </div>
+
+
+      <div className="container mx-auto mt-48 py-16 text-center background-grid-texture">
+        <h3 className="pb-2">Examples, patterns, and guides</h3>
+        <p>Explore a suite of fully-built examples, plus patterns and guides for building rich, reliable functionality</p>
+
+        <div className="flex justify-center pt-12">
+          <Button kind="outline" href="/quick-starts">View examples</Button>
+          <Button kind="outline" href="/docs">View docs</Button>
+        </div>
       </div>
 
       <div className="container mx-auto grid grid-cols-3 gap-16 pt-48">
@@ -147,6 +163,8 @@ export default function () {
           </p>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 }
