@@ -19,28 +19,26 @@ export default function () {
   return (
     <div>
       <Nav sticky={true} />
-      <div className="container mx-auto py-24">
-        <div className="grid xl:grid-cols-2 lg:grid-cols-5">
-          <div className="xl:col-span-1 lg:col-span-3">
-            <Tag className="mb-4">Data governance</Tag>
-            <h1>Guarantee good data, everywhere.</h1>
-            <p className="py-4 font-lg">
-              A single platform that allows you to inspect, validate, fix, and
-              enrich data as it’s processed — ensuring your data is correct in
-              every platform, everywhere it's used.
-            </p>
 
-            <Button
-              kind="primary"
-              href="/sign-up"
-              size="medium"
-              style={{ display: "inline-block" }}
-              className="mt-4"
-            >
-              Get started for free
-            </Button>
-          </div>
-          <div className="xl:col-span-1 lg:col-span-2">{/*TODO: Image */}</div>
+      <div className="container mx-auto py-24">
+        <div className="max-w-2xl mx-auto text-center">
+          <Tag className="mb-4">Data governance</Tag>
+          <h1>Guarantee good data, everywhere.</h1>
+          <p className="py-4 font-lg">
+            A single platform that allows you to inspect, validate, fix, and
+            enrich data as it’s processed — ensuring your data is correct in
+            every platform, everywhere it's used.
+          </p>
+
+          <Button
+            kind="primary"
+            href="/sign-up"
+            size="medium"
+            style={{ display: "inline-block" }}
+            className="mt-4"
+          >
+            Get started for free
+          </Button>
         </div>
       </div>
 
