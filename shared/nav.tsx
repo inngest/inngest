@@ -46,15 +46,15 @@ const NavContent: React.FC<Props> = (props: Props) => {
                 </a>
                 <a href="/features/data-governance" className="rounded-lg p-4">
                   <p>Data governance</p>
-                  <p className="pt-1 text-slate-400"><small>The single platform to handle, manage, and distribute all event data</small></p>
+                  <p className="pt-1 text-slate-400"><small>The single platform to handle and manage all event data</small></p>
                 </a>
               </div>
 
               <div className="secondary-links col-span-5 bg-slate-100 pt-6 pb-3 px-2 text-xs">
                 <span className="text-slate-400 px-4">Use cases</span>
-                <a href="/uses/serverless-node-background-jobs" className="rounded-lg p-4">Background and scheduled jobs</a>
-                <a href="/uses/internal-tools" className="rounded-lg p-4">Internal tools</a>
-                <a href="/uses/user-journey-automation" className="rounded-lg p-4">User journey automation</a>
+                <a href="/uses/serverless-node-background-jobs" className="rounded-lg px-4 py-3">Background and scheduled jobs</a>
+                <a href="/uses/internal-tools" className="rounded-lg px-4 py-3">Internal tools</a>
+                <a href="/uses/user-journey-automation" className="rounded-lg px-4 py-3">User journey automation</a>
               </div>
             </div>
           </Hoverable>
@@ -340,9 +340,6 @@ const Hoverable = styled.div`
       &:hover {
         background: #2f6d9d11;
       }
-    }
-    a + a {
-      margin-top: .25rem;
     }
     p { margin: 0;  line-height: 1.05; };
   }

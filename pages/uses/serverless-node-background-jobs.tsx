@@ -25,7 +25,7 @@ export default function Template() {
       <Nav sticky={true} nodemo />
       <div className="container mx-auto py-32 flex flex-row">
         <div className="basis-1/2 px-6">
-          <h1>Serverless background jobs for Node & Deno</h1>
+          <h1>Serverless background and scheduled jobs</h1>
           <p className="pt-6 subheading">
             Build, test, then deploy background jobs and scheduled tasks without
             worrying about infrastructure or queues — so you can focus on your
@@ -54,7 +54,7 @@ export default function Template() {
       <div className="container mx-auto">
         <h2 className="text-center">Designed for Developers</h2>
         <p className="text-center pt-2 pb-24">
-          Develop, test, and deploy background tasks for Node and Deno using a
+          Develop, test, and deploy background tasks across any language using a
           single CLI built for developer productivity.
         </p>
 
