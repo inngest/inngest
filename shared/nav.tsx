@@ -25,7 +25,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
   const [show, setShow] = useState(false);
   return (
     <Container className={`container mx-auto ${show && "show"}`}>
-      <div>
+      <div className="lg:px-0 sm:px-4">
         <a href="/?ref=nav">
           <Logo width={115} className="logo" />
         </a>
@@ -206,8 +206,6 @@ const Container = styled.div<{ sticky?: boolean }>`
     grid-template-columns: 1fr 64px;
     grid-column: 2 / -2;
     // unset
-    margin-left: 0;
-    margin-right: 0;
 
     .auth-options {
       display: none;
@@ -242,11 +240,16 @@ const Container = styled.div<{ sticky?: boolean }>`
       grid-template-columns: repeat(10, 1fr);
       align-items: stretch;
 
-      a {
+      > a, > div {
         grid-column: 2 / -2;
+      }
+      > div { padding: 0 }
+      a, > a {
+        display: block;
         margin: 0;
         padding: 0.5rem 4px;
       }
+
     }
 
     align-items: center;
@@ -292,6 +295,12 @@ const Hoverable = styled.div`
     pointer-events: all;
     transform: translateY(0);
     transition: all 0.3s;
+  }
+
+  @media only screen and (max-width: 800px) {
+    > div {
+      display: none;
+    }
   }
 
   > div {
