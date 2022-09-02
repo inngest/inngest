@@ -40,7 +40,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
             <div className="rounded-lg w-96 grid grid-cols-12">
               <div className="col-span-7 primary-links pt-6 pb-2 px-2">
                 <span className="text-slate-400 px-4">Product</span>
-                <a href="/features/data-governance" className="rounded-lg p-4">
+                <a href="/product" className="rounded-lg p-4">
                   <p>Functions</p>
                   <p className="pt-1 text-slate-400"><small>Event-driven and scheduled serverless step functions</small></p>
                 </a>
