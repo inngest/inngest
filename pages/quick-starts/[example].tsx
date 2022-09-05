@@ -64,7 +64,7 @@ export default function LibraryExamplePage(props: Props) {
               copy
             />
           </div>
-          <div className="flex flex-row justify-center">
+          <div className="flex flex-col justify-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
             <Button
               kind="primary"
               href={`/quick-starts?ref=quick-starts/${props.id}`}
@@ -75,7 +75,7 @@ export default function LibraryExamplePage(props: Props) {
               kind="outline"
               href={`https://github.com/inngest/inngest/tree/main/examples/${props.id}`}
               target="_blank"
-              className="flex flex-row items-center justify-center space-x-1"
+              className="flex flex-row items-center justify-center space-x-1 !ml-0 sm:!ml-4"
             >
               <Github />
               <div>Explore the code</div>
