@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -36,8 +37,9 @@ type runFunctionOpts struct {
 
 func NewCmdRun() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "run",
+		Use:     "run [dir]",
 		Short:   "Run a serverless function locally",
+		Long:    "Run a serverless function locally.\n\nIf no directory is provided, will attempt to run a function in the current directory, or look for an Inngest config file in a parent directory.\n\nIf a directory is provided, will attempt to recursively find and run all functions in that directory. Cannot replay a specific event ID or run data from a snapshot in recursive mode.",
 		Example: "inngest run",
 		Run:     doRun,
 	}
@@ -53,76 +55,105 @@ func NewCmdRun() *cobra.Command {
 }
 
 func doRun(cmd *cobra.Command, args []string) {
+	fmt.Println(cli.EnvString())
+	if err := run(cmd, args); err != nil {
+		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+		os.Exit(1)
+	}
+}
+
+func run(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	path := "."
+	path := ""
 	if len(args) == 1 {
 		path = args[0]
 	}
 
-	fn, err := function.Load(ctx, path)
-	if err != nil {
-		fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
-		os.Exit(1)
-		return
-	}
-
+	isRecursiveMode := path != ""
 	snapshotMode := cmd.Flag("snapshot").Value.String() == "true"
-
-	if !snapshotMode {
-		if err = buildImg(ctx, *fn); err != nil {
-			// This should already have been printed to the terminal.
-			fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
-			os.Exit(1)
-		}
-	}
-
 	triggerName := cmd.Flag("trigger").Value.String()
 	hasVerboseFlag := cmd.Flag("verbose").Value.String() == "true"
-	isReplayMode := cmd.Flag("replay").Value.String() == "true"
 	rawEventId := cmd.Flag("event-id").Value.String()
+	isReplayMode := cmd.Flag("replay").Value.String() == "true" || rawEventId != ""
 
-	// In order to improve the dev UX, if there's no trigger provided we should
-	// inspect the function and check to see if the fn only has one trigger.  If
-	// so, use that trigger - it's the only option.
-	if triggerName == "" && len(fn.Triggers) == 1 && fn.Triggers[0].EventTrigger != nil {
-		triggerName = fn.Triggers[0].Event
+	if rawEventId != "" && isRecursiveMode {
+		return fmt.Errorf("can't run in recursive mode with a single event ID; run the function individually instead")
 	}
 
-	eventFunc := generatedEventLoader(ctx, *fn, triggerName)
-	if isReplayMode {
-		// Replay N events.
-		eventFunc = multiReplayEventLoader(ctx, triggerName, replayCount)
-		if rawEventId != "" {
-			// We're fetching a single ID.
-			id, err := ulid.ParseStrict(rawEventId)
+	fns, err := function.LoadFromPath(ctx, path)
+	if err != nil {
+		return err
+	}
+	if len(fns) < 1 {
+		return fmt.Errorf("no functions found to run")
+	}
+	if len(fns) > 1 && snapshotMode {
+		return fmt.Errorf("using --snapshot flag but found multiple functions; one function must be provided to snapshot")
+	}
+
+	funcNames := make([]string, 0, len(fns))
+
+	for _, fn := range fns {
+		funcNames = append(funcNames, fn.Name)
+	}
+
+	fmt.Println("Running", len(fns), "function(s):", strings.Join(funcNames, ", "))
+
+	for _, fn := range fns {
+		// We only support snapshot mode when running a single function
+		if !snapshotMode {
+			if err = buildImg(ctx, *fn); err != nil {
+				// This should already have been printed to the terminal.
+				fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+				os.Exit(1)
+			}
+		}
+
+		// In order to improve the dev UX, if there's no trigger provided we should
+		// inspect the function and check to see if the fn only has one trigger.  If
+		// so, use that trigger - it's the only option.
+		if triggerName == "" && len(fn.Triggers) == 1 && fn.Triggers[0].EventTrigger != nil {
+			triggerName = fn.Triggers[0].Event
+		}
+
+		eventFunc := generatedEventLoader(ctx, *fn, triggerName)
+		if isReplayMode {
+			// Replay N events.
+			eventFunc = multiReplayEventLoader(ctx, triggerName, replayCount)
+			if rawEventId != "" {
+				// We're fetching a single ID.
+				id, err := ulid.ParseStrict(rawEventId)
+				if err != nil {
+					fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+					os.Exit(1)
+				}
+				eventFunc = singleReplayEventLoader(ctx, &id)
+			}
+		}
+
+		if cmd.Flag("snapshot").Value.String() == "true" {
+			err := snapshotEvents(ctx, eventFunc)
 			if err != nil {
 				fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
 				os.Exit(1)
 			}
-			eventFunc = singleReplayEventLoader(ctx, &id)
-		}
-	}
 
-	if cmd.Flag("snapshot").Value.String() == "true" {
-		err := snapshotEvents(ctx, eventFunc)
-		if err != nil {
-			fmt.Println("\n" + cli.RenderError(err.Error()) + "\n")
+			os.Exit(0)
+		}
+
+		opts := runFunctionOpts{
+			verbose:   hasVerboseFlag,
+			eventFunc: eventFunc,
+		}
+
+		if err = runFunction(ctx, *fn, opts); err != nil {
+			// Already printed.
 			os.Exit(1)
 		}
-
-		os.Exit(0)
 	}
 
-	opts := runFunctionOpts{
-		verbose:   hasVerboseFlag,
-		eventFunc: eventFunc,
-	}
-
-	if err = runFunction(ctx, *fn, opts); err != nil {
-		// Already printed.
-		os.Exit(1)
-	}
+	return nil
 }
 
 // Returns a loader that creates a single generated `triggerName` event, or a
