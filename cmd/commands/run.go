@@ -70,16 +70,11 @@ func run(cmd *cobra.Command, args []string) error {
 		path = args[0]
 	}
 
-	isRecursiveMode := path != ""
 	snapshotMode := cmd.Flag("snapshot").Value.String() == "true"
 	triggerName := cmd.Flag("trigger").Value.String()
 	hasVerboseFlag := cmd.Flag("verbose").Value.String() == "true"
 	rawEventId := cmd.Flag("event-id").Value.String()
 	isReplayMode := cmd.Flag("replay").Value.String() == "true" || rawEventId != ""
-
-	if rawEventId != "" && isRecursiveMode {
-		return fmt.Errorf("can't run in recursive mode with a single event ID; run the function individually instead")
-	}
 
 	fns, err := function.LoadFromPath(ctx, path)
 	if err != nil {
@@ -88,8 +83,14 @@ func run(cmd *cobra.Command, args []string) error {
 	if len(fns) < 1 {
 		return fmt.Errorf("no functions found to run")
 	}
-	if len(fns) > 1 && snapshotMode {
-		return fmt.Errorf("using --snapshot flag but found multiple functions; one function must be provided to snapshot")
+	if len(fns) > 1 {
+		if snapshotMode {
+			return fmt.Errorf("using --snapshot flag but found multiple functions; one function must be provided to snapshot")
+		}
+
+		if rawEventId != "" {
+			return fmt.Errorf("can't run in recursive mode with a single event ID; run the function individually instead")
+		}
 	}
 
 	funcNames := make([]string, 0, len(fns))
