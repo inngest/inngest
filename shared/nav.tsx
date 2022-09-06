@@ -42,25 +42,68 @@ const NavContent: React.FC<Props> = (props: Props) => {
                 <span className="text-slate-400 px-4">Product</span>
                 <a href="/product" className="rounded-lg p-4">
                   <p>Functions</p>
-                  <p className="pt-1 text-slate-400"><small>Event-driven and scheduled serverless step functions</small></p>
+                  <p className="pt-1 text-slate-400">
+                    <small>
+                      Event-driven and scheduled serverless step functions
+                    </small>
+                  </p>
                 </a>
                 <a href="/features/data-governance" className="rounded-lg p-4">
                   <p>Data governance</p>
-                  <p className="pt-1 text-slate-400"><small>The single platform to handle and manage all event data</small></p>
+                  <p className="pt-1 text-slate-400">
+                    <small>
+                      The single platform to handle and manage all event data
+                    </small>
+                  </p>
                 </a>
               </div>
 
               <div className="secondary-links col-span-5 bg-slate-100 pt-6 pb-3 px-2 text-xs">
                 <span className="text-slate-400 px-4">Use cases</span>
-                <a href="/uses/serverless-node-background-jobs" className="rounded-lg px-4 py-3">Background and scheduled jobs</a>
-                <a href="/uses/internal-tools" className="rounded-lg px-4 py-3">Internal tools</a>
-                <a href="/uses/user-journey-automation" className="rounded-lg px-4 py-3">User journey automation</a>
+                <a
+                  href="/uses/serverless-node-background-jobs"
+                  className="rounded-lg px-4 py-3"
+                >
+                  Background and scheduled jobs
+                </a>
+                <a href="/uses/internal-tools" className="rounded-lg px-4 py-3">
+                  Internal tools
+                </a>
+                <a
+                  href="/uses/user-journey-automation"
+                  className="rounded-lg px-4 py-3"
+                >
+                  User journey automation
+                </a>
               </div>
             </div>
           </Hoverable>
-          <StyledLink key="docs" href="/docs?ref=nav">
-            Docs
-          </StyledLink>
+          <Hoverable>
+            <StyledLink key="product" href="/docs?ref=nav">
+              Learn
+            </StyledLink>
+            <div className="rounded-lg w-56 ">
+              <div className="primary-links py-2 px-2">
+                <a href="/product" className="rounded-lg p-4">
+                  <p>Docs</p>
+                  <p className="pt-1 text-slate-400">
+                    <small>
+                      Everything you need to know about our event-driven
+                      platform
+                    </small>
+                  </p>
+                </a>
+                <a href="/features/data-governance" className="rounded-lg p-4">
+                  <p>Quick starts</p>
+                  <p className="pt-1 text-slate-400">
+                    <small>
+                      Example projects to reference when using Inngest
+                    </small>
+                  </p>
+                </a>
+              </div>
+            </div>
+          </Hoverable>
           <StyledLink key="blog" href="/blog?ref=nav">
             Blog
           </StyledLink>
@@ -240,16 +283,19 @@ const Container = styled.div<{ sticky?: boolean }>`
       grid-template-columns: repeat(10, 1fr);
       align-items: stretch;
 
-      > a, > div {
+      > a,
+      > div {
         grid-column: 2 / -2;
       }
-      > div { padding: 0 }
-      a, > a {
+      > div {
+        padding: 0;
+      }
+      a,
+      > a {
         display: block;
         margin: 0;
         padding: 0.5rem 4px;
       }
-
     }
 
     align-items: center;
@@ -277,7 +323,7 @@ const StyledLink = styled.a`
   white-space: nowrap;
 
   color: var(--font-color-primary);
-  transition: all .3s;
+  transition: all 0.3s;
 
   &:hover {
     background: #2f6d9d11;
@@ -290,7 +336,8 @@ const StyledLink = styled.a`
 const Hoverable = styled.div`
   position: relative;
 
-  &.visible > div, &:hover > div {
+  &.visible > div,
+  &:hover > div {
     opacity: 1;
     pointer-events: all;
     transform: translateY(0);
@@ -329,8 +376,7 @@ const Hoverable = styled.div`
     z-index: 3;
     background: #fff;
     box-sizing: border-box;
-    box-shadow: 0 0 100px rgba(0, 0, 0, 0.15),
-      0 10px 20px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 0 100px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.08);
   }
 
   span {
@@ -339,10 +385,11 @@ const Hoverable = styled.div`
     letter-spacing: 1.5px;
     font-size: 12px;
     line-height: 1.25;
-    margin: 0 0 .75rem;
+    margin: 0 0 0.75rem;
   }
 
-  .primary-links, .secondary-links {
+  .primary-links,
+  .secondary-links {
     a {
       display: block;
       margin: 0;
@@ -350,7 +397,10 @@ const Hoverable = styled.div`
         background: #2f6d9d11;
       }
     }
-    p { margin: 0;  line-height: 1.05; };
+    p {
+      margin: 0;
+      line-height: 1.05;
+    }
   }
 
   .secondary-links a {

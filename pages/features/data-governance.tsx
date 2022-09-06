@@ -14,7 +14,7 @@ export default function () {
       // This is emptied via onMouseLeave within the parent container.
       setHoverVal(str);
     }
-  }
+  };
 
   return (
     <div>
@@ -47,9 +47,14 @@ export default function () {
           <Tag>Feature highlights</Tag>
         </div>
       </div>
-      <div className="container mx-auto max-w-4xl grid lg:grid-cols-5 pt-16 text-center lg:px-0 sm:px-6 feature-highlights" onMouseOver={hover} onMouseLeave={() => setHoverVal("")}>
-        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
-        data-hover="Write custom transforms to adapt data as it's processed"
+      <div
+        className="container mx-auto max-w-4xl grid lg:grid-cols-5 pt-16 text-center lg:px-0 sm:px-6 feature-highlights"
+        onMouseOver={hover}
+        onMouseLeave={() => setHoverVal("")}
+      >
+        <div
+          className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
+          data-hover="Write custom transforms to adapt data as it's processed"
         >
           <svg
             width="24"
@@ -66,8 +71,9 @@ export default function () {
 
           <p className="pt-4">Inline JavaScript (ES6+) transforms</p>
         </div>
-        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
-        data-hover="Version each event with its own schema to control your data as it changes over time"
+        <div
+          className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
+          data-hover="Version each event with its own schema to control your data as it changes over time"
         >
           <svg
             width="24"
@@ -83,8 +89,9 @@ export default function () {
 
           <p className="pt-4">Event versioning and&nbsp;management</p>
         </div>
-        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
-        data-hover="Enforce schemas for each event, and store invalid events in quarantine for inspection and post-processing"
+        <div
+          className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
+          data-hover="Enforce schemas for each event, and store invalid events in quarantine for inspection and post-processing"
         >
           <svg
             width="24"
@@ -99,8 +106,9 @@ export default function () {
           </svg>
           <p className="pt-4">Event schemas with data quarantine</p>
         </div>
-        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
-        data-hover="Enrich data via external APIs using any programming language"
+        <div
+          className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
+          data-hover="Enrich data via external APIs using any programming language"
         >
           <svg
             width="24"
@@ -115,8 +123,9 @@ export default function () {
           </svg>
           <p className="pt-4">Enrichment via external&nbsp;APIs</p>
         </div>
-        <div className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
-        data-hover="Proactively alert when events become anomalous or have invalid data, without any setup"
+        <div
+          className="flex flex-col items-center hover:shadow-xl hover:bg-white rounded-sm p-4"
+          data-hover="Proactively alert when events become anomalous or have invalid data, without any setup"
         >
           <svg
             width="24"
@@ -132,7 +141,9 @@ export default function () {
           <p className="pt-4">Alerting and error reporting&nbsp;built-in</p>
         </div>
       </div>
-      <p className="text-center pt-6 text-xs text-slate-500">{hoverVal || (<>&nbsp;</>)}</p>
+      <p className="text-center pt-6 text-xs text-slate-500">
+        {hoverVal || <>&nbsp;</>}
+      </p>
 
       <div className="container mx-auto grid grid-cols-2 gap-16 pt-44">
         <div>
@@ -153,7 +164,12 @@ export default function () {
         </div>
 
         <div className="flex align-center justify-center">
-          <img src="/assets/overview-simplified.svg" alt="Inngest overview" height="auto" className="self-center" />
+          <img
+            src="/assets/overview-simplified.svg"
+            alt="Inngest overview"
+            height="auto"
+            className="self-center"
+          />
         </div>
       </div>
 
@@ -177,21 +193,25 @@ export default function () {
       <div className="container mx-auto">
         <div className="p-20 mt-24 rounded-xl bg-slate-100">
           <h2 className="mb-2">Develop faster and safer</h2>
-          <p>Use our platform to rapidly build functionality driven by events, with zero infrastructure and full end-to-end safety.</p>
+          <p>
+            Use our platform to rapidly build functionality driven by events,
+            with zero infrastructure and full end-to-end safety.
+          </p>
           <div className="grid lg:grid-cols-3 gap-16 mt-20">
             <div>
               <h3 className="pb-4">Powerful</h3>
               <p>
-                Transform and enrich data on-the-fly, ensuring your data is as clean
-                and powerful as possible. See an entire overview of what each event
-                does in your system — no documenting required.
+                Transform and enrich data on-the-fly, ensuring your data is as
+                clean and powerful as possible. See an entire overview of what
+                each event does in your system — no documenting required.
               </p>
             </div>
             <div>
               <h3 className="pb-4">Flexible</h3>
               <p>
-                Create unlimited event versions with a full changelog, ensuring your
-                event registry can adapt to your business needs as you grow.
+                Create unlimited event versions with a full changelog, ensuring
+                your event registry can adapt to your business needs as you
+                grow.
               </p>
             </div>
             <div>
