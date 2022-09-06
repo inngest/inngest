@@ -23,6 +23,30 @@ const (
 	JsonConfigName = "inngest.json"
 )
 
+// LoadFromPath loads either a single Inngest function from the current
+// directory or up if `path` is empty, or multiple Inngest functions recusrively
+// if `path` is populated.
+func LoadFromPath(ctx context.Context, path string) ([]*Function, error) {
+	var fns []*Function
+	var err error
+
+	if path != "" {
+		fns, err = LoadRecursive(ctx, path)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		fn, err := Load(ctx, ".")
+		if err != nil {
+			return nil, err
+		}
+
+		fns = []*Function{fn}
+	}
+
+	return fns, err
+}
+
 // Load loads the inngest function from the given directory.  It searches for both inngest.cue
 // and inngest.json as both are supported.  If neither exist, this returns ErrNotFound.
 func Load(ctx context.Context, dir string) (*Function, error) {
