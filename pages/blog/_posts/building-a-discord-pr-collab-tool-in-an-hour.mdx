@@ -1,0 +1,108 @@
+---
+focus: true
+heading: "Building a Discord PR collaboration tool in an hour"
+subtitle: How we built a reliable webhook based PR collaboration tool in less time your average company's sprint planning meeting
+image: "/assets/blog/building-a-realtime-websocket-app-using-sveltekit.jpg"
+date: 2022-09-06
+---
+
+<div className="blog--callout">
+
+Inngest is an event-driven platform which makes it easy for developers to build, test, then deploy background functions triggered by events and scheduled tasks — without worrying about infrastructure, queues, or stateful services.
+
+</div>
+
+At Inngest, we use Discord to collaborate across our remote team for all of our communication, including all of our engineering.  There are some good tools out there for centralizing PR discussions into Slack (hi [axolo.co](https://axolo.co)!) which help increase collaboration and efficiency when merging PRs but, unfortunately, there’s a dearth of these tools for Discord.  So we decided to build something using Inngest — and because of our platform it only took an hour to finish.  Best of all, you [can clone the functions](https://www.notion.so/Building-a-PR-collaboration-tool-on-discord-in-an-hour-d0002b2380e5428b8a8763cbb92d9d03) and deploy them for free to your own Discord org.
+
+In this post, we’ll walk through the architecture behind this kind of tool using AWS, and how you can build similar services rapidly using our platform.
+
+<h2>Requirements</h2>
+
+We want to centralize our PR discussions in discord using *threads* so that we have a single place to discuss each PR.  This means we need to:
+
+- Subscribe to GitHub events when PRs are created/updated/closed/merged, plus when comments and reviews are posted.
+- Create new [threads](https://www.notion.so/Building-a-PR-collaboration-tool-on-discord-in-an-hour-d0002b2380e5428b8a8763cbb92d9d03) in Discord when PRs are opened
+- Forward GH comments in the relevant Discord thread
+- Plus the associated SDLC flow, such as renaming threads when PRs are updated, or notifying users when reviews are approved or rejected
+
+<h2>Architecture</h2>
+
+We’re reacting to events sent from GitHub in real-time, then running associated logic depending on the type of event.  In order to do this, you’d have the following architecture:
+
+- A **webhook handler**, which accepts incoming webhook events from GitHub and passes them onto a **queue** for asynchronous processing
+    - Your API needs to respond within 10 seconds. Otherwise, GitHub will mark the webhook as *failed* and retry the HTTP request again.  So, you should push the payload onto a **queue** so that you can work with the event data asynchronously.
+- A worker that subscribes to the queue handles each event from GitHub and communicates with the Discord API to create threads or new messages.
+- A small state store that allows you to record processed event IDs. Webhooks are [at-least-once](https://www.cloudcomputingpatterns.org/at_least_once_delivery/), meaning you might receive the same event from GitHub multiple times. This state store allows you to check whether the specific event has already been handled. It’s an important and overlooked edge case, as we don’t want multiple threads per PR.
+
+In short, the events flow from GitHub to the webhook handler, which pushes them to a queue.  Your worker subscribes to the queue and then handles each incoming event asynchronously.  The worker checks the state store to see if the event has already been processed, and if not, it runs business logic to create a thread or post a comment, depending on the type of event.
+
+<h2>A typical AWS build</h2>
+
+While this is a perfect use case for Inngest's event-driven platform, let's talk about a typical AWS build-out for this architecture so that you can understand the full picture.  This is what we're building:
+
+<img src="/assets/blog/aws-webhooks.svg" alt="AWS Webhook architecture" />
+
+Within AWS, you’d have to:
+
+1. Create a new Lambda function or ECS service for receiving events and pushing them to an SNS topic, which publishes to an SQS queue
+2. Create and configure the SQS queue, the SNS topic, and the dead-letter queues for when events fail.  SQS is important here, else you wont get retries if the business logic fails — say Discord’s API gateway is down.
+3. Create new lambda functions or a stateful worker to subscribe to the SNS topic when events are received.
+4. You might want to also use something like aurora, dynamodb, or redis so that you can process events idempotently (ie. only once).
+5. Push logs from Cloudfront to another service for easy management and failure detection.
+
+All in, this could take days to weeks, depending on how comfortable you are with Terraform, Lambda, the associated configuration, and idempotent processing… as well as all of the hand-rolled code and config for manually dealing with these that then has to be maintained/updated.
+
+<h2>Building with Inngest</h2>
+
+As we mentioned, this is a perfect use case for Inngest.  Instead of creating and maintaining a complex web of services, config, and code, you set up GitHub to push webhook events to Inngest, deploy simple functions for each event with one command with the Inngest CLI, and we handle everything else.  In effect, this is the diagram:
+
+![](/assets/product/declarative-functions.png)
+
+It handles the queues, retries, throttling, idempotency, and logging for you, allowing you to focus on the important part of your product:  the code that runs when events are received.
+
+Plus, because Inngest stores events in an event store, you can use real data from events to test your functions locally.  This is a massive improvement to the development process.  You don’t need to run [ngrok](https://ngrok.com/), manually trigger webhooks to test, or push deploy to production and hope bugs are fixed — as running [`inngest run --replay`](https://www.inngest.com/docs/cli/run) will run your functions locally with past data.
+
+<h2>Building using Inngest</h2>
+
+The process for building this on Inngest is easy:
+
+1. [Create a new GitHub webhook in Inngest](https://www.inngest.com/docs/event-webhooks)
+2. [Copy the webhook URL into your own repository.](https://docs.github.com/en/developers/webhooks-and-events/webhooks/creating-webhooks#setting-up-a-webhook)  Events will automatically flow through to Inngest and be recorded for you to develop with in the future.  We’ll also automatically create types for these events for fast development. ⚡
+3. Run [`inngest init`](https://www.inngest.com/docs/cli/init) which will guide you through creagting new a new serverless function triggered by the `pull_request` GitHub event.
+4. Write the business logic to handle the event, such as creating a new Discord thread (example below!)
+5. Run [`inngest run --replay`](https://www.inngest.com/docs/cli/run) to test the function locally
+6. When you’re happy, run [`inngest deploy`](https://www.inngest.com/docs/cli/deploy) to deploy the function.
+
+There’s no configuration of queues, notifications, dead-letter queues, idempotency, or stateful workers — things just work.  The most amount of time spent on the build was looking at the Discord API and creating a new Discord bot and auth token!
+
+<h2>The code and build process</h2>
+
+You can view the full code for the discord PR management tool here: [https://github.com/inngest/olotl](https://github.com/inngest/olotl).  It’s separated into a few functions, each of which respond to an individual event from GitHub automatically:
+
+- The `pr-event` function handles the incoming `pull_request` event from Github.  This is sent when PRs are opened, closed, edited, etc, and the function needs to decide what to do based off of the `action` in the event.
+    - If the action is `opened`, the function creates a new thread in Discord using the PR number as a prefix (eg. “PR 805 - Your PR Title”..  By using the PR number as a prefix, we can search for and find the correct thread names on any future event, even if the PR title is updated.
+    - If the action is `closed` or `merged`, we need to archive and close the thread.  We use the PR prefix to find the associated thread and close the thread if it exists.
+    - When the PR is updated (eg. it switches from draft to ready to review, or the title is changed), we need to udpate the thread and send messages accordingly.
+- Other functions, such as `issue-comment`, handle sending messages to discord when reviews or comments are published.
+
+In order to create these functions we run `inngest init` ([see the docs here](https://www.notion.so/Building-a-PR-collaboration-tool-on-discord-in-an-hour-d0002b2380e5428b8a8763cbb92d9d03)), then walk through the init process to create new functions that are automatically triggered by their respective events.
+
+This generates a scaffold using your language of choice (eg. Typescript, Golang, Python, or Ruby), and allows you to dive into coding immediately.
+
+After running `inngest init` we used the [discordgo](https://www.notion.so/Building-a-PR-collaboration-tool-on-discord-in-an-hour-d0002b2380e5428b8a8763cbb92d9d03) library to communicate with the [Discord API using a new bot](https://www.notion.so/Building-a-PR-collaboration-tool-on-discord-in-an-hour-d0002b2380e5428b8a8763cbb92d9d03), allowing us to create and manage threads and comments.
+
+<h2>Testing the functions</h2>
+
+Okay, so we’ve ran `inngest init` and added some code to create threads in Discord.  Now we need to run the code locally and test it. 
+
+Using Inngest, you can run `inngest run --replay` to run the function locally using your most recently received events as the input data.  You can also use a specific event ID to test with locally via `inngest run --replay -e $EVENTID`, in case you have a specific event you’d like to test with from the Inngest UI.  You can also store these events in a JSON payload for use within CI via snapshotting.
+
+By continually developing and running `inngest run --replay` you can be sure your functions work before publishing them live. Then, run `inngest deploy` to deploy functions once you’re ready.
+
+<h2>Wrapping up</h2>
+
+By using our own platform, we were able to an awesome PR collaboration tool for Discord in an hour, without spending days configuring, testing and developing the architecture ourselves.
+
+If you’re interested in getting started with Inngest you can [sign up for free](https://www.inngest.com/sign-up), [browse quick start examples](https://www.inngest.com/quick-starts), and [read the docs here](https://www.inngest.com/docs).
+
+[We’re also around in our discord](https://www.inngest.com/discord) if you’d like to hang out with us, discuss event driven architecture, and ask us any questions!
