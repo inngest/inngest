@@ -49,21 +49,12 @@ func deploy(cmd *cobra.Command, args []string) error {
 		givenDir = args[0]
 	}
 
-	var fns []*function.Function
-	var err error
-
-	if givenDir != "" {
-		fns, err = function.LoadRecursive(ctx, givenDir)
-		if err != nil {
-			return err
-		}
-	} else {
-		fn, err := function.Load(ctx, ".")
-		if err != nil {
-			return err
-		}
-
-		fns = []*function.Function{fn}
+	fns, err := function.LoadFromPath(ctx, givenDir)
+	if err != nil {
+		return err
+	}
+	if len(fns) < 1 {
+		return fmt.Errorf("no functions found to deploy")
 	}
 
 	funcNames := make([]string, 0, len(fns))
