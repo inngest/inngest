@@ -25,7 +25,7 @@ func NewCmdDeploy() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy [dir]",
 		Short:   "Deploy a function to Inngest",
-		Long:    "Deploy a function to Inngest.\n\nIf no directory is provided, the we'll attempt to deploy a function in the current directory, or look for an Inngest config file in a parent directory.\n\nIf a direcotry is provided, we'll attempt to recursively find and deploy all functions in that directory.",
+		Long:    "Deploy a function to Inngest.\n\nIf no directory is provided, will attempt to deploy a function in the current directory, or look for an Inngest config file in a parent directory.\n\nIf a directory is provided, will attempt to recursively find and deploy all functions in that directory.",
 		Example: "inngest deploy",
 		Run:     doDeploy,
 	}
