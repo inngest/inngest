@@ -84,7 +84,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
             </StyledLink>
             <div className="rounded-lg w-56 ">
               <div className="primary-links py-2 px-2">
-                <a href="/product" className="rounded-lg p-4">
+                <a href="/docs" className="rounded-lg p-4">
                   <p>Docs</p>
                   <p className="pt-1 text-slate-400">
                     <small>
@@ -93,7 +93,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
                     </small>
                   </p>
                 </a>
-                <a href="/features/data-governance" className="rounded-lg p-4">
+                <a href="/quick-starts" className="rounded-lg p-4">
                   <p>Quick starts</p>
                   <p className="pt-1 text-slate-400">
                     <small>
