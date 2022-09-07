@@ -63,12 +63,10 @@ const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
       <Menu isExpanded={isExpanded}>
         <Nav>
           <NavList>
-    <NavItem isCurrentPage={router.asPath === "/docs"}>
-            <Link href="/docs/">
-              <a
-                className="docs-page"
-              >Welcome</a>
-            </Link>
+            <NavItem isCurrentPage={router.asPath === "/docs"}>
+              <Link href="/docs/">
+                <a className="docs-page">Welcome</a>
+              </Link>
             </NavItem>
             {nestedCLI.map((c, idx) => (
               <DocsNavItem key={`cat-${idx}`} category={c} type="cli" />
@@ -184,6 +182,7 @@ const DocsNavItem: React.FC<{
         <NavList className="items" isExpanded={isExpanded}>
           {pages
             .sort((a, b) => a.order - b.order)
+            .filter((d) => !d.hide)
             .map((d) => (
               <DocsNavItem
                 key={`sub-cat-${d.slug}`}

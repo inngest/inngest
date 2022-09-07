@@ -11,6 +11,8 @@ import {
   DocScope,
   Categories,
   Headings,
+  Doc,
+  Docs,
 } from "../../utils/docs";
 import Code from "src/shared/Code";
 import { DocsLayout, DocsContent } from "../docs";
@@ -59,6 +61,7 @@ export default function DocLayout(props: any) {
         <meta name="twitter:site" content="@inngest" />
         <meta name="twitter:title" content={metaTitle} />
         <meta name="twitter:image" content={socialImage} />
+        {scope.hide ? <meta name="robots" content="noindex,nofollow" /> : null}
       </Head>
       <DocsContent hasTOC={true}>
         <header>
@@ -160,10 +163,23 @@ export async function getStaticProps({ params }) {
   // Find next and previous articles based off of slug order.
   const [next, prev] = (() => {
     const idx = all.slugs.findIndex((s) => s === "/docs/" + parsedSlug);
-    const nextSlug = all.slugs[idx + 1];
-    const prevSlug = all.slugs[idx - 1];
-    const next = nextSlug ? all.docs[nextSlug.substring(6)] : null;
-    const prev = prevSlug ? all.docs[prevSlug.substring(6)] : null;
+    const subSlugs = all.slugs.map((slug) => slug.substring(6));
+
+    const next: Doc | null =
+      all.docs[
+        subSlugs
+          .slice(idx + 1)
+          .find((slug) => all.docs[slug] && !all.docs[slug].scope.hide)
+      ] || null;
+
+    const prev: Doc | null =
+      all.docs[
+        subSlugs
+          .reverse()
+          .slice(-idx)
+          .find((slug) => all.docs[slug] && !all.docs[slug].scope.hide)
+      ] || null;
+
     return [next, prev];
   })();
 

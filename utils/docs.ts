@@ -29,6 +29,8 @@ export type DocScope = {
   // title is the title of the documentation page
   title: string;
   order: number;
+  // if true, doc will be hidden on the nav, but will still be created as a page
+  hide?: boolean;
 
   // reading is reading information automatically added when parsing content
   reading?: { text: string; time: number; words: number; minutes: number };
@@ -45,7 +47,7 @@ export type Headings = {
   };
 };
 
-type Doc = {
+export type Doc = {
   slug: string;
   content: string;
   scope: DocScope;
@@ -60,7 +62,7 @@ export type Category = {
 
 export type Categories = { [title: string]: Category };
 
-type Docs = {
+export type Docs = {
   docs: { [slug: string]: Doc };
   // TODO: Is this an ordered set?
   slugs: string[];
@@ -107,37 +109,33 @@ export const getAllDocs = (() => {
       const fullpath = basepath + fname;
 
       if (fs.statSync(fullpath).isDirectory()) {
-        // recurse into this directory with a new parse function using the extended
-        // path.
-        fs.readdirSync(fullpath).forEach(parseDir(fullpath + "/", type));
-        return;
-      }
+          // recurse into this directory with a new parse function using the extended
+          // path.
+          fs.readdirSync(fullpath).forEach(parseDir(fullpath + "/", type));
+          return;
+        }
 
-      const source = fs.readFileSync(fullpath);
-      const { content, data: scope } = matter(source);
+        const source = fs.readFileSync(fullpath);
+        const { content, data: scope } = matter(source);
 
-      if (scope.hide === true) {
-        return;
-      }
+        if (type === "cloud" && scope.slug.indexOf("cloud/") !== 0) {
+          // Add a cloud prefix.
+          scope.slug = "cloud/" + scope.slug;
+        }
 
-      if (type === "cloud" && scope.slug.indexOf("cloud/") !== 0) {
-        // Add a cloud prefix.
-        scope.slug = "cloud/" + scope.slug;
-      }
-
-      memoizedDocs.slugs.push("/docs/" + scope.slug);
-      memoizedDocs.docs[scope.slug] = {
-        type,
-        slug: scope.slug,
-        content,
-        scope: {
+        memoizedDocs.slugs.push("/docs/" + scope.slug);
+        memoizedDocs.docs[scope.slug] = {
           type,
-          ...scope,
-          toc: getHeadings(content),
-          reading: readingTime(content),
-        },
+          slug: scope.slug,
+          content,
+          scope: {
+            type,
+            ...scope,
+            toc: getHeadings(content),
+            reading: readingTime(content),
+          },
+        };
       };
-    };
 
     fs.readdirSync("./pages/docs/_docs/").forEach(
       parseDir("./pages/docs/_docs/", "cli")
@@ -207,7 +205,7 @@ export const getAllDocs = (() => {
 
     // And finally, order the slugs according to the category
     // order then the page order.
-    // 
+    //
     // In order to do this, we're going to sort categories and
     // then iterate through each doc within those categories
     // in order, pushing the slugs to a new sorted array.
