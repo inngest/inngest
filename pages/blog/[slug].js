@@ -148,6 +148,19 @@ const Body = styled.main`
     line-height: 1.6em;
   }
 
+  p code, li code {
+    font-size: .75rem;
+  }
+
+  ul {
+    list-style-type: disc;
+    margin-left: 1rem;
+  }
+  ol {
+    list-style-type: number;
+  }
+
+
   aside {
     padding: 1.4em 1.5em;
     border: 1px solid var(--stroke-color);
