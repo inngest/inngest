@@ -84,7 +84,7 @@ body.light-theme {
   --stroke-color: #D3D3DF;
   --stroke-color-light: #80848e;
   --font-color-primary: #2E2E38;
-  --font-color-secondary: #8F8F9D;
+  --font-color-secondary: rgb(71, 85, 105);
   --link-color: var(--color-iris-100);
 
   --box-shadow: 0 1px 1rem 1rem rgba(0, 0, 0, 0.1);
@@ -559,6 +559,12 @@ ul.check li {
 }
 
 /** Tailwind complimentary bits */
+.text-color-primary {
+  color: var(--font-color-primary);
+}
+.text-color-secondary {
+  color: var(--font-color-secondary);
+}
 .text-color-iris-100 {
   color: var(--color-iris-100);
 }

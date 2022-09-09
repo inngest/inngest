@@ -34,36 +34,38 @@ export default function DocsHome(props) {
         <h2>Quick start</h2>
 
         <div className="grid pt-4 gap-4 sm:grid-cols-1 xl:grid-cols-3">
-          <a
+          <Quickstart
             href="/docs/installation"
-            className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white"
+            className="shadow-md rounded-sm p-4 border-2 hover:shadow-2xl"
           >
-            <p className="text-base my-2">🚀 Installation</p>
-            <p className="text-slate-600">
+            <p className="text-base my-2 text-color-primary">🚀 Installation</p>
+            <p className="text-color-secondary">
               Get up and running with the CLI in seconds. You'll have a full
               local development environment ready to go.
             </p>
-          </a>
-          <a
+          </Quickstart>
+          <Quickstart
             href="/docs/writing-and-running-fuctions"
-            className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white"
+            className="shadow-md rounded-sm p-4 border-2 hover:shadow-2xl"
           >
-            <p className="text-base my-2">👩‍💻 Writing & running functions</p>
-            <p className="text-slate-600">
+            <p className="text-base my-2 text-color-primary">
+              👩‍💻 Writing & running functions
+            </p>
+            <p className="text-color-secondary">
               Write and locally run your first function using any language and
               the CLI, triggered automatically by events
             </p>
-          </a>
-          <a
+          </Quickstart>
+          <Quickstart
             href="/docs/deploying-fuctions"
-            className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white"
+            className="shadow-md rounded-sm p-4 border-2 hover:shadow-2xl"
           >
-            <p className="text-base my-2">🚢 Deploying</p>
-            <p className="text-slate-600">
+            <p className="text-base my-2 text-color-primary">🚢 Deploying</p>
+            <p className="text-color-secondary">
               Learn how to deply your functions to production instantly, without
               managing infrastructure
             </p>
-          </a>
+          </Quickstart>
         </div>
 
         <h2 className="pt-6">What is Inngest?</h2>
@@ -441,10 +443,10 @@ const FeaturedDocs = styled.section`
   }
 `;
 
-const Quickstart = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1em;
+const Quickstart = styled.a`
+  background: var(--highlight-color);
+  border-color: var(--border-color);
+  color: var(--font-color-primary);
 `;
 
 const FeaturedDoc = styled.div`
@@ -452,8 +454,7 @@ const FeaturedDoc = styled.div`
   flex-direction: column;
   align-items: start;
   padding: 1.4em 1.5em;
-  background: var(--highlight-color);
-  border: 1px solid var(--border-color);
+
   border-radius: var(--border-radius);
 
   > h3:first-of-type {
