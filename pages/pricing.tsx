@@ -223,7 +223,7 @@ export default function Pricing() {
       <Nav />
 
       <Hero>
-        <h1>
+        <h1 className="text-3xl lg:text-5xl">
           Simple pricing.
           <br />
           Powerful functionality.
@@ -538,6 +538,20 @@ const ComparisonTable = styled.div`
   .plan-column {
     display: grid;
     grid-row-gap: 1rem;
+  }
+
+  // invert the columns on small screens
+  @media (max-width: 840px) {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(3, 1fr);
+    grid-gap: 0.5rem;
+    padding: 0.8rem 1rem;
+    font-size: 0.75rem;
+
+    .plan-column {
+      grid-template-columns: repeat(3, 1fr);
+      grid-gap: 0.5rem;
+    }
   }
 `;
 

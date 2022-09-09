@@ -5,7 +5,7 @@ export default class MyDocument extends Document {
     // const pageProps = this.props?.__NEXT_DATA__?.props?.pageProps;
     // const { htmlClassName } = pageProps;
     return (
-      <Html className={"OK"}>
+      <Html>
         <Head>
           <link rel="icon" href="/favicon-may-2022.png" />
           <link
