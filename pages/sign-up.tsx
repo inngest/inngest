@@ -70,9 +70,8 @@ const SignUp = () => {
         </header>
       </Header>
 
-      <Content className="reg-grid section-header">
-        <div className="col-2" />
-        <div className="signup col-4">
+      <Content className="grid mx-auto grid-cols-1 md:grid-cols-2 gap-12 px-12 pb-24 max-w-3xl section-header">
+        <div className="signup">
           <Button
             href={apiURL(`/v1/login/oauth/github/redirect?anonid=${anonId}`)}
             kind="black"
@@ -131,7 +130,7 @@ const SignUp = () => {
           </form>
         </div>
 
-        <div className="details col-3">
+        <div className="details">
           <h5>Try Inngest for free</h5>
           <IconList
             direction="vertical"
@@ -168,7 +167,6 @@ const Content = styled.div`
   .signup {
     display: flex;
     flex-direction: column;
-    padding-bottom: 8vh;
 
     button + button,
     a + a {
@@ -222,7 +220,6 @@ const Content = styled.div`
 
   .details {
     opacity: 0.85;
-    padding-left: var(--grid-gap);
     font-size: 0.85rem;
     display: flex;
     flex-direction: column;
