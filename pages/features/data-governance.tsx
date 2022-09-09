@@ -21,7 +21,7 @@ export default function () {
       <Nav sticky={true} />
 
       <div className="container mx-auto py-24">
-        <div className="max-w-2xl mx-auto text-center">
+        <div className="max-w-2xl px-4 lg:px-0 mx-auto text-center">
           <Tag className="mb-4">Data governance</Tag>
           <h1>Guarantee good data, everywhere.</h1>
           <p className="py-4 font-lg">
@@ -145,7 +145,7 @@ export default function () {
         {hoverVal || <>&nbsp;</>}
       </p>
 
-      <div className="container mx-auto grid grid-cols-2 gap-16 pt-44">
+      <div className="container mx-auto grid lg:grid-cols-2 gap-16 px-8 lg:px-0 pt-20 md:pt-44">
         <div>
           <h3 className="pb-4">Develop without errors</h3>
           <p style={{ margin: 0 }} className="pt-3">
@@ -173,7 +173,7 @@ export default function () {
         </div>
       </div>
 
-      <div className="container mx-auto mt-48 py-16 text-center background-grid-texture">
+      <div className="container mx-auto mt-20 md:mt-48 py-16 text-center background-grid-texture">
         <h3 className="pb-2">Examples, patterns, and guides</h3>
         <p>
           Explore a suite of fully-built examples, plus patterns and guides for
@@ -191,7 +191,7 @@ export default function () {
       </div>
 
       <div className="container mx-auto">
-        <div className="p-20 mt-24 rounded-xl bg-slate-100">
+        <div className="p-12 md:p-20 mt-12 md:mt-24 rounded-xl bg-slate-100">
           <h2 className="mb-2">Develop faster and safer</h2>
           <p>
             Use our platform to rapidly build functionality driven by events,
