@@ -25,7 +25,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
   const [show, setShow] = useState(false);
   return (
     <Container className={`container mx-auto ${show && "show"}`}>
-      <div className="lg:px-0 sm:px-4">
+      <div className="px-4 lg:px-0">
         <a href="/?ref=nav">
           <Logo width={115} className="logo" />
         </a>
