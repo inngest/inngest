@@ -152,7 +152,7 @@ func (d *dockerExec) start(ctx context.Context, state state.State, wa inngest.St
 }
 
 func (d *dockerExec) startOpts(ctx context.Context, state state.State, wa inngest.Step) (docker.CreateContainerOptions, error) {
-	marshalled, err := driver.MarshalV1(state)
+	marshalled, err := driver.MarshalV1(ctx, state, wa)
 	if err != nil {
 		return docker.CreateContainerOptions{}, fmt.Errorf("error marshalling state")
 	}
