@@ -24,12 +24,19 @@ type EnvManager interface {
 }
 
 // MarshalV1 marshals state as an input to driver runtimes.
-func MarshalV1(s state.State) ([]byte, error) {
+func MarshalV1(ctx context.Context, s state.State, step inngest.Step) ([]byte, error) {
 	data := map[string]interface{}{
 		"event": s.Event(),
 		"steps": s.Actions(),
 		"ctx": map[string]interface{}{
-			"workflow_id": s.WorkflowID(),
+			// fn_id is used within entrypoints to SDK-based functions in
+			// order to specify the ID of the function to run via RPC.
+			"fn_id": s.Workflow().ID,
+			// step_id is used within entrypoints to SDK-based functions in
+			// order to specify the step of the function to run via RPC.
+			"step_id": step.ID,
+			// XXX: Pass in opentracing context within ctx.
+			"run_id": s.RunID(),
 		},
 	}
 	return json.Marshal(data)
