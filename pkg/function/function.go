@@ -128,7 +128,11 @@ func (f Function) Validate(ctx context.Context) error {
 		err = multierror.Append(err, fmt.Errorf("A function ID is required"))
 	}
 
-	if slug.Make(f.ID) != f.ID {
+	id := f.ID
+	if strings.Contains(id, "/") {
+		id = strings.Split(id, "/")[1]
+	}
+	if slug.Make(id) != id {
 		err = multierror.Append(err, fmt.Errorf("A function ID must contain lowercase letters, numbers, and dashes only (eg. 'my-greatest-function-ef81b2')"))
 	}
 
@@ -153,7 +157,6 @@ func (f Function) Validate(ctx context.Context) error {
 		if strings.Contains(id, "/") {
 			id = strings.Split(id, "/")[1]
 		}
-
 		if slug.Make(id) != id {
 			err = multierror.Append(err, fmt.Errorf("A step ID must contain lowercase letters, numbers, and dashes only (eg. 'my-greatest-function-ef81b2')"))
 		}
