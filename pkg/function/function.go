@@ -127,6 +127,15 @@ func (f Function) Validate(ctx context.Context) error {
 	if f.ID == "" {
 		err = multierror.Append(err, fmt.Errorf("A function ID is required"))
 	}
+
+	id := f.ID
+	if strings.Contains(id, "/") {
+		id = strings.Split(id, "/")[1]
+	}
+	if slug.Make(id) != id {
+		err = multierror.Append(err, fmt.Errorf("A function ID must contain lowercase letters, numbers, and dashes only (eg. 'my-greatest-function-ef81b2')"))
+	}
+
 	if f.Name == "" {
 		err = multierror.Append(err, fmt.Errorf("A function name is required"))
 	}
@@ -142,6 +151,14 @@ func (f Function) Validate(ctx context.Context) error {
 	for k, step := range f.Steps {
 		if k == "" || step.ID == "" {
 			return fmt.Errorf("A step must have an ID defined")
+		}
+
+		id := step.ID
+		if strings.Contains(id, "/") {
+			id = strings.Split(id, "/")[1]
+		}
+		if slug.Make(id) != id {
+			err = multierror.Append(err, fmt.Errorf("A step ID must contain lowercase letters, numbers, and dashes only (eg. 'my-greatest-function-ef81b2')"))
 		}
 	}
 
