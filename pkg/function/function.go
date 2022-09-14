@@ -148,7 +148,13 @@ func (f Function) Validate(ctx context.Context) error {
 		if k == "" || step.ID == "" {
 			return fmt.Errorf("A step must have an ID defined")
 		}
-		if slug.Make(step.ID) != step.ID {
+
+		id := step.ID
+		if strings.Contains(id, "/") {
+			id = strings.Split(id, "/")[1]
+		}
+
+		if slug.Make(id) != id {
 			err = multierror.Append(err, fmt.Errorf("A step ID must contain lowercase letters, numbers, and dashes only (eg. 'my-greatest-function-ef81b2')"))
 		}
 	}
