@@ -127,6 +127,11 @@ func (f Function) Validate(ctx context.Context) error {
 	if f.ID == "" {
 		err = multierror.Append(err, fmt.Errorf("A function ID is required"))
 	}
+
+	if slug.Make(f.ID) != f.ID {
+		err = multierror.Append(err, fmt.Errorf("A function ID must contain lowercase letters, numbers, and dashes only (eg. 'my-greatest-function-ef81b2')"))
+	}
+
 	if f.Name == "" {
 		err = multierror.Append(err, fmt.Errorf("A function name is required"))
 	}
