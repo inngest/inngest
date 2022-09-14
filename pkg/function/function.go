@@ -148,6 +148,9 @@ func (f Function) Validate(ctx context.Context) error {
 		if k == "" || step.ID == "" {
 			return fmt.Errorf("A step must have an ID defined")
 		}
+		if slug.Make(step.ID) != step.ID {
+			err = multierror.Append(err, fmt.Errorf("A step ID must contain lowercase letters, numbers, and dashes only (eg. 'my-greatest-function-ef81b2')"))
+		}
 	}
 
 	_, edges, aerr := f.Actions(ctx)
