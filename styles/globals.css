@@ -29,6 +29,7 @@
   --green: #16a973;
   --color-almost-black: #070707;
   --color-white: #fff;
+  --color-almost-white: #fbfbff;
   --color-light-gray: #f8f7fa;
   --color-iris-60: #A5A6F6;
   --color-iris-100: #5D5FEF;
@@ -37,7 +38,7 @@
   --color-light-purple: #D1D1FA;
 
   --bg-color-d: #0a0a12;
-  --bg-color-l: #fbfbff;
+  --bg-color-l: var(--color-almost-white);
   --bg-color: var(--bg-color-d);
 
   --bg-primary-highlight: #12112b; /* A color that is used in gradients w/ the bg color to add depth */
@@ -293,6 +294,8 @@ li > ul {
   background-clip: text;
 }
 .gradient-text-ltr {
+  --from-color: #B565F3;
+  --to-color: #4636F5;
   background: linear-gradient(90deg, var(--from-color) 0%, var(--to-color) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -621,4 +624,34 @@ ul.check li {
   margin-top: 1px;
   width: 100%;
   opacity: .5;
+}
+
+
+/** SDK Code snippet */
+.transform-iso,
+.transform-iso-opposite,
+.hover\:transform-iso-opposite {
+  box-shadow: rgba(0, 0, 0, 0.25) 0px 25px 50px -12px;
+  transition: transform 1s ease 0s;
+}
+.transform-iso {
+  /* transform: perspective(1500px) rotateY(-5deg) rotateX(5deg); */
+  transform: perspective(1500px) rotateY(-10deg) rotateX(5deg);
+}
+.transform-iso-opposite,
+.hover\:transform-iso-opposite:hover {
+  transform: perspective(1500px) rotateY(5deg) rotateX(5deg);
+  transform: perspective(1500px) rotateY(10deg) rotateX(5deg);
+}
+.transform-iso:hover,
+.transform-iso-opposite:hover,
+.hover\:transform-iso-opposite {
+  transform: perspective(3000px) rotateY(-2deg);
+}
+
+/* Queue graphic animation */
+@keyframes queue-message-flash {
+  40% {background-color: #fff;}
+  50% {background-color: rgb(226 232 240); /* tailwind slate-200 */}
+  60% {background-color: #fff;}
 }

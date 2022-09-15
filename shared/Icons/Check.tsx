@@ -1,9 +1,9 @@
-import React from "react"
+import React from "react";
 
 type Props = {
-  size?: string | number
-  color?: string
-}
+  size?: string | number;
+  color?: string;
+};
 
 export default ({ size = 32, color }: Props) => (
   <svg
@@ -18,4 +18,4 @@ export default ({ size = 32, color }: Props) => (
       fill={color || "#000"}
     ></path>
   </svg>
-)
+);

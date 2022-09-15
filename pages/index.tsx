@@ -10,7 +10,7 @@ import FeatureCallouts from "src/shared/FeatureCallouts";
 import DemoBlock from "src/shared/DemoBlock";
 import GraphicCallout from "src/shared/GraphicCallout";
 
-import Section from "../shared/Section";
+import { Hero as SDKHero } from "./features/sdk";
 // import { Experiment, FadeIn } from "src/shared/Experiment";
 
 // TODO: move these into env vars
@@ -126,8 +126,13 @@ const useCases = [
 ];
 
 export default function Home() {
+  // TEMP for SDK hero
+  const [language, setLanguage] = useState<"javascript" | "typescript">(
+    "javascript"
+  );
+  const ext = language === "typescript" ? "ts" : "js";
   return (
-    <Wrapper className="home">
+    <div className="home">
       <Nav sticky={true} />
 
       <Hero
@@ -165,6 +170,13 @@ export default function Home() {
       />
 
       <HowItWorks />
+
+      <SDKHero
+        cta={{ href: "/features/sdk?ref=homepage-sdk", text: "Learn more →" }}
+        language={language}
+        ext={ext}
+        onToggle={(l) => setLanguage(l)}
+      />
 
       <Examples
         heading={
@@ -316,174 +328,9 @@ export default function Home() {
       />
 
       <Footer />
-    </Wrapper>
+    </div>
   );
 }
-
-// Wrapper defines a top-level scope for nesting home-specific CSS classes within.
-const Wrapper = styled.div`
-  .section-header-top {
-    margin-top: 6rem;
-  }
-
-  .button-group {
-    display: flex;
-    justify-content: center;
-  }
-
-  .use-cases-header {
-    margin-top: 6rem;
-  }
-  .discord-cta-wrapper {
-    margin: 4em auto;
-    max-width: 600px;
-  }
-
-  .video-player {
-    max-width: 1000px;
-    margin: 0 auto;
-    border: 1px solid var(--gray);
-  }
-  @media (max-width: 1040px) {
-    .video-player {
-      margin: 0 1em;
-    }
-  }
-`;
-
-const HeroX = styled.header`
-  padding: 10vh 0 4rem;
-  text-align: center;
-
-  h1 {
-    font-size: 4rem;
-    margin-bottom: 1.7rem;
-  }
-
-  .hero-subheading {
-    margin: 1em auto;
-    max-width: 540px;
-    font-size: 1rem;
-  }
-
-  .hero-graphic {
-    margin: 2.5rem auto;
-    max-width: 748px;
-  }
-
-  .icon-list {
-    margin: 2.5rem auto;
-    max-width: 400px;
-    max-width: fit-content;
-    text-align: left; // In case text wraps
-  }
-
-  .hero-ctas {
-    margin-top: 2em;
-    display: flex;
-    justify-content: center;
-  }
-
-  .button {
-    display: inline-flex;
-    font-family: var(--font-mono);
-    letter-spacing: -0.5px;
-  }
-  .button svg {
-    margin-right: 0.4rem;
-  }
-  .button-text-light {
-    font-weight: 200;
-  }
-  .button-text-med {
-    font-weight: 600;
-  }
-
-  @media (max-width: 800px) {
-    grid-template-columns: 1fr;
-    padding: 8vh 1rem;
-
-    > div:first-of-type {
-      grid-column: 1;
-    }
-
-    .hero-graphic {
-      width: 90%;
-    }
-
-    .icon-list {
-      max-width: fit-content;
-      padding: 0 1rem;
-    }
-
-    .hero-subheading:last-child {
-      padding: 0 0 2rem;
-    }
-
-    .button {
-      margin: 0.5rem !important;
-    }
-  }
-  @media (max-width: 600px) {
-    h1 {
-      font-size: 2rem;
-    }
-    .hero-subheading {
-      font-size: 0.9rem;
-    }
-  }
-`;
-
-const VidPlaceholder = styled.div`
-  position: relative;
-  max-width: 800px;
-  margin: 0 auto;
-
-  button {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-
-    svg {
-      box-shadow: 0 0 40px var(--primary-color);
-      border-radius: 60px;
-      transition: all 0.3s;
-    }
-
-    &:hover svg {
-      box-shadow: 0 0 80px 20px var(--primary-color);
-    }
-  }
-`;
-
-const BlackBackgroundWrapper = styled.div`
-  background: linear-gradient(180deg, black 50%, transparent 50%);
-`;
-
-const NextLevelSection = styled(Section)`
-  width: 96%;
-  max-width: 1200px;
-  padding: 2.5rem;
-
-  background: linear-gradient(134.83deg, #f4f4fb 24.75%, #fbfbff 89.21%);
-  box-shadow: 0px 2px 20px rgba(0, 0, 0, 0.25);
-  border-radius: 20px;
-
-  @media (max-width: 800px) {
-    padding: 2rem 1rem;
-  }
-`;
-
-const ClosingSection = styled(Section)`
-  h2 {
-    font-size: 2.1rem;
-  }
-  .cta-container {
-    margin-top: 3rem;
-  }
-`;
 
 const SocialProof = styled.section`
   max-width: 800px;
