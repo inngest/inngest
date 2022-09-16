@@ -35,7 +35,9 @@ const HowItWorks = ({ cta }: HowItWorksProps) => {
     >
       <div className="container mx-auto max-w-5xl px-6 py-6">
         <div className="text-center px-6 max-xl mx-auto py-16">
-          <h2 className="text-4xl font-normal	">How Inngest Works</h2>
+          <h2 className="text-3xl sm:text-4xl font-normal">
+            How Inngest Works
+          </h2>
         </div>
         <div className="grid md:grid-cols-3 gap-6 md:gap-16 items-start py-6">
           <div>

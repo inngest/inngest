@@ -171,7 +171,7 @@ export default function Home() {
           <>
             How Customers Use Us In{" "}
             <span className="underline italic text-green-700 decoration-wavy decoration-sky-500 underline-offset-6">
-              The Real World
+              The&nbsp;Real&nbsp;World
             </span>
           </>
         }

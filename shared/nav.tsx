@@ -335,13 +335,6 @@ const Hoverable = styled.div`
     transition: all 0.3s;
   }
 
-  @media only screen and (max-width: 800px) {
-    &:hover > div,
-    > div {
-      display: none;
-    }
-  }
-
   > div {
     display: flex;
     flex-direction: column;
@@ -380,6 +373,14 @@ const Hoverable = styled.div`
     font-size: 12px;
     line-height: 1.25;
     margin: 0 0 0.75rem;
+  }
+
+  // Completely remove submenus on small screens to prevent overflow and layout issues
+  @media only screen and (max-width: 800px) {
+    &:hover > div,
+    > div {
+      display: none;
+    }
   }
 
   @media only screen and (min-width: 940px) {

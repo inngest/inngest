@@ -22,7 +22,7 @@ const Examples = ({ heading, examples = [], cta }: ExamplesProps) => {
     >
       <div className="container mx-auto max-w-5xl px-6 py-6">
         <div className="text-center px-6 max-xl mx-auto py-16">
-          <h2 className="text-4xl font-normal	">{heading}</h2>
+          <h2 className="text-3xl sm:text-4xl font-normal	">{heading}</h2>
         </div>
         {examples.map((e, i) => (
           <div key={`ex-${i}`}>

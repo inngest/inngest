@@ -25,11 +25,11 @@ const Hero = ({
 }: HeroProps) => {
   return (
     <div className={className}>
-      <div className="container mx-auto py-32 flex flex-row">
+      <div className="container mx-auto py-16 sm:py-32 flex flex-row">
         <div className="text-center px-6 max-w-4xl mx-auto">
           <h1
             style={{ position: "relative", zIndex: 1 }}
-            className="text-4xl md:text-5xl overflow-hidden"
+            className="text-3xl sm:text-4xl md:text-5xl overflow-hidden"
           >
             {headline}
           </h1>
