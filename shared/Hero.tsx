@@ -29,7 +29,7 @@ const Hero = ({
         <div className="text-center px-6 max-w-4xl mx-auto">
           <h1
             style={{ position: "relative", zIndex: 1 }}
-            className="text-4xl md:text-5xl"
+            className="text-4xl md:text-5xl overflow-hidden"
           >
             {headline}
           </h1>
