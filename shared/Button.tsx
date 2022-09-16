@@ -83,7 +83,7 @@ export const buttonCSS = css`
   white-space: nowrap;
   font-size: 0.9rem;
 
-  & + .button {
+  & + .button:not(.no-margin) {
     margin-left: 16px;
   }
 

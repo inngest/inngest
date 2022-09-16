@@ -27,14 +27,24 @@ const Hero = ({
     <div className={className}>
       <div className="container mx-auto py-32 flex flex-row">
         <div className="text-center px-6 max-w-4xl mx-auto">
-          <h1 style={{ position: "relative", zIndex: 1 }}>{headline}</h1>
+          <h1
+            style={{ position: "relative", zIndex: 1 }}
+            className="text-4xl md:text-5xl"
+          >
+            {headline}
+          </h1>
           <p className="pt-6 max-w-xl mx-auto">{subheadline}</p>
-          <div className="flex flex-row justify-center pt-6">
+          <div className="flex flex flex-col gap-4 md:flex-row justify-center pt-6">
             <Button kind="primary" size="medium" href={primaryCTA.href}>
               {primaryCTA.text}
             </Button>
             {secondaryCTA && (
-              <Button kind="outline" size="medium" href={secondaryCTA.href}>
+              <Button
+                kind="outline"
+                size="medium"
+                href={secondaryCTA.href}
+                className="no-margin"
+              >
                 {secondaryCTA.text}
               </Button>
             )}

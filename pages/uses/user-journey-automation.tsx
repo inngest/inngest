@@ -129,8 +129,8 @@ const page = {
     headline: (
       <>
         Automate{" "}
-        <span className="gradient-text-ltr gradient-from-iris-60 gradient-to-cyan">
-          User&nbsp;Journeys
+        <span className="md:whitespace-nowrap	gradient-text-ltr gradient-from-iris-60 gradient-to-cyan">
+          User Journeys
         </span>
         <br />
         in Minutes.

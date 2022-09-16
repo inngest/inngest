@@ -182,7 +182,7 @@ export default function Home() {
         }}
       />
 
-      <div className="container mx-auto max-w-5xl my-24">
+      <div className="mx-auto max-w-5xl my-24">
         <div className="text-center px-6 max-w-2xl mx-auto">
           <h2 className="text-4xl mb-6">
             <span className="gradient-text gradient-text-ltr gradient-from-pink gradient-to-orange">
@@ -206,7 +206,7 @@ export default function Home() {
       </div>
 
       {/* Use cases */}
-      <div className="container mx-auto max-w-5xl mt-24 mb-36">
+      <div className="mx-auto max-w-5xl mt-24 mb-36">
         <div className="text-center px-6 max-xl mx-auto pb-16">
           <h2 className="text-4xl">
             Your{" "}
