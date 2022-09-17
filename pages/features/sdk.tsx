@@ -427,7 +427,7 @@ export const Hero = ({
           <span className="text-sm font-bold uppercase gradient-text-ltr">
             Inngest SDK Beta
           </span>
-          <h1 className="mt-2 mb-6 text-5xl leading-tight">
+          <h1 className="mt-2 mb-6 text-2xl md:text-5xl leading-tight">
             Ship background jobs in seconds
           </h1>
           <p>
@@ -454,7 +454,7 @@ export const Hero = ({
               </Button>*/}
           </div>
         </header>
-        <div className="lg:mt-12 mx-auto lg:mx-6 max-w-full md: max-w-lg flex flex-col justify-between">
+        <div className="lg:mt-12 mx-auto lg:mx-6 max-w-full md:max-w-lg flex flex-col justify-between">
           <CodeBlock
             className="transform-iso shadow-xl relative z-10"
             filename={`myGreatFunction.${ext}`}
