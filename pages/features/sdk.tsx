@@ -435,7 +435,7 @@ export const Hero = ({
             your existing JavaScript or TypeScript codebase.
           </p>
           <p>Works with:</p>
-          <div className="mt-4 flex items-center gap-6">
+          <div className="mt-4 flex flex-wrap items-center gap-6">
             {worksWithBrands.map((b) => (
               <img
                 key={b.brand}
@@ -454,7 +454,7 @@ export const Hero = ({
               </Button>*/}
           </div>
         </header>
-        <div className="lg:mt-12 mx-auto lg:mx-6 max-w-lg flex flex-col justify-between">
+        <div className="lg:mt-12 mx-auto lg:mx-6 max-w-full md: max-w-lg flex flex-col justify-between">
           <CodeBlock
             className="transform-iso shadow-xl relative z-10"
             filename={`myGreatFunction.${ext}`}
