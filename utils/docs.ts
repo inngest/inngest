@@ -9,11 +9,10 @@ const TOC = {
 
   "Writing functions": 5,
   "Sending events": 10,
-  "Deploying": 15,
+  Deploying: 15,
 
-  "Events": 100,
-  "Working with Events": 150,
-  "CLI": 200,
+  // "Events": 100,
+  CLI: 200,
 };
 
 export type DocScope = {
@@ -107,10 +106,11 @@ export const getAllDocs = (() => {
 
     // parseDir is given the current directory path, then returns a function which
     // can read all files from the given basepath and processes the input.
-    const parseDir = (basepath: string, type: "cli" | "cloud") => (fname: string) => {
-      const fullpath = basepath + fname;
+    const parseDir =
+      (basepath: string, type: "cli" | "cloud") => (fname: string) => {
+        const fullpath = basepath + fname;
 
-      if (fs.statSync(fullpath).isDirectory()) {
+        if (fs.statSync(fullpath).isDirectory()) {
           // recurse into this directory with a new parse function using the extended
           // path.
           fs.readdirSync(fullpath).forEach(parseDir(fullpath + "/", type));
@@ -213,10 +213,11 @@ export const getAllDocs = (() => {
     // in order, pushing the slugs to a new sorted array.
     const sorted: Array<string> = [];
 
-    [...Object.values(memoizedDocs.cli), ...Object.values(memoizedDocs.cloud)].
-      sort((a, b) => a.order - b.order).
-      forEach((category) => {
-        category.pages.forEach(p => sorted.push("/docs/" + p.slug));
+    [...Object.values(memoizedDocs.cli), ...Object.values(memoizedDocs.cloud)]
+      .sort((a, b) => a.order - b.order)
+      .forEach((category) => {
+        category.pages.sort((a, b) => a.order - b.order);
+        category.pages.forEach((p) => sorted.push("/docs/" + p.slug));
       });
 
     memoizedDocs.slugs = sorted;

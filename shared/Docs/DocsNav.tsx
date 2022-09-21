@@ -17,35 +17,45 @@ const createNestedTOC = (categories: Categories) => {
   const sortedCategories = Object.values(categories).sort(
     (a, b) => a.order - b.order
   );
-  return sortedCategories.map((category) => {
-    const pages = [];
-    category.pages.forEach((page) => {
-      const basePath = page.slug.split("/").slice(0, -1).join("/");
-      const parentPage = pages.find((p) => p.slug === basePath);
-      if (parentPage) {
-        parentPage.pages.push(page);
-      } else {
-        pages.push({ pages: [], ...page });
+  return sortedCategories
+    .map((category) => {
+      const pages = [];
+
+      category.pages.forEach((page) => {
+        const basePath = page.slug.split("/").slice(0, -1).join("/");
+        const parentPage = pages.find((p) => p.slug === basePath);
+        if (parentPage) {
+          parentPage.pages.push(page);
+        } else {
+          pages.push({ pages: [], ...page });
+        }
+      });
+
+      const visible = pages.filter((p) => !p.hide);
+      if (visible.length === 0) {
+        return null;
       }
-    });
+      const nestedPages = visible.filter((p) => p.title !== category.title);
 
-    const visible = pages.filter(p => !p.hide);
-    if (visible.length === 0) {
-      return null;
-    }
+      // If there's a page with the same title as the category,
+      // use it as the category page.
+      const categoryPage = pages.find(
+        (p) => !p.hide && p.title === category.title
+      );
 
-    // If there's a page with the same title as the category,
-    // use it as the category page.
-    const categoryPage = pages.find(p => !p.hide && p.title === category.title);
+      // HACK - for top level docs that also have nested docs
+      if (categoryPage && nestedPages) {
+        categoryPage.pages = nestedPages;
+      }
 
-    return {
-      title: category.title,
-      order: category.order,
-      categoryPage,
-      pages: visible.filter(p => p.title !== category.title),
-    };
-
-  }).filter(Boolean);
+      return {
+        title: category.title,
+        order: category.order,
+        categoryPage,
+        pages: nestedPages,
+      };
+    })
+    .filter(Boolean);
 };
 
 const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
@@ -81,7 +91,12 @@ const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
               </Link>
             </NavItem>
             {nestedCLI.map((c, idx) => (
-              <DocsNavItem key={`cat-${idx}`} category={c} type="cli" doc={c.categoryPage} />
+              <DocsNavItem
+                key={`cat-${idx}`}
+                category={c}
+                type="cli"
+                doc={c.categoryPage}
+              />
             ))}
 
             <hr />
@@ -89,7 +104,12 @@ const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
             <h5>Inngest Cloud</h5>
 
             {nestedCloud.map((c, idx) => (
-              <DocsNavItem key={`cat-${idx}`} category={c} type="cloud" doc={c.categoryPage} />
+              <DocsNavItem
+                key={`cat-${idx}`}
+                category={c}
+                type="cloud"
+                doc={c.categoryPage}
+              />
             ))}
           </NavList>
           <div>
@@ -132,7 +152,11 @@ const DocsNavItem: React.FC<{
   const pathSlug = router.asPath.replace(/^\/docs\//, "");
 
   const title = doc ? doc.title : category.title;
-  const pages = doc ? doc.pages : category.pages;
+  const pages = doc
+    ? doc.pages.length && category.pages.length
+      ? category.pages
+      : doc.pages
+    : category.pages;
   const isCurrentPage = pathSlug === doc?.slug && type === doc.type;
 
   const shouldExpand =

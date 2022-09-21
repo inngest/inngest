@@ -1,0 +1,44 @@
+---
+category: "Sending events"
+title: "Event Format"
+slug: "event-format-and-structure"
+order: 2 # ensure this is later than the parent sending-events doc
+---
+
+Inngest events are just JSON allowing them to be easily created and read. Here is a basic example of all required and optional payload fields:
+
+```js
+inngest.send({
+  name: "api/user.signup",
+  data: { method: "google_auth" },
+  user: { id: "1JDydig4HHBJCiaGu2a9" },
+  ts: new Date().valueOf(), // = 1663702869305
+  v: "2022-09-20.1",
+})
+```
+
+## Required fields
+
+- `name: String` - The name of your event. We recommend names are lowercase and use dot-notation. Using prefixes (e.g. `<prefix>/some.event`) is also encouraged to help organize your events.
+- `data: Object` - All data associated with the event. You can pass any data here and it will be serialized as JSON. Nested data is accepted, but we recommend keeping the payload simple and, more importantly, consistent.
+
+## Optional fields
+
+- `user: Object` - Any relevant user identifying data or attributes associated with the event. All fields are upserted into a “User” in Inngest cloud to associate and group events together for easier debugging (see: “Benefits of the user object” below).
+- `ts: Number` - A **timestamp** integer representing the time (in milliseconds) at which the event occurred. NOTE - Inngest will automatically set this to the exact time the event is received so this is only needed if you want to use historic events or want exact values.
+- `v: String` - A **version** identifier for a particular event payload. Versions become useful to record when the payload format (aka event schema) was changed. We recommend the format `YYYY-MM-DD.N` where the `N` is an integer increased for every change. This is an optional, but very useful field.
+
+### Benefits of the `user` object - User-based debugging
+
+The `user` object is a special field in Inngest Cloud. Sending data in this object enables: **unified user-based debugging and audit trails**.
+
+Inngest creates and stores a unified identity (aka profile) for each unique user that you send events for. You can think of it as performing an “upsert” for any data passed in the `user` object. There are two key ways to use this feature:
+
+- **Identifiers** - `id`, `email`, `phone`, or any field ending in `_id` will be used to match and group events together into a single identity. (Examples: `stripe_customer_id`, `zendesk_id`)
+- **Attributes** - Any non-identifier field will be stored as an an attribute for your own reference. Potential uses for attributes: `billing_plan` , `signup_source`, or `last_login_at`.
+
+<aside>
+  <p>🔐 <strong>Security</strong> - Each user's attributes is stored fully encrypted in our database using row-level encryption.  Each user gets its own encryption key which is permanently deleted when you delete the user from our system, which helps comply with GDPR and CCPA.</p>
+
+  <p>This user data is only accessible within the functions that you run and from your authenticated account. It is never shared or exposed to other users or Inngest staff.</p>
+</aside>

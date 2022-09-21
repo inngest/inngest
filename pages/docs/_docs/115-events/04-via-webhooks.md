@@ -3,6 +3,7 @@ category: "Events"
 title: "via Webhooks"
 slug: "event-webhooks"
 order: 4
+hide: true
 ---
 
 <div className="tldr">
