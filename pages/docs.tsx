@@ -47,7 +47,7 @@ export default function DocsHome(props) {
             </p>
           </Quickstart>
           <Quickstart
-            href="/docs/writing-and-running-fuctions"
+            href="/docs/events"
             className="shadow-md rounded-sm p-4 border-2 hover:shadow-2xl"
           >
             <p className="text-base my-2 text-color-primary">
@@ -58,7 +58,7 @@ export default function DocsHome(props) {
             </p>
           </Quickstart>
           <Quickstart
-            href="/docs/deploying-fuctions"
+            href="/docs/deploy"
             className="shadow-md rounded-sm p-4 border-2 hover:shadow-2xl"
           >
             <p className="text-base my-2 text-color-primary">🚢 &nbsp; Deploying</p>
