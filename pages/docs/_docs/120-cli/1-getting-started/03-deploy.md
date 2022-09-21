@@ -1,8 +1,8 @@
 ---
-category: "Getting started"
+category: "CLI"
 title: "Deploying functions"
-slug: "deploying-fuctions"
-order: 10
+slug: "cli/deploying-fuctions"
+order: 6
 ---
 
 Once you've built and locally tested your function it's time to deploy it to the cloud.

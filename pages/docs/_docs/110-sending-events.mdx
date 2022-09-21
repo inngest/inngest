@@ -1,0 +1,57 @@
+---
+category: "Sending events"
+title: "Sending events"
+slug: "events"
+order: 1
+---
+
+Follow along to learn how to:
+
+- Send events to Inngest so that you can automatically trigger any subscribing functions.
+
+## Sending events
+
+Firstly, make sure you have the `inngest` package installed via NPM or yarn.  Then, from your code, write the following:
+
+```typescript
+import Inngest from 'inngest';
+
+// Create a new client using your inngest event key
+export const client = new Inngest(process.env.INNGEST_EVENT_KEY);
+
+// This sends an event to Inngest.
+client.send({
+  // The event name
+  name: "demo/demo.event",
+  // The event's data
+  data: {
+    account: {
+      id: 123,
+      email: "test@example.com",
+    },
+    cartID: "ed12c8bde",
+    like: true,
+  }
+});
+```
+
+This code does two things.  We first create a new `client` using an event key.  Event keys are only used for sending events, and cannot access any other part of your account.
+
+Then, using the client, we send the event named `demo/demo.event` to Inngest. Inngest will accept this event and do the following:
+
+1. See if the event already exists within your account.  If not, we’ll automatically create a new version of this event and infer the type from the data sent.
+2. Look up any functions triggered by this event, then run them automatically in parallel using the entire event object supplied as the function’s arguments.
+
+<aside>
+
+💁 When you send an event, Inngest will automatically run any functions that are triggered by the same event name — in parallel, in the background, without configuring any queues.
+
+</aside>
+
+### Advanced usage
+
+There’s more you can do with events, such as user identification, event versioning, and filtering for each key.
+
+## Next up
+
+Next up, learn how to [deploy your functions](/docs/deploy) by registering them with Inngest.

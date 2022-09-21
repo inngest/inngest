@@ -163,7 +163,9 @@ export async function getStaticProps({ params }) {
   // Find next and previous articles based off of slug order.
   const [next, prev] = (() => {
     const idx = all.slugs.findIndex((s) => s === "/docs/" + parsedSlug);
+    // Remove '/docs/' from slugs.
     const subSlugs = all.slugs.map((slug) => slug.substring(6));
+    console.log(subSlugs, idx, "/docs/" + parsedSlug);
 
     const next: Doc | null =
       all.docs[
@@ -172,13 +174,13 @@ export async function getStaticProps({ params }) {
           .find((slug) => all.docs[slug] && !all.docs[slug].scope.hide)
       ] || null;
 
-    const prev: Doc | null =
+    const prev: Doc | null = (idx > 0 && 
       all.docs[
         subSlugs
           .reverse()
           .slice(-idx)
           .find((slug) => all.docs[slug] && !all.docs[slug].scope.hide)
-      ] || null;
+      ]) || null;
 
     return [next, prev];
   })();

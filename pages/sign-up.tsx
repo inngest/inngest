@@ -89,6 +89,7 @@ const SignUp = () => {
           <Button
             href={apiURL(`/v1/login/oauth/google/redirect?anonid=${anonId}`)}
             kind="black"
+            style={{ marginLeft: 0 }}
           >
             <img
               src="https://app.inngest.com/assets/icons/google.svg"

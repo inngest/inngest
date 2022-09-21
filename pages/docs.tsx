@@ -35,13 +35,15 @@ export default function DocsHome(props) {
 
         <div className="grid pt-4 gap-4 sm:grid-cols-1 xl:grid-cols-3">
           <Quickstart
-            href="/docs/installation"
+            href="/docs/functions"
             className="shadow-md rounded-sm p-4 border-2 hover:shadow-2xl"
           >
-            <p className="text-base my-2 text-color-primary">🚀 Installation</p>
+            <p className="text-base my-2 text-color-primary">
+              👩‍💻 &nbsp; Writing functions
+            </p>
             <p className="text-color-secondary">
-              Get up and running with the CLI in seconds. You'll have a full
-              local development environment ready to go.
+              Learn how to write functions using Typescript or Javascript using any
+              platform or framework
             </p>
           </Quickstart>
           <Quickstart
@@ -49,52 +51,45 @@ export default function DocsHome(props) {
             className="shadow-md rounded-sm p-4 border-2 hover:shadow-2xl"
           >
             <p className="text-base my-2 text-color-primary">
-              👩‍💻 Writing & running functions
+              📢 &nbsp; Sending events
             </p>
             <p className="text-color-secondary">
-              Write and locally run your first function using any language and
-              the CLI, triggered automatically by events
+              Learn how to trigger background jobs by sending events from your code
             </p>
           </Quickstart>
           <Quickstart
             href="/docs/deploying-fuctions"
             className="shadow-md rounded-sm p-4 border-2 hover:shadow-2xl"
           >
-            <p className="text-base my-2 text-color-primary">🚢 Deploying</p>
+            <p className="text-base my-2 text-color-primary">🚢 &nbsp; Deploying</p>
             <p className="text-color-secondary">
-              Learn how to deply your functions to production instantly, without
-              managing infrastructure
+              Deploy functions to your platform of choice, such as Vercel, Netlify,
+              Cloudflare, or AWS
             </p>
           </Quickstart>
         </div>
 
         <h2 className="pt-6">What is Inngest?</h2>
 
+        <p>Inngest is a serverless platform that allows you to build, test, and deploy serverless background functions and scheduled tasks — without any infrastructure, queues, or stateful long-running services.</p>
+
         <p>
-          Inngest is an open-source, event-driven platform which makes it easy
-          for developers to build, test, and deploy scheduled tasks and
-          background functions — without worrying about infrastructure, queues,
-          or stateful services.
-        </p>
-        <p>
-          Using Inngest, you can write and deploy serverless step functions
-          which are triggered by events or on a schedule without writing any
-          boilerplate code or infra.
-        </p>
+Using Inngest you can write serverless functions triggered by events within your existing code, zero boilerplate or infra required.</p>
 
         <h2 className="pt-4">Key features</h2>
         <ul>
-          <li>CLI with developer-friendly APIs and local testing</li>
-          <li>Stateless serverless step functions which run any language</li>
-          <li>
-            Complex functionality built in, such as event replay, canary
-            deploys, version management and git integration
-          </li>
-          <li>Event coordination for building complex interactive functions</li>
-          <li>
-            Event & data governance, schemas, and forwarding out of the box
-          </li>
+        <li><strong>Fully serverless:</strong>  Run background jobs, scheduled functions, and build event-driven systems without any servers, state, or setup</li>
+<li><strong>Deploy anywhere</strong>:  works with NextJS, Netlify, Vercel, Redwood, Express, Cloudflare, and Lambda</li>
+<li><strong>Use your existing code:</strong>  write functions within your current project, zero learning required</li>
+<li><strong>A complete platform</strong>:  complex functionality built in such as event replay, canary deploys, version management and git integration</li>
+<li><strong>Fully typed</strong>:  Event schemas, versioning, and governance out of the box</li>
+<li><strong>Observable</strong>:  A full UI for managing and inspecting your functions</li>
+<li><strong>Any language:</strong>  Use our CLI to write functions using any language</li>
         </ul>
+
+        <h2 className="pt-4">How it works</h2>
+        <p>
+        Inngest accepts events from your system, then runs any functions which listen to those events in parallel, with built retries if things fail.  Events are JSON objects sent via POST request and can be triggered from your own code, from webhooks, or from integrations.</p>
 
         <h2 className="pt-4">Use cases</h2>
         <p>
@@ -106,79 +101,59 @@ export default function DocsHome(props) {
         <ul>
           <li>
             <p>
-              <b>Reliably managing incoming webhooks without infrastructure</b>
+              <b>Building reliable webhooks</b>
               <br />
-              Inngest handles any number of incoming webhooks at scale with zero
-              infra, and idempotently schedules serverless functions to respond
-              to webhooks without any configuration.
+              Inngest acts as a layer which can handle webhook events and that run your functions automatically. The Inngest Cloud dashboard gives your complete observability into what event payloads were received and how your functions ran.
             </p>
           </li>
           <li>
             <p>
               <b>Serverless background jobs</b>
               <br />
-              Inngest schedules background jobs from in-app events without any
-              infrastructure, safely managing retries, queues, rolling deploys,
-              function versioning, and event versioning automatically.
+              Ensure your API is fast by running your code, asynchronously, in the background, without queues or long-running workers. Background jobs are triggered by events and have built in retries and logging.
+            </p>
+          </li>
+          <li>
+            <p>
+              <b>Scheduled jobs</b>
+              <br />
+              Run your function on a schedule to repeat hourly, daily, weekly or whatever you need.
             </p>
           </li>
           <li>
             <p>
               <b>Internal tools</b>
               <br />
-              Automate internal processes with versioned step functions written
-              in any language, and connect functions to external platforms such
-              as Retool.
+              Trigger scripts in your code to run from your own internal tools or third party products like Retool.
             </p>
           </li>
           <li>
             <p>
-              <b>Managing complex data pipelines</b>
+              <b>User journey automation</b>
               <br />
-              Inngest can run complex data pipelines using a mixture of
-              languages on a schedule or in real-time, with full local testing
-              and reproducibility built in.
+              Use customer behavior events to trigger automations to run like drip email campaigns, re-activation campaigns, or reminders.
             </p>
           </li>
           <li>
             <p>
-              <b>Building event-driven systems</b>
+              <b>Event-driven systems</b>
               <br />
-              Developers can send and subscribe to a variety of internal and
-              external events, creating complex event-driven architectures
-              without worrying about infrastructure, SDKs, and boilerplate.
+              Developers can send and subscribe to a variety of internal and external events, creating complex event-driven architectures without worrying about infrastructure, SDKs, and boilerplate.
             </p>
           </li>
           <li>
             <p>
-              <b>Real-time sync</b>
+              <b>
+              Complex pipelines & workflows
+              </b>
               <br />
-              Inngest can integrate with a variety of platforms to enable
-              real-time ETL and real-time reverse ETL.
-            </p>
-          </li>
-          <li>
-            <p>
-              <b>Data warehousing & event federation</b>
-              <br />
-              Inngest can aggregate events from a variety of sources, forwarding
-              them to data warehouses and other systems in addition to running
-              application logic.
+Build multi-step pipelines and workflows using conditional logic, delays or multiple events.
             </p>
           </li>
         </ul>
 
         <h2 className="pt-4">Ready to get started?</h2>
-        <p className="pb-4">
-          Learn how to install our CLI and write your first serverless function
-          in minutes, then get started with our cloud and deploy your functions
-          for free!
-        </p>
-        <p className="pb-4">
-          We've also curated a number of ready-to-deploy, pre-built functions
-          that we call "quick-starts" - you can use them as inspiration or as a
-          starting point for your own project.
-        </p>
+        <p className="pb-6">Learn how to write functions in your project within a few seconds</p>
 
         <Button
           kind="primary"
@@ -189,6 +164,7 @@ export default function DocsHome(props) {
           Get started
         </Button>
 
+        {/*
         <Button
           kind="black"
           size="small"
@@ -197,6 +173,7 @@ export default function DocsHome(props) {
         >
           See quick-starts
         </Button>
+        */}
       </DocsContent>
     </DocsLayout>
   );
@@ -300,14 +277,14 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
   }
   h2 {
     font-size: 1.5em;
-    margin-top: calc(2 * var(--base-size));
+    margin-top: calc(4 * var(--base-size));
   }
   h3 {
     font-size: 1.3em;
-    margin-top: calc(1.5 * var(--base-size));
+    margin: calc(2.5 * var(--base-size)) 0 0;
   }
-  h3 {
-    font-size: 1.3em;
+  h3 + p {
+    margin-top: 0.5rem !important;
   }
 
   p:not([class*="text-base"]),
@@ -339,9 +316,14 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
     list-style-type: number;
   }
 
+  li + li { margin-top: 0.5rem }
+  li {
+    margin-left: 1rem;
+  }
+
   aside,
   video {
-    margin: 1em 0;
+    margin: 2rem 0;
   }
 
   aside {

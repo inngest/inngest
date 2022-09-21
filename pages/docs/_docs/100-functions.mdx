@@ -1,0 +1,83 @@
+---
+category: "Writing functions"
+title: "Writing functions"
+slug: "functions"
+order: 1
+---
+
+
+Follow along to learn how to:
+
+- Write a background function triggered by an event
+- Write a scheduled function
+
+Writing functions is the same no matter what platform you deploy to — so this example can be used for any TypeScript or JavaScript project (such as NextJS, Netlify, or Lambda).
+
+## Install the SDK
+
+Firstly, you need to install the SDK via npm or yarn:
+
+```bash
+npm install inngest  # or yarn add inngest
+```
+
+## Writing a background function
+
+Copy the following code into a new file in your project, for example within `./inngest/function.ts`
+
+```typescript
+import { createFunction } from "inngest";
+
+// This function runs the code and will be called in the background.
+const job = async ({ event }) => {
+  return "hello!"; // You can write whatever you want here.
+}
+
+export const demoFunction = createFunction<DemoEvent>(
+  "Demo function",   // The name of your function, used for observability.
+  "demo/demo.event", // The event that triggers this function.
+  job,               // The function code, defined above.
+)
+```
+
+This defines a new background job which runs any code that you pass it.  This function is automatically triggered in the background whenever the demo/test.event event is received.  You can test this function using standard tooling such as Jest or Mocha by exporting the job code and running standard unit tests.
+
+<aside className="mt-6">
+
+💁 **Why event-driven?**
+
+Using events to trigger functions has many benefits:
+
+1. It’s simple:  there’s no config to define, and no queues to configure
+2. You can run many functions with a single event (fan-out)
+3. Each event has its own type, so that your data is always correct
+4. Inngest stores each event you receive, making testing and debugging simple
+
+</aside>
+
+## Writing a scheduled function
+
+The following code defines a scheduled function, which runs automatically using the specified cron schedule:
+
+```typescript
+import { createScheduledFunction } from "inngest";
+
+// This code will be called by the scheduled function.
+const job = async () => {
+  return "hello!"; // You can write whatever you want here.
+}
+
+export createScheduledFunction(
+  "Demo function", // The name of your function, used for observability.
+  "0 * * * *",     // The cron syntax for the function
+  job,             // The function code, defined above.
+)
+```
+
+This is very similar to defining an event-driven function, except it uses the `createScheduledFunction` call and a cron schedule to run your function at the specified interval.  This code can be deployed to any platform and will run automatically, without any HTTP calls.
+
+## Next up
+
+**Triggering functions**: next, you’ll run through how you can trigger these functions by sending events. 
+
+**Deploying**: then, you’ll learn how to deploy to your platform of choice so that they’re live.

@@ -28,12 +28,24 @@ const createNestedTOC = (categories: Categories) => {
         pages.push({ pages: [], ...page });
       }
     });
+
+    const visible = pages.filter(p => !p.hide);
+    if (visible.length === 0) {
+      return null;
+    }
+
+    // If there's a page with the same title as the category,
+    // use it as the category page.
+    const categoryPage = pages.find(p => !p.hide && p.title === category.title);
+
     return {
       title: category.title,
       order: category.order,
-      pages,
+      categoryPage,
+      pages: visible.filter(p => p.title !== category.title),
     };
-  });
+
+  }).filter(Boolean);
 };
 
 const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
@@ -65,11 +77,11 @@ const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
           <NavList>
             <NavItem isCurrentPage={router.asPath === "/docs"}>
               <Link href="/docs/">
-                <a className="docs-page">Welcome</a>
+                <a className="docs-page">Getting started</a>
               </Link>
             </NavItem>
             {nestedCLI.map((c, idx) => (
-              <DocsNavItem key={`cat-${idx}`} category={c} type="cli" />
+              <DocsNavItem key={`cat-${idx}`} category={c} type="cli" doc={c.categoryPage} />
             ))}
 
             <hr />
@@ -77,7 +89,7 @@ const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
             <h5>Inngest Cloud</h5>
 
             {nestedCloud.map((c, idx) => (
-              <DocsNavItem key={`cat-${idx}`} category={c} type="cloud" />
+              <DocsNavItem key={`cat-${idx}`} category={c} type="cloud" doc={c.categoryPage} />
             ))}
           </NavList>
           <div>

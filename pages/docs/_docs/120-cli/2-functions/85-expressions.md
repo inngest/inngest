@@ -3,6 +3,7 @@ category: "Functions"
 title: "Expressions"
 slug: "functions/expressions"
 order: 85
+hide: true
 ---
 
 Functions can use expressions to conditionally continue to the next step.  This

@@ -5,13 +5,15 @@
  */
 
 const TOC = {
-  "What is Inngest?": 0,
-  "Getting started": 1,
-  "Events": 2,
-  "Working with Events": 3,
-  Functions: 4,
-  CLI: 5,
-  "Managing workflows": 10,
+  "Getting started": 0,
+
+  "Writing functions": 5,
+  "Sending events": 10,
+  "Deploying": 15,
+
+  "Events": 100,
+  "Working with Events": 150,
+  "CLI": 200,
 };
 
 export type DocScope = {
