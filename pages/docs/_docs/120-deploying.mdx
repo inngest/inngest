@@ -26,12 +26,6 @@ you'll want to deploy Inngest's serve functionality as a single serverless funct
 
 Now that your function API is live, we need to let Inngest know which functions you’ve deployed; which events or schedules cause them to run; and the URL in which they’re hosted.
 
-<aside>
-
-💁 You'll need to register your functions with Inngest after each deploy.  This can be automated for each platform you deploy to.
-
-</aside>
-
 
 There are several ways you can register your functions with Inngest:
 
@@ -63,6 +57,13 @@ If, for some reason, you can’t create a PUT call to your endpoint you can regi
 ```bash
 curl -X PUT --data '{"url":"https://www.example.com/api/inngest"}' https://api.inngest.com/fn/register
 ```
+
+<aside>
+
+💁 You'll need to register your functions with Inngest after each deploy.  This can be automated for each platform you deploy to.
+
+</aside>
+
 
 ## Next up
 
