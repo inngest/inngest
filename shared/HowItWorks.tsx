@@ -14,12 +14,12 @@ const steps: Step[] = [
   {
     icon: <Zap />,
     description: "Event trigger",
-    action: "Webhooks, Integrations, API Keys",
+    action: "via SDK, Webhooks, Integrations",
   },
   {
     icon: <Code />,
-    description: "Business Logic",
-    action: "Any programming language",
+    description: "Serverless functions",
+    action: "JavaScript & TypeScript",
   },
   {
     icon: <Smile />,
@@ -43,22 +43,31 @@ const HowItWorks = ({ cta }: HowItWorksProps) => {
           <div>
             <h3 className="text-lg mb-2">Select your event trigger</h3>
             <p className="my-0">
-              Configure a webhook, connect an integration, or send data directly
-              from your application code with an API Key.
+              Send events directly from your application with{" "}
+              <a href="/docs/events?ref=how-it-works">our SDK</a>, configure a
+              webhook, connect an integration.
+              {/* TODO - link to page when it exists */}
             </p>
           </div>
           <div>
-            <h3 className="text-lg mb-2">Write business logic</h3>
+            <h3 className="text-lg mb-2">Write a function</h3>
             <p className="my-0">
-              Use our developer tooling to quickly create, write and test your
-              code to handle the event trigger.
+              Use our JavaScript & TypeScript SDK to{" "}
+              <a href="/docs/functions?ref=how-it-works">
+                create a background job
+              </a>{" "}
+              triggered by an event or{" "}
+              <a href="/docs/functions?ref=how-it-works#writing-a-scheduled-function">
+                on a schedule
+              </a>
+              .
             </p>
           </div>
           <div>
             <h3 className="text-lg mb-2">Deploy & Relax</h3>
             <p className="my-0">
-              Deploy your function in seconds. Inngest runs your code every time
-              a matching event trigger is received. <br />
+              Deploy your functions to your existing platform. Inngest runs your
+              code every time a matching event trigger is received. <br />
               <em>No infra to manage.</em>
             </p>
           </div>

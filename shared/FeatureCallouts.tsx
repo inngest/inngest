@@ -15,7 +15,7 @@ type FeatureCalloutsProps = {
       href: string;
       text?: string; // default = "Learn more"
     };
-    image: string;
+    image: ReactElement | string;
   }[];
   cta?: {
     href: string;
@@ -57,7 +57,11 @@ const FeatureCallouts = ({
               i % 2 === 0 ? "2" : "1"
             } flex items-center justify-center overflow-hidden`}
           >
-            <img src={f.image} alt={`A graphic of ${f.title} feature`} />
+            {typeof f.image === "string" ? (
+              <img src={f.image} alt={`A graphic of ${f.title} feature`} />
+            ) : (
+              f.image
+            )}
           </div>
         </div>
       ))}

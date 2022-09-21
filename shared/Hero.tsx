@@ -26,7 +26,7 @@ const Hero = ({
   return (
     <div className={className}>
       <div className="container mx-auto py-16 sm:py-32 flex flex-row">
-        <div className="text-center px-6 max-w-4xl mx-auto">
+        <header className="text-center px-6 max-w-4xl mx-auto">
           <h1
             style={{ position: "relative", zIndex: 1 }}
             className="text-3xl sm:text-4xl md:text-5xl overflow-hidden"
@@ -49,7 +49,7 @@ const Hero = ({
               </Button>
             )}
           </div>
-        </div>
+        </header>
       </div>
     </div>
   );

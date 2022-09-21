@@ -42,8 +42,8 @@ export default function DocsHome(props) {
               👩‍💻 &nbsp; Writing functions
             </p>
             <p className="text-color-secondary">
-              Learn how to write functions using Typescript or Javascript using any
-              platform or framework
+              Learn how to write functions using Typescript or Javascript using
+              any platform or framework
             </p>
           </Quickstart>
           <Quickstart
@@ -54,42 +54,78 @@ export default function DocsHome(props) {
               📢 &nbsp; Sending events
             </p>
             <p className="text-color-secondary">
-              Learn how to trigger background jobs by sending events from your code
+              Learn how to trigger background jobs by sending events from your
+              code
             </p>
           </Quickstart>
           <Quickstart
             href="/docs/deploy"
             className="shadow-md rounded-sm p-4 border-2 hover:shadow-2xl"
           >
-            <p className="text-base my-2 text-color-primary">🚢 &nbsp; Deploying</p>
+            <p className="text-base my-2 text-color-primary">
+              🚢 &nbsp; Deploying
+            </p>
             <p className="text-color-secondary">
-              Deploy functions to your platform of choice, such as Vercel, Netlify,
-              Cloudflare, or AWS
+              Deploy functions to your platform of choice, such as Vercel,
+              Netlify, Cloudflare, or AWS
             </p>
           </Quickstart>
         </div>
 
         <h2 className="pt-6">What is Inngest?</h2>
 
-        <p>Inngest is a serverless platform that allows you to build, test, and deploy serverless background functions and scheduled tasks — without any infrastructure, queues, or stateful long-running services.</p>
+        <p>
+          Inngest is a serverless platform that allows you to build, test, and
+          deploy serverless background functions and scheduled tasks — without
+          any infrastructure, queues, or stateful long-running services.
+        </p>
 
         <p>
-Using Inngest you can write serverless functions triggered by events within your existing code, zero boilerplate or infra required.</p>
+          Using Inngest you can write serverless functions triggered by events
+          within your existing code, zero boilerplate or infra required.
+        </p>
 
         <h2 className="pt-4">Key features</h2>
         <ul>
-        <li><strong>Fully serverless:</strong>  Run background jobs, scheduled functions, and build event-driven systems without any servers, state, or setup</li>
-<li><strong>Deploy anywhere</strong>:  works with NextJS, Netlify, Vercel, Redwood, Express, Cloudflare, and Lambda</li>
-<li><strong>Use your existing code:</strong>  write functions within your current project, zero learning required</li>
-<li><strong>A complete platform</strong>:  complex functionality built in such as event replay, canary deploys, version management and git integration</li>
-<li><strong>Fully typed</strong>:  Event schemas, versioning, and governance out of the box</li>
-<li><strong>Observable</strong>:  A full UI for managing and inspecting your functions</li>
-<li><strong>Any language:</strong>  Use our CLI to write functions using any language</li>
+          <li>
+            <strong>Fully serverless:</strong> Run background jobs, scheduled
+            functions, and build event-driven systems without any servers,
+            state, or setup
+          </li>
+          <li>
+            <strong>Deploy anywhere</strong>: works with NextJS, Netlify,
+            Vercel, Redwood, Express, Cloudflare, and Lambda
+          </li>
+          <li>
+            <strong>Use your existing code:</strong> write functions within your
+            current project, zero learning required
+          </li>
+          <li>
+            <strong>A complete platform</strong>: complex functionality built in
+            such as event replay, canary deploys, version management and git
+            integration
+          </li>
+          <li>
+            <strong>Fully typed</strong>: Event schemas, versioning, and
+            governance out of the box
+          </li>
+          <li>
+            <strong>Observable</strong>: A full UI for managing and inspecting
+            your functions
+          </li>
+          <li>
+            <strong>Any language:</strong> Use our CLI to write functions using
+            any language
+          </li>
         </ul>
 
         <h2 className="pt-4">How it works</h2>
         <p>
-        Inngest accepts events from your system, then runs any functions which listen to those events in parallel, with built retries if things fail.  Events are JSON objects sent via POST request and can be triggered from your own code, from webhooks, or from integrations.</p>
+          Inngest accepts events from your system, then runs any functions which
+          listen to those events in parallel, with built retries if things fail.
+          Events are JSON objects sent via POST request and can be triggered
+          from your own code, from webhooks, or from integrations.
+        </p>
 
         <h2 className="pt-4">Use cases</h2>
         <p>
@@ -103,57 +139,69 @@ Using Inngest you can write serverless functions triggered by events within your
             <p>
               <b>Building reliable webhooks</b>
               <br />
-              Inngest acts as a layer which can handle webhook events and that run your functions automatically. The Inngest Cloud dashboard gives your complete observability into what event payloads were received and how your functions ran.
+              Inngest acts as a layer which can handle webhook events and that
+              run your functions automatically. The Inngest Cloud dashboard
+              gives your complete observability into what event payloads were
+              received and how your functions ran.
             </p>
           </li>
           <li>
             <p>
               <b>Serverless background jobs</b>
               <br />
-              Ensure your API is fast by running your code, asynchronously, in the background, without queues or long-running workers. Background jobs are triggered by events and have built in retries and logging.
+              Ensure your API is fast by running your code, asynchronously, in
+              the background, without queues or long-running workers. Background
+              jobs are triggered by events and have built in retries and
+              logging.
             </p>
           </li>
           <li>
             <p>
               <b>Scheduled jobs</b>
               <br />
-              Run your function on a schedule to repeat hourly, daily, weekly or whatever you need.
+              Run your function on a schedule to repeat hourly, daily, weekly or
+              whatever you need.
             </p>
           </li>
           <li>
             <p>
               <b>Internal tools</b>
               <br />
-              Trigger scripts in your code to run from your own internal tools or third party products like Retool.
+              Trigger scripts in your code to run from your own internal tools
+              or third party products like Retool.
             </p>
           </li>
           <li>
             <p>
               <b>User journey automation</b>
               <br />
-              Use customer behavior events to trigger automations to run like drip email campaigns, re-activation campaigns, or reminders.
+              Use customer behavior events to trigger automations to run like
+              drip email campaigns, re-activation campaigns, or reminders.
             </p>
           </li>
           <li>
             <p>
               <b>Event-driven systems</b>
               <br />
-              Developers can send and subscribe to a variety of internal and external events, creating complex event-driven architectures without worrying about infrastructure, SDKs, and boilerplate.
+              Developers can send and subscribe to a variety of internal and
+              external events, creating complex event-driven architectures
+              without worrying about infrastructure and boilerplate.
             </p>
           </li>
           <li>
             <p>
-              <b>
-              Complex pipelines & workflows
-              </b>
+              <b>Complex pipelines & workflows</b>
               <br />
-Build multi-step pipelines and workflows using conditional logic, delays or multiple events.
+              Build multi-step pipelines and workflows using conditional logic,
+              delays or multiple events.
             </p>
           </li>
         </ul>
 
         <h2 className="pt-4">Ready to get started?</h2>
-        <p className="pb-6">Learn how to write functions in your project within a few seconds</p>
+        <p className="pb-6">
+          Learn how to write functions in your project within a few seconds
+        </p>
 
         <Button
           kind="primary"
@@ -316,7 +364,9 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
     list-style-type: number;
   }
 
-  li + li { margin-top: 0.5rem }
+  li + li {
+    margin-top: 0.5rem;
+  }
   li {
     margin-left: 1rem;
   }
