@@ -167,7 +167,14 @@ export default function FeaturesSDK() {
       <Nav sticky={true} />
 
       <Hero
-        cta={{ href: BETA_TYPEFORM_URL, text: "Join the beta →" }}
+        cta={{
+          href: "/docs/functions?ref=features-sdk",
+          text: "Try the new SDK →",
+        }}
+        secondaryCTA={{
+          href: BETA_TYPEFORM_URL,
+          text: "Join the mailing list",
+        }}
         language={language}
         ext={ext}
         onToggle={(l) => setLanguage(l)}
@@ -202,7 +209,7 @@ export default function FeaturesSDK() {
                 with Inngest's SDK.
               </p>
               <p>
-                <a href={BETA_TYPEFORM_URL}>Learn more →</a>
+                <a href="/docs/functions?ref=features-sdk">Learn more →</a>
               </p>
             </div>
 
@@ -219,7 +226,7 @@ export default function FeaturesSDK() {
                 call your code where it is.
               </p>
               <p>
-                <a href={BETA_TYPEFORM_URL}>Get more info →</a>
+                <a href="/docs/deploy?ref=features-sdk">Get more info →</a>
               </p>
             </div>
 
@@ -237,7 +244,7 @@ export default function FeaturesSDK() {
                 longer running code out of the critical path of an API request.
               </p>
               <p>
-                <a href={BETA_TYPEFORM_URL}>Join the beta user list →</a>
+                <a href="/docs/events?ref=features-sdk">Read the docs →</a>
               </p>
             </div>
           </div>
@@ -250,25 +257,30 @@ export default function FeaturesSDK() {
         <div className="mx-auto my-28 px-10 lg:px-4 max-w-4xl">
           <header className="mt-24 mb-12 text-center">
             <h2 className="text-4xl">
-              Join the{" "}
+              Try the{" "}
               <span className="gradient-text gradient-text-ltr">
                 Inngest SDK Beta
               </span>
             </h2>
             <p className="mt-8 mx-auto max-w-xl">
-              We'll be releasing the SDK beta for JavaScript and TypeScript
-              throughout September.
+              You can try the SDK today! Dive into our docs to get started
             </p>
             <p className="mx-auto max-w-xl">
-              Join our list and we'll email you when it's ready to test and
-              provide feedback on. You can also join our Discord community to
-              share feedback and have a direct line to shaping the future of the
-              SDK!
+              Join our mailing list and we'll email you updates and ways to
+              provide feedback. You can also join our Discord community to share
+              feedback and have a direct line to shaping the future of the SDK!
             </p>
           </header>
           <div className="my-10 flex flex-col sm:flex-row gap-6 justify-center items-center">
-            <Button href={BETA_TYPEFORM_URL} kind="primary">
-              Join the SDK Beta →
+            <Button href="/docs?ref=features-sdk" kind="primary">
+              Read the docs
+            </Button>
+            <Button
+              href={BETA_TYPEFORM_URL}
+              kind="outline"
+              style={{ margin: 0 }}
+            >
+              Join the SDK Beta Mailing List
             </Button>
             <Button
               href="https://www.inngest.com/discord"
@@ -288,11 +300,13 @@ export default function FeaturesSDK() {
 
 export const Hero = ({
   cta,
+  secondaryCTA,
   ext,
   language,
   onToggle,
 }: {
   cta: { href: string; text: string };
+  secondaryCTA: { href: string; text: string };
   language: "javascript" | "typescript";
   ext: string;
   onToggle: (string) => void;
@@ -327,9 +341,9 @@ export const Hero = ({
             <Button href={cta.href} kind="primary" size="medium">
               {cta.text}
             </Button>
-            {/*<Button href="/docs/sdk" kind="outline" size="medium">
-                Read the docs
-              </Button>*/}
+            <Button href={secondaryCTA.href} kind="outline" size="medium">
+              {secondaryCTA.text}
+            </Button>
           </div>
         </header>
         <div className="lg:mt-12 mx-auto lg:mx-6 max-w-full md:max-w-lg flex flex-col justify-between">
