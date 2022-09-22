@@ -327,21 +327,28 @@ export const Hero = ({
             your existing JavaScript or TypeScript codebase.
           </p>
           <p>Works with:</p>
-          <div className="mt-4 flex flex-wrap items-center gap-6 h-8">
+          <div className="mt-4 flex flex-wrap items-center gap-6">
             {worksWithBrands.map((b) => (
-              <img
-                key={b.brand}
-                src={b.logo}
-                alt={`${b.brand}'s logo`}
-                style={{ height: b.height }}
-              />
+              <div className="h-8">
+                <img
+                  key={b.brand}
+                  src={b.logo}
+                  alt={`${b.brand}'s logo`}
+                  style={{ height: b.height }}
+                />
+              </div>
             ))}
           </div>
-          <div className="mt-10 flex h-10">
+          <div className="mt-10 flex flex-wrap gap-6 justify-start items-center">
             <Button href={cta.href} kind="primary" size="medium">
               {cta.text}
             </Button>
-            <Button href={secondaryCTA.href} kind="outline" size="medium">
+            <Button
+              href={secondaryCTA.href}
+              kind="outline"
+              size="medium"
+              style={{ margin: 0 }}
+            >
               {secondaryCTA.text}
             </Button>
           </div>
