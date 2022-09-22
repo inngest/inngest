@@ -21,14 +21,15 @@ const createNestedTOC = (categories: Categories) => {
     .map((category) => {
       const pages = [];
 
+      // First, find whether the category itself has a homepage.
+      // If there's a page with the same title as the category,
+      // use it as the category page.
+      const categoryPage = category.pages.find(
+        (p) => !p.hide && p.title === category.title
+      );
+
       category.pages.forEach((page) => {
-        const basePath = page.slug.split("/").slice(0, -1).join("/");
-        const parentPage = pages.find((p) => p.slug === basePath);
-        if (parentPage) {
-          parentPage.pages.push(page);
-        } else {
-          pages.push({ pages: [], ...page });
-        }
+        pages.push({ pages: [], ...page });
       });
 
       const visible = pages.filter((p) => !p.hide);
@@ -36,12 +37,6 @@ const createNestedTOC = (categories: Categories) => {
         return null;
       }
       const nestedPages = visible.filter((p) => p.title !== category.title);
-
-      // If there's a page with the same title as the category,
-      // use it as the category page.
-      const categoryPage = pages.find(
-        (p) => !p.hide && p.title === category.title
-      );
 
       // HACK - for top level docs that also have nested docs
       if (categoryPage && nestedPages) {
