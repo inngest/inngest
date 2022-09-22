@@ -1,4 +1,5 @@
 import SyntaxHighlighter from "react-syntax-highlighter";
+import styled from "@emotion/styled";
 import {
   atomOneLight as syntaxThemeLight,
   atomOneDark as syntaxThemeDark,
@@ -34,7 +35,7 @@ const CodeWindow = ({
       ? "var(--color-almost-black)"
       : "var(--color-almost-white)";
   return (
-    <div
+    <Window
       className={`p-2 ${className}`}
       style={{ backgroundColor, borderRadius: "var(--border-radius)" }}
     >
@@ -53,15 +54,26 @@ const CodeWindow = ({
         language="javascript"
         showLineNumbers={type === "editor"}
         style={theme === "dark" ? syntaxThemeDark : syntaxThemeLight}
+        codeTagProps={{ className: "code-window" }}
+        // className="hello"
         customStyle={{
           backgroundColor,
-          fontSize: "0.7rem",
+          // fontSize: "0.7rem",
         }}
       >
         {removeLeadingSpaces(snippet)}
       </SyntaxHighlighter>
-    </div>
+    </Window>
   );
 };
+
+const Window = styled.div`
+  font-size: 0.55rem;
+
+  // larger screens
+  @media (min-width: 480px) {
+    font-size: 0.7rem;
+  }
+`;
 
 export default CodeWindow;

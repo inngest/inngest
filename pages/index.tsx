@@ -148,7 +148,7 @@ export default function Home() {
         <div className="mx-auto my-12 px-10 lg:px-16 max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8">
           <header className="lg:my-24 mt-8">
             <h1
-              className="mt-2 mb-6 text-2xl md:text-5xl leading-tight"
+              className="mt-2 mb-6 text-3xl sm:text-5xl leading-tight overflow-hidden"
               style={{ lineHeight: "1.08" }}
             >
               Build
@@ -169,7 +169,7 @@ export default function Home() {
               deploying code that runs in response to events or on a schedule —
               without spending any time on infrastructure.
             </p>
-            <div className="mt-10 flex h-10">
+            <div className="mt-10 flex flex-wrap gap-6 justify-start items-center">
               <Button
                 href="/sign-up?ref=homepage-hero"
                 kind="primary"
@@ -181,13 +181,13 @@ export default function Home() {
                 href="/docs?ref=homepage-hero"
                 kind="outline"
                 size="medium"
+                style={{ margin: 0 }}
               >
                 Read the docs
               </Button>
             </div>
           </header>
-          <div className="lg:mt-12 mx-auto lg:mx-6 max-w-full md:max-w-lg flex flex-col">
-            {/* justify-between */}
+          <div className="mt-6 lg:mt-12 mx-auto lg:mx-6 max-w-full md:max-w-lg flex flex-col">
             <CodeWindow
               className="transform-iso shadow-xl relative z-10"
               filename={`myGreatFunction.${ext}`}
@@ -202,10 +202,10 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl mb-24">
+      <div className="mx-auto max-w-5xl mb-24 mt-20 sm:mt-0">
         <div className="text-center px-6 max-w-2xl mx-auto">
           <h2 className="text-2xl mb-6">Works with</h2>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-8 h-12">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-8 h-8 sm:h-12">
             {worksWithBrands.map((b) => (
               <a
                 href={`/docs/deploy?ref=homepage-works-with`}
@@ -235,7 +235,7 @@ export default function Home() {
         {/* Content layout */}
         <div className="mx-auto my-28 px-10 lg:px-4 max-w-4xl">
           <header className="my-24 text-center">
-            <h2 className="text-4xl">
+            <h2 className="text-3xl md:text-4xl">
               The Complete Platform For{" "}
               <span className="gradient-text gradient-text-ltr gradient-from-pink gradient-to-orange">
                 Everything&nbsp;Async
@@ -478,7 +478,7 @@ export default function Home() {
             image: (
               <>
                 <p
-                  className="text-6xl font-bold drop-shadow-xl bg-clip-text text-transparent bg-gradient-to-t from-amber-400 via-orange-400 to-red-500"
+                  className="text-lg sm:text-2xl md:text-6xl font-bold drop-shadow-xl bg-clip-text text-transparent bg-gradient-to-t from-amber-400 via-orange-400 to-red-500"
                   style={{ transform: "skewY(-6deg)" }}
                 >
                   🔥 Serverless
@@ -649,10 +649,6 @@ const TextSlider = ({ strings = [] }) => {
 const TextSliderContainer = styled.span`
   position: relative;
 `;
-const TextSliderPlaceholder = styled.span`
-  visibility: hidden;
-  z-index: -10;
-`;
 const TextSliderElements = styled.span`
   position: relative;
   z-index: 1;
@@ -665,6 +661,11 @@ const TextSliderElements = styled.span`
   height: 100%;
   align-items: start;
   transition: all ease-out 200ms;
+
+  @media (max-width: 600px) {
+    top: auto;
+    display: inline-flex;
+  }
 `;
 const TextSliderString = styled.span<{ align: "center" | "left" }>`
   position: absolute;
@@ -683,6 +684,16 @@ const TextSliderString = styled.span<{ align: "center" | "left" }>`
   }
   &.upcoming {
     transform: translateX(100%);
+  }
+
+  // disable the animation and stack items on mobile
+  @media (max-width: 600px) {
+    position: inherit;
+    opacity: 1;
+    &.previous,
+    &.upcoming {
+      transform: none;
+    }
   }
 `;
 
@@ -929,8 +940,8 @@ const UseCases = ({ options }) => {
   return (
     <section>
       {/* Content layout */}
-      <div className="mx-auto my-16 py-10 px-16 max-w-5xl bg-violet-100 rounded-lg">
-        <h2 className="text-4xl mt-2 mb-2">Get things shipped</h2>
+      <div className="mx-auto my-16 py-10 px-6 md:px-16 max-w-5xl bg-violet-100 rounded-lg">
+        <h2 className="text-2xl sm:text-4xl mt-2 mb-2">Get things shipped</h2>
         <p className="text-sm text-color-secondary">
           Inngest's platform enables you to ship features quickly without the
           overhead.
