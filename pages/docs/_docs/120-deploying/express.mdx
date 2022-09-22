@@ -1,34 +1,42 @@
 ---
 category: "Deploying"
-title: "Next.js"
-slug: "deploy/nextjs"
+title: Express
+slug: "deploy/express"
 ---
 
-Inngest works with NextJS out of the box.  In order to deploy with next, you need to:
+You can host Inngest functions directly as an Express route. In order to deploy with
+express, you need to:
 
-1. Serve your functions with a new API route
-2. Register your functions with Inngest after deploying to your hosting service.
+1. Serve your functions in a new route via middleware
+2. Register your functions with Inngest after deploying to your hosting service
 
-## Serving functions in NextJS
+## Serving functions in Express
 
-You'll need to create a new `./pages/api/inngest.ts`
-file to serve the Inngest function API. Import `serve` from the `inngest/next`
-package to create your endpoint:
+Import `serve` from the `inngest` package to create middleware for Express:
 
 ```ts
-import { serve } from "inngest/next";
-import { createFunction } from "inngest";
+import express from "express";
 
-// You can define all functions in this file, or import functions from other files.
+// Imprt serve from inngest
+import { serve, createFunction } from "inngest";
+
+const app = express();
+
+// You'd usually have your functions defined in a separate file and imported here.
 const exampleFn = createFunction(
   "The name of my function",
   "app/user.created",
   ({ event }) => { return { body: "hello!" }; }
 );
 
-// You must export the serve handler, which hosts all of the provided functions
-// under one API endpoint.
-export default serve("My app/service name", process.env.INNGEST_SIGNING_KEY, [exampleFn]);
+// Create an endpoint for Inngest functions
+const inngestMiddleware = serve("My app/service name", process.env.INNGEST_SIGNING_KEY, [exampleFn]);
+
+// Use the middleware from Inngest to host at /api/inngest.
+app.use("/api/inngest", inngestMiddleware);
+
+app.listen(3006, () => { console.log("running"));
+
 ```
 
 This hosts an API endpoint at `${your-url}/api/inngest`, which we'll use to call your
@@ -75,3 +83,4 @@ Remember to swap www.example.com with your own domain name.
 
 
 [You can read more about registering functions here](/docs/deploy#registering-live-functions-with-inngest).
+
