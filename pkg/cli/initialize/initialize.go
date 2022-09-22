@@ -377,7 +377,7 @@ func (f *initModel) Init() tea.Cmd {
 	return tea.Batch(
 		f.loading.Tick,
 		func() tea.Msg {
-			schemas, err := fetchEvents()
+			schemas, err := FetchEvents()
 			if err != nil {
 				f.eventFetchError = err
 			}
@@ -705,7 +705,7 @@ func (f *initModel) cloneTemplate(ctx context.Context) tea.Cmd {
 }
 
 // fetchEvents fetches all public events and events from each workspace.
-func fetchEvents() (*cli.EventList, error) {
+func FetchEvents() (*cli.EventList, error) {
 	ctx, done := context.WithTimeout(context.Background(), 20*time.Second)
 	defer done()
 

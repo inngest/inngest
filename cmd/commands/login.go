@@ -41,7 +41,7 @@ func doLogin(cmd *cobra.Command, args []string) {
 	} else if token != "" {
 		tokenAuth(ctx)
 	} else {
-		deviceAuth(ctx)
+		DeviceAuth(ctx)
 	}
 
 	if err := fetchAccount(cmd.Context()); err != nil {
@@ -63,7 +63,7 @@ func tokenAuth(ctx context.Context) {
 	}
 }
 
-func deviceAuth(ctx context.Context) {
+func DeviceAuth(ctx context.Context) {
 	state := clistate.RequireState(ctx)
 	start, err := state.Client.StartDeviceLogin(ctx, state.ClientID)
 	if err != nil {
