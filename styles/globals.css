@@ -655,3 +655,15 @@ ul.check li {
   50% {background-color: rgb(226 232 240); /* tailwind slate-200 */}
   60% {background-color: #fff;}
 }
+
+.code-title {
+    margin: 0 0 .75rem;
+    color: var(--color-gray-purple);
+    font-size: 14px;
+    opacity: 0.8;
+}
+.code-title:before {
+  content: "//";
+  display: inline-block;
+  margin: 0 0.25rem 0 0;
+}
