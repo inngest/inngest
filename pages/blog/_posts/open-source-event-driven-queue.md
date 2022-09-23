@@ -44,7 +44,7 @@ This is what we think the system should have:
 
 This is what you get with the existing Inngest platform today, but we want to bring this to more developers through in their local dev experience and allow developers to self-host Inngest system with swappable drivers. Today, we start our open source journey.
 
-> If you're new to Inngest, [read about what Inngest is](/docs/what-is-inngest) or [dive into the architecture and how it works](/docs/high-level-architecture)
+> If you're new to Inngest, [read about what Inngest is](/docs) or [dive into the architecture and how it works](https://github.com/inngest/inngest#project-architecture)
 
 ## Why build in the open?
 
@@ -72,6 +72,6 @@ What do you want to see next? [Let us know on Discord, we’d love to hear from 
 
 ## Check out the repo
 
-Head over to **[Github to check out the repo](https://github.com/inngest/inngest)**, the README, the architecture docs, and give it a spin yourself with [the quick start guide](/docs/quick-start).
+Head over to **[Github to check out the repo](https://github.com/inngest/inngest)**, the README, the architecture docs, and give it a spin yourself with [the quick start guide](/docs/functions).
 
 We really hope developers get to experience what we’ve built and weigh in on the approach that we’re taking to improve working with queues and event-driven systems. We want developers to do more with less. Come chat with us!

@@ -416,7 +416,7 @@ export default function Home() {
                 functions.
                 <br />
                 <br />
-                <a href="/docs/function?ref=homepage">
+                <a href="/docs/functions?ref=homepage">
                   Learn how to get started →
                 </a>
               </>

@@ -12,7 +12,7 @@ Inngest is an event-driven platform which makes it easy for developers to build,
 
 </div>
 
-At Inngest, we use Discord to collaborate across our remote team for all of our communication, including all of our engineering.  There are some good tools out there for centralizing PR discussions into Slack (hi [axolo.co](https://axolo.co)!) which help increase collaboration and efficiency when merging PRs but, unfortunately, there’s a dearth of these tools for Discord.  So we decided to build something using Inngest — and because of our platform it only took an hour to finish.  Best of all, you [can clone the functions](https://www.notion.so/Building-a-PR-collaboration-tool-on-discord-in-an-hour-d0002b2380e5428b8a8763cbb92d9d03) and deploy them for free to your own Discord org.
+At Inngest, we use Discord to collaborate across our remote team for all of our communication, including all of our engineering.  There are some good tools out there for centralizing PR discussions into Slack (hi [axolo.co](https://axolo.co)!) which help increase collaboration and efficiency when merging PRs but, unfortunately, there’s a dearth of these tools for Discord.  So we decided to build something using Inngest — and because of our platform it only took an hour to finish.  Best of all, you [can clone the functions](https://github.com/inngest/olotl) and deploy them for free to your own Discord org.
 
 In this post, we’ll walk through the architecture behind this kind of tool using AWS, and how you can build similar services rapidly using our platform.
 
@@ -21,7 +21,7 @@ In this post, we’ll walk through the architecture behind this kind of tool usi
 We want to centralize our PR discussions in discord using *threads* so that we have a single place to discuss each PR.  This means we need to:
 
 - Subscribe to GitHub events when PRs are created/updated/closed/merged, plus when comments and reviews are posted.
-- Create new [threads](https://www.notion.so/Building-a-PR-collaboration-tool-on-discord-in-an-hour-d0002b2380e5428b8a8763cbb92d9d03) in Discord when PRs are opened
+- Create new threads in Discord when PRs are opened
 - Forward GH comments in the relevant Discord thread
 - Plus the associated SDLC flow, such as renaming threads when PRs are updated, or notifying users when reviews are approved or rejected
 
@@ -85,15 +85,15 @@ You can view the full code for the discord PR management tool here: [https://git
     - When the PR is updated (eg. it switches from draft to ready to review, or the title is changed), we need to udpate the thread and send messages accordingly.
 - Other functions, such as `issue-comment`, handle sending messages to discord when reviews or comments are published.
 
-In order to create these functions we run `inngest init` ([see the docs here](https://www.notion.so/Building-a-PR-collaboration-tool-on-discord-in-an-hour-d0002b2380e5428b8a8763cbb92d9d03)), then walk through the init process to create new functions that are automatically triggered by their respective events.
+In order to create these functions we run `inngest init` ([see the docs here](/docs/cli/writing-and-running-fuctions)), then walk through the init process to create new functions that are automatically triggered by their respective events.
 
 This generates a scaffold using your language of choice (eg. Typescript, Golang, Python, or Ruby), and allows you to dive into coding immediately.
 
-After running `inngest init` we used the [discordgo](https://www.notion.so/Building-a-PR-collaboration-tool-on-discord-in-an-hour-d0002b2380e5428b8a8763cbb92d9d03) library to communicate with the [Discord API using a new bot](https://www.notion.so/Building-a-PR-collaboration-tool-on-discord-in-an-hour-d0002b2380e5428b8a8763cbb92d9d03), allowing us to create and manage threads and comments.
+After running `inngest init` we used the [discordgo](https://github.com/bwmarrin/discordgo), allowing us to create and manage threads and comments.
 
 <h2>Testing the functions</h2>
 
-Okay, so we’ve ran `inngest init` and added some code to create threads in Discord.  Now we need to run the code locally and test it. 
+Okay, so we’ve ran `inngest init` and added some code to create threads in Discord.  Now we need to run the code locally and test it.
 
 Using Inngest, you can run `inngest run --replay` to run the function locally using your most recently received events as the input data.  You can also use a specific event ID to test with locally via `inngest run --replay -e $EVENTID`, in case you have a specific event you’d like to test with from the Inngest UI.  You can also store these events in a JSON payload for use within CI via snapshotting.
 

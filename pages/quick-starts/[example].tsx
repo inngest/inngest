@@ -97,7 +97,7 @@ export default function LibraryExamplePage(props: Props) {
             <h2>More quickstarts</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12 mt-4">
               {nextExamples.map((example) => (
-                <div className="w-full h-full flex flex-col">
+                <div key={example.id} className="w-full h-full flex flex-col">
                   <Link
                     key={example.id}
                     href={`/quick-starts/${example.id}?ref=quick-starts/${props.id}`}
