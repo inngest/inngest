@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -32,7 +31,6 @@ func NewCmdTypes() *cobra.Command {
 	root.AddCommand(typescript)
 
 	root.PersistentFlags().StringP("output", "o", "./__generated__/inngest.ts", "Specify the location of the generated .ts file")
-	root.PersistentFlags().BoolP("check", "c", false, "Compare found types with an existing generated file defined by --output, failing if they're different. Useful for CI to check you are up to date")
 
 	return root
 }
@@ -88,23 +86,6 @@ func doTypescript(cmd *cobra.Command, args []string) {
 	types, err := typescript(cmd, args)
 	if err != nil {
 		log.Fatalln("\n" + cli.RenderError(err.Error()) + "\n")
-	}
-
-	shouldCheck := cmd.Flag("check").Value.String() == "true"
-	if shouldCheck {
-		// load file, check if the same
-		currFile, err := os.ReadFile(absPath)
-		if err != nil {
-			log.Fatalln("\n" + cli.RenderError("Failed to read existing file; make sure to specify your types file using --output") + "\n")
-		}
-
-		diff := bytes.Compare(currFile, []byte(types))
-		if diff > 0 {
-			log.Fatalln("\n" + cli.RenderError("Local types are different to the latest types from Inngest Cloud. Consider regenerating your local types."))
-		}
-
-		fmt.Println("Local types are in sync with the latest types from Inngest Cloud.")
-		return
 	}
 
 	err = writeTypes(types, absPath)
