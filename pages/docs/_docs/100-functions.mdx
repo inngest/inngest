@@ -76,8 +76,51 @@ export createScheduledFunction(
 
 This is very similar to defining an event-driven function, except it uses the `createScheduledFunction` call and a cron schedule to run your function at the specified interval.  This code can be deployed to any platform and will run automatically, without any HTTP calls.
 
+## TypeScript
+
+The Inngest SDK lets you strictly type all of your code against your real production data. This powerful feature helps to:
+
+- Protect you from making breaking changes
+- Encourage discoverability of your events via autocomplete
+- Give you instant feedback as to whether your code will run as intended
+
+To use generated event types, just run the `types` command on the Inngest CLI. You can do this via `npx`:
+
+```sh
+npx inngest-cli types ts [--output my/file.ts]
+```
+
+This will - by default - create a file at `./__generated__/inngest.ts` with all of your event types. You can then pass these in to a `new Inngest()` client.
+
+```typescript
+import { Inngest } from "inngest";
+import { Events } from "./__generated__/inngest";
+
+const inngest = new Inngest<Events>({ name: "My App" });
+```
+
+Or use individual events if using the `createFunction` helper directly.
+
+```typescript
+import { createFunction } from "inngest";
+import { DemoEvent } from "./__generated__/inngest";
+
+const fn = createFunction<DemoEvent>("Demo function", "demo/demo.event", job);
+```
+
+Finally, sometimes you want to provide type safety before an event has reached your Inngest Cloud account. For this, we can pass extra custom event types to the generated `Events` type which will be silently overridden when these events appear in Inngest.
+
+```typescript
+const inngest = new Inngest<
+  Events<{
+    "app/user.created": { data: { id: string } };
+    "app/user.updated": AppUserUpdated;
+  }>
+>({ name: "My App" });
+```
+
 ## Next up
 
-**Triggering functions**: next, you’ll run through how you can trigger these functions by sending events. 
+**Triggering functions**: next, you’ll run through how you can trigger these functions by sending events.
 
 **Deploying**: then, you’ll learn how to deploy to your platform of choice so that they’re live.
