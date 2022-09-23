@@ -60,7 +60,7 @@ inngest run
 
 <!-- An annotated version of the `inngest.json|cue` file to help the user firm up the understanding of how the config works.-->
 
-Below is the annotated function definition (found at [inngest.json](/inngest.json)) to show how the above is defined in config.
+Below is the annotated function definition (found at [inngest.json](inngest.json)) to show how the above is defined in config.
 
 ```jsonc
 {
