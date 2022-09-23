@@ -9,10 +9,14 @@ const OUTPUT_DIR = "./out/assets/social-previews";
 const { docs } = getAllDocs();
 
 async function renderAll() {
-  fs.mkdirSync(OUTPUT_DIR);
+  try {
+    fs.mkdirSync(OUTPUT_DIR);
+  } catch (err) {
+    console.log(`Output directory already exists`);
+  }
 
   for await (let [slug, scope] of Object.entries(docs)) {
-    const flattenedSlug = slug.replace(/\//, "--");
+    const flattenedSlug = slug.replace(/\//g, "--");
     const filename = `${OUTPUT_DIR}/${flattenedSlug}.png`;
     const titleWithCategory =
       scope.scope.category !== scope.scope.title
