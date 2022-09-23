@@ -169,12 +169,37 @@ func typescript(cmd *cobra.Command, args []string) (string, error) {
 		b.WriteString(ts + "\n")
 	}
 
+	// Add a type to allow users to define custom types
+	b.WriteString("type CustomEvent = {\n")
+	b.WriteString("  data: Record<string, any>;\n")
+	b.WriteString("  user?: Record<string, any>;\n")
+	b.WriteString("};\n\n")
+
 	// Create a catch-all type that we'll use when creating clients
-	b.WriteString("export type Events = Readonly<{\n")
+	b.WriteString("type GeneratedEvents = Readonly<{\n")
 	for eventId, tsEventName := range eventNames {
 		b.WriteString(fmt.Sprintf("  \"%s\": Readonly<%s>;\n", eventId, tsEventName))
 	}
-	b.WriteString("}>;\n")
+	b.WriteString("}>;\n\n")
+
+	// Create the exported `Events` type that can take optional custom events
+	b.WriteString("/**\n")
+	b.WriteString(" * Events generated from real data in your Inngest Cloud account. Can be passed\n")
+	b.WriteString(" * an object containing custom events if you wisht to send events not yet in\n")
+	b.WriteString(" * your ecosystem.\n")
+	b.WriteString(" *\n")
+	b.WriteString(" * ```ts\n")
+	b.WriteString(" * const inngest = new Inngest<\n")
+	b.WriteString(" *   Events<{\n")
+	b.WriteString(" *     \"app/user.created\": {\n")
+	b.WriteString(" *       data: { id: string; email: string };\n")
+	b.WriteString(" *     };\n")
+	b.WriteString(" *   }>\n")
+	b.WriteString(" * >({ name: \"My App\" });\n")
+	b.WriteString(" * ```\n")
+	b.WriteString(" */\n")
+	b.WriteString("export type Events<CustomEvents extends Record<string, CustomEvent> = {}> =\n")
+	b.WriteString("  Readonly<Omit<CustomEvents, keyof GeneratedEvents> & GeneratedEvents>;")
 
 	return b.String(), nil
 }
