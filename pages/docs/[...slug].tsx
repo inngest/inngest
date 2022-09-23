@@ -87,7 +87,7 @@ export default function DocLayout(props: any) {
           <div>
             {props.prev && (
               <a
-                href={props.prev.slug}
+                href={`/docs/${props.prev.slug}`}
                 className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white"
               >
                 <small>Previous</small>
@@ -98,7 +98,7 @@ export default function DocLayout(props: any) {
           <div>
             {props.next && (
               <a
-                href={props.next.slug}
+                href={`/docs/${props.next.slug}`}
                 className="shadow-md rounded-sm p-4 border-slate-200 border-2 color-inherit hover:shadow-2xl bg-white text-right"
               >
                 <small>Next</small>
@@ -107,7 +107,6 @@ export default function DocLayout(props: any) {
             )}
           </div>
         </FooterLinks>
-        {/* TODO: Add a prev / next button */}
       </DocsContent>
       <aside>
         <TOCSide toc={scope.toc} />
