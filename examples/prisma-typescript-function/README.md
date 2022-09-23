@@ -41,7 +41,8 @@ class Inngest,step1 inngest;
 
 <!-- A quick view of how to get started with the template. -->
 <!-- The CLI can guide them -->
-Use this quickstart with a single CLI command to get started! The CLI will then guide you through running, testing, and deploying to [Inngest Cloud](https//inngest.com/sign-up?ref=github-example).
+
+Use this quickstart with a single CLI command to get started! The CLI will then guide you through running, testing, and deploying to [Inngest Cloud](https://inngest.com/sign-up?ref=github-example).
 
 ```sh
 npx inngest-cli init --template github.com/inngest/inngest#examples/prisma-typescript-function

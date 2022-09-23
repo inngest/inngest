@@ -1,10 +1,12 @@
 # Using environment variables
 
 <!-- Insert a short summary of the function. It should be no longer than a single paragraph -->
+
 A simple example of parsing and returning environment variables when running locally via `inngest run` in a few different languages.
 
 <!-- Define a flowchart to visually show how the function will work -->
 <!-- https://mermaid.live/ is a great tool for this, and docs are at https://mermaid-js.github.io/mermaid/#/flowchart -->
+
 ```mermaid
 graph LR
 Source[Your app] -->|"demo/event.sent"| Inngest(Inngest)
@@ -27,6 +29,7 @@ class Output out;
 ## Contents
 
 <!-- A table of contents for your example, covering a few key areas -->
+
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Code](#code)
@@ -36,7 +39,8 @@ class Output out;
 
 <!-- A quick view of how to get started with the template. -->
 <!-- The CLI can guide them -->
-Use this quickstart with a single CLI command to get started! The CLI will then guide you through running, testing, and deploying to [Inngest Cloud](https//inngest.com/sign-up?ref=github-example).
+
+Use this quickstart with a single CLI command to get started! The CLI will then guide you through running, testing, and deploying to [Inngest Cloud](https://inngest.com/sign-up?ref=github-example).
 
 ```sh
 npx inngest-cli init --template github.com/inngest/inngest#examples/simple-env-vars
@@ -118,7 +122,6 @@ Below is the annotated function definition (found at [inngest.json](/inngest.jso
     }
   }
 }
-
 ```
 
 ## Code
@@ -126,6 +129,7 @@ Below is the annotated function definition (found at [inngest.json](/inngest.jso
 This function shows using env vars in three different languages: Golang, Python, and TypeScript. There's a separate step for each, triggered by the initial event, `demo/event.sent`.
 
 <!-- A brief summary of where to find the various steps in the code and any other interesting configuration -->
+
 - ➡️ [**steps/golang/**](steps/golang)
 - ➡️ [**steps/python/**](steps/python)
 - ➡️ [**steps/typescript/**](steps/typescript)

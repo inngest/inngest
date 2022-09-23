@@ -1,6 +1,5 @@
 # Weekly summary & digest emails
 
-
 ```mermaid
 graph LR
 Source[Schedule] -->| | Inngest(Inngest)
@@ -24,7 +23,6 @@ class Output out;
 - [Usage](#usage)
 - [Code](#code)
 
-
 ## Why
 
 This solves writing scheduled functions without crons or queues in seconds with the following benefits:
@@ -37,7 +35,8 @@ This solves writing scheduled functions without crons or queues in seconds with 
 
 <!-- A quick view of how to get started with the template. -->
 <!-- The CLI can guide them -->
-Use this quickstart with a single CLI command to get started! The CLI will then guide you through running, testing, and deploying to [Inngest Cloud](https//inngest.com/sign-up?ref=github-example).
+
+Use this quickstart with a single CLI command to get started! The CLI will then guide you through running, testing, and deploying to [Inngest Cloud](https://inngest.com/sign-up?ref=github-example).
 
 Via the CLI:
 
@@ -46,6 +45,7 @@ inngest init --template github.com/inngest/inngest#examples/weekly-summary-email
 ```
 
 Via NPX:
+
 ```sh
 npx inngest-cli init --template github.com/inngest/inngest#examples/weekly-summary-email
 ```
@@ -54,6 +54,6 @@ With the function cloned, run `inngest run` to test the function locally.
 
 ## Code
 
-This function has a single step within `steps/run`.  This step loads all summaries
+This function has a single step within `steps/run`. This step loads all summaries
 to be sent, then sends an event to Inngest to record summary information and sends
 the email.

@@ -6,6 +6,7 @@ When a `user/profile.photo.uploaded` event is received, check that the uploaded 
 
 <!-- Define a flowchart to visually show how the function will work -->
 <!-- https://mermaid.live/ is a great tool for this, and docs are at https://mermaid-js.github.io/mermaid/#/flowchart -->
+
 ```mermaid
 graph LR
 Source[Your app] -->|"user/profile.photo.uploaded<br>'url':'https://.../photo.jpg'"| Inngest(Inngest)
@@ -24,6 +25,7 @@ class Alert,Process out;
 
 <!-- To go along with the visual diagram, you can optionally add some numbered steps here to show the same flow -->
 <!-- This may not always be required or appropriate, e.g. if there are some async actions happening -->
+
 1. `user/profile.photo.uploaded` event is received
 2. ➡️ Run [steps/safety-check](steps/safety-check) to check image safety
 3. If image **is** deemed safe:
@@ -34,6 +36,7 @@ class Alert,Process out;
 ## Contents
 
 <!-- A table of contents for your example, covering a few key areas -->
+
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Code](#code)
@@ -44,7 +47,8 @@ class Alert,Process out;
 
 <!-- A quick view of how to get started with the template. -->
 <!-- The CLI can guide them -->
-Use this quickstart with a single CLI command to get started! The CLI will then guide you through running, testing, and deploying to [Inngest Cloud](https//inngest.com/sign-up?ref=github-example).
+
+Use this quickstart with a single CLI command to get started! The CLI will then guide you through running, testing, and deploying to [Inngest Cloud](https://inngest.com/sign-up?ref=github-example).
 
 ```sh
 npx inngest-cli init --template github.com/inngest/inngest#examples/google-process-images
@@ -85,7 +89,7 @@ Below is the annotated function definition (found at [inngest.json](/inngest.jso
       "id": "safety-check",
       "name": "Safety Check",
       "path": "file://./steps/safety-check",
-      "runtime": {"type": "docker"}
+      "runtime": { "type": "docker" }
     },
     /**
      * Process is one of the two steps that can run after the Safety Check. It
@@ -121,7 +125,6 @@ Below is the annotated function definition (found at [inngest.json](/inngest.jso
     }
   }
 }
-
 ```
 
 ## Code
@@ -129,6 +132,7 @@ Below is the annotated function definition (found at [inngest.json](/inngest.jso
 This function has only a single step: `steps/hello`, which is triggered by the `user/hello` event.
 
 <!-- A brief summary of where to find the various steps in the code and any other interesting configuration -->
+
 - ➡️ [**steps/safety-check/**](steps/safety-check)
   > Using the `url` found in the event, this step will pass it to the Google Cloud Vision API to see if it is deemed safe. If the image is safe, `isSafe: true` will be passed as output to the next step. Otherwise, we'll pass `isSafe: false`.
 - ➡️ [**steps/process/**](steps/process)
@@ -150,9 +154,9 @@ For this quick-start, we're interacting with two Google APIs: [Google Cloud Visi
 - Enable **Cloud Storage** - https://console.cloud.google.com/apis/library/storage-component.googleapis.com
 - Head over to [Quickstart: Setup the Vision API](https://cloud.google.com/vision/docs/setup) to get started and create a service account
 - Add your service account `.json` file as a local secret using `.env` files
-    ```
-    node -e "console.log(\"GOOGLE_SERVICE_ACCOUNT=\'\" + JSON.stringify(require(\"./key.json\")) + \"\'\")" > .env
-    ```
+  ```
+  node -e "console.log(\"GOOGLE_SERVICE_ACCOUNT=\'\" + JSON.stringify(require(\"./key.json\")) + \"\'\")" > .env
+  ```
 - ✅ Run `inngest run`
 
 The final command, `inngest run`, will generate test data based on the event's schema (`user/profile.photo.uploaded`). To try this out with some real images, we could:
