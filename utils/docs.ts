@@ -6,9 +6,10 @@
 export enum Sections {
   default = "Default",
   reference = "Reference",
-  // cloud = "Inngest Cloud", // Hidden for now
+  cloud = "Inngest Cloud", // Hidden for now
 }
 const SectionOrder = [Sections.default, Sections.reference];
+const HiddenSections = [Sections.cloud];
 
 /**
  * Docs Table of Contents
@@ -79,7 +80,7 @@ export type Docs = {
   docs: { [slug: string]: Doc };
   // TODO: Is this an ordered set?
   slugs: string[];
-  sections: { section: Sections; categories: Categories }[];
+  sections: { section: Sections; categories: Categories; hide: boolean }[];
 };
 
 export const getAllDocs = (() => {
@@ -105,7 +106,18 @@ export const getAllDocs = (() => {
       docs: {},
       slugs: [],
 
-      sections: SectionOrder.map((section) => ({ section, categories: {} })),
+      sections: [
+        ...SectionOrder.map((section) => ({
+          section,
+          categories: {},
+          hide: false,
+        })),
+        ...HiddenSections.map((section) => ({
+          section,
+          categories: {},
+          hide: true,
+        })),
+      ],
     };
 
     const fs = require("fs");
@@ -147,14 +159,14 @@ export const getAllDocs = (() => {
       };
     };
 
-    SectionOrder.forEach((section) => {
+    [...SectionOrder, ...HiddenSections].forEach((section) => {
       const key = Object.keys(Sections).find((k) => Sections[k] === section);
       const dir = section === Sections.default ? "docs" : key;
       const path = `./pages/docs/_${dir}/`;
       fs.readdirSync(path).forEach(parseDir(path, section));
     });
 
-    SectionOrder.forEach((section) => {
+    [...SectionOrder, ...HiddenSections].forEach((section) => {
       const sectionObject = memoizedDocs.sections.find(
         (s) => s.section === section
       );

@@ -54,13 +54,15 @@ const createNestedTOC = (categories: Categories) => {
 };
 
 const DocsNav: React.FC<{
-  sections: { section: Sections; categories: Categories }[];
+  sections: { section: Sections; categories: Categories; hide: boolean }[];
 }> = ({ sections }) => {
   const [isExpanded, setExpanded] = useState(false);
-  const navSections = sections.map((s) => ({
-    section: s.section as string,
-    toc: createNestedTOC(s.categories),
-  }));
+  const navSections = sections
+    .filter((s) => !s.hide)
+    .map((s) => ({
+      section: s.section as string,
+      toc: createNestedTOC(s.categories),
+    }));
 
   const router = useRouter();
 
