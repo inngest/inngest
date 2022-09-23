@@ -136,6 +136,10 @@ func typescript(cmd *cobra.Command, args []string) (string, error) {
 	for _, eventId := range eventKeys {
 		event := unorderedEvents[eventId]
 
+		if event.Event.Versions[0].CueType == "" {
+			continue
+		}
+
 		et := function.EventTrigger{
 			Event: eventId,
 			Definition: &function.EventDefinition{
