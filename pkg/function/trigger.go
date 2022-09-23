@@ -54,6 +54,7 @@ type EventTrigger struct {
 
 func (e EventTrigger) TitleName() string {
 	words := strings.ReplaceAll(slug.Make(e.Event), "-", " ")
+	words = strings.ReplaceAll(words, "_", " ")
 	return strings.ReplaceAll(strings.Title(words), " ", "")
 }
 
