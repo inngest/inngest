@@ -12,6 +12,21 @@ module.exports = {
         destination: "http://eepurl.com/hI3dCr",
         permanent: true,
       },
+      {
+        source: "/docs/quick-start",
+        destination: "/docs",
+        permanent: false,
+      },
+      {
+        source: "/docs/function-ide-guide",
+        destination: "/docs/cloud/function-ide-guide",
+        permanent: false,
+      },
+      {
+        source: "/docs/using-the-inngest-cli",
+        destination: "/docs/cloud/using-the-inngest-cli",
+        permanent: false,
+      },
     ];
   },
 };
