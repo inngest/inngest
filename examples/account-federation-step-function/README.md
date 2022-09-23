@@ -71,7 +71,7 @@ users in external systems. You can use any language in steps and integrate any A
 
 ## Configuration
 
-Below is the annotated function definition (found at [inngest.json](/inngest.json)) to show how the above is defined in config.
+Below is the annotated function definition (found at [inngest.json](inngest.json)) to show how the above is defined in config.
 
 ```json
 {

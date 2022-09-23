@@ -1,10 +1,12 @@
 # Hello, World!
 
 <!-- Insert a short summary of the function. It should be no longer than a single paragraph -->
+
 Respond to a `user/hello` event and output a `"Hello, [name]!"` message.
 
 <!-- Define a flowchart to visually show how the function will work -->
 <!-- https://mermaid.live/ is a great tool for this, and docs are at https://mermaid-js.github.io/mermaid/#/flowchart -->
+
 ```mermaid
 graph LR
 Source[Your app] -->|"user/hello<br>'name':'Alice'"| Inngest(Inngest)
@@ -21,11 +23,12 @@ class Output out;
 ```
 
 <!-- To go along with the visual diagram, you can optionally add some numbered steps here to show the same flow -->
-<!-- This may not always be required or appropriate, e.g. if there are some async actions happening --> 
+<!-- This may not always be required or appropriate, e.g. if there are some async actions happening -->
 
 ## Contents
 
 <!-- A table of contents for your example, covering a few key areas -->
+
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Code](#code)
@@ -48,7 +51,7 @@ Next, check out how to [👉 trigger the function](#triggering-the-function).
 
 <!-- An annotated version of the `inngest.json|cue` file to help the user firm up the understanding of how the config works.-->
 
-Below is the annotated function definition (found at [inngest.json](/inngest.json)) to show how the above is defined in config.
+Below is the annotated function definition (found at [inngest.json](inngest.json)) to show how the above is defined in config.
 
 ```json
 {
@@ -66,6 +69,7 @@ Below is the annotated function definition (found at [inngest.json](/inngest.jso
 This function has only a single step: `steps/hello`, which is triggered by the `user/hello` event.
 
 <!-- A brief summary of where to find the various steps in the code and any other interesting configuration -->
+
 - ➡️ [**steps/hello/**](/steps/hello)
   > Says hello and does the things and stuff.
 
