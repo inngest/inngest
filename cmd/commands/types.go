@@ -166,11 +166,11 @@ func typescript(cmd *cobra.Command, args []string) (string, error) {
 	}
 
 	// Create a catch-all type that we'll use when creating clients
-	b.WriteString("export type Events = {\n")
+	b.WriteString("export type Events = Readonly<{\n")
 	for eventId, tsEventName := range eventNames {
-		b.WriteString(fmt.Sprintf("  \"%s\": %s;\n", eventId, tsEventName))
+		b.WriteString(fmt.Sprintf("  \"%s\": Readonly<%s>;\n", eventId, tsEventName))
 	}
-	b.WriteString("};\n")
+	b.WriteString("}>;\n")
 
 	return b.String(), nil
 }
