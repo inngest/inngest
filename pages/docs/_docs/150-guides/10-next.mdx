@@ -1,0 +1,127 @@
+---
+category: "Guides"
+title: "Next.js"
+slug: "guides/nextjs"
+---
+
+Inngest works with NextJS out of the box, and allows you to write background jobs,
+scheduled functions, and event driven systems using <a href="https://nextjs.org/docs/api-routes/introduction" rel='nofollow'>Next's API routes.</a>
+
+Follow along to learn how to:
+
+1. Write functions in NextJS
+2. Integrate your event types within functions
+3. Serve your functions with a new API route
+4. Register your functions with Inngest after deploying to your hosting service.
+
+## Writing functions in NextJS
+
+Firstly, create a new directory within the root of your NextJS app called `inngest`.  This
+will contain all of your functions:
+
+
+```twoslash include main
+// @filename: ./inngest/new_pr.ts
+import { createFunction } from "inngest";
+
+export const newPR = createFunction("New PR", "github/pull_request", ({ event }) => {
+ // This function is triggered when the `github/pull_request` event is received via
+ // a GH webhook.
+});
+```
+
+```bash
+mkdir ./inngest
+```
+
+Within this directory you can write your Inngest functions:
+
+```typescript twoslash
+import { createFunction } from "inngest";
+
+export const newPR = createFunction("New PR", "github/pull_request", ({ event }) => {
+ // This function is triggered when the `github/pull_request` event is received via
+ // a GH webhook.
+});
+```
+
+
+## Serving functions in NextJS
+
+You'll need to create a new `./pages/api/inngest.ts`
+file to serve the Inngest function API. Import `serve` from the `inngest/next`
+package to create your endpoint:
+
+```typescript twoslash
+// @filename: types.d.ts
+declare global {
+	var process: NodeJS.Process;
+        namespace NodeJS {
+		interface Process {
+			env: Record<string, string>;
+		}
+	}
+}        
+
+// @filename: ../../inngest/new_pr.ts
+import { createFunction } from "inngest";
+
+export const newPR = createFunction("New PR", "github/pull_request", ({ event }) => {
+ // This function is triggered when the `github/pull_request` event is received via
+ // a GH webhook.
+});
+
+// ---cut---
+import { serve } from "inngest/next";
+import { newPR } from "../../inngest/new_pr.ts";
+
+// You must export the serve handler, which hosts all of the provided functions
+// under one API endpoint.
+export default serve("My app/service name", process.env.INNGEST_SIGNING_KEY, [exampleFn]);
+```
+
+This hosts an API endpoint at `${your-url}/api/inngest`, which we'll use to call your
+functions.
+
+**`serve` syntax**
+
+```
+serve(appName, signingKey, [functions]);
+```
+
+**`serve` arguments**
+
+- **`appName`**:  The name of your app or microservice, used to group all functions together
+- **`signingKey`**: The signing key for your workspace, [available in your account](https://app.inngest.com/secrets)
+- **`[functions]`**: An array of all functions to enable
+
+## Registering your functions with Inngest
+
+By default, Inngest doesn't know which functions you're serving or the URL of your app. Once you
+deploy your site to production, you'll need to reigster your functions with Inngest.  You can do
+this via the UI or via an API call.
+
+### Registering via the UI
+
+You can add your endpoint’s URL to Inngest via the dashboard:
+
+<video controls autoPlay loop muted>
+  <source
+    src="/assets/docs/sdk-deploy.mp4"
+    type="video/mp4"
+  />
+</video>
+
+### Registering via the API
+
+You can register your function’s endpoints with a single PUT call to your function endpoint:
+
+```bash
+curl -X PUT https://www.example.com/api/inngest
+```
+
+Remember to swap www.example.com with your own domain name.
+
+
+[You can read more about registering functions here](/docs/deploy#registering-live-functions-with-inngest).
+

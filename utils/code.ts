@@ -7,4 +7,4 @@ import remarkShikiTwoslash from 'remark-shiki-twoslash';
 //     remarkPlugins: [highlight],
 //   },
 // });
-export const highlight: any = [remarkShikiTwoslash, { theme: "nord" }]
+export const highlight: any = [remarkShikiTwoslash]
