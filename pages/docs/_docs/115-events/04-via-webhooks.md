@@ -52,13 +52,6 @@ function transform(evt, headers = {}) {
 }
 ```
 
-<div>
-	<img src="/assets/webhook-transform.png" alt="Webhooks in Inngest" />
-	<small>An example of a webhook transform, adding the event name based off of the incoming webhook data</small>
-</div>
-
-<br />
-
 The above example shows a GitHub transform, using the incoming event data to create a new `name` field.
 
 You can use almost all ES6 features, and our UI allows you to preview the transform prior to saving the webhook. Transforms can be modified at any time.
