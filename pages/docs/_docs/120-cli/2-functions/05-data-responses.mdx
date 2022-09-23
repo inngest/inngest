@@ -34,7 +34,7 @@ The input has the following keys:
 
 Input data is accessed in different ways, depending on the [runtime](/docs/functions/inngest-json-configuration#runtimes).
 
-- `docker`: Custom docker-based functions can always read the input as a JSON-encoded string as a command line argument passed to the image's command or entrypoint (e.g. `os.Args[1]` in Go, `process.argv[2]` in Node) 
+- `docker`: Custom docker-based functions can always read the input as a JSON-encoded string as a command line argument passed to the image's command or entrypoint (e.g. `os.Args[1]` in Go, `process.argv[2]` in Node)
 - `http`: The input can be read as a JSON-encoded string from the request body.
 - `lambda`: The input data is read as a normal AWS lambda event.
 
@@ -52,7 +52,7 @@ For standard containers, printing to `stdout` is easy - and is built in to every
 
 ## Response format
 
-When a step completes it can return data that's usable by subsequent steps. The data also indicates how [retries](/docs/functions/retries) should be handled.
+When a step completes it can return data that's usable by subsequent steps. The data also indicates how [retries](/docs/reference/functions/retries) should be handled.
 
 In keeping with standards, we _strongly_ recommend returning HTTP-like responses:
 
@@ -62,7 +62,7 @@ In keeping with standards, we _strongly_ recommend returning HTTP-like responses
   status: 200,
 // @log: body can be any data returned from your function.
   body: {
-    records: [], 
+    records: [],
   }
 }
 ```
@@ -71,7 +71,7 @@ If `status` isn't provided, we fall back to `statusCode` (the field that AWS Lam
 
 ### Status codes
 
-Step responses can contain status codes, via the top level `status` or `statusCode` field.  This allows you to configure retries; a 5xx indicates a temporary internal error, whereas a 4xx indicates an error that cannot be fixed by retries. Read more about [retries here](/docs/functions/retries).
+Step responses can contain status codes, via the top level `status` or `statusCode` field.  This allows you to configure retries; a 5xx indicates a temporary internal error, whereas a 4xx indicates an error that cannot be fixed by retries. Read more about [retries here](/docs/reference/functions/retries).
 
 ### Body
 
@@ -80,4 +80,4 @@ within the run state and is visible within the cloud UI for debugging.
 
 ### Limits
 
-The response size is currently limited to 1MB.  To increase this limit, reach out to us:  hi@inngest.com. 
+The response size is currently limited to 1MB.  To increase this limit, reach out to us:  hi@inngest.com.

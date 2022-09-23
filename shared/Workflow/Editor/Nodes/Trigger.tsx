@@ -5,7 +5,7 @@ import { css } from "@emotion/react";
 
 import { baseCSS } from "./css";
 import Button, { ButtonGroup } from "src/shared/Button";
-import Tag from "src/shared/tag";
+import Tag from "src/shared/Tag";
 import cronstrue from "cronstrue";
 import {
   Handle,

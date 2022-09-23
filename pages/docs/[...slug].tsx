@@ -19,9 +19,8 @@ import { DocsLayout, DocsContent } from "../docs";
 import { highlight } from "../../utils/code";
 
 export default function DocLayout(props: any) {
-  const scope: DocScope & { cli: Categories; cloud: Categories } = JSON.parse(
-    props.post.scope.json
-  );
+  const scope: DocScope = JSON.parse(props.post.scope.json);
+  const sections = JSON.parse(props.sections);
 
   const formattedTitle = scope.title.replace(/`(.+)`/, "<code>$1</code>");
 
@@ -45,7 +44,7 @@ export default function DocLayout(props: any) {
     : generatedPreviewImage;
 
   return (
-    <DocsLayout cli={scope.cli} cloud={scope.cloud}>
+    <DocsLayout sections={sections}>
       <Head>
         <title>{metaTitle}</title>
         <meta name="description" content={description}></meta>
@@ -155,8 +154,6 @@ export async function getStaticProps({ params }) {
   // browser builds.
   const slug = params.slug;
   const parsedSlug = Array.isArray(slug) ? slug.join("/") : slug;
-
-  const { cli, cloud } = getAllDocs();
   const docs = getDocs(parsedSlug);
   const all = getAllDocs();
 
@@ -194,7 +191,7 @@ export async function getStaticProps({ params }) {
   const { content } = docs;
 
   // Add categories to the scope such that we can show them in the UI.
-  const scope = { ...docs.scope, cli, cloud };
+  const scope = { ...docs.scope };
 
   const post = await serialize(content, {
     scope: { json: JSON.stringify(scope) },
@@ -207,6 +204,7 @@ export async function getStaticProps({ params }) {
   return {
     props: {
       post,
+      sections: JSON.stringify(all.sections),
       next,
       prev,
       htmlClassName: "docs",

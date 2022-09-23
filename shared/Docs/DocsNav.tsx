@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 
-import { Categories, Category, DocScope } from "../../utils/docs";
+import { Categories, Category, DocScope, Sections } from "../../utils/docs";
 import ThemeToggleButton from "../ThemeToggleButton";
 import Button from "../Button";
 import Logo from "../Icons/Logo";
@@ -53,13 +53,14 @@ const createNestedTOC = (categories: Categories) => {
     .filter(Boolean);
 };
 
-const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
-  cli,
-  cloud,
-}) => {
+const DocsNav: React.FC<{
+  sections: { section: Sections; categories: Categories }[];
+}> = ({ sections }) => {
   const [isExpanded, setExpanded] = useState(false);
-  const nestedCLI = createNestedTOC(cli);
-  const nestedCloud = createNestedTOC(cloud);
+  const navSections = sections.map((s) => ({
+    section: s.section as string,
+    toc: createNestedTOC(s.categories),
+  }));
 
   const router = useRouter();
 
@@ -85,26 +86,25 @@ const DocsNav: React.FC<{ cli: Categories; cloud: Categories }> = ({
                 <a className="docs-page">Getting started</a>
               </Link>
             </NavItem>
-            {nestedCLI.map((c, idx) => (
-              <DocsNavItem
-                key={`cat-${idx}`}
-                category={c}
-                type="cli"
-                doc={c.categoryPage}
-              />
-            ))}
-
-            <hr />
-
-            <h5>Inngest Cloud</h5>
-
-            {nestedCloud.map((c, idx) => (
-              <DocsNavItem
-                key={`cat-${idx}`}
-                category={c}
-                type="cloud"
-                doc={c.categoryPage}
-              />
+            {navSections.map((s) => (
+              <div key={s.section}>
+                {s.section !== "Default" ? (
+                  <>
+                    <hr key={`${s.section}-hr`} />
+                    <h5 key={`${s.section}-h5`}>{s.section}</h5>
+                  </>
+                ) : (
+                  ""
+                )}
+                {s.toc.map((c, idx) => (
+                  <DocsNavItem
+                    key={`cat-${s.section}-${idx}`}
+                    category={c}
+                    type={s.section as Sections}
+                    doc={c.categoryPage}
+                  />
+                ))}
+              </div>
             ))}
           </NavList>
           <div>
@@ -140,7 +140,7 @@ export default DocsNav;
 const DocsNavItem: React.FC<{
   category: Category;
   doc?: DocScope;
-  type: "cli" | "cloud";
+  type: Sections;
 }> = ({ category, doc, type }) => {
   const [isExpanded, setExpanded] = useState(false);
   const router = useRouter();

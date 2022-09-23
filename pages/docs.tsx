@@ -8,17 +8,17 @@ import DocsNav from "../shared/Docs/DocsNav";
 import Footer from "../shared/footer";
 import Button from "../shared/Button";
 import ArrowUpRightIcon from "../shared/Icons/ArrowUpRight";
-import { getAllDocs, Categories } from "../utils/docs";
+import { getAllDocs, Categories, Sections } from "../utils/docs";
 import docsSyntaxHighlightingCSS from "../shared/syntaxHighlightingCSS";
 
 export async function getStaticProps() {
-  const { cli, cloud } = getAllDocs();
-  return { props: { cli: cli, cloud: cloud, htmlClassName: "docs" } };
+  const { sections } = getAllDocs();
+  return { props: { sections, htmlClassName: "docs" } };
 }
 
 export default function DocsHome(props) {
   return (
-    <DocsLayout cli={props.cli} cloud={props.cloud}>
+    <DocsLayout sections={props.sections}>
       <Head>
         <title>Inngest → Documentation & Guides</title>
       </Head>
@@ -227,16 +227,14 @@ export default function DocsHome(props) {
   );
 }
 
-export const DocsLayout: React.FC<{ cli: Categories; cloud: Categories }> = ({
-  children,
-  cli,
-  cloud,
-}) => {
+export const DocsLayout: React.FC<{
+  sections: { section: Sections; categories: Categories }[];
+}> = ({ children, sections }) => {
   return (
     <>
       <Global styles={DocsGlobalStyles} />
       <DocsWrapper>
-        <DocsNav cli={cli} cloud={cloud} />
+        <DocsNav sections={sections} />
         <Main>{children}</Main>
       </DocsWrapper>
       <Footer />

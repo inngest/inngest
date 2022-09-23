@@ -173,7 +173,7 @@ export default function Home() {
               <>
                 <strong>Automatic Retries</strong> - Use HTTP status codes to
                 define what code should be retried (
-                <a href="/docs/functions/retries?ref=product-feature-list">
+                <a href="/docs/reference/functions/retries?ref=product-feature-list">
                   docs
                 </a>
                 )
