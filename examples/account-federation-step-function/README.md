@@ -3,8 +3,8 @@
 This function responds to an `auth/account.created` event sent when a new user signs up, then adds
 the user to several external systems and sends a message in slack - in real-time.
 
-
 <!-- https://mermaid.live/ is a great tool for this, and docs are at https://mermaid-js.github.io/mermaid/#/flowchart -->
+
 ```mermaid
 graph LR
 Source[Your app] -->|"auth/account.created<br>'data': {...}"| Inngest(Inngest)
@@ -31,12 +31,11 @@ class Output out;
 - [Code](#code)
 - [Configuration](#configuration)
 
-
 ## Why
 
 Using step functions to add users to external systems (user federation) provides a few benefits:
 
-1. It happens in real time, vs relying on standard ETL processes.  This means fewer issues for your users and team.
+1. It happens in real time, vs relying on standard ETL processes. This means fewer issues for your users and team.
 2. If external APIs have errors we'll retry steps individually
 3. Functions are versioned and easily changed, so modifying this flow with future changes is simple
 4. It's decoupled from the sign-up flow, removing any risk of introducing sign-up bugs
@@ -45,7 +44,8 @@ Using step functions to add users to external systems (user federation) provides
 
 <!-- A quick view of how to get started with the template. -->
 <!-- The CLI can guide them -->
-Use this quickstart with a single CLI command to get started! The CLI will then guide you through running, testing, and deploying to [Inngest Cloud](https//inngest.com/sign-up?ref=github-example).
+
+Use this quickstart with a single CLI command to get started! The CLI will then guide you through running, testing, and deploying to [Inngest Cloud](https://inngest.com/sign-up?ref=github-example).
 
 Via the CLI:
 
@@ -54,6 +54,7 @@ inngest init --template github.com/inngest/inngest#examples/account-federation
 ```
 
 Via NPX:
+
 ```sh
 npx inngest-cli init --template github.com/inngest/inngest#examples/account-federation
 ```
@@ -62,11 +63,11 @@ With the function cloned, run `inngest run` to test the function locally.
 
 ## Code
 
-This function has several steps within `steps/`.  Each step runs in parallel independently of each
+This function has several steps within `steps/`. Each step runs in parallel independently of each
 other.
 
 In this example, all steps are Typescript functions which implement 3rd party APIs for creating
-users in external systems.  You can use any language in steps and integrate any APIs you need.
+users in external systems. You can use any language in steps and integrate any APIs you need.
 
 ## Configuration
 
@@ -94,18 +95,14 @@ Below is the annotated function definition (found at [inngest.json](/inngest.jso
       "path": "file://steps/add-to-intercom",
       "name": "Add to intercom",
       "runtime": { "type": "docker" },
-      "after": [
-        { "step": "$trigger" }
-      ]
+      "after": [{ "step": "$trigger" }]
     },
     "send-to-slack": {
       "id": "send-to-slack",
       "path": "file://steps/send-to-slack",
       "name": "Send to slack",
       "runtime": { "type": "docker" },
-      "after": [
-        { "step": "$trigger" }
-      ]
+      "after": [{ "step": "$trigger" }]
     },
     "add-to-close-io": {
       "id": "add-to-close-io",
@@ -114,8 +111,7 @@ Below is the annotated function definition (found at [inngest.json](/inngest.jso
       "runtime": {
         "type": "docker"
       }
-    },
+    }
   }
 }
 ```
-
