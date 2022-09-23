@@ -14,10 +14,9 @@ express, you need to:
 
 Import `serve` from the `inngest` package to create middleware for Express:
 
-```ts
+```ts twoslash
 import express from "express";
-
-// Imprt serve from inngest
+// Import serve from inngest
 import { serve, createFunction } from "inngest";
 
 const app = express();
@@ -30,13 +29,12 @@ const exampleFn = createFunction(
 );
 
 // Create an endpoint for Inngest functions
-const inngestMiddleware = serve("My app/service name", process.env.INNGEST_SIGNING_KEY, [exampleFn]);
+const inngestMiddleware = serve("My app/service name", process.env.INNGEST_SIGNING_KEY || "", [exampleFn]);
 
 // Use the middleware from Inngest to host at /api/inngest.
 app.use("/api/inngest", inngestMiddleware);
 
-app.listen(3006, () => { console.log("running"));
-
+app.listen(3006, () => { console.log("running"); });
 ```
 
 This hosts an API endpoint at `${your-url}/api/inngest`, which we'll use to call your
