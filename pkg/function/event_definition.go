@@ -118,6 +118,10 @@ func (ed *EventDefinition) Typescript(ctx context.Context) (string, error) {
 		return "", err
 	}
 
+	if ed.cueType == "" {
+		return "", nil
+	}
+
 	// Ensure we have an identifier so that this isn't broken into event components.
 	def := ed.cueType
 	if strings.TrimSpace(ed.cueType)[0] == '{' {
