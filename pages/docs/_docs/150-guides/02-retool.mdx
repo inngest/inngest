@@ -4,7 +4,6 @@ title: "Trigger your code directly from Retool"
 slug: "guides/trigger-your-code-from-retool"
 image: /assets/guides/trigger-your-code-from-retool/retool-inngest-featured-image.jpg
 order: 2
-hide: true
 ---
 
 Internal tools are a pain to build and maintain. Fortunately, [Retool](https://retool.com/) has helped tons of companies reduce the burden. Retool primarily focuses on building dashboards and forms and it integrates well with several databases and cloud APIs.
@@ -24,9 +23,9 @@ We're going to walk through how you can do this so your team can trigger importa
 The goal is to enable your team to trigger a script anytime they click a button in Retool. To achieve this we will:
 
 1. Create a Retool button that sends an event to Inngest
-2. Package up the script into an Inngest function
-3. Configure the function to run when that event is received
-4. See how it works end to end.
+2. Write an Inngest function that uses our existing script
+3. Configure that function to run when our event is received
+4. See how it works end to end
 
 ## Sending an event from Retool
 
@@ -64,126 +63,67 @@ Now that we've verified the data is sent over to Inngest, you can attach the res
 
 We're halfway there - with this in place any agent from our team can trigger this event as needed.
 
-## Preparing our script
+## Writing our Inngest function
 
-Heading over to our application code, we'll assume you are familiar with writing a `Dockerfile` or that you already have one in your project, otherwise, [you can check out the example repo here](https://github.com/inngest/example-monorepo) to see the final result. Let's create a new directory for our function from your project root:
+Using [the Inngest SDK](/features/sdk?ref=retool-guide) you can define your Inngest function and it's event trigger in one file. We'll create a directory called `inngest` in our project root:
 
-```shell
-mkdir -p functions/run-backfill
+```
+mkdir -p inngest
 ```
 
-Create a file in this directory to run you code, for this example we'll use JavaScript (Node.js) - `index.js` . In this code, will be our Inngest function: it imports the existing backfill code, parses the event payload from args, runs the backfill, then logs the output as JSON using an http status code to tell Inngest [if it should be retried or not](/docs/functions/retries?ref=retool-guide).
+Now we'll create a file in this directory for our function - `runBackfillForUser.js`. This will be our Inngest function which will import our existing backfill code, use the `user_id` from the event payload to run that code, and return a http status code in our response to tell Inngest [if it should be retried or not](/docs/functions/retries?ref=retool-guide).
+
 
 ```js
-const { runBackfillForUser } = require("../../lib/backfill-scripts");
+// filename: ./inngest/runBackfillForUser.js
+import { createFunction } from "inngest";
+import { runBackfillForUser }  from "../lib/backfill-scripts";
 
-const { event } = JSON.parse(process.argv.pop());
-
-const result = runBackfillForUser(event.data.user_id);
-
-console.log(JSON.stringify({
-  status: result.ok ? 200 : 500,
-  message: `Ran backfill for user ${event.data.user_id}`,
-}));
-```
-
-Essentially, this is what an Inngest function is, it receives a JSON payload via args, it runs some code then whatever is logged last to `stdout` is captured as the result of the function. No SDKs or libraries needed.
-
-## Configuring our script to run
-
-Every Inngest function requires an `inngest.json` configuration file which tells Inngest when and how to run the function. We'll create this file in our `functions/run-backfill` directory. At a basic level it has 3 parts:
-
-**Function metadata**
-
-The function needs a `name` and a unique `id` - the `id` cannot change.
-
-```json
-{
-  "name": "Run User Backfill",
-  "id": "run-user-backfill",
-```
-
-**Event trigger**
-
-Use the event name as the trigger. Events can have multiple triggers, but we only need one.
-
-```json
-  "triggers": [
-    { "event": "retool/backfill.requested" }
-  ],
-```
-
-**Function Steps**
-
-Every function can have `n` number of steps [enabling complex and powerful functions](/docs/functions/step-functions?ref=retool-guide), but we only need one for our function. `steps` is an object with keys that match the `id` of the step. We'll give it a name and specify some `runtime` information including the path to our `dockerfile` in our parent directory.
-
-```json
-  "steps": {
-    "backfill": {
-      "id": "backfill",
-      "name": "Backfill User Data",
-      "runtime": {
-        "type": "docker",
-        "dockerfile": "../../Dockerfile.backfill"
-      }
-    }
+export default createFunction(
+  "Run backfill for user",     // The name displayed in the Inngest dashboard
+  "retool/backfill.requested", // The event triggger
+  async ({ event }) => {
+    const result = await runBackfillForUser(event.data.user_id);
+    return {
+      status: result.ok ? 200 : 500,
+      message: `Ran backfill for user ${event.data.user_id}`,
+    };
   }
-}
+);
 ```
 
-**Dockerfile**
+That's our function - we now just need to serve our function.
 
-We already assume you have a Dockerfile to work from, but for clarity, here's our basic Dockerfile that runs our our backfill script. This needs to be in the project root directory so our `index.js` function file can access the files in the `./lib` dir.
+### Serving our function
 
-```docker
-FROM node:16.15-stretch-slim
-WORKDIR /opt/
-COPY . .
-RUN npm install --production
-ENTRYPOINT ["node", "./functions/backfill-user-data/index.js"]
+There are different ways that you can have Inngest execute your functions:
+
+1. You can serve the functions securely via HTTP with our framework-specific handlers
+2. You can deploy them to a serverless function runtime with the Inngest CLI (_Coming soon!_)
+
+For this guide, we'll focus on **the former** with an existing [Express.js](https://expressjs.com/) application. Inngest's default `serve` handler can be imported and passed to Express.js' `app.use` or `router.use`. You can get your Inngest signing key by visiting the Secrets tab in the Inngest dasboard ([direct link](https://app.inngest.com/secrets)).
+
+```js
+import { serve } from "inngest"
+import runBackfillForUser from "../inngest/runBackfillForUser"
+
+app.use("/api/inngest", serve("My API", process.env.INNGEST_SIGNING_KEY, [
+  runBackfillForUser,
+]))
+// your existing routes...
+app.get("/api/whatever", ...)
+app.post("/api/something_else", ...)
 ```
 
-<details>
-  <summary><strong>See the full <code>inngest.json</code> file</strong></summary>
+## Deploying your function
 
-```json
-{
-  "name": "Run User Backfill",
-  "id": "run-user-backfill",
-  "triggers": [
-    { "event": "retool/backfill.requested" }
-  ],
-  "steps": {
-    "backfill": {
-      "id": "backfill",
-      "name": "Backfill User Data",
-      "runtime": {
-        "type": "docker",
-        "dockerfile": "../../Dockerfile.backfill"
-      }
-    }
-  }
-}
-}
-```
-
-</details>
-
-<!-- FUTURE: Add info on Inngest run -->
-
-## Pushing the function live to Inngest Cloud
-
-Now, all you need to do is run `inngest deploy --prod` from your function's directory and it will build and push your function live. If you created your Inngest Source in the step above in with “Test” mode enabled in the dashboard, you do not need the `--prod` flag for this command.
+By serving your functions via HTTP, you don't need to deploy your code to Inngest Cloud or set up a new deployment process. After you deploy your code, you need to visit the Inngest dashboard to register your endpoint and functions. This allows Inngest to discover and remotely execute your functions.
 
 <aside>
-⭐️ This requires the <a href="/docs/cli/installation?ref=retool-guide">Inngest CLI v0.5.6</a> or greater
+  👉 You can read how to do this in <a href="/docs/deploy#registering-live-functions-with-inngest">our deployment docs here</a>.
 </aside>
 
-When you visit the Inngest Cloud dashboard's “Functions” tab, you should see your newly deployed function, ready to receive events!
-
-<aside>
-👋 You'll want to take this opportunity to add any necessary environment variables as secrets via the Inngest “Secrets Manager”: <a href="https://app.inngest.com/secrets">app.inngest.com/secrets</a>
-</aside>
+After registering your endpoint, your new funciton should appear in the Functions tab of the Inngest Cloud dashboard:
 
 ![Inngest Cloud dashboard view deployed function](/assets/guides/trigger-your-code-from-retool/inngest-deployed-function.png)
 
