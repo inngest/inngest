@@ -228,7 +228,7 @@ export default function DocsHome(props) {
 }
 
 export const DocsLayout: React.FC<{
-  sections: { section: Sections; categories: Categories }[];
+  sections: { section: Sections; categories: Categories; hide: boolean }[];
 }> = ({ children, sections }) => {
   return (
     <>
