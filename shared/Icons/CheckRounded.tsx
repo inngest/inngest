@@ -3,9 +3,15 @@ import type { IconProps } from "./props";
 
 type Props = IconProps & {
   shadow?: boolean;
+  stroke?: number;
 };
 
-export default ({ size = 32, fill = "currentColor", shadow = true }: Props) => (
+export default ({
+  size = 32,
+  fill = "currentColor",
+  shadow = true,
+  stroke = 6,
+}: Props) => (
   <svg
     width={size}
     height={size}
@@ -18,7 +24,7 @@ export default ({ size = 32, fill = "currentColor", shadow = true }: Props) => (
         <path
           d="M11.2734 31.6367L24.3228 44.686L52.2856 16.7231"
           stroke={fill}
-          strokeWidth="6"
+          strokeWidth={stroke}
           strokeLinecap="round"
           strokeLinejoin="round"
         />

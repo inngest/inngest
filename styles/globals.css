@@ -190,13 +190,6 @@ select {
 }
 
 /** Copy relationship: everything but home. **/
-
-p + ul,
-p + ol,
-ol + p,
-ul + p {
-  margin: 1.5rem 0;
-}
 li > ol,
 li > ul {
   margin: 1rem 0;

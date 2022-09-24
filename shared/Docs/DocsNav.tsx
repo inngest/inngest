@@ -146,7 +146,10 @@ const DocsNavItem: React.FC<{
 }> = ({ category, doc, type }) => {
   const [isExpanded, setExpanded] = useState(false);
   const router = useRouter();
-  const pathSlug = router.asPath.replace(/^\/docs\//, "");
+  const pathSlug = router.asPath
+    .replace(/^\/docs\//, "")
+    .replace(/(\?|#).+$/, "");
+  console.log(router);
 
   const title = doc ? doc.title : category.title;
   const pages = doc

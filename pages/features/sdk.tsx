@@ -5,6 +5,8 @@ import Nav from "src/shared/nav";
 import Button from "src/shared/Button";
 import CodeWindow from "src/shared/CodeWindow";
 import Discord from "src/shared/Icons/Discord";
+import CheckRounded from "src/shared/Icons/CheckRounded";
+import CheckboxUnchecked from "src/shared/Icons/CheckboxUnchecked";
 
 export async function getStaticProps() {
   return {
@@ -37,6 +39,19 @@ export const codesnippets = {
         myFn
       )
     `,
+    scheduledFunction: `
+      import { createScheduledFunction } from "inngest"
+
+      const scheduledTask = () => {
+        return { message: "success" }
+      }
+
+      export default createScheduledFunction(
+        "A scheduled function",
+        "0 9 * * MON", // any cron expression
+        scheduledTask
+      )
+    `,
     sendEventShort: `
       import { Inngest } from "inngest"
       const inngest = new Inngest("sourceKey123")
@@ -60,14 +75,12 @@ export const codesnippets = {
       }
     `,
     nextJSHandler: `
-      import { Inngest } from "inngest"
+      import { serve } from "inngest/next"
 
       import { myGreatFunction } from "../../myGreatFunction"
       import { scheduledTask } from "../../scheduledTask"
 
-      const inngest = new Inngest("My App", "<API_KEY>")
-
-      export default register(inngest, "<SIGNING_KEY>", [
+      export default serve("My App", "<SIGNING_KEY>", [
         myGreatFunction,
         scheduledFunction
       ]);
@@ -86,6 +99,19 @@ export const codesnippets = {
         "My Great Function",
         "demo/event.trigger",
         myFn
+      )
+    `,
+    scheduledFunction: `
+      import { createScheduledFunction } from "inngest"
+
+      const scheduledTask = () => {
+        return { message: "success" }
+      }
+
+      export default createScheduledFunction(
+        "A scheduled function",
+        "0 9 * * MON", // any cron expression
+        scheduledTask
       )
     `,
     sendEventShort: `
@@ -110,6 +136,7 @@ export const codesnippets = {
     `,
     nextJSHandler: `
       import { Inngest } from "inngest"
+      import { serve } from "inngest/next"
       import { Events } from "../../__generated__/inngest"
 
       import { myGreatFunction } from "../../myGreatFunction"
@@ -117,7 +144,7 @@ export const codesnippets = {
 
       const inngest = new Inngest<Events>("My App", "<API_KEY>")
 
-      export default register(inngest, "<SIGNING_KEY>", [
+      export default serve(inngest, "<SIGNING_KEY>", [
         myGreatFunction,
         scheduledFunction
       ]);
@@ -131,7 +158,6 @@ export const worksWithBrands = [
     logo: "/assets/brand-logos/next-js-dark.svg",
     brand: "Next.js",
     height: "100%",
-
     type: "framework",
   },
   {
@@ -185,7 +211,7 @@ export default function FeaturesSDK() {
         {/* Content layout */}
         <div className="mx-auto my-14 py-24 px-10 lg:px-4 max-w-4xl">
           <header className="mb-12 text-center">
-            <h2 className="text-4xl">Simple, but powerful</h2>
+            <h2 className="text-4xl">Simple, yet powerful</h2>
           </header>
 
           <div className="mb-12 text-center">
@@ -215,23 +241,6 @@ export default function FeaturesSDK() {
 
             <CodeWindow
               className="shadow-xl hover:transform-iso-opposite"
-              filename={`api/inngest.${ext}`}
-              snippet={codesnippets[language].nextJSHandler}
-            />
-            <div>
-              <h3 className="text-2xl">Deploy to your existing setup</h3>
-              <p className="my-6">
-                Inngest can remotely run your background tasks via secure HTTP
-                handler. You keep your existing deployment workflow and we'll
-                call your code where it is.
-              </p>
-              <p>
-                <a href="/docs/deploy?ref=features-sdk">Get more info →</a>
-              </p>
-            </div>
-
-            <CodeWindow
-              className="shadow-xl hover:transform-iso-opposite"
               filename={`api/someEndpoint.${ext}`}
               snippet={codesnippets[language].sendEvent}
             />
@@ -247,7 +256,112 @@ export default function FeaturesSDK() {
                 <a href="/docs/events?ref=features-sdk">Read the docs →</a>
               </p>
             </div>
+
+            <CodeWindow
+              className="shadow-xl hover:transform-iso-opposite"
+              filename={`inngest/scheduledTask.${ext}`}
+              snippet={codesnippets[language].scheduledFunction}
+            />
+            <div>
+              <h3 className="text-2xl">Schedule jobs easily</h3>
+              <p className="my-6">
+                Run your code on a schedule using basic cron expressions. Cron
+                jobs made simple with observability & logs.
+              </p>
+              <p>
+                <a href="/docs/functions?ref=features-sdk">Learn how →</a>
+              </p>
+            </div>
+
+            <CodeWindow
+              className="shadow-xl hover:transform-iso-opposite"
+              filename={`api/inngest.${ext}`}
+              snippet={codesnippets[language].nextJSHandler}
+            />
+            <div>
+              <h3 className="text-2xl">Deploy to your existing setup</h3>
+              <p className="my-6">
+                Inngest can remotely run your background tasks via secure HTTP
+                handler. You keep your existing deployment workflow and we'll
+                call your code where it is.
+              </p>
+              <p>
+                <a href="/docs/deploy?ref=features-sdk">Get more info →</a>
+              </p>
+            </div>
           </div>
+        </div>
+      </div>
+
+      {/* Background styles */}
+      <div className="">
+        {/* Content layout */}
+        <div className="mx-auto my-16 py-10 px-6 md:px-16 max-w-xl rounded-lg bg-gradient-to-br from-pink-50 to-violet-50">
+          <h2 className="text-xl sm:text-4xl mt-2 mb-2">Inngest SDK Roadmap</h2>
+          <p className="text-sm text-color-secondary">
+            What we've built and what's up next:
+          </p>
+          <ul className="my-4 flex flex-col gap-4">
+            {[
+              {
+                done: true,
+                text: "Create event-driven and scheduled functions",
+              },
+              {
+                done: true,
+                text: "Send events",
+              },
+              {
+                done: true,
+                text: "TypeScript support, including generics",
+              },
+              {
+                done: true,
+                text: (
+                  <>
+                    <a href="/docs/frameworks/nextjs?ref=features-sdk">
+                      Next.js
+                    </a>{" "}
+                    & <a href="/docs/deploy/express">Express.js</a> support
+                  </>
+                ),
+              },
+              {
+                done: true,
+                text: (
+                  <>
+                    TypeScript: Event <code>Type</code> generation and sync
+                  </>
+                ),
+              },
+              { done: false, text: "Inngest local dev server integration" },
+              { done: false, text: "Inngest Cloud deploy" },
+              { done: false, text: "Step Functions" },
+              {
+                done: false,
+                text: "Step delays, conditional expressions, & event-coordination",
+              },
+              { done: false, text: "Cloudflare Workers support" },
+            ].map((i) => (
+              <ol className="flex flex-row items-center gap-2">
+                {i.done ? (
+                  <CheckRounded
+                    size="22"
+                    fill="#5D5FEF"
+                    shadow={false}
+                    stroke={10}
+                  />
+                ) : (
+                  <CheckboxUnchecked size="22" fill="#5D5FEF" />
+                )}
+                <div>{i.text}</div>
+              </ol>
+            ))}
+          </ul>
+          <p>
+            <em>Future:</em> Additional platform support (AWS Lambda, Supabase,
+            Deno), additional framework support (Remix, RedwoodJS), testing APIs
+          </p>
         </div>
       </div>
 
@@ -329,7 +443,7 @@ export const Hero = ({
           <p>Works with:</p>
           <div className="mt-4 flex flex-wrap items-center gap-6">
             {worksWithBrands.map((b) => (
-              <div className="h-8">
+              <div className="h-8 flex items-center">
                 <img
                   key={b.brand}
                   src={b.logo}
