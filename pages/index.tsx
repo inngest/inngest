@@ -366,10 +366,9 @@ export default function Home() {
                 can focus on shipping.
                 <br />
                 <br />
-                <i>Framework guides coming soon!</i>
-                {/*
-                Guides: <a href="/docs/guides/nextjs">Next.js</a> |{" "}
-                <a href="/docs/guides/express">Express</a>*/}
+                Guides:{" "}
+                <a href="/docs/frameworks/nextjs?ref=homepage">Next.js</a>{" "}
+                &middot; <a href="/docs/deploy/express?ref=homepage">Express</a>
               </>
             ),
             image: (
@@ -765,7 +764,7 @@ const useCaseList = [
           import { createScheduledFunction } from "inngest"
           import { sendWeeklyDigestEmails } from "../emails"
 
-          export default createFunction(
+          export default createScheduledFunction(
             "Send Weekly Digest",
             "0 9 * * MON",
             sendWeeklyDigestEmails
