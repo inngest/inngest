@@ -79,8 +79,8 @@ function MyApp({ Component, pageProps }) {
           </>
         )}
       </Head>
-      <PageBanner href="/docs/guides/trigger-your-code-from-retool?ref=page-banner">
-        New guide: Trigger your existing code to run right from Retool
+      <PageBanner href="/features/sdk?ref=page-banner">
+        Introducing the Inngest TypeScript / JavaScript SDK
       </PageBanner>
       <Component {...pageProps} />
       <Script
