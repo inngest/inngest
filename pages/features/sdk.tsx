@@ -322,7 +322,7 @@ export default function FeaturesSDK() {
                     <a href="/docs/frameworks/nextjs?ref=features-sdk">
                       Next.js
                     </a>{" "}
-                    & <a href="/docs/deploy/express">Express.js</a> support
+                    & <a href="/docs/frameworks/express">Express.js</a> support
                   </>
                 ),
               },

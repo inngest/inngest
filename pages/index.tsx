@@ -368,7 +368,7 @@ export default function Home() {
                 <br />
                 Guides:{" "}
                 <a href="/docs/frameworks/nextjs?ref=homepage">Next.js</a>{" "}
-                &middot; <a href="/docs/deploy/express?ref=homepage">Express</a>
+                &middot; <a href="/docs/frameworks/express?ref=homepage">Express</a>
               </>
             ),
             image: (
