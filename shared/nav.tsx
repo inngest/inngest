@@ -123,7 +123,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
           <StyledLink key="discord" href={process.env.NEXT_PUBLIC_DISCORD_URL}>
             <Discord />
           </StyledLink>
-          <StyledLink key="github" href="https://github.com/inngest/inngest">
+          <StyledLink key="github" href="https://github.com/inngest/inngest-js">
             <Github />
           </StyledLink>
         </div>

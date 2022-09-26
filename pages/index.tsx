@@ -208,7 +208,7 @@ export default function Home() {
           <div className="mt-4 flex flex-wrap items-center justify-center gap-8 h-8 sm:h-12">
             {worksWithBrands.map((b) => (
               <a
-                href={`/docs/deploy?ref=homepage-works-with`}
+                href={`${b.docs}?ref=homepage-works-with`}
                 className="block"
                 style={{ height: b.height }}
               >

@@ -82,8 +82,8 @@ export const codesnippets = {
 
       export default serve("My App", "<SIGNING_KEY>", [
         myGreatFunction,
-        scheduledFunction
-      ]);
+        scheduledTask
+      ])
     `,
   },
   typescript: {
@@ -142,40 +142,40 @@ export const codesnippets = {
       import { myGreatFunction } from "../../myGreatFunction"
       import { scheduledTask } from "../../scheduledTask"
 
-      const inngest = new Inngest<Events>("My App", "<API_KEY>")
+      const inngest = new Inngest<Events>({ name: "My App" })
 
       export default serve(inngest, "<SIGNING_KEY>", [
         myGreatFunction,
-        scheduledFunction
-      ]);
+        scheduledTask
+      ])
     `,
   },
 };
 
 export const worksWithBrands = [
   {
-    docs: "/docs/guide/nextjs", // TODO - Update final guide url
+    docs: "/docs/frameworks/nextjs",
     logo: "/assets/brand-logos/next-js-dark.svg",
     brand: "Next.js",
     height: "100%",
     type: "framework",
   },
   {
-    docs: "/docs/deploying/vercel",
+    docs: "/docs/deploy",
     logo: "/assets/brand-logos/vercel-dark.svg",
     brand: "Vercel",
     height: "50%",
     type: "platform",
   },
   {
-    docs: "/docs/deploying/netlify",
+    docs: "/docs/deploy/netlify",
     logo: "/assets/brand-logos/netlify-dark.svg",
     brand: "Netlify",
     height: "75%",
     type: "platform",
   },
   {
-    docs: "/docs/guide/express",
+    docs: "/docs/deploy/express", // TODO - change to guide when launched
     logo: "/assets/brand-logos/express-js-dark.svg",
     brand: "Express.js",
     height: "100%",
@@ -185,7 +185,7 @@ export const worksWithBrands = [
 
 export default function FeaturesSDK() {
   const [language, setLanguage] = useState<"javascript" | "typescript">(
-    "javascript"
+    "typescript"
   );
   const ext = language === "typescript" ? "ts" : "js";
   return (
@@ -368,6 +368,66 @@ export default function FeaturesSDK() {
       {/* Background styles */}
       <div className="">
         {/* Content layout */}
+        <div className="mx-auto my-28 px-10 lg:px-4 max-w-4xl grid md:grid-cols-3 gap-8">
+          {[
+            {
+              type: "Framework Guide",
+              name: "Next.js",
+              logo: "/assets/brand-logos/next-js-dark.svg",
+              description:
+                "Trigger background and scheduled functions using our Next.js adapter",
+              href: "/docs/frameworks/nextjs",
+            },
+            {
+              type: "Framework Guide",
+              name: "Express.js",
+              logo: "/assets/brand-logos/express-js-dark.svg",
+              description:
+                "Run background jobs without workers or setting up a queue",
+              href: "/docs/deploy/express",
+            },
+            {
+              type: "Platform Guide",
+              name: "Netlify",
+              logo: "/assets/brand-logos/netlify-dark.svg",
+              description:
+                "Use our Netlify plugin to automate deployments of your functions",
+              href: "/docs/deploy/netlify",
+            },
+          ].map((i) => (
+            <a
+              href={`${i.href}?ref=features-sdk-guides`}
+              className="text-color-primary flex transition-all	hover:-translate-y-1"
+            >
+              <div className="p-6 h-full w-full flex flex-col rounded-md border-2 border-slate-800">
+                <p>
+                  <span
+                    className={`text-xs font-bold uppercase gradient-text-ltr ${
+                      i.type.match(/framework/i)
+                        ? "gradient-from-blue gradient-to-cyan"
+                        : "gradient-from-pink gradient-to-orange"
+                    }`}
+                  >
+                    {i.type}
+                  </span>
+                </p>
+                <div className="my-4">
+                  <img src={i.logo} className="h-8" alt={i.name} />
+                </div>
+                <p className="mb-6 text-sm">{i.description}</p>
+                <p className="mt-auto">
+                  {/* The whole div is clickable, but we make this look like a link to visually show it's clickable */}
+                  <span className="text-color-iris-100">Read the guide →</span>
+                </p>
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* Background styles */}
+      <div className="">
+        {/* Content layout */}
         <div className="mx-auto my-28 px-10 lg:px-4 max-w-4xl">
           <header className="mt-24 mb-12 text-center">
             <h2 className="text-4xl">
@@ -434,7 +494,7 @@ export const Hero = ({
             Inngest SDK Beta
           </span>
           <h1 className="mt-2 mb-6 text-2xl md:text-5xl leading-tight">
-            Ship background jobs in seconds
+            Write functions, send events.
           </h1>
           <p>
             Create and deploy background jobs or scheduled functions right in
@@ -443,14 +503,17 @@ export const Hero = ({
           <p>Works with:</p>
           <div className="mt-4 flex flex-wrap items-center gap-6">
             {worksWithBrands.map((b) => (
-              <div className="h-8 flex items-center">
+              <a
+                href={`${b.docs}?ref=features-sdk-hero`}
+                className="h-8 flex items-center"
+              >
                 <img
                   key={b.brand}
                   src={b.logo}
                   alt={`${b.brand}'s logo`}
                   style={{ height: b.height }}
                 />
-              </div>
+              </a>
             ))}
           </div>
           <div className="mt-10 flex flex-wrap gap-6 justify-start items-center">
@@ -489,8 +552,8 @@ export const Hero = ({
 
 const LanguageToggle = ({ onClick, language = "javascript" }) => {
   const options = [
-    { key: "javascript", name: "JavaScript" },
     { key: "typescript", name: "TypeScript" },
+    { key: "javascript", name: "JavaScript" },
   ];
   return (
     <div className="inline-flex text-xs rounded-md overflow-hidden border-solid border-2 border-indigo-600">
