@@ -155,10 +155,10 @@ export default function Home() {
               <br />
               <TextSlider
                 strings={[
-                  "User Journeys",
+                  "Background Jobs",
                   "Webhooks",
                   "Internal Tools",
-                  "Background Jobs",
+                  "User Journeys",
                 ]}
               />
               <br />
