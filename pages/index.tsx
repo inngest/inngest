@@ -148,7 +148,7 @@ export default function Home() {
         <div className="mx-auto my-12 px-10 lg:px-16 max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8">
           <header className="lg:my-24 mt-8">
             <h1
-              className="mt-2 mb-6 text-3xl sm:text-5xl leading-tight overflow-hidden"
+              className="mt-2 mb-6 text-3xl sm:text-5xl leading-tight sm:overflow-hidden"
               style={{ lineHeight: "1.08" }}
             >
               Build
@@ -661,7 +661,7 @@ const TextSliderElements = styled.span`
   align-items: start;
   transition: all ease-out 200ms;
 
-  @media (max-width: 600px) {
+  @media (max-width: 640px) {
     top: auto;
     display: inline-flex;
   }
@@ -685,8 +685,8 @@ const TextSliderString = styled.span<{ align: "center" | "left" }>`
     transform: translateX(100%);
   }
 
-  // disable the animation and stack items on mobile
-  @media (max-width: 600px) {
+  // disable the animation and stack items on mobile - Match tailwind breakpoint
+  @media (max-width: 640px) {
     position: inherit;
     opacity: 1;
     &.previous,
