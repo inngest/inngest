@@ -72,6 +72,14 @@ export default function BlogLayout(props) {
           </Header>
 
           <Body>
+            <ProductDescriptionAside className="background-grid-texture">
+              <a href="https://www.inngest.com?ref=blog-post">Inngest</a>'s
+              platform lets you build serverless background tasks and scheduled
+              jobs using events - zero infrastructure required.{" "}
+              <a href="https://www.inngest.com?ref=blog-post">
+                Give it a try →
+              </a>
+            </ProductDescriptionAside>
             <MDXRemote
               compiledSource={props.post.compiledSource}
               scope={scope}
@@ -85,6 +93,22 @@ export default function BlogLayout(props) {
     </>
   );
 }
+
+const ProductDescriptionAside = styled.aside`
+  // match paragraph style inline
+  font-size: 0.95rem !important;
+  background: url(/assets/grid-radial-texture.svg) no-repeat center center !important;
+  background-size: 100%;
+
+  a {
+    color: inherit !important;
+    text-decoration: underline;
+
+    &:hover {
+      color: var(--color-iris-100) !important;
+    }
+  }
+`;
 
 const Article = styled.article`
   margin: 1rem auto 4rem;
@@ -148,8 +172,9 @@ const Body = styled.main`
     line-height: 1.6em;
   }
 
-  p code, li code {
-    font-size: .75rem;
+  p code,
+  li code {
+    font-size: 0.75rem;
   }
 
   ul {
@@ -159,7 +184,6 @@ const Body = styled.main`
   ol {
     list-style-type: number;
   }
-
 
   aside {
     padding: 1.4em 1.5em;
