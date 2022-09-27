@@ -1,0 +1,120 @@
+---
+heading: No workers necessary - Simple background jobs with Node and Express
+subtitle: Skip the queue and workers.
+image: /assets/blog/no-workers-necessary-nodejs/featured-image.jpg
+date: 2022-09-28
+author: Dan Farrelly
+---
+
+Every single how-to blog post about running Node.js background jobs starts with setting up a queue, shows a little bit of code and ends with the generic “run this worker.” What if we didn't need to set up a queue and could skip running workers?
+
+We're going to compare a couple approaches - the classic queue & workers approach and a simple approach using http and [our serverless job scheduler](/blog/modern-serverless-job-scheduler).
+
+## Classic: Queues & Workers
+
+![Graphic of an API, a queue and workers and messages being send and received](/assets/blog/no-workers-necessary-nodejs/queue-and-workers.png)
+
+The most common pattern to running background tasks is to use a message queue. Queues are a fairly simple and well understood concept - you write messages onto one and on the other end you can pick messages up off the queue. The queue is your workhorse, but you'll also need to set up multiple worker processes to run in the background and wait around, consuming messages from the queue as they are available. Depending on your production setup and developer workflow this will all vary greatly.
+
+The first step of setting up this pattern is selecting and setting up your underlying queue infrastructure. Examples of popular queues are Redis, RabbitMQ, and AWS' SQS. You'll also use an SDK or a library like BullMQ to interface with the queue.
+
+Often, there is limited visibility out of the box for the queue and your workers. You'll need to add or instrument additional observability like logging, tracing and metrics (think Datadog).
+
+You'll want to add more background tasks as your application grows. As queues and workers are coupled, you'll need to configure more queues and more workers. There are also countless things to consider in system design including [message expiration](https://medium.com/event-driven-utopia/message-expiration-pattern-explained-fdaf2c10d2de), dropping messages, [dead letter queues](https://www.rabbitmq.com/dlx.html), but others have covered such topics deeply in other articles.
+
+## Simple: Inngest & Express
+
+![Graphic of an API, Inngest, an event being sent and then a function being called via HTTP](/assets/blog/no-workers-necessary-nodejs/inngest-http.png)
+
+
+With Inngest, you don't need to set up a message queue. You just send *events* to Inngest and the *functions* that you create decide which events that should trigger them to run. To use other terms to compare, Inngest is like a combination of PubSub with a job scheduler wrapped up in a one developer-first platform.
+
+This event-based approach enables you to fan-out and create multiple background jobs (aka functions) that react to the same event further decoupling logic. Another benefit is that there is no need to create or configure new queues for each type of background task - just start sending events.
+
+This post is all about a *simple* approach, so our goal is for you to have as few new things in order to run background jobs in production. With this goal in mind, Inngest can execute your background jobs via HTTP, right in your existing [Express.js](https://expressjs.com/) server. No need to run another worker service or re-configure your deployment pipeline - just use what you have.
+
+---
+
+To write a background task with Inngest, run `npm install inngest` and determine where you want to send your event from. For this example, we'll send an `account.created` event when a user signs up to our app:
+
+```js
+app.post("/signup", (req, res) => {
+  const account = await createAccount(req.body)
+  inngest.send({ name: "account.created", data: { account_id: account.id } })
+  res.redirect("/dashboard/welcome")
+})
+```
+
+Then you create a new file for your function code that utilizes that same event:
+
+```js
+import { createFunction } from "inngest"
+export default createFunction("My fn", "account.created", ({ event }) => {
+  // Do something fun, e.g. post to a company Slack channel
+  // or send a welcome email
+  return { message: "Hello world!" }
+})
+```
+
+Lastly, we need to serve our functions securely with Inngest' Express.js `serve` handler. We import our function and pass it to the handler.
+
+```js
+import { serve } from "inngest"
+import myFn from "../inngest/myfn"
+app.use("/api/inngest", serve("My App", process.env.INNGEST_SIGNING_KEY, [
+  myFn,
+]))
+```
+
+That's all the code that you need - Inngest will use [a signing key](https://app.inngest.com/secrets) to securely communicate with your server and we're ready to ship. After you have deployed your code, you need to tell Inngest where your code and, now, functions are running. It's a simple ping via the Inngest Cloud dashboard (docs + demo) or with a curl request:
+
+```shell
+curl -X PUT https://yourappsdomain.com/api/inngest
+```
+
+<aside className="flex flex-row gap-4 items-center">
+  <div>
+    🔜
+  </div><div>During the beta phase of our SDK development, this is the recommended flow, but we plan to automate this completely in the weeks ahead. <a href="https://eepurl.com/hI3dCr">Join our mailing list to get updates about SDK releases</a>.</div>
+</aside>
+
+> _[You can read the full Express.js guide in our docs here →](/docs/frameworks/express?ref=blog-no-workers-necessary)_
+
+We now can move unnecessarily blocking code out of the critical path of our app into background tasks without any new infrastructure to set up! The Inngest Cloud dashboard also gives you access to logs of all of your events as well as the results of every function that you run - Observability out-of-the-box.
+
+<div className="blog-image-container:2">
+  <fig>
+    <img
+      src="/assets/blog/no-workers-necessary-nodejs/screenshot-event-logs.png"
+      alt="Screenshot showing Inngest Cloud's event logs"
+      className="rounded-sm"
+      style={{ marginBottom: "0.5rem"}}
+    />
+    <figcaption className="text-xs text-center italic">
+      Inngest Cloud event logs
+    </figcaption>
+  </fig>
+  <fig>
+    <img
+      src="/assets/blog/no-workers-necessary-nodejs/screenshot-function-logs.png"
+      alt="Screenshot showing Inngest Cloud's function logs"
+      className="rounded-sm"
+      style={{ marginBottom: "0.5rem"}}
+    />
+    <figcaption className="text-xs text-center italic">
+      Inngest Cloud function logs
+    </figcaption>
+  </fig>
+</div>
+
+## But what about *serverless*?
+
+Yes, there are limitations to this approach due to http timeouts and potential extra load put on your backend server. While we think that the HTTP-based approach will work for most apps getting started with background jobs, we definitely think that background tasks should be serverless whenever possible.
+
+We're actively developing how you can easily deploy any function that you create to a number of serverless platforms like AWS Lambda or Inngest Cloud without a single change to your code. A true “*lift and shift*.” This gives you the flexibility of where you want your code to run.
+
+As of publishing, Inngest's SDK is in beta and already supports serverless functions on Vercel and Netlify with Cloudflare coming later this week. [Join our mailing list to stay up to date for future platform announcements](https://eepurl.com/hI3dCr).
+
+## Conclusion
+
+Lots of time and money is spent prematurely setting up queues and workers, leading to over-optimizations or unnecessary complexity for a small application. If your goal is to get tasks running in the background quickly, we hope you'll give it a try and stay tuned for additional platform support so you can deploy your functions anywhere without changing your code.

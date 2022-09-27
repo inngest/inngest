@@ -660,3 +660,16 @@ ul.check li {
   display: inline-block;
   margin: 0 0.25rem 0 0;
 }
+
+.blog-image-container\:2 {
+  display: grid;
+  gap: 1rem;
+}
+.blog-image-container\:2 img {
+  margin-bottom: 0.5rem;
+}
+@media (min-width:640px) {
+  .blog-image-container\:2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
