@@ -47,18 +47,22 @@ export type AuthSignup = {
   name: "auth/signup";
   data: {
     user_id: string;
+    email: string;
     account_id: string;
     plan: string;
   };
   user: {
     id: string;
+    email: string;
   };
   v?: string;
   ts?: number;
 };
 
 // @filename: ../lib/index.ts
+import { AuthSignup } from '../__generated__/inngest';
 export const addToStripe = async (user_id: string) => {};
+export const sendWelcomeEmail = async (event: AuthSignup) => {};
 
 // @filename: index.ts
 // ---cut---
@@ -71,7 +75,8 @@ import { addToStripe } from '../lib/';
 
 export const newPR = createFunction<AuthSignup>("New PR", "auth/signup", async ({ event }) => {
   // This function is triggered any time the `auth/signup` event is received.
-  addToStripe(event.data.user_id);
+  await addToStripe(event.data.user_id);
+  await sendWelcomeEmail(event);
 });
 ```
 
