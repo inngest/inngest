@@ -149,7 +149,6 @@ const DocsNavItem: React.FC<{
   const pathSlug = router.asPath
     .replace(/^\/docs\//, "")
     .replace(/(\?|#).+$/, "");
-  console.log(router);
 
   const title = doc ? doc.title : category.title;
   const pages = doc

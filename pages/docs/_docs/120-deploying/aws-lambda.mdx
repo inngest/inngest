@@ -1,0 +1,23 @@
+---
+category: "Deploying"
+title: "AWS Lambda"
+slug: "deploy/aws-lambda"
+order: 120
+---
+
+*AWS Lambda support for functions created with our SDK is _coming soon_!*
+
+If you're interested in this platform and would like be part of the early testing group, send us a message in [our Discord community](https://www.inngest.com/discord) or drop us an email: [hello@inngest.com](mailto:hello@inngest.com).
+
+---
+
+## How will it work?
+
+Inngest's tooling will package up your existing function code and deploy it to your AWS account. You won't have to make any changes to your code - Inngest will automatically support running your function in AWS Lambda. This enables you to run your functions in your own AWS account if you desire. We'll also have Github Actions available so you can easily deploy your code any time you merge to `main`. Here's an idea of how it will work:
+
+```shell
+$ inngest login
+$ inngest deploy --prod --target=aws ./inngest/myFunction.js
+```
+
+* As this is under development, this is subject to change and does not work yet today.
