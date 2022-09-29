@@ -1,0 +1,105 @@
+package devserver
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"net/http"
+	"strconv"
+	"sync"
+	"time"
+)
+
+var (
+	// Ports indicate the default ports that we attempt to scan on localhost
+	// when discovering SDK-based endpoints
+	Ports = []int{80, 3000, 3001, 3002, 3003, 3004, 3005, 5000, 8080, 8081}
+
+	// Paths indicate the paths we attempt to hit when a web server is available.
+	// These are the default, recommended paths for hosting Inngest routes.
+	Paths = []string{"/api/inngest", "/x/inngest", "/.netlify/functions/inngest"}
+
+	timeout = 2 * time.Second
+
+	hc = http.Client{
+		Timeout: timeout,
+	}
+)
+
+// Autodiscover attempts to automatically discover SDK endpoints running on
+// the local machine, using a combination of the default supported ports
+// and default API endpoints above.
+func Autodiscover(ctx context.Context) []string {
+	results := []string{}
+	ports := openPorts(ctx)
+	for _, port := range ports {
+		for _, path := range Paths {
+			// These requests _should_ be fast as we know a port is open,
+			// so we do these sequentially.
+			url := fmt.Sprintf("http://127.0.0.1:%d%s", port, path)
+			if err := checkURL(ctx, url); err == nil {
+				results = append(results, url)
+			}
+		}
+	}
+	return results
+}
+
+// checkURL attempts to discover whether there's an SDK hosted at the given url
+// by checking the presence of the "x-inngest-sdk" header.
+func checkURL(ctx context.Context, url string) error {
+	resp, err := hc.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.Header.Get("x-inngest-sdk") != "" {
+		// This is valid.
+		return nil
+	}
+	return fmt.Errorf("SDK header not found")
+}
+
+// openPorts simultaneously checks all supported localhost ports to see if
+// any are open. This allows us to filter the default ports to only those
+// that are serving connections prior to making HTTP requests.
+func openPorts(ctx context.Context) []int {
+	results := []int{}
+	// Create a buffered channel with the number of ports, letting us push
+	// valid ports without reading from the channel at the same time.
+	found := make(chan int, len(Ports))
+
+	wg := sync.WaitGroup{}
+	for _, port := range Ports {
+		wg.Add(1)
+		go func(port int) {
+			defer wg.Done()
+			err := checkPort(port)
+			if err == nil {
+				found <- port
+			}
+		}(port)
+	}
+	wg.Wait()
+	close(found)
+
+	// Read all results from the port after the connections are made.
+	for port := range found {
+		results = append(results, port)
+	}
+
+	return results
+}
+
+// checkPort makes a tcp connection to the given port on localhost.
+func checkPort(port int) error {
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)), timeout)
+	if err != nil {
+		return err
+	}
+	if conn != nil {
+		defer conn.Close()
+		return nil
+	}
+	return fmt.Errorf("error connecting")
+}
