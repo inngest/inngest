@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/go-chi/chi"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/rs/zerolog"
@@ -32,7 +33,7 @@ var (
 	EventPathRegex = regexp.MustCompile("^/e/([a-zA-Z0-9-_]+)$")
 )
 
-func NewAPI(o Options) (*API, error) {
+func NewAPI(o Options) (chi.Router, error) {
 	logger := o.Logger.With().Str("caller", "api").Logger()
 
 	if o.Config.EventAPI.MaxSize == 0 {
@@ -40,19 +41,22 @@ func NewAPI(o Options) (*API, error) {
 	}
 
 	api := &API{
+		Router:  chi.NewMux(),
 		config:  o.Config,
 		handler: o.EventHandler,
 		log:     &logger,
 	}
 
-	http.HandleFunc("/", api.HealthCheck)
-	http.HandleFunc("/health", api.HealthCheck)
-	http.HandleFunc("/e/", api.ReceiveEvent)
+	api.Get("/", api.HealthCheck)
+	api.Get("/health", api.HealthCheck)
+	api.Post("/e/", api.ReceiveEvent)
 
 	return api, nil
 }
 
 type API struct {
+	chi.Router
+
 	config config.Config
 
 	handler EventHandler
@@ -64,7 +68,7 @@ type API struct {
 func (a *API) Start(ctx context.Context) error {
 	a.server = &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", a.config.EventAPI.Addr, a.config.EventAPI.Port),
-		Handler: http.DefaultServeMux,
+		Handler: a.Router,
 	}
 	a.log.Info().Str("addr", a.server.Addr).Msg("starting server")
 	return a.server.ListenAndServe()

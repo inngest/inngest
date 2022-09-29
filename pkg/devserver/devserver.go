@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/config"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
@@ -25,7 +24,7 @@ import (
 //
 // - Builds locally defined docker-based functions using Buildx
 // - Adds development-specific APIs for communicating with the SDK.
-func NewDevServer(ctx context.Context, c config.Config, dir string) error {
+func New(ctx context.Context, c config.Config, dir string) error {
 	// The dev server _always_ logs output for development.
 	if !c.Execution.LogOutput {
 		logger.From(ctx).Info().Msg("overriding config to log step output within dev server")
@@ -56,12 +55,8 @@ func start(ctx context.Context, c config.Config, loader *inmemorydatastore.FSLoa
 		return err
 	}
 
-	ds := &devserver{
-		rootDir: dir,
-		loader:  loader,
-	}
-
-	api := api.NewService(c)
+	// The devserver embeds the event API.
+	ds := newService(c, dir, loader)
 	runner := runner.NewService(c, runner.WithExecutionLoader(loader))
 	exec := executor.NewService(
 		c,
@@ -69,7 +64,7 @@ func start(ctx context.Context, c config.Config, loader *inmemorydatastore.FSLoa
 		executor.WithEnvReader(envreader),
 	)
 
-	return service.StartAll(ctx, ds, api, runner, exec)
+	return service.StartAll(ctx, ds, runner, exec)
 }
 
 func prepareDockerImages(ctx context.Context, dir string) (*inmemorydatastore.FSLoader, error) {

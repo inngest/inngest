@@ -19,7 +19,7 @@ func NewCmdDev() *cobra.Command {
 	}
 
 	cmd.Flags().String("host", "", "host to run the API on")
-	cmd.Flags().StringP("port", "p", "9999", "port to run the API on")
+	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
 	cmd.Flags().String("dir", ".", "directory to load functions from")
 
 	return cmd
@@ -46,7 +46,7 @@ func doDev(cmd *cobra.Command, args []string) {
 	}
 	dir := cmd.Flag("dir").Value.String()
 
-	err = devserver.NewDevServer(ctx, *conf, dir)
+	err = devserver.New(ctx, *conf, dir)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
