@@ -3,7 +3,9 @@ package devserver
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/inngest/inngest/inngest/clistate"
 	"github.com/inngest/inngest/inngest/version"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/logger"
 )
 
 // devserver is an individual service which operates development-specific APIs.
@@ -40,13 +43,15 @@ func (d *devserver) Pre(ctx context.Context) error {
 
 	// Autodiscover the URLs that are hosting Inngest SDKs on the local machine.
 	go d.autodiscover(ctx)
+	go d.pollSDKs(ctx)
 
 	return nil
 }
 
 func (d *devserver) Run(ctx context.Context) error {
-	// Create a new API endpoint which hosts SDK-related functionality for
+	// TODO: Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
+	<-time.After(time.Minute)
 	return nil
 }
 
@@ -59,6 +64,10 @@ func (d *devserver) fetchWorkspaces(ctx context.Context) {
 	// If we're not authenticated, ensure that we poll for auth in the background.
 	// This lets us fetch account-related information to share with SDKs.
 	for {
+		if ctx.Err() != nil {
+			return
+		}
+
 		d.workspaces, err = clistate.Client(ctx).Workspaces(ctx)
 		if err == nil {
 			return
@@ -81,6 +90,10 @@ func (d *devserver) Router() chi.Router {
 // any point.
 func (d *devserver) autodiscover(ctx context.Context) {
 	for {
+		if ctx.Err() != nil {
+			return
+		}
+
 		d.ulock.Lock()
 		d.urls = Autodiscover(ctx)
 		d.ulock.Unlock()
@@ -88,17 +101,36 @@ func (d *devserver) autodiscover(ctx context.Context) {
 	}
 }
 
-func (d *devserver) pollSDKs() error {
-	d.ulock.Lock()
-	defer d.ulock.Unlock()
+func (d *devserver) pollSDKs(ctx context.Context) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
 
-	for _, u := range URLs {
-		// Make a new PUT request to the URL, indicating that the
-		// SDK should push functions to the dev server.
-		// TODO
+		d.ulock.Lock()
+		for _, u := range d.urls {
+			// Make a new PUT request to the URL, indicating that the
+			// SDK should push functions to the dev server.
+			req, _ := http.NewRequest(http.MethodPut, u, strings.NewReader(`{"devserver":true}`))
+			resp, err := hc.Do(req)
+			if err != nil {
+				logger.From(ctx).Error().Err(err).Str("url", u).Msg("unable to register SDK functions")
+			}
+			if resp.StatusCode == 200 {
+				continue
+			}
+			body, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			logger.From(ctx).Error().
+				Int("status", resp.StatusCode).
+				Str("url", u).
+				Str("response", string(body)).
+				Msg("erorr registering SDK functions")
+		}
+		d.ulock.Unlock()
+
+		<-time.After(time.Second)
 	}
-
-	return nil
 }
 
 // Info returns information about the dev server and its registered functions.
