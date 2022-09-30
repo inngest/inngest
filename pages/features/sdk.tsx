@@ -1,12 +1,12 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
-import Footer from "src/shared/footer";
-import Nav from "src/shared/nav";
 import Button from "src/shared/Button";
 import CodeWindow from "src/shared/CodeWindow";
-import Discord from "src/shared/Icons/Discord";
-import CheckRounded from "src/shared/Icons/CheckRounded";
+import Footer from "src/shared/footer";
 import CheckboxUnchecked from "src/shared/Icons/CheckboxUnchecked";
+import CheckRounded from "src/shared/Icons/CheckRounded";
+import Discord from "src/shared/Icons/Discord";
+import Nav from "src/shared/nav";
 
 export async function getStaticProps() {
   return {
@@ -209,7 +209,7 @@ export default function FeaturesSDK() {
       {/* Background styles */}
       <div className="bg-light-gray background-grid-texture">
         {/* Content layout */}
-        <div className="mx-auto my-14 py-24 px-10 lg:px-4 max-w-4xl">
+        <div className="mx-auto mt-14 py-24 px-10 lg:px-4 max-w-4xl">
           <header className="mb-12 text-center">
             <h2 className="text-4xl">Simple, yet powerful</h2>
           </header>
@@ -289,6 +289,79 @@ export default function FeaturesSDK() {
                 <a href="/docs/deploy?ref=features-sdk">Get more info →</a>
               </p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Background styles */}
+      <div className="bg-[#070707] background-grid-texture text-white">
+        {/* Content layout */}
+        <div className="mx-auto mb-14 py-24 px-10 lg:px-4 max-w-4xl">
+          <header className="mb-12 text-center">
+            <h2 className="text-4xl">
+              Deep{" "}
+              <span className="gradient-text gradient-text-ltr gradient-from-blue gradient-to-cyan">
+                TypeScript
+              </span>{" "}
+              support
+            </h2>
+          </header>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+            <div className="lg:col-span-5 grid grid-cols-1 gap-8 justify-center">
+              {[
+                {
+                  title: (
+                    <img
+                      className="w-6 h-6 inline mr-1"
+                      src="/assets/brand-logos/typescript.svg"
+                    />
+                  ),
+                  subtitle: "Painless type generation",
+                  description:
+                    "One command generates TS types for your entire ecosystem, based on your actual production data.",
+                },
+                {
+                  title: "🛡️",
+                  subtitle: "Automatic typesafety",
+                  description:
+                    "Keep in sync with your production data; strict TS types guard you every step of the way.",
+                },
+
+                {
+                  title: "🧙",
+                  subtitle: "Smart autocomplete",
+                  description: (
+                    <>
+                      Leverage TypeScript inference and easily discover events
+                      and their data using autocomplete.
+                    </>
+                  ),
+                },
+              ].map((i) => (
+                <div className="w-full flex flex-col space-y-4">
+                  <h3 className="text-xl font-bold text-white">
+                    <span className="text-2xl mr-2">{i.title}</span>
+                    {i.subtitle}
+                  </h3>
+                  <div className="text-sm">{i.description}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="lg:col-span-7 flex items-center justify-center">
+              <img
+                src="/assets/next-test.gif"
+                className="shadow-xl rounded"
+                alt="A screencast of the Inngest SDK's TypeScript features"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center mt-16">
+            <Button kind="primary" href="/docs/typescript">
+              Learn more →
+            </Button>
           </div>
         </div>
       </div>
@@ -445,7 +518,7 @@ export default function FeaturesSDK() {
               feedback and have a direct line to shaping the future of the SDK!
             </p>
           </header>
-          <div className="my-10 flex flex-col sm:flex-row gap-6 justify-center items-center">
+          <div className="my-10 flex flex-col sm:flex-row flex-wrap gap-6 justify-center items-center">
             <Button href="/docs?ref=features-sdk" kind="primary">
               Read the docs
             </Button>
@@ -505,7 +578,7 @@ export const Hero = ({
             {worksWithBrands.map((b) => (
               <a
                 href={`${b.docs}?ref=features-sdk-hero`}
-                className="h-8 flex items-center"
+                className="h-8 flex items-center bulge"
               >
                 <img
                   key={b.brand}

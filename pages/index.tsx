@@ -209,7 +209,7 @@ export default function Home() {
             {worksWithBrands.map((b) => (
               <a
                 href={`${b.docs}?ref=homepage-works-with`}
-                className="block"
+                className="block bulge"
                 style={{ height: b.height }}
               >
                 {/* href={`${b.docs}?ref=homepage-works-with`} TODO: Update this for each doc */}

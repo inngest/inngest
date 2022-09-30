@@ -458,6 +458,14 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
     }
   }
 
+  .error-text {
+    text-decoration-style: wavy;
+    text-underline-offset: 2px;
+    text-decoration-thickness: from-font;
+    text-decoration-line: underline;
+    text-decoration-color: red;
+  }
+
   // We export this to keep this file smaller and simpler
   ${docsSyntaxHighlightingCSS}
 `;
