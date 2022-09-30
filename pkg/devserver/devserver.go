@@ -17,6 +17,14 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 )
 
+// StartOpts configures the dev server
+type StartOpts struct {
+	Config       config.Config `json:"config"`
+	RootDir      string        `json:"dir"`
+	URLs         []string      `json:"urls"`
+	Autodiscover bool          `json:"autodiscover"`
+}
+
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
 // development.
 //
@@ -24,25 +32,25 @@ import (
 //
 // - Builds locally defined docker-based functions using Buildx
 // - Adds development-specific APIs for communicating with the SDK.
-func New(ctx context.Context, c config.Config, dir string) error {
+func New(ctx context.Context, opts StartOpts) error {
 	// The dev server _always_ logs output for development.
-	if !c.Execution.LogOutput {
+	if !opts.Config.Execution.LogOutput {
 		logger.From(ctx).Info().Msg("overriding config to log step output within dev server")
-		c.Execution.LogOutput = true
+		opts.Config.Execution.LogOutput = true
 	}
 
 	// we run this before initializing the devserver serivce (even though it has Pre)
 	// because building images should happen and error early, prior to any other
 	// service starting.
-	el, err := prepareDockerImages(ctx, dir)
+	el, err := prepareDockerImages(ctx, opts.RootDir)
 	if err != nil {
 		return err
 	}
 
-	return start(ctx, c, el, dir)
+	return start(ctx, opts, el)
 }
 
-func start(ctx context.Context, c config.Config, loader *inmemorydatastore.FSLoader, dir string) error {
+func start(ctx context.Context, opts StartOpts, loader *inmemorydatastore.FSLoader) error {
 	funcs, err := loader.Functions(ctx)
 	if err != nil {
 		return err
@@ -56,10 +64,10 @@ func start(ctx context.Context, c config.Config, loader *inmemorydatastore.FSLoa
 	}
 
 	// The devserver embeds the event API.
-	ds := newService(c, dir, loader)
-	runner := runner.NewService(c, runner.WithExecutionLoader(loader))
+	ds := newService(opts, loader)
+	runner := runner.NewService(opts.Config, runner.WithExecutionLoader(loader))
 	exec := executor.NewService(
-		c,
+		opts.Config,
 		executor.WithExecutionLoader(loader),
 		executor.WithEnvReader(envreader),
 	)

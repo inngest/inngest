@@ -126,10 +126,21 @@ func (m *MemoryExecutionLoader) AddFunction(ctx context.Context, fn *function.Fu
 		}
 	}
 
-	// TODO: Is this function and its actions already present?  If so, remove them.
-
-	m.actions = append(m.actions, actions...)
+	// Is this function and its actions already present?  If so, remove them.
+	for n, f := range m.functions {
+		if f.ID == fn.ID {
+			m.functions = append(m.functions[:n], m.functions[n+1:]...)
+			break
+		}
+	}
 	m.functions = append(m.functions, *fn)
+	m.actions = []inngest.ActionVersion{}
+
+	// Add all functions for each event again.
+	for _, fn := range m.functions {
+		actions, _, _ := fn.Actions(ctx)
+		m.actions = append(m.actions, actions...)
+	}
 
 	// recreate the in-memory action loader.
 	m.memactionloader = &memactionloader{

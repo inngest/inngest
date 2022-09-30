@@ -6,39 +6,63 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/inngest/inngest/inngest/version"
-	"github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
 )
 
 type devapi struct {
 	chi.Router
+
 	// loader stores all registered functions in the dev server.
-	loader *inmemory.FSLoader
+	devserver *devserver
 }
 
-func newDevAPI(loader *inmemory.FSLoader) chi.Router {
+func newDevAPI(d *devserver) chi.Router {
 	// Return a chi router, which lets us attach routes to a handler.
 	api := &devapi{
-		Router: chi.NewMux(),
-		loader: loader,
+		Router:    chi.NewMux(),
+		devserver: d,
 	}
 	api.addRoutes()
 	return api
 }
 
 func (a *devapi) addRoutes() {
+	a.Use(func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			l := logger.From(r.Context()).With().Str("caller", a.devserver.Name()).Logger()
+			r = r.WithContext(logger.With(r.Context(), l))
+			next.ServeHTTP(w, r)
+		}
+		return http.HandlerFunc(fn)
+	})
+
+	a.Get("/", a.UI)
 	a.Get("/dev", a.Info)
 	a.Post("/fn/register", a.Register)
 }
 
+func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("UI plz"))
+}
+
 // Info returns information about the dev server and its registered functions.
 func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
+	a.devserver.handlerLock.Lock()
+	defer a.devserver.handlerLock.Unlock()
+
+	funcs, _ := a.devserver.loader.Functions(r.Context())
 	ir := InfoResponse{
-		Version: version.Print(),
+		Version:       version.Print(),
+		StartOpts:     a.devserver.opts,
+		Authenticated: len(a.devserver.workspaces) > 0,
+		Functions:     funcs,
+		Handlers:      a.devserver.handlers,
 	}
 	byt, _ := json.MarshalIndent(ir, "", "  ")
 	_, _ = w.Write(byt)
@@ -46,10 +70,13 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 
 // Register regsters functions served via SDKs
 func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
+	a.devserver.handlerLock.Lock()
+	defer a.devserver.handlerLock.Unlock()
+
 	ctx := r.Context()
 	req := &sdk.RegisterRequest{}
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		a.err(ctx, w, 400, fmt.Errorf("Invalid request: %w", err.Error()))
+		a.err(ctx, w, 400, fmt.Errorf("Invalid request: %w", err))
 		return
 	}
 
@@ -67,17 +94,40 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	// signing key and warn if the user has an invalid key.
 
 	if err := req.Validate(ctx); err != nil {
-		a.err(ctx, w, 400, fmt.Errorf("At least one function is invalid:\n%w", err.Error()))
+		a.err(ctx, w, 400, fmt.Errorf("At least one function is invalid:\n%w", err))
 		return
 	}
 
+	// Find and update this SDK handler, if it exists.
+	var h *SDKHandler
+	for n, item := range a.devserver.handlers {
+		if item.SDK.URL == req.URL {
+			h = &item
+			// Remove this item from the handlers list.
+			a.devserver.handlers = append(a.devserver.handlers[:n], a.devserver.handlers[n+1:]...)
+			break
+		}
+	}
+	if h == nil {
+		h = &SDKHandler{
+			SDK:       *req,
+			CreatedAt: time.Now(),
+		}
+	}
+	// Reset function IDs;  we'll add these as we iterate through the requests.
+	h.FunctionIDs = []string{}
+	h.UpdatedAt = time.Now()
+
 	// For each function, add it to our loader.
 	for _, fn := range req.Functions {
-		if err := a.loader.AddFunction(ctx, &fn); err != nil {
+		h.FunctionIDs = append(h.FunctionIDs, fn.ID)
+		if err := a.devserver.loader.AddFunction(ctx, &fn); err != nil {
 			a.err(ctx, w, 400, err)
 			return
 		}
 	}
+
+	a.devserver.handlers = append(a.devserver.handlers, *h)
 
 	logger.From(ctx).Info().
 		Int("len", len(req.Functions)).
@@ -96,9 +146,9 @@ func (a devapi) err(ctx context.Context, w http.ResponseWriter, status int, err 
 
 type InfoResponse struct {
 	// Version lists the version of the development server
-	Version       string `json:"version"`
-	Authenticated bool   `json:"authed"`
-
-	// TODO
-	StartOpts any
+	Version       string              `json:"version"`
+	Authenticated bool                `json:"authed"`
+	StartOpts     StartOpts           `json:"startOpts"`
+	Functions     []function.Function `json:"functions"`
+	Handlers      []SDKHandler        `json:"handlers"`
 }

@@ -47,7 +47,6 @@ func NewAPI(o Options) (chi.Router, error) {
 		log:     &logger,
 	}
 
-	api.Get("/", api.HealthCheck)
 	api.Get("/health", api.HealthCheck)
 	api.Post("/e/", api.ReceiveEvent)
 

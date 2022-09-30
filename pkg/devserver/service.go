@@ -4,29 +4,29 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/inngest/inngest/inngest/client"
 	"github.com/inngest/inngest/inngest/clistate"
 	"github.com/inngest/inngest/pkg/api"
-	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
 )
 
 const (
-	SDKPollInterval = time.Second
+	SDKPollInterval = 5 * time.Second
 )
 
-func newService(config config.Config, rootDir string, loader *inmemory.FSLoader) *devserver {
+func newService(opts StartOpts, loader *inmemory.FSLoader) *devserver {
 	return &devserver{
-		config:  config,
-		rootDir: rootDir,
-		loader:  loader,
-		ulock:   &sync.Mutex{},
+		loader:      loader,
+		opts:        opts,
+		urls:        opts.URLs,
+		urlLock:     &sync.Mutex{},
+		handlerLock: &sync.Mutex{},
 	}
 }
 
@@ -37,20 +37,22 @@ func newService(config config.Config, rootDir string, loader *inmemory.FSLoader)
 // in a single router on a single port.  This simplifies the CLI args (--port) and
 // SDKs, as they can test and use a single URL.
 type devserver struct {
-	config config.Config
+	opts StartOpts
 
 	apiservice service.Service
 
 	// urls are the URLs that host SDKs
-	urls []string
-	// rootDir stores the directory that the dev server is operating within.
-	rootDir string
+	urls    []string
+	urlLock *sync.Mutex
+
 	// loader stores all registered functions in the dev server.
 	loader *inmemory.FSLoader
 	// workspaces stores the Inngest workspaces, if the CLI is authenticated.
 	workspaces []client.Workspace
 
-	ulock *sync.Mutex
+	// handlers are updated by the API (d.apiservice) when registering functions.
+	handlers    []SDKHandler
+	handlerLock *sync.Mutex
 }
 
 func (devserver) Name() string {
@@ -60,14 +62,17 @@ func (devserver) Name() string {
 func (d *devserver) Pre(ctx context.Context) error {
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
-	devAPI := newDevAPI(d.loader)
-	d.apiservice = api.NewService(d.config, devAPI)
+	devAPI := newDevAPI(d)
+	d.apiservice = api.NewService(d.opts.Config, devAPI)
 
 	// Fetch workspace information in the background, retrying if this
 	// errors out.  This is optimistic, and it doesn't matter if it fails.
 	go d.fetchWorkspaces(ctx)
-	// Autodiscover the URLs that are hosting Inngest SDKs on the local machine.
-	go d.autodiscover(ctx)
+
+	if d.opts.Autodiscover {
+		// Autodiscover the URLs that are hosting Inngest SDKs on the local machine.
+		go d.autodiscover(ctx)
+	}
 
 	return d.apiservice.Pre(ctx)
 }
@@ -75,6 +80,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 func (d *devserver) Run(ctx context.Context) error {
 	// Start polling the SDKs as the APIs are going live.
 	go d.pollSDKs(ctx)
+
 	return d.apiservice.Run(ctx)
 }
 
@@ -107,13 +113,14 @@ func (d *devserver) fetchWorkspaces(ctx context.Context) {
 // This lets the dev server start and wait for the SDK server to come up at
 // any point.
 func (d *devserver) autodiscover(ctx context.Context) {
+	logger.From(ctx).Info().Msg("autodiscovering locally hosted SDKs")
 	for {
 		if ctx.Err() != nil {
 			return
 		}
-		d.ulock.Lock()
+		d.urlLock.Lock()
 		d.urls = Autodiscover(ctx)
-		d.ulock.Unlock()
+		d.urlLock.Unlock()
 		<-time.After(5 * time.Second)
 	}
 }
@@ -126,31 +133,38 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 			return
 		}
 
-		d.ulock.Lock()
+		d.urlLock.Lock()
 		for _, u := range d.urls {
 			// Make a new PUT request to the URL, indicating that the
 			// SDK should push functions to the dev server.
-			req, _ := http.NewRequest(http.MethodPut, u, strings.NewReader(`{"devserver":true}`))
+			req, _ := http.NewRequest(http.MethodPut, u, nil)
 			resp, err := hc.Do(req)
 			if err != nil {
-				// TODO: If the error is of type connection refused, remove the URL from the list.
-				// This will be re-added when autodiscover scan re-runs.
-				logger.From(ctx).Error().Err(err).Str("url", u).Msg("unable to register SDK functions")
+				logger.From(ctx).Error().Err(err).Str("url", u).Msg("unable to connect to the SDK")
 				continue
 			}
 			if resp.StatusCode == 200 {
 				continue
 			}
+			// Log an error that we were unable to connect to the SDK.
 			body, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 			logger.From(ctx).Error().
 				Int("status", resp.StatusCode).
 				Str("url", u).
 				Str("response", string(body)).
-				Msg("erorr registering SDK functions")
+				Msg("unable to connect to the SDK")
 		}
-		d.ulock.Unlock()
+		d.urlLock.Unlock()
 
 		<-time.After(SDKPollInterval)
 	}
+}
+
+// SDKHandler represents a handler that has registered with the dev server.
+type SDKHandler struct {
+	FunctionIDs []string            `json:"functionIDs"`
+	SDK         sdk.RegisterRequest `json:"sdk"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	UpdatedAt   time.Time           `json:"updatedAt"`
 }
