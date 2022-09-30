@@ -139,7 +139,6 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 				continue
 			}
 			if resp.StatusCode == 200 {
-				logger.From(ctx).Info().Str("url", u).Msg("registered SDK functions")
 				continue
 			}
 			body, _ := io.ReadAll(resp.Body)

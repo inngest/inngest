@@ -4,7 +4,7 @@ package config
 #Config: {
 	log: {
 		level:  ("trace" | "debug" | "info" | "warn" | "error") | *"info"
-		format: "json" | *"json"
+		format: "json" | "console" | *"json"
 	}
 
 	// EventAPI is used to configure the API for listening to events.
