@@ -88,6 +88,7 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		Handlers:      a.devserver.handlers,
 		Workspaces:    workspaces,
 	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	byt, _ := json.MarshalIndent(ir, "", "  ")
 	_, _ = w.Write(byt)
 }
