@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -25,6 +26,14 @@ var (
 		Timeout: timeout,
 	}
 )
+
+func init() {
+	// Use the PORT env variable, if defined.
+	if ps := os.Getenv("PORT"); ps != "" {
+		num, _ := strconv.Atoi(ps)
+		Ports = append(Ports, num)
+	}
+}
 
 // Autodiscover attempts to automatically discover SDK endpoints running on
 // the local machine, using a combination of the default supported ports
