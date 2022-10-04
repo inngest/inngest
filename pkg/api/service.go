@@ -54,8 +54,7 @@ func (a *apiServer) Pre(ctx context.Context) error {
 	a.api = api.(*API)
 
 	for _, m := range a.mounts {
-		// api.Mount("/", m)
-		_ = m
+		api.Mount("/", m)
 	}
 
 	a.publisher, err = pubsub.NewPublisher(ctx, a.config.EventStream.Service)

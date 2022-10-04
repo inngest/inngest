@@ -44,7 +44,6 @@ type RegisterRequest struct {
 }
 
 func (f RegisterRequest) Validate(ctx context.Context) error {
-
 	// Ensure that there are no functions with the same ID.
 	if len(f.Functions) == 0 {
 		return ErrNoFunctions
