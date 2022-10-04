@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/logger"
@@ -16,9 +17,14 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func NewService(c config.Config) service.Service {
+// NewService returns a new API service for ingesting events.  Any additional
+// APIs can be mounted to this service to provide additional functionality.
+//
+// XXX (tonyhb): refactor this to remove extra mounts.
+func NewService(c config.Config, mounts ...chi.Router) service.Service {
 	return &apiServer{
 		config: c,
+		mounts: mounts,
 	}
 }
 
@@ -26,6 +32,8 @@ type apiServer struct {
 	config    config.Config
 	api       *API
 	publisher pubsub.Publisher
+
+	mounts []chi.Router
 }
 
 func (a *apiServer) Name() string {
@@ -35,14 +43,18 @@ func (a *apiServer) Name() string {
 func (a *apiServer) Pre(ctx context.Context) error {
 	var err error
 
-	a.api, err = NewAPI(Options{
+	api, err := NewAPI(Options{
 		Config:       a.config,
 		Logger:       logger.From(ctx),
 		EventHandler: a.handleEvent,
 	})
-
 	if err != nil {
 		return err
+	}
+	a.api = api.(*API)
+
+	for _, m := range a.mounts {
+		api.Mount("/", m)
 	}
 
 	a.publisher, err = pubsub.NewPublisher(ctx, a.config.EventStream.Service)

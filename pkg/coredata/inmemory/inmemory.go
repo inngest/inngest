@@ -105,9 +105,64 @@ type MemoryExecutionLoader struct {
 
 	// actions stores all actions parsed and read from functions within the filesystem.
 	actions []inngest.ActionVersion
+
+	l sync.RWMutex
+}
+
+func (m *MemoryExecutionLoader) AddFunction(ctx context.Context, fn *function.Function) error {
+	m.l.Lock()
+	defer m.l.Unlock()
+
+	actions, _, _ := fn.Actions(ctx)
+
+	// Ensure that this action has a version.  In the case of development servers,
+	// actions aren't versioned: so we auto-fill a v1.1.
+	for n, a := range actions {
+		if a.Version == nil {
+			actions[n].Version = &inngest.VersionInfo{
+				Major: 1,
+				Minor: 1,
+			}
+		}
+	}
+
+	// Is this function and its actions already present?  If so, remove them.
+	for n, f := range m.functions {
+		if f.ID == fn.ID {
+			m.functions = append(m.functions[:n], m.functions[n+1:]...)
+			break
+		}
+	}
+	m.functions = append(m.functions, *fn)
+	m.actions = []inngest.ActionVersion{}
+
+	// Add all functions for each event again.
+	for _, fn := range m.functions {
+		actions, _, _ := fn.Actions(ctx)
+		m.actions = append(m.actions, actions...)
+	}
+
+	// recreate the in-memory action loader.
+	m.memactionloader = &memactionloader{
+		Actions: make(map[string][]inngest.ActionVersion),
+		lock:    &sync.RWMutex{},
+	}
+	for _, a := range m.actions {
+		m.memactionloader.Add(a)
+	}
+
+	logger.From(ctx).
+		Debug().
+		Int("len", len(m.functions)).
+		Msg("added functions")
+
+	return nil
 }
 
 func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*function.Function) error {
+	m.l.Lock()
+	defer m.l.Unlock()
+
 	m.functions = []function.Function{}
 	m.actions = []inngest.ActionVersion{}
 
@@ -147,10 +202,13 @@ func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*function.
 }
 
 func (m *MemoryExecutionLoader) Functions(ctx context.Context) ([]function.Function, error) {
-	return m.functions, nil
+	return m.functions[:], nil
 }
 
 func (m *MemoryExecutionLoader) FunctionsScheduled(ctx context.Context) ([]function.Function, error) {
+	m.l.RLock()
+	defer m.l.RUnlock()
+
 	fns := []function.Function{}
 	for _, fn := range m.functions {
 		for _, t := range fn.Triggers {
@@ -164,6 +222,9 @@ func (m *MemoryExecutionLoader) FunctionsScheduled(ctx context.Context) ([]funct
 }
 
 func (m *MemoryExecutionLoader) FunctionsByTrigger(ctx context.Context, eventName string) ([]function.Function, error) {
+	m.l.RLock()
+	defer m.l.RUnlock()
+
 	fns := []function.Function{}
 	for _, fn := range m.functions {
 		for _, t := range fn.Triggers {

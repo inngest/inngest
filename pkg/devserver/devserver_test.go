@@ -48,7 +48,9 @@ func TestEngine_async(t *testing.T) {
 	sm, err := conf.State.Service.Concrete.Manager(ctx)
 	require.NoError(t, err)
 
-	el := &inmemorydatastore.MemoryExecutionLoader{}
+	el := &inmemorydatastore.FSLoader{
+		MemoryExecutionLoader: &inmemorydatastore.MemoryExecutionLoader{},
+	}
 	err = el.SetFunctions(ctx, []*function.Function{
 		{
 			Name: "test fn",
@@ -97,7 +99,9 @@ func TestEngine_async(t *testing.T) {
 
 	go func() {
 		// Start the engine.
-		err = newDevServer(ctx, *conf, el)
+		err = start(ctx, StartOpts{
+			Config: *conf,
+		}, el)
 		require.NoError(t, err)
 	}()
 

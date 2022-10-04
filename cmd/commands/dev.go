@@ -19,8 +19,9 @@ func NewCmdDev() *cobra.Command {
 	}
 
 	cmd.Flags().String("host", "", "host to run the API on")
-	cmd.Flags().StringP("port", "p", "9999", "port to run the API on")
+	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
 	cmd.Flags().String("dir", ".", "directory to load functions from")
+	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
 
 	return cmd
 }
@@ -44,9 +45,16 @@ func doDev(cmd *cobra.Command, args []string) {
 	if host != "" {
 		conf.EventAPI.Addr = host
 	}
-	dir := cmd.Flag("dir").Value.String()
 
-	err = devserver.NewDevServer(ctx, *conf, dir)
+	urls, _ := cmd.Flags().GetStringSlice("sdk-url")
+	opts := devserver.StartOpts{
+		Config:       *conf,
+		RootDir:      cmd.Flag("dir").Value.String(),
+		URLs:         urls,
+		Autodiscover: len(urls) == 0,
+	}
+
+	err = devserver.New(ctx, opts)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

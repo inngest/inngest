@@ -15,6 +15,9 @@ import (
 )
 
 config.#Config & {
+	log: {
+		format: "console"
+	}
 	execution: {
 		drivers: {
 			http:   config.#HTTPDriver
