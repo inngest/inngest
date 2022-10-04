@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/inngest/inngest/inngest/client"
 	"github.com/inngest/inngest/inngest/version"
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/logger"
@@ -59,6 +60,18 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 	defer a.devserver.handlerLock.Unlock()
 	defer a.devserver.workspaceLock.RUnlock()
 
+	workspaces := DevWorkspaces{}
+	for _, w := range a.devserver.workspaces {
+		if w.Name != "default" {
+			continue
+		}
+		if w.Test {
+			workspaces.Test = w
+		} else {
+			workspaces.Prod = w
+		}
+	}
+
 	funcs, _ := a.devserver.loader.Functions(r.Context())
 	ir := InfoResponse{
 		Version:       version.Print(),
@@ -66,6 +79,7 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		Authenticated: len(a.devserver.workspaces) > 0,
 		Functions:     funcs,
 		Handlers:      a.devserver.handlers,
+		Workspaces:    workspaces,
 	}
 	byt, _ := json.MarshalIndent(ir, "", "  ")
 	_, _ = w.Write(byt)
@@ -153,4 +167,10 @@ type InfoResponse struct {
 	StartOpts     StartOpts           `json:"startOpts"`
 	Functions     []function.Function `json:"functions"`
 	Handlers      []SDKHandler        `json:"handlers"`
+	Workspaces    DevWorkspaces       `json:"workspaces"`
+}
+
+type DevWorkspaces struct {
+	Prod client.Workspace `json:"prod"`
+	Test client.Workspace `json:"test"`
 }
