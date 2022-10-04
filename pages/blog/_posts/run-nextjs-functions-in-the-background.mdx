@@ -1,15 +1,14 @@
 ---
-focus: true
 heading: "Run Next.js functions in the background with events and schedules on Vercel and Netlify"
-subtitle: "Learn how to take regular Next.js api functions and run them as you would a message queue or a cron job."
+subtitle: "Learn how to use Next.js api functions and run them as you would a message queue or a cron job."
 image: "/assets/blog/run-nextjs-functions-in-the-background/featured-image.jpg"
-date: 2022-05-11
+date: 2022-10-04
 ---
 
 There comes a point in time when your application gets too complex to be completely comprised of synchronous API endpoints. APIs are fantastic for CRUD actions that your users are taking that need an immediate response, but there are use cases when you want to do some work in your application in the background:
 
 - **Non-critical path tasks** - When your API needs to do some work that isn't truly crucial, you should move it off of the critical path of the request to ensure a timely response time for your users. Your users shouldn't have to wait longer for a response because your app needs to send an email, update a CRM or perform some data aggregation to store in your database.
-- **Scheduled tasks** - You need to run something periodically like send a weekly digest email to your users or do a periodic data cleanup.
+- **Scheduled tasks (Cron Jobs)** - You need to run something periodically like send a weekly digest email to your users or do a periodic data cleanup.
 
 To accomplish these types of things, you usually have options that require more infrastructure to be setup like message queues, pub sub, or deploying your code to another platform that does scheduling. There are two considerations for this:
 
@@ -19,59 +18,89 @@ To accomplish these types of things, you usually have options that require more 
 The Inngest platform can do this for you with full observability and audit trails without having to configure new infrastructure. Let's see how we can get this done with your existing Next.js project running on Vercel or Netlify in just a couple of minutes.
 
 <aside>
-  <h2 className="mb-4" style={{fontSize: "1.3rem", marginTop: 0, fontWeight: "normal" }}>
-    Announcing our Inngest JavaScript & TypeScript SDK!
-  </h2>
-  <p>We've just released our SDK with first-class support for Next.js, Vercel, Netlify, and Express since we've first posted this article.</p>
-  <p>👉 <strong><a href="/docs/frameworks/nextjs?ref=blog-nextjs">Read our new guide for Next.js</a></strong></p>
+  <p>This blog post was updated in October 2022 to reflect the [new Inngest JavaScrpt & TypeScript SDK](/features/sdk?ref=blog-run-nextjs-functions-in-the-background)</p>
 </aside>
 
 ## Schedule functions
 
-If you wanted to send a weekly email digest to your users, you'll want to run this once a week at a particular time. Maybe you've written the code to query your database for users, query their weekly product usage, and format a well-designed email to send them. It's a fantastic feature and user retention tool. Here's some hypothetical code in [a Next.js api route](https://nextjs.org/docs/api-routes/introduction):
+If you wanted to send a weekly email digest to your users, you'll want to run this once a week at a particular time. Maybe you've written the code to query your database for users, query their weekly product usage, and format a well-designed email to send them. It's a fantastic feature and user retention tool. We'll show how the code would look as a [a Next.js api route](https://nextjs.org/docs/api-routes/introduction) and then break down what this code means and how to deploy it:
+
+```js twoslash title="/pages/api/inngest.js"
+// @filename: ../../someExistingCode.ts
+declare global {
+  var process: { env: { [key: string]: any } }
+}
+interface Results { sent: number }
+export const sendWeeklyDigestEmailsToAllUsers = async function() : Promise<Results> {
+  return { sent: 100 }
+}
+// @filename: index.ts
+// ---cut---
+import { createScheduledFunction } from "inngest"
+import { serve } from "inngest/next"
+import { sendWeeklyDigestEmailsToAllUsers } from "../../someExistingCode"
+
+// Your scheduled function
+const weeklyDigest = createScheduledFunction(
+  "Send Weekly Digest",
+  "0 12 * * 1", // At 12:00 every Monday
+  async () => {
+    const results = await sendWeeklyDigestEmailsToAllUsers();
+    return {
+      message: `Weekly digests sent to ${results.sent} users successfully`,
+    }
+  }
+)
+
+export default serve("My App", process.env.INNGEST_SIGNING_KEY, [ weeklyDigest ]);
+```
+<!-- TODO - Replace w/ below when new inngest-js is out:
+  export default serve("My App", [ sendWeeklyDigest ]);
+-->
+
+Let's break down what we're doing in the code above. We use [the Inngest SDK](https://github.com/inngest/inngest-js) (`npm install inngest`) to define our function and serve it. We start with defining a schedule function (aka Cron Job). This tells Inngest what to call the function, what schedule to run it on, and what code to run:
 
 ```js
-/* /pages/api/sendWeeklyDigests.js */
-export default async function handler(req, res) {
-  const results = await sendWeeklyDigestEmailsToAllUsers();
-  res.status(200).json({
-    message: `Weekly digests sent to ${results.sent} users successfully`,
-  });
-}
+import { createScheduledFunction } from "inngest"
+// Arguments:
+// - Function name
+// - Cron-tab expression
+// - The function code to run
+const weeklyDigest = createScheduledFunction("Send Weekly Digest", "0 12 * * 1", () => {
+  /* your code, anything returned will be catpured in Inngest logs */
+  return "Hello!"
+})
 ```
 
-To schedule this on Inngest is just a couple quick steps:
+### Serving your function
 
-1. Install the `inngest` cli:
+One feature of Inngest is that it supports running your code on other platforms like Vercel and Netlify - no extra deployment process needed. Inngest takes care of calling your funciton on the schedule that you specify. To do this, Inngest calls your Next.js app via HTTP.
 
-```shell
-$ curl -sfL https://cli.inngest.com/install.sh | sh && \
-  sudo mv ./inngest /usr/local/bin/inngest
+The Inngest SDK also provides a `serve` handler that enables Inngest to securely call your functions as required. You give your app a name and pass all of the functions that you created. In our Next.js app, we'll create a new file as `/pages/api/inngest.js` and set the `INNGEST_SIGNING_KEY` environment variable ([grab one here](https://app.inngest.com/secrets)):
+
+```js twoslash title="/pages/api/inngest.js"
+import { serve } from "inngest/next"
+// Arguments:
+// - The name of your app
+// - Inngest Signing Key - For securely communicating with Inngest
+// - Functions - An array of all of your Inngest functions
+export default serve("My App", process.env.INNGEST_SIGNING_KEY, [
+  weeklyDigest,
+  runDailyReport,
+]);
 ```
+<!-- TODO - update this with new SDK -->
 
-2. Navigate to your project's repo and initialize a new function. Here you get to choose your schedule - you can change this later (<a href="https://crontab.guru/" target="_blank">Crontab Guru</a> is useful for generating a schedule). Select “Call a URL” - this will be the URL of your endpoint that you'd like to request. Here we'll use once a week on Monday at 12pm (`0 12 * * 1`):
+Great! You've done all the hard work already. You can always add or remove functions as your app grows. The best part is your code stays in your existing repo right alongside everything else. Go ahead and merge your code and let your platform automatically deploy your code.
 
-<video controls autoPlay loop muted>
-  <source
-    src="/assets/blog/run-nextjs-functions-in-the-background/cli-cron-job-initialization.mp4"
-    type="video/mp4"
-  />
-</video>
+### Registering with Inngest
 
-3. Login and deploy your function:
+Your scheduled functions are ready to go, but there is one last step. Inngest doesn't yet know where your app's code is running or what schedule to run it on. For your platform, you'll need to set this up:
 
-```shell
-$ inngest login
-$ inngest deploy
-```
+* [Vercel](/docs/deploy/vercel?ref=blog-run-nextjs-functions-in-the-background)
+* [Netlify](/docs/deploy/netlify?ref=blog-run-nextjs-functions-in-the-background)
 
-### Creating a scheduled function in the Inngest web app
-
-You can also quickly create a scheduled function in the Inngest web app. From [the "Functions" tab](https://app.inngest.com/functions), click the "New Function" button and select "Call an existing HTTP endpoint." At the right, you'll be able to click the function "Trigger" drop down and select "Run on a schedule." You then can choose to "Run" to test your function or "Deploy" to deploy it make it live!
-
-![Configuring an HTTP cron job in the Inngest Web IDE](/assets/blog/run-nextjs-functions-in-the-background/web-ide-cron-job.png)
-
-<!-- TODO: ADD UI steps and screenshots/gifs here when we build it -->
+Once that's done Inngest will be able to call your functions running on Vercel or Netlfiy as needed!
 
 ## Background jobs and event-driven functions
 
@@ -85,7 +114,7 @@ When you implement this pattern, your initial endpoint shoots a message off to I
 
 ![A diagram showing a HTTP request to a signup endpoint and a background job being dispatched via Inngest](/assets/blog/run-nextjs-functions-in-the-background/call-url-diagram.gif)
 
-The first step is **choosing your event message** to send to your background function. This is comprised of an event name and any relevant data about that event and the associated user. For this example, our event name will be `user.signup` and we'll pass the user's email and their role on their team captured in your signup survey. Our event will look like this:
+The first step is **choosing your event message** to send to your background function. This is comprised of an event name and any relevant data about that event and the associated user. For this example, our event name will be `"user.signup"` and we'll pass the user's email and their role on their team captured in your signup survey. Our event will look like this:
 
 ```js
 {
@@ -99,42 +128,15 @@ The first step is **choosing your event message** to send to your background fun
 }
 ```
 
-Let's define the function that will be called:
+To start, we'll send this event in our existing `/api/signup` route defined in the following file. We'll use the [Inngest SDK](https://github.com/inngest/inngest-js) (`npm install inngest`) to send our event with the data captured during signup with an `INNGEST_EVENT_KEY` [that you can create here](/docs/creating-an-event-key?ref=blog-run-nextjs-functions-in-the-background):
 
-1. Install the `inngest` cli
-
-```shell
-$ curl -sfL https://cli.inngest.com/install.sh | sh && \
-  sudo mv ./inngest /usr/local/bin/inngest
-```
-
-2. Navigate to your project's repo and initialize a new function. Here you get to choose your an event as the trigger and enter the new `user.signup`. Select “Call a URL” - this will be the URL of your endpoint that you'd like to send the request, e.g. `https://myapp.com/api/sendWelcomeEmail`.
-
-```plaintext
-$ inngest init
-
-Let's get you set up with a new serverless function.
-Answer these questions to get started.
-
-1. Function name: Send Welcome Email
-2. Function trigger: Event based
-3. Function type: Call a URL
-4. Event trigger: user.signup
-
-🎉 Done!  Your project has been created in ./send-welcome-email
-For more information, read our documentation at https://www.inngest.com/docs
-```
-
-3. Using the inngest JavaScript library, we can send this event in our API's signup function ([You can create as many unique source keys as you want](https://www.inngest.com/docs/sending-data-via-inngest-sdks#getting-a-new-source-api-key)):
-
-```js
-/* /pages/api/signup.js */
+```js twoslash title="/pages/api/signup.js"
 import { Inngest } from "inngest";
 
 export default async function handler(req, res) {
   const { email, password, signupReason } = req.body;
   const result = await createNewUser(email, password);
-  const inngest = new Inngest(process.env.INNGEST_SOURCE_KEY);
+  const inngest = new Inngest({ eventKey: process.env.INNGEST_EVENT_KEY });
   await inngest.send({
     name: "user.signup",
     data: { signupReason },
@@ -144,44 +146,73 @@ export default async function handler(req, res) {
 }
 ```
 
-4. Our background job function will receive this event as the `req.body`, so, for this example, our function could look like this:
+Now, let's define the function that will be called. Similar to the above, we'll use the [Inngest SDK](https://github.com/inngest/inngest-js) (`npm install inngest`), but will import a different function `createFunction` to define our event-triggered function:
+
+```js twoslash title="/pages/api/inngest.js"
+// @filename: ../../someExistingCode.ts
+declare global {
+  var process: { env: { [key: string]: any } }
+}
+interface Options { template: string, to: string, data?: { [key:string]: string } }
+export const sendEmail = async function(options?: Options) : Promise<void> {
+  return undefined
+}
+// @filename: index.ts
+// ---cut---
+import { createFunction } from "inngest"
+import { serve } from "inngest/next"
+import { sendEmail } from "../../someExistingCode"
+
+// Define your function
+const welcomeEmail = createFunction(
+  "Send Welcome Email",
+  "user.signup",
+  async ({ event }) => {
+    if (!event.user?.email) {
+      throw new Error("Event payload missing email")
+    }
+
+    await sendEmail({
+      template: "welcome-email",
+      to: event.user.email,
+      data: {
+        // The template will use this to show useful content to our new user
+        signupReason: event.data?.signupReason,
+      },
+    });
+
+    return `Successfully sent`
+  }
+)
+
+// This is the same as above, you can pass as many functions are you want in the array:
+// Grab your key here: https://app.inngest.com/secrets
+export default serve("My App", process.env.INNGEST_SIGNING_KEY, [ welcomeEmail ]);
+```
+<!-- TODO - Replace w/ below when new inngest-js is out:
+  export default serve("My App", [ sendWeeklyDigest ]);
+-->
+
+> Bonus: Inngest SDK's has [first-class TypeScript support - click to learn more](/docs/typescript?ref=blog-run-nextjs-functions-in-the-background)
+
+If you read the above section on scheduled functions, you'll see lots of similarities! `createFunction` accepts 3 arguments with the second argument being the event name and the final function argument gets the event payload as an argument:
 
 ```js
-/* /pages/api/sendWelcomeEmail.js */
-export default async function handler(req, res) {
-  const { event } = req.body;
-  const result = await sendEmail({
-    template: "welcome-email",
-    to: event.user.email,
-    data: {
-      // The template will use this to show useful content to our new user
-      signupReason: event.user.data.signupReason,
-    },
-  });
-  const messasge = result.ok ? "Successfully sent" : result.error;
-  res.status(result.ok ? 200 : 500).json({ message });
-}
+import { createFunction } from "inngest"
+// Arguments:
+// - Function name
+// - Event name
+// - The function code to run - the `event` arg is the payload
+const welcomeEmail = createFunction("Send Welcome Email", "user.signup",
+  /* The `event` arg contains the entire data object that you sent above */
+  ({ event }) => {
+    /* your code, anything returned will be catpured in Inngest logs */
+    return `Hello ${event.name}!` // = "Hello user.signup!"
+  }
+)
 ```
 
-5. Now we have everything in place and you can deploy your function to Inngest:
-
-```jsx
-$ inngest login
-$ inngest deploy
-```
-
-When you next deploy your Next.js app you'll now start offloading work to your background job! Remember to add the Inngest Source Key to your environment variables first 😉.
-
-### Creating a background job or event-driven function in the Inngest web app
-
-Very similar to creating a scheduled function above, you can create a function in our web app that is triggered by an event. Clicking on the default event trigger will allow you to select a new event. You can create a new event of your own and name it whatever you'd like. You can also easily edit the test event paylod and click "Run" to send the request to your server. When you're happy with what you've got, click "Deploy Funciton" to make it live!
-
-<video controls autoPlay loop muted>
-  <source
-    src="/assets/blog/run-nextjs-functions-in-the-background/web-ide-event-http.mp4"
-    type="video/mp4"
-  />
-</video>
+That's how simple it is to define a background job - whenever the `"user.signup"` event is sent from your app, Inngest will asynchronously call your next function with that data. Remember to add the proper environment variables (`INNGEST_SIGNING_KEY`, `INNGEST_EVENT_KEY`) to your project first 😉.
 
 ## Viewing event and function history
 

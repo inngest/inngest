@@ -87,6 +87,6 @@
   "devDependencies": {
     "@types/lodash.shuffle": "^4.2.7",
     "@types/marked": "^4.0.5",
-    "@types/node": "^18.7.18"
+    "@types/node": "^18.8.2"
   }
 }

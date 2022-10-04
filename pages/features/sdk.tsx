@@ -157,7 +157,7 @@ export const worksWithBrands = [
     docs: "/docs/frameworks/nextjs",
     logo: "/assets/brand-logos/next-js-dark.svg",
     brand: "Next.js",
-    height: "100%",
+    height: "50%",
     type: "framework",
   },
   {
@@ -171,7 +171,7 @@ export const worksWithBrands = [
     docs: "/docs/deploy/netlify",
     logo: "/assets/brand-logos/netlify-dark.svg",
     brand: "Netlify",
-    height: "75%",
+    height: "65%",
     type: "platform",
   },
   {
@@ -415,8 +415,11 @@ export default function FeaturesSDK() {
                 text: "Step delays, conditional expressions, & event-coordination",
               },
               { done: false, text: "Cloudflare Workers support" },
-            ].map((i) => (
-              <ol className="flex flex-row items-center gap-2">
+            ].map((i, idx) => (
+              <ol
+                key={`item-${idx}`}
+                className="flex flex-row items-center gap-2"
+              >
                 {i.done ? (
                   <CheckRounded
                     size="22"

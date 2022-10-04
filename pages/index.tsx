@@ -208,6 +208,7 @@ export default function Home() {
           <div className="mt-4 flex flex-wrap items-center justify-center gap-8 h-8 sm:h-12">
             {worksWithBrands.map((b) => (
               <a
+                key={`brand-${b.brand}`}
                 href={`${b.docs}?ref=homepage-works-with`}
                 className="block bulge"
                 style={{ height: b.height }}
@@ -368,7 +369,8 @@ export default function Home() {
                 <br />
                 Guides:{" "}
                 <a href="/docs/frameworks/nextjs?ref=homepage">Next.js</a>{" "}
-                &middot; <a href="/docs/frameworks/express?ref=homepage">Express</a>
+                &middot;{" "}
+                <a href="/docs/frameworks/express?ref=homepage">Express</a>
               </>
             ),
             image: (
