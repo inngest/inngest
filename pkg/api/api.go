@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/rs/zerolog"
@@ -29,10 +28,6 @@ const (
 	DefaultMaxSize = 256 * 1024
 )
 
-var (
-	EventPathRegex = regexp.MustCompile("^/e/([a-zA-Z0-9-_]+)$")
-)
-
 func NewAPI(o Options) (chi.Router, error) {
 	logger := o.Logger.With().Str("caller", "api").Logger()
 
@@ -48,7 +43,7 @@ func NewAPI(o Options) (chi.Router, error) {
 	}
 
 	api.Get("/health", api.HealthCheck)
-	api.Post("/e/", api.ReceiveEvent)
+	api.Post("/e/{key}", api.ReceiveEvent)
 
 	return api, nil
 }
@@ -62,6 +57,9 @@ type API struct {
 	log     *zerolog.Logger
 
 	server *http.Server
+}
+
+func (a *API) AddRoutes() {
 }
 
 func (a *API) Start(ctx context.Context) error {
@@ -96,11 +94,11 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	matches := EventPathRegex.FindStringSubmatch(r.URL.Path)
-	if matches == nil || len(matches) != 2 {
+	key := chi.URLParam(r, "key")
+	if key == "" {
 		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusUnauthorized,
-			Error:      "API Key is required",
+			Error:      "Event key is required",
 		})
 		return
 	}

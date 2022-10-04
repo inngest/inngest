@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/logger"
@@ -54,7 +54,8 @@ func (a *apiServer) Pre(ctx context.Context) error {
 	a.api = api.(*API)
 
 	for _, m := range a.mounts {
-		api.Mount("/", m)
+		// api.Mount("/", m)
+		_ = m
 	}
 
 	a.publisher, err = pubsub.NewPublisher(ctx, a.config.EventStream.Service)

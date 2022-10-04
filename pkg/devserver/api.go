@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/inngest/version"
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/logger"
