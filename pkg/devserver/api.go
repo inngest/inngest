@@ -48,7 +48,7 @@ func (a *devapi) addRoutes() {
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("UI plz"))
+	// TODO: Respond with a UI here.
 }
 
 // Info returns information about the dev server and its registered functions.

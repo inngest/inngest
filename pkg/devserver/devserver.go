@@ -19,7 +19,7 @@ import (
 
 // StartOpts configures the dev server
 type StartOpts struct {
-	Config       config.Config `json:"config"`
+	Config       config.Config `json:"-"`
 	RootDir      string        `json:"dir"`
 	URLs         []string      `json:"urls"`
 	Autodiscover bool          `json:"autodiscover"`
