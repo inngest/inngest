@@ -11,9 +11,10 @@ import (
 // Workspace represents a single workspace within an Inngest account. The pertinent
 // fields for the active workspace are marshalled into State.
 type Workspace struct {
-	ID   uuid.UUID `json:"id"`
-	Name string    `json:"name"`
-	Test bool      `json:"test"`
+	ID         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	Test       bool      `json:"test"`
+	SigningKey string    `json:"webhookSigningKey"`
 }
 
 func (c httpClient) Workspaces(ctx context.Context) ([]Workspace, error) {
@@ -21,6 +22,7 @@ func (c httpClient) Workspaces(ctx context.Context) ([]Workspace, error) {
           query {
             workspaces {
 	      id name test
+	      webhookSigningKey
             }
           }`
 
