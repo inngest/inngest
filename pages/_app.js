@@ -46,6 +46,10 @@ function MyApp({ Component, pageProps }) {
   }
   const disableMetadata = pageProps?.meta?.disabled === true;
 
+  const canonicalUrl = `https://www.inngest.com${
+    router.asPath === "/" ? "" : router.asPath
+  }`.split("?")[0];
+
   return (
     <>
       <Head>
@@ -71,13 +75,11 @@ function MyApp({ Component, pageProps }) {
                 pageProps?.meta?.image || "/assets/img/og-image-default.jpg"
               }
             />
-            <meta
-              property="og:url"
-              content={`https://www.inngest.com${router.pathname}`}
-            />
+            <meta property="og:url" content={canonicalUrl} />
             <meta property="og:title" content={`Inngest - ${metaTitle}`} />
           </>
         )}
+        <link rel="canonical" href={canonicalUrl} />
       </Head>
       <PageBanner href="/features/sdk?ref=page-banner">
         Introducing the Inngest TypeScript / JavaScript SDK
