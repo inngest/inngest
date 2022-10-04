@@ -32,6 +32,7 @@
     "@tailwindcss/typography": "^0.5.4",
     "@tonyhb/rs-templating": "^0.1.7",
     "@types/express": "^4.17.14",
+    "@types/node": "^18.8.2",
     "@types/react": "^17.0.14",
     "autoprefixer": "^10.4.8",
     "babel-loader": "^8.2.3",
@@ -86,7 +87,6 @@
   },
   "devDependencies": {
     "@types/lodash.shuffle": "^4.2.7",
-    "@types/marked": "^4.0.5",
-    "@types/node": "^18.8.2"
+    "@types/marked": "^4.0.5"
   }
 }
