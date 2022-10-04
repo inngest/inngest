@@ -152,6 +152,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.devserver.handlers = append(a.devserver.handlers, *h)
+	_, _ = w.Write([]byte(`{"ok":true}`))
 
 	logger.From(ctx).Info().
 		Int("len", len(req.Functions)).
