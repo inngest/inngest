@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"github.com/inngest/inngest/inngest/client"
 	"github.com/inngest/inngest/inngest/version"
 	"github.com/inngest/inngest/pkg/function"
@@ -42,6 +43,12 @@ func (a *devapi) addRoutes() {
 		}
 		return http.HandlerFunc(fn)
 	})
+	a.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"https://*", "http://*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowCredentials: false,
+	}))
 
 	a.Get("/", a.UI)
 	a.Get("/dev", a.Info)
