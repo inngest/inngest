@@ -22,11 +22,12 @@ const (
 
 func newService(opts StartOpts, loader *inmemory.FSLoader) *devserver {
 	return &devserver{
-		loader:      loader,
-		opts:        opts,
-		urls:        opts.URLs,
-		urlLock:     &sync.Mutex{},
-		handlerLock: &sync.Mutex{},
+		loader:        loader,
+		opts:          opts,
+		urls:          opts.URLs,
+		urlLock:       &sync.Mutex{},
+		handlerLock:   &sync.Mutex{},
+		workspaceLock: &sync.RWMutex{},
 	}
 }
 
@@ -47,8 +48,10 @@ type devserver struct {
 
 	// loader stores all registered functions in the dev server.
 	loader *inmemory.FSLoader
+
 	// workspaces stores the Inngest workspaces, if the CLI is authenticated.
-	workspaces []client.Workspace
+	workspaces    []client.Workspace
+	workspaceLock *sync.RWMutex
 
 	// handlers are updated by the API (d.apiservice) when registering functions.
 	handlers    []SDKHandler
@@ -84,7 +87,7 @@ func (d *devserver) Run(ctx context.Context) error {
 	return d.apiservice.Run(ctx)
 }
 
-func (d devserver) Stop(ctx context.Context) error {
+func (d *devserver) Stop(ctx context.Context) error {
 	return d.apiservice.Stop(ctx)
 }
 
@@ -97,7 +100,9 @@ func (d *devserver) fetchWorkspaces(ctx context.Context) {
 			return
 		}
 
+		d.workspaceLock.Lock()
 		d.workspaces, err = clistate.Client(ctx).Workspaces(ctx)
+		d.workspaceLock.Unlock()
 		if err == nil {
 			return
 		}

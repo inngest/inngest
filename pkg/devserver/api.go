@@ -54,7 +54,10 @@ func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
 // Info returns information about the dev server and its registered functions.
 func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 	a.devserver.handlerLock.Lock()
+	a.devserver.workspaceLock.RLock()
+
 	defer a.devserver.handlerLock.Unlock()
+	defer a.devserver.workspaceLock.RUnlock()
 
 	funcs, _ := a.devserver.loader.Functions(r.Context())
 	ir := InfoResponse{
@@ -92,7 +95,6 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 
 	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
 	// signing key and warn if the user has an invalid key.
-
 	if err := req.Validate(ctx); err != nil {
 		a.err(ctx, w, 400, fmt.Errorf("At least one function is invalid:\n%w", err))
 		return
