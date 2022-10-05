@@ -59,7 +59,7 @@ export default createFunction("My fn", "account.created", ({ event }) => {
 Lastly, we need to serve our functions securely with Inngest' Express.js `serve` handler. We import our function and pass it to the handler.
 
 ```js
-import { serve } from "inngest"
+import { serve } from "inngest/express"
 import myFn from "../inngest/myfn"
 app.use("/api/inngest", serve("My App", process.env.INNGEST_SIGNING_KEY, [
   myFn,

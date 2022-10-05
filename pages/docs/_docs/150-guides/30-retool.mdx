@@ -104,7 +104,7 @@ There are different ways that you can have Inngest execute your functions:
 For this guide, we'll focus on **the former** with an existing [Express.js](https://expressjs.com/) application. Inngest's default `serve` handler can be imported and passed to Express.js' `app.use` or `router.use`. You can get your Inngest signing key by visiting the Secrets tab in the Inngest dasboard ([direct link](https://app.inngest.com/secrets)).
 
 ```js
-import { serve } from "inngest"
+import { serve } from "inngest/express"
 import runBackfillForUser from "../inngest/runBackfillForUser"
 
 app.use("/api/inngest", serve("My API", process.env.INNGEST_SIGNING_KEY, [
