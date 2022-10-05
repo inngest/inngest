@@ -18,7 +18,7 @@ To accomplish these types of things, you usually have options that require more 
 The Inngest platform can do this for you with full observability and audit trails without having to configure new infrastructure. Let's see how we can get this done with your existing Next.js project running on Vercel or Netlify in just a couple of minutes.
 
 <aside>
-  <p>This blog post was updated in October 2022 to reflect the [new Inngest JavaScrpt & TypeScript SDK](/features/sdk?ref=blog-run-nextjs-functions-in-the-background)</p>
+  <p>This blog post was updated in October 2022 to reflect the <a href="/features/sdk?ref=blog-run-nextjs-functions-in-the-background">new Inngest JavaScrpt & TypeScript SDK</a></p>
 </aside>
 
 ## Schedule functions
@@ -52,7 +52,9 @@ const weeklyDigest = createScheduledFunction(
   }
 )
 
-export default serve("My App", process.env.INNGEST_SIGNING_KEY, [ weeklyDigest ]);
+export default serve("My App", [ weeklyDigest ], {
+  signingKey: process.env.INNGEST_SIGNING_KEY
+});
 ```
 <!-- TODO - Replace w/ below when new inngest-js is out:
   export default serve("My App", [ sendWeeklyDigest ]);
@@ -82,12 +84,12 @@ The Inngest SDK also provides a `serve` handler that enables Inngest to securely
 import { serve } from "inngest/next"
 // Arguments:
 // - The name of your app
-// - Inngest Signing Key - For securely communicating with Inngest
 // - Functions - An array of all of your Inngest functions
-export default serve("My App", process.env.INNGEST_SIGNING_KEY, [
+// - Options, ing. Inngest Signing Key - For securely communicating with Inngest
+export default serve("My App", [
   weeklyDigest,
   runDailyReport,
-]);
+], { signingKey: process.env.INNGEST_SIGNING_KEY });
 ```
 <!-- TODO - update this with new SDK -->
 
@@ -187,7 +189,9 @@ const welcomeEmail = createFunction(
 
 // This is the same as above, you can pass as many functions are you want in the array:
 // Grab your key here: https://app.inngest.com/secrets
-export default serve("My App", process.env.INNGEST_SIGNING_KEY, [ welcomeEmail ]);
+export default serve("My App", [ welcomeEmail ], {
+  signingKey: process.env.INNGEST_SIGNING_KEY
+});
 ```
 <!-- TODO - Replace w/ below when new inngest-js is out:
   export default serve("My App", [ sendWeeklyDigest ]);
