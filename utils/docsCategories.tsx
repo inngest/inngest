@@ -14,6 +14,6 @@ export const categoryMeta = {
   },
   "managing workflows": {
     order: 1,
-    icon: <Workflow fill="#fff" size="20" />
+    icon: <Workflow fill="#fff" size={20} />
   },
 }
