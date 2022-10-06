@@ -72,7 +72,7 @@ export default function Template() {
           Inngest is the easiest way to build scheduled jobs in your app, no matter what framework or platform you use.
         </p>
 
-        <div className="grid grid-cols-3 text-center pb-32 gap-6">
+        <div className="grid text-center pb-32 gap-6 lg:grid-cols-3 md:grid-cols-1">
           <div className="bg-white rounded shadow-xl p-8">
             <Developers fill="var(--color-iris-100" className="mx-auto mb-2" size={30} />
             <h3 className="mb-2">Easy to use</h3>
@@ -108,7 +108,7 @@ export default function Template() {
 
       <div className="container mx-auto">
         <h2 className="text-center mb-16">How it works</h2>
-        <div className="grid grid-cols-3 gap-16">
+        <div className="grid gap-16 lg:grid-cols-3 md:grid-cols-1">
           <div>
             <h4 className="mb-4">1. Write your functions</h4>
             <p><a href="/docs/functions">Write your scheduled functions</a> using regular JS or TS, defined using a single line of code, all served via Inngest's handler.</p>
