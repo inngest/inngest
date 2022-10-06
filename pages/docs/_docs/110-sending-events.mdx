@@ -17,7 +17,7 @@ Firstly, make sure you have the `inngest` package installed via NPM or yarn.  Th
 import { Inngest } from 'inngest';
 
 // Create a new client using your inngest event key
-export const client = new Inngest(process.env.INNGEST_EVENT_KEY);
+export const client = new Inngest({ name: "Your app name" });
 
 // This sends an event to Inngest.
 client.send({

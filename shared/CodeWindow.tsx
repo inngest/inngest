@@ -29,6 +29,7 @@ const CodeWindow = ({
   filename?: string;
   theme?: "light" | "dark";
   type?: "editor" | "terminal";
+
 }) => {
   const backgroundColor =
     theme === "dark"

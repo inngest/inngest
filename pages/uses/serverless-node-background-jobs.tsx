@@ -2,8 +2,10 @@ import styled from "@emotion/styled";
 import React, { useState } from "react";
 import Button from "src/shared/Button";
 import Nav from "src/shared/nav";
+import CodeWindow from "src/shared/CodeWindow";
 import Footer from "src/shared/footer";
 import Play from "src/shared/Icons/Play";
+import IconListStories from "src/stories/IconList.stories";
 
 export async function getStaticProps() {
   return {
@@ -11,11 +13,66 @@ export async function getStaticProps() {
       meta: {
         title: "Serverless background jobs for Node & Deno",
         description:
-          "Build, test, then deploy background jobs and scheduled tasks without worrying about infrastructure or queues — so you can focus on your product.",
+          "Build, test, then deploy background tasks without worrying about infrastructure or queues — so you can focus on your product.",
       },
     },
   };
 }
+
+const snippet = `
+import { createScheduledFunction } from "inngest";
+
+createFunction(
+  "After signup",
+  "auth/user.created",
+  async ({ event }) => {
+  },
+);
+`
+
+const fullSnippet = `
+import { createScheduledFunction } from "inngest";
+
+createFunction(
+  "After signup",
+  "auth/user.created",
+  async ({ event }) => {
+    // This function runs in the background every time
+    // the "auth/user.created" event is received.
+    //
+    // Instead of your signup API triggering activation
+    // emails and setting up user accounts, your API
+    // offloads this work into the background by
+    // triggering an event which calls this function.
+    await sendActivationEmail({
+      email: event.user.email,
+      name: event.user.name
+    });
+    await createChurnCampaign({ id: event.user.id });
+  },
+);
+`
+
+const sendSnippet = `
+import { Inngest } from 'inngest';
+
+// Create a new client for sending events.
+export const client = new Inngest({ name: "Your app name" });
+
+// Send an event to Inngest, which triggers any background
+// function that listens to this event.
+client.send({
+  name: "auth/user.created",
+  data: {
+    plan: "The super awesome new plan",
+  },
+  user: {
+    id: "8f2bc",
+    email: "user@example.com",
+    name: "Super Awesome User", 
+  }
+});
+`
 
 export default function Template() {
   const [demo, setDemo] = useState(false);
@@ -25,11 +82,13 @@ export default function Template() {
       <Nav sticky={true} nodemo />
       <div className="container mx-auto py-32 flex flex-row">
         <div className="basis-1/2 px-6">
-          <h1>Serverless background and scheduled jobs</h1>
+          <h1>Background tasks made simple</h1>
           <p className="pt-6 subheading">
-            Build, test, then deploy background jobs and scheduled tasks without
-            worrying about infrastructure or queues — so you can focus on your
-            product.
+            Build serverless background tasks without any queues, infrastructure, or config.
+          </p>
+          <p className="mt-2">
+            Inngest allows you to easily offload work from your APIs to increase your app's speed &mdash; without
+            changing your project or building complex architectures.
           </p>
           <div className="flex flex-row pt-12">
             <Button kind="primary" href="/sign-up?ref=js-hero">
@@ -40,88 +99,59 @@ export default function Template() {
             </Button>
           </div>
         </div>
-        <VidPlaceholder className="basis-1/2 px-6 flex items-center">
-          <button
-            className="flex items-center justify-center"
-            onClick={() => setDemo(true)}
-          >
-            <Play outline={false} fill="var(--primary-color)" size={80} />
-          </button>
-          <img src="/assets/homepage/cli-3-commands.png" />
-        </VidPlaceholder>
+        <div className="basis-1/2 px-6 flex items-center">
+            <CodeWindow
+              className="transform-iso shadow-xl relative z-10"
+              filename={`functions/after_signup.ts`}
+              snippet={snippet}
+            />
+        </div>
       </div>
 
       <div className="container mx-auto">
-        <h2 className="text-center">Designed for Developers</h2>
+        <h2 className="text-center">Running in seconds</h2>
+
         <p className="text-center pt-2 pb-24">
-          Develop, test, and deploy background tasks across any language using a
-          single CLI built for developer productivity.
+          Inngest's SDK allows you to write and deploy background jobs with a single line of code.  Here's how it works:
         </p>
 
         <Developers className="grid grid-cols-2 gap-8 gap-y-16">
           <div className="flex flex-col justify-center">
-            <img src="/assets/product/cli-init.png" />
+            <CodeWindow
+              className="shadow-xl border relative z-10"
+              filename={`functions/after_signup.ts`}
+              snippet={fullSnippet}
+            />
           </div>
           <div className="flex flex-col justify-center">
-            <small>Designed for ease of use</small>
             <h3 className="pb-2">
-              Simple development: <code>inngest init</code>
+              1. Define your jobs
             </h3>
             <p>
-              Easily write background jobs and scheduled tasks using Node, Deno,
-              Typesript, Reason, Elm — or any other language in your stack. A
-              single command scaffolds the entire serverless function ready to
-              test.
+              Write your background jobs using regular TypeScript or JavaScript, then use our SDK to define which
+              events trigger the job.
             </p>
-            <ul className="space-y-1">
-              <li>Create scheduled or background jobs</li>
-              <li>Easily build complex step functions using any languages</li>
-            </ul>
+            <p className="mt-2">It takes a single line of code to specify how an event runs in the background, and a single line of code to provide an API that serves all background functions together.</p>
           </div>
 
           <div className="flex flex-col justify-center">
-            <img src="/assets/product/cli-run.png" />
+            <CodeWindow
+              className="shadow-xl border relative z-10"
+              filename={`api/signup.ts`}
+              snippet={sendSnippet}
+            />
           </div>
           <div className="flex flex-col justify-center">
-            <small>Designed for local development</small>
             <h3 className="pb-2">
-              Local testing: <code>inngest run</code>
+              2. Run functions via events
             </h3>
             <p>
-              Test your functions locally with a single command, using randomly
-              generated data or real production data via replay, then run a real
-              job queue in your project with zero infra via{" "}
-              <code>inngest dev</code>.
+              Sending events to Inngest automatically triggers background jobs which subscribe to that event — without any queues, databases, or configuration.
             </p>
-            <ul className="space-y-1">
-              <li>Locally run without any setup</li>
-              <li>Test with real production data</li>
-              <li>
-                Local UI with step function debugger <small>Coming soon</small>
-              </li>
-            </ul>
+            <p className="mt-2">This allows you to create <b>single background jobs</b> or <b>fan-out jobs that run in parallel</b>, triggered via a single event.</p>
+            <p className="mt-2">Events are fully typed, so you can guarantee that the data you send and receive is correct.</p>
           </div>
 
-          <div className="flex flex-col justify-center">
-            <img src="/assets/product/cli-deploy.png" />
-          </div>
-
-          <div className="flex flex-col justify-center">
-            <small>Designed to scale</small>
-            <h3 className="pb-2">
-              One-command deploy: <code>inngest deploy</code>
-            </h3>
-            <p>
-              Roll out new background jobs and scheduled tasks using a single
-              command — without setting up a single server, queue, or Redis
-              instance, and without changing your app.
-            </p>
-            <ul className="space-y-1">
-              <li>CI/CD built in</li>
-              <li>Immediate rollbacks</li>
-              <li>Deploy functions as internal tools</li>
-            </ul>
-          </div>
         </Developers>
       </div>
 
@@ -284,28 +314,6 @@ export default function Template() {
     </div>
   );
 }
-
-const VidPlaceholder = styled.div`
-  position: relative;
-
-  button {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-
-    svg {
-      box-shadow: 0 0 40px var(--primary-color);
-      border-radius: 60px;
-      transition: all 0.3s;
-    }
-
-    &:hover svg {
-      box-shadow: 0 0 80px 20px var(--primary-color);
-    }
-  }
-`;
 
 const Developers = styled.div`
   h3 code {
