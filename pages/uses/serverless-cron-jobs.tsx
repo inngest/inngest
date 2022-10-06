@@ -15,9 +15,9 @@ export async function getStaticProps() {
   return {
     props: {
       meta: {
-        title: "Serverless background jobs for Node & Deno",
+        title: "Serverless scheduled cron jobs",
         description:
-          "Build, test, then deploy background jobs and scheduled tasks without worrying about infrastructure or queues — so you can focus on your product.",
+          "Define and write scheduled functions or cron jobs in your existing projects using a single line of code, no infrastructure required.",
       },
     },
   };
