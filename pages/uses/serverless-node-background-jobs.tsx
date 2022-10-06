@@ -142,7 +142,7 @@ export default function Template() {
           </div>
           <div className="flex flex-col justify-center">
             <h3 className="pb-2">
-              2. Run functions via events
+              2. Run jobs via events
             </h3>
             <p>
               Sending events to Inngest automatically triggers background jobs which subscribe to that event — without any queues, databases, or configuration.
