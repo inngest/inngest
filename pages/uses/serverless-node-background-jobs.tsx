@@ -82,7 +82,7 @@ export default function Template() {
       <Nav sticky={true} nodemo />
       <div className="container mx-auto py-32 flex flex-row">
         <div className="basis-1/2 px-6">
-          <h1>Background tasks made simple</h1>
+          <h1>Background tasks, without the queues or workers</h1>
           <p className="pt-6 subheading">
             Build serverless background tasks without any queues, infrastructure, or config.
           </p>
