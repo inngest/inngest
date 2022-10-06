@@ -1,7 +1,8 @@
 import React from "react";
 
-export default ({ fill = "#ffffff", size = "15" }) => (
+export default ({ fill = "#ffffff", size = 15, className = ""  }) => (
   <svg
+    className={className} 
     width={size}
     height={size}
     viewBox="0 0 24 24"

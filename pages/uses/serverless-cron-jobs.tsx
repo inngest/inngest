@@ -4,6 +4,12 @@ import Button from "src/shared/Button";
 import Nav from "src/shared/nav";
 import Footer from "src/shared/footer";
 import CodeWindow from "src/shared/CodeWindow";
+import Developers from "src/shared/Icons/Developers";
+import Cube from "src/shared/Icons/Cube";
+import Workflow from "src/shared/Icons/Workflow";
+import CheckAll from "src/shared/Icons/CheckAll";
+import Airplane from "src/shared/Icons/Airplane";
+import Retries from "src/shared/Icons/Retries";
 
 export async function getStaticProps() {
   return {
@@ -68,26 +74,32 @@ export default function Template() {
 
         <div className="grid grid-cols-3 text-center pb-32 gap-6">
           <div className="bg-white rounded shadow-xl p-8">
+            <Developers fill="var(--color-iris-100" className="mx-auto mb-2" size={30} />
             <h3 className="mb-2">Easy to use</h3>
             <p>Create scheduled functions and cron jobs with a single line of code</p>
           </div>
           <div className="bg-white rounded shadow-xl p-8">
+            <Cube fill="var(--color-iris-100" className="mx-auto mb-2" size={30} />
             <h3 className="mb-2">Declarative</h3>
             <p>Define functions and schedules together in one place for easy maintenance</p>
           </div>
           <div className="bg-white rounded shadow-xl p-8">
+            <Workflow fill="var(--color-iris-100" className="mx-auto mb-2" size={30} />
             <h3 className="mb-2">Serverless</h3>
             <p>Scheduled functions run without servers or configuration - no setup required</p>
           </div>
           <div className="bg-white rounded shadow-xl p-8">
+            <CheckAll fill="var(--color-iris-100" className="mx-auto mb-2" size={30} />
             <h3 className="mb-2">Great DX</h3>
             <p>Local development-only UI to inspect functions and their schedules</p>
           </div>
           <div className="bg-white rounded shadow-xl p-8">
+            <Airplane fill="var(--color-iris-100" className="mx-auto mb-2" size={30} />
             <h3 className="mb-2">Any platform</h3>
             <p>Keep your code together by deploying to your platform choice</p>
           </div>
           <div className="bg-white rounded shadow-xl p-8">
+            <Retries fill="var(--color-iris-100" className="mx-auto mb-2" size={30} />
             <h3 className="mb-2">Reliable</h3>
             <p>If your job fails we'll rerun it multiple times without any work your side</p>
           </div>
@@ -96,14 +108,14 @@ export default function Template() {
 
       <div className="container mx-auto">
         <h2 className="text-center mb-16">How it works</h2>
-        <div className="grid grid-cols-3 text-center gap-8">
+        <div className="grid grid-cols-3 gap-16">
           <div>
             <h4 className="mb-4">1. Write your functions</h4>
-            <p>Write your scheduled functions using regular JS or TS, defined using a single line of code, all served via Inngest's handler.</p>
+            <p><a href="/docs/functions">Write your scheduled functions</a> using regular JS or TS, defined using a single line of code, all served via Inngest's handler.</p>
           </div>
           <div>
             <h4 className="mb-4">2. Register your URLs</h4>
-            <p>Let Inngest know where your serverless functions are hosted — by using our built-in integrations or a single post-deploy API call</p>
+            <p><a href="/docs/deploy">Let Inngest know where your serverless functions are hosted</a> — by using our built-in integrations or a single post-deploy API call</p>
           </div>
           <div>
             <h4 className="mb-4">3. Functions run automatically</h4>

@@ -1,8 +1,9 @@
 import React from "react";
 import type { IconProps } from "./props";
 
-const CheckAll = ({ size = "1em", fill = "currentColor" }: IconProps) => (
+const CheckAll = ({ size = "1em", fill = "currentColor", className }: IconProps) => (
   <svg
+    className={className}
     width={size}
     height={size}
     viewBox="0 0 24 24"
