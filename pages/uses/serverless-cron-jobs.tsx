@@ -95,10 +95,29 @@ export default function Template() {
       </div>
 
       <div className="container mx-auto">
-        <h2 className="text-center">How it works</h2>
+        <h2 className="text-center mb-16">How it works</h2>
+        <div className="grid grid-cols-3 text-center gap-8">
+          <div>
+            <h4 className="mb-4">1. Write your functions</h4>
+            <p>Write your scheduled functions using regular JS or TS, defined using a single line of code, all served via Inngest's handler.</p>
+          </div>
+          <div>
+            <h4 className="mb-4">2. Register your URLs</h4>
+            <p>Let Inngest know where your serverless functions are hosted — by using our built-in integrations or a single post-deploy API call</p>
+          </div>
+          <div>
+            <h4 className="mb-4">3. Functions run automatically</h4>
+            <p>Inngest calls all functions securely and automatically on their defined schedule, without any extra setup or servers.</p>
+          </div>
+        </div>
       </div>
 
-      <div className="container mx-auto flex py-32 justify-center">
+      <div className="container mx-auto text-center my-24 w-3/4">
+        <p className="text-slate-600 mb-4">Build easily using our local SDK UI:</p>
+        <img src="/assets/sdk-ui.png" alt="SDK Development UI" className="shadow-2xl rounded" />
+      </div>
+
+      <div className="container mx-auto flex mt-22 justify-center">
         <div className="flex flex-col justify-center align-center text-center pr-24">
           <p>
             <i>“Sooooo much easier than AWS”</i>
@@ -113,135 +132,6 @@ export default function Template() {
       </div>
 
       <Footer />
-
-      {demo && (
-        <Demo
-          className="flex justify-center items-center"
-          onClick={() => {
-            setDemo(false);
-          }}
-        >
-          <div className="container aspect-video mx-auto max-w-2xl flex">
-            <iframe
-              src="https://www.youtube.com/embed/qVXzYBcJmGU?autoplay=1"
-              title="Inngest Product Demo"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              className="flex-1"
-            ></iframe>
-          </div>
-        </Demo>
-      )}
     </div>
   );
 }
-
-const VidPlaceholder = styled.div`
-  position: relative;
-
-  button {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-
-    svg {
-      box-shadow: 0 0 40px var(--primary-color);
-      border-radius: 60px;
-      transition: all 0.3s;
-    }
-
-    &:hover svg {
-      box-shadow: 0 0 80px 20px var(--primary-color);
-    }
-  }
-`;
-
-const Developers = styled.div`
-  h3 code {
-    color: var(--color-iris-60);
-    margin-left: 0.25rem;
-  }
-
-  div > small {
-    font-weight: bold;
-    opacity: 0.4;
-  }
-`;
-
-const Features = styled.div`
-  position: relative;
-  &:before,
-  &:after {
-    content: "";
-    display: block;
-    height: 100%;
-    width: 100%;
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 0;
-  }
-  &:before {
-    background: var(--bg-feint-color) url(/assets/grid-bg.png) repeat 0 0;
-    opacity: 0.8;
-  }
-  &:after {
-    background: radial-gradient(
-      50% 50% at 50% 50%,
-      rgba(247, 248, 249, 0) 0%,
-      #f7f8f9 100%
-    );
-  }
-  > div {
-    position: relative;
-    z-index: 1;
-  }
-
-  .subheading {
-    color: #556987;
-  }
-`;
-
-const FeatureGrid = styled.div`
-  text-align: center;
-
-  h3 {
-    font-weight: normal;
-    padding-bottom: 0.25rem;
-    font-size: 1.25rem;
-  }
-`;
-
-const Quote = styled.div`
-  q {
-    font-size: 1.8rem;
-    font-weight: bold;
-    font-style: italic;
-    line-height: 1.2;
-    color: var(--color-gray-purple);
-  }
-
-  p {
-    opacity: 0.7;
-    font-size: 0.8rem;
-  }
-`;
-
-const Demo = styled.div`
-  position: fixed;
-  top: 0;
-  z-index: 10;
-  left: 0;
-  width: 100%;
-  max-width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.4);
-
-  > div {
-    box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
-  }
-`;
-
