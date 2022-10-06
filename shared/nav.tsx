@@ -64,10 +64,16 @@ const NavContent: React.FC<Props> = (props: Props) => {
               <div className="secondary-links bg-slate-100 pt-6 pb-3 px-2 text-xs rounded-r-lg">
                 <span className="text-slate-400 px-4">Use cases</span>
                 <a
+                  href="/uses/serverless-cron-jobs?ref=nav"
+                  className="rounded-lg px-4 py-3"
+                >
+                  Scheduled & cron jobs
+                </a>
+                <a
                   href="/uses/serverless-node-background-jobs?ref=nav"
                   className="rounded-lg px-4 py-3"
                 >
-                  Background and scheduled jobs
+                  Background tasks
                 </a>
                 <a
                   href="/uses/internal-tools?ref=nav"
