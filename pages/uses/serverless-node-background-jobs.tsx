@@ -26,6 +26,8 @@ createFunction(
   "After signup",
   "auth/user.created",
   async ({ event }) => {
+    // This function runs in the background every time
+    // the "auth/user.created" event is received.
   },
 );
 `
@@ -37,9 +39,6 @@ createFunction(
   "After signup",
   "auth/user.created",
   async ({ event }) => {
-    // This function runs in the background every time
-    // the "auth/user.created" event is received.
-    //
     // Instead of your signup API triggering activation
     // emails and setting up user accounts, your API
     // offloads this work into the background by
