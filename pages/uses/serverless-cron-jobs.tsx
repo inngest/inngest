@@ -59,7 +59,7 @@ export default function Template() {
         </div>
         <div className="px-6 items-center">
           <CodeWindow
-            className="transform-iso shadow-xl relative z-10 overflow-scroll"
+            className="transform-iso shadow-xl relative z-10"
             filename={`scheduled/function.ts`}
             snippet={snippet}
           />
