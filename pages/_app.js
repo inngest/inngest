@@ -82,7 +82,7 @@ function MyApp({ Component, pageProps }) {
         <link rel="canonical" href={canonicalUrl} />
       </Head>
       <PageBanner href="/features/sdk?ref=page-banner">
-        Introducing the Inngest TypeScript / JavaScript SDK
+        Check out our new TypeScript / JavaScript SDK
       </PageBanner>
       <Component {...pageProps} />
       <Script
