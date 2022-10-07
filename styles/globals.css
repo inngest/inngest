@@ -39,7 +39,7 @@
 
   --bg-color-d: #0a0a12;
   --bg-color-l: var(--color-almost-white);
-  --bg-color: var(--bg-color-d);
+  --bg-color: var(--bg-color-l);
 
   --bg-primary-highlight: #12112b; /* A color that is used in gradients w/ the bg color to add depth */
   --highlight-color: var(--black);

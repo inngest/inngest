@@ -41,8 +41,8 @@ export default function Template() {
   return (
     <div>
       <Nav sticky={true} nodemo />
-      <div className="container mx-auto py-32 flex flex-row">
-        <div className="basis-1/2 px-6">
+      <div className="container mx-auto py-8 lg:py-32 grid lg:grid-cols-2 md:grid-cols-1 gap-12">
+        <div className="px-6">
           <h1>Serverless cron jobs, made simple</h1>
           <p className="pt-6 subheading">
             Define and write scheduled functions in your existing projects with a single line of
@@ -57,18 +57,18 @@ export default function Template() {
             </Button>
           </div>
         </div>
-        <div className="basis-1/2 px-6 flex items-center">
-            <CodeWindow
-              className="transform-iso shadow-xl relative z-10"
-              filename={`scheduled/function.ts`}
-              snippet={snippet}
-            />
+        <div className="px-6 items-center">
+          <CodeWindow
+            className="transform-iso shadow-xl relative z-10 overflow-scroll"
+            filename={`scheduled/function.ts`}
+            snippet={snippet}
+          />
         </div>
       </div>
 
-      <div className="container mx-auto">
+      <div className="container mx-auto py-16">
         <h2 className="text-center">Designed for Developers</h2>
-        <p className="text-center pt-2 pb-24">
+        <p className="text-center pt-2 pb-12 lg:pb-24">
           Inngest is the easiest way to build scheduled jobs in your app, no matter what framework or platform you use.
         </p>
 
@@ -129,8 +129,8 @@ export default function Template() {
         <img src="/assets/sdk-ui.png" alt="SDK Development UI" className="shadow-2xl rounded" />
       </div>
 
-      <div className="container mx-auto flex mt-22 justify-center">
-        <div className="flex flex-col justify-center align-center text-center pr-24">
+      <div className="container mx-auto flex flex-col md:flex-row mt-22 justify-center">
+        <div className="flex flex-col justify-center align-center text-center pb-6 md:pb-0 md:pr-24">
           <p>
             <i>“Sooooo much easier than AWS”</i>
           </p>
