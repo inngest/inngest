@@ -504,7 +504,7 @@ export default function FeaturesSDK() {
       {/* Background styles */}
       <div className="">
         {/* Content layout */}
-        <div className="mx-auto my-28 px-10 lg:px-4 max-w-4xl">
+        <div className="mx-auto my-28 px-6 lg:px-4 max-w-4xl">
           <header className="mt-24 mb-12 text-center">
             <h2 className="text-4xl">
               Try the{" "}

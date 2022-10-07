@@ -168,7 +168,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
 
 const NavWrapper = styled.nav<{ sticky: boolean }>`
   position: ${({ sticky }) => (sticky ? "sticky" : "relative")};
-  z-index: 20;
+  z-index: 100;
   top: ${({ sticky }) => (sticky ? "0" : "auto")};
   margin: 0 auto 1.5rem;
   background-color: var(--bg-color);

@@ -238,8 +238,8 @@ export default function Home() {
           <header className="my-24 text-center">
             <h2 className="text-3xl md:text-4xl">
               The Complete Platform For{" "}
-              <span className="gradient-text gradient-text-ltr gradient-from-pink gradient-to-orange">
-                Everything&nbsp;Async
+              <span className="sm:whitespace-nowrap gradient-text gradient-text-ltr gradient-from-pink gradient-to-orange">
+                Everything Async
               </span>
             </h2>
             <p className="mt-8">
@@ -428,10 +428,10 @@ export default function Home() {
                   theme="dark"
                   snippet="$ npm install inngest"
                   type="terminal"
-                  className="w-52 relative z-20 shadow-md"
+                  className="w-52 relative sm:z-20 self-center sm:self-start shadow-md"
                 />
                 <CodeWindow
-                  className="w-80 self-end shadow-md"
+                  className="w-full min-w-min	z-40 sm:z-10 mt-1 sm:mt-0 sm:w-80 self-center sm:self-end shadow-md "
                   filename={`function.js`}
                   snippet={`
           import { createFunction } from "inngest"
@@ -459,21 +459,21 @@ export default function Home() {
                 your existing production setup or to Inngest Cloud
                 <br />
                 <br />
-                <a href="/docs/deploy?ref=homepage">Learn how to deploy →</a>
-                {/*
-                Deploy to: <a href="/docs/deploy/vercel">Vercel</a> |{" "}
-                <a href="/docs/deploy/netlify">Netlify</a> |{" "}
-                <a href="/docs/deploy/cloudflare-pages">
+                Deploy to: <a href="/docs/deploy/vercel?ref=homepage">
+                  Vercel
+                </a>{" "}
+                | <a href="/docs/deploy/netlify?ref=homepage">Netlify</a> |{" "}
+                <a href="/docs/deploy/cloudflare?ref=homepage">
                   Cloudflare&nbsp;Pages
                 </a>{" "}
                 |{" "}
-                <a href="/docs/deploy/inngest-cloud">
-                  Inngest&nbsp;Cloud&nbsp;(waitlist)
+                <a href="/docs/deploy/inngest-cloud?ref=homepage">
+                  Inngest&nbsp;Cloud&nbsp;(Coming soon)
                 </a>{" "}
                 |{" "}
-                <a href="/docs/deploy/aws-lambda">
-                  AWS&nbsp;Lambda&nbsp;(waitlist)
-            </a>*/}
+                <a href="/docs/deploy/aws-lambda?ref=homepage">
+                  AWS&nbsp;Lambda&nbsp;(Waitlist)
+                </a>
               </>
             ),
             image: (
@@ -507,7 +507,7 @@ export default function Home() {
       {/* Background styles */}
       <div className="">
         {/* Content layout */}
-        <div className="mx-auto my-28 px-10 lg:px-4 max-w-4xl">
+        <div className="mx-auto my-28 px-6 lg:px-4 max-w-4xl">
           <header className="mt-24 mb-12 text-center">
             <h2 className="text-4xl">
               Join the{" "}
@@ -690,6 +690,7 @@ const TextSliderString = styled.span<{ align: "center" | "left" }>`
   // disable the animation and stack items on mobile - Match tailwind breakpoint
   @media (max-width: 640px) {
     position: inherit;
+    white-space: normal;
     opacity: 1;
     &.previous,
     &.upcoming {

@@ -55,7 +55,7 @@ const FeatureCallouts = ({
               backgrounds === "gray" ? "bg-light-gray" : `alt-bg-${i}`
             } rounded-lg p-12 h-[350px] sm:h-[500px] lg:h-[400px] xl:h-[500px] w-full lg:w-1/2 bg-orange-50 order-1 lg:order-${
               i % 2 === 0 ? "2" : "1"
-            } flex items-center justify-center overflow-hidden`}
+            } flex items-center justify-center`}
           >
             {typeof f.image === "string" ? (
               <img src={f.image} alt={`A graphic of ${f.title} feature`} />
