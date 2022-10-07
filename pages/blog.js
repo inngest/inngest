@@ -225,4 +225,8 @@ const List = styled.div`
   @media (max-width: 800px) {
     grid-template-columns: 1fr;
   }
+  @media (max-width: 600px) {
+    margin-left: 0.2rem;
+    margin-right: 0.2rem;
+  }
 `;
