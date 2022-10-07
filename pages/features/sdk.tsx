@@ -175,11 +175,18 @@ export const worksWithBrands = [
     type: "platform",
   },
   {
-    docs: "/docs/deploy/express", // TODO - change to guide when launched
+    docs: "/docs/frameworks/express", // TODO - change to guide when launched
     logo: "/assets/brand-logos/express-js-dark.svg",
     brand: "Express.js",
-    height: "100%",
+    height: "80%",
     type: "framework",
+  },
+  {
+    docs: "/docs/frameworks/cloudflare-pages",
+    logo: "/assets/brand-logos/cloudflare-dark.svg",
+    brand: "Cloudflare Pages",
+    height: "80%",
+    type: "platform",
   },
 ];
 
@@ -407,6 +414,7 @@ export default function FeaturesSDK() {
                   </>
                 ),
               },
+              { done: true, text: "Cloudflare Pages support" },
               { done: false, text: "Inngest local dev server integration" },
               { done: false, text: "Inngest Cloud deploy" },
               { done: false, text: "Step Functions" },
@@ -414,7 +422,6 @@ export default function FeaturesSDK() {
                 done: false,
                 text: "Step delays, conditional expressions, & event-coordination",
               },
-              { done: false, text: "Cloudflare Workers support" },
             ].map((i, idx) => (
               <ol
                 key={`item-${idx}`}
@@ -450,6 +457,8 @@ export default function FeaturesSDK() {
               type: "Framework Guide",
               name: "Next.js",
               logo: "/assets/brand-logos/next-js-dark.svg",
+              logoHeight: worksWithBrands.find((b) => b.brand === "Next.js")
+                .height,
               description:
                 "Trigger background and scheduled functions using our Next.js adapter",
               href: "/docs/frameworks/nextjs",
@@ -458,6 +467,8 @@ export default function FeaturesSDK() {
               type: "Framework Guide",
               name: "Express.js",
               logo: "/assets/brand-logos/express-js-dark.svg",
+              logoHeight: worksWithBrands.find((b) => b.brand === "Express.js")
+                .height,
               description:
                 "Run background jobs without workers or setting up a queue",
               href: "/docs/deploy/express",
@@ -466,6 +477,8 @@ export default function FeaturesSDK() {
               type: "Platform Guide",
               name: "Netlify",
               logo: "/assets/brand-logos/netlify-dark.svg",
+              logoHeight: worksWithBrands.find((b) => b.brand === "Netlify")
+                .height,
               description:
                 "Use our Netlify plugin to automate deployments of your functions",
               href: "/docs/deploy/netlify",
@@ -487,8 +500,12 @@ export default function FeaturesSDK() {
                     {i.type}
                   </span>
                 </p>
-                <div className="my-4">
-                  <img src={i.logo} className="h-8" alt={i.name} />
+                <div className="h-10 my-4 flex items-center">
+                  <img
+                    src={i.logo}
+                    style={{ height: i.logoHeight }}
+                    alt={i.name}
+                  />
                 </div>
                 <p className="mb-6 text-sm">{i.description}</p>
                 <p className="mt-auto">
@@ -581,7 +598,7 @@ export const Hero = ({
             {worksWithBrands.map((b) => (
               <a
                 href={`${b.docs}?ref=features-sdk-hero`}
-                className="h-8 flex items-center bulge"
+                className="h-7 flex items-center bulge"
               >
                 <img
                   key={b.brand}
