@@ -5,23 +5,46 @@ slug: "deploy/vercel"
 order: 101
 ---
 
-Inngest allows you to deploy your event-driven functions to <a href="https://vercel.com/docs/concepts/functions/serverless-functions" rel="nofollow" target="_blank">Vercel's serverless functions</a> without
-any infrastructure or configuration.
+Inngest enables you to host your functions on Vercel using their [serverless functions platform](https://vercel.com/docs/concepts/functions/serverless-functions). This allows you to deploy your Inngest functions right alongside your existing website and API functions running on Vercel.
+
+Inngest will call your functions securely via HTTP request on-demand, whether triggered by an event or on a schedule in the case of cron jobs.
+
+## Hosting Inngest functions on Vercel
+
+After you've written your functions using [Next.js](/docs/frameworks/nextjs?ref=docs-deploy-vercel) or Vercel's [Express-like](/docs/frameworks/express?ref=docs-deploy-vercel) functions within your project, you need to serve them via the `serve` handler. Using the `serve` handler, create a Vercel/Next.js function at the `/api/inngest` endpoint. Here's an example in a Next.js app:
+
+```js
+// ./pages/api/inngest.js
+import { serve } from "inngest/next";
+import firstFunction from "../../inngest/first";
+import anotherFunction from "../../inngest/another";
+
+export default serve("Your app's name", [ firstFunction, anotherFunction ]);
+```
 
 ## Deploying to Vercel
 
-You can write your functions using [NextJS](/docs/frameworks/nextjs) or [Express-like](/docs/frameworks/express) functions within your project.  Follow these guides depending on your framework, then deploy your functions to Vercel using the `serve` handler.
+Installing [Inngest's official Vercel integraiton](https://vercel.com/integrations/inngest) does 2 things:
 
-##  Registering your functions
+1. Automatically sets the required `INNGEST_SIGNING_KEY` environment variable to securely communicate with Inngest's API
+2. Automatically deploys new functions to Inngest every time you deploy updated code to Vercel - no need to change your existing workflow!
 
-Now that your function API is live, we need to let Inngest know which functions you’ve deployed; which events or schedules cause them to run; and the URL in which they’re hosted.
+<a href="https://vercel.com/integrations/inngest" className="button" style={{ marginBottom: "1rem" }}>
+  <img src="/assets/brand-logos/vercel-icon-light.svg" className="button-icon" />
+  Install the Inngest Vercel integration
+</a>
 
+After you're installed, every new deploy to Vercel will update functions in [the Inngest dashboard](https://app.inngest.com/functions) within a few seconds!
 
-There are several ways you can register your functions with Inngest:
+---
 
-### Registering via the UI
+### Manually registering functions
 
-You can add your endpoint’s URL to Inngest via the dashboard:
+While we strongly recommend our Vercel integration, you can still use Inngest by manually telling Inngest that you've deployed updated functions.
+
+#### Registering via the UI
+
+You can add your endpoint's URL to Inngest via the dashboard:
 
 <video controls autoPlay loop muted>
   <source
@@ -30,26 +53,12 @@ You can add your endpoint’s URL to Inngest via the dashboard:
   />
 </video>
 
+#### Registering via the API
 
-
-### Registering via the API
-
-You can register your function’s endpoints with a single PUT call to your function endpoint:
+You can register your function's endpoints with a single PUT call to your function endpoint:
 
 ```bash
 curl -X PUT https://www.example.com/api/inngest
 ```
 
-This can be built in to your CI/CD process so that *after your site has deployed* you make this call to register your functions.  The guides for each platform talk about how to do this in more detail.
-
-If, for some reason, you can’t create a PUT call to your endpoint you can register functions via Inngest’s own API by sending the URL in a PUT request:
-
-```bash
-curl -X PUT --data '{"url":"https://www.example.com/api/inngest"}' https://api.inngest.com/fn/register
-```
-
-<aside>
-
-💁 You'll need to register your functions with Inngest after each deploy.  This can be automated for each platform you deploy to.
-
-</aside>
+We suggest adding this to your CI/CD process so that *after your site has deployed* you make this call to register your functions. The guides for each platform talk about how to do this in more detail.

@@ -323,11 +323,16 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
   }
   h2 {
     font-size: 1.5em;
-    margin-top: calc(4 * var(--base-size));
+    margin-top: calc(3 * var(--base-size));
   }
   h3 {
     font-size: 1.3em;
-    margin: calc(2.5 * var(--base-size)) 0 0;
+    margin: calc(2 * var(--base-size)) 0 0;
+  }
+  h4 {
+    font-size: 1.1em;
+    font-weight: bold;
+    margin: calc(1.5 * var(--base-size)) 0 0;
   }
   h3 + p {
     margin-top: 0.5rem !important;
@@ -367,6 +372,10 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
   }
   li {
     margin-left: 1rem;
+  }
+
+  hr {
+    margin: 2rem 0;
   }
 
   aside,
