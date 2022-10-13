@@ -433,6 +433,36 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
     display: none;
   }
 
+  .button {
+    border: var(--button-border-width) solid transparent;
+    border-radius: var(--border-radius);
+    padding: var(--button-padding-medium);
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    text-align: center;
+    transition: all 0.3s;
+    white-space: nowrap;
+    font-size: 0.8rem;
+
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff;
+    box-shadow: 0 5px 25px rgba(var(--primary-color-rgb), 0.6);
+  }
+  .button:hover {
+    box-shadow: 0 5px 45px rgba(var(--primary-color-rgb), 0.8);
+    transform: translateY(-2px);
+  }
+  .button-icon {
+    height: 0.8em;
+    border-radius: 0 !important;
+    margin-right: 0.4rem;
+  }
+
   .tldr {
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);

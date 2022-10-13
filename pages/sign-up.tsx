@@ -1,3 +1,4 @@
+import { useRouter } from "next/router";
 import styled from "@emotion/styled";
 import Nav from "../shared/nav";
 import Button from "../shared/Button";
@@ -19,6 +20,13 @@ const SignUp = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>(null);
   const { anonId } = useAnonId();
+  const router = useRouter();
+
+  // Only enable redirect URLs to be appended to the appURL to avoid external redirects
+  const redirect =
+    router.query.redirect?.indexOf("/") === 0
+      ? `${appURL}${router.query.redirect}`
+      : appURL;
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
@@ -53,7 +61,7 @@ const SignUp = () => {
 
     setLoading(false);
     // @ts-ignore
-    window.location = appURL;
+    window.location = redirect;
   };
 
   return (
