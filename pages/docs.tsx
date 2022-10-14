@@ -203,14 +203,12 @@ export default function DocsHome(props) {
           Learn how to write functions in your project within a few seconds
         </p>
 
-        <Button
-          kind="primary"
-          size="small"
-          href="/sign-up?ref=docs-started"
-          style={{ display: "inline-block" }}
+        <a
+          href="/docs/functions?ref=docs-started"
+          className="button button--primary"
         >
           Get started
-        </Button>
+        </a>
 
         {/*
         <Button
