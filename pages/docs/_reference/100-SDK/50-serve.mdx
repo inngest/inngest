@@ -1,0 +1,123 @@
+---
+category: "SDK"
+title: "`serve()`"
+slug: "sdk/serve"
+order: 50
+---
+
+The `serve()` handler is an HTTP handler that enables Inngest to remotely read your functions configurations and call your functions on-demand. This handler enables you to host your function code on any platform and have Inngest call them via HTTP.
+
+An `INNGEST_SIGNING_KEY` is required to securely communicate with the Inngest platform, either via environment variable (_recommend_) or it can be passed explicitly through the options argument.
+
+The `serve()` handler uses different HTTP request methods (`GET`, `PUT`, `POST`) to excute it's required actions.
+
+## How to use
+
+There are multiple `serve()` handlers that can be imported from the SDK depending on your applicaiton's framework (e.g. `"inngest/next"`), but all have the same arguments and options. The handler should be accessible on it's own HTTP route in your app. We recommend setting this up for `/api/inngest`.
+
+### Next.js
+
+The Next.js handler should be set up to run as an API route ([reference](https://nextjs.org/docs/api-routes/introduction)):
+
+```typescript
+// ./pages/api/inngest.js
+import { serve } from "inngest/next";
+import someFunction from "../../inngest/someFunction";
+import anotherFunction from "../../inngest/anotherFunction";
+
+export default serve("My App", [someFunction, anotherFunction]);
+```
+
+### Express.js
+
+The Express handler should be passed to `app.use()` ([reference](https://expressjs.com/en/4x/api.html#app.use)) or `router.use()` ([reference](https://expressjs.com/en/4x/api.html#router.use)) to handle all HTTP methods:
+
+```typescript
+import { serve } from "inngest/express";
+import someFunction from "../../inngest/someFunction";
+import anotherFunction from "../../inngest/anotherFunction";
+
+app.use("/api/inngest", serve("My App", [someFunction, anotherFunction]));
+```
+
+### Cloudflare Pages
+
+The Cloudflare Pages handler should be exported with as the `onRequest` handler ([reference](https://developers.cloudflare.com/pages/platform/functions/#writing-your-first-function)):
+
+```typescript
+// ./functions/api/inngest.ts
+import { serve } from "inngest/cloudflare";
+import someFunction from "../../inngest/someFunction";
+import anotherFunction from "../../inngest/anotherFunction";
+
+export const onRequest = serve("My App", [someFunction, anotherFunction]);
+```
+
+---
+
+Want to see support for another framework or platform? [Drop us a note](https://www.inngest.com/contact)
+
+## Reference
+
+**`serve` syntax**
+
+```typescript
+serve(appName, [functions]);
+serve(appName, [functions], options);
+```
+
+**`serve` arguments**
+
+- **`appName`**:  The name of your app or microservice, used to group all functions together
+- **`[functions]`**: An array of all functions to enable
+- **`options`**: An optional object of options, with the type:
+
+```ts
+type Options = {
+  /**
+   * A key used to sign requests to and from Inngest in order to prove that the
+   * source is legitimate.
+   *
+   * You must provide a signing key to communicate securely with Inngest. If
+   * your key is not provided here, we'll try to retrieve it from the
+   * `INNGEST_SIGNING_KEY` environment variable.
+   *
+   * You can retrieve your signing key from the Inngest UI inside the "Secrets"
+   * section at {@link https://app.inngest.com/secrets}. We highly recommend
+   * that you add this to your platform's available environment variables as
+   * `INNGEST_SIGNING_KEY`.
+   *
+   * If no key can be found, you will not be able to register your functions or
+   * receive events from Inngest.
+   */
+  signingKey?: string;
+
+  /**
+   * Controls whether a landing page with introspection capabilities is shown
+   * when a `GET` request is performed to this handler.
+   *
+   * Defaults to true if NODE_ENV !== production.
+   *
+   * This page is highly recommended when getting started in development,
+   * testing, or staging environments.
+   */
+  landingPage?: boolean;
+
+  /**
+   * The URL used to register functions with Inngest.
+   * Defaults to https://api.inngest.com/fn/register
+   */
+  inngestRegisterUrl?: string;
+
+  /**
+   * If provided, will override the used `fetch` implementation. Useful for
+   * giving the library a particular implementation if accessing it is not done
+   * via globals.
+   *
+   * By default the library will try to use the native Web API fetch, falling
+   * back to a Node implementation if no global fetch can be found.
+   */
+  fetch?: typeof fetch;
+}
+```
+

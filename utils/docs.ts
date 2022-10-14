@@ -26,6 +26,10 @@ const TOC = {
 
   // "Events": 100,
   CLI: 200,
+
+  // Reference
+  SDK: 1000,
+  Functions: 1010,
 };
 
 export type DocScope = {

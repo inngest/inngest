@@ -123,11 +123,12 @@ You can learn more about the Inngest SDK's TypeScript support on our [Using with
 
 ## Serving
 
-For Inngest to access your functions, you need to serve them.
+You can host your functions right in your existing application on _any platform_. Inngest will call your functions securely via HTTP request on-demand.
 
-Every `serve()` function is the same, for example serving on Next.js looks like:
+To enable Inngest to access and call your functions, you need to set up the `serve()` handler to be accessible on it's own route. We recommend setting this up for `/api/inngest`. The `serve()` handler requires an `INNGEST_SIGNING_KEY` to be set as an environment variable, or explicitly passed as an options argument. For example, in a Next.js app, it looks like this:
 
 ```typescript
+// ./pages/api/inngest.ts
 // Import the Next.js serve function
 import { serve } from "inngest/next";
 
@@ -138,14 +139,12 @@ const fn = createFunction<DemoEvent>("Demo function", "demo/demo.event", job);
 export default serve("My App", [fn, anotherFn]);
 ```
 
-We provide a number of handlers for easily doing so, along with guides for each.
+<aside>
+  For a complete reference of the <code>serve()</code> handler, <a href="/docs/reference/sdk/serve">view the reference documentation</a>.<br/>
+  For in-depth guides for particular frameworks, find yours in the navigation under <strong>"Frameworks."</strong>
+</aside>
 
-- [Express](https://expressjs.com/) ([Guide](/docs/frameworks/express)) - `"inngest/express"`
-- [Next.js](https://nextjs.org/) ([Guide](/docs/frameworks/nextjs)) - `"inngest/next"`
-
-Once you're serving your functions using any of the above handlers, make sure to open your handler (usually `${your-url}/api/inngest`) to see the local SDK dashboard.
-
-It'll show you whether your functions are set up correctly, prompt you with what to change if not, and show you any next steps needed along the way!
+Now that your functions are being served via HTTP, open the route in your browser to view the SDK debug page. It will show you whether your functions are set up correctly, prompt you with what to change if not, and show you any next steps needed along the way!
 
 ![The SDK's local dashboard showing success](/assets/docs/sdk/landing.png)
 
