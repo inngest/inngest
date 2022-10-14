@@ -367,7 +367,7 @@ const Hoverable = styled.div`
     top: 60px;
     left: calc(-1.75rem + 20px);
     z-index: 3;
-    background: #fff;
+    background: var(--highlight-color);
     box-sizing: border-box;
     box-shadow: 0 0 100px rgba(0, 0, 0, 0.15), 0 10px 20px rgba(0, 0, 0, 0.08);
   }
@@ -408,6 +408,9 @@ const Hoverable = styled.div`
       margin: 0;
       line-height: 1.05;
     }
+  }
+  .secondary-links a {
+    color: var(--color-almost-black);
   }
 `;
 

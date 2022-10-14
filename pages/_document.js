@@ -2,8 +2,6 @@ import Document, { Html, Head, Main, NextScript } from "next/document";
 
 export default class MyDocument extends Document {
   render() {
-    // const pageProps = this.props?.__NEXT_DATA__?.props?.pageProps;
-    // const { htmlClassName } = pageProps;
     return (
       <Html>
         <Head>
@@ -31,7 +29,7 @@ export default class MyDocument extends Document {
             }}
           />
         </Head>
-        <body className="light-theme XYZ">
+        <body className="light-theme">
           <script
             type="text/javascript"
             dangerouslySetInnerHTML={{
