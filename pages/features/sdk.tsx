@@ -29,14 +29,12 @@ export const codesnippets = {
     function: `
       import { createFunction } from "inngest"
 
-      const myFn = async ({ event }) => {
-        return { message: "success" }
-      }
-
       export default createFunction(
         "My Great Function",
         "demo/event.name",
-        myFn
+        async ({ event }) => {
+          return { message: "success" }
+        }
       )
     `,
     scheduledFunction: `
@@ -54,7 +52,7 @@ export const codesnippets = {
     `,
     sendEventShort: `
       import { Inngest } from "inngest"
-      const inngest = new Inngest("sourceKey123")
+      const inngest = new Inngest({ name: "My App" })
       inngest.send({
         name: "demo/event.name",
         data: { something: req.body.something }
@@ -63,7 +61,7 @@ export const codesnippets = {
     sendEvent: `
       import { Inngest } from "inngest"
 
-      const inngest = new Inngest("<SOURCE_KEY>")
+      const inngest = new Inngest({ name: "My App" })
 
       export default function apiEndpoint(req, res) {
         const success = yourExistingCode(req.body)
@@ -80,7 +78,7 @@ export const codesnippets = {
       import { myGreatFunction } from "../../myGreatFunction"
       import { scheduledTask } from "../../scheduledTask"
 
-      export default serve("My App", "<SIGNING_KEY>", [
+      export default serve("My App", [
         myGreatFunction,
         scheduledTask
       ])
@@ -91,14 +89,12 @@ export const codesnippets = {
       import { createFunction } from "inngest"
       import { DemoEventTrigger } from "./types"
 
-      const myFn = async ({ event }) => {
-        return { message: "success" }
-      }
-
       export default createFunction<DemoEventTrigger>(
         "My Great Function",
         "demo/event.trigger",
-        myFn
+        async ({ event }) => {
+          return { message: "success" }
+        }
       )
     `,
     scheduledFunction: `
@@ -117,7 +113,7 @@ export const codesnippets = {
     sendEventShort: `
       import { Inngest } from "inngest"
       import { Events } from "../../__generated__/inngest"
-      const inngest = new Inngest<Events>("sourceKey123")
+      const inngest = new Inngest<Events>({ name: "My App" })
       inngest.send({
         name: "demo/event.name",
         data: { something: req.body.something }
@@ -127,7 +123,7 @@ export const codesnippets = {
       import { Inngest } from "inngest"
       import { Events } from "../../__generated__/inngest"
 
-      const inngest = new Inngest<Events>("sourceKey123")
+      const inngest = new Inngest<Events>({ name: "My App" })
 
       inngest.send({
         name: "demo/event.name",
@@ -144,7 +140,7 @@ export const codesnippets = {
 
       const inngest = new Inngest<Events>({ name: "My App" })
 
-      export default serve(inngest, "<SIGNING_KEY>", [
+      export default serve(inngest, [
         myGreatFunction,
         scheduledTask
       ])
@@ -413,15 +409,20 @@ export default function FeaturesSDK() {
                     TypeScript: Event <code>Type</code> generation and sync
                   </>
                 ),
+                docs: "/docs/typescript",
               },
-              { done: true, text: "Cloudflare Pages support" },
-              { done: false, text: "Inngest local dev server integration" },
-              { done: false, text: "Inngest Cloud deploy" },
+              {
+                done: true,
+                text: "Cloudflare Pages support",
+                docs: "/docs/deploy/cloudflare",
+              },
+              { done: true, text: "Inngest local dev server integration" },
               { done: false, text: "Step Functions" },
               {
                 done: false,
                 text: "Step delays, conditional expressions, & event-coordination",
               },
+              { done: false, text: "Inngest Cloud deploy" },
             ].map((i, idx) => (
               <ol
                 key={`item-${idx}`}
@@ -437,7 +438,14 @@ export default function FeaturesSDK() {
                 ) : (
                   <CheckboxUnchecked size="22" fill="#5D5FEF" />
                 )}
-                <div>{i.text}</div>
+                <div>
+                  {i.text}{" "}
+                  {i.docs && (
+                    <>
+                      (<a href={`${i.docs}?ref=features-sdk-roadmap`}>docs</a>)
+                    </>
+                  )}
+                </div>
               </ol>
             ))}
           </ul>
