@@ -144,9 +144,15 @@ export const getAllDocs = (() => {
       const { content, data: scope } = matter(source);
 
       const prefix = Object.keys(Sections).find((k) => Sections[k] === type);
-      if (type !== Sections.default && scope.slug.indexOf(prefix) !== 0) {
-        // Prefix for the section
-        scope.slug = `${prefix}/${scope.slug}`;
+      try {
+        if (type !== Sections.default && scope.slug.indexOf(prefix) !== 0) {
+          // Prefix for the section
+          scope.slug = `${prefix}/${scope.slug}`;
+        }
+      } catch (err) {
+        throw new Error(
+          `Failed to read slug from file: ${fullpath}. Check the front-matter, it may be missing or incorrect.`
+        );
       }
 
       memoizedDocs.slugs.push("/docs/" + scope.slug);
