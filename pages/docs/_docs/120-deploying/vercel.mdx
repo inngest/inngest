@@ -40,25 +40,4 @@ After you're installed, every new deploy to Vercel will update functions in [the
 
 ### Manually registering functions
 
-While we strongly recommend our Vercel integration, you can still use Inngest by manually telling Inngest that you've deployed updated functions.
-
-#### Registering via the UI
-
-You can add your endpoint's URL to Inngest via the dashboard:
-
-<video controls autoPlay loop muted>
-  <source
-    src="/assets/docs/sdk-deploy.mp4"
-    type="video/mp4"
-  />
-</video>
-
-#### Registering via the API
-
-You can register your function's endpoints with a single PUT call to your function endpoint:
-
-```bash
-curl -X PUT https://www.example.com/api/inngest
-```
-
-We suggest adding this to your CI/CD process so that *after your site has deployed* you make this call to register your functions. The guides for each platform talk about how to do this in more detail.
+While we strongly recommend our Vercel integration, you can still use Inngest by manually telling Inngest that you've deployed updated functions. You can register your app [via the Inngest UI](/docs/deploy#registering-via-the-ui) or [via our API with a curl request](/docs/deploy#registering-via-the-api).
