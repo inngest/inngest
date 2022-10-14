@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { MouseEvent, useState } from "react";
 import Head from "next/head";
 import styled from "@emotion/styled";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
 import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
 // local
 import {
   getAllDocs,
@@ -196,7 +197,7 @@ export async function getStaticProps({ params }) {
     scope: { json: JSON.stringify(scope) },
     mdxOptions: {
       remarkPlugins: [highlight],
-      rehypePlugins: [rehypeSlug],
+      rehypePlugins: [rehypeSlug, rehypeAutolinkHeadings],
     },
   });
 

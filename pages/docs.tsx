@@ -338,6 +338,32 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
     margin-top: 0.5rem !important;
   }
 
+  // Heading links on hover
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    position: relative;
+    a {
+      visibility: hidden;
+      position: absolute;
+      top: 0.25em;
+      left: -1.5em;
+      width: 1.5em;
+    }
+    .icon-link {
+      display: block;
+      height: 1em;
+      width: 1em;
+      mask-image: url("/assets/docs/icon-link.svg");
+      background-color: var(--link-color);
+    }
+    &:hover a {
+      visibility: visible;
+    }
+  }
+
   p:not([class*="text-base"]),
   ol,
   ul,
