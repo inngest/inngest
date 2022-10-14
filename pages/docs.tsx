@@ -434,10 +434,14 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
   }
 
   .button {
-    border: var(--button-border-width) solid transparent;
+    --button-shadow-color: 0, 0, 0;
+    --button-color: var(--color-almost-white);
+    --button-border-color: var(--color-almost-black);
+
+    border: var(--button-border-width) solid var(--button-border-color);
     border-radius: var(--border-radius);
     padding: var(--button-padding-medium);
-    background: transparent;
+    background: var(--button-color);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -448,19 +452,47 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
     white-space: nowrap;
     font-size: 0.8rem;
 
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    color: #fff;
-    box-shadow: 0 5px 25px rgba(var(--primary-color-rgb), 0.6);
+    color: var(--color-almost-black);
   }
   .button:hover {
-    box-shadow: 0 5px 45px rgba(var(--primary-color-rgb), 0.8);
     transform: translateY(-2px);
+  }
+  .button--primary {
+    --button-shadow-color: var(--primary-color-rgb);
+    --button-color: var(--primary-color);
+    --button-border-color: var(--primary-color);
+    color: #fff;
+  }
+  // For guides links with logos and copy
+  .button--guide {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.2rem;
+    text-align: left;
+    white-space: normal;
+    .logo {
+      height: 1.6rem;
+      border-radius: 0;
+    }
+  }
+
+  .button--shadow {
+    box-shadow: 0 5px 25px rgba(var(--button-shadow-color), 0.6);
+    &:hover {
+      box-shadow: 0 5px 45px rgba(var(--button-shadow-color), 0.8);
+    }
   }
   .button-icon {
     height: 0.8em;
     border-radius: 0 !important;
     margin-right: 0.4rem;
+  }
+  .button-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin: 1.5rem 0%;
   }
 
   .tldr {
