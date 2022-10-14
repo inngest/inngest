@@ -650,35 +650,27 @@ Visit `${your-url}/api/inngest` (usually `http://localhost:3000/api/inngest`) to
 
 ![The SDK's local dashboard showing success](/assets/docs/sdk/landing.png)
 
-## Registering your functions with Inngest
+## Deploying your Next.js application
 
-By default, Inngest doesn't know which functions you're serving or the URL of your app. Once you
-deploy your site to production, you'll need to reigster your functions with Inngest.
+When you deploy your application, Inngest needs to know _where_ your applicaiton is running so it can call your functions. You can "register" your app in a couple of ways:
 
-Depending on the platform you deploy to this may be handled automatically, or you may need to register
-your functions manually.  [Read the deploy docs for more information](/docs/deploy).
+### Registering automatically
 
-### Registering via the UI
+Use one of our officially supported integrations which will automatically notify Inngest whenever you've deployed updated functions:
 
-You can add your endpoint’s URL to Inngest via the dashboard:
+<div className="button-container">
+  <a href="/docs/deploy/vercel?ref=docs-deploy" className="button button--guide">
+    <img src="/assets/brand-logos/vercel-dark.svg" className="logo" alt="Vercel deployment documentation"/>
+    Learn how to install our official Vercel integration →
+  </a>
+  <a href="/docs/deploy/netlify?ref=docs-deploy" className="button button--guide">
+    <img src="/assets/brand-logos/netlify-dark.svg" className="logo" alt="Netlify deployment documentation"/>
+    Learn how to install our official Netlify plugin →
+  </a>
+</div>
 
-<video controls autoPlay loop muted>
-  <source
-    src="/assets/docs/sdk-deploy.mp4"
-    type="video/mp4"
-  />
-</video>
+### Registering manually
 
-### Registering via the API
+If you're deploying your appliction to another platform, you can register your app [via the Inngest UI](/docs/deploy#registering-via-the-ui) or [via our API with a curl request](/docs/deploy#registering-via-the-api).
 
-You can register your function’s endpoints with a single PUT call to your function endpoint:
-
-```bash
-curl -X PUT https://www.example.com/api/inngest
-```
-
-Remember to swap www.example.com with your own domain name.
-
-
-[You can read more about registering functions here](/docs/deploy#registering-live-functions-with-inngest).
 
