@@ -22,6 +22,9 @@ const SignUp = () => {
   const { anonId } = useAnonId();
   const router = useRouter();
 
+  const to = router.query.to || "/";
+  const search = router.query.search || "";
+
   // Only enable redirect URLs to be appended to the appURL to avoid external redirects
   const redirect =
     router.query.redirect?.indexOf("/") === 0
@@ -81,7 +84,7 @@ const SignUp = () => {
       <Content className="grid mx-auto grid-cols-1 md:grid-cols-2 gap-12 px-12 pb-24 max-w-3xl section-header">
         <div className="signup">
           <Button
-            href={apiURL(`/v1/login/oauth/github/redirect?anonid=${anonId}`)}
+            href={apiURL(`/v1/login/oauth/github/redirect?anonid=${anonId}&to=${to}&search=${search}`)}
             kind="black"
           >
             <img
@@ -95,7 +98,7 @@ const SignUp = () => {
           </Button>
 
           <Button
-            href={apiURL(`/v1/login/oauth/google/redirect?anonid=${anonId}`)}
+            href={apiURL(`/v1/login/oauth/google/redirect?anonid=${anonId}&to=${to}&search=${search}`)}
             kind="black"
             style={{ marginLeft: 0 }}
           >
