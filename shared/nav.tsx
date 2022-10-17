@@ -26,9 +26,13 @@ const NavContent: React.FC<Props> = (props: Props) => {
   return (
     <Container className={`max-w-5xl mx-auto ${show && "show"}`}>
       <div className="px-4 lg:px-0">
-        <a href="/?ref=nav">
+        {props.nolinks ? (
           <Logo width={115} className="logo" />
-        </a>
+        ) : (
+          <a href="/?ref=nav">
+            <Logo width={115} className="logo" />
+          </a>
+        )}
       </div>
 
       {!props.nolinks && (
@@ -142,14 +146,16 @@ const NavContent: React.FC<Props> = (props: Props) => {
         >
           Log in
         </StyledLink>
-        <Button
-          href="/sign-up?ref=nav"
-          className="button"
-          kind="primary"
-          style={{ padding: "0.4rem 1rem" }}
-        >
-          Start building →
-        </Button>
+        {!props.nolinks && (
+          <Button
+            href="/sign-up?ref=nav"
+            className="button"
+            kind="primary"
+            style={{ padding: "0.4rem 1rem" }}
+          >
+            Start building →
+          </Button>
+        )}
       </div>
 
       {!props.nolinks && (
