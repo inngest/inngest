@@ -81,9 +81,12 @@ function MyApp({ Component, pageProps }) {
         )}
         <link rel="canonical" href={canonicalUrl} />
       </Head>
-      <PageBanner href="/features/sdk?ref=page-banner">
-        Check out our new TypeScript / JavaScript SDK
-      </PageBanner>
+      {router.pathname !== "/sign-up" && (
+        <PageBanner href="/features/sdk?ref=page-banner">
+          Check out our new TypeScript / JavaScript SDK
+        </PageBanner>
+      )}
+
       <Component {...pageProps} />
       <Script
         id="js-inngest-sdk-script"

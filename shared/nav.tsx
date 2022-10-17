@@ -152,16 +152,18 @@ const NavContent: React.FC<Props> = (props: Props) => {
         </Button>
       </div>
 
-      <a
-        href="#"
-        className="toggle"
-        onClick={(e) => {
-          e.preventDefault();
-          setShow(!show);
-        }}
-      >
-        <Hamburger size="24" />
-      </a>
+      {!props.nolinks && (
+        <a
+          href="#"
+          className="toggle"
+          onClick={(e) => {
+            e.preventDefault();
+            setShow(!show);
+          }}
+        >
+          <Hamburger size="24" />
+        </a>
+      )}
     </Container>
   );
 };

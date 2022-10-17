@@ -30,8 +30,6 @@ const SignUp = () => {
   // string base64 encoded so that we can drop this on the new page after login.
   // @ts-ignore
   const search = atob(b64search);
-
-  // Only enable redirect URLs to be appended to the appURL to avoid external redirects
   const redirect = `${to}${search}`;
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
@@ -74,114 +72,135 @@ const SignUp = () => {
     <>
       <Nav nolinks />
 
-      <Header className="header reg-grid section-header">
-        <header className="grid-center-6 text-center">
+      <div className="mx-auto max-w-3xl px-8">
+        <Header className="py-16 text-center">
           <h2>Sign up for Inngest Cloud</h2>
-          <p>
+          <p className="mt-4">
             The features and functionality that get out of your way and let you
             build.
           </p>
-        </header>
-      </Header>
+        </Header>
+        <PopUpHeader className="mb-6 text-center">
+          <h2 className="text-xl">
+            Sign up for Inngest Cloud {to !== "/" && "to continue"}
+          </h2>
+        </PopUpHeader>
 
-      <Content className="grid mx-auto grid-cols-1 md:grid-cols-2 gap-12 px-12 pb-24 max-w-3xl section-header">
-        <div className="signup">
-          <Button
-            href={apiURL(`/v1/login/oauth/github/redirect?anonid=${anonId}&to=${to}&search=${b64search}`)}
-            kind="black"
-          >
-            <img
-              src="https://app.inngest.com/assets/gh-mark.png"
-              alt="GitHub"
-              width="20"
+        <Content className="grid gap-12">
+          <div className="signup">
+            <div className="buttons">
+              <Button
+                href={apiURL(
+                  `/v1/login/oauth/github/redirect?anonid=${anonId}&to=${to}&search=${b64search}`
+                )}
+                kind="black"
+              >
+                <img
+                  src="https://app.inngest.com/assets/gh-mark.png"
+                  alt="GitHub"
+                  width="20"
+                />
+                <span>
+                  Sign up with <b>GitHub</b>
+                </span>
+              </Button>
+
+              <Button
+                href={apiURL(
+                  `/v1/login/oauth/google/redirect?anonid=${anonId}&to=${to}&search=${b64search}`
+                )}
+                kind="black"
+                style={{ marginLeft: 0 }}
+              >
+                <img
+                  src="https://app.inngest.com/assets/icons/google.svg"
+                  alt="Google"
+                  width="20"
+                />
+                <span>
+                  Sign up with <b>Google</b>
+                </span>
+              </Button>
+            </div>
+
+            <form className="form" action="" onSubmit={handleSubmit}>
+              <label>
+                Email
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="Create a strong password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </label>
+
+              {error && <p className="error">{error}</p>}
+
+              <Button type="submit" kind="primary" disabled={loading}>
+                Sign up via email
+              </Button>
+            </form>
+          </div>
+
+          <div className="details">
+            <h5>Try Inngest for free</h5>
+            <IconList
+              direction="vertical"
+              items={[
+                "No queues to configure",
+                "Full event history",
+                "Serverless functions",
+                "Any programming language",
+                "Step function support with DAGs",
+                "Bring your whole team",
+              ].map((text) => ({
+                icon: Check,
+                text,
+              }))}
             />
-            <span>
-              Sign up with <b>GitHub</b>
-            </span>
-          </Button>
-
-          <Button
-            href={apiURL(`/v1/login/oauth/google/redirect?anonid=${anonId}&to=${to}&search=${b64search}`)}
-            kind="black"
-            style={{ marginLeft: 0 }}
-          >
-            <img
-              src="https://app.inngest.com/assets/icons/google.svg"
-              alt="Google"
-              width="20"
-            />
-            <span>
-              Sign up with <b>Google</b>
-            </span>
-          </Button>
-
-          <form action="" onSubmit={handleSubmit}>
-            <label>
-              Email
-              <input
-                type="email"
-                name="email"
-                placeholder="you@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                name="password"
-                placeholder="Create a strong password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </label>
-
-            {error && <p className="error">{error}</p>}
-
-            <Button type="submit" kind="primary" disabled={loading}>
-              Sign up via email
-            </Button>
-          </form>
-        </div>
-
-        <div className="details">
-          <h5>Try Inngest for free</h5>
-          <IconList
-            direction="vertical"
-            items={[
-              "No queues to configure",
-              "Full event history",
-              "Serverless functions",
-              "Any programming language",
-              "Step function support with DAGs",
-              "Bring your whole team",
-            ].map((text) => ({
-              icon: Check,
-              text,
-            }))}
-          />
-        </div>
-      </Content>
+          </div>
+        </Content>
+      </div>
     </>
   );
 };
 
-const Header = styled.div`
-  > div,
-  > header {
-    padding: 4rem 0;
+const Header = styled.header`
+  // Hide for short pop-up windows, e.g. Vercel integration flow (e.g. 800x600)
+  @media (max-height: 800px) and (min-width: 640px) {
+    display: none;
   }
-
-  header p {
-    margin-top: 1rem;
+`;
+const PopUpHeader = styled.div`
+  display: none;
+  @media (max-height: 800px) and (min-width: 640px) {
+    display: block;
   }
 `;
 
 const Content = styled.div`
+  grid-template-columns: repeat(2, 1fr);
+
   .signup {
+    display: grid;
+    gap: 2rem;
+  }
+
+  .buttons {
     display: flex;
     flex-direction: column;
+    justify-content: center;
 
     button + button,
     a + a {
@@ -192,13 +211,12 @@ const Content = styled.div`
     }
   }
 
-  form,
-  .signup > a {
+  .form,
+  .buttons > a {
     box-shadow: 0 0 80px rgba(255, 255, 255, 0.06);
   }
 
-  form {
-    margin: 2rem 0 0;
+  .form {
     padding: 2rem;
     border-radius: var(--border-radius);
     background: linear-gradient(
@@ -242,6 +260,23 @@ const Content = styled.div`
 
     ul {
       margin: 2rem 0;
+    }
+  }
+
+  // mobile
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+
+  // Hide for short pop-up windows, e.g. Vercel integration flow (e.g. 800x600)
+  @media (max-height: 800px) and (min-width: 640px) {
+    grid-template-columns: 1fr;
+    .signup {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    .details {
+      display: none;
     }
   }
 `;
