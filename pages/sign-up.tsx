@@ -28,6 +28,7 @@ const SignUp = () => {
   // search is the base64-encoded search string that the previous authenticated
   // page had.  As we replace the query string with "to", we store this entire
   // string base64 encoded so that we can drop this on the new page after login.
+  // @ts-ignore
   const search = atob(b64search);
 
   // Only enable redirect URLs to be appended to the appURL to avoid external redirects
