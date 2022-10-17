@@ -87,7 +87,7 @@ const SignUp = () => {
       <Content className="grid mx-auto grid-cols-1 md:grid-cols-2 gap-12 px-12 pb-24 max-w-3xl section-header">
         <div className="signup">
           <Button
-            href={apiURL(`/v1/login/oauth/github/redirect?anonid=${anonId}&to=${to}&search=${search}`)}
+            href={apiURL(`/v1/login/oauth/github/redirect?anonid=${anonId}&to=${to}&search=${b64search}`)}
             kind="black"
           >
             <img
@@ -101,7 +101,7 @@ const SignUp = () => {
           </Button>
 
           <Button
-            href={apiURL(`/v1/login/oauth/google/redirect?anonid=${anonId}&to=${to}&search=${search}`)}
+            href={apiURL(`/v1/login/oauth/google/redirect?anonid=${anonId}&to=${to}&search=${b64search}`)}
             kind="black"
             style={{ marginLeft: 0 }}
           >
