@@ -22,9 +22,12 @@ const SignUp = () => {
   const { anonId } = useAnonId();
   const router = useRouter();
 
-  const to = router.query.to || "/";
-  const b64search = router.query.search || "";
+  const loc = router.query.to || "/";
+  const to = loc.indexOf("/") === 0
+      ? `${appURL}${loc}`
+      : loc;
 
+  const b64search = router.query.search || "";
   // search is the base64-encoded search string that the previous authenticated
   // page had.  As we replace the query string with "to", we store this entire
   // string base64 encoded so that we can drop this on the new page after login.
@@ -91,7 +94,7 @@ const SignUp = () => {
             <div className="buttons">
               <Button
                 href={apiURL(
-                  `/v1/login/oauth/github/redirect?anonid=${anonId}&to=${to}&search=${b64search}`
+                  `/v1/login/oauth/github/redirect?anonid=${anonId}&to=${loc}&search=${b64search}`
                 )}
                 kind="black"
               >
@@ -107,7 +110,7 @@ const SignUp = () => {
 
               <Button
                 href={apiURL(
-                  `/v1/login/oauth/google/redirect?anonid=${anonId}&to=${to}&search=${b64search}`
+                  `/v1/login/oauth/google/redirect?anonid=${anonId}&to=${loc}&search=${b64search}`
                 )}
                 kind="black"
                 style={{ marginLeft: 0 }}
