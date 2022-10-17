@@ -23,19 +23,21 @@ const SignUp = () => {
   const router = useRouter();
 
   const to = router.query.to || "/";
-  const search = router.query.search || "";
+  const b64search = router.query.search || "";
+
+  // search is the base64-encoded search string that the previous authenticated
+  // page had.  As we replace the query string with "to", we store this entire
+  // string base64 encoded so that we can drop this on the new page after login.
+  const search = atob(b64search);
 
   // Only enable redirect URLs to be appended to the appURL to avoid external redirects
-  const redirect =
-    router.query.redirect?.indexOf("/") === 0
-      ? `${appURL}${router.query.redirect}`
-      : appURL;
+  const redirect = `${to}${search}`;
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    let result;
+    let result: any;
     try {
       result = await fetch(apiURL(`/v1/register`), {
         method: "POST",
