@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/function/env"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
@@ -64,6 +65,7 @@ func (s *svc) Name() string {
 }
 
 func (s *svc) Pre(ctx context.Context) error {
+	var fns []function.Function
 	var err error
 
 	if s.data == nil {
@@ -98,6 +100,12 @@ func (s *svc) Pre(ctx context.Context) error {
 	// Create drivers based off of the available config
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range s.config.Execution.Drivers {
+		// If we don't have any loaded functions, don't load the Docker driver;
+		// we probably don't actually need it and will be using HTTP fns instead.
+		if driverConfig.RuntimeName() == "docker" && len(fns) == 0 {
+			continue
+		}
+
 		d, err := driverConfig.NewDriver()
 		if err != nil {
 			return err
