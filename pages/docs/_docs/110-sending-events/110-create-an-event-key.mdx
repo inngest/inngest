@@ -7,7 +7,7 @@ order: 3
 
 “Event Keys” are unique keys that allow applications to send (aka publish) events to Inngest. When using Event Keys with the [Inngest SDK](/docs/events), you can configure the `Inngest` client in 2 ways:
 
-1. Setting the key as an `INNGEST_EVENT_KEY` environment variable in your application
+1. Setting the key as an `INNGEST_EVENT_KEY` environment variable in your application*
 2. Passing the key as an argument
 
 ```jsx
@@ -20,6 +20,8 @@ const inngest = new Inngest({ name: "Your app name", eventKey: "xyz..." });
 // With the Event Key, you're now ready to send data:
 inngest.send(...)
 ```
+
+\* Our [Vercel integration](/docs/deploy/vercel) automatically sets the `INNGEST_EVENT_KEY` as an environment variable for you
 
 <aside>
   🙋 Event keys should be unique to a given <strong>environment</strong> (production, test) and a specific <strong>application</strong> (your API, your mobile app, etc.). You can easily create and manage your event keys from the Inngest Cloud dashboard.

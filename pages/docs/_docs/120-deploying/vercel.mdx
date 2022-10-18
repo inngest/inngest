@@ -24,10 +24,11 @@ export default serve("Your app's name", [ firstFunction, anotherFunction ]);
 
 ## Deploying to Vercel
 
-Installing [Inngest's official Vercel integraiton](https://vercel.com/integrations/inngest) does 2 things:
+Installing [Inngest's official Vercel integraiton](https://vercel.com/integrations/inngest) does 3 things:
 
 1. Automatically sets the required `INNGEST_SIGNING_KEY` environment variable to securely communicate with Inngest's API
-2. Automatically deploys new functions to Inngest every time you deploy updated code to Vercel - no need to change your existing workflow!
+2. Automatically sets the `INNGEST_EVENT_KEY` environment variable to enable your application to send events ([docs](/docs/creating-an-event-key))
+3. Automatically deploys new functions to Inngest every time you deploy updated code to Vercel - no need to change your existing workflow!
 
 <a href="https://vercel.com/integrations/inngest" className="button button--primary" style={{ marginBottom: "1rem" }}>
   <img src="/assets/brand-logos/vercel-icon-light.svg" className="button-icon" />
