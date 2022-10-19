@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/rs/zerolog"
@@ -41,6 +42,18 @@ func NewAPI(o Options) (chi.Router, error) {
 		handler: o.EventHandler,
 		log:     &logger,
 	}
+
+	cors := cors.New(cors.Options{
+		// AllowedOrigins is used instead of AllowOriginFunc as it's faster and we don't need
+		// to allow credentials, so an asterisk works.
+		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: false,
+		MaxAge:           60 * 60, // 1 hour
+	})
+	api.Use(cors.Handler)
 
 	api.Get("/health", api.HealthCheck)
 	api.Post("/e/{key}", api.ReceiveEvent)
