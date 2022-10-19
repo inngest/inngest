@@ -17,10 +17,19 @@ import (
 	"github.com/inngest/inngest/pkg/sdk"
 )
 
+var (
+	// signingKeyErrorLoggedCount ensures that we log the signing key message once
+	// every N times, instead of spamming the console every time we poll for functions.
+	signingKeyErrorCount = 0
+)
+
 type devapi struct {
 	chi.Router
 
 	// loader stores all registered functions in the dev server.
+	//
+	// TODO: Refactor this so that it's a part of the devserver, instead
+	// of holding a reference which is a weird pattern (tonyhb)
 	devserver *devserver
 }
 
@@ -112,7 +121,10 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	if key == "" {
 		// In development, we log a warning here.
-		logger.From(ctx).Warn().Msg("You're missing the INNGEST_SIGNING_KEY parameter when serving your functions.  This will not work in production.")
+		if signingKeyErrorCount%20 == 0 {
+			logger.From(ctx).Warn().Msg("You're missing the INNGEST_SIGNING_KEY parameter when serving your functions.  This will not work in production.")
+		}
+		signingKeyErrorCount++
 	}
 
 	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
@@ -125,13 +137,23 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	// Find and update this SDK handler, if it exists.
 	var h *SDKHandler
 	for n, item := range a.devserver.handlers {
-		if item.SDK.URL == req.URL {
-			h = &item
-			// Remove this item from the handlers list.
-			a.devserver.handlers = append(a.devserver.handlers[:n], a.devserver.handlers[n+1:]...)
-			break
+		if item.SDK.URL != req.URL {
+			continue
 		}
+
+		// Check if the checksum exists and is the same.  If so, we can ignore
+		// this request.
+		if item.SDK.Hash != nil && req.Hash != nil && *item.SDK.Hash == *req.Hash {
+			_, _ = w.Write([]byte(`{"ok":true}`))
+			return
+		}
+
+		// Remove this item from the handlers list.
+		h = &item
+		a.devserver.handlers = append(a.devserver.handlers[:n], a.devserver.handlers[n+1:]...)
+		break
 	}
+
 	if h == nil {
 		h = &SDKHandler{
 			SDK:       *req,
