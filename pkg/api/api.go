@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 )
@@ -85,7 +84,6 @@ func (a *API) Start(ctx context.Context) error {
 
 func (a API) Stop(ctx context.Context) error {
 	if a.server == nil {
-		logger.From(ctx).Warn().Msg("cannot stop server; server not started")
 		return nil
 	}
 

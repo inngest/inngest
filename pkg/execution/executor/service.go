@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"
@@ -14,7 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/function/env"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
@@ -65,7 +65,6 @@ func (s *svc) Name() string {
 }
 
 func (s *svc) Pre(ctx context.Context) error {
-	var fns []function.Function
 	var err error
 
 	if s.data == nil {
@@ -97,12 +96,19 @@ func (s *svc) Pre(ctx context.Context) error {
 		return err
 	}
 
-	// Create drivers based off of the available config
+	// Create drivers based off of the available config.  If we have no docker steps,
+	// don't initialize the docker driver.  This makes it easy for users to get started
+	// using the SDK with HTTP drivers only.
+	hasDocker, err := s.hasDockerStep(ctx)
+	if err != nil {
+		return err
+	}
+
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range s.config.Execution.Drivers {
 		// If we don't have any loaded functions, don't load the Docker driver;
 		// we probably don't actually need it and will be using HTTP fns instead.
-		if driverConfig.RuntimeName() == "docker" && len(fns) == 0 {
+		if driverConfig.RuntimeName() == "docker" && !hasDocker {
 			continue
 		}
 
@@ -371,4 +377,20 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	}
 
 	return nil
+}
+
+func (s *svc) hasDockerStep(ctx context.Context) (bool, error) {
+	fns, err := s.data.Functions(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, fn := range fns {
+		actions, _, _ := fn.Actions(ctx)
+		for _, a := range actions {
+			if a.Runtime.RuntimeType() == inngest.RuntimeTypeDocker {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
