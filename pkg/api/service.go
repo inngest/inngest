@@ -92,7 +92,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) error {
 		return err
 	}
 
-	l.Info().Str("event", e.Name).Str("id", e.ID).Interface("event", e).Msg("publishing event")
+	l.Info().Str("event_name", e.Name).Str("id", e.ID).Interface("event", e).Msg("publishing event")
 
 	return a.publisher.Publish(
 		ctx,

@@ -18,9 +18,9 @@ func Do(ctx context.Context) testdsl.Chain {
 
 		// Ensure API publishes event.
 		testdsl.RequireLogFields(map[string]any{
-			"caller":  "api",
-			"event":   "basic/single-step-retries",
-			"message": "publishing event",
+			"caller":     "api",
+			"event_name": "basic/single-step-retries",
+			"message":    "publishing event",
 		}),
 
 		// Ensure runner consumes event.
