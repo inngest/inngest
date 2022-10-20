@@ -340,7 +340,7 @@ export default function Home() {
               href="/docs/functions?ref=homepage-platform"
               kind="outlinePrimary"
             >
-              Try the SDK Beta →
+              Try the SDK →
             </Button>
           </div>
         </div>
@@ -515,16 +515,11 @@ export default function Home() {
               </span>
             </h2>
             <p className="mt-8 mx-auto max-w-xl">
-              Join our list and we'll email you when it's ready to test and
-              provide feedback on. You can also join our Discord community to
-              share feedback and have a direct line to shaping the future of the
-              SDK!
+              Join our Discord community to share feedback, get updates, and
+              have a direct line to shaping the future of the SDK!
             </p>
           </header>
           <div className="my-10 flex flex-col sm:flex-row gap-6 justify-center items-center">
-            <Button href={BETA_TYPEFORM_URL} kind="primary">
-              Join the SDK Beta →
-            </Button>
             <Button
               href="https://www.inngest.com/discord"
               kind="outline"
@@ -886,7 +881,7 @@ const useCaseList = [
             "app/user.signup",
             /*
               Coming soon!
-              Join the beta feedback group on Discord
+              Join the feedback group on Discord
             */
           )
           `}

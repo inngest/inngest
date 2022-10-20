@@ -72,7 +72,7 @@ export default function BlogLayout(props) {
           </Header>
 
           <Body>
-            <ProductDescriptionAside className="background-grid-texture">
+            <ProductDescriptionAside className="bg-texture-gridlines">
               <a href="https://www.inngest.com?ref=blog-post">Inngest</a>'s
               platform lets you build serverless background tasks and scheduled
               jobs using events - zero infrastructure required.{" "}
@@ -97,7 +97,7 @@ export default function BlogLayout(props) {
 const ProductDescriptionAside = styled.aside`
   // match paragraph style inline
   font-size: 0.95rem !important;
-  background: url(/assets/grid-radial-texture.svg) no-repeat center center !important;
+  background: url(/assets/texture-gridlines-100.svg) no-repeat center center !important;
   background-size: 100%;
 
   a {

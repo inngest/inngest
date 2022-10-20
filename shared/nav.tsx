@@ -53,14 +53,12 @@ const NavContent: React.FC<Props> = (props: Props) => {
                   </p>
                 </a>
                 <a
-                  href="/features/data-governance?ref=nav"
+                  href="/features/step-functions?ref=nav"
                   className="rounded-lg p-4"
                 >
-                  <p>Data governance</p>
+                  <p>Step Functions</p>
                   <p className="pt-1 text-slate-400">
-                    <small>
-                      The single platform to handle and manage all event data
-                    </small>
+                    <small>Build complex conditional workflows</small>
                   </p>
                 </a>
               </div>

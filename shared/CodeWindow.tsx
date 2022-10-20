@@ -29,7 +29,6 @@ const CodeWindow = ({
   filename?: string;
   theme?: "light" | "dark";
   type?: "editor" | "terminal";
-
 }) => {
   const backgroundColor =
     theme === "dark"
@@ -40,10 +39,10 @@ const CodeWindow = ({
       className={`p-2 ${className}`}
       style={{ backgroundColor, borderRadius: "var(--border-radius)" }}
     >
-      <div className="mb-1 flex gap-1 relative">
-        <div className="w-2.5 h-2.5 border border-slate-700 rounded-full"></div>
-        <div className="w-2.5 h-2.5 border border-slate-700 rounded-full"></div>
-        <div className="w-2.5 h-2.5 border border-slate-700 rounded-full"></div>
+      <div className="window-header mb-1 flex gap-1 relative">
+        <div className="w-2.5 h-2.5 border border-slate-300 rounded-full"></div>
+        <div className="w-2.5 h-2.5 border border-slate-300 rounded-full"></div>
+        <div className="w-2.5 h-2.5 border border-slate-300 rounded-full"></div>
         <div
           className="text-slate-500 absolute inset-x-0 mx-auto text-center"
           style={{ fontSize: "0.6rem", top: "-1px" }}
@@ -58,7 +57,7 @@ const CodeWindow = ({
         codeTagProps={{ className: "code-window" }}
         // className="hello"
         customStyle={{
-          backgroundColor,
+          backgroundColor: "transparent",
           // fontSize: "0.7rem",
         }}
       >
@@ -74,6 +73,10 @@ const Window = styled.div`
   // larger screens
   @media (min-width: 480px) {
     font-size: 0.7rem;
+  }
+
+  .linenumber {
+    color: rgb(203 213 225); // text-slate-300
   }
 `;
 

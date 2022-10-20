@@ -24,7 +24,7 @@ const GraphicCallout = ({
   },
 }: GraphicCalloutProps) => {
   return (
-    <div style={style} className="background-grid-texture my-16">
+    <div style={style} className="bg-texture-gridlines-30 my-16">
       <div className="flex flex-col md:flex-row justify-items-end gap-8">
         <div className="basis-2/5 pt-12 md:pb-12 mx-12 lg:mx-0 lg:pl-10p flex flex-col justify-center">
           <h2 className="text-3xl font-normal">{heading}</h2>

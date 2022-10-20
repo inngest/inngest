@@ -291,18 +291,24 @@ kbd {
 }
 
 /** Gradients */
+
 .gradient-text {
   --from-color: #5d5fef;
   --to-color: #ef5da8;
   background: linear-gradient(180deg, var(--from-color) 0%, var(--to-color) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: transparent;
 }
 .gradient-text-ltr {
   --from-color: #B565F3;
   --to-color: #4636F5;
   background: linear-gradient(90deg, var(--from-color) 0%, var(--to-color) 100%);
+}
+.gradient-spotlight {
+  background: linear-gradient(to right bottom, rgb(255, 255, 255) 30%, rgba(255, 255, 255, 0.38));
+}
+.gradient-text,
+.gradient-text-ltr,
+.gradient-spotlight {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -339,6 +345,27 @@ kbd {
 }
 .hero-gradient {
   background: linear-gradient(180deg, var(--bg-color) 0%, #fafdff 70%, #fbefff 100%);
+}
+
+.bg-dark-rainbow-gradient {
+  background:
+    url(/assets/texture-gridlines-10.svg),
+    linear-gradient(246.04deg, rgba(222, 224, 35, 0.12) 0%, rgba(159, 205, 83, 0) 50%, rgba(105, 255, 151, 0.12) 100%),
+    linear-gradient(113.96deg, rgba(93, 95, 239, 0.2) 0%, rgba(239, 95, 93, 0.2) 100%),
+    #000000;
+}
+.bg-texture-gridlines,
+.bg-texture-gridlines-30 {
+  background-repeat: no-repeat;
+  background-size: 100%;
+  background-position: center;
+}
+.bg-texture-gridlines {
+  background-image: url(/assets/texture-gridlines-10.svg);
+
+}
+.bg-texture-gridlines-30 {
+  background-image: url(/assets/texture-gridlines-30.svg);
 }
 
 /** New grid **/

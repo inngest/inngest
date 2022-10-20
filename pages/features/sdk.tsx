@@ -199,10 +199,6 @@ export default function FeaturesSDK() {
           href: "/docs/functions?ref=features-sdk",
           text: "Try the new SDK →",
         }}
-        secondaryCTA={{
-          href: BETA_TYPEFORM_URL,
-          text: "Join the mailing list",
-        }}
         language={language}
         ext={ext}
         onToggle={(l) => setLanguage(l)}
@@ -296,7 +292,7 @@ export default function FeaturesSDK() {
       </div>
 
       {/* Background styles */}
-      <div className="bg-[#070707] background-grid-texture text-white">
+      <div className="bg-[#070707] bg-texture-gridlines-30 text-white">
         {/* Content layout */}
         <div className="mx-auto mb-14 py-24 px-10 lg:px-4 max-w-4xl">
           <header className="mb-12 text-center">
@@ -533,28 +529,20 @@ export default function FeaturesSDK() {
             <h2 className="text-4xl">
               Try the{" "}
               <span className="gradient-text gradient-text-ltr">
-                Inngest SDK Beta
+                Inngest SDK
               </span>
             </h2>
             <p className="mt-8 mx-auto max-w-xl">
               You can try the SDK today! Dive into our docs to get started
             </p>
             <p className="mx-auto max-w-xl">
-              Join our mailing list and we'll email you updates and ways to
-              provide feedback. You can also join our Discord community to share
-              feedback and have a direct line to shaping the future of the SDK!
+              Join our Discord community to share feedback, get updates and have
+              a direct line to shaping the future of the SDK!
             </p>
           </header>
           <div className="my-10 flex flex-col sm:flex-row flex-wrap gap-6 justify-center items-center">
             <Button href="/docs?ref=features-sdk" kind="primary">
               Read the docs
-            </Button>
-            <Button
-              href={BETA_TYPEFORM_URL}
-              kind="outline"
-              style={{ margin: 0 }}
-            >
-              Join the SDK Beta Mailing List
             </Button>
             <Button
               href="https://www.inngest.com/discord"
@@ -580,7 +568,7 @@ export const Hero = ({
   onToggle,
 }: {
   cta: { href: string; text: string };
-  secondaryCTA: { href: string; text: string };
+  secondaryCTA?: { href: string; text: string };
   language: "javascript" | "typescript";
   ext: string;
   onToggle: (string) => void;
@@ -591,7 +579,7 @@ export const Hero = ({
       <div className="mx-auto my-12 px-10 lg:px-16 max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8">
         <header className="lg:my-24 mt-8">
           <span className="text-sm font-bold uppercase gradient-text-ltr">
-            Inngest SDK Beta
+            Inngest SDK
           </span>
           <h1 className="mt-2 mb-6 text-2xl md:text-5xl leading-tight">
             Write functions, send events.
@@ -620,14 +608,16 @@ export const Hero = ({
             <Button href={cta.href} kind="primary" size="medium">
               {cta.text}
             </Button>
-            <Button
-              href={secondaryCTA.href}
-              kind="outline"
-              size="medium"
-              style={{ margin: 0 }}
-            >
-              {secondaryCTA.text}
-            </Button>
+            {secondaryCTA && (
+              <Button
+                href={secondaryCTA.href}
+                kind="outline"
+                size="medium"
+                style={{ margin: 0 }}
+              >
+                {secondaryCTA.text}
+              </Button>
+            )}
           </div>
         </header>
         <div className="lg:mt-12 mx-auto lg:mx-6 max-w-full md:max-w-lg flex flex-col justify-between">
