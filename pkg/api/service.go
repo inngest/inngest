@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -67,7 +66,6 @@ func (a *apiServer) Pre(ctx context.Context) error {
 }
 
 func (a *apiServer) Run(ctx context.Context) error {
-	fmt.Println("starting API")
 	err := a.api.Start(ctx)
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
