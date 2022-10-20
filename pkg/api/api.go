@@ -83,6 +83,10 @@ func (a *API) Start(ctx context.Context) error {
 }
 
 func (a API) Stop(ctx context.Context) error {
+	if a.server == nil {
+		return nil
+	}
+
 	return a.server.Shutdown(ctx)
 }
 
