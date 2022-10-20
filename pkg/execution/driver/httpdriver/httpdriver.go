@@ -74,7 +74,7 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 
 	// Add an error to driver.Response if the status code isn't 2XX.
 	err = nil
-	if resp.StatusCode <= 200 || resp.StatusCode >= 299 {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		err = fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
 
