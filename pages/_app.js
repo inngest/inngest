@@ -56,7 +56,7 @@ function MyApp({ Component, pageProps }) {
         {/* Sections of the site like the blog and docs set these using different data */}
         {!disableMetadata && (
           <>
-            <title>Inngest → {metaTitle}</title>
+            <title>Inngest - {metaTitle}</title>
             {pageProps?.meta?.description && (
               <>
                 <meta
@@ -72,7 +72,8 @@ function MyApp({ Component, pageProps }) {
             <meta
               property="og:image"
               content={
-                pageProps?.meta?.image || "/assets/img/og-image-default.jpg"
+                pageProps?.meta?.image ||
+                "/assets/og-image-default-2022-10-20.jpg"
               }
             />
             <meta property="og:url" content={canonicalUrl} />

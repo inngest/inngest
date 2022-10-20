@@ -16,7 +16,6 @@ export async function getStaticProps() {
         title: "Inngest JavaScript & TypeScript SDK",
         description:
           "Quickly build, test and deploy code that runs in response to events or on a schedule — without spending any time on infrastructure.",
-        image: "/assets/img/og-image-default.jpg",
       },
     },
   };

@@ -31,10 +31,9 @@ export async function getStaticProps() {
   return {
     props: {
       meta: {
-        title: "You Send Events. We Run Your Code.",
+        title: "Write functions, Send Events",
         description:
-          "Quickly build, test and deploy code that runs in response to events or on a schedule — without spending any time on infrastructure.",
-        image: "/assets/img/og-image-default.jpg",
+          "Inngest is a developer platform for building, testing and deploying code that runs in response to events or on a schedule — without spending any time on infrastructure.",
       },
     },
   };
