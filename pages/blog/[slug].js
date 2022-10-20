@@ -177,9 +177,12 @@ const Body = styled.main`
     font-size: 0.75rem;
   }
 
+  ul,
+  ol {
+    margin: 1.5rem 0 1.5rem 1.5rem;
+  }
   ul {
     list-style-type: disc;
-    margin-left: 1rem;
   }
   ol {
     list-style-type: number;
@@ -197,13 +200,6 @@ const Body = styled.main`
     p:last-of-type {
       margin-bottom: 0;
     }
-  }
-
-  ol,
-  ul {
-    margin: 1.5rem 0;
-  }
-  li {
   }
 
   video {
