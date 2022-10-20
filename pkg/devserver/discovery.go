@@ -14,7 +14,7 @@ import (
 var (
 	// Ports indicate the default ports that we attempt to scan on localhost
 	// when discovering SDK-based endpoints
-	Ports = []int{80, 3000, 3001, 3002, 3003, 3004, 3005, 5000, 8000, 8080, 8081, 8888}
+	Ports = []int{80, 3000, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009, 3010, 5000, 8000, 8080, 8081, 8888}
 
 	// Paths indicate the paths we attempt to hit when a web server is available.
 	// These are the default, recommended paths for hosting Inngest routes.

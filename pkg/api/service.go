@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -66,6 +67,7 @@ func (a *apiServer) Pre(ctx context.Context) error {
 }
 
 func (a *apiServer) Run(ctx context.Context) error {
+	fmt.Println("starting API")
 	err := a.api.Start(ctx)
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
@@ -86,14 +88,13 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) error {
 		e.ID = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	}
 
-	// TODO: Move this into the API itself, once we've yanked out the dev
-	// server's logic and replaced with multiple services.
 	byt, err := json.Marshal(e)
 	if err != nil {
+		l.Error().Err(err).Msg("error unmarshalling event as JSON")
 		return err
 	}
 
-	l.Debug().Str("event", e.Name).Str("id", e.ID).Msg("publishing event")
+	l.Info().Str("event", e.Name).Str("id", e.ID).Interface("event", e).Msg("publishing event")
 
 	return a.publisher.Publish(
 		ctx,

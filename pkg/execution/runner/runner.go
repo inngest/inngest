@@ -151,7 +151,7 @@ func (s *svc) initializeCrons(ctx context.Context) error {
 	}
 
 	logger.From(ctx).
-		Debug().
+		Info().
 		Int("len", len(fns)).
 		Msg("initializing scheduled messages")
 
@@ -196,7 +196,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		Logger()
 	ctx = logger.With(ctx, l)
 
-	l.Debug().Msg("received message")
+	l.Info().Msg("received message")
 
 	var errs error
 	wg := &sync.WaitGroup{}
@@ -398,7 +398,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 }
 
 func (s *svc) initialize(ctx context.Context, fn function.Function, evt event.Event) error {
-	logger.From(ctx).Debug().Str("function", fn.ID).Msg("initializing fn")
+	logger.From(ctx).Info().Str("function", fn.ID).Msg("initializing fn")
 	_, err := Initialize(ctx, fn, evt, s.state, s.queue)
 	return err
 }
