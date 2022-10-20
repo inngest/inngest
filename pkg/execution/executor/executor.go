@@ -158,17 +158,23 @@ type executor struct {
 // workflow via an executor.  This returns all available steps we can run from
 // the workflow after the step has been executed.
 func (e *executor) Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error) {
-	if e.log != nil {
-		e.log.Debug().
-			Str("run_id", id.RunID.String()).
-			Str("step", from).
-			Int("attempt", attempt).
-			Msg("executing step")
-	}
+	var log *zerolog.Logger
 
 	s, err := e.sm.Load(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+
+	if e.log != nil {
+		l := e.log.With().
+			Str("run_id", id.RunID.String()).
+			Str("step", from).
+			Str("fn_name", s.Workflow().Name).
+			Str("fn_id", s.Workflow().ID).
+			Int("attempt", attempt).
+			Logger()
+		log = &l
+		log.Debug().Msg("executing step")
 	}
 
 	w := s.Workflow()
@@ -180,12 +186,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 	// To fix this particular consistency issue, always check to see
 	// if there's output stored for this action ID.
 	if resp, _ := s.ActionID(from); resp != nil {
-		if e.log != nil {
-			e.log.Warn().
-				Str("run_id", id.RunID.String()).
-				Str("step", from).
-				Int("attempt", attempt).
-				Msg("step already executed")
+		if log != nil {
+			log.Warn().Msg("step already executed")
 		}
 		// This has already successfully been executed.
 		return &state.DriverResponse{
@@ -204,7 +206,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 	}
 
 	resp, err := e.run(ctx, w, id, from, s, attempt)
-	if e.log != nil {
+	if log != nil {
 		var (
 			l   *zerolog.Event
 			msg string
@@ -212,14 +214,14 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 		// We want a different log level depending on whether this step
 		// errored.
 		if err == nil {
-			l = e.log.Info()
+			l = log.Debug()
 			msg = "executed step"
 		} else {
 			retryable := false
 			if resp != nil {
 				retryable = resp.Retryable()
 			}
-			l = e.log.Error().Err(err).Bool("retryable", retryable)
+			l = log.Error().Err(err).Bool("retryable", retryable)
 			msg = "error executing step"
 		}
 		l.Str("run_id", id.RunID.String()).Str("step", from).Msg(msg)
@@ -229,7 +231,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 			// a different caller.  This lets users scan for
 			// output easily, and if we build a TUI to filter on
 			// caller to show only step outputs, etc.
-			e.log.Info().
+			log.Info().
 				Str("caller", "output").
 				Interface("output", resp.Output).
 				Str("run_id", id.RunID.String()).

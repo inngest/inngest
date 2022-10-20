@@ -44,11 +44,9 @@ func NewAPI(o Options) (chi.Router, error) {
 	}
 
 	cors := cors.New(cors.Options{
-		// AllowedOrigins is used instead of AllowOriginFunc as it's faster and we don't need
-		// to allow credentials, so an asterisk works.
 		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowedHeaders:   []string{"*"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: false,
 		MaxAge:           60 * 60, // 1 hour

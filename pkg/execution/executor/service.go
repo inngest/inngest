@@ -167,7 +167,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		return err
 	}
 
-	l.Info().Interface("edge", edge).Msg("processing step")
+	l.Debug().Interface("edge", edge).Msg("processing step")
 
 	_, err = s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
 	if err != nil {
@@ -280,7 +280,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 			at = at.Add(dur)
 		}
 
-		l.Info().Str("outgoing", next.Outgoing).Time("at", at).Msg("scheduling next step")
+		l.Debug().Str("outgoing", next.Outgoing).Time("at", at).Msg("scheduling next step")
 
 		// Enqueue the next child in our queue.
 		if err := s.queue.Enqueue(ctx, queue.Item{
@@ -314,7 +314,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		return err
 	}
 
-	l.Info().Interface("edge", edge).Msg("step complete")
+	l.Debug().Interface("edge", edge).Msg("step complete")
 	return nil
 }
 
