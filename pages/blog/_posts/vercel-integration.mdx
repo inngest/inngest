@@ -12,20 +12,20 @@ Vercel has been a pioneer of modern developer platforms, enabling developers to 
 
 At Inngest, our goal is to build the best platform for developers to deliver event-driven applications. We aim to do what Vercel's done for backend logic.
 
-Inngest combines event streams, simple publishing APIs, and [a modern job scheduler](https://www.inngest.com/blog/modern-serverless-job-scheduler) all into a single developer-first serverless platform that enables anyone to ship event-driven in minutes, with zero infrastructure.
+Inngest combines event streams, simple publishing APIs, and [a modern job scheduler](https://www.inngest.com/blog/modern-serverless-job-scheduler?ref=blog-vercel-integration) all into a single developer-first serverless platform that enables anyone to ship event-driven in minutes, with zero infrastructure.
 
 ## Serverless background functions in minutes
 
-Vercel now enables developers to ship functions with Inngest faster than ever before. Developers can use [Inngest's SDK](https://www.inngest.com/docs/functions) to define functions and the events that trigger them and host these functions on Vercel right alongside their app and API's [serverless functions](https://vercel.com/docs/concepts/functions/serverless-functions).
+Vercel now enables developers to ship functions with Inngest faster than ever before. Developers can use [Inngest's SDK](https://www.inngest.com/docs/functions?ref=blog-vercel-integration) to define functions and the events that trigger them and host these functions on Vercel right alongside their app and API's [serverless functions](https://vercel.com/docs/concepts/functions/serverless-functions).
 
 ![Code snippets of a background function, triggered by an event and a cron job](/assets/blog/vercel-integration/code-snippets.jpg)
 
-Functions are triggered by events using [a simple `inngest.send()` call](https://www.inngest.com/docs/events). As Inngest receives events, it instantly and securely invokes any function that is defined to run when that event occurs. Multiple functions can be triggered by the same event, so you can [fan-out](https://en.wikipedia.org/wiki/Fan-out_(software)) work to separate functions, enabling you to decouple functions by their purpose.
+Functions are triggered by events using [a simple `inngest.send()` call](https://www.inngest.com/docs/events?ref=blog-vercel-integration). As Inngest receives events, it instantly and securely invokes any function that is defined to run when that event occurs. Multiple functions can be triggered by the same event, so you can [fan-out](https://en.wikipedia.org/wiki/Fan-out_(software)) work to separate functions, enabling you to decouple functions by their purpose.
 
 This decoupling makes it a great way to trigger background work. For example, you can send a `user.signup` event which could trigger separate background tasks to send a welcome email, start a Stripe trial, and add the user to Intercom. Some other benefits:
 
 - **Events are immutable facts** - They mark something that happened in history and can never be changed, aiding debuggability. Inngest stores a historic record of your events so you can debug faster than ever.
-- **Events can be fully typed and versioned** - [We generate TypeScript types for every event](https://www.inngest.com/docs/typescript) that you sent so you can be confident in the code that you're writing.
+- **Events can be fully typed and versioned** - [We generate TypeScript types for every event](https://www.inngest.com/docs/typescript?ref=blog-vercel-integration) that you sent so you can be confident in the code that you're writing.
 - **Events are everywhere** - Webhooks are events and HTTP requests are events. You may not think you've built “event-driven,” but you probably already have!
 
 These are just the highlights, but we're passionate about this approach and we think that it would be the defacto way of building if there wasn't such a high barrier to entry as there previously has been. We built Inngest to solve this problem and bring it to everyone.
@@ -35,21 +35,21 @@ These are just the highlights, but we're passionate about this approach and we t
 You can start running background tasks and cron jobs that run on your Vercel account in just a few short steps:
 
 1. Add [the Inngest integration from Vercel's marketplace](https://vercel.com/integrations/inngest) to link your Inngest account with your selected Vercel projects. This automatically sets required Inngest environment variables for your projects and also notifies Inngest whenever you deploy to Vercel.
-2. Write functions using the Inngest SDK and serve them to enable Inngest to remotely and securely invoke them  ([docs](https://www.inngest.com/docs/functions))
-3. Add some code to send an event from your application ([docs](https://www.inngest.com/docs/events))
+2. Write functions using the Inngest SDK and serve them to enable Inngest to remotely and securely invoke them  ([docs](https://www.inngest.com/docs/functions?ref=blog-vercel-integration))
+3. Add some code to send an event from your application ([docs](https://www.inngest.com/docs/events?ref=blog-vercel-integration))
 4. Merge and deploy your code to production on Vercel!
 
 That's it! Now every time you deploy to Vercel, Inngest will check your app for new or updates functions. You can view logs of events and functions in the Inngest dashboard to see how your functions are performing:
 
 ![Screenshot of Inngest dashboard viewing active functions](/assets/blog/vercel-integration/app-screenshot.jpg)
 
-Check out [the Inngest docs](https://www.inngest.com/docs/deploy/vercel) for more detail on how this works and how to test your functions right along side your existing local development workflow.
+Check out [the Inngest docs](https://www.inngest.com/docs/deploy/vercel?ref=blog-vercel-integration) for more detail on how this works and how to test your functions right along side your existing local development workflow.
 
 ## What's next
 
 The integration brings added functionality to your Vercel projects very quickly, but background tasks and cron jobs are just the beginning.
 
-Very soon you'll be able to write **Step Functions** which will enable you to write more complex workflows include the ability to:
+Very soon you'll be able to write [**Step Functions**](/features/step-functions?ref=blog-vercel-integration) which will enable you to write more complex workflows include the ability to:
 
 - **Add delays between steps for hours or days** - Create drip campaigns or reminders
 - **Coordinate between events** - Run code after a first event then wait for a second event before executing some more code.

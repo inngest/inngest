@@ -83,8 +83,8 @@ function MyApp({ Component, pageProps }) {
         <link rel="canonical" href={canonicalUrl} />
       </Head>
       {router.pathname !== "/sign-up" && (
-        <PageBanner href="/features/sdk?ref=page-banner">
-          Check out our new TypeScript / JavaScript SDK
+        <PageBanner href="/blog/vercel-integration?ref=page-banner">
+          Announcing our new Vercel integration
         </PageBanner>
       )}
 
