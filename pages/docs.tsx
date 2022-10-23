@@ -121,10 +121,11 @@ export default function DocsHome(props) {
 
         <h2 className="pt-4">How it works</h2>
         <p>
-          Inngest accepts events from your system, then runs any functions which
-          listen to those events in parallel, with built retries if things fail.
-          Events are JSON objects sent via POST request and can be triggered
-          from your own code, from webhooks, or from integrations.
+          Inngest accepts events from your system, then automatically runs
+          functions triggered by those events in the background, with built-in
+          retries if things fail. Events are JSON objects sent via POST
+          request and can be triggered from your own code, from webhooks,
+          or from integrations.
         </p>
 
         <h2 className="pt-4">Use cases</h2>
