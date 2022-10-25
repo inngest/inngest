@@ -101,6 +101,7 @@ func CheckState(t *testing.T, gen Generator) {
 
 	funcs := map[string]func(t *testing.T, m state.Manager){
 		"New":                                checkNew,
+		"New/StepData":                       checkNew_stepdata,
 		"Scheduled":                          checkScheduled,
 		"SaveResponse/Output":                checkSaveResponse_output,
 		"SaveResponse/Error":                 checkSaveResponse_error,
@@ -161,6 +162,51 @@ func checkNew(t *testing.T, m state.Manager) {
 
 	metadata := loaded.Metadata()
 	require.Equal(t, 1, metadata.Pending, "New should set pending count to 1")
+}
+
+// checkNew_stepdata ensures that state stores can be initialized with
+// predetermined step data.
+func checkNew_stepdata(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{
+		WorkflowID: w.UUID,
+		RunID:      runID,
+		Key:        runID.String(),
+	}
+
+	init := state.Input{
+		Identifier: id,
+		Workflow:   w,
+		EventData:  input.Map(),
+		Steps: map[string]map[string]any{
+			"step-a": {
+				"result": "predetermined",
+			},
+		},
+	}
+
+	s, err := m.New(ctx, init)
+	require.NoError(t, err)
+
+	found := s.Workflow()
+	require.EqualValues(t, w, found, "Returned workflow does not match input")
+	require.EqualValues(t, input.Map(), s.Event(), "Returned event does not match input")
+
+	loaded, err := m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+
+	found = loaded.Workflow()
+	require.EqualValues(t, w, found, "Loaded workflow does not match input")
+	require.EqualValues(t, input.Map(), loaded.Event(), "Loaded event does not match input")
+
+	metadata := loaded.Metadata()
+	require.Equal(t, 1, metadata.Pending, "New should set pending count to 1")
+
+	data := loaded.Actions()
+	require.Equal(t, 1, len(data), "New should store predetermined step data")
+	require.Equal(t, init.Steps["step-a"], data["step-a"], "New should store predetermined step data")
 }
 
 func checkScheduled(t *testing.T, m state.Manager) {
@@ -468,6 +514,8 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 		require.Error(t, state.ErrPauseLeased, err)
 		<-time.After(state.PauseLeaseDuration / 50)
 	}
+
+	<-time.After(5 * time.Millisecond)
 
 	// And again, once the lease is up, we should be able to lease the pause.
 	err = m.LeasePause(ctx, pause.ID)

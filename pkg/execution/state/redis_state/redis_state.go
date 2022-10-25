@@ -236,6 +236,19 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			return err
 		}
 
+		// Save predetermined step data
+		actionKey := m.kf.Actions(ctx, input.Identifier)
+		for stepID, value := range input.Steps {
+			// Save the output.
+			str, err := json.Marshal(value)
+			if err != nil {
+				return err
+			}
+			if err := m.r.HSet(ctx, actionKey, stepID, str).Err(); err != nil {
+				return err
+			}
+		}
+
 		// XXX: If/when we enforce limits on function durations here (eg.
 		// 1, 5, 10 years) this should have a similar TTL.
 		key = m.kf.Event(ctx, input.Identifier)
@@ -256,7 +269,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			input.Identifier,
 			metadata.Metadata(),
 			input.EventData,
-			map[string]map[string]any{},
+			input.Steps,
 			map[string]error{},
 		),
 		nil
