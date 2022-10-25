@@ -42,6 +42,8 @@ type Identifier struct {
 	Key string `json:"key"`
 }
 
+// IdempotencyKey returns the unique key used to represent this single
+// workflow run, across all steps.
 func (i Identifier) IdempotencyKey() string {
 	key := i.Key
 	if i.Key == "" {
