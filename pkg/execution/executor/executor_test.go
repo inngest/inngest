@@ -114,7 +114,11 @@ func TestExecute_state(t *testing.T) {
 		RunID: ulid.MustNew(ulid.Now(), rand.Reader),
 	}
 
-	s, err := sm.New(ctx, w, id, map[string]interface{}{})
+	s, err := sm.New(ctx, state.Input{
+		Workflow:   w,
+		Identifier: id,
+		EventData:  map[string]interface{}{},
+	})
 	require.Nil(t, err)
 
 	driver := &mockdriver.Mock{
@@ -259,10 +263,14 @@ func TestExecute_edge_expressions(t *testing.T) {
 		RunID: ulid.MustNew(ulid.Now(), rand.Reader),
 	}
 
-	s, err := sm.New(ctx, w, id, map[string]interface{}{
-		"data": map[string]interface{}{
-			"run":    true,
-			"string": "yes",
+	s, err := sm.New(ctx, state.Input{
+		Workflow:   w,
+		Identifier: id,
+		EventData: map[string]interface{}{
+			"data": map[string]interface{}{
+				"run":    true,
+				"string": "yes",
+			},
 		},
 	})
 	require.Nil(t, err)

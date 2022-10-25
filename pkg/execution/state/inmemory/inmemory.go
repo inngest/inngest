@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
@@ -63,27 +62,30 @@ func (m *mem) IsComplete(ctx context.Context, id state.Identifier) (bool, error)
 }
 
 // New initializes state for a new run using the specifid ID and starting data.
-func (m *mem) New(ctx context.Context, workflow inngest.Workflow, id state.Identifier, event map[string]any) (state.State, error) {
+func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	s := memstate{
 		metadata: state.Metadata{
-			StartedAt: time.Now(),
-			Pending:   1,
+			StartedAt:     time.Now(),
+			Pending:       1,
+			Debugger:      input.Debugger,
+			RunType:       input.RunType,
+			OriginalRunID: input.OriginalRunID,
 		},
-		workflow:   workflow,
-		identifier: id,
-		event:      event,
-		actions:    map[string]map[string]interface{}{},
+		workflow:   input.Workflow,
+		identifier: input.Identifier,
+		event:      input.EventData,
+		actions:    input.Steps,
 		errors:     map[string]error{},
 	}
 
-	if _, ok := m.state[id.IdempotencyKey()]; ok {
+	if _, ok := m.state[input.Identifier.IdempotencyKey()]; ok {
 		return nil, state.ErrIdentifierExists
 	}
 
-	m.state[id.IdempotencyKey()] = s
+	m.state[input.Identifier.IdempotencyKey()] = s
 
 	return s, nil
 
