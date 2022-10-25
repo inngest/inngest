@@ -164,6 +164,7 @@ func (s *svc) initializeCrons(ctx context.Context) error {
 			}
 			_, err := s.cronmanager.AddFunc(t.Cron, func() {
 				err := s.initialize(ctx, fn, event.Event{
+					ID:   time.Now().UTC().Format(time.RFC3339),
 					Name: "inngest/scheduled.timer",
 				})
 				if err != nil {
@@ -431,7 +432,11 @@ func Initialize(ctx context.Context, fn function.Function, evt event.Event, s st
 		Key:        evt.ID,
 	}
 
-	if _, err := s.New(ctx, *flow, id, evt.Map()); err != nil {
+	if _, err := s.New(ctx, state.Input{
+		Workflow:   *flow,
+		Identifier: id,
+		EventData:  evt.Map(),
+	}); err != nil {
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 

@@ -102,7 +102,19 @@ func (p Pause) Edge() inngest.Edge {
 // finished.  Functions may have many parallel branches with conditional execution.
 // Given this, no single step can tell whether it's the last step within a function.
 type Metadata struct {
+	// StartedAt represents the time that this function started at.
 	StartedAt time.Time `json:"startedAt"`
+
+	// Debugger represents whether this function was started via the debugger.
+	Debugger bool `json:"debugger"`
+
+	// RunType indicates the run type for this particular flow.  This allows
+	// us to store whether this is eg. a manual retry
+	RunType *string `json:"runType,omitempty"`
+
+	// OriginalRunID stores the original run ID, if this run is a retry.
+	// This is some basic book-keeping.
+	OriginalRunID *ulid.ULID `json:"originalRunID,omitempty"`
 
 	// Pending is the number of steps that have been enqueued but have
 	// not yet finalized.
@@ -114,7 +126,7 @@ type Metadata struct {
 	// - A step that has completed, and has its next steps (children in
 	//   the dag) enqueued. Note that the step must have its children
 	//   enqueued to be considered finalized.
-	Pending int
+	Pending int `json:"pending"`
 }
 
 // State represents the current state of a workflow.  It is data-structure
@@ -184,6 +196,34 @@ type CompleteSubscriber interface {
 }
 */
 
+// Input is the input for creating new state.  The required fields are Workflow,
+// Identifier and Input;  the rest of the data is stored within the state store as
+// metadata.
+type Input struct {
+	Workflow inngest.Workflow
+	// Identifier represents the identifier
+	Identifier Identifier
+
+	// EventData is the input data for initializing the workflow run, eg. the
+	// original event data.
+	EventData map[string]any
+
+	// Debugger represents whether this function was started via the debugger.
+	Debugger bool
+
+	// RunType indicates the run type for this particular flow.  This allows
+	// us to store whether this is eg. a manual retry
+	RunType *string `json:"runType,omitempty"`
+
+	// OriginalRunID stores the original run ID, if this run is a retry.
+	// This is some basic book-keeping.
+	OriginalRunID *ulid.ULID `json:"originalRunID,omitempty"`
+
+	// Steps allows users to specify pre-defined steps to run workflows from
+	// arbitrary points.
+	Steps map[string]map[string]any
+}
+
 // Mutater mutates state for a given identifier, storing the state and returning
 // the new state.
 //
@@ -194,7 +234,7 @@ type Mutater interface {
 	//
 	// If the IdempotencyKey within Identifier already exists, the state implementation should return
 	// ErrIdentifierExists.
-	New(ctx context.Context, workflow inngest.Workflow, i Identifier, input map[string]any) (State, error)
+	New(ctx context.Context, input Input) (State, error)
 
 	// scheduled increases the scheduled count for a run's metadata.
 	//

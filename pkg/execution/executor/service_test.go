@@ -219,12 +219,16 @@ func TestHandleQueueItemTriggerService(t *testing.T) {
 		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
 	}
 
-	_, err := data.sm.New(ctx, data.w, id, (event.Event{
-		Name: "test",
-		Data: map[string]interface{}{
-			"data": "ya",
-		},
-	}).Map())
+	_, err := data.sm.New(ctx, state.Input{
+		Workflow:   data.w,
+		Identifier: id,
+		EventData: (event.Event{
+			Name: "test",
+			Data: map[string]interface{}{
+				"data": "ya",
+			},
+		}).Map(),
+	})
 	require.NoError(t, err)
 
 	// Require that we have a pending count.
@@ -282,12 +286,16 @@ func TestHandleAsyncService(t *testing.T) {
 		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
 	}
 
-	_, err := data.sm.New(ctx, data.w, id, (event.Event{
-		Name: "test",
-		Data: map[string]interface{}{
-			"data": "ya",
-		},
-	}).Map())
+	_, err := data.sm.New(ctx, state.Input{
+		Workflow:   data.w,
+		Identifier: id,
+		EventData: (event.Event{
+			Name: "test",
+			Data: map[string]interface{}{
+				"data": "ya",
+			},
+		}).Map(),
+	})
 	require.NoError(t, err)
 
 	// Require that we have a pending count.

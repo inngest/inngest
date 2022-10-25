@@ -139,7 +139,13 @@ func checkNew(t *testing.T, m state.Manager) {
 		Key:        runID.String(),
 	}
 
-	s, err := m.New(ctx, w, id, input.Map())
+	init := state.Input{
+		Identifier: id,
+		Workflow:   w,
+		EventData:  input.Map(),
+	}
+
+	s, err := m.New(ctx, init)
 	require.NoError(t, err)
 
 	found := s.Workflow()
@@ -939,11 +945,19 @@ func checkIdempotency(t *testing.T, m state.Manager) {
 	wg := &sync.WaitGroup{}
 	for i := 0; i < 100; i++ {
 		copiedID := id
+
 		wg.Add(1)
 		go func() {
 			// Create a new Run ID each time
 			copiedID.RunID = ulid.MustNew(ulid.Now(), rand.Reader)
-			_, err := m.New(ctx, w, copiedID, data)
+
+			init := state.Input{
+				Identifier: copiedID,
+				Workflow:   w,
+				EventData:  data,
+			}
+
+			_, err := m.New(ctx, init)
 			if err == nil {
 				atomic.AddInt32(&okCount, 1)
 			} else {
@@ -970,7 +984,13 @@ func setup(t *testing.T, m state.Manager) state.State {
 		Key:        runID.String(),
 	}
 
-	s, err := m.New(ctx, w, id, input.Map())
+	init := state.Input{
+		Identifier: id,
+		Workflow:   w,
+		EventData:  input.Map(),
+	}
+
+	s, err := m.New(ctx, init)
 	require.NoError(t, err)
 
 	// We assume that the trigger has been handled and is not
