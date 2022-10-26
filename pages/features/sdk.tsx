@@ -183,6 +183,13 @@ export const worksWithBrands = [
     height: "80%",
     type: "platform",
   },
+  {
+    docs: "/docs/frameworks/redwoodjs",
+    logo: "/assets/brand-logos/redwoodjs-dark.svg",
+    brand: "RedwoodJS",
+    height: "80%",
+    type: "framework",
+  },
 ];
 
 export default function FeaturesSDK() {
