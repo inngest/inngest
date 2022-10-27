@@ -166,6 +166,12 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Re-initialize our cron manager.
+	if err := a.devserver.runner.InitializeCrons(ctx); err != nil {
+		a.err(ctx, w, 400, err)
+		return
+	}
+
 	a.devserver.handlers = append(a.devserver.handlers, *h)
 	_, _ = w.Write([]byte(`{"ok":true}`))
 

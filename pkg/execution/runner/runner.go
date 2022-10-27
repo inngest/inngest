@@ -29,13 +29,21 @@ import (
 
 type Opt func(s *svc)
 
+// Runner is the interface for the runner, which provides a standard Service
+// and the ability to re-initialize crons.
+type Runner interface {
+	service.Service
+
+	InitializeCrons(ctx context.Context) error
+}
+
 func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
 	}
 }
 
-func NewService(c config.Config, opts ...Opt) service.Service {
+func NewService(c config.Config, opts ...Opt) Runner {
 	svc := &svc{config: c}
 	for _, o := range opts {
 		o(svc)
@@ -101,7 +109,7 @@ func (s *svc) Pre(ctx context.Context) error {
 	// to rely on a single executor to 'claim' ownership:  we'd have to implement
 	// more complex logic to check for the last heartbeat and valid cron scheduled,
 	// then backtrack to re-execute in the case of node downtime.  This is simple.
-	if err := s.initializeCrons(ctx); err != nil {
+	if err := s.InitializeCrons(ctx); err != nil {
 		return err
 	}
 
@@ -130,7 +138,7 @@ func (s *svc) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (s *svc) initializeCrons(ctx context.Context) error {
+func (s *svc) InitializeCrons(ctx context.Context) error {
 	// If a previous cron manager exists, cancel it.
 	if s.cronmanager != nil {
 		s.cronmanager.Stop()
