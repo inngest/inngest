@@ -3,6 +3,8 @@ package httpdriver
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -35,6 +37,19 @@ func (e executor) RuntimeType() string {
 	return "http"
 }
 
+// Sign signs the body with a private key, ensuring that HTTP handlers can verify
+// that the request comes from us.
+func Sign(ctx context.Context, key, body []byte) string {
+	if key == nil || len(key) == 0 {
+		// Use the test key for sigining.
+		key = driver.DefaultSigningKey
+	}
+
+	sig := hmac.New(sha256.New, key).Sum(body)
+	now := time.Now().Unix()
+	return fmt.Sprintf("t=%d,s=%s", now, sig)
+}
+
 func (e executor) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, step inngest.Step) (*state.DriverResponse, error) {
 	rt, ok := action.Runtime.Runtime.(inngest.RuntimeHTTP)
 	if !ok {
@@ -51,6 +66,14 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/json")
+
+	// NOTE: In self-hosted mode we don't have the key available in the HTTP driver.
+	// We get around this by reading a key from the context.  Although this isn't
+	// that nice, it works for now.
+	//
+	// TODO (tonyhb): refactor this out of context to be easier to discover.
+	key := driver.GetSigningKey(ctx)
+	req.Header.Add("X-Inngest-Signature", Sign(ctx, key, input))
 
 	resp, err := e.client.Do(req)
 	if err != nil {

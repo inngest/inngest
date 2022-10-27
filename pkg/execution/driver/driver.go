@@ -9,6 +9,21 @@ import (
 	"github.com/inngest/inngest/pkg/function/env"
 )
 
+const (
+	DefaultSigningKey = []byte("test-key")
+)
+
+var signingKey struct{}
+
+func SetSigningKey(ctx context.Context, key []byte) context.Context {
+	return context.WithValue(ctx, signingKey, key)
+}
+
+func GetSigningKey(ctx context.Context) []byte {
+	val, _ := ctx.Value(signingKey).([]byte)
+	return val
+}
+
 type Driver interface {
 	inngest.Runtime
 
