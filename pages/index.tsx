@@ -202,9 +202,9 @@ export default function Home() {
       </div>
 
       <div className="mx-auto max-w-5xl mb-24 mt-20 sm:mt-0">
-        <div className="text-center px-6 max-w-3xl mx-auto">
+        <div className="text-center px-6 max-w-4xl mx-auto">
           <h2 className="text-2xl mb-6">Works with</h2>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-8 h-8 sm:h-12">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-8 h-8 sm:h-10">
             {worksWithBrands.map((b) => (
               <a
                 key={`brand-${b.brand}`}

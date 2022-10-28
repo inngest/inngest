@@ -596,7 +596,7 @@ export const Hero = ({
             your existing JavaScript or TypeScript codebase.
           </p>
           <p>Works with:</p>
-          <div className="mt-4 flex flex-wrap items-center gap-6">
+          <div className="mt-4 max-w-sm flex flex-wrap items-center gap-6">
             {worksWithBrands.map((b) => (
               <a
                 href={`${b.docs}?ref=features-sdk-hero`}
