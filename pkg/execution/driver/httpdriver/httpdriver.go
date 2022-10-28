@@ -49,7 +49,7 @@ func Sign(ctx context.Context, key, body []byte) string {
 	_, _ = mac.Write(body)
 	sig := hex.EncodeToString(mac.Sum(nil))
 	now := time.Now().Unix()
-	return fmt.Sprintf("t=%d,s=%s", now, sig)
+	return fmt.Sprintf("t=%d&s=%s", now, sig)
 }
 
 func (e executor) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, step inngest.Step) (*state.DriverResponse, error) {
