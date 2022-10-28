@@ -24,52 +24,54 @@ export const BETA_TYPEFORM_URL = "https://8qe8m10yfz6.typeform.com/to/F1aj8vLl";
 
 const codesnippets = {
   main: `
-    createFunction("Post-signup", "user/created", async function ({ event }) {
-      // Send the user an email
-      await step("Send an email", async () => {
-        await sendEmail({
-          email: event.user.email,
-          template: "welcome",
+    createStepFunction("Post-signup", "user/created",
+      function ({ event }, { step, waitForEvent }) {
+        // Send the user an email
+        step("Send an email", async () => {
+          await sendEmail({
+            email: event.user.email,
+            template: "welcome",
+          });
         });
-      });
 
-      // Wait for the user to create an order, by waiting and
-      // matching on another event
-      const order = await waitForEvent("order/created",
-        "event.user.id == async.user.id",
-        { timeout: "24h" }
-      })
-
-      if (order === null) {
-        // User didn't create an order;  send them a activation email
-        await step("Send activation", async () => {
-          // Some code here
+        // Wait for the user to create an order, by waiting and
+        // matching on another event
+        const order = waitForEvent("order/created",
+          "event.user.id == async.user.id",
+          { timeout: "24h" }
         })
+
+        if (order === null) {
+          // User didn't create an order;  send them a activation email
+          step("Send activation", async () => {
+            // Some code here
+          })
+        }
       }
-    });
+);
   `,
   eventCoordination: `
-    const order = await waitForEvent("order/created",
+    const order = waitForEvent("order/created",
       "event.user.id == async.user.id", {
         timeout: "24h"
       }
     })
   `,
   delay: `
-    await step("Do something", () => { ... })
+    step("Do something", () => { ... })
 
     // Pause the function and resume in 2d
-    await sleep("2d")
+    sleep("2d")
 
-    await step("Do something later", () => { ... })
+    step("Do something later", () => { ... })
   `,
   conditional: `
-    const result = await step("Send customer outreach", () => { ... })
+    const result = step("Send customer outreach", () => { ... })
 
     if (result.requiresFollowUp) {
-      const result = await step("Add task to Linear", () => { ... })
+      const result = step("Add task to Linear", () => { ... })
     } else {
-      const result = await step("Mark task complete", () => { ... })
+      const result = step("Mark task complete", () => { ... })
     }
   `,
 };
