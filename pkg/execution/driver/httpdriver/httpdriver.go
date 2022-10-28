@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -44,7 +45,9 @@ func Sign(ctx context.Context, key, body []byte) string {
 	if key == nil {
 		return ""
 	}
-	sig := hmac.New(sha256.New, key).Sum(body)
+	mac := hmac.New(sha256.New, key)
+	_, _ = mac.Write(body)
+	sig := hex.EncodeToString(mac.Sum(nil))
 	now := time.Now().Unix()
 	return fmt.Sprintf("t=%d,s=%s", now, sig)
 }
