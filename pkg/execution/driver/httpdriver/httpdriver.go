@@ -45,10 +45,17 @@ func Sign(ctx context.Context, key, body []byte) string {
 	if key == nil {
 		return ""
 	}
-	mac := hmac.New(sha256.New, key)
-	_, _ = mac.Write(body)
-	sig := hex.EncodeToString(mac.Sum(nil))
+
 	now := time.Now().Unix()
+
+	mac := hmac.New(sha256.New, key)
+
+	_, _ = mac.Write(body)
+	// Write the timestamp as a unix timestamp to the hmac to prevent
+	// timing attacks.
+	_, _ = mac.Write([]byte(fmt.Sprintf("%d", now)))
+
+	sig := hex.EncodeToString(mac.Sum(nil))
 	return fmt.Sprintf("t=%d&s=%s", now, sig)
 }
 
