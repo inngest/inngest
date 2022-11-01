@@ -1,0 +1,68 @@
+---
+heading: "Completing the Jamstack: What's needed in 2022?"
+subtitle: "Where the Jamstack is today and what is left to complete the vision."
+image: /assets/blog/completing-the-jamstack/featured-image.png
+date: 2022-11-02
+author: Dan Farrelly
+focus: true
+---
+
+The Jamstack has come a long way from a simple concept on how to build front-ends to an entire ecosystem and approach to building products in general. The frameworks, tools and platforms have ushered in a new era of serverless development that is performant and easily scalable with a seamless SDLC. The “stack” moniker kind of undersells it as it's not your tech stack, à la LAMP or MEAN, but an approach to building modern applications. It's 2022 and we've gotten to the a place where the [Jamstack](https://jamstack.org/) seems almost complete - but is it truly complete?
+
+## Where is the Jamstack in 2022
+
+The Jamstack as a concept was broadly introduced in 2016 and at the time it was a vision for how we should be building *front-ends*. “JAM” started with three concepts - JavaScript, APIs and Markup. It has evolved into a modern way to build applications for the web in general - not just front-ends. This shift has changed how applications are delivered, how business logic is written and where state lives.
+
+### JavaScript & Markup → Frameworks
+
+Frameworks have embraced this space providing some great tooling to both render static sites and enhance with JavaScript. This space is thriving with Next.js, Nuxt/Vue, Remix, Svelte among others. Each framework has fantastic developer productivity and takes care of things like code splitting that were once a painful and manual configuration. Platform support for each framework continues to grow and it's never been easier to build applications that statically rendered, delivered through an edge CDN all with a hands-off CI/CD workflow.
+
+### APIs → Serverless APIs / FaaS
+
+At the onset of the Jamstack paradigm, most APIs were likely run on separate backend servers, whether a container, droplet or some other PaaS. The advent of serverless and innovation on the front-end platform side pushed developers to drop the long running services and embrace functions-as-a-service (FaaS) platforms to write their synchronous API endpoints. Serverless functions are simpler to reason about for developers and FaaS platforms enabled developers to not have to worry about managing uptime and removed some overhead for thinking about scaling a backend.
+
+This is where the Jamstack started to embrace backend development and became more of a true “stack.” Frameworks like [Next.js](/docs/frameworks/nextjs) and platforms like [Vercel](/blog/vercel-integration) & [Netlify](/docs/deploy/netlify) embraced this demand and started seamlessly integrating FaaS into their previously front-end app hosting services.
+
+### APIs → Serverless databases and services
+
+The API evolution of the original “JAM” did not stop at serverless functions. The “serverless” concept took over every other *-as-a-service that could be imagined: databases, websockets, CMSes,  authentication backends, etc.. Every managed service that could be “serverless” would become serverless meaning the service would scale with your usage and needs. Planetscale, Neon, MongoDB Serverless, Pusher, Contentful among others all addressed the demand by applying the same concepts to managed services.
+
+![Graphic displaying the deliver, functionality, and backing services layers of the Jamstack in 2022](/assets/blog/completing-the-jamstack/jamstack-in-2022.jpg)
+
+It's a great picture - the next generation of developers will have amazing tools and they will expect this new level of usability and scalability by default.
+
+## What is missing?
+
+Taking a step back and comparing how I built applications in 2012 vs. how we do it in 2022, there has been innovation across the entire stack, but there are still things that were tried and true in 2012 that haven't seen industry an industry shift like other parts of the stack.
+
+I believe since a lot of the evolution has been driven from the front-end down the stack, it has been primarily focused as synchronous work. User visits an application, they perform an action, an API endpoint handles the business logic, connects to some sort of database to interact with state and returns information to the user. Front-ends are in the interaction-request-response loop, but what is missing is what is happening outside of this loop - **the asynchronous work**.
+
+Asynchronous work is a huge part of any application. It includes a great deal: running long running tasks as background jobs, scheduling work with cron jobs, data processing pipelines, [change data capture](https://en.wikipedia.org/wiki/Change_data_capture), and [handling webhooks in a performant and resilient manner](/blog/building-webhooks-that-scale). Often you need to combine all of these with database state to create complex, stateful user workflows. For example, an app may communicate with an external service, then will need to follow up with another action X hours or days later and perform another action depending on new data received.
+
+![Graphic displaying asynchronous work complimenting the state of the Jamstack in 2022](/assets/blog/completing-the-jamstack/jamstack-missing-pieces.jpg)
+
+When it comes to asynchronous work, developers are still reaching for queues and workers in some regard. Even if some queues like SQS consider themselves “serverless,” they're just pipes. The developer needs to determine how data should flow through the pipe, how to handle the output of that pipe and what to do if pipe's output isn't handled successfully. This does not align with the ethos of the evolution that we have seen in the Jamstack era.
+
+
+## Completing the picture
+
+Developers need modern solutions for these things. There are some options for background jobs that are more akin to fire-and-forget serverless API functions - these aren't the solutions that developers need. If we re-thought the use case from first principles we might come up with another solution.
+
+What would this solution look like [for modern developers](/blog/modern-serverless-job-scheduler)?
+
+- **Centered around events** - Events describe intent and action which make them ideal for reasoning about a system. Events are used in the front-end (“user clicked button”), on the backend (HTTP requests = Events), and when communicating with other systems (webhooks). It should also have a simple API requiring no pre-configuration of a queue before sending data.
+- **It calls your code, your code doesn't call it** - It should follow the model of serverless API functions and be automatically run on-demand as needed - there should not be some idling process checking for jobs to perform that you need to worry about scaling.
+- **Scales automatically** - This should be a given in 2022, but it should be a system that works from MVP to the enterprise.
+- **Great defaults, power as you need it** - Functionality every system needs for reliability and scalability should be included by default. From automatic retries of failures, concurrency, and throttling - developers should not have to roll this on their own.
+- **Combine functionality for complex workflows** - Every product eventually needs to run conditional logic based on activity (aka events) that occur over the span of hours, days, or weeks. Instead of writing separate, but related jobs, they should be able to be declared in code in [a single logical function](/features/step-functions).
+- **Developer-first** - The user experience must be imagined with the developer-first. Over are the days of enterprise tech that require massive sales and implementation engineering efforts just to figure it out.
+
+## Meet Inngest
+
+With Inngest, we've created a platform with these principles to enable developers to run any sort of asynchronous workloads all driven by event data. Any developer can [send events from ther application](/docs/events) or a third party webhook then [define a function using our SDK](/docs/functions) that will run every time that event is received by Inngest. You can [deploy your code](/docs/deploy) to several platforms and Inngest will call your code remotely and securely, on-demand. There are no queues or workers to configure - just write functions and send events! Get full event history, logs, metrics and TypeScript Type generation right out of the box.
+
+We've had Jamstack developers and non-Jamstackers tell us that we're filling a clear need in their stack - [read out docs to give us a try](/docs) and let us know what you think!
+
+_PS - We'll be launching a brand new way to build multi-step serverless workflows with delays, conditional logic and coordinate between events. Reach out to our team [on Discord](/discord) to get early access._
+
+
