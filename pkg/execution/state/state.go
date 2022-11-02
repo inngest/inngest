@@ -75,6 +75,12 @@ type Pause struct {
 	// Expression is an optional expression that must match for the pause
 	// to be resumed.
 	Expression *string `json:"expression"`
+	// ExpressionData _optionally_ stores only the data that we need to evaluate
+	// the expression from the event.  This allows us to load pauses from the
+	// state store without round trips to fetch the entire function state.  If
+	// this is empty and the pause contains an expression, function state will
+	// be loaded from the store.
+	ExpressionData map[string]any `json:"data"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout"`

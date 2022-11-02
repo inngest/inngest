@@ -323,13 +323,19 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			Msg("handling pause")
 
 		if pause.Expression != nil {
-			s, err := s.state.Load(ctx, pause.Identifier)
-			if err != nil {
-				return err
+			data := pause.ExpressionData
+
+			if len(data) == 0 {
+				// The pause had no expression data, so always load
+				// state for the function to retrieve expression data.
+				s, err := s.state.Load(ctx, pause.Identifier)
+				if err != nil {
+					return err
+				}
+				// Get expression data from the executor for the given run ID.
+				data = state.EdgeExpressionData(ctx, s, pause.Outgoing)
 			}
 
-			// Get expression data from the executor for the given run ID.
-			data := state.EdgeExpressionData(ctx, s, pause.Outgoing)
 			// Add the async event data to the expression
 			data["async"] = evtMap
 			// Compile and run the expression.
