@@ -1,7 +1,7 @@
 ---
 focus: true
-heading: "Open sourcing the anti-message queue"
-subtitle: "We're now building Inngest in the open."
+heading: "Open sourcing Inngest"
+subtitle: "The open source, serverless event-driven platform for developers."
 image: "/assets/blog/open-source-event-driven-queue.jpg"
 date: 2022-06-09
 ---

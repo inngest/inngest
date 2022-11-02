@@ -78,6 +78,24 @@ const ANGELS = [
   },
 ];
 
+// Used for key announcements and significant thought leadership for investors
+// or potential job applicants
+const FEATURED_BLOG_POSTS: { title: string; href: string }[] = [
+  {
+    title: "Modern serverless job schedulers",
+    href: "/blog/modern-serverless-job-scheduler",
+  },
+  {
+    title:
+      "Open sourcing Inngest: The serverless event-driven platform for developers",
+    href: "/blog/open-source-event-driven-queue",
+  },
+  {
+    title: "Completing the Jamstack: What's needed in 2022?",
+    href: "/blog/completing-the-jamstack",
+  },
+];
+
 export async function getStaticProps() {
   return {
     props: {
@@ -181,6 +199,25 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {FEATURED_BLOG_POSTS.length && (
+        <div>
+          <div className="container mx-auto px-10 lg:px-16 max-w-3xl py-8">
+            <div className="mx-auto py-6">
+              <h2 className="text-xl sm:text-2xl font-normal">From our blog</h2>
+            </div>
+            <div className="">
+              {FEATURED_BLOG_POSTS.map((p, idx) => (
+                <div className="mb-2">
+                  <p key={p.href} className="text-base">
+                    <a href={`${p.href}?ref=about-page`}>→ {p.title}</a>
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ marginTop: 100 }}>
         <Footer />
