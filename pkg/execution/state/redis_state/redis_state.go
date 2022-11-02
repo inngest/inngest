@@ -112,6 +112,22 @@ func WithConnectOpts(o redis.Options) Opt {
 	}
 }
 
+// WithKeyPrefix uses a specific key prefix
+func WithKeyPrefix(prefix string) Opt {
+	return func(m *mgr) {
+		m.kf = defaultKeyFunc{
+			prefix: prefix,
+		}
+	}
+}
+
+// WithRedisClient uses an already connected redis client.
+func WithRedisClient(r *redis.Client) Opt {
+	return func(m *mgr) {
+		m.r = r
+	}
+}
+
 // WithKeyGenerator specifies the function to use when creating keys for
 // each stored data type.
 func WithKeyGenerator(kf KeyGenerator) Opt {
