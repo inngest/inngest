@@ -353,7 +353,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	if err := s.state.ConsumePause(ctx, pause.ID); err != nil {
+	if err := s.state.ConsumePause(ctx, pause.ID, nil); err != nil {
 		return fmt.Errorf("error consuming timeout pause: %w", err)
 	}
 

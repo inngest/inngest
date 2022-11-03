@@ -531,8 +531,20 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 	}, leaseKey)
 }
 
-func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID) error {
+func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data map[string]any) error {
+	var (
+		marshalledData []byte
+		err            error
+	)
+
 	key := m.kf.PauseID(ctx, id)
+
+	if len(data) > 0 {
+		marshalledData, err = json.Marshal(data)
+		if err != nil {
+			return fmt.Errorf("cannot marshal data to store in state: %w", err)
+		}
+	}
 
 	return m.r.Watch(ctx, func(tx *redis.Tx) error {
 		str, err := tx.Get(ctx, key).Result()
@@ -554,6 +566,13 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID) error {
 			// Remove this from any event, also.
 			return tx.HDel(ctx, m.kf.PauseEvent(ctx, *pause.Event), pause.ID.String()).Err()
 		}
+
+		if pause.DataKey != "" && len(data) > 0 {
+			if err := m.r.HSet(ctx, m.kf.Actions(ctx, pause.Identifier), pause.DataKey, string(marshalledData)).Err(); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	}, key)
 }
@@ -675,9 +694,7 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	// The below fields are optional
-
 	if val, ok := data["debugger"]; ok {
-		fmt.Println("debugger: ", val)
 		if val == "true" {
 			m.Debugger = true
 		}

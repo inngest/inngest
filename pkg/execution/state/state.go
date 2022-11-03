@@ -91,6 +91,16 @@ type Pause struct {
 	// pause's next step.  After enqueueing, the worker can consume the pause
 	// entirely.
 	LeasedUntil *time.Time `json:"leasedUntil,omitempty"`
+
+	// DataKey is the name of the step to use when adding data to the function
+	// run's state after consuming this step.
+	//
+	// This allows us to create arbitrary "step" names for storing async event
+	// data from matching events in async edges, eg. `waitForEvent`.
+	//
+	// If DataKey is empty and data is provided when consuming a pause, no
+	// data will be saved in the function state.
+	DataKey string `json:"dataKey,omitempty"`
 }
 
 func (p Pause) Edge() inngest.Edge {
@@ -285,7 +295,10 @@ type PauseMutater interface {
 
 	// ConsumePause consumes a pause by its ID such that it can't be used again and
 	// will not be returned from any query.
-	ConsumePause(ctx context.Context, id uuid.UUID) error
+	//
+	// Any data passed when consuming a pause will be stored within function run state
+	// for future reference using the pause's DataKey.
+	ConsumePause(ctx context.Context, id uuid.UUID, data map[string]interface{}) error
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This

@@ -110,6 +110,9 @@ func CheckState(t *testing.T, gen Generator) {
 		"SavePause":                          checkSavePause,
 		"LeasePause":                         checkLeasePause,
 		"ConsumePause":                       checkConsumePause,
+		"ConsumePause/WithData":              checkConsumePauseWithData,
+		"ConsumePause/WithEmptyData":         checkConsumePauseWithEmptyData,
+		"ConsumePause/WithEmptyDataKey":      checkConsumePauseWithEmptyDataKey,
 		"PausesByEvent/Empty":                checkPausesByEvent_empty,
 		"PausesByEvent/Single":               checkPausesByEvent_single,
 		"PausesByEvent/Multiple":             checkPausesByEvent_multi,
@@ -515,7 +518,7 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 		<-time.After(state.PauseLeaseDuration / 50)
 	}
 
-	<-time.After(5 * time.Millisecond)
+	<-time.After(time.Second)
 
 	// And again, once the lease is up, we should be able to lease the pause.
 	err = m.LeasePause(ctx, pause.ID)
@@ -543,7 +546,7 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 	s := setup(t, m)
 
 	// Consuming a non-existent pause should error.
-	err := m.ConsumePause(ctx, uuid.New())
+	err := m.ConsumePause(ctx, uuid.New(), nil)
 	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
 
 	// Save a pause.
@@ -558,10 +561,10 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 
 	// Consuming the pause should work.
-	err = m.ConsumePause(ctx, pause.ID)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.NoError(t, err)
 
-	err = m.ConsumePause(ctx, pause.ID)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.NotNil(t, err)
 	require.Error(t, state.ErrPauseNotFound, err)
 
@@ -576,9 +579,165 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 		Expires:    time.Now().Add(10 * time.Millisecond),
 	}
 	<-time.After(15 * time.Millisecond)
-	err = m.ConsumePause(ctx, pause.ID)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.NotNil(t, err, "Consuming an expired pause should error")
 	require.Error(t, state.ErrPauseNotFound, err)
+}
+
+func checkConsumePauseWithData(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	pauseData := map[string]any{
+		"did this work?": true,
+	}
+
+	// Consuming a non-existent pause should error.
+	err := m.ConsumePause(ctx, uuid.New(), pauseData)
+	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
+
+	// Save a pause.
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+		DataKey:    "my-pause-data-stored-for-eternity",
+	}
+	err = m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	// Consuming the pause should work.
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
+	require.NoError(t, err)
+
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
+	require.NotNil(t, err)
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	//
+	// Assert that completing a leased pause fails.
+	//
+	pause = state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(10 * time.Millisecond),
+		DataKey:    "my-pause-data-stored-for-eternity",
+	}
+	<-time.After(15 * time.Millisecond)
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
+	require.NotNil(t, err, "Consuming an expired pause should error")
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	// Load function state and assert we have the pause stored in state.
+	reloaded, err := m.Load(ctx, s.Identifier())
+	require.Nil(t, err)
+	require.Equal(t, pauseData, reloaded.Actions()[pause.DataKey], "Pause data was not stored in the state store")
+}
+
+func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	// Consuming a non-existent pause should error.
+	err := m.ConsumePause(ctx, uuid.New(), nil)
+	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
+
+	// Save a pause.
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+		DataKey:    "my-pause-data-stored-for-eternity",
+	}
+	err = m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	// Consuming the pause should work.
+	err = m.ConsumePause(ctx, pause.ID, nil)
+	require.NoError(t, err)
+
+	err = m.ConsumePause(ctx, pause.ID, nil)
+	require.NotNil(t, err)
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	//
+	// Assert that completing a leased pause fails.
+	//
+	pause = state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(10 * time.Millisecond),
+		DataKey:    "my-pause-data-stored-for-eternity",
+	}
+	<-time.After(15 * time.Millisecond)
+	err = m.ConsumePause(ctx, pause.ID, nil)
+	require.NotNil(t, err, "Consuming an expired pause should error")
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	// Load function state and assert we have the pause stored in state.
+	reloaded, err := m.Load(ctx, s.Identifier())
+	require.Nil(t, err)
+	require.Equal(t, 0, len(reloaded.Actions()), "Pause data should not be stored if data is nil/empty")
+}
+
+func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	pauseData := map[string]any{
+		"did this work?": true,
+	}
+
+	// Consuming a non-existent pause should error.
+	err := m.ConsumePause(ctx, uuid.New(), pauseData)
+	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
+
+	// Save a pause.
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+	}
+	err = m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	// Consuming the pause should work.
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
+	require.NoError(t, err)
+
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
+	require.NotNil(t, err)
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	//
+	// Assert that completing a leased pause fails.
+	//
+	pause = state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    time.Now().Add(10 * time.Millisecond),
+	}
+	<-time.After(15 * time.Millisecond)
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
+	require.NotNil(t, err, "Consuming an expired pause should error")
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	// Load function state and assert we have the pause stored in state.
+	reloaded, err := m.Load(ctx, s.Identifier())
+	require.Nil(t, err)
+	require.Equal(t, 0, len(reloaded.Actions()), "Pause data was stored in the state store with no data key provided")
 }
 
 func checkPausesByEvent_empty(t *testing.T, m state.Manager) {
@@ -856,7 +1015,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 
 	// Consume the first pause, and assert that it doesn't show up in
 	// an iterator.
-	err = m.ConsumePause(ctx, pauses[0].ID)
+	err = m.ConsumePause(ctx, pauses[0].ID, nil)
 	require.NoError(t, err)
 
 	iter, err = m.PausesByEvent(ctx, evtA)
@@ -961,7 +1120,7 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 	require.EqualValues(t, pause, *found)
 
 	// Consume.
-	err = m.ConsumePause(ctx, pause.ID)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.Nil(t, err, "Consuming an expired pause should work")
 
 	found, err = m.PauseByID(ctx, pause.ID)

@@ -248,12 +248,27 @@ func (m *mem) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error)
 	return &pause, nil
 }
 
-func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID) error {
+func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data map[string]any) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if _, ok := m.pauses[id]; !ok {
+	pause, ok := m.pauses[id]
+	if !ok {
 		return state.ErrPauseNotFound
+	}
+
+	if pause.DataKey != "" && len(data) > 0 {
+		// Save data
+		s, ok := m.state[pause.Identifier.IdempotencyKey()]
+		if !ok {
+			return fmt.Errorf("identifier not found")
+		}
+		instance := s.(memstate)
+		// Copy the maps so that any previous state references aren't updated.
+		instance.actions = copyMap(instance.actions)
+		instance.errors = copyMap(instance.errors)
+		instance.actions[pause.DataKey] = data
+		m.state[pause.Identifier.IdempotencyKey()] = instance
 	}
 
 	delete(m.pauses, id)
