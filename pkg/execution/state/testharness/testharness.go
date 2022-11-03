@@ -477,7 +477,7 @@ func checkSavePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(5 * time.Second),
+		Expires:    state.Time(time.Now().Add(5 * time.Second)),
 	}
 	err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
@@ -491,7 +491,7 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 
 	// Leasing a non-existent pause should error.
 	err := m.LeasePause(ctx, uuid.New())
-	require.Equal(t, state.ErrPauseNotFound, err, "leasing a non-existent pause should return state.ErrPauseNotFound")
+	assert.Equal(t, state.ErrPauseNotFound, err, "leasing a non-existent pause should return state.ErrPauseNotFound")
 
 	// Save a pause.
 	pause := state.Pause{
@@ -499,16 +499,41 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).UTC()),
 	}
 	err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	now := time.Now()
 
-	// Leasing the pause should work.
-	err = m.LeasePause(ctx, pause.ID)
-	require.NoError(t, err)
+	var errors int32
+	var wg sync.WaitGroup
+	// Leasing the pause should work once over 50 parallel attempts
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			// Only one of these should work.
+			<-time.After(time.Until(time.Now().Truncate(time.Second).Add(time.Second)))
+			err = m.LeasePause(ctx, pause.ID)
+			if err != nil {
+				atomic.AddInt32(&errors, 1)
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	require.EqualValues(t, int32(49), errors)
+
+	// Fetch the pause and ensure it's formatted appropriately
+	fetched, err := m.PauseByID(ctx, pause.ID)
+	require.Nil(t, err)
+	require.NotNil(t, fetched.LeasedUntil)
+	require.WithinDuration(t, time.Now().Add(state.PauseLeaseDuration), fetched.LeasedUntil.Time(), 500*time.Millisecond)
+	require.Equal(t, pause.Expires.Time().Truncate(time.Millisecond), fetched.Expires.Time().Truncate(time.Millisecond))
+	require.Equal(t, pause.Identifier, fetched.Identifier)
+	require.Equal(t, pause.Outgoing, fetched.Outgoing)
+	require.Equal(t, pause.Incoming, fetched.Incoming)
 
 	// And we should not be able to re-lease the pause until the pause lease duration is up.
 	for time.Now().Before(now.Add(state.PauseLeaseDuration - (5 * time.Millisecond))) {
@@ -524,6 +549,12 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 	err = m.LeasePause(ctx, pause.ID)
 	require.NoError(t, err)
 
+	// Fetch the pause and ensure it's formatted appropriately
+	fetched, err = m.PauseByID(ctx, pause.ID)
+	require.Nil(t, err)
+	require.NotNil(t, fetched.LeasedUntil)
+	require.WithinDuration(t, time.Now().Add(state.PauseLeaseDuration), fetched.LeasedUntil.Time(), 500*time.Millisecond)
+
 	//
 	// Assert that leasing an expired pause fails.
 	//
@@ -533,7 +564,7 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(10 * time.Millisecond),
+		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
 	}
 	<-time.After(15 * time.Millisecond)
 	err = m.LeasePause(ctx, pause.ID)
@@ -555,7 +586,7 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 	}
 	err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
@@ -576,7 +607,7 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(10 * time.Millisecond),
+		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
 	}
 	<-time.After(15 * time.Millisecond)
 	err = m.ConsumePause(ctx, pause.ID, nil)
@@ -602,7 +633,7 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 		DataKey:    "my-pause-data-stored-for-eternity",
 	}
 	err = m.SavePause(ctx, pause)
@@ -624,7 +655,7 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(10 * time.Millisecond),
+		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
 		DataKey:    "my-pause-data-stored-for-eternity",
 	}
 	<-time.After(15 * time.Millisecond)
@@ -652,7 +683,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 		DataKey:    "my-pause-data-stored-for-eternity",
 	}
 	err = m.SavePause(ctx, pause)
@@ -674,7 +705,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(10 * time.Millisecond),
+		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
 		DataKey:    "my-pause-data-stored-for-eternity",
 	}
 	<-time.After(15 * time.Millisecond)
@@ -706,7 +737,7 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 	}
 	err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
@@ -727,7 +758,7 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(10 * time.Millisecond),
+		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
 	}
 	<-time.After(15 * time.Millisecond)
 	err = m.ConsumePause(ctx, pause.ID, pauseData)
@@ -763,7 +794,7 @@ func checkPausesByEvent_single(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC(),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
 		Event:      &evtA,
 	}
 	err := m.SavePause(ctx, pause)
@@ -775,7 +806,7 @@ func checkPausesByEvent_single(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC(),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
 		Event:      &evtB,
 	}
 	err = m.SavePause(ctx, unused)
@@ -804,7 +835,7 @@ func checkPausesByEvent_multi(t *testing.T, m state.Manager) {
 			Identifier: s.Identifier(),
 			Outgoing:   inngest.TriggerName,
 			Incoming:   w.Steps[0].ID,
-			Expires:    time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC(),
+			Expires:    state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
 			Event:      &evtA,
 		}
 		err := m.SavePause(ctx, p)
@@ -818,7 +849,7 @@ func checkPausesByEvent_multi(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   "plz-dont",
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 		Event:      &evtB,
 	}
 	err := m.SavePause(ctx, unused)
@@ -880,7 +911,7 @@ func checkPausesByEvent_concurrent(t *testing.T, m state.Manager) {
 			Identifier: s.Identifier(),
 			Outgoing:   inngest.TriggerName,
 			Incoming:   w.Steps[0].ID,
-			Expires:    time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC(),
+			Expires:    state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
 			Event:      &evtA,
 		}
 		err := m.SavePause(ctx, p)
@@ -973,7 +1004,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 			Identifier: s.Identifier(),
 			Outgoing:   inngest.TriggerName,
 			Incoming:   w.Steps[0].ID,
-			Expires:    time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC(),
+			Expires:    state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
 			Event:      &evtA,
 		}
 		err := m.SavePause(ctx, p)
@@ -1062,7 +1093,7 @@ func checkPausesByStep(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC(),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
 	}
 	err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
@@ -1072,7 +1103,7 @@ func checkPausesByStep(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   w.Steps[0].ID,
 		Incoming:   w.Steps[1].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC(),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
 	}
 	err = m.SavePause(ctx, second)
 	require.NoError(t, err)
@@ -1103,7 +1134,7 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC(),
+		Expires:    state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
 	}
 	err := m.SavePause(ctx, pause)
 	require.NoError(t, err)

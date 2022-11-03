@@ -196,14 +196,14 @@ func (m *mem) LeasePause(ctx context.Context, id uuid.UUID) error {
 	defer m.lock.Unlock()
 
 	pause, ok := m.pauses[id]
-	if !ok || pause.Expires.Before(time.Now()) {
+	if !ok || pause.Expires.Time().Before(time.Now()) {
 		return state.ErrPauseNotFound
 	}
-	if pause.LeasedUntil != nil && time.Now().Before(*pause.LeasedUntil) {
+	if pause.LeasedUntil != nil && time.Now().Before(pause.LeasedUntil.Time()) {
 		return state.ErrPauseLeased
 	}
 
-	lease := time.Now().Add(state.PauseLeaseDuration)
+	lease := state.Time(time.Now().Add(state.PauseLeaseDuration))
 	pause.LeasedUntil = &lease
 	m.pauses[id] = pause
 

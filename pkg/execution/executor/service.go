@@ -259,7 +259,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 				Identifier: run.Identifier(),
 				Outgoing:   next.Outgoing,
 				Incoming:   next.Incoming,
-				Expires:    expires,
+				Expires:    state.Time(expires),
 				Event:      &am.Event,
 				Expression: am.Match,
 				OnTimeout:  am.OnTimeout,

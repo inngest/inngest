@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -16,8 +17,22 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+//go:embed lua/*
+var embedded embed.FS
+
+var scripts = map[string]string{
+	"leasePause": "",
+}
+
 func init() {
 	registration.RegisterState(func() any { return &Config{} })
+	for k := range scripts {
+		val, err := embedded.ReadFile(fmt.Sprintf("lua/%s.lua", k))
+		if err != nil {
+			panic(fmt.Errorf("error reading redis lua script: %w", err))
+		}
+		scripts[k] = string(val)
+	}
 }
 
 // Config registers the configuration for the in-memory state store,
@@ -457,7 +472,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 			string(packed),
 			// Add at least 10 minutes to this pause, allowing us to process the
 			// pause by ID for 10 minutes past expiry.
-			time.Until(p.Expires)+(10*time.Minute),
+			time.Until(p.Expires.Time())+(10*time.Minute),
 		).Err()
 		if err != nil {
 			return err
@@ -469,7 +484,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 			ctx,
 			m.kf.PauseStep(ctx, p.Identifier, p.Outgoing),
 			p.ID.String(),
-			time.Until(p.Expires),
+			time.Until(p.Expires.Time()),
 		).Err()
 		if err != nil {
 			return err
@@ -498,37 +513,26 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 
 func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 	pauseKey := m.kf.PauseID(ctx, id)
-	leaseKey := m.kf.PauseLease(ctx, id)
-	return m.r.Watch(ctx, func(tx *redis.Tx) error {
-		exists, err := tx.Exists(ctx, pauseKey).Uint64()
-		if err != nil {
-			return err
-		}
-		if exists == 0 {
-			return state.ErrPauseNotFound
-		}
-
-		// Fetch the lease
-		str, err := tx.Get(ctx, leaseKey).Result()
-		if err != redis.Nil && err != nil {
-			return err
-		}
-		if str != "" {
-			// We have a lease.
-			leasedUntil, err := time.Parse(time.RFC3339Nano, str)
-			if err != nil {
-				return err
-			}
-
-			if time.Now().Before(leasedUntil) {
-				return state.ErrPauseLeased
-			}
-		}
-
-		// Lease the pause.
-		lease := time.Now().Add(state.PauseLeaseDuration).Format(time.RFC3339Nano)
-		return tx.Set(ctx, leaseKey, lease, time.Until(time.Now().Add(state.PauseLeaseDuration))).Err()
-	}, leaseKey)
+	status, err := redis.NewScript(scripts["leasePause"]).Eval(
+		ctx,
+		m.r,
+		[]string{pauseKey},
+		time.Now().UnixMilli(),
+		time.Now().Add(state.PauseLeaseDuration).UnixMilli(),
+	).Int64()
+	if err != nil {
+		return fmt.Errorf("error leasing pause: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return state.ErrPauseLeased
+	case 2:
+		return state.ErrPauseNotFound
+	default:
+		return fmt.Errorf("unknown response leasing pause: %d", status)
+	}
 }
 
 func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data map[string]any) error {

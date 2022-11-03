@@ -314,7 +314,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 		// NOTE: Some pauses may be nil or expired, as the iterator may take
 		// time to process.  We handle that here and assume that the event
 		// did not occur in time.
-		if pause == nil || pause.Expires.Before(time.Now()) {
+		if pause == nil || pause.Expires.Time().Before(time.Now()) {
 			continue
 		}
 

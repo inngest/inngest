@@ -68,7 +68,7 @@ type Pause struct {
 	// pause has not yet been consumed we can safely assume the event was
 	// not received.  Therefore, we must be able to load the pause for some
 	// time after timeout.
-	Expires time.Time `json:"expires"`
+	Expires Time `json:"expires"`
 	// Event is an optional event that can resume the pause automatically,
 	// often paired with an expression.
 	Event *string `json:"event"`
@@ -90,7 +90,7 @@ type Pause struct {
 	// A lease allows a single worker to claim a pause while enqueueing the
 	// pause's next step.  After enqueueing, the worker can consume the pause
 	// entirely.
-	LeasedUntil *time.Time `json:"leasedUntil,omitempty"`
+	LeasedUntil *Time `json:"leasedUntil,omitempty"`
 
 	// DataKey is the name of the step to use when adding data to the function
 	// run's state after consuming this step.
