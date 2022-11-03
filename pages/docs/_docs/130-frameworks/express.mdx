@@ -22,6 +22,9 @@ import { createFunction } from "inngest";
 import { serve } from "inngest/express";
 
 const app = express();
+// Ensure your express app parses JSON requests properly.  This MUST
+// be added to your app.
+app.use(express.json())
 
 // You'd usually have your functions defined in a separate file and imported here.
 const exampleFn = createFunction(
