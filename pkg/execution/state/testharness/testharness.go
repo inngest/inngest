@@ -514,7 +514,7 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 		go func() {
 			// Only one of these should work.
 			<-time.After(time.Until(time.Now().Truncate(time.Second).Add(time.Second)))
-			err = m.LeasePause(ctx, pause.ID)
+			err := m.LeasePause(ctx, pause.ID)
 			if err != nil {
 				atomic.AddInt32(&errors, 1)
 			}
