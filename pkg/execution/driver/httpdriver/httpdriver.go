@@ -3,6 +3,9 @@ package httpdriver
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -27,12 +30,33 @@ func Execute(ctx context.Context, s state.State, action inngest.ActionVersion, s
 }
 
 type executor struct {
-	client *http.Client
+	client     *http.Client
+	signingKey []byte
 }
 
 // RuntimeType fulfiils the inngest.Runtime interface.
 func (e executor) RuntimeType() string {
 	return "http"
+}
+
+// Sign signs the body with a private key, ensuring that HTTP handlers can verify
+// that the request comes from us.
+func Sign(ctx context.Context, key, body []byte) string {
+	if key == nil {
+		return ""
+	}
+
+	now := time.Now().Unix()
+
+	mac := hmac.New(sha256.New, key)
+
+	_, _ = mac.Write(body)
+	// Write the timestamp as a unix timestamp to the hmac to prevent
+	// timing attacks.
+	_, _ = mac.Write([]byte(fmt.Sprintf("%d", now)))
+
+	sig := hex.EncodeToString(mac.Sum(nil))
+	return fmt.Sprintf("t=%d&s=%s", now, sig)
 }
 
 func (e executor) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, step inngest.Step) (*state.DriverResponse, error) {
@@ -51,6 +75,10 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 		return nil, err
 	}
 	req.Header.Add("Content-Type", "application/json")
+
+	if len(e.signingKey) > 0 {
+		req.Header.Add("X-Inngest-Signature", Sign(ctx, e.signingKey, input))
+	}
 
 	resp, err := e.client.Do(req)
 	if err != nil {
