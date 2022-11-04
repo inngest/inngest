@@ -184,6 +184,13 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	l.Debug().Interface("edge", edge).Msg("processing step")
 
 	_, err = s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
+
+	if err == ErrFunctionRunCancelled {
+		// This run has been cancelled.  Finalize this step and ignore.
+		_ = s.state.Finalized(ctx, item.Identifier, edge.Incoming)
+		return nil
+	}
+
 	if err != nil {
 		// The executor usually returns a state.DriverResponse if the step's
 		// response was an error.  In this case, the executor itself handles
@@ -259,7 +266,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 				Identifier: run.Identifier(),
 				Outgoing:   next.Outgoing,
 				Incoming:   next.Incoming,
-				Expires:    expires,
+				Expires:    state.Time(expires),
 				Event:      &am.Event,
 				Expression: am.Match,
 				OnTimeout:  am.OnTimeout,
@@ -349,11 +356,11 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	if err != nil {
 		return err
 	}
-	if pause == nil || pause.LeasedUntil != nil {
+	if pause == nil {
 		return nil
 	}
 
-	if err := s.state.ConsumePause(ctx, pause.ID); err != nil {
+	if err := s.state.ConsumePause(ctx, pause.ID, nil); err != nil {
 		return fmt.Errorf("error consuming timeout pause: %w", err)
 	}
 

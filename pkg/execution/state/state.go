@@ -2,12 +2,31 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
 	"github.com/oklog/ulid/v2"
+)
+
+const (
+	// RunStatusRunning indicates that the function is running.  This is the
+	// default state, even if steps are scheduled in the future.
+	RunStatusRunning RunStatus = iota
+	// RunStatusComplete indicates that the function has completed running.
+	RunStatusComplete
+	// RunStatusFailed indicates that the function failed in one or more steps.
+	RunStatusFailed
+	// RunStatusCancelled indicates that the function has been cancelled prior
+	// to any errors
+	RunStatusCancelled
+)
+
+const (
+	// PauseLeaseDuration is the lifetime that a pause's lease is valid for.
+	PauseLeaseDuration = 5 * time.Second
 )
 
 var (
@@ -23,10 +42,12 @@ var (
 	ErrIdentifierExists = fmt.Errorf("identifier already exists")
 )
 
-const (
-	// PauseLeaseDuration is the lifetime that a pause's lease is valid for.
-	PauseLeaseDuration = 5 * time.Second
-)
+// RunStatus indicates the status for an individual function run.
+type RunStatus int
+
+func (r RunStatus) MarshalBinary() ([]byte, error) {
+	return json.Marshal(r)
+}
 
 // Identifier represents the unique identifier for a workflow run.
 type Identifier struct {
@@ -68,7 +89,7 @@ type Pause struct {
 	// pause has not yet been consumed we can safely assume the event was
 	// not received.  Therefore, we must be able to load the pause for some
 	// time after timeout.
-	Expires time.Time `json:"expires"`
+	Expires Time `json:"expires"`
 	// Event is an optional event that can resume the pause automatically,
 	// often paired with an expression.
 	Event *string `json:"event"`
@@ -84,13 +105,15 @@ type Pause struct {
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout"`
-	// LeasedUntil represents the time that this pause is leased until. If
-	// nil, this pause is not leased.
+	// DataKey is the name of the step to use when adding data to the function
+	// run's state after consuming this step.
 	//
-	// A lease allows a single worker to claim a pause while enqueueing the
-	// pause's next step.  After enqueueing, the worker can consume the pause
-	// entirely.
-	LeasedUntil *time.Time `json:"leasedUntil,omitempty"`
+	// This allows us to create arbitrary "step" names for storing async event
+	// data from matching events in async edges, eg. `waitForEvent`.
+	//
+	// If DataKey is empty and data is provided when consuming a pause, no
+	// data will be saved in the function state.
+	DataKey string `json:"dataKey,omitempty"`
 }
 
 func (p Pause) Edge() inngest.Edge {
@@ -108,8 +131,7 @@ func (p Pause) Edge() inngest.Edge {
 // finished.  Functions may have many parallel branches with conditional execution.
 // Given this, no single step can tell whether it's the last step within a function.
 type Metadata struct {
-	// StartedAt represents the time that this function started at.
-	StartedAt time.Time `json:"startedAt"`
+	Status RunStatus `json:"status"`
 
 	// Debugger represents whether this function was started via the debugger.
 	Debugger bool `json:"debugger"`
@@ -242,6 +264,10 @@ type Mutater interface {
 	// ErrIdentifierExists.
 	New(ctx context.Context, input Input) (State, error)
 
+	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
+	// future execution of steps.
+	Cancel(ctx context.Context, i Identifier) error
+
 	// scheduled increases the scheduled count for a run's metadata.
 	//
 	// We need to store the total number of steps enqueued to calculate when a step function
@@ -285,7 +311,10 @@ type PauseMutater interface {
 
 	// ConsumePause consumes a pause by its ID such that it can't be used again and
 	// will not be returned from any query.
-	ConsumePause(ctx context.Context, id uuid.UUID) error
+	//
+	// Any data passed when consuming a pause will be stored within function run state
+	// for future reference using the pause's DataKey.
+	ConsumePause(ctx context.Context, id uuid.UUID, data map[string]interface{}) error
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This

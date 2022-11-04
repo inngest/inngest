@@ -40,6 +40,7 @@ func NewStateManager() state.Manager {
 	return &mem{
 		state:  map[string]state.State{},
 		pauses: map[uuid.UUID]state.Pause{},
+		leases: map[uuid.UUID]time.Time{},
 		lock:   &sync.RWMutex{},
 	}
 }
@@ -47,6 +48,7 @@ func NewStateManager() state.Manager {
 type mem struct {
 	state  map[string]state.State
 	pauses map[uuid.UUID]state.Pause
+	leases map[uuid.UUID]time.Time
 	lock   *sync.RWMutex
 }
 
@@ -68,7 +70,6 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 
 	s := memstate{
 		metadata: state.Metadata{
-			StartedAt:     time.Now(),
 			Pending:       1,
 			Debugger:      input.Debugger,
 			RunType:       input.RunType,
@@ -143,6 +144,26 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string) 
 
 	instance := s.(memstate)
 	instance.metadata.Pending--
+	if instance.metadata.Pending == 0 {
+		instance.metadata.Status = state.RunStatusComplete
+	}
+
+	m.state[i.IdempotencyKey()] = instance
+
+	return nil
+}
+
+func (m *mem) Cancel(ctx context.Context, i state.Identifier) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	s, ok := m.state[i.IdempotencyKey()]
+	if !ok {
+		return fmt.Errorf("identifier not found")
+	}
+
+	instance := s.(memstate)
+	instance.metadata.Status = state.RunStatusCancelled
 	m.state[i.IdempotencyKey()] = instance
 
 	return nil
@@ -171,6 +192,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 
 	if r.Final() {
 		instance.metadata.Pending--
+		instance.metadata.Status = state.RunStatusFailed
 	}
 
 	m.state[i.IdempotencyKey()] = instance
@@ -196,17 +218,16 @@ func (m *mem) LeasePause(ctx context.Context, id uuid.UUID) error {
 	defer m.lock.Unlock()
 
 	pause, ok := m.pauses[id]
-	if !ok || pause.Expires.Before(time.Now()) {
+	if !ok || pause.Expires.Time().Before(time.Now()) {
 		return state.ErrPauseNotFound
 	}
-	if pause.LeasedUntil != nil && time.Now().Before(*pause.LeasedUntil) {
+
+	lease, ok := m.leases[id]
+	if ok && time.Now().Before(lease) {
 		return state.ErrPauseLeased
 	}
 
-	lease := time.Now().Add(state.PauseLeaseDuration)
-	pause.LeasedUntil = &lease
-	m.pauses[id] = pause
-
+	m.leases[id] = time.Now().Add(state.PauseLeaseDuration)
 	return nil
 }
 
@@ -248,12 +269,27 @@ func (m *mem) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error)
 	return &pause, nil
 }
 
-func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID) error {
+func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data map[string]any) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if _, ok := m.pauses[id]; !ok {
+	pause, ok := m.pauses[id]
+	if !ok {
 		return state.ErrPauseNotFound
+	}
+
+	if pause.DataKey != "" && len(data) > 0 {
+		// Save data
+		s, ok := m.state[pause.Identifier.IdempotencyKey()]
+		if !ok {
+			return fmt.Errorf("identifier not found")
+		}
+		instance := s.(memstate)
+		// Copy the maps so that any previous state references aren't updated.
+		instance.actions = copyMap(instance.actions)
+		instance.errors = copyMap(instance.errors)
+		instance.actions[pause.DataKey] = data
+		m.state[pause.Identifier.IdempotencyKey()] = instance
 	}
 
 	delete(m.pauses, id)

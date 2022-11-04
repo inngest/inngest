@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -16,8 +17,22 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+//go:embed lua/*
+var embedded embed.FS
+
+var scripts = map[string]string{
+	"leasePause": "",
+}
+
 func init() {
 	registration.RegisterState(func() any { return &Config{} })
+	for k := range scripts {
+		val, err := embedded.ReadFile(fmt.Sprintf("lua/%s.lua", k))
+		if err != nil {
+			panic(fmt.Errorf("error reading redis lua script: %w", err))
+		}
+		scripts[k] = string(val)
+	}
 }
 
 // Config registers the configuration for the in-memory state store,
@@ -197,10 +212,9 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	// their own redis hash for fast inserts (HSET on individual step results).
 	// However, the input event is immutable.
 	metadata := runMetadata{
-		Version:   input.Workflow.Version,
-		CreatedAt: time.Now().Truncate(time.Second),
-		Pending:   1,
-		Debugger:  input.Debugger,
+		Version:  input.Workflow.Version,
+		Pending:  1,
+		Debugger: input.Debugger,
 	}
 	if input.OriginalRunID != nil {
 		metadata.OriginalRunID = input.OriginalRunID.String()
@@ -307,6 +321,10 @@ func (m mgr) metadata(ctx context.Context, id state.Identifier) (*runMetadata, e
 	return NewRunMetadata(val)
 }
 
+func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
+	return m.r.HSet(ctx, m.kf.RunMetadata(ctx, id), "status", state.RunStatusCancelled).Err()
+}
+
 func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error) {
 	// XXX: Use a pipeliner to improve speed.
 	metadata, err := m.metadata(ctx, id)
@@ -395,11 +413,14 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		if err := m.r.HSet(ctx, m.kf.Errors(ctx, i), r.Step.ID, r.Err.Error()).Err(); err != nil {
 			return err
 		}
-		if r.Final() {
-			// Increase finalized.
-			return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Err()
+		if !r.Final() {
+			// we will retry
+			return nil
 		}
-		return nil
+		if err := m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Err(); err != nil {
+			return err
+		}
+		return m.r.HSet(ctx, m.kf.RunMetadata(ctx, i), "status", state.RunStatusFailed).Err()
 	})
 	if err != nil {
 		return nil, err
@@ -409,7 +430,14 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 }
 
 func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string) error {
-	return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Err()
+	val, err := m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Result()
+	if err != nil {
+		return err
+	}
+	if val == 0 {
+		return m.r.HSet(ctx, m.kf.RunMetadata(ctx, i), "status", state.RunStatusComplete).Err()
+	}
+	return nil
 }
 
 func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string) error {
@@ -457,7 +485,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 			string(packed),
 			// Add at least 10 minutes to this pause, allowing us to process the
 			// pause by ID for 10 minutes past expiry.
-			time.Until(p.Expires)+(10*time.Minute),
+			time.Until(p.Expires.Time())+(10*time.Minute),
 		).Err()
 		if err != nil {
 			return err
@@ -469,7 +497,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 			ctx,
 			m.kf.PauseStep(ctx, p.Identifier, p.Outgoing),
 			p.ID.String(),
-			time.Until(p.Expires),
+			time.Until(p.Expires.Time()),
 		).Err()
 		if err != nil {
 			return err
@@ -497,42 +525,42 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 }
 
 func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
-	pauseKey := m.kf.PauseID(ctx, id)
-	leaseKey := m.kf.PauseLease(ctx, id)
-	return m.r.Watch(ctx, func(tx *redis.Tx) error {
-		exists, err := tx.Exists(ctx, pauseKey).Uint64()
-		if err != nil {
-			return err
-		}
-		if exists == 0 {
-			return state.ErrPauseNotFound
-		}
-
-		// Fetch the lease
-		str, err := tx.Get(ctx, leaseKey).Result()
-		if err != redis.Nil && err != nil {
-			return err
-		}
-		if str != "" {
-			// We have a lease.
-			leasedUntil, err := time.Parse(time.RFC3339Nano, str)
-			if err != nil {
-				return err
-			}
-
-			if time.Now().Before(leasedUntil) {
-				return state.ErrPauseLeased
-			}
-		}
-
-		// Lease the pause.
-		lease := time.Now().Add(state.PauseLeaseDuration).Format(time.RFC3339Nano)
-		return tx.Set(ctx, leaseKey, lease, time.Until(time.Now().Add(state.PauseLeaseDuration))).Err()
-	}, leaseKey)
+	status, err := redis.NewScript(scripts["leasePause"]).Eval(
+		ctx,
+		m.r,
+		[]string{m.kf.PauseID(ctx, id), m.kf.PauseLease(ctx, id)},
+		time.Now().UnixMilli(),
+		state.PauseLeaseDuration.Seconds(),
+	).Int64()
+	if err != nil {
+		return fmt.Errorf("error leasing pause: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return state.ErrPauseLeased
+	case 2:
+		return state.ErrPauseNotFound
+	default:
+		return fmt.Errorf("unknown response leasing pause: %d", status)
+	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID) error {
+func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data map[string]any) error {
+	var (
+		marshalledData []byte
+		err            error
+	)
+
 	key := m.kf.PauseID(ctx, id)
+
+	if len(data) > 0 {
+		marshalledData, err = json.Marshal(data)
+		if err != nil {
+			return fmt.Errorf("cannot marshal data to store in state: %w", err)
+		}
+	}
 
 	return m.r.Watch(ctx, func(tx *redis.Tx) error {
 		str, err := tx.Get(ctx, key).Result()
@@ -554,6 +582,13 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID) error {
 			// Remove this from any event, also.
 			return tx.HDel(ctx, m.kf.PauseEvent(ctx, *pause.Event), pause.ID.String()).Err()
 		}
+
+		if pause.DataKey != "" && len(data) > 0 {
+			if err := m.r.HSet(ctx, m.kf.Actions(ctx, pause.Identifier), pause.DataKey, string(marshalledData)).Err(); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	}, key)
 }
@@ -655,17 +690,17 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 		return nil, fmt.Errorf("invalid workflow version stored in run metadata")
 	}
 
-	str, ok := data["createdAt"]
+	v, ok = data["status"]
 	if !ok {
-		return nil, fmt.Errorf("no created at stored in run metadata")
+		return nil, fmt.Errorf("no status stored in metadata")
 	}
-
-	m.CreatedAt, err = time.Parse(time.RFC3339, str)
+	status, err := strconv.Atoi(v)
 	if err != nil {
-		return nil, fmt.Errorf("invalid created at stored in run metadata")
+		return nil, fmt.Errorf("invalid workflow version stored in run metadata")
 	}
+	m.Status = state.RunStatus(status)
 
-	str, ok = data["pending"]
+	str, ok := data["pending"]
 	if !ok {
 		return nil, fmt.Errorf("no created at stored in run metadata")
 	}
@@ -675,9 +710,7 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 
 	// The below fields are optional
-
 	if val, ok := data["debugger"]; ok {
-		fmt.Println("debugger: ", val)
 		if val == "true" {
 			m.Debugger = true
 		}
@@ -696,10 +729,10 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 // creating a new run, and stores the triggering event as well as workflow-specific
 // metadata for the invocation.
 type runMetadata struct {
+	Status state.RunStatus `json:"status"`
 	// Version is required to load the correct workflow Version
 	// for the specific run.
-	Version   int       `json:"version"`
-	CreatedAt time.Time `json:"createdAt"`
+	Version int `json:"version"`
 
 	// These are the fields for standard state metadata.
 	Pending       int    `json:"pending"`
@@ -711,7 +744,7 @@ type runMetadata struct {
 func (r runMetadata) Map() map[string]any {
 	return map[string]any{
 		"version":       r.Version,
-		"createdAt":     r.CreatedAt.Format(time.RFC3339),
+		"status":        r.Status,
 		"pending":       r.Pending,
 		"debugger":      r.Debugger,
 		"runType":       r.RunType,
@@ -721,9 +754,9 @@ func (r runMetadata) Map() map[string]any {
 
 func (r runMetadata) Metadata() state.Metadata {
 	m := state.Metadata{
-		StartedAt: r.CreatedAt,
-		Pending:   r.Pending,
-		Debugger:  r.Debugger,
+		Pending:  r.Pending,
+		Debugger: r.Debugger,
+		Status:   r.Status,
 	}
 
 	if r.RunType != "" {

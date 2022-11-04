@@ -314,7 +314,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 		// NOTE: Some pauses may be nil or expired, as the iterator may take
 		// time to process.  We handle that here and assume that the event
 		// did not occur in time.
-		if pause == nil || pause.Expires.Before(time.Now()) {
+		if pause == nil || pause.Expires.Time().Before(time.Now()) {
 			continue
 		}
 
@@ -355,7 +355,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 		if pause.OnTimeout {
 			// Delete this pause, as an event has occured which matches
 			// the timeout.
-			if err := s.state.ConsumePause(ctx, pause.ID); err != nil {
+			if err := s.state.ConsumePause(ctx, pause.ID, nil); err != nil {
 				return err
 			}
 		}
@@ -404,7 +404,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			Str("pause_id", pause.ID.String()).
 			Str("run_id", pause.Identifier.RunID.String()).
 			Msg("consuming pause")
-		if err := s.state.ConsumePause(ctx, pause.ID); err != nil {
+		if err := s.state.ConsumePause(ctx, pause.ID, evtMap); err != nil {
 			return err
 		}
 	}

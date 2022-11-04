@@ -110,6 +110,9 @@ func CheckState(t *testing.T, gen Generator) {
 		"SavePause":                          checkSavePause,
 		"LeasePause":                         checkLeasePause,
 		"ConsumePause":                       checkConsumePause,
+		"ConsumePause/WithData":              checkConsumePauseWithData,
+		"ConsumePause/WithEmptyData":         checkConsumePauseWithEmptyData,
+		"ConsumePause/WithEmptyDataKey":      checkConsumePauseWithEmptyDataKey,
 		"PausesByEvent/Empty":                checkPausesByEvent_empty,
 		"PausesByEvent/Single":               checkPausesByEvent_single,
 		"PausesByEvent/Multiple":             checkPausesByEvent_multi,
@@ -117,16 +120,16 @@ func CheckState(t *testing.T, gen Generator) {
 		"PausesByEvent/Consumed":             checkPausesByEvent_consumed,
 		"PauseByStep":                        checkPausesByStep,
 		"PauseByID":                          checkPauseByID,
-		"Metadata/StartedAt":                 checkMetadataStartedAt,
 		"Idempotency":                        checkIdempotency,
+		"Cancel":                             checkCancel,
+		"Finalized/Status":                   checkFinalizedStatus,
 	}
 	for name, f := range funcs {
-		ok := t.Run(name, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			m, cleanup := gen()
 			f(t, m)
 			cleanup()
 		})
-		require.True(t, ok, name)
 	}
 }
 
@@ -152,6 +155,7 @@ func checkNew(t *testing.T, m state.Manager) {
 	found := s.Workflow()
 	require.EqualValues(t, w, found, "Returned workflow does not match input")
 	require.EqualValues(t, input.Map(), s.Event(), "Returned event does not match input")
+	require.EqualValues(t, state.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
 	loaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
@@ -229,7 +233,9 @@ func checkScheduled(t *testing.T, m state.Manager) {
 	// Load the state again.
 	loaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.EqualValues(t, len(n100.Steps), loaded.Metadata().Pending, "Scheduling 100 steps concurrently should return the correct pending count via metadata")
+	// The trigger is always pending, and we do not account for this when
+	// initializing in setup()
+	require.EqualValues(t, len(n100.Steps)+1, loaded.Metadata().Pending, "Scheduling 100 steps concurrently should return the correct pending count via metadata")
 }
 
 // checkSaveResponse_output checks the basics of saving output from a response.
@@ -272,7 +278,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 
 	// And that we have no state for the second step.
 	require.Empty(t, next.Actions()[w.Steps[1].ID])
-	require.Equal(t, 0, next.Metadata().Pending)
+	require.Equal(t, 1, next.Metadata().Pending)
 
 	//
 	// Check that saving a subsequent step saves the next output,
@@ -308,7 +314,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.EqualValues(t, r2.Output, loaded)
 	// Output shouldn't be finalized until edges are added via the runner.
-	require.Equal(t, 0, next.Metadata().Pending)
+	require.Equal(t, 1, next.Metadata().Pending)
 
 	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID)
 	require.NoError(t, err)
@@ -327,7 +333,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	require.EqualValues(t, next.Errors(), reloaded.Errors())
 
 	// Check metadata:  we must have two finalized steps.
-	require.Equal(t, -2, reloaded.Metadata().Pending)
+	require.Equal(t, -1, reloaded.Metadata().Pending)
 }
 
 func checkSaveResponse_error(t *testing.T, m state.Manager) {
@@ -347,7 +353,8 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	require.Nil(t, next.Actions()[r.Step.ID])
 	require.Equal(t, r.Err, next.Errors()[r.Step.ID])
 
-	require.Equal(t, 0, next.Metadata().Pending)
+	// Only the trigger, which was not yet complete.
+	require.Equal(t, 1, next.Metadata().Pending)
 
 	// Overwriting the error by setting as final should work and should
 	// finalize the error.
@@ -362,11 +369,10 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	require.Equal(t, r.Err, finalized.Errors()[r.Step.ID])
 
 	// Next stores an outdated reference
-	require.Equal(t, 0, next.Metadata().Pending)
+	require.Equal(t, 1, next.Metadata().Pending)
 	// But finalized should increaase finalized count.
-	require.Equal(t, -1, finalized.Metadata().Pending, "finalized error does not decrease pending count")
-
-	// Finalize via a call to the state store.
+	require.Equal(t, 0, finalized.Metadata().Pending, "finalized error does not decrease pending count")
+	require.Equal(t, state.RunStatusFailed, finalized.Metadata().Status, "finalized error does not set status to failed")
 }
 
 func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
@@ -388,7 +394,7 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 	require.Equal(t, r.Err, next.Errors()[r.Step.ID])
 
 	// This is not final
-	require.Equal(t, 0, next.Metadata().Pending)
+	require.Equal(t, 1, next.Metadata().Pending)
 
 	r.Err = nil
 	r.Output = map[string]interface{}{
@@ -402,14 +408,14 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 	// The error is still stored.
 	require.Equal(t, stepErr, next.Errors()[r.Step.ID])
 	// Saving output should not finalize.
-	require.Equal(t, 0, finalized.Metadata().Pending)
+	require.Equal(t, 1, finalized.Metadata().Pending)
 
 	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID)
 	require.NoError(t, err)
 
 	reloaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.Equal(t, -1, reloaded.Metadata().Pending)
+	require.Equal(t, 0, reloaded.Metadata().Pending)
 }
 
 func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
@@ -450,18 +456,7 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 
 	loaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.EqualValues(t, 0, loaded.Metadata().Pending, "scheduling and finalizing concurrently should end with 0")
-}
-
-func checkMetadataStartedAt(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	s := setup(t, m)
-
-	reloaded, err := m.Load(ctx, s.Identifier())
-	require.NoError(t, err)
-	require.NotNil(t, reloaded)
-
-	require.EqualValues(t, s.Metadata().StartedAt.UTC(), reloaded.Metadata().StartedAt.UTC())
+	require.EqualValues(t, 1, loaded.Metadata().Pending, "scheduling and finalizing concurrently should end with 1 (the trigger)")
 }
 
 func checkSavePause(t *testing.T, m state.Manager) {
@@ -474,7 +469,7 @@ func checkSavePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(5 * time.Second),
+		Expires:    state.Time(time.Now().Add(5 * time.Second)),
 	}
 	err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
@@ -488,7 +483,7 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 
 	// Leasing a non-existent pause should error.
 	err := m.LeasePause(ctx, uuid.New())
-	require.Equal(t, state.ErrPauseNotFound, err, "leasing a non-existent pause should return state.ErrPauseNotFound")
+	assert.Equal(t, state.ErrPauseNotFound, err, "leasing a non-existent pause should return state.ErrPauseNotFound")
 
 	// Save a pause.
 	pause := state.Pause{
@@ -496,16 +491,42 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 3).UTC()),
 	}
 	err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	now := time.Now()
 
-	// Leasing the pause should work.
-	err = m.LeasePause(ctx, pause.ID)
-	require.NoError(t, err)
+	var errors int32
+	var wg sync.WaitGroup
+
+	tick := time.Now().Add(2 * time.Second).Truncate(time.Second)
+
+	// Leasing the pause should work once over 50 parallel attempts
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			// Only one of these should work.
+			<-time.After(time.Until(tick))
+			err := m.LeasePause(ctx, pause.ID)
+			if err != nil {
+				atomic.AddInt32(&errors, 1)
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	require.EqualValues(t, int32(99), errors)
+
+	// Fetch the pause and ensure it's formatted appropriately
+	fetched, err := m.PauseByID(ctx, pause.ID)
+	require.Nil(t, err)
+	require.Equal(t, pause.Expires.Time().Truncate(time.Millisecond), fetched.Expires.Time().Truncate(time.Millisecond))
+	require.Equal(t, pause.Identifier, fetched.Identifier)
+	require.Equal(t, pause.Outgoing, fetched.Outgoing)
+	require.Equal(t, pause.Incoming, fetched.Incoming)
 
 	// And we should not be able to re-lease the pause until the pause lease duration is up.
 	for time.Now().Before(now.Add(state.PauseLeaseDuration - (5 * time.Millisecond))) {
@@ -515,7 +536,7 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 		<-time.After(state.PauseLeaseDuration / 50)
 	}
 
-	<-time.After(5 * time.Millisecond)
+	<-time.After(state.PauseLeaseDuration)
 
 	// And again, once the lease is up, we should be able to lease the pause.
 	err = m.LeasePause(ctx, pause.ID)
@@ -530,7 +551,7 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(10 * time.Millisecond),
+		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
 	}
 	<-time.After(15 * time.Millisecond)
 	err = m.LeasePause(ctx, pause.ID)
@@ -543,7 +564,7 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 	s := setup(t, m)
 
 	// Consuming a non-existent pause should error.
-	err := m.ConsumePause(ctx, uuid.New())
+	err := m.ConsumePause(ctx, uuid.New(), nil)
 	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
 
 	// Save a pause.
@@ -552,16 +573,16 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 	}
 	err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	// Consuming the pause should work.
-	err = m.ConsumePause(ctx, pause.ID)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.NoError(t, err)
 
-	err = m.ConsumePause(ctx, pause.ID)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.NotNil(t, err)
 	require.Error(t, state.ErrPauseNotFound, err)
 
@@ -573,12 +594,168 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(10 * time.Millisecond),
+		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
 	}
 	<-time.After(15 * time.Millisecond)
-	err = m.ConsumePause(ctx, pause.ID)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.NotNil(t, err, "Consuming an expired pause should error")
 	require.Error(t, state.ErrPauseNotFound, err)
+}
+
+func checkConsumePauseWithData(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	pauseData := map[string]any{
+		"did this work?": true,
+	}
+
+	// Consuming a non-existent pause should error.
+	err := m.ConsumePause(ctx, uuid.New(), pauseData)
+	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
+
+	// Save a pause.
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+		DataKey:    "my-pause-data-stored-for-eternity",
+	}
+	err = m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	// Consuming the pause should work.
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
+	require.NoError(t, err)
+
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
+	require.NotNil(t, err)
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	//
+	// Assert that completing a leased pause fails.
+	//
+	pause = state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
+		DataKey:    "my-pause-data-stored-for-eternity",
+	}
+	<-time.After(15 * time.Millisecond)
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
+	require.NotNil(t, err, "Consuming an expired pause should error")
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	// Load function state and assert we have the pause stored in state.
+	reloaded, err := m.Load(ctx, s.Identifier())
+	require.Nil(t, err)
+	require.Equal(t, pauseData, reloaded.Actions()[pause.DataKey], "Pause data was not stored in the state store")
+}
+
+func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	// Consuming a non-existent pause should error.
+	err := m.ConsumePause(ctx, uuid.New(), nil)
+	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
+
+	// Save a pause.
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+		DataKey:    "my-pause-data-stored-for-eternity",
+	}
+	err = m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	// Consuming the pause should work.
+	err = m.ConsumePause(ctx, pause.ID, nil)
+	require.NoError(t, err)
+
+	err = m.ConsumePause(ctx, pause.ID, nil)
+	require.NotNil(t, err)
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	//
+	// Assert that completing a leased pause fails.
+	//
+	pause = state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
+		DataKey:    "my-pause-data-stored-for-eternity",
+	}
+	<-time.After(15 * time.Millisecond)
+	err = m.ConsumePause(ctx, pause.ID, nil)
+	require.NotNil(t, err, "Consuming an expired pause should error")
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	// Load function state and assert we have the pause stored in state.
+	reloaded, err := m.Load(ctx, s.Identifier())
+	require.Nil(t, err)
+	require.Equal(t, 0, len(reloaded.Actions()), "Pause data should not be stored if data is nil/empty")
+}
+
+func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	pauseData := map[string]any{
+		"did this work?": true,
+	}
+
+	// Consuming a non-existent pause should error.
+	err := m.ConsumePause(ctx, uuid.New(), pauseData)
+	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
+
+	// Save a pause.
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+	}
+	err = m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	// Consuming the pause should work.
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
+	require.NoError(t, err)
+
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
+	require.NotNil(t, err)
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	//
+	// Assert that completing a leased pause fails.
+	//
+	pause = state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
+	}
+	<-time.After(15 * time.Millisecond)
+	err = m.ConsumePause(ctx, pause.ID, pauseData)
+	require.NotNil(t, err, "Consuming an expired pause should error")
+	require.Error(t, state.ErrPauseNotFound, err)
+
+	// Load function state and assert we have the pause stored in state.
+	reloaded, err := m.Load(ctx, s.Identifier())
+	require.Nil(t, err)
+	require.Equal(t, 0, len(reloaded.Actions()), "Pause data was stored in the state store with no data key provided")
 }
 
 func checkPausesByEvent_empty(t *testing.T, m state.Manager) {
@@ -604,7 +781,7 @@ func checkPausesByEvent_single(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC(),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
 		Event:      &evtA,
 	}
 	err := m.SavePause(ctx, pause)
@@ -616,7 +793,7 @@ func checkPausesByEvent_single(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC(),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
 		Event:      &evtB,
 	}
 	err = m.SavePause(ctx, unused)
@@ -645,7 +822,7 @@ func checkPausesByEvent_multi(t *testing.T, m state.Manager) {
 			Identifier: s.Identifier(),
 			Outgoing:   inngest.TriggerName,
 			Incoming:   w.Steps[0].ID,
-			Expires:    time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC(),
+			Expires:    state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
 			Event:      &evtA,
 		}
 		err := m.SavePause(ctx, p)
@@ -659,7 +836,7 @@ func checkPausesByEvent_multi(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   "plz-dont",
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 		Event:      &evtB,
 	}
 	err := m.SavePause(ctx, unused)
@@ -721,7 +898,7 @@ func checkPausesByEvent_concurrent(t *testing.T, m state.Manager) {
 			Identifier: s.Identifier(),
 			Outgoing:   inngest.TriggerName,
 			Incoming:   w.Steps[0].ID,
-			Expires:    time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC(),
+			Expires:    state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
 			Event:      &evtA,
 		}
 		err := m.SavePause(ctx, p)
@@ -814,7 +991,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 			Identifier: s.Identifier(),
 			Outgoing:   inngest.TriggerName,
 			Incoming:   w.Steps[0].ID,
-			Expires:    time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC(),
+			Expires:    state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
 			Event:      &evtA,
 		}
 		err := m.SavePause(ctx, p)
@@ -856,7 +1033,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 
 	// Consume the first pause, and assert that it doesn't show up in
 	// an iterator.
-	err = m.ConsumePause(ctx, pauses[0].ID)
+	err = m.ConsumePause(ctx, pauses[0].ID, nil)
 	require.NoError(t, err)
 
 	iter, err = m.PausesByEvent(ctx, evtA)
@@ -903,7 +1080,7 @@ func checkPausesByStep(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC(),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
 	}
 	err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
@@ -913,7 +1090,7 @@ func checkPausesByStep(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   w.Steps[0].ID,
 		Incoming:   w.Steps[1].ID,
-		Expires:    time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC(),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
 	}
 	err = m.SavePause(ctx, second)
 	require.NoError(t, err)
@@ -944,7 +1121,7 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC(),
+		Expires:    state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
 	}
 	err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
@@ -961,7 +1138,7 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 	require.EqualValues(t, pause, *found)
 
 	// Consume.
-	err = m.ConsumePause(ctx, pause.ID)
+	err = m.ConsumePause(ctx, pause.ID, nil)
 	require.Nil(t, err, "Consuming an expired pause should work")
 
 	found, err = m.PauseByID(ctx, pause.ID)
@@ -990,12 +1167,16 @@ func checkIdempotency(t *testing.T, m state.Manager) {
 
 	var errCount int32
 	var okCount int32
+
+	tick := time.Now().Add(2 * time.Second).Truncate(time.Second)
+
 	wg := &sync.WaitGroup{}
 	for i := 0; i < 100; i++ {
 		copiedID := id
 
 		wg.Add(1)
 		go func() {
+			<-time.After(time.Until(tick))
 			// Create a new Run ID each time
 			copiedID.RunID = ulid.MustNew(ulid.Now(), rand.Reader)
 
@@ -1022,7 +1203,7 @@ func checkIdempotency(t *testing.T, m state.Manager) {
 	assert.Equal(t, int32(99), atomic.LoadInt32(&errCount), "Must have errored 99 times when the run ID exists")
 }
 
-func setup(t *testing.T, m state.Manager) state.State {
+func checkCancel(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
@@ -1040,10 +1221,50 @@ func setup(t *testing.T, m state.Manager) state.State {
 
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
+	require.EqualValues(t, state.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
-	// We assume that the trigger has been handled and is not
-	// part of the pending count when calling setup.
-	err = m.Finalized(ctx, id, inngest.TriggerName)
+	err = m.Cancel(ctx, s.Identifier())
+	require.NoError(t, err)
+
+	reloaded, err := m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	require.EqualValues(t, state.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Running")
+}
+
+func checkFinalizedStatus(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+	loaded, err := m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	require.Equal(t, state.RunStatusRunning, loaded.Metadata().Status, fmt.Sprintf("expected status to be %d", state.RunStatusRunning))
+
+	// Finalize, reducing count to 0 which should set status to complete.
+	err = m.Finalized(ctx, s.Identifier(), inngest.TriggerName)
+	require.NoError(t, err)
+
+	loaded, err = m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	require.Equal(t, state.RunStatusComplete, loaded.Metadata().Status, "Finalizing step setting pending to 0 should set status to state.RunStatusComplete")
+	require.Equal(t, 0, loaded.Metadata().Pending)
+}
+
+func setup(t *testing.T, m state.Manager) state.State {
+	ctx := context.Background()
+	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{
+		WorkflowID: w.UUID,
+		RunID:      runID,
+		Key:        runID.String(),
+	}
+
+	init := state.Input{
+		Identifier: id,
+		Workflow:   w,
+		EventData:  input.Map(),
+	}
+
+	s, err := m.New(ctx, init)
 	require.NoError(t, err)
 
 	return s

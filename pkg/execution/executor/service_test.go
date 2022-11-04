@@ -329,7 +329,8 @@ func TestHandleAsyncService(t *testing.T) {
 	pause := pauses.Val(ctx)
 
 	// Pretend that we received an "async/continue" event via the runner.
-	err = data.sm.ConsumePause(ctx, pause.ID)
+	// XXX: Maybe add data here as a test.
+	err = data.sm.ConsumePause(ctx, pause.ID, nil)
 	require.NoError(t, err)
 	err = data.q.Enqueue(
 		ctx,
