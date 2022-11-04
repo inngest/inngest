@@ -1,0 +1,23 @@
+{
+  "name": "ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "preact": "^10.11.2"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.4.0",
+    "autoprefixer": "^10.4.13",
+    "postcss": "^8.4.18",
+    "tailwindcss": "^3.2.1",
+    "typescript": "^4.6.4",
+    "vite": "^3.2.0",
+    "vite-plugin-singlefile": "^0.12.3"
+  }
+}
