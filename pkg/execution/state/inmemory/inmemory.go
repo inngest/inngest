@@ -106,7 +106,7 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 		metadata:   state.Metadata{},
 		identifier: i,
 		event:      map[string]interface{}{},
-		actions:    map[string]map[string]interface{}{},
+		actions:    map[string]any{},
 		errors:     map[string]error{},
 	}
 
@@ -269,7 +269,7 @@ func (m *mem) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error)
 	return &pause, nil
 }
 
-func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data map[string]any) error {
+func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -278,7 +278,7 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data map[string]an
 		return state.ErrPauseNotFound
 	}
 
-	if pause.DataKey != "" && len(data) > 0 {
+	if pause.DataKey != "" {
 		// Save data
 		s, ok := m.state[pause.Identifier.IdempotencyKey()]
 		if !ok {

@@ -355,8 +355,8 @@ func TestHandleAsyncService(t *testing.T) {
 	run, err = data.sm.Load(ctx, id)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(run.Actions()))
-	require.EqualValues(t, map[string]map[string]interface{}{
-		"1": {"id": 1},
+	require.EqualValues(t, map[string]any{
+		"1": map[string]any{"id": 1},
 	}, run.Actions())
 	require.Equal(t, 2, run.Metadata().Pending)
 
@@ -366,9 +366,9 @@ func TestHandleAsyncService(t *testing.T) {
 	<-time.After(timeout + buffer)
 	run, err = data.sm.Load(ctx, id)
 	require.NoError(t, err)
-	require.EqualValues(t, map[string]map[string]interface{}{
-		"1": {"id": 1},
-		"2": {"id": 2},
+	require.EqualValues(t, map[string]any{
+		"1": map[string]any{"id": 1},
+		"2": map[string]any{"id": 2},
 	}, run.Actions())
 	require.Equal(t, 0, run.Metadata().Pending)
 
