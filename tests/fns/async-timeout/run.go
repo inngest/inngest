@@ -45,7 +45,7 @@ func Do(ctx context.Context) testdsl.Chain {
 			map[string]any{
 				"message": "scheduling pause timeout step",
 			},
-			time.Second,
+			2*time.Second,
 		),
 		testdsl.RequireLogFieldsWithin(
 			map[string]any{
