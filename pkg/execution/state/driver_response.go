@@ -1,11 +1,69 @@
 package state
 
 import (
+	"encoding/json"
+	"fmt"
+	"time"
+
 	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/xhit/go-str2duration/v2"
 )
 
 type Retryable interface {
 	Retryable() bool
+}
+
+type GeneratorOpcode struct {
+	// Op represents the type of operation invoked in the function.
+	Op enums.Opcode `json:"op"`
+	// ID represents a unique ID for the operation, in the format of:
+	// "$index:$name".  The data for this must be stored in the action
+	// field within a state store.
+	ID string `json:"id"`
+	// Opts indicate options for the operation, eg. matching expressions
+	// when setting up async event listeners via `waitForEvent`, or retry
+	// policies for steps.
+	Opts any `json:"opts"`
+	// Data is the resulting data from the operation, eg. the step
+	// output.
+	Data []byte `json:"data"`
+}
+
+func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
+	opts := WaitForEventOpts{
+		Event: g.ID,
+	}
+	if opts.Event == "" {
+		return nil, fmt.Errorf("An event name must be provided when waiting for an event")
+	}
+
+	if err := json.Unmarshal(g.Data, &opts); err != nil {
+		return nil, err
+	}
+	return &opts, nil
+}
+
+func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
+	if g.Op != enums.OpcodeSleep {
+		return 0, fmt.Errorf("unable to return sleep duration for opcode %s", g.Op.String())
+	}
+	return str2duration.ParseDuration(g.ID)
+}
+
+type WaitForEventOpts struct {
+	Timeout string  `json:"timeout"`
+	If      *string `json:"if"`
+	// Event is taken from GeneratorOpcode.ID
+	Event string `json:"-"`
+}
+
+func (w WaitForEventOpts) Expires() (time.Time, error) {
+	dur, err := str2duration.ParseDuration(w.Timeout)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Now().Add(dur), nil
 }
 
 // DriverResponse is returned after a driver executes an action.  This represents any
@@ -18,6 +76,22 @@ type Retryable interface {
 type DriverResponse struct {
 	// Step represents the step that this response is for.
 	Step inngest.Step `json:"step"`
+
+	// Generator indicates that this response is a partial repsonse from a
+	// SDK-based step (generator) function.  These functions are invoked
+	// multiple times with function state, and return a 206 Partial Content
+	// with an opcode indicating the next action (eg. wait for event, run step,
+	// sleep, etc.)
+	//
+	// The flow for an SDK-based step/generator function is:
+	//
+	//    1. Function runs.
+	//    2. It hits a step.  The step immediately runs, and we return an
+	//       opcode [consts.RanStep, "step name/data", { output }]
+	//    3. We store this in the state, then continue to invoke the function
+	//       with mutated state.  Each tool inside the function (step/wait)
+	//       returns a new opcode which we store in step state.
+	Generator *GeneratorOpcode `json:"generator,omitempty"`
 
 	// Scheduled, if set to true, represents that the action has been
 	// scheduled and will run asynchronously.  The output is not available.

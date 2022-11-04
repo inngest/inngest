@@ -240,12 +240,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 			// caller to show only step outputs, etc.
 			log.Info().
 				Str("caller", "output").
+				Interface("generator", resp.Generator).
 				Interface("output", resp.Output).
 				Str("run_id", id.RunID.String()).
 				Str("step", from).
 				Msg("step output")
 		}
-
 	}
 
 	if err != nil {
