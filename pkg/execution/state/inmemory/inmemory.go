@@ -40,6 +40,7 @@ func NewStateManager() state.Manager {
 	return &mem{
 		state:  map[string]state.State{},
 		pauses: map[uuid.UUID]state.Pause{},
+		leases: map[uuid.UUID]time.Time{},
 		lock:   &sync.RWMutex{},
 	}
 }
@@ -47,6 +48,7 @@ func NewStateManager() state.Manager {
 type mem struct {
 	state  map[string]state.State
 	pauses map[uuid.UUID]state.Pause
+	leases map[uuid.UUID]time.Time
 	lock   *sync.RWMutex
 }
 
@@ -199,14 +201,13 @@ func (m *mem) LeasePause(ctx context.Context, id uuid.UUID) error {
 	if !ok || pause.Expires.Time().Before(time.Now()) {
 		return state.ErrPauseNotFound
 	}
-	if pause.LeasedUntil != nil && time.Now().Before(pause.LeasedUntil.Time()) {
+
+	lease, ok := m.leases[id]
+	if ok && time.Now().Before(lease) {
 		return state.ErrPauseLeased
 	}
 
-	lease := state.Time(time.Now().Add(state.PauseLeaseDuration))
-	pause.LeasedUntil = &lease
-	m.pauses[id] = pause
-
+	m.leases[id] = time.Now().Add(state.PauseLeaseDuration)
 	return nil
 }
 

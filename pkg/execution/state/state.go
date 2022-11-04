@@ -84,14 +84,6 @@ type Pause struct {
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout"`
-	// LeasedUntil represents the time that this pause is leased until. If
-	// nil, this pause is not leased.
-	//
-	// A lease allows a single worker to claim a pause while enqueueing the
-	// pause's next step.  After enqueueing, the worker can consume the pause
-	// entirely.
-	LeasedUntil *Time `json:"leasedUntil,omitempty"`
-
 	// DataKey is the name of the step to use when adding data to the function
 	// run's state after consuming this step.
 	//

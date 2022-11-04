@@ -349,7 +349,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	if err != nil {
 		return err
 	}
-	if pause == nil || pause.LeasedUntil != nil {
+	if pause == nil {
 		return nil
 	}
 

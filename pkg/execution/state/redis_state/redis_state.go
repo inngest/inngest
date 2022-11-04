@@ -512,13 +512,12 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 }
 
 func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
-	pauseKey := m.kf.PauseID(ctx, id)
 	status, err := redis.NewScript(scripts["leasePause"]).Eval(
 		ctx,
 		m.r,
-		[]string{pauseKey},
+		[]string{m.kf.PauseID(ctx, id), m.kf.PauseLease(ctx, id)},
 		time.Now().UnixMilli(),
-		time.Now().Add(state.PauseLeaseDuration).UnixMilli(),
+		state.PauseLeaseDuration.Seconds(),
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error leasing pause: %w", err)

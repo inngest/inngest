@@ -499,7 +499,7 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).UTC()),
+		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 3).UTC()),
 	}
 	err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
@@ -508,12 +508,15 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 
 	var errors int32
 	var wg sync.WaitGroup
+
+	tick := time.Now().Add(2 * time.Second).Truncate(time.Second)
+
 	// Leasing the pause should work once over 50 parallel attempts
-	for i := 0; i < 50; i++ {
+	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func() {
 			// Only one of these should work.
-			<-time.After(time.Until(time.Now().Truncate(time.Second).Add(time.Second)))
+			<-time.After(time.Until(tick))
 			err := m.LeasePause(ctx, pause.ID)
 			if err != nil {
 				atomic.AddInt32(&errors, 1)
@@ -523,13 +526,11 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 	}
 
 	wg.Wait()
-	require.EqualValues(t, int32(49), errors)
+	require.EqualValues(t, int32(99), errors)
 
 	// Fetch the pause and ensure it's formatted appropriately
 	fetched, err := m.PauseByID(ctx, pause.ID)
 	require.Nil(t, err)
-	require.NotNil(t, fetched.LeasedUntil)
-	require.WithinDuration(t, time.Now().Add(state.PauseLeaseDuration), fetched.LeasedUntil.Time(), 500*time.Millisecond)
 	require.Equal(t, pause.Expires.Time().Truncate(time.Millisecond), fetched.Expires.Time().Truncate(time.Millisecond))
 	require.Equal(t, pause.Identifier, fetched.Identifier)
 	require.Equal(t, pause.Outgoing, fetched.Outgoing)
@@ -543,17 +544,11 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 		<-time.After(state.PauseLeaseDuration / 50)
 	}
 
-	<-time.After(time.Second)
+	<-time.After(state.PauseLeaseDuration)
 
 	// And again, once the lease is up, we should be able to lease the pause.
 	err = m.LeasePause(ctx, pause.ID)
 	require.NoError(t, err)
-
-	// Fetch the pause and ensure it's formatted appropriately
-	fetched, err = m.PauseByID(ctx, pause.ID)
-	require.Nil(t, err)
-	require.NotNil(t, fetched.LeasedUntil)
-	require.WithinDuration(t, time.Now().Add(state.PauseLeaseDuration), fetched.LeasedUntil.Time(), 500*time.Millisecond)
 
 	//
 	// Assert that leasing an expired pause fails.
