@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
@@ -341,6 +342,22 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	// set this.
 	response.Step = *action
 
+	// NOTE: We must ensure that the Step ID is overwritten for Generator steps.  Generator
+	// steps are executed many times until they stop yielding;  each execution returns a
+	// new step ID and data that must be stored independently of the parent generator ID.
+	//
+	// By updating the step ID, we ensure that the data will be saved to the generator's ID.
+	if response.Generator != nil {
+		response.Step.ID = response.Generator.ID
+		// Unmarshal the generator data into the step.
+		if response.Generator.Data != nil {
+			err = json.Unmarshal(response.Generator.Data, &response.Output)
+			if err != nil {
+				response.Err = fmt.Errorf("error unmarshalling generator step data as json: %w", err)
+			}
+		}
+	}
+
 	if response.ActionVersion == nil {
 		// Set the ActionVersion automatically from the executor, where
 		// provided from the definition.
@@ -370,15 +387,6 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 
 	if l != nil {
 		logger.From(ctx).Trace().Msg("saving response to state")
-	}
-
-	// NOTE: We must ensure that the Step ID is overwritten for Generator steps.  Generator
-	// steps are executed many times until they stop yielding;  each execution returns a
-	// new step ID and data that must be stored independently of the parent generator ID.
-	//
-	// By updating the step ID, we ensure that the data will be saved to the generator's ID.
-	if response.Generator != nil {
-		response.Step.ID = response.Generator.ID
 	}
 
 	if _, serr := e.sm.SaveResponse(ctx, id, *response, attempt); serr != nil {

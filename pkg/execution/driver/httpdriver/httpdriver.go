@@ -104,15 +104,7 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 			return nil, fmt.Errorf("invalid opcode returned in response")
 		}
 
-		var output any
-		if gen.Data != nil {
-			if err = json.Unmarshal(gen.Data, &output); err != nil {
-				return nil, fmt.Errorf("error unmarshalling generator step data as json: %w", err)
-			}
-		}
-
 		return &state.DriverResponse{
-			Output:        output,
 			Generator:     gen,
 			ActionVersion: action.Version,
 		}, nil

@@ -3,12 +3,14 @@ package executor
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/inmemory"
@@ -187,6 +189,113 @@ func TestExecute_state(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(s.Actions()))
 	assert.Equal(t, 1, len(s.Errors()))
+}
+
+func TestExecute_Generator(t *testing.T) {
+	ctx := context.Background()
+	sm := inmemory.NewStateManager()
+
+	al := inmemorydatastore.NewInMemoryActionLoader()
+	al.Add(inngest.ActionVersion{
+		DSN: "test",
+		Runtime: inngest.RuntimeWrapper{
+			Runtime: &mockdriver.Mock{},
+		},
+	})
+
+	w := inngest.Workflow{
+		UUID: uuid.New(),
+		Steps: []inngest.Step{
+			{
+				DSN: "test",
+				ID:  "step",
+			},
+		},
+		Edges: []inngest.Edge{
+			{
+				Outgoing: inngest.TriggerName,
+				Incoming: "step",
+			},
+		},
+	}
+
+	id := state.Identifier{WorkflowID: w.UUID, RunID: ulid.MustNew(ulid.Now(), rand.Reader)}
+
+	s, err := sm.New(ctx, state.Input{
+		Workflow:   w,
+		Identifier: id,
+		EventData:  map[string]interface{}{},
+	})
+	require.Nil(t, err)
+
+	responses := map[string]state.DriverResponse{
+		"step": {
+			Output: map[string]interface{}{"id": 1},
+			Generator: &state.GeneratorOpcode{
+				Op: enums.OpcodeStep,
+				ID: "1:some-id",
+				// JSON encoded string
+				Data: []byte(`"hello"`),
+			},
+		},
+	}
+	driver := &mockdriver.Mock{
+		Responses: responses,
+	}
+
+	exec, err := NewExecutor(
+		WithStateManager(sm),
+		WithActionLoader(al),
+		WithRuntimeDrivers(driver),
+	)
+	require.Nil(t, err)
+	require.NotNil(t, exec)
+
+	// Executing the trigger does nothing but validate which descendents from the trigger
+	// in the dag can run.
+	_, err = exec.Execute(ctx, s.Identifier(), inngest.TriggerName, 0)
+	assert.NoError(t, err)
+	assert.Equal(t, len(driver.Executed), 0)
+
+	// Execute the first generator step.
+	_, err = exec.Execute(ctx, s.Identifier(), "step", 0)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(driver.Executed))
+	// Ensure we recorded state.
+	s, err = sm.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	output := s.Actions()
+	assert.Equal(t, 1, len(output))
+	assert.Equal(t, "hello", output["1:some-id"], "Data should be unmarshalled JSON")
+
+	// Update the responses map with another generator.
+	data := map[string]any{
+		"u wot": "m8",
+		"ok":    []any{true, false},
+	}
+	byt, _ := json.Marshal(data)
+	driver.Responses = map[string]state.DriverResponse{
+		"step": {
+			Output: map[string]interface{}{"id": 1},
+			Generator: &state.GeneratorOpcode{
+				Op:   enums.OpcodeStep,
+				ID:   "2:another-id",
+				Data: byt,
+			},
+		},
+	}
+
+	// Execute the second generator step.
+	_, err = exec.Execute(ctx, s.Identifier(), "step", 0)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(driver.Executed))
+	// Ensure we recorded state.
+	s, err = sm.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	output = s.Actions()
+	assert.Equal(t, 2, len(output))
+	assert.Equal(t, "hello", output["1:some-id"], "Data should be unmarshalled JSON")
+	assert.Equal(t, data, output["2:another-id"], "Data should be unmarshalled JSON")
 }
 
 // TestExecute_edge_expressions asserts that we execute expressions using the correct
