@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
@@ -88,6 +89,25 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 	byt, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode == 206 {
+		// This is a generator-based function returning opcodes.
+		gen := &state.GeneratorOpcode{}
+		if err := json.Unmarshal(byt, gen); err == nil {
+			// When we return a 206, we always expect that this is
+			// a generator function.  Users SHOULD NOT return a 206
+			// in any other circumstance.
+			return nil, fmt.Errorf("error reading generator opcode response: %w", err)
+		}
+		if gen.Op == enums.OpcodeNone {
+			return nil, fmt.Errorf("invalid opcode returned in response")
+		}
+
+		return &state.DriverResponse{
+			Generator:     gen,
+			ActionVersion: action.Version,
+		}, nil
 	}
 
 	var body interface{}
