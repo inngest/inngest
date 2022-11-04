@@ -20,12 +20,14 @@ const removeLeadingSpaces = (snippet: string): string => {
 const CodeWindow = ({
   snippet,
   className = "",
+  style = {},
   filename = "",
   theme = "light",
   type = "editor",
 }: {
   snippet: string;
   className?: string;
+  style?: object;
   filename?: string;
   theme?: "light" | "dark";
   type?: "editor" | "terminal";
@@ -37,7 +39,11 @@ const CodeWindow = ({
   return (
     <Window
       className={`p-2 ${className}`}
-      style={{ backgroundColor, borderRadius: "var(--border-radius)" }}
+      style={{
+        backgroundColor,
+        borderRadius: "var(--border-radius)",
+        ...style,
+      }}
     >
       <div className="window-header mb-1 flex gap-1 relative">
         <div className="w-2.5 h-2.5 border border-slate-300 rounded-full"></div>
