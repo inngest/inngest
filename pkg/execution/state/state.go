@@ -187,13 +187,13 @@ type State interface {
 	Event() map[string]interface{}
 
 	// Actions returns a map of all output from each individual action.
-	Actions() map[string]map[string]interface{}
+	Actions() map[string]any
 
 	// Errors returns all actions that have errored.
 	Errors() map[string]error
 
 	// ActionID returns the action output or error for the given ID.
-	ActionID(id string) (map[string]interface{}, error)
+	ActionID(id string) (any, error)
 
 	// ActionComplete returns whether the action with the given ID has finished,
 	// ie. has completed with data stored in state.
@@ -249,7 +249,7 @@ type Input struct {
 
 	// Steps allows users to specify pre-defined steps to run workflows from
 	// arbitrary points.
-	Steps map[string]map[string]any
+	Steps map[string]any
 }
 
 // Mutater mutates state for a given identifier, storing the state and returning
@@ -314,7 +314,7 @@ type PauseMutater interface {
 	//
 	// Any data passed when consuming a pause will be stored within function run state
 	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, id uuid.UUID, data map[string]interface{}) error
+	ConsumePause(ctx context.Context, id uuid.UUID, data any) error
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This

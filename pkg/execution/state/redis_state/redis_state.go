@@ -362,9 +362,9 @@ func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error)
 	if err != nil {
 		return nil, err
 	}
-	actions := map[string]map[string]any{}
+	actions := map[string]any{}
 	for stepID, marshalled := range rmap {
-		data := map[string]any{}
+		var data any
 		err = json.Unmarshal([]byte(marshalled), &data)
 		if err != nil {
 			return nil, err
@@ -444,7 +444,7 @@ func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string) e
 	return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", 1).Err()
 }
 
-func (m mgr) SaveActionOutput(ctx context.Context, id state.Identifier, actionID string, data map[string]interface{}) (state.State, error) {
+func (m mgr) SaveActionOutput(ctx context.Context, id state.Identifier, actionID string, data any) (state.State, error) {
 	str, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -547,7 +547,7 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data map[string]any) error {
+func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 	var (
 		marshalledData []byte
 		err            error
@@ -555,11 +555,9 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data map[string]any
 
 	key := m.kf.PauseID(ctx, id)
 
-	if len(data) > 0 {
-		marshalledData, err = json.Marshal(data)
-		if err != nil {
-			return fmt.Errorf("cannot marshal data to store in state: %w", err)
-		}
+	marshalledData, err = json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("cannot marshal data to store in state: %w", err)
 	}
 
 	return m.r.Watch(ctx, func(tx *redis.Tx) error {
@@ -583,7 +581,7 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data map[string]any
 			return tx.HDel(ctx, m.kf.PauseEvent(ctx, *pause.Event), pause.ID.String()).Err()
 		}
 
-		if pause.DataKey != "" && len(data) > 0 {
+		if pause.DataKey != "" {
 			if err := m.r.HSet(ctx, m.kf.Actions(ctx, pause.Identifier), pause.DataKey, string(marshalledData)).Err(); err != nil {
 				return err
 			}

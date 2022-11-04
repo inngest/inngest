@@ -184,8 +184,8 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 		Identifier: id,
 		Workflow:   w,
 		EventData:  input.Map(),
-		Steps: map[string]map[string]any{
-			"step-a": {
+		Steps: map[string]any{
+			"step-a": map[string]any{
 				"result": "predetermined",
 			},
 		},
@@ -703,7 +703,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
 	// Load function state and assert we have the pause stored in state.
 	reloaded, err := m.Load(ctx, s.Identifier())
 	require.Nil(t, err)
-	require.Equal(t, 0, len(reloaded.Actions()), "Pause data should not be stored if data is nil/empty")
+	require.Equal(t, 1, len(reloaded.Actions()), "Pause data should still be stored if data is nil")
 }
 
 func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {

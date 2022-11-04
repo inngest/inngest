@@ -52,10 +52,10 @@ func (mr *MockStateMockRecorder) ActionComplete(id interface{}) *gomock.Call {
 }
 
 // ActionID mocks base method.
-func (m *MockState) ActionID(id string) (map[string]interface{}, error) {
+func (m *MockState) ActionID(id string) (any, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ActionID", id)
-	ret0, _ := ret[0].(map[string]interface{})
+	ret0, _ := ret[0].(any)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -67,10 +67,10 @@ func (mr *MockStateMockRecorder) ActionID(id interface{}) *gomock.Call {
 }
 
 // Actions mocks base method.
-func (m *MockState) Actions() map[string]map[string]interface{} {
+func (m *MockState) Actions() map[string]any {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Actions")
-	ret0, _ := ret[0].(map[string]map[string]interface{})
+	ret0, _ := ret[0].(map[string]any)
 	return ret0
 }
 

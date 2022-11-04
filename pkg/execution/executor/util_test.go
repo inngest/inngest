@@ -21,8 +21,8 @@ func TestParseWait(t *testing.T) {
 		map[string]any{
 			"data": time.Now().Format(time.RFC3339),
 		},
-		map[string]map[string]any{
-			"step-1": {
+		map[string]any{
+			"step-1": map[string]any{
 				"wait": time.Now().Format(time.RFC3339),
 			},
 		},

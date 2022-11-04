@@ -32,7 +32,7 @@ type Evaluator func(ctx context.Context, expression string, input map[string]int
 // edge's expressions.
 func EdgeExpressionData(ctx context.Context, s State, outgoingID string) map[string]interface{} {
 	// Add the outgoing edge's data as a "response" field for predefined edges.
-	var response map[string]interface{}
+	var response any
 	if outgoingID != "" && outgoingID != inngest.TriggerName {
 		response, _ = s.ActionID(outgoingID)
 	}

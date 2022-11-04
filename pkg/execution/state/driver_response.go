@@ -27,8 +27,8 @@ type DriverResponse struct {
 	// and state for managing asynchronous jobs in another manager.
 	Scheduled bool `json:"scheduled"`
 
-	// Output is the output from an action, as a JSON map.
-	Output map[string]interface{} `json:"output"`
+	// Output is the output from an action, as a JSON-marshalled value.
+	Output any `json:"output"`
 
 	// Err represents the error from the action, if the action errored.
 	// If the action terminated successfully this must be nil.
@@ -68,11 +68,19 @@ func (r DriverResponse) Retryable() bool {
 		return false
 	}
 
-	status, ok := r.Output["status"]
+	// Convert output into a map to check whether this responds with our
+	// suggested JSON response
+	mapped, ok := r.Output.(map[string]any)
+	if !ok {
+		// This doesn't contain the response, so default to retrying.
+		return true
+	}
+
+	status, ok := mapped["status"]
 	if !ok {
 		// Fall back to statusCode for AWS Lambda compatibility in
 		// an attempt to use this field.
-		status, ok = r.Output["statusCode"]
+		status, ok = mapped["statusCode"]
 		if !ok {
 			// If actions don't return a status, we assume that they're
 			// always retryable.  We prefer that actions respond with a
