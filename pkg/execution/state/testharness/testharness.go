@@ -120,16 +120,16 @@ func CheckState(t *testing.T, gen Generator) {
 		"PausesByEvent/Consumed":             checkPausesByEvent_consumed,
 		"PauseByStep":                        checkPausesByStep,
 		"PauseByID":                          checkPauseByID,
-		"Metadata/StartedAt":                 checkMetadataStartedAt,
 		"Idempotency":                        checkIdempotency,
+		"Cancel":                             checkCancel,
+		"Finalized/Status":                   checkFinalizedStatus,
 	}
 	for name, f := range funcs {
-		ok := t.Run(name, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			m, cleanup := gen()
 			f(t, m)
 			cleanup()
 		})
-		require.True(t, ok, name)
 	}
 }
 
@@ -155,6 +155,7 @@ func checkNew(t *testing.T, m state.Manager) {
 	found := s.Workflow()
 	require.EqualValues(t, w, found, "Returned workflow does not match input")
 	require.EqualValues(t, input.Map(), s.Event(), "Returned event does not match input")
+	require.EqualValues(t, state.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
 	loaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
@@ -232,7 +233,9 @@ func checkScheduled(t *testing.T, m state.Manager) {
 	// Load the state again.
 	loaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.EqualValues(t, len(n100.Steps), loaded.Metadata().Pending, "Scheduling 100 steps concurrently should return the correct pending count via metadata")
+	// The trigger is always pending, and we do not account for this when
+	// initializing in setup()
+	require.EqualValues(t, len(n100.Steps)+1, loaded.Metadata().Pending, "Scheduling 100 steps concurrently should return the correct pending count via metadata")
 }
 
 // checkSaveResponse_output checks the basics of saving output from a response.
@@ -275,7 +278,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 
 	// And that we have no state for the second step.
 	require.Empty(t, next.Actions()[w.Steps[1].ID])
-	require.Equal(t, 0, next.Metadata().Pending)
+	require.Equal(t, 1, next.Metadata().Pending)
 
 	//
 	// Check that saving a subsequent step saves the next output,
@@ -311,7 +314,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.EqualValues(t, r2.Output, loaded)
 	// Output shouldn't be finalized until edges are added via the runner.
-	require.Equal(t, 0, next.Metadata().Pending)
+	require.Equal(t, 1, next.Metadata().Pending)
 
 	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID)
 	require.NoError(t, err)
@@ -330,7 +333,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	require.EqualValues(t, next.Errors(), reloaded.Errors())
 
 	// Check metadata:  we must have two finalized steps.
-	require.Equal(t, -2, reloaded.Metadata().Pending)
+	require.Equal(t, -1, reloaded.Metadata().Pending)
 }
 
 func checkSaveResponse_error(t *testing.T, m state.Manager) {
@@ -350,7 +353,8 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	require.Nil(t, next.Actions()[r.Step.ID])
 	require.Equal(t, r.Err, next.Errors()[r.Step.ID])
 
-	require.Equal(t, 0, next.Metadata().Pending)
+	// Only the trigger, which was not yet complete.
+	require.Equal(t, 1, next.Metadata().Pending)
 
 	// Overwriting the error by setting as final should work and should
 	// finalize the error.
@@ -365,11 +369,10 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	require.Equal(t, r.Err, finalized.Errors()[r.Step.ID])
 
 	// Next stores an outdated reference
-	require.Equal(t, 0, next.Metadata().Pending)
+	require.Equal(t, 1, next.Metadata().Pending)
 	// But finalized should increaase finalized count.
-	require.Equal(t, -1, finalized.Metadata().Pending, "finalized error does not decrease pending count")
-
-	// Finalize via a call to the state store.
+	require.Equal(t, 0, finalized.Metadata().Pending, "finalized error does not decrease pending count")
+	require.Equal(t, state.RunStatusFailed, finalized.Metadata().Status, "finalized error does not set status to failed")
 }
 
 func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
@@ -391,7 +394,7 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 	require.Equal(t, r.Err, next.Errors()[r.Step.ID])
 
 	// This is not final
-	require.Equal(t, 0, next.Metadata().Pending)
+	require.Equal(t, 1, next.Metadata().Pending)
 
 	r.Err = nil
 	r.Output = map[string]interface{}{
@@ -405,14 +408,14 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 	// The error is still stored.
 	require.Equal(t, stepErr, next.Errors()[r.Step.ID])
 	// Saving output should not finalize.
-	require.Equal(t, 0, finalized.Metadata().Pending)
+	require.Equal(t, 1, finalized.Metadata().Pending)
 
 	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID)
 	require.NoError(t, err)
 
 	reloaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.Equal(t, -1, reloaded.Metadata().Pending)
+	require.Equal(t, 0, reloaded.Metadata().Pending)
 }
 
 func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
@@ -453,18 +456,7 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 
 	loaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.EqualValues(t, 0, loaded.Metadata().Pending, "scheduling and finalizing concurrently should end with 0")
-}
-
-func checkMetadataStartedAt(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	s := setup(t, m)
-
-	reloaded, err := m.Load(ctx, s.Identifier())
-	require.NoError(t, err)
-	require.NotNil(t, reloaded)
-
-	require.EqualValues(t, s.Metadata().StartedAt.UTC(), reloaded.Metadata().StartedAt.UTC())
+	require.EqualValues(t, 1, loaded.Metadata().Pending, "scheduling and finalizing concurrently should end with 1 (the trigger)")
 }
 
 func checkSavePause(t *testing.T, m state.Manager) {
@@ -1175,12 +1167,16 @@ func checkIdempotency(t *testing.T, m state.Manager) {
 
 	var errCount int32
 	var okCount int32
+
+	tick := time.Now().Add(2 * time.Second).Truncate(time.Second)
+
 	wg := &sync.WaitGroup{}
 	for i := 0; i < 100; i++ {
 		copiedID := id
 
 		wg.Add(1)
 		go func() {
+			<-time.After(time.Until(tick))
 			// Create a new Run ID each time
 			copiedID.RunID = ulid.MustNew(ulid.Now(), rand.Reader)
 
@@ -1207,7 +1203,7 @@ func checkIdempotency(t *testing.T, m state.Manager) {
 	assert.Equal(t, int32(99), atomic.LoadInt32(&errCount), "Must have errored 99 times when the run ID exists")
 }
 
-func setup(t *testing.T, m state.Manager) state.State {
+func checkCancel(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
@@ -1225,10 +1221,50 @@ func setup(t *testing.T, m state.Manager) state.State {
 
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
+	require.EqualValues(t, state.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
-	// We assume that the trigger has been handled and is not
-	// part of the pending count when calling setup.
-	err = m.Finalized(ctx, id, inngest.TriggerName)
+	err = m.Cancel(ctx, s.Identifier())
+	require.NoError(t, err)
+
+	reloaded, err := m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	require.EqualValues(t, state.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Running")
+}
+
+func checkFinalizedStatus(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+	loaded, err := m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	require.Equal(t, state.RunStatusRunning, loaded.Metadata().Status, fmt.Sprintf("expected status to be %d", state.RunStatusRunning))
+
+	// Finalize, reducing count to 0 which should set status to complete.
+	err = m.Finalized(ctx, s.Identifier(), inngest.TriggerName)
+	require.NoError(t, err)
+
+	loaded, err = m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	require.Equal(t, state.RunStatusComplete, loaded.Metadata().Status, "Finalizing step setting pending to 0 should set status to state.RunStatusComplete")
+	require.Equal(t, 0, loaded.Metadata().Pending)
+}
+
+func setup(t *testing.T, m state.Manager) state.State {
+	ctx := context.Background()
+	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{
+		WorkflowID: w.UUID,
+		RunID:      runID,
+		Key:        runID.String(),
+	}
+
+	init := state.Input{
+		Identifier: id,
+		Workflow:   w,
+		EventData:  input.Map(),
+	}
+
+	s, err := m.New(ctx, init)
 	require.NoError(t, err)
 
 	return s

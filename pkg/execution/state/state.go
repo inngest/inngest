@@ -2,12 +2,31 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
 	"github.com/oklog/ulid/v2"
+)
+
+const (
+	// RunStatusRunning indicates that the function is running.  This is the
+	// default state, even if steps are scheduled in the future.
+	RunStatusRunning RunStatus = iota
+	// RunStatusComplete indicates that the function has completed running.
+	RunStatusComplete
+	// RunStatusFailed indicates that the function failed in one or more steps.
+	RunStatusFailed
+	// RunStatusCancelled indicates that the function has been cancelled prior
+	// to any errors
+	RunStatusCancelled
+)
+
+const (
+	// PauseLeaseDuration is the lifetime that a pause's lease is valid for.
+	PauseLeaseDuration = 5 * time.Second
 )
 
 var (
@@ -23,10 +42,12 @@ var (
 	ErrIdentifierExists = fmt.Errorf("identifier already exists")
 )
 
-const (
-	// PauseLeaseDuration is the lifetime that a pause's lease is valid for.
-	PauseLeaseDuration = 5 * time.Second
-)
+// RunStatus indicates the status for an individual function run.
+type RunStatus int
+
+func (r RunStatus) MarshalBinary() ([]byte, error) {
+	return json.Marshal(r)
+}
 
 // Identifier represents the unique identifier for a workflow run.
 type Identifier struct {
@@ -110,8 +131,7 @@ func (p Pause) Edge() inngest.Edge {
 // finished.  Functions may have many parallel branches with conditional execution.
 // Given this, no single step can tell whether it's the last step within a function.
 type Metadata struct {
-	// StartedAt represents the time that this function started at.
-	StartedAt time.Time `json:"startedAt"`
+	Status RunStatus `json:"status"`
 
 	// Debugger represents whether this function was started via the debugger.
 	Debugger bool `json:"debugger"`
@@ -243,6 +263,10 @@ type Mutater interface {
 	// If the IdempotencyKey within Identifier already exists, the state implementation should return
 	// ErrIdentifierExists.
 	New(ctx context.Context, input Input) (State, error)
+
+	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
+	// future execution of steps.
+	Cancel(ctx context.Context, i Identifier) error
 
 	// scheduled increases the scheduled count for a run's metadata.
 	//

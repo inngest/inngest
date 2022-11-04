@@ -184,6 +184,13 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	l.Debug().Interface("edge", edge).Msg("processing step")
 
 	_, err = s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
+
+	if err == ErrFunctionRunCancelled {
+		// This run has been cancelled.  Finalize this step and ignore.
+		_ = s.state.Finalized(ctx, item.Identifier, edge.Incoming)
+		return nil
+	}
+
 	if err != nil {
 		// The executor usually returns a state.DriverResponse if the step's
 		// response was an error.  In this case, the executor itself handles

@@ -70,7 +70,6 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 
 	s := memstate{
 		metadata: state.Metadata{
-			StartedAt:     time.Now(),
 			Pending:       1,
 			Debugger:      input.Debugger,
 			RunType:       input.RunType,
@@ -145,6 +144,26 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string) 
 
 	instance := s.(memstate)
 	instance.metadata.Pending--
+	if instance.metadata.Pending == 0 {
+		instance.metadata.Status = state.RunStatusComplete
+	}
+
+	m.state[i.IdempotencyKey()] = instance
+
+	return nil
+}
+
+func (m *mem) Cancel(ctx context.Context, i state.Identifier) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	s, ok := m.state[i.IdempotencyKey()]
+	if !ok {
+		return fmt.Errorf("identifier not found")
+	}
+
+	instance := s.(memstate)
+	instance.metadata.Status = state.RunStatusCancelled
 	m.state[i.IdempotencyKey()] = instance
 
 	return nil
@@ -173,6 +192,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 
 	if r.Final() {
 		instance.metadata.Pending--
+		instance.metadata.Status = state.RunStatusFailed
 	}
 
 	m.state[i.IdempotencyKey()] = instance

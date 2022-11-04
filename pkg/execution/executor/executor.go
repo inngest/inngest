@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	ErrRuntimeRegistered = fmt.Errorf("runtime is already registered")
-	ErrNoStateManager    = fmt.Errorf("no state manager provided")
-	ErrNoActionLoader    = fmt.Errorf("no action loader provided")
-	ErrNoRuntimeDriver   = fmt.Errorf("runtime driver for action not found")
+	ErrRuntimeRegistered    = fmt.Errorf("runtime is already registered")
+	ErrNoStateManager       = fmt.Errorf("no state manager provided")
+	ErrNoActionLoader       = fmt.Errorf("no action loader provided")
+	ErrNoRuntimeDriver      = fmt.Errorf("runtime driver for action not found")
+	ErrFunctionRunCancelled = fmt.Errorf("function has been cancelled")
 )
 
 // Executor manages executing actions.  It interfaces over a state store to save
@@ -61,6 +62,9 @@ type Executor interface {
 	// It is important for this function to be atomic;  if the function was scheduled
 	// and the context terminates, we must store the output or async data in workflow
 	// state then schedule the child functions else the workflow will terminate early.
+	//
+	// Execution will fail with no response and ErrFunctionRunCancelled if this function
+	// run has been cancelled by an external event or process.
 	Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error)
 }
 
@@ -155,14 +159,17 @@ type executor struct {
 }
 
 // Execute loads a workflow and the current run state, then executes the
-// workflow via an executor.  This returns all available steps we can run from
-// the workflow after the step has been executed.
+// workflow via an executor.
 func (e *executor) Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error) {
 	var log *zerolog.Logger
 
 	s, err := e.sm.Load(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.Metadata().Status == state.RunStatusCancelled {
+		return nil, ErrFunctionRunCancelled
 	}
 
 	if e.log != nil {
