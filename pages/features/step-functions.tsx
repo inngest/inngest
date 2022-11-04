@@ -25,9 +25,9 @@ export const BETA_TYPEFORM_URL = "https://8qe8m10yfz6.typeform.com/to/F1aj8vLl";
 const codesnippets = {
   main: `
     createStepFunction("Post-signup", "user/created",
-      function ({ event }, { step, waitForEvent }) {
+      function ({ event, tools }) {
         // Send the user an email
-        step("Send an email", async () => {
+        tools.run("Send an email", async () => {
           await sendEmail({
             email: event.user.email,
             template: "welcome",
@@ -36,14 +36,14 @@ const codesnippets = {
 
         // Wait for the user to create an order, by waiting and
         // matching on another event
-        const order = waitForEvent("order/created",
-          "event.user.id == async.user.id",
-          { timeout: "24h" }
+        const order = tools.waitForEvent("order/created", {
+          match: ["data.user.id"],
+          timeout: "24h"
         })
 
         if (order === null) {
           // User didn't create an order;  send them a activation email
-          step("Send activation", async () => {
+          tools.run("Send activation", async () => {
             // Some code here
           })
         }
@@ -51,27 +51,26 @@ const codesnippets = {
 );
   `,
   eventCoordination: `
-    const order = waitForEvent("order/created",
-      "event.user.id == async.user.id", {
-        timeout: "24h"
-      }
-    })
+    const seenEvent = tools.waitForEvent("app/user.seen", {
+      match: ["data.email"],
+      timeout: "2d",
+    });
   `,
   delay: `
-    step("Do something", () => { ... })
+    tools.run("Do something", () => { ... })
 
     // Pause the function and resume in 2d
-    sleep("2d")
+    tools.sleep("2d")
 
-    step("Do something later", () => { ... })
+    tools.run("Do something later", () => { ... })
   `,
   conditional: `
-    const result = step("Send customer outreach", () => { ... })
+    const result = tools.run("Send customer outreach", () => { ... })
 
     if (result.requiresFollowUp) {
-      const result = step("Add task to Linear", () => { ... })
+      const result = tools.run("Add task to Linear", () => { ... })
     } else {
-      const result = step("Mark task complete", () => { ... })
+      const result = tools.run("Mark task complete", () => { ... })
     }
   `,
 };
