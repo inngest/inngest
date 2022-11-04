@@ -372,6 +372,15 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		logger.From(ctx).Trace().Msg("saving response to state")
 	}
 
+	// NOTE: We must ensure that the Step ID is overwritten for Generator steps.  Generator
+	// steps are executed many times until they stop yielding;  each execution returns a
+	// new step ID and data that must be stored independently of the parent generator ID.
+	//
+	// By updating the step ID, we ensure that the data will be saved to the generator's ID.
+	if response.Generator != nil {
+		response.Step.ID = response.Generator.ID
+	}
+
 	if _, serr := e.sm.SaveResponse(ctx, id, *response, attempt); serr != nil {
 		if l != nil {
 			logger.From(ctx).Error().Err(err).Msg("unable to save state")

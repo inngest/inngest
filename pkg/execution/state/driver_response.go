@@ -27,7 +27,7 @@ type GeneratorOpcode struct {
 	Opts any `json:"opts"`
 	// Data is the resulting data from the operation, eg. the step
 	// output.
-	Data []byte `json:"data"`
+	Data json.RawMessage `json:"data"`
 }
 
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
