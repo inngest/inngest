@@ -198,6 +198,7 @@ func typescript(cmd *cobra.Command, args []string) (string, error) {
 	b.WriteString(" * >({ name: \"My App\" });\n")
 	b.WriteString(" * ```\n")
 	b.WriteString(" */\n")
+	b.WriteString("// eslint-disable-next-line @typescript-eslint/ban-types\n")
 	b.WriteString("export type Events<CustomEvents extends Record<string, CustomEvent> = {}> =\n")
 	b.WriteString("  Readonly<Omit<CustomEvents, keyof GeneratedEvents> & GeneratedEvents>;")
 
