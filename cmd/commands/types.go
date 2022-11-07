@@ -166,6 +166,11 @@ func typescript(cmd *cobra.Command, args []string) (string, error) {
 		suffix := ";"
 		ts = strings.Replace(ts, fmt.Sprintf("%sstring%s", prefix, suffix), fmt.Sprintf("%s\"%s\"%s", prefix, eventId, suffix), 1)
 
+		// Replace any instance of `{}` with `Record<string, never>`. TS types
+		// declare `{}` as "any object", which means it could be pretty much
+		// anything in JS.
+		ts = strings.Replace(ts, "{}", "Record<string, never>", -1)
+
 		b.WriteString(ts + "\n")
 	}
 
