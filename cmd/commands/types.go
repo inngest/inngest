@@ -176,6 +176,7 @@ func typescript(cmd *cobra.Command, args []string) (string, error) {
 
 	// Add a type to allow users to define custom types
 	b.WriteString("type CustomEvent = {\n")
+	b.WriteString("  name: string;\n")
 	b.WriteString("  data: Record<string, any>;\n")
 	b.WriteString("  user?: Record<string, any>;\n")
 	b.WriteString("};\n\n")
