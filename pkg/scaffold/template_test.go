@@ -110,7 +110,7 @@ export interface First {
   ts: number;
 };
 
-export interface SecondEvent {
+export interface Second_Event {
   name: string;
   data: {
     account: string;
@@ -121,7 +121,7 @@ export interface SecondEvent {
   ts: number;
 };
 
-export type EventTriggers = First | SecondEvent;
+export type EventTriggers = First | Second_Event;
 
 export type Args = {
   event: EventTriggers;
