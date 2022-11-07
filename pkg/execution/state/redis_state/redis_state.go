@@ -69,7 +69,7 @@ func (c Config) Manager(ctx context.Context) (state.Manager, error) {
 		ctx,
 		WithConnectOpts(*opts),
 		WithExpiration(c.Expiry),
-		WithKeyGenerator(defaultKeyFunc{prefix: c.KeyPrefix}),
+		WithKeyGenerator(DefaultKeyFunc{Prefix: c.KeyPrefix}),
 	)
 }
 
@@ -96,13 +96,15 @@ func (c Config) ConnectOpts() (*redis.Options, error) {
 // Opt represents an option to use when creating a redis-backed state store.
 type Opt func(r *mgr)
 
+type RunCallback func(context.Context, state.Identifier) error
+
 // New returns a state manager which uses Redis as the backing state store.
 //
 // By default, this connects to a local Redis server.  Use WithConnectOpts to
 // change how we connect to Redis.
 func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 	m := &mgr{
-		kf: defaultKeyFunc{},
+		kf: DefaultKeyFunc{},
 	}
 
 	for _, opt := range opts {
@@ -130,8 +132,8 @@ func WithConnectOpts(o redis.Options) Opt {
 // WithKeyPrefix uses a specific key prefix
 func WithKeyPrefix(prefix string) Opt {
 	return func(m *mgr) {
-		m.kf = defaultKeyFunc{
-			prefix: prefix,
+		m.kf = DefaultKeyFunc{
+			Prefix: prefix,
 		}
 	}
 }
@@ -155,6 +157,22 @@ func WithKeyGenerator(kf KeyGenerator) Opt {
 func WithExpiration(ttl time.Duration) Opt {
 	return func(m *mgr) {
 		m.expiry = ttl
+	}
+}
+
+// WithOnComplete supplies a callback which is triggered any time a function
+// run completes.
+func WithOnComplete(f RunCallback) Opt {
+	return func(m *mgr) {
+		m.oncomplete = f
+	}
+}
+
+// WithOnError supplies a callback which is triggered any time a function
+// run completes.
+func WithOnError(f RunCallback) Opt {
+	return func(m *mgr) {
+		m.onerror = f
 	}
 }
 
@@ -204,6 +222,9 @@ type mgr struct {
 	expiry time.Duration
 	kf     KeyGenerator
 	r      *redis.Client
+
+	oncomplete RunCallback
+	onerror    RunCallback
 }
 
 func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
@@ -426,6 +447,13 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		return nil, err
 	}
 
+	if m.onerror != nil {
+		// Call a user-defined callback.
+		if err := m.onerror(ctx, i); err != nil {
+			return nil, err
+		}
+	}
+
 	return m.Load(ctx, i)
 }
 
@@ -434,42 +462,20 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string) e
 	if err != nil {
 		return err
 	}
-	if val == 0 {
-		return m.r.HSet(ctx, m.kf.RunMetadata(ctx, i), "status", state.RunStatusComplete).Err()
+	if val != 0 {
+		return nil
+	}
+	if err := m.r.HSet(ctx, m.kf.RunMetadata(ctx, i), "status", state.RunStatusComplete).Err(); err != nil {
+		return err
+	}
+	if m.oncomplete != nil {
+		return m.oncomplete(ctx, i)
 	}
 	return nil
 }
 
 func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string) error {
 	return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", 1).Err()
-}
-
-func (m mgr) SaveActionOutput(ctx context.Context, id state.Identifier, actionID string, data any) (state.State, error) {
-	str, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-	err = m.r.Watch(ctx, func(tx *redis.Tx) error {
-		// Delete the existing error.
-		if err := m.r.HDel(ctx, m.kf.Errors(ctx, id), actionID).Err(); err != nil {
-			return err
-		}
-		if err := m.r.HSet(ctx, m.kf.Actions(ctx, id), actionID, str).Err(); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return m.Load(ctx, id)
-}
-
-func (m mgr) SaveActionError(ctx context.Context, id state.Identifier, actionID string, err error) (state.State, error) {
-	if err := m.r.HSet(ctx, m.kf.Errors(ctx, id), actionID, err.Error()).Err(); err != nil {
-		return nil, err
-	}
-	return m.Load(ctx, id)
 }
 
 func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
@@ -767,46 +773,46 @@ func (r runMetadata) Metadata() state.Metadata {
 	return m
 }
 
-type defaultKeyFunc struct {
-	prefix string
+type DefaultKeyFunc struct {
+	Prefix string
 }
 
-func (d defaultKeyFunc) Idempotency(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:key:%s", d.prefix, id.IdempotencyKey())
+func (d DefaultKeyFunc) Idempotency(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:key:%s", d.Prefix, id.IdempotencyKey())
 }
 
-func (d defaultKeyFunc) RunMetadata(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:metadata:%s", d.prefix, id.RunID)
+func (d DefaultKeyFunc) RunMetadata(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:metadata:%s", d.Prefix, id.RunID)
 }
 
-func (d defaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int) string {
-	return fmt.Sprintf("%s:workflows:%s-%d", d.prefix, id, version)
+func (d DefaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int) string {
+	return fmt.Sprintf("%s:workflows:%s-%d", d.Prefix, id, version)
 }
 
-func (d defaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:events:%s:%s", d.prefix, id.WorkflowID, id.RunID)
+func (d DefaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:events:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
 }
 
-func (d defaultKeyFunc) Actions(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:actions:%s:%s", d.prefix, id.WorkflowID, id.RunID)
+func (d DefaultKeyFunc) Actions(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:actions:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
 }
 
-func (d defaultKeyFunc) Errors(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:errors:%s:%s", d.prefix, id.WorkflowID, id.RunID)
+func (d DefaultKeyFunc) Errors(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:errors:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
 }
 
-func (d defaultKeyFunc) PauseID(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("%s:pauses:%s", d.prefix, id.String())
+func (d DefaultKeyFunc) PauseID(ctx context.Context, id uuid.UUID) string {
+	return fmt.Sprintf("%s:pauses:%s", d.Prefix, id.String())
 }
 
-func (d defaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("%s:pause-lease:%s", d.prefix, id.String())
+func (d DefaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) string {
+	return fmt.Sprintf("%s:pause-lease:%s", d.Prefix, id.String())
 }
 
-func (d defaultKeyFunc) PauseEvent(ctx context.Context, event string) string {
-	return fmt.Sprintf("%s:pause-events:%s", d.prefix, event)
+func (d DefaultKeyFunc) PauseEvent(ctx context.Context, event string) string {
+	return fmt.Sprintf("%s:pause-events:%s", d.Prefix, event)
 }
 
-func (d defaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
-	return fmt.Sprintf("%s:pause-steps:%s-%s", d.prefix, id.RunID, step)
+func (d DefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
+	return fmt.Sprintf("%s:pause-steps:%s-%s", d.Prefix, id.RunID, step)
 }
