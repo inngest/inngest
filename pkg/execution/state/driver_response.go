@@ -17,10 +17,12 @@ type Retryable interface {
 type GeneratorOpcode struct {
 	// Op represents the type of operation invoked in the function.
 	Op enums.Opcode `json:"op"`
-	// ID represents a unique ID for the operation, in the format of:
-	// "$index:$name".  The data for this must be stored in the action
-	// field within a state store.
+	// ID represents a hashed unique ID for the operation.  This acts
+	// as the generated step ID for the state store.
 	ID string `json:"id"`
+	// Name represents the name of the step, or the sleep duration for
+	// sleeps.
+	Name string `json:"name"`
 	// Opts indicate options for the operation, eg. matching expressions
 	// when setting up async event listeners via `waitForEvent`, or retry
 	// policies for steps.
@@ -32,7 +34,7 @@ type GeneratorOpcode struct {
 
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
 	opts := WaitForEventOpts{
-		Event: g.ID,
+		Event: g.Name,
 	}
 	if opts.Event == "" {
 		return nil, fmt.Errorf("An event name must be provided when waiting for an event")
@@ -48,7 +50,7 @@ func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
 	if g.Op != enums.OpcodeSleep {
 		return 0, fmt.Errorf("unable to return sleep duration for opcode %s", g.Op.String())
 	}
-	return str2duration.ParseDuration(g.ID)
+	return str2duration.ParseDuration(g.Name)
 }
 
 type WaitForEventOpts struct {
