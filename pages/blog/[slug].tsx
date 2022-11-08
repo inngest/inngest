@@ -3,7 +3,7 @@ import Head from "next/head";
 import rehypeSlug from "rehype-slug";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
-import Footer from "../../shared/footer";
+import Footer from "../../shared/Footer";
 import Nav from "../../shared/nav";
 import Callout from "../../shared/Callout";
 import syntaxHighlightingCSS from "../../shared/syntaxHighlightingCSS";
@@ -18,8 +18,20 @@ const components = {
   DiscordCTA,
 };
 
+type Props = {
+  post: {
+    compiledSource: string;
+    scope: {
+      json: string;
+    };
+  };
+  meta: {
+    disabled: true;
+  };
+};
+
 export default function BlogLayout(props) {
-  const scope = JSON.parse(props.post.scope);
+  const scope = JSON.parse(props.post.scope.json);
   return (
     <>
       <Head>
@@ -330,7 +342,7 @@ export async function getStaticProps({ params }) {
   //   scope: string,
   // }
   const post = await serialize(content, {
-    scope: JSON.stringify(data),
+    scope: { json: JSON.stringify(data) },
     mdxOptions: {
       remarkPlugins: [highlight],
       rehypePlugins: [rehypeSlug],

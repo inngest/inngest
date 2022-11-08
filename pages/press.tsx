@@ -25,10 +25,6 @@ const ASSETS = [
 ];
 
 const Press = () => {
-  const onClick = (assetUrl) => () => {
-    download();
-  };
-
   return (
     <div className={styles.container}>
       <h1>Inngest Press Kit</h1>

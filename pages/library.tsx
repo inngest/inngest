@@ -1,7 +1,7 @@
 import { useState } from "react";
 import styled from "@emotion/styled";
 import Router from "next/router";
-import Footer from "../shared/footer";
+import Footer from "../shared/Footer";
 import Nav from "../shared/nav";
 import Content from "../shared/content";
 import { Wrapper } from "../shared/blog";
@@ -11,7 +11,7 @@ import { useSearchParam } from "react-use";
 import { toggle, titleCase, slugify } from "../shared/util";
 import { useMemo } from "react";
 
-const tagset = new Set();
+const tagset = new Set<string>();
 
 library.forEach((l) => {
   l.tags.forEach((t) => {
@@ -91,7 +91,7 @@ export default function Library() {
                         <p>{item.title}</p>
                         <p>{item.subtitle}</p>
 
-                        <span class="button button--outline">View</span>
+                        <span className="button button--outline">View</span>
                       </Item>
                     </Block>
                   ))}

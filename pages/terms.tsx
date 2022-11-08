@@ -1,26 +1,26 @@
 import styled from "@emotion/styled";
 import Head from "next/head";
-import Footer from "../shared/footer";
+import Footer from "../shared/Footer";
 import Nav from "../shared/nav";
 
 export async function getStaticProps() {
   return {
     props: {
       meta: {
-        title: "Privacy",
-        description: "Inngest's privacy policy",
+        title: "Terms",
+        description: "Inngest's terms and conditions",
       },
     },
   };
 }
 
-export default function Privacy() {
+export default function Terms() {
   return (
     <>
       <Nav />
 
       <Content>
-        <iframe src="https://www.iubenda.com/privacy-policy/26885259" />
+        <iframe src="https://www.iubenda.com/terms-and-conditions/26885259" />
       </Content>
 
       <Footer />

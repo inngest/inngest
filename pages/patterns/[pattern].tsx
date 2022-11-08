@@ -58,17 +58,26 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
 
 export const getStaticPaths: GetStaticPaths = async () => {
   const slugs = SECTIONS.map((s) => s.articles.map((a) => a.slug)).flat();
-  const paths = slugs.map((slug) => ({ params: { pattern: slug } }));
+  // TEMP - filter only paths that have valid slugs
+  const paths = slugs
+    .filter((s) => s !== "#TODO")
+    .map((slug) => ({ params: { pattern: slug } }));
   return { paths, fallback: false };
+};
+
+type Props = {
+  title: string;
+  subtitle: string;
+  tags: string[];
+  compiledSource: string;
 };
 
 export default function Patterns({
   title,
   subtitle,
   tags,
-  content,
   compiledSource,
-}) {
+}: Props) {
   const sectionClasses = `max-w-2xl mx-auto text-left`;
   return (
     <Page>
