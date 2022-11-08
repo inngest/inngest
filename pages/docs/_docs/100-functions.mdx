@@ -76,6 +76,44 @@ export createScheduledFunction(
 
 This is very similar to defining an event-driven function, except it uses the `createScheduledFunction` call and a cron schedule to run your function at the specified interval.  This code can be deployed to any platform and will run automatically, without any HTTP calls.
 
+## Writing a multi-step function
+
+The following code defines a multi-step function, which you can use to coordinate between events, work with delays, and safely handle multiple asynchronous steps.
+
+```typescript
+export default createStepFunction(
+  "Activation email",
+  "app/user.created",
+  ({ event, tools }) => {
+    // Send the user a welcome email
+    tools.run("Send welcome email", () =>
+      sendEmail({ email: event.user.email, template: "welcome" })
+    );
+
+    // Wait for the user to create an order, by waiting and
+    // matching on another event
+    const order = tools.waitForEvent("app/order.created", {
+      match: "data.user.id",
+      timeout: "24h",
+    });
+
+    if (!order) {
+      // User didn't create an order within 24 hours; send
+      // them an activation email
+      tools.run("Send activation email", async () => {
+        // Some code here
+      });
+    }
+  }
+);
+```
+
+Use a multi-step function to create a logical flow of actions triggered from an initial event. It's just like writing a regular synchronous function, but Inngest will step in to help coordinate between events, wait for long periods, or retry failed steps.
+
+In this example, we send the user a welcome email when they are created, then send an activation email after 24 hours if they haven't created an order in that time. Each call to `run()` can be retried independently, meaning a failure in one step won't affect any others.
+
+Coordinating between events like this often requires a lot of code and infrastructure to handle retries, timeouts, state, queues, and many edge cases. Inngest handles all of this for you, so you can focus on writing the code that matters in a clean, readable format.
+
 ## TypeScript
 
 The Inngest SDK lets you strictly type all of your code against your real production data. This powerful feature helps to:
