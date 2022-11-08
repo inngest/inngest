@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import Head from "next/head";
-import Footer from "../shared/footer";
+import Footer from "../shared/Footer";
 import Nav from "../shared/nav";
 import Content from "../shared/content";
 

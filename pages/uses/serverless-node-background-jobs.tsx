@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import Button from "src/shared/Button";
 import Nav from "src/shared/nav";
 import CodeWindow from "src/shared/CodeWindow";
-import Footer from "src/shared/footer";
+import Footer from "src/shared/Footer";
 import Play from "src/shared/Icons/Play";
 import IconListStories from "src/stories/IconList.stories";
 
@@ -30,7 +30,7 @@ createFunction(
     // the "auth/user.created" event is received.
   },
 );
-`
+`;
 
 const fullSnippet = `
 import { createScheduledFunction } from "inngest";
@@ -50,7 +50,7 @@ createFunction(
     await createChurnCampaign({ id: event.user.id });
   },
 );
-`
+`;
 
 const sendSnippet = `
 import { Inngest } from 'inngest';
@@ -68,10 +68,10 @@ client.send({
   user: {
     id: "8f2bc",
     email: "user@example.com",
-    name: "Super Awesome User", 
+    name: "Super Awesome User",
   }
 });
-`
+`;
 
 export default function Template() {
   const [demo, setDemo] = useState(false);
@@ -83,11 +83,13 @@ export default function Template() {
         <div className="basis-1/2 px-6">
           <h1>Background tasks, without the queues or workers</h1>
           <p className="pt-6 subheading">
-            Build serverless background tasks without any queues, infrastructure, or config.
+            Build serverless background tasks without any queues,
+            infrastructure, or config.
           </p>
           <p className="mt-2">
-            Inngest allows you to easily offload work from your APIs to increase your app's speed &mdash; without
-            changing your project or building complex architectures.
+            Inngest allows you to easily offload work from your APIs to increase
+            your app's speed &mdash; without changing your project or building
+            complex architectures.
           </p>
           <div className="flex flex-row pt-12">
             <Button kind="primary" href="/sign-up?ref=js-hero">
@@ -99,11 +101,11 @@ export default function Template() {
           </div>
         </div>
         <div className="basis-1/2 px-6 flex items-center">
-            <CodeWindow
-              className="transform-iso shadow-xl relative z-10"
-              filename={`functions/after_signup.ts`}
-              snippet={snippet}
-            />
+          <CodeWindow
+            className="transform-iso shadow-xl relative z-10"
+            filename={`functions/after_signup.ts`}
+            snippet={snippet}
+          />
         </div>
       </div>
 
@@ -111,7 +113,8 @@ export default function Template() {
         <h2 className="text-center">Running in seconds</h2>
 
         <p className="text-center pt-2 pb-24">
-          Inngest's SDK allows you to write and deploy background jobs with a single line of code.  Here's how it works:
+          Inngest's SDK allows you to write and deploy background jobs with a
+          single line of code. Here's how it works:
         </p>
 
         <Developers className="grid grid-cols-2 gap-8 gap-y-16">
@@ -123,14 +126,16 @@ export default function Template() {
             />
           </div>
           <div className="flex flex-col justify-center">
-            <h3 className="pb-2">
-              1. Define your jobs
-            </h3>
+            <h3 className="pb-2">1. Define your jobs</h3>
             <p>
-              Write your background jobs using regular TypeScript or JavaScript, then use our SDK to define which
-              events trigger the job.
+              Write your background jobs using regular TypeScript or JavaScript,
+              then use our SDK to define which events trigger the job.
             </p>
-            <p className="mt-2">It takes a single line of code to specify how an event runs in the background, and a single line of code to provide an API that serves all background functions together.</p>
+            <p className="mt-2">
+              It takes a single line of code to specify how an event runs in the
+              background, and a single line of code to provide an API that
+              serves all background functions together.
+            </p>
           </div>
 
           <div className="flex flex-col justify-center">
@@ -141,16 +146,22 @@ export default function Template() {
             />
           </div>
           <div className="flex flex-col justify-center">
-            <h3 className="pb-2">
-              2. Run jobs via events
-            </h3>
+            <h3 className="pb-2">2. Run jobs via events</h3>
             <p>
-              Sending events to Inngest automatically triggers background jobs which subscribe to that event — without any queues, databases, or configuration.
+              Sending events to Inngest automatically triggers background jobs
+              which subscribe to that event — without any queues, databases, or
+              configuration.
             </p>
-            <p className="mt-2">This allows you to create <b>single background jobs</b> or <b>fan-out jobs that run in parallel</b>, triggered via a single event.</p>
-            <p className="mt-2">Events are fully typed, so you can guarantee that the data you send and receive is correct.</p>
+            <p className="mt-2">
+              This allows you to create <b>single background jobs</b> or{" "}
+              <b>fan-out jobs that run in parallel</b>, triggered via a single
+              event.
+            </p>
+            <p className="mt-2">
+              Events are fully typed, so you can guarantee that the data you
+              send and receive is correct.
+            </p>
           </div>
-
         </Developers>
       </div>
 

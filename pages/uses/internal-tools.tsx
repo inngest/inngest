@@ -2,7 +2,7 @@ import styled from "@emotion/styled";
 import React, { useState } from "react";
 import Button from "src/shared/Button";
 import Nav from "src/shared/nav";
-import Footer from "src/shared/footer";
+import Footer from "src/shared/Footer";
 import GraphicCallout from "src/shared/GraphicCallout";
 import { Code, Eye, Activity } from "react-feather";
 

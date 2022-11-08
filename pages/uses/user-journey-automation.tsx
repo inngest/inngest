@@ -6,7 +6,7 @@ import Examples from "src/shared/Examples";
 import FeatureCallouts from "src/shared/FeatureCallouts";
 import Button from "src/shared/Button";
 import Nav from "src/shared/nav";
-import Footer from "src/shared/footer";
+import Footer from "src/shared/Footer";
 import DemoBlock from "src/shared/DemoBlock";
 import GraphicCallout from "src/shared/GraphicCallout";
 

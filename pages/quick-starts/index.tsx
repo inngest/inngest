@@ -3,7 +3,7 @@ import { GetStaticProps } from "next";
 import { queryTypes, useQueryState } from "next-usequerystate";
 import Link from "next/link";
 import { useMemo } from "react";
-import Footer from "src/shared/footer";
+import Footer from "src/shared/Footer";
 import Nav from "src/shared/nav";
 import { reqWithSchema } from "src/utils/fetch";
 import { z } from "zod";

@@ -2,7 +2,7 @@ import React from "react";
 import Nav from "../../shared/nav";
 import Tag from "../../shared/Tag";
 import Button from "src/shared/Button";
-import Footer from "src/shared/footer";
+import Footer from "src/shared/Footer";
 
 export default function () {
   const [hoverVal, setHoverVal] = React.useState("");

@@ -5,7 +5,7 @@ import styled from "@emotion/styled";
 import { Global, css } from "@emotion/react";
 
 import DocsNav from "../shared/Docs/DocsNav";
-import Footer from "../shared/footer";
+import Footer from "../shared/Footer";
 import Button from "../shared/Button";
 import ArrowUpRightIcon from "../shared/Icons/ArrowUpRight";
 import { getAllDocs, Categories, Sections } from "../utils/docs";
@@ -123,9 +123,9 @@ export default function DocsHome(props) {
         <p>
           Inngest accepts events from your system, then automatically runs
           functions triggered by those events in the background, with built-in
-          retries if things fail. Events are JSON objects sent via POST
-          request and can be triggered from your own code, from webhooks,
-          or from integrations.
+          retries if things fail. Events are JSON objects sent via POST request
+          and can be triggered from your own code, from webhooks, or from
+          integrations.
         </p>
 
         <h2 className="pt-4">Use cases</h2>

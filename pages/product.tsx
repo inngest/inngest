@@ -3,7 +3,7 @@ import styled from "@emotion/styled";
 import Head from "next/head";
 
 import Nav from "../shared/nav";
-import Footer from "../shared/footer";
+import Footer from "../shared/Footer";
 
 import Section from "../shared/Section";
 import ContentBlock from "../shared/ContentBlock";

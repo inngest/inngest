@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import Button from "src/shared/Button";
 import CodeWindow from "src/shared/CodeWindow";
-import Footer from "src/shared/footer";
+import Footer from "src/shared/Footer";
 import CheckboxUnchecked from "src/shared/Icons/CheckboxUnchecked";
 import CheckRounded from "src/shared/Icons/CheckRounded";
 import Discord from "src/shared/Icons/Discord";

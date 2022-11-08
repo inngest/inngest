@@ -1,0 +1,67 @@
+For web applications, [best practices recommend](https://web.dev/rail/) that a user's task should completed between 100ms and 1000ms. Beyond that, the user is likely more likely to abandon your app or feel that it's sluggish. In e-commerce, this tolerance is even lower. Pushing code to edge functions is a direct response to this need.
+
+To keep your API endpoints fast, the first thing you should do is to minimize the work performed in that request. Your API endpoint should only aim to perform what is needed to complete the [_critical path_](https://en.wikipedia.org/wiki/Critical_path_method) of the request. Is a block of code needed to complete the request and return data to the user? _Keep it_. Is it a task that can happen later after telling the user their request was successful? **It should be run asynchronously**. This does not mean that the code is not _important_, it is just not required to return a success response to the user.
+
+Running code, asynchronously, in the background is important for any application and must be done reliably and resiliently. Any code can fail and it must be properly logged, retried and be able to recover during outages.
+
+## How to implement this pattern
+
+A common way to implement this is with a queue and a worker service that runs continuously, polling the queue:
+
+1. Set up your queuing infrastructure (e.g. Redis, SQS)
+2. Configure a queue within your queuing system (e.g. `backfill_data`)
+3. Configure your application to connect to your queue using an appropriate library or SDK
+4. In your API request handler, send a message to your new queue
+5. Create a new worker service that, upon start up begins polling your queue for messages
+6. Define a handler function for when messages are received (e.g. `backfillUserData`)
+7. Deploy your service to a platform that is can run continuously (not serverlessly)
+
+For reliably and resiliency, you'll need to:
+
+* Ensure your new worker service handles graceful shutdowns so all messages are processed
+* Add logging to track successes, failures, debugging, audits
+* Write logic to handle retries including configuring [dead-letter queues](https://en.wikipedia.org/wiki/Dead_letter_queue)
+* Define how you'll re-route messages from your dead-letter queue
+
+## How to implement with Inngest
+
+Inngest is serverless, so there are no queues to set up or configure. You send events and any number of functions can be defined to automatically be called when that event is received:
+
+```js
+import { Inngest } from "inngest";
+
+app.post("/api/connectSource", await (req, res) => {
+  // Your critical-path business logic for connecting the source for the user
+  const source = createSource(req.body);
+  // Send an event for what just happened with pertinent data to be handled async
+  const inngest = new Inngest("API");
+  inngest.send({
+    name: "api/source.connected",
+    data: { sourceId: source.id, userId: req.user.id },
+  });
+  res.json({
+    data: { sourceId: source.id },
+    message: "Your source was connected successfully!"
+  })
+});
+```
+
+Functions are defined by declaring what event(s) should trigger it. Any returned value is logged and any error thrown will inform Inngest to [retry to the function](/docs/reference/functions/retries?ref=patterns).
+
+```js
+import { createFunction } from "inngest";
+
+createFunction("Backfill User Data", "api/source.connected", async ({ event }) => {
+  const source = await getSource(event.data.sourceId);
+  await backfillDataForSource(source);
+  return `Successful backfill for ${source.id} (User: ${event.data.userId})`;
+})
+```
+
+Functions can be [deployed in several ways](/docs/deploy?ref=patterns) that fit your current stack or needs.
+
+## Additional Resources
+
+* [Run Next.js functions in the background with events and schedules on Vercel and Netlify](/blog/run-nextjs-functions-in-the-background?ref=patterns)
+* [Docs: Sending Events](/docs/events?ref=patterns)
+* [Docs: Writing Functions](/docs/functions?ref=patterns)

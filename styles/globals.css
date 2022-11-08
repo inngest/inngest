@@ -36,6 +36,7 @@
   --color-fuschia-100: #EF5DA8;
   --color-gray-purple: #8A8A9D;
   --color-light-purple: #D1D1FA;
+  --color-dark-purple: #525398;
 
   --bg-color-d: #0a0a12;
   --bg-color-l: var(--color-almost-white);
@@ -619,6 +620,9 @@ ul.check li {
 }
 .text-color-gray-purple {
   color: var(--color-gray-purple);
+}
+.text-color-dark-purple {
+  color: var(--color-dark-purple);
 }
 .border-color-iris-60 {
   border-color: var(--color-iris-60);

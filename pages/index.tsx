@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 
-import Footer from "../shared/footer";
+import Footer from "../shared/Footer";
 import Nav from "../shared/nav";
 import Button from "src/shared/Button";
 import CheckRounded from "src/shared/Icons/CheckRounded";

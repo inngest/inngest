@@ -7,7 +7,7 @@ import Script from "next/script";
 import { useEffect, useMemo, useState } from "react";
 import Button from "src/shared/Button";
 import { CommandSnippet } from "src/shared/CommandSnippet";
-import Footer from "src/shared/footer";
+import Footer from "src/shared/Footer";
 import Github from "src/shared/Icons/Github";
 import Nav from "src/shared/nav";
 import { reqWithSchema } from "src/utils/fetch";
