@@ -1,5 +1,6 @@
 import React from "react";
 import styled from "@emotion/styled";
+import Link from "next/link";
 
 import Nav from "src/shared/nav";
 import Footer from "src/shared/Footer";
@@ -163,27 +164,25 @@ export default function Patterns() {
                 </div>
                 <div className="ml-11 my-6 flex flex-col gap-6">
                   {s.articles.map(({ title, subtitle, tags, slug }) => (
-                    <a
-                      key={slug}
-                      href={`/patterns/${slug}`}
-                      className="flex flex-col gap-2 text-almost-black"
-                    >
-                      <h2 className="text-lg text-color-dark-purple">
-                        {title}
-                      </h2>
-                      <p className="text-sm">{subtitle}</p>
-                      <div className="flex gap-2">
-                        {tags.map((t) => (
-                          <span
-                            key={t}
-                            className="py-1 px-2 rounded-full bg-slate-100 text-slate-600"
-                            style={{ fontSize: "0.6rem" }}
-                          >
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    </a>
+                    <Link key={slug} href={`/patterns/${slug}`} passHref>
+                      <a className="flex flex-col gap-2 text-almost-black">
+                        <h2 className="text-lg text-color-dark-purple">
+                          {title}
+                        </h2>
+                        <p className="text-sm">{subtitle}</p>
+                        <div className="flex gap-2">
+                          {tags.map((t) => (
+                            <span
+                              key={t}
+                              className="py-1 px-2 rounded-full bg-slate-100 text-slate-600"
+                              style={{ fontSize: "0.6rem" }}
+                            >
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      </a>
+                    </Link>
                   ))}
                 </div>
               </div>

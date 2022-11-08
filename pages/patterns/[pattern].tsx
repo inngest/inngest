@@ -1,6 +1,7 @@
 import React from "react";
 import styled from "@emotion/styled";
 import { GetStaticProps, GetStaticPaths } from "next";
+import Link from "next/link";
 import { MDXRemote } from "next-mdx-remote";
 import { serialize } from "next-mdx-remote/serialize";
 
@@ -91,13 +92,14 @@ export default function Patterns({
             <div className="flex flex-col gap-4">
               <header className="mt-2">
                 <p className="text-xs font-normal flex gap-1">
-                  <a
-                    href="/patterns"
-                    className="text-almost-black transition-all duration-300 hover:-translate-x-0.5"
-                  >
-                    <span className="text-slate-400">←</span> Patterns{" "}
-                    <span className="text-slate-400">Async + Event-Driven</span>
-                  </a>
+                  <Link href="/patterns" passHref>
+                    <a className="text-almost-black transition-all duration-300 hover:-translate-x-0.5">
+                      <span className="text-slate-400">←</span> Patterns{" "}
+                      <span className="text-slate-400">
+                        Async + Event-Driven
+                      </span>
+                    </a>
+                  </Link>
                 </p>
 
                 <h1 className="mt-2 tracking-tight">{title}</h1>
@@ -124,12 +126,11 @@ export default function Patterns({
             <MDXRemote compiledSource={compiledSource} components={{}} />
 
             <p className="mt-24 text-2xl font-normal flex gap-1">
-              <a
-                href="/patterns"
-                className="text-almost-black transition-all	duration-300 hover:-translate-x-1"
-              >
-                <span className="text-slate-400">←</span> View All Patterns
-              </a>
+              <Link href="/patterns" passHref>
+                <a className="text-almost-black transition-all	duration-300 hover:-translate-x-1">
+                  <span className="text-slate-400">←</span> View All Patterns
+                </a>
+              </Link>
             </p>
           </div>
         </Article>
