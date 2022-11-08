@@ -9,6 +9,13 @@ module.exports = {
           1000: '#080D19',
         },
       },
+      gridTemplateColumns: {
+        // Sidebar | Live Feed | Sidebar
+        app: '50px 1fr',
+      },
+      gridTemplateRows: {
+        app: '50px 1fr',
+      },
     },
     fontSize: {
       '4xs': '0.625rem', // 10px

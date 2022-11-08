@@ -1,4 +1,4 @@
-export default function InngestLogo() {
+export function InngestLogo() {
   return (
     <svg width="26" height="26">
       <g fill="none" fillRule="evenodd">
