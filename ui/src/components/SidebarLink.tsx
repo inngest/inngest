@@ -1,6 +1,6 @@
 import classNames from '../utils/classNames'
 
-export default function SidebarLink({ icon, active }) {
+export default function SidebarLink({ icon, active, badge }) {
   return (
     <button
       className={classNames(

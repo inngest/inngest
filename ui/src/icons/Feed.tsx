@@ -1,4 +1,4 @@
-export function FeedIcon() {
+export function IconFeed() {
   return (
     <svg width="20" height="15">
       <g fillRule="nonzero" fill="none">

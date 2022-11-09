@@ -16,6 +16,9 @@ module.exports = {
       gridTemplateRows: {
         app: '50px 1fr',
       },
+      outlineOffset: {
+        3: '3px',
+      },
     },
     fontSize: {
       '4xs': '0.625rem', // 10px
@@ -31,6 +34,14 @@ module.exports = {
       '4xl': '2.25rem', // 36px
       '5xl': '3rem', // 48px
       '6xl': '3.75rem', // 60p
+    },
+    borderRadius: {
+      none: '0',
+      sm: '4px',
+      md: '6px',
+      DEFAULT: '8px',
+      lg: '10px',
+      full: '9999px',
     },
   },
   plugins: [],

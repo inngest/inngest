@@ -1,4 +1,4 @@
-export function BookIcon() {
+export function IconBook() {
   return (
     <svg width="16" height="14">
       <g fillRule="nonzero" fill="none">
