@@ -14,7 +14,7 @@ export default function ContentCard({
     <div
       className={classNames(
         active ? `bg-slate-950` : ``,
-        `flex-1 border rounded-lg border-slate-800/50`
+        `flex-1 border rounded-lg border-slate-800/50 overflow-hidden flex flex-col`
       )}
     >
       <div className="px-5 pt-3.5 ">
@@ -28,7 +28,7 @@ export default function ContentCard({
           <span className="text-3xs leading-none">{id}</span>
         </div>
       </div>
-      <div>{children}</div>
+      <div className="overflow-y-scroll">{children}</div>
     </div>
   )
 }

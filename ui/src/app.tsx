@@ -1,16 +1,17 @@
+import eventStream from '../mock/eventStream'
+import eventFuncs from '../mock/eventFuncs'
 import './index.css'
 import Header from './components/Header'
 import Sidebar from './components/Sidebar/Sidebar'
 import SidebarLink from './components/Sidebar/SidebarLink'
 import ContentFrame from './components/Content/ContentFrame'
-import eventStream from '../mock/eventStream'
 import TimelineItem from './components/Timeline/TimelineItem'
 import TimelineScrollContainer from './components/Timeline/TimelineScrollContainer'
 import TimelineFeedContent from './components/Timeline/TimelineFeedContent'
 import ContentCard from './components/Content/ContentCard'
 import Button from './components/Button'
 import FuncCard from './components/Function/FuncCard'
-import eventFuncs from '../mock/eventFuncs'
+import CodeBlock from './components/CodeBlock'
 
 import { IconFeed, IconBook } from './icons'
 
@@ -58,6 +59,9 @@ export function App() {
                   </TimelineItem>
                 )
               })}
+            </div>
+            <div className="border-t border-slate-800/50 m-4 mt-2 pt-4">
+              <CodeBlock />
             </div>
           </ContentCard>
           <ContentCard>

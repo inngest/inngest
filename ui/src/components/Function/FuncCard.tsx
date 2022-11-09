@@ -14,7 +14,7 @@ export default function FuncCard({
     status === 'PAUSED' || status === 'FAILED' ? true : false
 
   return (
-    <div className="px-5 py-3.5 bg-slate-800/50 w-full mb-3 rounded-lg">
+    <div className="px-5 py-3.5 bg-slate-800/50 w-full mb-3 rounded-lg hover:bg-slate-800/80">
       <a href="#">
         <div className="flex items-start justify-between">
           <div>
