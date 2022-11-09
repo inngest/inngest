@@ -42,3 +42,32 @@ type FunctionVersion {
   createdAt: Time!
   updatedAt: Time!
 }
+
+type Event {
+  id: ID!
+  name: String
+  createdAt: Time
+  payload: String
+  schema: String
+  timeline: EventTimeline
+}
+
+type EventTimeline {
+  event: Event!
+  functionRuns: [FunctionRun!]
+}
+
+type FunctionRun {
+  id: ID!
+  functionVersion: FunctionVersion
+  status: String
+  startedAt: Time
+  steps: [FunctionRunStep!]
+}
+
+type FunctionRunStep {
+  functionRun: FunctionRun
+  status: String
+  output: String
+  startedAt: Time
+}
