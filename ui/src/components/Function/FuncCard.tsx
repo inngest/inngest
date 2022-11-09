@@ -23,7 +23,7 @@ export default function FuncCard({
           </div>
           {badge && <div className="flex items-center">{badge}</div>}
         </div>
-        <div className="flex items-center justify-between mt-1">
+        <div className="flex items-center justify-between mt-2">
           <span className="text-3xs leading-none">{id}</span>
           <span className="text-3xs leading-none flex items-center">
             <itemStatus.icon />
@@ -33,7 +33,7 @@ export default function FuncCard({
       </a>
 
       {contextualBar && (
-        <div className="border-t border-slate-700/50 mt-5 pt-3">
+        <div className="border-t border-slate-700/50 mt-5 pt-3 flex items-center justify-between">
           <p>Function paused for sleep until 1:40pm</p>
           {contextualButton && contextualButton}
         </div>

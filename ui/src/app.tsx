@@ -8,8 +8,9 @@ import TimelineItem from './components/Timeline/TimelineItem'
 import TimelineScrollContainer from './components/Timeline/TimelineScrollContainer'
 import TimelineFeedContent from './components/Timeline/TimelineFeedContent'
 import ContentCard from './components/Content/ContentCard'
-import EventCard from './components/Event/EventCard'
 import Button from './components/Button'
+import FuncCard from './components/Function/FuncCard'
+import eventFuncs from '../mock/eventFuncs'
 
 import { IconFeed, IconBook } from './icons'
 
@@ -42,10 +43,25 @@ export function App() {
             id="01GGG522ZATDGVQBCND4ZEAS6Z"
             active
           >
-            <EventCard />
+            <div className="mt-5">
+              {eventFuncs.map((eventFunc, i) => {
+                return (
+                  <TimelineItem key={i} status={eventFunc.status}>
+                    <FuncCard
+                      title={eventFunc.name}
+                      datetime={eventFunc.datetime}
+                      badge={eventFunc.version}
+                      id={eventFunc.id}
+                      status={eventFunc.status}
+                      contextualButton={<Button label="Rerun" />}
+                    />
+                  </TimelineItem>
+                )
+              })}
+            </div>
           </ContentCard>
           <ContentCard>
-            <EventCard />
+            <h1>Function Content</h1>
           </ContentCard>
         </div>
       </ContentFrame>
