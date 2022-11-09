@@ -1,4 +1,4 @@
-import classNames from '../../utils/classNames'
+import classNames from '../../utils/classnames'
 
 export default function SidebarLink({ icon, active, badge }) {
   return (
