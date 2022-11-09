@@ -53,8 +53,14 @@ export default createStepFunction<Added>(
     // cart also.
   },
   {
-    // Only run this function once for every cart ID.
-    idempotency: "event.data.cart_id",
+    // Automatically cancel this instance of the function whenever a user adds another
+    // product to their cart.  Another instance of this function will run and schedule
+    // another wait from 24 hours after the new product was added to their cart.
+    cancellation: {
+      event: "cart/product.added",
+      timeout: "24h",
+      match: "data.cart_id",
+    }
   }
 });
 ```
@@ -63,13 +69,22 @@ In this example we create a function that models key points in the user journey 
 
 First, we create a function that runs any time a user adds a product to their cart.  We then wait for the checkout event (`cart/purchased`) for up to 24 hours, via `tools.waitForEvent`.  This pauses the function until a matching event is received or the event isn't received within your time specified.
 
-Inngest resumes the function passing in the received event data, or null if the event was not received within the timeout.  Your code continues to run, handling events or timeouts in the same function.
+Inngest resumes the function passing in the received event data, or null if the event was not received within the timeout.  Your code then continues to run from after `waitForEvent`, allowing you to process the incoming event or timeouts easily.
 
 This has the following benefits:
 
 - All user-journey code is colocated within the same function
 - This makes the code easy to read, understand, and modify
-- You don't have to manage state, queues, or crons to check for eg. abandoned carts
+- You don't have to manage state, queues, or crons to check for specific conditions to run logic
+
+**Cancellations: running the function once**
+
+We only want to run this function once for each cart_id.  A user might add 3 products, but they should only receive a single reminder email.  In this case, we set a `cancellation` option when defining the function which cancels any running or paused functions.  Any time another product is added to the same cart ID, older runs of this function are cancelled.  For example:
+
+- A user adds a product to the cart.  This function runs with an ID of #1
+- A user adds another product.  Function #1 is cancelled automatically, and another copy of this function runs with an ID of #2
+
+The first product's journey is cancelled automatically, and the user only receives an email 24 hours after the second product is added.
 
 ## Alternative approaches
 
@@ -85,4 +100,5 @@ These are both possible within Inngest and using traditional queueing systems, a
 - TODO: Link to SDK `tools.waitForEvent` docs
 - TODO: Link to SDK `tools.run` docs
 - TODO: Link to SDK `tools.sleep` docs for alternative approaches
+- TODO: Link to auto-cancellation
 
