@@ -1,0 +1,30 @@
+Event-driven systems allow you to have multiple subscribers for a single event stream.  This lets you [fan-out](https://en.wikipedia.org/wiki/Fan-out_(software)#Message-oriented_middleware) an event to multiple functions in parallel.
+
+This is different to how most queueing systems work.  In most queueing systems like SQS or Celery, a specific job in a queue runs a single function.
+
+If you want to run 5 background jobs after a user signs up, using an event-driven system like Inngest you'll only have to send a single event.  In typical queueing systems you'll have to enqueue each of the 5 jobs individually.
+
+## How to implement this pattern
+
+Inngest allows you to create as many functions as you need which subscribe to the same event:
+
+```typescript
+import { createFunction } from "inngest";
+
+const funcA = createFunction("user/signup", ({ event }) => { /* Your logic runs on signup here */ });
+const funcB = createFunction("user/signup", ({ event }) => { /* And this function runs in parallel on signup */ });
+const funcC = createFunction("user/signup", ({ event }) => { /* This function _also_ runs at the same time */ });
+```
+
+In this example, we define three functions which run automatically in parallel whenever the `user/signup` event is received.  Each of these run independently, and can be defined in different projects - without worrying about managing queues or subscribers.
+
+**Alternative event-driven systems**
+
+You can create an event-driven system using things like NATS, Redis, or Kafka - all are reliable event-driven infrastructure components.
+
+Using this infrastructure, you'll need to configure your topics via code (or terraform), then configure stateful subscribers which listen to your topics using an always-alive service.  Your subscribers should handle parallelism themselves, ensuring that you ack/nack events as they're processed.  If a single subscription fails, you'll need to manage retries, dead-letter queues, and watermarks for a topic yourself. This is a common approach, though it's often a lot of work to build, set up, and maintain.
+
+## Additional resources
+
+* [Docs: Sending Events](/docs/events?ref=patterns)
+* [Docs: Writing Functions](/docs/functions?ref=patterns)

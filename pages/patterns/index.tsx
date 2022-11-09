@@ -41,7 +41,7 @@ export const SECTIONS: Section[] = [
       },
       {
         title: "Reliably run critical workflows",
-        subtitle: "Break complex code into independently run steps",
+        subtitle: "Break complex code into reliable, independently ran steps",
         tags: ["Reliability"],
         slug: "#TODO", //"reliably-run-critical-workflows",
       },
@@ -52,13 +52,13 @@ export const SECTIONS: Section[] = [
     articles: [
       {
         title: "Running functions in parallel",
-        subtitle: "Fan-out work to decoupled functions",
+        subtitle: "Fan-out work to multiple functions using a single event",
         tags: ["Architecture"],
-        slug: "#TODO",
+        slug: "running-functions-in-parallel",
       },
       {
         title: "Cancelling scheduled functions",
-        subtitle: "Schedule work with events then cancel as needed",
+        subtitle: "Schedule and automatically cancel work using events",
         tags: ["Scheduling"],
         slug: "#TODO",
       },
