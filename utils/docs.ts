@@ -56,13 +56,15 @@ export type DocScope = {
   toc?: Headings;
 };
 
+export type Heading = {
+  order: number;
+  title: string;
+  slug: string;
+  subheadings: [{ title: string; slug: string }];
+};
+
 export type Headings = {
-  [title: string]: {
-    order: number;
-    title: string;
-    slug: string;
-    subheadings: [{ title: string; slug: string }];
-  };
+  [title: string]: Heading;
 };
 
 export type Doc = {
@@ -238,7 +240,7 @@ export const getDocs = (slug: string): Doc | undefined => {
   return docs.docs[slug];
 };
 
-const getHeadings = (content: string) => {
+export const getHeadings = (content: string): Headings => {
   // Get headers for table of contents.
   const headings = {};
   let h2 = null; // store the current heading we're in
@@ -256,6 +258,13 @@ const getHeadings = (content: string) => {
     (headings[h2]?.subheadings || []).push({ title, slug: toSlug(title) });
   });
   return headings;
+};
+
+export const getHeadingsAsArray = (content: string): Heading[] => {
+  const headingsObj = getHeadings(content);
+  return Object.keys(headingsObj)
+    .map((key) => headingsObj[key])
+    .sort((a, b) => a.order - b.order);
 };
 
 const toSlug = (s: string) => {

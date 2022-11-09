@@ -73,6 +73,26 @@
   font-size: 20px;
   font-family: var(--font);
   color: var(--font-color-primary);
+
+  /*
+   * Shiki syntax highlighting for Docs, Blog, Patterns
+   * Docs: https://github.com/shikijs/shiki/blob/main/docs/themes.md
+   */
+    --shiki-color-text: #383a42;
+    --shiki-color-background: #fafafa;
+    --shiki-token-constant: #13769f;
+    --shiki-token-string: #50a14f;
+    --shiki-token-comment: #87828f;
+    --shiki-token-keyword: #a626a4;
+    --shiki-token-parameter: #e45649;
+    --shiki-token-function: #383a42;
+    --shiki-token-string-expression: var(--shiki-token-string);
+    --shiki-token-punctuation: var(--shiki-color-text);
+    --shiki-token-link: #4078f2;
+}
+
+html.docs {
+  scroll-behavior: smooth;
 }
 
 * {

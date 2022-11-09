@@ -307,6 +307,7 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
   h4,
   h5 {
     line-height: 1.5em;
+    scroll-margin-top: 2rem;
   }
   h1 {
     font-size: 2em;

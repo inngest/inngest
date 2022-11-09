@@ -4,11 +4,13 @@ import { GetStaticProps, GetStaticPaths } from "next";
 import Link from "next/link";
 import { MDXRemote } from "next-mdx-remote";
 import { serialize } from "next-mdx-remote/serialize";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
 
 import Nav from "src/shared/nav";
 import Footer from "src/shared/Footer";
-import CodeWindow from "src/shared/CodeWindow";
 import { highlight } from "src/utils/code";
+import { getHeadingsAsArray, Heading } from "src/utils/docs";
 
 import { SECTIONS, Page, Content } from "./index";
 
@@ -29,11 +31,13 @@ const loadPattern = async (slug: string) => {
     scope: { json: JSON.stringify(data) },
     mdxOptions: {
       remarkPlugins: [highlight],
+      rehypePlugins: [rehypeSlug, rehypeAutolinkHeadings],
     },
   });
 
   return {
     content,
+    headings: getHeadingsAsArray(content),
     ...serializedContent,
   };
 };
@@ -70,6 +74,7 @@ type Props = {
   title: string;
   subtitle: string;
   tags: string[];
+  headings: Heading[];
   compiledSource: string;
 };
 
@@ -77,9 +82,10 @@ export default function Patterns({
   title,
   subtitle,
   tags,
+  headings,
   compiledSource,
 }: Props) {
-  const sectionClasses = `max-w-2xl mx-auto text-left`;
+  const sectionClasses = `max-w-2xl mx-auto px-6 lg:px-4 text-left`;
   return (
     <Page>
       <Nav sticky={true} />
@@ -88,7 +94,7 @@ export default function Patterns({
         {/* Background styles */}
         <div>
           {/* Content layout */}
-          <div className={`${sectionClasses} mt-28 mb-14 px-6 lg:px-4`}>
+          <div className={`${sectionClasses} mt-28 mb-14`}>
             <div className="flex flex-col gap-4">
               <header className="mt-2">
                 <p className="text-xs font-normal flex gap-1">
@@ -108,6 +114,7 @@ export default function Patterns({
               <div className="flex gap-2">
                 {tags.map((t) => (
                   <span
+                    key={t}
                     className="py-1 px-2 rounded-full bg-slate-100 text-slate-600"
                     style={{ fontSize: "0.6rem" }}
                   >
@@ -120,9 +127,20 @@ export default function Patterns({
         </div>
 
         {/* Background styles */}
+        <JumpLinks className={`${sectionClasses}`}>
+          <h3 className="text-sm">Jump to</h3>
+          <ol className="mt-2">
+            {headings.map((h) => (
+              <li key={h.slug} className="text-xs">
+                <a href={`#${h.slug}`}>→ {h.title}</a>
+              </li>
+            ))}
+          </ol>
+        </JumpLinks>
+
         <Article>
           {/* Content layout */}
-          <div className={`${sectionClasses} my-14 px-6 lg:px-4`}>
+          <div className={`${sectionClasses} my-14`}>
             <MDXRemote compiledSource={compiledSource} components={{}} />
 
             <p className="mt-24 text-2xl font-normal flex gap-1">
@@ -140,7 +158,23 @@ export default function Patterns({
   );
 }
 
+const JumpLinks = styled.aside`
+  @media (min-width: calc(840px + 2 * (300px + 1rem))) {
+    position: fixed;
+    top: calc(
+      32px + 87px + 7rem + 2rem
+    ); // banner + nav + header margin(s) + backlink
+    right: 1rem;
+  }
+`;
+
 const Article = styled.article`
+  // For vertical margin for scroll anchors
+  h2,
+  h3 {
+    scroll-margin-top: 120px; /* Height of nav + margin */
+  }
+
   h2 {
     margin: 1.5rem 0 1rem;
     font-size: 1.25rem;
@@ -164,7 +198,7 @@ const Article = styled.article`
     position: relative;
     white-space: pre-wrap;
     font-size: 0.7rem;
-    box-shadow: rgb(0 0 0 / 25%) 0px 5px 20px -15px;
+    box-shadow: rgb(0 0 0 / 30%) 0px 5px 25px -10px;
     border-radius: var(--border-radius);
   }
 

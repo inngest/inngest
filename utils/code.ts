@@ -11,7 +11,8 @@ import remarkShikiTwoslash from "remark-shiki-twoslash";
 export const highlight: any = [
   remarkShikiTwoslash,
   {
-    theme: "min-light",
+    // theme: "min-light",
+    theme: "css-variables",
     // See: https://github.com/shikijs/twoslash/blob/main/packages/shiki-twoslash/README.md#user-settings
     defaultOptions: {
       showEmit: false,
