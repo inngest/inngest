@@ -36,7 +36,7 @@ export function App() {
             </TimelineItem>
           ))}
         </TimelineScrollContainer>
-        <div className="flex gap-3 p-3 w-full">
+        <div className="flex gap-3 p-3 w-full min-w-0">
           <ContentCard
             title="accounts/profile.photo.uploaded"
             datetime="14:34:21 28/04/2022"
@@ -64,7 +64,12 @@ export function App() {
               <CodeBlock />
             </div>
           </ContentCard>
-          <ContentCard>
+          <ContentCard
+            title="Process uploaded images"
+            datetime="14:34:21 28/04/2022"
+            button={<Button label="Open Function" icon={<IconFeed />} />}
+            id="01GGG522ZATDGVQBCND4ZEAS6Z"
+          >
             <h1>Function Content</h1>
           </ContentCard>
         </div>
