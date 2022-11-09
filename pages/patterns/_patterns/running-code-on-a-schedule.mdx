@@ -1,0 +1,39 @@
+Not all core logic in an application happens directly from user input. Often code needs to be run every `X` hours, days, or weeks or [when external data is received](/patterns/build-reliable-webhooks). This focuses on the former &mdash; _cron jobs_.
+
+Popular use cases for cron jobs are sending weekly email digests, performing daily system audits or cleanups, and exporting data for backups or similar. Other applications may require more frequent schedules like running every 5 minutes to trigger notifications or run user-created scheduled tasks.
+
+Cron jobs are an [old concept](https://en.wikipedia.org/wiki/Cron) and are baked into all operating systems in some form. They're often simple to set up if you're used to operating your own servers, but for modern applications that run in containers or in serverless runtimes, creating cron jobs becomes very platform-specific if it's supported at all. Also, several serverless API function platforms do not have support for cron jobs either.
+
+## How to implement with Inngest
+
+Inngest allows you to specify a schedule in [cron expression format](https://crontab.guru/). Inngest then runs your code on this schedule, storing the function's output in logs and retrying your code if it fails. Here is an example of a basic weekly digest that will be sent out every Monday at 9am:
+
+```js
+import { createScheduledFunction } from "inngest";
+
+createScheduledFunction("Send Weekly Digest", "0 9 * * MON", async () => {
+  const accounts = await getAllAccounts();
+  for (let account of accounts) {
+    await sentWeeklyDigest(account);
+  }
+  return `Sent ${accounts.length} weekly digest emails`
+})
+```
+
+After deploying your scheduled function to Inngest [using your preferred platform]((/docs/deploy?ref=patterns)), you'll be able to view previous run's logs and next run times in the Inngest dashboard.
+
+## Alternative approaches
+
+As mentioned above, cron jobs today are very often platform-specific, from the Kubernetes' [`CronJob`](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/) to the AWS ECS [Scheduled Task](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/scheduled_tasks.html) to the classic Linux [crontab](https://opensource.com/article/17/11/how-use-cron-linux). You'll need to determine how to run cron jobs on `X` platform then determine:
+
+- How will I know that my cron configuration was correcct and it actually ran?
+- How will logs be captured and stored?
+- How will I handle failed cron jobs?
+- How will I handle CI/CD?
+
+These are all things that are solvable depending on your platform, but do require consideration when running cron jobs yourself.
+
+## Additional Resources
+
+* [Run Next.js functions in the background with events and schedules on Vercel and Netlify](/blog/run-nextjs-functions-in-the-background?ref=patterns)
+* [Docs: Writing Scheduled Functions](/docs/functions?ref=patterns#writing-a-scheduled-function)

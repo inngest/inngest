@@ -27,10 +27,11 @@ export const SECTIONS: Section[] = [
         slug: "keeping-your-api-fast",
       },
       {
-        title: "Send weekly emails",
-        subtitle: "Scheduling code to run periodically, as cron jobs",
+        title: "Running code on a schedule",
+        subtitle:
+          "Run task periodically, as cron jobs, like weekly emails or daily backups",
         tags: ["Scheduling"],
-        slug: "#TODO", //"sending-weekly-emails",
+        slug: "running-code-on-a-schedule",
       },
       {
         title: "Build reliable webhooks",
