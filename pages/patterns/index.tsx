@@ -37,7 +37,7 @@ export const SECTIONS: Section[] = [
         title: "Build reliable webhooks",
         subtitle: "Handle high throughput webhooks in a fault tolerant way",
         tags: ["Performance", "Reliability"],
-        slug: "#TODO", //"build-reliable-webhooks",
+        slug: "build-reliable-webhooks",
       },
       {
         title: "Reliably run critical workflows",

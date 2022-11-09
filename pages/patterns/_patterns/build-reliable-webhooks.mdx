@@ -1,0 +1,52 @@
+Webhooks are an incredible useful way to build real-time integrations. They're widely supported and simple in concept, but failure modes need to be understood in order to build reliable webhooks that can scale under load.
+
+Webhooks must do three things: **respond quickly**, **handle varying throughput levels**, and be able to **recover during downtime**.
+
+Most third party webhooks will consider the request failed if it doesn't respond fast enough, so you need to respond immediately. Your application also should have a built in way to handle bursts of requests that don't bring down your HTTP handler/server. Your application also needs to properly handle and re-process failed webhook events. This will likely mean a combination of re-queuing failed events and/or logging all webhook events for audits, debugging and replaying events from a specific time period.
+
+## How to implement this pattern
+
+A common approach to build a reliable webhook that covers the requirements listed above will include:
+
+1. Create a queue to buffer webhook events
+2. Create an HTTP handler for a webhook endpoint that verifies [the webhook payload signature](https://stripe.com/docs/webhooks/signatures) and pushes webhook events to a particular queue
+3. Create a worker that polls the queue for messages and processes them
+4. Configure your worker
+5. Define a [dead-letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue) for events that fail to be processed and potentially, a redrive policy for retrying at a later time.
+6. Implement webhook event logging to archive all events for future audits or replays
+
+For replays, you'll also need to:
+
+* Write code to query logs and replay events
+* Ensure your worker code is _idempotent_, meaning that if the handler runs multiple times it produces the same side effects and results exactly once
+
+## How to implement with Inngest
+
+Inngest is a serverless platform which combines an event hub and a job scheduler. This means that it is designed to receive huge volumes of events via HTTP request and call functions that are defined to run when those given events are received. It simplifies building reliable webhooks by enabling you to just write the code to process the webhook event, leaving the rest to Inngest.
+
+You can set up a webhook with Inngest in 2 ways:
+
+* Create a [webhook "source" in the Inngest dashboard](https://app.inngest.com/sources/new#Webhook) which will give you a unique URL which you can add to any third party service that
+* Connect a [built-in integration via the Inngest dashboard](https://app.inngest.com/sources/new) which support event sources.
+
+After connecting your webhook, you'll start to receive events in your Inngest dashboard. Here's an example of using the `stripe/invoice.payment_failed` event ([Stripe docs](https://stripe.com/docs/api/invoices/object))
+
+```js
+import { createFunction } from "inngest";
+
+createFunction("Downgrade customer", "stripe/invoice.payment_failed", async ({ event }) => {
+  const invoice = event.data.data.object;
+  const user = await getUserByStripeCustomerId(invoice.customer);
+  await billingUtils.downgradeUser(user.id);
+  await sendDowngradeEmail(user.email);
+  return `Downgraded user plan & ${user.id}`;
+})
+```
+
+Functions can then be [deployed to several supported platforms](/docs/deploy?ref=patterns).
+
+## Additional Resources
+
+* [Blog: Building Webhooks That Scale](/blog/building-webhooks-that-scale?ref=patterns)
+* [Docs: Writing Functions](/docs/functions?ref=patterns)
+* [Docs: Testing Functions](/docs/functions/testing-functions?ref=patterns)
