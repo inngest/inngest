@@ -9,6 +9,7 @@ import TimelineScrollContainer from './components/Timeline/TimelineScrollContain
 import TimelineFeedContent from './components/Timeline/TimelineFeedContent'
 import ContentCard from './components/Content/ContentCard'
 import EventCard from './components/Event/EventCard'
+import Button from './components/Button'
 
 import { IconFeed, IconBook } from './icons'
 
@@ -37,7 +38,7 @@ export function App() {
           <ContentCard
             title="accounts/profile.photo.uploaded"
             datetime="14:34:21 28/04/2022"
-            button={<button>Open Event</button>}
+            button={<Button label="Open Event" icon={<IconFeed />} />}
             id="01GGG522ZATDGVQBCND4ZEAS6Z"
             active
           >
