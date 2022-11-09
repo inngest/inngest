@@ -20,7 +20,7 @@ const Footer = () => {
             <a href="/features/sdk?ref=footer">Function SDK</a>
             <a href="/features/step-functions?ref=footer">Step Functions</a>
             <a href="/docs?ref=footer">Documentation</a>
-            <a href="/patterns?ref=footer">Patterns: Async + Event-Driven</a>
+            {/* <a href="/patterns?ref=footer">Patterns: Async + Event-Driven</a> */}
             <a href="/docs/self-hosting?ref=footer">Self-host</a>
             <a
               href="https://typedwebhook.tools?ref=inngest-footer"

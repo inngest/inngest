@@ -107,14 +107,14 @@ const NavContent: React.FC<Props> = (props: Props) => {
                     </small>
                   </p>
                 </a>
-                <a href="/patterns?ref=nav" className="rounded-lg p-4">
+                {/* <a href="/patterns?ref=nav" className="rounded-lg p-4">
                   <p>Patterns: Async + Event Driven</p>
                   <p className="pt-1 text-slate-400">
                     <small>
                       How to build asynchronous functionality by example
                     </small>
                   </p>
-                </a>
+                </a> */}
                 <a href="/quick-starts?ref=nav" className="rounded-lg p-4">
                   <p>Quick starts</p>
                   <p className="pt-1 text-slate-400">
