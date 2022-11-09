@@ -8,7 +8,7 @@ export default function Header() {
           <InngestLogo />
           <span className="ml-1.5">Inngest Server</span>
         </h1>
-        <span className="flex bg-slate-800 text-xs text-slate-300 items-center rounded-lg px-2.5 py-1.5 ml-5">
+        <span className="flex bg-slate-800 text-xs text-slate-300 items-center rounded px-2 py-1.5 ml-5 leading-none">
           <span className="bg-lime-400 w-2 h-2 rounded-full block mr-1.5">
             {''}
           </span>

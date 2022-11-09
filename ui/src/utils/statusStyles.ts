@@ -9,7 +9,7 @@ import {
 } from '../icons'
 
 
-export default function getStatusVals(status) {
+export default function statusStyles(status) {
   switch (status) {
     case 'RUNNING':
       return {
