@@ -84,7 +84,7 @@ export const SECTIONS: Section[] = [
       {
         title: "Building flows for lost customers",
         subtitle:
-          "Combine events into a single function to build things like **cart abandonment** and **churn flows**.",
+          "Combine events into a single function to build things like cart abandonment, sales processes, and churn flows",
         tags: ["Activation", "User Journeys", "Event Coordination"],
         slug: "event-coordination-for-lost-customers",
       },
