@@ -110,6 +110,7 @@ export async function getStaticProps() {
         title: "Patterns: Async + Event-Driven",
         description:
           "A collection of software architecture patterns for asynchronous flows",
+        image: "/assets/patterns/og-image-patterns.jpg",
       },
     },
   };
@@ -141,7 +142,7 @@ export default function Patterns() {
                 what the solutions look like with or without using events.
               </p>
             </div>
-            <div style={{ maxWidth: "30%" }}>
+            <div style={{ maxWidth: "30%" }} className="hidden sm:block">
               <img
                 src="/assets/patterns/patterns-hero.png"
                 className="max-w-full rounded-lg"

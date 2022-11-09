@@ -56,6 +56,7 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
         title: "Patterns: Async + Event-Driven",
         description:
           "A collection of software architecture patterns for asynchronous flows",
+        image: "/assets/patterns/og-image-patterns.jpg",
       },
     },
   };
