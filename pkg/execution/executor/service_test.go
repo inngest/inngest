@@ -219,12 +219,16 @@ func TestHandleQueueItemTriggerService(t *testing.T) {
 		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
 	}
 
-	_, err := data.sm.New(ctx, data.w, id, (event.Event{
-		Name: "test",
-		Data: map[string]interface{}{
-			"data": "ya",
-		},
-	}).Map())
+	_, err := data.sm.New(ctx, state.Input{
+		Workflow:   data.w,
+		Identifier: id,
+		EventData: (event.Event{
+			Name: "test",
+			Data: map[string]interface{}{
+				"data": "ya",
+			},
+		}).Map(),
+	})
 	require.NoError(t, err)
 
 	// Require that we have a pending count.
@@ -282,12 +286,16 @@ func TestHandleAsyncService(t *testing.T) {
 		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
 	}
 
-	_, err := data.sm.New(ctx, data.w, id, (event.Event{
-		Name: "test",
-		Data: map[string]interface{}{
-			"data": "ya",
-		},
-	}).Map())
+	_, err := data.sm.New(ctx, state.Input{
+		Workflow:   data.w,
+		Identifier: id,
+		EventData: (event.Event{
+			Name: "test",
+			Data: map[string]interface{}{
+				"data": "ya",
+			},
+		}).Map(),
+	})
 	require.NoError(t, err)
 
 	// Require that we have a pending count.
@@ -321,7 +329,8 @@ func TestHandleAsyncService(t *testing.T) {
 	pause := pauses.Val(ctx)
 
 	// Pretend that we received an "async/continue" event via the runner.
-	err = data.sm.ConsumePause(ctx, pause.ID)
+	// XXX: Maybe add data here as a test.
+	err = data.sm.ConsumePause(ctx, pause.ID, nil)
 	require.NoError(t, err)
 	err = data.q.Enqueue(
 		ctx,
@@ -346,8 +355,8 @@ func TestHandleAsyncService(t *testing.T) {
 	run, err = data.sm.Load(ctx, id)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(run.Actions()))
-	require.EqualValues(t, map[string]map[string]interface{}{
-		"1": {"id": 1},
+	require.EqualValues(t, map[string]any{
+		"1": map[string]any{"id": 1},
 	}, run.Actions())
 	require.Equal(t, 2, run.Metadata().Pending)
 
@@ -357,9 +366,9 @@ func TestHandleAsyncService(t *testing.T) {
 	<-time.After(timeout + buffer)
 	run, err = data.sm.Load(ctx, id)
 	require.NoError(t, err)
-	require.EqualValues(t, map[string]map[string]interface{}{
-		"1": {"id": 1},
-		"2": {"id": 2},
+	require.EqualValues(t, map[string]any{
+		"1": map[string]any{"id": 1},
+		"2": map[string]any{"id": 2},
 	}, run.Actions())
 	require.Equal(t, 0, run.Metadata().Pending)
 

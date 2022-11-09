@@ -29,13 +29,21 @@ import (
 
 type Opt func(s *svc)
 
+// Runner is the interface for the runner, which provides a standard Service
+// and the ability to re-initialize crons.
+type Runner interface {
+	service.Service
+
+	InitializeCrons(ctx context.Context) error
+}
+
 func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
 	}
 }
 
-func NewService(c config.Config, opts ...Opt) service.Service {
+func NewService(c config.Config, opts ...Opt) Runner {
 	svc := &svc{config: c}
 	for _, o := range opts {
 		o(svc)
@@ -101,7 +109,7 @@ func (s *svc) Pre(ctx context.Context) error {
 	// to rely on a single executor to 'claim' ownership:  we'd have to implement
 	// more complex logic to check for the last heartbeat and valid cron scheduled,
 	// then backtrack to re-execute in the case of node downtime.  This is simple.
-	if err := s.initializeCrons(ctx); err != nil {
+	if err := s.InitializeCrons(ctx); err != nil {
 		return err
 	}
 
@@ -130,7 +138,7 @@ func (s *svc) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (s *svc) initializeCrons(ctx context.Context) error {
+func (s *svc) InitializeCrons(ctx context.Context) error {
 	// If a previous cron manager exists, cancel it.
 	if s.cronmanager != nil {
 		s.cronmanager.Stop()
@@ -164,6 +172,7 @@ func (s *svc) initializeCrons(ctx context.Context) error {
 			}
 			_, err := s.cronmanager.AddFunc(t.Cron, func() {
 				err := s.initialize(ctx, fn, event.Event{
+					ID:   time.Now().UTC().Format(time.RFC3339),
 					Name: "inngest/scheduled.timer",
 				})
 				if err != nil {
@@ -305,7 +314,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 		// NOTE: Some pauses may be nil or expired, as the iterator may take
 		// time to process.  We handle that here and assume that the event
 		// did not occur in time.
-		if pause == nil || pause.Expires.Before(time.Now()) {
+		if pause == nil || pause.Expires.Time().Before(time.Now()) {
 			continue
 		}
 
@@ -314,13 +323,19 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			Msg("handling pause")
 
 		if pause.Expression != nil {
-			s, err := s.state.Load(ctx, pause.Identifier)
-			if err != nil {
-				return err
+			data := pause.ExpressionData
+
+			if len(data) == 0 {
+				// The pause had no expression data, so always load
+				// state for the function to retrieve expression data.
+				s, err := s.state.Load(ctx, pause.Identifier)
+				if err != nil {
+					return err
+				}
+				// Get expression data from the executor for the given run ID.
+				data = state.EdgeExpressionData(ctx, s, pause.Outgoing)
 			}
 
-			// Get expression data from the executor for the given run ID.
-			data := state.EdgeExpressionData(ctx, s, pause.Outgoing)
 			// Add the async event data to the expression
 			data["async"] = evtMap
 			// Compile and run the expression.
@@ -340,7 +355,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 		if pause.OnTimeout {
 			// Delete this pause, as an event has occured which matches
 			// the timeout.
-			if err := s.state.ConsumePause(ctx, pause.ID); err != nil {
+			if err := s.state.ConsumePause(ctx, pause.ID, nil); err != nil {
 				return err
 			}
 		}
@@ -389,7 +404,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			Str("pause_id", pause.ID.String()).
 			Str("run_id", pause.Identifier.RunID.String()).
 			Msg("consuming pause")
-		if err := s.state.ConsumePause(ctx, pause.ID); err != nil {
+		if err := s.state.ConsumePause(ctx, pause.ID, evtMap); err != nil {
 			return err
 		}
 	}
@@ -431,7 +446,11 @@ func Initialize(ctx context.Context, fn function.Function, evt event.Event, s st
 		Key:        evt.ID,
 	}
 
-	if _, err := s.New(ctx, *flow, id, evt.Map()); err != nil {
+	if _, err := s.New(ctx, state.Input{
+		Workflow:   *flow,
+		Identifier: id,
+		EventData:  evt.Map(),
+	}); err != nil {
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 

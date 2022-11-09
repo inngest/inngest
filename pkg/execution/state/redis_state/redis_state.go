@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -13,16 +14,25 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/inmemory"
+	"github.com/oklog/ulid/v2"
 )
 
-const (
-	// defaultExpiry is used as a placeholder while we configure open-source
-	// workflow timeouts.  Right now, data stored in redis never has a TTL.
-	defaultExpiry = 0
-)
+//go:embed lua/*
+var embedded embed.FS
+
+var scripts = map[string]string{
+	"leasePause": "",
+}
 
 func init() {
 	registration.RegisterState(func() any { return &Config{} })
+	for k := range scripts {
+		val, err := embedded.ReadFile(fmt.Sprintf("lua/%s.lua", k))
+		if err != nil {
+			panic(fmt.Errorf("error reading redis lua script: %w", err))
+		}
+		scripts[k] = string(val)
+	}
 }
 
 // Config registers the configuration for the in-memory state store,
@@ -41,6 +51,10 @@ type Config struct {
 	PoolSize   *int
 
 	KeyPrefix string
+
+	// Expiry represents the expiration time on values stored in state.
+	// This defaults to 0, ie. no expiry TTL.
+	Expiry time.Duration
 }
 
 func (c Config) StateName() string { return "redis" }
@@ -54,7 +68,8 @@ func (c Config) Manager(ctx context.Context) (state.Manager, error) {
 	return New(
 		ctx,
 		WithConnectOpts(*opts),
-		WithKeyGenerator(defaultKeyFunc{prefix: c.KeyPrefix}),
+		WithExpiration(c.Expiry),
+		WithKeyGenerator(DefaultKeyFunc{Prefix: c.KeyPrefix}),
 	)
 }
 
@@ -81,13 +96,15 @@ func (c Config) ConnectOpts() (*redis.Options, error) {
 // Opt represents an option to use when creating a redis-backed state store.
 type Opt func(r *mgr)
 
+type RunCallback func(context.Context, state.Identifier) error
+
 // New returns a state manager which uses Redis as the backing state store.
 //
 // By default, this connects to a local Redis server.  Use WithConnectOpts to
 // change how we connect to Redis.
 func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 	m := &mgr{
-		kf: defaultKeyFunc{},
+		kf: DefaultKeyFunc{},
 	}
 
 	for _, opt := range opts {
@@ -112,11 +129,50 @@ func WithConnectOpts(o redis.Options) Opt {
 	}
 }
 
+// WithKeyPrefix uses a specific key prefix
+func WithKeyPrefix(prefix string) Opt {
+	return func(m *mgr) {
+		m.kf = DefaultKeyFunc{
+			Prefix: prefix,
+		}
+	}
+}
+
+// WithRedisClient uses an already connected redis client.
+func WithRedisClient(r *redis.Client) Opt {
+	return func(m *mgr) {
+		m.r = r
+	}
+}
+
 // WithKeyGenerator specifies the function to use when creating keys for
 // each stored data type.
 func WithKeyGenerator(kf KeyGenerator) Opt {
 	return func(m *mgr) {
 		m.kf = kf
+	}
+}
+
+// WithExpiration specifies the TTL to use when setting values in Redis.
+func WithExpiration(ttl time.Duration) Opt {
+	return func(m *mgr) {
+		m.expiry = ttl
+	}
+}
+
+// WithOnComplete supplies a callback which is triggered any time a function
+// run completes.
+func WithOnComplete(f RunCallback) Opt {
+	return func(m *mgr) {
+		m.oncomplete = f
+	}
+}
+
+// WithOnError supplies a callback which is triggered any time a function
+// run completes.
+func WithOnError(f RunCallback) Opt {
+	return func(m *mgr) {
+		m.onerror = f
 	}
 }
 
@@ -163,47 +219,57 @@ type KeyGenerator interface {
 }
 
 type mgr struct {
-	kf KeyGenerator
-	r  *redis.Client
+	expiry time.Duration
+	kf     KeyGenerator
+	r      *redis.Client
+
+	oncomplete RunCallback
+	onerror    RunCallback
 }
 
-func (m mgr) New(ctx context.Context, workflow inngest.Workflow, id state.Identifier, input map[string]any) (state.State, error) {
+func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	// TODO: We could probably optimize the commands here by storing the event
 	// within run metadata.  We want step output (actions) and errors to be
 	// their own redis hash for fast inserts (HSET on individual step results).
 	// However, the input event is immutable.
 	metadata := runMetadata{
-		Version:   workflow.Version,
-		CreatedAt: time.Now().Truncate(time.Second),
-		Pending:   1,
+		Version:  input.Workflow.Version,
+		Pending:  1,
+		Debugger: input.Debugger,
+	}
+	if input.OriginalRunID != nil {
+		metadata.OriginalRunID = input.OriginalRunID.String()
+	}
+	if input.RunType != nil {
+		metadata.RunType = *input.RunType
 	}
 
 	// We marshal this ahead of creating a redis transaction as it's necessary
 	// every time and reduces the duration that the lock is held.
-	inputJSON, err := json.Marshal(input)
+	inputJSON, err := json.Marshal(input.EventData)
 	if err != nil {
 		return nil, err
 	}
 
-	ikey := m.kf.Idempotency(ctx, id)
+	ikey := m.kf.Idempotency(ctx, input.Identifier)
 
 	err = m.r.Watch(ctx, func(tx *redis.Tx) error {
 		// Ensure that the workflow exists within the state store.
 		//
 		// XXX: Could this use SETNX to combine these steps or is it more performant
 		//      not to have to marshal the workflow every new run?
-		key := m.kf.Workflow(ctx, workflow.UUID, workflow.Version)
+		key := m.kf.Workflow(ctx, input.Workflow.UUID, input.Workflow.Version)
 		val, err := tx.Exists(ctx, key).Uint64()
 		if err != nil {
 			return err
 		}
 		if val == 0 {
 			// Set the workflow.
-			byt, err := json.Marshal(workflow)
+			byt, err := json.Marshal(input.Workflow)
 			if err != nil {
 				return err
 			}
-			if err := tx.Set(ctx, key, byt, defaultExpiry).Err(); err != nil {
+			if err := tx.Set(ctx, key, byt, m.expiry).Err(); err != nil {
 				return err
 			}
 		}
@@ -217,14 +283,27 @@ func (m mgr) New(ctx context.Context, workflow inngest.Workflow, id state.Identi
 		}
 
 		// Save metadata about this particular run.
-		if err := tx.HSet(ctx, m.kf.RunMetadata(ctx, id), metadata.Map()).Err(); err != nil {
+		if err := tx.HSet(ctx, m.kf.RunMetadata(ctx, input.Identifier), metadata.Map()).Err(); err != nil {
 			return err
+		}
+
+		// Save predetermined step data
+		actionKey := m.kf.Actions(ctx, input.Identifier)
+		for stepID, value := range input.Steps {
+			// Save the output.
+			str, err := json.Marshal(value)
+			if err != nil {
+				return err
+			}
+			if err := m.r.HSet(ctx, actionKey, stepID, str).Err(); err != nil {
+				return err
+			}
 		}
 
 		// XXX: If/when we enforce limits on function durations here (eg.
 		// 1, 5, 10 years) this should have a similar TTL.
-		key = m.kf.Event(ctx, id)
-		if err := tx.Set(ctx, key, inputJSON, defaultExpiry).Err(); err != nil {
+		key = m.kf.Event(ctx, input.Identifier)
+		if err := tx.Set(ctx, key, inputJSON, m.expiry).Err(); err != nil {
 			return err
 		}
 
@@ -237,13 +316,11 @@ func (m mgr) New(ctx context.Context, workflow inngest.Workflow, id state.Identi
 	// We return a new in-memory state instance with the workflow, ID, and input
 	// pre-filled.
 	return inmemory.NewStateInstance(
-			workflow,
-			id,
-			state.Metadata{
-				StartedAt: metadata.CreatedAt,
-			},
-			input,
-			map[string]map[string]any{},
+			input.Workflow,
+			input.Identifier,
+			metadata.Metadata(),
+			input.EventData,
+			input.Steps,
 			map[string]error{},
 		),
 		nil
@@ -265,6 +342,10 @@ func (m mgr) metadata(ctx context.Context, id state.Identifier) (*runMetadata, e
 	return NewRunMetadata(val)
 }
 
+func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
+	return m.r.HSet(ctx, m.kf.RunMetadata(ctx, id), "status", state.RunStatusCancelled).Err()
+}
+
 func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error) {
 	// XXX: Use a pipeliner to improve speed.
 	metadata, err := m.metadata(ctx, id)
@@ -282,7 +363,8 @@ func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error)
 		return nil, err
 	}
 
-	// TODO: We must ensure that the workflow UUID and Version are marshalled in JSON.
+	// We must ensure that the workflow UUID and Version are marshalled in JSON.
+	// In the dev server these are blank, so we force-add them here.
 	w.UUID = id.WorkflowID
 	w.Version = metadata.Version
 
@@ -301,9 +383,9 @@ func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error)
 	if err != nil {
 		return nil, err
 	}
-	actions := map[string]map[string]any{}
+	actions := map[string]any{}
 	for stepID, marshalled := range rmap {
-		data := map[string]any{}
+		var data any
 		err = json.Unmarshal([]byte(marshalled), &data)
 		if err != nil {
 			return nil, err
@@ -328,10 +410,7 @@ func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error)
 		return nil, err
 	}
 
-	meta := state.Metadata{
-		StartedAt: metadata.CreatedAt,
-		Pending:   metadata.Pending,
-	}
+	meta := metadata.Metadata()
 
 	return inmemory.NewStateInstance(*w, id, meta, event, actions, errors), nil
 }
@@ -355,53 +434,48 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		if err := m.r.HSet(ctx, m.kf.Errors(ctx, i), r.Step.ID, r.Err.Error()).Err(); err != nil {
 			return err
 		}
-		if r.Final() {
-			// Increase finalized.
-			return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Err()
+		if !r.Final() {
+			// we will retry
+			return nil
 		}
-		return nil
+		if err := m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Err(); err != nil {
+			return err
+		}
+		return m.r.HSet(ctx, m.kf.RunMetadata(ctx, i), "status", state.RunStatusFailed).Err()
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if m.onerror != nil {
+		// Call a user-defined callback.
+		if err := m.onerror(ctx, i); err != nil {
+			return nil, err
+		}
 	}
 
 	return m.Load(ctx, i)
 }
 
 func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string) error {
-	return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Err()
+	val, err := m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Result()
+	if err != nil {
+		return err
+	}
+	if val != 0 {
+		return nil
+	}
+	if err := m.r.HSet(ctx, m.kf.RunMetadata(ctx, i), "status", state.RunStatusComplete).Err(); err != nil {
+		return err
+	}
+	if m.oncomplete != nil {
+		return m.oncomplete(ctx, i)
+	}
+	return nil
 }
 
 func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string) error {
 	return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", 1).Err()
-}
-
-func (m mgr) SaveActionOutput(ctx context.Context, id state.Identifier, actionID string, data map[string]interface{}) (state.State, error) {
-	str, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-	err = m.r.Watch(ctx, func(tx *redis.Tx) error {
-		// Delete the existing error.
-		if err := m.r.HDel(ctx, m.kf.Errors(ctx, id), actionID).Err(); err != nil {
-			return err
-		}
-		if err := m.r.HSet(ctx, m.kf.Actions(ctx, id), actionID, str).Err(); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return m.Load(ctx, id)
-}
-
-func (m mgr) SaveActionError(ctx context.Context, id state.Identifier, actionID string, err error) (state.State, error) {
-	if err := m.r.HSet(ctx, m.kf.Errors(ctx, id), actionID, err.Error()).Err(); err != nil {
-		return nil, err
-	}
-	return m.Load(ctx, id)
 }
 
 func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
@@ -417,7 +491,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 			string(packed),
 			// Add at least 10 minutes to this pause, allowing us to process the
 			// pause by ID for 10 minutes past expiry.
-			time.Until(p.Expires)+(10*time.Minute),
+			time.Until(p.Expires.Time())+(10*time.Minute),
 		).Err()
 		if err != nil {
 			return err
@@ -429,7 +503,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 			ctx,
 			m.kf.PauseStep(ctx, p.Identifier, p.Outgoing),
 			p.ID.String(),
-			time.Until(p.Expires),
+			time.Until(p.Expires.Time()),
 		).Err()
 		if err != nil {
 			return err
@@ -457,42 +531,40 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 }
 
 func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
-	pauseKey := m.kf.PauseID(ctx, id)
-	leaseKey := m.kf.PauseLease(ctx, id)
-	return m.r.Watch(ctx, func(tx *redis.Tx) error {
-		exists, err := tx.Exists(ctx, pauseKey).Uint64()
-		if err != nil {
-			return err
-		}
-		if exists == 0 {
-			return state.ErrPauseNotFound
-		}
-
-		// Fetch the lease
-		str, err := tx.Get(ctx, leaseKey).Result()
-		if err != redis.Nil && err != nil {
-			return err
-		}
-		if str != "" {
-			// We have a lease.
-			leasedUntil, err := time.Parse(time.RFC3339Nano, str)
-			if err != nil {
-				return err
-			}
-
-			if time.Now().Before(leasedUntil) {
-				return state.ErrPauseLeased
-			}
-		}
-
-		// Lease the pause.
-		lease := time.Now().Add(state.PauseLeaseDuration).Format(time.RFC3339Nano)
-		return tx.Set(ctx, leaseKey, lease, time.Until(time.Now().Add(state.PauseLeaseDuration))).Err()
-	}, leaseKey)
+	status, err := redis.NewScript(scripts["leasePause"]).Eval(
+		ctx,
+		m.r,
+		[]string{m.kf.PauseID(ctx, id), m.kf.PauseLease(ctx, id)},
+		time.Now().UnixMilli(),
+		state.PauseLeaseDuration.Seconds(),
+	).Int64()
+	if err != nil {
+		return fmt.Errorf("error leasing pause: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return state.ErrPauseLeased
+	case 2:
+		return state.ErrPauseNotFound
+	default:
+		return fmt.Errorf("unknown response leasing pause: %d", status)
+	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID) error {
+func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
+	var (
+		marshalledData []byte
+		err            error
+	)
+
 	key := m.kf.PauseID(ctx, id)
+
+	marshalledData, err = json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("cannot marshal data to store in state: %w", err)
+	}
 
 	return m.r.Watch(ctx, func(tx *redis.Tx) error {
 		str, err := tx.Get(ctx, key).Result()
@@ -514,6 +586,13 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID) error {
 			// Remove this from any event, also.
 			return tx.HDel(ctx, m.kf.PauseEvent(ctx, *pause.Event), pause.ID.String()).Err()
 		}
+
+		if pause.DataKey != "" {
+			if err := m.r.HSet(ctx, m.kf.Actions(ctx, pause.Identifier), pause.DataKey, string(marshalledData)).Err(); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	}, key)
 }
@@ -615,23 +694,36 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 		return nil, fmt.Errorf("invalid workflow version stored in run metadata")
 	}
 
-	str, ok := data["createdAt"]
+	v, ok = data["status"]
 	if !ok {
-		return nil, fmt.Errorf("no created at stored in run metadata")
+		return nil, fmt.Errorf("no status stored in metadata")
 	}
-
-	m.CreatedAt, err = time.Parse(time.RFC3339, str)
+	status, err := strconv.Atoi(v)
 	if err != nil {
-		return nil, fmt.Errorf("invalid created at stored in run metadata")
+		return nil, fmt.Errorf("invalid workflow version stored in run metadata")
 	}
+	m.Status = state.RunStatus(status)
 
-	str, ok = data["pending"]
+	str, ok := data["pending"]
 	if !ok {
 		return nil, fmt.Errorf("no created at stored in run metadata")
 	}
 	m.Pending, err = strconv.Atoi(str)
 	if err != nil {
 		return nil, fmt.Errorf("invalid pending stored in run metadata")
+	}
+
+	// The below fields are optional
+	if val, ok := data["debugger"]; ok {
+		if val == "true" {
+			m.Debugger = true
+		}
+	}
+	if val, ok := data["originalRunID"]; ok {
+		m.OriginalRunID = val
+	}
+	if val, ok := data["runType"]; ok {
+		m.RunType = val
 	}
 
 	return m, nil
@@ -641,61 +733,86 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 // creating a new run, and stores the triggering event as well as workflow-specific
 // metadata for the invocation.
 type runMetadata struct {
+	Status state.RunStatus `json:"status"`
 	// Version is required to load the correct workflow Version
 	// for the specific run.
-	Version   int       `json:"version"`
-	CreatedAt time.Time `json:"createdAt"`
-	Pending   int       `json:"pending"`
+	Version int `json:"version"`
+
+	// These are the fields for standard state metadata.
+	Pending       int    `json:"pending"`
+	Debugger      bool   `json:"debugger"`
+	RunType       string `json:"runType,omitempty"`
+	OriginalRunID string `json:"originalRunID,omitempty"`
 }
 
 func (r runMetadata) Map() map[string]any {
 	return map[string]any{
-		"version":   r.Version,
-		"createdAt": r.CreatedAt.Format(time.RFC3339),
-		"pending":   r.Pending,
+		"version":       r.Version,
+		"status":        r.Status,
+		"pending":       r.Pending,
+		"debugger":      r.Debugger,
+		"runType":       r.RunType,
+		"originalRunID": r.OriginalRunID,
 	}
 }
 
-type defaultKeyFunc struct {
-	prefix string
+func (r runMetadata) Metadata() state.Metadata {
+	m := state.Metadata{
+		Pending:  r.Pending,
+		Debugger: r.Debugger,
+		Status:   r.Status,
+	}
+
+	if r.RunType != "" {
+		m.RunType = &r.RunType
+	}
+	if r.OriginalRunID != "" {
+		id := ulid.MustParse(r.OriginalRunID)
+		m.OriginalRunID = &id
+	}
+	return m
 }
 
-func (d defaultKeyFunc) Idempotency(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:key:%s", d.prefix, id.IdempotencyKey())
+type DefaultKeyFunc struct {
+	Prefix string
 }
 
-func (d defaultKeyFunc) RunMetadata(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:metadata:%s", d.prefix, id.RunID)
+func (d DefaultKeyFunc) Idempotency(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:key:%s", d.Prefix, id.IdempotencyKey())
 }
 
-func (d defaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int) string {
-	return fmt.Sprintf("%s:workflows:%s-%d", d.prefix, id, version)
+func (d DefaultKeyFunc) RunMetadata(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:metadata:%s", d.Prefix, id.RunID)
 }
 
-func (d defaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:events:%s:%s", d.prefix, id.WorkflowID, id.RunID)
+func (d DefaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int) string {
+	return fmt.Sprintf("%s:workflows:%s-%d", d.Prefix, id, version)
 }
 
-func (d defaultKeyFunc) Actions(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:actions:%s:%s", d.prefix, id.WorkflowID, id.RunID)
+func (d DefaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:events:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
 }
 
-func (d defaultKeyFunc) Errors(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:errors:%s:%s", d.prefix, id.WorkflowID, id.RunID)
+func (d DefaultKeyFunc) Actions(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:actions:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
 }
 
-func (d defaultKeyFunc) PauseID(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("%s:pauses:%s", d.prefix, id.String())
+func (d DefaultKeyFunc) Errors(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:errors:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
 }
 
-func (d defaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("%s:pause-lease:%s", d.prefix, id.String())
+func (d DefaultKeyFunc) PauseID(ctx context.Context, id uuid.UUID) string {
+	return fmt.Sprintf("%s:pauses:%s", d.Prefix, id.String())
 }
 
-func (d defaultKeyFunc) PauseEvent(ctx context.Context, event string) string {
-	return fmt.Sprintf("%s:pause-events:%s", d.prefix, event)
+func (d DefaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) string {
+	return fmt.Sprintf("%s:pause-lease:%s", d.Prefix, id.String())
 }
 
-func (d defaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
-	return fmt.Sprintf("%s:pause-steps:%s-%s", d.prefix, id.RunID, step)
+func (d DefaultKeyFunc) PauseEvent(ctx context.Context, event string) string {
+	return fmt.Sprintf("%s:pause-events:%s", d.Prefix, event)
+}
+
+func (d DefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
+	return fmt.Sprintf("%s:pause-steps:%s-%s", d.Prefix, id.RunID, step)
 }

@@ -31,20 +31,4 @@ config.#Config & {
 		}
 		logOutput: true
 	}
-
-	eventstream: {
-		service: config.#SQSMessaging & {
-			queueURL: "http://localhost:4566/000000000000/sqs-redis-events?endpoint=http://localhost:4566"
-			region:   "us-east-1"
-			topic:    "events"
-		}
-	}
-
-	queue: {
-		service: config.#SQSQueue & {
-			queueURL: "http://localhost:4566/000000000000/sqs-redis-steps?endpoint=http://localhost:4566"
-			region:   "us-east-1"
-			topic:    "steps"
-		}
-	}
 }

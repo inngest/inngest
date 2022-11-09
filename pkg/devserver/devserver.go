@@ -63,9 +63,10 @@ func start(ctx context.Context, opts StartOpts, loader *inmemorydatastore.FSLoad
 		return err
 	}
 
-	// The devserver embeds the event API.
-	ds := newService(opts, loader)
 	runner := runner.NewService(opts.Config, runner.WithExecutionLoader(loader))
+
+	// The devserver embeds the event API.
+	ds := newService(opts, loader, runner)
 	exec := executor.NewService(
 		opts.Config,
 		executor.WithExecutionLoader(loader),

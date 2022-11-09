@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -183,7 +184,13 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 	l.Debug().Interface("edge", edge).Msg("processing step")
 
-	_, err = s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
+	resp, err := s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
+	// Check if the execution is cancelled, and if so finalize and terminate early.
+	// This prevents steps from scheduling children.
+	if err == ErrFunctionRunCancelled {
+		_ = s.state.Finalized(ctx, item.Identifier, edge.Incoming)
+		return nil
+	}
 	if err != nil {
 		// The executor usually returns a state.DriverResponse if the step's
 		// response was an error.  In this case, the executor itself handles
@@ -213,6 +220,19 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 			return err
 		}
 		return nil
+	}
+
+	// If this is a generator step, we need to re-invoke the current function.
+	if resp != nil && resp.Generator != nil {
+		// We're re-invoking the current step again.  Generator steps do not have
+		// their own "step output" until the end of the function;  instead, each
+		// sub-step within the generator yields a new output with its own step ID.
+		//
+		// We keep invoking Generator-based functions until they provide no more
+		// yields, signalling they're done.
+		if err := s.scheduleGeneratorResponse(ctx, item, resp); err != nil {
+			return err
+		}
 	}
 
 	run, err := s.state.Load(ctx, item.Identifier)
@@ -259,7 +279,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 				Identifier: run.Identifier(),
 				Outgoing:   next.Outgoing,
 				Incoming:   next.Incoming,
-				Expires:    expires,
+				Expires:    state.Time(expires),
 				Event:      &am.Event,
 				Expression: am.Match,
 				OnTimeout:  am.OnTimeout,
@@ -332,6 +352,68 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	return nil
 }
 
+func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r *state.DriverResponse) error {
+	if r.Generator == nil {
+		return fmt.Errorf("unable to handle non-generator response")
+	}
+
+	edge, ok := item.Payload.(queue.PayloadEdge)
+	if !ok {
+		return fmt.Errorf("unknown queue item type handling generator: %T", item.Payload)
+	}
+
+	switch r.Generator.Op {
+	case enums.OpcodeWaitForEvent:
+		opts, err := r.Generator.WaitForEventOpts()
+		if err != nil {
+			return err
+		}
+		expires, err := opts.Expires()
+		if err != nil {
+			return err
+		}
+		pauseID := uuid.New()
+		err = s.state.SavePause(ctx, state.Pause{
+			ID:         pauseID,
+			Identifier: item.Identifier,
+			Outgoing:   edge.Edge.Outgoing,
+			Incoming:   edge.Edge.Incoming,
+			Expires:    state.Time(expires),
+			Event:      &opts.Event,
+			Expression: opts.If,
+		})
+		if err != nil {
+			return err
+		}
+		// SDK-based event coordination is called both when an event is received
+		// OR on timeout, depending on which happens first.  Both routes consume
+		// the pause so this race will conclude by calling the function once, as only
+		// one thread can lease and consume a pause;  the other will find that the
+		// pause is no longer available and return.
+		return s.queue.Enqueue(ctx, queue.Item{
+			Kind:       queue.KindPause,
+			Identifier: item.Identifier,
+			Payload: queue.PayloadPauseTimeout{
+				PauseID:   pauseID,
+				OnTimeout: true,
+			},
+		}, expires)
+	case enums.OpcodeSleep:
+		// Re-enqueue the exact same edge after a sleep.
+		dur, err := r.Generator.SleepDuration()
+		if err != nil {
+			return err
+		}
+		return s.queue.Enqueue(ctx, item, time.Now().Add(dur))
+	case enums.OpcodeStep:
+		// Re-enqueue the exact same edge to run now.
+		return s.queue.Enqueue(ctx, item, time.Now())
+	}
+
+	// Enqueue the next child in our queue.
+	return fmt.Errorf("unknown opcode: %s", r.Generator.Op.String())
+}
+
 func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	l := logger.From(ctx).With().Str("run_id", item.Identifier.RunID.String()).Logger()
 
@@ -349,11 +431,11 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	if err != nil {
 		return err
 	}
-	if pause == nil || pause.LeasedUntil != nil {
+	if pause == nil {
 		return nil
 	}
 
-	if err := s.state.ConsumePause(ctx, pause.ID); err != nil {
+	if err := s.state.ConsumePause(ctx, pause.ID, nil); err != nil {
 		return fmt.Errorf("error consuming timeout pause: %w", err)
 	}
 

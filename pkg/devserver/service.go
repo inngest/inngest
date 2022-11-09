@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/inngest/clistate"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
@@ -20,8 +21,9 @@ const (
 	SDKPollInterval = 5 * time.Second
 )
 
-func newService(opts StartOpts, loader *inmemory.FSLoader) *devserver {
+func newService(opts StartOpts, loader *inmemory.FSLoader, runner runner.Runner) *devserver {
 	return &devserver{
+		runner:        runner,
 		loader:        loader,
 		opts:          opts,
 		urls:          opts.URLs,
@@ -39,6 +41,9 @@ func newService(opts StartOpts, loader *inmemory.FSLoader) *devserver {
 // SDKs, as they can test and use a single URL.
 type devserver struct {
 	opts StartOpts
+
+	// runner stores the runner
+	runner runner.Runner
 
 	apiservice service.Service
 

@@ -5,6 +5,7 @@ test:
 	golangci-lint run
 
 e2e:
+	# go run . -test.v -test.run inmemory-async
 	cd ./tests && go run . -test.v
 
 snapshot:

@@ -48,6 +48,7 @@ require (
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.7.1
 	github.com/tidwall/sjson v1.2.5
+	github.com/tonyhb/enumer v1.2.0
 	github.com/vektah/gqlparser/v2 v2.4.6
 	github.com/xhit/go-str2duration/v2 v2.0.0
 	gocloud.dev v0.25.0
@@ -153,6 +154,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/opencontainers/runc v1.0.3 // indirect
+	github.com/pascaldekloe/name v0.0.0-20180628100202-0fd16699aae1 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/protocolbuffers/txtpbfmt v0.0.0-20201118171849-f6a6b3f636fc // indirect

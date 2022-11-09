@@ -97,13 +97,13 @@ func (d *dockerExec) Execute(ctx context.Context, s state.State, action inngest.
 	}
 
 	resp := &state.DriverResponse{
-		Output:        map[string]interface{}{},
+		Output:        map[string]any{},
 		ActionVersion: action.Version,
 	}
 
 	if len(byt) == 0 {
 		byt, _ = io.ReadAll(stderr)
-		resp.Output["stderr"] = string(byt)
+		resp.Output.(map[string]any)["stderr"] = string(byt)
 	}
 	if exit != 0 {
 		resp.Err = fmt.Errorf("Non-zero status code: %d\nOutput: %s", exit, string(byt))
@@ -118,7 +118,7 @@ func (d *dockerExec) Execute(ctx context.Context, s state.State, action inngest.
 
 	// Return the output as JSON
 	if err := json.Unmarshal(content, &resp.Output); err != nil {
-		resp.Output["body"] = string(content)
+		resp.Output.(map[string]any)["body"] = string(content)
 	}
 
 	return resp, nil

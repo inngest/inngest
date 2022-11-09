@@ -798,6 +798,9 @@ github.com/opencontainers/image-spec/specs-go/v1
 # github.com/opencontainers/runc v1.0.3
 ## explicit; go 1.13
 github.com/opencontainers/runc/libcontainer/user
+# github.com/pascaldekloe/name v0.0.0-20180628100202-0fd16699aae1
+## explicit
+github.com/pascaldekloe/name
 # github.com/pelletier/go-toml v1.9.4
 ## explicit; go 1.12
 github.com/pelletier/go-toml
@@ -897,6 +900,9 @@ github.com/tklauser/go-sysconf
 # github.com/tklauser/numcpus v0.4.0
 ## explicit; go 1.11
 github.com/tklauser/numcpus
+# github.com/tonyhb/enumer v1.2.0
+## explicit; go 1.12
+github.com/tonyhb/enumer
 # github.com/urfave/cli/v2 v2.8.1
 ## explicit; go 1.18
 github.com/urfave/cli/v2

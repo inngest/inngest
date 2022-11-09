@@ -19,8 +19,8 @@ func TestEdgeExpressionData(t *testing.T) {
 	}
 	state.EXPECT().Event().Return(event)
 
-	actions := map[string]map[string]any{
-		"first": {
+	actions := map[string]any{
+		"first": map[string]any{
 			"result": "yep",
 		},
 	}

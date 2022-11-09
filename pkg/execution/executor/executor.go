@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
@@ -15,10 +16,11 @@ import (
 )
 
 var (
-	ErrRuntimeRegistered = fmt.Errorf("runtime is already registered")
-	ErrNoStateManager    = fmt.Errorf("no state manager provided")
-	ErrNoActionLoader    = fmt.Errorf("no action loader provided")
-	ErrNoRuntimeDriver   = fmt.Errorf("runtime driver for action not found")
+	ErrRuntimeRegistered    = fmt.Errorf("runtime is already registered")
+	ErrNoStateManager       = fmt.Errorf("no state manager provided")
+	ErrNoActionLoader       = fmt.Errorf("no action loader provided")
+	ErrNoRuntimeDriver      = fmt.Errorf("runtime driver for action not found")
+	ErrFunctionRunCancelled = fmt.Errorf("function has been cancelled")
 )
 
 // Executor manages executing actions.  It interfaces over a state store to save
@@ -61,6 +63,9 @@ type Executor interface {
 	// It is important for this function to be atomic;  if the function was scheduled
 	// and the context terminates, we must store the output or async data in workflow
 	// state then schedule the child functions else the workflow will terminate early.
+	//
+	// Execution will fail with no response and ErrFunctionRunCancelled if this function
+	// run has been cancelled by an external event or process.
 	Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error)
 }
 
@@ -155,14 +160,17 @@ type executor struct {
 }
 
 // Execute loads a workflow and the current run state, then executes the
-// workflow via an executor.  This returns all available steps we can run from
-// the workflow after the step has been executed.
+// workflow via an executor.
 func (e *executor) Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error) {
 	var log *zerolog.Logger
 
 	s, err := e.sm.Load(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+
+	if s.Metadata().Status == state.RunStatusCancelled {
+		return nil, ErrFunctionRunCancelled
 	}
 
 	if e.log != nil {
@@ -233,12 +241,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 			// caller to show only step outputs, etc.
 			log.Info().
 				Str("caller", "output").
+				Interface("generator", resp.Generator).
 				Interface("output", resp.Output).
 				Str("run_id", id.RunID.String()).
 				Str("step", from).
 				Msg("step output")
 		}
-
 	}
 
 	if err != nil {
@@ -333,6 +341,22 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	// Ensure that the step is always set.  This removes the need for drivers to always
 	// set this.
 	response.Step = *action
+
+	// NOTE: We must ensure that the Step ID is overwritten for Generator steps.  Generator
+	// steps are executed many times until they stop yielding;  each execution returns a
+	// new step ID and data that must be stored independently of the parent generator ID.
+	//
+	// By updating the step ID, we ensure that the data will be saved to the generator's ID.
+	if response.Generator != nil {
+		response.Step.ID = response.Generator.ID
+		// Unmarshal the generator data into the step.
+		if response.Generator.Data != nil {
+			err = json.Unmarshal(response.Generator.Data, &response.Output)
+			if err != nil {
+				response.Err = fmt.Errorf("error unmarshalling generator step data as json: %w", err)
+			}
+		}
+	}
 
 	if response.ActionVersion == nil {
 		// Set the ActionVersion automatically from the executor, where

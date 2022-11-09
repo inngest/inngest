@@ -2,12 +2,31 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
 	"github.com/oklog/ulid/v2"
+)
+
+const (
+	// RunStatusRunning indicates that the function is running.  This is the
+	// default state, even if steps are scheduled in the future.
+	RunStatusRunning RunStatus = iota
+	// RunStatusComplete indicates that the function has completed running.
+	RunStatusComplete
+	// RunStatusFailed indicates that the function failed in one or more steps.
+	RunStatusFailed
+	// RunStatusCancelled indicates that the function has been cancelled prior
+	// to any errors
+	RunStatusCancelled
+)
+
+const (
+	// PauseLeaseDuration is the lifetime that a pause's lease is valid for.
+	PauseLeaseDuration = 5 * time.Second
 )
 
 var (
@@ -23,10 +42,12 @@ var (
 	ErrIdentifierExists = fmt.Errorf("identifier already exists")
 )
 
-const (
-	// PauseLeaseDuration is the lifetime that a pause's lease is valid for.
-	PauseLeaseDuration = 5 * time.Second
-)
+// RunStatus indicates the status for an individual function run.
+type RunStatus int
+
+func (r RunStatus) MarshalBinary() ([]byte, error) {
+	return json.Marshal(r)
+}
 
 // Identifier represents the unique identifier for a workflow run.
 type Identifier struct {
@@ -68,23 +89,31 @@ type Pause struct {
 	// pause has not yet been consumed we can safely assume the event was
 	// not received.  Therefore, we must be able to load the pause for some
 	// time after timeout.
-	Expires time.Time `json:"expires"`
+	Expires Time `json:"expires"`
 	// Event is an optional event that can resume the pause automatically,
 	// often paired with an expression.
 	Event *string `json:"event"`
 	// Expression is an optional expression that must match for the pause
 	// to be resumed.
 	Expression *string `json:"expression"`
+	// ExpressionData _optionally_ stores only the data that we need to evaluate
+	// the expression from the event.  This allows us to load pauses from the
+	// state store without round trips to fetch the entire function state.  If
+	// this is empty and the pause contains an expression, function state will
+	// be loaded from the store.
+	ExpressionData map[string]any `json:"data"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout"`
-	// LeasedUntil represents the time that this pause is leased until. If
-	// nil, this pause is not leased.
+	// DataKey is the name of the step to use when adding data to the function
+	// run's state after consuming this step.
 	//
-	// A lease allows a single worker to claim a pause while enqueueing the
-	// pause's next step.  After enqueueing, the worker can consume the pause
-	// entirely.
-	LeasedUntil *time.Time `json:"leasedUntil,omitempty"`
+	// This allows us to create arbitrary "step" names for storing async event
+	// data from matching events in async edges, eg. `waitForEvent`.
+	//
+	// If DataKey is empty and data is provided when consuming a pause, no
+	// data will be saved in the function state.
+	DataKey string `json:"dataKey,omitempty"`
 }
 
 func (p Pause) Edge() inngest.Edge {
@@ -102,7 +131,18 @@ func (p Pause) Edge() inngest.Edge {
 // finished.  Functions may have many parallel branches with conditional execution.
 // Given this, no single step can tell whether it's the last step within a function.
 type Metadata struct {
-	StartedAt time.Time `json:"startedAt"`
+	Status RunStatus `json:"status"`
+
+	// Debugger represents whether this function was started via the debugger.
+	Debugger bool `json:"debugger"`
+
+	// RunType indicates the run type for this particular flow.  This allows
+	// us to store whether this is eg. a manual retry
+	RunType *string `json:"runType,omitempty"`
+
+	// OriginalRunID stores the original run ID, if this run is a retry.
+	// This is some basic book-keeping.
+	OriginalRunID *ulid.ULID `json:"originalRunID,omitempty"`
 
 	// Pending is the number of steps that have been enqueued but have
 	// not yet finalized.
@@ -114,7 +154,7 @@ type Metadata struct {
 	// - A step that has completed, and has its next steps (children in
 	//   the dag) enqueued. Note that the step must have its children
 	//   enqueued to be considered finalized.
-	Pending int
+	Pending int `json:"pending"`
 }
 
 // State represents the current state of a workflow.  It is data-structure
@@ -147,13 +187,13 @@ type State interface {
 	Event() map[string]interface{}
 
 	// Actions returns a map of all output from each individual action.
-	Actions() map[string]map[string]interface{}
+	Actions() map[string]any
 
 	// Errors returns all actions that have errored.
 	Errors() map[string]error
 
 	// ActionID returns the action output or error for the given ID.
-	ActionID(id string) (map[string]interface{}, error)
+	ActionID(id string) (any, error)
 
 	// ActionComplete returns whether the action with the given ID has finished,
 	// ie. has completed with data stored in state.
@@ -184,6 +224,34 @@ type CompleteSubscriber interface {
 }
 */
 
+// Input is the input for creating new state.  The required fields are Workflow,
+// Identifier and Input;  the rest of the data is stored within the state store as
+// metadata.
+type Input struct {
+	Workflow inngest.Workflow
+	// Identifier represents the identifier
+	Identifier Identifier
+
+	// EventData is the input data for initializing the workflow run, eg. the
+	// original event data.
+	EventData map[string]any
+
+	// Debugger represents whether this function was started via the debugger.
+	Debugger bool
+
+	// RunType indicates the run type for this particular flow.  This allows
+	// us to store whether this is eg. a manual retry
+	RunType *string `json:"runType,omitempty"`
+
+	// OriginalRunID stores the original run ID, if this run is a retry.
+	// This is some basic book-keeping.
+	OriginalRunID *ulid.ULID `json:"originalRunID,omitempty"`
+
+	// Steps allows users to specify pre-defined steps to run workflows from
+	// arbitrary points.
+	Steps map[string]any
+}
+
 // Mutater mutates state for a given identifier, storing the state and returning
 // the new state.
 //
@@ -194,7 +262,11 @@ type Mutater interface {
 	//
 	// If the IdempotencyKey within Identifier already exists, the state implementation should return
 	// ErrIdentifierExists.
-	New(ctx context.Context, workflow inngest.Workflow, i Identifier, input map[string]any) (State, error)
+	New(ctx context.Context, input Input) (State, error)
+
+	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
+	// future execution of steps.
+	Cancel(ctx context.Context, i Identifier) error
 
 	// scheduled increases the scheduled count for a run's metadata.
 	//
@@ -239,7 +311,10 @@ type PauseMutater interface {
 
 	// ConsumePause consumes a pause by its ID such that it can't be used again and
 	// will not be returned from any query.
-	ConsumePause(ctx context.Context, id uuid.UUID) error
+	//
+	// Any data passed when consuming a pause will be stored within function run state
+	// for future reference using the pause's DataKey.
+	ConsumePause(ctx context.Context, id uuid.UUID, data any) error
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
