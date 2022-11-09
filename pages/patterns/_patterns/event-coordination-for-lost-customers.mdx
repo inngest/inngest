@@ -1,0 +1,88 @@
+It's common to want to build functions which react to user journeys, and allow you to react to user activity within code directly.  Some common examples are:
+
+- In e-commerce, when a user adds a product to their cart without checking out in 24 hours send them a reminder email
+- In a SaaS app, if a user signs up but doesn't perform a required action in 3 days, send them a message
+- When a lead enters your sales pipeline, send a reminder to the sales team if there's no outreach in a week
+
+In each example, you want to start a function using one event, then _wait some time for another event_, then continue your logic when the time is up (or when the event is received). This allows you to model complex user journeys by simply waiting for new events (triggered by the user on your product).
+
+## How to implement this pattern
+
+Inngest allows you to build functions which coordinate between events using a few lines fo the SDK:
+
+```typescript
+import { createStepFunction } from "inngest";
+
+// This is the data received whenever the `cart/product.added` event is received. 
+type Added = {
+  name: "cart/product.added"
+  data: {
+    cart_id: string;
+    product_id: string;
+    product_name: string;
+  };
+  user: {
+    email: string;
+  };
+};
+
+export default createStepFunction<Added>(
+  "cart/product.added",
+  ({ event, tools }) => {
+    // This function runs as soon as a product is added to the cart.
+    // We immediately pause and wait up to 24 hours for the `cart/purchased`
+    // event from the same cart_id.
+    const purchased = tools.waitForEvent("cart/purchased", {
+      timeout: "24h",
+      match: "data.cart_id", // The "data.cart_id" field in both events must match.
+    });
+
+    // waitForEvent will return the `cart/purchased` event immediately when the
+    // matching event is received, or after the timeout with `null` if the event
+    // was not received (ie. the user didn't purchase).
+    if (purchased !== null) {
+      // The user has purchased their products;  we can end.
+      return;
+    }
+
+    tools.run("Send reminder", () => {
+      sendCartReminderEmail({ email: event.user.email, cart: event.data.cart_id });
+    });
+
+    // We could wait another 6 days to send a reminder after a week of adding to the
+    // cart also.
+  },
+  {
+    // Only run this function once for every cart ID.
+    idempotency: "event.data.cart_id",
+  }
+});
+```
+
+In this example we create a function that models key points in the user journey declaratively, without worrying about state or timing in code.
+
+First, we create a function that runs any time a user adds a product to their cart.  We then wait for the checkout event (`cart/purchased`) for up to 24 hours, via `tools.waitForEvent`.  This pauses the function until a matching event is received or the event isn't received within your time specified.
+
+Inngest resumes the function passing in the received event data, or null if the event was not received within the timeout.  Your code continues to run, handling events or timeouts in the same function.
+
+This has the following benefits:
+
+- All user-journey code is colocated within the same function
+- This makes the code easy to read, understand, and modify
+- You don't have to manage state, queues, or crons to check for eg. abandoned carts
+
+## Alternative approaches
+
+It's possible to handle these flows within standard applications by:
+
+- Creating scheduled functions that run every hour to check for abandoned carts within the age range of 23-24 hours.
+- Enqueueing a function to wait for 24 hours, then checking to see if the cart has been purchased directly wihtin the database.
+
+These are both possible within Inngest and using traditional queueing systems, although these approaches typically have more code and distributed state to maintain, increasing the chances of bugs and breaking changes.
+
+## Additional resources
+
+- TODO: Link to SDK `tools.waitForEvent` docs
+- TODO: Link to SDK `tools.run` docs
+- TODO: Link to SDK `tools.sleep` docs for alternative approaches
+

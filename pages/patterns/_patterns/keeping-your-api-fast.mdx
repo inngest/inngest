@@ -30,15 +30,17 @@ Inngest is serverless, so there are no queues to set up or configure. You send e
 ```js
 import { Inngest } from "inngest";
 
-app.post("/api/connectSource", await (req, res) => {
+app.post("/api/connectSource", async (req, res) => {
   // Your critical-path business logic for connecting the source for the user
   const source = createSource(req.body);
+
   // Send an event for what just happened with pertinent data to be handled async
   const inngest = new Inngest("API");
   inngest.send({
     name: "api/source.connected",
     data: { sourceId: source.id, userId: req.user.id },
   });
+
   res.json({
     data: { sourceId: source.id },
     message: "Your source was connected successfully!"
@@ -46,7 +48,7 @@ app.post("/api/connectSource", await (req, res) => {
 });
 ```
 
-Functions are defined by declaring what event(s) should trigger it. Any returned value is logged and any error thrown will inform Inngest to [retry to the function](/docs/reference/functions/retries?ref=patterns).
+Functions are defined by declaring which event(s) should trigger it. When matching events are received, all corresponding functions run in the background automatically.  Any returned value is logged and any error thrown will inform Inngest to [retry to the function](/docs/reference/functions/retries?ref=patterns).
 
 ```js
 import { createFunction } from "inngest";

@@ -22,7 +22,7 @@ export const SECTIONS: Section[] = [
       {
         title: "Keeping your API fast",
         subtitle:
-          "Moving code out of the critical path to keep API response times performant",
+          "Moving code out of the critical path into background jobs to keep API response times performant",
         tags: ["Performance"],
         slug: "keeping-your-api-fast",
       },
@@ -82,11 +82,11 @@ export const SECTIONS: Section[] = [
     title: "Event-coordination",
     articles: [
       {
-        title: "Cart abandonment",
+        title: "Building flows for lost customers",
         subtitle:
-          "Build conversion goal campaigns using multiple user-created events",
-        tags: ["Activation"],
-        slug: "#TODO",
+          "Combine events into a single function to build things like **cart abandonment** and **churn flows**.",
+        tags: ["Activation", "User Journeys", "Event Coordination"],
+        slug: "event-coordination-for-lost-customers",
       },
       {
         title: "Human-in-the-middle",
