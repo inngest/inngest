@@ -62,12 +62,12 @@ export const SECTIONS: Section[] = [
         tags: ["Scheduling"],
         slug: "#TODO",
       },
-      {
+      /*{
         title: "Data recovery through replay",
         subtitle: "Use event history to re-run work to fix issues",
         tags: ["Architecture"],
         slug: "#TODO",
-      },
+      },*/
       {
         // NOTE - Cron to n-Events
         title: "Reliable scheduling systems",
