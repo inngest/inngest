@@ -25,6 +25,8 @@ Multi-step functions are written using either the `createStepFunction()` helper 
 First, let's look at a simple single-step function.
 
 ```ts
+import { createFunction } from "inngest";
+
 createFunction(
   "Activation email",
   "app/user.created",
@@ -46,6 +48,8 @@ First, let's convert out function to a multi-step function. To do this, we'll do
 - Wrap our `sendEmail()` call in a `tools.run()` call
 
 ```ts
+import { createStepFunction } from "inngest";
+
 createStepFunction(
   "Activation email",
   "app/user.created",
@@ -66,6 +70,8 @@ Once our welcome email is sent, we want to wait at most 24 hours for our user to
 To do this, we can use the `waitForEvent` tool. This tool will wait for a matching event to be fired, and then return the event data. If the event is not fired within the timeout, it will return `null`, which we can use to decide whether to send the reminder email.
 
 ```ts
+import { createStepFunction } from "inngest";
+
 createStepFunction(
   "Activation email",
   "app/user.created",
@@ -88,6 +94,8 @@ Now we have our `postCreated` variable, which will be `null` if the user hasn't 
 Finally, we can use this to send the reminder email if the user hasn't created a post by running another block of code with `tools.run()`.
 
 ```ts
+import { createStepFunction } from "inngest";
+
 createStepFunction(
   "Activation email",
   "app/user.created",
