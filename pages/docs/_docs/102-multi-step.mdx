@@ -110,10 +110,62 @@ Most importantly, we had to write no config to do this. We can use all the power
 
 Inngest provides a number of tools to help you write multi-step functions. These tools are available in the `tools` argument of your function.
 
-- `run` - Run synchronous or asynchronous code as a retryable step in your function
-- `waitForEvent` - Wait for an event to be fired, and return the event data
-- `sleep` - Sleep for a given amount of time
-- `sleepUntil` - Sleep until a given time
+- [`run`](#run) - Run synchronous or asynchronous code as a retryable step in your function
+- [`waitForEvent`](#waitforevent) - Wait for an event to be fired, and return the event data
+- [`sleep`](#sleep) - Sleep for a given amount of time
+- [`sleepUntil`](#sleepuntil) - Sleep until a given time
+
+### `run()`
+
+Use `tools.run()` to run synchronous or asynchronous code as a retryable step in your function.
+
+It takes a name for the block (for you, so you can easily see which steps ran) and a function to run when the block is triggered, then returns a Promise that resolves to the return value of the given function.
+
+For example, I could fetch a random user from the database in a lottery draw:
+
+```ts
+const user = await tools.run("Get random user", () => getRandomUser());
+```
+
+### `waitForEvent()`
+
+Use `tools.waitForEvent()` to wait for a particular event to be received before continuing. It returns a Promise that is resolved with the received event.
+
+```ts
+const postCreated = tools.waitForEvent("app/post.created", {
+  timeout: "30 minutes",
+});
+```
+
+A `timeout` must be provided as the maximum time to wait for the event. If this timeout is reached, the tool will resolve with `null` instead of the event data.
+
+### `sleep()`
+
+Use `tools.sleep()` to wait for a specified amount of time before continuing.
+
+```ts
+tools.sleep("30 minutes");
+tools.sleep(1000 * 60 * 30);
+```
+
+`time` can be specified using a `number` of milliseconds or an `ms`-compatible
+time string like `"1 hour"`, `"30 mins"`, or `"2.5d"`. See the [ms](https://npm.im/ms) package for more information.
+
+To wait until a particular date, use `tools.sleepUntil()` instead.
+
+### `sleepUntil()`
+
+Use `tools.sleepUntil()` to wait until a particular date before continuing by
+passing a `Date`.
+
+```ts
+const tomorrow = new Date();
+tomorrow.setDate(tomorrow.getDate() + 1);
+
+tools.sleepUntil(tomorrow);)
+```
+
+To wait a particular amount of time, use `tools.sleep()` instead.
 
 ## Gotchas
 
