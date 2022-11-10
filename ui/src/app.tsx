@@ -83,7 +83,40 @@ export function App() {
             button={<Button label="Open Function" icon={<IconFeed />} />}
             id="01GGG522ZATDGVQBCND4ZEAS6Z"
           >
-            <h1>Function Content</h1>
+            <div className="border-t border-slate-800/50 m-4 mt-0 pt-4">
+              <CodeBlock />
+            </div>
+            <div className="flex justify-end px-4 border-t border-slate-800/50 pt-4 mt-4">
+              <Button label="Retry" />
+            </div>
+            <div>
+              <TimelineItem status="COMPLETED">
+                <TimelineStaticRow
+                  label="Event Received"
+                  datetime="14:34:21 28/04/2022"
+                />
+                <CodeBlock />
+              </TimelineItem>
+
+              {eventFuncs.map((eventFunc, i) => {
+                return (
+                  <TimelineItem key={i} status={eventFunc.status}>
+                    <FuncCard
+                      title={eventFunc.name}
+                      datetime={eventFunc.datetime}
+                      badge={eventFunc.version}
+                      id={eventFunc.id}
+                      status={eventFunc.status}
+                      actionBtn={<Button label="Rerun" />}
+                    />
+                  </TimelineItem>
+                )
+              })}
+
+              <TimelineItem status="FAILED">
+                <TimelineStaticRow label="Function 3 Errored with Error 404" />
+              </TimelineItem>
+            </div>
           </ContentCard>
         </div>
       </ContentFrame>
