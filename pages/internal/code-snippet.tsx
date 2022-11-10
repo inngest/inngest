@@ -85,12 +85,11 @@ export default function CodeSnippet() {
           <label>
             Code{" "}
             <textarea
-              className="w-full h-64 text-xs"
+              className="w-full h-64 text-xs font-mono"
               style={{ border: "1px solid #94a3b8" }}
               onChange={(e) => setCode(e.target.value)}
-            >
-              {code}
-            </textarea>
+              defaultValue={code}
+            ></textarea>
           </label>
         </div>
       </div>
