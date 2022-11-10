@@ -16,22 +16,21 @@ export default function TimelineItem({
         <div
           className={classNames(
             topLine ? 'bg-slate-700' : '',
-            `w-[2px] bg-transparent h-[27px] mb-2`
+            `w-[2px] bg-transparent h-[60px] mb-2 min-h-0`
           )}
         ></div>
         <div className="w-full flex items-center justify-center h-[12px]">
           <itemStatus.icon />
         </div>
-        {bottomLine && (
-          <div
-            className={classNames(
-              bottomLine ? `bg-slate-700` : ``,
-              `w-[2px] bg-transparent mt-2 h-[20px]`
-            )}
-          ></div>
-        )}
+
+        <div
+          className={classNames(
+            bottomLine ? `bg-slate-700` : ``,
+            `w-[2px] bg-transparent mt-2 h-full`
+          )}
+        ></div>
       </div>
-      <div className="flex items-start min-w-0 w-full">{children}</div>
+      <div className="flex items-start min-w-0 w-full mb-4">{children}</div>
     </li>
   )
 }

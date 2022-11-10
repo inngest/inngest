@@ -5,16 +5,21 @@ import Header from './components/Header'
 import Sidebar from './components/Sidebar/Sidebar'
 import SidebarLink from './components/Sidebar/SidebarLink'
 import ContentFrame from './components/Content/ContentFrame'
+
+import TimelineRow from './components/Timeline/TimelineRow'
+
 import TimelineItem from './components/Timeline/TimelineItem'
+import TimelineFuncItem from './components/Timeline/TimelineFuncItem'
 import TimelineScrollContainer from './components/Timeline/TimelineScrollContainer'
 import TimelineFeedContent from './components/Timeline/TimelineFeedContent'
+
 import ContentCard from './components/Content/ContentCard'
 import Button from './components/Button'
 import FuncCard from './components/Function/FuncCard'
 import CodeBlock from './components/CodeBlock'
 
 import { IconFeed, IconBook } from './icons'
-import TimelineStaticRow from './components/Timeline/TimelineStaticRow'
+import TimelineStaticContent from './components/Timeline/TimelineStaticContent'
 
 export function App() {
   return (
@@ -27,14 +32,14 @@ export function App() {
       <ContentFrame>
         <TimelineScrollContainer>
           {eventStream.map((event, i) => (
-            <TimelineItem key={i} status={event.status}>
+            <TimelineRow key={i} status={event.status} iconOffset={30}>
               <TimelineFeedContent
                 datetime={event.datetime}
                 name={event.name}
                 badge={event.fnCount}
                 status={event.status}
               />
-            </TimelineItem>
+            </TimelineRow>
           ))}
         </TimelineScrollContainer>
         <div className="flex gap-3 p-3 w-full min-w-0">
@@ -45,18 +50,22 @@ export function App() {
             id="01GGG522ZATDGVQBCND4ZEAS6Z"
             active
           >
-            <div className="">
-              <TimelineItem status="COMPLETED">
-                <TimelineStaticRow
+            <div className="pr-4 pt-4">
+              <TimelineRow status="COMPLETED" iconOffset={0}>
+                <TimelineStaticContent
                   label="Event Received"
                   datetime="14:34:21 28/04/2022"
                   actionBtn={<Button label="Retry" />}
                 />
-              </TimelineItem>
+              </TimelineRow>
 
               {eventFuncs.map((eventFunc, i) => {
                 return (
-                  <TimelineItem key={i} status={eventFunc.status}>
+                  <TimelineRow
+                    key={i}
+                    status={eventFunc.status}
+                    iconOffset={36}
+                  >
                     <FuncCard
                       title={eventFunc.name}
                       datetime={eventFunc.datetime}
@@ -65,13 +74,13 @@ export function App() {
                       status={eventFunc.status}
                       actionBtn={<Button label="Rerun" />}
                     />
-                  </TimelineItem>
+                  </TimelineRow>
                 )
               })}
 
-              <TimelineItem status="FAILED">
-                <TimelineStaticRow label="Function 3 Errored with Error 404" />
-              </TimelineItem>
+              <TimelineRow status="FAILED" iconOffset={0} bottomLine={false}>
+                <TimelineStaticContent label="Function 3 Errored with Error 404" />
+              </TimelineRow>
             </div>
             <div className="border-t border-slate-800/50 m-4 mt-0 pt-4">
               <CodeBlock />
@@ -91,7 +100,7 @@ export function App() {
             </div>
             <div>
               <TimelineItem status="COMPLETED">
-                <TimelineStaticRow
+                <TimelineStaticContent
                   label="Event Received"
                   datetime="14:34:21 28/04/2022"
                 />
@@ -114,7 +123,7 @@ export function App() {
               })}
 
               <TimelineItem status="FAILED">
-                <TimelineStaticRow label="Function 3 Errored with Error 404" />
+                <TimelineStaticContent label="Function 3 Errored with Error 404" />
               </TimelineItem>
             </div>
           </ContentCard>

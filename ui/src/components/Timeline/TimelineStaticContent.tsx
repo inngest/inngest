@@ -1,6 +1,6 @@
 export default function TimelineStaticRow({ label, datetime, actionBtn }) {
   return (
-    <div className="flex items-start justify-between w-full pt-2">
+    <div className="flex items-start justify-between w-full pt-[2px]">
       <div>
         <h2 className="text-slate-50">{label}</h2>
         {datetime && (

@@ -1,7 +1,7 @@
 import classNames from '../../utils/classnames'
 import statusStyles from '../../utils/statusStyles'
 
-export default function TimelineEventContent({
+export default function TimelineFeedContent({
   datetime,
   status,
   name,
@@ -17,7 +17,7 @@ export default function TimelineEventContent({
         active
           ? `outline outline-2 outline-indigo-400 outline-offset-3 bg-slate-900 border-slate-700/50`
           : `hover:bg-slate-800`,
-        `pr-1.5 pl-2.5 pb-1.5 pt-2.5 bg-transparent border border-transparent text-left rounded group flex flex-col flex-1 min-w-0 mb-3.5`
+        `pr-1.5 pl-2.5 pb-1.5 pt-2.5 bg-transparent border border-transparent text-left rounded group flex flex-col flex-1 min-w-0`
       )}
     >
       <span className="block text-3xs text-slate-300 pb-0.5">{datetime}</span>
