@@ -55,7 +55,11 @@ func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
 	// Quick heuristic to check if this is likely a date layout
 	if len(g.Name) >= 10 {
 		if parsed, err := dateutil.Parse(g.Name); err == nil {
-			return time.Until(parsed).Round(time.Second), nil
+			at := time.Until(parsed).Round(time.Second)
+			if at < 0 {
+				return time.Duration(0), nil
+			}
+			return at, nil
 		}
 	}
 

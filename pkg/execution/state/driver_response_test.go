@@ -229,6 +229,15 @@ func TestGeneratorSleepDuration(t *testing.T) {
 	require.Nil(t, err)
 	require.WithinDuration(t, time.Now().Truncate(time.Second).Add(duration), at, time.Second)
 
+	// Check that this works with a timestamp
+	g = GeneratorOpcode{
+		Op:   enums.OpcodeSleep,
+		Name: "2022-01-01T10:30:00.468Z",
+	}
+	duration, err = g.SleepDuration()
+	require.Nil(t, err)
+	require.EqualValues(t, 0, duration.Seconds())
+
 	// Check that this works with a duration string
 	g = GeneratorOpcode{
 		Op:   enums.OpcodeSleep,
