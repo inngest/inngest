@@ -20,6 +20,7 @@ import CodeBlock from './components/CodeBlock'
 
 import { IconFeed, IconBook } from './icons'
 import TimelineStaticContent from './components/Timeline/TimelineStaticContent'
+import TimelineFuncProgress from './components/Timeline/TimelineFuncProgress'
 
 export function App() {
   return (
@@ -98,33 +99,45 @@ export function App() {
             <div className="flex justify-end px-4 border-t border-slate-800/50 pt-4 mt-4">
               <Button label="Retry" />
             </div>
-            <div>
-              <TimelineItem status="COMPLETED">
-                <TimelineStaticContent
-                  label="Event Received"
+            <div className="pr-4 mt-4">
+              <TimelineRow status="COMPLETED" iconOffset={0}>
+                <TimelineFuncProgress
+                  label="Function Started"
                   datetime="14:34:21 28/04/2022"
+                  id="01GGG522ZATDGVQBCND4ZEAS6Z"
+                >
+                  <CodeBlock />
+                </TimelineFuncProgress>
+              </TimelineRow>
+
+              <TimelineRow status="COMPLETED">
+                <TimelineFuncProgress
+                  label="Function Started"
+                  datetime="14:34:21 28/04/2022"
+                  id="01GGG522ZATDGVQBCND4ZEAS6Z"
                 />
-                <CodeBlock />
-              </TimelineItem>
-
-              {eventFuncs.map((eventFunc, i) => {
-                return (
-                  <TimelineItem key={i} status={eventFunc.status}>
-                    <FuncCard
-                      title={eventFunc.name}
-                      datetime={eventFunc.datetime}
-                      badge={eventFunc.version}
-                      id={eventFunc.id}
-                      status={eventFunc.status}
-                      actionBtn={<Button label="Rerun" />}
-                    />
-                  </TimelineItem>
-                )
-              })}
-
-              <TimelineItem status="FAILED">
-                <TimelineStaticContent label="Function 3 Errored with Error 404" />
-              </TimelineItem>
+              </TimelineRow>
+              <TimelineRow status="FAILED">
+                <TimelineFuncProgress
+                  label="Function Started"
+                  datetime="14:34:21 28/04/2022"
+                  id="01GGG522ZATDGVQBCND4ZEAS6Z"
+                />
+              </TimelineRow>
+              <TimelineRow status="FAILED">
+                <TimelineFuncProgress
+                  label="Function Started"
+                  datetime="14:34:21 28/04/2022"
+                  id="01GGG522ZATDGVQBCND4ZEAS6Z"
+                />
+              </TimelineRow>
+              <TimelineRow status="FAILED" bottomLine={false}>
+                <TimelineFuncProgress
+                  label="Function Started"
+                  datetime="14:34:21 28/04/2022"
+                  id="01GGG522ZATDGVQBCND4ZEAS6Z"
+                />
+              </TimelineRow>
             </div>
           </ContentCard>
         </div>

@@ -6,7 +6,7 @@ export default function TimelineRow({
   children,
   topLine = true,
   bottomLine = true,
-  iconOffset = 36,
+  iconOffset = 0,
 }) {
   const itemStatus = statusStyles(status)
 
