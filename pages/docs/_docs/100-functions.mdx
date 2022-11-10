@@ -80,6 +80,8 @@ This is very similar to defining an event-driven function, except it uses the `c
 
 The following code defines a multi-step function, which you can use to coordinate between events, work with delays, and safely handle multiple asynchronous steps.
 
+<aside>Check out the <a href="/docs/functions/multi-step">Multi-step functions</a> page for more!</aside>
+
 ```typescript
 export default createStepFunction(
   "Activation email",
@@ -113,6 +115,8 @@ Use a multi-step function to create a logical flow of actions triggered from an 
 In this example, we send the user a welcome email when they are created, then send an activation email after 24 hours if they haven't created an order in that time. Each call to `run()` can be retried independently, meaning a failure in one step won't affect any others.
 
 Coordinating between events like this often requires a lot of code and infrastructure to handle retries, timeouts, state, queues, and many edge cases. Inngest handles all of this for you, so you can focus on writing the code that matters in a clean, readable format.
+
+You can learn more about the Inngest SDK's multi-step functions on our [Multi-step functions](/docs/functions/multi-step) page.
 
 ## TypeScript
 
