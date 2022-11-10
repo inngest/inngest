@@ -75,12 +75,11 @@ export const SECTIONS: Section[] = [
         slug: "#TODO",
       },*/
       {
-        // NOTE - Cron to n-Events
         title: "Reliable scheduling systems",
         subtitle:
           "Combine cron-jobs with event fan-out for auditable scheduling",
-        tags: ["Architecture"],
-        slug: "#TODO",
+        tags: ["Architecture", "Scheduling"],
+        slug: "reliable-scheduling-systems",
       },
     ],
   },

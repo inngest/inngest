@@ -1,0 +1,65 @@
+Modern products have increased in both customization, notifications, and _customized notifications_. Let's take a common use case: `X` product adds a feature that enables their users to select when to post a status report to a connected Slack channel via the product's Slackbot. Imagine a sales product where some teams prefer their report on Monday or Friday and at 9am ET or 9am PT.
+
+To start, a simple system may run a long, complex [cron job](/patterns/running-code-on-a-schedule) that checks what is configured to scheduled at that given time slot, then runs all of the code in a loop. Individual errors will have to be caught and logged for future auditing and retries.
+
+As volume increases, the long running job may be more prone to fail for whatever reason (e.g. memory leaks). Each individual task that is scheduled **should be run independently**, allowing for individual **retries** and **parallelization**. After all, this is a scheduling feature &mdash; if a scheduled post is 15 minutes late, is that acceptable for your user?
+
+The key is combining a reliable scheduling system with a reliable system that can process tasks in parallel.
+
+## How to implement this pattern
+
+At a basic level, you're combining a cron job with a queue and workers. You define 1 or more cron jobs then have each cron job publish `n` number of messages to a queue for each task that has been scheduled to run at that given time.
+
+Then a worker will need to be set up to poll for messages and complete each task, all while handling failures, retries, and logging well.
+
+## How to implement with Inngest
+
+Inngest supports scheduled functions and event-triggered functions. Combining the two enables you to [fan-out functions to run in parallel](/patterns/running-functions-in-parallel?ref=patterns). We'll define two these two functions:
+
+```typescript
+import { createScheduledFunction, createFunction } from "inngest";
+
+const inngest = new Inngest("Scheduling Backend");
+
+// A scheduled function uses the current time to find notifications to send
+const slackCron = createScheduledFunction("Slack Notification Cron",
+  "0 9,12 * * MON,FRI",
+  async () => {
+    const day = new Date().getDay();
+    const hour = new Date().getHours();
+    const notifications = await getNotificationsToRun(day, hour);
+    for (let notification of notifications) {
+      // Send an event for each notification to be published to Slack
+      // TODO - Check limits to batching
+      await inngest.send({
+        name: "app/notification.dispatched",
+        data: { notification }
+      });
+    }
+    return `${notifications.length} notifications dispatched`
+  }
+);
+// A function runs for every app/notification.dispatched event to
+// post the notification to Slack
+const postSlackNotification = createFunction("Send Slack Notification",
+  "app/notification.dispatched",
+  async ({ event }) => {
+    const reportData = getAccountReportData(event.data.notification.accountId);
+    const result = await app.client.chat.postMessage({
+      channel: event.data.notification.slackChannelId,
+      blocks: generateReportSlackBlocks(reportData)
+      // ...
+    });
+    return result;
+  }
+);
+```
+
+This is the system &mdash; both functions can even be defined in the same file to keep things simple and maintainable. This approach works well for systems that have commonly scheduled times, but for more flexible systems that are scheduled as one-off, non-repeated tasks you should review [Patterns: Running at specific times](/patterns/running-at-specific-times?ref=patterns).
+
+
+## Additional Resources
+
+* [Patterns: Running at specific times](/patterns/running-at-specific-times?ref=patterns)
+* [Patterns: Cancelling scheduled functions](/patterns/cancelling-scheduled-functions?ref=patterns)
+* [Docs: Writing Functions](/docs/functions?ref=patterns)
