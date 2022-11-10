@@ -57,10 +57,16 @@ export const SECTIONS: Section[] = [
         slug: "running-functions-in-parallel",
       },
       {
+        title: "Running at specific times",
+        subtitle: "Pause and wait until a specific time based off of data within an event",
+        tags: ["Scheduling", "Architecture"],
+        slug: "running-at-specific-times",
+      },
+      {
         title: "Cancelling scheduled functions",
-        subtitle: "Schedule and automatically cancel work using events",
+        subtitle: "Automatically cancel scheduled, paused, and waiting work using events",
         tags: ["Scheduling"],
-        slug: "#TODO",
+        slug: "cancelling-scheduled-functions",
       },
       /*{
         title: "Data recovery through replay",
@@ -167,11 +173,11 @@ export default function Patterns() {
                 <div className="ml-11 my-6 flex flex-col gap-6">
                   {s.articles.map(({ title, subtitle, tags, slug }) => (
                     <Link key={slug} href={`/patterns/${slug}`} passHref>
-                      <a className="flex flex-col gap-2 text-almost-black">
+                      <a className="flex flex-col text-almost-black">
                         <h2 className="text-lg text-color-dark-purple">
                           {title}
                         </h2>
-                        <p className="text-sm">{subtitle}</p>
+                        <p className="text-sm mt-1 mb-3">{subtitle}</p>
                         <div className="flex gap-2">
                           {tags.map((t) => (
                             <span

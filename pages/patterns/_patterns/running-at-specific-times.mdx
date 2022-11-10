@@ -1,0 +1,53 @@
+It's very common to need to run code at a specific time, across any type of app.  For example, you might want to send appointment reminders 10 minutes before the event, send emails at a specific time, or make blog posts live according to a user-specified date.
+
+Job systems allow you to specify the time that a code should run when you enqueue the job.  Within Inngest, jobs run automatically when an event is received.  How can you schedule work to run at a specific time?
+
+The answer is: pass the date and time that you want the event to run at within the event itself.  Within your function, you can `sleep` or `sleepUntil` the date within the event.
+
+## How to implement this pattern
+
+In order to run code at a specific time based off of event data, first make sure that you send your desired time in the event:
+
+```typescript
+import { Inngest } from "inngest";
+
+// Create a new client
+const inngest = new Inngest("API");
+
+// Send an event with the time to schedule a blog post in the event data.
+inngest.send({
+  name: "blog/post.scheduled",
+  data: {
+    scheduleAt: "2023-04-01T12:30:00.000Z",
+    postID: "ed6f81",
+  },
+});
+```
+
+Then, within your function, you can pause until the time in the event:
+
+```typescript
+import { createStepFunction } from "inngest";
+
+const delayed = createStepFunction("blog/post.scheduled", ({ event, tools }) => {
+  const at = new Date(event.data.scheduleAt);
+
+  // Use the built-in `sleepUntil` tool to sleep until the time in the event.
+  // This function will pause then resume running the code below at the given time.
+  tools.sleepUntil(at);
+
+  tools.run("Your code that runs at the time in the event", () => {
+    // Any code here runs at the time in the event.
+  });
+});
+```
+
+This function runs immediately when the `blog/post.scheduled` event is received, then pauses until the time and date within the event.  This lets you create a single function that can schedule work at any time using data from the event, intsead of hard-coding times within your code.
+
+You can also cancel these scheduled functions using [the cancellation pattern](/patterns/cancelling-scheduled-functions).
+
+## Additional Resources
+
+* [Docs: Sending Events](/docs/events?ref=patterns)
+* [Docs: Writing Functions](/docs/functions?ref=patterns)
+* [Patterns: Cancelling scheduled functions](/patterns/cancelling-scheduled-functions?ref=patterns)
