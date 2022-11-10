@@ -1,6 +1,6 @@
-Event-driven systems allow you to have multiple subscribers for a single event stream.  This lets you [fan-out](https://en.wikipedia.org/wiki/Fan-out_(software)#Message-oriented_middleware) an event to multiple functions in parallel.
+Event-driven systems allow you to have multiple subscribers for a single event stream.  This lets you [fan-out](https://en.wikipedia.org/wiki/Fan-out_(software)#Message-oriented_middleware) an event to multiple functions in parallel.  Fan-out is useful for decoupling distinct logic into independently run jobs.
 
-This is different to how most queueing systems work.  In most queueing systems like SQS or Celery, a specific job in a queue runs a single function.
+This is different to how most queueing systems work.  In most queueing systems like SQS or Celery, a specific job in a queue runs a single function.  This may cause developers to bundle unrelated logic into a a single background job which isn't ideal as a failure in one part of your job may cause unrelated code to also fail.
 
 If you want to run 5 background jobs after a user signs up, using an event-driven system like Inngest you'll only have to send a single event.  In typical queueing systems you'll have to enqueue each 5 different messages individually.
 
@@ -11,9 +11,9 @@ Inngest allows you to create as many functions as you need which subscribe to th
 ```typescript
 import { createFunction } from "inngest";
 
-const funcA = createFunction("user/signup", ({ event }) => { /* Your logic runs on signup here */ });
-const funcB = createFunction("user/signup", ({ event }) => { /* And this function runs in parallel on signup */ });
-const funcC = createFunction("user/signup", ({ event }) => { /* This function _also_ runs at the same time */ });
+const funcA = createFunction("A", "user/signup", ({ event }) => { /* Your logic runs on signup here */ });
+const funcB = createFunction("B", "user/signup", ({ event }) => { /* And this function runs in parallel on signup */ });
+const funcC = createFunction("C", "user/signup", ({ event }) => { /* This function _also_ runs at the same time */ });
 ```
 
 In this example, we define three functions which run automatically in parallel whenever the `user/signup` event is received.  Each of these run independently, and can be defined in different projects - without worrying about managing queues or subscribers.
