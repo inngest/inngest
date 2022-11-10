@@ -1,7 +1,8 @@
 ---
 heading: "Building More Reliable Workflows With Events"
 subtitle: Run critical code with guarantees and observability
-image: /assets/blog/completing-the-jamstack/featured-image.png
+image: /assets/blog/build-more-reliable-workflows-with-events.jpg
+imageCredits: Photo by <a href="https://unsplash.com/@charlesdeluvio?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">charlesdeluvio</a> on <a href="https://unsplash.com/?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
 date: 2022-11-10
 author: Dan Farrelly
 focus: true
@@ -89,9 +90,11 @@ createStepFunction("Contacts Import and enrichment", "api/contact_list.uploaded"
 )
 ```
 
-All code within each `tools.run()` callback will be run independently and will be retried upon failure, resuming from where the function left off. Using `tools.waitForEvent()` enable the workflow to wait for additional user interactions or events via [event coordination](/patterns/event-coordination-for-lost-customers?ref=blog-build-more-reliable-workflows-with-events). More info on these and other `tools` are [in our docs](/docs/functions/multi-step?ref=blog-build-more-reliable-workflows-with-events#tools).
+* All code within each `tools.run()` callback will be run independently and will be **retried upon failure, resuming from where the function left off**.
+* Using `tools.waitForEvent()` enable the workflow to wait for additional user interactions or events via [**event coordination**](/patterns/event-coordination-for-lost-customers?ref=blog-build-more-reliable-workflows-with-events).
+* The results of each step, including failures and retries are logged can be inspected on the Inngest dashboard for **complete observability**.
 
-The results of each step, including failures and retries are logged can be inspected on the Inngest dashboard for complete observability.
+More info on these and other `tools` are [in our docs](/docs/functions/multi-step?ref=blog-build-more-reliable-workflows-with-events#tools).
 
 ## Over to you
 

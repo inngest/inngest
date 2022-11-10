@@ -72,7 +72,17 @@ export default function BlogLayout(props) {
         <Nav sticky={true} />
 
         <Article>
-          {scope.image && <Image src={scope.image} />}
+          {scope.image && (
+            <FeaturedImageFigure>
+              <Image src={scope.image} />
+              {scope.imageCredits && (
+                <figcaption
+                  className="text-xs"
+                  dangerouslySetInnerHTML={{ __html: scope.imageCredits }}
+                ></figcaption>
+              )}
+            </FeaturedImageFigure>
+          )}
 
           <Header>
             <h1>{scope.heading}</h1>
@@ -132,8 +142,18 @@ const Article = styled.article`
   }
 `;
 
-const Image = styled.img`
+const FeaturedImageFigure = styled.figure`
   margin: 1rem auto;
+
+  figcaption {
+    margin-top: 0.3rem;
+    text-align: right;
+    font-size: 0.7rem;
+    color: var(--font-color-secondary);
+    font-style: italic;
+  }
+`;
+const Image = styled.img`
   max-width: 100%;
   border-radius: var(--border-radius);
 `;
