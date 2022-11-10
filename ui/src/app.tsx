@@ -14,6 +14,7 @@ import FuncCard from './components/Function/FuncCard'
 import CodeBlock from './components/CodeBlock'
 
 import { IconFeed, IconBook } from './icons'
+import TimelineStaticRow from './components/Timeline/TimelineStaticRow'
 
 export function App() {
   return (
@@ -44,7 +45,15 @@ export function App() {
             id="01GGG522ZATDGVQBCND4ZEAS6Z"
             active
           >
-            <div className="mt-5">
+            <div className="">
+              <TimelineItem status="COMPLETED">
+                <TimelineStaticRow
+                  label="Event Received"
+                  datetime="14:34:21 28/04/2022"
+                  actionBtn={<Button label="Retry" />}
+                />
+              </TimelineItem>
+
               {eventFuncs.map((eventFunc, i) => {
                 return (
                   <TimelineItem key={i} status={eventFunc.status}>
@@ -54,13 +63,17 @@ export function App() {
                       badge={eventFunc.version}
                       id={eventFunc.id}
                       status={eventFunc.status}
-                      contextualButton={<Button label="Rerun" />}
+                      actionBtn={<Button label="Rerun" />}
                     />
                   </TimelineItem>
                 )
               })}
+
+              <TimelineItem status="FAILED">
+                <TimelineStaticRow label="Function 3 Errored with Error 404" />
+              </TimelineItem>
             </div>
-            <div className="border-t border-slate-800/50 m-4 mt-2 pt-4">
+            <div className="border-t border-slate-800/50 m-4 mt-0 pt-4">
               <CodeBlock />
             </div>
           </ContentCard>

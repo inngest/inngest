@@ -8,8 +8,6 @@ export default function ContentCard({
   id,
   active,
 }) {
-  console.log(active)
-
   return (
     <div
       className={classNames(
@@ -17,7 +15,12 @@ export default function ContentCard({
         `flex-1 border rounded-lg border-slate-800/50 overflow-hidden flex flex-col shrink-0`
       )}
     >
-      <div className="px-5 pt-3.5 ">
+      <div
+        className={classNames(
+          active ? ` shadow-slate-950` : ` shadow-slate-1000`,
+          `px-5 pt-3.5 shadow-lg relative z-30`
+        )}
+      >
         <div className="mb-5">
           <h1 className="text-base text-slate-50">{title}</h1>
           <span className="text-2xs mt-1 block">{datetime}</span>

@@ -3,7 +3,7 @@ import Button from '../Button'
 export default function CodeBlock() {
   return (
     <div className="w-full bg-slate-800/30 border border-slate-700/30 rounded-lg shadow ">
-      <div className="bg-slate-800/40 flex justify-between">
+      <div className="bg-slate-800/40 flex justify-between shadow">
         <div className="flex">
           <a
             className="text-xs px-5 py-2.5 border-b-2 border-indigo-400 text-white block"
