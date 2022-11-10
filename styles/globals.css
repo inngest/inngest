@@ -722,6 +722,15 @@ ul.check li {
   }
 }
 
+/* Basic inline code highlighting */
+p code,
+li code {
+  background: var(--color-light-gray);
+  padding: 0.1em 0.3em 0.15em;
+  border-radius: 3px;
+  color: var(--color-dark-purple);
+}
+
 /*
   * Shiki syntax highlighting for Docs, Blog, Patterns
   * Docs: https://github.com/shikijs/shiki/blob/main/docs/themes.md

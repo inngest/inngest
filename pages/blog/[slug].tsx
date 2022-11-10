@@ -251,18 +251,6 @@ const Body = styled.main`
     font-style: italic;
   }
 
-  p code,
-  li code {
-    background: rgb(46, 52, 64);
-    padding: 0.1em 0.3em 0.15em;
-    border-radius: 3px;
-    color: rgb(216, 222, 233);
-  }
-
-  a:not(.button) {
-    color: var(--color-iris-60);
-  }
-
   pre {
     margin: 1rem 0;
     padding: 1.1rem 1.4rem;
