@@ -1,0 +1,53 @@
+Many applications and products must run mission critical code in the background. Because of the asynchronous nature of background tasks, it's more challenging to observe success or failure as compared to synchronous API requests. Also, code may run for minutes or hours, so reliability and durability are vital to running a system with confidence.
+
+One might start off with a single long function that runs for an extended period of time, but what happens if it fails halfway through a multi-minute or multi-hour job? Does the entire job need to be restarted from the beginning? How did it fail? What part of the code failed? Is this part of the code more likely to fail than the rest of it due to a dependency on an external system or API?
+
+These are all key questions that developers have for long-running, critical workflows. An answer to many of these questions is to decouple the logic of your long running jobs into discrete steps. Each step can be run independently and chained together into a singular workflow. Since each step is run independently, each can throw it's own errors, be independently retried, and be re-used in different workflows.
+
+The challenge with this pattern is often on the developer determining how to break up functions into steps, how to run each reliably, how to pass data from one step to the next, how to keep track of the state of the workflow and how to stitch logs from each step together into a history of a given workflow run.
+
+## How to implement with Inngest
+
+Inngest enables you to compose workflows using a set of [pre-built tools](/docs/functions/multi-step?ref=patterns) to break functionality down into independently run steps. You can leverage these tools using the `createStepFunction` helper. The following example demonstrates processing a large CSV upload including validation, data enrichment all when a custom `api/contact_list.uploaded` event is sent from an application.
+
+```typescript
+import { createStepFunction } from "inngest";
+
+createStepFunction("Process contacts csv upload", "api/contact_list.uploaded",
+  ({ event, tools }) => {
+    const { isValid, errors } = tools.run("Validate upload contents", async () => {
+      const uploadFilename = event.data.filename;
+      // Download the csv file from object storage, validate columns and data in each row
+    });
+    if (!isValid) {
+      return tools.run("Notify user of invalid contents", async () =>
+        await sendContactsImportFailedEmail(event.user.id, errors)
+      );
+    }
+    tools.run("Enrich address information", async () => {
+      // Call a third party API service to enriches each contact's address information
+      // with zip codes, etc., then uploads the enriched data to the object store
+    });
+    const { totalUsersAdded } = tools.run("Create contacts in CRM", async () => {
+      // Download the enriched file and insert into contacts into the database
+    });
+    tools.run("Notify user of successful import", async () =>
+      await sendContactsImportSuccessEmail(event.user.id, totalUsersAdded)
+    )
+  }
+);
+```
+
+The above hypothetical function would handle each step independently, and retry code within any `tools.run()` callback when it fails. This avoids the code from needing to be re-run from the start if part of it fails. The above is a basic function, but [read through the resources below](#additional-resources) to see what other `tools` are available to handle the most complex of workflows.
+
+## Alternative approaches
+
+Implementing this in your system will be a choice between platform or deciding to roll-your-own custom system. Solutions might include AWS Step Functions or Temporal, but each have their significant learning curves, limitations, and pitfalls to consider. Inngest's approach is serverless and aims to be as simple as writing normal code without a difficult to learn DSL or set or concepts.
+
+Developers can roll their own solution, which is a valid path and might start off fairly simple if one already has a reliable way to run background jobs, but the end solution will most likely resemble chaining several queues together with separately written workers that have all have to run independently. Over time, bespoke systems can become more complex with features added for a specific workflow use case and can grow in difficulty to maintain.
+
+## Additional Resources
+
+* [Docs: Writing Multi-step functions](/docs/functions/multi-step?ref=patterns)
+* [Patterns: Cancelling scheduled functions](/patterns/cancelling-scheduled-functions?ref=patterns)
+* [Patterns: Building flows for lost customers](/patterns/event-coordination-for-lost-customers)

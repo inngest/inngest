@@ -43,7 +43,7 @@ export const SECTIONS: Section[] = [
         title: "Reliably run critical workflows",
         subtitle: "Break complex code into reliable, independently ran steps",
         tags: ["Reliability"],
-        slug: "#TODO", //"reliably-run-critical-workflows",
+        slug: "reliably-run-critical-workflows",
       },
     ],
   },
