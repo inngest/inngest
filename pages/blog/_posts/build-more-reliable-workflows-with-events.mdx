@@ -1,0 +1,65 @@
+---
+heading: "Building More Reliable Workflows With Events"
+subtitle: Run critical code with guarantees and observability
+image: /assets/blog/completing-the-jamstack/featured-image.png
+date: 2022-11-10
+author: Dan Farrelly
+focus: true
+---
+
+Every application starts off with running some basic code in the background. Common use cases include sending email notifications, handling subscription payment webhooks, or periodically fetching data from third party APIs.
+
+At some point, most applications will be required to run tasks in the background that are critical to the core functionality or business value of the product. This is when applications need to get serious and consider more robust solutions as failed tasks can represent lost revenue.
+
+Application-critical tasks are everywhere and might include:
+
+* Ingesting data from user uploads or third party APIs, transforming or validating data and sending user notifications
+* User actions that require propagation across several databases, systems or external integrations
+* Transaction processing including payments sent and received
+
+All of these tasks must be reliable and fault-tolerant. Failures in these situations can lead data inconsistencies or broken states for users.
+
+## What is needed
+
+As tasks gets more complex, it often can be split into multiple independent steps or phases. Many folks use the term "workflows" or step functions to describe these more complex tasks where, often, logic is required to glue the steps together.
+
+Developers or operators need confidence that their critical workflows are running consistently, reliably, and durably. Quite often, one part of a workflow may be more susceptible to failure due to a flaky external API or rate limiting. If this one part of the code fails, it should be independently retried, avoiding the need to restart a job from the beginning.
+
+Lastly, observability is crucial to understanding errors and results from each stage of your task. Status and logs should be grouped by type of workflow and individual workflow runs.
+
+## Splitting the code into steps
+
+There are many different ways to split tasks into discrete steps (e.g. actions, sub-tasks, etc.). A simple approach is that teams will chain together multiple queues and workers. This works, but it requires more overhead, it may be difficult to audit, and will likely require separating of related code into separate jobs.
+
+Alternatively, another approach could be to use a workflow orchestration framework. Each has it's own paradigm for building this logic often with significant learning curves.
+
+## Writing critical workflows as code
+
+Our goals were to enable developers to write complex jobs combining multiple steps right in code while minimizing custom DSL and concepts to learn.
+
+We don't think writing step functions or workflows as a large JSON configuration is a great developer experience. Also, using a online GUI to design these isn't always ideal as the logic or [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph) may be edited or managed outside of the actual code's version control.
+
+We also believe it should be simple to run, from local development, to production where code can be [deployed to any number of platforms](/docs/deploy?ref=blog-build-more-reliable-workflows-with-events).
+
+Let's take a use case to demonstrate our approach.
+
+--TODO USE CASE: Highlight how using events to trigger and combine steps is unique and awesome--
+
+```typescript
+import { createStepFunction } from "inngest";
+
+createStepFunction("", "",
+  ({ event, tools }) => {
+    // TODO use run, wait for event, sleep, etc. to demonstrate power
+  }
+)
+```
+
+TODO - Not about observability w/ Inngest
+
+## Over to you
+
+For critical code that runs in the background, developers need guarantees and observability in a simple to use package. Simple to use, easy to maintain. Investing in any solution should mean transparency, portability and potential to self-host. We keep our system including the execution engine that powers all of this functionality as well as the SDK completely open source: [inngest/inngest](https://github.com/inngest/inngest), [inngest/inngest-js](https://github.com/inngest/inngest-js).
+
+Our beta release is out today and can be used with [Inngest Cloud](https://www.inngest.com/sign-up?ref=nav) today - it's free to start using. Come join us on [Discord](https://www.inngest.com/discord) or Github to share feedback or seek support on building out some critical workflows for yourself.
+
