@@ -1,0 +1,49 @@
+When you [schedule work for the future](/patterns/running-at-specific-times) there's always a chance that you might need to cancel or reschedule these jobs.  For example, if you're scheduling a product to go live at a specific time, you might end up changing the go-live time multiple times. You need a way to cancel work that's already scheduled.
+
+Rescheduling is very similar.  First, you cancel the current work.  Then, you schedule a new function. 
+
+## How to implement this pattern
+
+Inngest allows you to automatically cancel running or paused/sleeping functions via events:
+
+```typescript
+import { createStepFunction } from "inngest";
+
+const func = createStepFunction(
+  "Schedules and cancels automatically", // Name
+  "blog/post.scheduled", // Triggering event
+  ({ event, tools }) => { // Function
+    // Sleep until the scheduleAt time in the event.
+    tools.sleepUntil(event.data.scheduleAt);
+
+    tools.run("Publish the post", () => {
+      // Publish the post.
+      publishBlogPost(event.data.postID);
+    });
+  },
+  {
+    cancellation: {
+      event: "blog/post.cancelled",
+      match: "data.postID", // The data.postID field in both events must match.
+    }
+  },
+);
+```
+
+In the above example, we define a function that runs every time a `blog/post.scheduled` event is received.  This functionwaits until the post schedule time, then runs a function to publish the post.
+
+**The function also defines a cancellation policy**:  any time the `blog/post.cancelled` event is received _and_ the event has the same data.postID values, the function will be cancelled.
+
+You can send a `blog/post.cancelled` event at any time before the `scheduledAt` time to prevent the original function from running. To reschedule, send another `blog/post.scheduled` event after the cancellation event.
+
+**Alternative systems**
+
+In typical job systems, you'll need to record the job ID each time you schedule the job, then use the system's API to cancel the work.  If the job is already running, you might not be able to cancel the function.  
+
+## Additional resources
+
+## Additional Resources
+
+* [Docs: Sending Events](/docs/events?ref=patterns)
+* [Docs: Writing Functions](/docs/functions?ref=patterns)
+* [Patterns: Running at specific times](/patterns/running-at-specific-times)
