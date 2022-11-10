@@ -108,6 +108,8 @@ const DocsNav: React.FC<{
                 ))}
               </div>
             ))}
+            <hr />
+            <a href="/patterns?ref=docs">Event-Driven Patterns ↗</a>
           </NavList>
           <div>
             <ThemeToggleButton />
