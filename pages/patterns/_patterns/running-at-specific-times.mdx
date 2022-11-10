@@ -29,17 +29,21 @@ Then, within your function, you can pause until the time in the event:
 ```typescript
 import { createStepFunction } from "inngest";
 
-const delayed = createStepFunction("blog/post.scheduled", ({ event, tools }) => {
-  const at = new Date(event.data.scheduleAt);
+const delayed = createStepFunction(
+  "Schedule post",
+  "blog/post.scheduled",
+  ({ event, tools }) => {
+    const at = new Date(event.data.scheduleAt);
 
-  // Use the built-in `sleepUntil` tool to sleep until the time in the event.
-  // This function will pause then resume running the code below at the given time.
-  tools.sleepUntil(at);
+    // Use the built-in `sleepUntil` tool to sleep until the time in the event.
+    // This function will pause then resume running the code below at the given time.
+    tools.sleepUntil(at);
 
-  tools.run("Publish post", () => {
-    // Any code here runs at the time in the event.
-    schedulePost(event.data.postID);
-  });
+    tools.run("Publish post", () => {
+      // Any code here runs at the time in the event.
+      schedulePost(event.data.postID);
+    });
+  },
 });
 ```
 
