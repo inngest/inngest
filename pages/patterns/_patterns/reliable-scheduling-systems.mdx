@@ -28,15 +28,14 @@ const slackCron = createScheduledFunction("Slack Notification Cron",
     const day = new Date().getDay();
     const hour = new Date().getHours();
     const notifications = await getNotificationsToRun(day, hour);
-    for (let notification of notifications) {
-      // Send an event for each notification to be published to Slack
-      // TODO - Check limits to batching
-      await inngest.send({
-        name: "app/notification.dispatched",
-        data: { notification }
-      });
-    }
-    return `${notifications.length} notifications dispatched`
+    const payloads = notifications.map((notification) => ({
+      name: "app/notification.dispatched",
+      data: { notification },
+    }));
+    // Inngest can accept individual event payloads or an array for batching
+    // up to 512kb in size
+    await inngest.send(payloads);
+    return `${notifications.length} notifications dispatched`;
   }
 );
 // A function runs for every app/notification.dispatched event to
@@ -47,7 +46,7 @@ const postSlackNotification = createFunction("Send Slack Notification",
     const reportData = getAccountReportData(event.data.notification.accountId);
     const result = await app.client.chat.postMessage({
       channel: event.data.notification.slackChannelId,
-      blocks: generateReportSlackBlocks(reportData)
+      blocks: generateReportSlackBlocks(reportData),
       // ...
     });
     return result;
