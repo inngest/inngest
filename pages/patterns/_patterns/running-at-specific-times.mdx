@@ -36,8 +36,9 @@ const delayed = createStepFunction("blog/post.scheduled", ({ event, tools }) => 
   // This function will pause then resume running the code below at the given time.
   tools.sleepUntil(at);
 
-  tools.run("Your code that runs at the time in the event", () => {
+  tools.run("Publish post", () => {
     // Any code here runs at the time in the event.
+    schedulePost(event.data.postID);
   });
 });
 ```
