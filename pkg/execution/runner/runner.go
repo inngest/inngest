@@ -25,6 +25,11 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/oklog/ulid/v2"
 	"github.com/robfig/cron/v3"
+	"github.com/xhit/go-str2duration/v2"
+)
+
+const (
+	CancelTimeout = (24 * time.Hour) * 365
 )
 
 type Opt func(s *svc)
@@ -352,6 +357,23 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			}
 		}
 
+		if pause.Cancel {
+			// This cancels the workflow, preventing future runs.
+			//
+			// XXX: When cancelling a workflow we should delete all other pauses
+			// for the same function run.  This should happen in the state store
+			// directly.
+			if err := s.state.Cancel(ctx, pause.Identifier); err != nil {
+				switch err {
+				case state.ErrFunctionCancelled, state.ErrFunctionComplete, state.ErrFunctionFailed:
+					// We can safely ignore these errors.
+					return nil
+				default:
+					return err
+				}
+			}
+		}
+
 		if pause.OnTimeout {
 			// Delete this pause, as an event has occured which matches
 			// the timeout.
@@ -452,6 +474,30 @@ func Initialize(ctx context.Context, fn function.Function, evt event.Event, s st
 		EventData:  evt.Map(),
 	}); err != nil {
 		return nil, fmt.Errorf("error creating run state: %w", err)
+	}
+
+	// Set any cancellation pauses immediately
+	for _, c := range fn.Cancel {
+		pauseID := uuid.New()
+		expires := time.Now().Add(CancelTimeout)
+		if c.Timeout != nil {
+			dur, err := str2duration.ParseDuration(*c.Timeout)
+			if err != nil {
+				return &id, fmt.Errorf("error parsing cancel duration: %w", err)
+			}
+			expires = time.Now().Add(dur)
+		}
+		err = s.SavePause(ctx, state.Pause{
+			ID:         pauseID,
+			Identifier: id,
+			Expires:    state.Time(expires),
+			Event:      &c.Event,
+			Expression: c.If,
+			Cancel:     true,
+		})
+		if err != nil {
+			return &id, fmt.Errorf("error saving pause: %w", err)
+		}
 	}
 
 	// Enqueue running this from the source.

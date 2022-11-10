@@ -122,6 +122,8 @@ func CheckState(t *testing.T, gen Generator) {
 		"PauseByID":                          checkPauseByID,
 		"Idempotency":                        checkIdempotency,
 		"Cancel":                             checkCancel,
+		"Cancel/AlreadyCompleted":            checkCancel_completed,
+		"Cancel/AlreadyCancelled":            checkCancel_cancelled,
 		"Finalized/Status":                   checkFinalizedStatus,
 	}
 	for name, f := range funcs {
@@ -1228,7 +1230,70 @@ func checkCancel(t *testing.T, m state.Manager) {
 
 	reloaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.EqualValues(t, state.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Running")
+	require.EqualValues(t, state.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
+}
+
+func checkCancel_cancelled(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{
+		WorkflowID: w.UUID,
+		RunID:      runID,
+		Key:        runID.String(),
+	}
+	init := state.Input{
+		Identifier: id,
+		Workflow:   w,
+		EventData:  input.Map(),
+	}
+
+	s, err := m.New(ctx, init)
+	require.NoError(t, err)
+	require.EqualValues(t, state.RunStatusRunning, s.Metadata().Status, "Status is not Running")
+
+	err = m.Cancel(ctx, s.Identifier())
+	require.NoError(t, err)
+	reloaded, err := m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	require.EqualValues(t, state.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
+
+	err = m.Cancel(ctx, s.Identifier())
+	require.Equal(t, err, state.ErrFunctionCancelled)
+}
+
+func checkCancel_completed(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{
+		WorkflowID: w.UUID,
+		RunID:      runID,
+		Key:        runID.String(),
+	}
+	init := state.Input{
+		Identifier: id,
+		Workflow:   w,
+		EventData:  input.Map(),
+	}
+
+	s, err := m.New(ctx, init)
+	require.NoError(t, err)
+	require.EqualValues(t, state.RunStatusRunning, s.Metadata().Status, "Status is not Running")
+
+	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID)
+	require.NoError(t, err)
+
+	s, err = m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	require.EqualValues(t, state.RunStatusComplete, s.Metadata().Status, "Status is not Complete after finalizing")
+
+	err = m.Cancel(ctx, s.Identifier())
+	require.Equal(t, err, state.ErrFunctionComplete)
+
+	s, err = m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
+	require.EqualValues(t, state.RunStatusComplete, s.Metadata().Status, "Status is not Complete after finalizing")
 }
 
 func checkFinalizedStatus(t *testing.T, m state.Manager) {
@@ -1247,6 +1312,49 @@ func checkFinalizedStatus(t *testing.T, m state.Manager) {
 	require.Equal(t, state.RunStatusComplete, loaded.Metadata().Status, "Finalizing step setting pending to 0 should set status to state.RunStatusComplete")
 	require.Equal(t, 0, loaded.Metadata().Pending)
 }
+
+// TODO: Optimization - when finalizing steps, we should delete all pauses when the counter is set to 0
+/*
+func checkFinalizedDeletesPauses(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	// Create a pause.
+	evt := "event/a"
+	pause := state.Pause{
+		ID:         uuid.New(),
+		Identifier: s.Identifier(),
+		Outgoing:   inngest.TriggerName,
+		Incoming:   w.Steps[0].ID,
+		Expires:    state.Time(time.Now().Add(time.Minute)),
+		Event:      &evt,
+	}
+	err := m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	iter, err := m.PausesByEvent(ctx, evt)
+	require.NoError(t, err)
+	require.NotNil(t, iter)
+	require.True(t, iter.Next(ctx))
+	require.EqualValues(t, &pause, iter.Val(ctx))
+
+	found, err := m.PauseByID(ctx, pause.ID)
+	require.Nil(t, err)
+	require.EqualValues(t, pause, *found)
+
+	// Finalize, reducing count to 0 which should delete all active pauses for this identifier
+	err = m.Finalized(ctx, s.Identifier(), inngest.TriggerName)
+	require.NoError(t, err)
+
+	// Pause should be deleted.
+	iter, err = m.PausesByEvent(ctx, evt)
+	require.NoError(t, err)
+	require.Nil(t, iter)
+	found, err = m.PauseByID(ctx, pause.ID)
+	require.Equal(t, state.ErrPauseNotFound, err)
+	require.Nil(t, found)
+}
+*/
 
 func setup(t *testing.T, m state.Manager) state.State {
 	ctx := context.Background()
