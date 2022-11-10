@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/xhit/go-str2duration/v2"
 )
@@ -50,6 +51,14 @@ func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
 	if g.Op != enums.OpcodeSleep {
 		return 0, fmt.Errorf("unable to return sleep duration for opcode %s", g.Op.String())
 	}
+
+	// Quick heuristic to check if this is likely a date layout
+	if len(g.Name) >= 10 {
+		if parsed, err := dateutil.Parse(g.Name); err == nil {
+			return time.Until(parsed).Round(time.Second), nil
+		}
+	}
+
 	return str2duration.ParseDuration(g.Name)
 }
 
