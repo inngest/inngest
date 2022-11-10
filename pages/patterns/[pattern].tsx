@@ -192,28 +192,4 @@ const Article = styled.article`
   ul {
     list-style: circle;
   }
-
-  pre {
-    margin: 1.5rem 0;
-    padding: 0.7rem 0.9rem;
-    position: relative;
-    white-space: pre-wrap;
-    font-size: 0.7rem;
-    box-shadow: rgb(0 0 0 / 30%) 0px 5px 25px -10px;
-    border-radius: var(--border-radius);
-  }
-
-  pre .line {
-    min-height: 1em;
-  }
-
-  .language-id {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    padding: 0.2rem 0.3rem;
-    font-size: 0.6rem;
-    border-radius: var(--border-radius);
-    background: rgb(241 245 249);
-  }
 `;

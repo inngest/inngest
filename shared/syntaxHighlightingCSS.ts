@@ -25,11 +25,6 @@ const docsSyntaxHighlightingCSS = css`
     min-height: 1rem;
   }
 
-  /** Don't show the language identifiers */
-  pre.shiki .language-id {
-    display: none;
-  }
-
   /* Visually differentiates twoslash code samples  */
   pre.twoslash {
     border-color: #719af4;

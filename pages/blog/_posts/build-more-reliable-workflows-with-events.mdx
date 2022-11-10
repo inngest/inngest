@@ -41,21 +41,57 @@ We don't think writing step functions or workflows as a large JSON configuration
 
 We also believe it should be simple to run, from local development, to production where code can be [deployed to any number of platforms](/docs/deploy?ref=blog-build-more-reliable-workflows-with-events).
 
-Let's take a use case to demonstrate our approach.
+Let's take a use case to demonstrate our approach. A product is a CRM tool that enables a user to upload a large CSV file with contacts information. The API triggers this to run with the event `api/contact_list.uploaded`. This advanced CRM tool validates the upload then uses third party APIs to enrich the data with information about the contact's business then waits for the user to review and filter this list down before inserting all data into the the CRM database. When the user approve or rejects and selects filers, the API will send another event: `api/contact_list.reviewed`. Here's what the code could look like:
 
---TODO USE CASE: Highlight how using events to trigger and combine steps is unique and awesome--
 
 ```typescript
 import { createStepFunction } from "inngest";
 
-createStepFunction("", "",
+createStepFunction("Contacts Import and enrichment", "api/contact_list.uploaded",
   ({ event, tools }) => {
-    // TODO use run, wait for event, sleep, etc. to demonstrate power
+    const { isValid, errors } = tools.run("Validate upload contents", async () => {
+      // Download the csv file, validate columns and data in each row
+      const { isValid, errors } = downloadAndValidateCSV(event.data.filename);
+      return { isValid, errors };
+    });
+
+    if (!isValid) {
+      return tools.run("Notify user of invalid contents", async () =>
+        await sendContactsImportFailedEmail(event.user.id, errors)
+      );
+    }
+
+    // Enrichment may fail at times due to networking blip
+    tools.run("Enrich contracts information", async () => {
+      // Call a third party API service to enriches each contact's info
+      // then uploads the data to an object store when complete
+    });
+
+    const listReviewedEvent = tools.waitForEvent("api/contact_list.reviewed", {
+      timeout: "7d",
+      match: "data.upload_id", // data.upload_id is in both events and must match to proceed
+    })
+
+    if (listReviewedEvent.data.is_approved === false) {
+      return tools.run("Delete uploaded contact lists", () => { /* ...*/ });
+    }
+
+    const { totalUsersAdded } = tools.run("Create contacts in CRM", async () => {
+      const contacts = await downloadEnrichedContactList(event.data.filename);
+      const filteredContacts = applyFilters(listReviewedEvent.data.filters);
+      return await insertContactsIntoCRMDatabase(event.data.account_id, filteredContacts);
+    });
+
+    tools.run("Notify user of successful import", async () =>
+      await sendContactsImportSuccessEmail(event.user.id, totalUsersAdded)
+    );
   }
 )
 ```
 
-TODO - Not about observability w/ Inngest
+All code within each `tools.run()` callback will be run independently and will be retried upon failure, resuming from where the function left off. Using `tools.waitForEvent()` enable the workflow to wait for additional user interactions or events via [event coordination](/patterns/event-coordination-for-lost-customers?ref=blog-build-more-reliable-workflows-with-events). More info on these and other `tools` are [in our docs](/docs/functions/multi-step?ref=blog-build-more-reliable-workflows-with-events#tools).
+
+The results of each step, including failures and retries are logged can be inspected on the Inngest dashboard for complete observability.
 
 ## Over to you
 
