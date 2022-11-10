@@ -8,7 +8,17 @@ Use Inngest's multi-step functions to safely coordinate between events, delay ex
 
 Critically, multi-step functions are written in code, not config, meaning you create readable, obvious functionality that's easy to maintain.
 
-## Writing a multi-step function
+## Benefits
+
+Writing multi-step functions provide you with some easy-to-use tools to create intuitive flows for your system.
+
+- Run retryable blocks of code to maximum reliability
+- Pause execution and Wait for an event matching rules before continuing
+- Pause for an amount of time or until a specified time
+
+This makes building reliable, distributed code simple. By wrapping asynchronous actions such as API calls in retryable blocks, we can ensure reliability when coordinating across many services.
+
+## Writing
 
 Multi-step functions are written using either the `createStepFunction()` helper or the `Inngest#createStepFunction()` method.
 
