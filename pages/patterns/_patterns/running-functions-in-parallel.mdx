@@ -2,7 +2,7 @@ Event-driven systems allow you to have multiple subscribers for a single event s
 
 This is different to how most queueing systems work.  In most queueing systems like SQS or Celery, a specific job in a queue runs a single function.
 
-If you want to run 5 background jobs after a user signs up, using an event-driven system like Inngest you'll only have to send a single event.  In typical queueing systems you'll have to enqueue each of the 5 jobs individually.
+If you want to run 5 background jobs after a user signs up, using an event-driven system like Inngest you'll only have to send a single event.  In typical queueing systems you'll have to enqueue each 5 different messages individually.
 
 ## How to implement this pattern
 
@@ -20,9 +20,9 @@ In this example, we define three functions which run automatically in parallel w
 
 **Alternative event-driven systems**
 
-You can create an event-driven system using things like NATS, Redis, or Kafka - all are reliable event-driven infrastructure components.
+You can create an event-driven system using things like NATS, Redis, or Kafka - all are reliable event streaming infrastructure components.
 
-Using this infrastructure, you'll need to configure your topics via code (or terraform), then configure stateful subscribers which listen to your topics using an always-alive service.  Your subscribers should handle parallelism themselves, ensuring that you ack/nack events as they're processed.  If a single subscription fails, you'll need to manage retries, dead-letter queues, and watermarks for a topic yourself. This is a common approach, though it's often a lot of work to build, set up, and maintain.
+Using this infrastructure, you'll need to configure your topics via code (or terraform), then configure stateful subscribers which listen to your topics using an always-alive service.  Your subscribers should handle parallelism themselves, ensuring that you [ack/nack](https://docs.nats.io/legacy/stan/streaming/acks) events as they're processed.  If a single subscription fails, you'll need to manage retries, dead-letter queues, and watermarks for a topic yourself. This is a common approach, though it's often a lot of work to build, set up, and maintain.
 
 ## Additional resources
 
