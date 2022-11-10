@@ -1,6 +1,6 @@
 Many applications and products must run mission critical code in the background. Because of the asynchronous nature of background tasks, it's more challenging to observe success or failure as compared to synchronous API requests. Also, code may run for minutes or hours, so reliability and durability are vital to running a system with confidence.
 
-One might start off with a single long function that runs for an extended period of time, but what happens if it fails halfway through a multi-minute or multi-hour job? Does the entire job need to be restarted from the beginning? How did it fail? What part of the code failed? Is this part of the code more likely to fail than the rest of it due to a dependency on an external system or API?
+You might start off with a single long function that runs for an extended period of time, but what happens if it fails halfway through a multi-minute or multi-hour job? Does the entire job need to be restarted from the beginning? How did it fail? What part of the code failed? Is this part of the code more likely to fail than the rest of it due to a dependency on an external system or API?
 
 These are all key questions that developers have for long-running, critical workflows. An answer to many of these questions is to decouple the logic of your long running jobs into discrete steps. Each step can be run independently and chained together into a singular workflow. Since each step is run independently, each can throw it's own errors, be independently retried, and be re-used in different workflows.
 
