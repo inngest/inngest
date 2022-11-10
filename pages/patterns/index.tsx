@@ -58,13 +58,15 @@ export const SECTIONS: Section[] = [
       },
       {
         title: "Running at specific times",
-        subtitle: "Pause and wait until a specific time based off of data within an event",
+        subtitle:
+          "Pause and wait until a specific time based off of data within an event",
         tags: ["Scheduling", "Architecture"],
         slug: "running-at-specific-times",
       },
       {
         title: "Cancelling scheduled functions",
-        subtitle: "Automatically cancel scheduled, paused, and waiting work using events",
+        subtitle:
+          "Automatically cancel scheduled, paused, and waiting work using events",
         tags: ["Scheduling"],
         slug: "cancelling-scheduled-functions",
       },
@@ -93,12 +95,12 @@ export const SECTIONS: Section[] = [
         tags: ["Activation", "User Journeys", "Event Coordination"],
         slug: "event-coordination-for-lost-customers",
       },
-      {
+      /*{
         title: "Human-in-the-middle",
         subtitle: "Workflows that require human input to run conditional code",
         tags: ["Compliance", "Internal Tooling"],
         slug: "#TODO",
-      },
+      },*/
     ],
   },
 ];
