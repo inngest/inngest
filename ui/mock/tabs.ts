@@ -15,7 +15,9 @@ const payloadContent = `{
  }`
 
 const schemaContent = `{
-  name: 'some.scope/event.name',  
+  label: String,
+  id: ObjectId,
+  count: Integer,
  }`
 
 export const eventTabs = [

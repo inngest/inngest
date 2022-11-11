@@ -42,7 +42,7 @@ export default function CodeBlock({ tabs }) {
           <code
             className={classNames(
               i === activeTab ? ` ` : `opacity-0`,
-              `col-start-1 row-start-1`
+              `col-start-1 row-start-1 transition-all`
             )}
           >
             <pre className="p-4 overflow-x-scroll text-2xs">
