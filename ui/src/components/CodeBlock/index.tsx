@@ -7,7 +7,10 @@ export default function CodeBlock({ tabs }) {
 
   const handleTabClick = (index) => {
     setActiveTab(index)
-    console.log('clicked')
+  }
+
+  const handleCopyClick = () => {
+    navigator.clipboard.writeText(tabs[activeTab].content)
   }
 
   return (
@@ -30,7 +33,7 @@ export default function CodeBlock({ tabs }) {
           ))}
         </div>
         <div className="flex gap-2 items-center mr-2">
-          <Button label="Copy" />
+          <Button label="Copy" btnAction={handleCopyClick} />
           <Button label="Expand" />
         </div>
       </div>
