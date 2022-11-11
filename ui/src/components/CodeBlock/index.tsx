@@ -3,7 +3,7 @@ import { useState } from 'preact/hooks'
 import classNames from '../../utils/classnames'
 import CopyButton from './CopyButton'
 
-export default function CodeBlock({ tabs }) {
+export default function CodeBlock({ tabs, modal, expanded = false }) {
   const [activeTab, setActiveTab] = useState(0)
 
   const handleTabClick = (index) => {
@@ -12,6 +12,11 @@ export default function CodeBlock({ tabs }) {
 
   const handleCopyClick = () => {
     navigator.clipboard.writeText(tabs[activeTab].content)
+  }
+
+  const handleExpandClick = () => {
+    // console.log('clicked')
+    modal(tabs)
   }
 
   return (
@@ -36,10 +41,18 @@ export default function CodeBlock({ tabs }) {
         <div className="flex gap-2 items-center mr-2">
           {/* <Button label="Copy" btnAction={handleCopyClick} /> */}
           <CopyButton btnAction={handleCopyClick} />
-          <Button label="Expand" />
+          <Button
+            label={expanded ? 'Close' : 'Expand'}
+            btnAction={handleExpandClick}
+          />
         </div>
       </div>
-      <div className="overflow-scroll grid max-h-[300px]">
+      <div
+        className={classNames(
+          expanded ? `max-w-[800px] max-h-[800px]` : `max-h-[300px]`,
+          `overflow-scroll grid`
+        )}
+      >
         {tabs.map((tab, i) => (
           <code
             className={classNames(

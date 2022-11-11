@@ -1,31 +1,64 @@
+import { useState } from 'preact/hooks'
+
 import eventStream from '../mock/eventStream'
 import eventFuncs from '../mock/eventFuncs'
 import './index.css'
 import Header from './components/Header'
+
 import Sidebar from './components/Sidebar/Sidebar'
 import SidebarLink from './components/Sidebar/SidebarLink'
+
 import ContentFrame from './components/Content/ContentFrame'
+import ContentCard from './components/Content/ContentCard'
 
 import TimelineRow from './components/Timeline/TimelineRow'
-
-import TimelineFuncItem from './components/Timeline/TimelineFuncItem'
 import TimelineScrollContainer from './components/Timeline/TimelineScrollContainer'
 import TimelineFeedContent from './components/Timeline/TimelineFeedContent'
-
-import ContentCard from './components/Content/ContentCard'
-import Button from './components/Button'
-import FuncCard from './components/Function/FuncCard'
-import CodeBlock from './components/CodeBlock'
-
-import { IconFeed, IconBook } from './icons'
 import TimelineStaticContent from './components/Timeline/TimelineStaticContent'
 import TimelineFuncProgress from './components/Timeline/TimelineFuncProgress'
 
+import Button from './components/Button'
+import FuncCard from './components/Function/FuncCard'
+
+import CodeBlock from './components/CodeBlock'
+import CodeBlockModal from './components/CodeBlock/CodeBlockModal'
+
+import { IconFeed, IconBook } from './icons'
+
 import { eventTabs } from '../mock/tabs'
+import { funcTabs } from '../mock/funcTabs'
 
 export function App() {
+  const [codeBlockModalActive, setCodeBlockModalActive] = useState({
+    visible: false,
+    content: '',
+  })
+
+  const setModal = (content) => {
+    if (codeBlockModalActive.visible) {
+      setCodeBlockModalActive({
+        visible: false,
+        content: '',
+      })
+    } else {
+      setCodeBlockModalActive({
+        visible: true,
+        content: content,
+      })
+    }
+  }
+
   return (
     <div class="w-screen h-screen text-slate-400 text-sm grid grid-cols-app grid-rows-app overflow-hidden">
+      {codeBlockModalActive.visible && (
+        <CodeBlockModal closeModal={setModal}>
+          <CodeBlock
+            tabs={codeBlockModalActive.content}
+            modal={setModal}
+            expanded
+          />
+        </CodeBlockModal>
+      )}
       <Header />
       <Sidebar>
         <SidebarLink icon={<IconFeed />} active badge={20} />
@@ -85,7 +118,7 @@ export function App() {
               </TimelineRow>
             </div>
             <div className="border-t border-slate-800/50 m-4 mt-0 pt-4">
-              <CodeBlock tabs={eventTabs} />
+              <CodeBlock modal={setModal} tabs={eventTabs} />
             </div>
           </ContentCard>
           <ContentCard
@@ -95,7 +128,7 @@ export function App() {
             id="01GGG522ZATDGVQBCND4ZEAS6Z"
           >
             <div className="border-t border-slate-800/50 m-4 mt-0 pt-4">
-              <CodeBlock tabs={eventTabs} />
+              <CodeBlock modal={setModal} tabs={funcTabs} />
             </div>
             <div className="flex justify-end px-4 border-t border-slate-800/50 pt-4 mt-4">
               <Button label="Retry" />
@@ -107,7 +140,7 @@ export function App() {
                   datetime="14:34:21 28/04/2022"
                   id="01GGG522ZATDGVQBCND4ZEAS6Z"
                 >
-                  <CodeBlock tabs={eventTabs} />
+                  <CodeBlock modal={setModal} tabs={funcTabs} />
                 </TimelineFuncProgress>
               </TimelineRow>
 
