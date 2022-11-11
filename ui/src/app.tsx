@@ -8,7 +8,6 @@ import ContentFrame from './components/Content/ContentFrame'
 
 import TimelineRow from './components/Timeline/TimelineRow'
 
-import TimelineItem from './components/Timeline/TimelineItem'
 import TimelineFuncItem from './components/Timeline/TimelineFuncItem'
 import TimelineScrollContainer from './components/Timeline/TimelineScrollContainer'
 import TimelineFeedContent from './components/Timeline/TimelineFeedContent'
