@@ -35,6 +35,7 @@ type Workflow struct {
 	Triggers []Trigger `json:"triggers"`
 	Steps    []Step    `json:"actions"`
 	Edges    []Edge    `json:"edges"`
+	Cancel   []Cancel  `json:"cancel,omitempty"`
 }
 
 type Throttle struct {
@@ -80,6 +81,8 @@ type Step struct {
 	Version  *VersionConstraint     `json:"version,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 	Retries  *RetryOptions          `json:"retries,omitempty"`
+	// Cancel specifies cancellation signals for the function
+	Cancel []Cancel `json:"cancel,omitempty"`
 }
 
 // RetryCount returns the number of retries for this step.
@@ -136,4 +139,13 @@ type VersionConstraint struct {
 type RetryOptions struct {
 	// Attempts is the maximum number of times to retry.
 	Attempts *int `json:"attempts,omitempty"`
+}
+
+// Cancel represents a cancellation signal for a function.  When specified, this
+// will set up pauses which automatically cancel the function based off of matching
+// events and expressions.
+type Cancel struct {
+	Event   string  `json:"event"`
+	Timeout *string `json:"timeout"`
+	If      *string `json:"if"`
 }

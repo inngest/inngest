@@ -25,6 +25,7 @@ import (
 	actions?: [ ...#Action]
 	edges?: [ ...#Edge]
 	alerts?: [ ...#Alert]
+	cancel?: [...#Cancel]
 }
 
 #Alert: {
@@ -72,4 +73,14 @@ import (
 	outgoing:  string | "$trigger" // Either the action ID or 'trigger'
 	incoming:  string
 	metadata?: #EdgeMetadata
+}
+
+#Cancel: {
+	// event is the event name that will cancel this function
+	event: string
+	// timeout is the time at which the function can be cancelled, defaulting
+	// to the max runtime length.
+	timeout?: string
+	// if is an optional expression to match when cancelling the function.
+	if?: string
 }

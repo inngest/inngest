@@ -225,6 +225,10 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 		Triggers: make([]inngest.Trigger, len(f.Triggers)),
 	}
 
+	// TODO: Refactor these into shared structs and definitions, extend.
+	// This is really ugly, and is a symptom of functions coming after
+	// workflows and not being truly first class in the executor.
+
 	for n, t := range f.Triggers {
 		if t.EventTrigger != nil {
 			w.Triggers[n].EventTrigger = &inngest.EventTrigger{
@@ -252,6 +256,14 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 			Count:  1,
 			Period: "24h",
 		}
+	}
+
+	for _, c := range f.Cancel {
+		w.Cancel = append(w.Cancel, inngest.Cancel{
+			Event:   c.Event,
+			Timeout: c.Timeout,
+			If:      c.If,
+		})
 	}
 
 	// This has references to actions.  Create the actions then reference them
