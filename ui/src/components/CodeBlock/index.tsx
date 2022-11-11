@@ -14,19 +14,19 @@ export default function CodeBlock({ tabs }) {
   }
 
   return (
-    <div className="w-full bg-slate-800/30 border border-slate-700/30 rounded-lg shadow ">
+    <div className="w-full bg-slate-800/30 border border-slate-700/30 rounded-lg shadow">
       <div className="bg-slate-800/40 flex justify-between shadow">
         <div className="flex">
-          {tabs.map((tab, index) => (
+          {tabs.map((tab, i) => (
             <button
               className={classNames(
-                index === activeTab
+                i === activeTab
                   ? `border-indigo-400 text-white`
                   : `border-transparent text-slate-400`,
                 `text-xs px-5 py-2.5 border-b-2 block transition-all duration-150`
               )}
-              onClick={() => handleTabClick(index)}
-              key={index}
+              onClick={() => handleTabClick(i)}
+              key={i}
             >
               {tab.label}
             </button>
@@ -37,12 +37,19 @@ export default function CodeBlock({ tabs }) {
           <Button label="Expand" />
         </div>
       </div>
-      <div className="overflow-hidden">
-        <code className="">
-          <pre className="p-4 overflow-x-scroll text-2xs">
-            {tabs[activeTab].content}
-          </pre>
-        </code>
+      <div className="overflow-hidden grid">
+        {tabs.map((tab, i) => (
+          <code
+            className={classNames(
+              i === activeTab ? ` ` : `opacity-0`,
+              `col-start-1 row-start-1`
+            )}
+          >
+            <pre className="p-4 overflow-x-scroll text-2xs">
+              {tabs[i].content}
+            </pre>
+          </code>
+        ))}
       </div>
     </div>
   )
