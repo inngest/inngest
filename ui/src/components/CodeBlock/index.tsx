@@ -1,6 +1,7 @@
 import Button from '../Button'
 import { useState } from 'preact/hooks'
 import classNames from '../../utils/classnames'
+import CopyButton from './CopyButton'
 
 export default function CodeBlock({ tabs }) {
   const [activeTab, setActiveTab] = useState(0)
@@ -33,21 +34,20 @@ export default function CodeBlock({ tabs }) {
           ))}
         </div>
         <div className="flex gap-2 items-center mr-2">
-          <Button label="Copy" btnAction={handleCopyClick} />
+          {/* <Button label="Copy" btnAction={handleCopyClick} /> */}
+          <CopyButton btnAction={handleCopyClick} />
           <Button label="Expand" />
         </div>
       </div>
-      <div className="overflow-hidden grid">
+      <div className="overflow-scroll grid max-h-[300px]">
         {tabs.map((tab, i) => (
           <code
             className={classNames(
               i === activeTab ? ` ` : `opacity-0`,
-              `col-start-1 row-start-1 transition-all`
+              `col-start-1 row-start-1 transition-all duration-150`
             )}
           >
-            <pre className="p-4 overflow-x-scroll text-2xs">
-              {tabs[i].content}
-            </pre>
+            <pre className="p-4 text-2xs">{tabs[i].content}</pre>
           </code>
         ))}
       </div>
