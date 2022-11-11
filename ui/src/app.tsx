@@ -21,6 +21,8 @@ import { IconFeed, IconBook } from './icons'
 import TimelineStaticContent from './components/Timeline/TimelineStaticContent'
 import TimelineFuncProgress from './components/Timeline/TimelineFuncProgress'
 
+import { eventTabs } from '../mock/tabs'
+
 export function App() {
   return (
     <div class="w-screen h-screen text-slate-400 text-sm grid grid-cols-app grid-rows-app overflow-hidden">
@@ -83,7 +85,7 @@ export function App() {
               </TimelineRow>
             </div>
             <div className="border-t border-slate-800/50 m-4 mt-0 pt-4">
-              <CodeBlock />
+              <CodeBlock tabs={eventTabs} />
             </div>
           </ContentCard>
           <ContentCard
@@ -93,7 +95,7 @@ export function App() {
             id="01GGG522ZATDGVQBCND4ZEAS6Z"
           >
             <div className="border-t border-slate-800/50 m-4 mt-0 pt-4">
-              <CodeBlock />
+              <CodeBlock tabs={eventTabs} />
             </div>
             <div className="flex justify-end px-4 border-t border-slate-800/50 pt-4 mt-4">
               <Button label="Retry" />
@@ -105,7 +107,7 @@ export function App() {
                   datetime="14:34:21 28/04/2022"
                   id="01GGG522ZATDGVQBCND4ZEAS6Z"
                 >
-                  <CodeBlock />
+                  <CodeBlock tabs={eventTabs} />
                 </TimelineFuncProgress>
               </TimelineRow>
 
