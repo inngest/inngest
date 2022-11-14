@@ -27,6 +27,7 @@ import { IconFeed, IconBook } from './icons'
 
 import { eventTabs } from '../mock/tabs'
 import { funcTabs } from '../mock/funcTabs'
+import ActionBar from './components/ActionBar'
 
 export function App() {
   const [codeBlockModalActive, setCodeBlockModalActive] = useState({
@@ -64,19 +65,20 @@ export function App() {
         <SidebarLink icon={<IconFeed />} active badge={20} />
         <SidebarLink icon={<IconBook />} />
       </Sidebar>
+      <ActionBar />
+      <TimelineScrollContainer>
+        {eventStream.map((event, i) => (
+          <TimelineRow key={i} status={event.status} iconOffset={30}>
+            <TimelineFeedContent
+              datetime={event.datetime}
+              name={event.name}
+              badge={event.fnCount}
+              status={event.status}
+            />
+          </TimelineRow>
+        ))}
+      </TimelineScrollContainer>
       <ContentFrame>
-        <TimelineScrollContainer>
-          {eventStream.map((event, i) => (
-            <TimelineRow key={i} status={event.status} iconOffset={30}>
-              <TimelineFeedContent
-                datetime={event.datetime}
-                name={event.name}
-                badge={event.fnCount}
-                status={event.status}
-              />
-            </TimelineRow>
-          ))}
-        </TimelineScrollContainer>
         <div className="flex gap-3 p-3 w-full min-w-0">
           <ContentCard
             title="accounts/profile.photo.uploaded"
