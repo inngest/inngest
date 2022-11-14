@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks'
 
-import eventStream from '../mock/eventStream'
+import classNames from './utils/classnames'
+import { feeds } from '../mock/eventStream'
 import eventFuncs from '../mock/eventFuncs'
 import './index.css'
 import Header from './components/Header'
@@ -29,11 +30,17 @@ import { eventTabs } from '../mock/tabs'
 import { funcTabs } from '../mock/funcTabs'
 import ActionBar from './components/ActionBar'
 
+import Tab from './components/Tab'
+
 export function App() {
   const [codeBlockModalActive, setCodeBlockModalActive] = useState({
     visible: false,
     content: '',
   })
+
+  const [activeFeed, setActiveFeed] = useState(1)
+
+  const tabs = ['Event Stream', 'Function Log']
 
   const setModal = (content) => {
     if (codeBlockModalActive.visible) {
@@ -49,8 +56,12 @@ export function App() {
     }
   }
 
+  const handleTabClick = (index) => {
+    setActiveFeed(index)
+  }
+
   return (
-    <div class="w-screen h-screen text-slate-400 text-sm grid grid-cols-app grid-rows-app overflow-hidden">
+    <div class="w-screen h-screen text-slate-400 text-sm grid grid-cols-app 2xl:grid-cols-app-desktop grid-rows-app overflow-hidden">
       {codeBlockModalActive.visible && (
         <CodeBlockModal closeModal={setModal}>
           <CodeBlock
@@ -65,14 +76,29 @@ export function App() {
         <SidebarLink icon={<IconFeed />} active badge={20} />
         <SidebarLink icon={<IconBook />} />
       </Sidebar>
-      <ActionBar />
+      <ActionBar
+        tabs={feeds.map((tab, i) => (
+          <button
+            className={classNames(
+              i === activeFeed
+                ? `border-indigo-400 text-white`
+                : `border-transparent text-slate-400`,
+              `text-xs px-5 py-2.5 border-b-2 block transition-all duration-150`
+            )}
+            onClick={() => handleTabClick(i)}
+            key={i}
+          >
+            {tab.name}
+          </button>
+        ))}
+      />
       <TimelineScrollContainer>
-        {eventStream.map((event, i) => (
+        {feeds[activeFeed].content.map((event, i) => (
           <TimelineRow key={i} status={event.status} iconOffset={30}>
             <TimelineFeedContent
               datetime={event.datetime}
               name={event.name}
-              badge={event.fnCount}
+              badge={event.badge}
               status={event.status}
             />
           </TimelineRow>

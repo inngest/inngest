@@ -12,6 +12,7 @@ module.exports = {
       gridTemplateColumns: {
         // Sidebar | Timeline Scroll | Content Frame
         app: '50px 340px 1fr',
+        'app-desktop': '50px 420px 1fr',
       },
       gridTemplateRows: {
         // Header | Action Bar | Content Frame
