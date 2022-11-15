@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
@@ -100,31 +101,32 @@ func CheckState(t *testing.T, gen Generator) {
 	t.Helper()
 
 	funcs := map[string]func(t *testing.T, m state.Manager){
-		"New":                                checkNew,
-		"New/StepData":                       checkNew_stepdata,
-		"Scheduled":                          checkScheduled,
-		"SaveResponse/Output":                checkSaveResponse_output,
-		"SaveResponse/Error":                 checkSaveResponse_error,
-		"SaveResponse/OutputOverwritesError": checkSaveResponse_outputOverwritesError,
-		"SaveResponse/Concurrent":            checkSaveResponse_concurrent,
-		"SavePause":                          checkSavePause,
-		"LeasePause":                         checkLeasePause,
-		"ConsumePause":                       checkConsumePause,
-		"ConsumePause/WithData":              checkConsumePauseWithData,
-		"ConsumePause/WithEmptyData":         checkConsumePauseWithEmptyData,
-		"ConsumePause/WithEmptyDataKey":      checkConsumePauseWithEmptyDataKey,
-		"PausesByEvent/Empty":                checkPausesByEvent_empty,
-		"PausesByEvent/Single":               checkPausesByEvent_single,
-		"PausesByEvent/Multiple":             checkPausesByEvent_multi,
-		"PausesByEvent/ConcurrentCursors":    checkPausesByEvent_concurrent,
-		"PausesByEvent/Consumed":             checkPausesByEvent_consumed,
-		"PauseByStep":                        checkPausesByStep,
-		"PauseByID":                          checkPauseByID,
-		"Idempotency":                        checkIdempotency,
-		"Cancel":                             checkCancel,
-		"Cancel/AlreadyCompleted":            checkCancel_completed,
-		"Cancel/AlreadyCancelled":            checkCancel_cancelled,
-		"Finalized/Status":                   checkFinalizedStatus,
+		"New": checkNew,
+		// "New/StepData":                       checkNew_stepdata,
+		// "Scheduled":                          checkScheduled,
+		// "SaveResponse/Output":                checkSaveResponse_output,
+		// "SaveResponse/Error":                 checkSaveResponse_error,
+		// "SaveResponse/OutputOverwritesError": checkSaveResponse_outputOverwritesError,
+		// "SaveResponse/Concurrent":            checkSaveResponse_concurrent,
+		// "SavePause":                          checkSavePause,
+		// "LeasePause":                         checkLeasePause,
+		// "ConsumePause":                       checkConsumePause,
+		// "ConsumePause/WithData":              checkConsumePauseWithData,
+		// "ConsumePause/WithEmptyData":         checkConsumePauseWithEmptyData,
+		// "ConsumePause/WithEmptyDataKey":      checkConsumePauseWithEmptyDataKey,
+		// "PausesByEvent/Empty":                checkPausesByEvent_empty,
+		// "PausesByEvent/Single":               checkPausesByEvent_single,
+		// "PausesByEvent/Multiple":             checkPausesByEvent_multi,
+		// "PausesByEvent/ConcurrentCursors":    checkPausesByEvent_concurrent,
+		// "PausesByEvent/Consumed":             checkPausesByEvent_consumed,
+		// "PauseByStep":                        checkPausesByStep,
+		// "PauseByID":                          checkPauseByID,
+		// "Idempotency":                        checkIdempotency,
+		// "Cancel":                             checkCancel,
+		// "Cancel/AlreadyCompleted":            checkCancel_completed,
+		// "Cancel/AlreadyCancelled":            checkCancel_cancelled,
+		// "Finalized/Status":                   checkFinalizedStatus,
+		// "Log/FunctionLog":                    checkLogs,
 	}
 	for name, f := range funcs {
 		t.Run(name, func(t *testing.T) {
@@ -1286,14 +1288,14 @@ func checkCancel_completed(t *testing.T, m state.Manager) {
 
 	s, err = m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.EqualValues(t, state.RunStatusComplete, s.Metadata().Status, "Status is not Complete after finalizing")
+	require.EqualValues(t, state.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
 
 	err = m.Cancel(ctx, s.Identifier())
 	require.Equal(t, err, state.ErrFunctionComplete)
 
 	s, err = m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.EqualValues(t, state.RunStatusComplete, s.Metadata().Status, "Status is not Complete after finalizing")
+	require.EqualValues(t, state.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
 }
 
 func checkFinalizedStatus(t *testing.T, m state.Manager) {
@@ -1309,7 +1311,7 @@ func checkFinalizedStatus(t *testing.T, m state.Manager) {
 
 	loaded, err = m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.Equal(t, state.RunStatusComplete, loaded.Metadata().Status, "Finalizing step setting pending to 0 should set status to state.RunStatusComplete")
+	require.Equal(t, state.RunStatusCompleted, loaded.Metadata().Status, "Finalizing step setting pending to 0 should set status to state.RunStatusComplete")
 	require.Equal(t, 0, loaded.Metadata().Pending)
 }
 
@@ -1355,6 +1357,18 @@ func checkFinalizedDeletesPauses(t *testing.T, m state.Manager) {
 	require.Nil(t, found)
 }
 */
+func checkLogs(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	t.Run("Check that starting a function creates a function started history event", func(t *testing.T) {
+		history, err := m.History(ctx, s.Identifier())
+
+		require.NoError(t, err)
+		require.Equal(t, 1, len(history))
+		require.Equal(t, enums.HistoryTypeFunctionStarted, history[0].Type)
+	})
+}
 
 func setup(t *testing.T, m state.Manager) state.State {
 	ctx := context.Background()

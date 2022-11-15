@@ -145,7 +145,7 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string) 
 	instance := s.(memstate)
 	instance.metadata.Pending--
 	if instance.metadata.Pending == 0 {
-		instance.metadata.Status = state.RunStatusComplete
+		instance.metadata.Status = state.RunStatusCompleted
 	}
 
 	m.state[i.IdempotencyKey()] = instance
@@ -163,7 +163,7 @@ func (m *mem) Cancel(ctx context.Context, i state.Identifier) error {
 	}
 
 	switch s.Metadata().Status {
-	case state.RunStatusComplete:
+	case state.RunStatusCompleted:
 		return state.ErrFunctionComplete
 	case state.RunStatusFailed:
 		return state.ErrFunctionFailed
@@ -303,6 +303,10 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 
 	delete(m.pauses, id)
 	return nil
+}
+
+func (m *mem) History(ctx context.Context, i state.Identifier) ([]state.History, error) {
+	return nil, nil
 }
 
 func copyMap[K comparable, V any](m map[K]V) map[K]V {

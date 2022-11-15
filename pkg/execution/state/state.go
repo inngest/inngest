@@ -15,8 +15,8 @@ const (
 	// RunStatusRunning indicates that the function is running.  This is the
 	// default state, even if steps are scheduled in the future.
 	RunStatusRunning RunStatus = iota
-	// RunStatusComplete indicates that the function has completed running.
-	RunStatusComplete
+	// RunStatusCompleted indicates that the function has completed running.
+	RunStatusCompleted
 	// RunStatusFailed indicates that the function failed in one or more steps.
 	RunStatusFailed
 	// RunStatusCancelled indicates that the function has been cancelled prior
@@ -54,8 +54,9 @@ func (r RunStatus) MarshalBinary() ([]byte, error) {
 
 // Identifier represents the unique identifier for a workflow run.
 type Identifier struct {
-	WorkflowID uuid.UUID `json:"workflowID"`
-	RunID      ulid.ULID `json:"runID"`
+	WorkflowID      uuid.UUID `json:"workflowID"`
+	WorkflowVersion int       `json:"workflowVersion"`
+	RunID           ulid.ULID `json:"runID"`
 	// Key represents a unique idempotency key used to deduplicate this
 	// workflow run amongst other runs for the same workflow.
 	Key string `json:"key"`
@@ -66,7 +67,7 @@ func (i Identifier) IdempotencyKey() string {
 	if i.Key == "" {
 		key = i.RunID.String()
 	}
-	return fmt.Sprintf("%s:%s", i.WorkflowID, key)
+	return fmt.Sprintf("%s:%d:%s", i.WorkflowID, i.WorkflowVersion, key)
 }
 
 // Metadata must be stored for each workflow run, allowing the runner to inspect
@@ -152,6 +153,9 @@ type State interface {
 type Loader interface {
 	// Load returns run state for the given identifier.
 	Load(ctx context.Context, i Identifier) (State, error)
+
+	// History loads history for the given run identifier.
+	History(ctx context.Context, i Identifier) ([]History, error)
 
 	// IsComplete returns whether the given identifier is complete, ie. the
 	// pending count in the identifier's metadata is zero.

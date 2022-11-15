@@ -24,6 +24,7 @@ var scripts = map[string]string{
 	"leasePause": "",
 	"finalize":   "",
 	"cancel":     "",
+	"new":        "",
 }
 
 func init() {
@@ -234,6 +235,19 @@ type mgr struct {
 }
 
 func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
+	// We marshal this ahead of creating a redis transaction as it's necessary
+	// every time and reduces the duration that the lock is held.
+	event, err := json.Marshal(input.EventData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the workflow.
+	workflow, err := json.Marshal(input.Workflow)
+	if err != nil {
+		return nil, err
+	}
+
 	// TODO: We could probably optimize the commands here by storing the event
 	// within run metadata.  We want step output (actions) and errors to be
 	// their own redis hash for fast inserts (HSET on individual step results).
@@ -250,77 +264,47 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		metadata.RunType = *input.RunType
 	}
 
-	// We marshal this ahead of creating a redis transaction as it's necessary
-	// every time and reduces the duration that the lock is held.
-	inputJSON, err := json.Marshal(input.EventData)
-	if err != nil {
-		return nil, err
-	}
-
-	ikey := m.kf.Idempotency(ctx, input.Identifier)
-
-	err = m.r.Watch(ctx, func(tx *redis.Tx) error {
-		// Ensure that the workflow exists within the state store.
-		//
-		// XXX: Could this use SETNX to combine these steps or is it more performant
-		//      not to have to marshal the workflow every new run?
-		key := m.kf.Workflow(ctx, input.Workflow.UUID, input.Workflow.Version)
-		val, err := tx.Exists(ctx, key).Uint64()
-		if err != nil {
-			return err
-		}
-		if val == 0 {
-			// Set the workflow.
-			byt, err := json.Marshal(input.Workflow)
-			if err != nil {
-				return err
-			}
-			if err := tx.Set(ctx, key, byt, m.expiry).Err(); err != nil {
-				return err
-			}
-		}
-
-		set, err := tx.SetNX(ctx, ikey, "", 0).Result()
-		if err != nil {
-			return err
-		}
-		if !set {
-			return state.ErrIdentifierExists
-		}
-
-		// Save metadata about this particular run.
-		if err := tx.HSet(ctx, m.kf.RunMetadata(ctx, input.Identifier), metadata.Map()).Err(); err != nil {
-			return err
-		}
-
-		// Save predetermined step data
-		actionKey := m.kf.Actions(ctx, input.Identifier)
-		for stepID, value := range input.Steps {
-			// Save the output.
-			str, err := json.Marshal(value)
-			if err != nil {
-				return err
-			}
-			if err := m.r.HSet(ctx, actionKey, stepID, str).Err(); err != nil {
-				return err
-			}
-		}
-
-		// XXX: If/when we enforce limits on function durations here (eg.
-		// 1, 5, 10 years) this should have a similar TTL.
-		key = m.kf.Event(ctx, input.Identifier)
-		if err := tx.Set(ctx, key, inputJSON, m.expiry).Err(); err != nil {
-			return err
-		}
-
-		return nil
-	}, ikey)
+	metadataByt, err := json.Marshal(metadata.Map())
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
 
-	// We return a new in-memory state instance with the workflow, ID, and input
-	// pre-filled.
+	var stepsByt []byte
+
+	if len(input.Steps) > 0 {
+		stepsByt, err = json.Marshal(input.Steps)
+		if err != nil {
+			return nil, fmt.Errorf("error storing run state in redis: %w", err)
+		}
+	}
+
+	// TODO: Loop over steps, marshal JSON, add to map, send as single map
+	status, err := redis.NewScript(scripts["new"]).Eval(
+		ctx,
+		m.r,
+		[]string{
+			m.kf.Idempotency(ctx, input.Identifier),                         // idempotency key
+			m.kf.Event(ctx, input.Identifier),                               // event key
+			m.kf.Workflow(ctx, input.Workflow.UUID, input.Workflow.Version), // workflow key
+			m.kf.RunMetadata(ctx, input.Identifier),                         // metadata key
+			m.kf.Actions(ctx, input.Identifier),                             // step key
+			"",                                                              // log key
+		},
+		event,
+		workflow,
+		metadataByt,
+		stepsByt,
+		m.expiry,
+	).Int64()
+
+	if err != nil {
+		return nil, fmt.Errorf("error storing run state in redis: %w", err)
+	}
+
+	if status == 1 {
+		return nil, state.ErrIdentifierExists
+	}
+
 	return inmemory.NewStateInstance(
 			input.Workflow,
 			input.Identifier,
@@ -330,6 +314,105 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			map[string]error{},
 		),
 		nil
+
+	// --------------------
+
+	// TODO: We could probably optimize the commands here by storing the event
+	// within run metadata.  We want step output (actions) and errors to be
+	// their own redis hash for fast inserts (HSET on individual step results).
+	// However, the input event is immutable.
+	// metadata := runMetadata{
+	// 	Version:  input.Workflow.Version,
+	// 	Pending:  1,
+	// 	Debugger: input.Debugger,
+	// }
+	// if input.OriginalRunID != nil {
+	// 	metadata.OriginalRunID = input.OriginalRunID.String()
+	// }
+	// if input.RunType != nil {
+	// 	metadata.RunType = *input.RunType
+	// }
+
+	// // We marshal this ahead of creating a redis transaction as it's necessary
+	// // every time and reduces the duration that the lock is held.
+	// inputJSON, err := json.Marshal(input.EventData)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// ikey := m.kf.Idempotency(ctx, input.Identifier)
+
+	// err = m.r.Watch(ctx, func(tx *redis.Tx) error {
+	// 	// Ensure that the workflow exists within the state store.
+	// 	//
+	// 	// XXX: Could this use SETNX to combine these steps or is it more performant
+	// 	//      not to have to marshal the workflow every new run?
+	// 	key := m.kf.Workflow(ctx, input.Workflow.UUID, input.Workflow.Version)
+	// 	val, err := tx.Exists(ctx, key).Uint64()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	if val == 0 {
+	// 		// Set the workflow.
+	// 		byt, err := json.Marshal(input.Workflow)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		if err := tx.Set(ctx, key, byt, m.expiry).Err(); err != nil {
+	// 			return err
+	// 		}
+	// 	}
+
+	// 	set, err := tx.SetNX(ctx, ikey, "", 0).Result()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	if !set {
+	// 		return state.ErrIdentifierExists
+	// 	}
+
+	// 	// Save metadata about this particular run.
+	// 	if err := tx.HSet(ctx, m.kf.RunMetadata(ctx, input.Identifier), metadata.Map()).Err(); err != nil {
+	// 		return err
+	// 	}
+
+	// 	// Save predetermined step data
+	// 	actionKey := m.kf.Actions(ctx, input.Identifier)
+	// 	for stepID, value := range input.Steps {
+	// 		// Save the output.
+	// 		str, err := json.Marshal(value)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		if err := m.r.HSet(ctx, actionKey, stepID, str).Err(); err != nil {
+	// 			return err
+	// 		}
+	// 	}
+
+	// 	// XXX: If/when we enforce limits on function durations here (eg.
+	// 	// 1, 5, 10 years) this should have a similar TTL.
+	// 	key = m.kf.Event(ctx, input.Identifier)
+	// 	if err := tx.Set(ctx, key, inputJSON, m.expiry).Err(); err != nil {
+	// 		return err
+	// 	}
+
+	// 	return nil
+	// }, ikey)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error storing run state in redis: %w", err)
+	// }
+
+	// We return a new in-memory state instance with the workflow, ID, and input
+	// pre-filled.
+	// return inmemory.NewStateInstance(
+	// 		input.Workflow,
+	// 		input.Identifier,
+	// 		metadata.Metadata(),
+	// 		input.EventData,
+	// 		input.Steps,
+	// 		map[string]error{},
+	// 	),
+	// 	nil
 }
 
 func (m mgr) IsComplete(ctx context.Context, id state.Identifier) (bool, error) {
@@ -674,6 +757,10 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 	pause := &state.Pause{}
 	err = json.Unmarshal([]byte(str), pause)
 	return pause, err
+}
+
+func (m mgr) History(ctx context.Context, i state.Identifier) ([]state.History, error) {
+	return nil, nil
 }
 
 type iter struct {
