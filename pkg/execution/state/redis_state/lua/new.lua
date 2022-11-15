@@ -38,7 +38,7 @@ if steps ~= nil and steps ~= "" then
   local stepsJson = cjson.decode(steps)
 
   for k, v in pairs(stepsJson) do
-    redis.call("HSET", stepKey, k, tostring(v))
+    redis.call("HSET", stepKey, k, cjson.encode(v))
   end
 end
 
