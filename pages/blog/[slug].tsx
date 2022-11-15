@@ -30,14 +30,41 @@ type Props = {
   };
 };
 
+const authorURLs = {
+  "Dan Farrelly": "https://twitter.com/djfarrelly",
+  "Tony Holdstock-Brown": "https://twitter.com/itstonyhb",
+  "Jack Williams": "https://twitter.com/atticjack",
+};
+
 export default function BlogLayout(props) {
   const scope = JSON.parse(props.post.scope.json);
+
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: scope.heading,
+    description: scope.subtitle,
+    image: [`${process.env.NEXT_PUBLIC_HOST}${scope.image}`],
+    datePublished: scope.date,
+    dateModified: scope.date,
+    author: [
+      {
+        "@type": scope.author ? "Person" : "Organization",
+        name: scope.author || "Inngest",
+        url:
+          scope.author && authorURLs.hasOwnProperty(scope.author)
+            ? authorURLs[scope.author]
+            : process.env.NEXT_PUBLIC_HOST,
+      },
+    ],
+  };
+
   return (
     <>
       <Head>
         <title>{scope.heading} → Inngest Blog</title>
         <meta name="description" content={scope.subtitle}></meta>
-        <meta name="title" content={scope.subtitle}></meta>
+        <meta name="title" content={scope.heading}></meta>
         <meta property="og:title" content={`${scope.heading} → Inngest Blog`} />
         <meta property="og:description" content={scope.subtitle} />
         <meta property="og:type" content="article" />
@@ -64,6 +91,12 @@ export default function BlogLayout(props) {
             content={`${process.env.NEXT_PUBLIC_HOST}${scope.image}`}
           />
         )}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(structuredData),
+          }}
+        ></script>
       </Head>
 
       <ThemeToggleButton isFloating={true} />
