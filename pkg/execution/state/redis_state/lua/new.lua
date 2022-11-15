@@ -18,6 +18,8 @@ local workflow = ARGV[2]
 local metadata = ARGV[3]
 local steps = ARGV[4]
 local expiry = tonumber(ARGV[5])
+local log = ARGV[6]
+local logScore = tonumber(ARGV[7])
 
 if redis.call("SETNX", idempotencyKey, "") == 0 then
   -- If this key exists, everything must've been initialised, so we can exit early
@@ -42,11 +44,14 @@ end
 
 redis.call("SETNX", eventKey, event)
 
+redis.call("ZADD", logKey, logScore, log)
+
 if expiry > 0 then
   redis.call("EXPIRE", workflowKey, expiry)
   redis.call("EXPIRE", metadataKey, expiry)
   redis.call("EXPIRE", stepKey, expiry)
   redis.call("EXPIRE", eventKey, expiry)
+  redis.call("EXPIRE", logKey, expiry)
 end
 
 return 0

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/inmemory"
 	"github.com/oklog/ulid/v2"
@@ -223,6 +224,9 @@ type KeyGenerator interface {
 
 	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
 	PauseStep(context.Context, state.Identifier, string) string
+
+	// Log returns the key used to store a log entry for run hisotry
+	Log(context.Context, state.Identifier) string
 }
 
 type mgr struct {
@@ -278,7 +282,12 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		}
 	}
 
-	// TODO: Loop over steps, marshal JSON, add to map, send as single map
+	history := state.History{
+		Type:       enums.HistoryTypeFunctionStarted,
+		Identifier: input.Identifier,
+		CreatedAt:  time.UnixMilli(int64(input.Identifier.RunID.Time())),
+	}
+
 	status, err := redis.NewScript(scripts["new"]).Eval(
 		ctx,
 		m.r,
@@ -288,13 +297,15 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			m.kf.Workflow(ctx, input.Workflow.UUID, input.Workflow.Version), // workflow key
 			m.kf.RunMetadata(ctx, input.Identifier),                         // metadata key
 			m.kf.Actions(ctx, input.Identifier),                             // step key
-			"",                                                              // log key
+			m.kf.Log(ctx, input.Identifier),                                 // log key
 		},
 		event,
 		workflow,
 		metadataByt,
 		stepsByt,
 		m.expiry,
+		history,
+		history.CreatedAt.UnixMilli(),
 	).Int64()
 
 	if err != nil {
@@ -314,105 +325,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			map[string]error{},
 		),
 		nil
-
-	// --------------------
-
-	// TODO: We could probably optimize the commands here by storing the event
-	// within run metadata.  We want step output (actions) and errors to be
-	// their own redis hash for fast inserts (HSET on individual step results).
-	// However, the input event is immutable.
-	// metadata := runMetadata{
-	// 	Version:  input.Workflow.Version,
-	// 	Pending:  1,
-	// 	Debugger: input.Debugger,
-	// }
-	// if input.OriginalRunID != nil {
-	// 	metadata.OriginalRunID = input.OriginalRunID.String()
-	// }
-	// if input.RunType != nil {
-	// 	metadata.RunType = *input.RunType
-	// }
-
-	// // We marshal this ahead of creating a redis transaction as it's necessary
-	// // every time and reduces the duration that the lock is held.
-	// inputJSON, err := json.Marshal(input.EventData)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// ikey := m.kf.Idempotency(ctx, input.Identifier)
-
-	// err = m.r.Watch(ctx, func(tx *redis.Tx) error {
-	// 	// Ensure that the workflow exists within the state store.
-	// 	//
-	// 	// XXX: Could this use SETNX to combine these steps or is it more performant
-	// 	//      not to have to marshal the workflow every new run?
-	// 	key := m.kf.Workflow(ctx, input.Workflow.UUID, input.Workflow.Version)
-	// 	val, err := tx.Exists(ctx, key).Uint64()
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if val == 0 {
-	// 		// Set the workflow.
-	// 		byt, err := json.Marshal(input.Workflow)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		if err := tx.Set(ctx, key, byt, m.expiry).Err(); err != nil {
-	// 			return err
-	// 		}
-	// 	}
-
-	// 	set, err := tx.SetNX(ctx, ikey, "", 0).Result()
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if !set {
-	// 		return state.ErrIdentifierExists
-	// 	}
-
-	// 	// Save metadata about this particular run.
-	// 	if err := tx.HSet(ctx, m.kf.RunMetadata(ctx, input.Identifier), metadata.Map()).Err(); err != nil {
-	// 		return err
-	// 	}
-
-	// 	// Save predetermined step data
-	// 	actionKey := m.kf.Actions(ctx, input.Identifier)
-	// 	for stepID, value := range input.Steps {
-	// 		// Save the output.
-	// 		str, err := json.Marshal(value)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		if err := m.r.HSet(ctx, actionKey, stepID, str).Err(); err != nil {
-	// 			return err
-	// 		}
-	// 	}
-
-	// 	// XXX: If/when we enforce limits on function durations here (eg.
-	// 	// 1, 5, 10 years) this should have a similar TTL.
-	// 	key = m.kf.Event(ctx, input.Identifier)
-	// 	if err := tx.Set(ctx, key, inputJSON, m.expiry).Err(); err != nil {
-	// 		return err
-	// 	}
-
-	// 	return nil
-	// }, ikey)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("error storing run state in redis: %w", err)
-	// }
-
-	// We return a new in-memory state instance with the workflow, ID, and input
-	// pre-filled.
-	// return inmemory.NewStateInstance(
-	// 		input.Workflow,
-	// 		input.Identifier,
-	// 		metadata.Metadata(),
-	// 		input.EventData,
-	// 		input.Steps,
-	// 		map[string]error{},
-	// 	),
-	// 	nil
 }
 
 func (m mgr) IsComplete(ctx context.Context, id state.Identifier) (bool, error) {
@@ -759,8 +671,36 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 	return pause, err
 }
 
-func (m mgr) History(ctx context.Context, i state.Identifier) ([]state.History, error) {
-	return nil, nil
+func (m mgr) History(ctx context.Context, id state.Identifier) ([]state.History, error) {
+	cmd := m.r.ZScan(ctx, m.kf.Log(ctx, id), 0, "", -1)
+	if err := cmd.Err(); err != nil {
+		return nil, err
+	}
+
+	i := cmd.Iterator()
+	if i == nil {
+		return nil, fmt.Errorf("unable to create event iterator")
+	}
+
+	history := []state.History{}
+
+	for i.Next(ctx) {
+		var h state.History
+
+		err := h.UnmarshalBinary([]byte(i.Val()))
+		if err != nil {
+			return nil, err
+		}
+
+		history = append(history, h)
+
+		// The redis command will include a "score", meaning the next actual piece
+		// of data we want to access is yet another iteration along. We call this
+		// here so the next loop is looking at the correct data.
+		i.Next(ctx)
+	}
+
+	return history, nil
 }
 
 type iter struct {
@@ -926,4 +866,8 @@ func (d DefaultKeyFunc) PauseStepPrefix(ctx context.Context, id state.Identifier
 func (d DefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
 	prefix := d.PauseStepPrefix(ctx, id)
 	return fmt.Sprintf("%s-%s", prefix, step)
+}
+
+func (d DefaultKeyFunc) Log(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:history:%s", d.Prefix, id.RunID)
 }

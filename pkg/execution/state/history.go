@@ -1,16 +1,57 @@
 package state
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 )
+
+var prefixGzip = []byte("1:")
 
 type History struct {
 	Type       enums.HistoryType `json:"type"`
 	Identifier Identifier        `json:"id"`
 	CreatedAt  time.Time         `json:"createdAt"`
 	Data       any               `json:"data"`
+}
+
+func (h History) MarshalBinary() (data []byte, err error) {
+	jsonByt, err := json.Marshal(h)
+	if err != nil {
+		return nil, err
+	}
+
+	var b bytes.Buffer
+
+	w := gzip.NewWriter(&b)
+	w.Write(jsonByt)
+	w.Close()
+
+	return append([]byte(prefixGzip), b.Bytes()...), nil
+}
+
+func (h *History) UnmarshalBinary(data []byte) error {
+	if len(data) < 2 {
+		return fmt.Errorf("history must be prefixed; invalid data length")
+	}
+
+	prefix, data := data[0:2], data[2:]
+
+	switch string(prefix) {
+	case string(prefixGzip):
+		r, err := gzip.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return fmt.Errorf("could not un-gzip data: %w", err)
+		}
+
+		return json.NewDecoder(r).Decode(h)
+	}
+
+	return fmt.Errorf("history had no recognised prefix")
 }
 
 type HistoryFunctionCancelled struct {
