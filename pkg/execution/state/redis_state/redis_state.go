@@ -369,17 +369,17 @@ func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error)
 	// XXX: Use a pipeliner to improve speed.
 	metadata, err := m.metadata(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load metadata; %w", err)
 	}
 
 	// Load the workflow.
 	byt, err := m.r.Get(ctx, m.kf.Workflow(ctx, id.WorkflowID, metadata.Version)).Bytes()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load workflow; %w", err)
 	}
 	w := &inngest.Workflow{}
 	if err := json.Unmarshal(byt, w); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal workflow; %w", err)
 	}
 
 	// We must ensure that the workflow UUID and Version are marshalled in JSON.
@@ -390,43 +390,37 @@ func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error)
 	// Load the event.
 	byt, err = m.r.Get(ctx, m.kf.Event(ctx, id)).Bytes()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get event; %w", err)
 	}
 	event := map[string]any{}
 	if err := json.Unmarshal(byt, &event); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal event; %w", err)
 	}
 
 	// Load the actions.  This is a map of step IDs to JSON-encoded results.
 	rmap, err := m.r.HGetAll(ctx, m.kf.Actions(ctx, id)).Result()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed loading actions; %w", err)
 	}
 	actions := map[string]any{}
 	for stepID, marshalled := range rmap {
 		var data any
 		err = json.Unmarshal([]byte(marshalled), &data)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to unmarshal step \"%s\" with data \"%s\"; %w", stepID, marshalled, err)
 		}
 		actions[stepID] = data
-	}
-	if err := json.Unmarshal(byt, &event); err != nil {
-		return nil, err
 	}
 
 	// Load the errors.  This is a map of step IDs to error strings.
 	// The original error type is not preserved.
 	rmap, err = m.r.HGetAll(ctx, m.kf.Errors(ctx, id)).Result()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load errors; %w", err)
 	}
 	errors := map[string]error{}
 	for stepID, str := range rmap {
 		errors[stepID] = fmt.Errorf(str)
-	}
-	if err := json.Unmarshal(byt, &event); err != nil {
-		return nil, err
 	}
 
 	meta := metadata.Metadata()
