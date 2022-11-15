@@ -23,6 +23,22 @@ module.exports = {
       outlineOffset: {
         3: '3px',
       },
+      keyframes: {
+        'pulse-spin': {
+          '0%': {
+            transform: 'rotate(0deg)',
+          },
+          '50%': {
+            transform: 'rotate(360deg)',
+          },
+          '100%': {
+            transform: 'rotate(720deg)',
+          },
+        },
+      },
+      animation: {
+        'pulse-spin': 'pulse-spin 1.7s ease-in-out infinite',
+      },
     },
     fontSize: {
       '4xs': '0.625rem', // 10px
