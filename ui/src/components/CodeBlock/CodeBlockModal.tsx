@@ -12,8 +12,10 @@ export default function CodeBlockModal({ children, closeModal }) {
   }, [])
 
   return (
-    <div className="fixed inset-0 z-50 px-6 flex items-center justify-center bg-black/50 w-screen h-screen  ">
-      <div className=" bg-slate-950">{children}</div>
+    <div className="fixed inset-0 z-50 px-6 py-6 flex items-center justify-center bg-black/50 w-screen h-screen  ">
+      <div className="max-h-full overflow-y-hidden bg-slate-950 rounded">
+        {children}
+      </div>
     </div>
   )
 }

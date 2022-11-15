@@ -22,7 +22,7 @@ export default function FuncCard({
             <h2 className="text-white mt-2">{title}</h2>
           </div>
           {badge && (
-            <div className="flex items-center px-2 py-2 rounded bg-slate-800 text-2xs leading-none text-slate-50">
+            <div className="flex items-center px-2 py-2 rounded-sm bg-slate-800 text-2xs leading-none text-slate-50">
               {badge}
             </div>
           )}

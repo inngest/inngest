@@ -5,7 +5,7 @@ export default function TimelineFuncProgress({
   children,
 }) {
   return (
-    <div>
+    <div className="mb-2">
       <div className="flex items-start justify-between w-full">
         <div>
           <h2 className="text-slate-50">{label}</h2>

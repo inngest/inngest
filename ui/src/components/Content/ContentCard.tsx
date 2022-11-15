@@ -12,21 +12,21 @@ export default function ContentCard({
     <div
       className={classNames(
         active ? `bg-slate-950` : ``,
-        `flex-1 border rounded-lg border-slate-800/50 overflow-hidden flex flex-col shrink-0`
+        `flex-1 border rounded-lg border-slate-800/30 overflow-hidden flex flex-col shrink-0`
       )}
     >
       <div
         className={classNames(
           active ? ` shadow-slate-950` : ` shadow-slate-1000`,
-          `px-5 pt-3.5 shadow-lg relative z-30`
+          `px-5 py-4 shadow-lg relative z-30`
         )}
       >
         <div className="mb-5">
-          <h1 className="text-base text-slate-50">{title}</h1>
+          <h1 className=" text-lg text-slate-50">{title}</h1>
           <span className="text-2xs mt-1 block">{datetime}</span>
         </div>
 
-        <div className="flex items-center justify-between border-b border-slate-800/50 pb-5">
+        <div className="flex items-center justify-between">
           {button && button}
           <span className="text-3xs leading-none">{id}</span>
         </div>

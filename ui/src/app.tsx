@@ -30,7 +30,7 @@ import { eventTabs } from '../mock/tabs'
 import { funcTabs } from '../mock/funcTabs'
 import ActionBar from './components/ActionBar'
 
-import Tab from './components/Tab'
+import EventDetail from './components/Event/Detail'
 
 export function App() {
   const [codeBlockModalActive, setCodeBlockModalActive] = useState({
@@ -71,6 +71,7 @@ export function App() {
           />
         </CodeBlockModal>
       )}
+      {/* <EventDetail /> */}
       <Header />
       <Sidebar>
         <SidebarLink icon={<IconFeed />} active badge={20} />
@@ -83,7 +84,7 @@ export function App() {
               i === activeFeed
                 ? `border-indigo-400 text-white`
                 : `border-transparent text-slate-400`,
-              `text-xs px-5 py-2.5 border-b-2 block transition-all duration-150`
+              `text-xs px-5 py-2.5 border-b block transition-all duration-150`
             )}
             onClick={() => handleTabClick(i)}
             key={i}
@@ -105,104 +106,98 @@ export function App() {
         ))}
       </TimelineScrollContainer>
       <ContentFrame>
-        <div className="flex gap-3 p-3 w-full min-w-0">
-          <ContentCard
-            title="accounts/profile.photo.uploaded"
-            datetime="14:34:21 28/04/2022"
-            button={<Button label="Open Event" icon={<IconFeed />} />}
-            id="01GGG522ZATDGVQBCND4ZEAS6Z"
-            active
-          >
-            <div className="pr-4 pt-4">
-              <TimelineRow status="COMPLETED" iconOffset={0}>
-                <TimelineStaticContent
-                  label="Event Received"
-                  datetime="14:34:21 28/04/2022"
-                  actionBtn={<Button label="Retry" />}
-                />
-              </TimelineRow>
+        <ContentCard
+          title="accounts/profile.photo.uploaded"
+          datetime="14:34:21 28/04/2022"
+          button={<Button label="Open Event" icon={<IconFeed />} />}
+          id="01GGG522ZATDGVQBCND4ZEAS6Z"
+          active
+        >
+          <div className="pr-4 pt-4">
+            <TimelineRow status="COMPLETED" iconOffset={0}>
+              <TimelineStaticContent
+                label="Event Received"
+                datetime="14:34:21 28/04/2022"
+                actionBtn={<Button label="Retry" />}
+              />
+            </TimelineRow>
 
-              {eventFuncs.map((eventFunc, i) => {
-                return (
-                  <TimelineRow
-                    key={i}
+            {eventFuncs.map((eventFunc, i) => {
+              return (
+                <TimelineRow key={i} status={eventFunc.status} iconOffset={36}>
+                  <FuncCard
+                    title={eventFunc.name}
+                    datetime={eventFunc.datetime}
+                    badge={eventFunc.version}
+                    id={eventFunc.id}
                     status={eventFunc.status}
-                    iconOffset={36}
-                  >
-                    <FuncCard
-                      title={eventFunc.name}
-                      datetime={eventFunc.datetime}
-                      badge={eventFunc.version}
-                      id={eventFunc.id}
-                      status={eventFunc.status}
-                      actionBtn={<Button label="Rerun" />}
-                    />
-                  </TimelineRow>
-                )
-              })}
+                    actionBtn={<Button label="Rerun" />}
+                  />
+                </TimelineRow>
+              )
+            })}
 
-              <TimelineRow status="FAILED" iconOffset={0} bottomLine={false}>
-                <TimelineStaticContent label="Function 3 Errored with Error 404" />
-              </TimelineRow>
-            </div>
-            <div className="border-t border-slate-800/50 m-4 mt-0 pt-4">
-              <CodeBlock modal={setModal} tabs={eventTabs} />
-            </div>
-          </ContentCard>
-          <ContentCard
-            title="Process uploaded images"
-            datetime="14:34:21 28/04/2022"
-            button={<Button label="Open Function" icon={<IconFeed />} />}
-            id="01GGG522ZATDGVQBCND4ZEAS6Z"
-          >
-            <div className="border-t border-slate-800/50 m-4 mt-0 pt-4">
-              <CodeBlock modal={setModal} tabs={funcTabs} />
-            </div>
-            <div className="flex justify-end px-4 border-t border-slate-800/50 pt-4 mt-4">
-              <Button label="Retry" />
-            </div>
-            <div className="pr-4 mt-4">
-              <TimelineRow status="COMPLETED" iconOffset={0}>
-                <TimelineFuncProgress
-                  label="Function Started"
-                  datetime="14:34:21 28/04/2022"
-                  id="01GGG522ZATDGVQBCND4ZEAS6Z"
-                >
-                  <CodeBlock modal={setModal} tabs={funcTabs} />
-                </TimelineFuncProgress>
-              </TimelineRow>
+            <TimelineRow status="FAILED" iconOffset={0} bottomLine={false}>
+              <TimelineStaticContent label="Function 3 Errored with Error 404" />
+            </TimelineRow>
+          </div>
+          <div className="border-t border-slate-800/50 m-4 mt-0 pt-4">
+            <CodeBlock modal={setModal} tabs={eventTabs} />
+          </div>
+        </ContentCard>
+        <ContentCard
+          title="Process uploaded images"
+          datetime="14:34:21 28/04/2022"
+          button={<Button label="Open Function" icon={<IconFeed />} />}
+          id="01GGG522ZATDGVQBCND4ZEAS6Z"
+        >
+          <div className="border-t border-slate-800/50 m-4 mt-0 pt-4">
+            <CodeBlock modal={setModal} tabs={funcTabs} />
+          </div>
+          <div className="flex justify-end px-4 border-t border-slate-800/50 pt-4 mt-4">
+            <Button label="Retry" />
+          </div>
+          <div className="pr-4 mt-4">
+            <TimelineRow status="COMPLETED" iconOffset={0}>
+              <TimelineFuncProgress
+                label="Function Started"
+                datetime="14:34:21 28/04/2022"
+                id="01GGG522ZATDGVQBCND4ZEAS6Z"
+              >
+                <CodeBlock modal={setModal} tabs={funcTabs} />
+              </TimelineFuncProgress>
+            </TimelineRow>
 
-              <TimelineRow status="COMPLETED">
-                <TimelineFuncProgress
-                  label="Function Started"
-                  datetime="14:34:21 28/04/2022"
-                  id="01GGG522ZATDGVQBCND4ZEAS6Z"
-                />
-              </TimelineRow>
-              <TimelineRow status="FAILED">
-                <TimelineFuncProgress
-                  label="Function Started"
-                  datetime="14:34:21 28/04/2022"
-                  id="01GGG522ZATDGVQBCND4ZEAS6Z"
-                />
-              </TimelineRow>
-              <TimelineRow status="FAILED">
-                <TimelineFuncProgress
-                  label="Function Started"
-                  datetime="14:34:21 28/04/2022"
-                  id="01GGG522ZATDGVQBCND4ZEAS6Z"
-                />
-              </TimelineRow>
-              <TimelineRow status="FAILED" bottomLine={false}>
-                <TimelineFuncProgress
-                  label="Function Started"
-                  datetime="14:34:21 28/04/2022"
-                  id="01GGG522ZATDGVQBCND4ZEAS6Z"
-                />
-              </TimelineRow>
-            </div>
-          </ContentCard>
-        </div>
+            <TimelineRow status="COMPLETED">
+              <TimelineFuncProgress
+                label="Function Started"
+                datetime="14:34:21 28/04/2022"
+                id="01GGG522ZATDGVQBCND4ZEAS6Z"
+              />
+            </TimelineRow>
+            <TimelineRow status="FAILED">
+              <TimelineFuncProgress
+                label="Function Started"
+                datetime="14:34:21 28/04/2022"
+                id="01GGG522ZATDGVQBCND4ZEAS6Z"
+              />
+            </TimelineRow>
+            <TimelineRow status="FAILED">
+              <TimelineFuncProgress
+                label="Function Started"
+                datetime="14:34:21 28/04/2022"
+                id="01GGG522ZATDGVQBCND4ZEAS6Z"
+              />
+            </TimelineRow>
+            <TimelineRow status="FAILED" bottomLine={false}>
+              <TimelineFuncProgress
+                label="Function Started"
+                datetime="14:34:21 28/04/2022"
+                id="01GGG522ZATDGVQBCND4ZEAS6Z"
+              />
+            </TimelineRow>
+          </div>
+        </ContentCard>
       </ContentFrame>
     </div>
   )
