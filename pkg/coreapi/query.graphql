@@ -8,3 +8,18 @@ input ActionVersionQuery {
   versionMajor: Int
   versionMinor: Int
 }
+
+input EventsQuery {
+  workspaceId: ID! = "local"
+  lastEventId: ID
+}
+
+input EventTimelineQuery {
+  workspaceId: ID! = "local"
+  eventId: ID!
+}
+
+input FunctionRunQuery {
+  workspaceId: ID! = "local"
+  functionRunId: ID!
+}

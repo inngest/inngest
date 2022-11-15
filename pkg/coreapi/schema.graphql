@@ -21,6 +21,10 @@ type ExecutionDockerDriverConfig {
   namespace: String
 }
 
+type Workspace {
+  id: ID!
+}
+
 type ActionVersion {
   dsn: String!
   name: String!
@@ -41,4 +45,37 @@ type FunctionVersion {
   validTo: Time
   createdAt: Time!
   updatedAt: Time!
+}
+
+type Event {
+  id: ID!
+  workspaceID: UUID
+  name: String
+  createdAt: Time
+  payload: String
+  schema: String
+  timeline: EventTimeline
+}
+
+type EventTimeline {
+  workspace: Workspace
+  event: Event!
+  functionRuns: [FunctionRun!]
+}
+
+type FunctionRun {
+  id: ID!
+  workspace: Workspace
+  functionVersion: FunctionVersion
+  status: String
+  startedAt: Time
+  steps: [FunctionRunStep!]
+}
+
+type FunctionRunStep {
+  workspace: Workspace
+  functionRun: FunctionRun
+  status: String
+  output: String
+  startedAt: Time
 }
