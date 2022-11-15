@@ -1,5 +1,21 @@
 package event
 
+var inMemoryEvents map[string]map[string]Event
+
+type EventManager interface {
+	// Fetch an individual event by its workspace and ID.
+	EventById(workspaceId string, id string) *Event
+
+	// Fetch all events with a given name from a given workspace.
+	EventsByName(workspaceId string, name string) []Event
+
+	// Fetch all events from a given workspace.
+	Events(workspaceId string) []Event
+
+	// Save an event to a data store.
+	SaveEvent(evt Event) error
+}
+
 // Event represents an event sent to Inngest.
 type Event struct {
 	Name string                 `json:"name"`
