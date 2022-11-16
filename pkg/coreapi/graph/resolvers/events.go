@@ -8,7 +8,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 )
 
-func (r *queryResolver) EventTimeline(ctx context.Context, query models.EventTimelineQuery) (*models.EventTimeline, error) {
+func (r *queryResolver) Event(ctx context.Context, query models.EventQuery) (*models.Event, error) {
 	return nil, nil
 }
 

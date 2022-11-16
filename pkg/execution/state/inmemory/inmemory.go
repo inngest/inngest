@@ -338,6 +338,7 @@ func (m *mem) Runs(ctx context.Context) ([]state.Metadata, error) {
 			Debugger:      met.Debugger,
 			RunType:       met.RunType,
 			OriginalRunID: &id,
+			Pending:       met.Pending,
 		})
 	}
 

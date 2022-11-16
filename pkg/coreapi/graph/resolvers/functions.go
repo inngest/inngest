@@ -2,10 +2,18 @@ package resolvers
 
 import (
 	"context"
+	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/function"
 )
+
+type functionRunResolver struct{ *Resolver }
+
+func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error) {
+	return nil, nil
+}
 
 func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionRunsQuery) ([]*models.FunctionRun, error) {
 	metadata, err := r.Runner.Runs(ctx)
@@ -20,16 +28,32 @@ func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionR
 	var runs []*models.FunctionRun
 
 	for _, m := range metadata {
+		status := models.FunctionRunStatusRunning
+
+		switch m.Status {
+		case state.RunStatusCompleted:
+			status = models.FunctionRunStatusCompleted
+		case state.RunStatusFailed:
+			status = models.FunctionRunStatusFailed
+		case state.RunStatusCancelled:
+			status = models.FunctionRunStatusCancelled
+		}
+
+		var startedAt time.Time
+
+		if m.OriginalRunID != nil {
+			startedAt = time.UnixMilli(int64(m.OriginalRunID.Time()))
+		}
+
 		runs = append(runs, &models.FunctionRun{
-			ID: m.OriginalRunID.String(),
+			ID:           m.OriginalRunID.String(),
+			Status:       &status,
+			PendingSteps: &m.Pending,
+			StartedAt:    &startedAt,
 		})
 	}
 
 	return runs, nil
-}
-
-func (r *queryResolver) FunctionTimeline(ctx context.Context, query models.FunctionTimelineQuery) (*models.FunctionRun, error) {
-	return nil, nil
 }
 
 // Deploy a function creating a new function version
@@ -57,4 +81,8 @@ func (r *mutationResolver) DeployFunction(ctx context.Context, input models.Depl
 
 	fv.Config = string(config)
 	return &fv, nil
+}
+
+func (r *functionRunResolver) Status(ctx context.Context, as string) (string, error) {
+	return as, nil
 }

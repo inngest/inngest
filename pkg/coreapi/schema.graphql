@@ -54,27 +54,57 @@ type Event {
   createdAt: Time
   payload: String
   schema: String
-  timeline: EventTimeline
-}
-
-type EventTimeline {
-  workspace: Workspace
-  event: Event!
   functionRuns: [FunctionRun!]
 }
 
-type FunctionRun {
-  id: ID!
-  workspace: Workspace
-  status: String
-  startedAt: Time
-  steps: [FunctionRunStep!]
+enum FunctionRunStatus {
+  COMPLETED
+  FAILED
+  CANCELLED
+  RUNNING
 }
 
-type FunctionRunStep {
+enum FunctionEventType {
+  STARTED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+type FunctionEvent {
   workspace: Workspace
   functionRun: FunctionRun
-  status: String
+  type: FunctionEventType
   output: String
+  createdAt: Time
+}
+
+enum StepEventType {
+  SCHEDULED
+  STARTED
+  COMPLETED
+  ERRORED
+  FAILED
+  WAITING
+  SLEEPING
+}
+
+type StepEvent {
+  workspace: Workspace
+  functionRun: FunctionRun
+  type: StepEventType
+  output: String
+  createdAt: Time
+}
+
+union FunctionRunEvent = FunctionEvent | StepEvent
+
+type FunctionRun {
+  id: ID!
+  name: String
+  workspace: Workspace
+  status: FunctionRunStatus
+  pendingSteps: Int
   startedAt: Time
+  timeline: [FunctionRunEvent!]
 }

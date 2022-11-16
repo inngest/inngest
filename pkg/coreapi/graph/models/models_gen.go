@@ -3,8 +3,15 @@
 package models
 
 import (
+	"fmt"
+	"io"
+	"strconv"
 	"time"
 )
+
+type FunctionRunEvent interface {
+	IsFunctionRunEvent()
+}
 
 type ActionVersionQuery struct {
 	Dsn          string `json:"dsn"`
@@ -27,22 +34,16 @@ type DeployFunctionInput struct {
 }
 
 type Event struct {
-	ID        string         `json:"id"`
-	Workspace *Workspace     `json:"workspace"`
-	Name      *string        `json:"name"`
-	CreatedAt *time.Time     `json:"createdAt"`
-	Payload   *string        `json:"payload"`
-	Schema    *string        `json:"schema"`
-	Timeline  *EventTimeline `json:"timeline"`
-}
-
-type EventTimeline struct {
+	ID           string         `json:"id"`
 	Workspace    *Workspace     `json:"workspace"`
-	Event        *Event         `json:"event"`
+	Name         *string        `json:"name"`
+	CreatedAt    *time.Time     `json:"createdAt"`
+	Payload      *string        `json:"payload"`
+	Schema       *string        `json:"schema"`
 	FunctionRuns []*FunctionRun `json:"functionRuns"`
 }
 
-type EventTimelineQuery struct {
+type EventQuery struct {
 	WorkspaceID string `json:"workspaceId"`
 	EventID     string `json:"eventId"`
 }
@@ -65,31 +66,44 @@ type ExecutionDriversConfig struct {
 	Docker *ExecutionDockerDriverConfig `json:"docker"`
 }
 
+type FunctionEvent struct {
+	Workspace   *Workspace         `json:"workspace"`
+	FunctionRun *FunctionRun       `json:"functionRun"`
+	Type        *FunctionEventType `json:"type"`
+	Output      *string            `json:"output"`
+	CreatedAt   *time.Time         `json:"createdAt"`
+}
+
+func (FunctionEvent) IsFunctionRunEvent() {}
+
 type FunctionRun struct {
-	ID        string             `json:"id"`
-	Workspace *Workspace         `json:"workspace"`
-	Status    *string            `json:"status"`
-	StartedAt *time.Time         `json:"startedAt"`
-	Steps     []*FunctionRunStep `json:"steps"`
+	ID           string             `json:"id"`
+	Name         *string            `json:"name"`
+	Workspace    *Workspace         `json:"workspace"`
+	Status       *FunctionRunStatus `json:"status"`
+	PendingSteps *int               `json:"pendingSteps"`
+	StartedAt    *time.Time         `json:"startedAt"`
+	Timeline     []FunctionRunEvent `json:"timeline"`
 }
 
-type FunctionRunStep struct {
-	Workspace   *Workspace   `json:"workspace"`
-	FunctionRun *FunctionRun `json:"functionRun"`
-	Status      *string      `json:"status"`
-	Output      *string      `json:"output"`
-	StartedAt   *time.Time   `json:"startedAt"`
-}
-
-type FunctionRunsQuery struct {
-	WorkspaceID string  `json:"workspaceId"`
-	LastRunID   *string `json:"lastRunId"`
-}
-
-type FunctionTimelineQuery struct {
+type FunctionRunQuery struct {
 	WorkspaceID   string `json:"workspaceId"`
 	FunctionRunID string `json:"functionRunId"`
 }
+
+type FunctionRunsQuery struct {
+	WorkspaceID string `json:"workspaceId"`
+}
+
+type StepEvent struct {
+	Workspace   *Workspace     `json:"workspace"`
+	FunctionRun *FunctionRun   `json:"functionRun"`
+	Type        *StepEventType `json:"type"`
+	Output      *string        `json:"output"`
+	CreatedAt   *time.Time     `json:"createdAt"`
+}
+
+func (StepEvent) IsFunctionRunEvent() {}
 
 type UpdateActionVersionInput struct {
 	Dsn          string `json:"dsn"`
@@ -100,4 +114,145 @@ type UpdateActionVersionInput struct {
 
 type Workspace struct {
 	ID string `json:"id"`
+}
+
+type FunctionEventType string
+
+const (
+	FunctionEventTypeStarted   FunctionEventType = "STARTED"
+	FunctionEventTypeCompleted FunctionEventType = "COMPLETED"
+	FunctionEventTypeFailed    FunctionEventType = "FAILED"
+	FunctionEventTypeCancelled FunctionEventType = "CANCELLED"
+)
+
+var AllFunctionEventType = []FunctionEventType{
+	FunctionEventTypeStarted,
+	FunctionEventTypeCompleted,
+	FunctionEventTypeFailed,
+	FunctionEventTypeCancelled,
+}
+
+func (e FunctionEventType) IsValid() bool {
+	switch e {
+	case FunctionEventTypeStarted, FunctionEventTypeCompleted, FunctionEventTypeFailed, FunctionEventTypeCancelled:
+		return true
+	}
+	return false
+}
+
+func (e FunctionEventType) String() string {
+	return string(e)
+}
+
+func (e *FunctionEventType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FunctionEventType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FunctionEventType", str)
+	}
+	return nil
+}
+
+func (e FunctionEventType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type FunctionRunStatus string
+
+const (
+	FunctionRunStatusCompleted FunctionRunStatus = "COMPLETED"
+	FunctionRunStatusFailed    FunctionRunStatus = "FAILED"
+	FunctionRunStatusCancelled FunctionRunStatus = "CANCELLED"
+	FunctionRunStatusRunning   FunctionRunStatus = "RUNNING"
+)
+
+var AllFunctionRunStatus = []FunctionRunStatus{
+	FunctionRunStatusCompleted,
+	FunctionRunStatusFailed,
+	FunctionRunStatusCancelled,
+	FunctionRunStatusRunning,
+}
+
+func (e FunctionRunStatus) IsValid() bool {
+	switch e {
+	case FunctionRunStatusCompleted, FunctionRunStatusFailed, FunctionRunStatusCancelled, FunctionRunStatusRunning:
+		return true
+	}
+	return false
+}
+
+func (e FunctionRunStatus) String() string {
+	return string(e)
+}
+
+func (e *FunctionRunStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FunctionRunStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FunctionRunStatus", str)
+	}
+	return nil
+}
+
+func (e FunctionRunStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type StepEventType string
+
+const (
+	StepEventTypeScheduled StepEventType = "SCHEDULED"
+	StepEventTypeStarted   StepEventType = "STARTED"
+	StepEventTypeCompleted StepEventType = "COMPLETED"
+	StepEventTypeErrored   StepEventType = "ERRORED"
+	StepEventTypeFailed    StepEventType = "FAILED"
+	StepEventTypeWaiting   StepEventType = "WAITING"
+	StepEventTypeSleeping  StepEventType = "SLEEPING"
+)
+
+var AllStepEventType = []StepEventType{
+	StepEventTypeScheduled,
+	StepEventTypeStarted,
+	StepEventTypeCompleted,
+	StepEventTypeErrored,
+	StepEventTypeFailed,
+	StepEventTypeWaiting,
+	StepEventTypeSleeping,
+}
+
+func (e StepEventType) IsValid() bool {
+	switch e {
+	case StepEventTypeScheduled, StepEventTypeStarted, StepEventTypeCompleted, StepEventTypeErrored, StepEventTypeFailed, StepEventTypeWaiting, StepEventTypeSleeping:
+		return true
+	}
+	return false
+}
+
+func (e StepEventType) String() string {
+	return string(e)
+}
+
+func (e *StepEventType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = StepEventType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid StepEventType", str)
+	}
+	return nil
+}
+
+func (e StepEventType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
