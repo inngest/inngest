@@ -54,7 +54,7 @@ export default function CodeBlock({ tabs, modal, expanded = false }) {
         {tabs.map((tab, i) => (
           <code
             className={classNames(
-              i === activeTab ? ` ` : `opacity-0`,
+              i === activeTab ? ` ` : `opacity-0 pointer-events-none`,
               `col-start-1 row-start-1 transition-all duration-150`
             )}
           >

@@ -1,3 +1,4 @@
+import classNames from '../../utils/classnames'
 import statusStyles from '../../utils/statusStyles'
 
 export default function FuncCard({
@@ -6,15 +7,20 @@ export default function FuncCard({
   badge,
   id,
   status,
-  actionBtn,
+  active,
+  contextualBar,
 }) {
   const itemStatus = statusStyles(status)
 
-  const contextualBar =
-    status === 'PAUSED' || status === 'FAILED' ? true : false
-
   return (
-    <div className="px-5 py-3.5 bg-slate-800/50 w-full rounded-lg hover:bg-slate-800/80">
+    <div
+      className={classNames(
+        active
+          ? `outline outline-2 outline-indigo-400 outline-offset-3 bg-slate-900 border-slate-700/50`
+          : `hover:bg-slate-800`,
+        `px-5 py-3.5 bg-slate-800/50 w-full rounded-lg hover:bg-slate-800/80`
+      )}
+    >
       <a href="#">
         <div className="flex items-start justify-between">
           <div>
@@ -38,8 +44,7 @@ export default function FuncCard({
 
       {contextualBar && (
         <div className="border-t border-slate-700/50 mt-5 pt-3 flex items-center justify-between">
-          <p>Function paused for sleep until 1:40pm</p>
-          {actionBtn && actionBtn}
+          {contextualBar}
         </div>
       )}
     </div>
