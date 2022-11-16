@@ -2,6 +2,12 @@
 
 package models
 
+import (
+	"time"
+
+	"github.com/inngest/inngest/pkg/function"
+)
+
 type ActionVersionQuery struct {
 	Dsn          string `json:"dsn"`
 	VersionMajor *int   `json:"versionMajor"`
@@ -22,6 +28,32 @@ type DeployFunctionInput struct {
 	Live   *bool        `json:"live"`
 }
 
+type Event struct {
+	ID        string         `json:"id"`
+	Workspace *Workspace     `json:"workspace"`
+	Name      *string        `json:"name"`
+	CreatedAt *time.Time     `json:"createdAt"`
+	Payload   *string        `json:"payload"`
+	Schema    *string        `json:"schema"`
+	Timeline  *EventTimeline `json:"timeline"`
+}
+
+type EventTimeline struct {
+	Workspace    *Workspace     `json:"workspace"`
+	Event        *Event         `json:"event"`
+	FunctionRuns []*FunctionRun `json:"functionRuns"`
+}
+
+type EventTimelineQuery struct {
+	WorkspaceID string `json:"workspaceId"`
+	EventID     string `json:"eventId"`
+}
+
+type EventsQuery struct {
+	WorkspaceID string  `json:"workspaceId"`
+	LastEventID *string `json:"lastEventId"`
+}
+
 type ExecutionConfig struct {
 	Drivers *ExecutionDriversConfig `json:"drivers"`
 }
@@ -35,9 +67,35 @@ type ExecutionDriversConfig struct {
 	Docker *ExecutionDockerDriverConfig `json:"docker"`
 }
 
+type FunctionRun struct {
+	ID              string                    `json:"id"`
+	Workspace       *Workspace                `json:"workspace"`
+	FunctionVersion *function.FunctionVersion `json:"functionVersion"`
+	Status          *string                   `json:"status"`
+	StartedAt       *time.Time                `json:"startedAt"`
+	Steps           []*FunctionRunStep        `json:"steps"`
+}
+
+type FunctionRunQuery struct {
+	WorkspaceID   string `json:"workspaceId"`
+	FunctionRunID string `json:"functionRunId"`
+}
+
+type FunctionRunStep struct {
+	Workspace   *Workspace   `json:"workspace"`
+	FunctionRun *FunctionRun `json:"functionRun"`
+	Status      *string      `json:"status"`
+	Output      *string      `json:"output"`
+	StartedAt   *time.Time   `json:"startedAt"`
+}
+
 type UpdateActionVersionInput struct {
 	Dsn          string `json:"dsn"`
 	VersionMajor int    `json:"versionMajor"`
 	VersionMinor int    `json:"versionMinor"`
 	Enabled      *bool  `json:"enabled"`
+}
+
+type Workspace struct {
+	ID string `json:"id"`
 }

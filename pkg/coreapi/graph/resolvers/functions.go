@@ -7,6 +7,10 @@ import (
 	"github.com/inngest/inngest/pkg/function"
 )
 
+func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error) {
+	return nil, nil
+}
+
 // Deploy a function creating a new function version
 func (r *mutationResolver) DeployFunction(ctx context.Context, input models.DeployFunctionInput) (*function.FunctionVersion, error) {
 	// Parse function CUE or JSON string - This also validates the function
