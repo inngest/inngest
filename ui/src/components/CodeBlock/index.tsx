@@ -19,7 +19,7 @@ export default function CodeBlock({ tabs, modal, expanded = false }) {
   }
 
   return (
-    <div className="w-full bg-slate-800/30 border border-slate-700/30 rounded-lg shadow">
+    <div className="w-full bg-slate-800/30 border border-slate-700/30 rounded-lg shadow overflow-hidden">
       <div className="bg-slate-800/40 flex justify-between shadow border-b border-slate-700/20">
         <div className="flex -mb-px">
           {tabs.map((tab, i) => (
