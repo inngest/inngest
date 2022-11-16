@@ -63,7 +63,7 @@ export function App() {
   }
 
   return (
-    <div class="w-screen h-screen text-slate-400 text-sm grid grid-cols-app 2xl:grid-cols-app-desktop grid-rows-app overflow-hidden">
+    <div class="w-screen h-screen text-slate-400 text-sm grid grid-cols-app-sm xl:grid-cols-app 2xl:grid-cols-app-desktop grid-rows-app overflow-hidden">
       <BG />
       {codeBlockModalActive.visible && (
         <CodeBlockModal closeModal={setModal}>
@@ -74,7 +74,7 @@ export function App() {
           />
         </CodeBlockModal>
       )}
-      {/* <EventDetail /> */}
+      <EventDetail />
       <Header />
       <Sidebar>
         <SidebarLink icon={<IconFeed />} active badge={20} />

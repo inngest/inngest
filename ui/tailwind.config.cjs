@@ -11,6 +11,7 @@ module.exports = {
       },
       gridTemplateColumns: {
         // Sidebar | Timeline Scroll | Content Frame
+        'app-sm': '50px 260px 1fr',
         app: '50px 340px 1fr',
         'app-desktop': '50px 420px 1fr',
         'event-overlay': '340px 1fr',
@@ -18,7 +19,7 @@ module.exports = {
       gridTemplateRows: {
         // Header | Action Bar | Content Frame
         app: '50px 50px 1fr',
-        'event-overlay': '200px 1fr',
+        'event-overlay': '120px 1fr',
       },
       outlineOffset: {
         3: '3px',
@@ -32,12 +33,12 @@ module.exports = {
             transform: 'rotate(360deg)',
           },
           '100%': {
-            transform: 'rotate(720deg)',
+            transform: 'rotate(360deg)',
           },
         },
       },
       animation: {
-        'pulse-spin': 'pulse-spin 1.7s ease-in-out infinite',
+        'pulse-spin': 'pulse-spin 1s ease-out infinite',
       },
     },
     fontSize: {
