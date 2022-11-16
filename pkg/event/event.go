@@ -1,19 +1,71 @@
 package event
 
-var inMemoryEvents map[string]map[string]Event
+import "encoding/json"
 
-type EventManager interface {
-	// Fetch an individual event by its workspace and ID.
-	EventById(workspaceId string, id string) *Event
+type Manager struct {
+	events map[string]Event
+}
 
-	// Fetch all events with a given name from a given workspace.
-	EventsByName(workspaceId string, name string) []Event
+func NewManager() Manager {
+	return Manager{
+		events: make(map[string]Event),
+	}
+}
 
-	// Fetch all events from a given workspace.
-	Events(workspaceId string) []Event
+// Fetch an individual event by its ID.
+func (e Manager) EventById(id string) *Event {
+	evt, ok := e.events[id]
+	if !ok {
+		return nil
+	}
 
-	// Save an event to a data store.
-	SaveEvent(evt Event) error
+	return &evt
+}
+
+// Fetch all events with a given name.
+func (e Manager) EventsByName(name string) []Event {
+	events := []Event{}
+
+	for _, evt := range e.events {
+		if evt.Name == name {
+			events = append(events, evt)
+		}
+	}
+
+	return events
+
+}
+
+// Fetch all events.
+func (e Manager) Events() []Event {
+	events := []Event{}
+
+	for _, evt := range e.events {
+		events = append(events, evt)
+	}
+
+	return events
+}
+
+// Parse and create a new event, adding it to the in-memory map as we go.
+func (e Manager) NewEvent(data string) (*Event, error) {
+	evt, err := NewEvent(data)
+	if err != nil {
+		return nil, err
+	}
+
+	e.events[evt.ID] = *evt
+
+	return evt, err
+}
+
+func NewEvent(data string) (*Event, error) {
+	evt := &Event{}
+	if err := json.Unmarshal([]byte(data), evt); err != nil {
+		return nil, err
+	}
+
+	return evt, nil
 }
 
 // Event represents an event sent to Inngest.

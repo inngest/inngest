@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -42,11 +41,18 @@ type Runner interface {
 	InitializeCrons(ctx context.Context) error
 	History(ctx context.Context, id state.Identifier) ([]state.History, error)
 	Runs(ctx context.Context) ([]state.Metadata, error)
+	Events(ctx context.Context) ([]event.Event, error)
 }
 
 func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
+	}
+}
+
+func WithEventManager(e event.Manager) func(s *svc) {
+	return func(s *svc) {
+		s.em = &e
 	}
 }
 
@@ -72,6 +78,7 @@ type svc struct {
 	queue queue.Queue
 	// cronmanager allows the creation of new scheduled functions.
 	cronmanager *cron.Cron
+	em          *event.Manager
 }
 
 func (s svc) Name() string {
@@ -204,14 +211,25 @@ func (s *svc) Runs(ctx context.Context) ([]state.Metadata, error) {
 	return s.state.Runs(ctx)
 }
 
+func (s *svc) Events(ctx context.Context) ([]event.Event, error) {
+	return s.em.Events(), nil
+}
+
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	if m.Name != "event/event.received" {
 		return fmt.Errorf("unknown event type: %s", m.Name)
 	}
 
-	evt := &event.Event{}
-	if err := json.Unmarshal([]byte(m.Data), evt); err != nil {
-		return fmt.Errorf("error unmarshalling event: %w", err)
+	var evt *event.Event
+	var err error
+
+	if s.em == nil {
+		evt, err = event.NewEvent(m.Data)
+	} else {
+		evt, err = s.em.NewEvent(m.Data)
+	}
+	if err != nil {
+		return fmt.Errorf("error creating event: %w", err)
 	}
 
 	l := logger.From(ctx).With().

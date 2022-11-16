@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/runner"
@@ -67,7 +68,7 @@ func start(ctx context.Context, opts StartOpts, loader *inmemorydatastore.FSLoad
 		return err
 	}
 
-	runner := runner.NewService(opts.Config, runner.WithExecutionLoader(loader))
+	runner := runner.NewService(opts.Config, runner.WithExecutionLoader(loader), runner.WithEventManager(event.NewManager()))
 
 	// The devserver embeds the event API.
 	ds := newService(opts, loader, runner)
