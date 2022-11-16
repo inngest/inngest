@@ -67,6 +67,9 @@ type Function struct {
 	// that we have a single action specified in the current directory using
 	Steps map[string]Step `json:"steps,omitempty"`
 
+	// Cancel specifies cancellation signals for the function
+	Cancel []Cancel `json:"cancel,omitempty"`
+
 	// dir is an internal field which maps the root directory for the function
 	dir string
 }
@@ -89,6 +92,15 @@ type After struct {
 
 	// TODO: support multiple steps all finishing prior to running this once.
 	// Steps []string `json:"steps,omitempty"`
+}
+
+// Cancel represents a cancellation signal for a function.  When specified, this
+// will set up pauses which automatically cancel the function based off of matching
+// events and expressions.
+type Cancel struct {
+	Event   string  `json:"event"`
+	Timeout *string `json:"timeout"`
+	If      *string `json:"if"`
 }
 
 // New returns a new, empty function with a randomly generated ID.
@@ -213,6 +225,10 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 		Triggers: make([]inngest.Trigger, len(f.Triggers)),
 	}
 
+	// TODO: Refactor these into shared structs and definitions, extend.
+	// This is really ugly, and is a symptom of functions coming after
+	// workflows and not being truly first class in the executor.
+
 	for n, t := range f.Triggers {
 		if t.EventTrigger != nil {
 			w.Triggers[n].EventTrigger = &inngest.EventTrigger{
@@ -240,6 +256,14 @@ func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 			Count:  1,
 			Period: "24h",
 		}
+	}
+
+	for _, c := range f.Cancel {
+		w.Cancel = append(w.Cancel, inngest.Cancel{
+			Event:   c.Event,
+			Timeout: c.Timeout,
+			If:      c.If,
+		})
 	}
 
 	// This has references to actions.  Create the actions then reference them

@@ -230,9 +230,13 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		//
 		// We keep invoking Generator-based functions until they provide no more
 		// yields, signalling they're done.
-		if err := s.scheduleGeneratorResponse(ctx, item, resp); err != nil {
+		err := s.scheduleGeneratorResponse(ctx, item, resp)
+		if err != nil {
 			return err
 		}
+		// Finalize this step early, as we don't need to re-invoke anything else or
+		// load children until generators complete.
+		return s.state.Finalized(ctx, item.Identifier, edge.Incoming)
 	}
 
 	run, err := s.state.Load(ctx, item.Identifier)

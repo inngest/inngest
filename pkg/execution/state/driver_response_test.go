@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/require"
 )
 
@@ -167,7 +169,6 @@ func TestDriverResponseRetryable(t *testing.T) {
 }
 
 func TestDriverResponseFinal(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		r        DriverResponse
@@ -215,4 +216,34 @@ func TestDriverResponseFinal(t *testing.T) {
 			require.Equal(t, test.expected, actual)
 		})
 	}
+}
+
+func TestGeneratorSleepDuration(t *testing.T) {
+	// Check that this works with a timestamp
+	at := time.Now().Truncate(time.Second).Add(time.Minute)
+	g := GeneratorOpcode{
+		Op:   enums.OpcodeSleep,
+		Name: at.Format(time.RFC3339),
+	}
+	duration, err := g.SleepDuration()
+	require.Nil(t, err)
+	require.WithinDuration(t, time.Now().Truncate(time.Second).Add(duration), at, time.Second)
+
+	// Check that this works with a timestamp
+	g = GeneratorOpcode{
+		Op:   enums.OpcodeSleep,
+		Name: "2022-01-01T10:30:00.468Z",
+	}
+	duration, err = g.SleepDuration()
+	require.Nil(t, err)
+	require.EqualValues(t, 0, duration.Seconds())
+
+	// Check that this works with a duration string
+	g = GeneratorOpcode{
+		Op:   enums.OpcodeSleep,
+		Name: "60s",
+	}
+	duration, err = g.SleepDuration()
+	require.Nil(t, err)
+	require.WithinDuration(t, time.Now().Truncate(time.Second).Add(time.Minute), time.Now().Add(duration), time.Second)
 }

@@ -1,6 +1,22 @@
 # Changelog
 
-## [Unreleased]
+## [v0.7.0] - 2022-11-10
+
+### Added
+
+- Executor and state support for generator functions!  This allows you to build
+  multi-step functions using the SDK.  Each step is retried individually, and you
+  can sleep, wait for events, etc. within code without writing config.
+- Function statuses to function metadata in state
+- Cancellations to the executor and fn definitions, allowing you to cancel long-
+  running step functions automatically via events.
+- Added OnComplete/OnError callbacks to redis state interface
+- Added HTTP signatures to externally called functions (eg. via SDK)
+
+### Changed
+
+- Modified the state store interface to support generator steps
+- Allowed consuming pauses to store data within a function run's state
 
 ## [v0.4.0] - 2022-07-01
 

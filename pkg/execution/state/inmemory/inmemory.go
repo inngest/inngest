@@ -162,6 +162,15 @@ func (m *mem) Cancel(ctx context.Context, i state.Identifier) error {
 		return fmt.Errorf("identifier not found")
 	}
 
+	switch s.Metadata().Status {
+	case state.RunStatusComplete:
+		return state.ErrFunctionComplete
+	case state.RunStatusFailed:
+		return state.ErrFunctionFailed
+	case state.RunStatusCancelled:
+		return state.ErrFunctionCancelled
+	}
+
 	instance := s.(memstate)
 	instance.metadata.Status = state.RunStatusCancelled
 	m.state[i.IdempotencyKey()] = instance

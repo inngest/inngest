@@ -22,6 +22,8 @@ var embedded embed.FS
 
 var scripts = map[string]string{
 	"leasePause": "",
+	"finalize":   "",
+	"cancel":     "",
 }
 
 func init() {
@@ -214,6 +216,10 @@ type KeyGenerator interface {
 	// PauseEvent returns the key used to store data for
 	PauseEvent(context.Context, string) string
 
+	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
+	// iterate through all pauses for a given identifier
+	PauseStepPrefix(context.Context, state.Identifier) string
+
 	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
 	PauseStep(context.Context, state.Identifier, string) string
 }
@@ -343,7 +349,25 @@ func (m mgr) metadata(ctx context.Context, id state.Identifier) (*runMetadata, e
 }
 
 func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
-	return m.r.HSet(ctx, m.kf.RunMetadata(ctx, id), "status", state.RunStatusCancelled).Err()
+	status, err := redis.NewScript(scripts["cancel"]).Eval(
+		ctx,
+		m.r,
+		[]string{m.kf.RunMetadata(ctx, id)},
+	).Int64()
+	if err != nil {
+		return fmt.Errorf("error cancelling: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return state.ErrFunctionComplete
+	case 2:
+		return state.ErrFunctionFailed
+	case 3:
+		return state.ErrFunctionCancelled
+	}
+	return nil
 }
 
 func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error) {
@@ -458,18 +482,13 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 }
 
 func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string) error {
-	val, err := m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Result()
+	_, err := redis.NewScript(scripts["finalize"]).Eval(
+		ctx,
+		m.r,
+		[]string{m.kf.RunMetadata(ctx, i)},
+	).Int64()
 	if err != nil {
-		return err
-	}
-	if val != 0 {
-		return nil
-	}
-	if err := m.r.HSet(ctx, m.kf.RunMetadata(ctx, i), "status", state.RunStatusComplete).Err(); err != nil {
-		return err
-	}
-	if m.oncomplete != nil {
-		return m.oncomplete(ctx, i)
+		return fmt.Errorf("error finalizing: %w", err)
 	}
 	return nil
 }
@@ -700,7 +719,7 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 	status, err := strconv.Atoi(v)
 	if err != nil {
-		return nil, fmt.Errorf("invalid workflow version stored in run metadata")
+		return nil, fmt.Errorf("invalid function status stored in run metadata")
 	}
 	m.Status = state.RunStatus(status)
 
@@ -813,6 +832,11 @@ func (d DefaultKeyFunc) PauseEvent(ctx context.Context, event string) string {
 	return fmt.Sprintf("%s:pause-events:%s", d.Prefix, event)
 }
 
+func (d DefaultKeyFunc) PauseStepPrefix(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:pause-steps:%s", d.Prefix, id.RunID)
+}
+
 func (d DefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
-	return fmt.Sprintf("%s:pause-steps:%s-%s", d.Prefix, id.RunID, step)
+	prefix := d.PauseStepPrefix(ctx, id)
+	return fmt.Sprintf("%s-%s", prefix, step)
 }
