@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
@@ -38,18 +39,20 @@ func (c *Config) Manager(ctx context.Context) (state.Manager, error) {
 // functions in-memory, for development and testing only.
 func NewStateManager() state.Manager {
 	return &mem{
-		state:  map[string]state.State{},
-		pauses: map[uuid.UUID]state.Pause{},
-		leases: map[uuid.UUID]time.Time{},
-		lock:   &sync.RWMutex{},
+		state:   map[string]state.State{},
+		pauses:  map[uuid.UUID]state.Pause{},
+		leases:  map[uuid.UUID]time.Time{},
+		history: map[string][]state.History{},
+		lock:    &sync.RWMutex{},
 	}
 }
 
 type mem struct {
-	state  map[string]state.State
-	pauses map[uuid.UUID]state.Pause
-	leases map[uuid.UUID]time.Time
-	lock   *sync.RWMutex
+	state   map[string]state.State
+	pauses  map[uuid.UUID]state.Pause
+	leases  map[uuid.UUID]time.Time
+	history map[string][]state.History
+	lock    *sync.RWMutex
 }
 
 func (m *mem) IsComplete(ctx context.Context, id state.Identifier) (bool, error) {
@@ -87,6 +90,12 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 	}
 
 	m.state[input.Identifier.IdempotencyKey()] = s
+
+	m.setHistory(ctx, input.Identifier, state.History{
+		Type:       enums.HistoryTypeFunctionStarted,
+		Identifier: input.Identifier,
+		CreatedAt:  time.UnixMilli(int64(input.Identifier.RunID.Time())),
+	})
 
 	return s, nil
 
@@ -306,7 +315,25 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 }
 
 func (m *mem) History(ctx context.Context, i state.Identifier) ([]state.History, error) {
-	return nil, nil
+	history, ok := m.history[i.RunID.String()]
+	if !ok {
+		return nil, fmt.Errorf("history for run %s not found", i.RunID)
+	}
+
+	return history, nil
+}
+
+func (m *mem) setHistory(ctx context.Context, i state.Identifier, entry state.History) error {
+	_, ok := m.history[i.RunID.String()]
+	if !ok {
+		m.history[i.RunID.String()] = []state.History{}
+	}
+
+	m.history[i.RunID.String()] = append(m.history[i.RunID.String()], entry)
+
+	fmt.Printf("\n\n%#v\n\n", m.history)
+
+	return nil
 }
 
 func copyMap[K comparable, V any](m map[K]V) map[K]V {
