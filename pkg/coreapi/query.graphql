@@ -1,9 +1,18 @@
 type Query {
   config: Config
   actionVersion(query: ActionVersionQuery!): ActionVersion
+
+  # Get all events sent
   events(query: EventsQuery!): [Event!]
+
+  # Get all function runs
+  functionRuns(query: FunctionRunsQuery!): [FunctionRun!]
+
+  # Get the timeline created from a particular event, e.g. function runs
   eventTimeline(query: EventTimelineQuery!): EventTimeline
-  functionRun(query: FunctionRunQuery!): FunctionRun
+
+  # Get the timeline created
+  functionTimeline(query: FunctionTimelineQuery!): FunctionRun
 }
 
 input ActionVersionQuery {
@@ -17,12 +26,17 @@ input EventsQuery {
   lastEventId: ID
 }
 
+input FunctionRunsQuery {
+  workspaceId: ID! = "local"
+  lastRunId: ID
+}
+
 input EventTimelineQuery {
   workspaceId: ID! = "local"
   eventId: ID!
 }
 
-input FunctionRunQuery {
+input FunctionTimelineQuery {
   workspaceId: ID! = "local"
   functionRunId: ID!
 }

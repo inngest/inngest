@@ -7,6 +7,8 @@ import (
 
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/coreapi"
+	"github.com/inngest/inngest/pkg/coredata/inmemory"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest/pkg/execution/executor"
@@ -51,6 +53,8 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts, loader *inmemorydatastore.FSLoader) error {
+	inmemory.NewInMemoryAPIReadWriter()
+
 	funcs, err := loader.Functions(ctx)
 	if err != nil {
 		return err
@@ -72,8 +76,9 @@ func start(ctx context.Context, opts StartOpts, loader *inmemorydatastore.FSLoad
 		executor.WithExecutionLoader(loader),
 		executor.WithEnvReader(envreader),
 	)
+	coreapi := coreapi.NewService(opts.Config, coreapi.WithRunner(runner))
 
-	return service.StartAll(ctx, ds, runner, exec)
+	return service.StartAll(ctx, ds, runner, exec, coreapi)
 }
 
 func prepareDockerImages(ctx context.Context, dir string) (*inmemorydatastore.FSLoader, error) {

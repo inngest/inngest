@@ -7,7 +7,28 @@ import (
 	"github.com/inngest/inngest/pkg/function"
 )
 
-func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error) {
+func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionRunsQuery) ([]*models.FunctionRun, error) {
+	metadata, err := r.Runner.Runs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(metadata) == 0 {
+		return nil, nil
+	}
+
+	var runs []*models.FunctionRun
+
+	for _, m := range metadata {
+		runs = append(runs, &models.FunctionRun{
+			ID: m.OriginalRunID.String(),
+		})
+	}
+
+	return runs, nil
+}
+
+func (r *queryResolver) FunctionTimeline(ctx context.Context, query models.FunctionTimelineQuery) (*models.FunctionRun, error) {
 	return nil, nil
 }
 

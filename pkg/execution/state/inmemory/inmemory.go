@@ -323,6 +323,29 @@ func (m *mem) History(ctx context.Context, i state.Identifier) ([]state.History,
 	return history, nil
 }
 
+func (m *mem) Runs(ctx context.Context) ([]state.Metadata, error) {
+	var metadata []state.Metadata
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	for _, s := range m.state {
+		met := s.Metadata()
+		id := s.RunID()
+
+		metadata = append(metadata, state.Metadata{
+			Status:        met.Status,
+			Debugger:      met.Debugger,
+			RunType:       met.RunType,
+			OriginalRunID: &id,
+		})
+	}
+
+	fmt.Printf("\n\n%#v\n\n", metadata)
+
+	return metadata, nil
+}
+
 func (m *mem) setHistory(ctx context.Context, i state.Identifier, entry state.History) error {
 	_, ok := m.history[i.RunID.String()]
 	if !ok {

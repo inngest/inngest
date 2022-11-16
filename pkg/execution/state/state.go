@@ -157,6 +157,9 @@ type Loader interface {
 	// History loads history for the given run identifier.
 	History(ctx context.Context, i Identifier) ([]History, error)
 
+	// Runs loads all run metadata
+	Runs(ctx context.Context) ([]Metadata, error)
+
 	// IsComplete returns whether the given identifier is complete, ie. the
 	// pending count in the identifier's metadata is zero.
 	IsComplete(ctx context.Context, i Identifier) (complete bool, err error)

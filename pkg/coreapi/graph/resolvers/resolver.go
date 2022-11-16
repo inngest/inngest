@@ -5,10 +5,12 @@ package resolvers
 import (
 	"github.com/inngest/inngest/pkg/coreapi/generated"
 	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/execution/runner"
 )
 
 type Resolver struct {
 	APIReadWriter coredata.APIReadWriter
+	Runner        runner.Runner
 }
 
 // Mutation returns generated.MutationResolver implementation.

@@ -697,6 +697,10 @@ func (m mgr) History(ctx context.Context, id state.Identifier) ([]state.History,
 	return history, nil
 }
 
+func (m mgr) Runs(ctx context.Context) ([]state.Metadata, error) {
+	return nil, nil
+}
+
 type iter struct {
 	ri *redis.ScanIterator
 }

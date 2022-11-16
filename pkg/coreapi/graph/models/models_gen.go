@@ -4,8 +4,6 @@ package models
 
 import (
 	"time"
-
-	"github.com/inngest/inngest/pkg/function"
 )
 
 type ActionVersionQuery struct {
@@ -68,17 +66,11 @@ type ExecutionDriversConfig struct {
 }
 
 type FunctionRun struct {
-	ID              string                    `json:"id"`
-	Workspace       *Workspace                `json:"workspace"`
-	FunctionVersion *function.FunctionVersion `json:"functionVersion"`
-	Status          *string                   `json:"status"`
-	StartedAt       *time.Time                `json:"startedAt"`
-	Steps           []*FunctionRunStep        `json:"steps"`
-}
-
-type FunctionRunQuery struct {
-	WorkspaceID   string `json:"workspaceId"`
-	FunctionRunID string `json:"functionRunId"`
+	ID        string             `json:"id"`
+	Workspace *Workspace         `json:"workspace"`
+	Status    *string            `json:"status"`
+	StartedAt *time.Time         `json:"startedAt"`
+	Steps     []*FunctionRunStep `json:"steps"`
 }
 
 type FunctionRunStep struct {
@@ -87,6 +79,16 @@ type FunctionRunStep struct {
 	Status      *string      `json:"status"`
 	Output      *string      `json:"output"`
 	StartedAt   *time.Time   `json:"startedAt"`
+}
+
+type FunctionRunsQuery struct {
+	WorkspaceID string  `json:"workspaceId"`
+	LastRunID   *string `json:"lastRunId"`
+}
+
+type FunctionTimelineQuery struct {
+	WorkspaceID   string `json:"workspaceId"`
+	FunctionRunID string `json:"functionRunId"`
 }
 
 type UpdateActionVersionInput struct {

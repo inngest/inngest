@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/generated"
 	"github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
 	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/rs/zerolog"
 )
 
@@ -18,6 +19,7 @@ type Options struct {
 	Config        config.Config
 	Logger        *zerolog.Logger
 	APIReadWriter coredata.APIReadWriter
+	Runner        runner.Runner
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
@@ -30,6 +32,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
 		APIReadWriter: o.APIReadWriter,
+		Runner:        o.Runner,
 	}}))
 
 	// TODO - Add option for enabling GraphQL Playground

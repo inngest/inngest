@@ -40,6 +40,8 @@ type Runner interface {
 	service.Service
 
 	InitializeCrons(ctx context.Context) error
+	History(ctx context.Context, id state.Identifier) ([]state.History, error)
+	Runs(ctx context.Context) ([]state.Metadata, error)
 }
 
 func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
@@ -192,6 +194,14 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 
 	s.cronmanager.Start()
 	return nil
+}
+
+func (s *svc) History(ctx context.Context, id state.Identifier) ([]state.History, error) {
+	return s.state.History(ctx, id)
+}
+
+func (s *svc) Runs(ctx context.Context) ([]state.Metadata, error) {
+	return s.state.Runs(ctx)
 }
 
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
