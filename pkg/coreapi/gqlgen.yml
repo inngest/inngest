@@ -21,10 +21,10 @@ models:
       - github.com/99designs/gqlgen/graphql.Int
       - github.com/99designs/gqlgen/graphql.Uint
   Environment:
-    model: github.com/inngest/inngest-cli/pkg/coreapi/graph/models.Environment
+    model: github.com/inngest/inngest/pkg/coreapi/graph/models.Environment
   Runtime:
-    model: github.com/inngest/inngest-cli/inngest.RuntimeWrapper
+    model: github.com/inngest/inngest/inngest.RuntimeWrapper
   ActionVersion:
-    model: github.com/inngest/inngest-cli/inngest/client.ActionVersion
+    model: github.com/inngest/inngest/inngest/client.ActionVersion
   FunctionVersion:
-    model: github.com/inngest/inngest-cli/pkg/function.FunctionVersion
+    model: github.com/inngest/inngest/pkg/function.FunctionVersion
