@@ -1,6 +1,9 @@
 type Query {
   config: Config
   actionVersion(query: ActionVersionQuery!): ActionVersion
+  events(query: EventsQuery!): [Event!]
+  eventTimeline(query: EventTimelineQuery!): EventTimeline
+  functionRun(query: FunctionRunQuery!): FunctionRun
 }
 
 input ActionVersionQuery {
