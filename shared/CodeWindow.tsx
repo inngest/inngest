@@ -24,6 +24,7 @@ const CodeWindow = ({
   filename = "",
   theme = "light",
   type = "editor",
+  showTitleBar = true,
 }: {
   snippet: string;
   className?: string;
@@ -31,6 +32,7 @@ const CodeWindow = ({
   filename?: string;
   theme?: "light" | "dark";
   type?: "editor" | "terminal";
+  showTitleBar?: boolean;
 }) => {
   const backgroundColor =
     theme === "dark"
@@ -45,17 +47,19 @@ const CodeWindow = ({
         ...style,
       }}
     >
-      <div className="window-header mb-1 flex gap-1 relative">
-        <div className="w-2.5 h-2.5 border border-slate-300 rounded-full"></div>
-        <div className="w-2.5 h-2.5 border border-slate-300 rounded-full"></div>
-        <div className="w-2.5 h-2.5 border border-slate-300 rounded-full"></div>
-        <div
-          className="text-slate-500 absolute inset-x-0 mx-auto text-center"
-          style={{ fontSize: "0.6rem", top: "-1px" }}
-        >
-          {filename}
+      {showTitleBar && (
+        <div className="window-header mb-1 flex gap-1 relative">
+          <div className="w-2.5 h-2.5 border border-slate-300 rounded-full"></div>
+          <div className="w-2.5 h-2.5 border border-slate-300 rounded-full"></div>
+          <div className="w-2.5 h-2.5 border border-slate-300 rounded-full"></div>
+          <div
+            className="text-slate-500 absolute inset-x-0 mx-auto text-center"
+            style={{ fontSize: "0.6rem", top: "-1px" }}
+          >
+            {filename}
+          </div>
         </div>
-      </div>
+      )}
       <SyntaxHighlighter
         language="javascript"
         showLineNumbers={type === "editor"}
