@@ -132,6 +132,7 @@ export function App() {
                     id={eventFunc.id}
                     status={eventFunc.status}
                     actionBtn={<Button label="Rerun" />}
+                    active={eventFunc.active}
                   />
                 </TimelineRow>
               )

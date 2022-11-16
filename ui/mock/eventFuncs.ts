@@ -12,6 +12,7 @@ const eventFuncs = [
     name: 'Upload images',
     version: "v12",
     id: "01GGG522ZATDGVQBCND4ZEAS6Z",
+    active: true,
   },
   {
     datetime: '2018-01-01T00:00:00Z',
