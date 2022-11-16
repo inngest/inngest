@@ -7,13 +7,10 @@ export default function FuncCard({
   badge,
   id,
   status,
-  actionBtn,
   active,
+  contextualBar,
 }) {
   const itemStatus = statusStyles(status)
-
-  const contextualBar =
-    status === 'PAUSED' || status === 'FAILED' ? true : false
 
   return (
     <div
@@ -47,8 +44,7 @@ export default function FuncCard({
 
       {contextualBar && (
         <div className="border-t border-slate-700/50 mt-5 pt-3 flex items-center justify-between">
-          <p>Function paused for sleep until 1:40pm</p>
-          {actionBtn && actionBtn}
+          {contextualBar}
         </div>
       )}
     </div>

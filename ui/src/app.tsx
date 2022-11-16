@@ -131,8 +131,13 @@ export function App() {
                     badge={eventFunc.version}
                     id={eventFunc.id}
                     status={eventFunc.status}
-                    actionBtn={<Button label="Rerun" />}
                     active={eventFunc.active}
+                    contextualBar={
+                      <>
+                        <p>Function paused for sleep until 1:40pm</p>
+                        <Button label="Rerun" />
+                      </>
+                    }
                   />
                 </TimelineRow>
               )
