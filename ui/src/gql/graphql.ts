@@ -53,25 +53,22 @@ export type DeployFunctionInput = {
 export type Event = {
   __typename?: 'Event';
   createdAt?: Maybe<Scalars['Time']>;
+  functionRuns?: Maybe<Array<FunctionRun>>;
   id: Scalars['ID'];
   name?: Maybe<Scalars['String']>;
   payload?: Maybe<Scalars['String']>;
   schema?: Maybe<Scalars['String']>;
-  timeline?: Maybe<EventTimeline>;
+  workspace?: Maybe<Workspace>;
 };
 
-export type EventTimeline = {
-  __typename?: 'EventTimeline';
-  event: Event;
-  functionRuns?: Maybe<Array<FunctionRun>>;
-};
-
-export type EventTimelineQuery = {
+export type EventQuery = {
   eventId: Scalars['ID'];
+  workspaceId?: Scalars['ID'];
 };
 
 export type EventsQuery = {
   lastEventId?: InputMaybe<Scalars['ID']>;
+  workspaceId?: Scalars['ID'];
 };
 
 export type ExecutionConfig = {
@@ -90,25 +87,49 @@ export type ExecutionDriversConfig = {
   docker?: Maybe<ExecutionDockerDriverConfig>;
 };
 
+export type FunctionEvent = {
+  __typename?: 'FunctionEvent';
+  createdAt?: Maybe<Scalars['Time']>;
+  functionRun?: Maybe<FunctionRun>;
+  output?: Maybe<Scalars['String']>;
+  type?: Maybe<FunctionEventType>;
+  workspace?: Maybe<Workspace>;
+};
+
+export enum FunctionEventType {
+  Cancelled = 'CANCELLED',
+  Completed = 'COMPLETED',
+  Failed = 'FAILED',
+  Started = 'STARTED'
+}
+
 export type FunctionRun = {
   __typename?: 'FunctionRun';
-  functionVersion?: Maybe<FunctionVersion>;
   id: Scalars['ID'];
+  name?: Maybe<Scalars['String']>;
+  pendingSteps?: Maybe<Scalars['Int']>;
   startedAt?: Maybe<Scalars['Time']>;
-  status?: Maybe<Scalars['String']>;
-  steps?: Maybe<Array<FunctionRunStep>>;
+  status?: Maybe<FunctionRunStatus>;
+  timeline?: Maybe<Array<FunctionRunEvent>>;
+  workspace?: Maybe<Workspace>;
 };
+
+export type FunctionRunEvent = FunctionEvent | StepEvent;
 
 export type FunctionRunQuery = {
   functionRunId: Scalars['ID'];
+  workspaceId?: Scalars['ID'];
 };
 
-export type FunctionRunStep = {
-  __typename?: 'FunctionRunStep';
-  functionRun?: Maybe<FunctionRun>;
-  output?: Maybe<Scalars['String']>;
-  startedAt?: Maybe<Scalars['Time']>;
-  status?: Maybe<Scalars['String']>;
+export enum FunctionRunStatus {
+  Cancelled = 'CANCELLED',
+  Completed = 'COMPLETED',
+  Failed = 'FAILED',
+  Running = 'RUNNING'
+}
+
+export type FunctionRunsQuery = {
+  workspaceId?: Scalars['ID'];
 };
 
 export type FunctionVersion = {
@@ -148,9 +169,10 @@ export type Query = {
   __typename?: 'Query';
   actionVersion?: Maybe<ActionVersion>;
   config?: Maybe<Config>;
-  eventTimeline?: Maybe<EventTimeline>;
+  event?: Maybe<Event>;
   events?: Maybe<Array<Event>>;
   functionRun?: Maybe<FunctionRun>;
+  functionRuns?: Maybe<Array<FunctionRun>>;
 };
 
 
@@ -159,8 +181,8 @@ export type QueryActionVersionArgs = {
 };
 
 
-export type QueryEventTimelineArgs = {
-  query: EventTimelineQuery;
+export type QueryEventArgs = {
+  query: EventQuery;
 };
 
 
@@ -173,11 +195,40 @@ export type QueryFunctionRunArgs = {
   query: FunctionRunQuery;
 };
 
+
+export type QueryFunctionRunsArgs = {
+  query: FunctionRunsQuery;
+};
+
+export type StepEvent = {
+  __typename?: 'StepEvent';
+  createdAt?: Maybe<Scalars['Time']>;
+  functionRun?: Maybe<FunctionRun>;
+  output?: Maybe<Scalars['String']>;
+  type?: Maybe<StepEventType>;
+  workspace?: Maybe<Workspace>;
+};
+
+export enum StepEventType {
+  Completed = 'COMPLETED',
+  Errored = 'ERRORED',
+  Failed = 'FAILED',
+  Scheduled = 'SCHEDULED',
+  Sleeping = 'SLEEPING',
+  Started = 'STARTED',
+  Waiting = 'WAITING'
+}
+
 export type UpdateActionVersionInput = {
   dsn: Scalars['String'];
   enabled?: InputMaybe<Scalars['Boolean']>;
   versionMajor: Scalars['Int'];
   versionMinor: Scalars['Int'];
+};
+
+export type Workspace = {
+  __typename?: 'Workspace';
+  id: Scalars['ID'];
 };
 
 export type GetEventsStreamQueryVariables = Exact<{
