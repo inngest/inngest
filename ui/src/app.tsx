@@ -1,5 +1,7 @@
 import { useState } from 'preact/hooks'
 
+import BG from './components/BG'
+
 import classNames from './utils/classnames'
 import { feeds } from '../mock/eventStream'
 import eventFuncs from '../mock/eventFuncs'
@@ -62,6 +64,7 @@ export function App() {
 
   return (
     <div class="w-screen h-screen text-slate-400 text-sm grid grid-cols-app 2xl:grid-cols-app-desktop grid-rows-app overflow-hidden">
+      <BG />
       {codeBlockModalActive.visible && (
         <CodeBlockModal closeModal={setModal}>
           <CodeBlock
@@ -175,13 +178,6 @@ export function App() {
             </TimelineRow>
 
             <TimelineRow status="COMPLETED">
-              <TimelineFuncProgress
-                label="Function Started"
-                datetime="14:34:21 28/04/2022"
-                id="01GGG522ZATDGVQBCND4ZEAS6Z"
-              />
-            </TimelineRow>
-            <TimelineRow status="FAILED">
               <TimelineFuncProgress
                 label="Function Started"
                 datetime="14:34:21 28/04/2022"
