@@ -1,12 +1,8 @@
-import { ApolloClient, ApolloProvider, InMemoryCache } from "@apollo/client";
+import { ApolloProvider } from "@apollo/client";
 import { render } from "preact";
 import { App } from "./app";
+import { client } from "./coreapi";
 import "./index.css";
-
-const client = new ApolloClient({
-  uri: "http://localhost:4000/graphql",
-  cache: new InMemoryCache(),
-});
 
 render(
   <ApolloProvider client={client}>
