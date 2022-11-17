@@ -103,6 +103,7 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 		Type:       enums.HistoryTypeFunctionStarted,
 		Identifier: input.Identifier,
 		CreatedAt:  time.UnixMilli(int64(input.Identifier.RunID.Time())),
+		Data:       input.EventData,
 	})
 
 	go m.runCallbacks(ctx, input.Identifier, enums.RunStatusRunning)
@@ -137,8 +138,11 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 }
 
 func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
-	// This is a no-op
-	return nil
+	return m.setHistory(ctx, i, state.History{
+		Type:       enums.HistoryTypeStepStarted,
+		Identifier: i,
+		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+	})
 }
 
 func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
@@ -153,6 +157,12 @@ func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string, 
 	instance := s.(memstate)
 	instance.metadata.Pending++
 	m.state[i.IdempotencyKey()] = instance
+
+	m.setHistory(ctx, i, state.History{
+		Type:       enums.HistoryTypeStepScheduled,
+		Identifier: i,
+		CreatedAt:  time.UnixMilli(int64(i.RunID.Time())),
+	})
 
 	return nil
 }
@@ -231,11 +241,27 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 	instance.actions = copyMap(instance.actions)
 	instance.errors = copyMap(instance.errors)
 
+	now := time.UnixMilli(time.Now().UnixMilli())
+
 	if r.Err == nil {
 		instance.actions[r.Step.ID] = r.Output
 		delete(instance.errors, r.Step.ID)
+
+		m.setHistory(ctx, i, state.History{
+			Type:       enums.HistoryTypeStepCompleted,
+			Identifier: i,
+			CreatedAt:  now,
+			Data:       r.Output,
+		})
 	} else {
 		instance.errors[r.Step.ID] = r.Err
+
+		m.setHistory(ctx, i, state.History{
+			Type:       enums.HistoryTypeStepErrored,
+			Identifier: i,
+			CreatedAt:  now,
+			Data:       r.Err.Error(),
+		})
 	}
 
 	if r.Final() {
@@ -246,7 +272,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 		m.setHistory(ctx, i, state.History{
 			Type:       enums.HistoryTypeFunctionFailed,
 			Identifier: i,
-			CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+			CreatedAt:  now,
 		})
 	}
 
