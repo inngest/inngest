@@ -14,11 +14,30 @@ import (
 var (
 	// Ports indicate the default ports that we attempt to scan on localhost
 	// when discovering SDK-based endpoints
-	Ports = []int{80, 3000, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009, 3010, 5000, 8000, 8080, 8081, 8888}
+	Ports = []int{
+		// le derp
+		80, 443,
+		// Rails, Express & N*xt routes
+		3000, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009, 3010,
+		// Django
+		5000,
+		// Other common ports
+		8000, 8080, 8081, 8888,
+		// Redwood
+		8910, 8911,
+	}
 
 	// Paths indicate the paths we attempt to hit when a web server is available.
 	// These are the default, recommended paths for hosting Inngest routes.
-	Paths = []string{"/api/inngest", "/x/inngest", "/.netlify/functions/inngest"}
+	Paths = []string{
+		// Defaults
+		"/api/inngest",
+		"/x/inngest",
+		// Netlify
+		"/.netlify/functions/inngest",
+		// Redwood
+		"/.redwood/functions/inngest",
+	}
 
 	timeout = 2 * time.Second
 
