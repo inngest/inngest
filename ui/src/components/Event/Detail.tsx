@@ -1,47 +1,44 @@
-import { useState } from 'preact/hooks'
-import classNames from '../../utils/classnames'
+import { useState } from "preact/hooks";
+import classNames from "../../utils/classnames";
 
-import { feeds } from '../../../mock/eventStream'
+import TimelineFuncProgress from "../Timeline/TimelineFuncProgress";
+import TimelineRow from "../Timeline/TimelineRow";
+import TimelineStaticContent from "../Timeline/TimelineStaticContent";
 
-import TimelineRow from '../Timeline/TimelineRow'
-import TimelineStaticContent from '../Timeline/TimelineStaticContent'
-import TimelineFuncProgress from '../Timeline/TimelineFuncProgress'
-import TimelineScrollContainer from '../Timeline/TimelineScrollContainer'
-import TimelineFeedContent from '../Timeline/TimelineFeedContent'
-
-import { funcTabs } from '../../../mock/funcTabs'
-import ContentCard from '../Content/ContentCard'
-import FuncCard from '../Function/FuncCard'
-import CodeBlock from '../CodeBlock'
-import Button from '../Button'
-import eventFuncs from '../../../mock/eventFuncs'
-import { eventTabs } from '../../../mock/tabs'
-import { IconFeed } from '../../icons'
-import HistoricalList from './HistoricalList'
+import eventFuncs from "../../../mock/eventFuncs";
+import { funcTabs } from "../../../mock/funcTabs";
+import { eventTabs } from "../../../mock/tabs";
+import { IconFeed } from "../../icons";
+import { EventStatus } from "../../store/generated";
+import Button from "../Button";
+import CodeBlock from "../CodeBlock";
+import ContentCard from "../Content/ContentCard";
+import FuncCard from "../Function/FuncCard";
+import HistoricalList from "./HistoricalList";
 
 export default function EventDetail() {
   const [codeBlockModalActive, setCodeBlockModalActive] = useState({
     visible: false,
-    content: '',
-  })
+    content: "",
+  });
 
-  const [activeTab, setActiveTab] = useState(0)
+  const [activeTab, setActiveTab] = useState(0);
 
   const setModal = (content) => {
     if (codeBlockModalActive.visible) {
       setCodeBlockModalActive({
         visible: false,
-        content: '',
-      })
+        content: "",
+      });
     } else {
       setCodeBlockModalActive({
         visible: true,
         content: content,
-      })
+      });
     }
-  }
+  };
 
-  const tabs = ['Event History', 'Analytics']
+  const tabs = ["Event History", "Analytics"];
 
   return (
     // fake overlay
@@ -63,7 +60,7 @@ export default function EventDetail() {
                     : `border-transparent text-slate-400`,
                   `text-xs px-5 py-2.5 border-b block transition-all duration-150`
                 )}
-                onClick={() => handleTabClick(i)}
+                // onClick={() => handleTabClick(i)}
                 key={i}
               >
                 {tab}
@@ -81,10 +78,10 @@ export default function EventDetail() {
           <div className="flex gap-3 p-3 w-full min-w-0">
             <div className="flex-1 border rounded-lg border-slate-800/50 overflow-y-scroll flex flex-col shrink-0">
               <div className="pr-4 pt-4">
-                <TimelineRow status="COMPLETED" iconOffset={0}>
+                <TimelineRow status={EventStatus.Completed} iconOffset={0}>
                   <TimelineStaticContent
                     label="Event Received"
-                    datetime="14:34:21 28/04/2022"
+                    date={new Date("2022-04-28T14:34:21")}
                     actionBtn={<Button label="Retry" />}
                   />
                 </TimelineRow>
@@ -98,7 +95,7 @@ export default function EventDetail() {
                     >
                       <FuncCard
                         title={eventFunc.name}
-                        datetime={eventFunc.datetime}
+                        date={new Date(eventFunc.datetime)}
                         badge={eventFunc.version}
                         id={eventFunc.id}
                         status={eventFunc.status}
@@ -110,10 +107,14 @@ export default function EventDetail() {
                         }
                       />
                     </TimelineRow>
-                  )
+                  );
                 })}
 
-                <TimelineRow status="FAILED" iconOffset={0} bottomLine={false}>
+                <TimelineRow
+                  status={EventStatus.Failed}
+                  iconOffset={0}
+                  bottomLine={false}
+                >
                   <TimelineStaticContent label="Function 3 Errored with Error 404" />
                 </TimelineRow>
               </div>
@@ -123,7 +124,7 @@ export default function EventDetail() {
             </div>
             <ContentCard
               title="Process uploaded images"
-              datetime="14:34:21 28/04/2022"
+              date={new Date("2022-04-28T14:34:21")}
               button={<Button label="Open Function" icon={<IconFeed />} />}
               id="01GGG522ZATDGVQBCND4ZEAS6Z"
             >
@@ -134,41 +135,41 @@ export default function EventDetail() {
                 <Button label="Retry" />
               </div>
               <div className="pr-4 mt-4">
-                <TimelineRow status="COMPLETED" iconOffset={0}>
+                <TimelineRow status={EventStatus.Completed} iconOffset={0}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    datetime="14:34:21 28/04/2022"
+                    date={new Date("2022-04-28T14:34:21")}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   >
                     <CodeBlock modal={setModal} tabs={funcTabs} />
                   </TimelineFuncProgress>
                 </TimelineRow>
 
-                <TimelineRow status="COMPLETED">
+                <TimelineRow status={EventStatus.Completed}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    datetime="14:34:21 28/04/2022"
+                    date={new Date("2022-04-28T14:34:21")}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   />
                 </TimelineRow>
-                <TimelineRow status="FAILED">
+                <TimelineRow status={EventStatus.Failed}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    datetime="14:34:21 28/04/2022"
+                    date={new Date("2022-04-28T14:34:21")}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   />
                 </TimelineRow>
-                <TimelineRow status="FAILED">
+                <TimelineRow status={EventStatus.Failed}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    datetime="14:34:21 28/04/2022"
+                    date={new Date("2022-04-28T14:34:21")}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   />
                 </TimelineRow>
-                <TimelineRow status="FAILED" bottomLine={false}>
+                <TimelineRow status={EventStatus.Failed} bottomLine={false}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    datetime="14:34:21 28/04/2022"
+                    date={new Date("2022-04-28T14:34:21")}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   />
                 </TimelineRow>
@@ -178,5 +179,5 @@ export default function EventDetail() {
         </main>
       </div>
     </div>
-  )
+  );
 }

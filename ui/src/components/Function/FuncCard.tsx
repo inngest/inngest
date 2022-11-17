@@ -1,16 +1,28 @@
-import classNames from '../../utils/classnames'
-import statusStyles from '../../utils/statusStyles'
+import { ComponentChild } from "preact";
+import { EventStatus } from "../../store/generated";
+import classNames from "../../utils/classnames";
+import statusStyles from "../../utils/statusStyles";
+
+interface FuncCardProps {
+  title: string;
+  date: Date;
+  badge?: string | number;
+  id: string;
+  status: EventStatus;
+  active?: boolean;
+  contextualBar?: ComponentChild;
+}
 
 export default function FuncCard({
   title,
-  datetime,
+  date,
   badge,
   id,
   status,
-  active,
+  active = false,
   contextualBar,
-}) {
-  const itemStatus = statusStyles(status)
+}: FuncCardProps) {
+  const itemStatus = statusStyles(status);
 
   return (
     <div
@@ -24,7 +36,9 @@ export default function FuncCard({
       <a href="#">
         <div className="flex items-start justify-between">
           <div>
-            <span className="text-2xs mt-1 block leading-none">{datetime}</span>
+            <span className="text-2xs mt-1 block leading-none">
+              {date.toISOString()}
+            </span>
             <h2 className="text-white mt-2">{title}</h2>
           </div>
           {badge && (
@@ -48,5 +62,5 @@ export default function FuncCard({
         </div>
       )}
     </div>
-  )
+  );
 }

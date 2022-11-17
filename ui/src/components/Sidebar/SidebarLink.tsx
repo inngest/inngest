@@ -1,6 +1,17 @@
-import classNames from '../../utils/classnames'
+import { ComponentChild } from "preact";
+import classNames from "../../utils/classnames";
 
-export default function SidebarLink({ icon, active, badge }) {
+interface SidebarLinkProps {
+  icon: ComponentChild;
+  active?: boolean;
+  badge?: number;
+}
+
+export default function SidebarLink({
+  icon,
+  active = false,
+  badge = 0,
+}: SidebarLinkProps) {
   return (
     <button
       className={classNames(
@@ -12,5 +23,5 @@ export default function SidebarLink({ icon, active, badge }) {
     >
       {icon}
     </button>
-  )
+  );
 }

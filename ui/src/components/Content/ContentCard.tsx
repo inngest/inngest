@@ -1,13 +1,23 @@
-import classNames from '../../utils/classnames'
+import { ComponentChild, ComponentChildren } from "preact";
+import classNames from "../../utils/classnames";
+
+interface ContentCardProps {
+  children: ComponentChildren;
+  title: string;
+  date: Date;
+  button?: ComponentChild;
+  id: string;
+  active?: boolean;
+}
 
 export default function ContentCard({
   children,
   title,
-  datetime,
+  date,
   button,
   id,
-  active,
-}) {
+  active = false,
+}: ContentCardProps) {
   return (
     <div
       className={classNames(
@@ -18,7 +28,7 @@ export default function ContentCard({
       <div className="shadow-slate-950 px-5 py-4 shadow-lg relative z-30">
         <div className="mb-5">
           <h1 className=" text-lg text-slate-50">{title}</h1>
-          <span className="text-2xs mt-1 block">{datetime}</span>
+          <span className="text-2xs mt-1 block">{date.toISOString()}</span>
         </div>
 
         <div className="flex items-center justify-between">
@@ -28,5 +38,5 @@ export default function ContentCard({
       </div>
       <div className="overflow-y-scroll">{children}</div>
     </div>
-  )
+  );
 }

@@ -1,5 +1,5 @@
 import { ComponentChildren } from "preact";
-import { EventStatus } from "../../gql/graphql";
+import { EventStatus } from "../../store/generated";
 import classNames from "../../utils/classnames";
 import statusStyles from "../../utils/statusStyles";
 

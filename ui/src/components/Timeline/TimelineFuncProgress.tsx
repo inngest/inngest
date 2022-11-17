@@ -1,17 +1,26 @@
+import { ComponentChildren } from "preact";
+
+interface TimelineFuncProgressProps {
+  label: string;
+  date?: Date;
+  id: string;
+  children?: ComponentChildren;
+}
+
 export default function TimelineFuncProgress({
   label,
-  datetime,
+  date,
   id,
   children,
-}) {
+}: TimelineFuncProgressProps) {
   return (
     <div className="mb-2">
       <div className="flex items-start justify-between w-full">
         <div>
           <h2 className="text-slate-50">{label}</h2>
-          {datetime && (
+          {date && (
             <span className="text-2xs mt-1 block leading-none text-slate-400">
-              {datetime}
+              {date.toISOString()}
             </span>
           )}
         </div>
@@ -19,5 +28,5 @@ export default function TimelineFuncProgress({
       </div>
       {children && <div className="w-full mt-4">{children}</div>}
     </div>
-  )
+  );
 }

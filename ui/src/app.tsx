@@ -31,6 +31,7 @@ import { funcTabs } from "../mock/funcTabs";
 import { eventTabs } from "../mock/tabs";
 import ActionBar from "./components/ActionBar";
 import { EventStream } from "./components/Event/Stream";
+import { EventStatus } from "./store/generated";
 
 export function App() {
   const [codeBlockModalActive, setCodeBlockModalActive] = useState({
@@ -110,16 +111,16 @@ export function App() {
       <ContentFrame>
         <ContentCard
           title="accounts/profile.photo.uploaded"
-          datetime="14:34:21 28/04/2022"
+          date={new Date("2022-04-28T14:34:21")}
           button={<Button label="Open Event" icon={<IconFeed />} />}
           id="01GGG522ZATDGVQBCND4ZEAS6Z"
           active
         >
           <div className="pr-4 pt-4">
-            <TimelineRow status="COMPLETED" iconOffset={0}>
+            <TimelineRow status={EventStatus.Completed} iconOffset={0}>
               <TimelineStaticContent
                 label="Event Received"
-                datetime="14:34:21 28/04/2022"
+                date={new Date("2022-04-28T14:34:21")}
                 actionBtn={<Button label="Retry" />}
               />
             </TimelineRow>
@@ -129,7 +130,7 @@ export function App() {
                 <TimelineRow key={i} status={eventFunc.status} iconOffset={36}>
                   <FuncCard
                     title={eventFunc.name}
-                    datetime={eventFunc.datetime}
+                    date={new Date(eventFunc.datetime)}
                     badge={eventFunc.version}
                     id={eventFunc.id}
                     status={eventFunc.status}
@@ -145,7 +146,11 @@ export function App() {
               );
             })}
 
-            <TimelineRow status="FAILED" iconOffset={0} bottomLine={false}>
+            <TimelineRow
+              status={EventStatus.Failed}
+              iconOffset={0}
+              bottomLine={false}
+            >
               <TimelineStaticContent label="Function 3 Errored with Error 404" />
             </TimelineRow>
           </div>
@@ -155,7 +160,7 @@ export function App() {
         </ContentCard>
         <ContentCard
           title="Process uploaded images"
-          datetime="14:34:21 28/04/2022"
+          date={new Date("2022-04-28T14:34:21")}
           button={<Button label="Open Function" icon={<IconFeed />} />}
           id="01GGG522ZATDGVQBCND4ZEAS6Z"
         >
@@ -166,34 +171,34 @@ export function App() {
             <Button label="Retry" />
           </div>
           <div className="pr-4 mt-4">
-            <TimelineRow status="COMPLETED" iconOffset={0}>
+            <TimelineRow status={EventStatus.Completed} iconOffset={0}>
               <TimelineFuncProgress
                 label="Function Started"
-                datetime="14:34:21 28/04/2022"
+                date={new Date("2022-04-28T14:34:21")}
                 id="01GGG522ZATDGVQBCND4ZEAS6Z"
               >
                 <CodeBlock modal={setModal} tabs={funcTabs} />
               </TimelineFuncProgress>
             </TimelineRow>
 
-            <TimelineRow status="COMPLETED">
+            <TimelineRow status={EventStatus.Completed}>
               <TimelineFuncProgress
                 label="Function Started"
-                datetime="14:34:21 28/04/2022"
+                date={new Date("2022-04-28T14:34:21")}
                 id="01GGG522ZATDGVQBCND4ZEAS6Z"
               />
             </TimelineRow>
-            <TimelineRow status="FAILED">
+            <TimelineRow status={EventStatus.Failed}>
               <TimelineFuncProgress
                 label="Function Started"
-                datetime="14:34:21 28/04/2022"
+                date={new Date("2022-04-28T14:34:21")}
                 id="01GGG522ZATDGVQBCND4ZEAS6Z"
               />
             </TimelineRow>
-            <TimelineRow status="FAILED" bottomLine={false}>
+            <TimelineRow status={EventStatus.Failed} bottomLine={false}>
               <TimelineFuncProgress
                 label="Function Started"
-                datetime="14:34:21 28/04/2022"
+                date={new Date("2022-04-28T14:34:21")}
                 id="01GGG522ZATDGVQBCND4ZEAS6Z"
               />
             </TimelineRow>

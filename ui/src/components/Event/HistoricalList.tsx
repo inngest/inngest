@@ -1,6 +1,4 @@
-import { useQuery } from "@apollo/client";
-import { EVENTS_STREAM } from "../../coreapi";
-import { EventStatus, GetEventsStreamQuery } from "../../gql/graphql";
+import { EventStatus, useGetEventsStreamQuery } from "../../store/generated";
 import statusStyles from "../../utils/statusStyles";
 
 interface ListItemProps {
@@ -33,7 +31,7 @@ function ListItem({ date, id, badge, status }: ListItemProps) {
 }
 
 export default function HistoricalList() {
-  const events = useQuery<GetEventsStreamQuery>(EVENTS_STREAM);
+  const events = useGetEventsStreamQuery({}, { pollingInterval: 1000 });
 
   return (
     <div className="flex flex-col overflow-y-scroll">
