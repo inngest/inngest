@@ -57,7 +57,9 @@ export type Event = {
   id: Scalars['ID'];
   name?: Maybe<Scalars['String']>;
   payload?: Maybe<Scalars['String']>;
+  pendingRuns?: Maybe<Scalars['Int']>;
   schema?: Maybe<Scalars['String']>;
+  status?: Maybe<EventStatus>;
   workspace?: Maybe<Workspace>;
 };
 
@@ -65,6 +67,13 @@ export type EventQuery = {
   eventId: Scalars['ID'];
   workspaceId?: Scalars['ID'];
 };
+
+export enum EventStatus {
+  Completed = 'COMPLETED',
+  Failed = 'FAILED',
+  Paused = 'PAUSED',
+  Running = 'RUNNING'
+}
 
 export type EventsQuery = {
   lastEventId?: InputMaybe<Scalars['ID']>;
@@ -232,11 +241,11 @@ export type Workspace = {
 };
 
 export type GetEventsStreamQueryVariables = Exact<{
-  query: EventsQuery;
+  query?: EventsQuery;
 }>;
 
 
-export type GetEventsStreamQuery = { __typename?: 'Query', events?: Array<{ __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, payload?: string | null }> | null };
+export type GetEventsStreamQuery = { __typename?: 'Query', events?: Array<{ __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null }> | null };
 
 
-export const GetEventsStreamDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetEventsStream"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"query"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"EventsQuery"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"events"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"query"},"value":{"kind":"Variable","name":{"kind":"Name","value":"query"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"payload"}}]}}]}}]} as unknown as DocumentNode<GetEventsStreamQuery, GetEventsStreamQueryVariables>;
+export const GetEventsStreamDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetEventsStream"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"query"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"EventsQuery"}}},"defaultValue":{"kind":"ObjectValue","fields":[]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"events"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"query"},"value":{"kind":"Variable","name":{"kind":"Name","value":"query"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"pendingRuns"}}]}}]}}]} as unknown as DocumentNode<GetEventsStreamQuery, GetEventsStreamQueryVariables>;

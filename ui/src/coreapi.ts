@@ -8,12 +8,13 @@ export const client = new ApolloClient({
 });
 
 export const EVENTS_STREAM = graphql(`
-  query GetEventsStream($query: EventsQuery!) {
+  query GetEventsStream($query: EventsQuery! = {}) {
     events(query: $query) {
       id
       name
       createdAt
-      payload
+      status
+      pendingRuns
     }
   }
 `);
