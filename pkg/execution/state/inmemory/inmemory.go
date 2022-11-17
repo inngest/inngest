@@ -171,6 +171,12 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string, 
 	if instance.metadata.Pending == 0 {
 		instance.metadata.Status = enums.RunStatusCompleted
 		go m.runCallbacks(ctx, i, enums.RunStatusCompleted)
+
+		m.setHistory(ctx, i, state.History{
+			Type:       enums.HistoryTypeFunctionCompleted,
+			Identifier: i,
+			CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+		})
 	}
 
 	m.state[i.IdempotencyKey()] = instance
@@ -202,6 +208,12 @@ func (m *mem) Cancel(ctx context.Context, i state.Identifier) error {
 
 	go m.runCallbacks(ctx, i, enums.RunStatusCancelled)
 
+	m.setHistory(ctx, i, state.History{
+		Type:       enums.HistoryTypeFunctionCancelled,
+		Identifier: i,
+		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+	})
+
 	return nil
 }
 
@@ -230,6 +242,12 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 		instance.metadata.Pending--
 		instance.metadata.Status = enums.RunStatusFailed
 		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
+
+		m.setHistory(ctx, i, state.History{
+			Type:       enums.HistoryTypeFunctionFailed,
+			Identifier: i,
+			CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+		})
 	}
 
 	m.state[i.IdempotencyKey()] = instance
