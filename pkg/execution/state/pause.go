@@ -1,9 +1,81 @@
 package state
 
 import (
+	"context"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
 )
+
+// PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
+type PauseMutater interface {
+	// SavePause indicates that the traversal of an edge is paused until some future time.
+	//
+	// The runner which coordinates workflow executions is responsible for managing paused
+	// DAG executions.
+	SavePause(ctx context.Context, p Pause) error
+
+	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
+	// we can 'consume' the pause to remove it.
+	//
+	// This prevents a failure mode in which we consume the pause but enqueueing the next
+	// action fails (eg. due to power loss).
+	//
+	// If the given pause has been leased within LeasePauseDuration, this should return an
+	// ErrPauseLeased error.
+	//
+	// See https://github.com/inngest/inngest/issues/123 for more info
+	LeasePause(ctx context.Context, id uuid.UUID) error
+
+	// ConsumePause consumes a pause by its ID such that it can't be used again and
+	// will not be returned from any query.
+	//
+	// Any data passed when consuming a pause will be stored within function run state
+	// for future reference using the pause's DataKey.
+	ConsumePause(ctx context.Context, id uuid.UUID, data any) error
+}
+
+// PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
+// is required to fetch pauses to automatically continue workflows.
+type PauseGetter interface {
+	// PausesByEvent returns all pauses for a given event.
+	PausesByEvent(ctx context.Context, eventName string) (PauseIterator, error)
+
+	// PauseByStep returns a specific pause for a given workflow run, from a given step.
+	//
+	// This is required when continuing a step function from an async step, ie. one that
+	// has deferred results which must be continued by resuming the specific pause set
+	// up for the given step ID.
+	PauseByStep(ctx context.Context, i Identifier, actionID string) (*Pause, error)
+
+	// PauseByID returns a given pause by pause ID.  This must return expired pauses
+	// that have not yet been consumed in order to properly handle timeouts.
+	//
+	// This should not return consumed pauses.
+	PauseByID(ctx context.Context, pauseID uuid.UUID) (*Pause, error)
+}
+
+// PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This
+// ensures that, at scale, all pauses do not need to be loaded into memory.
+type PauseIterator interface {
+	// Next advances the iterator and returns whether the next call to Val will
+	// return a non-nil pause.
+	//
+	// Next should be called prior to any call to the iterator's Val method, after
+	// the iterator has been created.
+	//
+	// The order of the iterator is unspecified.
+	Next(ctx context.Context) bool
+
+	// Val returns the current Pause from the iterator.
+	Val(context.Context) *Pause
+}
+
+// PauseManager manages mutating and fetching pauses from a backend implementation.
+type PauseManager interface {
+	PauseMutater
+	PauseGetter
+}
 
 // Pause allows steps of a function to be paused until some condition in the future.
 //

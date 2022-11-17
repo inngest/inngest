@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -169,7 +170,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 		return nil, err
 	}
 
-	if s.Metadata().Status == state.RunStatusCancelled {
+	if s.Metadata().Status == enums.RunStatusCancelled {
 		return nil, ErrFunctionRunCancelled
 	}
 

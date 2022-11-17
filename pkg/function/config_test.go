@@ -3,7 +3,6 @@ package function
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -155,8 +154,6 @@ func TestUnmarshal_testdata(t *testing.T) {
 	if err != nil {
 		require.NoError(t, err)
 	}
-
-	fmt.Println(string(archive.Comment))
 
 	td := testdata{}
 	for _, f := range archive.Files {

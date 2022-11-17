@@ -26,11 +26,13 @@ func (h History) MarshalBinary() (data []byte, err error) {
 	}
 
 	var b bytes.Buffer
-
 	w := gzip.NewWriter(&b)
-	w.Write(jsonByt)
-	w.Close()
-
+	if _, err := w.Write(jsonByt); err != nil {
+		return nil, err
+	}
+	if err := w.Close(); err != nil {
+		return nil, err
+	}
 	return append([]byte(prefixGzip), b.Bytes()...), nil
 }
 

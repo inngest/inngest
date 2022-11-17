@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
-	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/function"
 )
 
@@ -31,11 +31,11 @@ func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionR
 		status := models.FunctionRunStatusRunning
 
 		switch m.Status {
-		case state.RunStatusCompleted:
+		case enums.RunStatusCompleted:
 			status = models.FunctionRunStatusCompleted
-		case state.RunStatusFailed:
+		case enums.RunStatusFailed:
 			status = models.FunctionRunStatusFailed
-		case state.RunStatusCancelled:
+		case enums.RunStatusCancelled:
 			status = models.FunctionRunStatusCancelled
 		}
 

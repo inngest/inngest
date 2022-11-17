@@ -5,7 +5,9 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -21,21 +23,27 @@ import (
 //go:embed lua/*
 var embedded embed.FS
 
-var scripts = map[string]string{
-	"leasePause": "",
-	"finalize":   "",
-	"cancel":     "",
-	"new":        "",
-}
+// scripts stores all embedded lua scripts on initialization
+var scripts = map[string]string{}
 
 func init() {
+	// register the redis driver
 	registration.RegisterState(func() any { return &Config{} })
-	for k := range scripts {
-		val, err := embedded.ReadFile(fmt.Sprintf("lua/%s.lua", k))
+
+	// read the lua scripts
+	entries, err := embedded.ReadDir("lua")
+	if err != nil {
+		panic(fmt.Errorf("error reading redis lua dir: %w", err))
+	}
+	for _, e := range entries {
+		val, err := embedded.ReadFile(filepath.Join("lua", e.Name()))
 		if err != nil {
 			panic(fmt.Errorf("error reading redis lua script: %w", err))
 		}
-		scripts[k] = string(val)
+		name := e.Name()
+		name = strings.TrimPrefix(name, "lua/")
+		name = strings.TrimSuffix(name, ".lua")
+		scripts[name] = string(val)
 	}
 }
 
@@ -99,8 +107,6 @@ func (c Config) ConnectOpts() (*redis.Options, error) {
 
 // Opt represents an option to use when creating a redis-backed state store.
 type Opt func(r *mgr)
-
-type RunCallback func(context.Context, state.Identifier) error
 
 // New returns a state manager which uses Redis as the backing state store.
 //
@@ -166,67 +172,10 @@ func WithExpiration(ttl time.Duration) Opt {
 
 // WithOnComplete supplies a callback which is triggered any time a function
 // run completes.
-func WithOnComplete(f RunCallback) Opt {
+func WithFunctionCallbacks(f ...state.FunctionCallback) Opt {
 	return func(m *mgr) {
-		m.oncomplete = f
+		m.callbacks = f
 	}
-}
-
-// WithOnError supplies a callback which is triggered any time a function
-// run completes.
-func WithOnError(f RunCallback) Opt {
-	return func(m *mgr) {
-		m.onerror = f
-	}
-}
-
-// KeyFunc returns a unique string based off of given data, which is used
-// as the key for data stored in redis for workflows, events, actions, and
-// errors.
-type KeyGenerator interface {
-	// Workflow returns the key for the current workflow ID and version.
-	Workflow(ctx context.Context, workflowID uuid.UUID, version int) string
-
-	// Idempotency stores the idempotency key for atomic lookup.
-	Idempotency(context.Context, state.Identifier) string
-
-	// RunMetadata stores state regarding the current run identifier, such
-	// as the workflow version, the time the run started, etc.
-	RunMetadata(context.Context, state.Identifier) string
-
-	// Event returns the key used to store the specific event for the
-	// given workflow run.
-	Event(context.Context, state.Identifier) string
-
-	// Actions returns the key used to store the action response map used
-	// for given workflow run - ie. the results for individual steps.
-	Actions(context.Context, state.Identifier) string
-
-	// Errors returns the key used to store the error hash map used
-	// for given workflow run.
-	Errors(context.Context, state.Identifier) string
-
-	// PauseLease stores the key which references a pause's lease.
-	//
-	// This is stored independently as we may store more than one copy of a pause
-	// for easy iteration.
-	PauseLease(context.Context, uuid.UUID) string
-
-	// PauseID returns the key used to store an individual pause from its ID.
-	PauseID(context.Context, uuid.UUID) string
-
-	// PauseEvent returns the key used to store data for
-	PauseEvent(context.Context, string) string
-
-	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
-	// iterate through all pauses for a given identifier
-	PauseStepPrefix(context.Context, state.Identifier) string
-
-	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
-	PauseStep(context.Context, state.Identifier, string) string
-
-	// Log returns the key used to store a log entry for run hisotry
-	Log(context.Context, state.Identifier) string
 }
 
 type mgr struct {
@@ -234,8 +183,13 @@ type mgr struct {
 	kf     KeyGenerator
 	r      *redis.Client
 
-	oncomplete RunCallback
-	onerror    RunCallback
+	callbacks []state.FunctionCallback
+}
+
+// OnFunctionStatus adds a callback to be called whenever functions
+// transition status.
+func (m *mgr) OnFunctionStatus(f state.FunctionCallback) {
+	m.callbacks = append(m.callbacks, f)
 }
 
 func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
@@ -251,11 +205,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO: We could probably optimize the commands here by storing the event
-	// within run metadata.  We want step output (actions) and errors to be
-	// their own redis hash for fast inserts (HSET on individual step results).
-	// However, the input event is immutable.
 	metadata := runMetadata{
 		Version:  input.Workflow.Version,
 		Pending:  1,
@@ -274,7 +223,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	}
 
 	var stepsByt []byte
-
 	if len(input.Steps) > 0 {
 		stepsByt, err = json.Marshal(input.Steps)
 		if err != nil {
@@ -292,12 +240,12 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		ctx,
 		m.r,
 		[]string{
-			m.kf.Idempotency(ctx, input.Identifier),                         // idempotency key
-			m.kf.Event(ctx, input.Identifier),                               // event key
-			m.kf.Workflow(ctx, input.Workflow.UUID, input.Workflow.Version), // workflow key
-			m.kf.RunMetadata(ctx, input.Identifier),                         // metadata key
-			m.kf.Actions(ctx, input.Identifier),                             // step key
-			m.kf.Log(ctx, input.Identifier),                                 // log key
+			m.kf.Idempotency(ctx, input.Identifier),
+			m.kf.Event(ctx, input.Identifier),
+			m.kf.Workflow(ctx, input.Workflow.UUID, input.Workflow.Version),
+			m.kf.RunMetadata(ctx, input.Identifier),
+			m.kf.Actions(ctx, input.Identifier),
+			m.kf.Log(ctx, input.Identifier),
 		},
 		event,
 		workflow,
@@ -315,6 +263,8 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	if status == 1 {
 		return nil, state.ErrIdentifierExists
 	}
+
+	go m.runCallbacks(ctx, input.Identifier, enums.RunStatusRunning)
 
 	return inmemory.NewStateInstance(
 			input.Workflow,
@@ -354,6 +304,7 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 	}
 	switch status {
 	case 0:
+		go m.runCallbacks(ctx, id, enums.RunStatusCancelled)
 		return nil
 	case 1:
 		return state.ErrFunctionComplete
@@ -362,7 +313,7 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 	case 3:
 		return state.ErrFunctionCancelled
 	}
-	return nil
+	return fmt.Errorf("unknown return value cancelling function: %d", status)
 }
 
 func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error) {
@@ -454,24 +405,31 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		if err := m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Err(); err != nil {
 			return err
 		}
-		return m.r.HSet(ctx, m.kf.RunMetadata(ctx, i), "status", state.RunStatusFailed).Err()
+		return m.r.HSet(ctx, m.kf.RunMetadata(ctx, i), "status", enums.RunStatusFailed).Err()
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	if m.onerror != nil {
-		// Call a user-defined callback.
-		if err := m.onerror(ctx, i); err != nil {
-			return nil, err
-		}
+	if r.Final() {
+		// Trigger error callbacks
+		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
 	}
 
 	return m.Load(ctx, i)
 }
 
-func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string) error {
-	_, err := redis.NewScript(scripts["finalize"]).Eval(
+func (m mgr) Started(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
+	// TODO: Write log
+	return nil
+}
+
+func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
+	return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", 1).Err()
+}
+
+func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
+	status, err := redis.NewScript(scripts["finalize"]).Eval(
 		ctx,
 		m.r,
 		[]string{m.kf.RunMetadata(ctx, i)},
@@ -479,11 +437,10 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string) e
 	if err != nil {
 		return fmt.Errorf("error finalizing: %w", err)
 	}
+	if status == 1 {
+		go m.runCallbacks(ctx, i, enums.RunStatusCompleted)
+	}
 	return nil
-}
-
-func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string) error {
-	return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", 1).Err()
 }
 
 func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
@@ -701,6 +658,14 @@ func (m mgr) Runs(ctx context.Context) ([]state.Metadata, error) {
 	return nil, nil
 }
 
+func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
+	for _, f := range m.callbacks {
+		go func(fn state.FunctionCallback) {
+			fn(ctx, id, status)
+		}(f)
+	}
+}
+
 type iter struct {
 	ri *redis.ScanIterator
 }
@@ -744,9 +709,9 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 	}
 	status, err := strconv.Atoi(v)
 	if err != nil {
-		return nil, fmt.Errorf("invalid function status stored in run metadata")
+		return nil, fmt.Errorf("invalid function status stored in run metadata: %#v", v)
 	}
-	m.Status = state.RunStatus(status)
+	m.Status = enums.RunStatus(status)
 
 	str, ok := data["pending"]
 	if !ok {
@@ -777,7 +742,7 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 // creating a new run, and stores the triggering event as well as workflow-specific
 // metadata for the invocation.
 type runMetadata struct {
-	Status state.RunStatus `json:"status"`
+	Status enums.RunStatus `json:"status"`
 	// Version is required to load the correct workflow Version
 	// for the specific run.
 	Version int `json:"version"`
@@ -815,57 +780,4 @@ func (r runMetadata) Metadata() state.Metadata {
 		m.OriginalRunID = &id
 	}
 	return m
-}
-
-type DefaultKeyFunc struct {
-	Prefix string
-}
-
-func (d DefaultKeyFunc) Idempotency(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:key:%s", d.Prefix, id.IdempotencyKey())
-}
-
-func (d DefaultKeyFunc) RunMetadata(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:metadata:%s", d.Prefix, id.RunID)
-}
-
-func (d DefaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int) string {
-	return fmt.Sprintf("%s:workflows:%s-%d", d.Prefix, id, version)
-}
-
-func (d DefaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:events:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
-}
-
-func (d DefaultKeyFunc) Actions(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:actions:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
-}
-
-func (d DefaultKeyFunc) Errors(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:errors:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
-}
-
-func (d DefaultKeyFunc) PauseID(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("%s:pauses:%s", d.Prefix, id.String())
-}
-
-func (d DefaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) string {
-	return fmt.Sprintf("%s:pause-lease:%s", d.Prefix, id.String())
-}
-
-func (d DefaultKeyFunc) PauseEvent(ctx context.Context, event string) string {
-	return fmt.Sprintf("%s:pause-events:%s", d.Prefix, event)
-}
-
-func (d DefaultKeyFunc) PauseStepPrefix(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:pause-steps:%s", d.Prefix, id.RunID)
-}
-
-func (d DefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
-	prefix := d.PauseStepPrefix(ctx, id)
-	return fmt.Sprintf("%s-%s", prefix, step)
-}
-
-func (d DefaultKeyFunc) Log(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:history:%s", d.Prefix, id.RunID)
 }

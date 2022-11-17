@@ -56,6 +56,12 @@ func WithEventManager(e event.Manager) func(s *svc) {
 	}
 }
 
+func WithStateManager(sm state.Manager) func(s *svc) {
+	return func(s *svc) {
+		s.state = sm
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) Runner {
 	svc := &svc{config: c}
 	for _, o := range opts {
@@ -101,9 +107,11 @@ func (s *svc) Pre(ctx context.Context) error {
 		return err
 	}
 
-	s.state, err = s.config.State.Service.Concrete.Manager(ctx)
-	if err != nil {
-		return err
+	if s.state == nil {
+		s.state, err = s.config.State.Service.Concrete.Manager(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
 	logger.From(ctx).Info().Str("backend", s.config.Queue.Service.Backend).Msg("starting queue")

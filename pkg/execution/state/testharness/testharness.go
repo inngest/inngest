@@ -159,7 +159,7 @@ func checkNew(t *testing.T, m state.Manager) {
 	found := s.Workflow()
 	require.EqualValues(t, w, found, "Returned workflow does not match input")
 	require.EqualValues(t, input.Map(), s.Event(), "Returned event does not match input")
-	require.EqualValues(t, state.RunStatusRunning, s.Metadata().Status, "Status is not Running")
+	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
 	loaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
@@ -226,7 +226,7 @@ func checkScheduled(t *testing.T, m state.Manager) {
 		n := i
 		wg.Add(1)
 		go func() {
-			err := m.Scheduled(ctx, s.Identifier(), n100.Steps[n].ID)
+			err := m.Scheduled(ctx, s.Identifier(), n100.Steps[n].ID, 0)
 			wg.Done()
 			require.NoError(t, err)
 		}()
@@ -320,9 +320,9 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	// Output shouldn't be finalized until edges are added via the runner.
 	require.Equal(t, 1, next.Metadata().Pending)
 
-	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID)
+	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID, 0)
 	require.NoError(t, err)
-	err = m.Finalized(ctx, s.Identifier(), w.Steps[1].ID)
+	err = m.Finalized(ctx, s.Identifier(), w.Steps[1].ID, 0)
 	require.NoError(t, err)
 
 	//
@@ -343,6 +343,8 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
+	_, err := m.Load(ctx, s.Identifier())
+	require.NoError(t, err)
 
 	r := state.DriverResponse{
 		Step: w.Steps[0],
@@ -376,7 +378,7 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	require.Equal(t, 1, next.Metadata().Pending)
 	// But finalized should increaase finalized count.
 	require.Equal(t, 0, finalized.Metadata().Pending, "finalized error does not decrease pending count")
-	require.Equal(t, state.RunStatusFailed, finalized.Metadata().Status, "finalized error does not set status to failed")
+	require.Equal(t, enums.RunStatusFailed, finalized.Metadata().Status, "finalized error does not set status to failed")
 }
 
 func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
@@ -414,7 +416,7 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 	// Saving output should not finalize.
 	require.Equal(t, 1, finalized.Metadata().Pending)
 
-	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID)
+	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID, 0)
 	require.NoError(t, err)
 
 	reloaded, err := m.Load(ctx, s.Identifier())
@@ -433,7 +435,7 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 		wg.Add(2)
 
 		go func() {
-			err := m.Scheduled(ctx, s.Identifier(), n100.Steps[n].ID)
+			err := m.Scheduled(ctx, s.Identifier(), n100.Steps[n].ID, 0)
 			wg.Done()
 			require.NoError(t, err)
 		}()
@@ -451,7 +453,7 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 			}
 			_, err := m.SaveResponse(ctx, id, r, mrand.Intn(3))
 			require.NoError(t, err)
-			err = m.Finalized(ctx, s.Identifier(), n100.Steps[n].ID)
+			err = m.Finalized(ctx, s.Identifier(), n100.Steps[n].ID, 0)
 			require.NoError(t, err)
 		}()
 
@@ -1225,14 +1227,14 @@ func checkCancel(t *testing.T, m state.Manager) {
 
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
-	require.EqualValues(t, state.RunStatusRunning, s.Metadata().Status, "Status is not Running")
+	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
 	err = m.Cancel(ctx, s.Identifier())
 	require.NoError(t, err)
 
 	reloaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.EqualValues(t, state.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
+	require.EqualValues(t, enums.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
 }
 
 func checkCancel_cancelled(t *testing.T, m state.Manager) {
@@ -1252,13 +1254,13 @@ func checkCancel_cancelled(t *testing.T, m state.Manager) {
 
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
-	require.EqualValues(t, state.RunStatusRunning, s.Metadata().Status, "Status is not Running")
+	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
 	err = m.Cancel(ctx, s.Identifier())
 	require.NoError(t, err)
 	reloaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.EqualValues(t, state.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
+	require.EqualValues(t, enums.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
 
 	err = m.Cancel(ctx, s.Identifier())
 	require.Equal(t, err, state.ErrFunctionCancelled)
@@ -1281,21 +1283,21 @@ func checkCancel_completed(t *testing.T, m state.Manager) {
 
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
-	require.EqualValues(t, state.RunStatusRunning, s.Metadata().Status, "Status is not Running")
+	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
-	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID)
+	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID, 0)
 	require.NoError(t, err)
 
 	s, err = m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.EqualValues(t, state.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
+	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
 
 	err = m.Cancel(ctx, s.Identifier())
 	require.Equal(t, err, state.ErrFunctionComplete)
 
 	s, err = m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.EqualValues(t, state.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
+	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
 }
 
 func checkFinalizedStatus(t *testing.T, m state.Manager) {
@@ -1303,15 +1305,15 @@ func checkFinalizedStatus(t *testing.T, m state.Manager) {
 	s := setup(t, m)
 	loaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.Equal(t, state.RunStatusRunning, loaded.Metadata().Status, fmt.Sprintf("expected status to be %d", state.RunStatusRunning))
+	require.Equal(t, enums.RunStatusRunning, loaded.Metadata().Status, fmt.Sprintf("expected status to be %d", enums.RunStatusRunning))
 
 	// Finalize, reducing count to 0 which should set status to complete.
-	err = m.Finalized(ctx, s.Identifier(), inngest.TriggerName)
+	err = m.Finalized(ctx, s.Identifier(), inngest.TriggerName, 0)
 	require.NoError(t, err)
 
 	loaded, err = m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
-	require.Equal(t, state.RunStatusCompleted, loaded.Metadata().Status, "Finalizing step setting pending to 0 should set status to state.RunStatusComplete")
+	require.Equal(t, enums.RunStatusCompleted, loaded.Metadata().Status, "Finalizing step setting pending to 0 should set status to enums.RunStatusComplete")
 	require.Equal(t, 0, loaded.Metadata().Pending)
 }
 

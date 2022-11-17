@@ -37,6 +37,18 @@ func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
 	}
 }
 
+func WithState(sm state.Manager) func(s *svc) {
+	return func(s *svc) {
+		s.state = sm
+	}
+}
+
+func WithQueue(q queue.Queue) func(s *svc) {
+	return func(s *svc) {
+		s.queue = q
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) service.Service {
 	svc := &svc{config: c}
 	for _, o := range opts {
@@ -74,7 +86,6 @@ func (s *svc) Pre(ctx context.Context) error {
 			return err
 		}
 		s.data = l
-
 		// Allow .env readers when using the FS loader only.
 		fns, err := l.Functions(ctx)
 		if err != nil {
@@ -86,15 +97,19 @@ func (s *svc) Pre(ctx context.Context) error {
 		}
 	}
 
-	s.state, err = s.config.State.Service.Concrete.Manager(ctx)
-	if err != nil {
-		return err
+	if s.state == nil {
+		s.state, err = s.config.State.Service.Concrete.Manager(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
-	logger.From(ctx).Info().Str("backend", s.config.Queue.Service.Backend).Msg("starting queue")
-	s.queue, err = s.config.Queue.Service.Concrete.Queue()
-	if err != nil {
-		return err
+	if s.queue == nil {
+		logger.From(ctx).Info().Str("backend", s.config.Queue.Service.Backend).Msg("starting queue")
+		s.queue, err = s.config.Queue.Service.Concrete.Queue()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Create drivers based off of the available config.  If we have no docker steps,
@@ -188,9 +203,10 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
 	if err == ErrFunctionRunCancelled {
-		_ = s.state.Finalized(ctx, item.Identifier, edge.Incoming)
+		_ = s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
 		return nil
 	}
+
 	if err != nil {
 		// The executor usually returns a state.DriverResponse if the step's
 		// response was an error.  In this case, the executor itself handles
@@ -216,7 +232,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 		// This is a non-retryable error.  Finalize this step.
 		l.Warn().Interface("edge", edge).Msg("step permanently failed")
-		if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming); err != nil {
+		if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.ErrorCount); err != nil {
 			return err
 		}
 		return nil
@@ -236,7 +252,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		}
 		// Finalize this step early, as we don't need to re-invoke anything else or
 		// load children until generators complete.
-		return s.state.Finalized(ctx, item.Identifier, edge.Incoming)
+		return s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
 	}
 
 	run, err := s.state.Load(ctx, item.Identifier)
@@ -271,7 +287,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 			// This should also increase the waitgroup count, as we have an
 			// edge that is outstanding.
-			if err := s.state.Scheduled(ctx, item.Identifier, next.Incoming); err != nil {
+			if err := s.state.Scheduled(ctx, item.Identifier, next.Incoming, 0); err != nil {
 				return err
 			}
 
@@ -339,7 +355,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		// and this is a no-op - things should be atomic where possible.
 		//
 		// TODO: Add a unit test to ensure WG is 0 at the end of execution.
-		if err := s.state.Scheduled(ctx, item.Identifier, next.Outgoing); err != nil {
+		if err := s.state.Scheduled(ctx, item.Identifier, next.Outgoing, 0); err != nil {
 			return err
 		}
 	}
@@ -348,7 +364,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	//
 	// This must happen after everything is enqueued, else the scheduled <> finalized count
 	// is out of order.
-	if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming); err != nil {
+	if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.ErrorCount); err != nil {
 		return err
 	}
 
@@ -457,7 +473,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	} else {
 		l.Info().Interface("pause", pauseTimeout).Interface("edge", pause.Edge()).Msg("ignoring pause timeout")
 		// Finalize this action without it running.
-		if err := s.state.Finalized(ctx, item.Identifier, pause.Edge().Incoming); err != nil {
+		if err := s.state.Finalized(ctx, item.Identifier, pause.Edge().Incoming, 0); err != nil {
 			return err
 		}
 	}
