@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -38,6 +39,7 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	Event() EventResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 }
@@ -140,6 +142,9 @@ type ComplexityRoot struct {
 	}
 }
 
+type EventResolver interface {
+	FunctionRuns(ctx context.Context, obj *models.Event) ([]*models.FunctionRun, error)
+}
 type MutationResolver interface {
 	DeployFunction(ctx context.Context, input models.DeployFunctionInput) (*function.FunctionVersion, error)
 	CreateActionVersion(ctx context.Context, input models.CreateActionVersionInput) (*client.ActionVersion, error)
@@ -1678,7 +1683,7 @@ func (ec *executionContext) _Event_functionRuns(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.FunctionRuns, nil
+		return ec.resolvers.Event().FunctionRuns(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1696,8 +1701,8 @@ func (ec *executionContext) fieldContext_Event_functionRuns(ctx context.Context,
 	fc = &graphql.FieldContext{
 		Object:     "Event",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -5944,7 +5949,7 @@ func (ec *executionContext) _Event(ctx context.Context, sel ast.SelectionSet, ob
 			out.Values[i] = ec._Event_id(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "workspace":
 
@@ -5967,9 +5972,22 @@ func (ec *executionContext) _Event(ctx context.Context, sel ast.SelectionSet, ob
 			out.Values[i] = ec._Event_schema(ctx, field, obj)
 
 		case "functionRuns":
+			field := field
 
-			out.Values[i] = ec._Event_functionRuns(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Event_functionRuns(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

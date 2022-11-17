@@ -9,8 +9,6 @@ import (
 	"github.com/inngest/inngest/pkg/function"
 )
 
-type functionRunResolver struct{ *Resolver }
-
 func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error) {
 	return nil, nil
 }
@@ -81,8 +79,4 @@ func (r *mutationResolver) DeployFunction(ctx context.Context, input models.Depl
 
 	fv.Config = string(config)
 	return &fv, nil
-}
-
-func (r *functionRunResolver) Status(ctx context.Context, as string) (string, error) {
-	return as, nil
 }

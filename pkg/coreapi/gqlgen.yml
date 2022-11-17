@@ -28,3 +28,7 @@ models:
     model: github.com/inngest/inngest/inngest/client.ActionVersion
   FunctionVersion:
     model: github.com/inngest/inngest/pkg/function.FunctionVersion
+  Event:
+    fields:
+      functionRuns:
+        resolver: true
