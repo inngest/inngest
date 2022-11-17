@@ -92,7 +92,7 @@ func (a API) Stop(ctx context.Context) error {
 }
 
 func (a API) UI(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "ui/index.html")
+	http.ServeFile(w, r, "ui/dist/index.html")
 }
 
 func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
