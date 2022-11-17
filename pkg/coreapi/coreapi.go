@@ -7,6 +7,8 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coreapi/generated"
 	"github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
@@ -28,7 +30,16 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	a := &CoreAPI{
 		config: o.Config,
 		log:    &logger,
+		Router: chi.NewMux(),
 	}
+
+	cors := cors.New(cors.Options{
+		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
+		AllowCredentials: false,
+	})
+	a.Use(cors.Handler)
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
 		APIReadWriter: o.APIReadWriter,
@@ -36,13 +47,14 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	}}))
 
 	// TODO - Add option for enabling GraphQL Playground
-	http.Handle("/", playground.Handler("GraphQL playground", "/gql"))
-	http.Handle("/gql", srv)
+	a.Handle("/", playground.Handler("GraphQL playground", "/gql"))
+	a.Handle("/gql", srv)
 
 	return a, nil
 }
 
 type CoreAPI struct {
+	chi.Router
 	config config.Config
 	log    *zerolog.Logger
 	server *http.Server
@@ -51,7 +63,7 @@ type CoreAPI struct {
 func (a *CoreAPI) Start(ctx context.Context) error {
 	a.server = &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", a.config.CoreAPI.Addr, a.config.CoreAPI.Port),
-		Handler: http.DefaultServeMux,
+		Handler: a.Router,
 	}
 
 	// Todo only show this if playground is enabled in config
