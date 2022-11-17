@@ -3,6 +3,7 @@ package resolvers
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
@@ -39,6 +40,10 @@ func (r *queryResolver) Events(ctx context.Context, query models.EventsQuery) ([
 			Payload:   &payload,
 		})
 	}
+
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].ID > events[j].ID
+	})
 
 	return events, nil
 }

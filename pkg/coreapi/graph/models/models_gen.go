@@ -40,6 +40,8 @@ type Event struct {
 	CreatedAt    *time.Time     `json:"createdAt"`
 	Payload      *string        `json:"payload"`
 	Schema       *string        `json:"schema"`
+	Status       *EventStatus   `json:"status"`
+	PendingRuns  *int           `json:"pendingRuns"`
 	FunctionRuns []*FunctionRun `json:"functionRuns"`
 }
 
@@ -114,6 +116,51 @@ type UpdateActionVersionInput struct {
 
 type Workspace struct {
 	ID string `json:"id"`
+}
+
+type EventStatus string
+
+const (
+	EventStatusRunning   EventStatus = "RUNNING"
+	EventStatusCompleted EventStatus = "COMPLETED"
+	EventStatusPaused    EventStatus = "PAUSED"
+	EventStatusFailed    EventStatus = "FAILED"
+)
+
+var AllEventStatus = []EventStatus{
+	EventStatusRunning,
+	EventStatusCompleted,
+	EventStatusPaused,
+	EventStatusFailed,
+}
+
+func (e EventStatus) IsValid() bool {
+	switch e {
+	case EventStatusRunning, EventStatusCompleted, EventStatusPaused, EventStatusFailed:
+		return true
+	}
+	return false
+}
+
+func (e EventStatus) String() string {
+	return string(e)
+}
+
+func (e *EventStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = EventStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid EventStatus", str)
+	}
+	return nil
+}
+
+func (e EventStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type FunctionEventType string

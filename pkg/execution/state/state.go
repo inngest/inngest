@@ -77,6 +77,9 @@ type Metadata struct {
 	// This is some basic book-keeping.
 	OriginalRunID *ulid.ULID `json:"originalRunID,omitempty"`
 
+	// Name stores the name of the workflow as it started.
+	Name string `json:"name"`
+
 	// Pending is the number of steps that have been enqueued but have
 	// not yet finalized.
 	//
@@ -171,7 +174,7 @@ type Loader interface {
 	History(ctx context.Context, i Identifier) ([]History, error)
 
 	// Runs loads all run metadata
-	Runs(ctx context.Context) ([]Metadata, error)
+	Runs(ctx context.Context, eventId string) ([]Metadata, error)
 
 	// IsComplete returns whether the given identifier is complete, ie. the
 	// pending count in the identifier's metadata is zero.

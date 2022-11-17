@@ -21,6 +21,9 @@ func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
 func (r *Resolver) Event() generated.EventResolver { return &eventResolver{r} }
 
+func (r *Resolver) FunctionRun() generated.FunctionRunResolver { return &functionRunResolver{r} }
+
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type eventResolver struct{ *Resolver }
+type functionRunResolver struct{ *Resolver }

@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
@@ -14,13 +15,9 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 }
 
 func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionRunsQuery) ([]*models.FunctionRun, error) {
-	metadata, err := r.Runner.Runs(ctx)
+	metadata, err := r.Runner.Runs(ctx, "")
 	if err != nil {
 		return nil, err
-	}
-
-	if len(metadata) == 0 {
-		return nil, nil
 	}
 
 	var runs []*models.FunctionRun
@@ -43,13 +40,21 @@ func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionR
 			startedAt = time.UnixMilli(int64(m.OriginalRunID.Time()))
 		}
 
+		name := string(m.Name)
+		pending := int(m.Pending)
+
 		runs = append(runs, &models.FunctionRun{
 			ID:           m.OriginalRunID.String(),
+			Name:         &name,
 			Status:       &status,
-			PendingSteps: &m.Pending,
+			PendingSteps: &pending,
 			StartedAt:    &startedAt,
 		})
 	}
+
+	sort.Slice(runs, func(i, j int) bool {
+		return runs[i].ID > runs[j].ID
+	})
 
 	return runs, nil
 }

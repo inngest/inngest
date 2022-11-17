@@ -54,7 +54,16 @@ type Event {
   createdAt: Time
   payload: String
   schema: String
+  status: EventStatus
+  pendingRuns: Int
   functionRuns: [FunctionRun!]
+}
+
+enum EventStatus {
+  RUNNING
+  COMPLETED
+  PAUSED
+  FAILED
 }
 
 enum FunctionRunStatus {

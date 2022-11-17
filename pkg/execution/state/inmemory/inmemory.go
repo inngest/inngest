@@ -342,13 +342,22 @@ func (m *mem) History(ctx context.Context, i state.Identifier) ([]state.History,
 	return history, nil
 }
 
-func (m *mem) Runs(ctx context.Context) ([]state.Metadata, error) {
+// Returns function runs, optionally filtering to only those triggered by a
+// specific event if `eventId` is provided.
+func (m *mem) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
 	var metadata []state.Metadata
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	for _, s := range m.state {
+		if eventId != "" {
+			evt := s.Event()
+			if evt == nil || evt["id"] != eventId {
+				continue
+			}
+		}
+
 		met := s.Metadata()
 		id := s.RunID()
 
@@ -358,6 +367,7 @@ func (m *mem) Runs(ctx context.Context) ([]state.Metadata, error) {
 			RunType:       met.RunType,
 			OriginalRunID: &id,
 			Pending:       met.Pending,
+			Name:          s.Workflow().Name,
 		})
 	}
 

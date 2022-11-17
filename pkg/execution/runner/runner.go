@@ -40,7 +40,7 @@ type Runner interface {
 
 	InitializeCrons(ctx context.Context) error
 	History(ctx context.Context, id state.Identifier) ([]state.History, error)
-	Runs(ctx context.Context) ([]state.Metadata, error)
+	Runs(ctx context.Context, eventId string) ([]state.Metadata, error)
 	Events(ctx context.Context) ([]event.Event, error)
 }
 
@@ -215,8 +215,8 @@ func (s *svc) History(ctx context.Context, id state.Identifier) ([]state.History
 	return s.state.History(ctx, id)
 }
 
-func (s *svc) Runs(ctx context.Context) ([]state.Metadata, error) {
-	return s.state.Runs(ctx)
+func (s *svc) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
+	return s.state.Runs(ctx, eventId)
 }
 
 func (s *svc) Events(ctx context.Context) ([]event.Event, error) {
