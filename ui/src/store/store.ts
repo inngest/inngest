@@ -1,9 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { api } from "./generated";
+import globalReducer from "./global";
 
 export const store = configureStore({
   reducer: {
     [api.reducerPath]: api.reducer,
+    global: globalReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(api.middleware),

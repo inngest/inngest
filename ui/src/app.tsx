@@ -34,6 +34,10 @@ import { EventStream } from "./components/Event/Stream";
 import { EventStatus } from "./store/generated";
 
 export function App() {
+  // const sidebarTab = useAppSelector((state) => state.global.sidebarTab);
+  // const dispatch = useAppDispatch();
+  // dispatch(setSidebarTab("events"));
+
   const [codeBlockModalActive, setCodeBlockModalActive] = useState({
     visible: false,
     content: "",
