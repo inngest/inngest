@@ -30,18 +30,20 @@ func (r *functionRunResolver) Timeline(ctx context.Context, obj *models.Function
 
 		if isFunctionEvent(h.Type) {
 			t := functionEventEnum(h.Type)
+			createdAt := h.CreatedAt
 
 			events = append(events, models.FunctionEvent{
 				Type:      &t,
-				CreatedAt: &h.CreatedAt,
+				CreatedAt: &createdAt,
 				Output:    &output,
 			})
 		} else {
 			t := stepEventEnum(h.Type)
+			createdAt := h.CreatedAt
 
 			events = append(events, models.StepEvent{
 				Type:      &t,
-				CreatedAt: &h.CreatedAt,
+				CreatedAt: &createdAt,
 				Output:    &output,
 			})
 		}
