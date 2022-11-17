@@ -55,6 +55,7 @@ func NewAPI(o Options) (chi.Router, error) {
 
 	api.Get("/health", api.HealthCheck)
 	api.Post("/e/{key}", api.ReceiveEvent)
+	api.Get("/", api.UI)
 
 	return api, nil
 }
@@ -88,6 +89,10 @@ func (a API) Stop(ctx context.Context) error {
 	}
 
 	return a.server.Shutdown(ctx)
+}
+
+func (a API) UI(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "ui/index.html")
 }
 
 func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
