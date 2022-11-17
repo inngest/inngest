@@ -1,17 +1,24 @@
-import { historicEvents } from '../../../mock/historicEventFeed'
-import TimelineRow from '../Timeline/TimelineRow'
-import TimelineFeedContent from '../Timeline/TimelineFeedContent'
-import statusStyles from '../../utils/statusStyles'
+import { useQuery } from "@apollo/client";
+import { EVENTS_STREAM } from "../../coreapi";
+import { EventStatus, GetEventsStreamQuery } from "../../gql/graphql";
+import statusStyles from "../../utils/statusStyles";
 
-function ListItem({ datetime, id, badge, status }) {
-  const eventStatusStyles = statusStyles(status)
+interface ListItemProps {
+  date: Date;
+  id: string;
+  status: EventStatus;
+  badge: number;
+}
+
+function ListItem({ date, id, badge, status }: ListItemProps) {
+  const eventStatusStyles = statusStyles(status);
 
   return (
     <button className="px-4 py-4 bg-transparent border-t border-slate-800/50 text-left group flex flex-col min-w-0 w-full first-of-type:border-transparent hover:bg-slate-800/40">
       <div className="flex items-start justify-between w-full">
         <div className="text-sm font-normal whitespace-nowrap overflow-hidden text-ellipsis grow pr-2 leading-none">
           <span className={`block text-xs ${eventStatusStyles.text}`}>
-            {datetime}
+            {date.toISOString()}
           </span>
           <span className={`block text-3xs text-slate-500 mt-2`}>{id}</span>
         </div>
@@ -22,21 +29,23 @@ function ListItem({ datetime, id, badge, status }) {
         </span>
       </div>
     </button>
-  )
+  );
 }
 
 export default function HistoricalList() {
+  const events = useQuery<GetEventsStreamQuery>(EVENTS_STREAM);
+
   return (
     <div className="flex flex-col overflow-y-scroll">
-      {historicEvents.map((event, i) => (
+      {events.data?.events?.map((event, i) => (
         <ListItem
-          key={i}
-          datetime={event.datetime}
+          key={event.id}
+          date={new Date(event.createdAt)}
           id={event.id}
-          badge={event.badge}
-          status={event.status}
+          badge={event.pendingRuns || 0}
+          status={event.status || EventStatus.Completed}
         />
       ))}
     </div>
-  )
+  );
 }

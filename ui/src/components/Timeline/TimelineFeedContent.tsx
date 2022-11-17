@@ -1,14 +1,23 @@
-import classNames from '../../utils/classnames'
-import statusStyles from '../../utils/statusStyles'
+import { EventStatus } from "../../gql/graphql";
+import classNames from "../../utils/classnames";
+import statusStyles from "../../utils/statusStyles";
+
+interface TimelineFeedContent {
+  date: Date;
+  status: EventStatus;
+  name: string;
+  badge: number;
+  active?: boolean;
+}
 
 export default function TimelineFeedContent({
-  datetime,
+  date,
   status,
   name,
   badge,
-  active,
-}) {
-  const eventStatusStyles = statusStyles(status)
+  active = false,
+}: TimelineFeedContent) {
+  const eventStatusStyles = statusStyles(status);
 
   return (
     <a
@@ -20,7 +29,9 @@ export default function TimelineFeedContent({
         `pr-1.5 pl-2.5 pb-1.5 pt-2.5 bg-transparent border border-transparent text-left rounded group flex flex-col flex-1 min-w-0`
       )}
     >
-      <span className="block text-3xs text-slate-300 pb-0.5">{datetime}</span>
+      <span className="block text-3xs text-slate-300 pb-0.5">
+        {date.toISOString()}
+      </span>
       <div className="flex items-center">
         <h4 className="text-sm font-normal whitespace-nowrap overflow-hidden text-ellipsis grow pr-2 leading-none ">
           <span className={`${eventStatusStyles.text}`}>{name}</span>
@@ -32,5 +43,5 @@ export default function TimelineFeedContent({
         </span>
       </div>
     </a>
-  )
+  );
 }

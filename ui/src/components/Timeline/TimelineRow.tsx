@@ -1,5 +1,15 @@
-import classNames from '../../utils/classnames'
-import statusStyles from '../../utils/statusStyles'
+import { ComponentChildren } from "preact";
+import { EventStatus } from "../../gql/graphql";
+import classNames from "../../utils/classnames";
+import statusStyles from "../../utils/statusStyles";
+
+interface TimelineRowProps {
+  status: EventStatus;
+  children: ComponentChildren;
+  topLine?: boolean;
+  bottomLine?: boolean;
+  iconOffset?: number;
+}
 
 export default function TimelineRow({
   status,
@@ -7,8 +17,8 @@ export default function TimelineRow({
   topLine = true,
   bottomLine = true,
   iconOffset = 0,
-}) {
-  const itemStatus = statusStyles(status)
+}: TimelineRowProps) {
+  const itemStatus = statusStyles(status);
 
   return (
     <li className="flex">
@@ -32,5 +42,5 @@ export default function TimelineRow({
       </div>
       <div className="w-full pb-4 min-w-0">{children}</div>
     </li>
-  )
+  );
 }

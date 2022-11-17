@@ -1,66 +1,64 @@
-import { useState } from 'preact/hooks'
+import { useState } from "preact/hooks";
 
-import BG from './components/BG'
+import BG from "./components/BG";
 
-import classNames from './utils/classnames'
-import { feeds } from '../mock/eventStream'
-import eventFuncs from '../mock/eventFuncs'
-import './index.css'
-import Header from './components/Header'
+import eventFuncs from "../mock/eventFuncs";
+import { feeds } from "../mock/eventStream";
+import Header from "./components/Header";
+import "./index.css";
+import classNames from "./utils/classnames";
 
-import Sidebar from './components/Sidebar/Sidebar'
-import SidebarLink from './components/Sidebar/SidebarLink'
+import Sidebar from "./components/Sidebar/Sidebar";
+import SidebarLink from "./components/Sidebar/SidebarLink";
 
-import ContentFrame from './components/Content/ContentFrame'
-import ContentCard from './components/Content/ContentCard'
+import ContentCard from "./components/Content/ContentCard";
+import ContentFrame from "./components/Content/ContentFrame";
 
-import TimelineRow from './components/Timeline/TimelineRow'
-import TimelineScrollContainer from './components/Timeline/TimelineScrollContainer'
-import TimelineFeedContent from './components/Timeline/TimelineFeedContent'
-import TimelineStaticContent from './components/Timeline/TimelineStaticContent'
-import TimelineFuncProgress from './components/Timeline/TimelineFuncProgress'
+import TimelineFuncProgress from "./components/Timeline/TimelineFuncProgress";
+import TimelineRow from "./components/Timeline/TimelineRow";
+import TimelineScrollContainer from "./components/Timeline/TimelineScrollContainer";
+import TimelineStaticContent from "./components/Timeline/TimelineStaticContent";
 
-import Button from './components/Button'
-import FuncCard from './components/Function/FuncCard'
+import Button from "./components/Button";
+import FuncCard from "./components/Function/FuncCard";
 
-import CodeBlock from './components/CodeBlock'
-import CodeBlockModal from './components/CodeBlock/CodeBlockModal'
+import CodeBlock from "./components/CodeBlock";
+import CodeBlockModal from "./components/CodeBlock/CodeBlockModal";
 
-import { IconFeed, IconBook } from './icons'
+import { IconBook, IconFeed } from "./icons";
 
-import { eventTabs } from '../mock/tabs'
-import { funcTabs } from '../mock/funcTabs'
-import ActionBar from './components/ActionBar'
-
-import EventDetail from './components/Event/Detail'
+import { funcTabs } from "../mock/funcTabs";
+import { eventTabs } from "../mock/tabs";
+import ActionBar from "./components/ActionBar";
+import { EventStream } from "./components/Event/Stream";
 
 export function App() {
   const [codeBlockModalActive, setCodeBlockModalActive] = useState({
     visible: false,
-    content: '',
-  })
+    content: "",
+  });
 
-  const [activeFeed, setActiveFeed] = useState(1)
+  const [activeFeed, setActiveFeed] = useState(1);
 
-  const tabs = ['Event Stream', 'Function Log']
+  const tabs = ["Event Stream", "Function Log"];
 
   const setModal = (content) => {
     if (codeBlockModalActive.visible) {
       setCodeBlockModalActive({
         visible: false,
-        content: '',
-      })
+        content: "",
+      });
     } else {
       setCodeBlockModalActive({
         visible: true,
         content: content,
-      })
+      });
     }
-  }
+  };
 
   const handleTabClick = (index) => {
-    setActiveFeed(index)
-  }
+    setActiveFeed(index);
+  };
 
   return (
     <div class="w-screen h-screen text-slate-400 text-sm grid grid-cols-app-sm xl:grid-cols-app 2xl:grid-cols-app-desktop grid-rows-app overflow-hidden">
@@ -74,7 +72,7 @@ export function App() {
           />
         </CodeBlockModal>
       )}
-      <EventDetail />
+      {/* <EventDetail /> */}
       <Header />
       <Sidebar>
         <SidebarLink icon={<IconFeed />} active badge={20} />
@@ -97,7 +95,7 @@ export function App() {
         ))}
       />
       <TimelineScrollContainer>
-        {feeds[activeFeed].content.map((event, i) => (
+        {/* {feeds[activeFeed].content.map((event, i) => (
           <TimelineRow key={i} status={event.status} iconOffset={30}>
             <TimelineFeedContent
               datetime={event.datetime}
@@ -106,7 +104,8 @@ export function App() {
               status={event.status}
             />
           </TimelineRow>
-        ))}
+        ))} */}
+        <EventStream />
       </TimelineScrollContainer>
       <ContentFrame>
         <ContentCard
@@ -143,7 +142,7 @@ export function App() {
                     }
                   />
                 </TimelineRow>
-              )
+              );
             })}
 
             <TimelineRow status="FAILED" iconOffset={0} bottomLine={false}>
@@ -202,5 +201,5 @@ export function App() {
         </ContentCard>
       </ContentFrame>
     </div>
-  )
+  );
 }
