@@ -1,5 +1,4 @@
-/* eslint-disable */
-import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/core';
+import { api } from './baseApi';
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = Maybe<T>;
 export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
@@ -248,4 +247,26 @@ export type GetEventsStreamQueryVariables = Exact<{
 export type GetEventsStreamQuery = { __typename?: 'Query', events?: Array<{ __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null }> | null };
 
 
-export const GetEventsStreamDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetEventsStream"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"query"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"EventsQuery"}}},"defaultValue":{"kind":"ObjectValue","fields":[]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"events"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"query"},"value":{"kind":"Variable","name":{"kind":"Name","value":"query"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"pendingRuns"}}]}}]}}]} as unknown as DocumentNode<GetEventsStreamQuery, GetEventsStreamQueryVariables>;
+export const GetEventsStreamDocument = `
+    query GetEventsStream($query: EventsQuery! = {}) {
+  events(query: $query) {
+    id
+    name
+    createdAt
+    status
+    pendingRuns
+  }
+}
+    `;
+
+const injectedRtkApi = api.injectEndpoints({
+  endpoints: (build) => ({
+    GetEventsStream: build.query<GetEventsStreamQuery, GetEventsStreamQueryVariables | void>({
+      query: (variables) => ({ document: GetEventsStreamDocument, variables })
+    }),
+  }),
+});
+
+export { injectedRtkApi as api };
+export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery } = injectedRtkApi;
+

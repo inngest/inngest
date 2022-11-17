@@ -1,4 +1,3 @@
-import { EventStatus } from "../gql/graphql";
 import {
   IconStatusCompleted,
   IconStatusDefault,
@@ -6,6 +5,7 @@ import {
   IconStatusPaused,
   IconStatusRunning,
 } from "../icons";
+import { EventStatus } from "../store/generated";
 
 export default function statusStyles(status: EventStatus) {
   switch (status) {

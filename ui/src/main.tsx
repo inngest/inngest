@@ -1,12 +1,20 @@
-import { ApolloProvider } from "@apollo/client";
 import { render } from "preact";
+import { Provider } from "react-redux";
 import { App } from "./app";
-import { client } from "./coreapi";
 import "./index.css";
+import { store } from "./store/store";
+
+/**
+ * We're using Preact rather than React here, so the `react-redux` `Provider`
+ * gets a bit confused about what we're passing it.
+ *
+ * Let's avoid the issue here.
+ */
+const P = Provider as any;
 
 render(
-  <ApolloProvider client={client}>
+  <P store={store}>
     <App />
-  </ApolloProvider>,
+  </P>,
   document.getElementById("app") as HTMLElement
 );

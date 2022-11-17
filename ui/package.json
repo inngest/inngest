@@ -11,13 +11,17 @@
     "codegen": "graphql-codegen --config codegen.ts"
   },
   "dependencies": {
-    "@apollo/client": "^3.7.1",
+    "@reduxjs/toolkit": "^1.9.0",
+    "@rtk-query/graphql-request-base-query": "^2.2.0",
     "graphql": "^16.6.0",
-    "preact": "^10.11.2"
+    "graphql-request": "4",
+    "preact": "^10.11.2",
+    "react-redux": "^8.0.5"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "2.13.11",
-    "@graphql-codegen/client-preset": "1.1.3",
+    "@graphql-codegen/typescript-operations": "^2.5.7",
+    "@graphql-codegen/typescript-rtk-query": "^2.3.7",
     "@preact/preset-vite": "^2.4.0",
     "autoprefixer": "^10.4.13",
     "concurrently": "^7.5.0",

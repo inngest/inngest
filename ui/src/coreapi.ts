@@ -1,13 +1,6 @@
-import { ApolloClient, InMemoryCache } from "@apollo/client";
-import { graphql } from "./gql";
+import { gql } from "graphql-request";
 
-export const client = new ApolloClient({
-  uri: "http://localhost:8300/gql",
-  cache: new InMemoryCache(),
-  name: "Dev Server Core API",
-});
-
-export const EVENTS_STREAM = graphql(`
+export const EVENTS_STREAM = gql`
   query GetEventsStream($query: EventsQuery! = {}) {
     events(query: $query) {
       id
@@ -17,4 +10,4 @@ export const EVENTS_STREAM = graphql(`
       pendingRuns
     }
   }
-`);
+`;

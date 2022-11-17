@@ -5,9 +5,17 @@ const config: CodegenConfig = {
   schema: "../pkg/coreapi/**/*.graphql",
   documents: "src/**/*",
   generates: {
-    "src/gql/": {
-      preset: "client",
-      plugins: [],
+    "src/store/generated.ts": {
+      plugins: [
+        "typescript",
+        "typescript-operations",
+        {
+          "typescript-rtk-query": {
+            importBaseApiFrom: "./baseApi",
+            exportHooks: true,
+          },
+        },
+      ],
     },
   },
 };

@@ -1,13 +1,14 @@
-import { useQuery } from "@apollo/client";
-import { EVENTS_STREAM } from "../../coreapi";
-import { EventStatus, GetEventsStreamQuery } from "../../gql/graphql";
+import { EventStatus, useGetEventsStreamQuery } from "../../store/generated";
 import TimelineFeedContent from "../Timeline/TimelineFeedContent";
 import TimelineRow from "../Timeline/TimelineRow";
 
 export const EventStream = () => {
-  const events = useQuery<GetEventsStreamQuery>(EVENTS_STREAM, {
-    pollInterval: 1000,
-  });
+  const events = useGetEventsStreamQuery(
+    {},
+    {
+      pollingInterval: 1000,
+    }
+  );
 
   return (
     <>
