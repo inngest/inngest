@@ -60,6 +60,7 @@ export type Event = {
   raw?: Maybe<Scalars['String']>;
   schema?: Maybe<Scalars['String']>;
   status?: Maybe<EventStatus>;
+  totalRuns?: Maybe<Scalars['Int']>;
   workspace?: Maybe<Workspace>;
 };
 
@@ -71,6 +72,7 @@ export type EventQuery = {
 export enum EventStatus {
   Completed = 'COMPLETED',
   Failed = 'FAILED',
+  NoFunctions = 'NO_FUNCTIONS',
   PartiallyFailed = 'PARTIALLY_FAILED',
   Paused = 'PAUSED',
   Running = 'RUNNING'
@@ -245,12 +247,12 @@ export type Workspace = {
 export type GetEventsStreamQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetEventsStreamQuery = { __typename?: 'Query', events?: Array<{ __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null }> | null };
+export type GetEventsStreamQuery = { __typename?: 'Query', events?: Array<{ __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, totalRuns?: number | null }> | null };
 
 export type GetFunctionsStreamQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetFunctionsStreamQuery = { __typename?: 'Query', functionRuns?: Array<{ __typename?: 'FunctionRun', id: string, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, name?: string | null }> | null };
+export type GetFunctionsStreamQuery = { __typename?: 'Query', functionRuns?: Array<{ __typename?: 'FunctionRun', id: string, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, name?: string | null, event?: { __typename?: 'Event', id: string } | null }> | null };
 
 export type GetEventQueryVariables = Exact<{
   id: Scalars['ID'];
@@ -274,7 +276,7 @@ export const GetEventsStreamDocument = `
     name
     createdAt
     status
-    pendingRuns
+    totalRuns
   }
 }
     `;
@@ -286,6 +288,9 @@ export const GetFunctionsStreamDocument = `
     startedAt
     pendingSteps
     name
+    event {
+      id
+    }
   }
 }
     `;

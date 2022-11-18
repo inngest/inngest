@@ -47,8 +47,8 @@ func (r *queryResolver) Events(ctx context.Context, query models.EventsQuery) ([
 	var events []*models.Event
 
 	for _, evt := range evts {
+		name := evt.Name
 		createdAt := time.UnixMilli(evt.Timestamp)
-
 		payloadByt, err := json.Marshal(evt.Data)
 		if err != nil {
 			continue
@@ -57,7 +57,7 @@ func (r *queryResolver) Events(ctx context.Context, query models.EventsQuery) ([
 
 		events = append(events, &models.Event{
 			ID:        evt.ID,
-			Name:      &evt.Name,
+			Name:      &name,
 			CreatedAt: &createdAt,
 			Payload:   &payload,
 		})

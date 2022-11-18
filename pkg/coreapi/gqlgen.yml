@@ -34,6 +34,8 @@ models:
         resolver: true
       pendingRuns:
         resolver: true
+      totalRuns:
+        resolver: true
       status:
         resolver: true
       raw:

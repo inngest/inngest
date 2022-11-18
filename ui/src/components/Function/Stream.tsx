@@ -2,7 +2,7 @@ import {
   FunctionRunStatus,
   useGetFunctionsStreamQuery,
 } from "../../store/generated";
-import { selectRun } from "../../store/global";
+import { selectEvent, selectRun } from "../../store/global";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import TimelineFeedContent from "../Timeline/TimelineFeedContent";
 import TimelineRow from "../Timeline/TimelineRow";
@@ -31,7 +31,10 @@ export const FuncStream = () => {
             status={run.status || FunctionRunStatus.Completed}
             badge={run.pendingSteps || 0}
             name={run.name || "Unknown"}
-            onClick={() => dispatch(selectRun(run.id))}
+            onClick={() => {
+              dispatch(selectRun(run.id));
+              dispatch(selectEvent(run.event?.id || null));
+            }}
           />
         </TimelineRow>
       ))}

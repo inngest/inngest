@@ -4,7 +4,7 @@ import classNames from "../../utils/classnames";
 import statusStyles from "../../utils/statusStyles";
 
 interface TimelineRowProps {
-  status: EventStatus | FunctionRunStatus;
+  status: EventStatus | FunctionRunStatus | null;
   children: ComponentChildren;
   topLine?: boolean;
   bottomLine?: boolean;

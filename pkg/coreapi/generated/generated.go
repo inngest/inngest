@@ -74,6 +74,7 @@ type ComplexityRoot struct {
 		Raw          func(childComplexity int) int
 		Schema       func(childComplexity int) int
 		Status       func(childComplexity int) int
+		TotalRuns    func(childComplexity int) int
 		Workspace    func(childComplexity int) int
 	}
 
@@ -150,6 +151,7 @@ type ComplexityRoot struct {
 type EventResolver interface {
 	Status(ctx context.Context, obj *models.Event) (*models.EventStatus, error)
 	PendingRuns(ctx context.Context, obj *models.Event) (*int, error)
+	TotalRuns(ctx context.Context, obj *models.Event) (*int, error)
 	Raw(ctx context.Context, obj *models.Event) (*string, error)
 	FunctionRuns(ctx context.Context, obj *models.Event) ([]*models.FunctionRun, error)
 }
@@ -311,6 +313,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Event.Status(childComplexity), true
+
+	case "Event.totalRuns":
+		if e.complexity.Event.TotalRuns == nil {
+			break
+		}
+
+		return e.complexity.Event.TotalRuns(childComplexity), true
 
 	case "Event.workspace":
 		if e.complexity.Event.Workspace == nil {
@@ -832,17 +841,35 @@ type Event {
   schema: String
   status: EventStatus
   pendingRuns: Int
+  # The total number of function runs triggered by this event.
+  totalRuns: Int
   # The raw JSON of this event, as it would've be sent by the producer.
   raw: String
   functionRuns: [FunctionRun!]
 }
 
 enum EventStatus {
+  # The event has triggered one or more functions, none of them have failed, and
+  # some of are them are still running.
   RUNNING
+
+  # The event has triggered one or more functions and all of them have completed
+  # successfully.
   COMPLETED
+
+  # The event has triggered one or more functions and has paused for a period of
+  # time or is waiting for an event.
   PAUSED
+
+  # The event has triggered one or more functions and all have failed.
   FAILED
+
+  # The event has triggered one or more functions, at least one - but not all -
+  # have failed, and all have run finished running.
   PARTIALLY_FAILED
+
+  # The event triggered no functions.
+  NO_FUNCTIONS
 }
 
 enum FunctionRunStatus {
@@ -1804,6 +1831,47 @@ func (ec *executionContext) fieldContext_Event_pendingRuns(ctx context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _Event_totalRuns(ctx context.Context, field graphql.CollectedField, obj *models.Event) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Event_totalRuns(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Event().TotalRuns(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Event_totalRuns(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Event",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Event_raw(ctx context.Context, field graphql.CollectedField, obj *models.Event) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Event_raw(ctx, field)
 	if err != nil {
@@ -2651,6 +2719,8 @@ func (ec *executionContext) fieldContext_FunctionRun_event(ctx context.Context, 
 				return ec.fieldContext_Event_status(ctx, field)
 			case "pendingRuns":
 				return ec.fieldContext_Event_pendingRuns(ctx, field)
+			case "totalRuns":
+				return ec.fieldContext_Event_totalRuns(ctx, field)
 			case "raw":
 				return ec.fieldContext_Event_raw(ctx, field)
 			case "functionRuns":
@@ -3339,6 +3409,8 @@ func (ec *executionContext) fieldContext_Query_event(ctx context.Context, field 
 				return ec.fieldContext_Event_status(ctx, field)
 			case "pendingRuns":
 				return ec.fieldContext_Event_pendingRuns(ctx, field)
+			case "totalRuns":
+				return ec.fieldContext_Event_totalRuns(ctx, field)
 			case "raw":
 				return ec.fieldContext_Event_raw(ctx, field)
 			case "functionRuns":
@@ -3413,6 +3485,8 @@ func (ec *executionContext) fieldContext_Query_events(ctx context.Context, field
 				return ec.fieldContext_Event_status(ctx, field)
 			case "pendingRuns":
 				return ec.fieldContext_Event_pendingRuns(ctx, field)
+			case "totalRuns":
+				return ec.fieldContext_Event_totalRuns(ctx, field)
 			case "raw":
 				return ec.fieldContext_Event_raw(ctx, field)
 			case "functionRuns":
@@ -6259,6 +6333,23 @@ func (ec *executionContext) _Event(ctx context.Context, sel ast.SelectionSet, ob
 					}
 				}()
 				res = ec._Event_pendingRuns(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "totalRuns":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Event_totalRuns(ctx, field, obj)
 				return res
 			}
 

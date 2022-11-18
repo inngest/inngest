@@ -56,17 +56,35 @@ type Event {
   schema: String
   status: EventStatus
   pendingRuns: Int
+  # The total number of function runs triggered by this event.
+  totalRuns: Int
   # The raw JSON of this event, as it would've be sent by the producer.
   raw: String
   functionRuns: [FunctionRun!]
 }
 
 enum EventStatus {
+  # The event has triggered one or more functions, none of them have failed, and
+  # some of are them are still running.
   RUNNING
+
+  # The event has triggered one or more functions and all of them have completed
+  # successfully.
   COMPLETED
+
+  # The event has triggered one or more functions and has paused for a period of
+  # time or is waiting for an event.
   PAUSED
+
+  # The event has triggered one or more functions and all have failed.
   FAILED
+
+  # The event has triggered one or more functions, at least one - but not all -
+  # have failed, and all have run finished running.
   PARTIALLY_FAILED
+
+  # The event triggered no functions.
+  NO_FUNCTIONS
 }
 
 enum FunctionRunStatus {

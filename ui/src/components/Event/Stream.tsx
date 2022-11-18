@@ -26,7 +26,7 @@ export const EventStream = () => {
             date={event.createdAt}
             active={selectedEvent === event.id}
             status={event.status || EventStatus.Completed}
-            badge={event.pendingRuns || 0}
+            badge={event.totalRuns || 0}
             name={event.name || "Unknown"}
             onClick={() => dispatch(selectEvent(event.id))}
           />

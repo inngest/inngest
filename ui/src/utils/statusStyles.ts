@@ -3,12 +3,15 @@ import {
   IconStatusCompleted,
   IconStatusDefault,
   IconStatusFailed,
+  IconStatusNoFn,
   IconStatusPaused,
   IconStatusRunning,
 } from "../icons";
 import { EventStatus, FunctionRunStatus } from "../store/generated";
 
-export default function statusStyles(status: EventStatus | FunctionRunStatus) {
+export default function statusStyles(
+  status: EventStatus | FunctionRunStatus | null
+) {
   switch (status) {
     case FunctionRunStatus.Running:
     case EventStatus.Running:
@@ -43,12 +46,12 @@ export default function statusStyles(status: EventStatus | FunctionRunStatus) {
         icon: IconStatusActionReq,
         fnBG: "bg-yellow-500/20 group-hover:bg-yellow-500/40",
       };
-    // case 'NO_FN':
-    //   return {
-    //     text: 'text-white',
-    //     icon: IconStatusNoFn,
-    //     fnBG: 'bg-slate-800 group-hover:bg-slate-700',
-    //   }
+    case EventStatus.NoFunctions:
+      return {
+        text: "text-white",
+        icon: IconStatusNoFn,
+        fnBG: "bg-slate-800 group-hover:bg-slate-700",
+      };
     default:
       return {
         text: "text-white",

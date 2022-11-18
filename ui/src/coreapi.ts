@@ -7,7 +7,7 @@ export const EVENTS_STREAM = gql`
       name
       createdAt
       status
-      pendingRuns
+      totalRuns
     }
   }
 `;
@@ -20,6 +20,9 @@ export const FUNCTIONS_STREAM = gql`
       startedAt
       pendingSteps
       name
+      event {
+        id
+      }
     }
   }
 `;

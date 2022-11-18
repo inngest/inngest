@@ -95,7 +95,7 @@ export default function EventDetail() {
                     >
                       <FuncCard
                         title={eventFunc.name}
-                        date={new Date(eventFunc.datetime)}
+                        date={eventFunc.datetime}
                         badge={eventFunc.version}
                         id={eventFunc.id}
                         // status={eventFunc.status}

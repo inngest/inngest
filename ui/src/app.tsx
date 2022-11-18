@@ -74,7 +74,7 @@ export function App() {
       {codeBlockModalActive.visible && (
         <CodeBlockModal closeModal={setModal}>
           <CodeBlock
-            tabs={codeBlockModalActive.content}
+            tabs={[{ label: "Payload", content: codeBlockModalActive.content }]}
             modal={setModal}
             expanded
           />

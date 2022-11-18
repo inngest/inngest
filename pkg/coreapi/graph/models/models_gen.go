@@ -42,6 +42,7 @@ type Event struct {
 	Schema       *string        `json:"schema"`
 	Status       *EventStatus   `json:"status"`
 	PendingRuns  *int           `json:"pendingRuns"`
+	TotalRuns    *int           `json:"totalRuns"`
 	Raw          *string        `json:"raw"`
 	FunctionRuns []*FunctionRun `json:"functionRuns"`
 }
@@ -128,6 +129,7 @@ const (
 	EventStatusPaused          EventStatus = "PAUSED"
 	EventStatusFailed          EventStatus = "FAILED"
 	EventStatusPartiallyFailed EventStatus = "PARTIALLY_FAILED"
+	EventStatusNoFunctions     EventStatus = "NO_FUNCTIONS"
 )
 
 var AllEventStatus = []EventStatus{
@@ -136,11 +138,12 @@ var AllEventStatus = []EventStatus{
 	EventStatusPaused,
 	EventStatusFailed,
 	EventStatusPartiallyFailed,
+	EventStatusNoFunctions,
 }
 
 func (e EventStatus) IsValid() bool {
 	switch e {
-	case EventStatusRunning, EventStatusCompleted, EventStatusPaused, EventStatusFailed, EventStatusPartiallyFailed:
+	case EventStatusRunning, EventStatusCompleted, EventStatusPaused, EventStatusFailed, EventStatusPartiallyFailed, EventStatusNoFunctions:
 		return true
 	}
 	return false

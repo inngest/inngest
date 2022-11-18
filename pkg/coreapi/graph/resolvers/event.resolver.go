@@ -84,7 +84,13 @@ func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.
 		return nil, err
 	}
 
-	status := models.EventStatusCompleted
+	status := models.EventStatusNoFunctions
+
+	if len(metadata) == 0 {
+		return &status, nil
+	}
+
+	status = models.EventStatusCompleted
 	var failedRuns int
 	var isRunning bool
 
@@ -134,4 +140,15 @@ func (r *eventResolver) Raw(ctx context.Context, obj *models.Event) (*string, er
 	jsonStr := string(byt)
 
 	return &jsonStr, nil
+}
+
+func (r *eventResolver) TotalRuns(ctx context.Context, obj *models.Event) (*int, error) {
+	metadata, err := r.Runner.Runs(ctx, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	total := len(metadata)
+
+	return &total, nil
 }
