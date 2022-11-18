@@ -1,4 +1,5 @@
 import {
+  IconStatusActionReq,
   IconStatusCompleted,
   IconStatusDefault,
   IconStatusFailed,
@@ -36,12 +37,12 @@ export default function statusStyles(status: EventStatus | FunctionRunStatus) {
         icon: IconStatusPaused,
         fnBG: "bg-slate-800 group-hover:bg-slate-700",
       };
-    // case 'ACTION_REQ':
-    //   return {
-    //     text: 'text-orange-300',
-    //     icon: IconStatusActionReq,
-    //     fnBG: 'bg-yellow-500/20 group-hover:bg-yellow-500/40',
-    //   }
+    case EventStatus.PartiallyFailed:
+      return {
+        text: "text-orange-300",
+        icon: IconStatusActionReq,
+        fnBG: "bg-yellow-500/20 group-hover:bg-yellow-500/40",
+      };
     // case 'NO_FN':
     //   return {
     //     text: 'text-white',

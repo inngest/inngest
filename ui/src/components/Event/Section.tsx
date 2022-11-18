@@ -44,7 +44,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
   return (
     <ContentCard
       title={event.name || "unknown"}
-      date={new Date(event.createdAt)}
+      date={event.createdAt}
       id={eventId}
       active
       button={<Button label="Open Event" icon={<IconFeed />} />}
@@ -53,20 +53,21 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
         <TimelineRow status={EventStatus.Completed} iconOffset={0}>
           <TimelineStaticContent
             label="Event Received"
-            date={new Date(event.createdAt)}
+            date={event.createdAt}
             actionBtn={<Button label="Retry" />}
           />
         </TimelineRow>
 
-        {event.functionRuns?.map((run) => (
+        {event.functionRuns?.map((run, i, list) => (
           <TimelineRow
             key={run.id}
             status={run.status || FunctionRunStatus.Completed}
             iconOffset={36}
+            bottomLine={i < list.length - 1}
           >
             <FuncCard
               title={run.name || "Unknown"}
-              date={new Date(run.startedAt)}
+              date={run.startedAt}
               id={run.id}
               status={run.status || FunctionRunStatus.Completed}
               active={selectedRun === run.id}

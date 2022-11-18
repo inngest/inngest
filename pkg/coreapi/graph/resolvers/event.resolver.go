@@ -40,6 +40,11 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 		name := string(m.Name)
 		pending := int(m.Pending)
 
+		// Don't let pending be negative for clients
+		if pending < 0 {
+			pending = 0
+		}
+
 		runs = append(runs, &models.FunctionRun{
 			ID:           m.OriginalRunID.String(),
 			Name:         &name,
@@ -80,16 +85,29 @@ func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.
 	}
 
 	status := models.EventStatusCompleted
+	var failedRuns int
+	var isRunning bool
 
 	for _, m := range metadata {
 		if m.Status == enums.RunStatusFailed {
-			status = models.EventStatusFailed
-			break
+			failedRuns++
+			continue
 		}
 
 		if m.Status == enums.RunStatusRunning {
-			status = models.EventStatusRunning
+			isRunning = true
+			continue
 		}
+	}
+
+	if failedRuns > 0 {
+		if failedRuns == len(metadata) {
+			status = models.EventStatusFailed
+		} else {
+			status = models.EventStatusPartiallyFailed
+		}
+	} else if isRunning {
+		status = models.EventStatusRunning
 	}
 
 	return &status, nil

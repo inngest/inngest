@@ -71,6 +71,7 @@ export type EventQuery = {
 export enum EventStatus {
   Completed = 'COMPLETED',
   Failed = 'FAILED',
+  PartiallyFailed = 'PARTIALLY_FAILED',
   Paused = 'PAUSED',
   Running = 'RUNNING'
 }
@@ -241,12 +242,15 @@ export type Workspace = {
   id: Scalars['ID'];
 };
 
-export type GetEventsStreamQueryVariables = Exact<{
-  query?: EventsQuery;
-}>;
+export type GetEventsStreamQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type GetEventsStreamQuery = { __typename?: 'Query', events?: Array<{ __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null }> | null };
+
+export type GetFunctionsStreamQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetFunctionsStreamQuery = { __typename?: 'Query', functionRuns?: Array<{ __typename?: 'FunctionRun', id: string, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, name?: string | null }> | null };
 
 export type GetEventQueryVariables = Exact<{
   id: Scalars['ID'];
@@ -264,13 +268,24 @@ export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __type
 
 
 export const GetEventsStreamDocument = `
-    query GetEventsStream($query: EventsQuery! = {}) {
-  events(query: $query) {
+    query GetEventsStream {
+  events(query: {}) {
     id
     name
     createdAt
     status
     pendingRuns
+  }
+}
+    `;
+export const GetFunctionsStreamDocument = `
+    query GetFunctionsStream {
+  functionRuns(query: {}) {
+    id
+    status
+    startedAt
+    pendingSteps
+    name
   }
 }
     `;
@@ -325,6 +340,9 @@ const injectedRtkApi = api.injectEndpoints({
     GetEventsStream: build.query<GetEventsStreamQuery, GetEventsStreamQueryVariables | void>({
       query: (variables) => ({ document: GetEventsStreamDocument, variables })
     }),
+    GetFunctionsStream: build.query<GetFunctionsStreamQuery, GetFunctionsStreamQueryVariables | void>({
+      query: (variables) => ({ document: GetFunctionsStreamDocument, variables })
+    }),
     GetEvent: build.query<GetEventQuery, GetEventQueryVariables>({
       query: (variables) => ({ document: GetEventDocument, variables })
     }),
@@ -335,5 +353,5 @@ const injectedRtkApi = api.injectEndpoints({
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery } = injectedRtkApi;
+export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery } = injectedRtkApi;
 

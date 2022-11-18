@@ -16,13 +16,15 @@
     "graphql": "^16.6.0",
     "graphql-request": "4",
     "preact": "^10.11.2",
-    "react-redux": "^8.0.5"
+    "react-redux": "^8.0.5",
+    "react-timeago": "^7.1.0"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "2.13.11",
     "@graphql-codegen/typescript-operations": "^2.5.7",
     "@graphql-codegen/typescript-rtk-query": "^2.3.7",
     "@preact/preset-vite": "^2.4.0",
+    "@types/react-timeago": "^4.1.3",
     "autoprefixer": "^10.4.13",
     "concurrently": "^7.5.0",
     "nodemon": "^2.0.20",

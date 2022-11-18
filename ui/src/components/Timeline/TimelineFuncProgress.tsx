@@ -1,8 +1,9 @@
 import { ComponentChildren } from "preact";
+import { Time } from "../Time";
 
 interface TimelineFuncProgressProps {
   label: string;
-  date?: Date;
+  date?: string | number;
   id: string;
   children?: ComponentChildren;
 }
@@ -20,7 +21,7 @@ export default function TimelineFuncProgress({
           <h2 className="text-slate-50">{label}</h2>
           {date && (
             <span className="text-2xs mt-1 block leading-none text-slate-400">
-              {date.toISOString()}
+              <Time date={date} />
             </span>
           )}
         </div>

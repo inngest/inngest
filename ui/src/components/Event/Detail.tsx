@@ -9,7 +9,7 @@ import eventFuncs from "../../../mock/eventFuncs";
 import { funcTabs } from "../../../mock/funcTabs";
 import { eventTabs } from "../../../mock/tabs";
 import { IconFeed } from "../../icons";
-import { EventStatus } from "../../store/generated";
+import { EventStatus, FunctionRunStatus } from "../../store/generated";
 import Button from "../Button";
 import CodeBlock from "../CodeBlock";
 import ContentCard from "../Content/ContentCard";
@@ -81,7 +81,7 @@ export default function EventDetail() {
                 <TimelineRow status={EventStatus.Completed} iconOffset={0}>
                   <TimelineStaticContent
                     label="Event Received"
-                    date={new Date("2022-04-28T14:34:21")}
+                    date={"2022-04-28T14:34:21"}
                     actionBtn={<Button label="Retry" />}
                   />
                 </TimelineRow>
@@ -98,7 +98,8 @@ export default function EventDetail() {
                         date={new Date(eventFunc.datetime)}
                         badge={eventFunc.version}
                         id={eventFunc.id}
-                        status={eventFunc.status}
+                        // status={eventFunc.status}
+                        status={FunctionRunStatus.Completed}
                         contextualBar={
                           <>
                             <p>Function paused for sleep until 1:40pm</p>
@@ -124,7 +125,7 @@ export default function EventDetail() {
             </div>
             <ContentCard
               title="Process uploaded images"
-              date={new Date("2022-04-28T14:34:21")}
+              date={"2022-04-28T14:34:21"}
               button={<Button label="Open Function" icon={<IconFeed />} />}
               id="01GGG522ZATDGVQBCND4ZEAS6Z"
             >
@@ -138,7 +139,7 @@ export default function EventDetail() {
                 <TimelineRow status={EventStatus.Completed} iconOffset={0}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    date={new Date("2022-04-28T14:34:21")}
+                    date={"2022-04-28T14:34:21"}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   >
                     <CodeBlock modal={setModal} tabs={funcTabs} />
@@ -148,28 +149,28 @@ export default function EventDetail() {
                 <TimelineRow status={EventStatus.Completed}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    date={new Date("2022-04-28T14:34:21")}
+                    date={"2022-04-28T14:34:21"}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   />
                 </TimelineRow>
                 <TimelineRow status={EventStatus.Failed}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    date={new Date("2022-04-28T14:34:21")}
+                    date={"2022-04-28T14:34:21"}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   />
                 </TimelineRow>
                 <TimelineRow status={EventStatus.Failed}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    date={new Date("2022-04-28T14:34:21")}
+                    date={"2022-04-28T14:34:21"}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   />
                 </TimelineRow>
                 <TimelineRow status={EventStatus.Failed} bottomLine={false}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    date={new Date("2022-04-28T14:34:21")}
+                    date={"2022-04-28T14:34:21"}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   />
                 </TimelineRow>

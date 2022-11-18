@@ -2,10 +2,11 @@ import { ComponentChild } from "preact";
 import { FunctionRunStatus } from "../../store/generated";
 import classNames from "../../utils/classnames";
 import statusStyles from "../../utils/statusStyles";
+import { Time } from "../Time";
 
 interface FuncCardProps {
   title: string;
-  date: Date;
+  date: string | number;
   badge?: string | number;
   id: string;
   status: FunctionRunStatus;
@@ -47,7 +48,7 @@ export default function FuncCard({
         <div className="flex items-start justify-between">
           <div>
             <span className="text-2xs mt-1 block leading-none">
-              {date.toISOString()}
+              <Time date={date} />
             </span>
             <h2 className="text-white mt-2">{title}</h2>
           </div>

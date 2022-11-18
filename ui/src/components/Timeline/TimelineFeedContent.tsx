@@ -1,10 +1,11 @@
-import { EventStatus } from "../../store/generated";
+import { EventStatus, FunctionRunStatus } from "../../store/generated";
 import classNames from "../../utils/classnames";
 import statusStyles from "../../utils/statusStyles";
+import { Time } from "../Time";
 
 interface TimelineFeedContent {
-  date: Date;
-  status: EventStatus;
+  date: string | number;
+  status: EventStatus | FunctionRunStatus;
   name: string;
   badge: number;
   active?: boolean;
@@ -40,7 +41,7 @@ export default function TimelineFeedContent({
       }
     >
       <span className="block text-3xs text-slate-300 pb-0.5">
-        {date.toISOString()}
+        <Time date={date} />
       </span>
       <div className="flex items-center">
         <h4 className="text-sm font-normal whitespace-nowrap overflow-hidden text-ellipsis grow pr-2 leading-none ">

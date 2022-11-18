@@ -123,10 +123,11 @@ type Workspace struct {
 type EventStatus string
 
 const (
-	EventStatusRunning   EventStatus = "RUNNING"
-	EventStatusCompleted EventStatus = "COMPLETED"
-	EventStatusPaused    EventStatus = "PAUSED"
-	EventStatusFailed    EventStatus = "FAILED"
+	EventStatusRunning         EventStatus = "RUNNING"
+	EventStatusCompleted       EventStatus = "COMPLETED"
+	EventStatusPaused          EventStatus = "PAUSED"
+	EventStatusFailed          EventStatus = "FAILED"
+	EventStatusPartiallyFailed EventStatus = "PARTIALLY_FAILED"
 )
 
 var AllEventStatus = []EventStatus{
@@ -134,11 +135,12 @@ var AllEventStatus = []EventStatus{
 	EventStatusCompleted,
 	EventStatusPaused,
 	EventStatusFailed,
+	EventStatusPartiallyFailed,
 }
 
 func (e EventStatus) IsValid() bool {
 	switch e {
-	case EventStatusRunning, EventStatusCompleted, EventStatusPaused, EventStatusFailed:
+	case EventStatusRunning, EventStatusCompleted, EventStatusPaused, EventStatusFailed, EventStatusPartiallyFailed:
 		return true
 	}
 	return false

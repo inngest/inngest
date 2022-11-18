@@ -25,7 +25,7 @@ export default function TimelineRow({
       <div className="flex flex-col items-center basis-[36px]">
         <div
           className={classNames(
-            bottomLine ? `bg-slate-700/60` : ``,
+            topLine ? `bg-slate-700/60` : ``,
             `w-[2px] shrink-0 bg-transparent`
           )}
           style={`flex-basis: ${iconOffset}px`}

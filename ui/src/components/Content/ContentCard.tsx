@@ -1,10 +1,11 @@
 import { ComponentChild, ComponentChildren } from "preact";
 import classNames from "../../utils/classnames";
+import { Time } from "../Time";
 
 interface ContentCardProps {
   children: ComponentChildren;
   title: string;
-  date: Date;
+  date: string | number;
   button?: ComponentChild;
   id: string;
   active?: boolean;
@@ -28,7 +29,9 @@ export default function ContentCard({
       <div className="shadow-slate-950 px-5 py-4 shadow-lg relative z-30">
         <div className="mb-5">
           <h1 className=" text-lg text-slate-50">{title}</h1>
-          <span className="text-2xs mt-1 block">{date.toISOString()}</span>
+          <span className="text-2xs mt-1 block">
+            <Time date={date} />
+          </span>
         </div>
 
         <div className="flex items-center justify-between">

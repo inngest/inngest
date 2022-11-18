@@ -5,24 +5,29 @@ import TimelineFeedContent from "../Timeline/TimelineFeedContent";
 import TimelineRow from "../Timeline/TimelineRow";
 
 export const EventStream = () => {
-  const events = useGetEventsStreamQuery({}, { pollingInterval: 1000 });
+  const events = useGetEventsStreamQuery(
+    {},
+    { pollingInterval: 1000, refetchOnMountOrArgChange: true }
+  );
   const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
   const dispatch = useAppDispatch();
 
   return (
     <>
-      {events?.data?.events?.map((event, i) => (
+      {events?.data?.events?.map((event, i, list) => (
         <TimelineRow
           key={event.id}
           status={event.status || EventStatus.Completed}
           iconOffset={30}
+          topLine={i !== 0}
+          bottomLine={i < list.length - 1}
         >
           <TimelineFeedContent
-            date={new Date(event.createdAt)}
+            date={event.createdAt}
             active={selectedEvent === event.id}
             status={event.status || EventStatus.Completed}
             badge={event.pendingRuns || 0}
-            name={event.name || "unknown"}
+            name={event.name || "Unknown"}
             onClick={() => dispatch(selectEvent(event.id))}
           />
         </TimelineRow>

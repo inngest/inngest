@@ -842,6 +842,7 @@ enum EventStatus {
   COMPLETED
   PAUSED
   FAILED
+  PARTIALLY_FAILED
 }
 
 enum FunctionRunStatus {

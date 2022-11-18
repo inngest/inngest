@@ -1,13 +1,25 @@
 import { gql } from "graphql-request";
 
 export const EVENTS_STREAM = gql`
-  query GetEventsStream($query: EventsQuery! = {}) {
-    events(query: $query) {
+  query GetEventsStream {
+    events(query: {}) {
       id
       name
       createdAt
       status
       pendingRuns
+    }
+  }
+`;
+
+export const FUNCTIONS_STREAM = gql`
+  query GetFunctionsStream {
+    functionRuns(query: {}) {
+      id
+      status
+      startedAt
+      pendingSteps
+      name
     }
   }
 `;

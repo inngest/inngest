@@ -22,10 +22,10 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
   const [pollingInterval, setPollingInterval] = useState(1000);
   const query = useGetFunctionRunQuery(
     { id: runId || "" },
-    { pollingInterval, skip: !runId }
+    { pollingInterval, skip: !runId, refetchOnMountOrArgChange: true }
   );
   const run = useMemo(() => query.data?.functionRun, [query.data?.functionRun]);
-  const eventPayload = usePrettyJson(run?.event?.raw);
+  // const eventPayload = usePrettyJson(run?.event?.raw);
 
   useEffect(() => {
     if (typeof run?.pendingSteps !== "number") return;
@@ -38,7 +38,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
 
   if (!run) {
     return (
-      <ContentCard title="Event not found" date={new Date()} id="">
+      <ContentCard title="Event not found" date={0} id="">
         Event not found
       </ContentCard>
     );
@@ -47,7 +47,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
   return (
     <ContentCard
       title={run.name || "Unknown"}
-      date={new Date(run.startedAt)}
+      date={run.startedAt}
       id={run.id}
       button={<Button label="Open Function" icon={<IconFeed />} />}
     >
@@ -57,7 +57,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       <div className="pr-4 mt-4">
         {run.timeline?.map((row) => (
           <FunctionRunTimelineRow
-            createdAt={row.createdAt || new Date()}
+            createdAt={row.createdAt}
             rowType={row.__typename === "FunctionEvent" ? "function" : "step"}
             eventType={
               row.__typename === "FunctionEvent"
@@ -76,7 +76,7 @@ type FunctionRunTimelineRowProps = {
   rowType: "function" | "step";
   eventType: FunctionEventType | StepEventType;
   output: string | null | undefined;
-  createdAt: Date;
+  createdAt: string | number;
 };
 
 const FunctionRunTimelineRow = ({
@@ -94,7 +94,7 @@ const FunctionRunTimelineRow = ({
 
   return (
     <TimelineRow status={status} iconOffset={0}>
-      <TimelineFuncProgress label={label} date={new Date(createdAt)} id="">
+      <TimelineFuncProgress label={label} date={createdAt} id="">
         {payload ? (
           <CodeBlock tabs={[{ label: "Payload", content: payload }]} />
         ) : null}
