@@ -41,7 +41,7 @@ type Runner interface {
 	InitializeCrons(ctx context.Context) error
 	History(ctx context.Context, id state.Identifier) ([]state.History, error)
 	Runs(ctx context.Context, eventId string) ([]state.Metadata, error)
-	Events(ctx context.Context) ([]event.Event, error)
+	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
 func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
@@ -219,7 +219,16 @@ func (s *svc) Runs(ctx context.Context, eventId string) ([]state.Metadata, error
 	return s.state.Runs(ctx, eventId)
 }
 
-func (s *svc) Events(ctx context.Context) ([]event.Event, error) {
+func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error) {
+	if eventId != "" {
+		evt := s.em.EventById(eventId)
+		if evt != nil {
+			return []event.Event{*evt}, nil
+		}
+
+		return []event.Event{}, nil
+	}
+
 	return s.em.Events(), nil
 }
 
