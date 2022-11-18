@@ -42,6 +42,7 @@ type Event struct {
 	Schema       *string        `json:"schema"`
 	Status       *EventStatus   `json:"status"`
 	PendingRuns  *int           `json:"pendingRuns"`
+	Raw          *string        `json:"raw"`
 	FunctionRuns []*FunctionRun `json:"functionRuns"`
 }
 
@@ -86,6 +87,7 @@ type FunctionRun struct {
 	PendingSteps *int               `json:"pendingSteps"`
 	StartedAt    *time.Time         `json:"startedAt"`
 	Timeline     []FunctionRunEvent `json:"timeline"`
+	Event        *Event             `json:"event"`
 }
 
 type FunctionRunQuery struct {

@@ -36,7 +36,11 @@ models:
         resolver: true
       status:
         resolver: true
+      raw:
+        resolver: true
   FunctionRun:
     fields:
       timeline:
+        resolver: true
+      event:
         resolver: true

@@ -56,6 +56,8 @@ type Event {
   schema: String
   status: EventStatus
   pendingRuns: Int
+  # The raw JSON of this event, as it would've be sent by the producer.
+  raw: String
   functionRuns: [FunctionRun!]
 }
 
@@ -116,4 +118,5 @@ type FunctionRun {
   pendingSteps: Int
   startedAt: Time
   timeline: [FunctionRunEvent!]
+  event: Event
 }

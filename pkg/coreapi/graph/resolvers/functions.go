@@ -2,16 +2,71 @@ package resolvers
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/function"
 )
 
 func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error) {
-	return nil, nil
+	if query.FunctionRunID == "" {
+		return nil, fmt.Errorf("function run id is required")
+	}
+
+	metadata, err := r.Runner.Runs(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+
+	var targetRun *state.Metadata
+
+	for _, m := range metadata {
+		if m.OriginalRunID.String() == query.FunctionRunID {
+			targetRun = &m
+			break
+		}
+	}
+
+	if targetRun == nil {
+		return nil, nil
+	}
+
+	status := models.FunctionRunStatusRunning
+
+	switch targetRun.Status {
+	case enums.RunStatusCompleted:
+		status = models.FunctionRunStatusCompleted
+	case enums.RunStatusFailed:
+		status = models.FunctionRunStatusFailed
+	case enums.RunStatusCancelled:
+		status = models.FunctionRunStatusCancelled
+	}
+
+	var startedAt time.Time
+
+	if targetRun.OriginalRunID != nil {
+		startedAt = time.UnixMilli(int64(targetRun.OriginalRunID.Time()))
+	}
+
+	name := string(targetRun.Name)
+	pending := int(targetRun.Pending)
+
+	// Don't let pending be negative for clients
+	if pending < 0 {
+		pending = 0
+	}
+
+	return &models.FunctionRun{
+		ID:           targetRun.OriginalRunID.String(),
+		Name:         &name,
+		Status:       &status,
+		PendingSteps: &pending,
+		StartedAt:    &startedAt,
+	}, nil
 }
 
 func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionRunsQuery) ([]*models.FunctionRun, error) {
@@ -42,6 +97,11 @@ func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionR
 
 		name := string(m.Name)
 		pending := int(m.Pending)
+
+		// Don't let pending be negative for clients
+		if pending < 0 {
+			pending = 0
+		}
 
 		runs = append(runs, &models.FunctionRun{
 			ID:           m.OriginalRunID.String(),

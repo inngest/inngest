@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"time"
 
@@ -92,4 +93,27 @@ func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.
 	}
 
 	return &status, nil
+}
+
+func (r *eventResolver) Raw(ctx context.Context, obj *models.Event) (*string, error) {
+	evts, err := r.Runner.Events(ctx, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(evts) == 0 {
+		return nil, nil
+	}
+
+	evt := evts[0]
+
+	// Marshall the entire event to JSON and return that string.
+	byt, err := json.Marshal(evt)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonStr := string(byt)
+
+	return &jsonStr, nil
 }
