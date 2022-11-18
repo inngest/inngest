@@ -70,10 +70,15 @@
 
   --nav-height: 120px;
 
-  font-size: 20px;
+  font-size: 16px; /* Tailwind base */
   font-family: var(--font);
   color: var(--font-color-primary);
   background: var(--bg-color);
+}
+
+/* Legacy base styles */
+:root.v1 {
+  font-size: 20px;
 }
 
 html.docs {

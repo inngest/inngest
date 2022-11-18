@@ -23,6 +23,7 @@ import {
 export async function getStaticProps() {
   return {
     props: {
+      designVersion: "2",
       meta: {
         // TODO
         title: "Write functions, Send Events",
