@@ -11,6 +11,7 @@ import DemoBlock from "src/shared/DemoBlock";
 import GraphicCallout from "src/shared/GraphicCallout";
 import CodeWindow from "src/shared/CodeWindow";
 import Discord from "src/shared/Icons/Discord";
+import SendEventsImg from "src/shared/Home/HomeImg/SendEventsImg";
 
 import {
   Hero as SDKHero,
@@ -18,6 +19,8 @@ import {
   worksWithBrands,
   BETA_TYPEFORM_URL,
 } from "./features/sdk";
+import Header from "src/shared/Home/Header";
+import Hero from "src/shared/Home/Hero";
 // import { Experiment, FadeIn } from "src/shared/Experiment";
 
 export async function getStaticProps() {
@@ -133,8 +136,36 @@ export default function Home() {
   );
   const ext = language === "typescript" ? "ts" : "js";
   return (
-    <div className="home">
-      <Nav sticky={true} />
+    <div className="home bg-slate-1000">
+      <Header />
+
+      <Hero />
+
+      <div className="max-w-container-desktop m-auto mb-12 px-10 2xl:-mt-20">
+        <h2 className="text-slate-50 font-medium text-5xl mb-7 ">
+          Event driven, made simple
+        </h2>
+        <p className="text-slate-300 font-light max-w-xl leading-7">
+          Our dev server runs on your machine providing you instant feedback and
+          debugging tools so you can build serverless functions with events like
+          never before possible.
+        </p>
+      </div>
+
+      <div className="bg-gradient-to-r from-slate-1000/0  to-slate-900">
+        <div className="max-w-container-desktop m-auto flex px-10 relative">
+          <div className="py-16">
+            <h3 className="text-2xl text-slate-50 mb-3">
+              Write code, send events
+            </h3>
+            <p className="text-slate-400 font-light text-sm max-w-sm leading-7">
+              Use the Inngest SDK to define functions that are triggered by
+              events from your app or anywhere on the internet.
+            </p>
+          </div>
+          <SendEventsImg />
+        </div>
+      </div>
 
       <div>
         {/* Content layout */}

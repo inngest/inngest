@@ -6,6 +6,7 @@ export default class MyDocument extends Document {
       <Html>
         <Head>
           <link rel="icon" href={`/${process.env.NEXT_PUBLIC_FAVICON}`} />
+          <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
           <link
             rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.4.0/styles/github-dark.min.css"
