@@ -8,6 +8,7 @@ interface TimelineFeedContent {
   name: string;
   badge: number;
   active?: boolean;
+  onClick?: () => void;
 }
 
 export default function TimelineFeedContent({
@@ -16,6 +17,7 @@ export default function TimelineFeedContent({
   name,
   badge,
   active = false,
+  onClick,
 }: TimelineFeedContent) {
   const eventStatusStyles = statusStyles(status);
 
@@ -28,6 +30,14 @@ export default function TimelineFeedContent({
           : `hover:bg-slate-800`,
         `pr-1.5 pl-2.5 pb-1.5 pt-2.5 bg-transparent border border-transparent text-left rounded group flex flex-col flex-1 min-w-0`
       )}
+      onClick={
+        onClick
+          ? (e) => {
+              e.preventDefault();
+              onClick();
+            }
+          : undefined
+      }
     >
       <span className="block text-3xs text-slate-300 pb-0.5">
         {date.toISOString()}

@@ -57,6 +57,7 @@ export type Event = {
   name?: Maybe<Scalars['String']>;
   payload?: Maybe<Scalars['String']>;
   pendingRuns?: Maybe<Scalars['Int']>;
+  raw?: Maybe<Scalars['String']>;
   schema?: Maybe<Scalars['String']>;
   status?: Maybe<EventStatus>;
   workspace?: Maybe<Workspace>;
@@ -113,6 +114,7 @@ export enum FunctionEventType {
 
 export type FunctionRun = {
   __typename?: 'FunctionRun';
+  event?: Maybe<Event>;
   id: Scalars['ID'];
   name?: Maybe<Scalars['String']>;
   pendingSteps?: Maybe<Scalars['Int']>;
@@ -246,6 +248,20 @@ export type GetEventsStreamQueryVariables = Exact<{
 
 export type GetEventsStreamQuery = { __typename?: 'Query', events?: Array<{ __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null }> | null };
 
+export type GetEventQueryVariables = Exact<{
+  id: Scalars['ID'];
+}>;
+
+
+export type GetEventQuery = { __typename?: 'Query', event?: { __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null, functionRuns?: Array<{ __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null }> | null } | null };
+
+export type GetFunctionRunQueryVariables = Exact<{
+  id: Scalars['ID'];
+}>;
+
+
+export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, event?: { __typename?: 'Event', raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, stepType?: StepEventType | null }> | null } | null };
+
 
 export const GetEventsStreamDocument = `
     query GetEventsStream($query: EventsQuery! = {}) {
@@ -258,15 +274,66 @@ export const GetEventsStreamDocument = `
   }
 }
     `;
+export const GetEventDocument = `
+    query GetEvent($id: ID!) {
+  event(query: {eventId: $id}) {
+    id
+    name
+    createdAt
+    status
+    pendingRuns
+    functionRuns {
+      id
+      name
+      status
+      startedAt
+      pendingSteps
+    }
+  }
+}
+    `;
+export const GetFunctionRunDocument = `
+    query GetFunctionRun($id: ID!) {
+  functionRun(query: {functionRunId: $id}) {
+    id
+    name
+    status
+    startedAt
+    pendingSteps
+    event {
+      raw
+    }
+    timeline {
+      __typename
+      ... on StepEvent {
+        stepType: type
+        createdAt
+        output
+      }
+      ... on FunctionEvent {
+        functionType: type
+        createdAt
+        output
+      }
+    }
+  }
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
     GetEventsStream: build.query<GetEventsStreamQuery, GetEventsStreamQueryVariables | void>({
       query: (variables) => ({ document: GetEventsStreamDocument, variables })
     }),
+    GetEvent: build.query<GetEventQuery, GetEventQueryVariables>({
+      query: (variables) => ({ document: GetEventDocument, variables })
+    }),
+    GetFunctionRun: build.query<GetFunctionRunQuery, GetFunctionRunQueryVariables>({
+      query: (variables) => ({ document: GetFunctionRunDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery } = injectedRtkApi;
+export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery } = injectedRtkApi;
 

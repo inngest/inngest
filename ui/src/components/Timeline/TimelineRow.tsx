@@ -1,10 +1,10 @@
 import { ComponentChildren } from "preact";
-import { EventStatus } from "../../store/generated";
+import { EventStatus, FunctionRunStatus } from "../../store/generated";
 import classNames from "../../utils/classnames";
 import statusStyles from "../../utils/statusStyles";
 
 interface TimelineRowProps {
-  status: EventStatus;
+  status: EventStatus | FunctionRunStatus;
   children: ComponentChildren;
   topLine?: boolean;
   bottomLine?: boolean;

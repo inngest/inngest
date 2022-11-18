@@ -4,11 +4,11 @@ import { createSlice } from "@reduxjs/toolkit";
 const initialState: {
   sidebarTab: "events" | "functions";
   selectedEvent: string | null;
-  selectedHistoryEvent: string | null;
+  selectedRun: string | null;
 } = {
   sidebarTab: "events",
   selectedEvent: null,
-  selectedHistoryEvent: null,
+  selectedRun: null,
 };
 
 const globalState = createSlice({
@@ -24,12 +24,11 @@ const globalState = createSlice({
     selectEvent(state, action: PayloadAction<string | null>) {
       state.selectedEvent = action.payload;
     },
-    selectHistoryEvent(state, action: PayloadAction<string | null>) {
-      state.selectedHistoryEvent = action.payload;
+    selectRun(state, action: PayloadAction<string | null>) {
+      state.selectedRun = action.payload;
     },
   },
 });
 
-export const { selectEvent, selectHistoryEvent, setSidebarTab } =
-  globalState.actions;
+export const { selectEvent, selectRun, setSidebarTab } = globalState.actions;
 export default globalState.reducer;

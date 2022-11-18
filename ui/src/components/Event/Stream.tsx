@@ -1,18 +1,17 @@
 import { EventStatus, useGetEventsStreamQuery } from "../../store/generated";
+import { selectEvent } from "../../store/global";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import TimelineFeedContent from "../Timeline/TimelineFeedContent";
 import TimelineRow from "../Timeline/TimelineRow";
 
 export const EventStream = () => {
-  const events = useGetEventsStreamQuery(
-    {},
-    {
-      pollingInterval: 1000,
-    }
-  );
+  const events = useGetEventsStreamQuery({}, { pollingInterval: 1000 });
+  const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
+  const dispatch = useAppDispatch();
 
   return (
     <>
-      {events.data?.events?.map((event, i) => (
+      {events?.data?.events?.map((event, i) => (
         <TimelineRow
           key={event.id}
           status={event.status || EventStatus.Completed}
@@ -20,9 +19,11 @@ export const EventStream = () => {
         >
           <TimelineFeedContent
             date={new Date(event.createdAt)}
+            active={selectedEvent === event.id}
             status={event.status || EventStatus.Completed}
             badge={event.pendingRuns || 0}
             name={event.name || "unknown"}
+            onClick={() => dispatch(selectEvent(event.id))}
           />
         </TimelineRow>
       ))}

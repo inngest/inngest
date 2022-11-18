@@ -11,3 +11,50 @@ export const EVENTS_STREAM = gql`
     }
   }
 `;
+
+export const EVENT = gql`
+  query GetEvent($id: ID!) {
+    event(query: { eventId: $id }) {
+      id
+      name
+      createdAt
+      status
+      pendingRuns
+      functionRuns {
+        id
+        name
+        status
+        startedAt
+        pendingSteps
+      }
+    }
+  }
+`;
+
+export const FUNCTION_RUN = gql`
+  query GetFunctionRun($id: ID!) {
+    functionRun(query: { functionRunId: $id }) {
+      id
+      name
+      status
+      startedAt
+      pendingSteps
+      event {
+        raw
+      }
+      timeline {
+        __typename
+        ... on StepEvent {
+          stepType: type
+          createdAt
+          output
+        }
+        ... on FunctionEvent {
+          functionType: type
+          createdAt
+          output
+        }
+      }
+    }
+  }
+`;
