@@ -40,7 +40,7 @@ export default function HistoricalList() {
           key={event.id}
           date={new Date(event.createdAt)}
           id={event.id}
-          badge={event.pendingRuns || 0}
+          badge={event.totalRuns || 0}
           status={event.status || EventStatus.Completed}
         />
       ))}
