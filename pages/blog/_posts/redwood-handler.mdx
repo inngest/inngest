@@ -1,0 +1,47 @@
+---
+heading: Deploying event-driven functions to RedwoodJS
+subtitle: Announcing our new RedwoodJS handler.
+image: "/assets/blog/redwood-handler/header.png"
+date: 2022-11-21
+author: Jack Williams
+focus: true
+---
+
+The Inngest SDK has added official support for another framework - [RedwoodJS](https://redwoodjs.com/)!
+
+Redwood is an opinionated, full-stack, JavaScript/TypeScript web application framework. It's built on top of React, GraphQL, and Prisma and is designed to make it easy to start a new project and scale to a large team.
+
+Part of Redwood's roster is its [Serverless Functions](https://redwoodjs.com/docs/serverless-functions), which are a great way to add server-side logic to your application. Inngest's RedwoodJS handler allows you to register those functions with Inngest and use Inngest's event-driven infrastructure to trigger them as background jobs, scheduled tasks, or complex step functions.
+
+<aside>To get started right away, check out our <a href="/docs/frameworks/redwoodjs?ref=blog-redwood-handler">RedwoodJS Framework Guide</a> or the <a href="https://github.com/inngest/sdk-example-redwoodjs-vercel">inngest/sdk-example-redwoodjs-vercel</a> repo.</aside>
+
+Like [all of our other handlers](https://www.inngest.com/docs/functions?ref=blog-redwood-handler#serving), the Redwood handler is simple to use.
+
+```ts
+import { serve } from 'inngest/redwood'
+
+const userAlert = createFunction(
+  'New User Alert',
+  'app/user.created',
+  ({ event }) => {
+    console.log(`New user @${event.data.username} created!`)
+  }
+)
+
+export const handler = serve('My RedwoodJS App', [userAlert])
+```
+
+We can then use Inngest's existing deployment guides for popular Redwood targets like [Vercel](/docs/deploy/vercel?ref=blog-redwood-handler) and [Netlify](/docs/deploy/netlify?ref=blog-redwood-handler) to deploy our functions to Inngest.
+
+## Why Redwood?
+
+At Inngest, we want to support frameworks that already provide an incredible developer experience and enhance them by allowing developers to leverage event-driven architecture with a tiny amount of code.
+
+Redwood is a fantastic framework for building serverless applications, but utilising background jobs usually requires running a stateful, always-on service like [Faktory](https://contribsys.com/faktory/) alongside ensuring your app is serverful - a significant extra cost and technical burden to create and maintain, especially if you're just getting started.
+
+By pairing Redwood with Inngest, you can deploy your serverless functions as usual and use Inngest's event-driven infrastructure to trigger them; use Redwood's serverless functions to handle your background jobs without worrying about running and maintaining a separate service.
+
+## Getting started
+
+Check out the [RedwoodJS Framework Guide](/docs/frameworks/redwoodjs?ref=blog-redwood-handler) or the [inngest/sdk-example-redwoodjs-vercel](https://github.com/inngest/sdk-example-redwoodjs-vercel) repository to start your journey, or jump into our [Writing functions](/docs/functions?ref=blog-redwood-handler) documentation to see what's possible with Inngest!
+
