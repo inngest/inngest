@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { IconFeed } from "../../icons";
+import { useSendEventMutation } from "../../store/devApi";
 import {
   EventStatus,
   FunctionRunStatus,
@@ -33,6 +34,8 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
     setPollingInterval(event.pendingRuns > 0 ? 1000 : 0);
   }, [event?.pendingRuns]);
 
+  const [sendEvent, sendEventState] = useSendEventMutation();
+
   if (query.isLoading) {
     return <div>Loading...</div>;
   }
@@ -54,7 +57,14 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
           <TimelineStaticContent
             label="Event Received"
             date={event.createdAt}
-            actionBtn={<Button label="Retry" />}
+            actionBtn={
+              <Button
+                label="Retry"
+                btnAction={() => {
+                  sendEvent(event.raw);
+                }}
+              />
+            }
           />
         </TimelineRow>
 

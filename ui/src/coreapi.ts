@@ -35,6 +35,7 @@ export const EVENT = gql`
       createdAt
       status
       pendingRuns
+      raw
       functionRuns {
         id
         name
