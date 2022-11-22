@@ -334,7 +334,9 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 			Msg("executing action")
 	}
 
-	go e.sm.Started(ctx, id, action.ID, attempt)
+	if err := e.sm.Started(ctx, id, action.ID, attempt); err != nil {
+		return nil, fmt.Errorf("error saving started state: %w", err)
+	}
 
 	response, err := d.Execute(ctx, s, *definition, *action)
 	if err != nil || response == nil {
