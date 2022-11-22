@@ -1,28 +1,21 @@
 import { useState } from "preact/hooks";
-
+import ActionBar from "./components/ActionBar";
 import BG from "./components/BG";
-
-import Header from "./components/Header";
-import "./index.css";
-
-import Sidebar from "./components/Sidebar/Sidebar";
-import SidebarLink from "./components/Sidebar/SidebarLink";
-
-import ContentFrame from "./components/Content/ContentFrame";
-
-import TimelineScrollContainer from "./components/Timeline/TimelineScrollContainer";
-
 import CodeBlock from "./components/CodeBlock";
 import CodeBlockModal from "./components/CodeBlock/CodeBlockModal";
-
-import { IconBook, IconFeed } from "./icons";
-
-import ActionBar from "./components/ActionBar";
+import ContentFrame from "./components/Content/ContentFrame";
+import { Docs } from "./components/Docs";
 import { EventSection } from "./components/Event/Section";
 import { EventStream } from "./components/Event/Stream";
 import { FunctionRunSection } from "./components/Function/RunSection";
 import { FuncStream } from "./components/Function/Stream";
-import { setSidebarTab } from "./store/global";
+import Header from "./components/Header";
+import Sidebar from "./components/Sidebar/Sidebar";
+import SidebarLink from "./components/Sidebar/SidebarLink";
+import TimelineScrollContainer from "./components/Timeline/TimelineScrollContainer";
+import { IconBook, IconFeed } from "./icons";
+import "./index.css";
+import { selectContentView, setSidebarTab } from "./store/global";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
 import classNames from "./utils/classnames";
 
@@ -30,6 +23,7 @@ export function App() {
   const sidebarTab = useAppSelector((state) => state.global.sidebarTab);
   const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
   const selectedRun = useAppSelector((state) => state.global.selectedRun);
+  const contentView = useAppSelector((state) => state.global.contentView);
   const dispatch = useAppDispatch();
 
   const [codeBlockModalActive, setCodeBlockModalActive] = useState({
@@ -69,7 +63,14 @@ export function App() {
   };
 
   return (
-    <div class="w-screen h-screen text-slate-400 text-sm grid grid-cols-app-sm xl:grid-cols-app 2xl:grid-cols-app-desktop grid-rows-app overflow-hidden">
+    <div
+      class={classNames(
+        "w-screen h-screen text-slate-400 text-sm grid overflow-hidden relative",
+        contentView === "feed"
+          ? "grid-cols-app-sm xl:grid-cols-app 2xl:grid-cols-app-desktop grid-rows-app"
+          : "grid-cols-docs grid-rows-docs"
+      )}
+    >
       <BG />
       {codeBlockModalActive.visible && (
         <CodeBlockModal closeModal={setModal}>
@@ -83,34 +84,49 @@ export function App() {
       {/* <EventDetail /> */}
       <Header />
       <Sidebar>
-        <SidebarLink icon={<IconFeed />} active badge={20} />
-        <SidebarLink icon={<IconBook />} />
+        <SidebarLink
+          icon={<IconFeed />}
+          active={contentView === "feed"}
+          badge={20}
+          onClick={() => dispatch(selectContentView("feed"))}
+        />
+        <SidebarLink
+          icon={<IconBook />}
+          active={contentView === "docs"}
+          onClick={() => dispatch(selectContentView("docs"))}
+        />
       </Sidebar>
-      <ActionBar
-        tabs={tabs.map((tab) => (
-          <button
-            key={tab.key}
-            className={classNames(
-              sidebarTab === tab.key
-                ? `border-indigo-400 text-white`
-                : `border-transparent text-slate-400`,
-              `text-xs px-5 py-2.5 border-b block transition-all duration-150`
-            )}
-            onClick={tab.onClick}
-          >
-            {tab.title}
-          </button>
-        ))}
-      />
-      <TimelineScrollContainer>
-        {sidebarTab === "events" ? <EventStream /> : <FuncStream />}
-      </TimelineScrollContainer>
-      {selectedEvent ? (
-        <ContentFrame>
-          <EventSection eventId={selectedEvent} />
-          <FunctionRunSection runId={selectedRun} />
-        </ContentFrame>
-      ) : null}
+      {contentView === "feed" ? (
+        <>
+          <ActionBar
+            tabs={tabs.map((tab) => (
+              <button
+                key={tab.key}
+                className={classNames(
+                  sidebarTab === tab.key
+                    ? `border-indigo-400 text-white`
+                    : `border-transparent text-slate-400`,
+                  `text-xs px-5 py-2.5 border-b block transition-all duration-150`
+                )}
+                onClick={tab.onClick}
+              >
+                {tab.title}
+              </button>
+            ))}
+          />
+          <TimelineScrollContainer>
+            {sidebarTab === "events" ? <EventStream /> : <FuncStream />}
+          </TimelineScrollContainer>
+          {selectedEvent ? (
+            <ContentFrame>
+              <EventSection eventId={selectedEvent} />
+              <FunctionRunSection runId={selectedRun} />
+            </ContentFrame>
+          ) : null}
+        </>
+      ) : (
+        <Docs />
+      )}
     </div>
   );
 }
