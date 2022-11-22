@@ -424,12 +424,7 @@ func (m mgr) Started(ctx context.Context, i state.Identifier, stepName string, a
 	return nil
 }
 
-func (m mgr) Sleeping(ctx context.Context, i state.Identifier, endTime time.Time) error {
-	// TODO: Write log
-	return nil
-}
-
-func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepName string, attempt int) error {
+func (m mgr) Scheduled(ctx context.Context, i state.Identifier, at *time.Time) error {
 	return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", 1).Err()
 }
 

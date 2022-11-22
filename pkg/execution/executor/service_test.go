@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/coredata"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -133,6 +135,25 @@ var (
 							Event: "async/do-not-continue",
 						},
 					},
+				},
+			},
+		},
+	}
+	genF = function.Function{
+		ID:   "generator",
+		Name: "generator",
+		Triggers: []function.Trigger{
+			{
+				EventTrigger: &function.EventTrigger{
+					Event: "test-evt",
+				},
+			},
+		},
+		Steps: map[string]function.Step{
+			"step": {
+				ID: "step",
+				Runtime: &inngest.RuntimeWrapper{
+					Runtime: &mockdriver.Mock{},
 				},
 			},
 		},
@@ -371,5 +392,111 @@ func TestHandleAsyncService(t *testing.T) {
 		"2": map[string]any{"id": 2},
 	}, run.Actions())
 	require.Equal(t, 0, run.Metadata().Pending)
+
+}
+
+// TestServiceGeneratorState asserts that the service and execution engine handles running
+// generator-based steps correctly.
+//
+// We assert that the backing state store has correct state for eg. function status, waitgroups
+// as generator steps are processed.
+func TestServiceGeneratorState(t *testing.T) {
+	ctx := context.Background()
+	data := prepare(ctx, t, genF)
+	require.NotNil(t, data)
+
+	var counter int32
+
+	// Ensure our step returns a generator response.
+	data.c.Execution.Drivers["mock"] = &mockdriver.Config{
+		DynamicResponses: func(ctx context.Context, run state.State, av inngest.ActionVersion, s inngest.Step) map[string]state.DriverResponse {
+
+			switch atomic.AddInt32(&counter, 1) {
+			case 1:
+				// On the first call return a generator step
+				return map[string]state.DriverResponse{
+					"step": {
+						Generator: &state.GeneratorOpcode{
+							Op:   enums.OpcodeStep,
+							ID:   "step 1",
+							Name: "step 1",
+							Data: []byte(`{"ok":true}`),
+						},
+					},
+				}
+			case 2:
+				// On the second call return a generator step
+				return map[string]state.DriverResponse{
+					"step": {
+						Generator: &state.GeneratorOpcode{
+							Op:   enums.OpcodeStep,
+							ID:   "step 2",
+							Name: "step 2",
+							Data: []byte(`{"ok":true}`),
+						},
+					},
+				}
+			default:
+				return map[string]state.DriverResponse{
+					"step": {},
+				}
+
+			}
+
+		},
+	}
+
+	svc := NewService(
+		*data.c,
+		WithExecutionLoader(data.al),
+		// WithState(data.sm),
+		// WithQueue(data.q),
+	)
+	go func() {
+		err := service.Start(ctx, svc)
+		require.NoError(t, err)
+	}()
+
+	var id state.Identifier
+	t.Run("Create a new run", func(t *testing.T) {
+		// Create a new run.
+		id = state.Identifier{
+			WorkflowID: data.w.UUID,
+			RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+		}
+		_, err := data.sm.New(ctx, state.Input{
+			Workflow:   data.w,
+			Identifier: id,
+			EventData: (event.Event{
+				Name: "test",
+				Data: map[string]interface{}{
+					"data": "ya",
+				},
+			}).Map(),
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("Running the executor processes a generator step correctly", func(t *testing.T) {
+		err := data.q.Enqueue(ctx, queue.Item{
+			Kind:       queue.KindEdge,
+			Identifier: id,
+			Payload:    queue.PayloadEdge{Edge: inngest.SourceEdge},
+		}, time.Now())
+		require.NoError(t, err)
+
+		<-time.After(buffer)
+
+		run, err := data.sm.Load(ctx, id)
+		require.NoError(t, err)
+
+		md := run.Metadata()
+
+		// There should be 3 entries:  the overall generator response plus each individual
+		// substep.
+		require.EqualValues(t, 3, len(run.Actions()))
+		require.EqualValues(t, state.RunStatusComplete, md.Status)
+		require.EqualValues(t, 0, md.Pending)
+	})
 
 }

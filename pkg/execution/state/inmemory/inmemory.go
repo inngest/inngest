@@ -162,7 +162,7 @@ func (m *mem) Sleeping(ctx context.Context, i state.Identifier, endTime time.Tim
 	})
 }
 
-func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepName string, attempt int) error {
+func (m *mem) Scheduled(ctx context.Context, i state.Identifier, at *time.Time) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -175,15 +175,16 @@ func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepName string
 	instance.metadata.Pending++
 	m.state[i.IdempotencyKey()] = instance
 
-	m.setHistory(ctx, i, state.History{
-		Type:       enums.HistoryTypeStepScheduled,
-		Identifier: i,
-		CreatedAt:  time.UnixMilli(int64(i.RunID.Time())),
-		Data: state.HistoryStep{
-			Name:    stepName,
-			Attempt: attempt,
-		},
-	})
+	if at != nil {
+		m.setHistory(ctx, i, state.History{
+			Type:       enums.HistoryTypeStepWaiting,
+			Identifier: i,
+			CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+			Data: state.HistoryStepWaiting{
+				ExpiryTime: *at,
+			},
+		})
+	}
 
 	return nil
 }

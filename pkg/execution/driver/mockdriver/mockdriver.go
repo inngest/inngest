@@ -17,6 +17,10 @@ func init() {
 const RuntimeName = "mock"
 
 type Mock struct {
+	// DynamicResponses allows users to specify a function which allows
+	// steps to return different data on each execution invocation.
+	DynamicResponses func(context.Context, state.State, inngest.ActionVersion, inngest.Step) map[string]state.DriverResponse
+
 	// Responses stores the responses that a driver should return.
 	Responses map[string]state.DriverResponse
 
@@ -48,11 +52,15 @@ func (m *Mock) Execute(ctx context.Context, s state.State, action inngest.Action
 	if m.Executed == nil {
 		m.Executed = map[string]inngest.ActionVersion{}
 	}
-
 	m.Executed[step.ID] = action
 
-	response := m.Responses[step.ID]
+	resp := m.Responses
+	if m.DynamicResponses != nil {
+		resp = m.DynamicResponses(ctx, s, action, step)
+	}
+	response := resp[step.ID]
 	err := m.Errors[step.ID]
+
 	return &response, err
 }
 
@@ -67,10 +75,11 @@ func (m *Mock) ExecutedLen() int {
 type Config struct {
 	l         sync.Mutex
 	Responses map[string]state.DriverResponse
-
+	// DynamicResponses allows users to specify a function which allows
+	// steps to return different data on each execution invocation.
+	DynamicResponses func(context.Context, state.State, inngest.ActionVersion, inngest.Step) map[string]state.DriverResponse
 	// driver stores the driver once, as a singleton per config instance.
 	driver driver.Driver
-
 	Driver string
 }
 
@@ -86,8 +95,9 @@ func (c *Config) NewDriver() (driver.Driver, error) {
 
 	if c.driver == nil {
 		c.driver = &Mock{
-			Responses:   c.Responses,
-			RuntimeName: c.Driver,
+			Responses:        c.Responses,
+			DynamicResponses: c.DynamicResponses,
+			RuntimeName:      c.Driver,
 		}
 	}
 	return c.driver, nil
