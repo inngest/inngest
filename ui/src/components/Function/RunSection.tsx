@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useMemo, useState } from "preact/hooks";
 import { usePrettyJson } from "../../hooks/usePrettyJson";
 import { IconFeed } from "../../icons";
 import {
@@ -25,12 +25,6 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
     { pollingInterval, skip: !runId, refetchOnMountOrArgChange: true }
   );
   const run = useMemo(() => query.data?.functionRun, [query.data?.functionRun]);
-  // const eventPayload = usePrettyJson(run?.event?.raw);
-
-  useEffect(() => {
-    if (typeof run?.pendingSteps !== "number") return;
-    setPollingInterval(run.pendingSteps > 0 ? 1000 : 0);
-  }, [run?.pendingSteps]);
 
   if (query.isLoading) {
     return <div>Loading...</div>;
@@ -65,6 +59,9 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
                 : row.stepType || StepEventType.Completed
             }
             output={row.output}
+            name={
+              row.__typename === "StepEvent" ? row.name || undefined : undefined
+            }
           />
         ))}
       </div>
@@ -77,6 +74,7 @@ type FunctionRunTimelineRowProps = {
   eventType: FunctionEventType | StepEventType;
   output: string | null | undefined;
   createdAt: string | number;
+  name?: string;
 };
 
 const FunctionRunTimelineRow = ({
@@ -84,13 +82,32 @@ const FunctionRunTimelineRow = ({
   eventType,
   output,
   createdAt,
+  name,
 }: FunctionRunTimelineRowProps) => {
   const payload = usePrettyJson(output);
 
-  const { label, status } =
-    rowType === "function"
-      ? functionEventTypeMap[eventType]
-      : stepEventTypeMap[eventType];
+  const { label, status } = useMemo(() => {
+    if (rowType === "function") {
+      return functionEventTypeMap[eventType];
+    }
+
+    const stepData = stepEventTypeMap[eventType as StepEventType];
+
+    // if ((eventType as StepEventType) === StepEventType.Waiting) {
+    // }
+
+    const prefix =
+      !name || name === "step"
+        ? "Step"
+        : name === "$trigger"
+        ? "First call"
+        : `Step "${name}"`;
+
+    return {
+      ...stepData,
+      label: `${prefix} ${stepData.label}`,
+    };
+  }, [rowType, eventType, name]);
 
   return (
     <TimelineRow status={status} iconOffset={0}>
@@ -130,28 +147,24 @@ const stepEventTypeMap: Record<
   { status: EventStatus | FunctionRunStatus; label: string }
 > = {
   [StepEventType.Completed]: {
-    label: "Step Completed",
+    label: "ran",
     status: EventStatus.Completed,
   },
   [StepEventType.Failed]: { label: "Step Failed", status: EventStatus.Failed },
   [StepEventType.Started]: {
-    label: "Step Started",
+    label: "started",
     status: EventStatus.Completed,
   },
   [StepEventType.Errored]: {
-    label: "Step Errored",
+    label: "errored",
     status: EventStatus.Failed,
   },
   [StepEventType.Scheduled]: {
-    label: "Step Scheduled",
-    status: EventStatus.Completed,
-  },
-  [StepEventType.Sleeping]: {
-    label: "Step Sleeping",
+    label: "scheduled",
     status: EventStatus.Completed,
   },
   [StepEventType.Waiting]: {
-    label: "Step Waiting",
-    status: EventStatus.Completed,
+    label: "waiting",
+    status: EventStatus.Paused,
   },
 };

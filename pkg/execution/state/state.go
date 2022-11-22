@@ -206,12 +206,12 @@ type Mutater interface {
 	// SQS, Celery).  In thise cases recording that a step was scheduled is a separate step.
 	//
 	// Attempt is zero-indexed.
-	Scheduled(ctx context.Context, i Identifier, stepID string, attempt int) error
+	Scheduled(ctx context.Context, i Identifier, at *time.Time) error
 
 	// Started is called when a step is started.
 	//
 	// Attempt is zero-indexed.
-	Started(ctx context.Context, i Identifier, stepID string, attempt int) error
+	Started(ctx context.Context, i Identifier, stepName string, attempt int) error
 
 	// Finalized increases the finalized count for a run's metadata.
 	//

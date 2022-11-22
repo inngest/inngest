@@ -124,6 +124,7 @@ export type FunctionRun = {
   startedAt?: Maybe<Scalars['Time']>;
   status?: Maybe<FunctionRunStatus>;
   timeline?: Maybe<Array<FunctionRunEvent>>;
+  waitingFor?: Maybe<StepEventWait>;
   workspace?: Maybe<Workspace>;
 };
 
@@ -217,8 +218,10 @@ export type StepEvent = {
   __typename?: 'StepEvent';
   createdAt?: Maybe<Scalars['Time']>;
   functionRun?: Maybe<FunctionRun>;
+  name?: Maybe<Scalars['String']>;
   output?: Maybe<Scalars['String']>;
   type?: Maybe<StepEventType>;
+  waitingFor?: Maybe<StepEventWait>;
   workspace?: Maybe<Workspace>;
 };
 
@@ -227,10 +230,16 @@ export enum StepEventType {
   Errored = 'ERRORED',
   Failed = 'FAILED',
   Scheduled = 'SCHEDULED',
-  Sleeping = 'SLEEPING',
   Started = 'STARTED',
   Waiting = 'WAITING'
 }
+
+export type StepEventWait = {
+  __typename?: 'StepEventWait';
+  eventName?: Maybe<Scalars['String']>;
+  expression?: Maybe<Scalars['String']>;
+  waitUntil: Scalars['Time'];
+};
 
 export type UpdateActionVersionInput = {
   dsn: Scalars['String'];
@@ -259,14 +268,14 @@ export type GetEventQueryVariables = Exact<{
 }>;
 
 
-export type GetEventQuery = { __typename?: 'Query', event?: { __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null, raw?: string | null, functionRuns?: Array<{ __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null }> | null } | null };
+export type GetEventQuery = { __typename?: 'Query', event?: { __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null, raw?: string | null, functionRuns?: Array<{ __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', waitUntil: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
 
 export type GetFunctionRunQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
 
-export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, event?: { __typename?: 'Event', raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, stepType?: StepEventType | null }> | null } | null };
+export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', waitUntil: any, eventName?: string | null, expression?: string | null } | null, event?: { __typename?: 'Event', raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', waitUntil: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
 
 
 export const GetEventsStreamDocument = `
@@ -309,6 +318,11 @@ export const GetEventDocument = `
       status
       startedAt
       pendingSteps
+      waitingFor {
+        waitUntil
+        eventName
+        expression
+      }
     }
   }
 }
@@ -321,6 +335,11 @@ export const GetFunctionRunDocument = `
     status
     startedAt
     pendingSteps
+    waitingFor {
+      waitUntil
+      eventName
+      expression
+    }
     event {
       raw
     }
@@ -330,6 +349,12 @@ export const GetFunctionRunDocument = `
         stepType: type
         createdAt
         output
+        name
+        waitingFor {
+          waitUntil
+          eventName
+          expression
+        }
       }
       ... on FunctionEvent {
         functionType: type

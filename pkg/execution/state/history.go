@@ -68,14 +68,12 @@ type HistoryStep struct {
 	Data    any    `json:"data"`
 }
 
-type HistoryStepWaitingForEvent struct {
-	Name       string    `json:"name"`
-	EventName  string    `json:"eventName"`
-	Expression string    `json:"expression"`
-	ExpiryTime time.Time `json:"expiry"`
-}
+type HistoryStepWaiting struct {
+	// The name of the step that is waiting.
+	Name string `json:"name"`
 
-type HistoryStepSleepingUntil struct {
-	Name   string    `json:"name"`
-	WakeAt time.Time `json:"wakeAt"`
+	//
+	EventName  *string   `json:"eventName"`
+	Expression *string   `json:"expression"`
+	ExpiryTime time.Time `json:"expiry"`
 }

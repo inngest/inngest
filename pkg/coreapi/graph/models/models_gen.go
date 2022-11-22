@@ -85,6 +85,7 @@ type FunctionRun struct {
 	Name         *string            `json:"name"`
 	Workspace    *Workspace         `json:"workspace"`
 	Status       *FunctionRunStatus `json:"status"`
+	WaitingFor   *StepEventWait     `json:"waitingFor"`
 	PendingSteps *int               `json:"pendingSteps"`
 	StartedAt    *time.Time         `json:"startedAt"`
 	Timeline     []FunctionRunEvent `json:"timeline"`
@@ -103,12 +104,20 @@ type FunctionRunsQuery struct {
 type StepEvent struct {
 	Workspace   *Workspace     `json:"workspace"`
 	FunctionRun *FunctionRun   `json:"functionRun"`
+	Name        *string        `json:"name"`
 	Type        *StepEventType `json:"type"`
 	Output      *string        `json:"output"`
 	CreatedAt   *time.Time     `json:"createdAt"`
+	WaitingFor  *StepEventWait `json:"waitingFor"`
 }
 
 func (StepEvent) IsFunctionRunEvent() {}
+
+type StepEventWait struct {
+	WaitUntil  time.Time `json:"waitUntil"`
+	EventName  *string   `json:"eventName"`
+	Expression *string   `json:"expression"`
+}
 
 type UpdateActionVersionInput struct {
 	Dsn          string `json:"dsn"`
@@ -269,7 +278,6 @@ const (
 	StepEventTypeErrored   StepEventType = "ERRORED"
 	StepEventTypeFailed    StepEventType = "FAILED"
 	StepEventTypeWaiting   StepEventType = "WAITING"
-	StepEventTypeSleeping  StepEventType = "SLEEPING"
 )
 
 var AllStepEventType = []StepEventType{
@@ -279,12 +287,11 @@ var AllStepEventType = []StepEventType{
 	StepEventTypeErrored,
 	StepEventTypeFailed,
 	StepEventTypeWaiting,
-	StepEventTypeSleeping,
 }
 
 func (e StepEventType) IsValid() bool {
 	switch e {
-	case StepEventTypeScheduled, StepEventTypeStarted, StepEventTypeCompleted, StepEventTypeErrored, StepEventTypeFailed, StepEventTypeWaiting, StepEventTypeSleeping:
+	case StepEventTypeScheduled, StepEventTypeStarted, StepEventTypeCompleted, StepEventTypeErrored, StepEventTypeFailed, StepEventTypeWaiting:
 		return true
 	}
 	return false

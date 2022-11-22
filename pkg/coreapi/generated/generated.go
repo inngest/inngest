@@ -107,6 +107,7 @@ type ComplexityRoot struct {
 		StartedAt    func(childComplexity int) int
 		Status       func(childComplexity int) int
 		Timeline     func(childComplexity int) int
+		WaitingFor   func(childComplexity int) int
 		Workspace    func(childComplexity int) int
 	}
 
@@ -138,9 +139,17 @@ type ComplexityRoot struct {
 	StepEvent struct {
 		CreatedAt   func(childComplexity int) int
 		FunctionRun func(childComplexity int) int
+		Name        func(childComplexity int) int
 		Output      func(childComplexity int) int
 		Type        func(childComplexity int) int
+		WaitingFor  func(childComplexity int) int
 		Workspace   func(childComplexity int) int
+	}
+
+	StepEventWait struct {
+		EventName  func(childComplexity int) int
+		Expression func(childComplexity int) int
+		WaitUntil  func(childComplexity int) int
 	}
 
 	Workspace struct {
@@ -156,6 +165,8 @@ type EventResolver interface {
 	FunctionRuns(ctx context.Context, obj *models.Event) ([]*models.FunctionRun, error)
 }
 type FunctionRunResolver interface {
+	WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error)
+
 	Timeline(ctx context.Context, obj *models.FunctionRun) ([]models.FunctionRunEvent, error)
 	Event(ctx context.Context, obj *models.FunctionRun) (*models.Event, error)
 }
@@ -440,6 +451,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.FunctionRun.Timeline(childComplexity), true
 
+	case "FunctionRun.waitingFor":
+		if e.complexity.FunctionRun.WaitingFor == nil {
+			break
+		}
+
+		return e.complexity.FunctionRun.WaitingFor(childComplexity), true
+
 	case "FunctionRun.workspace":
 		if e.complexity.FunctionRun.Workspace == nil {
 			break
@@ -613,6 +631,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.StepEvent.FunctionRun(childComplexity), true
 
+	case "StepEvent.name":
+		if e.complexity.StepEvent.Name == nil {
+			break
+		}
+
+		return e.complexity.StepEvent.Name(childComplexity), true
+
 	case "StepEvent.output":
 		if e.complexity.StepEvent.Output == nil {
 			break
@@ -627,12 +652,40 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.StepEvent.Type(childComplexity), true
 
+	case "StepEvent.waitingFor":
+		if e.complexity.StepEvent.WaitingFor == nil {
+			break
+		}
+
+		return e.complexity.StepEvent.WaitingFor(childComplexity), true
+
 	case "StepEvent.workspace":
 		if e.complexity.StepEvent.Workspace == nil {
 			break
 		}
 
 		return e.complexity.StepEvent.Workspace(childComplexity), true
+
+	case "StepEventWait.eventName":
+		if e.complexity.StepEventWait.EventName == nil {
+			break
+		}
+
+		return e.complexity.StepEventWait.EventName(childComplexity), true
+
+	case "StepEventWait.expression":
+		if e.complexity.StepEventWait.Expression == nil {
+			break
+		}
+
+		return e.complexity.StepEventWait.Expression(childComplexity), true
+
+	case "StepEventWait.waitUntil":
+		if e.complexity.StepEventWait.WaitUntil == nil {
+			break
+		}
+
+		return e.complexity.StepEventWait.WaitUntil(childComplexity), true
 
 	case "Workspace.id":
 		if e.complexity.Workspace.ID == nil {
@@ -901,24 +954,32 @@ enum StepEventType {
   ERRORED
   FAILED
   WAITING
-  SLEEPING
 }
 
 type StepEvent {
   workspace: Workspace
   functionRun: FunctionRun
+  name: String
   type: StepEventType
   output: String
   createdAt: Time
+  waitingFor: StepEventWait
 }
 
 union FunctionRunEvent = FunctionEvent | StepEvent
+
+type StepEventWait {
+  waitUntil: Time!
+  eventName: String
+  expression: String
+}
 
 type FunctionRun {
   id: ID!
   name: String
   workspace: Workspace
   status: FunctionRunStatus
+  waitingFor: StepEventWait
   pendingSteps: Int
   startedAt: Time
   timeline: [FunctionRunEvent!]
@@ -1957,6 +2018,8 @@ func (ec *executionContext) fieldContext_Event_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_workspace(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
+			case "waitingFor":
+				return ec.fieldContext_FunctionRun_waitingFor(ctx, field)
 			case "pendingSteps":
 				return ec.fieldContext_FunctionRun_pendingSteps(ctx, field)
 			case "startedAt":
@@ -2235,6 +2298,8 @@ func (ec *executionContext) fieldContext_FunctionEvent_functionRun(ctx context.C
 				return ec.fieldContext_FunctionRun_workspace(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
+			case "waitingFor":
+				return ec.fieldContext_FunctionRun_waitingFor(ctx, field)
 			case "pendingSteps":
 				return ec.fieldContext_FunctionRun_pendingSteps(ctx, field)
 			case "startedAt":
@@ -2539,6 +2604,55 @@ func (ec *executionContext) fieldContext_FunctionRun_status(ctx context.Context,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type FunctionRunStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionRun_waitingFor(ctx context.Context, field graphql.CollectedField, obj *models.FunctionRun) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionRun_waitingFor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.FunctionRun().WaitingFor(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.StepEventWait)
+	fc.Result = res
+	return ec.marshalOStepEventWait2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStepEventWait(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionRun_waitingFor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionRun",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "waitUntil":
+				return ec.fieldContext_StepEventWait_waitUntil(ctx, field)
+			case "eventName":
+				return ec.fieldContext_StepEventWait_eventName(ctx, field)
+			case "expression":
+				return ec.fieldContext_StepEventWait_expression(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type StepEventWait", field.Name)
 		},
 	}
 	return fc, nil
@@ -3553,6 +3667,8 @@ func (ec *executionContext) fieldContext_Query_functionRun(ctx context.Context, 
 				return ec.fieldContext_FunctionRun_workspace(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
+			case "waitingFor":
+				return ec.fieldContext_FunctionRun_waitingFor(ctx, field)
 			case "pendingSteps":
 				return ec.fieldContext_FunctionRun_pendingSteps(ctx, field)
 			case "startedAt":
@@ -3623,6 +3739,8 @@ func (ec *executionContext) fieldContext_Query_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_workspace(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
+			case "waitingFor":
+				return ec.fieldContext_FunctionRun_waitingFor(ctx, field)
 			case "pendingSteps":
 				return ec.fieldContext_FunctionRun_pendingSteps(ctx, field)
 			case "startedAt":
@@ -3867,6 +3985,8 @@ func (ec *executionContext) fieldContext_StepEvent_functionRun(ctx context.Conte
 				return ec.fieldContext_FunctionRun_workspace(ctx, field)
 			case "status":
 				return ec.fieldContext_FunctionRun_status(ctx, field)
+			case "waitingFor":
+				return ec.fieldContext_FunctionRun_waitingFor(ctx, field)
 			case "pendingSteps":
 				return ec.fieldContext_FunctionRun_pendingSteps(ctx, field)
 			case "startedAt":
@@ -3877,6 +3997,47 @@ func (ec *executionContext) fieldContext_StepEvent_functionRun(ctx context.Conte
 				return ec.fieldContext_FunctionRun_event(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StepEvent_name(ctx context.Context, field graphql.CollectedField, obj *models.StepEvent) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StepEvent_name(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StepEvent_name(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StepEvent",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -4000,6 +4161,181 @@ func (ec *executionContext) fieldContext_StepEvent_createdAt(ctx context.Context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StepEvent_waitingFor(ctx context.Context, field graphql.CollectedField, obj *models.StepEvent) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StepEvent_waitingFor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.WaitingFor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.StepEventWait)
+	fc.Result = res
+	return ec.marshalOStepEventWait2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStepEventWait(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StepEvent_waitingFor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StepEvent",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "waitUntil":
+				return ec.fieldContext_StepEventWait_waitUntil(ctx, field)
+			case "eventName":
+				return ec.fieldContext_StepEventWait_eventName(ctx, field)
+			case "expression":
+				return ec.fieldContext_StepEventWait_expression(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type StepEventWait", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StepEventWait_waitUntil(ctx context.Context, field graphql.CollectedField, obj *models.StepEventWait) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StepEventWait_waitUntil(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.WaitUntil, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StepEventWait_waitUntil(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StepEventWait",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StepEventWait_eventName(ctx context.Context, field graphql.CollectedField, obj *models.StepEventWait) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StepEventWait_eventName(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EventName, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StepEventWait_eventName(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StepEventWait",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StepEventWait_expression(ctx context.Context, field graphql.CollectedField, obj *models.StepEventWait) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StepEventWait_expression(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Expression, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StepEventWait_expression(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StepEventWait",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -6551,6 +6887,23 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 
 			out.Values[i] = ec._FunctionRun_status(ctx, field, obj)
 
+		case "waitingFor":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._FunctionRun_waitingFor(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "pendingSteps":
 
 			out.Values[i] = ec._FunctionRun_pendingSteps(ctx, field, obj)
@@ -6896,6 +7249,10 @@ func (ec *executionContext) _StepEvent(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = ec._StepEvent_functionRun(ctx, field, obj)
 
+		case "name":
+
+			out.Values[i] = ec._StepEvent_name(ctx, field, obj)
+
 		case "type":
 
 			out.Values[i] = ec._StepEvent_type(ctx, field, obj)
@@ -6907,6 +7264,46 @@ func (ec *executionContext) _StepEvent(ctx context.Context, sel ast.SelectionSet
 		case "createdAt":
 
 			out.Values[i] = ec._StepEvent_createdAt(ctx, field, obj)
+
+		case "waitingFor":
+
+			out.Values[i] = ec._StepEvent_waitingFor(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var stepEventWaitImplementors = []string{"StepEventWait"}
+
+func (ec *executionContext) _StepEventWait(ctx context.Context, sel ast.SelectionSet, obj *models.StepEventWait) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, stepEventWaitImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StepEventWait")
+		case "waitUntil":
+
+			out.Values[i] = ec._StepEventWait_waitUntil(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "eventName":
+
+			out.Values[i] = ec._StepEventWait_eventName(ctx, field, obj)
+
+		case "expression":
+
+			out.Values[i] = ec._StepEventWait_expression(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -8033,6 +8430,13 @@ func (ec *executionContext) marshalOStepEventType2ᚖgithubᚗcomᚋinngestᚋin
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOStepEventWait2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStepEventWait(ctx context.Context, sel ast.SelectionSet, v *models.StepEventWait) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._StepEventWait(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v interface{}) (*string, error) {

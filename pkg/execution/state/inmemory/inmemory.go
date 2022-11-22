@@ -137,15 +137,32 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 	return state, nil
 }
 
-func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
+func (m *mem) Started(ctx context.Context, i state.Identifier, stepName string, attempt int) error {
+	m.state[i.IdempotencyKey()].Actions()
+
 	return m.setHistory(ctx, i, state.History{
 		Type:       enums.HistoryTypeStepStarted,
 		Identifier: i,
 		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+		Data: state.HistoryStep{
+			Name:    stepName,
+			Attempt: attempt,
+		},
 	})
 }
 
-func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
+func (m *mem) Sleeping(ctx context.Context, i state.Identifier, endTime time.Time) error {
+	return m.setHistory(ctx, i, state.History{
+		Type:       enums.HistoryTypeStepWaiting,
+		Identifier: i,
+		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+		Data: state.HistoryStepWaiting{
+			ExpiryTime: endTime,
+		},
+	})
+}
+
+func (m *mem) Scheduled(ctx context.Context, i state.Identifier, at *time.Time) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -158,11 +175,16 @@ func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string, 
 	instance.metadata.Pending++
 	m.state[i.IdempotencyKey()] = instance
 
-	m.setHistory(ctx, i, state.History{
-		Type:       enums.HistoryTypeStepScheduled,
-		Identifier: i,
-		CreatedAt:  time.UnixMilli(int64(i.RunID.Time())),
-	})
+	if at != nil {
+		m.setHistory(ctx, i, state.History{
+			Type:       enums.HistoryTypeStepWaiting,
+			Identifier: i,
+			CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+			Data: state.HistoryStepWaiting{
+				ExpiryTime: *at,
+			},
+		})
+	}
 
 	return nil
 }
@@ -243,6 +265,11 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 
 	now := time.UnixMilli(time.Now().UnixMilli())
 
+	stepName := r.Step.ID
+	if r.Generator != nil && r.Generator.Name != "" {
+		stepName = r.Generator.Name
+	}
+
 	if r.Err == nil {
 		instance.actions[r.Step.ID] = r.Output
 		delete(instance.errors, r.Step.ID)
@@ -251,7 +278,12 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 			Type:       enums.HistoryTypeStepCompleted,
 			Identifier: i,
 			CreatedAt:  now,
-			Data:       r.Output,
+			// Data:       r.Output,
+			Data: state.HistoryStep{
+				Name:    stepName,
+				Attempt: attempt,
+				Data:    r.Output,
+			},
 		})
 	} else {
 		instance.errors[r.Step.ID] = r.Err
@@ -260,7 +292,12 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 			Type:       enums.HistoryTypeStepErrored,
 			Identifier: i,
 			CreatedAt:  now,
-			Data:       r.Err.Error(),
+			// Data:       r.Err.Error(),
+			Data: state.HistoryStep{
+				Name:    stepName,
+				Attempt: attempt,
+				Data:    r.Err.Error(),
+			},
 		})
 	}
 
@@ -291,6 +328,18 @@ func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
 	}
 
 	m.pauses[p.ID] = p
+
+	m.setHistory(ctx, p.Identifier, state.History{
+		Type:       enums.HistoryTypeStepWaiting,
+		Identifier: p.Identifier,
+		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+		Data: state.HistoryStepWaiting{
+			EventName:  p.Event,
+			Expression: p.Expression,
+			ExpiryTime: time.Time(p.Expires),
+		},
+	})
+
 	return nil
 }
 

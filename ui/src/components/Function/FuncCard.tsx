@@ -1,5 +1,5 @@
 import { ComponentChild } from "preact";
-import { FunctionRunStatus } from "../../store/generated";
+import { EventStatus, FunctionRunStatus } from "../../store/generated";
 import classNames from "../../utils/classnames";
 import statusStyles from "../../utils/statusStyles";
 import { Time } from "../Time";
@@ -9,7 +9,7 @@ interface FuncCardProps {
   date: string | number;
   badge?: string | number;
   id: string;
-  status: FunctionRunStatus;
+  status: FunctionRunStatus | EventStatus;
   active?: boolean;
   contextualBar?: ComponentChild;
   onClick?: () => void;

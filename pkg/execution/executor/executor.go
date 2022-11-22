@@ -331,6 +331,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 			Interface("version", definition.Version).
 			Interface("scopes", definition.Scopes).
 			Str("dsn", definition.DSN).
+			Str("action_name", action.Name).
 			Msg("executing action")
 	}
 

@@ -116,24 +116,32 @@ enum StepEventType {
   ERRORED
   FAILED
   WAITING
-  SLEEPING
 }
 
 type StepEvent {
   workspace: Workspace
   functionRun: FunctionRun
+  name: String
   type: StepEventType
   output: String
   createdAt: Time
+  waitingFor: StepEventWait
 }
 
 union FunctionRunEvent = FunctionEvent | StepEvent
+
+type StepEventWait {
+  waitUntil: Time!
+  eventName: String
+  expression: String
+}
 
 type FunctionRun {
   id: ID!
   name: String
   workspace: Workspace
   status: FunctionRunStatus
+  waitingFor: StepEventWait
   pendingSteps: Int
   startedAt: Time
   timeline: [FunctionRunEvent!]

@@ -46,3 +46,5 @@ models:
         resolver: true
       event:
         resolver: true
+      waitingFor:
+        resolver: true

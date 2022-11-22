@@ -194,7 +194,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 	edge, err := queue.GetEdge(item)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to get edge from queue item: %w", err)
 	}
 
 	l.Debug().Interface("edge", edge).Msg("processing step")
@@ -225,7 +225,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 			at := backoff.LinearJitterBackoff(next.ErrorCount)
 			l.Info().Interface("edge", next).Time("at", at).Msg("enqueueing retry")
 			if err := s.queue.Enqueue(ctx, next, at); err != nil {
-				return err
+				return fmt.Errorf("unable to enqueue retry: %w", err)
 			}
 			return nil
 		}
@@ -233,7 +233,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		// This is a non-retryable error.  Finalize this step.
 		l.Warn().Interface("edge", edge).Msg("step permanently failed")
 		if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.ErrorCount); err != nil {
-			return err
+			return fmt.Errorf("unable to finalize step: %w", err)
 		}
 		return nil
 	}
@@ -248,7 +248,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		// yields, signalling they're done.
 		err := s.scheduleGeneratorResponse(ctx, item, resp)
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to schedule generator response: %w", err)
 		}
 		// Finalize this step early, as we don't need to re-invoke anything else or
 		// load children until generators complete.
@@ -257,12 +257,12 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 	run, err := s.state.Load(ctx, item.Identifier)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to load run: %w", err)
 	}
 
 	children, err := state.DefaultEdgeEvaluator.AvailableChildren(ctx, run, edge.Incoming)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to evaluate available children: %w", err)
 	}
 
 	l.Trace().Int("len", len(children)).Msg("evaluated children")
@@ -287,8 +287,8 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 			// This should also increase the waitgroup count, as we have an
 			// edge that is outstanding.
-			if err := s.state.Scheduled(ctx, item.Identifier, next.Incoming, 0); err != nil {
-				return err
+			if err := s.state.Scheduled(ctx, item.Identifier, nil); err != nil {
+				return fmt.Errorf("unable to schedule async edge: %w", err)
 			}
 
 			l.Debug().Interface("edge", next).Msg("saving pause")
@@ -320,7 +320,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 					OnTimeout: am.OnTimeout,
 				},
 			}, expires); err != nil {
-				return err
+				return fmt.Errorf("unable to enqueue pause timeout: %w", err)
 			}
 			continue
 		}
@@ -329,7 +329,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		if next.Metadata != nil && next.Metadata.Wait != nil {
 			dur, err := ParseWait(ctx, *next.Metadata.Wait, run, edge.Incoming)
 			if err != nil {
-				return err
+				return fmt.Errorf("unable to parse wait: %w", err)
 			}
 			at = at.Add(dur)
 		}
@@ -342,7 +342,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 			Identifier: item.Identifier,
 			Payload:    queue.PayloadEdge{Edge: next},
 		}, at); err != nil {
-			return err
+			return fmt.Errorf("unable to enqueue next step: %w", err)
 		}
 
 		// Increase the waitgroup counter.
@@ -355,8 +355,8 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		// and this is a no-op - things should be atomic where possible.
 		//
 		// TODO: Add a unit test to ensure WG is 0 at the end of execution.
-		if err := s.state.Scheduled(ctx, item.Identifier, next.Outgoing, 0); err != nil {
-			return err
+		if err := s.state.Scheduled(ctx, item.Identifier, nil); err != nil {
+			return fmt.Errorf("unable to schedule next step: %w", err)
 		}
 	}
 
@@ -365,7 +365,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	// This must happen after everything is enqueued, else the scheduled <> finalized count
 	// is out of order.
 	if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.ErrorCount); err != nil {
-		return err
+		return fmt.Errorf("unable to finalize step: %w", err)
 	}
 
 	l.Debug().Interface("edge", edge).Msg("step complete")
@@ -383,15 +383,24 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 	}
 
 	switch r.Generator.Op {
+	case enums.OpcodeNone:
+		return nil
 	case enums.OpcodeWaitForEvent:
 		opts, err := r.Generator.WaitForEventOpts()
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to parse wait for event opts: %w", err)
 		}
 		expires, err := opts.Expires()
 		if err != nil {
-			return err
+			return fmt.Errorf("unable to parse wait for event expires: %w", err)
 		}
+
+		// This should also increase the waitgroup count, as we have an
+		// edge that is outstanding.
+		if err := s.state.Scheduled(ctx, item.Identifier, nil); err != nil {
+			return fmt.Errorf("unable to schedule wait for event: %w", err)
+		}
+
 		pauseID := uuid.New()
 		err = s.state.SavePause(ctx, state.Pause{
 			ID:         pauseID,
@@ -424,9 +433,17 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 		if err != nil {
 			return err
 		}
+		at := time.Now().Add(dur)
+
+		if err := s.state.Scheduled(ctx, item.Identifier, &at); err != nil {
+			return err
+		}
 		return s.queue.Enqueue(ctx, item, time.Now().Add(dur))
 	case enums.OpcodeStep:
 		// Re-enqueue the exact same edge to run now.
+		if err := s.state.Scheduled(ctx, item.Identifier, nil); err != nil {
+			return err
+		}
 		return s.queue.Enqueue(ctx, item, time.Now())
 	}
 
