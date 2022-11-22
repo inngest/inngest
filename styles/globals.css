@@ -71,7 +71,7 @@
   --nav-height: 120px;
 
   font-size: 16px; /* Tailwind base */
-  font-family: var(--font);
+  font-family: var(--text-font);
   color: var(--font-color-primary);
   background: var(--bg-color);
 }
@@ -105,7 +105,7 @@ body.dark-theme {
 }
 
 .home {
-  font-family: var(--font);
+  font-family: var(--text-font);
 }
 
 /* p + p {
