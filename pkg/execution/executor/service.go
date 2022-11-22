@@ -367,6 +367,8 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 	}
 
 	switch r.Generator.Op {
+	case enums.OpcodeNone:
+		return nil
 	case enums.OpcodeWaitForEvent:
 		opts, err := r.Generator.WaitForEventOpts()
 		if err != nil {
@@ -376,6 +378,13 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 		if err != nil {
 			return err
 		}
+
+		// This should also increase the waitgroup count, as we have an
+		// edge that is outstanding.
+		if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming); err != nil {
+			return err
+		}
+
 		pauseID := uuid.New()
 		err = s.state.SavePause(ctx, state.Pause{
 			ID:         pauseID,
@@ -408,9 +417,15 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 		if err != nil {
 			return err
 		}
+		if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming); err != nil {
+			return err
+		}
 		return s.queue.Enqueue(ctx, item, time.Now().Add(dur))
 	case enums.OpcodeStep:
 		// Re-enqueue the exact same edge to run now.
+		if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming); err != nil {
+			return err
+		}
 		return s.queue.Enqueue(ctx, item, time.Now())
 	}
 
