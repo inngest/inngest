@@ -27,7 +27,7 @@ Then, sending an event is simple, just call the the `send()` method with your ev
 
 ```typescript
 // This sends an event to Inngest.
-inngest.send({
+await inngest.send({
   // The event name
   name: "demo/demo.event",
   // The event's data

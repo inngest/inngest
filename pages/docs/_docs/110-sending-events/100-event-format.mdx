@@ -8,7 +8,7 @@ order: 2 # ensure this is later than the parent sending-events doc
 Inngest events are just JSON allowing them to be easily created and read. Here is a basic example of all required and optional payload fields:
 
 ```js
-inngest.send({
+await inngest.send({
   name: "api/user.signup",
   data: { method: "google_auth" },
   user: { id: "1JDydig4HHBJCiaGu2a9" },
