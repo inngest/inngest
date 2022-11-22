@@ -331,10 +331,11 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 			Interface("version", definition.Version).
 			Interface("scopes", definition.Scopes).
 			Str("dsn", definition.DSN).
+			Str("action_name", action.Name).
 			Msg("executing action")
 	}
 
-	go e.sm.Started(ctx, id, action.ID, attempt)
+	go e.sm.Started(ctx, id, action.Name, attempt)
 
 	response, err := d.Execute(ctx, s, *definition, *action)
 	if err != nil || response == nil {

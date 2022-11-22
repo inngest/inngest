@@ -43,11 +43,37 @@ func (r *functionRunResolver) Timeline(ctx context.Context, obj *models.Function
 			t := stepEventEnum(h.Type)
 			createdAt := h.CreatedAt
 
-			events = append(events, models.StepEvent{
+			event := models.StepEvent{
 				Type:      &t,
 				CreatedAt: &createdAt,
 				Output:    &output,
-			})
+			}
+
+			if h.Type == enums.HistoryTypeStepWaiting {
+				stepData, ok := h.Data.(state.HistoryStepWaiting)
+				if ok {
+					event.WaitingFor = &models.StepEventWait{
+						WaitUntil:  stepData.ExpiryTime,
+						EventName:  stepData.EventName,
+						Expression: stepData.Expression,
+					}
+					event.Output = nil
+				}
+			} else {
+				stepData, ok := h.Data.(state.HistoryStep)
+				if ok {
+					event.Name = &stepData.Name
+
+					outputByt, err := json.Marshal(stepData.Data)
+					if err != nil {
+						continue
+					}
+					output := string(outputByt)
+					event.Output = &output
+				}
+			}
+
+			events = append(events, event)
 		}
 	}
 
@@ -104,6 +130,37 @@ func (r *functionRunResolver) Event(ctx context.Context, obj *models.FunctionRun
 	}, nil
 }
 
+func (r *functionRunResolver) WaitingFor(ctx context.Context, obj *models.FunctionRun) (*models.StepEventWait, error) {
+	history, err := r.Runner.History(ctx, state.Identifier{
+		RunID: ulid.MustParse(obj.ID),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var wait *models.StepEventWait
+
+	for _, h := range history {
+		// If this isn't a waiting event, skip it.
+		// We also skip function completed logs, as these are thrown early for SDK functions.
+		if h.Type != enums.HistoryTypeStepWaiting && h.Type != enums.HistoryTypeFunctionCompleted {
+			wait = nil
+			continue
+		}
+
+		stepData, ok := h.Data.(state.HistoryStepWaiting)
+		if ok {
+			wait = &models.StepEventWait{
+				WaitUntil:  stepData.ExpiryTime,
+				EventName:  stepData.EventName,
+				Expression: stepData.Expression,
+			}
+		}
+	}
+
+	return wait, nil
+}
+
 func isFunctionEvent(h enums.HistoryType) bool {
 	return h == enums.HistoryTypeFunctionStarted || h == enums.HistoryTypeFunctionCompleted || h == enums.HistoryTypeFunctionCancelled || h == enums.HistoryTypeFunctionFailed
 }
@@ -133,8 +190,6 @@ func stepEventEnum(h enums.HistoryType) models.StepEventType {
 		return models.StepEventTypeFailed
 	case enums.HistoryTypeStepWaiting:
 		return models.StepEventTypeWaiting
-	case enums.HistoryTypeStepSleeping:
-		return models.StepEventTypeSleeping
 	}
 
 	return models.StepEventTypeScheduled

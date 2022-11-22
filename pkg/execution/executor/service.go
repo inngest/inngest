@@ -424,7 +424,11 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 		if err != nil {
 			return err
 		}
-		return s.queue.Enqueue(ctx, item, time.Now().Add(dur))
+		endTime := time.Now().Add(dur)
+
+		go s.state.Sleeping(ctx, item.Identifier, endTime)
+
+		return s.queue.Enqueue(ctx, item, endTime)
 	case enums.OpcodeStep:
 		// Re-enqueue the exact same edge to run now.
 		return s.queue.Enqueue(ctx, item, time.Now())

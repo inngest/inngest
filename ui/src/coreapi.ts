@@ -42,6 +42,11 @@ export const EVENT = gql`
         status
         startedAt
         pendingSteps
+        waitingFor {
+          waitUntil
+          eventName
+          expression
+        }
       }
     }
   }
@@ -55,6 +60,11 @@ export const FUNCTION_RUN = gql`
       status
       startedAt
       pendingSteps
+      waitingFor {
+        waitUntil
+        eventName
+        expression
+      }
       event {
         raw
       }
@@ -64,6 +74,12 @@ export const FUNCTION_RUN = gql`
           stepType: type
           createdAt
           output
+          name
+          waitingFor {
+            waitUntil
+            eventName
+            expression
+          }
         }
         ... on FunctionEvent {
           functionType: type
