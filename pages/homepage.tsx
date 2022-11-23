@@ -64,33 +64,40 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="max-w-container-desktop m-auto flex px-10 relative gap-4 mt-24">
-        <div className=" w-1/2 flex flex-col gap-10 justify-between text-center bg-slate-800/60 rounded-xl py-11 px-16">
-          <div>
-            <h4 className="text-white text-2xl font-medium tracking-tight mb-2">
-              Use with your favorite frameworks
-            </h4>
-            <p className="text-slate-400">
-              Write your code directly within your existing codebase.
-            </p>
+      <div className="max-w-container-desktop m-auto flex px-10 relative gap-16 mt-24">
+        <div className="w-1/2 relative">
+          <div className="absolute inset-0 rounded-lg bg-blue-500 opacity-20 rotate-2 -z-0 scale-x-[110%] mx-5"></div>
+          <div className=" flex flex-col justify-between text-center bg-blue-500 rounded-xl py-11 px-16 relative w-full h-full">
+            <div>
+              <h4 className="text-white text-2xl font-medium tracking-tight mb-2">
+                Use with your favorite frameworks
+              </h4>
+              <p className="text-sky-200">
+                Write your code directly within your existing codebase.
+              </p>
+            </div>
+            <div>logos</div>
           </div>
-          <div>logos</div>
         </div>
-        <div className="w-[86px] h-[84px] relative z-10 mt-16 -mx-[54px]  leading-none flex items-center justify-center rounded-full bg-indigo-500 text-white text-2xl font-medium border-slate-1000 border-8">
+
+        {/* <div className="w-[86px] h-[84px] relative z-10 mt-16 -mx-[54px]  leading-none flex items-center justify-center rounded-full bg-slate-700 text-white text-2xl font-medium border-slate-1000 border-8">
           &
-        </div>
-        <div className=" w-1/2 flex flex-col justify-between text-center bg-slate-800/60 rounded-xl py-11 px-16">
-          <div>
-            <h4 className="text-white text-2xl font-medium tracking-tight mb-2">
-              Deploy functions anywhere
-            </h4>
-            <p className="text-slate-400">
-              Inngest calls your code, securely, as events are received.
-              <br />
-              Keep shipping your code as you do today.
-            </p>
+        </div> */}
+        <div className=" w-1/2 relative">
+          <div className="absolute inset-0 rounded-lg bg-purple-500 opacity-20 rotate-2 -z-0 scale-x-[110%] mx-5"></div>
+          <div className=" flex flex-col justify-between text-center bg-purple-500 rounded-xl py-11 px-16 relative w-full h-full">
+            <div>
+              <h4 className="text-white text-2xl font-medium tracking-tight mb-2">
+                Deploy functions anywhere
+              </h4>
+              <p className="text-purple-100">
+                Inngest calls your code, securely, as events are received.
+                <br />
+                Keep shipping your code as you do today.
+              </p>
+            </div>
+            <div>logos</div>
           </div>
-          <div>logos</div>
         </div>
       </div>
 
