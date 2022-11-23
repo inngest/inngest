@@ -11,8 +11,12 @@ e2e:
 snapshot:
 	goreleaser release --snapshot --skip-publish --rm-dist
 
+build-ui:
+	cd ui && yarn
+	cd ui && yarn build
+	cp ./ui/dist/index.html ./pkg/devserver/index.html
+
 build:
-	sh -c 'cd ./ui && yarn && yarn build && cp ./dist/index.html ../pkg/devserver/index.html'
 	goreleaser build
 
 gql:
