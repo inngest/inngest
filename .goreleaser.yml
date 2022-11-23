@@ -2,6 +2,7 @@ before:
   hooks:
     - go mod tidy
     - go generate ./...
+    - cd ui && yarn && yarn build && cp ./dist/index.html ../pkg/devserver/static/index.html
 
 builds:
   - env:
