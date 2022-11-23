@@ -19,6 +19,40 @@ type History struct {
 	Data       any               `json:"data"`
 }
 
+func (h *History) UnmarshalJSON(data []byte) error {
+	// We unmarshal into a copy of the struct so that we can
+	// correctly unmarshal the Data field into the correct struct
+	// type.
+	m := struct {
+		Type       enums.HistoryType `json:"type"`
+		Identifier Identifier        `json:"id"`
+		CreatedAt  time.Time         `json:"createdAt"`
+	}{}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return err
+	}
+	h.Type = m.Type
+	h.Identifier = m.Identifier
+	h.CreatedAt = m.CreatedAt
+
+	switch h.Type {
+	case enums.HistoryTypeStepScheduled,
+		enums.HistoryTypeStepStarted,
+		enums.HistoryTypeStepCompleted,
+		enums.HistoryTypeStepErrored,
+		enums.HistoryTypeStepFailed:
+		v := struct {
+			Data HistoryStep `json:"data"`
+		}{}
+		if err := json.Unmarshal(data, &v); err != nil {
+			return err
+		}
+		h.Data = v.Data
+	}
+
+	return nil
+}
+
 func (h History) MarshalBinary() (data []byte, err error) {
 	jsonByt, err := json.Marshal(h)
 	if err != nil {
@@ -49,8 +83,10 @@ func (h *History) UnmarshalBinary(data []byte) error {
 		if err != nil {
 			return fmt.Errorf("could not un-gzip data: %w", err)
 		}
-
-		return json.NewDecoder(r).Decode(h)
+		if err := json.NewDecoder(r).Decode(h); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	return fmt.Errorf("history had no recognised prefix")
@@ -63,6 +99,12 @@ type HistoryFunctionCancelled struct {
 
 // TODO Add tracking of the parent steps so that we can create a visual DAG
 type HistoryStep struct {
+	// ID stores the step ID.  This is the key used within the state
+	// store to represent the step's data.
+	ID string `json:"id"`
+	// Name represents the human step name.  This is included as generator
+	// based steps do not have names included in function config and is
+	// needed for the UI.
 	Name    string `json:"name"`
 	Attempt int    `json:"attempt"`
 	Data    any    `json:"data"`

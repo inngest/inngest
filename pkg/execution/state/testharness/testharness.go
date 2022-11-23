@@ -226,7 +226,7 @@ func checkScheduled(t *testing.T, m state.Manager) {
 		n := i
 		wg.Add(1)
 		go func() {
-			err := m.Scheduled(ctx, s.Identifier(), n100.Steps[n].ID, 0)
+			err := m.Scheduled(ctx, s.Identifier(), n100.Steps[n].ID, 0, nil)
 			wg.Done()
 			require.NoError(t, err)
 		}()
@@ -435,7 +435,7 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 		wg.Add(2)
 
 		go func() {
-			err := m.Scheduled(ctx, s.Identifier(), n100.Steps[n].ID, 0)
+			err := m.Scheduled(ctx, s.Identifier(), n100.Steps[n].ID, 0, nil)
 			wg.Done()
 			require.NoError(t, err)
 		}()
@@ -1315,6 +1315,189 @@ func checkFinalizedStatus(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.Equal(t, enums.RunStatusCompleted, loaded.Metadata().Status, "Finalizing step setting pending to 0 should set status to enums.RunStatusComplete")
 	require.Equal(t, 0, loaded.Metadata().Pending)
+
+	t.Run("It doesn't overwrite cancelled statuses, etc", func(t *testing.T) {
+		s = setup(t, m)
+
+		err = m.Cancel(ctx, s.Identifier())
+		require.NoError(t, err)
+
+		loaded, err := m.Load(ctx, s.Identifier())
+		require.NoError(t, err)
+		require.Equal(t, enums.RunStatusCancelled, loaded.Metadata().Status)
+
+		err = m.Finalized(ctx, s.Identifier(), inngest.TriggerName, 0)
+		require.NoError(t, err)
+
+		loaded, err = m.Load(ctx, s.Identifier())
+		require.NoError(t, err)
+		require.Equal(t, enums.RunStatusCancelled, loaded.Metadata().Status)
+	})
+}
+
+func checkLogs(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	t.Run("New() stores HistoryTypeFunctionStarted", func(t *testing.T) {
+		history, err := m.History(ctx, s.Identifier())
+
+		require.NoError(t, err)
+		require.Equal(t, 1, len(history))
+		require.Equal(t, enums.HistoryTypeFunctionStarted, history[0].Type)
+	})
+
+	t.Run("Started() stores HistoryTypeStepStarted with attempt information", func(t *testing.T) {
+		s = setup(t, m)
+
+		err := m.Started(ctx, s.Identifier(), w.Steps[0].ID, 2)
+		require.NoError(t, err)
+
+		history, err := m.History(ctx, s.Identifier())
+		require.NoError(t, err)
+		require.Equal(t, 2, len(history))
+
+		started := history[1]
+
+		require.Equal(t, enums.HistoryTypeStepStarted.String(), started.Type.String())
+		require.NotNil(t, started.Data)
+
+		stepdata, ok := started.Data.(state.HistoryStep)
+		require.True(t, ok, "step data is %T instead of state.HistoryStep", started.Data)
+		require.Equal(t, 2, stepdata.Attempt)
+	})
+
+	t.Run("SaveResponse() with a non-final error stores HistoryTypeStepErrored", func(t *testing.T) {
+		s = setup(t, m)
+
+		r := state.DriverResponse{
+			Step: w.Steps[0],
+			Err:  fmt.Errorf("lol"),
+		}
+		_, err := m.SaveResponse(ctx, s.Identifier(), r, 2)
+		require.NoError(t, err)
+
+		history, err := m.History(ctx, s.Identifier())
+		require.NoError(t, err)
+		require.Equal(t, 2, len(history))
+
+		errored := history[1]
+
+		require.Equal(t, enums.HistoryTypeStepErrored.String(), errored.Type.String())
+		require.NotNil(t, errored.Data)
+
+		stepdata, ok := errored.Data.(state.HistoryStep)
+		require.True(t, ok, "step data is %T instead of state.HistoryStep (%v)", errored.Data, errored.Data)
+		require.Equal(t, 2, stepdata.Attempt)
+		require.Equal(t, w.Steps[0].ID, stepdata.ID)
+		require.Equal(t, w.Steps[0].Name, stepdata.Name)
+	})
+
+	t.Run("SaveResponse() with a final error stores HistoryTypeStepFailed and HistoryTypeFunctionFailed", func(t *testing.T) {
+		s = setup(t, m)
+
+		r := state.DriverResponse{
+			Step: w.Steps[0],
+			Err:  fmt.Errorf("lol"),
+		}
+		r.SetFinal()
+		_, err := m.SaveResponse(ctx, s.Identifier(), r, 2)
+		require.NoError(t, err)
+
+		history, err := m.History(ctx, s.Identifier())
+		require.NoError(t, err)
+		require.Equal(t, 3, len(history))
+
+		historyStep := history[1]
+		historyFunc := history[2]
+
+		require.Equal(t, enums.HistoryTypeStepFailed.String(), historyStep.Type.String())
+		require.Equal(t, enums.HistoryTypeFunctionFailed.String(), historyFunc.Type.String())
+
+		stepdata, ok := historyStep.Data.(state.HistoryStep)
+		require.True(t, ok, "step data is %T instead of state.HistoryStep (%v)", historyStep.Data, historyStep.Data)
+		require.Equal(t, 2, stepdata.Attempt)
+		require.Equal(t, w.Steps[0].ID, stepdata.ID)
+		require.Equal(t, w.Steps[0].Name, stepdata.Name)
+	})
+
+	t.Run("SaveResponse() with step data stores HistoryTypeStepCompleted", func(t *testing.T) {
+		s = setup(t, m)
+
+		r := state.DriverResponse{
+			Step:   w.Steps[0],
+			Output: map[string]any{"ok": true},
+		}
+		_, err := m.SaveResponse(ctx, s.Identifier(), r, 2)
+		require.NoError(t, err)
+
+		history, err := m.History(ctx, s.Identifier())
+		require.NoError(t, err)
+		require.Equal(t, 2, len(history))
+
+		historyStep := history[1]
+
+		require.Equal(t, enums.HistoryTypeStepCompleted.String(), historyStep.Type.String())
+
+		stepdata, ok := historyStep.Data.(state.HistoryStep)
+		require.True(t, ok, "step data is %T instead of state.HistoryStep (%v)", historyStep.Data, historyStep.Data)
+		require.Equal(t, 2, stepdata.Attempt)
+		require.Equal(t, w.Steps[0].ID, stepdata.ID)
+		require.Equal(t, w.Steps[0].Name, stepdata.Name)
+	})
+
+	t.Run("Scheduled() stores HistoryTypeStepScheduled", func(t *testing.T) {
+		s = setup(t, m)
+		err := m.Scheduled(ctx, s.Identifier(), w.Steps[0].ID, 2, nil)
+		require.NoError(t, err)
+
+		history, err := m.History(ctx, s.Identifier())
+		require.NoError(t, err)
+		require.Equal(t, 2, len(history))
+
+		historyStep := history[1]
+		require.Equal(t, enums.HistoryTypeStepScheduled.String(), historyStep.Type.String())
+
+		stepdata, ok := historyStep.Data.(state.HistoryStep)
+		require.True(t, ok, "step data is %T instead of state.HistoryStep (%v)", historyStep.Data, historyStep.Data)
+		require.Equal(t, 2, stepdata.Attempt)
+		require.Equal(t, w.Steps[0].ID, stepdata.ID)
+		// TODO
+		// require.Equal(t, w.Steps[0].Name, stepdata.Name)
+	})
+
+	t.Run("Finalized() does nothing with a >0 pending count", func(t *testing.T) {
+		s = setup(t, m)
+		err := m.Scheduled(ctx, s.Identifier(), w.Steps[0].ID, 2, nil)
+		require.NoError(t, err)
+
+		reloaded, err := m.Load(ctx, s.Identifier())
+		require.NoError(t, err)
+		require.EqualValues(t, 2, reloaded.Metadata().Pending)
+
+		err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID, 2)
+		require.NoError(t, err)
+
+		history, err := m.History(ctx, s.Identifier())
+		require.NoError(t, err)
+		require.Equal(t, 2, len(history))
+	})
+
+	t.Run("Finalized() stores HistoryTypeFunctionComplete if pending count transitions to 0", func(t *testing.T) {
+		s = setup(t, m)
+
+		require.EqualValues(t, 1, s.Metadata().Pending)
+
+		err := m.Finalized(ctx, s.Identifier(), w.Steps[0].ID, 2)
+		require.NoError(t, err)
+
+		history, err := m.History(ctx, s.Identifier())
+		require.NoError(t, err)
+		require.Equal(t, 2, len(history))
+
+		historyStep := history[1]
+		require.Equal(t, enums.HistoryTypeFunctionCompleted.String(), historyStep.Type.String())
+	})
 }
 
 // TODO: Optimization - when finalizing steps, we should delete all pauses when the counter is set to 0
@@ -1359,18 +1542,6 @@ func checkFinalizedDeletesPauses(t *testing.T, m state.Manager) {
 	require.Nil(t, found)
 }
 */
-func checkLogs(t *testing.T, m state.Manager) {
-	ctx := context.Background()
-	s := setup(t, m)
-
-	t.Run("Check that starting a function creates a function started history event", func(t *testing.T) {
-		history, err := m.History(ctx, s.Identifier())
-
-		require.NoError(t, err)
-		require.Equal(t, 1, len(history))
-		require.Equal(t, enums.HistoryTypeFunctionStarted, history[0].Type)
-	})
-}
 
 func setup(t *testing.T, m state.Manager) state.State {
 	ctx := context.Background()

@@ -5,7 +5,6 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -36,7 +35,10 @@ func init() {
 		panic(fmt.Errorf("error reading redis lua dir: %w", err))
 	}
 	for _, e := range entries {
-		val, err := embedded.ReadFile(filepath.Join("lua", e.Name()))
+		// NOTE: When using embed go always uses forward slashes as a path
+		// prefix. filepath.Join uses OS-specific prefixes which fails on
+		// windows, so we construct the path using Sprintf for all platforms
+		val, err := embedded.ReadFile(fmt.Sprintf("lua/%s", e.Name()))
 		if err != nil {
 			panic(fmt.Errorf("error reading redis lua script: %w", err))
 		}
@@ -245,7 +247,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			m.kf.Workflow(ctx, input.Workflow.UUID, input.Workflow.Version),
 			m.kf.RunMetadata(ctx, input.Identifier),
 			m.kf.Actions(ctx, input.Identifier),
-			m.kf.Log(ctx, input.Identifier),
+			m.kf.History(ctx, input.Identifier),
 		},
 		event,
 		workflow,
@@ -380,38 +382,67 @@ func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error)
 }
 
 func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (state.State, error) {
+	var (
+		data            any
+		err             error
+		typ             enums.HistoryType
+		funcFailHistory state.History
+	)
+
+	now := time.Now()
+
 	if r.Err == nil {
-		// Save the output.
-		str, err := json.Marshal(r.Output)
-		if err != nil {
-			return nil, err
+		typ = enums.HistoryTypeStepCompleted
+		if data, err = json.Marshal(r.Output); err != nil {
+			return nil, fmt.Errorf("error marshalling step output: %w", err)
 		}
-		if err := m.r.HSet(ctx, m.kf.Actions(ctx, i), r.Step.ID, str).Err(); err != nil {
-			return nil, err
+	} else {
+		typ = enums.HistoryTypeStepErrored
+		data = r.Err.Error()
+		if r.Final() {
+			typ = enums.HistoryTypeStepFailed
+			funcFailHistory = state.History{
+				Type:       enums.HistoryTypeFunctionFailed,
+				Identifier: i,
+				CreatedAt:  now,
+			}
 		}
-		return m.Load(ctx, i)
 	}
 
-	// Save the error.
-	err := m.r.Watch(ctx, func(tx *redis.Tx) error {
-		// Save the error.
-		if err := m.r.HSet(ctx, m.kf.Errors(ctx, i), r.Step.ID, r.Err.Error()).Err(); err != nil {
-			return err
-		}
-		if !r.Final() {
-			// we will retry
-			return nil
-		}
-		if err := m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", -1).Err(); err != nil {
-			return err
-		}
-		return m.r.HSet(ctx, m.kf.RunMetadata(ctx, i), "status", enums.RunStatusFailed).Err()
-	})
+	stepHistory := state.History{
+		Type:       typ,
+		Identifier: i,
+		CreatedAt:  now,
+		Data: state.HistoryStep{
+			ID:      r.Step.ID,
+			Name:    r.Step.Name,
+			Attempt: attempt,
+			Data:    data,
+		},
+	}
+
+	err = redis.NewScript(scripts["saveResponse"]).Eval(
+		ctx,
+		m.r,
+		[]string{
+			m.kf.Actions(ctx, i),
+			m.kf.Errors(ctx, i),
+			m.kf.RunMetadata(ctx, i),
+			m.kf.History(ctx, i),
+		},
+		data,
+		r.Step.ID,
+		r.Err != nil,
+		r.Final(),
+		stepHistory,
+		funcFailHistory,
+		now.UnixMilli(),
+	).Err()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error finalizing: %w", err)
 	}
 
-	if r.Final() {
+	if r.Err != nil && r.Final() {
 		// Trigger error callbacks
 		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
 	}
@@ -419,20 +450,59 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 	return m.Load(ctx, i)
 }
 
-func (m mgr) Started(ctx context.Context, i state.Identifier, stepName string, attempt int) error {
-	// TODO: Write log
+func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, attempt int) error {
+	now := time.Now()
+
+	return m.r.ZAdd(ctx, m.kf.History(ctx, id), &redis.Z{
+		Score: float64(now.UnixMilli()),
+		Member: state.History{
+			Type:       enums.HistoryTypeStepStarted,
+			Identifier: id,
+			CreatedAt:  now,
+			Data: state.HistoryStep{
+				ID:      stepID,
+				Attempt: attempt,
+			},
+		},
+	}).Err()
+}
+
+func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
+	now := time.Now()
+	err := redis.NewScript(scripts["scheduled"]).Eval(
+		ctx,
+		m.r,
+		[]string{m.kf.RunMetadata(ctx, i), m.kf.History(ctx, i)},
+		state.History{
+			Type:       enums.HistoryTypeStepScheduled,
+			Identifier: i,
+			CreatedAt:  now,
+			Data: state.HistoryStep{
+				ID:      stepID,
+				Attempt: attempt,
+			},
+		},
+		now.UnixMilli(),
+	).Err()
+	if err != nil {
+		return fmt.Errorf("error updating scheduled state: %w", err)
+	}
 	return nil
 }
 
-func (m mgr) Scheduled(ctx context.Context, i state.Identifier, at *time.Time) error {
-	return m.r.HIncrBy(ctx, m.kf.RunMetadata(ctx, i), "pending", 1).Err()
-}
-
 func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
+	now := time.Now()
+
 	status, err := redis.NewScript(scripts["finalize"]).Eval(
 		ctx,
 		m.r,
-		[]string{m.kf.RunMetadata(ctx, i)},
+		[]string{m.kf.RunMetadata(ctx, i), m.kf.History(ctx, i)},
+		state.History{
+			Type:       enums.HistoryTypeFunctionCompleted,
+			Identifier: i,
+			CreatedAt:  now,
+		},
+		now.UnixMilli(),
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error finalizing: %w", err)
@@ -623,7 +693,7 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 }
 
 func (m mgr) History(ctx context.Context, id state.Identifier) ([]state.History, error) {
-	cmd := m.r.ZScan(ctx, m.kf.Log(ctx, id), 0, "", -1)
+	cmd := m.r.ZScan(ctx, m.kf.History(ctx, id), 0, "", -1)
 	if err := cmd.Err(); err != nil {
 		return nil, err
 	}
@@ -652,10 +722,6 @@ func (m mgr) History(ctx context.Context, id state.Identifier) ([]state.History,
 	}
 
 	return history, nil
-}
-
-func (m mgr) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
-	return nil, nil
 }
 
 func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
@@ -757,7 +823,7 @@ type runMetadata struct {
 func (r runMetadata) Map() map[string]any {
 	return map[string]any{
 		"version":       r.Version,
-		"status":        r.Status,
+		"status":        int(r.Status), // Always store this as an int
 		"pending":       r.Pending,
 		"debugger":      r.Debugger,
 		"runType":       r.RunType,

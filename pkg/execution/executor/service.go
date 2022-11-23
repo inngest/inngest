@@ -287,7 +287,10 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 			// This should also increase the waitgroup count, as we have an
 			// edge that is outstanding.
-			if err := s.state.Scheduled(ctx, item.Identifier, nil); err != nil {
+			//
+			// XXX: Should this be a part of saving a pause?  Maybe we should
+			// always increase scheduled count atomically here.
+			if err := s.state.Scheduled(ctx, item.Identifier, next.Incoming, 0, nil); err != nil {
 				return fmt.Errorf("unable to schedule async edge: %w", err)
 			}
 
@@ -355,7 +358,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		// and this is a no-op - things should be atomic where possible.
 		//
 		// TODO: Add a unit test to ensure WG is 0 at the end of execution.
-		if err := s.state.Scheduled(ctx, item.Identifier, nil); err != nil {
+		if err := s.state.Scheduled(ctx, item.Identifier, next.Incoming, 0, nil); err != nil {
 			return fmt.Errorf("unable to schedule next step: %w", err)
 		}
 	}
@@ -397,7 +400,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 
 		// This should also increase the waitgroup count, as we have an
 		// edge that is outstanding.
-		if err := s.state.Scheduled(ctx, item.Identifier, nil); err != nil {
+		if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
 			return fmt.Errorf("unable to schedule wait for event: %w", err)
 		}
 
@@ -435,13 +438,13 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 		}
 		at := time.Now().Add(dur)
 
-		if err := s.state.Scheduled(ctx, item.Identifier, &at); err != nil {
+		if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, &at); err != nil {
 			return err
 		}
 		return s.queue.Enqueue(ctx, item, time.Now().Add(dur))
 	case enums.OpcodeStep:
 		// Re-enqueue the exact same edge to run now.
-		if err := s.state.Scheduled(ctx, item.Identifier, nil); err != nil {
+		if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
 			return err
 		}
 		return s.queue.Enqueue(ctx, item, time.Now())

@@ -98,7 +98,7 @@ func start(ctx context.Context, opts StartOpts, loader *inmemorydatastore.FSLoad
 		notify.OnFunctionStatus(func(ctx context.Context, id state.Identifier, rs enums.RunStatus) {
 			switch rs {
 			case enums.RunStatusRunning:
-				// TODO: A new function was added, so add this to the core API
+				// A new function was added, so add this to the core API
 				// for listing functions by XYZ.
 			}
 		})

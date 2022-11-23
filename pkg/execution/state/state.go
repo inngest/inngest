@@ -173,9 +173,6 @@ type Loader interface {
 	// History loads history for the given run identifier.
 	History(ctx context.Context, i Identifier) ([]History, error)
 
-	// Runs loads all run metadata
-	Runs(ctx context.Context, eventId string) ([]Metadata, error)
-
 	// IsComplete returns whether the given identifier is complete, ie. the
 	// pending count in the identifier's metadata is zero.
 	IsComplete(ctx context.Context, i Identifier) (complete bool, err error)
@@ -206,12 +203,12 @@ type Mutater interface {
 	// SQS, Celery).  In thise cases recording that a step was scheduled is a separate step.
 	//
 	// Attempt is zero-indexed.
-	Scheduled(ctx context.Context, i Identifier, at *time.Time) error
+	Scheduled(ctx context.Context, i Identifier, stepID string, attempt int, at *time.Time) error
 
 	// Started is called when a step is started.
 	//
 	// Attempt is zero-indexed.
-	Started(ctx context.Context, i Identifier, stepName string, attempt int) error
+	Started(ctx context.Context, i Identifier, stepID string, attempt int) error
 
 	// Finalized increases the finalized count for a run's metadata.
 	//
