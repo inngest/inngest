@@ -166,11 +166,17 @@ func typescript(cmd *cobra.Command, args []string) (string, error) {
 		suffix := ";"
 		ts = strings.Replace(ts, fmt.Sprintf("%sstring%s", prefix, suffix), fmt.Sprintf("%s\"%s\"%s", prefix, eventId, suffix), 1)
 
+		// Replace any instance of `{}` with `Record<string, never>`. TS types
+		// declare `{}` as "any object", which means it could be pretty much
+		// anything in JS.
+		ts = strings.Replace(ts, "{}", "Record<string, never>", -1)
+
 		b.WriteString(ts + "\n")
 	}
 
 	// Add a type to allow users to define custom types
 	b.WriteString("type CustomEvent = {\n")
+	b.WriteString("  name: string;\n")
 	b.WriteString("  data: Record<string, any>;\n")
 	b.WriteString("  user?: Record<string, any>;\n")
 	b.WriteString("};\n\n")
@@ -198,6 +204,7 @@ func typescript(cmd *cobra.Command, args []string) (string, error) {
 	b.WriteString(" * >({ name: \"My App\" });\n")
 	b.WriteString(" * ```\n")
 	b.WriteString(" */\n")
+	b.WriteString("// eslint-disable-next-line @typescript-eslint/ban-types\n")
 	b.WriteString("export type Events<CustomEvents extends Record<string, CustomEvent> = {}> =\n")
 	b.WriteString("  Readonly<Omit<CustomEvents, keyof GeneratedEvents> & GeneratedEvents>;")
 
