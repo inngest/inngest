@@ -59,7 +59,7 @@ inngest init --trigger demo/event.sent
 inngest run
 ```
 
-4. Run the Inngest DevServer. This starts a local "Event API" which can receive events. When events are received, functions with matching triggers will automatically be run. Optionally use the `-p` flag to specify the sport for the Event API.
+4. Run the Inngest DevServer. This starts a local "Event API" which can receive events. When events are received, functions with matching triggers will automatically be run. Optionally use the `-p` flag to specify the port for the Event API.
 
 ```shell
 inngest dev -p 9999
