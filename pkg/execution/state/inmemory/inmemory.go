@@ -137,15 +137,15 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 	return state, nil
 }
 
-func (m *mem) Started(ctx context.Context, i state.Identifier, stepName string, attempt int) error {
+func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
 	m.state[i.IdempotencyKey()].Actions()
-
 	return m.setHistory(ctx, i, state.History{
 		Type:       enums.HistoryTypeStepStarted,
 		Identifier: i,
 		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
 		Data: state.HistoryStep{
-			Name:    stepName,
+			ID:      stepID,
+			Name:    stepID,
 			Attempt: attempt,
 		},
 	})
@@ -162,7 +162,7 @@ func (m *mem) Sleeping(ctx context.Context, i state.Identifier, endTime time.Tim
 	})
 }
 
-func (m *mem) Scheduled(ctx context.Context, i state.Identifier, at *time.Time) error {
+func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -186,6 +186,17 @@ func (m *mem) Scheduled(ctx context.Context, i state.Identifier, at *time.Time) 
 		})
 	}
 
+	m.setHistory(ctx, i, state.History{
+		Type:       enums.HistoryTypeStepScheduled,
+		Identifier: i,
+		CreatedAt:  time.UnixMilli(int64(i.RunID.Time())),
+		Data: state.HistoryStep{
+			ID:      stepID,
+			Name:    stepID,
+			Attempt: attempt,
+		},
+	})
+
 	return nil
 }
 
@@ -200,7 +211,7 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string, 
 
 	instance := s.(memstate)
 	instance.metadata.Pending--
-	if instance.metadata.Pending == 0 {
+	if instance.metadata.Pending == 0 && instance.metadata.Status == enums.RunStatusRunning {
 		instance.metadata.Status = enums.RunStatusCompleted
 		go m.runCallbacks(ctx, i, enums.RunStatusCompleted)
 
@@ -265,11 +276,6 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 
 	now := time.UnixMilli(time.Now().UnixMilli())
 
-	stepName := r.Step.ID
-	if r.Generator != nil && r.Generator.Name != "" {
-		stepName = r.Generator.Name
-	}
-
 	if r.Err == nil {
 		instance.actions[r.Step.ID] = r.Output
 		delete(instance.errors, r.Step.ID)
@@ -278,25 +284,30 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 			Type:       enums.HistoryTypeStepCompleted,
 			Identifier: i,
 			CreatedAt:  now,
-			// Data:       r.Output,
 			Data: state.HistoryStep{
-				Name:    stepName,
-				Attempt: attempt,
+				ID:      r.Step.ID,
+				Name:    r.Step.Name,
 				Data:    r.Output,
+				Attempt: attempt,
 			},
 		})
 	} else {
 		instance.errors[r.Step.ID] = r.Err
 
+		typ := enums.HistoryTypeStepErrored
+		if r.Final() {
+			typ = enums.HistoryTypeStepFailed
+		}
+
 		m.setHistory(ctx, i, state.History{
-			Type:       enums.HistoryTypeStepErrored,
+			Type:       typ,
 			Identifier: i,
 			CreatedAt:  now,
-			// Data:       r.Err.Error(),
 			Data: state.HistoryStep{
-				Name:    stepName,
-				Attempt: attempt,
+				ID:      r.Step.ID,
+				Name:    r.Step.Name,
 				Data:    r.Err.Error(),
+				Attempt: attempt,
 			},
 		})
 	}
@@ -305,7 +316,6 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 		instance.metadata.Pending--
 		instance.metadata.Status = enums.RunStatusFailed
 		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
-
 		m.setHistory(ctx, i, state.History{
 			Type:       enums.HistoryTypeFunctionFailed,
 			Identifier: i,

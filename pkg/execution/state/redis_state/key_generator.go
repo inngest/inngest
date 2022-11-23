@@ -53,8 +53,8 @@ type KeyGenerator interface {
 	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
 	PauseStep(context.Context, state.Identifier, string) string
 
-	// Log returns the key used to store a log entry for run hisotry
-	Log(context.Context, state.Identifier) string
+	// History returns the key used to store a log entry for run hisotry
+	History(context.Context, state.Identifier) string
 }
 
 type DefaultKeyFunc struct {
@@ -106,6 +106,6 @@ func (d DefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step
 	return fmt.Sprintf("%s-%s", prefix, step)
 }
 
-func (d DefaultKeyFunc) Log(ctx context.Context, id state.Identifier) string {
+func (d DefaultKeyFunc) History(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("%s:history:%s", d.Prefix, id.RunID)
 }

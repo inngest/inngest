@@ -495,7 +495,7 @@ func TestServiceGeneratorState(t *testing.T) {
 		// There should be 3 entries:  the overall generator response plus each individual
 		// substep.
 		require.EqualValues(t, 3, len(run.Actions()))
-		require.EqualValues(t, state.RunStatusComplete, md.Status)
+		require.EqualValues(t, enums.RunStatusCompleted, md.Status)
 		require.EqualValues(t, 0, md.Pending)
 	})
 

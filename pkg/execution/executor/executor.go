@@ -355,6 +355,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	// By updating the step ID, we ensure that the data will be saved to the generator's ID.
 	if response.Generator != nil {
 		response.Step.ID = response.Generator.ID
+		response.Step.Name = response.Generator.Name
 		// Unmarshal the generator data into the step.
 		if response.Generator.Data != nil {
 			err = json.Unmarshal(response.Generator.Data, &response.Output)
