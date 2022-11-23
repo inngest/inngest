@@ -14,7 +14,7 @@ snapshot:
 build-ui:
 	cd ui && yarn
 	cd ui && yarn build
-	cp ./ui/dist/index.html ./pkg/devserver/index.html
+	cp ./ui/dist/index.html ./pkg/devserver/static/index.html
 
 build:
 	goreleaser build
