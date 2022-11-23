@@ -58,7 +58,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
         <Button label="Retry" />
       </div>
       <div className="pr-4 mt-4">
-        {run.timeline?.map((row) => (
+        {run.timeline?.map((row, i, list) => (
           <FunctionRunTimelineRow
             createdAt={row.createdAt}
             rowType={row.__typename === "FunctionEvent" ? "function" : "step"}
@@ -71,6 +71,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
             name={
               row.__typename === "StepEvent" ? row.name || undefined : undefined
             }
+            last={i === list.length - 1}
           />
         ))}
       </div>
@@ -84,6 +85,7 @@ type FunctionRunTimelineRowProps = {
   output: string | null | undefined;
   createdAt: string | number;
   name?: string;
+  last?: boolean;
 };
 
 const FunctionRunTimelineRow = ({
@@ -92,6 +94,7 @@ const FunctionRunTimelineRow = ({
   output,
   createdAt,
   name,
+  last,
 }: FunctionRunTimelineRowProps) => {
   const payload = usePrettyJson(output);
 
@@ -119,7 +122,7 @@ const FunctionRunTimelineRow = ({
   }, [rowType, eventType, name]);
 
   return (
-    <TimelineRow status={status} iconOffset={0}>
+    <TimelineRow status={status} iconOffset={0} bottomLine={!last}>
       <TimelineFuncProgress label={label} date={createdAt} id="">
         {payload ? (
           <CodeBlock tabs={[{ label: "Payload", content: payload }]} />
