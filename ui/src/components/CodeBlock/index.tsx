@@ -1,6 +1,5 @@
 import { useState } from "preact/hooks";
 import classNames from "../../utils/classnames";
-import Button from "../Button";
 import CopyButton from "./CopyButton";
 
 interface CodeBlockProps {
@@ -52,10 +51,10 @@ export default function CodeBlock({
         </div>
         <div className="flex gap-2 items-center mr-2">
           <CopyButton btnAction={handleCopyClick} />
-          <Button
+          {/* <Button
             label={expanded ? "Close" : "Expand"}
             btnAction={handleExpandClick}
-          />
+          /> */}
         </div>
       </div>
       <div

@@ -1,6 +1,5 @@
 import { useMemo, useState } from "preact/hooks";
 import { usePrettyJson } from "../../hooks/usePrettyJson";
-import { IconFeed } from "../../icons";
 import {
   EventStatus,
   FunctionEventType,
@@ -27,13 +26,23 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
   const run = useMemo(() => query.data?.functionRun, [query.data?.functionRun]);
 
   if (query.isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <ContentCard date={0} id="">
+        <div className="w-full h-full flex items-center justify-center p-8">
+          <div className="opacity-75 italic">Loading...</div>
+        </div>
+      </ContentCard>
+    );
   }
 
   if (!run) {
     return (
-      <ContentCard title="Event not found" date={0} id="">
-        Event not found
+      <ContentCard date={0} id="">
+        <div className="w-full h-full flex items-center justify-center p-8">
+          <div className="opacity-75 italic">
+            Select a run on the left to see its status
+          </div>
+        </div>
       </ContentCard>
     );
   }
@@ -43,7 +52,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       title={run.name || "Unknown"}
       date={run.startedAt}
       id={run.id}
-      button={<Button label="Open Function" icon={<IconFeed />} />}
+      // button={<Button label="Open Function" icon={<IconFeed />} />}
     >
       <div className="flex justify-end px-4 border-t border-slate-800/50 pt-4 mt-4">
         <Button label="Retry" />
