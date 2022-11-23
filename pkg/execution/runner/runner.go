@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/inmemory"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/logger"
@@ -216,7 +217,7 @@ func (s *svc) History(ctx context.Context, id state.Identifier) ([]state.History
 }
 
 func (s *svc) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
-	return s.state.Runs(ctx, eventId)
+	return s.state.(inmemory.InmemoryLoader).Runs(ctx, eventId)
 }
 
 func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error) {

@@ -5,7 +5,6 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -36,7 +35,10 @@ func init() {
 		panic(fmt.Errorf("error reading redis lua dir: %w", err))
 	}
 	for _, e := range entries {
-		val, err := embedded.ReadFile(filepath.Join("lua", e.Name()))
+		// NOTE: When using embed go always uses forward slashes as a path
+		// prefix. filepath.Join uses OS-specific prefixes which fails on
+		// windows, so we construct the path using Sprintf for all platforms
+		val, err := embedded.ReadFile(fmt.Sprintf("lua/%s", e.Name()))
 		if err != nil {
 			panic(fmt.Errorf("error reading redis lua script: %w", err))
 		}
@@ -720,10 +722,6 @@ func (m mgr) History(ctx context.Context, id state.Identifier) ([]state.History,
 	}
 
 	return history, nil
-}
-
-func (m mgr) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
-	return nil, nil
 }
 
 func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {

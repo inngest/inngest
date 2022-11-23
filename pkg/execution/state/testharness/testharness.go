@@ -1448,7 +1448,8 @@ func checkLogs(t *testing.T, m state.Manager) {
 
 	t.Run("Scheduled() stores HistoryTypeStepScheduled", func(t *testing.T) {
 		s = setup(t, m)
-		m.Scheduled(ctx, s.Identifier(), w.Steps[0].ID, 2, nil)
+		err := m.Scheduled(ctx, s.Identifier(), w.Steps[0].ID, 2, nil)
+		require.NoError(t, err)
 
 		history, err := m.History(ctx, s.Identifier())
 		require.NoError(t, err)

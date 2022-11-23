@@ -17,7 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/sdk"
 )
 
-//go:embed index.html
+//go:embed static/index.html
 var uiHtml []byte
 
 var (
@@ -62,7 +62,7 @@ func (a *devapi) addRoutes() {
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
-	w.Write(uiHtml)
+	_, _ = w.Write(uiHtml)
 }
 
 // Info returns information about the dev server and its registered functions.

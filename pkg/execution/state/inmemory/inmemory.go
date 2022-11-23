@@ -12,6 +12,13 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
+type InmemoryLoader interface {
+	state.Loader
+
+	// Runs loads all run metadata
+	Runs(ctx context.Context, eventId string) ([]state.Metadata, error)
+}
+
 func init() {
 	registration.RegisterState(func() any { return &Config{} })
 }
@@ -99,7 +106,7 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 
 	m.state[input.Identifier.IdempotencyKey()] = s
 
-	_ = m.setHistory(ctx, input.Identifier, state.History{
+	m.setHistory(ctx, input.Identifier, state.History{
 		Type:       enums.HistoryTypeFunctionStarted,
 		Identifier: input.Identifier,
 		CreatedAt:  time.UnixMilli(int64(input.Identifier.RunID.Time())),
@@ -139,7 +146,7 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 
 func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
 	m.state[i.IdempotencyKey()].Actions()
-	return m.setHistory(ctx, i, state.History{
+	m.setHistory(ctx, i, state.History{
 		Type:       enums.HistoryTypeStepStarted,
 		Identifier: i,
 		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
@@ -149,10 +156,11 @@ func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, at
 			Attempt: attempt,
 		},
 	})
+	return nil
 }
 
 func (m *mem) Sleeping(ctx context.Context, i state.Identifier, endTime time.Time) error {
-	return m.setHistory(ctx, i, state.History{
+	m.setHistory(ctx, i, state.History{
 		Type:       enums.HistoryTypeStepWaiting,
 		Identifier: i,
 		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
@@ -160,6 +168,7 @@ func (m *mem) Sleeping(ctx context.Context, i state.Identifier, endTime time.Tim
 			ExpiryTime: endTime,
 		},
 	})
+	return nil
 }
 
 func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
@@ -477,15 +486,12 @@ func (m *mem) Runs(ctx context.Context, eventId string) ([]state.Metadata, error
 	return metadata, nil
 }
 
-func (m *mem) setHistory(ctx context.Context, i state.Identifier, entry state.History) error {
+func (m *mem) setHistory(ctx context.Context, i state.Identifier, entry state.History) {
 	_, ok := m.history[i.RunID.String()]
 	if !ok {
 		m.history[i.RunID.String()] = []state.History{}
 	}
-
 	m.history[i.RunID.String()] = append(m.history[i.RunID.String()], entry)
-
-	return nil
 }
 
 func (m mem) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
