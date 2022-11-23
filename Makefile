@@ -12,7 +12,7 @@ snapshot:
 	goreleaser release --snapshot --skip-publish --rm-dist
 
 build:
-	sh -c 'cd ./ui && yarn && yarn build && cp ./dist/index.html ../static/index.html'
+	sh -c 'cd ./ui && yarn && yarn build && cp ./dist/index.html ../pkg/devserver/index.html'
 	goreleaser build
 
 gql:

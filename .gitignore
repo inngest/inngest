@@ -4,4 +4,4 @@ dist/
 testfns/
 
 main
-static/index.html
+pkg/devserver/index.html

@@ -2,6 +2,7 @@ package devserver
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,6 +16,9 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
 )
+
+//go:embed index.html
+var uiHtml []byte
 
 var (
 	// signingKeyErrorLoggedCount ensures that we log the signing key message once
@@ -58,7 +62,7 @@ func (a *devapi) addRoutes() {
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
-	// TODO: Respond with a UI here.
+	w.Write(uiHtml)
 }
 
 // Info returns information about the dev server and its registered functions.
