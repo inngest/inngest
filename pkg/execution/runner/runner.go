@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/inmemory"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/logger"
@@ -40,11 +40,26 @@ type Runner interface {
 	service.Service
 
 	InitializeCrons(ctx context.Context) error
+	History(ctx context.Context, id state.Identifier) ([]state.History, error)
+	Runs(ctx context.Context, eventId string) ([]state.Metadata, error)
+	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
 func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
+	}
+}
+
+func WithEventManager(e event.Manager) func(s *svc) {
+	return func(s *svc) {
+		s.em = &e
+	}
+}
+
+func WithStateManager(sm state.Manager) func(s *svc) {
+	return func(s *svc) {
+		s.state = sm
 	}
 }
 
@@ -70,6 +85,7 @@ type svc struct {
 	queue queue.Queue
 	// cronmanager allows the creation of new scheduled functions.
 	cronmanager *cron.Cron
+	em          *event.Manager
 }
 
 func (s svc) Name() string {
@@ -92,9 +108,11 @@ func (s *svc) Pre(ctx context.Context) error {
 		return err
 	}
 
-	s.state, err = s.config.State.Service.Concrete.Manager(ctx)
-	if err != nil {
-		return err
+	if s.state == nil {
+		s.state, err = s.config.State.Service.Concrete.Manager(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
 	logger.From(ctx).Info().Str("backend", s.config.Queue.Service.Backend).Msg("starting queue")
@@ -194,14 +212,42 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 	return nil
 }
 
+func (s *svc) History(ctx context.Context, id state.Identifier) ([]state.History, error) {
+	return s.state.History(ctx, id)
+}
+
+func (s *svc) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
+	return s.state.(inmemory.InmemoryLoader).Runs(ctx, eventId)
+}
+
+func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error) {
+	if eventId != "" {
+		evt := s.em.EventById(eventId)
+		if evt != nil {
+			return []event.Event{*evt}, nil
+		}
+
+		return []event.Event{}, nil
+	}
+
+	return s.em.Events(), nil
+}
+
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	if m.Name != "event/event.received" {
 		return fmt.Errorf("unknown event type: %s", m.Name)
 	}
 
-	evt := &event.Event{}
-	if err := json.Unmarshal([]byte(m.Data), evt); err != nil {
-		return fmt.Errorf("error unmarshalling event: %w", err)
+	var evt *event.Event
+	var err error
+
+	if s.em == nil {
+		evt, err = event.NewEvent(m.Data)
+	} else {
+		evt, err = s.em.NewEvent(m.Data)
+	}
+	if err != nil {
+		return fmt.Errorf("error creating event: %w", err)
 	}
 
 	l := logger.From(ctx).With().

@@ -7,6 +7,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 )
@@ -27,11 +28,19 @@ func WithAPIReadWriter(rw coredata.APIReadWriter) func(s *svc) {
 	}
 }
 
+func WithRunner(r runner.Runner) Opt {
+	return func(s *svc) {
+		s.runner = r
+	}
+}
+
 type svc struct {
 	config config.Config
 	api    *CoreAPI
 	// data provides the ability to write and load data
 	data coredata.APIReadWriter
+	// runner is the execution runner
+	runner runner.Runner
 }
 
 func (s *svc) Name() string {
@@ -49,6 +58,7 @@ func (s *svc) Pre(ctx context.Context) (err error) {
 		Config:        s.config,
 		Logger:        logger.From(ctx),
 		APIReadWriter: s.data,
+		Runner:        s.runner,
 	})
 
 	if err != nil {

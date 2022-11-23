@@ -2,26 +2,13 @@ package state
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
-)
-
-const (
-	// RunStatusRunning indicates that the function is running.  This is the
-	// default state, even if steps are scheduled in the future.
-	RunStatusRunning RunStatus = iota
-	// RunStatusComplete indicates that the function has completed running.
-	RunStatusComplete
-	// RunStatusFailed indicates that the function failed in one or more steps.
-	RunStatusFailed
-	// RunStatusCancelled indicates that the function has been cancelled prior
-	// to any errors
-	RunStatusCancelled
 )
 
 const (
@@ -45,17 +32,11 @@ var (
 	ErrFunctionFailed    = fmt.Errorf("function failed")
 )
 
-// RunStatus indicates the status for an individual function run.
-type RunStatus int
-
-func (r RunStatus) MarshalBinary() ([]byte, error) {
-	return json.Marshal(r)
-}
-
 // Identifier represents the unique identifier for a workflow run.
 type Identifier struct {
-	WorkflowID uuid.UUID `json:"workflowID"`
-	RunID      ulid.ULID `json:"runID"`
+	WorkflowID      uuid.UUID `json:"workflowID"`
+	WorkflowVersion int       `json:"workflowVersion"`
+	RunID           ulid.ULID `json:"runID"`
 	// Key represents a unique idempotency key used to deduplicate this
 	// workflow run amongst other runs for the same workflow.
 	Key string `json:"key"`
@@ -66,7 +47,13 @@ func (i Identifier) IdempotencyKey() string {
 	if i.Key == "" {
 		key = i.RunID.String()
 	}
-	return fmt.Sprintf("%s:%s", i.WorkflowID, key)
+	return fmt.Sprintf("%s:%d:%s", i.WorkflowID, i.WorkflowVersion, key)
+}
+
+type StepNotification struct {
+	ID      Identifier
+	Step    string
+	Attempt int
 }
 
 // Metadata must be stored for each workflow run, allowing the runner to inspect
@@ -77,7 +64,7 @@ func (i Identifier) IdempotencyKey() string {
 // finished.  Functions may have many parallel branches with conditional execution.
 // Given this, no single step can tell whether it's the last step within a function.
 type Metadata struct {
-	Status RunStatus `json:"status"`
+	Status enums.RunStatus `json:"status"`
 
 	// Debugger represents whether this function was started via the debugger.
 	Debugger bool `json:"debugger"`
@@ -89,6 +76,9 @@ type Metadata struct {
 	// OriginalRunID stores the original run ID, if this run is a retry.
 	// This is some basic book-keeping.
 	OriginalRunID *ulid.ULID `json:"originalRunID,omitempty"`
+
+	// Name stores the name of the workflow as it started.
+	Name string `json:"name"`
 
 	// Pending is the number of steps that have been enqueued but have
 	// not yet finalized.
@@ -148,27 +138,93 @@ type State interface {
 	ActionComplete(id string) bool
 }
 
+// Manager represents a state manager which can both load and mutate state.
+type Manager interface {
+	Loader
+	Mutater
+	PauseManager
+}
+
+// FunctionNotifier is an optional interface that state stores can fulfil,
+// invoking callbacks when functions start, complete, error, or permanently
+// fail. These callbacks cannot error;  they are not retried. Callbacks are
+// called after the state store commits state for functions.
+//
+// This exists on state stores as states manage the distributed waitgroup
+// counts monitoring the number of running steps;  once this counter reaches
+// zero the function completes.  Only the state store can monitor when
+// functions truly complete successfully.
+//
+// If a state store fulfils this interface these notifications will be
+// called.
+type FunctionNotifier interface {
+	// OnFunctionStatus adds a new callback which is invoked each time
+	// a function changes status.
+	OnFunctionStatus(f FunctionCallback)
+}
+
+type FunctionCallback func(context.Context, Identifier, enums.RunStatus)
+
 // Loader allows loading of previously stored state based off of a given Identifier.
 type Loader interface {
 	// Load returns run state for the given identifier.
 	Load(ctx context.Context, i Identifier) (State, error)
+
+	// History loads history for the given run identifier.
+	History(ctx context.Context, i Identifier) ([]History, error)
 
 	// IsComplete returns whether the given identifier is complete, ie. the
 	// pending count in the identifier's metadata is zero.
 	IsComplete(ctx context.Context, i Identifier) (complete bool, err error)
 }
 
-/*
-// CompleteSubscriber allows users to subscribe to a particular identifier and block
-// until the identifier's pending count reaches zero.
+// Mutater mutates state for a given identifier, storing the state and returning
+// the new state.
 //
-// This is an optional interface which a state can implement using internal mechanisms
-// to watch keys.  The runner will check to see if the state store implements this interface;
-// if so, it will subscribe to be notified when the function completes.
-type CompleteSubscriber interface {
-	BlockUntilComplete(ctx context.Context, i Identifier) (complete bool, err error)
+// It accepst any starting state as its input.  This is usually, and locally in dev,
+// a map[string]interface{} containing event data.
+type Mutater interface {
+	// New creates a new state for the given run ID, using the event as the input data for the root workflow.
+	//
+	// If the IdempotencyKey within Identifier already exists, the state implementation should return
+	// ErrIdentifierExists.
+	New(ctx context.Context, input Input) (State, error)
+
+	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
+	// future execution of steps.
+	Cancel(ctx context.Context, i Identifier) error
+
+	// scheduled increases the scheduled count for a run's metadata.
+	//
+	// We need to store the total number of steps enqueued to calculate when a step function
+	// has finished execution.  If the state store is the same as the queuee (eg. an all-in-one
+	// MySQL store) it makes sense to atomically increase this when enqueueing the step.  However,
+	// we must provide compatibility for queues that exist separately to the state store (eg.
+	// SQS, Celery).  In thise cases recording that a step was scheduled is a separate step.
+	//
+	// Attempt is zero-indexed.
+	Scheduled(ctx context.Context, i Identifier, stepID string, attempt int, at *time.Time) error
+
+	// Started is called when a step is started.
+	//
+	// Attempt is zero-indexed.
+	Started(ctx context.Context, i Identifier, stepID string, attempt int) error
+
+	// Finalized increases the finalized count for a run's metadata.
+	//
+	// This must be called after storing a response and scheduling all child steps.
+	//
+	// Attempt is zero-indexed.
+	Finalized(ctx context.Context, i Identifier, stepID string, attempt int) error
+
+	// SaveResponse saves the driver response for the attempt to the backing state store.
+	//
+	// If the response is an error, this must store the error for the specific attempt, allowing
+	// visibility into each error when executing a step.
+	//
+	// Attempt is zero-indexed.
+	SaveResponse(ctx context.Context, i Identifier, r DriverResponse, attempt int) (State, error)
 }
-*/
 
 // Input is the input for creating new state.  The required fields are Workflow,
 // Identifier and Input;  the rest of the data is stored within the state store as
@@ -196,118 +252,4 @@ type Input struct {
 	// Steps allows users to specify pre-defined steps to run workflows from
 	// arbitrary points.
 	Steps map[string]any
-}
-
-// Mutater mutates state for a given identifier, storing the state and returning
-// the new state.
-//
-// It accepst any starting state as its input.  This is usually, and locally in dev,
-// a map[string]interface{} containing event data.
-type Mutater interface {
-	// New creates a new state for the given run ID, using the event as the input data for the root workflow.
-	//
-	// If the IdempotencyKey within Identifier already exists, the state implementation should return
-	// ErrIdentifierExists.
-	New(ctx context.Context, input Input) (State, error)
-
-	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
-	// future execution of steps.
-	Cancel(ctx context.Context, i Identifier) error
-
-	// scheduled increases the scheduled count for a run's metadata.
-	//
-	// We need to store the total number of steps enqueued to calculate when a step function
-	// has finished execution.  If the state store is the same as the queuee (eg. an all-in-one
-	// MySQL store) it makes sense to atomically increase this when enqueueing the step.  However,
-	// we must provide compatibility for queues that exist separately to the state store (eg.
-	// SQS, Celery).  In thise cases recording that a step was scheduled is a separate step.
-	Scheduled(ctx context.Context, i Identifier, stepID string) error
-
-	// Finalized increases the finalized count for a run's metadata.
-	//
-	// This must be called after storing a response and scheduling all child steps.
-	Finalized(ctx context.Context, i Identifier, stepID string) error
-
-	// SaveResponse saves the driver response for the attempt to the backing state store.
-	//
-	// If the response is an error, this must store the error for the specific attempt, allowing
-	// visibility into each error when executing a step.
-	SaveResponse(ctx context.Context, i Identifier, r DriverResponse, attempt int) (State, error)
-}
-
-// PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
-type PauseMutater interface {
-	// SavePause indicates that the traversal of an edge is paused until some future time.
-	//
-	// The runner which coordinates workflow executions is responsible for managing paused
-	// DAG executions.
-	SavePause(ctx context.Context, p Pause) error
-
-	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
-	// we can 'consume' the pause to remove it.
-	//
-	// This prevents a failure mode in which we consume the pause but enqueueing the next
-	// action fails (eg. due to power loss).
-	//
-	// If the given pause has been leased within LeasePauseDuration, this should return an
-	// ErrPauseLeased error.
-	//
-	// See https://github.com/inngest/inngest/issues/123 for more info
-	LeasePause(ctx context.Context, id uuid.UUID) error
-
-	// ConsumePause consumes a pause by its ID such that it can't be used again and
-	// will not be returned from any query.
-	//
-	// Any data passed when consuming a pause will be stored within function run state
-	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, id uuid.UUID, data any) error
-}
-
-// PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
-// is required to fetch pauses to automatically continue workflows.
-type PauseGetter interface {
-	// PausesByEvent returns all pauses for a given event.
-	PausesByEvent(ctx context.Context, eventName string) (PauseIterator, error)
-
-	// PauseByStep returns a specific pause for a given workflow run, from a given step.
-	//
-	// This is required when continuing a step function from an async step, ie. one that
-	// has deferred results which must be continued by resuming the specific pause set
-	// up for the given step ID.
-	PauseByStep(ctx context.Context, i Identifier, actionID string) (*Pause, error)
-
-	// PauseByID returns a given pause by pause ID.  This must return expired pauses
-	// that have not yet been consumed in order to properly handle timeouts.
-	//
-	// This should not return consumed pauses.
-	PauseByID(ctx context.Context, pauseID uuid.UUID) (*Pause, error)
-}
-
-// PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This
-// ensures that, at scale, all pauses do not need to be loaded into memory.
-type PauseIterator interface {
-	// Next advances the iterator and returns whether the next call to Val will
-	// return a non-nil pause.
-	//
-	// Next should be called prior to any call to the iterator's Val method, after
-	// the iterator has been created.
-	//
-	// The order of the iterator is unspecified.
-	Next(ctx context.Context) bool
-
-	// Val returns the current Pause from the iterator.
-	Val(context.Context) *Pause
-}
-
-// PauseManager manages mutating and fetching pauses from a backend implementation.
-type PauseManager interface {
-	PauseMutater
-	PauseGetter
-}
-
-// Manager represents a state manager which can both load and mutate state.
-type Manager interface {
-	Loader
-	Mutater
-	PauseManager
 }

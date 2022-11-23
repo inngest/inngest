@@ -1,10 +1,41 @@
 type Query {
   config: Config
   actionVersion(query: ActionVersionQuery!): ActionVersion
+
+  # Get an individual event
+  event(query: EventQuery!): Event
+
+  # Get all events sent
+  events(query: EventsQuery!): [Event!]
+
+  # Get an individual function run
+  functionRun(query: FunctionRunQuery!): FunctionRun
+
+  # Get all function runs
+  functionRuns(query: FunctionRunsQuery!): [FunctionRun!]
 }
 
 input ActionVersionQuery {
   dsn: String!
   versionMajor: Int
   versionMinor: Int
+}
+
+input EventQuery {
+  workspaceId: ID! = "local"
+  eventId: ID!
+}
+
+input EventsQuery {
+  workspaceId: ID! = "local"
+  lastEventId: ID
+}
+
+input FunctionRunQuery {
+  workspaceId: ID! = "local"
+  functionRunId: ID!
+}
+
+input FunctionRunsQuery {
+  workspaceId: ID! = "local"
 }

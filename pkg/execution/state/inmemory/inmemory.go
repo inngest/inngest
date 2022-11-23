@@ -8,8 +8,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
+
+type InmemoryLoader interface {
+	state.Loader
+
+	// Runs loads all run metadata
+	Runs(ctx context.Context, eventId string) ([]state.Metadata, error)
+}
 
 func init() {
 	registration.RegisterState(func() any { return &Config{} })
@@ -38,18 +46,28 @@ func (c *Config) Manager(ctx context.Context) (state.Manager, error) {
 // functions in-memory, for development and testing only.
 func NewStateManager() state.Manager {
 	return &mem{
-		state:  map[string]state.State{},
-		pauses: map[uuid.UUID]state.Pause{},
-		leases: map[uuid.UUID]time.Time{},
-		lock:   &sync.RWMutex{},
+		state:   map[string]state.State{},
+		pauses:  map[uuid.UUID]state.Pause{},
+		leases:  map[uuid.UUID]time.Time{},
+		history: map[string][]state.History{},
+		lock:    &sync.RWMutex{},
 	}
 }
 
 type mem struct {
-	state  map[string]state.State
-	pauses map[uuid.UUID]state.Pause
-	leases map[uuid.UUID]time.Time
-	lock   *sync.RWMutex
+	state   map[string]state.State
+	pauses  map[uuid.UUID]state.Pause
+	leases  map[uuid.UUID]time.Time
+	history map[string][]state.History
+	lock    *sync.RWMutex
+
+	callbacks []state.FunctionCallback
+}
+
+// OnFunctionStatus adds a callback to be called whenever functions
+// transition status.
+func (m *mem) OnFunctionStatus(f state.FunctionCallback) {
+	m.callbacks = append(m.callbacks, f)
 }
 
 func (m *mem) IsComplete(ctx context.Context, id state.Identifier) (bool, error) {
@@ -88,6 +106,15 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 
 	m.state[input.Identifier.IdempotencyKey()] = s
 
+	m.setHistory(ctx, input.Identifier, state.History{
+		Type:       enums.HistoryTypeFunctionStarted,
+		Identifier: input.Identifier,
+		CreatedAt:  time.UnixMilli(int64(input.Identifier.RunID.Time())),
+		Data:       input.EventData,
+	})
+
+	go m.runCallbacks(ctx, input.Identifier, enums.RunStatusRunning)
+
 	return s, nil
 
 }
@@ -117,7 +144,34 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 	return state, nil
 }
 
-func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string) error {
+func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
+	m.state[i.IdempotencyKey()].Actions()
+	m.setHistory(ctx, i, state.History{
+		Type:       enums.HistoryTypeStepStarted,
+		Identifier: i,
+		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+		Data: state.HistoryStep{
+			ID:      stepID,
+			Name:    stepID,
+			Attempt: attempt,
+		},
+	})
+	return nil
+}
+
+func (m *mem) Sleeping(ctx context.Context, i state.Identifier, endTime time.Time) error {
+	m.setHistory(ctx, i, state.History{
+		Type:       enums.HistoryTypeStepWaiting,
+		Identifier: i,
+		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+		Data: state.HistoryStepWaiting{
+			ExpiryTime: endTime,
+		},
+	})
+	return nil
+}
+
+func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -130,10 +184,32 @@ func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string) 
 	instance.metadata.Pending++
 	m.state[i.IdempotencyKey()] = instance
 
+	if at != nil {
+		m.setHistory(ctx, i, state.History{
+			Type:       enums.HistoryTypeStepWaiting,
+			Identifier: i,
+			CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+			Data: state.HistoryStepWaiting{
+				ExpiryTime: *at,
+			},
+		})
+	}
+
+	m.setHistory(ctx, i, state.History{
+		Type:       enums.HistoryTypeStepScheduled,
+		Identifier: i,
+		CreatedAt:  time.UnixMilli(int64(i.RunID.Time())),
+		Data: state.HistoryStep{
+			ID:      stepID,
+			Name:    stepID,
+			Attempt: attempt,
+		},
+	})
+
 	return nil
 }
 
-func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string) error {
+func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -144,8 +220,15 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string) 
 
 	instance := s.(memstate)
 	instance.metadata.Pending--
-	if instance.metadata.Pending == 0 {
-		instance.metadata.Status = state.RunStatusComplete
+	if instance.metadata.Pending == 0 && instance.metadata.Status == enums.RunStatusRunning {
+		instance.metadata.Status = enums.RunStatusCompleted
+		go m.runCallbacks(ctx, i, enums.RunStatusCompleted)
+
+		m.setHistory(ctx, i, state.History{
+			Type:       enums.HistoryTypeFunctionCompleted,
+			Identifier: i,
+			CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+		})
 	}
 
 	m.state[i.IdempotencyKey()] = instance
@@ -163,17 +246,25 @@ func (m *mem) Cancel(ctx context.Context, i state.Identifier) error {
 	}
 
 	switch s.Metadata().Status {
-	case state.RunStatusComplete:
+	case enums.RunStatusCompleted:
 		return state.ErrFunctionComplete
-	case state.RunStatusFailed:
+	case enums.RunStatusFailed:
 		return state.ErrFunctionFailed
-	case state.RunStatusCancelled:
+	case enums.RunStatusCancelled:
 		return state.ErrFunctionCancelled
 	}
 
 	instance := s.(memstate)
-	instance.metadata.Status = state.RunStatusCancelled
+	instance.metadata.Status = enums.RunStatusCancelled
 	m.state[i.IdempotencyKey()] = instance
+
+	go m.runCallbacks(ctx, i, enums.RunStatusCancelled)
+
+	m.setHistory(ctx, i, state.History{
+		Type:       enums.HistoryTypeFunctionCancelled,
+		Identifier: i,
+		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+	})
 
 	return nil
 }
@@ -192,16 +283,53 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 	instance.actions = copyMap(instance.actions)
 	instance.errors = copyMap(instance.errors)
 
+	now := time.UnixMilli(time.Now().UnixMilli())
+
 	if r.Err == nil {
 		instance.actions[r.Step.ID] = r.Output
 		delete(instance.errors, r.Step.ID)
+
+		m.setHistory(ctx, i, state.History{
+			Type:       enums.HistoryTypeStepCompleted,
+			Identifier: i,
+			CreatedAt:  now,
+			Data: state.HistoryStep{
+				ID:      r.Step.ID,
+				Name:    r.Step.Name,
+				Data:    r.Output,
+				Attempt: attempt,
+			},
+		})
 	} else {
 		instance.errors[r.Step.ID] = r.Err
+
+		typ := enums.HistoryTypeStepErrored
+		if r.Final() {
+			typ = enums.HistoryTypeStepFailed
+		}
+
+		m.setHistory(ctx, i, state.History{
+			Type:       typ,
+			Identifier: i,
+			CreatedAt:  now,
+			Data: state.HistoryStep{
+				ID:      r.Step.ID,
+				Name:    r.Step.Name,
+				Data:    r.Err.Error(),
+				Attempt: attempt,
+			},
+		})
 	}
 
 	if r.Final() {
 		instance.metadata.Pending--
-		instance.metadata.Status = state.RunStatusFailed
+		instance.metadata.Status = enums.RunStatusFailed
+		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
+		m.setHistory(ctx, i, state.History{
+			Type:       enums.HistoryTypeFunctionFailed,
+			Identifier: i,
+			CreatedAt:  now,
+		})
 	}
 
 	m.state[i.IdempotencyKey()] = instance
@@ -219,6 +347,18 @@ func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
 	}
 
 	m.pauses[p.ID] = p
+
+	m.setHistory(ctx, p.Identifier, state.History{
+		Type:       enums.HistoryTypeStepWaiting,
+		Identifier: p.Identifier,
+		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+		Data: state.HistoryStepWaiting{
+			EventName:  p.Event,
+			Expression: p.Expression,
+			ExpiryTime: time.Time(p.Expires),
+		},
+	})
+
 	return nil
 }
 
@@ -303,6 +443,63 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 
 	delete(m.pauses, id)
 	return nil
+}
+
+func (m *mem) History(ctx context.Context, i state.Identifier) ([]state.History, error) {
+	history, ok := m.history[i.RunID.String()]
+	if !ok {
+		return nil, fmt.Errorf("history for run %s not found", i.RunID)
+	}
+
+	return history, nil
+}
+
+// Returns function runs, optionally filtering to only those triggered by a
+// specific event if `eventId` is provided.
+func (m *mem) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
+	var metadata []state.Metadata
+
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	for _, s := range m.state {
+		if eventId != "" {
+			evt := s.Event()
+			if evt == nil || evt["id"] != eventId {
+				continue
+			}
+		}
+
+		met := s.Metadata()
+		id := s.RunID()
+
+		metadata = append(metadata, state.Metadata{
+			Status:        met.Status,
+			Debugger:      met.Debugger,
+			RunType:       met.RunType,
+			OriginalRunID: &id,
+			Pending:       met.Pending,
+			Name:          s.Workflow().Name,
+		})
+	}
+
+	return metadata, nil
+}
+
+func (m *mem) setHistory(ctx context.Context, i state.Identifier, entry state.History) {
+	_, ok := m.history[i.RunID.String()]
+	if !ok {
+		m.history[i.RunID.String()] = []state.History{}
+	}
+	m.history[i.RunID.String()] = append(m.history[i.RunID.String()], entry)
+}
+
+func (m mem) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
+	for _, f := range m.callbacks {
+		go func(fn state.FunctionCallback) {
+			fn(ctx, id, status)
+		}(f)
+	}
 }
 
 func copyMap[K comparable, V any](m map[K]V) map[K]V {
