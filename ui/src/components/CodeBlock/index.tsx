@@ -1,22 +1,34 @@
-import Button from '../Button'
-import { useState } from 'preact/hooks'
-import classNames from '../../utils/classnames'
-import CopyButton from './CopyButton'
+import { useState } from "preact/hooks";
+import classNames from "../../utils/classnames";
+import CopyButton from "./CopyButton";
 
-export default function CodeBlock({ tabs, modal, expanded = false }) {
-  const [activeTab, setActiveTab] = useState(0)
+interface CodeBlockProps {
+  tabs: {
+    label: string;
+    content: string;
+  }[];
+  expanded?: boolean;
+  modal?: (...args: any[]) => any;
+}
+
+export default function CodeBlock({
+  tabs,
+  modal,
+  expanded = false,
+}: CodeBlockProps) {
+  const [activeTab, setActiveTab] = useState(0);
 
   const handleTabClick = (index) => {
-    setActiveTab(index)
-  }
+    setActiveTab(index);
+  };
 
   const handleCopyClick = () => {
-    navigator.clipboard.writeText(tabs[activeTab].content)
-  }
+    navigator.clipboard.writeText(tabs[activeTab].content);
+  };
 
   const handleExpandClick = () => {
-    modal(tabs)
-  }
+    modal?.(tabs);
+  };
 
   return (
     <div className="w-full bg-slate-800/30 border border-slate-700/30 rounded-lg shadow overflow-hidden">
@@ -39,10 +51,10 @@ export default function CodeBlock({ tabs, modal, expanded = false }) {
         </div>
         <div className="flex gap-2 items-center mr-2">
           <CopyButton btnAction={handleCopyClick} />
-          <Button
-            label={expanded ? 'Close' : 'Expand'}
+          {/* <Button
+            label={expanded ? "Close" : "Expand"}
             btnAction={handleExpandClick}
-          />
+          /> */}
         </div>
       </div>
       <div
@@ -63,5 +75,5 @@ export default function CodeBlock({ tabs, modal, expanded = false }) {
         ))}
       </div>
     </div>
-  )
+  );
 }

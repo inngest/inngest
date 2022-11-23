@@ -21,6 +21,10 @@ type ExecutionDockerDriverConfig {
   namespace: String
 }
 
+type Workspace {
+  id: ID!
+}
+
 type ActionVersion {
   dsn: String!
   name: String!
@@ -45,29 +49,101 @@ type FunctionVersion {
 
 type Event {
   id: ID!
+  workspace: Workspace
   name: String
   createdAt: Time
   payload: String
   schema: String
-  timeline: EventTimeline
+  status: EventStatus
+  pendingRuns: Int
+  # The total number of function runs triggered by this event.
+  totalRuns: Int
+  # The raw JSON of this event, as it would've be sent by the producer.
+  raw: String
+  functionRuns: [FunctionRun!]
 }
 
-type EventTimeline {
-  event: Event!
-  functionRuns: [FunctionRun!]
+enum EventStatus {
+  # The event has triggered one or more functions, none of them have failed, and
+  # some of are them are still running.
+  RUNNING
+
+  # The event has triggered one or more functions and all of them have completed
+  # successfully.
+  COMPLETED
+
+  # The event has triggered one or more functions and has paused for a period of
+  # time or is waiting for an event.
+  PAUSED
+
+  # The event has triggered one or more functions and all have failed.
+  FAILED
+
+  # The event has triggered one or more functions, at least one - but not all -
+  # have failed, and all have run finished running.
+  PARTIALLY_FAILED
+
+  # The event triggered no functions.
+  NO_FUNCTIONS
+}
+
+enum FunctionRunStatus {
+  COMPLETED
+  FAILED
+  CANCELLED
+  RUNNING
+}
+
+enum FunctionEventType {
+  STARTED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+type FunctionEvent {
+  workspace: Workspace
+  functionRun: FunctionRun
+  type: FunctionEventType
+  output: String
+  createdAt: Time
+}
+
+enum StepEventType {
+  SCHEDULED
+  STARTED
+  COMPLETED
+  ERRORED
+  FAILED
+  WAITING
+}
+
+type StepEvent {
+  workspace: Workspace
+  functionRun: FunctionRun
+  name: String
+  type: StepEventType
+  output: String
+  createdAt: Time
+  waitingFor: StepEventWait
+}
+
+union FunctionRunEvent = FunctionEvent | StepEvent
+
+type StepEventWait {
+  waitUntil: Time!
+  eventName: String
+  expression: String
 }
 
 type FunctionRun {
   id: ID!
-  functionVersion: FunctionVersion
-  status: String
+  name: String
+  workspace: Workspace
+  status: FunctionRunStatus
+  waitingFor: StepEventWait
+  pendingSteps: Int
   startedAt: Time
-  steps: [FunctionRunStep!]
-}
-
-type FunctionRunStep {
-  functionRun: FunctionRun
-  status: String
-  output: String
-  startedAt: Time
+  timeline: [FunctionRunEvent!]
+  event: Event
 }

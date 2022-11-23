@@ -1,8 +1,29 @@
-import classNames from '../../utils/classnames'
+import { ComponentChild } from "preact";
+import classNames from "../../utils/classnames";
 
-export default function SidebarLink({ icon, active, badge }) {
+interface SidebarLinkProps {
+  icon: ComponentChild;
+  active?: boolean;
+  badge?: number;
+  onClick?: () => void;
+}
+
+export default function SidebarLink({
+  icon,
+  active = false,
+  badge = 0,
+  onClick,
+}: SidebarLinkProps) {
   return (
     <button
+      onClick={
+        onClick
+          ? (e) => {
+              e.preventDefault();
+              onClick();
+            }
+          : undefined
+      }
       className={classNames(
         active
           ? `border-indigo-400`
@@ -12,5 +33,5 @@ export default function SidebarLink({ icon, active, badge }) {
     >
       {icon}
     </button>
-  )
+  );
 }

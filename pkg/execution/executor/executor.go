@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -169,7 +170,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 		return nil, err
 	}
 
-	if s.Metadata().Status == state.RunStatusCancelled {
+	if s.Metadata().Status == enums.RunStatusCancelled {
 		return nil, ErrFunctionRunCancelled
 	}
 
@@ -330,7 +331,12 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 			Interface("version", definition.Version).
 			Interface("scopes", definition.Scopes).
 			Str("dsn", definition.DSN).
+			Str("action_name", action.Name).
 			Msg("executing action")
+	}
+
+	if err := e.sm.Started(ctx, id, action.ID, attempt); err != nil {
+		return nil, fmt.Errorf("error saving started state: %w", err)
 	}
 
 	response, err := d.Execute(ctx, s, *definition, *action)
@@ -349,6 +355,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	// By updating the step ID, we ensure that the data will be saved to the generator's ID.
 	if response.Generator != nil {
 		response.Step.ID = response.Generator.ID
+		response.Step.Name = response.Generator.Name
 		// Unmarshal the generator data into the step.
 		if response.Generator.Data != nil {
 			err = json.Unmarshal(response.Generator.Data, &response.Output)
