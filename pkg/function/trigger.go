@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"cuelang.org/go/cue"
-	"github.com/gosimple/slug"
 	"github.com/inngest/event-schemas/pkg/fakedata"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/expressions"
@@ -53,9 +52,20 @@ type EventTrigger struct {
 }
 
 func (e EventTrigger) TitleName() string {
-	words := strings.ReplaceAll(slug.Make(e.Event), "-", " ")
-	words = strings.ReplaceAll(words, "_", " ")
-	return strings.ReplaceAll(strings.Title(words), " ", "")
+	joiner := "_"
+	replacements := []string{".", "/", "-"}
+
+	rep := e.Event
+	for k, v := range replacements {
+		rep = strings.ReplaceAll(rep, v, strings.Repeat(joiner, k+1))
+	}
+
+	words := strings.Split(rep, joiner)
+	for i, w := range words {
+		words[i] = strings.Title(w)
+	}
+
+	return strings.Join(words, joiner)
 }
 
 func (e EventTrigger) Validate(ctx context.Context) error {
