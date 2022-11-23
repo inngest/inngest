@@ -2,19 +2,24 @@ package devserver
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/inngest/inngest/inngest/client"
 	"github.com/inngest/inngest/inngest/clistate"
 	"github.com/inngest/inngest/pkg/api"
+	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/mattn/go-isatty"
 )
 
 const (
@@ -88,6 +93,31 @@ func (d *devserver) Pre(ctx context.Context) error {
 func (d *devserver) Run(ctx context.Context) error {
 	// Start polling the SDKs as the APIs are going live.
 	go d.pollSDKs(ctx)
+
+	// Add a nice output to the terminal.
+	if isatty.IsTerminal(os.Stdout.Fd()) {
+		go func() {
+			<-time.After(25 * time.Millisecond)
+			addr := fmt.Sprintf("%s:%d", d.opts.Config.EventAPI.Addr, d.opts.Config.EventAPI.Port)
+			fmt.Println("")
+			fmt.Println("")
+			fmt.Print(cli.BoldStyle.Render("\tInngest dev server online "))
+			fmt.Printf(cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)) + "\n\n")
+			for n, ip := range localIPs() {
+				style := cli.BoldStyle
+				if n > 0 {
+					style = cli.TextStyle
+				}
+				fmt.Print(style.Render(fmt.Sprintf("\t - http://%s:%d", ip.IP.String(), d.opts.Config.EventAPI.Port)))
+				if ip.IP.IsLoopback() {
+					fmt.Print(cli.TextStyle.Render(fmt.Sprintf(" (http://localhost:%d)", d.opts.Config.EventAPI.Port)))
+				}
+				fmt.Println("")
+			}
+			fmt.Println("")
+			fmt.Println("")
+		}()
+	}
 
 	return d.apiservice.Run(ctx)
 }
@@ -177,4 +207,21 @@ type SDKHandler struct {
 	SDK         sdk.RegisterRequest `json:"sdk"`
 	CreatedAt   time.Time           `json:"createdAt"`
 	UpdatedAt   time.Time           `json:"updatedAt"`
+}
+
+func localIPs() []*net.IPNet {
+	ips := []*net.IPNet{}
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ips
+	}
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok {
+			if ipnet.IP.To4() != nil {
+				ips = append(ips, ipnet)
+			}
+		}
+	}
+	return ips
 }

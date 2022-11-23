@@ -18,7 +18,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/function/env"
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 )
 
@@ -40,7 +39,6 @@ type StartOpts struct {
 func New(ctx context.Context, opts StartOpts) error {
 	// The dev server _always_ logs output for development.
 	if !opts.Config.Execution.LogOutput {
-		logger.From(ctx).Info().Msg("overriding config to log step output within dev server")
 		opts.Config.Execution.LogOutput = true
 	}
 

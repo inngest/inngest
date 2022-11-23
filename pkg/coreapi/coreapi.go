@@ -66,9 +66,6 @@ func (a *CoreAPI) Start(ctx context.Context) error {
 		Handler: a.Router,
 	}
 
-	// Todo only show this if playground is enabled in config
-	a.log.Info().Msgf("connect to http://%s/ for GraphQL playground", a.server.Addr)
-
 	a.log.Info().Str("addr", a.server.Addr).Msg("starting server")
 	return a.server.ListenAndServe()
 }
