@@ -23,6 +23,8 @@ const Banner = styled.a`
   color: #fff;
   text-decoration: none;
   transition: all 0.3s ease-in-out;
+  position: relative;
+  z-index: 100;
 
   .page-banner-arrow {
     white-space: nowrap; // prevent the arrow from wrapping to a line by itself

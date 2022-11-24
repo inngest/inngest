@@ -14,7 +14,7 @@ module.exports = {
         },
       },
       maxWidth: {
-        "container-desktop": "1440px",
+        "container-desktop": "1600px",
       },
     },
     fontFamily: {
