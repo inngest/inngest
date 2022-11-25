@@ -1,16 +1,15 @@
 import Container from "./Container";
+import SectionHeader from "./SectionHeader";
 
 export default function EventDriven() {
   return (
     <>
       <Container className="mt-20 mb-12">
-        <h2 className="text-slate-50 font-medium text-2xl lg:text-4xl xl:text-5xl mb-4 tracking-tighter ">
-          Event driven, made simple
-        </h2>
-        <p className="text-slate-300 font-light max-w-md lg:max-w-xl text-sm lg:text-base leading-5 lg:leading-7">
-          Add Inngest to your stack in a few lines for code, then deploy to your
-          existing provider. You don't have to change anything to get started.
-        </p>
+        <SectionHeader
+          title="Event driven, made simple"
+          lede="Add Inngest to your stack in a few lines for code, then deploy to your
+          existing provider. You don't have to change anything to get started."
+        />
       </Container>
 
       <div className="bg-gradient-to-r from-slate-1000/0  to-slate-900 pb-32 relative z-10">

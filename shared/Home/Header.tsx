@@ -47,6 +47,14 @@ export default function Header() {
                 </a>
               </li>
               <li>
+                <a
+                  href="/blog?ref=nav"
+                  className="flex items-center text-white font-medium px-5 py-2 text-sm"
+                >
+                  Blog
+                </a>
+              </li>
+              <li>
                 <a className="flex items-center text-white font-medium px-3.5 py-2 text-sm ml-4">
                   <Github />
                 </a>

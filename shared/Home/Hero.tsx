@@ -20,7 +20,7 @@ export default function Hero() {
             Ship Background Jobs, Crons, Webhooks, and Reliable Workflows in
             record time
           </h1>
-          <p className="text-sm md:text-base text-slate-300 font-light max-w-xl leading-6 md:leading-7">
+          <p className="text-sm md:text-base text-slate-300 max-w-xl leading-6 md:leading-7">
             Build, test, and deploy serverless functions driven by events or a
             schedule to any platform in seconds, with zero infrastructure.
           </p>
