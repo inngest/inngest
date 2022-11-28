@@ -22,7 +22,7 @@ export default function EventDriven() {
       </Container>
 
       <div className="bg-gradient-to-r from-slate-1000/0  to-slate-900 pb-32 relative z-10">
-        <Container className="px-20 h-[440px]">
+        <Container className="md:px-20 xl:h-[440px]">
           <div className="py-16">
             <h3 className="text-lg xl:text-2xl text-slate-50 mb-3">
               Write code, send events
@@ -42,7 +42,7 @@ export default function EventDriven() {
 
       <Container className="flex flex-col lg:flex-row  gap-6 lg:gap-8 xl:gap-16 -mt-24 ">
         <div className="lg:w-1/2 relative md:mr-40 lg:mr-0">
-          <div className="absolute inset-0 rounded-lg bg-blue-500 opacity-20 rotate-2 -z-0 scale-x-[110%] mx-5"></div>
+          <div className="lg:absolute inset-0 rounded-lg bg-blue-500 opacity-20 rotate-2 -z-0 scale-x-[110%] mx-5"></div>
           <div
             style={{
               backgroundImage: "url(/assets/footer/footer-grid.svg)",
