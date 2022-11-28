@@ -52,10 +52,12 @@ require (
 	github.com/xhit/go-str2duration/v2 v2.0.0
 	gocloud.dev v0.25.0
 	gocloud.dev/pubsub/natspubsub v0.25.0
+	golang.org/x/exp v0.0.0-20210126221216-84987778548c
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171
 	golang.org/x/text v0.3.7
 	golang.org/x/tools v0.1.10
+	gonum.org/v1/gonum v0.12.0
 	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21
 )
 
