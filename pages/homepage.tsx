@@ -18,6 +18,7 @@ import DevUI from "src/shared/Home/DevUI";
 import OutTheBox from "src/shared/Home/OutTheBox";
 import FullyManaged from "src/shared/Home/FullyManaged";
 import Roadmap from "src/shared/Home/Roadmap";
+import SocialCTA from "src/shared/Home/SocialCTA";
 import Footer from "src/shared/Home/Footer";
 
 import Patterns from "src/shared/Home/Patterns";
@@ -58,6 +59,8 @@ export default function Home() {
       <GetThingsShipped />
 
       <Roadmap />
+
+      <SocialCTA />
 
       <Footer />
     </div>

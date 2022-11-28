@@ -39,14 +39,14 @@ export default function Roadmap() {
         <div className="w-full lg:w-1/3">
           <h4 className="text-white text-xl font-medium ml-4 mb-4">Launched</h4>
           <ul className="flex flex-col gap-3 border border-slate-600/10 p-3 xl:p-4 rounded-xl">
-            <li className="text-slate-200 bg-slate-800/80 rounded text-sm xl:text-base overflow-hidden">
+            <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base overflow-hidden">
               <div className="flex items-center px-6 py-4">
                 Step functions{" "}
                 <span className="px-1.5 py-1 font-medium leading-none text-white bg-indigo-500 rounded text-xs ml-2">
                   New
                 </span>
               </div>
-              <div className="flex flex-wrap px-4 py-2 bg-slate-900">
+              <div className="flex flex-wrap px-4 py-2 bg-slate-800/40">
                 <span className="bg-cyan-600 text-slate-200 text-xs font-medium leading-none px-2 py-1 rounded-full">
                   Frameworks
                 </span>

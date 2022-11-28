@@ -15,7 +15,9 @@ export default function FullyManaged() {
 
       <Container className="mt-20 flex flex-col md:flex-row items-start gap-x-8 gap-y-16 lg:gap-16">
         <div className="w-full md:w-1/2">
-          <div className="w-full h-40 bg-slate-950 rounded-x mb-8">Image</div>
+          <div className="w-full h-40 bg-slate-950 rounded-x mb-8 hidden">
+            Image
+          </div>
           <div className="pr-8 lg:px-8">
             <h4 className="text-white text-xl lg:text-2xl mb-2">
               Full observability at your fingertips
@@ -39,7 +41,9 @@ export default function FullyManaged() {
           </div>
         </div>
         <div className="w-full md:w-1/2">
-          <div className="w-full h-40 bg-slate-950 rounded-x mb-8">Image</div>
+          <div className="w-full h-40 bg-slate-950 rounded-x mb-8 hidden">
+            Image
+          </div>
           <div className="pr-8 lg:px-8">
             <h4 className="text-white text-xl lg:text-2xl mb-2">
               We've built the hard stuff for you

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Container from "./Container";
-import classNames from "src/utils/classnames";
+import classNames from "src/utils/classNames";
 import SectionHeader from "./SectionHeader";
 
 export default function GetThingsShipped() {
@@ -37,8 +37,7 @@ export default createFunction(
       body: \`SMS Sent (Message SID: \${result.sid})\`
     }
   }
-)          
-        `,
+)`,
       },
     },
     {
@@ -64,8 +63,7 @@ export default createScheduledFunction(
   "Send Weekly Digest",
   "0 9 * * MON",
   sendWeeklyDigestEmails
-)    
-        `,
+)`,
       },
     },
     {
@@ -212,8 +210,8 @@ export const handleApptCancelled = createFunction("...",
         />
       </Container>
 
-      <Container className="flex items-start mt-20 mb-80">
-        <ul className="flex flex-col justify-start gap-2 w-[290px] pt-4">
+      <Container className="flex flex-col xl:flex-row items-start mt-20 mb-80">
+        <ul className="flex xl:flex-col flex-wrap justify-start xl:gap-2 xl:w-[290px] pb-8 xl:pb-0 xl:pt-4">
           {tabs.map((tab, i) => (
             <li key={i}>
               <button
@@ -235,7 +233,10 @@ export const handleApptCancelled = createFunction("...",
           <div className="absolute top-0 bottom-0 -left-10 -right-10 rounded-lg bg-indigo-500 opacity-20 rotate-1 -z-0 mx-5"></div>
           {tabs.map((tab, i) =>
             activeTab === i ? (
-              <div className="flex pl-10 pr-16 w-1/2" key={i}>
+              <div
+                className="flex flex-col md:flex-row px-5 lg:pl-10 lg:pr-16 md:w-1/2"
+                key={i}
+              >
                 <div className="py-10 pr-8 flex flex-col gap-4">
                   <h2 className="text-white text-xl font-semibold">
                     {tab.title}
@@ -251,7 +252,7 @@ export const handleApptCancelled = createFunction("...",
                     </div>
                   ))}
                 </div>
-                <div className="w-1/2 absolute right-10 top-10 bg-slate-950/80 backdrop-blur-md border border-slate-800/60 rounded-lg overflow-hidden shadow-lg">
+                <div className="w-full md:w-1/2 md:absolute right-10 top-10 bg-slate-950/80 backdrop-blur-md border border-slate-800/60 rounded-lg overflow-hidden shadow-lg">
                   <h6 className="text-slate-300 w-full bg-slate-950/50 text-center text-xs py-1.5 border-b border-slate-800/50">
                     {tab.code.title}
                   </h6>
