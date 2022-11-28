@@ -11,8 +11,9 @@ local queueKey      = KEYS[1]
 local queueIndexKey = KEYS[2]
 local partitionKey  = KEYS[3]
 
-local newLeaseKey   = ARGV[1]
-local currentTime   = tonumber(ARGV[2]) -- in ms
+local queueID       = ARGV[1]
+local newLeaseKey   = ARGV[2]
+local currentTime   = tonumber(ARGV[3]) -- in ms
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -21,7 +22,7 @@ local currentTime   = tonumber(ARGV[2]) -- in ms
 local nextTime = decode_ulid_time(newLeaseKey)
 
 -- Look up the current queue item.  We need to see if the queue item is already leased.
-local item = cjson.decode(redis.call("GET", queueKey))
+local item = cjson.decode(redis.call("HGET", queueKey, queueID))
 if item == nil then
 	return 1
 end
@@ -33,7 +34,7 @@ end
 
 item.leaseID = newLeaseKey
 -- Update the item's lease key.
-redis.call("SET", queueKey, cjson.encode(item))
+redis.call("HSET", queueKey, queueID, cjson.encode(item))
 -- Update the item's score in our sorted index.
 redis.call("ZADD", queueIndexKey, math.floor(nextTime / 1000), item.id)
 

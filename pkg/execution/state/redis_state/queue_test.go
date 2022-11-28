@@ -133,6 +133,70 @@ func TestQueueEnqueue(t *testing.T) {
 	})
 }
 
+func TestQueuePeek(t *testing.T) {
+	r := miniredis.RunT(t)
+	q := queue{
+		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
+			return 4
+		},
+	}
+	ctx := context.Background()
+
+	t.Run("It returns none with no items enqueued", func(t *testing.T) {
+		items, err := q.Peek(ctx, uuid.UUID{}, time.Now().Add(time.Hour), 10)
+		require.NoError(t, err)
+		require.EqualValues(t, 0, len(items))
+	})
+
+	t.Run("It returns an ordered list of items", func(t *testing.T) {
+		a := time.Now().Truncate(time.Second)
+		b := a.Add(time.Second)
+		c := b.Add(time.Second)
+		d := c.Add(time.Second)
+
+		ia, err := q.Enqueue(ctx, QueueItem{}, a)
+		require.NoError(t, err)
+		ib, err := q.Enqueue(ctx, QueueItem{}, b)
+		require.NoError(t, err)
+		ic, err := q.Enqueue(ctx, QueueItem{}, c)
+		require.NoError(t, err)
+
+		items, err := q.Peek(ctx, uuid.UUID{}, time.Now().Add(time.Hour), 10)
+		require.NoError(t, err)
+		require.EqualValues(t, 3, len(items))
+		require.EqualValues(t, []*QueueItem{&ia, &ib, &ic}, items)
+		require.NotEqualValues(t, []*QueueItem{&ib, &ia, &ic}, items)
+
+		id, err := q.Enqueue(ctx, QueueItem{}, d)
+		require.NoError(t, err)
+
+		items, err = q.Peek(ctx, uuid.UUID{}, time.Now().Add(time.Hour), 10)
+		require.NoError(t, err)
+		require.EqualValues(t, 4, len(items))
+		require.EqualValues(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
+
+		t.Run("It should limit the list", func(t *testing.T) {
+			items, err = q.Peek(ctx, uuid.UUID{}, time.Now().Add(time.Hour), 2)
+			require.NoError(t, err)
+			require.EqualValues(t, 2, len(items))
+			require.EqualValues(t, []*QueueItem{&ia, &ib}, items)
+		})
+
+		t.Run("It should apply a peek offset", func(t *testing.T) {
+			items, err = q.Peek(ctx, uuid.UUID{}, time.Now().Add(-1*time.Hour), QueuePeekMax)
+			require.NoError(t, err)
+			require.EqualValues(t, 0, len(items))
+
+			items, err = q.Peek(ctx, uuid.UUID{}, c, QueuePeekMax)
+			require.NoError(t, err)
+			require.EqualValues(t, 3, len(items))
+			require.EqualValues(t, []*QueueItem{&ia, &ib, &ic}, items)
+		})
+	})
+
+}
+
 func TestQueueLease(t *testing.T) {
 	r := miniredis.RunT(t)
 	q := queue{
@@ -151,39 +215,59 @@ func TestQueueLease(t *testing.T) {
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
-		err = q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+		id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
 		require.NotNil(t, item.LeaseID)
+		require.EqualValues(t, id, item.LeaseID)
 		require.WithinDuration(t, time.Now().Add(time.Second), ulid.Time(item.LeaseID.Time()), 10*time.Millisecond)
 
 		t.Run("Leasing again should fail", func(t *testing.T) {
 			for i := 0; i < 50; i++ {
-				err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+				id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
 				require.Equal(t, ErrQueueItemAlreadyLeased, err)
+				require.Nil(t, id)
 				<-time.After(5 * time.Millisecond)
 			}
 		})
 
 		t.Run("Leasing an expired lease should succeed", func(t *testing.T) {
 			<-time.After(1005 * time.Millisecond)
-			err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+			id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+			require.NoError(t, err)
 			require.NoError(t, err)
 
 			item = getQueueItem(t, r, item.ID)
 			require.NotNil(t, item.LeaseID)
+			require.EqualValues(t, id, item.LeaseID)
 			require.WithinDuration(t, time.Now().Add(time.Second), ulid.Time(item.LeaseID.Time()), 10*time.Millisecond)
 		})
 	})
 }
 
+func TestQueueExtendLease(t *testing.T) {
+}
+
+func TestQueueDequeue(t *testing.T) {
+}
+
+func TestQueuePartitionLease(t *testing.T) {
+}
+
+func TestQueuePartitionPeek(t *testing.T) {
+}
+
+func TestQueuePartitionReprioritize(t *testing.T) {
+}
+
 func getQueueItem(t *testing.T, r *miniredis.Miniredis, id ulid.ULID) QueueItem {
+	t.Helper()
 	// Ensure that our data is set up correctly.
-	val, err := r.Get(fmt.Sprintf("queue:item:%s", id))
-	require.NoError(t, err)
+	val := r.HGet("queue:item", id.String())
+	require.NotEmpty(t, val)
 	i := QueueItem{}
-	err = json.Unmarshal([]byte(val), &i)
+	err := json.Unmarshal([]byte(val), &i)
 	require.NoError(t, err)
 	return i
 }
