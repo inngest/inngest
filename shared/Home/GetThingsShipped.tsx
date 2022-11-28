@@ -210,7 +210,7 @@ export const handleApptCancelled = createFunction("...",
         />
       </Container>
 
-      <Container className="flex flex-col xl:flex-row items-start mt-20 mb-80">
+      <Container className="flex flex-col xl:flex-row items-start mt-10 lg:mt-20 mb-80">
         <ul className="flex xl:flex-col flex-wrap justify-start xl:gap-2 xl:w-[290px] pb-8 xl:pb-0 xl:pt-4">
           {tabs.map((tab, i) => (
             <li key={i}>
@@ -234,7 +234,7 @@ export const handleApptCancelled = createFunction("...",
           {tabs.map((tab, i) =>
             activeTab === i ? (
               <div
-                className="flex flex-col md:flex-row px-5 lg:pl-10 lg:pr-16 md:w-1/2"
+                className="flex flex-col md:flex-row px-5 lg:pl-10 lg:pr-16 md:w-1/2 overflow-hidden "
                 key={i}
               >
                 <div className="py-10 pr-8 flex flex-col gap-4">
@@ -252,11 +252,11 @@ export const handleApptCancelled = createFunction("...",
                     </div>
                   ))}
                 </div>
-                <div className="w-full md:w-1/2 md:absolute right-10 top-10 bg-slate-950/80 backdrop-blur-md border border-slate-800/60 rounded-lg overflow-hidden shadow-lg">
+                <div className="max-w-full overflow-x-scroll md:w-1/2 md:absolute right-10 top-10 bg-slate-950/80 backdrop-blur-md border border-slate-800/60 rounded-lg overflow-hidden shadow-lg">
                   <h6 className="text-slate-300 w-full bg-slate-950/50 text-center text-xs py-1.5 border-b border-slate-800/50">
                     {tab.code.title}
                   </h6>
-                  <pre className="px-4 py-3 overflow-x-scroll">
+                  <pre className="px-4 py-3 overflow-x-scroll max-w-full">
                     <code className="text-xs text-slate-300">
                       {tab.code.content}
                     </code>

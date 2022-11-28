@@ -4,7 +4,7 @@ export default function HomeArrow() {
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 20 20"
       fill="currentColor"
-      className="w-5 h-5"
+      className="w-5 h-5 flex-shrink-0"
     >
       <path
         fill-rule="evenodd"
