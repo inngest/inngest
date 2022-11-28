@@ -5,10 +5,10 @@ Enqueus an item within the queue.
 
 --]]
 
-local queueKey          = KEYS[1] -- queue:item:$itemID
-local queueIndexKey     = KEYS[2] -- queue:sorted:$workflowID
-local partitionKey      = KEYS[3] -- partition:item:$workflowID
-local partitionIndexKey = KEYS[4] -- partition:sorted
+local queueKey          = KEYS[1] -- queue:item - hash: { $itemID: $item }
+local queueIndexKey     = KEYS[2] -- queue:sorted:$workflowID - zset
+local partitionKey      = KEYS[3] -- partition:item:$workflowID - hash { item: $partition, n: $leased, len: $enqueued }
+local partitionIndexKey = KEYS[4] -- partition:sorted - zset
 
 local queueItem      = ARGV[1] -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID        = ARGV[2] -- id
@@ -16,7 +16,8 @@ local queueScore     = tonumber(ARGV[3]) -- vesting time, in seconds
 local partitionIndex = ARGV[4] -- {workflow, priority}
 local partitionItem  = ARGV[5] -- {workflow, priority, leasedAt, etc}
 
-if redis.call("SETNX", queueKey, queueItem) == 0 then
+-- Make these a hash to save on memory usage
+if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
 	-- This already exists;  return an error.
 	return 1
 end

@@ -20,7 +20,8 @@ const (
 	PartitionPeekMax       int64 = PartitionSelectionMax * 3
 	PartitionLeaseDuration       = 2 * time.Second
 	QueueSelectionMax      int64 = 50
-	QueuePeekMax           int64 = QueueSelectionMax * 3
+	QueuePeekMax           int64 = 1000
+	QueuePeekDefault       int64 = QueueSelectionMax * 3
 	QueueLeaseDuration           = 10 * time.Second
 
 	PriorityMax uint = 0
@@ -28,12 +29,13 @@ const (
 )
 
 var (
-	ErrQueueItemExists        = fmt.Errorf("queue item already exists")
-	ErrQueueItemNotFound      = fmt.Errorf("queue item not found")
-	ErrQueueItemAlreadyLeased = fmt.Errorf("queue item already leased")
-	ErrPriorityTooLow         = fmt.Errorf("priority is too low")
-	ErrWeightedSampleRead     = fmt.Errorf("error reading from weighted sample")
-	ErrPartitionAlreadyLeased = fmt.Errorf("partition already leased")
+	ErrQueueItemExists           = fmt.Errorf("queue item already exists")
+	ErrQueueItemNotFound         = fmt.Errorf("queue item not found")
+	ErrQueueItemAlreadyLeased    = fmt.Errorf("queue item already leased")
+	ErrPriorityTooLow            = fmt.Errorf("priority is too low")
+	ErrWeightedSampleRead        = fmt.Errorf("error reading from weighted sample")
+	ErrPartitionAlreadyLeased    = fmt.Errorf("partition already leased")
+	ErrQueuePeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", QueuePeekMax)
 )
 
 var (
@@ -128,7 +130,7 @@ func (q queue) Enqueue(ctx context.Context, i QueueItem, at time.Time) (QueueIte
 	qpi := QueuePartitionIndex{i.WorkflowID, priority}
 
 	keys := []string{
-		fmt.Sprintf("queue:item:%s", i.ID),             // Queue item
+		"queue:item", // Queue item
 		fmt.Sprintf("queue:sorted:%s", i.WorkflowID),   // Queue sorted set
 		fmt.Sprintf("partition:item:%s", i.WorkflowID), // Partition item
 		"partition:sorted",                             // Global partition queue
@@ -161,25 +163,55 @@ func (q queue) Enqueue(ctx context.Context, i QueueItem, at time.Time) (QueueIte
 }
 
 // Peek takes QueuePeekMax items from a queue.
-func (q queue) Peek(ctx context.Context, workflowID uuid.UUID) ([]*QueueItem, error) {
-	return nil, nil
+func (q queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, limit int64) ([]*QueueItem, error) {
+	if limit > QueuePeekMax {
+		// Lua's max unpack() length is 8000; don't allow users to peek more than
+		// 1k at a time regardless.
+		return nil, ErrQueuePeekMaxExceedsLimits
+	}
+	if limit <= 0 {
+		limit = QueuePeekMax
+	}
+
+	items, err := redis.NewScript(scripts["queue/peek"]).Eval(
+		ctx,
+		q.r,
+		[]string{
+			fmt.Sprintf("queue:sorted:%s", workflowID),
+			"queue:item",
+		},
+		until.Unix(),
+		limit,
+	).StringSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error peeking queue items: %w", err)
+	}
+	result := make([]*QueueItem, len(items))
+	for n, str := range items {
+		qi := &QueueItem{}
+		if err := json.Unmarshal([]byte(str), qi); err != nil {
+			return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
+		}
+		result[n] = qi
+	}
+	return result, nil
 }
 
 // Lease temporarily dequeues an item from the queue by obtaining a lease, preventing
 // other workers from working on this queue item at the same time.
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
-// lease duration.
-func (q queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULID, duration time.Duration) error {
+// lease duration. This returns the newly acquired lease ID on success.
+func (q queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	// TODO: Add custom throttling here.
 
 	leaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), r)
 	if err != nil {
-		return fmt.Errorf("error generating id: %w", err)
+		return nil, fmt.Errorf("error generating id: %w", err)
 	}
 
 	keys := []string{
-		fmt.Sprintf("queue:item:%s", itemID),         // Queue item
+		"queue:item", // Queue item
 		fmt.Sprintf("queue:sorted:%s", workflowID),   // Queue sorted set
 		fmt.Sprintf("partition:item:%s", workflowID), // Partition item
 	}
@@ -187,21 +219,22 @@ func (q queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULID
 		ctx,
 		q.r,
 		keys,
+		itemID.String(),
 		leaseID.String(),
 		time.Now().UnixMilli(),
 	).Int64()
 	if err != nil {
-		return fmt.Errorf("error leasing pause: %w", err)
+		return nil, fmt.Errorf("error leasing pause: %w", err)
 	}
 	switch status {
 	case 0:
-		return nil
+		return &leaseID, nil
 	case 1:
-		return ErrQueueItemNotFound
+		return nil, ErrQueueItemNotFound
 	case 2:
-		return ErrQueueItemAlreadyLeased
+		return nil, ErrQueueItemAlreadyLeased
 	default:
-		return fmt.Errorf("unknown response enqueueing item: %d", status)
+		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)
 	}
 }
 
@@ -220,14 +253,6 @@ func (q queue) Dequeue(ctx context.Context, i QueueItem) error {
 func (q queue) PartitionLease(ctx context.Context, qpi QueuePartitionIndex) (*QueuePartition, error) {
 	// TODO: Fetch partition item in lua, check partition lease, update item and index if available
 	return nil, nil
-}
-
-// PartitionReprioritize reprioritizes a workflow's QueueItems within the queue.
-func (q queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID, priority uint) error {
-	// TODO: Remove the partition and index, and re-add atomically.
-	// We must remove the partition entirely as it's used within a ZSET,
-	// and when the structure changes we can no longer update it via ZADD.
-	return nil
 }
 
 // PartitionPeek returns up to PartitionSelectionMax partition items from the queue. This
@@ -289,4 +314,12 @@ func (q queue) PartitionPeek(ctx context.Context, sequential bool) ([]*QueuePart
 	}
 
 	return result, nil
+}
+
+// PartitionReprioritize reprioritizes a workflow's QueueItems within the queue.
+func (q queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID, priority uint) error {
+	// TODO: Remove the partition and index, and re-add atomically.
+	// We must remove the partition entirely as it's used within a ZSET,
+	// and when the structure changes we can no longer update it via ZADD.
+	return nil
 }
