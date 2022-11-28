@@ -5,6 +5,8 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -22,8 +24,11 @@ import (
 //go:embed lua/*
 var embedded embed.FS
 
-// scripts stores all embedded lua scripts on initialization
-var scripts = map[string]string{}
+var (
+	// scripts stores all embedded lua scripts on initialization
+	scripts = map[string]string{}
+	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
+)
 
 func init() {
 	// register the redis driver
@@ -34,18 +39,44 @@ func init() {
 	if err != nil {
 		panic(fmt.Errorf("error reading redis lua dir: %w", err))
 	}
+
+	readRedisScripts("lua", entries)
+}
+
+func readRedisScripts(path string, entries []fs.DirEntry) {
 	for _, e := range entries {
 		// NOTE: When using embed go always uses forward slashes as a path
 		// prefix. filepath.Join uses OS-specific prefixes which fails on
 		// windows, so we construct the path using Sprintf for all platforms
-		val, err := embedded.ReadFile(fmt.Sprintf("lua/%s", e.Name()))
+		if e.IsDir() {
+			entries, _ := embedded.ReadDir(fmt.Sprintf("%s/%s", path, e.Name()))
+			readRedisScripts(path+"/"+e.Name(), entries)
+			continue
+		}
+
+		byt, err := embedded.ReadFile(fmt.Sprintf("%s/%s", path, e.Name()))
 		if err != nil {
 			panic(fmt.Errorf("error reading redis lua script: %w", err))
 		}
-		name := e.Name()
+
+		name := path + "/" + e.Name()
 		name = strings.TrimPrefix(name, "lua/")
 		name = strings.TrimSuffix(name, ".lua")
-		scripts[name] = string(val)
+		val := string(byt)
+
+		// Add any includes.
+		items := include.FindAllStringSubmatch(val, -1)
+		if len(items) > 0 {
+			// Replace each include
+			for _, include := range items {
+				byt, err = embedded.ReadFile(fmt.Sprintf("lua/includes/%s", include[1]))
+				if err != nil {
+					panic(fmt.Errorf("error reading redis lua include: %w", err))
+				}
+				val = strings.ReplaceAll(val, include[0], string(byt))
+			}
+		}
+		scripts[name] = val
 	}
 }
 

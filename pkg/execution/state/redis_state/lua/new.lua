@@ -33,7 +33,6 @@ for k, v in pairs(metadataJson) do
   redis.call("HSET", metadataKey, k, tostring(v))
 end
 
-
 if steps ~= nil and steps ~= "" then
   local stepsJson = cjson.decode(steps)
 
@@ -43,7 +42,6 @@ if steps ~= nil and steps ~= "" then
 end
 
 redis.call("SETNX", eventKey, event)
-
 redis.call("ZADD", logKey, logScore, log)
 
 if expiry > 0 then
