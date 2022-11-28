@@ -32,6 +32,8 @@ var (
 	ErrQueueItemExists           = fmt.Errorf("queue item already exists")
 	ErrQueueItemNotFound         = fmt.Errorf("queue item not found")
 	ErrQueueItemAlreadyLeased    = fmt.Errorf("queue item already leased")
+	ErrQueueItemLeaseMismatch    = fmt.Errorf("item lease does not match")
+	ErrQueueItemNotLeased        = fmt.Errorf("queue item is not leased")
 	ErrPriorityTooLow            = fmt.Errorf("priority is too low")
 	ErrWeightedSampleRead        = fmt.Errorf("error reading from weighted sample")
 	ErrPartitionAlreadyLeased    = fmt.Errorf("partition already leased")
@@ -40,12 +42,12 @@ var (
 
 var (
 	source rand.Source
-	r      *rand.Rand
+	rnd    *rand.Rand
 )
 
 func init() {
 	source = rand.NewSource(uint64(time.Now().UnixNano()))
-	r = rand.New(source)
+	rnd = rand.New(source)
 }
 
 // PriorityFinder returns the priority for a given workflow.
@@ -119,7 +121,7 @@ func (q QueuePartitionIndex) MarshalBinary() ([]byte, error) {
 // will be created for the queue item.
 func (q queue) Enqueue(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error) {
 	if i.ID.Compare(ulid.ULID{}) == 0 {
-		i.ID = ulid.MustNew(ulid.Now(), r)
+		i.ID = ulid.MustNew(ulid.Now(), rnd)
 	}
 
 	priority := q.pf(ctx, i.WorkflowID)
@@ -150,7 +152,7 @@ func (q queue) Enqueue(ctx context.Context, i QueueItem, at time.Time) (QueueIte
 		},
 	).Int64()
 	if err != nil {
-		return i, fmt.Errorf("error leasing pause: %w", err)
+		return i, fmt.Errorf("error enqueueing item: %w", err)
 	}
 	switch status {
 	case 0:
@@ -162,7 +164,9 @@ func (q queue) Enqueue(ctx context.Context, i QueueItem, at time.Time) (QueueIte
 	}
 }
 
-// Peek takes QueuePeekMax items from a queue.
+// Peek takes n items from a queue, up until QueuePeekMax.
+//
+// XXX: Ensure this only returns items that are not leased.
 func (q queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, limit int64) ([]*QueueItem, error) {
 	if limit > QueuePeekMax {
 		// Lua's max unpack() length is 8000; don't allow users to peek more than
@@ -204,8 +208,7 @@ func (q queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, 
 // lease duration. This returns the newly acquired lease ID on success.
 func (q queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	// TODO: Add custom throttling here.
-
-	leaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), r)
+	leaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
@@ -240,8 +243,45 @@ func (q queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULID
 
 // ExtendLease extens the lease for a given queue item, given the queue item is currently
 // leased with the given ID.  This returns a new lease ID if the lease is successfully ended.
+//
+// The existing lease ID must be passed in so that we can guarantee that the worker
+// renewing the lease still owns the lease.
+//
+// Renewing a lease updates the vesting time for the queue item until now() +
+// lease duration. This returns the newly acquired lease ID on success.
 func (q queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
-	return nil, nil
+	newLeaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
+	if err != nil {
+		return nil, fmt.Errorf("error generating id: %w", err)
+	}
+
+	keys := []string{
+		"queue:item", // Queue item
+		fmt.Sprintf("queue:sorted:%s", i.WorkflowID), // Queue sorted set
+	}
+	status, err := redis.NewScript(scripts["queue/extendLease"]).Eval(
+		ctx,
+		q.r,
+		keys,
+		i.ID.String(),
+		leaseID.String(),
+		newLeaseID.String(),
+	).Int64()
+	if err != nil {
+		return nil, fmt.Errorf("error extending lease: %w", err)
+	}
+	switch status {
+	case 0:
+		return &newLeaseID, nil
+	case 1:
+		return nil, ErrQueueItemNotFound
+	case 2:
+		return nil, ErrQueueItemNotLeased
+	case 3:
+		return nil, ErrQueueItemLeaseMismatch
+	default:
+		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)
+	}
 }
 
 // Dequeue removes an item from the queue entirely.
@@ -303,7 +343,7 @@ func (q queue) PartitionPeek(ctx context.Context, sequential bool) ([]*QueuePart
 	// many shared nothing scanners can query for outstanding partitions and receive a
 	// randomized order favouring higher-priority queue items.  This reduces the chances
 	// of contention when leasing.
-	w := sampleuv.NewWeighted(weights, r)
+	w := sampleuv.NewWeighted(weights, rnd)
 	result := make([]*QueuePartitionIndex, PartitionSelectionMax)
 	for n := range result {
 		idx, ok := w.Take()

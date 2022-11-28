@@ -247,6 +247,62 @@ func TestQueueLease(t *testing.T) {
 }
 
 func TestQueueExtendLease(t *testing.T) {
+	r := miniredis.RunT(t)
+	q := queue{
+		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
+			return 4
+		},
+	}
+	ctx := context.Background()
+
+	start := time.Now().Truncate(time.Second)
+	t.Run("It leases an item", func(t *testing.T) {
+		item, err := q.Enqueue(ctx, QueueItem{}, start)
+		require.NoError(t, err)
+
+		item = getQueueItem(t, r, item.ID)
+		require.Nil(t, item.LeaseID)
+
+		id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+		require.NoError(t, err)
+
+		item = getQueueItem(t, r, item.ID)
+		require.NotNil(t, item.LeaseID)
+		require.EqualValues(t, id, item.LeaseID)
+		require.WithinDuration(t, time.Now().Add(time.Second), ulid.Time(item.LeaseID.Time()), 10*time.Millisecond)
+
+		nextID, err := q.ExtendLease(ctx, item, *id, 10*time.Second)
+		require.NoError(t, err)
+
+		// Ensure the leased item has the next ID.
+		item = getQueueItem(t, r, item.ID)
+		require.NotNil(t, item.LeaseID)
+		require.EqualValues(t, nextID, item.LeaseID)
+		require.WithinDuration(t, time.Now().Add(10*time.Second), ulid.Time(item.LeaseID.Time()), 10*time.Millisecond)
+
+		t.Run("It fails with an invalid lease ID", func(t *testing.T) {
+			invalid := ulid.MustNew(ulid.Now(), rnd)
+			nextID, err := q.ExtendLease(ctx, item, invalid, 10*time.Second)
+			require.EqualValues(t, ErrQueueItemLeaseMismatch, err)
+			require.Nil(t, nextID)
+		})
+	})
+
+	t.Run("It does not extend an unleased item", func(t *testing.T) {
+		item, err := q.Enqueue(ctx, QueueItem{}, start)
+		require.NoError(t, err)
+
+		item = getQueueItem(t, r, item.ID)
+		require.Nil(t, item.LeaseID)
+
+		nextID, err := q.ExtendLease(ctx, item, ulid.ULID{}, 10*time.Second)
+		require.EqualValues(t, ErrQueueItemNotLeased, err)
+		require.Nil(t, nextID)
+
+		item = getQueueItem(t, r, item.ID)
+		require.Nil(t, item.LeaseID)
+	})
 }
 
 func TestQueueDequeue(t *testing.T) {
