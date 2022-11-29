@@ -1,5 +1,4 @@
-import { useMemo } from "preact/hooks";
-import { useSendEventMutation } from "../../store/devApi";
+import { useMemo, useState } from "preact/hooks";
 import {
   EventStatus,
   FunctionRunStatus,
@@ -12,6 +11,7 @@ import ContentCard from "../Content/ContentCard";
 import FuncCard from "../Function/FuncCard";
 import TimelineRow from "../Timeline/TimelineRow";
 import TimelineStaticContent from "../Timeline/TimelineStaticContent";
+import { SendEventModal } from "./SendEventModal";
 
 interface EventSectionProps {
   eventId: string;
@@ -33,7 +33,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
   //   setPollingInterval(event.pendingRuns > 0 ? 1000 : 0);
   // }, [event?.pendingRuns]);
 
-  const [sendEvent, sendEventState] = useSendEventMutation();
+  const [eventModalVisible, setEventModalVisible] = useState(false);
 
   if (query.isLoading) {
     return <div>Loading...</div>;
@@ -51,6 +51,12 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
       active
       // button={<Button label="Open Event" icon={<IconFeed />} />}
     >
+      {eventModalVisible ? (
+        <SendEventModal
+          onClose={() => setEventModalVisible(false)}
+          eventDataStr={event.raw}
+        />
+      ) : null}
       <div className="pr-4 pt-4">
         <TimelineRow status={EventStatus.Completed} iconOffset={0}>
           <TimelineStaticContent
@@ -58,9 +64,9 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
             date={event.createdAt}
             actionBtn={
               <Button
-                label="Retry"
+                label="Replay"
                 btnAction={() => {
-                  sendEvent(event.raw);
+                  setEventModalVisible((v) => !v);
                 }}
               />
             }
@@ -71,11 +77,6 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
           const status = run.waitingFor
             ? EventStatus.Paused
             : run.status || FunctionRunStatus.Completed;
-
-          // waitingFor is null, no bar
-          // waitingFor has time only, bar time
-          // waitingFor has event and time, bar time with event mention
-          // waitingFor has event, time, and expression, bar time with event mention and expression
 
           let contextBar;
 
