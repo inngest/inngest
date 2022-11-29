@@ -81,6 +81,7 @@
   font-size: 20px;
 }
 
+
 html.docs {
   scroll-behavior: smooth;
 }
@@ -133,77 +134,77 @@ button {
   margin: 0;
 } */
 
-/** Typography **/
 
-/* h1,
-h2,
-h3,
-.h1,
-.h2,
-.h3 {
+:root.v1 h1,
+:root.v1 h2,
+:root.v1 h3,
+:root.v1 .h1,
+:root.v1 .h2,
+:root.v1 .h3 {
   font-family: var(--font-heading);
 }
 
-h1 {
+/** Typography **/
+
+:root.v1 h1 {
   font-size: 3em;
   font-weight: bold;
   line-height: 1.05;
 }
 
-h2 {
+:root.v1 h2 {
   font-size: 1.8rem;
   font-weight: bold;
   line-height: 1.2;
 }
 
-h3,
-.h3 {
+:root.v1 h3,
+:root.v1 .h3 {
   font-size: 1.4rem;
   font-weight: bold;
 }
 
-h4 {
+:root.v1 h4 {
   font-size: 1.1rem;
 }
 
-h5 {
+:root.v1 h5 {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
-p, ol, ul, li {
+:root.v1 p, :root.v1 ol, :root.v1 ul, :root.v1 li {
   font-size: 0.9rem;
 }
 
-input,
-textarea,
-select {
+:root.v1 input,
+:root.v1 textarea,
+:root.v1 select {
   border: 0;
   padding: 0.5rem 0.5rem;
   border-radius: var(--border-radius);
-} */
+}
 
 /** Copy relationship: everything but home. **/
-/* li > ol,
-li > ul {
+:root.v1 li > ol,
+:root.v1 li > ul {
   margin: 1rem 0;
-} */
+}
 
-/* @media (max-width: 980px) {
-  h1 {
+@media (max-width: 980px) {
+  :root.v1 h1 {
     font-size: 3rem;
   }
-  h2 {
+  :root.v1 h2 {
     font-size: 2rem;
   }
-  h4 {
+  :root.v1 h4 {
     font-size: 1.1rem;
   }
-  h5 {
+  :root.v1 h5 {
     font-size: 0.7rem;
   }
-  */
   /**
    * This ensures that pre-formatted code breaks so that there's no
    * horizontal scroll.  `code .line` is used for code formatting.
@@ -213,7 +214,8 @@ li > ul {
     white-space: pre-wrap !important;
     overflow: auto !important;
   }
-} */
+  */
+}
 
 kbd {
   background-color: #eee;
