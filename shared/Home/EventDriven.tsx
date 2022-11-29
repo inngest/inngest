@@ -9,6 +9,7 @@ import Netlify from "../Icons/Netlify";
 import Vercel from "../Icons/Vercel";
 import Logo from "../Icons/Logo";
 import Cloudflare from "../Icons/Cloudflare";
+import InngestFramework from "../Icons/InngestFramework";
 
 export default function EventDriven() {
   return (
@@ -50,9 +51,9 @@ export default function EventDriven() {
               backgroundPosition: "right -60px top -160px",
               backgroundRepeat: "no-repeat",
             }}
-            className=" flex flex-col justify-between text-center bg-blue-500/90 rounded-xl py-6 lg:py-11 px-4 xl:px-16 relative w-full h-full"
+            className=" flex flex-col justify-between text-center bg-blue-500/90 rounded-xl relative w-full h-full"
           >
-            <div>
+            <div className=" pt-6 lg:pt-11 px-4 xl:px-16">
               <h4 className="text-white text-xl lg:text-2xl font-medium tracking-tight mb-2">
                 Use with your favorite frameworks
               </h4>
@@ -60,11 +61,15 @@ export default function EventDriven() {
                 Write your code directly within your existing codebase.
               </p>
             </div>
-            <div className="flex items-center w-full justify-between mt-6 px-3 flex-wrap ">
-              <NextJs />
-              <Express />
-              <RedwoodJs />
-              <CloudflarePages />
+            <div className="flex items-center justify-evenly xl:justify-between mt-6 mb-8 lg:flex-wrap m-auto px-8">
+              <div className="flex flex-col lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
+                <NextJs />
+                <Express />
+              </div>
+              <div className="flex flex-col lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
+                <RedwoodJs />
+                <CloudflarePages />
+              </div>
             </div>
           </div>
         </div>
@@ -80,7 +85,7 @@ export default function EventDriven() {
             }}
             className=" flex flex-col justify-between text-center bg-purple-500/90 rounded-xl relative w-full h-full"
           >
-            <div className="pt-8 lt:p-11 px-4 xl:px-16 ">
+            <div className=" pt-6 lg:pt-11 px-4 xl:px-16">
               <h4 className="text-white text-xl lg:text-2xl font-medium tracking-tight mb-2">
                 Deploy functions anywhere
               </h4>
@@ -90,17 +95,13 @@ export default function EventDriven() {
                 Keep shipping your code as you do today.
               </p>
             </div>
-            <div className="flex items-center mt-6 mb-8 px-8 lg:gap-4 lg:flex-wrap m-auto">
-              <div className="">
+            <div className="flex items-center justify-evenly xl:justify-between mt-6 mb-8 lg:flex-wrap m-auto px-8">
+              <div className="flex flex-col lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
                 <Netlify />
-              </div>
-              <div className="">
                 <Vercel />
               </div>
-              <div className="">
-                <Logo className="text-slate-200" />
-              </div>
-              <div className=" relative -top-1">
+              <div className="flex flex-col lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
+                <InngestFramework />
                 <Cloudflare />
               </div>
             </div>
