@@ -32,9 +32,9 @@ export default function Header() {
     >
       <Container className="flex justify-between items-center  py-5 lg:py-0">
         <div className="flex  items-center">
-          <h1 className="mr-4">
+          <a href="/" className="mr-4">
             <Logo className="text-white w-20 relative top-[2px]" />
-          </h1>
+          </a>
           <nav
             className={classNames(
               menuState ? `block` : `hidden`,
@@ -47,7 +47,7 @@ export default function Header() {
                   Product
                 </span>
                 <div className="overflow-hidden lg:overflow-auto group-hover:lg:bg-slate-800 lg:rounded-lg lg:absolute top-[70px] lg:hidden group-hover:lg:block">
-                  <div className="flex flex-col md:flex-row lg:w-[620px]">
+                  <div className="flex flex-col md:flex-row md:w-[650px]">
                     <div className="flex w-full flex-col py-5 p-4">
                       <h3 className="text-sm text-slate-400 mb-1 px-4">
                         Product
@@ -64,7 +64,7 @@ export default function Header() {
                         </span>
                       </a>
                       <a
-                        href="/features/sdk?ref=nav"
+                        href="/features/step-functions?ref=nav"
                         className="hover:bg-slate-700/80 px-4 py-3 rounded  transition-all duration-150"
                       >
                         <h4 className="text-base text-white">Step Functions</h4>
@@ -73,7 +73,7 @@ export default function Header() {
                         </span>
                       </a>
                     </div>
-                    <div className="lg:bg-slate-700 flex flex-col  md:w-[320px] px-6 py-4">
+                    <div className="lg:bg-slate-700 flex flex-col  md:w-[380px] px-6 py-4">
                       <h3 className="text-sm text-slate-400 mb-1 px-2">
                         Use Cases
                       </h3>
@@ -118,7 +118,7 @@ export default function Header() {
                         Learn
                       </h3>
                       <a
-                        href="/features/sdk?ref=nav"
+                        href="/docs?ref=nav"
                         className="hover:bg-slate-700/80 px-4 py-3 rounded  transition-all duration-150"
                       >
                         <h4 className="text-base text-white">Docs</h4>
@@ -127,7 +127,7 @@ export default function Header() {
                         </span>
                       </a>
                       <a
-                        href="/features/sdk?ref=nav"
+                        href="/patterns?ref=nav"
                         className="hover:bg-slate-700/80 px-4 py-3 rounded  transition-all duration-150"
                       >
                         <h4 className="text-base text-white">
@@ -144,7 +144,7 @@ export default function Header() {
               <li>
                 <a
                   href="/pricing?ref=nav"
-                  className="flex items-center text-white font-medium px-8 lg:px-5 py-2 text-sm"
+                  className="flex items-center text-white font-medium px-8 lg:px-5 py-2 text-sm  hover:opacity-60"
                 >
                   Pricing
                 </a>
@@ -152,7 +152,7 @@ export default function Header() {
               <li>
                 <a
                   href="/blog?ref=nav"
-                  className="flex items-center text-white font-medium px-8 lg:px-5 py-2 text-sm"
+                  className="flex items-center text-white font-medium px-8 lg:px-5 py-2 text-sm  hover:opacity-60"
                 >
                   Blog
                 </a>
@@ -160,17 +160,26 @@ export default function Header() {
             </ul>
             <ul className="flex lg:items-center mt-2 lg:mt-0">
               <li>
-                <a className="flex items-center text-white font-medium px-3.5 py-2 text-sm ml-4">
+                <a
+                  href="https://github.com/inngest/inngest"
+                  className="flex items-center text-white font-medium px-3.5 py-2 text-sm ml-4  hover:opacity-60"
+                >
                   <Github />
                 </a>
               </li>
               <li>
-                <a className="flex items-center text-white font-medium px-3.5 py-2 text-sm">
+                <a
+                  href="https://discord.gg/EuesV2ZSnX"
+                  className="flex items-center text-white font-medium px-3.5 py-2 text-sm  hover:opacity-60"
+                >
                   <Discord />
                 </a>
               </li>
               <li>
-                <a className="flex items-center text-white font-medium px-3.5 py-2 text-sm">
+                <a
+                  href="https://twitter.com/inngest"
+                  className="flex items-center text-white font-medium px-3.5 py-2 text-sm hover:opacity-60"
+                >
                   <Twitter />
                 </a>
               </li>
