@@ -130,7 +130,6 @@ func (q queue) Enqueue(ctx context.Context, i QueueItem, at time.Time) (QueueIte
 	}
 
 	qpi := QueuePartitionIndex{i.WorkflowID, priority}
-
 	keys := []string{
 		"queue:item", // Queue item
 		fmt.Sprintf("queue:sorted:%s", i.WorkflowID),   // Queue sorted set
@@ -286,12 +285,73 @@ func (q queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, 
 
 // Dequeue removes an item from the queue entirely.
 func (q queue) Dequeue(ctx context.Context, i QueueItem) error {
-	return nil
+	keys := []string{
+		"queue:item", // Queue item
+		fmt.Sprintf("queue:sorted:%s", i.WorkflowID),   // Queue sorted set
+		fmt.Sprintf("partition:item:%s", i.WorkflowID), // Queue sorted set
+	}
+	status, err := redis.NewScript(scripts["queue/dequeue"]).Eval(
+		ctx,
+		q.r,
+		keys,
+		i.ID.String(),
+	).Int64()
+	if err != nil {
+		return fmt.Errorf("error dequeueing item: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return ErrQueueItemNotFound
+	default:
+		return fmt.Errorf("unknown response dequeueing item: %d", status)
+	}
+}
+
+func (q queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
+	// TODO: remove in-progress counter if claimed.
+	priority := q.pf(ctx, i.WorkflowID)
+	if priority > PriorityMin {
+		return ErrPriorityTooLow
+	}
+
+	qpi := QueuePartitionIndex{i.WorkflowID, priority}
+	keys := []string{
+		"queue:item", // Queue item
+		fmt.Sprintf("queue:sorted:%s", i.WorkflowID),   // Queue sorted set
+		fmt.Sprintf("partition:item:%s", i.WorkflowID), // Partition item
+		"partition:sorted",                             // Global partition queue
+	}
+	status, err := redis.NewScript(scripts["queue/requeue"]).Eval(
+		ctx,
+		q.r,
+		keys,
+
+		i,
+		i.ID.String(),
+		at.Unix(),
+		qpi,
+		QueuePartition{
+			QueuePartitionIndex: qpi,
+			Earliest:            at,
+		},
+	).Int64()
+	if err != nil {
+		return fmt.Errorf("error requeueing item: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	default:
+		return fmt.Errorf("unknown response enqueueing item: %d", status)
+	}
 }
 
 // Partition
 func (q queue) PartitionLease(ctx context.Context, qpi QueuePartitionIndex) (*QueuePartition, error) {
 	// TODO: Fetch partition item in lua, check partition lease, update item and index if available
+	panic("unimplemented")
 	return nil, nil
 }
 
@@ -356,10 +416,21 @@ func (q queue) PartitionPeek(ctx context.Context, sequential bool) ([]*QueuePart
 	return result, nil
 }
 
+// Requeue requeues a parition with a new score, ensuring that the partition will be read
+// at (or very close to) the given time.
+//
+// This is used after peeking and passing all queue items onto workers; we then take the next
+// unleased available time for the queue item and requeue the partition.
+func (q queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at time.Time) error {
+	panic("unimplemented")
+	return nil
+}
+
 // PartitionReprioritize reprioritizes a workflow's QueueItems within the queue.
 func (q queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID, priority uint) error {
 	// TODO: Remove the partition and index, and re-add atomically.
 	// We must remove the partition entirely as it's used within a ZSET,
 	// and when the structure changes we can no longer update it via ZADD.
+	panic("unimplemented")
 	return nil
 }

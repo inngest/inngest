@@ -195,6 +195,10 @@ func TestQueuePeek(t *testing.T) {
 		})
 	})
 
+	t.Run("It should remove any leased items from the list", func(t *testing.T) {
+		t.Fatalf("NOT TESTED")
+	})
+
 }
 
 func TestQueueLease(t *testing.T) {
@@ -222,6 +226,12 @@ func TestQueueLease(t *testing.T) {
 		require.NotNil(t, item.LeaseID)
 		require.EqualValues(t, id, item.LeaseID)
 		require.WithinDuration(t, time.Now().Add(time.Second), ulid.Time(item.LeaseID.Time()), 10*time.Millisecond)
+
+		t.Run("It should increase the in-progress count", func(t *testing.T) {
+			val := r.HGet(fmt.Sprintf("partition:item:%s", item.WorkflowID), "n")
+			require.NotEmpty(t, val)
+			require.Equal(t, "1", val)
+		})
 
 		t.Run("Leasing again should fail", func(t *testing.T) {
 			for i := 0; i < 50; i++ {
@@ -306,15 +316,121 @@ func TestQueueExtendLease(t *testing.T) {
 }
 
 func TestQueueDequeue(t *testing.T) {
+	r := miniredis.RunT(t)
+	q := queue{
+		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
+			return 4
+		},
+	}
+	ctx := context.Background()
+
+	t.Run("It should remove a queue item", func(t *testing.T) {
+		start := time.Now()
+
+		item, err := q.Enqueue(ctx, QueueItem{}, start)
+		require.NoError(t, err)
+
+		id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+		require.NoError(t, err)
+
+		err = q.Dequeue(ctx, item)
+		require.NoError(t, err)
+
+		t.Run("It should remove the item from the queue map", func(t *testing.T) {
+			val := r.HGet("queue:item", item.ID.String())
+			require.Empty(t, val)
+		})
+
+		t.Run("Extending a lease should fail after dequeue", func(t *testing.T) {
+			id, err := q.ExtendLease(ctx, item, *id, time.Minute)
+			require.Equal(t, ErrQueueItemNotFound, err)
+			require.Nil(t, id)
+		})
+
+		t.Run("It should remove the item from the queue index", func(t *testing.T) {
+			items, err := q.Peek(ctx, item.WorkflowID, time.Now().Add(time.Hour), 10)
+			require.NoError(t, err)
+			require.EqualValues(t, 0, len(items))
+		})
+
+		t.Run("It should decrease the in-progress count", func(t *testing.T) {
+			val := r.HGet(fmt.Sprintf("partition:item:%s", item.WorkflowID), "n")
+			require.NotEmpty(t, val)
+			require.Equal(t, "0", val)
+		})
+
+		t.Run("It should work if the item is not leased (eg. deletions)", func(t *testing.T) {
+			item, err := q.Enqueue(ctx, QueueItem{}, start)
+			require.NoError(t, err)
+
+			err = q.Dequeue(ctx, item)
+			require.NoError(t, err)
+
+			val := r.HGet("queue:item", item.ID.String())
+			require.Empty(t, val)
+		})
+	})
+}
+
+func TestQueueRequeue(t *testing.T) {
+	r := miniredis.RunT(t)
+	q := queue{
+		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
+			return 4
+		},
+	}
+	ctx := context.Background()
+
+	t.Run("Re-enqueuing a leased item should succeed", func(t *testing.T) {
+		item, err := q.Enqueue(ctx, QueueItem{}, time.Now())
+		require.NoError(t, err)
+		_, err = q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+		require.NoError(t, err)
+
+		requireInProgress(t, r, item.WorkflowID, 1)
+
+		at := time.Now().Add(time.Hour)
+		err = q.Requeue(ctx, item, at)
+		require.NoError(t, err)
+
+		t.Run("It should re-enqueue the item with the future time", func(t *testing.T) {
+			score, err := r.ZScore(fmt.Sprintf("queue:sorted:%s", item.WorkflowID), item.ID.String())
+			parsed := time.Unix(int64(score), 0)
+			require.NoError(t, err)
+			require.WithinDuration(t, at, parsed, time.Second)
+		})
+
+		t.Run("It should remove the lease from the re-enqueued item", func(t *testing.T) {
+			fetched := getQueueItem(t, r, item.ID)
+			require.Nil(t, fetched.LeaseID)
+		})
+
+		t.Run("It should decrease the in-progress count", func(t *testing.T) {
+			requireInProgress(t, r, item.WorkflowID, 0)
+		})
+
+		t.Run("It should update the partition's earliest time, if earlier", func(t *testing.T) {
+			t.Fatalf("NOT TESTED")
+		})
+	})
 }
 
 func TestQueuePartitionLease(t *testing.T) {
+	t.Fatalf("NOT TESTED")
 }
 
 func TestQueuePartitionPeek(t *testing.T) {
+	t.Fatalf("NOT TESTED")
 }
 
 func TestQueuePartitionReprioritize(t *testing.T) {
+	t.Fatalf("NOT TESTED")
+}
+
+func TestQueuePartitionRequeue(t *testing.T) {
+	t.Fatalf("NOT TESTED")
 }
 
 func getQueueItem(t *testing.T, r *miniredis.Miniredis, id ulid.ULID) QueueItem {
@@ -326,4 +442,11 @@ func getQueueItem(t *testing.T, r *miniredis.Miniredis, id ulid.ULID) QueueItem 
 	err := json.Unmarshal([]byte(val), &i)
 	require.NoError(t, err)
 	return i
+}
+
+func requireInProgress(t *testing.T, r *miniredis.Miniredis, workflowID uuid.UUID, count int) {
+	t.Helper()
+	val := r.HGet(fmt.Sprintf("partition:item:%s", workflowID), "n")
+	require.NotEmpty(t, val)
+	require.Equal(t, fmt.Sprintf("%d", count), val)
 }

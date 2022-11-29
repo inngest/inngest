@@ -16,12 +16,13 @@ local currentLeaseKey = ARGV[2]
 local newLeaseKey     = ARGV[3]
 
 -- $include(decode_ulid_time.lua)
+-- $include(fetch_queue_item.lua)
 
 -- Grab the current time from the new lease key.
 local nextTime = decode_ulid_time(newLeaseKey)
 
 -- Look up the current queue item.  We need to see if the queue item is already leased.
-local item = cjson.decode(redis.call("HGET", queueKey, queueID))
+local item = get_queue_item(queueKey, queueID)
 if item == nil then
 	return 1
 end
