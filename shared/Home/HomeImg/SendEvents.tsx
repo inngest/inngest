@@ -10,13 +10,13 @@ export default function SendEvents() {
     {
       title: "Custom Event",
       payload: `inngest.send({
-    name: “app/user.signup”,
+    name: "app/user.signup",
     data: { userId: “...”, email: “...” }
 })`,
       fnName: "Create Function",
       fnVersion: 27,
       fnID: "01GGG522ZATDGVQBCND4ZEAS6Z",
-      code: `createFunction(“post-signup”, “app/user.signup”,
+      code: `createFunction("post-signup", "app/user.signup",
   function ({ event, tools }) {
     // Send the user an email
     tools.run("Send an email", async () => {
@@ -30,7 +30,7 @@ export default function SendEvents() {
     {
       title: "Webhook",
       payload: `inngest.send({
-    name: “app/user.signup”,
+    name: "app/user.signup",
     data: { userId: “...”, email: “...” }
 })`,
       fnName: "Create Function",
