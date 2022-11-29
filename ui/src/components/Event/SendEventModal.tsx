@@ -77,7 +77,11 @@ export const SendEventModal = ({
       return pushToast("Event payload user must be an object if defined.");
     }
 
-    _sendEvent(JSON.stringify(data));
+    _sendEvent(JSON.stringify(data))
+      .unwrap()
+      .then(() => {
+        onClose();
+      });
   }, [_sendEvent, input]);
 
   const monaco = useMonaco();
