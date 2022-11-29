@@ -24,7 +24,7 @@ export default function Hero() {
             Build, test, and deploy serverless functions driven by events or a
             schedule to any platform in seconds, with zero infrastructure.
           </p>
-          <div className="flex gap-4 mt-6 lg:mt-12 items-center">
+          <div className="flex flex-col items-start lg:flex-row gap-4 mt-6 lg:mt-12 lg:items-center">
             <a
               href="sign-up?ref=homepage-hero"
               className="group flex items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2  bg-indigo-500 hover:bg-indigo-400 transition-all text-white"
