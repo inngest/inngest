@@ -13,7 +13,7 @@ export default function Hero() {
         className="absolute w-[200vw] -translate-x-1/2 -translate-y-1/2 h-[200vw] rounded-full blur-lg opacity-90"
       ></div>
 
-      <Container className=" pt-36 pb-28 lg:pt-36 lg:pb-40 xl:pt-40 xl:pb-32  2xl:pt-56 2xl:pb-48  flex items-center">
+      <Container className="pt-20 pb-16 md:pt-36 md:pb-28 lg:pt-36 lg:pb-40 xl:pt-40 xl:pb-32  2xl:pt-56 2xl:pb-48  flex items-center">
         <HeroImg />
         <div className="max-w-[760px] relative pr-10 lg:px-auto m-x-auto py-10 rounded-lg">
           <h1 className="text-4xl leading-[48px] sm:text-5xl sm:leading-[58px] lg:text-6xl font-semibold lg:leading-[68px] tracking-[-2px] text-slate-50 mb-5">
