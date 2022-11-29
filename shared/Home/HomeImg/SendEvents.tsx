@@ -81,11 +81,11 @@ export default createFunction(
         {tabs.map((tab, i) =>
           activeTab === i ? (
             <SyntaxHighlighter
+              key={i}
               language="javascript"
               showLineNumbers={false}
               style={syntaxThemeDark}
               codeTagProps={{ className: "code-window" }}
-              // className="hello"
               customStyle={{
                 backgroundColor: "transparent",
                 fontSize: "0.7rem",
