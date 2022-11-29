@@ -176,6 +176,7 @@ export const SendEventModal = ({
               });
             }}
             options={{
+              fixedOverflowWidgets: true,
               formatOnPaste: true,
               formatOnType: true,
               minimap: {
