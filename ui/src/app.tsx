@@ -1,8 +1,6 @@
 import { useState } from "preact/hooks";
 import ActionBar from "./components/ActionBar";
 import BG from "./components/BG";
-import CodeBlock from "./components/CodeBlock";
-import CodeBlockModal from "./components/CodeBlock/CodeBlockModal";
 import ContentFrame from "./components/Content/ContentFrame";
 import { Docs } from "./components/Docs";
 import { EventSection } from "./components/Event/Section";
@@ -72,15 +70,6 @@ export function App() {
       )}
     >
       <BG />
-      {codeBlockModalActive.visible && (
-        <CodeBlockModal closeModal={setModal}>
-          <CodeBlock
-            tabs={[{ label: "Payload", content: codeBlockModalActive.content }]}
-            modal={setModal}
-            expanded
-          />
-        </CodeBlockModal>
-      )}
       {/* <EventDetail /> */}
       <Header />
       <Sidebar>
