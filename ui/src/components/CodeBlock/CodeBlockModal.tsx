@@ -23,6 +23,14 @@ export default function CodeBlockModal({
   return (
     <div
       className="fixed inset-0 z-50 px-6 py-6 flex items-center justify-center bg-black/50 w-screen h-screen"
+      onClick={() => closeModal()}
+    >
+      <div
+        className="max-h-full overflow-y-hidden bg-slate-950 rounded"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
       >
         {children}
       </div>
