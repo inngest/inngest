@@ -70,7 +70,7 @@ export default function Patterns() {
           href="/patterns"
           className="rounded-full inline-flex text-sm font-medium pl-6 pr-5 py-2 bg-slate-800 hover:bg-indigo-800 transition-all text-white gap-1.5 group"
         >
-          Browse patterns
+          Browse all patterns
           <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " />
         </a>
       </div>
