@@ -213,7 +213,7 @@ export const handleApptCancelled = createFunction("...",
       </Container>
 
       <Container className="flex flex-col xl:flex-row items-start mt-10 lg:mt-20 mb-80">
-        <ul className="flex xl:flex-col flex-wrap justify-start xl:gap-2 xl:w-[290px] pb-8 xl:pb-0 xl:pt-4">
+        <ul className="flex xl:flex-col flex-wrap justify-start gap-1 xl:gap-2 xl:w-[290px] pb-8 xl:pb-0 xl:pt-4">
           {tabs.map((tab, i) => (
             <li key={i}>
               <button
