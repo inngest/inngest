@@ -1,3 +1,5 @@
+import SyntaxHighlighter from "react-syntax-highlighter";
+import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 import { useState } from "react";
 import classNames from "src/utils/classNames";
 
@@ -78,11 +80,20 @@ export default createFunction(
         </div>
         {tabs.map((tab, i) =>
           activeTab === i ? (
-            <pre key={i} className="px-4 py-3 overflow-x-scroll">
-              <code className="text-xs text-slate-300 leading-tight">
-                {tab.payload}
-              </code>
-            </pre>
+            <SyntaxHighlighter
+              language="javascript"
+              showLineNumbers={false}
+              style={syntaxThemeDark}
+              codeTagProps={{ className: "code-window" }}
+              // className="hello"
+              customStyle={{
+                backgroundColor: "transparent",
+                fontSize: "0.7rem",
+                padding: "1rem",
+              }}
+            >
+              {tab.payload}
+            </SyntaxHighlighter>
           ) : null
         )}
       </div>
@@ -118,9 +129,20 @@ export default createFunction(
                   </span>
                 </div>
               </div>
-              <pre className="px-4 py-3 overflow-x-scroll">
-                <code className="text-xs text-slate-300">{tab.code}</code>
-              </pre>
+              <SyntaxHighlighter
+                language="javascript"
+                showLineNumbers={false}
+                style={syntaxThemeDark}
+                codeTagProps={{ className: "code-window" }}
+                // className="hello"
+                customStyle={{
+                  backgroundColor: "transparent",
+                  fontSize: "0.7rem",
+                  padding: "1.5rem",
+                }}
+              >
+                {tab.code}
+              </SyntaxHighlighter>
             </div>
           ) : null
         )}

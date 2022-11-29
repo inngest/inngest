@@ -1,3 +1,5 @@
+import SyntaxHighlighter from "react-syntax-highlighter";
+import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 import { useState } from "react";
 import Container from "./Container";
 import classNames from "src/utils/classNames";
@@ -256,11 +258,26 @@ export const handleApptCancelled = createFunction("...",
                   <h6 className="text-slate-300 w-full bg-slate-950/50 text-center text-xs py-1.5 border-b border-slate-800/50">
                     {tab.code.title}
                   </h6>
-                  <pre className="px-4 py-3 overflow-x-scroll max-w-full">
+                  {/* <pre className="px-4 py-3 overflow-x-scroll max-w-full">
                     <code className="text-xs text-slate-300">
                       {tab.code.content}
                     </code>
-                  </pre>
+                  </pre> */}
+
+                  <SyntaxHighlighter
+                    language="javascript"
+                    showLineNumbers={false}
+                    style={syntaxThemeDark}
+                    codeTagProps={{ className: "code-window" }}
+                    // className="hello"
+                    customStyle={{
+                      backgroundColor: "transparent",
+                      fontSize: "0.7rem",
+                      padding: "1.5rem",
+                    }}
+                  >
+                    {tab.code.content}
+                  </SyntaxHighlighter>
                 </div>
               </div>
             ) : null
