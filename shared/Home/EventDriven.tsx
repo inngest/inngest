@@ -61,14 +61,26 @@ export default function EventDriven() {
                 Write your code directly within your existing codebase.
               </p>
             </div>
-            <div className="flex items-center justify-evenly xl:justify-between mt-6 mb-8 lg:flex-wrap m-auto px-8">
-              <div className="flex flex-col lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
-                <NextJs />
-                <Express />
+            <div className="flex items-center justify-evenly xl:justify-between mt-6 mb-8 flex-wrap m-auto px-8">
+              <div className="flex items-end lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
+                <img
+                  className="w-1/2 max-w-[140px]"
+                  src="/assets/homepage/send-events/next-js.png"
+                />
+                <img
+                  className="w-1/2 max-w-[140px]"
+                  src="/assets/homepage/send-events/express.png"
+                />
               </div>
-              <div className="flex flex-col lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
-                <RedwoodJs />
-                <CloudflarePages />
+              <div className="flex items-start lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
+                <img
+                  className="w-1/2 max-w-[140px]"
+                  src="/assets/homepage/send-events/redwood.png"
+                />
+                <img
+                  className="w-1/2 max-w-[140px]"
+                  src="/assets/homepage/send-events/cloudflare-pages.png"
+                />
               </div>
             </div>
           </div>
@@ -95,14 +107,26 @@ export default function EventDriven() {
                 Keep shipping your code as you do today.
               </p>
             </div>
-            <div className="flex items-center justify-evenly xl:justify-between mt-6 mb-8 lg:flex-wrap m-auto px-8">
-              <div className="flex flex-col lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
-                <Netlify />
-                <Vercel />
+            <div className="flex items-center justify-evenly xl:justify-between mt-6 mb-8 flex-wrap m-auto px-8">
+              <div className="flex items-end lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
+                <img
+                  className="w-1/2 max-w-[140px]"
+                  src="/assets/homepage/send-events/vercel.png"
+                />
+                <img
+                  className="w-1/2 max-w-[140px]"
+                  src="/assets/homepage/send-events/netlify.png"
+                />
               </div>
-              <div className="flex flex-col lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
-                <InngestFramework />
-                <Cloudflare />
+              <div className="flex items-start lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
+                <img
+                  className="w-1/2 max-w-[140px]"
+                  src="/assets/homepage/send-events/inngest.png"
+                />
+                <img
+                  className="w-1/2 max-w-[140px]"
+                  src="/assets/homepage/send-events/cloudflare-pages.png"
+                />
               </div>
             </div>
           </div>
