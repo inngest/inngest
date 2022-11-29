@@ -1,6 +1,4 @@
 import Container from "./Container";
-import OutTheBoxTriggerFn from "./HomeImg/OutTheBox/OutTheBoxTriggerFn";
-import ScheduledEvents from "./HomeImg/OutTheBox/ScheduledEvents";
 import SectionHeader from "./SectionHeader";
 
 export default function OutTheBox() {

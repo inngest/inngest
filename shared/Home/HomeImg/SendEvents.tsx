@@ -111,12 +111,14 @@ export default createFunction(
                       {tab.fnName}
                     </h6>
                   </div>
-                  <span className="block bg-slate-900/50 rounded text-xs text-slate-300 font-bold px-2 py-1.5 leading-none">
+                  <span className=" bg-slate-900/50 rounded text-xs text-slate-300 font-bold px-2 py-1.5 leading-none">
                     {tab.fnVersion}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-xs text-slate-400">{tab.fnID}</span>
+                  <span className="text-xs text-slate-400 hidden md:block">
+                    {tab.fnID}
+                  </span>
                   <span className="text-xs text-slate-200 flex items-center">
                     <svg width="11" height="10" className="mr-1.5">
                       <path
