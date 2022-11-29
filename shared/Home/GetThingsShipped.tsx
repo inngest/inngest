@@ -231,8 +231,8 @@ export const handleApptCancelled = createFunction("...",
           ))}
         </ul>
 
-        <div className="w-full rounded-lg bg-indigo-600 flex relative">
-          <div className="absolute top-0 bottom-0 -left-10 -right-10 rounded-lg bg-indigo-500 opacity-20 rotate-1 -z-0 mx-5"></div>
+        <div className="w-full rounded-lg bg-indigo-600 pb-4 md:pb-0 flex relative">
+          <div className="hidden md:block absolute top-0 bottom-0 -left-10 -right-10 rounded-lg bg-indigo-500 opacity-20 rotate-1 -z-0 mx-5"></div>
           {tabs.map((tab, i) =>
             activeTab === i ? (
               <div
