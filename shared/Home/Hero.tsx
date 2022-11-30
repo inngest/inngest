@@ -21,8 +21,9 @@ export default function Hero() {
             record time
           </h1>
           <p className="text-sm md:text-base text-slate-300 max-w-xl leading-6 md:leading-7">
-            Build, test, and deploy serverless functions driven by events or a
-            schedule to any platform in seconds, with zero infrastructure.
+            Use TypeScript to build, test, and deploy serverless functions
+            driven by events or a schedule to any platform in seconds, with zero
+            infrastructure.
           </p>
           <div className="flex flex-col items-start lg:flex-row gap-4 mt-6 lg:mt-12 lg:items-center">
             <a
