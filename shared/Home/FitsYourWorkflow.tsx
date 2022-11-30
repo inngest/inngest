@@ -16,7 +16,7 @@ export default function EventDriven() {
         <Container className="md:px-20 xl:h-[440px]">
           <div className="py-16">
             <h3 className="text-lg xl:text-2xl text-slate-50 mb-3">
-              Write code, send events
+              Reliable background functions in one line
             </h3>
             <p className="text-slate-400 text-sm max-w-lg leading-5 lg:leading-7 lg:text-base">
               Use the Inngest SDK to define functions that are triggered by
