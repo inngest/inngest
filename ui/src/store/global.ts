@@ -3,11 +3,13 @@ import { createSlice } from "@reduxjs/toolkit";
 
 const initialState: {
   contentView: "feed" | "docs";
+  docsPath: string | null;
   sidebarTab: "events" | "functions";
   selectedEvent: string | null;
   selectedRun: string | null;
 } = {
   contentView: "feed",
+  docsPath: null,
   sidebarTab: "events",
   selectedEvent: null,
   selectedRun: null,

@@ -1,3 +1,5 @@
+import { useAppSelector } from "../store/hooks";
+
 export const Docs = () => {
   /**
    * When link seleted.
@@ -5,6 +7,12 @@ export const Docs = () => {
    * Ensure url.pathname starts with /docs
    * If not, open in new tab
    */
+  const path = useAppSelector((state) => state.global.docsPath);
 
-  return <iframe src="https://inngest.com/docs" className="w-full h-full" />;
+  return (
+    <iframe
+      src={`https://inngest.com/docs${path || ""}`}
+      className="w-full h-full"
+    />
+  );
 };
