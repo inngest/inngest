@@ -122,7 +122,7 @@ export default function DevUI() {
               </li>
             </ul>
           </div>
-          <div className="flex items-center justify-center gap-4 pb-16 mt-8 ">
+          <div className="flex items-center justify-center gap-4 pb-16 mt-8 flex-col lg:flex-row">
             <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/30 flex rounded text-sm text-slate-200 shadow-lg">
               <pre className=" pl-4 pr-4 py-2">
                 <code className="bg-transparent text-slate-300">
