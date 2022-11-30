@@ -1,6 +1,7 @@
 import { useState } from "preact/hooks";
 import classNames from "../../utils/classnames";
 import CopyButton from "./CopyButton";
+import { SyntaxHighlight } from "./SyntaxHighlight";
 
 interface CodeBlockProps {
   tabs: {
@@ -70,7 +71,7 @@ export default function CodeBlock({
               `col-start-1 row-start-1 transition-all duration-150`
             )}
           >
-            <pre className="p-4 text-2xs">{tabs[i].content}</pre>
+            <SyntaxHighlight code={tabs[i].content} className="p-4 text-2xs" />
           </code>
         ))}
       </div>
