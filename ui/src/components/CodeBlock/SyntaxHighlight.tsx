@@ -11,7 +11,7 @@ Refractor.registerLanguage(json);
  * Highlighting has no styling by default; we use a custom theme here, which is
  * just a Prism theme with some minor modifications.
  */
-import "./nord.min.css";
+import "./highlight.min.css";
 
 interface SyntaxHighlightProps {
   /**
