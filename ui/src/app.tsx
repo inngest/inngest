@@ -1,6 +1,10 @@
 import { useState } from "preact/hooks";
+import noEventsImg from "../assets/images/no-events.png";
+import noFnSelectedImg from "../assets/images/no-fn-selected.png";
+import noResultsImg from "../assets/images/no-results.png";
 import ActionBar from "./components/ActionBar";
 import BG from "./components/BG";
+import { BlankSlate } from "./components/Blank";
 import CodeBlock from "./components/CodeBlock";
 import CodeBlockModal from "./components/CodeBlock/CodeBlockModal";
 import ContentFrame from "./components/Content/ContentFrame";
@@ -15,7 +19,11 @@ import SidebarLink from "./components/Sidebar/SidebarLink";
 import TimelineScrollContainer from "./components/Timeline/TimelineScrollContainer";
 import { IconBook, IconFeed } from "./icons";
 import "./index.css";
-import { selectContentView, setSidebarTab } from "./store/global";
+import {
+  useGetEventsStreamQuery,
+  useGetFunctionsStreamQuery,
+} from "./store/generated";
+import { setSidebarTab, showDocs, showFeed } from "./store/global";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
 import classNames from "./utils/classnames";
 
@@ -62,6 +70,26 @@ export function App() {
     }
   };
 
+  const { hasEvents, isLoading: eventsLoading } = useGetEventsStreamQuery(
+    {},
+    {
+      selectFromResult: (result) => ({
+        ...result,
+        hasEvents: Boolean(result.data?.events?.length || 0),
+      }),
+    }
+  );
+
+  const { hasRuns, isLoading: runsLoading } = useGetFunctionsStreamQuery(
+    {},
+    {
+      selectFromResult: (result) => ({
+        ...result,
+        hasRuns: Boolean(result.data?.functionRuns?.length || 0),
+      }),
+    }
+  );
+
   return (
     <div
       class={classNames(
@@ -88,12 +116,12 @@ export function App() {
           icon={<IconFeed />}
           active={contentView === "feed"}
           badge={20}
-          onClick={() => dispatch(selectContentView("feed"))}
+          onClick={() => dispatch(showFeed())}
         />
         <SidebarLink
           icon={<IconBook />}
           active={contentView === "docs"}
-          onClick={() => dispatch(selectContentView("docs"))}
+          onClick={() => dispatch(showDocs())}
         />
       </Sidebar>
       {contentView === "feed" ? (
@@ -122,7 +150,41 @@ export function App() {
               <EventSection eventId={selectedEvent} />
               <FunctionRunSection runId={selectedRun} />
             </ContentFrame>
-          ) : null}
+          ) : eventsLoading || runsLoading ? null : sidebarTab === "events" ? (
+            hasEvents ? (
+              <BlankSlate
+                title="No event selected"
+                subtitle="Select an event from the stream on the left to view its details and which functions it's triggered."
+                imageUrl={noFnSelectedImg}
+              />
+            ) : (
+              <BlankSlate
+                title="Inngest hasn't received any events"
+                subtitle="Read our documentation to learn how to send events to Inngest."
+                imageUrl={noEventsImg}
+                button={{
+                  text: "Sending Events",
+                  onClick: () => dispatch(showDocs("/events")),
+                }}
+              />
+            )
+          ) : hasRuns ? (
+            <BlankSlate
+              title="No run selected"
+              subtitle="Select a function run from the stream on the left to view its details, trigger, and execution timeline."
+              imageUrl={noFnSelectedImg}
+            />
+          ) : (
+            <BlankSlate
+              title="No functions have been run yet"
+              subtitle="We haven't run any functions in response to events or crons yet. Read our documentation to learn how to write and call a function."
+              imageUrl={noResultsImg}
+              button={{
+                text: "Writing Functions",
+                onClick: () => dispatch(showDocs("/functions")),
+              }}
+            />
+          )}
         </>
       ) : (
         <Docs />
