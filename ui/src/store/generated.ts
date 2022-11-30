@@ -275,7 +275,7 @@ export type GetFunctionRunQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', waitUntil: any, eventName?: string | null, expression?: string | null } | null, event?: { __typename?: 'Event', raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', waitUntil: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
+export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', waitUntil: any, eventName?: string | null, expression?: string | null } | null, event?: { __typename?: 'Event', id: string, raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', waitUntil: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
 
 
 export const GetEventsStreamDocument = `
@@ -341,6 +341,7 @@ export const GetFunctionRunDocument = `
       expression
     }
     event {
+      id
       raw
     }
     timeline {

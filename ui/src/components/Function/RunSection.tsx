@@ -1,4 +1,4 @@
-import { useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { usePrettyJson } from "../../hooks/usePrettyJson";
 import {
   EventStatus,
@@ -7,6 +7,8 @@ import {
   StepEventType,
   useGetFunctionRunQuery,
 } from "../../store/generated";
+import { selectRun } from "../../store/global";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import Button from "../Button";
 import CodeBlock from "../CodeBlock";
 import ContentCard from "../Content/ContentCard";
@@ -24,6 +26,18 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
     { pollingInterval, skip: !runId, refetchOnMountOrArgChange: true }
   );
   const run = useMemo(() => query.data?.functionRun, [query.data?.functionRun]);
+  const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    if (!run?.event?.id) {
+      return;
+    }
+
+    if (run.event.id !== selectedEvent) {
+      dispatch(selectRun(null));
+    }
+  }, [selectedEvent, run?.event?.id]);
 
   if (query.isLoading) {
     return (
