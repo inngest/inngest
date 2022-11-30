@@ -17,7 +17,7 @@ export default function DevUI() {
                 </span>
               </span>
             }
-            lede="Our dev server runs on your machine providing you instant feedback
+            lede="Our open-source dev server runs on your machine providing you instant feedback
             and debugging tools so you can build serverless functions with
             events like never before possible."
           />
