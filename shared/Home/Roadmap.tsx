@@ -21,19 +21,34 @@ export default function Roadmap() {
               Additional framework support
             </li>
             <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
+              Local event schema management
+            </li>
+            <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
+              Dev server replay
+            </li>
+            <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
               SDK APIs for testing
             </li>
             <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
               Dashboards for function metrics
             </li>
             <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
+              Event schema mismatch quarantine
+            </li>
+            <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
               Event stream warehousing
+            </li>
+            <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
+              User-level debugging
             </li>
           </ul>
         </div>
         <div className="w-full lg:w-1/3">
           <h4 className="text-white text-xl font-medium ml-4 mb-4">Now</h4>
           <ul className="flex flex-col gap-3 border border-slate-600/10 p-3 xl:p-4 rounded-xl">
+            <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
+              Scheduled function cancellation
+            </li>
             <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
               Step parallelization
             </li>
