@@ -32,15 +32,21 @@ if item.leaseID ~= nil and decode_ulid_time(item.leaseID) > currentTime then
 	return 2
 end
 
+if item.leaseID == nil then
+	-- Increase the in-progress count by 1 as we've just leased an item.
+	-- This lets us calculate the number of concurrent items when multiple shared-nothing
+	-- workers are working on the same queue.
+	-- 
+	-- If the lease ID is not nil then we assume this has already been increaased and is
+	-- a dead worker.
+	redis.call("HINCRBY", partitionKey, "n", 1)
+end
+
+
 item.leaseID = newLeaseKey
 -- Update the item's lease key.
 redis.call("HSET", queueKey, queueID, cjson.encode(item))
 -- Update the item's score in our sorted index.
 redis.call("ZADD", queueIndexKey, math.floor(nextTime / 1000), item.id)
-
--- Increase the in-progress count by 1 as we've just leased an item.
--- This lets us calculate the number of concurrent items when multiple shared-nothing
--- workers are working on the same queue.
-redis.call("HINCRBY", partitionKey, "n", 1)
 
 return 0

@@ -14,12 +14,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testPriority = 4
+
 func TestQueueEnqueue(t *testing.T) {
 	r := miniredis.RunT(t)
 	q := queue{
 		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return 4
+			return testPriority
 		},
 	}
 	ctx := context.Background()
@@ -43,10 +45,18 @@ func TestQueueEnqueue(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			QueuePartitionIndex: QueuePartitionIndex{
 				WorkflowID: item.WorkflowID,
-				Priority:   4,
+				Priority:   testPriority,
 			},
 			Earliest: start,
 		}, qp)
+	})
+
+	t.Run("It sets the right item score", func(t *testing.T) {
+		start := time.Now().Truncate(time.Second)
+		item, err := q.Enqueue(ctx, QueueItem{}, start)
+		require.NoError(t, err)
+
+		requireItemScoreEquals(t, r, item, start)
 	})
 
 	t.Run("It enqueues an item in the future", func(t *testing.T) {
@@ -63,7 +73,7 @@ func TestQueueEnqueue(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			QueuePartitionIndex: QueuePartitionIndex{
 				WorkflowID: item.WorkflowID,
-				Priority:   4,
+				Priority:   testPriority,
 			},
 			Earliest: start,
 		}, qp)
@@ -77,7 +87,7 @@ func TestQueueEnqueue(t *testing.T) {
 		require.EqualValues(t, start.Unix(), score)
 	})
 
-	t.Run("Updates vestimg time to earlier times", func(t *testing.T) {
+	t.Run("Updates partition vesting time to earlier times", func(t *testing.T) {
 		at := time.Now().Add(-10 * time.Minute).Truncate(time.Second)
 		item, err := q.Enqueue(ctx, QueueItem{}, at)
 		require.NoError(t, err)
@@ -91,7 +101,7 @@ func TestQueueEnqueue(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			QueuePartitionIndex: QueuePartitionIndex{
 				WorkflowID: item.WorkflowID,
-				Priority:   4,
+				Priority:   testPriority,
 			},
 			Earliest: at,
 		}, qp)
@@ -126,7 +136,7 @@ func TestQueueEnqueue(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			QueuePartitionIndex: QueuePartitionIndex{
 				WorkflowID: item.WorkflowID,
-				Priority:   4,
+				Priority:   testPriority,
 			},
 			Earliest: at,
 		}, qp)
@@ -138,7 +148,7 @@ func TestQueuePeek(t *testing.T) {
 	q := queue{
 		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return 4
+			return testPriority
 		},
 	}
 	ctx := context.Background()
@@ -193,10 +203,27 @@ func TestQueuePeek(t *testing.T) {
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*QueueItem{&ia, &ib, &ic}, items)
 		})
-	})
 
-	t.Run("It should remove any leased items from the list", func(t *testing.T) {
-		t.Fatalf("NOT TESTED")
+		t.Run("It should remove any leased items from the list", func(t *testing.T) {
+			// Lease step B, and it should be removed.
+			leaseID, err := q.Lease(ctx, ib.WorkflowID, ib.ID, 50*time.Millisecond)
+			require.NoError(t, err)
+
+			items, err = q.Peek(ctx, uuid.UUID{}, d, QueuePeekMax)
+			require.NoError(t, err)
+			require.EqualValues(t, 3, len(items))
+			require.EqualValues(t, []*QueueItem{&ia, &ic, &id}, items)
+
+			// When the lease expires it should re-appear
+			<-time.After(50 * time.Millisecond)
+
+			items, err = q.Peek(ctx, uuid.UUID{}, d, QueuePeekMax)
+			require.NoError(t, err)
+			require.EqualValues(t, 4, len(items))
+			ib.LeaseID = leaseID
+			// NOTE: item B should have an expired lease ID.
+			require.ElementsMatch(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
+		})
 	})
 
 }
@@ -206,7 +233,7 @@ func TestQueueLease(t *testing.T) {
 	q := queue{
 		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return 4
+			return testPriority
 		},
 	}
 	ctx := context.Background()
@@ -252,6 +279,26 @@ func TestQueueLease(t *testing.T) {
 			require.NotNil(t, item.LeaseID)
 			require.EqualValues(t, id, item.LeaseID)
 			require.WithinDuration(t, time.Now().Add(time.Second), ulid.Time(item.LeaseID.Time()), 10*time.Millisecond)
+
+			t.Run("Expired does not increase partition in-progress count", func(t *testing.T) {
+				val := r.HGet(fmt.Sprintf("partition:item:%s", item.WorkflowID), "n")
+				require.NotEmpty(t, val)
+				require.Equal(t, "1", val)
+			})
+		})
+
+		t.Run("It should increase the score of the item by the lease duration", func(t *testing.T) {
+			start := time.Now().Truncate(time.Second)
+			item, err := q.Enqueue(ctx, QueueItem{}, start)
+			require.NoError(t, err)
+			require.Nil(t, item.LeaseID)
+
+			requireItemScoreEquals(t, r, item, start)
+
+			_, err = q.Lease(ctx, item.WorkflowID, item.ID, time.Minute)
+			require.NoError(t, err)
+
+			requireItemScoreEquals(t, r, item, start.Add(time.Minute))
 		})
 	})
 }
@@ -261,7 +308,7 @@ func TestQueueExtendLease(t *testing.T) {
 	q := queue{
 		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return 4
+			return testPriority
 		},
 	}
 	ctx := context.Background()
@@ -320,7 +367,7 @@ func TestQueueDequeue(t *testing.T) {
 	q := queue{
 		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return 4
+			return testPriority
 		},
 	}
 	ctx := context.Background()
@@ -378,31 +425,34 @@ func TestQueueRequeue(t *testing.T) {
 	q := queue{
 		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return 4
+			return testPriority
 		},
 	}
 	ctx := context.Background()
 
 	t.Run("Re-enqueuing a leased item should succeed", func(t *testing.T) {
-		item, err := q.Enqueue(ctx, QueueItem{}, time.Now())
+		now := time.Now().Truncate(time.Second)
+
+		item, err := q.Enqueue(ctx, QueueItem{}, now)
 		require.NoError(t, err)
 		_, err = q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
 		require.NoError(t, err)
 
+		// Assert partition index is original
+		pi := QueuePartitionIndex{WorkflowID: item.WorkflowID, Priority: testPriority}
+		requirePartitionScoreEquals(t, r, pi, now)
+
 		requireInProgress(t, r, item.WorkflowID, 1)
 
-		at := time.Now().Add(time.Hour)
-		err = q.Requeue(ctx, item, at)
+		next := now.Add(time.Hour)
+		err = q.Requeue(ctx, item, next)
 		require.NoError(t, err)
 
 		t.Run("It should re-enqueue the item with the future time", func(t *testing.T) {
-			score, err := r.ZScore(fmt.Sprintf("queue:sorted:%s", item.WorkflowID), item.ID.String())
-			parsed := time.Unix(int64(score), 0)
-			require.NoError(t, err)
-			require.WithinDuration(t, at, parsed, time.Second)
+			requireItemScoreEquals(t, r, item, next)
 		})
 
-		t.Run("It should remove the lease from the re-enqueued item", func(t *testing.T) {
+		t.Run("It should always remove the lease from the re-enqueued item", func(t *testing.T) {
 			fetched := getQueueItem(t, r, item.ID)
 			require.Nil(t, fetched.LeaseID)
 		})
@@ -411,8 +461,22 @@ func TestQueueRequeue(t *testing.T) {
 			requireInProgress(t, r, item.WorkflowID, 0)
 		})
 
-		t.Run("It should update the partition's earliest time, if earlier", func(t *testing.T) {
-			t.Fatalf("NOT TESTED")
+		t.Run("It should update the partition's earliest time, if earliest", func(t *testing.T) {
+			// Assert partition index is updated, as there's only one item here.
+			requirePartitionScoreEquals(t, r, pi, next)
+		})
+
+		t.Run("It should not update the partition's earliest time, if later", func(t *testing.T) {
+			_, err := q.Enqueue(ctx, QueueItem{}, now)
+			require.NoError(t, err)
+
+			requirePartitionScoreEquals(t, r, pi, now)
+
+			next := now.Add(2 * time.Hour)
+			err = q.Requeue(ctx, item, next)
+			require.NoError(t, err)
+
+			requirePartitionScoreEquals(t, r, pi, now)
 		})
 	})
 }
@@ -449,4 +513,22 @@ func requireInProgress(t *testing.T, r *miniredis.Miniredis, workflowID uuid.UUI
 	val := r.HGet(fmt.Sprintf("partition:item:%s", workflowID), "n")
 	require.NotEmpty(t, val)
 	require.Equal(t, fmt.Sprintf("%d", count), val)
+}
+
+func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem, expected time.Time) {
+	t.Helper()
+	score, err := r.ZScore(fmt.Sprintf("queue:sorted:%s", item.WorkflowID), item.ID.String())
+	parsed := time.Unix(int64(score), 0)
+	require.NoError(t, err)
+	require.WithinDuration(t, expected.Truncate(time.Second), parsed, time.Millisecond)
+}
+
+func requirePartitionScoreEquals(t *testing.T, r *miniredis.Miniredis, pi QueuePartitionIndex, expected time.Time) {
+	t.Helper()
+	key, err := pi.MarshalBinary()
+	require.NoError(t, err)
+	score, err := r.ZScore("partition:sorted", string(key))
+	parsed := time.Unix(int64(score), 0)
+	require.NoError(t, err)
+	require.WithinDuration(t, expected.Truncate(time.Second), parsed, time.Millisecond)
 }
