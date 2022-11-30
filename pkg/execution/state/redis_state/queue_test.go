@@ -222,7 +222,7 @@ func TestQueuePeek(t *testing.T) {
 			require.EqualValues(t, 4, len(items))
 			ib.LeaseID = leaseID
 			// NOTE: item B should have an expired lease ID.
-			require.ElementsMatch(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
+			require.EqualValues(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
 		})
 	})
 
@@ -486,7 +486,67 @@ func TestQueuePartitionLease(t *testing.T) {
 }
 
 func TestQueuePartitionPeek(t *testing.T) {
-	t.Fatalf("NOT TESTED")
+	idA := uuid.New() // low pri
+	idB := uuid.New()
+	idC := uuid.New()
+
+	r := miniredis.RunT(t)
+	q := queue{
+		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
+			switch workflowID {
+			case idB, idC:
+				return PriorityMax
+			default:
+				return PriorityMin // Sorry A
+			}
+		},
+	}
+	ctx := context.Background()
+
+	now := time.Now().Truncate(time.Second)
+	_, err := q.Enqueue(ctx, QueueItem{WorkflowID: idA}, now)
+	require.NoError(t, err)
+	_, err = q.Enqueue(ctx, QueueItem{WorkflowID: idB}, now.Add(1*time.Second))
+	require.NoError(t, err)
+	_, err = q.Enqueue(ctx, QueueItem{WorkflowID: idC}, now.Add(2*time.Second))
+	require.NoError(t, err)
+
+	t.Run("Sequentially returns indexes in order", func(t *testing.T) {
+		items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
+		require.NoError(t, err)
+		require.Len(t, items, 3)
+		require.EqualValues(t, []*QueuePartitionIndex{
+			{idA, PriorityMin},
+			{idB, PriorityMax},
+			{idC, PriorityMax},
+		}, items)
+	})
+
+	t.Run("Random returns items randomly using weighted sample", func(t *testing.T) {
+		a, b, c := 0, 0, 0
+		for i := 0; i <= 1000; i++ {
+			items, err := q.PartitionPeek(ctx, false, time.Now().Add(time.Hour), PartitionPeekMax)
+			require.NoError(t, err)
+			require.Len(t, items, 3)
+			switch items[0].WorkflowID {
+			case idA:
+				a++
+			case idB:
+				b++
+			case idC:
+				c++
+			default:
+				t.Fatal()
+			}
+		}
+		// Statistically this is going to fail at some point, but we want to ensure randomness
+		// will return low priority items less.
+		require.GreaterOrEqual(t, a, 1) // A may be called low-digit times.
+		require.Less(t, a, 250)         // But less than 1/4 (it's 1 in 10, statistically)
+		require.Greater(t, c, 300)
+		require.Greater(t, b, 300)
+	})
 }
 
 func TestQueuePartitionReprioritize(t *testing.T) {
