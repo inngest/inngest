@@ -18,10 +18,16 @@ export default function Roadmap() {
               Additional platform support (AWS Lambda, Supabase, Deno)
             </li>
             <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
-              Additional framework support (Remix, RedwoodJS)
+              Additional framework support
             </li>
             <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
-              Testing APIs
+              SDK APIs for testing
+            </li>
+            <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
+              Dashboards for function metrics
+            </li>
+            <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
+              Event stream warehousing
             </li>
           </ul>
         </div>
@@ -29,10 +35,19 @@ export default function Roadmap() {
           <h4 className="text-white text-xl font-medium ml-4 mb-4">Now</h4>
           <ul className="flex flex-col gap-3 border border-slate-600/10 p-3 xl:p-4 rounded-xl">
             <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
-              Step delays, conditional expressions, & event-coordination
+              Step parallelization
             </li>
             <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
-              Inngest Cloud deploy
+              Automatic error functions
+            </li>
+            <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
+              Function concurrency limits
+            </li>
+            <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
+              Function Throttling
+            </li>
+            <li className="text-slate-200 bg-slate-900 rounded text-sm xl:text-base px-6 py-4">
+              Dev server UI: function lists
             </li>
           </ul>
         </div>
