@@ -1,6 +1,7 @@
 import Container from "./Container";
 import SectionHeader from "./SectionHeader";
 import HomeArrow from "../Icons/HomePatternsCheck";
+import ArrowRight from "../Icons/ArrowRight";
 
 export default function DevUI() {
   return (
@@ -39,47 +40,64 @@ export default function DevUI() {
       </div>
 
       <Container className="lg:mb-40">
-        <div className="bg-slate-900/70 backdrop-blur-sm -mt-40 pt-40 md:pt-32 lg:px-24 xl:px-32 flex flex-col xl:flex-row justify-between p-8 rounded-lg">
-          <ul className="text-slate-50 text-sm mr-8">
-            <li className="mb-3 flex items-center text-slate-50 xl:max-w-[300px] w-full leading-5">
-              <HomeArrow />
-              <span className="ml-1.5">Events appear in real-time</span>
-            </li>
-            <li className="mb-3 flex items-center text-slate-50 xl:max-w-[300px] w-full leading-5">
-              <HomeArrow />
-              <span className="ml-1.5">View function status at a glance</span>
-            </li>
-          </ul>
-          <ul className="gap-2 mr-8 text-sm">
-            <li className="mb-3 flex items-top text-slate-50 xl:max-w-[300px] w-full leading-5 ">
-              <HomeArrow />
-              <span className="ml-1.5">
-                Inspect event payloads and see exactly what functions are
-                triggered
-              </span>
-            </li>
-            <li className="mb-3 flex items-top text-slate-50 xl:max-w-[300px] w-full leading-5">
-              <HomeArrow />
-              <span className="ml-1.5">
-                TypeScript types are automatically generated
-              </span>
-            </li>
-          </ul>
-          <ul className="gap-2 mr-8 text-sm">
-            <li className="mb-3 flex items-top text-slate-50 xl:max-w-[300px] w-full leading-5 ">
-              <HomeArrow />
-              <span className="ml-1.5">
-                Debug your functions with ease. Check step-by-step output and
-                view logs.
-              </span>
-            </li>
-            <li className="mb-3 flex items-top text-slate-50 xl:max-w-[300px] w-full leading-5 ">
-              <HomeArrow />
-              <span className="ml-1.5">
-                Re-run functions with one click to quickly iterate and fix bugs.
-              </span>
-            </li>
-          </ul>
+        <div className="bg-slate-900/70 backdrop-blur-sm -mt-40 pt-40 md:pt-32 lg:px-24 xl:px-32 rounded-xl px-8">
+          <div className="flex flex-col xl:flex-row justify-between rounded-lg">
+            <ul className="text-slate-50 text-sm mr-8">
+              <li className="mb-3 flex items-center text-slate-50 xl:max-w-[300px] w-full leading-5">
+                <HomeArrow />
+                <span className="ml-1.5">Events appear in real-time</span>
+              </li>
+              <li className="mb-3 flex items-center text-slate-50 xl:max-w-[300px] w-full leading-5">
+                <HomeArrow />
+                <span className="ml-1.5">View function status at a glance</span>
+              </li>
+            </ul>
+            <ul className="gap-2 mr-8 text-sm">
+              <li className="mb-3 flex items-top text-slate-50 xl:max-w-[300px] w-full leading-5 ">
+                <HomeArrow />
+                <span className="ml-1.5">
+                  Inspect event payloads and see exactly what functions are
+                  triggered
+                </span>
+              </li>
+              <li className="mb-3 flex items-top text-slate-50 xl:max-w-[300px] w-full leading-5">
+                <HomeArrow />
+                <span className="ml-1.5">
+                  TypeScript types are automatically generated
+                </span>
+              </li>
+            </ul>
+            <ul className="gap-2 mr-8 text-sm">
+              <li className="mb-3 flex items-top text-slate-50 xl:max-w-[300px] w-full leading-5 ">
+                <HomeArrow />
+                <span className="ml-1.5">
+                  Debug your functions with ease. Check step-by-step output and
+                  view logs.
+                </span>
+              </li>
+              <li className="mb-3 flex items-top text-slate-50 xl:max-w-[300px] w-full leading-5 ">
+                <HomeArrow />
+                <span className="ml-1.5">
+                  Re-run functions with one click to quickly iterate and fix
+                  bugs.
+                </span>
+              </li>
+            </ul>
+          </div>
+          <div className="flex items-center justify-center pb-20 pt-16 gap-8">
+            <pre className="bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded px-6 py-2 text-sm text-slate-200 overflow-hidden shadow-lg">
+              <code>
+                <span className="text-cyan-400">npx</span> inngest-cli dev
+              </code>
+            </pre>
+            <a
+              href="/docs/functions?ref=homepage-dev-tools"
+              className="group flex items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2  bg-indigo-500 hover:bg-indigo-400 transition-all text-white"
+            >
+              Learn more
+              <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " />
+            </a>
+          </div>
         </div>
       </Container>
     </div>
