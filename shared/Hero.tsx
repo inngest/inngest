@@ -34,7 +34,7 @@ const Hero = ({
             {headline}
           </h1>
           <p className="pt-6 max-w-xl mx-auto">{subheadline}</p>
-          <div className="flex flex flex-col gap-4 md:flex-row justify-center pt-6">
+          <div className="flex flex-col gap-4 md:flex-row justify-center pt-6">
             <Button kind="primary" size="medium" href={primaryCTA.href}>
               {primaryCTA.text}
             </Button>

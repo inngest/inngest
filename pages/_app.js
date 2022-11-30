@@ -16,9 +16,14 @@ function MyApp({ Component, pageProps }) {
   useEffect(() => {
     fullstory.init({ orgId: "o-1CVB8R-na1" });
 
+    const htmlEl = document.getElementsByTagName("html")[0];
     if (pageProps.htmlClassName) {
-      document.getElementsByTagName("html")[0].className =
-        pageProps.htmlClassName;
+      htmlEl.className = pageProps.htmlClassName;
+    }
+    if (pageProps.designVersion) {
+      htmlEl.classList.add(`v${pageProps.designVersion}`);
+    } else {
+      htmlEl.classList.add(`v1`);
     }
   });
   useEffect(() => {

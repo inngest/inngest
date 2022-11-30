@@ -46,7 +46,7 @@ const NavContent: React.FC<Props> = (props: Props) => {
                 <span className="text-slate-400 px-4">Product</span>
                 <a href="/features/sdk?ref=nav" className="rounded-lg p-4">
                   <p>TypeScript & JavaScript SDK</p>
-                  <p className="pt-1 text-slate-400">
+                  <p className="pt-1 mt-0 text-slate-400">
                     <small>
                       Event-driven and scheduled serverless functions
                     </small>

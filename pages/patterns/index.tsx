@@ -139,7 +139,7 @@ export default function Patterns() {
               <header className="mt-2">
                 <h1 className="text-5xl font-normal flex flex-col gap-2">
                   Patterns{" "}
-                  <span className="text-xl text-slate-400">
+                  <span className="text-xl font-medium text-slate-400">
                     Async + Event-Driven
                   </span>
                 </h1>

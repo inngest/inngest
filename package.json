@@ -45,6 +45,7 @@
     "fuse.js": "^6.6.2",
     "gray-matter": "^4.0.3",
     "hast-util-heading-rank": "2.1.0",
+    "heroicons": "^2.0.13",
     "highlight.js": "^11.6.0",
     "inngest": "^0.5.0",
     "inngest-sdk": "^1.0.1",

@@ -70,10 +70,17 @@
 
   --nav-height: 120px;
 
-  font-size: 20px;
-  font-family: var(--font);
+  font-size: 16px; /* Tailwind base */
+  font-family: var(--text-font);
   color: var(--font-color-primary);
+  background: var(--bg-color);
 }
+
+/* Legacy base styles */
+:root.v1 {
+  font-size: 20px;
+}
+
 
 html.docs {
   scroll-behavior: smooth;
@@ -99,15 +106,10 @@ body.dark-theme {
 }
 
 .home {
-  font-family: var(--font);
+  font-family: var(--text-font);
 }
 
-p + p {
-  margin-top: 1.5rem;
-}
-li + li {
-  margin-top: 0.75rem;
-}
+
 
 a {
   color: var(--link-color);
@@ -117,108 +119,108 @@ a {
   color: inherit !important;
 }
 
-html,
-body {
-  background: var(--bg-color);
+:root.v1 .primary-links p + p {
+  padding-top: 0.25rem;
+  margin-top: 0;
 }
 
-body,
-button {
-  margin: 0;
+:root.v1 h2.text-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+:root.v1 h1,
+:root.v1 h2,
+:root.v1 h3,
+:root.v1 .h1,
+:root.v1 .h2,
+:root.v1 .h3 {
+  font-family: var(--font-heading);
 }
 
 /** Typography **/
 
-h1,
-h2,
-h3,
-.h1,
-.h2,
-.h3 {
-  font-family: var(--font-heading);
-}
-
-h1 {
+:root.v1 h1 {
   font-size: 3em;
   font-weight: bold;
   line-height: 1.05;
 }
 
-h2 {
+:root.v1 h2 {
   font-size: 1.8rem;
   font-weight: bold;
   line-height: 1.2;
 }
 
-h3,
-.h3 {
+:root.v1 h3,
+:root.v1 .h3 {
   font-size: 1.4rem;
   font-weight: bold;
 }
 
-h4 {
+:root.v1 h3.text-sm {
+  font-size: 0.875rem;
+}
+
+:root.v1 h4 {
   font-size: 1.1rem;
 }
 
-h5 {
+:root.v1 h5 {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
-p, ol, ul, li {
+:root.v1 p+p {
+  margin-top: 1.5rem;
+}
+
+ p,  ol,  ul,  li {
   font-size: 0.9rem;
 }
 
-input,
-textarea,
-select {
+ input,
+ textarea,
+ select {
   border: 0;
   padding: 0.5rem 0.5rem;
   border-radius: var(--border-radius);
 }
 
-/* Home versions, as REM is changed cuz roboto mono */
-
-.h2 {
-  font-size: 1.6rem;
-}
-
-.h3 {
-  font-size: 1.2rem;
-}
-
 /** Copy relationship: everything but home. **/
-li > ol,
-li > ul {
+ li > ol,
+ li > ul {
   margin: 1rem 0;
 }
 
+:root.v1 li+li {
+  margin-top: 0.75rem;
+}
+
 @media (max-width: 980px) {
-  h1 {
+  :root.v1 h1 {
     font-size: 3rem;
-    /* line-height: 1; */
   }
-  h2 {
+  :root.v1 h2 {
     font-size: 2rem;
-    /* line-height: 1; */
   }
-  h4 {
+  :root.v1 h4 {
     font-size: 1.1rem;
   }
-  h5 {
+  :root.v1 h5 {
     font-size: 0.7rem;
   }
-
   /**
    * This ensures that pre-formatted code breaks so that there's no
    * horizontal scroll.  `code .line` is used for code formatting.
-   */
+   *//*
   pre,
   code .line {
     white-space: pre-wrap !important;
     overflow: auto !important;
   }
+  */
 }
 
 kbd {
