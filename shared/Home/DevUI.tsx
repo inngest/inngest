@@ -84,7 +84,7 @@ export default function DevUI() {
               </li>
             </ul>
           </div>
-          <div className="flex items-center justify-center pb-20 pt-16 gap-8">
+          <div className="flex flex-col md:flex-row items-center justify-center pb-20 pt-16 gap-8">
             <pre className="bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded px-6 py-2 text-sm text-slate-200 overflow-hidden shadow-lg">
               <code>
                 <span className="text-cyan-400">npx</span> inngest-cli dev
