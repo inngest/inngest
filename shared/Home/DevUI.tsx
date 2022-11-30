@@ -2,12 +2,13 @@ import Container from "./Container";
 import SectionHeader from "./SectionHeader";
 import HomeArrow from "../Icons/HomePatternsCheck";
 import ArrowRight from "../Icons/ArrowRight";
+import Github from "../Icons/Github";
 
 export default function DevUI() {
   return (
     <div className="overflow-hidden pb-60 -mb-60">
       <div>
-        <Container className="mt-60 -mb-30">
+        <Container className="mt-60 -mb-30 relative z-30">
           <SectionHeader
             title={
               <span className="lg:flex gap-2 items-end text-slate-50 font-medium text-2xl lg:text-4xl xl:text-5xl mb-4 tracking-tighter ">
@@ -17,9 +18,23 @@ export default function DevUI() {
                 </span>
               </span>
             }
-            lede="Our open-source dev server runs on your machine providing you instant feedback
-            and debugging tools so you can build serverless functions with
-            events like never before possible."
+            lede={
+              <>
+                <p>
+                  Our open-source dev server runs on your machine providing you
+                  instant feedback and debugging tools so you can build
+                  serverless functions with events like never before possible.
+                </p>
+                <a
+                  href="https://github.com/inngest/inngest"
+                  className="group inline-flex gap-2.5 mt-8 items-center rounded-full text-sm font-medium pl-6 pr-5 py-2  bg-indigo-500 hover:bg-indigo-400 transition-all text-white"
+                >
+                  <span>View and star the github project</span>
+                  {/* <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " /> */}
+                  <Github />
+                </a>
+              </>
+            }
           />
         </Container>
       </div>
