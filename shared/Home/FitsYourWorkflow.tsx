@@ -53,24 +53,44 @@ export default function EventDriven() {
             </div>
             <div className="flex items-center justify-evenly xl:justify-between mt-6 mb-8 flex-wrap m-auto px-8">
               <div className="flex items-end lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
-                <img
-                  className="w-1/2 max-w-[140px]"
-                  src="/assets/homepage/send-events/next-js.png"
-                />
-                <img
-                  className="w-1/2 max-w-[140px]"
-                  src="/assets/homepage/send-events/express.png"
-                />
+                <a
+                  href="/docs/frameworks/nextjs?ref=homepage-fits-your-workflow"
+                  className="flex w-1/2 max-w-[140px] hover:scale-110 transition-all duration-150"
+                >
+                  <img
+                    className="max-w-[140px]"
+                    src="/assets/homepage/send-events/next-js.png"
+                  />
+                </a>
+                <a
+                  href="/docs/frameworks/express?ref=homepage-fits-your-workflow"
+                  className="flex w-1/2 max-w-[140px] hover:scale-110 transition-all duration-150"
+                >
+                  <img
+                    className="max-w-[140px]"
+                    src="/assets/homepage/send-events/express.png"
+                  />
+                </a>
               </div>
               <div className="flex items-start lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
-                <img
-                  className="w-1/2 max-w-[140px]"
-                  src="/assets/homepage/send-events/redwood.png"
-                />
-                <img
-                  className="w-1/2 max-w-[140px]"
-                  src="/assets/homepage/send-events/cloudflare-pages.png"
-                />
+                <a
+                  href="/docs/frameworks/redwoodjs?ref=homepage-fits-your-workflow"
+                  className="flex w-1/2 max-w-[140px] hover:scale-110 transition-all duration-150"
+                >
+                  <img
+                    className="max-w-[140px]"
+                    src="/assets/homepage/send-events/redwood.png"
+                  />
+                </a>
+                <a
+                  href="/docs/frameworks/cloudflare-pages?ref=homepage-fits-your-workflow"
+                  className="flex w-1/2 max-w-[140px] hover:scale-110 transition-all duration-150"
+                >
+                  <img
+                    className="max-w-[140px]"
+                    src="/assets/homepage/send-events/cloudflare-pages.png"
+                  />
+                </a>
               </div>
             </div>
           </div>
@@ -99,24 +119,44 @@ export default function EventDriven() {
             </div>
             <div className="flex items-center justify-evenly xl:justify-between mt-6 mb-8 flex-wrap m-auto px-8">
               <div className="flex items-end lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
-                <img
-                  className="w-1/2 max-w-[140px]"
-                  src="/assets/homepage/send-events/vercel.png"
-                />
-                <img
-                  className="w-1/2 max-w-[140px]"
-                  src="/assets/homepage/send-events/netlify.png"
-                />
+                <a
+                  href="/docs/deploy/vercel?ref=homepage-fits-your-workflow"
+                  className="flex w-1/2 max-w-[140px] hover:scale-110 transition-all duration-150"
+                >
+                  <img
+                    className="max-w-[140px]"
+                    src="/assets/homepage/send-events/vercel.png"
+                  />
+                </a>
+                <a
+                  href="/docs/deploy/netlify?ref=homepage-fits-your-workflow"
+                  className="flex w-1/2 max-w-[140px] hover:scale-110 transition-all duration-150"
+                >
+                  <img
+                    className="max-w-[140px]"
+                    src="/assets/homepage/send-events/netlify.png"
+                  />
+                </a>
               </div>
               <div className="flex items-start lg:flex-row justify-evenly xl:justify-between w-full m-auto xl:w-1/2">
-                <img
-                  className="w-1/2 max-w-[140px]"
-                  src="/assets/homepage/send-events/inngest.png"
-                />
-                <img
-                  className="w-1/2 max-w-[140px]"
-                  src="/assets/homepage/send-events/cloudflare-pages.png"
-                />
+                <a
+                  href="/docs/deploy/inngest-cloud?ref=homepage-fits-your-workflow"
+                  className="flex w-1/2 max-w-[140px] hover:scale-110 transition-all duration-150"
+                >
+                  <img
+                    className="max-w-[140px]"
+                    src="/assets/homepage/send-events/inngest.png"
+                  />
+                </a>
+                <a
+                  href="/docs/deploy/cloudflare?ref=homepage-fits-your-workflow"
+                  className="flex w-1/2 max-w-[140px] hover:scale-110 transition-all duration-150"
+                >
+                  <img
+                    className="max-w-[140px]"
+                    src="/assets/homepage/send-events/cloudflare-pages.png"
+                  />
+                </a>
               </div>
             </div>
           </div>

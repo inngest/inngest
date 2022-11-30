@@ -1,7 +1,7 @@
 import React from "react";
 import Header from "src/shared/Home/Header";
 import Hero from "src/shared/Home/Hero";
-import EventDriven from "src/shared/Home/EventDriven";
+import FitsYourWorkflow from "src/shared/Home/FitsYourWorkflow";
 import DevUI from "src/shared/Home/DevUI";
 import OutTheBox from "src/shared/Home/OutTheBox";
 import FullyManaged from "src/shared/Home/FullyManaged";
@@ -33,7 +33,7 @@ export default function Home() {
 
       <Hero />
 
-      <EventDriven />
+      <FitsYourWorkflow />
 
       <DevUI />
 
