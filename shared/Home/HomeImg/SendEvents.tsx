@@ -29,10 +29,10 @@ export default function SendEvents() {
     },
     {
       title: "Webhook",
-      payload: `inngest.send({
-    name: "app/user.signup",
-    data: { userId: “...”, email: “...” }
-})`,
+      payload: `{
+  name: "stripe/charge.failed",
+  data: { ... }
+}`,
       fnName: "Create Function",
       fnVersion: 27,
       fnID: "01GGG522ZATDGVQBCND4ZEAS6Z",
