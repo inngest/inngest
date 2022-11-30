@@ -145,7 +145,9 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 }
 
 func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
-	m.state[i.IdempotencyKey()].Actions()
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	m.setHistory(ctx, i, state.History{
 		Type:       enums.HistoryTypeStepStarted,
 		Identifier: i,
@@ -160,6 +162,9 @@ func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, at
 }
 
 func (m *mem) Sleeping(ctx context.Context, i state.Identifier, endTime time.Time) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	m.setHistory(ctx, i, state.History{
 		Type:       enums.HistoryTypeStepWaiting,
 		Identifier: i,
@@ -446,6 +451,9 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 }
 
 func (m *mem) History(ctx context.Context, i state.Identifier) ([]state.History, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
 	history, ok := m.history[i.RunID.String()]
 	if !ok {
 		return nil, fmt.Errorf("history for run %s not found", i.RunID)
@@ -459,8 +467,8 @@ func (m *mem) History(ctx context.Context, i state.Identifier) ([]state.History,
 func (m *mem) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
 	var metadata []state.Metadata
 
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 
 	for _, s := range m.state {
 		if eventId != "" {
