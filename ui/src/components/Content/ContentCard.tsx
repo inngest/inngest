@@ -45,7 +45,7 @@ export default function ContentCard({
           <span className="text-3xs leading-none">{id}</span>
         </div>
       </div>
-      <div className="overflow-y-scroll">{children}</div>
+      <div className="overflow-y-scroll flex-1">{children}</div>
     </div>
   );
 }
