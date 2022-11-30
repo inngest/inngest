@@ -5,7 +5,7 @@
 ![Discord](https://img.shields.io/discord/842170679536517141?label=discord)
 ![Twitter Follow](https://img.shields.io/twitter/follow/inngest?style=social)
 
-Run reliable serverless functions in the background.  Inngest allows you to schedule, enqueue, and run serverless functions in the background reliably with retries on any platform, with zero infrastructure, fully locally testable.  Learn moreL. https://www.inngest.com.
+Run reliable serverless functions in the background.  Inngest allows you to schedule, enqueue, and run serverless functions in the background reliably with retries on any platform, with zero infrastructure, fully locally testable.  Learn more: https://www.inngest.com.
 
 
 <br />
