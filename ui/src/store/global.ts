@@ -31,15 +31,19 @@ const globalState = createSlice({
     selectRun(state, action: PayloadAction<string | null>) {
       state.selectedRun = action.payload;
     },
-    selectContentView(
-      state,
-      action: PayloadAction<typeof initialState["contentView"]>
-    ) {
-      state.contentView = action.payload;
+    showFeed(state) {
+      state.contentView = "feed";
+    },
+    showDocs(state, action: PayloadAction<`/${string}` | null | undefined>) {
+      state.contentView = "docs";
+
+      if (typeof action !== "undefined") {
+        state.docsPath = action.payload || null;
+      }
     },
   },
 });
 
-export const { selectEvent, selectRun, setSidebarTab, selectContentView } =
+export const { selectEvent, selectRun, setSidebarTab, showDocs, showFeed } =
   globalState.actions;
 export default globalState.reducer;
