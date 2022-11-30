@@ -5,14 +5,22 @@
 ![Discord](https://img.shields.io/discord/842170679536517141?label=discord)
 ![Twitter Follow](https://img.shields.io/twitter/follow/inngest?style=social)
 
-Inngest is an open-source, event-driven platform which makes it easy for developers to build, test, and deploy serverless functions without worrying about infrastructure, queues, or stateful services.
+Run reliable serverless functions in the background.  Inngest allows you to schedule, enqueue, and run serverless functions in the background reliably with retries on any platform, with zero infrastructure, fully locally testable.  Learn moreL. https://www.inngest.com.
 
-Using Inngest, you can write and deploy serverless step functions which are triggered by events without writing any boilerplate code or infra. Learn more at https://www.inngest.com.
+
+<br />
+
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
 - [Project Architecture](#project-architecture)
 - [Community](#community)
+
+<br />
+
+The local development UI:
+
+![DevUI](https://user-images.githubusercontent.com/306177/204876780-d97eec85-53e2-4fca-81ce-cae45d56c319.png)
 
 <br />
 
@@ -38,46 +46,32 @@ We created Inngest to bring the benefits of event-driven systems to all develope
 
 ## Quick Start
 
-1. Install the Inngest CLI to get started:
+1. [NPM install our SDK for your typescript project](https://github.com/inngest/inngest-js): `npm install inngest`
+2. Run the Inngest dev serverL `npx inngest@latest dev`.  That's _this_ cli.
+3. [Integrate Inngest with your framework in one line](https://www.inngest.com/docs/frameworks/nextjs) via the `serve() handler`
+4. [Write and run functions in your existing framework or project](https://www.inngest.com/docs/functions)
 
-```bash
-curl -sfL https://cli.inngest.com/install.sh | sh \
-  && sudo mv ./inngest /usr/local/bin/inngest
-# or via npm
-npm install -g inngest-cli
+Here's an example:
+
+```js
+import { createStepFunction } from "inngest";
+
+// This function runs on any platform in the background with retries any time
+// the app/user.signup event is received - automatically.
+export const signupFlow = createStepFunction("post-signup", "app/user.signup",
+  function ({ event, tools }) {
+    // Send the user an email
+    tools.run("Send an email", async () => {
+      await sendEmail({
+        email: event.user.email,
+        template: "welcome",
+      })
+   })
+})
 ```
 
-2.  Create a new function. It will prompt you to select a programming language and what event will trigger your function. Optionally use the `--trigger` flag to specify the event name:
 
-```shell
-inngest init --trigger demo/event.sent
-```
-
-3. Run your new hello world function with dummy data:
-
-```shell
-inngest run
-```
-
-4. Run the Inngest DevServer. This starts a local "Event API" which can receive events. When events are received, functions with matching triggers will automatically be run. Optionally use the `-p` flag to specify the port for the Event API.
-
-```shell
-inngest dev -p 9999
-```
-
-5. Send events to the DevServer. Send right from your application using HTTP + JSON or simply, as a curl with a dummy key of `KEY`.
-
-```shell
-curl -X POST --data '{"name":"demo/event.sent","data":{"test":true}}' http://127.0.0.1:9999/e/KEY
-```
-
-That's it - your hello world function should run automatically! When you `inngest deploy` your function to Inngest Cloud or your self-hosted Inngest. Here are some more resources to get you going:
-
-- [Full Quick Start Guide](https://www.inngest.com/docs/quick-start?ref=github)
-- [Function arguments & responses](https://www.inngest.com/docs/functions/function-input-and-output?ref=github)
-- [Sending Events to Inngest](https://www.inngest.com/docs/event-format-and-structure?ref=github)
-- [Inngest Cloud: Managing Secrets](https://www.inngest.com/docs/cloud/managing-secrets?ref=github)
-- [Self-hosting Inngest](https://www.inngest.com/docs/self-hosting?ref=github)
+That's it - your function is set up!
 
 <br />
 
