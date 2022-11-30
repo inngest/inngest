@@ -1,7 +1,12 @@
+import CopyBtn from "./CopyBtn";
 import Container from "./Container";
 import SendEvents from "./HomeImg/SendEvents";
 import SectionHeader from "./SectionHeader";
 export default function EventDriven() {
+  const handleCopyClick = (copy) => {
+    navigator.clipboard.writeText(copy);
+  };
+
   return (
     <>
       <Container className="mt-20 mb-12">
@@ -22,10 +27,19 @@ export default function EventDriven() {
               Use the Inngest SDK to define functions that are triggered by
               events from your app or anywhere on the internet.
             </p>
-            <code className="text-xs mr-5 text-slate-50 mt-8 inline-block bg-slate-800/50 px-4 py-2 rounded-lg">
-              <span className="text-slate-500 mr-2">$</span>
-              npm install inngest
-            </code>
+            <div className="bg-slate-800/50 mt-4  backdrop-blur-md border border-slate-700/30 inline-flex rounded text-sm text-slate-200 shadow-lg">
+              <pre className=" pl-4 pr-4 py-2">
+                <code className="bg-transparent text-slate-300">
+                  <span className="text-cyan-400">npm install</span> inngest
+                </code>
+              </pre>
+              <div className="bg-slate-900/50 rounded-r flex items-center justify-center pl-2 pr-2.5">
+                <CopyBtn
+                  btnAction={handleCopyClick}
+                  copy="npm install inngest"
+                />
+              </div>
+            </div>
           </div>
           <SendEvents />
         </Container>
