@@ -28,7 +28,7 @@ export default function Patterns() {
           <li className="text-slate-200 flex text-sm md:w-1/2 md:mb-2">
             <HomePatternsCheck />{" "}
             <a
-              href=""
+              href="/patterns/build-reliable-webhooks?ref=homepage-patterns"
               className="ml-2 text-slate-200 flex items-bottom group hover:text-white transition-colors"
             >
               Build reliable webhooks
@@ -38,7 +38,7 @@ export default function Patterns() {
           <li className="text-slate-200 flex text-sm md:w-1/2 md:mb-2">
             <HomePatternsCheck />{" "}
             <a
-              href=""
+              href="/patterns/running-functions-in-parallel?ref=homepage-patterns"
               className="ml-2 text-slate-200 flex items-bottom group hover:text-white transition-colors"
             >
               Running functions in parallel
@@ -48,7 +48,7 @@ export default function Patterns() {
           <li className="text-slate-200 flex text-sm md:w-1/2">
             <HomePatternsCheck />{" "}
             <a
-              href=""
+              href="/patterns/reliably-run-critical-workflows?ref=homepage-patterns"
               className="ml-2 text-slate-200 flex items-bottom group hover:text-white transition-colors"
             >
               Reliably run critical workflows
@@ -58,7 +58,7 @@ export default function Patterns() {
           <li className="text-slate-200 flex text-sm md:w-1/2">
             <HomePatternsCheck />{" "}
             <a
-              href=""
+              href="/patterns/event-coordination-for-lost-customers?ref=homepage-patterns"
               className="ml-2 text-slate-200 flex items-bottom group hover:text-white transition-colors"
             >
               Building flows for lost customers
@@ -67,7 +67,7 @@ export default function Patterns() {
           </li>
         </ul>
         <a
-          href="/patterns"
+          href="/patterns?ref=homepage-patterns"
           className="rounded-full inline-flex text-sm font-medium pl-6 pr-5 py-2 bg-slate-800 hover:bg-indigo-800 transition-all text-white gap-1.5 group"
         >
           Browse all patterns
