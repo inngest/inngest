@@ -29,15 +29,17 @@ const (
 )
 
 var (
-	ErrQueueItemExists           = fmt.Errorf("queue item already exists")
-	ErrQueueItemNotFound         = fmt.Errorf("queue item not found")
-	ErrQueueItemAlreadyLeased    = fmt.Errorf("queue item already leased")
-	ErrQueueItemLeaseMismatch    = fmt.Errorf("item lease does not match")
-	ErrQueueItemNotLeased        = fmt.Errorf("queue item is not leased")
-	ErrPriorityTooLow            = fmt.Errorf("priority is too low")
-	ErrWeightedSampleRead        = fmt.Errorf("error reading from weighted sample")
-	ErrPartitionAlreadyLeased    = fmt.Errorf("partition already leased")
-	ErrQueuePeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", QueuePeekMax)
+	ErrQueueItemExists               = fmt.Errorf("queue item already exists")
+	ErrQueueItemNotFound             = fmt.Errorf("queue item not found")
+	ErrQueueItemAlreadyLeased        = fmt.Errorf("queue item already leased")
+	ErrQueueItemLeaseMismatch        = fmt.Errorf("item lease does not match")
+	ErrQueueItemNotLeased            = fmt.Errorf("queue item is not leased")
+	ErrQueuePeekMaxExceedsLimits     = fmt.Errorf("peek exceeded the maximum limit of %d", QueuePeekMax)
+	ErrPriorityTooLow                = fmt.Errorf("priority is too low")
+	ErrPriorityTooHigh               = fmt.Errorf("priority is too high")
+	ErrWeightedSampleRead            = fmt.Errorf("error reading from weighted sample")
+	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
+	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
 )
 
 var (
@@ -46,6 +48,7 @@ var (
 )
 
 func init() {
+	// For weighted shuffles generate a new rand.
 	source = rand.NewSource(uint64(time.Now().UnixNano()))
 	rnd = rand.New(source)
 }
@@ -127,6 +130,9 @@ func (q queue) Enqueue(ctx context.Context, i QueueItem, at time.Time) (QueueIte
 	priority := q.pf(ctx, i.WorkflowID)
 	if priority > PriorityMin {
 		return i, ErrPriorityTooLow
+	}
+	if priority < PriorityMax {
+		return i, ErrPriorityTooHigh
 	}
 
 	qpi := QueuePartitionIndex{i.WorkflowID, priority}
@@ -374,13 +380,17 @@ func (q queue) PartitionLease(ctx context.Context, qpi QueuePartitionIndex) (*Qu
 // available lease times. Otherwise, this shuffles all partitions and picks partitions
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
-func (q queue) PartitionPeek(ctx context.Context, sequential bool) ([]*QueuePartitionIndex, error) {
+func (q queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartitionIndex, error) {
+	if limit > PartitionPeekMax {
+		return nil, ErrPartitionPeekMaxExceedsLimits
+	}
+
 	encoded, err := q.r.ZRangeArgs(ctx, redis.ZRangeArgs{
 		Key:     "partition:sorted",
 		Start:   "-inf",
-		Stop:    time.Now().Unix(),
+		Stop:    until.Unix(),
 		ByScore: true,
-		Count:   PartitionPeekMax,
+		Count:   limit,
 	}).Result()
 	if err != nil {
 		return nil, fmt.Errorf("error peeking partition: %w", err)
@@ -404,19 +414,12 @@ func (q queue) PartitionPeek(ctx context.Context, sequential bool) ([]*QueuePart
 		return items[0:n], nil
 	}
 
-	if len(items) <= int(PartitionSelectionMax) {
-		// Just return them all, shuffled.  We don't need to do priority shuffling
-		// or blending as there aren't enough items to pick from.
-		rand.Shuffle(len(items), func(i, j int) { items[i], items[j] = items[j], items[i] })
-		return items, nil
-	}
-
-	// Otherwise, we want to weighted shuffle the resulting array random.  This means that
-	// many shared nothing scanners can query for outstanding partitions and receive a
+	// We want to weighted shuffle the resulting array random.  This means that many
+	// shared nothing scanners can query for outstanding partitions and receive a
 	// randomized order favouring higher-priority queue items.  This reduces the chances
 	// of contention when leasing.
 	w := sampleuv.NewWeighted(weights, rnd)
-	result := make([]*QueuePartitionIndex, PartitionSelectionMax)
+	result := make([]*QueuePartitionIndex, len(items))
 	for n := range result {
 		idx, ok := w.Take()
 		if !ok {
