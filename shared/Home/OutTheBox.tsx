@@ -1,3 +1,4 @@
+import ArrowRight from "../Icons/ArrowRight";
 import Container from "./Container";
 import SectionHeader from "./SectionHeader";
 
@@ -11,7 +12,7 @@ export default function OutTheBox() {
           without having to re-invent the wheel."
         />
       </Container>
-      <Container className="grid xl:gap-y-20 md:gap-x-8 mb-48 grid-cols-1 grid-rows-4 md:grid-cols-2 md:grid-rows-2 grid-flow-row">
+      <Container className="grid xl:gap-y-20 md:gap-x-8 mb-20 grid-cols-1 grid-rows-4 md:grid-cols-2 md:grid-rows-2 grid-flow-row">
         <div>
           <img src="/assets/homepage/out-the-box/trigger-function.jpg" />
           <div className="pr-8 lg:px-8 mt-8">
@@ -22,6 +23,13 @@ export default function OutTheBox() {
               Send events from your app, webhooks, or integrations. Use them to
               trigger one or multiple functions.
             </p>
+            <a
+              href="/docs/functions?ref=homepage-everything-you-need"
+              className="group inline-flex mt-4 items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2  bg-slate-800 hover:bg-slate-700 transition-all text-white"
+            >
+              Learn more
+              <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " />
+            </a>
           </div>
         </div>
         <div>
@@ -34,6 +42,13 @@ export default function OutTheBox() {
               All functions are retried automatically. Functions can be broken
               into individual steps which are each run independently.
             </p>
+            <a
+              href="/docs/reference/functions/retries?ref=homepage-everything-you-need"
+              className="group inline-flex mt-4 items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2  bg-slate-800 hover:bg-slate-700 transition-all text-white"
+            >
+              Learn more
+              <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " />
+            </a>
           </div>
         </div>
         <div className="mt-8 lg:mt-0">
@@ -45,6 +60,13 @@ export default function OutTheBox() {
             <p className="text-sm lg:text-base text-slate-400 max-w-lg">
               Create functions that run over hours, days, or weeks.
             </p>
+            <a
+              href="/docs/functions/multi-step?ref=homepage-everything-you-need"
+              className="group inline-flex mt-4 items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2  bg-slate-800 hover:bg-slate-700 transition-all text-white"
+            >
+              Learn more
+              <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " />
+            </a>
           </div>
         </div>
         <div>
@@ -58,11 +80,24 @@ export default function OutTheBox() {
               multiple input events like cart abandonment, sales processes, and
               churn flows.
             </p>
+            <a
+              href="/docs/functions/multi-step?ref=homepage-everything-you-need"
+              className="group inline-flex mt-4 items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2  bg-slate-800 hover:bg-slate-700 transition-all text-white"
+            >
+              Learn more
+              <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " />
+            </a>
           </div>
         </div>
       </Container>
-      <Container>
-        <button>Sign Up or something</button>
+      <Container className="flex items-center justify-center mb-32">
+        <a
+          href="/docs?ref=homepage-everything-you-need"
+          className="group inline-flex mt-4 items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-3  bg-indigo-500 hover:bg-indigo-400 transition-all text-white"
+        >
+          Learn how to get started
+          <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " />
+        </a>
       </Container>
     </>
   );
