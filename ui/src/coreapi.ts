@@ -66,6 +66,7 @@ export const FUNCTION_RUN = gql`
         expression
       }
       event {
+        id
         raw
       }
       timeline {
