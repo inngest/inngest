@@ -1,22 +1,12 @@
 import Container from "./Container";
 import SendEvents from "./HomeImg/SendEvents";
 import SectionHeader from "./SectionHeader";
-import NextJs from "../Icons/NextJs";
-import CloudflarePages from "../Icons/CloudflarePages";
-import RedwoodJs from "../Icons/RedwoodJs";
-import Express from "../Icons/Express";
-import Netlify from "../Icons/Netlify";
-import Vercel from "../Icons/Vercel";
-import Logo from "../Icons/Logo";
-import Cloudflare from "../Icons/Cloudflare";
-import InngestFramework from "../Icons/InngestFramework";
-
 export default function EventDriven() {
   return (
     <>
       <Container className="mt-20 mb-12">
         <SectionHeader
-          title="Event driven, made simple"
+          title="Fits into your workflow"
           lede="Add Inngest to your stack in a few lines for code, then deploy to your
           existing provider. You don't have to change anything to get started."
         />

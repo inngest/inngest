@@ -393,8 +393,9 @@ export default function Home() {
                         type: "language",
                       },
                     ])
-                    .map((b) => (
+                    .map((b, i) => (
                       <img
+                        key={i}
                         src={b.logo}
                         className="max-h-20"
                         style={{ height: `calc(${b.height} /3 }` }}

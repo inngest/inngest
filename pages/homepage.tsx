@@ -1,16 +1,4 @@
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
-import { Head } from "next/document";
-import HomePatternsCheck from "src/shared/Icons/HomePatternsCheck";
-import ArrowRight from "src/shared/Icons/ArrowRight";
-
-// import Footer from "../shared/Footer";
-
-import Button from "src/shared/Button";
-import CodeWindow from "src/shared/CodeWindow";
-import Discord from "src/shared/Icons/Discord";
-import SendEventsImg from "src/shared/Home/HomeImg/SendEventsImg";
-
+import React from "react";
 import Header from "src/shared/Home/Header";
 import Hero from "src/shared/Home/Hero";
 import EventDriven from "src/shared/Home/EventDriven";
@@ -22,7 +10,6 @@ import SocialCTA from "src/shared/Home/SocialCTA";
 import Footer from "src/shared/Home/Footer";
 
 import Patterns from "src/shared/Home/Patterns";
-import Container from "src/shared/Home/Container";
 import GetThingsShipped from "src/shared/Home/GetThingsShipped";
 
 export async function getStaticProps() {

@@ -61,6 +61,9 @@ export default function OutTheBox() {
           </div>
         </div>
       </Container>
+      <Container>
+        <button>Sign Up or something</button>
+      </Container>
     </>
   );
 }
