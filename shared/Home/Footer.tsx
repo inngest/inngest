@@ -34,8 +34,8 @@ export default function Footer() {
       name: "Use Cases",
       links: [
         {
-          label: "Quick-starts",
-          url: "/quick-starts?ref=footer",
+          label: "Scheduled & cron jobs",
+          url: "/uses/serverless-cron-jobs?ref=footer",
         },
         {
           label: "Node.js background jobs",
