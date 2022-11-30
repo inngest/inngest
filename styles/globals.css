@@ -109,12 +109,7 @@ body.dark-theme {
   font-family: var(--text-font);
 }
 
-/* p + p {
-  margin-top: 1.5rem;
-}
-li + li {
-  margin-top: 0.75rem;
-} */
+
 
 a {
   color: var(--link-color);
@@ -124,16 +119,15 @@ a {
   color: inherit !important;
 }
 
-/* html,
-body {
-
+:root.v1 .primary-links p + p {
+  padding-top: 0.25rem;
+  margin-top: 0;
 }
 
-body,
-button {
-  margin: 0;
-} */
-
+:root.v1 h2.text-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
 
 :root.v1 h1,
 :root.v1 h2,
@@ -164,6 +158,10 @@ button {
   font-weight: bold;
 }
 
+:root.v1 h3.text-sm {
+  font-size: 0.875rem;
+}
+
 :root.v1 h4 {
   font-size: 1.1rem;
 }
@@ -174,22 +172,30 @@ button {
   letter-spacing: 1px;
 }
 
-:root.v1 p, :root.v1 ol, :root.v1 ul, :root.v1 li {
+:root.v1 p+p {
+  margin-top: 1.5rem;
+}
+
+ p,  ol,  ul,  li {
   font-size: 0.9rem;
 }
 
-:root.v1 input,
-:root.v1 textarea,
-:root.v1 select {
+ input,
+ textarea,
+ select {
   border: 0;
   padding: 0.5rem 0.5rem;
   border-radius: var(--border-radius);
 }
 
 /** Copy relationship: everything but home. **/
-:root.v1 li > ol,
-:root.v1 li > ul {
+ li > ol,
+ li > ul {
   margin: 1rem 0;
+}
+
+:root.v1 li+li {
+  margin-top: 0.75rem;
 }
 
 @media (max-width: 980px) {
