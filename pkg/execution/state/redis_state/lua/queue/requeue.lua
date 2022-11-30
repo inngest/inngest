@@ -34,10 +34,18 @@ redis.call("HSET", queueKey, queueID, queueItem)
 -- Update the queue score
 redis.call("ZADD", queueIndexKey, queueScore, queueID)
 
--- Fetch partition index;  if the current score is lower decrease it.
+-- Fetch partition index;  ensure this is the same as our lowest queue item score
 local currentScore = redis.call("ZSCORE", partitionIndexKey, partitionIndex)
-if currentScore == false or tonumber(currentScore) > queueScore then
-	redis.call("ZADD", partitionIndexKey, queueScore, partitionIndex)
+
+-- Peek the earliest time from the queue index.  We need to know
+-- the earliest time for the entire function set, as we may be
+-- rescheduling the only time in the queue;  this is the only way
+-- to update the partiton index.
+local earliest = redis.call("ZRANGE", queueIndexKey, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+
+-- earliest is a table containing {item, score}
+if currentScore == false or tonumber(currentScore) ~= tonumber(earliest[2]) then
+	redis.call("ZADD", partitionIndexKey, earliest[2], partitionIndex)
 	-- Update the partition item too
 	redis.call("HSET", partitionKey, "item", partitionItem)
 end

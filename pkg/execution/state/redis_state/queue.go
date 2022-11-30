@@ -189,15 +189,27 @@ func (q queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, 
 	if err != nil {
 		return nil, fmt.Errorf("error peeking queue items: %w", err)
 	}
+
+	// Create a slice up to items in length.  We're going to remove any items that are
+	// leased here, so we may end up returning less than the total length.
 	result := make([]*QueueItem, len(items))
-	for n, str := range items {
+	n := 0
+	now := time.Now()
+
+	for _, str := range items {
 		qi := &QueueItem{}
 		if err := json.Unmarshal([]byte(str), qi); err != nil {
 			return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
 		}
+		if qi.LeaseID != nil && now.Before(ulid.Time(qi.LeaseID.Time())) {
+			// Leased item, don't return.
+			continue
+		}
 		result[n] = qi
+		n++
 	}
-	return result, nil
+
+	return result[0:n], nil
 }
 
 // Lease temporarily dequeues an item from the queue by obtaining a lease, preventing
