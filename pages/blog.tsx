@@ -39,18 +39,13 @@ export default function BlogLayout(props) {
         <meta property="og:description" content={description} />
       </Head>
 
-      {/* <ThemeToggleButton isFloating={true} /> */}
-
-      <Header />
-
       <div className="home bg-slate-1000 font-sans">
+        <Header />
         <Container>
           <div>
-            <div>
-              <h1>Blog</h1>
-              <span className="divider">|</span>
-              <p>{description}</p>
-            </div>
+            <h1>Blog</h1>
+            <span className="divider">|</span>
+            <p>{description}</p>
 
             {focus && (
               <a href={`/blog/${focus.slug}`}>
@@ -118,5 +113,16 @@ export async function getStaticProps() {
     return JSON.stringify(data);
   });
 
-  return { props: { content } };
+  return {
+    props: {
+      content,
+      designVersion: "2",
+      meta: {
+        // TODO
+        title: "Write functions, Send Events",
+        description:
+          "Inngest is a developer platform for building, testing and deploying code that runs in response to events or on a schedule — without spending any time on infrastructure.",
+      },
+    },
+  };
 }
