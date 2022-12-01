@@ -1,5 +1,7 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
+import.meta.env.DEV;
+
 const devUrl = new URL(window.location.href);
 devUrl.pathname = "";
 
@@ -20,8 +22,20 @@ export const devApi = createApi({
           typeof rawPayload === "string" ? JSON.parse(rawPayload) : rawPayload;
         delete payload.id;
 
+        let url = "/e/dev_key";
+
+        /**
+         * In dev mode, always assume that the dev server API is available at 8288. This
+         * allows us to use a separate hot-reloading port for the UI when developing.
+         */
+        if (import.meta.env.DEV) {
+          const localDevUrl = new URL(url, devUrl);
+          localDevUrl.port = "8288";
+          url = localDevUrl.href;
+        }
+
         return {
-          url: "/e/dev_key",
+          url,
           method: "POST",
           body: JSON.stringify(payload),
         };
