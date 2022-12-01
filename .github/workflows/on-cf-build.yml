@@ -19,4 +19,5 @@ jobs:
             --recursive --host-requests 10 --requests 10 --follow \
             --exclude '${{ steps.deployment.outputs.url }}/test/' \
             --exclude 'https://www.iubenda.com' \
+            --exclude ' https://stripe.com/docs/api' \
             --exclude ' https://docs.github.com'
