@@ -3,7 +3,7 @@ import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cj
 import { useState } from "react";
 import Container from "../layout/Container";
 import classNames from "src/utils/classNames";
-import SectionHeader from "./SectionHeader";
+import SectionHeader from "../SectionHeader";
 
 export default function GetThingsShipped() {
   const tabs = [

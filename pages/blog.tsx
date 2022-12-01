@@ -8,6 +8,7 @@ import Nav from "../shared/legacy/nav";
 import ThemeToggleButton from "../shared/legacy/ThemeToggleButton";
 import Container from "../shared/layout/Container";
 import Tags from "../shared/Blog/Tags";
+import SectionHeader from "src/shared/SectionHeader";
 
 export default function BlogLayout(props) {
   const router = useRouter();
@@ -39,38 +40,42 @@ export default function BlogLayout(props) {
         <meta property="og:description" content={description} />
       </Head>
 
-      <div className="home bg-slate-1000 font-sans">
+      <div className="bg-slate-1000 font-sans">
         <Header />
-        <Container>
-          <div>
-            <h1>Blog</h1>
-            <span className="divider">|</span>
-            <p>{description}</p>
-
+        <Container className="pt-32">
+          <SectionHeader title="Blog" lede={description} />
+          <div className="pt-32">
             {focus && (
-              <a href={`/blog/${focus.slug}`}>
-                <div className="post-text">
-                  <h2>{focus.heading}</h2>
-                  <p className="byline">
+              <a
+                className="flex w-4/5 bg-slate-800/30 rounded-lg mb-32"
+                href={`/blog/${focus.slug}`}
+              >
+                <div className="w-2/5 p-8">
+                  <h2 className="text-2xl text-white mb-1">{focus.heading}</h2>
+                  <p className="text-slate-400 text-sm font-medium mb-4">
                     {focus.humanDate} <Tags tags={focus.tags} />
                   </p>
-                  <p>{focus.subtitle}</p>
+                  <p className="text-slate-300">{focus.subtitle}</p>
                 </div>
-                {focus.image && <img src={focus.image} />}
+                {focus.image && (
+                  <img src={focus.image} className="w-3/5 rounded-r-lg" />
+                )}
               </a>
             )}
 
-            <ul>
+            <ul className="grid grid-cols-3 gap-x-4 gap-y-12">
               {rest.map((item) => (
-                <li className="post--item" key={item.slug}>
+                <li key={item.slug}>
                   <a href={`/blog/${item.slug}`}>
                     {item.image && <img src={item.image} />}
-                    <div className="post-text">
-                      <h2>{item.heading}</h2>
-                      <p className="byline">
+                    <div className="px-4 py-6">
+                      <h2 className="text-xl text-white mb-1">
+                        {item.heading}
+                      </h2>
+                      <p className="text-slate-400 text-sm font-medium mb-4">
                         {item.humanDate} <Tags tags={item.tags} />
                       </p>
-                      <p>{item.subtitle}</p>
+                      <p className="text-slate-300">{item.subtitle}</p>
                     </div>
                   </a>
                 </li>
