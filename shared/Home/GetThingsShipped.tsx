@@ -236,7 +236,7 @@ export const handleApptCancelled = createFunction("...",
           {tabs.map((tab, i) =>
             activeTab === i ? (
               <div
-                className="flex flex-col md:flex-row px-5 lg:pl-10 lg:pr-16 md:w-1/2 overflow-hidden "
+                className="flex flex-col md:flex-row px-5 lg:pl-10 lg:pr-16 md:w-1/2 overflow-hidden z-10"
                 key={i}
               >
                 <div className="py-10 pr-8 flex flex-col gap-4">
