@@ -2,73 +2,9 @@ import Logo from "src/shared/Icons/Logo";
 import Discord from "../Icons/Discord";
 import Github from "../Icons/Github";
 import Twitter from "../Icons/Twitter";
+import footerLinks from "./footerLinks";
 
 export default function Footer() {
-  const footerLinks = [
-    {
-      name: "Product",
-      links: [
-        {
-          label: "Function SDK",
-          url: "/features/SDK?ref=footer",
-        },
-        {
-          label: "Step Functions",
-          url: "/features/step-functions?ref=footer",
-        },
-        {
-          label: "Documentation",
-          url: "/docs?ref=footer",
-        },
-        {
-          label: "Patterns: Async + Event-Driven",
-          url: "/patterns?ref=footer",
-        },
-        {
-          label: "Self Hosting",
-          url: "/docs/self-hosting?ref=footer",
-        },
-      ],
-    },
-    {
-      name: "Use Cases",
-      links: [
-        {
-          label: "Scheduled & cron jobs",
-          url: "/uses/serverless-cron-jobs?ref=footer",
-        },
-        {
-          label: "Node.js background jobs",
-          url: "/uses/serverless-node-background-jobs?ref=footer",
-        },
-        {
-          label: "Internal tools",
-          url: "/uses/internal-tools?ref=footer",
-        },
-        {
-          label: "User Journey Automation",
-          url: "/uses/user-journey-automation?ref=footer",
-        },
-      ],
-    },
-    {
-      name: "Company",
-      links: [
-        {
-          label: "About",
-          url: "/about?ref=footer",
-        },
-        {
-          label: "Blog",
-          url: "/blog?ref=footer",
-        },
-        {
-          label: "Contact Us",
-          url: "/contact?ref=footer",
-        },
-      ],
-    },
-  ];
   return (
     <footer className="mt-20 ">
       <div className="relative max-w-[1800px] m-auto px-10 z-10">

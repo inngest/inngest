@@ -1,14 +1,14 @@
 import { useEffect } from "react";
 import styled from "@emotion/styled";
 import Head from "next/head";
-import Footer from "../shared/Footer";
-import Nav from "../shared/nav";
-import Content from "../shared/content";
-import Callout from "../shared/Callout";
+import Footer from "../shared/legacy/Footer";
+import Nav from "../shared/legacy/nav";
+import Content from "../shared/legacy/content";
+import Callout from "../shared/legacy/Callout";
 
-import Block from "../shared/Block";
-import IconList from "../shared/IconList";
-import Button from "../shared/Button";
+import Block from "../shared/legacy/Block";
+import IconList from "../shared/legacy/IconList";
+import Button from "../shared/legacy/Button";
 
 import Workflow from "../shared/Icons/Workflow";
 import Language from "../shared/Icons/Language";

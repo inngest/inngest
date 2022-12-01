@@ -2,7 +2,7 @@ import styled from "@emotion/styled";
 import Head from "next/head";
 import { useRouter } from "next/router";
 
-import Footer from "../shared/legacy/Footer";
+import Footer from "../shared/Footer";
 import Nav from "../shared/legacy/nav";
 import ThemeToggleButton from "../shared/legacy/ThemeToggleButton";
 import Container from "../shared/layout/Container";
@@ -42,48 +42,50 @@ export default function BlogLayout(props) {
 
       <Nav />
 
-      <Container>
-        <Main>
-          <Header>
-            <h1>Blog</h1>
-            <span className="divider">|</span>
-            <p>{description}</p>
-          </Header>
+      <div className="home bg-slate-1000 font-sans">
+        <Container>
+          <Main>
+            <Header>
+              <h1>Blog</h1>
+              <span className="divider">|</span>
+              <p>{description}</p>
+            </Header>
 
-          {focus && (
-            <FocusPost href={`/blog/${focus.slug}`}>
-              <div className="post-text">
-                <h2>{focus.heading}</h2>
-                <p className="byline">
-                  {focus.humanDate} <Tags tags={focus.tags} />
-                </p>
-                <p>{focus.subtitle}</p>
-              </div>
-              {focus.image && <img src={focus.image} />}
-            </FocusPost>
-          )}
-
-          <List>
-            {rest.map((item) => (
-              <PreviousPost
-                href={`/blog/${item.slug}`}
-                className="post--item"
-                key={item.slug}
-              >
-                {item.image && <img src={item.image} />}
+            {focus && (
+              <FocusPost href={`/blog/${focus.slug}`}>
                 <div className="post-text">
-                  <h2>{item.heading}</h2>
+                  <h2>{focus.heading}</h2>
                   <p className="byline">
-                    {item.humanDate} <Tags tags={item.tags} />
+                    {focus.humanDate} <Tags tags={focus.tags} />
                   </p>
-                  <p>{item.subtitle}</p>
+                  <p>{focus.subtitle}</p>
                 </div>
-              </PreviousPost>
-            ))}
-          </List>
-        </Main>
+                {focus.image && <img src={focus.image} />}
+              </FocusPost>
+            )}
+
+            <List>
+              {rest.map((item) => (
+                <PreviousPost
+                  href={`/blog/${item.slug}`}
+                  className="post--item"
+                  key={item.slug}
+                >
+                  {item.image && <img src={item.image} />}
+                  <div className="post-text">
+                    <h2>{item.heading}</h2>
+                    <p className="byline">
+                      {item.humanDate} <Tags tags={item.tags} />
+                    </p>
+                    <p>{item.subtitle}</p>
+                  </div>
+                </PreviousPost>
+              ))}
+            </List>
+          </Main>
+        </Container>
         <Footer />
-      </Container>
+      </div>
     </>
   );
 }
