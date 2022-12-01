@@ -318,8 +318,9 @@ const Nav = styled.nav`
 const NavList = styled.ul<{ isExpanded?: boolean }>`
   display: ${({ isExpanded }) => (isExpanded ? "block" : "none")};
   padding: 0;
+  margin-bottom: 1rem;
   list-style: none;
-  font-size: 1em;
+  font-size: 13px;
 
   a {
     text-decoration: none;
@@ -349,7 +350,7 @@ const NavList = styled.ul<{ isExpanded?: boolean }>`
   }
 
   h5 {
-    font-size: 0.6rem;
+    font-size: 0.6rem !important;
   }
 `;
 NavList.defaultProps = {

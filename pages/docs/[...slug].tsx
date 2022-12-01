@@ -229,7 +229,7 @@ const TOC = styled.nav<{ isExpanded: boolean }>`
   ol,
   li {
     margin: 1em 0;
-    font-size: 1em;
+    font-size: 1em !important;
   }
 
   a {
