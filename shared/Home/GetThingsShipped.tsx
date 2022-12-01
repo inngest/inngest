@@ -1,7 +1,7 @@
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 import { useState } from "react";
-import Container from "./Container";
+import Container from "../layout/Container";
 import classNames from "src/utils/classNames";
 import SectionHeader from "./SectionHeader";
 

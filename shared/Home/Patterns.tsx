@@ -1,6 +1,6 @@
 import HomePatternsCheck from "../Icons/HomePatternsCheck";
 import ArrowRight from "../Icons/ArrowRight";
-import Container from "./Container";
+import Container from "../layout/Container";
 
 export default function Patterns() {
   return (

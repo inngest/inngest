@@ -2,10 +2,10 @@ import styled from "@emotion/styled";
 import Head from "next/head";
 import { useRouter } from "next/router";
 
-import Footer from "../shared/Footer";
-import Nav from "../shared/nav";
-import ThemeToggleButton from "../shared/ThemeToggleButton";
-import { Wrapper } from "../shared/blog";
+import Footer from "../shared/legacy/Footer";
+import Nav from "../shared/legacy/nav";
+import ThemeToggleButton from "../shared/legacy/ThemeToggleButton";
+import Container from "../shared/layout/Container";
 import Tags from "../shared/Blog/Tags";
 
 export default function BlogLayout(props) {
@@ -38,11 +38,11 @@ export default function BlogLayout(props) {
         <meta property="og:description" content={description} />
       </Head>
 
-      <ThemeToggleButton isFloating={true} />
+      {/* <ThemeToggleButton isFloating={true} /> */}
 
-      <Wrapper>
-        <Nav />
+      <Nav />
 
+      <Container>
         <Main>
           <Header>
             <h1>Blog</h1>
@@ -83,7 +83,7 @@ export default function BlogLayout(props) {
           </List>
         </Main>
         <Footer />
-      </Wrapper>
+      </Container>
     </>
   );
 }

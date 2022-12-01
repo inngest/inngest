@@ -1,7 +1,7 @@
 import React from "react";
 import styled from "@emotion/styled";
 
-import Button from "../Button";
+import Button from "../legacy/Button";
 import DiscordLogo from "../Icons/Discord";
 
 const DiscordCTA: React.FC<{ size?: "default" | "small" }> = ({

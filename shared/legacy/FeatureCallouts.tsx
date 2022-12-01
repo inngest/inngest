@@ -1,8 +1,6 @@
 import React, { ReactElement } from "react";
-import styled from "@emotion/styled";
 
-import StepGrid, { Step } from "src/shared/StepGrid";
-import Button from "src/shared/Button";
+import Button from "./Button";
 
 type FeatureCalloutsProps = {
   heading: ReactElement | string;

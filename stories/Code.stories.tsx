@@ -1,10 +1,10 @@
-import React from 'react';
-import { ComponentStory, ComponentMeta } from '@storybook/react';
+import React from "react";
+import { ComponentStory, ComponentMeta } from "@storybook/react";
 
-import Code from '../shared/Code';
+import Code from "../shared/legacy/Code";
 
 export default {
-  title: 'Code',
+  title: "Code",
   component: Code,
 } as ComponentMeta<typeof Code>;
 

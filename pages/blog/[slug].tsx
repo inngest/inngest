@@ -3,13 +3,13 @@ import Head from "next/head";
 import rehypeSlug from "rehype-slug";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
-import Footer from "../../shared/Footer";
-import Nav from "../../shared/nav";
-import Callout from "../../shared/Callout";
-import syntaxHighlightingCSS from "../../shared/syntaxHighlightingCSS";
-import { Wrapper } from "../../shared/blog";
+import Footer from "../../shared/legacy/Footer";
+import Nav from "../../shared/legacy/nav";
+import Callout from "../../shared/legacy/Callout";
+import syntaxHighlightingCSS from "../../shared/legacy/syntaxHighlightingCSS";
+import { Wrapper } from "../../shared/legacy/blog";
 import { highlight } from "../../utils/code";
-import ThemeToggleButton from "../../shared/ThemeToggleButton";
+import ThemeToggleButton from "../../shared/legacy/ThemeToggleButton";
 import Tags from "../../shared/Blog/Tags";
 
 // MDX Components
@@ -99,7 +99,7 @@ export default function BlogLayout(props) {
         ></script>
       </Head>
 
-      <ThemeToggleButton isFloating={true} />
+      {/* <ThemeToggleButton isFloating={true} /> */}
 
       <Wrapper>
         <Nav sticky={true} />

@@ -1,7 +1,7 @@
 import React, { ReactElement } from "react";
 import { Zap, Code, Smile } from "react-feather";
 
-import StepGrid, { Step } from "src/shared/StepGrid";
+import StepGrid, { Step } from "./StepGrid";
 
 type HowItWorksProps = {
   cta?: {

@@ -1,8 +1,8 @@
 import React from "react";
-import Nav from "../../shared/nav";
-import Tag from "../../shared/Tag";
-import Button from "src/shared/Button";
-import Footer from "src/shared/Footer";
+import Nav from "../../shared/legacy/nav";
+import Tag from "../../shared/legacy/Tag";
+import Button from "src/shared/legacy/Button";
+import Footer from "src/shared/legacy/Footer";
 
 export default function () {
   const [hoverVal, setHoverVal] = React.useState("");

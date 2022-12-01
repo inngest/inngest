@@ -1,7 +1,7 @@
 import React from "react";
 import { ComponentStory, ComponentMeta } from "@storybook/react";
 
-import VideoPlayer from "../shared/VideoPlayer";
+import VideoPlayer from "../shared/legacy/VideoPlayer";
 
 export default {
   title: "VideoPlayer",

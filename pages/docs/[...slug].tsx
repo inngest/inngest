@@ -15,7 +15,7 @@ import {
   Doc,
   Docs,
 } from "../../utils/docs";
-import Code from "src/shared/Code";
+import Code from "../../shared/legacy/Code";
 import { DocsLayout, DocsContent } from "../docs";
 import { highlight } from "../../utils/code";
 

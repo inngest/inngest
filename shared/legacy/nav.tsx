@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import styled from "@emotion/styled";
-import Logo from "../shared/Icons/Logo";
-import Button from "../shared/Button";
-import Hamburger from "../shared/Icons/Hamburger";
-import Discord from "../shared/Icons/Discord";
-import Github from "../shared/Icons/Github";
+import Logo from "../Icons/Logo";
+import Button from "./Button";
+import Hamburger from "../Icons/Hamburger";
+import Discord from "../Icons/Discord";
+import Github from "../Icons/Github";
 
 type Props = {
   nolinks?: boolean;

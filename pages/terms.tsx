@@ -1,7 +1,7 @@
 import styled from "@emotion/styled";
 import Head from "next/head";
-import Footer from "../shared/Footer";
-import Nav from "../shared/nav";
+import Footer from "../shared/legacy/Footer";
+import Nav from "../shared/legacy/nav";
 
 export async function getStaticProps() {
   return {

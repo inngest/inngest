@@ -1,9 +1,9 @@
 import React from "react";
 import styled from "@emotion/styled";
 
-import Logo from "./Icons/Logo";
-import Discord from "./Icons/Discord";
-import Github from "./Icons/Github";
+import Logo from "../Icons/Logo";
+import Discord from "../Icons/Discord";
+import Github from "../Icons/Github";
 
 const Footer = () => {
   return (

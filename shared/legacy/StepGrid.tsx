@@ -1,7 +1,7 @@
 import React, { ReactElement } from "react";
 import styled from "@emotion/styled";
 
-import Button from "src/shared/Button";
+import Button from "./Button";
 
 export type Step = {
   icon: ReactElement | string;

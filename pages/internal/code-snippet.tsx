@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 import React, { useState } from "react";
-import CodeWindow from "src/shared/CodeWindow";
+import CodeWindow from "src/shared/legacy/CodeWindow";
 
 const defaultCode = `
   import { createFunction } from "inngest"

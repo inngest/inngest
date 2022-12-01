@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import Head from "next/head";
-import Footer from "../shared/Footer";
-import Nav from "../shared/nav";
-import Content from "../shared/content";
+import Footer from "../shared/legacy/Footer";
+import Nav from "../shared/legacy/nav";
+import Content from "../shared/legacy/content";
 
-import Block from "../shared/Block";
+import Block from "../shared/legacy/Block";
 
 const MISSION = "To accelerate the adoption of event-based architecture.";
 

@@ -1,9 +1,9 @@
 import styled from "@emotion/styled";
 import React, { useState } from "react";
-import Button from "src/shared/Button";
-import Nav from "src/shared/nav";
-import CodeWindow from "src/shared/CodeWindow";
-import Footer from "src/shared/Footer";
+import Button from "src/shared/legacy/Button";
+import Nav from "src/shared/legacy/nav";
+import CodeWindow from "src/shared/legacy/CodeWindow";
+import Footer from "src/shared/legacy/Footer";
 import Play from "src/shared/Icons/Play";
 import IconListStories from "src/stories/IconList.stories";
 

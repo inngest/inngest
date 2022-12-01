@@ -1,6 +1,6 @@
 import Discord from "../Icons/Discord";
 import Github from "../Icons/Github";
-import Container from "./Container";
+import Container from "../layout/Container";
 import ArrowRight from "../Icons/ArrowRight";
 
 export default function SocialCTA() {
