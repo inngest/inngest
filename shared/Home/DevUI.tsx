@@ -140,9 +140,8 @@ export default function DevUI() {
               href="https://github.com/inngest/inngest"
               className="group inline-flex gap-2.5 items-center rounded-full text-sm font-medium pl-6 pr-5 py-2  bg-indigo-500 hover:bg-indigo-400 transition-all text-white"
             >
-              <span>View and star the github project</span>
+              View and star <Github />
               {/* <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " /> */}
-              <Github />
             </a>
           </div>
         </div>
