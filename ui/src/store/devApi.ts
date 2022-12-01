@@ -1,7 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
-import.meta.env.DEV;
-
 const devUrl = new URL(window.location.href);
 devUrl.pathname = "";
 
