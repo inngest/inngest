@@ -1,5 +1,5 @@
 import React from "react";
-import Header from "../shared/Home/Header";
+import Header from "../shared/Header";
 import Hero from "../shared/Home/Hero";
 import FitsYourWorkflow from "../shared/Home/FitsYourWorkflow";
 import DevUI from "../shared/Home/DevUI";

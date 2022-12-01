@@ -3,6 +3,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 
 import Footer from "../shared/Footer";
+import Header from "../shared/Header";
 import Nav from "../shared/legacy/nav";
 import ThemeToggleButton from "../shared/legacy/ThemeToggleButton";
 import Container from "../shared/layout/Container";
@@ -40,19 +41,19 @@ export default function BlogLayout(props) {
 
       {/* <ThemeToggleButton isFloating={true} /> */}
 
-      <Nav />
+      <Header />
 
       <div className="home bg-slate-1000 font-sans">
         <Container>
-          <Main>
-            <Header>
+          <div>
+            <div>
               <h1>Blog</h1>
               <span className="divider">|</span>
               <p>{description}</p>
-            </Header>
+            </div>
 
             {focus && (
-              <FocusPost href={`/blog/${focus.slug}`}>
+              <a href={`/blog/${focus.slug}`}>
                 <div className="post-text">
                   <h2>{focus.heading}</h2>
                   <p className="byline">
@@ -61,28 +62,26 @@ export default function BlogLayout(props) {
                   <p>{focus.subtitle}</p>
                 </div>
                 {focus.image && <img src={focus.image} />}
-              </FocusPost>
+              </a>
             )}
 
-            <List>
+            <ul>
               {rest.map((item) => (
-                <PreviousPost
-                  href={`/blog/${item.slug}`}
-                  className="post--item"
-                  key={item.slug}
-                >
-                  {item.image && <img src={item.image} />}
-                  <div className="post-text">
-                    <h2>{item.heading}</h2>
-                    <p className="byline">
-                      {item.humanDate} <Tags tags={item.tags} />
-                    </p>
-                    <p>{item.subtitle}</p>
-                  </div>
-                </PreviousPost>
+                <li className="post--item" key={item.slug}>
+                  <a href={`/blog/${item.slug}`}>
+                    {item.image && <img src={item.image} />}
+                    <div className="post-text">
+                      <h2>{item.heading}</h2>
+                      <p className="byline">
+                        {item.humanDate} <Tags tags={item.tags} />
+                      </p>
+                      <p>{item.subtitle}</p>
+                    </div>
+                  </a>
+                </li>
               ))}
-            </List>
-          </Main>
+            </ul>
+          </div>
         </Container>
         <Footer />
       </div>
@@ -121,114 +120,3 @@ export async function getStaticProps() {
 
   return { props: { content } };
 }
-
-const Main = styled.main`
-  margin: 1rem auto 4rem;
-  max-width: 980px;
-
-  @media (max-width: 1000px) {
-    margin-left: 1.5rem;
-    margin-right: 1.5rem;
-  }
-`;
-
-const Header = styled.header`
-  display: flex;
-  margin: 3rem auto 4rem;
-  line-height: 1em;
-  align-items: center;
-  h1 {
-    white-space: nowrap;
-  }
-  h1,
-  p {
-    font-size: 0.8rem;
-    line-height: 1em;
-    padding: 0;
-  }
-  p {
-    color: var(--font-color-secondary);
-  }
-  .divider {
-    margin: 0 0.5rem;
-    font-size: 0.8rem;
-    color: var(--stroke-color);
-  }
-`;
-
-const BlogPost = styled.a`
-  display: flex;
-
-  flex-direction: column;
-  color: var(--font-color-primary);
-  text-decoration: none;
-
-  .byline {
-    margin: 0.5rem 0;
-    font-size: 0.8rem;
-    color: var(--font-color-secondary);
-  }
-  p {
-    margin-top: 1.2rem;
-    font-size: 0.9rem;
-  }
-`;
-
-const FocusPost = styled(BlogPost)`
-  width: 100%;
-  margin: 3rem 0;
-  align-items: center;
-  flex-direction: row;
-
-  img {
-    margin-left: 1.6rem;
-    max-width: 45%;
-    border-radius: var(--border-radius);
-  }
-
-  @media (max-width: 800px) {
-    flex-direction: column-reverse;
-    img {
-      margin: 0 0 1rem;
-      max-width: 100%;
-    }
-  }
-`;
-
-const PreviousPost = styled(BlogPost)`
-  align-items: start;
-  /* background: var(--highlight-color); */
-  border: 1px solid var(--stroke-color);
-  border-radius: var(--border-radius);
-  overflow: hidden;
-
-  .post-text {
-    padding: 1.2rem;
-  }
-
-  h2 {
-    font-size: 1.3rem;
-    line-height: 1.4em;
-  }
-
-  img {
-    align-self: center;
-    max-width: 100%; // a 600x300px image filles the width
-    width: auto;
-  }
-`;
-
-const List = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-gap: 2rem;
-  margin: 5rem 2rem 20vh;
-
-  @media (max-width: 800px) {
-    grid-template-columns: 1fr;
-  }
-  @media (max-width: 600px) {
-    margin-left: 0.2rem;
-    margin-right: 0.2rem;
-  }
-`;
