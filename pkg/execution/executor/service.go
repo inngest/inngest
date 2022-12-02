@@ -358,7 +358,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		// and this is a no-op - things should be atomic where possible.
 		//
 		// TODO: Add a unit test to ensure WG is 0 at the end of execution.
-		if err := s.state.Scheduled(ctx, item.Identifier, next.Incoming, 0, nil); err != nil {
+		if err := s.state.Scheduled(ctx, item.Identifier, next.Incoming, 0, &at); err != nil {
 			return fmt.Errorf("unable to schedule next step: %w", err)
 		}
 	}

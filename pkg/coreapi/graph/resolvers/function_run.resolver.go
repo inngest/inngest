@@ -49,21 +49,19 @@ func (r *functionRunResolver) Timeline(ctx context.Context, obj *models.Function
 				Output:    &output,
 			}
 
-			if h.Type == enums.HistoryTypeStepWaiting {
-				stepData, ok := h.Data.(state.HistoryStepWaiting)
-				if ok {
+			switch h.Type {
+			case enums.HistoryTypeStepWaiting:
+				if stepData, ok := h.Data.(state.HistoryStepWaiting); ok {
 					event.WaitingFor = &models.StepEventWait{
-						WaitUntil:  stepData.ExpiryTime,
+						ExpiryTime: stepData.ExpiryTime,
 						EventName:  stepData.EventName,
 						Expression: stepData.Expression,
 					}
 					event.Output = nil
 				}
-			} else {
-				stepData, ok := h.Data.(state.HistoryStep)
-				if ok {
+			default:
+				if stepData, ok := h.Data.(state.HistoryStep); ok {
 					event.Name = &stepData.Name
-
 					outputByt, err := json.Marshal(stepData.Data)
 					if err != nil {
 						continue
@@ -151,7 +149,7 @@ func (r *functionRunResolver) WaitingFor(ctx context.Context, obj *models.Functi
 		stepData, ok := h.Data.(state.HistoryStepWaiting)
 		if ok {
 			wait = &models.StepEventWait{
-				WaitUntil:  stepData.ExpiryTime,
+				ExpiryTime: stepData.ExpiryTime,
 				EventName:  stepData.EventName,
 				Expression: stepData.Expression,
 			}

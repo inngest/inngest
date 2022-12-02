@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import noFnsImg from "../../../assets/images/no-fn-selected.png";
 import { usePrettyJson } from "../../hooks/usePrettyJson";
+import ms from "ms";
 import {
   EventStatus,
   FunctionEventType,
   FunctionRunStatus,
+  FunctionRunEvent,
   StepEventType,
   useGetFunctionRunQuery,
 } from "../../store/generated";
@@ -28,8 +30,10 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
     { pollingInterval, skip: !runId, refetchOnMountOrArgChange: true }
   );
   const run = useMemo(() => query.data?.functionRun, [query.data?.functionRun]);
+  const timeline = useMemo(() => normalizeSteps(run?.timeline || null), [run]);
   const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
   const dispatch = useAppDispatch();
+
 
   useEffect(() => {
     if (!run?.event?.id) {
@@ -74,7 +78,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
         <Button label="Rerun" />
       </div>
       <div className="pr-4 mt-4">
-        {run.timeline?.map((row, i, list) => (
+        {timeline?.map((row, i, list) => (
           <FunctionRunTimelineRow
             createdAt={row.createdAt}
             rowType={row.__typename === "FunctionEvent" ? "function" : "step"}
@@ -121,9 +125,6 @@ const FunctionRunTimelineRow = ({
 
     const stepData = stepEventTypeMap[eventType as StepEventType];
 
-    // if ((eventType as StepEventType) === StepEventType.Waiting) {
-    // }
-
     const prefix =
       !name || name === "step"
         ? "Step"
@@ -131,9 +132,23 @@ const FunctionRunTimelineRow = ({
         ? "First call"
         : `Step "${name}"`;
 
+    let suffix = "";
+
+    // If we're waiting, check how long we're waiting for.
+    if (stepData.status === EventStatus.Paused) {
+      try {
+        if (typeof output === "string") {
+          // We're waiting for a date.
+          const date = new Date(output).valueOf();
+          const diff = date - new Date(createdAt).valueOf();
+          suffix = `for ${ms(diff, { long: true })}`;
+        }
+      } catch(e) {}
+    }
+
     return {
       ...stepData,
-      label: `${prefix} ${stepData.label}`,
+      label: `${prefix} ${stepData.label} ${suffix}`.trim(),
     };
   }, [rowType, eventType, name]);
 
@@ -196,3 +211,53 @@ const stepEventTypeMap: Record<
     status: EventStatus.Paused,
   },
 };
+
+// TODO: Normalize this type in generated.ts
+type Timeline = null | Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }>;
+
+const normalizeSteps = (timeline: Timeline): Timeline => {
+  // Normalize the feed here.  The dev server API gives us _every_ event;
+  // if a step is scheduled then runs immediately we can hide the scheduled
+  // event.  Similarly, if a step starts then finishes immediately we can show
+  // only the "Step finished" event.
+  if (!timeline) return [];
+
+  // TODO: When we include job IDs in history entries we can filter the timeline
+  // by job ID:  if we have a "started" item for a job ID, don't show scheduled:
+  // just show started + latency as the history info.
+  const filtered = timeline.map((item, n) => {
+    if (item.__typename === "FunctionEvent") return item;
+
+    switch (item.stepType) {
+      // Clean up scheduled and started.
+      case StepEventType.Scheduled: {
+        // If the scheduled at time is different to the historical time,
+        // show the timestamp.
+        const output = JSON.parse(item.output || "null");
+        const diff = new Date(output).valueOf() - new Date(item.createdAt).valueOf();
+
+        if (output && diff > 999) {
+          // Only show "waiting" if we're waiting for longer than a second.  Naturally,
+          // there may be milliseconds of difference right now adding a history log
+          // and something to the queue, depending on the backend implementation.
+          return { ...item, stepType: StepEventType.Waiting, output };
+        }
+
+        const next = timeline[n+1];
+        if (!next || next.__typename === "FunctionEvent") return item;
+
+        // Don't show this if the next step is started.
+        if (next.stepType === "STARTED") return null;
+      }
+      case StepEventType.Started: {
+        const next = timeline[n+1];
+        if (!next || next.__typename === "FunctionEvent") return item;
+        // Don't show this if the next step is completed.
+        if (next.stepType === "COMPLETED" || next.stepType === "FAILED") return null;
+      }
+    }
+    return item;
+  });
+
+  return filtered.filter(Boolean) as Timeline;
+}

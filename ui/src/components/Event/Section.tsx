@@ -95,7 +95,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
 
           let contextBar: ComponentChild | undefined;
 
-          if (run.waitingFor?.waitUntil) {
+          if (run.waitingFor?.expiryTime) {
             if (run.waitingFor.eventName) {
               contextBar = (
                 <div className="flex-1">
@@ -120,7 +120,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
                       Function paused for sleep until&nbsp;
                       <strong>
                         {new Date(
-                          run.waitingFor.waitUntil
+                          run.waitingFor.expiryTime
                         ).toLocaleTimeString()}
                       </strong>
                     </div>

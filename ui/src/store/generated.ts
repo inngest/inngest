@@ -220,6 +220,7 @@ export type StepEvent = {
   functionRun?: Maybe<FunctionRun>;
   name?: Maybe<Scalars['String']>;
   output?: Maybe<Scalars['String']>;
+  stepID?: Maybe<Scalars['String']>;
   type?: Maybe<StepEventType>;
   waitingFor?: Maybe<StepEventWait>;
   workspace?: Maybe<Workspace>;
@@ -237,8 +238,8 @@ export enum StepEventType {
 export type StepEventWait = {
   __typename?: 'StepEventWait';
   eventName?: Maybe<Scalars['String']>;
+  expiryTime: Scalars['Time'];
   expression?: Maybe<Scalars['String']>;
-  waitUntil: Scalars['Time'];
 };
 
 export type UpdateActionVersionInput = {
@@ -268,14 +269,14 @@ export type GetEventQueryVariables = Exact<{
 }>;
 
 
-export type GetEventQuery = { __typename?: 'Query', event?: { __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null, raw?: string | null, functionRuns?: Array<{ __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', waitUntil: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
+export type GetEventQuery = { __typename?: 'Query', event?: { __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null, raw?: string | null, functionRuns?: Array<{ __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
 
 export type GetFunctionRunQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
 
-export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', waitUntil: any, eventName?: string | null, expression?: string | null } | null, event?: { __typename?: 'Event', id: string, raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', waitUntil: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
+export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null, event?: { __typename?: 'Event', id: string, raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
 
 
 export const GetEventsStreamDocument = `
@@ -319,7 +320,7 @@ export const GetEventDocument = `
       startedAt
       pendingSteps
       waitingFor {
-        waitUntil
+        expiryTime
         eventName
         expression
       }
@@ -336,7 +337,7 @@ export const GetFunctionRunDocument = `
     startedAt
     pendingSteps
     waitingFor {
-      waitUntil
+      expiryTime
       eventName
       expression
     }
@@ -352,7 +353,7 @@ export const GetFunctionRunDocument = `
         output
         name
         waitingFor {
-          waitUntil
+          expiryTime
           eventName
           expression
         }
