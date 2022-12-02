@@ -17,8 +17,9 @@ import (
 
 func NewCmdSteps() *cobra.Command {
 	root := &cobra.Command{
-		Use:   "step",
-		Short: "",
+		Use:    "step",
+		Short:  "",
+		Hidden: true,
 	}
 
 	add := &cobra.Command{

@@ -20,6 +20,7 @@ import (
 func NewCmdInit() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "init",
+		Hidden:  true,
 		Short:   "Create a new serverless function",
 		Example: "inngestctl init",
 		Run:     runInit,
