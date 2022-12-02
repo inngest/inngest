@@ -17,6 +17,7 @@ import DiscordCTA from "../../shared/Blog/DiscordCTA";
 import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
 import Button from "src/shared/Button";
+import IconCalendar from "src/shared/Icons/Calendar";
 const components = {
   DiscordCTA,
 };
@@ -130,9 +131,12 @@ export default function BlogLayout(props) {
                 <h1 className="text-white font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter leading-loose">
                   {scope.heading}
                 </h1>
-                <p className="text-slate-300 text-sm mt-2 block">
+                <p className="text-slate-300 text-sm mt-2 flex items-center gap-2">
                   {!!scope.author ? <>{scope.author} &middot; </> : ""}
-                  {scope.humanDate} &middot; {scope.reading.text}
+                  <span className="flex items-center gap-1">
+                    <IconCalendar /> {scope.humanDate}
+                  </span>{" "}
+                  &middot; <span>{scope.reading.text}</span>
                   <Tags tags={scope.tags} />
                 </p>
               </header>

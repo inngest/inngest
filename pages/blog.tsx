@@ -57,7 +57,7 @@ export default function BlogLayout(props) {
           <div className="pt-16">
             {focus && (
               <a
-                className="relative flex flex-col-reverse lg:flex-row xl:w-4/5 bg-indigo-500 rounded-lg mb-32 group   shadow-lg"
+                className="relative flex flex-col-reverse lg:flex-row xl:w-4/5 bg-indigo-600 rounded-lg mb-32 group   shadow-lg"
                 href={`/blog/${focus.slug}`}
               >
                 <div className="absolute top-0 bottom-0 -left-[40px] -right-[40px] rounded-lg bg-indigo-500 opacity-20 rotate-1 -z-0 mx-5"></div>
