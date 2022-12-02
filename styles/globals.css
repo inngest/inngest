@@ -176,7 +176,7 @@ a {
   margin-top: 1.5rem;
 }
 
- p,  ol,  ul,  li {
+:root.v1 p, :root.v1 ol, :root.v1 ul, :root.v1 li {
   font-size: 0.9rem;
 }
 

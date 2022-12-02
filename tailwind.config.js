@@ -13,6 +13,9 @@ module.exports = {
           1000: "#080D19",
         },
       },
+      fontSize: {
+        "5xl": ["3rem", "1.3"],
+      },
       maxWidth: {
         "container-desktop": "1600px",
       },

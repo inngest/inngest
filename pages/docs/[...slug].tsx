@@ -73,7 +73,7 @@ export default function DocLayout(props: any) {
           {!!scope.image && (
             <img
               src={scope.image}
-              className="featured-image"
+              className=" shadow-xl "
               alt="Featured image"
             />
           )}
@@ -209,6 +209,7 @@ export async function getStaticProps({ params }) {
       prev,
       htmlClassName: "docs",
       meta: { disabled: true },
+      designVersion: "2",
     },
   };
 }

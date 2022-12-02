@@ -26,7 +26,7 @@ export default function Header() {
   return (
     <header
       className={classNames(
-        scroll ? `bg-slate-950/80` : "",
+        scroll ? `bg-slate-1000/60` : "",
         `sticky backdrop-blur-sm top-0 left-0 right-0 z-50 transition-colors duration-200`
       )}
     >
