@@ -469,6 +469,7 @@ func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, at
 
 func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
 	now := time.Now()
+
 	err := redis.NewScript(scripts["scheduled"]).Eval(
 		ctx,
 		m.r,
@@ -480,6 +481,7 @@ func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, a
 			Data: state.HistoryStep{
 				ID:      stepID,
 				Attempt: attempt,
+				Data:    at,
 			},
 		},
 		now.UnixMilli(),

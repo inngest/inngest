@@ -22,6 +22,7 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
 	cmd.Flags().String("dir", ".", "directory to load functions from")
 	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
+	cmd.Flags().Bool("docker", false, "enable docker-based steps")
 
 	return cmd
 }
@@ -47,10 +48,12 @@ func doDev(cmd *cobra.Command, args []string) {
 	}
 
 	urls, _ := cmd.Flags().GetStringSlice("sdk-url")
+	docker, _ := strconv.ParseBool(cmd.Flag("docker").Value.String())
 	opts := devserver.StartOpts{
 		Config:       *conf,
 		RootDir:      cmd.Flag("dir").Value.String(),
 		URLs:         urls,
+		Docker:       docker,
 		Autodiscover: len(urls) == 0,
 	}
 

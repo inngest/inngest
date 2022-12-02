@@ -161,21 +161,6 @@ func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, at
 	return nil
 }
 
-func (m *mem) Sleeping(ctx context.Context, i state.Identifier, endTime time.Time) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.setHistory(ctx, i, state.History{
-		Type:       enums.HistoryTypeStepWaiting,
-		Identifier: i,
-		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
-		Data: state.HistoryStepWaiting{
-			ExpiryTime: endTime,
-		},
-	})
-	return nil
-}
-
 func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -189,25 +174,14 @@ func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string, 
 	instance.metadata.Pending++
 	m.state[i.IdempotencyKey()] = instance
 
-	if at != nil {
-		m.setHistory(ctx, i, state.History{
-			Type:       enums.HistoryTypeStepWaiting,
-			Identifier: i,
-			CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
-			Data: state.HistoryStepWaiting{
-				ExpiryTime: *at,
-			},
-		})
-	}
-
 	m.setHistory(ctx, i, state.History{
 		Type:       enums.HistoryTypeStepScheduled,
 		Identifier: i,
 		CreatedAt:  time.UnixMilli(int64(i.RunID.Time())),
 		Data: state.HistoryStep{
 			ID:      stepID,
-			Name:    stepID,
 			Attempt: attempt,
+			Data:    at,
 		},
 	})
 

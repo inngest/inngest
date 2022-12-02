@@ -104,6 +104,7 @@ type FunctionRunsQuery struct {
 type StepEvent struct {
 	Workspace   *Workspace     `json:"workspace"`
 	FunctionRun *FunctionRun   `json:"functionRun"`
+	StepID      *string        `json:"stepID"`
 	Name        *string        `json:"name"`
 	Type        *StepEventType `json:"type"`
 	Output      *string        `json:"output"`
@@ -114,9 +115,9 @@ type StepEvent struct {
 func (StepEvent) IsFunctionRunEvent() {}
 
 type StepEventWait struct {
-	WaitUntil  time.Time `json:"waitUntil"`
 	EventName  *string   `json:"eventName"`
 	Expression *string   `json:"expression"`
+	ExpiryTime time.Time `json:"expiryTime"`
 }
 
 type UpdateActionVersionInput struct {

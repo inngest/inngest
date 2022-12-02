@@ -141,6 +141,7 @@ type ComplexityRoot struct {
 		FunctionRun func(childComplexity int) int
 		Name        func(childComplexity int) int
 		Output      func(childComplexity int) int
+		StepID      func(childComplexity int) int
 		Type        func(childComplexity int) int
 		WaitingFor  func(childComplexity int) int
 		Workspace   func(childComplexity int) int
@@ -148,8 +149,8 @@ type ComplexityRoot struct {
 
 	StepEventWait struct {
 		EventName  func(childComplexity int) int
+		ExpiryTime func(childComplexity int) int
 		Expression func(childComplexity int) int
-		WaitUntil  func(childComplexity int) int
 	}
 
 	Workspace struct {
@@ -645,6 +646,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.StepEvent.Output(childComplexity), true
 
+	case "StepEvent.stepID":
+		if e.complexity.StepEvent.StepID == nil {
+			break
+		}
+
+		return e.complexity.StepEvent.StepID(childComplexity), true
+
 	case "StepEvent.type":
 		if e.complexity.StepEvent.Type == nil {
 			break
@@ -673,19 +681,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.StepEventWait.EventName(childComplexity), true
 
+	case "StepEventWait.expiryTime":
+		if e.complexity.StepEventWait.ExpiryTime == nil {
+			break
+		}
+
+		return e.complexity.StepEventWait.ExpiryTime(childComplexity), true
+
 	case "StepEventWait.expression":
 		if e.complexity.StepEventWait.Expression == nil {
 			break
 		}
 
 		return e.complexity.StepEventWait.Expression(childComplexity), true
-
-	case "StepEventWait.waitUntil":
-		if e.complexity.StepEventWait.WaitUntil == nil {
-			break
-		}
-
-		return e.complexity.StepEventWait.WaitUntil(childComplexity), true
 
 	case "Workspace.id":
 		if e.complexity.Workspace.ID == nil {
@@ -959,6 +967,7 @@ enum StepEventType {
 type StepEvent {
   workspace: Workspace
   functionRun: FunctionRun
+  stepID: String
   name: String
   type: StepEventType
   output: String
@@ -969,9 +978,9 @@ type StepEvent {
 union FunctionRunEvent = FunctionEvent | StepEvent
 
 type StepEventWait {
-  waitUntil: Time!
   eventName: String
   expression: String
+  expiryTime: Time!
 }
 
 type FunctionRun {
@@ -2645,12 +2654,12 @@ func (ec *executionContext) fieldContext_FunctionRun_waitingFor(ctx context.Cont
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "waitUntil":
-				return ec.fieldContext_StepEventWait_waitUntil(ctx, field)
 			case "eventName":
 				return ec.fieldContext_StepEventWait_eventName(ctx, field)
 			case "expression":
 				return ec.fieldContext_StepEventWait_expression(ctx, field)
+			case "expiryTime":
+				return ec.fieldContext_StepEventWait_expiryTime(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type StepEventWait", field.Name)
 		},
@@ -4002,6 +4011,47 @@ func (ec *executionContext) fieldContext_StepEvent_functionRun(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _StepEvent_stepID(ctx context.Context, field graphql.CollectedField, obj *models.StepEvent) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StepEvent_stepID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.StepID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StepEvent_stepID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StepEvent",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _StepEvent_name(ctx context.Context, field graphql.CollectedField, obj *models.StepEvent) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_StepEvent_name(ctx, field)
 	if err != nil {
@@ -4202,58 +4252,14 @@ func (ec *executionContext) fieldContext_StepEvent_waitingFor(ctx context.Contex
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "waitUntil":
-				return ec.fieldContext_StepEventWait_waitUntil(ctx, field)
 			case "eventName":
 				return ec.fieldContext_StepEventWait_eventName(ctx, field)
 			case "expression":
 				return ec.fieldContext_StepEventWait_expression(ctx, field)
+			case "expiryTime":
+				return ec.fieldContext_StepEventWait_expiryTime(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type StepEventWait", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _StepEventWait_waitUntil(ctx context.Context, field graphql.CollectedField, obj *models.StepEventWait) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_StepEventWait_waitUntil(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.WaitUntil, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(time.Time)
-	fc.Result = res
-	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_StepEventWait_waitUntil(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "StepEventWait",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Time does not have child fields")
 		},
 	}
 	return fc, nil
@@ -4336,6 +4342,50 @@ func (ec *executionContext) fieldContext_StepEventWait_expression(ctx context.Co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StepEventWait_expiryTime(ctx context.Context, field graphql.CollectedField, obj *models.StepEventWait) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StepEventWait_expiryTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExpiryTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StepEventWait_expiryTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StepEventWait",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
 		},
 	}
 	return fc, nil
@@ -7249,6 +7299,10 @@ func (ec *executionContext) _StepEvent(ctx context.Context, sel ast.SelectionSet
 
 			out.Values[i] = ec._StepEvent_functionRun(ctx, field, obj)
 
+		case "stepID":
+
+			out.Values[i] = ec._StepEvent_stepID(ctx, field, obj)
+
 		case "name":
 
 			out.Values[i] = ec._StepEvent_name(ctx, field, obj)
@@ -7290,13 +7344,6 @@ func (ec *executionContext) _StepEventWait(ctx context.Context, sel ast.Selectio
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("StepEventWait")
-		case "waitUntil":
-
-			out.Values[i] = ec._StepEventWait_waitUntil(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		case "eventName":
 
 			out.Values[i] = ec._StepEventWait_eventName(ctx, field, obj)
@@ -7305,6 +7352,13 @@ func (ec *executionContext) _StepEventWait(ctx context.Context, sel ast.Selectio
 
 			out.Values[i] = ec._StepEventWait_expression(ctx, field, obj)
 
+		case "expiryTime":
+
+			out.Values[i] = ec._StepEventWait_expiryTime(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

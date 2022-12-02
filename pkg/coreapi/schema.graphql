@@ -121,6 +121,7 @@ enum StepEventType {
 type StepEvent {
   workspace: Workspace
   functionRun: FunctionRun
+  stepID: String
   name: String
   type: StepEventType
   output: String
@@ -131,9 +132,9 @@ type StepEvent {
 union FunctionRunEvent = FunctionEvent | StepEvent
 
 type StepEventWait {
-  waitUntil: Time!
   eventName: String
   expression: String
+  expiryTime: Time!
 }
 
 type FunctionRun {

@@ -27,6 +27,7 @@ type StartOpts struct {
 	RootDir      string        `json:"dir"`
 	URLs         []string      `json:"urls"`
 	Autodiscover bool          `json:"autodiscover"`
+	Docker       bool          `json:"docker"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -45,12 +46,15 @@ func New(ctx context.Context, opts StartOpts) error {
 	// we run this before initializing the devserver serivce (even though it has Pre)
 	// because building images should happen and error early, prior to any other
 	// service starting.
-	el, err := prepareDockerImages(ctx, opts.RootDir)
-	if err != nil {
-		return err
+	el, _ := inmemorydatastore.NewFSLoader(ctx, opts.RootDir)
+	if opts.Docker {
+		var err error
+		if el, err = prepareDockerImages(ctx, opts.RootDir); err != nil {
+			return err
+		}
 	}
 
-	return start(ctx, opts, el)
+	return start(ctx, opts, el.(*inmemorydatastore.FSLoader))
 }
 
 func start(ctx context.Context, opts StartOpts, loader *inmemorydatastore.FSLoader) error {

@@ -107,14 +107,16 @@ type HistoryStep struct {
 	// needed for the UI.
 	Name    string `json:"name"`
 	Attempt int    `json:"attempt"`
-	Data    any    `json:"data"`
+	// Opcode stores the generator opcode for this step, if any.
+	Opcode enums.Opcode `json:"opcode"`
+	// Data stores data for this event, dependent on the history type.
+	Data any `json:"data"`
 }
 
+// HistoryStepWaiting is stored within HistoryStep when we create a pause to wait
+// for an event
 type HistoryStepWaiting struct {
-	// The name of the step that is waiting.
-	Name string `json:"name"`
-
-	//
+	// EventName is the name of the event we're waiting for.
 	EventName  *string   `json:"eventName"`
 	Expression *string   `json:"expression"`
 	ExpiryTime time.Time `json:"expiry"`
