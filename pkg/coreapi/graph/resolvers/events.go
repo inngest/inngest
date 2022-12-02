@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/oklog/ulid/v2"
 )
 
 func (r *queryResolver) Event(ctx context.Context, query models.EventQuery) (*models.Event, error) {
@@ -20,7 +21,14 @@ func (r *queryResolver) Event(ctx context.Context, query models.EventQuery) (*mo
 	}
 
 	evt := evts[0]
+
 	createdAt := time.UnixMilli(evt.Timestamp)
+	if evt.Timestamp == 0 {
+		if id, err := ulid.Parse(evt.ID); err == nil {
+			createdAt = ulid.Time(id.Time())
+		}
+	}
+
 	payloadByt, err := json.Marshal(evt.Data)
 	if err != nil {
 		return nil, err
@@ -48,7 +56,14 @@ func (r *queryResolver) Events(ctx context.Context, query models.EventsQuery) ([
 
 	for _, evt := range evts {
 		name := evt.Name
+
 		createdAt := time.UnixMilli(evt.Timestamp)
+		if evt.Timestamp == 0 {
+			if id, err := ulid.Parse(evt.ID); err == nil {
+				createdAt = ulid.Time(id.Time())
+			}
+		}
+
 		payloadByt, err := json.Marshal(evt.Data)
 		if err != nil {
 			continue

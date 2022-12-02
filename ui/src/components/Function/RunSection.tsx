@@ -71,7 +71,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       // button={<Button label="Open Function" icon={<IconFeed />} />}
     >
       <div className="flex justify-end px-4 border-t border-slate-800/50 pt-4 mt-4">
-        <Button label="Retry" />
+        <Button label="Rerun" />
       </div>
       <div className="pr-4 mt-4">
         {run.timeline?.map((row, i, list) => (

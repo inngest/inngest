@@ -82,7 +82,7 @@ export default function EventDetail() {
                   <TimelineStaticContent
                     label="Event Received"
                     date={"2022-04-28T14:34:21"}
-                    actionBtn={<Button label="Retry" />}
+                    actionBtn={<Button label="Replay" />}
                   />
                 </TimelineRow>
 
@@ -133,7 +133,7 @@ export default function EventDetail() {
                 <CodeBlock modal={setModal} tabs={funcTabs} />
               </div>
               <div className="flex justify-end px-4 border-t border-slate-800/50 pt-4 mt-4">
-                <Button label="Retry" />
+                <Button label="Replay" />
               </div>
               <div className="pr-4 mt-4">
                 <TimelineRow status={EventStatus.Completed} iconOffset={0}>
