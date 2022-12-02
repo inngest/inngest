@@ -1,4 +1,5 @@
 import { useMemo, useState } from "preact/hooks";
+import { useSendEventMutation } from "../../store/devApi";
 import {
   EventStatus,
   FunctionRunStatus,
@@ -34,6 +35,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
   // }, [event?.pendingRuns]);
 
   const [eventModalVisible, setEventModalVisible] = useState(false);
+  const [sendEvent] = useSendEventMutation();
 
   if (query.isLoading) {
     return <div>Loading...</div>;
@@ -63,12 +65,30 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
             label="Event Received"
             date={event.createdAt}
             actionBtn={
-              <Button
-                label="Replay"
-                btnAction={() => {
-                  setEventModalVisible((v) => !v);
-                }}
-              />
+              <>
+                <Button
+                  label="Replay"
+                  btnAction={() => {
+                    if (!event?.raw) {
+                      return;
+                    }
+
+                    sendEvent(
+                      JSON.stringify({
+                        ...JSON.parse(event.raw),
+                        ts: Date.now(),
+                      })
+                    );
+                  }}
+                />
+                <Button
+                  label="Edit and replay"
+                  kind="secondary"
+                  btnAction={() => {
+                    setEventModalVisible((v) => !v);
+                  }}
+                />
+              </>
             }
           />
         </TimelineRow>

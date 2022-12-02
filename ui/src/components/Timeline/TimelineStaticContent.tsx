@@ -22,7 +22,7 @@ export default function TimelineStaticRow({
           </span>
         )}
       </div>
-      {actionBtn && actionBtn}
+      <div className="flex flex-row space-x-2">{actionBtn && actionBtn}</div>
     </div>
   );
 }
