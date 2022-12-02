@@ -15,5 +15,9 @@ config.#Config & {
 
 	execution: {
 		logOutput: true
+		drivers: {
+			docker: config.#DockerDriver
+			http: config.#DockerDriver
+		}
 	}
 }

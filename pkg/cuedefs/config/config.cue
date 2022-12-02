@@ -34,15 +34,11 @@ package config
 		//
 		// This allows you to build and specify alternate drivers for each
 		// runtime, eg. a Kubernetes driver for the docker runtime.
-		//
-		// By default, enable the docker and HTTP drivers for the docker and
-		// HTTP runtimes respectively.
 		drivers: {
 			// For each runtime, specify a driver which has its own name.
 			[runtime=_]: #Driver & {name: string}
 		} | *{
 
-			docker: #DockerDriver
 			http:   #HTTPDriver
 		}
 
