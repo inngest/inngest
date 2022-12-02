@@ -40,7 +40,7 @@ export default function TimelineFeedContent({
           : undefined
       }
     >
-      <span className="block text-3xs text-slate-300 pb-0.5">
+      <span className="block text-3xs text-slate-400 pb-0.5">
         <Time date={date} />
       </span>
       <div className="flex items-center">
@@ -48,7 +48,7 @@ export default function TimelineFeedContent({
           <span className={`${eventStatusStyles.text}`}>{name}</span>
         </h4>
         <span
-          className={`rounded-md ${eventStatusStyles.fnBG} text-slate-100 text-3xs font-semibold leading-none flex items-center justify-center py-1.5 px-2`}
+          className={`rounded-md ${eventStatusStyles.fnBG} ${badge > 0 ? "text-slate-100" : "text-slate-400"} text-3xs font-semibold leading-none flex items-center justify-center py-1.5 px-2`}
         >
           {badge}
         </span>
