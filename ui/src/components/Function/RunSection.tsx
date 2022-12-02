@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
+import noFnsImg from "../../../assets/images/no-fn-selected.png";
 import { usePrettyJson } from "../../hooks/usePrettyJson";
 import {
   EventStatus,
@@ -9,6 +10,7 @@ import {
 } from "../../store/generated";
 import { selectRun } from "../../store/global";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { BlankSlate } from "../Blank";
 import Button from "../Button";
 import CodeBlock from "../CodeBlock";
 import ContentCard from "../Content/ContentCard";
@@ -52,11 +54,11 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
   if (!run) {
     return (
       <ContentCard date={0} id="">
-        <div className="w-full h-full flex items-center justify-center p-8">
-          <div className="opacity-75 italic">
-            Select a run on the left to see its status
-          </div>
-        </div>
+        <BlankSlate
+          imageUrl={noFnsImg}
+          title="No function run selected"
+          subtitle="Select a function run on the left to see a timeline of its execution."
+        />
       </ContentCard>
     );
   }

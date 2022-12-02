@@ -20,7 +20,9 @@
     "monaco-editor": "^0.34.1",
     "preact": "^10.11.2",
     "react-redux": "^8.0.5",
-    "react-timeago": "^7.1.0"
+    "react-refractor": "^2.1.7",
+    "react-timeago": "^7.1.0",
+    "refractor": "^4.8.0"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "2.13.11",
