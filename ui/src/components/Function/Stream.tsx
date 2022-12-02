@@ -15,6 +15,11 @@ export const FuncStream = () => {
   const selectedRun = useAppSelector((state) => state.global.selectedRun);
   const dispatch = useAppDispatch();
 
+  // TODO: Normalize the feed here.  The dev server API gives us _every_ event;
+  // if a step is scheduled then runs immediately we can probably hide the scheduled
+  // event.  Similarly, if a step starts then finishes immediately we can probably
+  // only show the "Step finished" event.
+
   return (
     <>
       {functions.data?.functionRuns?.map((run, i, list) => (

@@ -58,7 +58,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
             date={event.createdAt}
             actionBtn={
               <Button
-                label="Retry"
+                label="Replay"
                 btnAction={() => {
                   sendEvent(event.raw);
                 }}
