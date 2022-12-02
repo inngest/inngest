@@ -32,7 +32,7 @@ var (
 func NewCmdServe() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:       "serve [component]",
-		Short:     "Start an Inngest service",
+		Short:     "Start an Inngest service for self hosting",
 		Example:   fmt.Sprintf("inngest serve %s", strings.Join(serveArgs, " ")),
 		Run:       serve,
 		Args:      cobra.OnlyValidArgs,

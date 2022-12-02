@@ -37,6 +37,9 @@ func Execute() {
 		Use:   "inngest",
 		Short: "A serverless event-driven infrastructure platform",
 		Long:  longDescription,
+		CompletionOptions: cobra.CompletionOptions{
+			DisableDefaultCmd: true,
+		},
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			m := tel.NewMetadata(cmd.Context())
 			m.SetCobraCmd(cmd)

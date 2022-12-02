@@ -37,6 +37,7 @@ type runFunctionOpts struct {
 func NewCmdRun() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "run",
+		Hidden:  true,
 		Short:   "Run a serverless function locally",
 		Example: "inngest run",
 		Run:     doRun,
