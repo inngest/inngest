@@ -42,7 +42,7 @@ import {
 } from "../accounts"
 import { sendFailedPaymentEmail } from "../emails"
 
-export default createFunction(
+export default createStepFunction(
   "Handle failed payments",
   "stripe/charge.failed",
   async ({ event }) => {

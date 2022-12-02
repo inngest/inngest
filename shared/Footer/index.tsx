@@ -4,6 +4,7 @@ import Github from "../Icons/Github";
 import Twitter from "../Icons/Twitter";
 import Container from "../layout/Container";
 import footerLinks from "./footerLinks";
+import StatusWidget from "../StatusWidget";
 
 export default function Footer() {
   return (
@@ -18,9 +19,11 @@ export default function Footer() {
     >
       <Container>
         <div className="relative">
-          {/* <div className="absolute inset-0 rounded-lg bg-slate-900 opacity-20 rotate-1 -z-0 scale-[102%] mx-5"></div> */}
           <div className=" w-full py-16 rounded-lg relative ">
-            <Logo className="text-white w-20 mb-8" />
+            <div className=" mb-12 flex gap-6 items-center">
+              <Logo className="text-white w-20 relative top-[3px]" />
+              <StatusWidget />
+            </div>
             <div className="flex flex-wrap gap-8 lg:gap-12 xl:gap-20">
               {footerLinks.map((footerLink, i) => (
                 <div className=" lg:w-auto  flex-shrink-0" key={i}>

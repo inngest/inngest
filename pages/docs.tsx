@@ -349,13 +349,13 @@ export const DocsContent = styled.article<{ hasTOC: boolean }>`
       visibility: hidden;
       position: absolute;
       top: 0.25em;
-      left: -1.5em;
-      width: 1.5em;
+      left: -30px;
+      width: 30px;
     }
     .icon-link {
       display: block;
-      height: 1em;
-      width: 1em;
+      height: 20px;
+      width: 20px;
       mask-image: url("/assets/docs/icon-link.svg");
       background-color: var(--link-color);
     }
