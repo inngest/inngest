@@ -4,7 +4,7 @@ const footerLinks = [
       links: [
         {
           label: "Function SDK",
-          url: "/features/SDK?ref=footer",
+          url: "/features/sdk?ref=footer",
         },
         {
           label: "Step Functions",
