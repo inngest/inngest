@@ -1,13 +1,14 @@
-import { useState } from "preact/hooks";
 import noEventsImg from "../assets/images/no-events.png";
 import noFnSelectedImg from "../assets/images/no-fn-selected.png";
 import noResultsImg from "../assets/images/no-results.png";
 import ActionBar from "./components/ActionBar";
 import BG from "./components/BG";
 import { BlankSlate } from "./components/Blank";
+import Button from "./components/Button";
 import ContentFrame from "./components/Content/ContentFrame";
 import { Docs } from "./components/Docs";
 import { EventSection } from "./components/Event/Section";
+import { SendEventModal } from "./components/Event/SendEventModal";
 import { EventStream } from "./components/Event/Stream";
 import { FunctionRunSection } from "./components/Function/RunSection";
 import { FuncStream } from "./components/Function/Stream";
@@ -21,7 +22,12 @@ import {
   useGetEventsStreamQuery,
   useGetFunctionsStreamQuery,
 } from "./store/generated";
-import { setSidebarTab, showDocs, showFeed } from "./store/global";
+import {
+  setSidebarTab,
+  showDocs,
+  showEventSendModal,
+  showFeed,
+} from "./store/global";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
 import classNames from "./utils/classnames";
 
@@ -31,11 +37,6 @@ export function App() {
   const selectedRun = useAppSelector((state) => state.global.selectedRun);
   const contentView = useAppSelector((state) => state.global.contentView);
   const dispatch = useAppDispatch();
-
-  const [codeBlockModalActive, setCodeBlockModalActive] = useState({
-    visible: false,
-    content: "",
-  });
 
   const tabs: {
     key: typeof sidebarTab;
@@ -53,20 +54,6 @@ export function App() {
       onClick: () => dispatch(setSidebarTab("functions")),
     },
   ];
-
-  const setModal = (content) => {
-    if (codeBlockModalActive.visible) {
-      setCodeBlockModalActive({
-        visible: false,
-        content: "",
-      });
-    } else {
-      setCodeBlockModalActive({
-        visible: true,
-        content: content,
-      });
-    }
-  };
 
   const { hasEvents, isLoading: eventsLoading } = useGetEventsStreamQuery(
     {},
@@ -100,6 +87,7 @@ export function App() {
       <BG />
       {/* <EventDetail /> */}
       <Header />
+      <SendEventModal />
       <Sidebar>
         <SidebarLink
           icon={<IconFeed />}
@@ -130,6 +118,23 @@ export function App() {
                 {tab.title}
               </button>
             ))}
+            actions={
+              <Button
+                label="Send event"
+                btnAction={() => {
+                  dispatch(
+                    showEventSendModal({
+                      show: true,
+                      data: JSON.stringify({
+                        name: "",
+                        data: {},
+                        user: {},
+                      }),
+                    })
+                  );
+                }}
+              />
+            }
           />
           <TimelineScrollContainer>
             {sidebarTab === "events" ? <EventStream /> : <FuncStream />}

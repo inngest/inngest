@@ -8,29 +8,23 @@ import {
 } from "preact/hooks";
 import { usePortal } from "../../hooks/usePortal";
 import { useSendEventMutation } from "../../store/devApi";
+import { showEventSendModal } from "../../store/global";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { genericiseEvent } from "../../utils/events";
 import CodeBlockModal from "../CodeBlock/CodeBlockModal";
 
-interface EventPayload {
-  name: string;
-  data?: Record<string, any>;
-  user?: Record<string, any>;
-  ts: number;
-}
-
-interface SendEventModalProps {
-  // visible: boolean;
-  eventDataStr: string | null | undefined;
-  onClose: () => void;
-}
-
-export const SendEventModal = ({
-  // visible,
-  eventDataStr,
-  onClose,
-}: SendEventModalProps) => {
+export const SendEventModal = () => {
   const [_sendEvent, sendEventState] = useSendEventMutation();
   const portal = usePortal();
+  const eventDataStr = useAppSelector(
+    (state) => state.global.sendEventModalData
+  );
+  const visible = useAppSelector((state) => state.global.showingSendEventModal);
+  const dispatch = useAppDispatch();
+
+  const onClose = () => {
+    dispatch(showEventSendModal({ show: false }));
+  };
 
   const snippedData = useMemo(
     () => genericiseEvent(eventDataStr),
@@ -40,7 +34,7 @@ export const SendEventModal = ({
   const [input, setInput] = useState(snippedData);
   useEffect(() => {
     setInput(genericiseEvent(snippedData));
-  }, [eventDataStr /*, visible */]);
+  }, [eventDataStr, visible]);
 
   const pushToast = (message: string) => {
     alert(message);
@@ -136,9 +130,9 @@ export const SendEventModal = ({
     });
   }, [monaco]);
 
-  // if (!visible) {
-  //   return null;
-  // }
+  if (!visible) {
+    return null;
+  }
 
   return portal(
     <CodeBlockModal closeModal={onClose}>
