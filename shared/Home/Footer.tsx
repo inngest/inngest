@@ -2,6 +2,7 @@ import Logo from "src/shared/Icons/Logo";
 import Discord from "../Icons/Discord";
 import Github from "../Icons/Github";
 import Twitter from "../Icons/Twitter";
+import StatusWidget from "src/shared/StatusWidget";
 
 export default function Footer() {
   const footerLinks = [
@@ -139,6 +140,7 @@ export default function Footer() {
               </ul>
             </div>
           </div>
+          <StatusWidget className="mt-8" />
         </div>
       </div>
       <ul className="max-w-[1800px] m-auto py-8 lg:py-0 px-10 flex lg:gap-6 flex-col-reverse items-start lg:flex-row">
