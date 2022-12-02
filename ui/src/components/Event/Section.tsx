@@ -1,3 +1,4 @@
+import { ComponentChild } from "preact";
 import { useMemo } from "preact/hooks";
 import { useSendEventMutation } from "../../store/devApi";
 import {
@@ -5,7 +6,7 @@ import {
   FunctionRunStatus,
   useGetEventQuery,
 } from "../../store/generated";
-import { selectRun } from "../../store/global";
+import { selectRun, showEventSendModal } from "../../store/global";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import Button from "../Button";
 import ContentCard from "../Content/ContentCard";
@@ -33,7 +34,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
   //   setPollingInterval(event.pendingRuns > 0 ? 1000 : 0);
   // }, [event?.pendingRuns]);
 
-  const [sendEvent, sendEventState] = useSendEventMutation();
+  const [sendEvent] = useSendEventMutation();
 
   if (query.isLoading) {
     return <div>Loading...</div>;
@@ -57,12 +58,32 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
             label="Event Received"
             date={event.createdAt}
             actionBtn={
-              <Button
-                label="Retry"
-                btnAction={() => {
-                  sendEvent(event.raw);
-                }}
-              />
+              <>
+                <Button
+                  label="Replay"
+                  btnAction={() => {
+                    if (!event?.raw) {
+                      return;
+                    }
+
+                    sendEvent(
+                      JSON.stringify({
+                        ...JSON.parse(event.raw),
+                        ts: Date.now(),
+                      })
+                    );
+                  }}
+                />
+                <Button
+                  label="Edit and replay"
+                  kind="secondary"
+                  btnAction={() => {
+                    dispatch(
+                      showEventSendModal({ show: true, data: event.raw })
+                    );
+                  }}
+                />
+              </>
             }
           />
         </TimelineRow>
@@ -72,12 +93,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
             ? EventStatus.Paused
             : run.status || FunctionRunStatus.Completed;
 
-          // waitingFor is null, no bar
-          // waitingFor has time only, bar time
-          // waitingFor has event and time, bar time with event mention
-          // waitingFor has event, time, and expression, bar time with event mention and expression
-
-          let contextBar;
+          let contextBar: ComponentChild | undefined;
 
           if (run.waitingFor?.waitUntil) {
             if (run.waitingFor.eventName) {

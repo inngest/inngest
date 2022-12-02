@@ -7,12 +7,16 @@ const initialState: {
   sidebarTab: "events" | "functions";
   selectedEvent: string | null;
   selectedRun: string | null;
+  showingSendEventModal: boolean;
+  sendEventModalData: string | null;
 } = {
   contentView: "feed",
   docsPath: null,
   sidebarTab: "events",
   selectedEvent: null,
   selectedRun: null,
+  showingSendEventModal: false,
+  sendEventModalData: null,
 };
 
 const globalState = createSlice({
@@ -37,13 +41,29 @@ const globalState = createSlice({
     showDocs(state, action: PayloadAction<`/${string}` | null | undefined>) {
       state.contentView = "docs";
 
-      if (typeof action !== "undefined") {
+      if (typeof action.payload !== "undefined") {
         state.docsPath = action.payload || null;
+      }
+    },
+    showEventSendModal: (
+      state,
+      action: PayloadAction<{ show: boolean; data?: string | null }>
+    ) => {
+      state.showingSendEventModal = action.payload.show;
+
+      if (typeof action.payload.data !== "undefined") {
+        state.sendEventModalData = action.payload.data;
       }
     },
   },
 });
 
-export const { selectEvent, selectRun, setSidebarTab, showDocs, showFeed } =
-  globalState.actions;
+export const {
+  selectEvent,
+  selectRun,
+  setSidebarTab,
+  showDocs,
+  showFeed,
+  showEventSendModal,
+} = globalState.actions;
 export default globalState.reducer;

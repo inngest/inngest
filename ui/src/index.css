@@ -21,3 +21,7 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-slate-700;
 }
+
+#modals {
+  @apply text-slate-400 text-sm;
+}
