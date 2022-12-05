@@ -127,7 +127,7 @@ export default function BlogLayout(props) {
                   )}
                 </figure>
               )}
-              <header className="pt-24">
+              <header className="pt-24 max-w-[65ch] m-auto">
                 <h1 className="text-white font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter leading-loose">
                   {scope.heading}
                 </h1>
@@ -140,7 +140,7 @@ export default function BlogLayout(props) {
                   <Tags tags={scope.tags} />
                 </p>
               </header>
-              <aside className="bg-indigo-900/20 text-indigo-100 flex flex-col items-start gap-4 leading-relaxed rounded-lg py-5 px-6 max-w-[650px] my-12 border border-indigo-900/50">
+              <aside className=" max-w-[65ch] m-auto bg-indigo-900/20 text-indigo-100 flex flex-col items-start gap-4 leading-relaxed rounded-lg py-5 px-6  my-12 border border-indigo-900/50">
                 <p className="text-sm lg:text-base">
                   <a
                     className="text-indigo-400 font-medium hover:text-white transition-all no-underline hover:underline"
@@ -155,7 +155,7 @@ export default function BlogLayout(props) {
                   Give it a try
                 </Button>
               </aside>
-              <div className="mb-20 prose prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
+              <div className="m-auto mb-20 prose prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
                 <MDXRemote
                   compiledSource={props.post.compiledSource}
                   scope={scope}
