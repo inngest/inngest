@@ -1,0 +1,43 @@
+
+/*
+  * Shiki syntax highlighting for Docs, Blog, Patterns
+  * Docs: https://github.com/shikijs/shiki/blob/main/docs/themes.md
+  */
+:root {
+   --shiki-color-text: ##e2e8f0;
+   --shiki-color-background: #0f172a;
+   --shiki-token-constant: #2dd4bf;
+   --shiki-token-string: #7dd3fc;
+   --shiki-token-comment: #94a3b8;
+   --shiki-token-keyword: #ffb74f;
+   --shiki-token-parameter: #e45649;
+   --shiki-token-function: #818cf8;
+   --shiki-token-string-expression: var(--shiki-token-string);
+   --shiki-token-punctuation: #ffb74f;
+   --shiki-token-link: #4078f2;
+}
+
+pre.shiki {
+  margin: 1.5rem 0;
+  padding: 2rem;
+  position: relative;
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+  box-shadow: rgb(0 0 0 / 30%) 0px 5px 25px -10px;
+}
+
+pre.shiki .line {
+  min-height: 1em;
+}
+
+pre.shiki .language-id {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.7rem;
+  background: #1e293b;
+  border-radius: 4px;
+}
