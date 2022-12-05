@@ -4,7 +4,7 @@
   * Docs: https://github.com/shikijs/shiki/blob/main/docs/themes.md
   */
 :root {
-   --shiki-color-text: ##e2e8f0;
+   --shiki-color-text: #e2e8f0;
    --shiki-color-background: #0f172a;
    --shiki-token-constant: #2dd4bf;
    --shiki-token-string: #7dd3fc;
@@ -50,4 +50,54 @@ pre.shiki .error-behind {
   border-left: 4px solid rgb(145, 27, 27, 0.6);
   padding-left: 0.5rem;
   margin: 0.5rem 0;
+}
+
+pre.twoslash data-lsp {
+  border-color: #64748B !important;
+}
+
+pre.twoslash:hover data-lsp {
+  text-decoration: underline;
+}
+
+pre.twoslash data-lsp:hover::before {
+  content: attr(lsp);
+  position: absolute;
+  transform: translate(0, 1rem);
+  
+
+  background-color: #1E293B;
+  color: #fff;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: "JetBrains Mono", Menlo, Monaco, Consolas, Courier New,
+    monospace;
+    box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+  font-size: 12px;
+  white-space: pre-wrap;
+  z-index: 100;
+}
+
+pre .arrow {
+  /* Transparent background */
+  background-color: #1E293B;
+  position: relative;
+  top: -5px;
+  margin-left: 0.1rem;
+  /* Edges */
+  /* border-left: 1px solid #eee;
+  border-top: 1px solid #eee; */
+  transform: translateY(25%) rotate(45deg);
+  /* Size */
+  height: 8px;
+  width: 8px;
+}
+pre .popover {
+  margin-bottom: 10px;
+  background-color: #1E293B;
+  display: inline-block;
+  padding: 0 1rem 0.4rem 1rem;
+  margin-top: 10px;
+  border-radius: 6px;
 }
