@@ -5,11 +5,12 @@ import Twitter from "../Icons/Twitter";
 import Container from "../layout/Container";
 import footerLinks from "./footerLinks";
 import StatusWidget from "../StatusWidget";
+import Button from "../Button";
 
 export default function Footer() {
   return (
     <footer
-      className="mt-20  bg-slate-950"
+      className="mt-20  bg-slate-1000"
       style={{
         backgroundImage: "url(/assets/footer/footer-grid.svg)",
         backgroundSize: "contain",
@@ -19,16 +20,19 @@ export default function Footer() {
     >
       <div className="bg-indigo-600 backdrop-blur text-white">
         {/* <div className="bg-slate-950/40 backdrop-blur text-white"> */}
-        <Container className="py-32">
-          <h4 className="text-4xl tracking-tight mb-4 font-medium">
+        <Container className="py-20 lg:py-32">
+          <h4 className=" text-2xl lg:text-4xl tracking-tight mb-4 font-medium">
             Ready to start building?
           </h4>
-          <p className="max-w-xl text-indigo-100">
-            Lorem ipsum dolor sit amet consectetur adipisicing elit. Dolores
-            eveniet illo ipsa dolorem repellat ullam neque dolor deserunt in!
-            Quod impedit et autem sequi culpa nobis molestiae aliquid molestias
-            nam!
+          <p className="text-sm lg:text-base max-w-xl text-indigo-100">
+            Enqueue and schedule reliable serverless functions in record time.
           </p>
+          <code className="text-sm text-white block mt-8 mr-4">
+            <span className="text-indigo-300">$</span> npm install inngest
+          </code>
+          <Button className="mt-4" arrow kind="secondary">
+            Get started for free
+          </Button>
         </Container>
       </div>
       <Container className="pb-12 pt-16 lg:pt-24">
