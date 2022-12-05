@@ -52,8 +52,12 @@ export default function BlogLayout(props) {
 
         <Header />
         <Container className="pt-8">
-          {/* <SectionHeader title="Blog" lede={description} /> */}
-          <h2 className="text-slate-200">{description}</h2>
+          <div className="flex flex-col lg:flex-row gap-2 lg:gap-4 items-start lg:items-center">
+            <h2 className="font-bold text-base text-white lg:border-r border-slate-600/50 pr-4">
+              Blog
+            </h2>
+            <p className="text-slate-200 text-sm">{description}</p>
+          </div>
           <div className="pt-16">
             {focus && (
               <a
