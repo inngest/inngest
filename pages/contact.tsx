@@ -1,8 +1,8 @@
 import styled from "@emotion/styled";
 import Head from "next/head";
-import Footer from "../shared/Footer";
-import Nav from "../shared/nav";
-import Content from "../shared/content";
+import Footer from "../shared/legacy/Footer";
+import Nav from "../shared/legacy/nav";
+import Content from "../shared/legacy/content";
 
 import Workflow from "../shared/Icons/Workflow";
 import Language from "../shared/Icons/Language";

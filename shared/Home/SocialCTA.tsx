@@ -1,6 +1,6 @@
 import Discord from "../Icons/Discord";
 import Github from "../Icons/Github";
-import Container from "./Container";
+import Container from "../layout/Container";
 import ArrowRight from "../Icons/ArrowRight";
 
 export default function SocialCTA() {
@@ -50,15 +50,6 @@ export default function SocialCTA() {
             <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " />
           </a>
         </div>
-      </Container>
-      <Container className="flex items-center justify-center mb-32">
-        <a
-          href="?ref=homepage-bottom-cta"
-          className="group inline-flex mt-4 items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-3  bg-indigo-500 hover:bg-indigo-400 transition-all text-white"
-        >
-          Ready to get started?
-          <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " />
-        </a>
       </Container>
     </div>
   );

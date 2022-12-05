@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { useState, useEffect } from "react";
 import ArrowRight from "../Icons/ArrowRight";
 import Logo from "../Icons/Logo";
@@ -6,7 +5,7 @@ import classNames from "src/utils/classNames";
 import Github from "../Icons/Github";
 import Discord from "../Icons/Discord";
 import Twitter from "../Icons/Twitter";
-import Container from "./Container";
+import Container from "../layout/Container";
 import BurgerMenu from "../Icons/BurgerMenu";
 import CloseMenu from "../Icons/CloseMenu";
 
@@ -27,7 +26,7 @@ export default function Header() {
   return (
     <header
       className={classNames(
-        scroll ? `bg-slate-950/80` : "",
+        scroll ? `bg-slate-1000/60` : "",
         `sticky backdrop-blur-sm top-0 left-0 right-0 z-50 transition-colors duration-200`
       )}
     >

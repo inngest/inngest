@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import styled from "@emotion/styled";
 
-import Hero from "src/shared/Hero";
-import Examples from "src/shared/Examples";
-import FeatureCallouts from "src/shared/FeatureCallouts";
-import Button from "src/shared/Button";
-import Nav from "src/shared/nav";
-import Footer from "src/shared/Footer";
-import DemoBlock from "src/shared/DemoBlock";
-import GraphicCallout from "src/shared/GraphicCallout";
+import Hero from "src/shared/legacy/Hero";
+import Examples from "src/shared/legacy/Examples";
+import FeatureCallouts from "src/shared/legacy/FeatureCallouts";
+import Button from "src/shared/legacy/Button";
+import Nav from "src/shared/legacy/nav";
+import Footer from "src/shared/legacy/Footer";
+import DemoBlock from "src/shared/legacy/DemoBlock";
+import GraphicCallout from "src/shared/legacy/GraphicCallout";
 
 export async function getStaticProps() {
   return {

@@ -1,14 +1,18 @@
 import Head from "next/head";
 import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
-import Footer from "../../shared/Footer";
-import Nav from "../../shared/nav";
-import Content from "../../shared/content";
-import Tag from "../../shared/tag";
-import { Wrapper } from "../../shared/blog";
+import Footer from "../../shared/legacy/Footer";
+import Nav from "../../shared/legacy/nav";
+import Content from "../../shared/legacy/content";
+import Tag from "../../shared/legacy/tag";
+import { Wrapper } from "../../shared/legacy/blog";
 import library from "../../public/json/library.json";
-import { Inner, WorkflowContent, Description } from "../../shared/libraryitem";
-import { titleCase, slugify } from "../../shared/util";
+import {
+  Inner,
+  WorkflowContent,
+  Description,
+} from "../../shared/legacy/libraryitem";
+import { titleCase, slugify } from "../../shared/legacy/util";
 const Workflow = dynamic(() => import("../../shared/Workflow/Viewer"));
 
 const path = "$1";

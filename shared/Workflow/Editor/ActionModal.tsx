@@ -1,8 +1,8 @@
 import React, { useMemo } from "react";
 import styled from "@emotion/styled";
-import Box from "src/shared/Box";
-import ActionGrid from "src/shared/Actions/Grid";
-import Navigator from "src/shared/Actions/Navigator";
+import Box from "../../legacy/Box";
+import ActionGrid from "../../Actions/Grid";
+import Navigator from "../../Actions/Navigator";
 import { useWorkflowContext, EdgeMetadata } from "../state";
 import { newClientID } from "./consts";
 import { Action } from "src/types";

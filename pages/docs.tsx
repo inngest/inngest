@@ -5,11 +5,11 @@ import styled from "@emotion/styled";
 import { Global, css } from "@emotion/react";
 
 import DocsNav from "../shared/Docs/DocsNav";
-import Footer from "../shared/Footer";
-import Button from "../shared/Button";
+import Footer from "../shared/legacy/Footer";
+import Button from "../shared/legacy/Button";
 import ArrowUpRightIcon from "../shared/Icons/ArrowUpRight";
 import { getAllDocs, Categories, Sections } from "../utils/docs";
-import docsSyntaxHighlightingCSS from "../shared/syntaxHighlightingCSS";
+import docsSyntaxHighlightingCSS from "../shared/legacy/syntaxHighlightingCSS";
 
 export async function getStaticProps() {
   const { sections } = getAllDocs();

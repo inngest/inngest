@@ -1,12 +1,12 @@
 import { useState } from "react";
 
-import Button from "src/shared/Button";
-import CodeWindow from "src/shared/CodeWindow";
-import Footer from "src/shared/Footer";
+import Button from "src/shared/legacy/Button";
+import CodeWindow from "src/shared/legacy/CodeWindow";
+import Footer from "src/shared/legacy/Footer";
 import CheckboxUnchecked from "src/shared/Icons/CheckboxUnchecked";
 import CheckRounded from "src/shared/Icons/CheckRounded";
 import Discord from "src/shared/Icons/Discord";
-import Nav from "src/shared/nav";
+import Nav from "src/shared/legacy/nav";
 
 export async function getStaticProps() {
   return {

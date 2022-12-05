@@ -1,6 +1,6 @@
 import React, { ReactElement } from "react";
 
-import StepGrid, { Step } from "src/shared/StepGrid";
+import StepGrid, { Step } from "./StepGrid";
 
 type ExamplesProps = {
   heading: ReactElement | string;

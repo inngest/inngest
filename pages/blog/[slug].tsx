@@ -4,16 +4,20 @@ import rehypeSlug from "rehype-slug";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
 import Footer from "../../shared/Footer";
-import Nav from "../../shared/nav";
-import Callout from "../../shared/Callout";
-import syntaxHighlightingCSS from "../../shared/syntaxHighlightingCSS";
-import { Wrapper } from "../../shared/blog";
+import Nav from "../../shared/legacy/nav";
+import Callout from "../../shared/legacy/Callout";
+import syntaxHighlightingCSS from "../../shared/legacy/syntaxHighlightingCSS";
+import { Wrapper } from "../../shared/legacy/blog";
 import { highlight } from "../../utils/code";
-import ThemeToggleButton from "../../shared/ThemeToggleButton";
+import ThemeToggleButton from "../../shared/legacy/ThemeToggleButton";
 import Tags from "../../shared/Blog/Tags";
 
 // MDX Components
 import DiscordCTA from "../../shared/Blog/DiscordCTA";
+import Header from "src/shared/Header";
+import Container from "src/shared/layout/Container";
+import Button from "src/shared/Button";
+import IconCalendar from "src/shared/Icons/Calendar";
 const components = {
   DiscordCTA,
 };
@@ -99,245 +103,74 @@ export default function BlogLayout(props) {
         ></script>
       </Head>
 
-      <ThemeToggleButton isFloating={true} />
+      {/* <ThemeToggleButton isFloating={true} /> */}
 
-      <Wrapper>
-        <Nav sticky={true} />
-
-        <Article>
-          {scope.image && (
-            <FeaturedImageFigure>
-              <Image src={scope.image} />
-              {scope.imageCredits && (
-                <figcaption
-                  className="text-xs"
-                  dangerouslySetInnerHTML={{ __html: scope.imageCredits }}
-                ></figcaption>
+      <div className="bg-slate-1000 font-sans">
+        <div
+          style={{
+            background: "radial-gradient(circle at center, #13123B, #08090d)",
+          }}
+          className="absolute w-[200vw] -translate-x-1/2 -translate-y-1/2 h-[200vw] rounded-full blur-lg opacity-90"
+        ></div>
+        <Header />
+        <Container>
+          <article>
+            <main className="m-auto max-w-3xl pt-16">
+              {scope.image && (
+                <figure className="flex flex-col items-end">
+                  <img src={scope.image} className="rounded-lg shadow-lg" />
+                  {scope.imageCredits && (
+                    <figcaption
+                      className="text-xs text-slate-400 mt-2"
+                      dangerouslySetInnerHTML={{ __html: scope.imageCredits }}
+                    ></figcaption>
+                  )}
+                </figure>
               )}
-            </FeaturedImageFigure>
-          )}
-
-          <Header>
-            <h1>{scope.heading}</h1>
-            <p className="blog-byline">
-              {!!scope.author ? <>{scope.author} &middot; </> : ""}
-              {scope.humanDate} &middot; {scope.reading.text}
-              <Tags tags={scope.tags} />
-            </p>
-          </Header>
-
-          <Body>
-            <ProductDescriptionAside className="bg-texture-gridlines">
-              <a href="https://www.inngest.com?ref=blog-post">Inngest</a>'s
-              platform lets you build serverless background tasks and scheduled
-              jobs using events - zero infrastructure required.{" "}
-              <a href="https://www.inngest.com?ref=blog-post">
-                Give it a try →
-              </a>
-            </ProductDescriptionAside>
-            <MDXRemote
-              compiledSource={props.post.compiledSource}
-              scope={scope}
-              components={components}
-            />
-          </Body>
-          <DiscordCTA />
-        </Article>
+              <header className="pt-12 lg:pt-24 max-w-[65ch] m-auto">
+                <h1 className="text-white font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter lg:leading-loose">
+                  {scope.heading}
+                </h1>
+                <p className="text-slate-300 text-sm mt-2 flex items-center gap-2">
+                  {!!scope.author ? <>{scope.author} &middot; </> : ""}
+                  <span className="flex items-center gap-1">
+                    <IconCalendar /> {scope.humanDate}
+                  </span>{" "}
+                  &middot; <span>{scope.reading.text}</span>
+                  <Tags tags={scope.tags} />
+                </p>
+              </header>
+              <aside className=" max-w-[65ch] m-auto bg-indigo-900/20 text-indigo-100 flex flex-col items-start gap-4 leading-relaxed rounded-lg py-5 px-6  my-12 border border-indigo-900/50">
+                <p className="text-sm lg:text-base">
+                  <a
+                    className="text-indigo-400 font-medium hover:text-white transition-all no-underline hover:underline"
+                    href="https://www.inngest.com?ref=blog-post"
+                  >
+                    Inngest's
+                  </a>{" "}
+                  platform lets you build serverless background tasks and
+                  scheduled jobs using events - zero infrastructure required.{" "}
+                </p>
+                <Button href="https://www.inngest.com?ref=blog-post" arrow>
+                  Give it a try
+                </Button>
+              </aside>
+              <div className="m-auto mb-20 prose prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
+                <MDXRemote
+                  compiledSource={props.post.compiledSource}
+                  scope={scope}
+                  components={components}
+                />
+              </div>
+              <DiscordCTA />
+            </main>
+          </article>
+        </Container>
         <Footer />
-      </Wrapper>
+      </div>
     </>
   );
 }
-
-const ProductDescriptionAside = styled.aside`
-  // match paragraph style inline
-  font-size: 0.95rem !important;
-  background: url(/assets/texture-gridlines-100.svg) no-repeat center center !important;
-  background-size: 100%;
-
-  a {
-    color: inherit !important;
-    text-decoration: underline;
-
-    &:hover {
-      color: var(--color-iris-100) !important;
-    }
-  }
-`;
-
-const Article = styled.article`
-  margin: 1rem auto 4rem;
-  max-width: 800px;
-
-  @media (max-width: 800px) {
-    margin-left: 1.5rem;
-    margin-right: 1.6rem;
-  }
-`;
-
-const FeaturedImageFigure = styled.figure`
-  margin: 1rem auto;
-
-  figcaption {
-    margin-top: 0.3rem;
-    text-align: right;
-    font-size: 0.7rem;
-    color: var(--font-color-secondary);
-    font-style: italic;
-  }
-`;
-const Image = styled.img`
-  max-width: 100%;
-  border-radius: var(--border-radius);
-`;
-
-const Header = styled.header`
-  margin: 3rem 0;
-  h1 {
-    font-size: 2rem;
-    line-height: 1.5em;
-  }
-  .blog-byline {
-    font-size: 0.8rem;
-  }
-  @media (max-width: 800px) {
-    margin: 2rem 0;
-    h1 {
-      font-size: 1.8rem;
-      line-height: 1.3em;
-    }
-  }
-`;
-
-const Body = styled.main`
-  margin: 2rem 0;
-
-  h2,
-  h3,
-  h4,
-  h5 {
-    line-height: 1.5em;
-  }
-  h2 {
-    font-size: 1.5em;
-    margin-top: 2rem;
-  }
-  h3 {
-    font-size: 1.3em;
-    margin-top: 2rem;
-  }
-  h3 {
-    font-size: 1.3em;
-    margin-top: 2rem;
-  }
-
-  p,
-  blockquote {
-    margin: 1.5rem 0;
-    line-height: 1.6em;
-  }
-
-  p code,
-  li code {
-    font-size: 0.75rem;
-  }
-
-  ul,
-  ol {
-    margin: 1.5rem 0 1.5rem 1.5rem;
-  }
-  ul {
-    list-style-type: disc;
-  }
-  ol {
-    list-style-type: number;
-  }
-
-  aside {
-    padding: 1.4em 1.5em;
-    border: 1px solid var(--stroke-color);
-    border-radius: var(--border-radius);
-    background: var(--highlight-color);
-
-    p:first-of-type {
-      margin-top: 0;
-    }
-    p:last-of-type {
-      margin-bottom: 0;
-    }
-  }
-
-  video {
-    margin: 2rem 0;
-  }
-
-  img {
-    max-width: 100%;
-    /* max-height: 300px; */
-    margin: 2rem auto 2rem;
-    pointer-events: none;
-  }
-
-  blockquote {
-    padding: 0 1.5rem;
-    border-left: 4px solid var(--primary-color);
-    font-style: italic;
-  }
-
-  pre {
-    margin: 1rem 0;
-    padding: 1.1rem 1.4rem;
-    border-radius: var(--border-radius);
-  }
-
-  .blog--callout {
-    font-weight: 500;
-
-    box-sizing: content-box;
-    padding: 2rem;
-    margin: 0 0 8vh;
-    border-radius: 10px;
-
-    background-image: linear-gradient(
-      -45deg,
-      rgba(255, 255, 255, 0.08) 25%,
-      transparent 25%,
-      transparent 50%,
-      rgba(255, 255, 255, 0.08) 50%,
-      rgba(255, 255, 255, 0.08) 75%,
-      transparent 75%,
-      transparent
-    );
-    background-size: 5px 5px;
-  }
-
-  ul {
-    list-style-type: disc;
-    margin-left: 1rem;
-  }
-
-  @media (max-width: 800px) {
-    p,
-    ol,
-    ul,
-    li {
-      font-size: 0.8rem;
-    }
-    h1 {
-      font-size: 1.8rem;
-    }
-  }
-
-  @media (max-width: 980px) {
-    .blog--callout {
-      padding: 1.5rem;
-      width: calc(100% - 1rem);
-      margin-left: -1rem;
-    }
-  }
-
-  ${syntaxHighlightingCSS}
-`;
 
 // This function gets called at build time to figure out which URLs
 // we need to statically compile.
@@ -395,6 +228,7 @@ export async function getStaticProps({ params }) {
       meta: {
         disabled: true,
       },
+      designVersion: "2",
     },
   };
 }

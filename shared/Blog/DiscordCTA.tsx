@@ -8,34 +8,18 @@ const DiscordCTA: React.FC<{ size?: "default" | "small" }> = ({
   size = "default",
 }) => {
   return (
-    <Box size={size}>
-      <DiscordLogo />
-      <p>Ask questions, give feedback, and share feature requests</p>
-      <Button
-        href={process.env.NEXT_PUBLIC_DISCORD_URL}
-        kind="outline"
-        size={size === "small" ? "medium" : "default"}
-      >
+    <div className="max-w-[65ch] border-t-[2px] border-slate-800 pt-16 m-auto text-indigo-500">
+      <DiscordLogo size={32} />
+      <h2 className="text-white text-xl font-medium mt-6">
+        Help shape the future of Inngest
+      </h2>
+      <p className="text-slate-400 mb-6 mt-2 text-sm">
+        Ask questions, give feedback, and share feature requests
+      </p>
+      <Button href={process.env.NEXT_PUBLIC_DISCORD_URL} arrow>
         Join our Discord!
       </Button>
-    </Box>
+    </div>
   );
 };
-const Box = styled.div<{ size: "default" | "small" }>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 2rem 0;
-  background-color: #5865f2; // Discord Blurple
-  color: #fff;
-  border-radius: var(--border-radius);
-  text-align: center;
-
-  svg {
-    font-size: ${({ size }) => (size === "small" ? "80px" : "120px")};
-  }
-  p {
-    margin: 1.5rem 0;
-  }
-`;
 export default DiscordCTA;

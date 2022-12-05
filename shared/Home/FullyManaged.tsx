@@ -1,6 +1,6 @@
 import ArrowRight from "../Icons/ArrowRight";
-import Container from "./Container";
-import SectionHeader from "./SectionHeader";
+import Container from "../layout/Container";
+import SectionHeader from "../SectionHeader";
 import HomePatternsCheck from "src/shared/Icons/HomePatternsCheck";
 
 export default function FullyManaged() {

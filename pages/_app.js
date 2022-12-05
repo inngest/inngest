@@ -3,11 +3,11 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import Script from "next/script";
 import { trackPageView } from "../utils/tracking";
-import { useAnonId } from "../shared/trackingHooks";
+import { useAnonId } from "../shared/legacy/trackingHooks";
 import "../styles/globals.css";
 import * as fullstory from "@fullstory/browser";
 
-import PageBanner from "../shared/PageBanner";
+import PageBanner from "../shared/legacy/PageBanner";
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();

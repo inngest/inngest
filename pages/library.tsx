@@ -1,14 +1,14 @@
 import { useState } from "react";
 import styled from "@emotion/styled";
 import Router from "next/router";
-import Footer from "../shared/Footer";
-import Nav from "../shared/nav";
-import Content from "../shared/content";
-import { Wrapper } from "../shared/blog";
-import Block from "../shared/Block";
+import Footer from "../shared/legacy/Footer";
+import Nav from "../shared/legacy/nav";
+import Content from "../shared/legacy/content";
+import { Wrapper } from "../shared/legacy/blog";
+import Block from "../shared/legacy/Block";
 import library from "../public/json/library.json";
 import { useSearchParam } from "react-use";
-import { toggle, titleCase, slugify } from "../shared/util";
+import { toggle, titleCase, slugify } from "../shared/legacy/util";
 import { useMemo } from "react";
 
 const tagset = new Set<string>();

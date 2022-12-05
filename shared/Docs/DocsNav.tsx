@@ -4,8 +4,8 @@ import styled from "@emotion/styled";
 import { useRouter } from "next/router";
 
 import { Categories, Category, DocScope, Sections } from "../../utils/docs";
-import ThemeToggleButton from "../ThemeToggleButton";
-import Button from "../Button";
+import ThemeToggleButton from "../legacy/ThemeToggleButton";
+import Button from "../legacy/Button";
 import Logo from "../Icons/Logo";
 import Hamburger from "../Icons/Hamburger";
 import Discord from "../Icons/Discord";

@@ -10,7 +10,12 @@ const Tags: React.FC<{ tags: string[] }> = ({ tags = [] }) => {
   return (
     <TagContainer>
       {tags.map((t) => (
-        <Tag key={t}>{TagMap[t]}</Tag>
+        <span
+          className="bg-indigo-500/30 text-indigo-200 text-sm inline-flex px-2.5 py-1 rounded"
+          key={t}
+        >
+          {TagMap[t]}
+        </span>
       ))}
     </TagContainer>
   );
@@ -21,11 +26,4 @@ const TagContainer = styled.span`
   margin-left: 0.5rem; ;
 `;
 
-const Tag = styled.span`
-  display: inline-flex;
-  font-size: 0.7rem;
-  line-height: 1em;
-  font-weight: bold;
-  color: var(--color-iris-60);
-`;
 export default Tags;

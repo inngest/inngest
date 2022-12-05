@@ -1,21 +1,21 @@
-import React from "react"
-import { ComponentStory, ComponentMeta } from "@storybook/react"
+import React from "react";
+import { ComponentStory, ComponentMeta } from "@storybook/react";
 
-import IconList from "../shared/IconList"
+import IconList from "../shared/legacy/IconList";
 
-import CheckIcon from "../shared/Icons/Check"
-import WorkflowIcon from "../shared/Icons/Workflow"
-import LanguageIcon from "../shared/Icons/Language"
-import LightningIcon from "../shared/Icons/Lightning"
+import CheckIcon from "../shared/Icons/Check";
+import WorkflowIcon from "../shared/Icons/Workflow";
+import LanguageIcon from "../shared/Icons/Language";
+import LightningIcon from "../shared/Icons/Lightning";
 
 export default {
   title: "IconList",
   component: IconList,
-} as ComponentMeta<typeof IconList>
+} as ComponentMeta<typeof IconList>;
 
 const Template: ComponentStory<typeof IconList> = (args) => (
   <IconList {...args} />
-)
+);
 
 const checklistItems = [
   {
@@ -30,25 +30,25 @@ const checklistItems = [
     icon: CheckIcon,
     text: "Retries & replays built in",
   },
-]
+];
 
-export const Default = Template.bind({})
+export const Default = Template.bind({});
 Default.args = {
   items: checklistItems,
-}
+};
 
-export const Vertical = Template.bind({})
+export const Vertical = Template.bind({});
 Vertical.args = {
   direction: "vertical",
   items: checklistItems,
-}
+};
 
-export const Small = Template.bind({})
+export const Small = Template.bind({});
 Small.args = {
   direction: "vertical",
   size: "small",
   items: checklistItems,
-}
+};
 
 const mixedIconItems = [
   {
@@ -72,17 +72,17 @@ const mixedIconItems = [
     icon: CheckIcon,
     text: "Retries & replays built in",
   },
-]
+];
 
-export const MixedIcons = Template.bind({})
+export const MixedIcons = Template.bind({});
 MixedIcons.args = {
   direction: "vertical",
   items: mixedIconItems,
-}
+};
 
-export const WithoutCircles = Template.bind({})
+export const WithoutCircles = Template.bind({});
 WithoutCircles.args = {
   direction: "vertical",
   circles: false,
   items: mixedIconItems,
-}
+};

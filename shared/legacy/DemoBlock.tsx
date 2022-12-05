@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import styled from "@emotion/styled";
 
 import { trackDemoView } from "src/utils/tracking";
-import Button from "src/shared/Button";
-import DemoModal from "src/shared/DemoModal";
-import Play from "src/shared/Icons/Play";
+import Button from "./Button";
+import DemoModal from "./DemoModal";
+import Play from "../Icons/Play";
 
 export default function DemoBlock({
   headline,

@@ -2,15 +2,15 @@ import { useEffect, useState } from "react";
 import styled from "@emotion/styled";
 import Head from "next/head";
 
-import Nav from "../shared/nav";
-import Footer from "../shared/Footer";
+import Nav from "../shared/legacy/nav";
+import Footer from "../shared/legacy/Footer";
 
-import Section from "../shared/Section";
-import ContentBlock from "../shared/ContentBlock";
-import IconList from "../shared/IconList";
+import Section from "../shared/legacy/Section";
+import ContentBlock from "../shared/legacy/ContentBlock";
+import IconList from "../shared/legacy/IconList";
 import Check from "src/shared/Icons/Check";
-import Button from "src/shared/Button";
-import CLIInstall from "src/shared/CLIInstall";
+import Button from "src/shared/legacy/Button";
+import CLIInstall from "src/shared/legacy/CLIInstall";
 
 // TODO: move these into env vars
 export const INGEST_KEY =

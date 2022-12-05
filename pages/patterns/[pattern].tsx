@@ -7,8 +7,8 @@ import { serialize } from "next-mdx-remote/serialize";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 
-import Nav from "src/shared/nav";
-import Footer from "src/shared/Footer";
+import Nav from "src/shared/legacy/nav";
+import Footer from "src/shared/legacy/Footer";
 import { highlight } from "src/utils/code";
 import { getHeadingsAsArray, Heading } from "src/utils/docs";
 

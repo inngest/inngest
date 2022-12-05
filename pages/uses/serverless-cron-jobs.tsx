@@ -1,9 +1,9 @@
 import styled from "@emotion/styled";
 import React, { useState } from "react";
-import Button from "src/shared/Button";
-import Nav from "src/shared/nav";
-import Footer from "src/shared/Footer";
-import CodeWindow from "src/shared/CodeWindow";
+import Button from "src/shared/legacy/Button";
+import Nav from "src/shared/legacy/nav";
+import Footer from "src/shared/legacy/Footer";
+import CodeWindow from "src/shared/legacy/CodeWindow";
 import Developers from "src/shared/Icons/Developers";
 import Cube from "src/shared/Icons/Cube";
 import Workflow from "src/shared/Icons/Workflow";

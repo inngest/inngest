@@ -1,7 +1,7 @@
 import React from "react";
 import { ComponentStory, ComponentMeta } from "@storybook/react";
 
-import PageBanner from "../shared/PageBanner";
+import PageBanner from "../shared/legacy/PageBanner";
 
 export default {
   title: "PageBanner",

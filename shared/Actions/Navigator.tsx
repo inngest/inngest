@@ -1,9 +1,9 @@
 import React, { useMemo } from "react";
 import styled from "@emotion/styled";
 import { Action } from "src/types";
-import Box from "src/shared/Box";
-import { useIntegrations } from "src/shared/integrationHooks";
-import { PageTitle } from "src/shared/PageTitle";
+import Box from "../legacy/Box";
+import { useIntegrations } from "../legacy/integrationHooks";
+import { PageTitle } from "../legacy/PageTitle";
 import { categoryIcons, defaultIcon } from "./icons";
 
 type Props = {
@@ -60,33 +60,33 @@ const Navigator: React.FC<Props> = ({ actions, onClick }) => {
         <h2>
           <a id="builtin">Your own actions</a>
         </h2>
-          <>
-            <p>
-              You don't have any actions yet. You can run your own code, in any
-              language, as a workflow or an internal task.
-            </p>
-            <a
-              href="https://docs.inngest.com/docs/actions/serverless/tutorial"
-              target="_blank"
-              style={{ color: "inherit", textDecoration: "none" }}
+        <>
+          <p>
+            You don't have any actions yet. You can run your own code, in any
+            language, as a workflow or an internal task.
+          </p>
+          <a
+            href="https://docs.inngest.com/docs/actions/serverless/tutorial"
+            target="_blank"
+            style={{ color: "inherit", textDecoration: "none" }}
+          >
+            <Box
+              kind="dashed"
+              style={{
+                marginBottom: "3rem",
+                background: "#fff",
+                padding: "36px 48px",
+                boxShadow: "0 5px 20px rgba(0, 0, 0, 0.05)",
+              }}
             >
-              <Box
-                kind="dashed"
-                style={{
-                  marginBottom: "3rem",
-                  background: "#fff",
-                  padding: "36px 48px",
-                  boxShadow: "0 5px 20px rgba(0, 0, 0, 0.05)",
-                }}
-              >
-                <h3>Create your own actions</h3>
-                <p>
-                  Read our getting started guide which walks through how to make
-                  your own actions →
-                </p>
-              </Box>
-            </a>
-          </>
+              <h3>Create your own actions</h3>
+              <p>
+                Read our getting started guide which walks through how to make
+                your own actions →
+              </p>
+            </Box>
+          </a>
+        </>
 
         <h2>
           <a id="builtin">Built in</a>

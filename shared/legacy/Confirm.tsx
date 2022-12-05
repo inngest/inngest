@@ -1,6 +1,6 @@
 import React from "react";
 import Modal from "./Modal";
-import Button, { Kinds } from "src/shared/Button";
+import Button, { Kinds } from "./Button";
 import styled from "@emotion/styled";
 
 export type Confirm = {

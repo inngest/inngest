@@ -2,8 +2,8 @@ import React from "react";
 import styled from "@emotion/styled";
 import Link from "next/link";
 
-import Nav from "src/shared/nav";
-import Footer from "src/shared/Footer";
+import Nav from "src/shared/legacy/nav";
+import Footer from "src/shared/legacy/Footer";
 
 interface Section {
   title: string;

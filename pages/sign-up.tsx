@@ -1,11 +1,11 @@
 import { useRouter } from "next/router";
 import styled from "@emotion/styled";
-import Nav from "../shared/nav";
-import Button from "../shared/Button";
-import IconList from "../shared/IconList";
+import Nav from "../shared/legacy/nav";
+import Button from "../shared/legacy/Button";
+import IconList from "../shared/legacy/IconList";
 import Check from "../shared/Icons/Check";
 import { useState } from "react";
-import { useAnonId } from "src/shared/trackingHooks";
+import { useAnonId } from "src/shared/legacy/trackingHooks";
 
 const api = process.env.NEXT_PUBLIC_API_HOST || "https://api.inngest.com";
 const appURL = process.env.NEXT_PUBLIC_APP_HOST || "https://app.inngest.com";
@@ -23,9 +23,7 @@ const SignUp = () => {
   const router = useRouter();
 
   const loc = router.query.to || "/";
-  const to = loc.indexOf("/") === 0
-      ? `${appURL}${loc}`
-      : loc;
+  const to = loc.indexOf("/") === 0 ? `${appURL}${loc}` : loc;
 
   const b64search = router.query.search || "";
   // search is the base64-encoded search string that the previous authenticated

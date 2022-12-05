@@ -1,7 +1,7 @@
 import CopyBtn from "./CopyBtn";
-import Container from "./Container";
+import Container from "../layout/Container";
 import SendEvents from "./HomeImg/SendEvents";
-import SectionHeader from "./SectionHeader";
+import SectionHeader from "../SectionHeader";
 export default function EventDriven() {
   const handleCopyClick = (copy) => {
     navigator.clipboard.writeText(copy);

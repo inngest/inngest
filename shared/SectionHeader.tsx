@@ -1,50 +1,27 @@
-import React from "react";
-import styled from "@emotion/styled";
+import React, { ReactElement } from "react";
 
-const SectionHeader: React.FC<{
-  title: string | React.ReactNode;
-  subtitle: string;
-  className?: string;
-  size?: "large" | "default";
-  align?: "left" | "center";
-}> = ({ title, subtitle, className, size = "default", align = "center" }) => {
-  return (
-    <Wrapper align={align} className={className || ""}>
-      <Heading size={size}>{title}</Heading>
-      <Subheading align={align}>{subtitle}</Subheading>
-    </Wrapper>
-  );
+type SectionHeaderProps = {
+  title: ReactElement | string;
+  lede: ReactElement | string;
 };
 
-const Wrapper = styled.div<{ align: "left" | "center" }>`
-  max-width: var(--max-page-width);
-  margin: 3rem auto;
-  display: flex;
-  flex-direction: column;
-  align-items: ${({ align }) => (align === "center" ? "center" : "flex-start")};
-  text-align: ${({ align }) => align};
-
-  @media (max-width: 1240px) {
-    margin-left: 2rem;
-    margin-right: 2rem;
-  }
-
-  @media (max-width: 700px) {
-    margin-bottom: 2rem;
-    font-size: 0.8rem;
-  }
-`;
-
-const Heading = styled.h2<{ size: "large" | "default" }>`
-  margin: 0 0 0.2em;
-  max-width: 45rem;
-  font-size: ${({ size }) => (size === "large" ? "2em" : "1.8em")};
-`;
-const Subheading = styled.p<{ align: "left" | "center" }>`
-  margin: 0.2rem 0 0;
-  max-width: ${({ align }) => (align === "center" ? "30rem" : "100%")};
-  font-size: 1.1em;
-  color: var(--font-color-secondary);
-`;
+const SectionHeader = ({ title, lede }: SectionHeaderProps) => {
+  return (
+    <>
+      <h2 className="text-slate-50 font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter ">
+        {title}
+      </h2>
+      {typeof lede === "string" ? (
+        <p className="text-slate-400 max-w-md lg:max-w-xl text-sm md:text-base leading-5 md:leading-7">
+          {lede}
+        </p>
+      ) : (
+        <div className="text-slate-400 max-w-md lg:max-w-xl text-sm md:text-base leading-5 md:leading-7">
+          {lede}
+        </div>
+      )}
+    </>
+  );
+};
 
 export default SectionHeader;

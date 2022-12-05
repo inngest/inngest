@@ -15,7 +15,7 @@ import {
   Doc,
   Docs,
 } from "../../utils/docs";
-import Code from "src/shared/Code";
+import Code from "../../shared/legacy/Code";
 import { DocsLayout, DocsContent } from "../docs";
 import { highlight } from "../../utils/code";
 
@@ -73,7 +73,7 @@ export default function DocLayout(props: any) {
           {!!scope.image && (
             <img
               src={scope.image}
-              className="featured-image"
+              className=" shadow-xl "
               alt="Featured image"
             />
           )}
@@ -209,6 +209,7 @@ export async function getStaticProps({ params }) {
       prev,
       htmlClassName: "docs",
       meta: { disabled: true },
+      designVersion: "2",
     },
   };
 }

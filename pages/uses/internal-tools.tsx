@@ -1,9 +1,9 @@
 import styled from "@emotion/styled";
 import React, { useState } from "react";
-import Button from "src/shared/Button";
-import Nav from "src/shared/nav";
-import Footer from "src/shared/Footer";
-import GraphicCallout from "src/shared/GraphicCallout";
+import Button from "src/shared/legacy/Button";
+import Nav from "src/shared/legacy/nav";
+import Footer from "src/shared/legacy/Footer";
+import GraphicCallout from "src/shared/legacy/GraphicCallout";
 import { Code, Eye, Activity } from "react-feather";
 
 export async function getStaticProps() {

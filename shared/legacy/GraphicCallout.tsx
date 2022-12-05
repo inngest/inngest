@@ -1,6 +1,6 @@
 import React, { ReactElement } from "react";
 
-import Button from "src/shared/Button";
+import Button from "./Button";
 
 type GraphicCalloutProps = {
   heading: ReactElement | string;
