@@ -60,7 +60,7 @@ We can do this using a `Record<>` type, where we specify the keys and values we 
 // @errors: 2741
 type Hobby = "dancing" | "romancing" | "typescript";
 
-// @annotate: left { "textDegree": "3deg" } - The compiler will make sure we account for every hobby!
+// The compiler will make sure we account for every hobby!
 const myHobbies: Record<Hobby, boolean> = {
   dancing: false,
   typescript: true,
@@ -144,7 +144,7 @@ const on = (
   fn: (...args: any[]) => any
 ) => {
   // ...
-// @annotate: left { "textDegree": "3deg" } - We're protected at compile time, and we get autocomplete!
+  // We're protected at compile time, and we get autocomplete!
 };
 
 on("event", () => console.log("Something happened"));

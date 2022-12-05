@@ -41,3 +41,13 @@ pre.shiki .language-id {
   background: #1e293b;
   border-radius: 4px;
 }
+
+pre.shiki .error,
+pre.shiki .error-behind {
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 0, 0, 0.2);
+  border-left: 4px solid rgb(145, 27, 27, 0.6);
+  padding-left: 0.5rem;
+  margin: 0.5rem 0;
+}
