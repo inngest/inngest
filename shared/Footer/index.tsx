@@ -28,7 +28,7 @@ export default function Footer() {
             Enqueue and schedule reliable serverless functions in record time.
           </p>
           <code className="text-sm text-white block mt-8 mr-4">
-            <span className="text-indigo-300">$</span> npm install inngest
+            <span className="text-indigo-300">$</span> npx inngest-cli dev
           </code>
           <Button className="mt-4" arrow kind="secondary">
             Get started for free
