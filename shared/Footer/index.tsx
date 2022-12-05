@@ -30,7 +30,12 @@ export default function Footer() {
           <code className="text-sm text-white block mt-8 mr-4">
             <span className="text-indigo-300">$</span> npx inngest-cli dev
           </code>
-          <Button className="mt-4" arrow kind="secondary">
+          <Button
+            className="mt-4"
+            arrow
+            kind="secondary"
+            href="/sign-up?ref=callout"
+          >
             Get started for free
           </Button>
         </Container>
