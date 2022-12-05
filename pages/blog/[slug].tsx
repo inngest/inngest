@@ -127,8 +127,8 @@ export default function BlogLayout(props) {
                   )}
                 </figure>
               )}
-              <header className="pt-24 max-w-[65ch] m-auto">
-                <h1 className="text-white font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter leading-loose">
+              <header className="pt-12 lg:pt-24 max-w-[65ch] m-auto">
+                <h1 className="text-white font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter lg:leading-loose">
                   {scope.heading}
                 </h1>
                 <p className="text-slate-300 text-sm mt-2 flex items-center gap-2">
