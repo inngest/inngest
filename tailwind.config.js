@@ -15,6 +15,7 @@ module.exports = {
       },
       fontSize: {
         "5xl": ["3rem", "1.3"],
+        "2xs": "0.625rem",
       },
       maxWidth: {
         "container-desktop": "1600px",
