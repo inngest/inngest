@@ -4,10 +4,10 @@ export default function FeaturedLink({ link }) {
   return (
     <a
       href={link.url}
-      className="hover:bg-slate-800/80 px-5 py-2 transition-all duration-150 flex items-center mb-1.5 leading-none group/nav-item"
+      className="hover:bg-slate-800/80 px-5 py-2 transition-all duration-150 flex items-start lg:items-center mb-1.5 leading-none group/nav-item"
     >
       <div
-        className={`h-11 w-11 flex items-center justify-center rounded ${link.iconBg}`}
+        className={`h-11 w-11 flex flex-shrink-0 items-center justify-center rounded ${link.iconBg}`}
       >
         <link.icon />
       </div>
