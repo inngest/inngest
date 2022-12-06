@@ -19,7 +19,7 @@ local queueScore     = tonumber(ARGV[3]) -- vesting time, in seconds
 local partitionIndex = ARGV[4] -- {workflow, priority}
 local partitionItem  = ARGV[5] -- {workflow, priority, leasedAt, etc}
 
--- $include(fetch_queue_item.lua)
+-- $include(get_queue_item.lua)
 local item = get_queue_item(queueKey, queueID)
 if item == nil then
 	return 1

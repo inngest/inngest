@@ -12,7 +12,7 @@ local partitionKey  = KEYS[3]
 
 local queueID = ARGV[1]
 
--- $include(fetch_queue_item.lua)
+-- $include(get_queue_item.lua)
 -- Fetch this item to see if it was in progress prior to deleting.
 local item = get_queue_item(queueKey, queueID)
 if item == nil then

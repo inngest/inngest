@@ -38,6 +38,7 @@ var (
 	ErrPriorityTooLow                = fmt.Errorf("priority is too low")
 	ErrPriorityTooHigh               = fmt.Errorf("priority is too high")
 	ErrWeightedSampleRead            = fmt.Errorf("error reading from weighted sample")
+	ErrPartitionNotFound             = fmt.Errorf("partition not found")
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
 )
@@ -85,12 +86,22 @@ func (q QueueItem) MarshalBinary() ([]byte, error) {
 // QueuePartition represents an individual queue for a workflow.  It stores the
 // time of the earliest job within the workflow.
 type QueuePartition struct {
-	// QueuePartitionIndex embeds the workflow ID and priority within the
-	// actual partition.
-	QueuePartitionIndex
+	WorkflowID uuid.UUID `json:"wid"`
 
-	// Earliest refers to the earliest QueueItem time within this partition.
-	Earliest time.Time
+	Priority uint `json:"p"`
+
+	// At refers to the earliest QueueItem time within this partition, in
+	// seconds as a unix epoch.
+	//
+	// This is updated when taking a lease.
+	At int64 `json:"at"`
+
+	// Last represents the time that this QueueItem was last leased, as a unix
+	// epoch.
+	//
+	// This lets us inspect the time a QueuePartition was last leased, and figure
+	// out whether we should garbage collect the partition index.
+	Last int64 `json:"last"`
 
 	// LeaseID represents a lease on this partition.  If the LeaseID is not nil,
 	// this partition can be claimed by a shared-nothing worker to work on the
@@ -98,22 +109,10 @@ type QueuePartition struct {
 	//
 	// A lease is shortly held (eg seconds).  It should last long enough for
 	// workers to claim QueueItems only.
-	LeaseID *ulid.ULID
+	LeaseID *ulid.ULID `json:"leaseID"`
 }
 
 func (q QueuePartition) MarshalBinary() ([]byte, error) {
-	return json.Marshal(q)
-}
-
-// QueuePartitionIndex is an index for looking up queue partitions by time.  We store
-// the priority within the index such that peeking on a queue is fast and can use
-// priorities for random sampling.
-type QueuePartitionIndex struct {
-	WorkflowID uuid.UUID
-	Priority   uint
-}
-
-func (q QueuePartitionIndex) MarshalBinary() ([]byte, error) {
 	return json.Marshal(q)
 }
 
@@ -135,12 +134,13 @@ func (q queue) Enqueue(ctx context.Context, i QueueItem, at time.Time) (QueueIte
 		return i, ErrPriorityTooHigh
 	}
 
-	qpi := QueuePartitionIndex{i.WorkflowID, priority}
+	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, At: at.Unix()}
 	keys := []string{
 		"queue:item", // Queue item
-		fmt.Sprintf("queue:sorted:%s", i.WorkflowID),   // Queue sorted set
+		fmt.Sprintf("queue:sorted:%s", i.WorkflowID), // Queue sorted set
+		"partition:item", // Partition item, map
 		fmt.Sprintf("partition:item:%s", i.WorkflowID), // Partition item
-		"partition:sorted",                             // Global partition queue
+		"partition:sorted", // Global partition queue
 	}
 	status, err := redis.NewScript(scripts["queue/enqueue"]).Eval(
 		ctx,
@@ -150,11 +150,8 @@ func (q queue) Enqueue(ctx context.Context, i QueueItem, at time.Time) (QueueIte
 		i,
 		i.ID.String(),
 		at.Unix(),
-		qpi,
-		QueuePartition{
-			QueuePartitionIndex: qpi,
-			Earliest:            at,
-		},
+		i.WorkflowID.String(),
+		qp,
 	).Int64()
 	if err != nil {
 		return i, fmt.Errorf("error enqueueing item: %w", err)
@@ -334,7 +331,7 @@ func (q queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 		return ErrPriorityTooLow
 	}
 
-	qpi := QueuePartitionIndex{i.WorkflowID, priority}
+	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, At: at.Unix()}
 	keys := []string{
 		"queue:item", // Queue item
 		fmt.Sprintf("queue:sorted:%s", i.WorkflowID),   // Queue sorted set
@@ -349,11 +346,8 @@ func (q queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 		i,
 		i.ID.String(),
 		at.Unix(),
-		qpi,
-		QueuePartition{
-			QueuePartitionIndex: qpi,
-			Earliest:            at,
-		},
+		qp.WorkflowID.String(),
+		qp,
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error requeueing item: %w", err)
@@ -366,11 +360,45 @@ func (q queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	}
 }
 
-// Partition
-func (q queue) PartitionLease(ctx context.Context, qpi QueuePartitionIndex) (*QueuePartition, error) {
-	// TODO: Fetch partition item in lua, check partition lease, update item and index if available
-	panic("unimplemented")
-	return nil, nil
+// PartitionLease leases a parititon for a given workflow ID.  It returns the new lease ID.
+func (q queue) PartitionLease(ctx context.Context, wid uuid.UUID, duration time.Duration) (*ulid.ULID, error) {
+	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
+	// the pointer and back off.  A question here is enqueuing new items onto the partition
+	// will reset the pointer update, leading to thrash.
+	now := time.Now()
+	leaseExpires := now.Add(duration).UTC().Truncate(time.Millisecond)
+	leaseID, err := ulid.New(ulid.Timestamp(leaseExpires), rnd)
+	if err != nil {
+		return nil, fmt.Errorf("error generating id: %w", err)
+	}
+
+	keys := []string{
+		"partition:item",
+		"partition:sorted",
+	}
+	status, err := redis.NewScript(scripts["queue/partitionLease"]).Eval(
+		ctx,
+		q.r,
+		keys,
+
+		wid.String(),
+		leaseID.String(),
+		now.UnixMilli(),
+		leaseExpires.Unix(),
+	).Int64()
+	if err != nil {
+		return nil, fmt.Errorf("error leasing item: %w", err)
+	}
+	switch status {
+	case 0:
+		return &leaseID, nil
+	case 1:
+		return nil, ErrPartitionNotFound
+	case 2:
+		return nil, ErrPartitionAlreadyLeased
+	default:
+		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)
+	}
 }
 
 // PartitionPeek returns up to PartitionSelectionMax partition items from the queue. This
@@ -380,26 +408,32 @@ func (q queue) PartitionLease(ctx context.Context, qpi QueuePartitionIndex) (*Qu
 // available lease times. Otherwise, this shuffles all partitions and picks partitions
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
-func (q queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartitionIndex, error) {
+func (q queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
 	if limit > PartitionPeekMax {
 		return nil, ErrPartitionPeekMaxExceedsLimits
 	}
+	if limit <= 0 {
+		limit = PartitionPeekMax
+	}
 
-	encoded, err := q.r.ZRangeArgs(ctx, redis.ZRangeArgs{
-		Key:     "partition:sorted",
-		Start:   "-inf",
-		Stop:    until.Unix(),
-		ByScore: true,
-		Count:   limit,
-	}).Result()
+	encoded, err := redis.NewScript(scripts["queue/partitionPeek"]).Eval(
+		ctx,
+		q.r,
+		[]string{
+			"partition:sorted",
+			"partition:item",
+		},
+		until.Unix(),
+		limit,
+	).StringSlice()
 	if err != nil {
-		return nil, fmt.Errorf("error peeking partition: %w", err)
+		return nil, fmt.Errorf("error peeking queue items: %w", err)
 	}
 
 	weights := []float64{}
-	items := make([]*QueuePartitionIndex, len(encoded))
+	items := make([]*QueuePartition, len(encoded))
 	for n, i := range encoded {
-		item := &QueuePartitionIndex{}
+		item := &QueuePartition{}
 		if err = json.Unmarshal([]byte(i), item); err != nil {
 			return nil, fmt.Errorf("error reading partition item: %w", err)
 		}
@@ -419,7 +453,7 @@ func (q queue) PartitionPeek(ctx context.Context, sequential bool, until time.Ti
 	// randomized order favouring higher-priority queue items.  This reduces the chances
 	// of contention when leasing.
 	w := sampleuv.NewWeighted(weights, rnd)
-	result := make([]*QueuePartitionIndex, len(items))
+	result := make([]*QueuePartition, len(items))
 	for n := range result {
 		idx, ok := w.Take()
 		if !ok {
@@ -431,21 +465,69 @@ func (q queue) PartitionPeek(ctx context.Context, sequential bool, until time.Ti
 	return result, nil
 }
 
-// Requeue requeues a parition with a new score, ensuring that the partition will be read
-// at (or very close to) the given time.
+// PartitionRequeue requeues a parition with a new score, ensuring that the partition will be
+// read at (or very close to) the given time.
 //
 // This is used after peeking and passing all queue items onto workers; we then take the next
 // unleased available time for the queue item and requeue the partition.
 func (q queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at time.Time) error {
+	keys := []string{
+		"partition:item",
+		"partition:sorted",
+	}
+	status, err := redis.NewScript(scripts["queue/partitionRequeue"]).Eval(
+		ctx,
+		q.r,
+		keys,
+
+		workflowID.String(),
+		at.Unix(),
+	).Int64()
+	if err != nil {
+		return fmt.Errorf("error requeueing partition: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return ErrPartitionNotFound
+	default:
+		return fmt.Errorf("unknown response requeueing item: %d", status)
+	}
+}
+
+// PartitionDequeue removes a partition pointer from the queue.  This is used when peeking and
+// receiving zero items to run.
+func (q queue) PartitionDequeue(ctx context.Context, workflowID uuid.UUID, at time.Time) error {
 	panic("unimplemented")
-	return nil
 }
 
 // PartitionReprioritize reprioritizes a workflow's QueueItems within the queue.
 func (q queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID, priority uint) error {
-	// TODO: Remove the partition and index, and re-add atomically.
-	// We must remove the partition entirely as it's used within a ZSET,
-	// and when the structure changes we can no longer update it via ZADD.
-	panic("unimplemented")
-	return nil
+	if priority > PriorityMin {
+		return ErrPriorityTooLow
+	}
+	if priority < PriorityMax {
+		return ErrPriorityTooHigh
+	}
+
+	keys := []string{"partition:item"}
+	status, err := redis.NewScript(scripts["queue/partitionReprioritize"]).Eval(
+		ctx,
+		q.r,
+		keys,
+		workflowID.String(),
+		priority,
+	).Int64()
+	if err != nil {
+		return fmt.Errorf("error enqueueing item: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return ErrPartitionNotFound
+	default:
+		return fmt.Errorf("unknown response reprioritizing partition: %d", status)
+	}
 }

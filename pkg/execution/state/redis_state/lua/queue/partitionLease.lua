@@ -12,8 +12,8 @@ local partitionIndexKey = KEYS[2]
 
 local partitionID = ARGV[1]
 local leaseID     = ARGV[2]
-local currentTime = tonumber(ARGV[3]) -- in ms
-local leaseTime   = tonumber(ARGV[4]) -- in seconds
+local currentTime = tonumber(ARGV[3]) -- in ms, to check lease validation
+local leaseTime   = tonumber(ARGV[4]) -- in seconds, as partition score
 
 -- $include(get_partition_item.lua)
 -- $include(decode_ulid_time.lua)
@@ -29,6 +29,7 @@ end
 
 existing.leaseID = leaseID
 existing.at = leaseTime
+existing.last = math.floor(currentTime / 1000)
 
 -- Update item and index score
 redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
