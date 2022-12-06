@@ -46,7 +46,7 @@ func New(ctx context.Context, opts StartOpts) error {
 	// we run this before initializing the devserver serivce (even though it has Pre)
 	// because building images should happen and error early, prior to any other
 	// service starting.
-	el, _ := inmemorydatastore.NewFSLoader(ctx, opts.RootDir)
+	el, _ := inmemorydatastore.NewEmptyFSLoader(ctx, opts.RootDir)
 	if opts.Docker {
 		var err error
 		if el, err = prepareDockerImages(ctx, opts.RootDir); err != nil {
@@ -54,7 +54,7 @@ func New(ctx context.Context, opts StartOpts) error {
 		}
 	}
 
-	return start(ctx, opts, el.(*inmemorydatastore.FSLoader))
+	return start(ctx, opts, el)
 }
 
 func start(ctx context.Context, opts StartOpts, loader *inmemorydatastore.FSLoader) error {

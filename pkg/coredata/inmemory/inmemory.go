@@ -82,15 +82,22 @@ func NewFSLoader(ctx context.Context, path string) (coredata.ExecutionLoader, er
 	// for the dev server.  in this case, a single process hosts the
 	// runner and the executor together - and we don't want to process
 	// the directory multiple times within the same pid.
+	loader, err := NewEmptyFSLoader(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	if err := loader.ReadDir(ctx); err != nil {
+		return loader, err
+	}
+	return loader, nil
+}
+
+func NewEmptyFSLoader(ctx context.Context, path string) (*FSLoader, error) {
 	abspath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
 	}
-	loader := &FSLoader{root: abspath, MemoryExecutionLoader: &MemoryExecutionLoader{}}
-	if err := loader.ReadDir(ctx); err != nil {
-		return nil, err
-	}
-	return loader, nil
+	return &FSLoader{root: abspath, MemoryExecutionLoader: &MemoryExecutionLoader{}}, nil
 }
 
 // MemoryExecutionLoader is a function and action loader which returns data from
