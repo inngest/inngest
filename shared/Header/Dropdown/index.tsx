@@ -4,7 +4,7 @@ import NavLink from "./NavLink";
 
 export default function HeaderDropdown({ navLinks }) {
   return (
-    <div className="overflow-hidden px-2 lg:px-0 lg:overflow-auto lg:bg-slate-950 lg:rounded-lg lg:absolute top-[70px] -left-4 lg:hidden group-hover:lg:block">
+    <div className="overflow-hidden px-2 md:px-5 lg:px-0 lg:overflow-auto lg:bg-slate-950 lg:rounded-lg lg:absolute top-[70px] -left-4 lg:hidden group-hover:lg:block">
       <div className="flex flex-col md:w-[520px]">
         <div className="flex w-full flex-col">
           <h3 className="text-base lg:text-2xs lg:uppercase text-slate-200 font-semibold mb-1 px-5 pt-3">

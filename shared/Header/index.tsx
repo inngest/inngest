@@ -32,11 +32,24 @@ export default function Header() {
         `sticky backdrop-blur-sm top-0 left-0 right-0 z-50 transition-colors duration-200`
       )}
     >
-      <Container className="flex justify-between items-center  py-5 lg:py-0">
+      <Container className="flex justify-between items-center px-0 md:px-0">
         <div className="flex  items-center w-full">
-          <a href="/" className="mr-4">
-            <Logo className="text-white w-20 relative top-[2px]" />
-          </a>
+          <div
+            className={classNames(
+              menuState ? `bg-slate-900` : ``,
+              `lg:bg-transparent flex px-6 md:px-10 items-center py-5 lg:py-0 w-full lg:w-auto lg:px-0 justify-between`
+            )}
+          >
+            <a href="/" className="mr-4">
+              <Logo className="text-white w-20 relative top-[2px]" />
+            </a>
+            <button
+              className="text-slate-400 xl:m lg:hidden"
+              onClick={() => toggleMenu()}
+            >
+              {menuState ? <CloseMenu /> : <BurgerMenu />}
+            </button>
+          </div>
           <nav
             className={classNames(
               menuState ? `block` : `hidden`,
@@ -60,7 +73,7 @@ export default function Header() {
                 <li>
                   <a
                     href="/pricing?ref=nav"
-                    className="flex mt-4 lg:mt-0 items-center text-white font-medium px-8 lg:px-5 py-2 text-sm  hover:opacity-60"
+                    className="flex mt-4 lg:mt-0 items-center text-white font-medium px-7 md:px-10 lg:px-5 py-2 text-sm  hover:opacity-60"
                   >
                     Pricing
                   </a>
@@ -68,13 +81,13 @@ export default function Header() {
                 <li>
                   <a
                     href="/blog?ref=nav"
-                    className="flex items-center text-white font-medium px-8 lg:px-5 py-2 text-sm  hover:opacity-60"
+                    className="flex items-center text-white font-medium px-7 md:px-10 lg:px-5 py-2 text-sm  hover:opacity-60"
                   >
                     Blog
                   </a>
                 </li>
               </ul>
-              <ul className="flex lg:items-center mt-2 lg:mt-0">
+              <ul className="flex lg:items-center mt-6 lg:mt-0 md:px-3">
                 <li>
                   <a
                     href="https://github.com/inngest/inngest"
@@ -101,7 +114,7 @@ export default function Header() {
                 </li>
               </ul>
             </div>
-            <div className="px-8 py-8 lg:py-0 lg:px-0 flex gap-6 items-center lg:w-1/3 lg:justify-end">
+            <div className="px-8 md:px-10 py-8 lg:py-0 lg:px-0 flex gap-6 items-center lg:w-1/3 lg:justify-end">
               <a
                 href="https://app.inngest.com/login?ref=nav"
                 className="text-white font-medium text-sm  hover:opacity-60 duration-150 transition-all"
@@ -119,12 +132,6 @@ export default function Header() {
             </div>
           </nav>
         </div>
-        <button
-          className="text-slate-400 xl:m lg:hidden"
-          onClick={() => toggleMenu()}
-        >
-          {menuState ? <CloseMenu /> : <BurgerMenu />}
-        </button>
       </Container>
     </header>
   );
