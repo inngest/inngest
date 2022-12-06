@@ -1,5 +1,6 @@
 import styled from "@emotion/styled";
 import Head from "next/head";
+import Image from "next/image";
 import rehypeSlug from "rehype-slug";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
@@ -118,7 +119,13 @@ export default function BlogLayout(props) {
             <main className="m-auto max-w-3xl pt-16">
               {scope.image && (
                 <figure className="flex flex-col items-end">
-                  <img src={scope.image} className="rounded-lg shadow-lg" />
+                  <Image
+                    className="rounded-lg shadow-lg"
+                    src={scope.image}
+                    width={768}
+                    height={768 / 2}
+                    quality={95}
+                  />
                   {scope.imageCredits && (
                     <figcaption
                       className="text-xs text-slate-400 mt-2"

@@ -1,6 +1,7 @@
 import styled from "@emotion/styled";
 import Head from "next/head";
 import { useRouter } from "next/router";
+import Image from "next/image";
 
 import IconCalendar from "src/shared/Icons/Calendar";
 import ArrowRight from "src/shared/Icons/ArrowRight";
@@ -85,10 +86,15 @@ export default function BlogLayout(props) {
                   </span>
                 </div>
                 {focus.image && (
-                  <img
-                    src={focus.image}
-                    className="lg:w-3/5 rounded-t-lg lg:rounded-t-none lg:rounded-r-lg relative group-hover:scale-105 group-hover:rounded-lg transition-all"
-                  />
+                  <div className="lg:w-3/5 flex rounded-t-lg lg:rounded-t-none lg:rounded-r-lg relative group-hover:scale-105 group-hover:rounded-lg transition-all">
+                    <Image
+                      className="rounded-t-lg lg:rounded-t-none lg:rounded-r-lg group-hover:rounded-lg"
+                      src={focus.image}
+                      width={900}
+                      height={900 / 2}
+                      quality={95}
+                    />
+                  </div>
                 )}
               </a>
             )}
@@ -101,10 +107,15 @@ export default function BlogLayout(props) {
                     className="group flex flex-col rounded-lg ease-out transition-all "
                   >
                     {item.image && (
-                      <img
-                        className="rounded-lg shadow group-hover:scale-105 transition-all"
-                        src={item.image}
-                      />
+                      <div className="flex rounded-lg shadow group-hover:scale-105 transition-all">
+                        {/* We use 720 as the responsive view goes full width at 720px viewport width */}
+                        <Image
+                          className="rounded-lg"
+                          src={item.image}
+                          width={720}
+                          height={720 / 2}
+                        />
+                      </div>
                     )}
                     <div className="pt-4 xl:pt-6 xl:py-4">
                       <h2 className="text-base xl:text-lg text-white mb-1 group-hover:text-indigo-400 transition-all">
