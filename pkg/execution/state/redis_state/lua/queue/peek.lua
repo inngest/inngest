@@ -1,6 +1,6 @@
 --[[
 
-Peek returns items from the queue that are unleased.
+Peek returns items from the queue in order.
 
 ]]
 
