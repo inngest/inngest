@@ -2,11 +2,16 @@
 build: #get-library generate-library
 	yarn build
 
-.PHONY: cloudflare-build
-cloudflare-build:
+# Create a production build
+.PHONY: build-prod
+build-prod:
 	yarn build
 	yarn next export
 	yarn render-social-preview-images
+
+.PHONY: cloudflare-build
+cloudflare-build:
+	make build-prod
 	cp ./_redirects ./out/_redirects
 
 .PHONY: dirty

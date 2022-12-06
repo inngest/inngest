@@ -12,6 +12,8 @@ module.exports = {
         destination: "http://eepurl.com/hI3dCr",
         permanent: true,
       },
+      // Legacy docs pages - These should be able to be removed after we
+      // remove all legacy CLI + Cloud docs
       {
         source: "/docs/quick-start",
         destination: "/docs",
