@@ -1,7 +1,7 @@
 export default function IconBackgroundTasks() {
   return (
     <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
-      <g fill-rule="nonzero" fill="none">
+      <g fillRule="nonzero" fill="none">
         <path
           d="M4.75 15.75v-8a2.652 2.652 0 0 1 3-3h8a2.652 2.652 0 0 1 3 3v8a2.652 2.652 0 0 1-3 3h-8a2.652 2.652 0 0 1-3-3Z"
           fill="#6366F1"

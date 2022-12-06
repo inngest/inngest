@@ -10,11 +10,11 @@ export default function IconWritingFns() {
       <g
         id="Scratchpad"
         stroke="none"
-        stroke-width="1"
+        strokeWidth="1"
         fill="none"
-        fill-rule="evenodd"
+        fillRule="evenodd"
       >
-        <g id="Group" fill-rule="nonzero">
+        <g id="Group" fillRule="nonzero">
           <rect
             id="Rectangle-Copy-38"
             fill="#FFFFFF"

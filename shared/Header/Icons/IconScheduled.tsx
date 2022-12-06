@@ -1,7 +1,7 @@
 export default function IconScheduled() {
   return (
     <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
-      <g fill-rule="nonzero" fill="none">
+      <g fillRule="nonzero" fill="none">
         <path
           d="M7.1432 19.3575A7.9927 7.9927 0 0 0 8.871 20.365l-.979 1.6956c-.276.4783-.8877.6421-1.366.366-.4783-.2761-.6421-.8877-.366-1.366l.9832-1.703Zm7.9935 1.0042a7.9931 7.9931 0 0 0 1.7267-1.0093l.9687 1.6777c.276.4783.1122 1.09-.366 1.366-.4784.2762-1.09.1123-1.3661-.366l-.9633-1.6684Z"
           fill="#FFF"

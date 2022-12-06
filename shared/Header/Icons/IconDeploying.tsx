@@ -10,9 +10,9 @@ export default function IconDeploying() {
       <g
         id="Scratchpad"
         stroke="none"
-        stroke-width="1"
+        strokeWidth="1"
         fill="none"
-        fill-rule="evenodd"
+        fillRule="evenodd"
       >
         <g id="Group-8">
           <rect
@@ -27,7 +27,7 @@ export default function IconDeploying() {
           <g
             id="cloud-upload"
             transform="translate(3.000000, 3.000000)"
-            fill-rule="nonzero"
+            fillRule="nonzero"
           >
             <path
               d="M2.74714567,11.0425758 C1.09410362,9.9740356 0,8.1147886 0,6 C0,2.6862915 2.6862915,0 6,0 C8.7957591,0 11.1449096,1.91215918 11.8109738,4.5 L14.25,4.5 C16.3210678,4.5 18,6.17893219 18,8.25 C18,10.3210678 16.3210678,12 14.25,12 L5.25,12 C4.28817895,12 3.41093178,11.6378962 2.74714567,11.0425758 Z"

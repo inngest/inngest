@@ -1,7 +1,7 @@
 export default function IconSendEvents() {
   return (
     <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
-      <g fill-rule="nonzero" fill="none">
+      <g fillRule="nonzero" fill="none">
         <path
           d="M8.3333 13.0697 19.7431 12 8.3333 10.9303V6.2908a.4583.4583 0 0 1 .6465-.418l12.687 5.7092a.4583.4583 0 0 1 0 .836L8.9798 18.127a.4583.4583 0 0 1-.6465-.418v-4.6394Z"
           fill="#3B82F6"
