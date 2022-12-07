@@ -481,7 +481,7 @@ export default function FeaturesSDK() {
                 .height,
               description:
                 "Run background jobs without workers or setting up a queue",
-              href: "/docs/deploy/express",
+              href: "/docs/frameworks/express",
             },
             {
               type: "Platform Guide",

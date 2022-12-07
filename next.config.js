@@ -1,5 +1,4 @@
 module.exports = {
-  // All redirects must also be copied to ./_redirects for production on Cloudflare Pages
   async redirects() {
     return [
       {
@@ -14,16 +13,6 @@ module.exports = {
       },
       // Legacy docs pages - These should be able to be removed after we
       // remove all legacy CLI + Cloud docs
-      {
-        source: "/docs/deploy/nextjs",
-        destination: "/docs/frameworks/nextjs",
-        permanent: false,
-      },
-      {
-        source: "/docs/deploy/express",
-        destination: "/docs/frameworks/express",
-        permanent: false,
-      },
       {
         source: "/docs/quick-start",
         destination: "/docs",
