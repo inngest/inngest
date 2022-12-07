@@ -114,8 +114,7 @@ package config
 // # Queues
 //
 
-// @TODO: Add SQS.
-#QueueService: #InmemQueue | #SQSQueue
+#QueueService: #InmemQueue | #SQSQueue | #RedisQueue
 
 #InmemQueue: {
 	backend: "inmemory"
@@ -133,6 +132,26 @@ package config
 	// concurrency specifies how many concurrent queue items - and therefore
 	// function steps - can be handled in parallel.
 	concurrency: >=1 | *10
+}
+
+// RedisState uses Redis as the backend state store.
+#RedisQueue: {
+	backend: "redis"
+
+	// If DSN is supplied (eg. redis://user:pass@host:port/db), this
+	// will override any of the options provided below.
+	dsn?: string
+
+	host:        string | *"localhost"
+	port:        >0 & <=65535 | *6379
+	db:          >=0 | *0
+	username?:   string
+	password?:   string
+	maxRetries?: >=-1 | *3
+	poolSize?:   >=1
+
+	// keyPrefix is the prefix used for all redis keys stored
+	keyPrefix: string | *""
 }
 
 // # State

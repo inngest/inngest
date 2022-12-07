@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
 	"gonum.org/v1/gonum/stat/sampleuv"
 )
@@ -26,6 +27,8 @@ const (
 
 	PriorityMax uint = 0
 	PriorityMin uint = 9
+
+	pollPeriod = 20 * time.Millisecond
 )
 
 var (
@@ -57,10 +60,13 @@ func init() {
 // PriorityFinder returns the priority for a given workflow.
 type PriorityFinder func(ctx context.Context, workflowID uuid.UUID) uint
 
+// queue represents
 type queue struct {
 	metrics any
 	r       *redis.Client
 	pf      PriorityFinder
+
+	workers chan *QueueItem
 }
 
 // QueueItem represents an individually queued work scheduled for some time in the
@@ -76,7 +82,7 @@ type QueueItem struct {
 	LeaseID *ulid.ULID `json:"leaseID"`
 	// Data represents the enqueued data, eg. the edge to process or the pause
 	// to resume.
-	Data any `json:"data"`
+	Data osqueue.Item `json:"data"`
 }
 
 func (q QueueItem) MarshalBinary() ([]byte, error) {
@@ -126,7 +132,11 @@ func (q queue) Enqueue(ctx context.Context, i QueueItem, at time.Time) (QueueIte
 		i.ID = ulid.MustNew(ulid.Now(), rnd)
 	}
 
-	priority := q.pf(ctx, i.WorkflowID)
+	priority := PriorityMin
+	if q.pf != nil {
+		priority = q.pf(ctx, i.WorkflowID)
+	}
+
 	if priority > PriorityMin {
 		return i, ErrPriorityTooLow
 	}
@@ -326,7 +336,12 @@ func (q queue) Dequeue(ctx context.Context, i QueueItem) error {
 
 func (q queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	// TODO: remove in-progress counter if claimed.
-	priority := q.pf(ctx, i.WorkflowID)
+
+	priority := PriorityMin
+	if q.pf != nil {
+		priority = q.pf(ctx, i.WorkflowID)
+	}
+
 	if priority > PriorityMin {
 		return ErrPriorityTooLow
 	}

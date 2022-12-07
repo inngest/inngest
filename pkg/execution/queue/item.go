@@ -60,10 +60,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		i.Payload = *p
-	default:
-		return fmt.Errorf("unknown queue kind: %s", temp.Kind)
 	}
-
 	return nil
 }
 
