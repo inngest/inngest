@@ -60,11 +60,11 @@ func init() {
 // PriorityFinder returns the priority for a given workflow.
 type PriorityFinder func(ctx context.Context, workflowID uuid.UUID) uint
 
-// queue represents
 type queue struct {
 	metrics any
 	r       *redis.Client
 	pf      PriorityFinder
+	kg      QueueKeyGenerator
 
 	workers chan *QueueItem
 }
@@ -146,11 +146,11 @@ func (q queue) Enqueue(ctx context.Context, i QueueItem, at time.Time) (QueueIte
 
 	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, At: at.Unix()}
 	keys := []string{
-		"queue:item", // Queue item
-		fmt.Sprintf("queue:sorted:%s", i.WorkflowID), // Queue sorted set
-		"partition:item", // Partition item, map
-		fmt.Sprintf("partition:item:%s", i.WorkflowID), // Partition item
-		"partition:sorted", // Global partition queue
+		q.kg.QueueItem(),                          // Queue item
+		q.kg.QueueIndex(i.WorkflowID.String()),    // Queue sorted set
+		q.kg.PartitionItem(),                      // Partition item, map
+		q.kg.PartitionMeta(i.WorkflowID.String()), // Partition item
+		q.kg.PartitionIndex(),                     // Global partition queue
 	}
 	status, err := redis.NewScript(scripts["queue/enqueue"]).Eval(
 		ctx,
@@ -193,8 +193,8 @@ func (q queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, 
 		ctx,
 		q.r,
 		[]string{
-			fmt.Sprintf("queue:sorted:%s", workflowID),
-			"queue:item",
+			q.kg.QueueIndex(workflowID.String()),
+			q.kg.QueueItem(),
 		},
 		until.Unix(),
 		limit,
@@ -238,9 +238,9 @@ func (q queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULID
 	}
 
 	keys := []string{
-		"queue:item", // Queue item
-		fmt.Sprintf("queue:sorted:%s", workflowID),   // Queue sorted set
-		fmt.Sprintf("partition:item:%s", workflowID), // Partition item
+		q.kg.QueueItem(),
+		q.kg.QueueIndex(workflowID.String()),
+		q.kg.PartitionMeta(workflowID.String()),
 	}
 	status, err := redis.NewScript(scripts["queue/lease"]).Eval(
 		ctx,
@@ -280,8 +280,8 @@ func (q queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, 
 	}
 
 	keys := []string{
-		"queue:item", // Queue item
-		fmt.Sprintf("queue:sorted:%s", i.WorkflowID), // Queue sorted set
+		q.kg.QueueItem(),
+		q.kg.QueueIndex(i.WorkflowID.String()),
 	}
 	status, err := redis.NewScript(scripts["queue/extendLease"]).Eval(
 		ctx,
@@ -311,9 +311,9 @@ func (q queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, 
 // Dequeue removes an item from the queue entirely.
 func (q queue) Dequeue(ctx context.Context, i QueueItem) error {
 	keys := []string{
-		"queue:item", // Queue item
-		fmt.Sprintf("queue:sorted:%s", i.WorkflowID),   // Queue sorted set
-		fmt.Sprintf("partition:item:%s", i.WorkflowID), // Queue sorted set
+		q.kg.QueueItem(),
+		q.kg.QueueIndex(i.WorkflowID.String()),
+		q.kg.PartitionMeta(i.WorkflowID.String()),
 	}
 	status, err := redis.NewScript(scripts["queue/dequeue"]).Eval(
 		ctx,
@@ -348,10 +348,10 @@ func (q queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 
 	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, At: at.Unix()}
 	keys := []string{
-		"queue:item", // Queue item
-		fmt.Sprintf("queue:sorted:%s", i.WorkflowID),   // Queue sorted set
-		fmt.Sprintf("partition:item:%s", i.WorkflowID), // Partition item
-		"partition:sorted",                             // Global partition queue
+		q.kg.QueueItem(),
+		q.kg.QueueIndex(i.WorkflowID.String()),
+		q.kg.PartitionMeta(i.WorkflowID.String()),
+		q.kg.PartitionIndex(),
 	}
 	status, err := redis.NewScript(scripts["queue/requeue"]).Eval(
 		ctx,
@@ -388,8 +388,8 @@ func (q queue) PartitionLease(ctx context.Context, wid uuid.UUID, duration time.
 	}
 
 	keys := []string{
-		"partition:item",
-		"partition:sorted",
+		q.kg.PartitionItem(),
+		q.kg.PartitionIndex(),
 	}
 	status, err := redis.NewScript(scripts["queue/partitionLease"]).Eval(
 		ctx,
@@ -435,8 +435,8 @@ func (q queue) PartitionPeek(ctx context.Context, sequential bool, until time.Ti
 		ctx,
 		q.r,
 		[]string{
-			"partition:sorted",
-			"partition:item",
+			q.kg.PartitionIndex(),
+			q.kg.PartitionItem(),
 		},
 		until.Unix(),
 		limit,
@@ -487,8 +487,8 @@ func (q queue) PartitionPeek(ctx context.Context, sequential bool, until time.Ti
 // unleased available time for the queue item and requeue the partition.
 func (q queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at time.Time) error {
 	keys := []string{
-		"partition:item",
-		"partition:sorted",
+		q.kg.PartitionItem(),
+		q.kg.PartitionIndex(),
 	}
 	status, err := redis.NewScript(scripts["queue/partitionRequeue"]).Eval(
 		ctx,
@@ -526,7 +526,7 @@ func (q queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID, 
 		return ErrPriorityTooHigh
 	}
 
-	keys := []string{"partition:item"}
+	keys := []string{q.kg.PartitionItem()}
 	status, err := redis.NewScript(scripts["queue/partitionReprioritize"]).Eval(
 		ctx,
 		q.r,
