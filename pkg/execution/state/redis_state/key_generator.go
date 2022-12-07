@@ -128,6 +128,10 @@ type QueueKeyGenerator interface {
 	// PartitionMeta returns the key to store metadata for partitions, eg.
 	// the number of items enqueued, number in progress, etc.
 	PartitionMeta(id string) string
+
+	// Sequential returns the key which allows a worker to claim sequential processing
+	// of the partitions.
+	Sequential() string
 }
 
 type DefaultQueueKeyGenerator struct {
@@ -152,4 +156,8 @@ func (d DefaultQueueKeyGenerator) PartitionIndex() string {
 
 func (d DefaultQueueKeyGenerator) PartitionMeta(id string) string {
 	return fmt.Sprintf("%s:partition:meta:%s", d.Prefix, id)
+}
+
+func (d DefaultQueueKeyGenerator) Sequential() string {
+	return fmt.Sprintf("%s:queue:sequential", d.Prefix)
 }

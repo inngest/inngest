@@ -13,22 +13,24 @@ import (
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
+	"github.com/uber-go/tally"
 	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
 const (
-	PartitionSelectionMax  int64 = 20
-	PartitionPeekMax       int64 = PartitionSelectionMax * 3
-	PartitionLeaseDuration       = 2 * time.Second
-	QueueSelectionMax      int64 = 50
-	QueuePeekMax           int64 = 1000
-	QueuePeekDefault       int64 = QueueSelectionMax * 3
-	QueueLeaseDuration           = 10 * time.Second
+	PartitionSelectionMax   int64 = 20
+	PartitionPeekMax        int64 = PartitionSelectionMax * 3
+	PartitionLeaseDuration        = 2 * time.Second
+	QueueSelectionMax       int64 = 50
+	QueuePeekMax            int64 = 1000
+	QueuePeekDefault        int64 = QueueSelectionMax * 3
+	QueueLeaseDuration            = 10 * time.Second
+	SequentialLeaseDuration       = 10 * time.Second
+	SequentialLeaseMax            = 20 * time.Second
 
-	PriorityMax uint = 0
-	PriorityMin uint = 9
-
-	pollPeriod = 20 * time.Millisecond
+	PriorityMax     uint = 0
+	PriorityDefault uint = 5
+	PriorityMin     uint = 9
 )
 
 var (
@@ -44,6 +46,8 @@ var (
 	ErrPartitionNotFound             = fmt.Errorf("partition not found")
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
+	ErrSequentialAlreadyLeased       = fmt.Errorf("sequential scanner already leased")
+	ErrSequentialLeaseExceedsLimits  = fmt.Errorf("sequential lease duration exceeds the maximum of %d seconds", int(SequentialLeaseMax.Seconds()))
 )
 
 var (
@@ -60,13 +64,61 @@ func init() {
 // PriorityFinder returns the priority for a given workflow.
 type PriorityFinder func(ctx context.Context, workflowID uuid.UUID) uint
 
-type queue struct {
-	metrics any
-	r       *redis.Client
-	pf      PriorityFinder
-	kg      QueueKeyGenerator
+type QueueOpt func(q *queue)
 
-	workers chan *QueueItem
+func WithName(name string) func(q *queue) {
+	return func(q *queue) {
+		q.name = name
+	}
+}
+
+func WithMetricsScope(scope tally.Scope) func(q *queue) {
+	return func(q *queue) {
+		q.metrics = scope
+	}
+}
+
+func WithPriorityFinder(pf PriorityFinder) func(q *queue) {
+	return func(q *queue) {
+		q.pf = pf
+	}
+}
+
+func WithQueueKeyGenerator(kg QueueKeyGenerator) func(q *queue) {
+	return func(q *queue) {
+		q.kg = kg
+	}
+}
+
+func NewQueue(r *redis.Client, opts ...QueueOpt) *queue {
+	q := &queue{
+		r: r,
+		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
+			return PriorityDefault
+		},
+		kg:      defaultQueueKey,
+		metrics: tally.NewTestScope("queue", map[string]string{}),
+	}
+
+	for _, opt := range opts {
+		opt(q)
+	}
+
+	return q
+}
+
+type queue struct {
+	// name is the identifiable name for this worker, for logging.
+	name string
+	// redis stores the redis connection to use.
+	r  *redis.Client
+	pf PriorityFinder
+	kg QueueKeyGenerator
+	// metrics allows reporting of metrics
+	metrics tally.Scope
+
+	workers    chan *QueueItem
+	seqLeaseID *ulid.ULID
 }
 
 // QueueItem represents an individually queued work scheduled for some time in the
@@ -122,12 +174,12 @@ func (q QueuePartition) MarshalBinary() ([]byte, error) {
 	return json.Marshal(q)
 }
 
-// Enqueue enqueues a QueueItem.  It creates a QueuePartition for the workspace
+// EnqueueItem enqueues a QueueItem.  It creates a QueuePartition for the workspace
 // if a partition does not exist.
 //
 // The QueueItem's ID can be a zero UUID;  if the ID is a zero value a new ID
 // will be created for the queue item.
-func (q queue) Enqueue(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error) {
+func (q queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error) {
 	if i.ID.Compare(ulid.ULID{}) == 0 {
 		i.ID = ulid.MustNew(ulid.Now(), rnd)
 	}
@@ -544,5 +596,51 @@ func (q queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID, 
 		return ErrPartitionNotFound
 	default:
 		return fmt.Errorf("unknown response reprioritizing partition: %d", status)
+	}
+}
+
+// LeaseSequential allows a worker to lease sequential processing.  If leased, this allows a worker
+// to peek partitions sequentially.  Leasing this key works similar to leasing partitions or queue items:
+//
+// - If the key isn't leased, a new lease is accepted.
+// - If the lease is expired, a new lease is accepted.
+// - If the key is leased, you must pass in the existing lease ID to renew the lease.  Mismatches do not
+//   grant a lease.
+//
+// This returns the new lease ID on success.
+func (q queue) LeaseSequential(ctx context.Context, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
+	if duration > SequentialLeaseMax {
+		return nil, ErrSequentialLeaseExceedsLimits
+	}
+
+	now := time.Now()
+	newLeaseID, err := ulid.New(ulid.Timestamp(now.Add(duration)), rnd)
+	if err != nil {
+		return nil, err
+	}
+
+	var existing string
+	if len(existingLeaseID) > 0 && existingLeaseID[0] != nil {
+		existing = existingLeaseID[0].String()
+	}
+
+	status, err := redis.NewScript(scripts["queue/sequentialLease"]).Eval(
+		ctx,
+		q.r,
+		[]string{q.kg.Sequential()},
+		now.UnixMilli(),
+		newLeaseID.String(),
+		existing,
+	).Int64()
+	if err != nil {
+		return nil, fmt.Errorf("error claiming sequential lease: %w", err)
+	}
+	switch status {
+	case 0:
+		return &newLeaseID, nil
+	case 1:
+		return nil, ErrSequentialAlreadyLeased
+	default:
+		return nil, fmt.Errorf("unknown response claiming sequential lease: %d", status)
 	}
 }

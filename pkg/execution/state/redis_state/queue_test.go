@@ -14,23 +14,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testPriority = 4
+const testPriority = PriorityDefault
 
-func TestQueueEnqueue(t *testing.T) {
+func TestQueueEnqueueItem(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := queue{
-		kg: DefaultQueueKeyGenerator{},
-		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
-		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return testPriority
-		},
-	}
+	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
 
 	t.Run("It enqueues an item", func(t *testing.T) {
-		item, err := q.Enqueue(ctx, QueueItem{}, start)
+		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 		require.NotEqual(t, item.ID, ulid.ULID{})
 
@@ -49,7 +43,7 @@ func TestQueueEnqueue(t *testing.T) {
 
 	t.Run("It sets the right item score", func(t *testing.T) {
 		start := time.Now().Truncate(time.Second)
-		item, err := q.Enqueue(ctx, QueueItem{}, start)
+		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 
 		requireItemScoreEquals(t, r, item, start)
@@ -57,7 +51,7 @@ func TestQueueEnqueue(t *testing.T) {
 
 	t.Run("It enqueues an item in the future", func(t *testing.T) {
 		at := time.Now().Add(time.Hour).Truncate(time.Second)
-		item, err := q.Enqueue(ctx, QueueItem{}, at)
+		item, err := q.EnqueueItem(ctx, QueueItem{}, at)
 		require.NoError(t, err)
 
 		// Ensure the partition is inserted, and the earliest time is still
@@ -80,7 +74,7 @@ func TestQueueEnqueue(t *testing.T) {
 
 	t.Run("Updates partition vesting time to earlier times", func(t *testing.T) {
 		at := time.Now().Add(-10 * time.Minute).Truncate(time.Second)
-		item, err := q.Enqueue(ctx, QueueItem{}, at)
+		item, err := q.EnqueueItem(ctx, QueueItem{}, at)
 		require.NoError(t, err)
 
 		// Ensure the partition is inserted, and the earliest time is updated
@@ -103,7 +97,7 @@ func TestQueueEnqueue(t *testing.T) {
 
 	t.Run("Adding another workflow ID increases partition set", func(t *testing.T) {
 		at := time.Now().Truncate(time.Second)
-		item, err := q.Enqueue(ctx, QueueItem{
+		item, err := q.EnqueueItem(ctx, QueueItem{
 			WorkflowID: uuid.New(),
 		}, at)
 		require.NoError(t, err)
@@ -126,13 +120,7 @@ func TestQueueEnqueue(t *testing.T) {
 
 func TestQueuePeek(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := queue{
-		kg: DefaultQueueKeyGenerator{},
-		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
-		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return testPriority
-		},
-	}
+	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
 	ctx := context.Background()
 
 	t.Run("It returns none with no items enqueued", func(t *testing.T) {
@@ -147,11 +135,11 @@ func TestQueuePeek(t *testing.T) {
 		c := b.Add(2 * time.Second)
 		d := c.Add(2 * time.Second)
 
-		ia, err := q.Enqueue(ctx, QueueItem{}, a)
+		ia, err := q.EnqueueItem(ctx, QueueItem{}, a)
 		require.NoError(t, err)
-		ib, err := q.Enqueue(ctx, QueueItem{}, b)
+		ib, err := q.EnqueueItem(ctx, QueueItem{}, b)
 		require.NoError(t, err)
-		ic, err := q.Enqueue(ctx, QueueItem{}, c)
+		ic, err := q.EnqueueItem(ctx, QueueItem{}, c)
 		require.NoError(t, err)
 
 		items, err := q.Peek(ctx, uuid.UUID{}, time.Now().Add(time.Hour), 10)
@@ -160,7 +148,7 @@ func TestQueuePeek(t *testing.T) {
 		require.EqualValues(t, []*QueueItem{&ia, &ib, &ic}, items)
 		require.NotEqualValues(t, []*QueueItem{&ib, &ia, &ic}, items)
 
-		id, err := q.Enqueue(ctx, QueueItem{}, d)
+		id, err := q.EnqueueItem(ctx, QueueItem{}, d)
 		require.NoError(t, err)
 
 		items, err = q.Peek(ctx, uuid.UUID{}, time.Now().Add(time.Hour), 10)
@@ -212,18 +200,12 @@ func TestQueuePeek(t *testing.T) {
 
 func TestQueueLease(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := queue{
-		kg: DefaultQueueKeyGenerator{},
-		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
-		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return testPriority
-		},
-	}
+	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
 	t.Run("It leases an item", func(t *testing.T) {
-		item, err := q.Enqueue(ctx, QueueItem{}, start)
+		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -272,7 +254,7 @@ func TestQueueLease(t *testing.T) {
 
 		t.Run("It should increase the score of the item by the lease duration", func(t *testing.T) {
 			start := time.Now().Truncate(time.Second)
-			item, err := q.Enqueue(ctx, QueueItem{}, start)
+			item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 			require.NoError(t, err)
 			require.Nil(t, item.LeaseID)
 
@@ -288,18 +270,12 @@ func TestQueueLease(t *testing.T) {
 
 func TestQueueExtendLease(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := queue{
-		kg: DefaultQueueKeyGenerator{},
-		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
-		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return testPriority
-		},
-	}
+	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
 	t.Run("It leases an item", func(t *testing.T) {
-		item, err := q.Enqueue(ctx, QueueItem{}, start)
+		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -331,7 +307,7 @@ func TestQueueExtendLease(t *testing.T) {
 	})
 
 	t.Run("It does not extend an unleased item", func(t *testing.T) {
-		item, err := q.Enqueue(ctx, QueueItem{}, start)
+		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -348,19 +324,13 @@ func TestQueueExtendLease(t *testing.T) {
 
 func TestQueueDequeue(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := queue{
-		kg: DefaultQueueKeyGenerator{},
-		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
-		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return testPriority
-		},
-	}
+	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
 	ctx := context.Background()
 
 	t.Run("It should remove a queue item", func(t *testing.T) {
 		start := time.Now()
 
-		item, err := q.Enqueue(ctx, QueueItem{}, start)
+		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 
 		id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
@@ -393,7 +363,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		t.Run("It should work if the item is not leased (eg. deletions)", func(t *testing.T) {
-			item, err := q.Enqueue(ctx, QueueItem{}, start)
+			item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 			require.NoError(t, err)
 
 			err = q.Dequeue(ctx, item)
@@ -407,19 +377,13 @@ func TestQueueDequeue(t *testing.T) {
 
 func TestQueueRequeue(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := queue{
-		kg: DefaultQueueKeyGenerator{},
-		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
-		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return testPriority
-		},
-	}
+	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
 	ctx := context.Background()
 
 	t.Run("Re-enqueuing a leased item should succeed", func(t *testing.T) {
 		now := time.Now().Truncate(time.Second)
 
-		item, err := q.Enqueue(ctx, QueueItem{}, now)
+		item, err := q.EnqueueItem(ctx, QueueItem{}, now)
 		require.NoError(t, err)
 		_, err = q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
 		require.NoError(t, err)
@@ -453,7 +417,7 @@ func TestQueueRequeue(t *testing.T) {
 		})
 
 		t.Run("It should not update the partition's earliest time, if later", func(t *testing.T) {
-			_, err := q.Enqueue(ctx, QueueItem{}, now)
+			_, err := q.EnqueueItem(ctx, QueueItem{}, now)
 			require.NoError(t, err)
 
 			requirePartitionScoreEquals(t, r, pi.WorkflowID, now)
@@ -474,20 +438,14 @@ func TestQueuePartitionLease(t *testing.T) {
 	atA, atB, atC := now, now.Add(time.Second), now.Add(2*time.Second)
 
 	r := miniredis.RunT(t)
-	q := queue{
-		kg: DefaultQueueKeyGenerator{},
-		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
-		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return testPriority
-		},
-	}
+	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
 	ctx := context.Background()
 
-	_, err := q.Enqueue(ctx, QueueItem{WorkflowID: idA}, atA)
+	_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, atA)
 	require.NoError(t, err)
-	_, err = q.Enqueue(ctx, QueueItem{WorkflowID: idB}, atB)
+	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idB}, atB)
 	require.NoError(t, err)
-	_, err = q.Enqueue(ctx, QueueItem{WorkflowID: idC}, atC)
+	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idC}, atC)
 	require.NoError(t, err)
 
 	t.Run("Partitions are in order after enqueueing", func(t *testing.T) {
@@ -564,25 +522,24 @@ func TestQueuePartitionPeek(t *testing.T) {
 	atA, atB, atC := now, now.Add(time.Second), now.Add(2*time.Second)
 
 	r := miniredis.RunT(t)
-	q := queue{
-		kg: DefaultQueueKeyGenerator{},
-		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
-		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
+	q := NewQueue(
+		redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		WithPriorityFinder(func(ctx context.Context, workflowID uuid.UUID) uint {
 			switch workflowID {
 			case idB, idC:
 				return PriorityMax
 			default:
 				return PriorityMin // Sorry A
 			}
-		},
-	}
+		}),
+	)
 	ctx := context.Background()
 
-	_, err := q.Enqueue(ctx, QueueItem{WorkflowID: idA}, atA)
+	_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, atA)
 	require.NoError(t, err)
-	_, err = q.Enqueue(ctx, QueueItem{WorkflowID: idB}, atB)
+	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idB}, atB)
 	require.NoError(t, err)
-	_, err = q.Enqueue(ctx, QueueItem{WorkflowID: idC}, atC)
+	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idC}, atC)
 	require.NoError(t, err)
 
 	t.Run("Sequentially returns indexes in order", func(t *testing.T) {
@@ -624,18 +581,12 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 func TestQueuePartitionRequeue(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := queue{
-		kg: DefaultQueueKeyGenerator{},
-		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
-		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
-			return PriorityMin
-		},
-	}
+	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
 	ctx := context.Background()
 	idA := uuid.New()
 	now := time.Now()
 
-	_, err := q.Enqueue(ctx, QueueItem{WorkflowID: idA}, now)
+	_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
 	require.NoError(t, err)
 
 	qp := getPartition(t, r, idA)
@@ -673,16 +624,15 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 
 	priority := PriorityMin
 	r := miniredis.RunT(t)
-	q := queue{
-		kg: DefaultQueueKeyGenerator{},
-		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
-		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
+	q := NewQueue(
+		redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		WithPriorityFinder(func(ctx context.Context, workflowID uuid.UUID) uint {
 			return priority
-		},
-	}
+		}),
+	)
 	ctx := context.Background()
 
-	_, err := q.Enqueue(ctx, QueueItem{WorkflowID: idA}, now)
+	_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
 	require.NoError(t, err)
 
 	first := getPartition(t, r, idA)
@@ -710,6 +660,67 @@ func TestQueuePartitionDequeue(t *testing.T) {
 	})
 
 	t.Run("It removes the counters", func(t *testing.T) {
+	})
+}
+
+func TestQueueLeaseSequential(t *testing.T) {
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+	q := queue{
+		kg: defaultQueueKey,
+		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
+			return PriorityMin
+		},
+	}
+
+	var (
+		leaseID *ulid.ULID
+		err     error
+	)
+
+	t.Run("It claims sequential leases", func(t *testing.T) {
+		now := time.Now()
+		dur := 500 * time.Millisecond
+		leaseID, err = q.LeaseSequential(ctx, dur)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
+	})
+
+	t.Run("It doesn't allow leasing without an existing lease ID", func(t *testing.T) {
+		id, err := q.LeaseSequential(ctx, time.Second)
+		require.Equal(t, ErrSequentialAlreadyLeased, err)
+		require.Nil(t, id)
+	})
+
+	t.Run("It doesn't allow leasing with an invalid lease ID", func(t *testing.T) {
+		newULID := ulid.MustNew(ulid.Now(), rnd)
+		id, err := q.LeaseSequential(ctx, time.Second, &newULID)
+		require.Equal(t, ErrSequentialAlreadyLeased, err)
+		require.Nil(t, id)
+	})
+
+	t.Run("It extends the lease with a valid lease ID", func(t *testing.T) {
+		require.NotNil(t, leaseID)
+
+		now := time.Now()
+		dur := 50 * time.Millisecond
+		leaseID, err = q.LeaseSequential(ctx, dur, leaseID)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
+	})
+
+	t.Run("It allows leasing when the current lease is expired", func(t *testing.T) {
+		<-time.After(100 * time.Millisecond)
+
+		now := time.Now()
+		dur := 50 * time.Millisecond
+		leaseID, err = q.LeaseSequential(ctx, dur)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
 	})
 }
 
