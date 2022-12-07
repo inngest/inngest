@@ -17,11 +17,13 @@ jobs:
       - name: Display deployment status
         run: "echo The deployment at ${{ fromJson(steps.deployment.outputs.deploymentDetails).url }} is ${{ fromJson(steps.deployment.outputs.deploymentDetails).readyState }}"
 
+      # NOTE - broken-link-checker does not properly follow Next's 308 permanent redirects (e.g. /discord)
       - if: fromJson(steps.deployment.outputs.deploymentDetails).readyState == 'READY'
         run: |
           npx broken-link-checker https://${{ fromJson(steps.deployment.outputs.deploymentDetails).url }} \
             --recursive --host-requests 10 --requests 10 --follow \
             --exclude 'https://${{ fromJson(steps.deployment.outputs.deploymentDetails).url }}/test/' \
+            --exclude 'https://${{ fromJson(steps.deployment.outputs.deploymentDetails).url }}/discord' \
             --exclude 'https://www.iubenda.com' \
             --exclude ' https://stripe.com/docs/api' \
             --exclude ' https://docs.github.com'
