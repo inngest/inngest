@@ -692,6 +692,17 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	})
 }
 
+func TestQueuePartitionDequeue(t *testing.T) {
+	t.Run("It removes the partition", func(t *testing.T) {
+	})
+
+	t.Run("It removes the index", func(t *testing.T) {
+	})
+
+	t.Run("It removes the counters", func(t *testing.T) {
+	})
+}
+
 func getQueueItem(t *testing.T, r *miniredis.Miniredis, id ulid.ULID) QueueItem {
 	t.Helper()
 	// Ensure that our data is set up correctly.
