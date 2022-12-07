@@ -22,6 +22,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang/mock v1.6.0
 	github.com/google/cel-go v0.11.4
+	github.com/google/go-cmp v0.5.7
 	github.com/google/uuid v1.3.0
 	github.com/gosimple/slug v1.12.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -48,6 +49,7 @@ require (
 	github.com/stretchr/testify v1.7.1
 	github.com/tidwall/sjson v1.2.5
 	github.com/tonyhb/enumer v1.2.0
+	github.com/uber-go/tally v3.5.0+incompatible
 	github.com/vektah/gqlparser/v2 v2.4.6
 	github.com/xhit/go-str2duration/v2 v2.0.0
 	gocloud.dev v0.25.0
@@ -116,7 +118,6 @@ require (
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/go-cmp v0.5.7 // indirect
 	github.com/google/wire v0.5.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.2.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
@@ -176,6 +177,7 @@ require (
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/tklauser/numcpus v0.4.0 // indirect
+	github.com/twmb/murmur3 v1.1.6 // indirect
 	github.com/urfave/cli/v2 v2.8.1 // indirect
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
@@ -186,6 +188,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zclconf/go-cty v1.8.3 // indirect
 	go.opencensus.io v0.23.0 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/crypto v0.0.0-20220331220935-ae2d96664a29 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
 	golang.org/x/net v0.0.0-20220401154927-543a649e0bdd // indirect

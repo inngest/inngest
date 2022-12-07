@@ -903,6 +903,13 @@ github.com/tklauser/numcpus
 # github.com/tonyhb/enumer v1.2.0
 ## explicit; go 1.12
 github.com/tonyhb/enumer
+# github.com/twmb/murmur3 v1.1.6
+## explicit; go 1.11
+github.com/twmb/murmur3
+# github.com/uber-go/tally v3.5.0+incompatible
+## explicit
+github.com/uber-go/tally
+github.com/uber-go/tally/internal/identity
 # github.com/urfave/cli/v2 v2.8.1
 ## explicit; go 1.18
 github.com/urfave/cli/v2
@@ -976,6 +983,9 @@ go.opencensus.io/trace
 go.opencensus.io/trace/internal
 go.opencensus.io/trace/propagation
 go.opencensus.io/trace/tracestate
+# go.uber.org/atomic v1.10.0
+## explicit; go 1.18
+go.uber.org/atomic
 # gocloud.dev v0.25.0
 ## explicit; go 1.12
 gocloud.dev/aws
