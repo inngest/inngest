@@ -19,7 +19,8 @@ const testPriority = 4
 func TestQueueEnqueue(t *testing.T) {
 	r := miniredis.RunT(t)
 	q := queue{
-		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		kg: DefaultQueueKeyGenerator{},
+		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			return testPriority
 		},
@@ -69,10 +70,10 @@ func TestQueueEnqueue(t *testing.T) {
 		}, qp)
 
 		// Ensure that the zscore did not change.
-		keys, err := r.ZMembers("partition:sorted")
+		keys, err := r.ZMembers(defaultQueueKey.PartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
-		score, err := r.ZScore("partition:sorted", keys[0])
+		score, err := r.ZScore(defaultQueueKey.PartitionIndex(), keys[0])
 		require.NoError(t, err)
 		require.EqualValues(t, start.Unix(), score)
 	})
@@ -92,10 +93,10 @@ func TestQueueEnqueue(t *testing.T) {
 		}, qp)
 
 		// Assert that the zscore was changed to this earliest timestamp.
-		keys, err := r.ZMembers("partition:sorted")
+		keys, err := r.ZMembers(defaultQueueKey.PartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 1, len(keys))
-		score, err := r.ZScore("partition:sorted", keys[0])
+		score, err := r.ZScore(defaultQueueKey.PartitionIndex(), keys[0])
 		require.NoError(t, err)
 		require.EqualValues(t, at.Unix(), score)
 	})
@@ -108,7 +109,7 @@ func TestQueueEnqueue(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assert that we have two zscores in partition:sorted.
-		keys, err := r.ZMembers("partition:sorted")
+		keys, err := r.ZMembers(defaultQueueKey.PartitionIndex())
 		require.NoError(t, err)
 		require.Equal(t, 2, len(keys))
 
@@ -126,7 +127,8 @@ func TestQueueEnqueue(t *testing.T) {
 func TestQueuePeek(t *testing.T) {
 	r := miniredis.RunT(t)
 	q := queue{
-		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		kg: DefaultQueueKeyGenerator{},
+		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			return testPriority
 		},
@@ -141,9 +143,9 @@ func TestQueuePeek(t *testing.T) {
 
 	t.Run("It returns an ordered list of items", func(t *testing.T) {
 		a := time.Now().Truncate(time.Second)
-		b := a.Add(time.Second)
-		c := b.Add(time.Second)
-		d := c.Add(time.Second)
+		b := a.Add(2 * time.Second)
+		c := b.Add(2 * time.Second)
+		d := c.Add(2 * time.Second)
 
 		ia, err := q.Enqueue(ctx, QueueItem{}, a)
 		require.NoError(t, err)
@@ -186,22 +188,22 @@ func TestQueuePeek(t *testing.T) {
 
 		t.Run("It should remove any leased items from the list", func(t *testing.T) {
 			// Lease step B, and it should be removed.
-			leaseID, err := q.Lease(ctx, ib.WorkflowID, ib.ID, 50*time.Millisecond)
+			leaseID, err := q.Lease(ctx, ia.WorkflowID, ia.ID, 50*time.Millisecond)
 			require.NoError(t, err)
 
 			items, err = q.Peek(ctx, uuid.UUID{}, d, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 3, len(items))
-			require.EqualValues(t, []*QueueItem{&ia, &ic, &id}, items)
+			require.EqualValues(t, []*QueueItem{&ib, &ic, &id}, items)
 
 			// When the lease expires it should re-appear
-			<-time.After(50 * time.Millisecond)
+			<-time.After(52 * time.Millisecond)
 
 			items, err = q.Peek(ctx, uuid.UUID{}, d, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 4, len(items))
-			ib.LeaseID = leaseID
-			// NOTE: item B should have an expired lease ID.
+			ia.LeaseID = leaseID
+			// NOTE: item A should have an expired lease ID.
 			require.EqualValues(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
 		})
 	})
@@ -211,7 +213,8 @@ func TestQueuePeek(t *testing.T) {
 func TestQueueLease(t *testing.T) {
 	r := miniredis.RunT(t)
 	q := queue{
-		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		kg: DefaultQueueKeyGenerator{},
+		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			return testPriority
 		},
@@ -235,7 +238,7 @@ func TestQueueLease(t *testing.T) {
 		require.WithinDuration(t, time.Now().Add(time.Second), ulid.Time(item.LeaseID.Time()), 10*time.Millisecond)
 
 		t.Run("It should increase the in-progress count", func(t *testing.T) {
-			val := r.HGet(fmt.Sprintf("partition:item:%s", item.WorkflowID), "n")
+			val := r.HGet(defaultQueueKey.PartitionMeta(item.WorkflowID.String()), "n")
 			require.NotEmpty(t, val)
 			require.Equal(t, "1", val)
 		})
@@ -261,7 +264,7 @@ func TestQueueLease(t *testing.T) {
 			require.WithinDuration(t, time.Now().Add(time.Second), ulid.Time(item.LeaseID.Time()), 10*time.Millisecond)
 
 			t.Run("Expired does not increase partition in-progress count", func(t *testing.T) {
-				val := r.HGet(fmt.Sprintf("partition:item:%s", item.WorkflowID), "n")
+				val := r.HGet(defaultQueueKey.PartitionMeta(item.WorkflowID.String()), "n")
 				require.NotEmpty(t, val)
 				require.Equal(t, "1", val)
 			})
@@ -286,7 +289,8 @@ func TestQueueLease(t *testing.T) {
 func TestQueueExtendLease(t *testing.T) {
 	r := miniredis.RunT(t)
 	q := queue{
-		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		kg: DefaultQueueKeyGenerator{},
+		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			return testPriority
 		},
@@ -345,7 +349,8 @@ func TestQueueExtendLease(t *testing.T) {
 func TestQueueDequeue(t *testing.T) {
 	r := miniredis.RunT(t)
 	q := queue{
-		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		kg: DefaultQueueKeyGenerator{},
+		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			return testPriority
 		},
@@ -365,7 +370,7 @@ func TestQueueDequeue(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("It should remove the item from the queue map", func(t *testing.T) {
-			val := r.HGet("queue:item", item.ID.String())
+			val := r.HGet(defaultQueueKey.QueueItem(), id.String())
 			require.Empty(t, val)
 		})
 
@@ -382,7 +387,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		t.Run("It should decrease the in-progress count", func(t *testing.T) {
-			val := r.HGet(fmt.Sprintf("partition:item:%s", item.WorkflowID), "n")
+			val := r.HGet(defaultQueueKey.PartitionMeta(item.WorkflowID.String()), "n")
 			require.NotEmpty(t, val)
 			require.Equal(t, "0", val)
 		})
@@ -394,7 +399,7 @@ func TestQueueDequeue(t *testing.T) {
 			err = q.Dequeue(ctx, item)
 			require.NoError(t, err)
 
-			val := r.HGet("queue:item", item.ID.String())
+			val := r.HGet(defaultQueueKey.QueueItem(), id.String())
 			require.Empty(t, val)
 		})
 	})
@@ -403,7 +408,8 @@ func TestQueueDequeue(t *testing.T) {
 func TestQueueRequeue(t *testing.T) {
 	r := miniredis.RunT(t)
 	q := queue{
-		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		kg: DefaultQueueKeyGenerator{},
+		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			return testPriority
 		},
@@ -469,7 +475,8 @@ func TestQueuePartitionLease(t *testing.T) {
 
 	r := miniredis.RunT(t)
 	q := queue{
-		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		kg: DefaultQueueKeyGenerator{},
+		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			return testPriority
 		},
@@ -558,7 +565,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 	r := miniredis.RunT(t)
 	q := queue{
-		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		kg: DefaultQueueKeyGenerator{},
+		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			switch workflowID {
 			case idB, idC:
@@ -617,7 +625,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 func TestQueuePartitionRequeue(t *testing.T) {
 	r := miniredis.RunT(t)
 	q := queue{
-		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		kg: DefaultQueueKeyGenerator{},
+		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			return PriorityMin
 		},
@@ -665,7 +674,8 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	priority := PriorityMin
 	r := miniredis.RunT(t)
 	q := queue{
-		r: redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		kg: DefaultQueueKeyGenerator{},
+		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			return priority
 		},
@@ -706,7 +716,7 @@ func TestQueuePartitionDequeue(t *testing.T) {
 func getQueueItem(t *testing.T, r *miniredis.Miniredis, id ulid.ULID) QueueItem {
 	t.Helper()
 	// Ensure that our data is set up correctly.
-	val := r.HGet("queue:item", id.String())
+	val := r.HGet(defaultQueueKey.QueueItem(), id.String())
 	require.NotEmpty(t, val)
 	i := QueueItem{}
 	err := json.Unmarshal([]byte(val), &i)
@@ -716,14 +726,14 @@ func getQueueItem(t *testing.T, r *miniredis.Miniredis, id ulid.ULID) QueueItem 
 
 func requireInProgress(t *testing.T, r *miniredis.Miniredis, workflowID uuid.UUID, count int) {
 	t.Helper()
-	val := r.HGet(fmt.Sprintf("partition:item:%s", workflowID), "n")
+	val := r.HGet(defaultQueueKey.PartitionMeta(workflowID.String()), "n")
 	require.NotEmpty(t, val)
 	require.Equal(t, fmt.Sprintf("%d", count), val)
 }
 
 func getPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) QueuePartition {
 	t.Helper()
-	val := r.HGet("partition:item", id.String())
+	val := r.HGet(defaultQueueKey.PartitionItem(), id.String())
 	qp := QueuePartition{}
 	err := json.Unmarshal([]byte(val), &qp)
 	require.NoError(t, err)
@@ -732,7 +742,7 @@ func getPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) QueueParti
 
 func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem, expected time.Time) {
 	t.Helper()
-	score, err := r.ZScore(fmt.Sprintf("queue:sorted:%s", item.WorkflowID), item.ID.String())
+	score, err := r.ZScore(defaultQueueKey.QueueIndex(item.WorkflowID.String()), item.ID.String())
 	parsed := time.Unix(int64(score), 0)
 	require.NoError(t, err)
 	require.WithinDuration(t, expected.Truncate(time.Second), parsed, time.Millisecond)
@@ -740,7 +750,7 @@ func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem
 
 func requirePartitionScoreEquals(t *testing.T, r *miniredis.Miniredis, wid uuid.UUID, expected time.Time) {
 	t.Helper()
-	score, err := r.ZScore("partition:sorted", wid.String())
+	score, err := r.ZScore(defaultQueueKey.PartitionIndex(), wid.String())
 	parsed := time.Unix(int64(score), 0)
 	require.NoError(t, err)
 	require.WithinDuration(t, expected.Truncate(time.Second), parsed, time.Millisecond)

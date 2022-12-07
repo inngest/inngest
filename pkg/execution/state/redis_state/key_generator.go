@@ -8,6 +8,10 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
+var (
+	defaultQueueKey = DefaultQueueKeyGenerator{}
+)
+
 // KeyFunc returns a unique string based off of given data, which is used
 // as the key for data stored in redis for workflows, events, actions, and
 // errors.
@@ -108,4 +112,44 @@ func (d DefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step
 
 func (d DefaultKeyFunc) History(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("%s:history:%s", d.Prefix, id.RunID)
+}
+
+type QueueKeyGenerator interface {
+	// QueueItem returns the key for the hash containing all items within a
+	// queue for a function.
+	QueueItem() string
+	// QueueIndex returns the key containing the sorted zset for a function
+	// queue.
+	QueueIndex(id string) string
+	// PartitionItem returns the key for the hash containing all partition items.
+	PartitionItem() string
+	// PartitionIndex returns the sorted set for the partition queue.
+	PartitionIndex() string
+	// PartitionMeta returns the key to store metadata for partitions, eg.
+	// the number of items enqueued, number in progress, etc.
+	PartitionMeta(id string) string
+}
+
+type DefaultQueueKeyGenerator struct {
+	Prefix string
+}
+
+func (d DefaultQueueKeyGenerator) QueueItem() string {
+	return fmt.Sprintf("%s:queue:item", d.Prefix)
+}
+
+func (d DefaultQueueKeyGenerator) QueueIndex(id string) string {
+	return fmt.Sprintf("%s:queue:sorted:%s", d.Prefix, id)
+}
+
+func (d DefaultQueueKeyGenerator) PartitionItem() string {
+	return fmt.Sprintf("%s:partition:item", d.Prefix)
+}
+
+func (d DefaultQueueKeyGenerator) PartitionIndex() string {
+	return fmt.Sprintf("%s:partition:sorted", d.Prefix)
+}
+
+func (d DefaultQueueKeyGenerator) PartitionMeta(id string) string {
+	return fmt.Sprintf("%s:partition:meta:%s", d.Prefix, id)
 }
