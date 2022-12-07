@@ -1,0 +1,27 @@
+name: On Deployment
+
+on: push
+
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    steps:
+      - id: deployment
+        uses: UnlyEd/github-action-await-vercel@v1.2.14
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        with:
+          deployment-url: inngest.vercel.app
+          timeout: 60 # Wait for 60 seconds before failing
+
+      - name: Display deployment status
+        run: "echo The deployment at ${{ fromJson(steps.deployment.outputs.deploymentDetails).url }} is ${{ fromJson(steps.deployment.outputs.deploymentDetails).readyState }}"
+
+      - if: fromJson(steps.deployment.outputs.deploymentDetails).readyState == 'READY'
+        run: |
+          npx broken-link-checker https://${{ fromJson(steps.deployment.outputs.deploymentDetails).url }} \
+            --recursive --host-requests 10 --requests 10 --follow \
+            --exclude 'https://${{ fromJson(steps.deployment.outputs.deploymentDetails).url }}/test/' \
+            --exclude 'https://www.iubenda.com' \
+            --exclude ' https://stripe.com/docs/api' \
+            --exclude ' https://docs.github.com'
