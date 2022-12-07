@@ -68,7 +68,7 @@ As we’re starting to build our a roadmap, we’re going to be focused on a few
 
 Our roadmap will be in the open and [you can view it right on Github here](https://github.com/orgs/inngest/projects/1).
 
-What do you want to see next? [Let us know on Discord, we’d love to hear from you](https://www.inngest.com/discord).
+What do you want to see next? [Let us know on Discord, we’d love to hear from you](/discord).
 
 ## Check out the repo
 

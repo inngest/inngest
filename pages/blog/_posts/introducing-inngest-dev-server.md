@@ -95,7 +95,7 @@ You probably just want to see some real code don't you? We created a demo projec
 
 You can also view the DevServer's source code from right in our CLI repo: [github.com/inngest/inngest](https://github.com/inngest/inngest).
 
-**Have questions, feedback or ideas? [Join our Discord](https://www.inngest.com/discord)!**
+**Have questions, feedback or ideas? [Join our Discord](/discord)!**
 
 ## Over to you
 

@@ -87,4 +87,4 @@ We’ve built all of this into Inngest to give you everything you need out of th
 
 If you are running a reliable webhook at any decent scale or throughput, you need to decouple, add a queue, and have rock solid, idempotent retries. I hope that this has given you a blueprint on how you can scale your own webhooks as your user base grows.
 
-If you don’t want to roll it yourself - [check out Inngest](https://www.inngest.com/?ref=blog-building-webhooks-that-scale). Come [chat with us on Discord](https://www.inngest.com/discord), we’d be happy to share free advice for scaling your webhooks with Inngest or building our your own setup.
+If you don’t want to roll it yourself - [check out Inngest](https://www.inngest.com/?ref=blog-building-webhooks-that-scale). Come [chat with us on Discord](/discord), we’d be happy to share free advice for scaling your webhooks with Inngest or building our your own setup.

@@ -551,11 +551,7 @@ export default function FeaturesSDK() {
             <Button href="/docs?ref=features-sdk" kind="primary">
               Read the docs
             </Button>
-            <Button
-              href="https://www.inngest.com/discord"
-              kind="outline"
-              style={{ margin: 0 }}
-            >
+            <Button href="/discord" kind="outline" style={{ margin: 0 }}>
               <Discord /> Join our community on Discord
             </Button>
           </div>

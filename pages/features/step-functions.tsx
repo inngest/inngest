@@ -241,11 +241,7 @@ export default function FeaturesSDK() {
             <Button href="/contact" kind="outline" style={{ margin: 0 }}>
               Send us an email
             </Button>
-            <Button
-              href="https://www.inngest.com/discord"
-              kind="outline"
-              style={{ margin: 0 }}
-            >
+            <Button href="/discord" kind="outline" style={{ margin: 0 }}>
               <Discord /> Reach out on our Discord
             </Button>
           </div>

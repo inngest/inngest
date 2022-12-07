@@ -108,6 +108,6 @@ We’ve open sourced the execution engine, locally running drivers, in-memory an
 
 You can check out the code here: [https://github.com/inngest/inngest](https://github.com/inngest/inngest). We’ll be adding _lots_ to this over a short amount of time.
 
-We’re _super_ interested in feedback — your ideas, thoughts, and comments are more than welcome, either in GitHub or [our discord.](https://www.inngest.com/discord)
+We’re _super_ interested in feedback — your ideas, thoughts, and comments are more than welcome, either in GitHub or [our discord.](/discord)
 
 If you’d like to self host this and prototype it, drop us a note in Discord and we’ll help you get set up. We also offer a [hosted version](https://www.inngest.com), but this isn’t a sales pitch: we’re genuinely interested in this technology and sharing our approach because we think it offers a host of benefits (though we’re biased).

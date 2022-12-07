@@ -11,7 +11,7 @@ tags: release-notes
 - **Historic replay,** which allows you to locally test your functions with _real production data_
 - **Self-hosting beta,** so that you can host Inngest in your own environment
 
-Read more about our [future plans in our roadmap](https://github.com/orgs/inngest/projects/1), and if you want to propose new features or ideas feel free to [start a discussion](https://github.com/inngest/inngest/discussions) or [chat with us in discord](https://www.inngest.com/discord). Let’s dive in!
+Read more about our [future plans in our roadmap](https://github.com/orgs/inngest/projects/1), and if you want to propose new features or ideas feel free to [start a discussion](https://github.com/inngest/inngest/discussions) or [chat with us in discord](/discord). Let’s dive in!
 
 ## Replay past events
 
@@ -38,7 +38,7 @@ While we offer our [hosted cloud](https://www.inngest.com/sign-up?ref=v0.5.0) wh
 - A single 1GB / 0.5vCPU event API can process 110 requests per second with a p99 latency of 35ms, without breaking ~35mb ram usage.
 - It’s easy to scale to thousands of requests per second, as the services themselves are shared nothing.
 
-If you’re interested in self-hosting, you can [read the docs here](https://www.inngest.com/docs/self-hosting) and [chat with us on discord](https://www.inngest.com/discord) if you have any questions
+If you’re interested in self-hosting, you can [read the docs here](https://www.inngest.com/docs/self-hosting) and [chat with us on discord](/discord) if you have any questions
 
 ## Other changes
 
