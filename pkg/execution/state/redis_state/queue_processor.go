@@ -17,13 +17,12 @@ import (
 const (
 	ErrMaxConsecutiveProcessErrors = 20
 
-	defaultNumWorkers = 5_000
+	defaultNumWorkers = 100
 	minWorkersFree    = 5
 	pollTick          = 20 * time.Millisecond
 )
 
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
-	q.workers = make(chan QueueItem, q.numWorkers)
 	for i := int32(0); i < q.numWorkers; i++ {
 		go q.worker(ctx, f)
 	}
@@ -47,7 +46,9 @@ LOOP:
 			tick.Stop()
 			break LOOP
 		case <-tick.C:
+			q.seqLeaseLock.RLock()
 			if q.capacity() < minWorkersFree {
+				q.seqLeaseLock.RUnlock()
 				// Wait until we have more workers free.  This stops us from
 				// claiming a partition to work on a single job, ensuring we
 				// have capacity to run at least MinWorkersFree concurrent
@@ -55,6 +56,7 @@ LOOP:
 				// there are lots of enqueued and available jobs.
 				continue
 			}
+			q.seqLeaseLock.RUnlock()
 
 			if err := q.scan(ctx, f); err != nil {
 				// On scan errors, halt the worker entirely.
@@ -77,12 +79,15 @@ LOOP:
 // work on partitions sequentially;  this reduces contention.
 func (q *queue) claimSequentialLease(ctx context.Context) {
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.LeaseSequential(ctx, SequentialLeaseDuration, q.seqLeaseID)
+	leaseID, err := q.LeaseSequential(ctx, SequentialLeaseDuration, q.sequentialLease())
 	if err != ErrSequentialAlreadyLeased && err != nil {
 		q.quit <- err
 		return
 	}
+
+	q.seqLeaseLock.Lock()
 	q.seqLeaseID = leaseID
+	q.seqLeaseLock.Unlock()
 
 	tick := time.NewTicker(SequentialLeaseDuration / 3)
 	for {
@@ -91,7 +96,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 			tick.Stop()
 			return
 		case <-tick.C:
-			leaseID, err := q.LeaseSequential(ctx, SequentialLeaseDuration, q.seqLeaseID)
+			leaseID, err := q.LeaseSequential(ctx, SequentialLeaseDuration, q.sequentialLease())
 			if err == ErrSequentialAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
@@ -101,7 +106,10 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 				logger.From(ctx).Error().Err(err).Msg("error claiming sequential lease")
 				continue
 			}
+
+			q.seqLeaseLock.Lock()
 			q.seqLeaseID = leaseID
+			q.seqLeaseLock.Unlock()
 		}
 	}
 }
@@ -130,7 +138,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 	}
 }
 
-func (q queue) scan(ctx context.Context, f osqueue.RunFunc) error {
+func (q *queue) scan(ctx context.Context, f osqueue.RunFunc) error {
 	partitions, err := q.PartitionPeek(ctx, q.isSequential(), time.Now(), PartitionPeekMax)
 	if err != nil {
 		return err
@@ -316,13 +324,25 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 	return nil
 }
 
-func (q queue) capacity() int64 {
-	return int64(q.numWorkers) - q.sem.counter
+// sequentialLease is a helper method for concurrently reading the sequential
+// lease ID.
+func (q *queue) sequentialLease() *ulid.ULID {
+	q.seqLeaseLock.RLock()
+	defer q.seqLeaseLock.RUnlock()
+	if q.seqLeaseID == nil {
+		return nil
+	}
+	copied := *q.seqLeaseID
+	return &copied
+}
+
+func (q *queue) capacity() int64 {
+	return int64(q.numWorkers) - atomic.LoadInt64(&q.sem.counter)
 }
 
 // peekSize returns the total number of available workers which can consume individual
 // queue items.
-func (q queue) peekSize() int64 {
+func (q *queue) peekSize() int64 {
 	f := q.capacity()
 	if f > QueuePeekMax {
 		return QueuePeekMax
@@ -330,11 +350,11 @@ func (q queue) peekSize() int64 {
 	return f
 }
 
-func (q queue) isSequential() bool {
-	if q.seqLeaseID == nil {
+func (q *queue) isSequential() bool {
+	if q.sequentialLease() == nil {
 		return false
 	}
-	return ulid.Time(q.seqLeaseID.Time()).After(time.Now())
+	return ulid.Time(q.sequentialLease().Time()).After(time.Now())
 }
 
 // trackingSemaphore returns a semaphore that tracks closely - but not atomically -

@@ -25,8 +25,16 @@ func TestQueueRunSequential(t *testing.T) {
 
 	q1ctx, q1cancel := context.WithCancel(ctx)
 
-	q1 := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
-	q2 := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
+	q1 := NewQueue(
+		redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(10),
+	)
+	q2 := NewQueue(
+		redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(10),
+	)
 
 	// Run the queue.  After running this worker should claim the sequential lease.
 	go func() {
@@ -43,17 +51,17 @@ func TestQueueRunSequential(t *testing.T) {
 
 	<-time.After(20 * time.Millisecond)
 	// Q1 gets lease, as it started first.
-	require.NotNil(t, q1.seqLeaseID)
+	require.NotNil(t, q1.sequentialLease())
 	// Lease is in the future.
-	require.True(t, ulid.Time(q1.seqLeaseID.Time()).After(time.Now()))
+	require.True(t, ulid.Time(q1.sequentialLease().Time()).After(time.Now()))
 	// Q2 has no lease.
-	require.Nil(t, q2.seqLeaseID)
+	require.Nil(t, q2.sequentialLease())
 
 	<-time.After(SequentialLeaseDuration)
 
 	// Q1 retains lease.
-	require.NotNil(t, q1.seqLeaseID)
-	require.Nil(t, q2.seqLeaseID)
+	require.NotNil(t, q1.sequentialLease())
+	require.Nil(t, q2.sequentialLease())
 
 	// Cancel q1, temrinating the queue with the sequential lease.
 	q1cancel()
@@ -61,13 +69,18 @@ func TestQueueRunSequential(t *testing.T) {
 	<-time.After(SequentialLeaseDuration)
 
 	// Q2 obtains lease.
-	require.NotNil(t, q2.seqLeaseID)
+	require.NotNil(t, q2.sequentialLease())
 	// And that the previous lease has expired.
-	require.True(t, ulid.Time(q1.seqLeaseID.Time()).Before(time.Now()))
+	require.True(t, ulid.Time(q1.sequentialLease().Time()).Before(time.Now()))
 }
 
 func TestQueueRunBasic(t *testing.T) {
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: "127.0.0.1", PoolSize: 100}))
+	r := miniredis.RunT(t)
+	q := NewQueue(
+		redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(1000),
+	)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	idA, idB := uuid.New(), uuid.New()
@@ -111,10 +124,11 @@ func TestQueueRunBasic(t *testing.T) {
 	}
 
 	<-time.After(2 * time.Second)
-	require.EqualValues(t, len(items), atomic.LoadInt32(&handled))
+	require.EqualValues(t, int32(len(items)), atomic.LoadInt32(&handled))
 	cancel()
 
-	<-time.After(pollTick)
+	<-time.After(pollTick * 2)
+	r.Close()
 
 	// TODO: Assert queue items have been processed
 	// TODO: Assert queue items have been dequeued, and peek is nil for workflows.
@@ -127,9 +141,18 @@ func TestQueueRunBasic(t *testing.T) {
 // - Each job can take from 0->7500ms to complete.
 //
 // We assert that all jobs are handled within 100ms of budget.
+//
+// NOTE: When this runs with the race decetor (--race), the throughput of goroutines
+// is severely limited.  This means that we need to extend the time in which we can
+// process jobs.
 func TestQueueRunExtended(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379", PoolSize: 100}))
+	q := NewQueue(
+		redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		// We can't add more than 8128 goroutines when detecting race conditions,
+		// so lower the number of workers.
+		WithNumWorkers(1000),
+	)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	mrand.Seed(time.Now().UnixMicro())
@@ -139,14 +162,14 @@ func TestQueueRunExtended(t *testing.T) {
 		funcs[n] = uuid.New()
 	}
 
-	jobCompleteMax := 12_500 // ms
-	delayMax := 15_000       // ms
+	jobCompleteMax := int32(12_500) // ms
+	delayMax := int32(15_000)       // ms
 
 	var handled int64
 	go func() {
 		_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
 			// Wait up to N seconds to complete.
-			<-time.After(time.Duration(mrand.Intn(jobCompleteMax)) * time.Millisecond)
+			<-time.After(time.Duration(mrand.Int31n(atomic.LoadInt32(&jobCompleteMax))) * time.Millisecond)
 			// Increase handled when job is done.
 			atomic.AddInt64(&handled, 1)
 			return nil
@@ -156,9 +179,9 @@ func TestQueueRunExtended(t *testing.T) {
 	enqueueDuration := 30 * time.Second
 
 	var added int64
-	go func() {
+	go func(duration time.Duration) {
 		// For N seconds enqueue items.
-		after := time.After(enqueueDuration)
+		after := time.After(duration)
 		for {
 			sleep := mrand.Intn(50)
 			select {
@@ -173,7 +196,7 @@ func TestQueueRunExtended(t *testing.T) {
 					}
 
 					// Enqueue with a delay.
-					diff := mrand.Intn(delayMax)
+					diff := mrand.Int31n(atomic.LoadInt32(&delayMax))
 
 					_, err := q.EnqueueItem(ctx, item, time.Now().Add(time.Duration(diff)*time.Millisecond))
 					require.NoError(t, err)
@@ -181,7 +204,7 @@ func TestQueueRunExtended(t *testing.T) {
 				}
 			}
 		}
-	}()
+	}(enqueueDuration)
 
 	go func() {
 		t := time.Tick(1000 * time.Millisecond)
@@ -204,14 +227,21 @@ func TestQueueRunExtended(t *testing.T) {
 	// Wait for all items to complete
 	<-time.After(enqueueDuration)
 
+	// The default wait
+	wait := atomic.LoadInt32(&delayMax) + atomic.LoadInt32(&jobCompleteMax) + 100
+	// Increasing, because of the race detector
+	wait = wait * 2
+
 	// We enqueue jobs up to delayMax, and they can take up to jobCompleteMax, so add
 	// 100ms of buffer.
-	<-time.After(time.Duration(delayMax+jobCompleteMax+100) * time.Millisecond)
+	<-time.After(time.Duration(wait) * time.Millisecond)
 
-	fmt.Printf("Added %d items\n", added)
-	fmt.Printf("Handled %d items\n", handled)
+	a := atomic.LoadInt64(&added)
+	h := atomic.LoadInt64(&handled)
+	fmt.Printf("Added %d items\n", a)
+	fmt.Printf("Handled %d items\n", h)
 
-	require.EqualValues(t, added, handled, "Added %d, handled %d (delta: %d)", added, handled, added-handled)
+	require.EqualValues(t, a, h, "Added %d, handled %d (delta: %d)", a, h, a-h)
 	cancel()
 
 	<-time.After(pollTick * 2)

@@ -55,13 +55,13 @@ require (
 	github.com/xhit/go-str2duration/v2 v2.0.0
 	gocloud.dev v0.25.0
 	gocloud.dev/pubsub/natspubsub v0.25.0
-	golang.org/x/exp v0.0.0-20210126221216-84987778548c
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/term v0.0.0-20220411215600-e5f449aeb171
 	golang.org/x/text v0.3.7
 	golang.org/x/tools v0.1.10
 	gonum.org/v1/gonum v0.12.0
 	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21
+	lukechampine.com/frand v1.4.2
 )
 
 require (
@@ -75,6 +75,7 @@ require (
 	github.com/Microsoft/hcsshim v0.9.1 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
+	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/agext/levenshtein v1.2.2 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
 	github.com/alicebob/gopher-json v0.0.0-20200520072559-a9ecdc9d1d3a // indirect
@@ -191,6 +192,7 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/crypto v0.0.0-20220331220935-ae2d96664a29 // indirect
+	golang.org/x/exp v0.0.0-20210126221216-84987778548c // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
 	golang.org/x/net v0.0.0-20220401154927-543a649e0bdd // indirect
 	golang.org/x/oauth2 v0.0.0-20220309155454-6242fa91716a // indirect

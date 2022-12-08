@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/exp/rand"
 	"golang.org/x/sync/semaphore"
 
 	"github.com/go-redis/redis/v8"
@@ -17,6 +16,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/uber-go/tally"
 	"gonum.org/v1/gonum/stat/sampleuv"
+	"lukechampine.com/frand"
 )
 
 const (
@@ -61,14 +61,12 @@ var (
 )
 
 var (
-	source rand.Source
-	rnd    *rand.Rand
+	rnd *frandRNG
 )
 
 func init() {
 	// For weighted shuffles generate a new rand.
-	source = rand.NewSource(uint64(time.Now().UnixNano()))
-	rnd = rand.New(source)
+	rnd = &frandRNG{RNG: frand.New()}
 }
 
 // PriorityFinder returns the priority for a given workflow.
@@ -112,10 +110,11 @@ func NewQueue(r *redis.Client, opts ...QueueOpt) *queue {
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			return PriorityDefault
 		},
-		kg:         defaultQueueKey,
-		numWorkers: defaultNumWorkers,
-		metrics:    tally.NewTestScope("queue", map[string]string{}),
-		wg:         &sync.WaitGroup{},
+		kg:           defaultQueueKey,
+		numWorkers:   defaultNumWorkers,
+		metrics:      tally.NewTestScope("queue", map[string]string{}),
+		wg:           &sync.WaitGroup{},
+		seqLeaseLock: &sync.RWMutex{},
 	}
 
 	for _, opt := range opts {
@@ -123,6 +122,7 @@ func NewQueue(r *redis.Client, opts ...QueueOpt) *queue {
 	}
 
 	q.sem = &trackingSemaphore{Weighted: semaphore.NewWeighted(int64(q.numWorkers))}
+	q.workers = make(chan QueueItem, q.numWorkers)
 
 	return q
 }
@@ -141,9 +141,6 @@ type queue struct {
 	// of the Run loop.  This typically accepts an error, but a nil error
 	// will still quit the runner.
 	quit chan error
-	// seqLeaseID stores the lease ID if this queue is the sequential processor.
-	// all runners attempt to claim this lease automatically.
-	seqLeaseID *ulid.ULID
 	// wg stores a waitgroup for all in-progress jobs
 	wg *sync.WaitGroup
 	// numWorkers stores the number of workers available to concurrently process jobs.
@@ -155,6 +152,13 @@ type queue struct {
 	// being processed.  This lets us check whether there's capacity in the queue
 	// prior to leasing items.
 	sem *trackingSemaphore
+
+	// seqLeaseID stores the lease ID if this queue is the sequential processor.
+	// all runners attempt to claim this lease automatically.
+	seqLeaseID *ulid.ULID
+	// seqLeaseLock ensures that there are no data races writing to
+	// or reading from seqLeaseID in parallel.
+	seqLeaseLock *sync.RWMutex
 }
 
 // QueueItem represents an individually queued work scheduled for some time in the
@@ -222,7 +226,7 @@ func (q QueuePartition) MarshalBinary() ([]byte, error) {
 //
 // The QueueItem's ID can be a zero UUID;  if the ID is a zero value a new ID
 // will be created for the queue item.
-func (q queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error) {
+func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error) {
 	if i.ID.Compare(ulid.ULID{}) == 0 {
 		i.ID = ulid.MustNew(ulid.Now(), rnd)
 	}
@@ -278,7 +282,7 @@ func (q queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Queu
 //
 // If limit is -1, this will return the first unleased item - representing the next available item in the
 // queue.
-func (q queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, limit int64) ([]*QueueItem, error) {
+func (q *queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, limit int64) ([]*QueueItem, error) {
 	// Check whether limit is -1, peeking next available time
 	isPeekNext := limit == -1
 
@@ -336,7 +340,7 @@ func (q queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, 
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+func (q *queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	// TODO: Add custom throttling here.
 	leaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
 	if err != nil {
@@ -379,7 +383,7 @@ func (q queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULID
 //
 // Renewing a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+func (q *queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	newLeaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
@@ -415,7 +419,7 @@ func (q queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, 
 }
 
 // Dequeue removes an item from the queue entirely.
-func (q queue) Dequeue(ctx context.Context, i QueueItem) error {
+func (q *queue) Dequeue(ctx context.Context, i QueueItem) error {
 	keys := []string{
 		q.kg.QueueItem(),
 		q.kg.QueueIndex(i.WorkflowID.String()),
@@ -441,7 +445,7 @@ func (q queue) Dequeue(ctx context.Context, i QueueItem) error {
 }
 
 // Requeue requeues an item in the future.
-func (q queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
+func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	priority := PriorityMin
 	if q.pf != nil {
 		priority = q.pf(ctx, i.WorkflowID)
@@ -486,7 +490,7 @@ func (q queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 }
 
 // PartitionLease leases a parititon for a given workflow ID.  It returns the new lease ID.
-func (q queue) PartitionLease(ctx context.Context, wid uuid.UUID, duration time.Duration) (*ulid.ULID, error) {
+func (q *queue) PartitionLease(ctx context.Context, wid uuid.UUID, duration time.Duration) (*ulid.ULID, error) {
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
 	// the pointer and back off.  A question here is enqueuing new items onto the partition
 	// will reset the pointer update, leading to thrash.
@@ -533,7 +537,7 @@ func (q queue) PartitionLease(ctx context.Context, wid uuid.UUID, duration time.
 // available lease times. Otherwise, this shuffles all partitions and picks partitions
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
-func (q queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
+func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
 	if limit > PartitionPeekMax {
 		return nil, ErrPartitionPeekMaxExceedsLimits
 	}
@@ -595,7 +599,7 @@ func (q queue) PartitionPeek(ctx context.Context, sequential bool, until time.Ti
 //
 // This is used after peeking and passing all queue items onto workers; we then take the next
 // unleased available time for the queue item and requeue the partition.
-func (q queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at time.Time) error {
+func (q *queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at time.Time) error {
 	keys := []string{
 		q.kg.PartitionItem(),
 		q.kg.PartitionIndex(),
@@ -623,12 +627,12 @@ func (q queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at ti
 
 // PartitionDequeue removes a partition pointer from the queue.  This is used when peeking and
 // receiving zero items to run.
-func (q queue) PartitionDequeue(ctx context.Context, workflowID uuid.UUID, at time.Time) error {
+func (q *queue) PartitionDequeue(ctx context.Context, workflowID uuid.UUID, at time.Time) error {
 	panic("unimplemented")
 }
 
 // PartitionReprioritize reprioritizes a workflow's QueueItems within the queue.
-func (q queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID, priority uint) error {
+func (q *queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID, priority uint) error {
 	if priority > PriorityMin {
 		return ErrPriorityTooLow
 	}
@@ -666,7 +670,7 @@ func (q queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID, 
 //   grant a lease.
 //
 // This returns the new lease ID on success.
-func (q queue) LeaseSequential(ctx context.Context, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
+func (q *queue) LeaseSequential(ctx context.Context, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
 	if duration > SequentialLeaseMax {
 		return nil, ErrSequentialLeaseExceedsLimits
 	}
@@ -701,4 +705,26 @@ func (q queue) LeaseSequential(ctx context.Context, duration time.Duration, exis
 	default:
 		return nil, fmt.Errorf("unknown response claiming sequential lease: %d", status)
 	}
+}
+
+// frandRNG is a fast crypto-secure prng which uses a mutex to guard
+// parallel reads.  It also implements the x/exp/rand.Source interface
+// by adding a Seed() method which does nothing.
+type frandRNG struct {
+	*frand.RNG
+	lock sync.Mutex
+}
+
+func (f *frandRNG) Read(b []byte) (int, error) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.RNG.Read(b)
+}
+
+func (f *frandRNG) Seed(seed uint64) {
+	// Do nothing.
+}
+
+func (f *frandRNG) Uint64() uint64 {
+	return f.RNG.Uint64n(math.MaxUint64)
 }
