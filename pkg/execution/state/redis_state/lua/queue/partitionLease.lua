@@ -19,11 +19,12 @@ local leaseTime   = tonumber(ARGV[4]) -- in seconds, as partition score
 -- $include(decode_ulid_time.lua)
 
 local existing = get_partition_item(partitionKey, partitionID)
-if existing == nil then
+if existing == nil or existing == false then
 	return 1
 end
+
 -- Check for an existing lease.
-if existing.leaseID ~= nil and decode_ulid_time(existing.leaseID) > currentTime then
+if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and decode_ulid_time(existing.leaseID) > currentTime then
 	return 2
 end
 

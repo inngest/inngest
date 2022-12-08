@@ -26,12 +26,13 @@ local encoded = redis.call("HGET", queueKey, queueID)
 if encoded == false then
 	return 1
 end
+
 local item = cjson.decode(encoded)
 if item == nil then
 	return 1
 end
 
-if item.leaseID ~= nil and decode_ulid_time(item.leaseID) > currentTime then
+if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
 	-- This is already leased;  don't let this requester lease the item.
 	return 2
 end
