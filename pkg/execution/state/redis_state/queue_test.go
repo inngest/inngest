@@ -217,13 +217,14 @@ func TestQueueLease(t *testing.T) {
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
+		now := time.Now()
 		id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
 		require.NotNil(t, item.LeaseID)
 		require.EqualValues(t, id, item.LeaseID)
-		require.WithinDuration(t, time.Now().Add(time.Second), ulid.Time(item.LeaseID.Time()), 10*time.Millisecond)
+		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
 		t.Run("It should increase the in-progress count", func(t *testing.T) {
 			val := r.HGet(defaultQueueKey.PartitionMeta(item.WorkflowID.String()), "n")
@@ -290,13 +291,14 @@ func TestQueueExtendLease(t *testing.T) {
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
+		now := time.Now()
 		id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
 		require.NotNil(t, item.LeaseID)
 		require.EqualValues(t, id, item.LeaseID)
-		require.WithinDuration(t, time.Now().Add(time.Second), ulid.Time(item.LeaseID.Time()), 10*time.Millisecond)
+		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
 		nextID, err := q.ExtendLease(ctx, item, *id, 10*time.Second)
 		require.NoError(t, err)
