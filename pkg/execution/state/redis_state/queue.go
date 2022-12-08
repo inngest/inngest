@@ -138,8 +138,9 @@ type queue struct {
 	metrics tally.Scope
 
 	// quit is a channel that any method can send on to trigger termination
-	// of the Run loop.
-	quit chan bool
+	// of the Run loop.  This typically accepts an error, but a nil error
+	// will still quit the runner.
+	quit chan error
 	// seqLeaseID stores the lease ID if this queue is the sequential processor.
 	// all runners attempt to claim this lease automatically.
 	seqLeaseID *ulid.ULID

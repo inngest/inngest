@@ -30,13 +30,13 @@ func TestQueueRunSequential(t *testing.T) {
 
 	// Run the queue.  After running this worker should claim the sequential lease.
 	go func() {
-		q1.Run(q1ctx, func(ctx context.Context, item osqueue.Item) error {
+		_ = q1.Run(q1ctx, func(ctx context.Context, item osqueue.Item) error {
 			return nil
 		})
 	}()
 	go func() {
 		<-time.After(10 * time.Millisecond)
-		q2.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+		_ = q2.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
 			return nil
 		})
 	}()
@@ -98,7 +98,7 @@ func TestQueueRunBasic(t *testing.T) {
 
 	var handled int32
 	go func() {
-		q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+		_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
 			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
 			atomic.AddInt32(&handled, 1)
 			return nil
@@ -129,7 +129,7 @@ func TestQueueRunBasic(t *testing.T) {
 // We assert that all jobs are handled within 100ms of budget.
 func TestQueueRunExtended(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
+	q := NewQueue(redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379", PoolSize: 100}))
 	ctx, cancel := context.WithCancel(context.Background())
 
 	mrand.Seed(time.Now().UnixMicro())
@@ -144,7 +144,7 @@ func TestQueueRunExtended(t *testing.T) {
 
 	var handled int64
 	go func() {
-		q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+		_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
 			// Wait up to N seconds to complete.
 			<-time.After(time.Duration(mrand.Intn(jobCompleteMax)) * time.Millisecond)
 			// Increase handled when job is done.
