@@ -160,7 +160,7 @@ func TestQueueRunExtended(t *testing.T) {
 		// For N seconds enqueue items.
 		after := time.After(enqueueDuration)
 		for {
-			sleep := mrand.Intn(25)
+			sleep := mrand.Intn(50)
 			select {
 			case <-after:
 				return

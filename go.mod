@@ -20,6 +20,7 @@ require (
 	github.com/go-chi/cors v1.2.1
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/go-redis/redis/v8 v8.11.5
+	github.com/goccy/go-json v0.10.0
 	github.com/golang/mock v1.6.0
 	github.com/google/cel-go v0.11.4
 	github.com/google/go-cmp v0.5.7

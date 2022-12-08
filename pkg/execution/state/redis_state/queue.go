@@ -2,7 +2,6 @@ package redis_state
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/go-redis/redis/v8"
+	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
