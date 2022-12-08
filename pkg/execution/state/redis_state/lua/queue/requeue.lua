@@ -10,7 +10,7 @@ Output:
 
 local queueKey          = KEYS[1] -- queue:item - hash: { $itemID: $item }
 local queueIndexKey     = KEYS[2] -- queue:sorted:$workflowID - zset
-local partitionKey      = KEYS[3] -- partition:item:$workflowID - hash { item: $partition, n: $leased, len: $enqueued }
+local partitionKey      = KEYS[3] -- partition:item:$workflowID - hash { n: $leased, len: $enqueued }
 local partitionIndexKey = KEYS[4] -- partition:sorted - zset
 
 local queueItem      = ARGV[1] -- {id, lease id, attempt, max attempt, data, etc...}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"golang.org/x/exp/rand"
@@ -98,6 +99,7 @@ func NewQueue(r *redis.Client, opts ...QueueOpt) *queue {
 		},
 		kg:      defaultQueueKey,
 		metrics: tally.NewTestScope("queue", map[string]string{}),
+		wg:      &sync.WaitGroup{},
 	}
 
 	for _, opt := range opts {
@@ -117,8 +119,17 @@ type queue struct {
 	// metrics allows reporting of metrics
 	metrics tally.Scope
 
-	workers    chan *QueueItem
+	// quit is a channel that any method can send on to trigger termination
+	// of the Run loop.
+	quit chan bool
+	// workers is a buffered channel which allows scanners to send queue items
+	// to workers to be processed
+	workers chan *QueueItem
+	// seqLeaseID stores the lease ID if this queue is the sequential processor.
+	// all runners attempt to claim this lease automatically.
 	seqLeaseID *ulid.ULID
+	// wg stores a waitgroup for all in-progress jobs
+	wg *sync.WaitGroup
 }
 
 // QueueItem represents an individually queued work scheduled for some time in the
@@ -126,8 +137,15 @@ type queue struct {
 type QueueItem struct {
 	// ID represents a unique identifier for the queue item.  The ULID
 	// stores when the QueueItem was created.
-	ID          ulid.ULID `json:"id"`
+	ID ulid.ULID `json:"id"`
+	// At represents the current time that this QueueItem needs to be executed at,
+	// as a millisecond epoch.  This is the millisecond-level granularity score of
+	// the item.  Note that the score in Redis is second-level, ie this field / 1000.
+	//
+	// This is necessary for rescoring partitions and checking latencies.
+	At          int64     `json:"at"`
 	WorkflowID  uuid.UUID `json:"workflowID"`
+	WorkspaceID uuid.UUID `json:"workspaceID"`
 	Attempt     int       `json:"attempt"`
 	MaxAttempts int       `json:"maxAttempts"`
 	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
@@ -196,6 +214,9 @@ func (q queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Queu
 		return i, ErrPriorityTooHigh
 	}
 
+	// Add the At timestamp.
+	i.At = at.UnixMilli()
+
 	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, At: at.Unix()}
 	keys := []string{
 		q.kg.QueueItem(),                          // Queue item
@@ -230,8 +251,12 @@ func (q queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Queu
 
 // Peek takes n items from a queue, up until QueuePeekMax.
 //
-// XXX: Ensure this only returns items that are not leased.
+// If limit is -1, this will return the first unleased item - representing the next available item in the
+// queue.
 func (q queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, limit int64) ([]*QueueItem, error) {
+	// Check whether limit is -1, peeking next available time
+	isPeekNext := limit == -1
+
 	if limit > QueuePeekMax {
 		// Lua's max unpack() length is 8000; don't allow users to peek more than
 		// 1k at a time regardless.
@@ -272,6 +297,10 @@ func (q queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, 
 		}
 		result[n] = qi
 		n++
+
+		if isPeekNext {
+			return []*QueueItem{qi}, nil
+		}
 	}
 
 	return result[0:n], nil
@@ -386,9 +415,8 @@ func (q queue) Dequeue(ctx context.Context, i QueueItem) error {
 	}
 }
 
+// Requeue requeues an item in the future.
 func (q queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
-	// TODO: remove in-progress counter if claimed.
-
 	priority := PriorityMin
 	if q.pf != nil {
 		priority = q.pf(ctx, i.WorkflowID)
@@ -397,6 +425,11 @@ func (q queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	if priority > PriorityMin {
 		return ErrPriorityTooLow
 	}
+
+	// Unset any lease ID as this is requeued.
+	i.LeaseID = nil
+	// Update the At timestamp.
+	i.At = at.UnixMilli()
 
 	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, At: at.Unix()}
 	keys := []string{
@@ -494,7 +527,7 @@ func (q queue) PartitionPeek(ctx context.Context, sequential bool, until time.Ti
 		limit,
 	).StringSlice()
 	if err != nil {
-		return nil, fmt.Errorf("error peeking queue items: %w", err)
+		return nil, fmt.Errorf("error peeking partition items: %w", err)
 	}
 
 	weights := []float64{}
