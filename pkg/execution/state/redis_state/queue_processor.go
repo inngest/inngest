@@ -265,6 +265,10 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 	// Continually extend lease in the background while we're working on this job
 	go func() {
 		for range extendLeaseTick.C {
+			if ctx.Err() != nil {
+				// Don't extend lease when the ctx is done.
+				return
+			}
 			leaseID, err = q.ExtendLease(ctx, qi, *leaseID, QueueLeaseDuration)
 			if err != nil && err != ErrQueueItemNotFound {
 				// XXX: Increase counter here.
@@ -280,8 +284,6 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 	defer jobCancel()
 
 	go func() {
-		//logger.From(ctx).Debug().Interface("item", qi).Msg("queue item starting")
-
 		err := f(jobCtx, qi.Data)
 		extendLeaseTick.Stop()
 		if err != nil {

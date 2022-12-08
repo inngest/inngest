@@ -18,7 +18,9 @@ const testPriority = PriorityDefault
 
 func TestQueueEnqueueItem(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	defer rc.Close()
+	q := NewQueue(rc)
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
@@ -120,7 +122,9 @@ func TestQueueEnqueueItem(t *testing.T) {
 
 func TestQueuePeek(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	defer rc.Close()
+	q := NewQueue(rc)
 	ctx := context.Background()
 
 	t.Run("It returns none with no items enqueued", func(t *testing.T) {
@@ -200,7 +204,9 @@ func TestQueuePeek(t *testing.T) {
 
 func TestQueueLease(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	defer rc.Close()
+	q := NewQueue(rc)
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
@@ -270,7 +276,9 @@ func TestQueueLease(t *testing.T) {
 
 func TestQueueExtendLease(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	defer rc.Close()
+	q := NewQueue(rc)
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
@@ -324,7 +332,9 @@ func TestQueueExtendLease(t *testing.T) {
 
 func TestQueueDequeue(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	defer rc.Close()
+	q := NewQueue(rc)
 	ctx := context.Background()
 
 	t.Run("It should remove a queue item", func(t *testing.T) {
@@ -377,7 +387,9 @@ func TestQueueDequeue(t *testing.T) {
 
 func TestQueueRequeue(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	defer rc.Close()
+	q := NewQueue(rc)
 	ctx := context.Background()
 
 	t.Run("Re-enqueuing a leased item should succeed", func(t *testing.T) {
@@ -438,7 +450,9 @@ func TestQueuePartitionLease(t *testing.T) {
 	atA, atB, atC := now, now.Add(time.Second), now.Add(2*time.Second)
 
 	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	defer rc.Close()
+	q := NewQueue(rc)
 	ctx := context.Background()
 
 	_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, atA)
@@ -522,8 +536,10 @@ func TestQueuePartitionPeek(t *testing.T) {
 	atA, atB, atC := now, now.Add(time.Second), now.Add(2*time.Second)
 
 	r := miniredis.RunT(t)
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	defer rc.Close()
 	q := NewQueue(
-		redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		rc,
 		WithPriorityFinder(func(ctx context.Context, workflowID uuid.UUID) uint {
 			switch workflowID {
 			case idB, idC:
@@ -581,7 +597,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 func TestQueuePartitionRequeue(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	defer rc.Close()
+	q := NewQueue(rc)
 	ctx := context.Background()
 	idA := uuid.New()
 	now := time.Now()
@@ -624,8 +642,10 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 
 	priority := PriorityMin
 	r := miniredis.RunT(t)
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	defer rc.Close()
 	q := NewQueue(
-		redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		rc,
 		WithPriorityFinder(func(ctx context.Context, workflowID uuid.UUID) uint {
 			return priority
 		}),
@@ -666,9 +686,10 @@ func TestQueuePartitionDequeue(t *testing.T) {
 func TestQueueLeaseSequential(t *testing.T) {
 	ctx := context.Background()
 	r := miniredis.RunT(t)
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
 	q := queue{
 		kg: defaultQueueKey,
-		r:  redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		r:  rc,
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			return PriorityMin
 		},
