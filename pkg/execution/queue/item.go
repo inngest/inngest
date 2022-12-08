@@ -40,7 +40,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
 	if err != nil {
-		return err
+		return fmt.Errorf("error unmarshalling queue item: %w", err)
 	}
 
 	i.Kind = temp.Kind
@@ -49,12 +49,18 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 
 	switch temp.Kind {
 	case KindEdge:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
 		p := &PayloadEdge{}
 		if err := json.Unmarshal(temp.Payload, p); err != nil {
 			return err
 		}
 		i.Payload = *p
 	case KindPause:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
 		p := &PayloadPauseTimeout{}
 		if err := json.Unmarshal(temp.Payload, p); err != nil {
 			return err
