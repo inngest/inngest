@@ -721,10 +721,26 @@ func (f *frandRNG) Read(b []byte) (int, error) {
 	return f.RNG.Read(b)
 }
 
-func (f *frandRNG) Seed(seed uint64) {
-	// Do nothing.
+func (f *frandRNG) Uint64() uint64 {
+	return f.Uint64n(math.MaxUint64)
 }
 
-func (f *frandRNG) Uint64() uint64 {
-	return f.RNG.Uint64n(math.MaxUint64)
+func (f *frandRNG) Uint64n(n uint64) uint64 {
+	// sampled.Take calls Uint64n, which must be guarded by a lock in order
+	// to be thread-safe.
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.RNG.Uint64n(n)
+}
+
+func (f *frandRNG) Float64() float64 {
+	// sampled.Take also calls Float64, which must be guarded by a lock in order
+	// to be thread-safe.
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.RNG.Float64()
+}
+
+func (f *frandRNG) Seed(seed uint64) {
+	// Do nothing.
 }

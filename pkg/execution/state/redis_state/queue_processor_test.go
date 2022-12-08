@@ -21,17 +21,21 @@ import (
 
 func TestQueueRunSequential(t *testing.T) {
 	r := miniredis.RunT(t)
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 50})
+	defer rc.Close()
 	ctx := context.Background()
 
 	q1ctx, q1cancel := context.WithCancel(ctx)
+	q2ctx, q2cancel := context.WithCancel(ctx)
+	defer q2cancel()
 
 	q1 := NewQueue(
-		redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		rc,
 		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 	)
 	q2 := NewQueue(
-		redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		rc,
 		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 	)
@@ -44,7 +48,7 @@ func TestQueueRunSequential(t *testing.T) {
 	}()
 	go func() {
 		<-time.After(10 * time.Millisecond)
-		_ = q2.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+		_ = q2.Run(q2ctx, func(ctx context.Context, item osqueue.Item) error {
 			return nil
 		})
 	}()
@@ -76,10 +80,11 @@ func TestQueueRunSequential(t *testing.T) {
 
 func TestQueueRunBasic(t *testing.T) {
 	r := miniredis.RunT(t)
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 50})
 	q := NewQueue(
-		redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		rc,
 		// We can't add more than 8128 goroutines when detecting race conditions.
-		WithNumWorkers(1000),
+		WithNumWorkers(10),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -127,8 +132,10 @@ func TestQueueRunBasic(t *testing.T) {
 	require.EqualValues(t, int32(len(items)), atomic.LoadInt32(&handled))
 	cancel()
 
-	<-time.After(pollTick * 2)
+	<-time.After(time.Second)
+
 	r.Close()
+	rc.Close()
 
 	// TODO: Assert queue items have been processed
 	// TODO: Assert queue items have been dequeued, and peek is nil for workflows.
@@ -147,11 +154,13 @@ func TestQueueRunBasic(t *testing.T) {
 // process jobs.
 func TestQueueRunExtended(t *testing.T) {
 	r := miniredis.RunT(t)
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	defer rc.Close()
 	q := NewQueue(
-		redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}),
+		rc,
 		// We can't add more than 8128 goroutines when detecting race conditions,
 		// so lower the number of workers.
-		WithNumWorkers(1000),
+		WithNumWorkers(2500),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -183,13 +192,13 @@ func TestQueueRunExtended(t *testing.T) {
 		// For N seconds enqueue items.
 		after := time.After(duration)
 		for {
-			sleep := mrand.Intn(50)
+			sleep := mrand.Intn(250)
 			select {
 			case <-after:
 				return
 			case <-time.After(time.Duration(sleep) * time.Millisecond):
-				// Enqueue 1-50 N jobs
-				n := mrand.Intn(49) + 1
+				// Enqueue 1-25 N jobs
+				n := mrand.Intn(24) + 1
 				for i := 0; i < n; i++ {
 					item := QueueItem{
 						WorkflowID: funcs[mrand.Intn(len(funcs))],
@@ -244,6 +253,6 @@ func TestQueueRunExtended(t *testing.T) {
 	require.EqualValues(t, a, h, "Added %d, handled %d (delta: %d)", a, h, a-h)
 	cancel()
 
-	<-time.After(pollTick * 2)
+	<-time.After(time.Second)
 	r.Close()
 }
