@@ -20,9 +20,17 @@ import (
 )
 
 const (
-	PartitionSelectionMax   int64 = 20
-	PartitionPeekMax        int64 = PartitionSelectionMax * 3
-	PartitionLeaseDuration        = 2 * time.Second
+	PartitionSelectionMax int64 = 20
+	PartitionPeekMax      int64 = PartitionSelectionMax * 3
+
+	// PartitionLeaseDuration dictates how long a worker holds the lease for
+	// a partition.  This gives the worker a right to scan all queue items
+	// for that partition to schedule the execution of jobs.
+	//
+	// Right now, this must be short enough to reduce contention but long enough
+	// to account for the latency of peeking QueuePeekMax jobs from Redis.
+	PartitionLeaseDuration        = 4 * time.Second
+	PartitionLeaseExtension       = 30 * time.Second
 	QueueSelectionMax       int64 = 50
 	QueuePeekMax            int64 = 1000
 	QueuePeekDefault        int64 = QueueSelectionMax * 3
@@ -92,6 +100,12 @@ func WithQueueKeyGenerator(kg QueueKeyGenerator) func(q *queue) {
 	}
 }
 
+func WithNumWorkers(n int32) func(q *queue) {
+	return func(q *queue) {
+		q.numWorkers = n
+	}
+}
+
 func NewQueue(r *redis.Client, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
@@ -107,10 +121,6 @@ func NewQueue(r *redis.Client, opts ...QueueOpt) *queue {
 	for _, opt := range opts {
 		opt(q)
 	}
-
-	q.r = redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
-	})
 
 	q.sem = &trackingSemaphore{Weighted: semaphore.NewWeighted(int64(q.numWorkers))}
 
@@ -239,7 +249,7 @@ func (q queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Queu
 		q.kg.PartitionMeta(i.WorkflowID.String()), // Partition item
 		q.kg.PartitionIndex(),                     // Global partition queue
 	}
-	status, err := scripts["queue/enqueue"].Eval(
+	status, err := scripts["queue/enqueue"].Run(
 		ctx,
 		q.r,
 		keys,
@@ -280,7 +290,7 @@ func (q queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, 
 		limit = QueuePeekMax
 	}
 
-	items, err := scripts["queue/peek"].Eval(
+	items, err := scripts["queue/peek"].Run(
 		ctx,
 		q.r,
 		[]string{
@@ -337,7 +347,7 @@ func (q queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULID
 		q.kg.QueueIndex(workflowID.String()),
 		q.kg.PartitionMeta(workflowID.String()),
 	}
-	status, err := scripts["queue/lease"].Eval(
+	status, err := scripts["queue/lease"].Run(
 		ctx,
 		q.r,
 		keys,
@@ -378,7 +388,7 @@ func (q queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, 
 		q.kg.QueueItem(),
 		q.kg.QueueIndex(i.WorkflowID.String()),
 	}
-	status, err := scripts["queue/extendLease"].Eval(
+	status, err := scripts["queue/extendLease"].Run(
 		ctx,
 		q.r,
 		keys,
@@ -410,7 +420,7 @@ func (q queue) Dequeue(ctx context.Context, i QueueItem) error {
 		q.kg.QueueIndex(i.WorkflowID.String()),
 		q.kg.PartitionMeta(i.WorkflowID.String()),
 	}
-	status, err := scripts["queue/dequeue"].Eval(
+	status, err := scripts["queue/dequeue"].Run(
 		ctx,
 		q.r,
 		keys,
@@ -452,7 +462,7 @@ func (q queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 		q.kg.PartitionMeta(i.WorkflowID.String()),
 		q.kg.PartitionIndex(),
 	}
-	status, err := scripts["queue/requeue"].Eval(
+	status, err := scripts["queue/requeue"].Run(
 		ctx,
 		q.r,
 		keys,
@@ -490,7 +500,7 @@ func (q queue) PartitionLease(ctx context.Context, wid uuid.UUID, duration time.
 		q.kg.PartitionItem(),
 		q.kg.PartitionIndex(),
 	}
-	status, err := scripts["queue/partitionLease"].Eval(
+	status, err := scripts["queue/partitionLease"].Run(
 		ctx,
 		q.r,
 		keys,
@@ -530,7 +540,7 @@ func (q queue) PartitionPeek(ctx context.Context, sequential bool, until time.Ti
 		limit = PartitionPeekMax
 	}
 
-	encoded, err := scripts["queue/partitionPeek"].Eval(
+	encoded, err := scripts["queue/partitionPeek"].Run(
 		ctx,
 		q.r,
 		[]string{
@@ -589,7 +599,7 @@ func (q queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at ti
 		q.kg.PartitionItem(),
 		q.kg.PartitionIndex(),
 	}
-	status, err := scripts["queue/partitionRequeue"].Eval(
+	status, err := scripts["queue/partitionRequeue"].Run(
 		ctx,
 		q.r,
 		keys,
@@ -626,7 +636,7 @@ func (q queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID, 
 	}
 
 	keys := []string{q.kg.PartitionItem()}
-	status, err := scripts["queue/partitionReprioritize"].Eval(
+	status, err := scripts["queue/partitionReprioritize"].Run(
 		ctx,
 		q.r,
 		keys,
@@ -671,7 +681,7 @@ func (q queue) LeaseSequential(ctx context.Context, duration time.Duration, exis
 		existing = existingLeaseID[0].String()
 	}
 
-	status, err := scripts["queue/sequentialLease"].Eval(
+	status, err := scripts["queue/sequentialLease"].Run(
 		ctx,
 		q.r,
 		[]string{q.kg.Sequential()},
