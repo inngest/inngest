@@ -25,7 +25,7 @@ if item == nil then
 	return 1
 end
 
-if item.leaseID ~= nil then
+if item.leaseID ~= nil and item.leaseID ~= cjson.null then
 	-- Remove total number in progress if there's a lease.
 	redis.call("HINCRBY", partitionKey, "n", -1)
 end
