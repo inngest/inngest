@@ -37,7 +37,7 @@ if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.
 	return 2
 end
 
-if item.leaseID == nil then
+if item.leaseID == nil or item.leaseID == cjson.null then
 	-- Increase the in-progress count by 1 as we've just leased an item.
 	-- This lets us calculate the number of concurrent items when multiple shared-nothing
 	-- workers are working on the same queue.

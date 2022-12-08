@@ -23,7 +23,7 @@ redis.call("HDEL", queueKey, queueID)
 redis.call("ZREM", queueIndexKey, queueID)
 redis.call("HINCRBY", partitionKey, "len", -1) -- len of enqueued items decreases
 
-if item.leaseID ~= nil then
+if item.leaseID ~= nil and item.leaseID ~= cjson.null then
 	-- Remove total number in progress, if there's a lease.
 	redis.call("HINCRBY", partitionKey, "n", -1)
 end
