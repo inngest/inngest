@@ -66,7 +66,7 @@ var (
 
 func init() {
 	// For weighted shuffles generate a new rand.
-	rnd = &frandRNG{RNG: frand.New()}
+	rnd = &frandRNG{RNG: frand.New(), lock: &sync.Mutex{}}
 }
 
 // PriorityFinder returns the priority for a given workflow.
@@ -712,7 +712,7 @@ func (q *queue) LeaseSequential(ctx context.Context, duration time.Duration, exi
 // by adding a Seed() method which does nothing.
 type frandRNG struct {
 	*frand.RNG
-	lock sync.Mutex
+	lock *sync.Mutex
 }
 
 func (f *frandRNG) Read(b []byte) (int, error) {
