@@ -122,9 +122,13 @@ func (q queue) process(ctx context.Context, qi *QueueItem, f osqueue.RunFunc) er
 	l := logger.From(ctx)
 
 	leaseID, err := q.Lease(ctx, qi.WorkflowID, qi.ID, QueueLeaseDuration)
+	if err == ErrQueueItemNotFound {
+		// Already handled.
+		return nil
+	}
 	if err == ErrQueueItemAlreadyLeased {
 		// XXX: Increase counter for lease contention
-		l.Warn().Msg("worker attempting to claim existing lease")
+		l.Warn().Interface("item", qi).Msg("worker attempting to claim existing lease")
 		return nil
 	}
 	if err != nil {
@@ -150,7 +154,7 @@ func (q queue) process(ctx context.Context, qi *QueueItem, f osqueue.RunFunc) er
 	go func() {
 		for range extendLeaseTick.C {
 			leaseID, err = q.ExtendLease(ctx, *qi, *leaseID, QueueLeaseDuration)
-			if err != nil {
+			if err != nil && err != ErrQueueItemNotFound {
 				// XXX: Increase counter here.
 				logger.From(ctx).Error().Err(err).Msg("error extending lease")
 				errCh <- fmt.Errorf("error extending lease while processing: %w", err)
@@ -165,7 +169,9 @@ func (q queue) process(ctx context.Context, qi *QueueItem, f osqueue.RunFunc) er
 	go func() {
 		logger.From(ctx).Debug().Interface("item", qi).Msg("queue item starting")
 
-		if err := f(jobCtx, qi.Data); err != nil {
+		err := f(jobCtx, qi.Data)
+		extendLeaseTick.Stop()
+		if err != nil {
 			// XXX: Increase counter for queue item error
 			errCh <- err
 			return

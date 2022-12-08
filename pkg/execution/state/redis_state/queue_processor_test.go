@@ -141,8 +141,8 @@ func TestQueueRunExtended(t *testing.T) {
 		funcs[n] = uuid.New()
 	}
 
-	jobCompleteMax := 7_500 // ms
-	delayMax := 10_000      // ms
+	jobCompleteMax := 12_500 // ms
+	delayMax := 15_000       // ms
 
 	var handled int64
 	go func() {
@@ -162,7 +162,7 @@ func TestQueueRunExtended(t *testing.T) {
 		// For N seconds enqueue items.
 		after := time.After(enqueueDuration)
 		for {
-			sleep := mrand.Intn(100)
+			sleep := mrand.Intn(25)
 			select {
 			case <-after:
 				return

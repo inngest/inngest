@@ -22,7 +22,11 @@ local currentTime   = tonumber(ARGV[3]) -- in ms
 local nextTime = decode_ulid_time(newLeaseKey)
 
 -- Look up the current queue item.  We need to see if the queue item is already leased.
-local item = cjson.decode(redis.call("HGET", queueKey, queueID))
+local encoded = redis.call("HGET", queueKey, queueID)
+if encoded == false then
+	return 1
+end
+local item = cjson.decode(encoded)
 if item == nil then
 	return 1
 end
