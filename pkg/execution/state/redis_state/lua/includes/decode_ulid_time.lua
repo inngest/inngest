@@ -9,10 +9,10 @@ local function decode_ulid_time(s)
 
 	-- Take first 10 characters of the ULID, which is the time portion.
 	s = string.sub(s, 1, 10)
-	local rev = s.reverse(s)
+	local rev = tostring(s.reverse(s))
 	local time = 0
 	for i = 1, #rev do
-		time = time + (index[string.sub(rev, i, i)] * math.pow(32, i-1))
+		time = time + (ulidMap[string.sub(rev, i, i)] * math.pow(32, i-1))
 	end
 	return time
 end

@@ -26,7 +26,7 @@ local item = get_queue_item(queueKey, queueID)
 if item == nil then
 	return 1
 end
-if item.leaseID == nil then
+if item.leaseID == nil or item.leaseID == cjson.null then
 	return 2
 end
 if item.leaseID ~= currentLeaseKey then
