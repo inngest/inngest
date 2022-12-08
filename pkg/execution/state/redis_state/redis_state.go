@@ -26,7 +26,7 @@ var embedded embed.FS
 
 var (
 	// scripts stores all embedded lua scripts on initialization
-	scripts = map[string]string{}
+	scripts = map[string]*redis.Script{}
 	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
 )
 
@@ -76,7 +76,7 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 				val = strings.ReplaceAll(val, include[0], string(byt))
 			}
 		}
-		scripts[name] = val
+		scripts[name] = redis.NewScript(val)
 	}
 }
 
@@ -269,7 +269,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		CreatedAt:  time.UnixMilli(int64(input.Identifier.RunID.Time())),
 	}
 
-	status, err := redis.NewScript(scripts["new"]).Eval(
+	status, err := scripts["new"].Eval(
 		ctx,
 		m.r,
 		[]string{
@@ -327,7 +327,7 @@ func (m mgr) metadata(ctx context.Context, id state.Identifier) (*runMetadata, e
 }
 
 func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
-	status, err := redis.NewScript(scripts["cancel"]).Eval(
+	status, err := scripts["cancel"].Eval(
 		ctx,
 		m.r,
 		[]string{m.kf.RunMetadata(ctx, id)},
@@ -452,7 +452,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		},
 	}
 
-	err = redis.NewScript(scripts["saveResponse"]).Eval(
+	err = scripts["saveResponse"].Eval(
 		ctx,
 		m.r,
 		[]string{
@@ -501,7 +501,7 @@ func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, at
 func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
 	now := time.Now()
 
-	err := redis.NewScript(scripts["scheduled"]).Eval(
+	err := scripts["scheduled"].Eval(
 		ctx,
 		m.r,
 		[]string{m.kf.RunMetadata(ctx, i), m.kf.History(ctx, i)},
@@ -526,7 +526,7 @@ func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, a
 func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
 	now := time.Now()
 
-	status, err := redis.NewScript(scripts["finalize"]).Eval(
+	status, err := scripts["finalize"].Eval(
 		ctx,
 		m.r,
 		[]string{m.kf.RunMetadata(ctx, i), m.kf.History(ctx, i)},
@@ -599,7 +599,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 }
 
 func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
-	status, err := redis.NewScript(scripts["leasePause"]).Eval(
+	status, err := scripts["leasePause"].Eval(
 		ctx,
 		m.r,
 		[]string{m.kf.PauseID(ctx, id), m.kf.PauseLease(ctx, id)},

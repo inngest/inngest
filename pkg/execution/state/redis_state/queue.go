@@ -239,7 +239,7 @@ func (q queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Queu
 		q.kg.PartitionMeta(i.WorkflowID.String()), // Partition item
 		q.kg.PartitionIndex(),                     // Global partition queue
 	}
-	status, err := redis.NewScript(scripts["queue/enqueue"]).Eval(
+	status, err := scripts["queue/enqueue"].Eval(
 		ctx,
 		q.r,
 		keys,
@@ -280,7 +280,7 @@ func (q queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, 
 		limit = QueuePeekMax
 	}
 
-	items, err := redis.NewScript(scripts["queue/peek"]).Eval(
+	items, err := scripts["queue/peek"].Eval(
 		ctx,
 		q.r,
 		[]string{
@@ -337,7 +337,7 @@ func (q queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULID
 		q.kg.QueueIndex(workflowID.String()),
 		q.kg.PartitionMeta(workflowID.String()),
 	}
-	status, err := redis.NewScript(scripts["queue/lease"]).Eval(
+	status, err := scripts["queue/lease"].Eval(
 		ctx,
 		q.r,
 		keys,
@@ -378,7 +378,7 @@ func (q queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, 
 		q.kg.QueueItem(),
 		q.kg.QueueIndex(i.WorkflowID.String()),
 	}
-	status, err := redis.NewScript(scripts["queue/extendLease"]).Eval(
+	status, err := scripts["queue/extendLease"].Eval(
 		ctx,
 		q.r,
 		keys,
@@ -410,7 +410,7 @@ func (q queue) Dequeue(ctx context.Context, i QueueItem) error {
 		q.kg.QueueIndex(i.WorkflowID.String()),
 		q.kg.PartitionMeta(i.WorkflowID.String()),
 	}
-	status, err := redis.NewScript(scripts["queue/dequeue"]).Eval(
+	status, err := scripts["queue/dequeue"].Eval(
 		ctx,
 		q.r,
 		keys,
@@ -452,7 +452,7 @@ func (q queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 		q.kg.PartitionMeta(i.WorkflowID.String()),
 		q.kg.PartitionIndex(),
 	}
-	status, err := redis.NewScript(scripts["queue/requeue"]).Eval(
+	status, err := scripts["queue/requeue"].Eval(
 		ctx,
 		q.r,
 		keys,
@@ -490,7 +490,7 @@ func (q queue) PartitionLease(ctx context.Context, wid uuid.UUID, duration time.
 		q.kg.PartitionItem(),
 		q.kg.PartitionIndex(),
 	}
-	status, err := redis.NewScript(scripts["queue/partitionLease"]).Eval(
+	status, err := scripts["queue/partitionLease"].Eval(
 		ctx,
 		q.r,
 		keys,
@@ -530,7 +530,7 @@ func (q queue) PartitionPeek(ctx context.Context, sequential bool, until time.Ti
 		limit = PartitionPeekMax
 	}
 
-	encoded, err := redis.NewScript(scripts["queue/partitionPeek"]).Eval(
+	encoded, err := scripts["queue/partitionPeek"].Eval(
 		ctx,
 		q.r,
 		[]string{
@@ -589,7 +589,7 @@ func (q queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at ti
 		q.kg.PartitionItem(),
 		q.kg.PartitionIndex(),
 	}
-	status, err := redis.NewScript(scripts["queue/partitionRequeue"]).Eval(
+	status, err := scripts["queue/partitionRequeue"].Eval(
 		ctx,
 		q.r,
 		keys,
@@ -626,7 +626,7 @@ func (q queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID, 
 	}
 
 	keys := []string{q.kg.PartitionItem()}
-	status, err := redis.NewScript(scripts["queue/partitionReprioritize"]).Eval(
+	status, err := scripts["queue/partitionReprioritize"].Eval(
 		ctx,
 		q.r,
 		keys,
@@ -671,7 +671,7 @@ func (q queue) LeaseSequential(ctx context.Context, duration time.Duration, exis
 		existing = existingLeaseID[0].String()
 	}
 
-	status, err := redis.NewScript(scripts["queue/sequentialLease"]).Eval(
+	status, err := scripts["queue/sequentialLease"].Eval(
 		ctx,
 		q.r,
 		[]string{q.kg.Sequential()},
