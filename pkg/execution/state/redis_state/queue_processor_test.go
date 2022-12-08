@@ -145,7 +145,7 @@ func TestQueueRunExtended(t *testing.T) {
 	var handled int64
 	go func() {
 		q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
-			// Wait up to 5 seconds to complete.
+			// Wait up to N seconds to complete.
 			<-time.After(time.Duration(mrand.Intn(jobCompleteMax)) * time.Millisecond)
 			// Increase handled when job is done.
 			atomic.AddInt64(&handled, 1)

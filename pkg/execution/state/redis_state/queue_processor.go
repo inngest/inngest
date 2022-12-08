@@ -80,7 +80,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) error {
 	}
 	q.seqLeaseID = leaseID
 
-	tick := time.NewTicker(SequentialLeaseDuration / 2)
+	tick := time.NewTicker(SequentialLeaseDuration / 3)
 	for {
 		select {
 		case <-ctx.Done():
@@ -109,6 +109,8 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) error {
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-q.quit:
+			return nil
 		case qi := <-q.workers:
 			err := q.process(ctx, qi, f)
 			q.sem.Release(1)
@@ -116,10 +118,10 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) error {
 				continue
 			}
 
-			logger.From(ctx).Error().Err(err).Msg("error processing queue item")
 			// We handle the error individually within process, requeueing
 			// the item into the queue.  Here, the worker can continue as
 			// usual to process the next item.
+			logger.From(ctx).Error().Err(err).Msg("error processing queue item")
 		}
 	}
 }
@@ -136,6 +138,7 @@ func (q queue) scan(ctx context.Context, f osqueue.RunFunc) error {
 			return nil
 		}
 		if err := q.processPartition(ctx, p, f); err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error processing partition")
 			return err
 		}
 	}
@@ -162,11 +165,6 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	queue, err := q.Peek(peekCtx, p.WorkflowID, time.Now(), q.peekSize())
 	if err != nil {
 		return err
-	}
-
-	if len(queue) == 0 {
-		// XXX: Here we can dequeue, which must check if there are any items _at all_ in this
-		// workflow queue.
 	}
 
 	for _, item := range queue {
@@ -216,10 +214,15 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	if err != nil {
 		return err
 	}
-	next := time.Now().Add(10 * time.Second)
+
+	next := time.Now().Add(PartitionLeaseExtension)
 	if len(queue) > 0 {
 		next = time.UnixMilli(queue[0].At)
 	}
+
+	// TODO: If len(queue) == 0, check:  are there any jobs in the queue at all?
+	// if not, delete the partition to reduce wasted effort scanning this partition
+
 	if err := q.PartitionRequeue(ctx, p.WorkflowID, next); err != nil {
 		return err
 	}
