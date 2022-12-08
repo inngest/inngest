@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"golang.org/x/exp/rand"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
@@ -97,14 +98,21 @@ func NewQueue(r *redis.Client, opts ...QueueOpt) *queue {
 		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
 			return PriorityDefault
 		},
-		kg:      defaultQueueKey,
-		metrics: tally.NewTestScope("queue", map[string]string{}),
-		wg:      &sync.WaitGroup{},
+		kg:         defaultQueueKey,
+		numWorkers: defaultNumWorkers,
+		metrics:    tally.NewTestScope("queue", map[string]string{}),
+		wg:         &sync.WaitGroup{},
 	}
 
 	for _, opt := range opts {
 		opt(q)
 	}
+
+	q.r = redis.NewClient(&redis.Options{
+		Addr: "127.0.0.1:6379",
+	})
+
+	q.sem = &trackingSemaphore{Weighted: semaphore.NewWeighted(int64(q.numWorkers))}
 
 	return q
 }
@@ -122,14 +130,20 @@ type queue struct {
 	// quit is a channel that any method can send on to trigger termination
 	// of the Run loop.
 	quit chan bool
-	// workers is a buffered channel which allows scanners to send queue items
-	// to workers to be processed
-	workers chan *QueueItem
 	// seqLeaseID stores the lease ID if this queue is the sequential processor.
 	// all runners attempt to claim this lease automatically.
 	seqLeaseID *ulid.ULID
 	// wg stores a waitgroup for all in-progress jobs
 	wg *sync.WaitGroup
+	// numWorkers stores the number of workers available to concurrently process jobs.
+	numWorkers int32
+	// workers is a buffered channel which allows scanners to send queue items
+	// to workers to be processed
+	workers chan QueueItem
+	// sem stores a semaphore controlling the number of jobs currently
+	// being processed.  This lets us check whether there's capacity in the queue
+	// prior to leasing items.
+	sem *trackingSemaphore
 }
 
 // QueueItem represents an individually queued work scheduled for some time in the
@@ -487,7 +501,7 @@ func (q queue) PartitionLease(ctx context.Context, wid uuid.UUID, duration time.
 		leaseExpires.Unix(),
 	).Int64()
 	if err != nil {
-		return nil, fmt.Errorf("error leasing item: %w", err)
+		return nil, fmt.Errorf("error leasing partition: %w", err)
 	}
 	switch status {
 	case 0:

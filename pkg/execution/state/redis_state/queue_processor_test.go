@@ -67,8 +67,7 @@ func TestQueueRunSequential(t *testing.T) {
 }
 
 func TestQueueRunBasic(t *testing.T) {
-	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
+	q := NewQueue(redis.NewClient(&redis.Options{Addr: "127.0.0.1", PoolSize: 100}))
 	ctx, cancel := context.WithCancel(context.Background())
 
 	idA, idB := uuid.New(), uuid.New()
@@ -116,7 +115,6 @@ func TestQueueRunBasic(t *testing.T) {
 	cancel()
 
 	<-time.After(pollTick)
-	r.Close()
 
 	// TODO: Assert queue items have been processed
 	// TODO: Assert queue items have been dequeued, and peek is nil for workflows.
@@ -131,7 +129,7 @@ func TestQueueRunBasic(t *testing.T) {
 // We assert that all jobs are handled within 100ms of budget.
 func TestQueueRunExtended(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
+	q := NewQueue(redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379", PoolSize: 100}))
 	ctx, cancel := context.WithCancel(context.Background())
 
 	mrand.Seed(time.Now().UnixMicro())
@@ -155,7 +153,7 @@ func TestQueueRunExtended(t *testing.T) {
 		})
 	}()
 
-	enqueueDuration := 60 * time.Second
+	enqueueDuration := 30 * time.Second
 
 	var added int64
 	go func() {
@@ -167,8 +165,8 @@ func TestQueueRunExtended(t *testing.T) {
 			case <-after:
 				return
 			case <-time.After(time.Duration(sleep) * time.Millisecond):
-				// Enqueue 1-150 N jobs
-				n := mrand.Intn(149) + 1
+				// Enqueue 1-50 N jobs
+				n := mrand.Intn(49) + 1
 				for i := 0; i < n; i++ {
 					item := QueueItem{
 						WorkflowID: funcs[mrand.Intn(len(funcs))],
@@ -182,6 +180,24 @@ func TestQueueRunExtended(t *testing.T) {
 					atomic.AddInt64(&added, 1)
 				}
 			}
+		}
+	}()
+
+	go func() {
+		t := time.Tick(1000 * time.Millisecond)
+		prev := atomic.LoadInt64(&handled)
+		for {
+			<-t
+			next := atomic.LoadInt64(&handled)
+			added := atomic.LoadInt64(&added)
+			fmt.Printf(
+				"Handled: %d \t Handled delta: %d \t Added: %d \t Remaining: %d\n",
+				next,
+				next-prev,
+				added,
+				added-next,
+			)
+			prev = next
 		}
 	}()
 
