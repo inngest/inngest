@@ -75,7 +75,7 @@ func (m *mem) Channel() chan queue.Item {
 	return m.q
 }
 
-func (m *mem) Run(ctx context.Context, f func(context.Context, queue.Item) error) error {
+func (m *mem) Run(ctx context.Context, f queue.RunFunc) error {
 	for {
 		select {
 		case <-ctx.Done():

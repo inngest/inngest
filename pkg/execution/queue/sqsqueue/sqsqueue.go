@@ -141,7 +141,7 @@ func (i impl) Enqueue(ctx context.Context, item queue.Item, at time.Time) error 
 }
 
 // Run subscribes to the topic, processing each queue item.
-func (i impl) Run(ctx context.Context, f func(context.Context, queue.Item) error) error {
+func (i impl) Run(ctx context.Context, f queue.RunFunc) error {
 	// We can use our pubsub broker logic here, as SQS is a supported backend.
 	sqsConf := config.SQSMessaging{
 		Region:   i.config.Region,

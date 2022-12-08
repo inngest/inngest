@@ -31,19 +31,22 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	// Attempt to be the worker which processes items sequentially.
 	go q.claimSequentialLease(ctx)
 
-	tick := time.Tick(pollTick)
+	tick := time.NewTicker(pollTick)
 
 LOOP:
 	for {
 		select {
 		case <-ctx.Done():
 			// Kill signal
+			tick.Stop()
 			break LOOP
-		case <-q.quit:
+		case err := <-q.quit:
 			// An inner function received an error which was deemed irrecoverable, so
 			// we're quitting the queue.
+			logger.From(ctx).Error().Err(err).Msg("quitting runner internally")
+			tick.Stop()
 			break LOOP
-		case <-tick:
+		case <-tick.C:
 			if q.capacity() < minWorkersFree {
 				// Wait until we have more workers free.  This stops us from
 				// claiming a partition to work on a single job, ensuring we
@@ -72,11 +75,12 @@ LOOP:
 // claimSequentialLease is a process which continually runs while listening to the queue,
 // attempting to claim a lease on sequential processing.  Only one worker is allowed to
 // work on partitions sequentially;  this reduces contention.
-func (q *queue) claimSequentialLease(ctx context.Context) error {
+func (q *queue) claimSequentialLease(ctx context.Context) {
 	// Attempt to claim the lease immediately.
 	leaseID, err := q.LeaseSequential(ctx, SequentialLeaseDuration, q.seqLeaseID)
 	if err != ErrSequentialAlreadyLeased && err != nil {
-		return err
+		q.quit <- err
+		return
 	}
 	q.seqLeaseID = leaseID
 
@@ -85,7 +89,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			tick.Stop()
-			return nil
+			return
 		case <-tick.C:
 			leaseID, err := q.LeaseSequential(ctx, SequentialLeaseDuration, q.seqLeaseID)
 			if err == ErrSequentialAlreadyLeased {
@@ -104,13 +108,13 @@ func (q *queue) claimSequentialLease(ctx context.Context) error {
 
 // worker runs a blocking process that listens to items being pushed into the
 // worker channel.  This allows us to process an individual item from a queue.
-func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) error {
+func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return
 		case <-q.quit:
-			return nil
+			return
 		case qi := <-q.workers:
 			err := q.process(ctx, qi, f)
 			q.sem.Release(1)
