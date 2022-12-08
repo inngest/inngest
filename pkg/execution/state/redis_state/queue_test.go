@@ -242,14 +242,15 @@ func TestQueueLease(t *testing.T) {
 
 		t.Run("Leasing an expired lease should succeed", func(t *testing.T) {
 			<-time.After(1005 * time.Millisecond)
-			id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+			now := time.Now()
+			id, err := q.Lease(ctx, item.WorkflowID, item.ID, 5*time.Second)
 			require.NoError(t, err)
 			require.NoError(t, err)
 
 			item = getQueueItem(t, r, item.ID)
 			require.NotNil(t, item.LeaseID)
 			require.EqualValues(t, id, item.LeaseID)
-			require.WithinDuration(t, time.Now().Add(time.Second), ulid.Time(item.LeaseID.Time()), 10*time.Millisecond)
+			require.WithinDuration(t, now.Add(5*time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
 			t.Run("Expired does not increase partition in-progress count", func(t *testing.T) {
 				val := r.HGet(defaultQueueKey.PartitionMeta(item.WorkflowID.String()), "n")
