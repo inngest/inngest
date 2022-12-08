@@ -4,28 +4,31 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/backoff"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
 	ErrMaxConsecutiveProcessErrors = 20
 
-	numWorkers     = 5_000
-	minWorkersFree = 5
-	pollTick       = 20 * time.Millisecond
+	defaultNumWorkers = 5_000
+	minWorkersFree    = 5
+	pollTick          = 20 * time.Millisecond
 )
 
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
-	q.workers = make(chan *QueueItem, numWorkers)
-	for i := 0; i < numWorkers; i++ {
+	q.workers = make(chan QueueItem, q.numWorkers)
+	for i := int32(0); i < q.numWorkers; i++ {
 		go q.worker(ctx, f)
 	}
 
+	// Attempt to be the worker which processes items sequentially.
 	go q.claimSequentialLease(ctx)
 
 	tick := time.Tick(pollTick)
@@ -37,6 +40,8 @@ LOOP:
 			// Kill signal
 			break LOOP
 		case <-q.quit:
+			// An inner function received an error which was deemed irrecoverable, so
+			// we're quitting the queue.
 			break LOOP
 		case <-tick:
 			if q.capacity() < minWorkersFree {
@@ -99,13 +104,14 @@ func (q *queue) claimSequentialLease(ctx context.Context) error {
 
 // worker runs a blocking process that listens to items being pushed into the
 // worker channel.  This allows us to process an individual item from a queue.
-func (q queue) worker(ctx context.Context, f osqueue.RunFunc) error {
+func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case qi := <-q.workers:
 			err := q.process(ctx, qi, f)
+			q.sem.Release(1)
 			if err == nil {
 				continue
 			}
@@ -118,22 +124,113 @@ func (q queue) worker(ctx context.Context, f osqueue.RunFunc) error {
 	}
 }
 
-func (q queue) process(ctx context.Context, qi *QueueItem, f osqueue.RunFunc) error {
-	l := logger.From(ctx)
-
-	leaseID, err := q.Lease(ctx, qi.WorkflowID, qi.ID, QueueLeaseDuration)
-	if err == ErrQueueItemNotFound {
-		// Already handled.
-		return nil
+func (q queue) scan(ctx context.Context, f osqueue.RunFunc) error {
+	partitions, err := q.PartitionPeek(ctx, q.isSequential(), time.Now(), PartitionPeekMax)
+	if err != nil {
+		return err
 	}
-	if err == ErrQueueItemAlreadyLeased {
-		// XXX: Increase counter for lease contention
-		l.Warn().Interface("item", qi).Msg("worker attempting to claim existing lease")
+
+	for _, p := range partitions {
+		if q.capacity() == 0 {
+			// no available workers for partition
+			return nil
+		}
+		if err := q.processPartition(ctx, p, f); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osqueue.RunFunc) error {
+	// Attempt to lease items
+	_, err := q.PartitionLease(ctx, p.WorkflowID, PartitionLeaseDuration)
+	if err == ErrPartitionAlreadyLeased {
+		// TODO: Increase metric for partition contention
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("error leasing in process: %w", err)
+		return err
 	}
+
+	// Ensure that peek doesn't take longer than the partition lease, to
+	// reduce contention.
+	peekCtx, cancel := context.WithTimeout(ctx, PartitionLeaseDuration)
+	defer cancel()
+
+	queue, err := q.Peek(peekCtx, p.WorkflowID, time.Now(), q.peekSize())
+	if err != nil {
+		return err
+	}
+
+	if len(queue) == 0 {
+		// XXX: Here we can dequeue, which must check if there are any items _at all_ in this
+		// workflow queue.
+	}
+
+	for _, item := range queue {
+		if item.LeaseID != nil && ulid.Time(item.LeaseID.Time()).After(time.Now()) {
+			// TODO: Increase metric for queue contention
+			continue
+		}
+
+		// Cbeck if there's capacity in our queue atomically prior to leasing our tiems.
+		if !q.sem.TryAcquire(1) {
+			break
+		}
+
+		// Attempt to lease this item before passing this to a worker.  We have to do this
+		// synchronously as we need to lease prior to requeueing the partition pointer. If
+		// we don't do this here, the workers may not lease the items before calling Peek
+		// to re-enqeueu the pointer, which then increases contention - as we requeue a
+		// pointer too early.
+		//
+		// This is safe:  only one process runs scan(), and we guard the total number of
+		// available workers with the above semaphore.
+		leaseID, err := q.Lease(ctx, item.WorkflowID, item.ID, QueueLeaseDuration)
+		if err == ErrQueueItemNotFound {
+			// Already handled.
+			q.sem.Release(1)
+			continue
+		}
+		if err == ErrQueueItemAlreadyLeased {
+			// XXX: Increase counter for lease contention
+			q.sem.Release(1)
+			logger.From(ctx).Warn().Interface("item", item).Msg("worker attempting to claim existing lease")
+			continue
+		}
+		if err != nil {
+			q.sem.Release(1)
+			return fmt.Errorf("error leasing in process: %w", err)
+		}
+
+		// Assign the lease ID and pass this to be handled by the available worker.
+		item.LeaseID = leaseID
+		q.workers <- *item
+	}
+
+	// Read the next queue item available.  This is why we have to lease above,
+	// else this may return an item that was just leased.
+	queue, err = q.Peek(peekCtx, p.WorkflowID, time.Now().Add(24*time.Hour), -1)
+	if err != nil {
+		return err
+	}
+	next := time.Now().Add(10 * time.Second)
+	if len(queue) > 0 {
+		next = time.UnixMilli(queue[0].At)
+	}
+	if err := q.PartitionRequeue(ctx, p.WorkflowID, next); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) error {
+	var err error
+	leaseID := qi.LeaseID
+
+	// TODO Verify we have lease.
 
 	// Allow the main runner to block until this work is done
 	q.wg.Add(1)
@@ -153,11 +250,12 @@ func (q queue) process(ctx context.Context, qi *QueueItem, f osqueue.RunFunc) er
 	// Continually extend lease in the background while we're working on this job
 	go func() {
 		for range extendLeaseTick.C {
-			leaseID, err = q.ExtendLease(ctx, *qi, *leaseID, QueueLeaseDuration)
+			leaseID, err = q.ExtendLease(ctx, qi, *leaseID, QueueLeaseDuration)
 			if err != nil && err != ErrQueueItemNotFound {
 				// XXX: Increase counter here.
 				logger.From(ctx).Error().Err(err).Msg("error extending lease")
 				errCh <- fmt.Errorf("error extending lease while processing: %w", err)
+				return
 			}
 		}
 	}()
@@ -167,7 +265,7 @@ func (q queue) process(ctx context.Context, qi *QueueItem, f osqueue.RunFunc) er
 	defer jobCancel()
 
 	go func() {
-		logger.From(ctx).Debug().Interface("item", qi).Msg("queue item starting")
+		//logger.From(ctx).Debug().Interface("item", qi).Msg("queue item starting")
 
 		err := f(jobCtx, qi.Data)
 		extendLeaseTick.Stop()
@@ -189,7 +287,7 @@ func (q queue) process(ctx context.Context, qi *QueueItem, f osqueue.RunFunc) er
 			logger.From(ctx).Debug().Interface("item", qi).Msg("dequeueing failed job")
 
 			// Dequeue entirely.
-			if err := q.Dequeue(ctx, *qi); err != nil {
+			if err := q.Dequeue(ctx, qi); err != nil {
 				return err
 			}
 			return nil
@@ -198,74 +296,12 @@ func (q queue) process(ctx context.Context, qi *QueueItem, f osqueue.RunFunc) er
 		// TODO: Remove requeueing from the execution service;  just return a failed job here.
 		qi.Attempt += 1
 		qi.Data.ErrorCount += 1
-		if err := q.Requeue(ctx, *qi, backoff.LinearJitterBackoff(qi.Attempt)); err != nil {
+		if err := q.Requeue(ctx, qi, backoff.LinearJitterBackoff(qi.Attempt)); err != nil {
 			logger.From(ctx).Error().Err(err).Interface("item", qi).Msg("error requeuing job")
 		}
 	case <-doneCh:
-		logger.From(ctx).Debug().Interface("item", qi).Msg("queue item complete")
-		if err := q.Dequeue(ctx, *qi); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (q queue) scan(ctx context.Context, f osqueue.RunFunc) error {
-	partitions, err := q.PartitionPeek(ctx, q.isSequential(), time.Now(), PartitionPeekMax)
-	if err != nil {
-		return err
-	}
-
-	for _, p := range partitions {
-		if q.capacity() == 0 {
-			// no available workers for partition
-			return nil
-		}
-
-		// Attempt to lease items
-		_, err := q.PartitionLease(ctx, p.WorkflowID, PartitionLeaseDuration)
-		if err == ErrPartitionAlreadyLeased {
-			// TODO: Increase metric for partition contention
-			continue
-		}
-		if err != nil {
-			return err
-		}
-
-		// Ensure that peek doesn't take longer than the partition lease, to
-		// reduce contention.
-		peekCtx, cancel := context.WithTimeout(ctx, PartitionLeaseDuration)
-		defer cancel()
-
-		queue, err := q.Peek(peekCtx, p.WorkflowID, time.Now(), q.peekSize())
-		if err != nil {
-			return err
-		}
-
-		if len(queue) == 0 {
-			// XXX: Here we can dequeue, which must check if there are any items _at all_ in this
-			// workflow queue.
-		}
-
-		for _, item := range queue {
-			if item.LeaseID != nil && ulid.Time(item.LeaseID.Time()).After(time.Now()) {
-				// TODO: Increase metric for queue contention
-				continue
-			}
-			q.workers <- item
-		}
-
-		// Read the next queue item available.
-		queue, err = q.Peek(peekCtx, p.WorkflowID, time.Now().Add(24*time.Hour), -1)
-		if err != nil {
-			return err
-		}
-		next := time.Now().Add(10 * time.Second)
-		if len(queue) > 0 {
-			next = time.UnixMilli(queue[0].At)
-		}
-		if err := q.PartitionRequeue(ctx, p.WorkflowID, next); err != nil {
+		//logger.From(ctx).Debug().Interface("item", qi).Msg("queue item complete")
+		if err := q.Dequeue(ctx, qi); err != nil {
 			return err
 		}
 	}
@@ -274,13 +310,13 @@ func (q queue) scan(ctx context.Context, f osqueue.RunFunc) error {
 }
 
 func (q queue) capacity() int64 {
-	return int64(cap(q.workers) - len(q.workers))
+	return int64(q.numWorkers) - q.sem.counter
 }
 
 // peekSize returns the total number of available workers which can consume individual
 // queue items.
 func (q queue) peekSize() int64 {
-	f := q.capacity() + 1
+	f := q.capacity()
 	if f > QueuePeekMax {
 		return QueuePeekMax
 	}
@@ -292,4 +328,35 @@ func (q queue) isSequential() bool {
 		return false
 	}
 	return ulid.Time(q.seqLeaseID.Time()).After(time.Now())
+}
+
+// trackingSemaphore returns a semaphore that tracks closely - but not atomically -
+// the total number of items in the semaphore.  This is best effort, and is loosely
+// accurate to reduce further contention.
+//
+// This is only used as an indicator as to whether to scan.
+type trackingSemaphore struct {
+	*semaphore.Weighted
+	counter int64
+}
+
+func (t *trackingSemaphore) TryAcquire(n int64) bool {
+	if !t.Weighted.TryAcquire(n) {
+		return false
+	}
+	atomic.AddInt64(&t.counter, n)
+	return true
+}
+
+func (t *trackingSemaphore) Acquire(ctx context.Context, n int64) error {
+	if err := t.Weighted.Acquire(ctx, n); err != nil {
+		return err
+	}
+	atomic.AddInt64(&t.counter, n)
+	return nil
+}
+
+func (t *trackingSemaphore) Release(n int64) {
+	t.Weighted.Release(n)
+	atomic.AddInt64(&t.counter, -n)
 }
