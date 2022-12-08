@@ -70,7 +70,7 @@ func TestQueueRunSequential(t *testing.T) {
 	// Cancel q1, temrinating the queue with the sequential lease.
 	q1cancel()
 
-	<-time.After(SequentialLeaseDuration)
+	<-time.After(SequentialLeaseDuration * 2)
 
 	// Q2 obtains lease.
 	require.NotNil(t, q2.sequentialLease())
