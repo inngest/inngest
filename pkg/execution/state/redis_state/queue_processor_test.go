@@ -129,7 +129,7 @@ func TestQueueRunBasic(t *testing.T) {
 // We assert that all jobs are handled within 100ms of budget.
 func TestQueueRunExtended(t *testing.T) {
 	r := miniredis.RunT(t)
-	q := NewQueue(redis.NewClient(&redis.Options{Addr: "127.0.0.1:6379", PoolSize: 100}))
+	q := NewQueue(redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100}))
 	ctx, cancel := context.WithCancel(context.Background())
 
 	mrand.Seed(time.Now().UnixMicro())
