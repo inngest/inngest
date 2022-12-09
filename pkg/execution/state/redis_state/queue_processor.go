@@ -31,6 +31,16 @@ func init() {
 	latencySem = &sync.Mutex{}
 }
 
+func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) error {
+	_, err := q.EnqueueItem(ctx, QueueItem{
+		AtMS:       at.UnixMilli(),
+		WorkflowID: item.Identifier.WorkflowID,
+		Data:       item,
+	}, at)
+	logger.From(ctx).Trace().Interface("item", item).Msg("enqueued item")
+	return err
+}
+
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	for i := int32(0); i < q.numWorkers; i++ {
 		go q.worker(ctx, f)
@@ -328,27 +338,33 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 	}()
 
 	select {
-	case <-errCh:
+	case err := <-errCh:
 		// Job errored or extending lease errored.  Cancel the job ASAP.
 		jobCancel()
 
-		if qi.Attempt == qi.MaxAttempts {
-			// XXX: Increase failed counter here.
-			logger.From(ctx).Debug().Interface("item", qi).Msg("dequeueing failed job")
-
-			// Dequeue entirely.
-			if err := q.Dequeue(ctx, qi); err != nil {
+		if osqueue.ShouldRetry(err, qi.Data.Attempt, qi.Data.GetMaxAttempts()) {
+			// XXX: Increase errored count
+			qi.Data.Attempt += 1
+			logger.From(ctx).Info().Err(err).Interface("item", qi).Msg("requeuing job")
+			if err := q.Requeue(ctx, qi, backoff.LinearJitterBackoff(qi.Data.Attempt)); err != nil {
+				logger.From(ctx).Error().Err(err).Interface("item", qi).Msg("error requeuing job")
 				return err
 			}
 			return nil
 		}
 
-		// TODO: Remove requeueing from the execution service;  just return a failed job here.
-		qi.Attempt += 1
-		qi.Data.ErrorCount += 1
-		if err := q.Requeue(ctx, qi, backoff.LinearJitterBackoff(qi.Attempt)); err != nil {
-			logger.From(ctx).Error().Err(err).Interface("item", qi).Msg("error requeuing job")
+		// Dequeue this entirely, as this permanently failed.
+		// XXX: Increase permanently failed counter here.
+		logger.From(ctx).Info().Interface("item", qi).Msg("dequeueing failed job")
+		if err := q.Dequeue(ctx, qi); err != nil {
+			return err
 		}
+
+		if _, ok := err.(osqueue.QuitError); ok {
+			q.quit <- err
+			return err
+		}
+
 	case <-doneCh:
 		//logger.From(ctx).Debug().Interface("item", qi).Msg("queue item complete")
 		if err := q.Dequeue(ctx, qi); err != nil {
