@@ -224,7 +224,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 			next := item
 			next.ErrorCount += 1
 			at := backoff.LinearJitterBackoff(next.ErrorCount)
-			l.Info().Interface("edge", next).Time("at", at).Msg("enqueueing retry")
+			l.Info().Interface("edge", next).Time("at", at).Err(err).Msg("enqueueing retry")
 			if err := s.queue.Enqueue(ctx, next, at); err != nil {
 				return fmt.Errorf("unable to enqueue retry: %w", err)
 			}
