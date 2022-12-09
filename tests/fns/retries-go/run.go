@@ -37,7 +37,7 @@ func Do(ctx context.Context) testdsl.Chain {
 		// Ensure retries per step are adhered to
 		testdsl.RequireStepRetries("step-custom-retries-high", 4),
 		testdsl.RequireStepRetries("step-default-retries", 3),
-		testdsl.RequireStepRetries("step-custom-retries-low", 1),
+		testdsl.RequireStepRetries("step-custom-retries-low", 2),
 		testdsl.RequireStepRetries("step-custom-retries-none", 0),
 	}
 }

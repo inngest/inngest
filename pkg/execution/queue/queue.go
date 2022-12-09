@@ -7,7 +7,7 @@ import (
 
 const (
 	// DefaultRetryCount is used when no retry count for a job is specified.
-	DefaultRetryCount = 5
+	DefaultRetryCount = 3
 )
 
 type Queue interface {

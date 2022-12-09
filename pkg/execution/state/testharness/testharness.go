@@ -130,6 +130,7 @@ func CheckState(t *testing.T, gen Generator) {
 	}
 	for name, f := range funcs {
 		t.Run(name, func(t *testing.T) {
+			t.Helper()
 			m, cleanup := gen()
 			f(t, m)
 			cleanup()
@@ -1336,6 +1337,8 @@ func checkFinalizedStatus(t *testing.T, m state.Manager) {
 }
 
 func checkLogs(t *testing.T, m state.Manager) {
+	t.Helper()
+
 	ctx := context.Background()
 	s := setup(t, m)
 

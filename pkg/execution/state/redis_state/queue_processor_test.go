@@ -47,13 +47,13 @@ func TestQueueRunSequential(t *testing.T) {
 		})
 	}()
 	go func() {
-		<-time.After(10 * time.Millisecond)
+		<-time.After(100 * time.Millisecond)
 		_ = q2.Run(q2ctx, func(ctx context.Context, item osqueue.Item) error {
 			return nil
 		})
 	}()
 
-	<-time.After(20 * time.Millisecond)
+	<-time.After(110 * time.Millisecond)
 	// Q1 gets lease, as it started first.
 	require.NotNil(t, q1.sequentialLease())
 	// Lease is in the future.
