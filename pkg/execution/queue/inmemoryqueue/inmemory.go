@@ -21,6 +21,9 @@ var (
 )
 
 func New() queue.Queue {
+	r := miniredis.NewMiniRedis()
+	r.Start()
+
 	rc := redis.NewClient(&redis.Options{
 		Addr:     r.Addr(),
 		PoolSize: 100,

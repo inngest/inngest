@@ -128,7 +128,7 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 		return s, nil
 	}
 
-	return nil, fmt.Errorf("state not found with identifier: %w", i.RunID)
+	return nil, fmt.Errorf("state not found with identifier: %s", i.RunID.String())
 }
 
 func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
