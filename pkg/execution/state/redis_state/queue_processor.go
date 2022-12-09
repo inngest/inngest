@@ -174,7 +174,15 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	peekCtx, cancel := context.WithTimeout(ctx, PartitionLeaseDuration)
 	defer cancel()
 
-	queue, err := q.Peek(peekCtx, p.WorkflowID, time.Now(), q.peekSize())
+	// We need to round ourselves up to the nearest second, then add another second
+	// to peek for jobs in the next <= 1999 milliseconds.
+	//
+	// There's a really subtle issue:  if two jobs contend for a pause and are scheduled
+	// within 5ms of each other, we fetch them in order but we may process them out of
+	// order, depending on how long it takes for the item to pass through the channel
+	// to the worker, how long Redis takes to lease the item, etc.
+	fetch := time.Now().Truncate(time.Second).Add(2 * time.Second)
+	queue, err := q.Peek(peekCtx, p.WorkflowID, fetch, q.peekSize())
 	if err != nil {
 		return err
 	}
@@ -277,6 +285,19 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 	defer jobCancel()
 
 	go func() {
+		// This job may be up to 1999 ms in the future, as explained in processPartition.
+		// Just... wait until the job is available.
+		delay := time.Until(time.UnixMilli(qi.AtMS))
+
+		if delay > 0 {
+			logger.From(ctx).Trace().
+				Int64("ms", delay.Milliseconds()).
+				Msg("delaying job in memory")
+			<-time.After(delay)
+		}
+
+		// XXX: Track job latency here via metrics.
+
 		err := f(jobCtx, qi.Data)
 		extendLeaseTick.Stop()
 		if err != nil {
