@@ -39,7 +39,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			WorkflowID: item.WorkflowID,
 			Priority:   testPriority,
-			At:         start.Unix(),
+			AtS:        start.Unix(),
 		}, qp)
 	})
 
@@ -62,7 +62,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			WorkflowID: item.WorkflowID,
 			Priority:   testPriority,
-			At:         start.Unix(),
+			AtS:        start.Unix(),
 		}, qp)
 
 		// Ensure that the zscore did not change.
@@ -85,7 +85,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			WorkflowID: item.WorkflowID,
 			Priority:   testPriority,
-			At:         at.Unix(),
+			AtS:        at.Unix(),
 		}, qp)
 
 		// Assert that the zscore was changed to this earliest timestamp.
@@ -115,7 +115,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, QueuePartition{
 			WorkflowID: item.WorkflowID,
 			Priority:   testPriority,
-			At:         at.Unix(),
+			AtS:        at.Unix(),
 		}, qp)
 	})
 }
@@ -470,9 +470,9 @@ func TestQueuePartitionLease(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{WorkflowID: idA, Priority: testPriority, At: atA.Unix()},
-			{WorkflowID: idB, Priority: testPriority, At: atB.Unix()},
-			{WorkflowID: idC, Priority: testPriority, At: atC.Unix()},
+			{WorkflowID: idA, Priority: testPriority, AtS: atA.Unix()},
+			{WorkflowID: idB, Priority: testPriority, AtS: atB.Unix()},
+			{WorkflowID: idC, Priority: testPriority, AtS: atC.Unix()},
 		}, items)
 	})
 
@@ -493,12 +493,12 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, items, 3)
 			require.EqualValues(t, []*QueuePartition{
-				{WorkflowID: idB, Priority: testPriority, At: atB.Unix()},
-				{WorkflowID: idC, Priority: testPriority, At: atC.Unix()},
+				{WorkflowID: idB, Priority: testPriority, AtS: atB.Unix()},
+				{WorkflowID: idC, Priority: testPriority, AtS: atC.Unix()},
 				{
 					WorkflowID: idA,
 					Priority:   testPriority,
-					At:         ulid.Time(leaseID.Time()).Unix(),
+					AtS:        ulid.Time(leaseID.Time()).Unix(),
 					Last:       time.Now().Unix(),
 					LeaseID:    leaseID,
 				}, // idA is now last.
@@ -566,9 +566,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 3)
 		require.EqualValues(t, []*QueuePartition{
-			{WorkflowID: idA, Priority: PriorityMin, At: atA.Unix()},
-			{WorkflowID: idB, Priority: PriorityMax, At: atB.Unix()},
-			{WorkflowID: idC, Priority: PriorityMax, At: atC.Unix()},
+			{WorkflowID: idA, Priority: PriorityMin, AtS: atA.Unix()},
+			{WorkflowID: idB, Priority: PriorityMax, AtS: atB.Unix()},
+			{WorkflowID: idC, Priority: PriorityMax, AtS: atC.Unix()},
 		}, items)
 	})
 
@@ -607,25 +607,30 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	idA := uuid.New()
 	now := time.Now()
 
-	_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
+	qi, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
 	require.NoError(t, err)
 
-	qp := getPartition(t, r, idA)
-
-	t.Run("Requeues the partition", func(t *testing.T) {
+	t.Run("Doesn't requeue the partition if there's an unleased job", func(t *testing.T) {
 		requirePartitionScoreEquals(t, r, idA, now)
 		next := now.Add(time.Hour)
 		err := q.PartitionRequeue(ctx, idA, next)
 		require.NoError(t, err)
-		requirePartitionScoreEquals(t, r, idA, next)
-
-		loaded := getPartition(t, r, idA)
-		qp.At = next.Unix()
-		require.Equal(t, qp, loaded)
+		requirePartitionScoreEquals(t, r, idA, now)
 	})
 
-	t.Run("It removes any lease", func(t *testing.T) {
-		next := now.Add(time.Second)
+	t.Run("Requeus the partition with a leased job", func(t *testing.T) {
+		_, err := q.Lease(ctx, idA, qi.ID, 10*time.Second)
+		require.NoError(t, err)
+
+		requirePartitionScoreEquals(t, r, idA, now)
+		next := now.Add(time.Hour)
+		err = q.PartitionRequeue(ctx, idA, next)
+		require.NoError(t, err)
+		requirePartitionScoreEquals(t, r, idA, next)
+	})
+
+	t.Run("It removes any lease when requeueing", func(t *testing.T) {
+		next := now.Add(5 * time.Second)
 
 		_, err := q.PartitionLease(ctx, idA, time.Minute)
 		require.NoError(t, err)
@@ -636,6 +641,14 @@ func TestQueuePartitionRequeue(t *testing.T) {
 
 		loaded := getPartition(t, r, idA)
 		require.Nil(t, loaded.LeaseID)
+	})
+
+	t.Run("It removes the partition if there are no jobs available", func(t *testing.T) {
+		err := q.Dequeue(ctx, qi)
+		require.NoError(t, err)
+
+		err = q.PartitionRequeue(ctx, idA, time.Now().Add(time.Minute))
+		require.Equal(t, ErrPartitionGarbageCollected, err)
 	})
 }
 
@@ -672,17 +685,6 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	t.Run("It doesn't accept min priorities", func(t *testing.T) {
 		err = q.PartitionReprioritize(ctx, idA, PriorityMin+1)
 		require.Equal(t, ErrPriorityTooLow, err)
-	})
-}
-
-func TestQueuePartitionDequeue(t *testing.T) {
-	t.Run("It removes the partition", func(t *testing.T) {
-	})
-
-	t.Run("It removes the index", func(t *testing.T) {
-	})
-
-	t.Run("It removes the counters", func(t *testing.T) {
 	})
 }
 
