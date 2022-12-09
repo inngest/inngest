@@ -44,7 +44,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 	})
 
 	t.Run("It sets the right item score", func(t *testing.T) {
-		start := time.Now().Truncate(time.Second)
+		start := time.Now()
 		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 
@@ -261,7 +261,7 @@ func TestQueueLease(t *testing.T) {
 		})
 
 		t.Run("It should increase the score of the item by the lease duration", func(t *testing.T) {
-			start := time.Now().Truncate(time.Second)
+			start := time.Now()
 			item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 			require.NoError(t, err)
 			require.Nil(t, item.LeaseID)
@@ -396,7 +396,7 @@ func TestQueueRequeue(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Re-enqueuing a leased item should succeed", func(t *testing.T) {
-		now := time.Now().Truncate(time.Second)
+		now := time.Now()
 
 		item, err := q.EnqueueItem(ctx, QueueItem{}, now)
 		require.NoError(t, err)
@@ -405,7 +405,7 @@ func TestQueueRequeue(t *testing.T) {
 
 		// Assert partition index is original
 		pi := QueuePartition{WorkflowID: item.WorkflowID, Priority: testPriority}
-		requirePartitionScoreEquals(t, r, pi.WorkflowID, now)
+		requirePartitionScoreEquals(t, r, pi.WorkflowID, now.Truncate(time.Second))
 
 		requireInProgress(t, r, item.WorkflowID, 1)
 
@@ -780,9 +780,9 @@ func getPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) QueueParti
 func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem, expected time.Time) {
 	t.Helper()
 	score, err := r.ZScore(defaultQueueKey.QueueIndex(item.WorkflowID.String()), item.ID.String())
-	parsed := time.Unix(int64(score), 0)
+	parsed := time.UnixMilli(int64(score))
 	require.NoError(t, err)
-	require.WithinDuration(t, expected.Truncate(time.Second), parsed, time.Millisecond)
+	require.WithinDuration(t, expected.Truncate(time.Millisecond), parsed, 10*time.Millisecond)
 }
 
 func requirePartitionScoreEquals(t *testing.T, r *miniredis.Miniredis, wid uuid.UUID, expected time.Time) {

@@ -15,8 +15,8 @@ local partitionIndexKey = KEYS[4] -- partition:sorted - zset
 
 local queueItem      = ARGV[1] -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID        = ARGV[2] -- id
-local queueScore     = tonumber(ARGV[3]) -- vesting time, in seconds
-local partitionIndex = ARGV[4] -- {workflow, priority}
+local queueScore     = tonumber(ARGV[3]) -- vesting time, in ms
+local partitionIndex = ARGV[4] -- workflowID
 local partitionItem  = ARGV[5] -- {workflow, priority, leasedAt, etc}
 
 -- $include(get_queue_item.lua)
@@ -41,11 +41,14 @@ local currentScore = redis.call("ZSCORE", partitionIndexKey, partitionIndex)
 -- the earliest time for the entire function set, as we may be
 -- rescheduling the only time in the queue;  this is the only way
 -- to update the partiton index.
-local earliest = redis.call("ZRANGE", queueIndexKey, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+local queueScore = redis.call("ZRANGE", queueIndexKey, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+
+-- queues are ordered by ms precision, whereas pointers are second precision.
+local earliestTime = math.floor(tonumber(queueScore[2]) / 1000)
 
 -- earliest is a table containing {item, score}
-if currentScore == false or tonumber(currentScore) ~= tonumber(earliest[2]) then
-	redis.call("ZADD", partitionIndexKey, earliest[2], partitionIndex)
+if currentScore == false or tonumber(currentScore) ~= earliestTime then
+	redis.call("ZADD", partitionIndexKey, earliestTime, partitionIndex)
 	-- Update the partition item too
 	redis.call("HSET", partitionKey, "item", partitionItem)
 end

@@ -229,6 +229,11 @@ func TestQueueRunExtended(t *testing.T) {
 				added,
 				added-next,
 			)
+			latencySem.Lock()
+			// NOTE: RUNNING THIS WITH THE RACE CHECKER SIGNIFICANTLY REDUCES LATENCY.
+			// The actual latency should be checked without --race on.
+			fmt.Printf("AVG LATENCY: %dms\n", time.Duration(latencyAvg.GetEWMA()).Milliseconds())
+			latencySem.Unlock()
 			prev = next
 		}
 	}()
@@ -251,6 +256,7 @@ func TestQueueRunExtended(t *testing.T) {
 	fmt.Printf("Handled %d items\n", h)
 
 	require.EqualValues(t, a, h, "Added %d, handled %d (delta: %d)", a, h, a-h)
+
 	cancel()
 
 	<-time.After(time.Second)

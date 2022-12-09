@@ -494,7 +494,7 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 
 		i,
 		i.ID.String(),
-		at.Unix(),
+		at.UnixMilli(),
 		qp.WorkflowID.String(),
 		qp,
 	).Int64()

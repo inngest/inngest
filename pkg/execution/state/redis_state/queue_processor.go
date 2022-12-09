@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/emperorearth/vitess/go/ewma"
 	"github.com/inngest/inngest/pkg/backoff"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -16,9 +18,18 @@ import (
 
 const (
 	ErrMaxConsecutiveProcessErrors = 20
-
-	minWorkersFree = 5
+	minWorkersFree                 = 5
 )
+
+var (
+	latencyAvg *ewma.EWMA
+	latencySem *sync.Mutex
+)
+
+func init() {
+	latencyAvg = ewma.NewEWMA(ewma.DefaultWeightingFactor)
+	latencySem = &sync.Mutex{}
+}
 
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	for i := int32(0); i < q.numWorkers; i++ {
@@ -174,7 +185,15 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	peekCtx, cancel := context.WithTimeout(ctx, PartitionLeaseDuration)
 	defer cancel()
 
-	queue, err := q.Peek(peekCtx, p.WorkflowID, time.Now(), q.peekSize())
+	// We need to round ourselves up to the nearest second, then add another second
+	// to peek for jobs in the next <= 1999 milliseconds.
+	//
+	// There's a really subtle issue:  if two jobs contend for a pause and are scheduled
+	// within 5ms of each other, we fetch them in order but we may process them out of
+	// order, depending on how long it takes for the item to pass through the channel
+	// to the worker, how long Redis takes to lease the item, etc.
+	fetch := time.Now().Truncate(time.Second).Add(2 * time.Second)
+	queue, err := q.Peek(peekCtx, p.WorkflowID, fetch, q.peekSize())
 	if err != nil {
 		return err
 	}
@@ -250,7 +269,6 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 
 	// XXX: Increase counter for queue items processed
 	// XXX: Increase / defer decrease gauge for items processing
-	// XXX: Track latency as metric from qi.ItemID (enqueue at time)
 
 	errCh := make(chan error)
 	doneCh := make(chan struct{})
@@ -277,6 +295,28 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 	defer jobCancel()
 
 	go func() {
+		// This job may be up to 1999 ms in the future, as explained in processPartition.
+		// Just... wait until the job is available.
+		delay := time.Until(time.UnixMilli(qi.AtMS))
+
+		if delay > 0 {
+			<-time.After(delay)
+			logger.From(ctx).Trace().
+				Int64("at", qi.AtMS).
+				Int64("ms", delay.Milliseconds()).
+				Msg("delaying job in memory")
+		}
+
+		go func() {
+			// Track the latency on average globally.  Do this in a goroutine so that it doesn't
+			// at all delay the job during concurrenty locking contention.
+			latencySem.Lock()
+			defer latencySem.Unlock()
+			latency := time.Since(time.UnixMilli(qi.AtMS))
+			latencyAvg.AddValue(float64(latency))
+			// XXX: Add indinvidual latency to metrics
+		}()
+
 		err := f(jobCtx, qi.Data)
 		extendLeaseTick.Stop()
 		if err != nil {
