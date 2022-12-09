@@ -31,6 +31,18 @@ func init() {
 	latencySem = &sync.Mutex{}
 }
 
+func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) error {
+	// TODO: Workspace ID
+	// TODO: MaxAttempts
+	_, err := q.EnqueueItem(ctx, QueueItem{
+		AtMS:       at.UnixMilli(),
+		WorkflowID: item.Identifier.WorkflowID,
+		Data:       item,
+	}, at)
+	logger.From(ctx).Trace().Interface("item", item).Msg("enqueued item")
+	return err
+}
+
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	for i := int32(0); i < q.numWorkers; i++ {
 		go q.worker(ctx, f)

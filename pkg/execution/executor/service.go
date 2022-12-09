@@ -161,6 +161,7 @@ func (s *svc) Pre(ctx context.Context) error {
 func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
 	return s.queue.Run(ctx, func(ctx context.Context, item queue.Item) error {
+		logger.From(ctx).Info().Interface("item", item).Msg("processing queue item")
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()

@@ -17,7 +17,9 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/driver/mockdriver"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/queue/inmemoryqueue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/inmemory"
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/oklog/ulid/v2"
@@ -25,8 +27,8 @@ import (
 )
 
 const (
-	timeout = 200 * time.Millisecond
-	buffer  = 50 * time.Millisecond
+	timeout = 500 * time.Millisecond
+	buffer  = 100 * time.Millisecond
 )
 
 type prepared struct {
@@ -78,6 +80,7 @@ var (
 			},
 		},
 	}
+
 	asyncF = function.Function{
 		ID:   "test",
 		Name: "test",
@@ -139,6 +142,7 @@ var (
 			},
 		},
 	}
+
 	genF = function.Function{
 		ID:   "generator",
 		Name: "generator",
@@ -163,32 +167,11 @@ var (
 func prepare(ctx context.Context, t *testing.T, f function.Function) prepared {
 	t.Helper()
 
+	q := inmemoryqueue.New()
+	c, _ := config.Dev(ctx)
+	sm := inmemory.NewStateManager()
+
 	// Create a new state manager and queue, in-memory
-	c, err := config.Parse([]byte(`package main
-
-import (
-	config "inngest.com/defs/config"
-)
-
-config.#Config & {
-	execution: {
-		drivers: {
-			http: config.#MockDriver & {
-				driver: "http"
-			}
-			docker: config.#MockDriver & {
-				driver: "docker"
-			}
-		}
-	}
-}`))
-
-	require.NoError(t, err)
-	sm, err := c.State.Service.Concrete.Manager(ctx)
-	require.NoError(t, err)
-	q, err := c.Queue.Service.Concrete.Queue()
-	require.NoError(t, err)
-
 	w, err := f.Workflow(ctx)
 	require.NoError(t, err)
 
@@ -211,7 +194,12 @@ func TestPre(t *testing.T) {
 	ctx := context.Background()
 	prepared := prepare(ctx, t, syncF)
 	// Create a new service.
-	svc := NewService(*prepared.c)
+	svc := NewService(
+		*prepared.c,
+		WithExecutionLoader(prepared.al),
+		WithQueue(prepared.q),
+		WithState(prepared.sm),
+	)
 	// This should return nil
 	err := svc.Pre(ctx)
 	require.NoError(t, err)
@@ -227,7 +215,13 @@ func TestHandleQueueItemTriggerService(t *testing.T) {
 			"1": {Output: map[string]interface{}{"id": 1}},
 		},
 	}
-	svc := NewService(*data.c, WithExecutionLoader(data.al))
+
+	svc := NewService(
+		*data.c,
+		WithExecutionLoader(data.al),
+		WithQueue(data.q),
+		WithState(data.sm),
+	)
 
 	go func() {
 		err := service.Start(ctx, svc)
@@ -295,7 +289,12 @@ func TestHandleAsyncService(t *testing.T) {
 
 	// Ensure that we add async expressions.
 
-	svc := NewService(*data.c, WithExecutionLoader(data.al))
+	svc := NewService(
+		*data.c,
+		WithExecutionLoader(data.al),
+		WithQueue(data.q),
+		WithState(data.sm),
+	)
 	go func() {
 		err := service.Start(ctx, svc)
 		require.NoError(t, err)
@@ -449,8 +448,8 @@ func TestServiceGeneratorState(t *testing.T) {
 	svc := NewService(
 		*data.c,
 		WithExecutionLoader(data.al),
-		// WithState(data.sm),
-		// WithQueue(data.q),
+		WithQueue(data.q),
+		WithState(data.sm),
 	)
 	go func() {
 		err := service.Start(ctx, svc)
