@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,10 +23,12 @@ const (
 
 var (
 	latencyAvg *ewma.EWMA
+	latencySem *sync.Mutex
 )
 
 func init() {
 	latencyAvg = ewma.NewEWMA(ewma.DefaultWeightingFactor)
+	latencySem = &sync.Mutex{}
 }
 
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
@@ -298,17 +301,21 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 
 		if delay > 0 {
 			<-time.After(delay)
-
 			logger.From(ctx).Trace().
 				Int64("at", qi.AtMS).
 				Int64("ms", delay.Milliseconds()).
 				Msg("delaying job in memory")
 		}
 
-		// Track the latency on average globally.
-		latency := time.Since(time.UnixMilli(qi.AtMS))
-		latencyAvg.AddValue(float64(latency))
-		// XXX: Add indinvidual latency to metrics
+		go func() {
+			// Track the latency on average globally.  Do this in a goroutine so that it doesn't
+			// at all delay the job during concurrenty locking contention.
+			latencySem.Lock()
+			defer latencySem.Unlock()
+			latency := time.Since(time.UnixMilli(qi.AtMS))
+			latencyAvg.AddValue(float64(latency))
+			// XXX: Add indinvidual latency to metrics
+		}()
 
 		err := f(jobCtx, qi.Data)
 		extendLeaseTick.Stop()
