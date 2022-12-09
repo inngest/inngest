@@ -306,7 +306,7 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 		}
 
 		// Track the latency on average globally.
-		latency := time.Now().Sub(time.UnixMilli(qi.AtMS))
+		latency := time.Since(time.UnixMilli(qi.AtMS))
 		latencyAvg.AddValue(float64(latency))
 		// XXX: Add indinvidual latency to metrics
 
