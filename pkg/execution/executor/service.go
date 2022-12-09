@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
@@ -175,11 +174,6 @@ func (s *svc) Run(ctx context.Context) error {
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
-
-		if err != nil {
-			logger.From(ctx).Error().Err(err).Interface("item", item).Msg("critical error handling queue item")
-		}
-
 		return err
 	})
 }
@@ -200,11 +194,11 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 	l.Debug().Interface("edge", edge).Msg("processing step")
 
-	resp, err := s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
+	resp, err := s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.Attempt)
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
 	if err == ErrFunctionRunCancelled {
-		_ = s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
+		_ = s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt)
 		return nil
 	}
 
@@ -221,19 +215,12 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		// always retryable.
 		retry, isRetryable := err.(state.Retryable)
 		if (isRetryable && retry.Retryable()) || !isRetryable {
-			next := item
-			next.ErrorCount += 1
-			at := backoff.LinearJitterBackoff(next.ErrorCount)
-			l.Info().Interface("edge", next).Time("at", at).Err(err).Msg("enqueueing retry")
-			if err := s.queue.Enqueue(ctx, next, at); err != nil {
-				return fmt.Errorf("unable to enqueue retry: %w", err)
-			}
-			return nil
+			return err
 		}
 
 		// This is a non-retryable error.  Finalize this step.
 		l.Warn().Interface("edge", edge).Msg("step permanently failed")
-		if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.ErrorCount); err != nil {
+		if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt); err != nil {
 			return fmt.Errorf("unable to finalize step: %w", err)
 		}
 		return nil
@@ -253,7 +240,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		}
 		// Finalize this step early, as we don't need to re-invoke anything else or
 		// load children until generators complete.
-		return s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.ErrorCount)
+		return s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt)
 	}
 
 	run, err := s.state.Load(ctx, item.Identifier)
@@ -368,7 +355,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	//
 	// This must happen after everything is enqueued, else the scheduled <> finalized count
 	// is out of order.
-	if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.ErrorCount); err != nil {
+	if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt); err != nil {
 		return fmt.Errorf("unable to finalize step: %w", err)
 	}
 

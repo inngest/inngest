@@ -18,24 +18,38 @@ const (
 //
 // Note that each individual implementation may wrap this to add their own fields,
 // such as a job identifier.
+//
+// TODO: Refactor this with the QueueItem in redis state to remove duplicates.
 type Item struct {
+	WorkspaceID uuid.UUID `json:"-"`
 	// Kind represents the job type and payload kind stored within Payload.
 	Kind string `json:"kind"`
 	// Identifier represents the unique workflow ID and run ID for the current job.
 	Identifier state.Identifier `json:"identifier"`
-	// ErrorCount stores the total number of errors that this job has currently procesed.
-	ErrorCount int `json:"errorCount"`
+	// Attempt stores the zero index attempt counter
+	Attempt int `json:"atts"`
+	// MaxAttempts is the maximum number of attempts we can retry.  When attempts == this,
+	// do not schedule another try.  If nil, use queue.DefaultRetryCount.
+	MaxAttempts *int `json:"maxAtts,omitEmpty"`
 	// Payload stores item-specific data for use when processing the item.  For example,
 	// this may contain the function's edge for running a step.
 	Payload any `json:"payload"`
 }
 
+func (i Item) GetMaxAttempts() int {
+	if i.MaxAttempts == nil {
+		return DefaultRetryCount
+	}
+	return *i.MaxAttempts
+}
+
 func (i *Item) UnmarshalJSON(b []byte) error {
 	type kind struct {
-		Kind       string           `json:"kind"`
-		Identifier state.Identifier `json:"identifier"`
-		ErrorCount int              `json:"errorCount"`
-		Payload    json.RawMessage  `json:"payload"`
+		Kind        string           `json:"kind"`
+		Identifier  state.Identifier `json:"identifier"`
+		Attempt     int              `json:"atts"`
+		MaxAttempts *int             `json:"maxAtts,omitEmpty"`
+		Payload     json.RawMessage  `json:"payload"`
 	}
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
@@ -45,7 +59,8 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 
 	i.Kind = temp.Kind
 	i.Identifier = temp.Identifier
-	i.ErrorCount = temp.ErrorCount
+	i.Attempt = temp.Attempt
+	i.MaxAttempts = temp.MaxAttempts
 
 	switch temp.Kind {
 	case KindEdge:

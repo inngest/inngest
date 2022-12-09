@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/coredata"
@@ -497,5 +498,85 @@ func TestServiceGeneratorState(t *testing.T) {
 		require.EqualValues(t, enums.RunStatusCompleted, md.Status)
 		require.EqualValues(t, 0, md.Pending)
 	})
+}
 
+func TestServiceRetry(t *testing.T) {
+	ctx := context.Background()
+	data := prepare(ctx, t, genF)
+	require.NotNil(t, data)
+
+	var counter int32
+
+	// Ensure our step returns a generator response.
+	data.c.Execution.Drivers["mock"] = &mockdriver.Config{
+		DynamicResponses: func(ctx context.Context, run state.State, av inngest.ActionVersion, s inngest.Step) map[string]state.DriverResponse {
+			switch atomic.AddInt32(&counter, 1) {
+			case 1:
+				// Error first.
+				return map[string]state.DriverResponse{
+					"step": {
+						Err: fmt.Errorf("failure"),
+					},
+				}
+			default:
+				return map[string]state.DriverResponse{
+					"step": {},
+				}
+
+			}
+
+		},
+	}
+
+	svc := NewService(
+		*data.c,
+		WithExecutionLoader(data.al),
+		WithQueue(data.q),
+		WithState(data.sm),
+	)
+	go func() {
+		err := service.Start(ctx, svc)
+		require.NoError(t, err)
+	}()
+
+	var id state.Identifier
+	t.Run("Create a new run", func(t *testing.T) {
+		// Create a new run.
+		id = state.Identifier{
+			WorkflowID: data.w.UUID,
+			RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+		}
+		_, err := data.sm.New(ctx, state.Input{
+			Workflow:   data.w,
+			Identifier: id,
+			EventData: (event.Event{
+				Name: "test",
+				Data: map[string]interface{}{
+					"data": "ya",
+				},
+			}).Map(),
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("Running the executor processes a generator step correctly", func(t *testing.T) {
+		err := data.q.Enqueue(ctx, queue.Item{
+			Kind:       queue.KindEdge,
+			Identifier: id,
+			Payload:    queue.PayloadEdge{Edge: inngest.SourceEdge},
+		}, time.Now())
+		require.NoError(t, err)
+
+		<-time.After(time.Until(backoff.LinearJitterBackoff(1)) + (2 * time.Second))
+
+		run, err := data.sm.Load(ctx, id)
+		require.NoError(t, err)
+
+		md := run.Metadata()
+
+		// There should be an entry after a retry.
+		require.EqualValues(t, 1, len(run.Actions()))
+		require.EqualValues(t, enums.RunStatusCompleted, md.Status)
+		require.EqualValues(t, 0, md.Pending)
+	})
 }
