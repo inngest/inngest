@@ -244,6 +244,8 @@ func (q QueuePartition) MarshalBinary() ([]byte, error) {
 //
 // The QueueItem's ID can be a zero UUID;  if the ID is a zero value a new ID
 // will be created for the queue item.
+//
+// The queue score must be added in milliseconds to process sub-second items in order.
 func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error) {
 	if i.ID.Compare(ulid.ULID{}) == 0 {
 		i.ID = ulid.MustNew(ulid.Now(), rnd)
@@ -279,7 +281,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 
 		i,
 		i.ID.String(),
-		at.Unix(),
+		at.UnixMilli(),
 		i.WorkflowID.String(),
 		qp,
 	).Int64()
@@ -320,7 +322,7 @@ func (q *queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time,
 			q.kg.QueueIndex(workflowID.String()),
 			q.kg.QueueItem(),
 		},
-		until.Unix(),
+		until.UnixMilli(),
 		limit,
 	).StringSlice()
 	if err != nil {
