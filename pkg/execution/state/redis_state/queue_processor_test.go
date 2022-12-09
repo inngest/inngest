@@ -78,6 +78,10 @@ func TestQueueRunSequential(t *testing.T) {
 	require.True(t, ulid.Time(q1.sequentialLease().Time()).Before(time.Now()))
 }
 
+func max(i int) *int {
+	return &i
+}
+
 func TestQueueRunBasic(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 50})
@@ -91,10 +95,10 @@ func TestQueueRunBasic(t *testing.T) {
 	idA, idB := uuid.New(), uuid.New()
 	items := []QueueItem{
 		{
-			WorkflowID:  idA,
-			MaxAttempts: 3,
+			WorkflowID: idA,
 			Data: osqueue.Item{
-				Kind: osqueue.KindEdge,
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(3),
 				Identifier: state.Identifier{
 					WorkflowID: idA,
 					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
@@ -102,10 +106,10 @@ func TestQueueRunBasic(t *testing.T) {
 			},
 		},
 		{
-			WorkflowID:  idB,
-			MaxAttempts: 1,
+			WorkflowID: idB,
 			Data: osqueue.Item{
-				Kind: osqueue.KindEdge,
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
 				Identifier: state.Identifier{
 					WorkflowID: idB,
 					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),

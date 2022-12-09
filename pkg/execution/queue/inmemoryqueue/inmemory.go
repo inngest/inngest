@@ -12,7 +12,7 @@ import (
 
 func init() {
 	r = miniredis.NewMiniRedis()
-	r.Start()
+	_ = r.Start()
 	registration.RegisterQueue(func() any { return &Config{} })
 }
 
@@ -22,7 +22,7 @@ var (
 
 func New() queue.Queue {
 	r := miniredis.NewMiniRedis()
-	r.Start()
+	_ = r.Start()
 
 	rc := redis.NewClient(&redis.Options{
 		Addr:     r.Addr(),

@@ -30,7 +30,7 @@ type Item struct {
 	Attempt int `json:"atts"`
 	// MaxAttempts is the maximum number of attempts we can retry.  When attempts == this,
 	// do not schedule another try.  If nil, use queue.DefaultRetryCount.
-	MaxAttempts *int `json:"maxAtts,omitEmpty"`
+	MaxAttempts *int `json:"maxAtts,omitempty"`
 	// Payload stores item-specific data for use when processing the item.  For example,
 	// this may contain the function's edge for running a step.
 	Payload any `json:"payload"`
@@ -48,7 +48,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		Kind        string           `json:"kind"`
 		Identifier  state.Identifier `json:"identifier"`
 		Attempt     int              `json:"atts"`
-		MaxAttempts *int             `json:"maxAtts,omitEmpty"`
+		MaxAttempts *int             `json:"maxAtts,omitempty"`
 		Payload     json.RawMessage  `json:"payload"`
 	}
 	temp := &kind{}

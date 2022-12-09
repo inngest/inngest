@@ -191,7 +191,7 @@ type QueueItem struct {
 	WorkflowID  uuid.UUID `json:"wfID"`
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
-	LeaseID *ulid.ULID `json:"leaseID,omitEmpty"`
+	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
 	// Data represents the enqueued data, eg. the edge to process or the pause
 	// to resume.
 	Data osqueue.Item `json:"data"`
