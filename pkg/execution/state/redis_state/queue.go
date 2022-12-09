@@ -29,18 +29,23 @@ const (
 	//
 	// Right now, this must be short enough to reduce contention but long enough
 	// to account for the latency of peeking QueuePeekMax jobs from Redis.
-	PartitionLeaseDuration        = 4 * time.Second
-	PartitionLeaseExtension       = 30 * time.Second
-	QueueSelectionMax       int64 = 50
-	QueuePeekMax            int64 = 1000
-	QueuePeekDefault        int64 = QueueSelectionMax * 3
-	QueueLeaseDuration            = 10 * time.Second
-	SequentialLeaseDuration       = 10 * time.Second
-	SequentialLeaseMax            = 20 * time.Second
+	PartitionLeaseDuration = 4 * time.Second
+	// PartitionRequeueExtension is the length of time that we extend a partition's
+	// vesting time when requeueing by default.
+	PartitionRequeueExtension       = 30 * time.Second
+	QueueSelectionMax         int64 = 50
+	QueuePeekMax              int64 = 1000
+	QueuePeekDefault          int64 = QueueSelectionMax * 3
+	QueueLeaseDuration              = 10 * time.Second
+	SequentialLeaseDuration         = 10 * time.Second
+	SequentialLeaseMax              = 20 * time.Second
 
 	PriorityMax     uint = 0
 	PriorityDefault uint = 5
 	PriorityMin     uint = 9
+
+	defaultNumWorkers = 100
+	defaultPollTick   = 10 * time.Millisecond
 )
 
 var (
@@ -56,6 +61,7 @@ var (
 	ErrPartitionNotFound             = fmt.Errorf("partition not found")
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
+	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
 	ErrSequentialAlreadyLeased       = fmt.Errorf("sequential scanner already leased")
 	ErrSequentialLeaseExceedsLimits  = fmt.Errorf("sequential lease duration exceeds the maximum of %d seconds", int(SequentialLeaseMax.Seconds()))
 )
@@ -104,6 +110,12 @@ func WithNumWorkers(n int32) func(q *queue) {
 	}
 }
 
+func WithPollTick(t time.Duration) func(q *queue) {
+	return func(q *queue) {
+		q.pollTick = t
+	}
+}
+
 func NewQueue(r *redis.Client, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
@@ -115,6 +127,7 @@ func NewQueue(r *redis.Client, opts ...QueueOpt) *queue {
 		metrics:      tally.NewTestScope("queue", map[string]string{}),
 		wg:           &sync.WaitGroup{},
 		seqLeaseLock: &sync.RWMutex{},
+		pollTick:     defaultPollTick,
 	}
 
 	for _, opt := range opts {
@@ -137,6 +150,8 @@ type queue struct {
 	// metrics allows reporting of metrics
 	metrics tally.Scope
 
+	// pollTick is the interval between each scan for jobs.
+	pollTick time.Duration
 	// quit is a channel that any method can send on to trigger termination
 	// of the Run loop.  This typically accepts an error, but a nil error
 	// will still quit the runner.
@@ -172,7 +187,7 @@ type QueueItem struct {
 	// the item.  Note that the score in Redis is second-level, ie this field / 1000.
 	//
 	// This is necessary for rescoring partitions and checking latencies.
-	At          int64     `json:"at"`
+	AtMS        int64     `json:"at"`
 	WorkflowID  uuid.UUID `json:"workflowID"`
 	WorkspaceID uuid.UUID `json:"workspaceID"`
 	Attempt     int       `json:"attempt"`
@@ -195,11 +210,14 @@ type QueuePartition struct {
 
 	Priority uint `json:"p"`
 
-	// At refers to the earliest QueueItem time within this partition, in
+	// AtS refers to the earliest QueueItem time within this partition, in
 	// seconds as a unix epoch.
 	//
-	// This is updated when taking a lease.
-	At int64 `json:"at"`
+	// This is updated when taking a lease, requeuing items, etc.
+	//
+	// The S suffix differentiates between a QueueItem;  we only need second-
+	// level granularity here as queue partitions work to the nearest second.
+	AtS int64 `json:"at"`
 
 	// Last represents the time that this QueueItem was last leased, as a unix
 	// epoch.
@@ -244,9 +262,9 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	}
 
 	// Add the At timestamp.
-	i.At = at.UnixMilli()
+	i.AtMS = at.UnixMilli()
 
-	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, At: at.Unix()}
+	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, AtS: at.Unix()}
 	keys := []string{
 		q.kg.QueueItem(),                          // Queue item
 		q.kg.QueueIndex(i.WorkflowID.String()),    // Queue sorted set
@@ -458,9 +476,9 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	// Unset any lease ID as this is requeued.
 	i.LeaseID = nil
 	// Update the At timestamp.
-	i.At = at.UnixMilli()
+	i.AtMS = at.UnixMilli()
 
-	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, At: at.Unix()}
+	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, AtS: at.Unix()}
 	keys := []string{
 		q.kg.QueueItem(),
 		q.kg.QueueIndex(i.WorkflowID.String()),
@@ -545,6 +563,7 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 		limit = PartitionPeekMax
 	}
 
+	unix := until.Unix()
 	encoded, err := scripts["queue/partitionPeek"].Run(
 		ctx,
 		q.r,
@@ -552,7 +571,7 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 			q.kg.PartitionIndex(),
 			q.kg.PartitionItem(),
 		},
-		until.Unix(),
+		unix,
 		limit,
 	).StringSlice()
 	if err != nil {
@@ -561,6 +580,7 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 
 	weights := []float64{}
 	items := make([]*QueuePartition, len(encoded))
+
 	for n, i := range encoded {
 		item := &QueuePartition{}
 		if err = json.Unmarshal([]byte(i), item); err != nil {
@@ -603,6 +623,9 @@ func (q *queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at t
 	keys := []string{
 		q.kg.PartitionItem(),
 		q.kg.PartitionIndex(),
+		q.kg.PartitionMeta(workflowID.String()),
+		q.kg.QueueIndex(workflowID.String()),
+		q.kg.QueueItem(),
 	}
 	status, err := scripts["queue/partitionRequeue"].Run(
 		ctx,
@@ -611,6 +634,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at t
 
 		workflowID.String(),
 		at.Unix(),
+		QueuePeekMax,
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error requeueing partition: %w", err)
@@ -620,6 +644,8 @@ func (q *queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at t
 		return nil
 	case 1:
 		return ErrPartitionNotFound
+	case 2:
+		return ErrPartitionGarbageCollected
 	default:
 		return fmt.Errorf("unknown response requeueing item: %d", status)
 	}
@@ -628,7 +654,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at t
 // PartitionDequeue removes a partition pointer from the queue.  This is used when peeking and
 // receiving zero items to run.
 func (q *queue) PartitionDequeue(ctx context.Context, workflowID uuid.UUID, at time.Time) error {
-	panic("unimplemented")
+	panic("unimplemented: requeueing partitions handles this.")
 }
 
 // PartitionReprioritize reprioritizes a workflow's QueueItems within the queue.

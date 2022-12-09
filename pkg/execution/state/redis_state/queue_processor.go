@@ -17,9 +17,7 @@ import (
 const (
 	ErrMaxConsecutiveProcessErrors = 20
 
-	defaultNumWorkers = 100
-	minWorkersFree    = 5
-	pollTick          = 20 * time.Millisecond
+	minWorkersFree = 5
 )
 
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
@@ -30,7 +28,9 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	// Attempt to be the worker which processes items sequentially.
 	go q.claimSequentialLease(ctx)
 
-	tick := time.NewTicker(pollTick)
+	tick := time.NewTicker(q.pollTick)
+
+	logger.From(ctx).Debug().Msg("starting queue worker")
 
 LOOP:
 	for {
@@ -220,22 +220,15 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 		q.workers <- *item
 	}
 
-	// Read the next queue item available.  This is why we have to lease above,
-	// else this may return an item that was just leased.
-	queue, err = q.Peek(peekCtx, p.WorkflowID, time.Now().Add(24*time.Hour), -1)
+	// Requeue the partition, which reads the next unleased job or sets a time of
+	// 30 seconds.  This is why we have to lease above, else this may return an item that is
+	// about to be leased and processed by the worker.
+	err = q.PartitionRequeue(ctx, p.WorkflowID, time.Now().Add(PartitionRequeueExtension))
+	if err == ErrPartitionGarbageCollected {
+		// Safe;  we're preventing this from wasting cycles in the future.
+		return nil
+	}
 	if err != nil {
-		return err
-	}
-
-	next := time.Now().Add(PartitionLeaseExtension)
-	if len(queue) > 0 {
-		next = time.UnixMilli(queue[0].At)
-	}
-
-	// TODO: If len(queue) == 0, check:  are there any jobs in the queue at all?
-	// if not, delete the partition to reduce wasted effort scanning this partition
-
-	if err := q.PartitionRequeue(ctx, p.WorkflowID, next); err != nil {
 		return err
 	}
 	return nil
