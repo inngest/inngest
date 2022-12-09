@@ -29,7 +29,7 @@ import (
 
 const (
 	timeout = 500 * time.Millisecond
-	buffer  = 100 * time.Millisecond
+	buffer  = 500 * time.Millisecond
 )
 
 type prepared struct {
