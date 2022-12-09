@@ -36,12 +36,14 @@ redis.call("HSETNX", partitionKey, workflowID, partitionItem)
 redis.call("HSETNX", partitionCounterKey, "n", 0)   -- Atomic counter, currently leased (in progress) items.
 redis.call("HINCRBY", partitionCounterKey, "len", 1) -- Atomic counter, length of enqueued items, set to 1 or increased.
 
+local partitionScore = math.floor(queueScore / 1000)
+
 -- Get the current score of the partition;  if queueScore < currentScore update the
 -- partition's score so that we can work on this workflow when the earliest member
 -- is available.
 local currentScore = redis.call("ZSCORE", partitionIndexKey, workflowID)
-if currentScore == false or tonumber(currentScore) > queueScore then
-	redis.call("ZADD", partitionIndexKey, queueScore, workflowID)
+if currentScore == false or tonumber(currentScore) > partitionScore then
+	redis.call("ZADD", partitionIndexKey, partitionScore, workflowID)
 	-- Update the partition item too
 	redis.call("HSET", partitionKey, workflowID, partitionItem)
 end
