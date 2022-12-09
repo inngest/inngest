@@ -229,6 +229,7 @@ func TestQueueRunExtended(t *testing.T) {
 				added,
 				added-next,
 			)
+			fmt.Printf("AVG LATENCY: %dms\n", time.Duration(latencyAvg.GetEWMA()).Milliseconds())
 			prev = next
 		}
 	}()
@@ -251,6 +252,7 @@ func TestQueueRunExtended(t *testing.T) {
 	fmt.Printf("Handled %d items\n", h)
 
 	require.EqualValues(t, a, h, "Added %d, handled %d (delta: %d)", a, h, a-h)
+
 	cancel()
 
 	<-time.After(time.Second)

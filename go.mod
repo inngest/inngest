@@ -14,6 +14,7 @@ require (
 	github.com/charmbracelet/glamour v0.5.0
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
+	github.com/emperorearth/vitess v2.0.0+incompatible
 	github.com/fergusstrange/embedded-postgres v1.17.0
 	github.com/fsouza/go-dockerclient v1.7.9
 	github.com/go-chi/chi/v5 v5.0.7

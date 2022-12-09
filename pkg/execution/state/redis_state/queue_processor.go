@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/emperorearth/vitess/go/ewma"
 	"github.com/inngest/inngest/pkg/backoff"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -16,9 +17,16 @@ import (
 
 const (
 	ErrMaxConsecutiveProcessErrors = 20
-
-	minWorkersFree = 5
+	minWorkersFree                 = 5
 )
+
+var (
+	latencyAvg *ewma.EWMA
+)
+
+func init() {
+	latencyAvg = ewma.NewEWMA(ewma.DefaultWeightingFactor)
+}
 
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	for i := int32(0); i < q.numWorkers; i++ {
@@ -258,7 +266,6 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 
 	// XXX: Increase counter for queue items processed
 	// XXX: Increase / defer decrease gauge for items processing
-	// XXX: Track latency as metric from qi.ItemID (enqueue at time)
 
 	errCh := make(chan error)
 	doneCh := make(chan struct{})
@@ -290,13 +297,18 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 		delay := time.Until(time.UnixMilli(qi.AtMS))
 
 		if delay > 0 {
+			<-time.After(delay)
+
 			logger.From(ctx).Trace().
+				Int64("at", qi.AtMS).
 				Int64("ms", delay.Milliseconds()).
 				Msg("delaying job in memory")
-			<-time.After(delay)
 		}
 
-		// XXX: Track job latency here via metrics.
+		// Track the latency on average globally.
+		latency := time.Now().Sub(time.UnixMilli(qi.AtMS))
+		latencyAvg.AddValue(float64(latency))
+		// XXX: Add indinvidual latency to metrics
 
 		err := f(jobCtx, qi.Data)
 		extendLeaseTick.Stop()
