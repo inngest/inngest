@@ -28,7 +28,7 @@
         "type": "docker"
       },
       "retries": {
-        "attempts": 1
+        "attempts": 2
       }
     },
     "step-custom-retries-none": {
@@ -39,7 +39,7 @@
         "type": "docker"
       },
       "retries": {
-        "attempts": 1
+        "attempts": 0
       }
     },
     "step-custom-retries-high": {

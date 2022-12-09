@@ -192,6 +192,7 @@ func (r DriverResponse) Retryable() bool {
 			return true
 		}
 	}
+
 	return false
 }
 

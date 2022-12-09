@@ -345,8 +345,9 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 		if osqueue.ShouldRetry(err, qi.Data.Attempt, qi.Data.GetMaxAttempts()) {
 			// XXX: Increase errored count
 			qi.Data.Attempt += 1
-			logger.From(ctx).Info().Err(err).Interface("item", qi).Msg("requeuing job")
-			if err := q.Requeue(ctx, qi, backoff.LinearJitterBackoff(qi.Data.Attempt)); err != nil {
+			at := backoff.LinearJitterBackoff(qi.Data.Attempt)
+			logger.From(ctx).Info().Err(err).Int64("at_ms", at.UnixMilli()).Interface("item", qi).Msg("requeuing job")
+			if err := q.Requeue(ctx, qi, at); err != nil {
 				logger.From(ctx).Error().Err(err).Interface("item", qi).Msg("error requeuing job")
 				return err
 			}

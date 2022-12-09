@@ -226,7 +226,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 			l = log.Debug()
 			msg = "executed step"
 		} else {
-			retryable := false
+			retryable := true
 			if resp != nil {
 				retryable = resp.Retryable()
 			}
