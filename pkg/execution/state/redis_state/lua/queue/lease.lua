@@ -52,6 +52,6 @@ item.leaseID = newLeaseKey
 -- Update the item's lease key.
 redis.call("HSET", queueKey, queueID, cjson.encode(item))
 -- Update the item's score in our sorted index.
-redis.call("ZADD", queueIndexKey, math.floor(nextTime / 1000), item.id)
+redis.call("ZADD", queueIndexKey, nextTime, item.id)
 
 return 0

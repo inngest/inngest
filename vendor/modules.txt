@@ -468,6 +468,9 @@ github.com/emirpasic/gods/lists/arraylist
 github.com/emirpasic/gods/trees
 github.com/emirpasic/gods/trees/binaryheap
 github.com/emirpasic/gods/utils
+# github.com/emperorearth/vitess v2.0.0+incompatible
+## explicit
+github.com/emperorearth/vitess/go/ewma
 # github.com/fergusstrange/embedded-postgres v1.17.0
 ## explicit; go 1.13
 github.com/fergusstrange/embedded-postgres
