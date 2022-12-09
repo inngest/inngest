@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/function"
@@ -220,15 +221,15 @@ func RequireOutputWithin(output string, within time.Duration) Proc {
 
 func RequireStepRetries(step string, count int) Proc {
 	return func(ctx context.Context, td *TestData) error {
-		var backoffTime uint
+		var backoffTime time.Time
 
 		for i := 0; i < count; i++ {
-			fmt.Printf("> Checking step %s performs retry %d of %d\n", step, i+1, count)
+			fmt.Printf("> Checking step %s performs attempt %d of %d\n", step, i, count-1)
 
-			backoffTime = uint(10) << i
+			backoffTime = backoff.LinearJitterBackoff(i + 1).Add(10 * time.Second)
 
-			fmt.Printf("\t> Checking attempt #%d executes (waiting %d seconds)\n", i+1, backoffTime)
-			if err := timeout(time.Second*time.Duration(backoffTime), func() error {
+			fmt.Printf("\t> Checking attempt #%d executes (waiting %f seconds)\n", i, time.Until(backoffTime).Seconds())
+			if err := timeout(time.Until(backoffTime), func() error {
 				return requireLogFields(ctx, td, map[string]any{
 					"caller":  "executor",
 					"step":    step,
@@ -242,28 +243,10 @@ func RequireStepRetries(step string, count int) Proc {
 			if i+1 >= count {
 				continue
 			}
-
-			fmt.Printf("\t> Checking attempt #%d queues a retry\n", i+1)
-			if err := timeout(time.Second*5, func() error {
-				return requireLogFields(ctx, td, map[string]any{
-					"caller":  "executor",
-					"message": "enqueueing retry",
-					"edge": map[string]any{
-						"errorCount": i + 1,
-						"payload": map[string]any{
-							"edge": map[string]any{
-								"incoming": step,
-							},
-						},
-					},
-				})
-			}); err != nil {
-				return err
-			}
 		}
 
-		fmt.Printf("> Checking step %s permanently failed after %d retries (waiting %d seconds)\n", step, count, backoffTime)
-		if err := timeout(time.Second*time.Duration(backoffTime), func() error {
+		fmt.Printf("> Checking step %s permanently failed after %d retries (waiting %f seconds)\n", step, count-1, time.Until(backoffTime).Seconds())
+		if err := timeout(time.Until(backoffTime), func() error {
 			return requireLogFields(ctx, td, map[string]any{
 				"caller":  "executor",
 				"message": "step permanently failed",

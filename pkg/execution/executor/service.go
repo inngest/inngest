@@ -185,7 +185,10 @@ func (s *svc) Stop(ctx context.Context) error {
 }
 
 func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
-	l := logger.From(ctx).With().Str("run_id", item.Identifier.RunID.String()).Logger()
+	l := logger.From(ctx).With().
+		Str("run_id", item.Identifier.RunID.String()).
+		Int("attempt", item.Attempt).
+		Logger()
 
 	edge, err := queue.GetEdge(item)
 	if err != nil {
@@ -195,6 +198,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	l.Debug().Interface("edge", edge).Msg("processing step")
 
 	resp, err := s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.Attempt)
+
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
 	if err == ErrFunctionRunCancelled {
@@ -219,7 +223,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		}
 
 		// This is a non-retryable error.  Finalize this step.
-		l.Warn().Interface("edge", edge).Msg("step permanently failed")
+		l.Warn().Interface("edge", edge).Err(err).Msg("step permanently failed")
 		if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt); err != nil {
 			return fmt.Errorf("unable to finalize step: %w", err)
 		}
