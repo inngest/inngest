@@ -117,6 +117,8 @@ package config
 #QueueService: #InmemQueue | #SQSQueue | #RedisQueue
 
 #InmemQueue: {
+	// This uses the Redis driver with an in-memory redis instance
+	// under the hood.
 	backend: "inmemory"
 }
 

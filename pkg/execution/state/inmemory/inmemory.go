@@ -125,23 +125,10 @@ func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error)
 	m.lock.RUnlock()
 
 	if ok {
-		// TODO: Return an error.
 		return s, nil
 	}
 
-	state := memstate{
-		metadata:   state.Metadata{},
-		identifier: i,
-		event:      map[string]interface{}{},
-		actions:    map[string]any{},
-		errors:     map[string]error{},
-	}
-
-	m.lock.Lock()
-	m.state[i.IdempotencyKey()] = state
-	m.lock.Unlock()
-
-	return state, nil
+	return nil, fmt.Errorf("state not found with identifier: %s", i.RunID.String())
 }
 
 func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, attempt int) error {

@@ -230,7 +230,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 			if resp != nil {
 				retryable = resp.Retryable()
 			}
-			l = log.Error().Err(err).Bool("retryable", retryable)
+			l = log.Warn().Err(err).Bool("retryable", retryable)
 			msg = "error executing step"
 		}
 		l.Str("run_id", id.RunID.String()).Str("step", from).Msg(msg)

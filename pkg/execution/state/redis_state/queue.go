@@ -188,12 +188,10 @@ type QueueItem struct {
 	//
 	// This is necessary for rescoring partitions and checking latencies.
 	AtMS        int64     `json:"at"`
-	WorkflowID  uuid.UUID `json:"workflowID"`
-	WorkspaceID uuid.UUID `json:"workspaceID"`
-	Attempt     int       `json:"attempt"`
-	MaxAttempts int       `json:"maxAttempts"`
+	WorkflowID  uuid.UUID `json:"wfID"`
+	WorkspaceID uuid.UUID `json:"wsID"`
 	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
-	LeaseID *ulid.ULID `json:"leaseID"`
+	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
 	// Data represents the enqueued data, eg. the edge to process or the pause
 	// to resume.
 	Data osqueue.Item `json:"data"`

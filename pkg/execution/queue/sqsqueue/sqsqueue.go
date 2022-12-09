@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -179,7 +180,12 @@ func (i impl) Run(ctx context.Context, f queue.RunFunc) error {
 			return i.Enqueue(ctx, w.Item, w.At)
 		}
 
-		return f(ctx, w.Item)
+		err := f(ctx, w.Item)
+		if queue.ShouldRetry(err, w.Item.Attempt, w.Item.GetMaxAttempts()) {
+			w.Item.Attempt += 1
+			return i.Enqueue(ctx, w.Item, backoff.LinearJitterBackoff(w.Item.Attempt))
+		}
+		return nil
 	}, int64(i.config.Concurrency))
 }
 
