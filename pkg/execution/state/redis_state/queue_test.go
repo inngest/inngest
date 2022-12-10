@@ -300,6 +300,7 @@ func TestQueueExtendLease(t *testing.T) {
 		require.EqualValues(t, id, item.LeaseID)
 		require.WithinDuration(t, now.Add(time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
+		now = time.Now()
 		nextID, err := q.ExtendLease(ctx, item, *id, 10*time.Second)
 		require.NoError(t, err)
 
@@ -307,7 +308,7 @@ func TestQueueExtendLease(t *testing.T) {
 		item = getQueueItem(t, r, item.ID)
 		require.NotNil(t, item.LeaseID)
 		require.EqualValues(t, nextID, item.LeaseID)
-		require.WithinDuration(t, time.Now().Add(10*time.Second), ulid.Time(item.LeaseID.Time()), 10*time.Millisecond)
+		require.WithinDuration(t, now.Add(10*time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
 		t.Run("It fails with an invalid lease ID", func(t *testing.T) {
 			invalid := ulid.MustNew(ulid.Now(), rnd)
