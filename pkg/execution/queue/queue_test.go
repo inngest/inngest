@@ -37,8 +37,8 @@ func TestShouldRetry(t *testing.T) {
 		},
 		{
 			fmt.Errorf("basic err fails at max attempts"),
-			5,
-			5,
+			2, // 0, 1, 2 - off by one from zero index.
+			3,
 			false,
 		},
 		{

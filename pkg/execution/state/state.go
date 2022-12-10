@@ -93,6 +93,9 @@ type Metadata struct {
 	//   the dag) enqueued. Note that the step must have its children
 	//   enqueued to be considered finalized.
 	Pending int `json:"pending"`
+
+	// Context allows storing any other contextual data in metadata.
+	Context map[string]any `json:"ctx,omitempty"`
 }
 
 // State represents the current state of a workflow.  It is data-structure
@@ -212,12 +215,16 @@ type Mutater interface {
 	// Attempt is zero-indexed.
 	Started(ctx context.Context, i Identifier, stepID string, attempt int) error
 
-	// Finalized increases the finalized count for a run's metadata.
+	// Finalized increases the finalized count for a run's metadata. This must be called after
+	// storing a response and scheduling all child steps.
 	//
-	// This must be called after storing a response and scheduling all child steps.
+	// If a status is provided, the function status will be set _if_ there are no more in-progress
+	// steps running for this function run.  This lets the executor specify failed statuses if
+	// no step output was received for the last step, and the last step failed (eg. SaveResponse
+	// is a no-op and didn't set the status).
 	//
 	// Attempt is zero-indexed.
-	Finalized(ctx context.Context, i Identifier, stepID string, attempt int) error
+	Finalized(ctx context.Context, i Identifier, stepID string, attempt int, status ...enums.RunStatus) error
 
 	// SaveResponse saves the driver response for the attempt to the backing state store.
 	//
@@ -254,4 +261,7 @@ type Input struct {
 	// Steps allows users to specify pre-defined steps to run workflows from
 	// arbitrary points.
 	Steps map[string]any
+
+	// Context is additional context for the run stored in metadata.
+	Context map[string]any
 }
