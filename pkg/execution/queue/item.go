@@ -34,7 +34,7 @@ type Item struct {
 	MaxAttempts *int `json:"maxAtts,omitempty"`
 	// Payload stores item-specific data for use when processing the item.  For example,
 	// this may contain the function's edge for running a step.
-	Payload any `json:"payload"`
+	Payload any `json:"payload,omitempty"`
 }
 
 func (i Item) GetMaxAttempts() int {
@@ -64,7 +64,9 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.MaxAttempts = temp.MaxAttempts
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.
-	i.Payload = temp.Payload
+	if len(temp.Payload) > 0 {
+		i.Payload = temp.Payload
+	}
 
 	switch temp.Kind {
 	case KindEdge:
