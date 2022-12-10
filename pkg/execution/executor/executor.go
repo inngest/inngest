@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/coredata"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/rs/zerolog"
@@ -383,7 +384,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		return response, nil
 	}
 
-	if response.Err != nil && (!response.Retryable() || attempt >= action.RetryCount()-1) {
+	if response.Err != nil && !queue.ShouldRetry(err, attempt, action.RetryCount()) {
 		// We need to detect whether this error is 'final' here, depending on whether
 		// we've hit the retry count or this error is deemed non-retryable.
 		//

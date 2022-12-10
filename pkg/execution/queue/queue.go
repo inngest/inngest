@@ -5,11 +5,6 @@ import (
 	"time"
 )
 
-const (
-	// DefaultRetryCount is used when no retry count for a job is specified.
-	DefaultRetryCount = 3
-)
-
 type Queue interface {
 	Producer
 	Consumer
@@ -68,6 +63,7 @@ func ShouldRetry(err error, attempt int, max int) bool {
 
 	// So, at this point we either have a basic, non-interface error OR
 	// a retryable error which returns Retryable() true.
+	// Note that attempt is 0-indexed, hence attempt+1
 	// Check max attempts.
-	return attempt < max
+	return (attempt + 1) < max
 }

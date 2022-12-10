@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
@@ -38,7 +39,7 @@ type Item struct {
 
 func (i Item) GetMaxAttempts() int {
 	if i.MaxAttempts == nil {
-		return DefaultRetryCount
+		return consts.DefaultRetryCount
 	}
 	return *i.MaxAttempts
 }
@@ -61,6 +62,9 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.Identifier = temp.Identifier
 	i.Attempt = temp.Attempt
 	i.MaxAttempts = temp.MaxAttempts
+	// Save this for custom unmarshalling of other jobs.  This is overwritten
+	// for known queue kinds.
+	i.Payload = temp.Payload
 
 	switch temp.Kind {
 	case KindEdge:

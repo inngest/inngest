@@ -1,6 +1,9 @@
 package inngest
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
+)
 
 const (
 	TriggerName = "$trigger"
@@ -91,7 +94,7 @@ func (s Step) RetryCount() int {
 		return *s.Retries.Attempts
 	}
 
-	return 3
+	return consts.DefaultRetryCount
 }
 
 type Edge struct {
