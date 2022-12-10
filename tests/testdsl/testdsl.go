@@ -223,12 +223,12 @@ func RequireStepRetries(step string, count int) Proc {
 	return func(ctx context.Context, td *TestData) error {
 		var backoffTime time.Time
 
-		for i := 0; i < count; i++ {
-			fmt.Printf("> Checking step %s performs attempt %d of %d\n", step, i, count-1)
+		for i := 0; i < (count - 1); i++ {
+			fmt.Printf("> Checking step %s performs attempt %d of %d\n", step, i+1, count-1)
 
 			backoffTime = backoff.LinearJitterBackoff(i + 1).Add(10 * time.Second)
 
-			fmt.Printf("\t> Checking attempt #%d executes (waiting %f seconds)\n", i, time.Until(backoffTime).Seconds())
+			fmt.Printf("\t> Checking attempt #%d executes (waiting %f seconds)\n", i+1, time.Until(backoffTime).Seconds())
 			if err := timeout(time.Until(backoffTime), func() error {
 				return requireLogFields(ctx, td, map[string]any{
 					"caller":  "executor",
