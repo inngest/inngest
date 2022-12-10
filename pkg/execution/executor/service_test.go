@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	timeout = 500 * time.Millisecond
+	timeout = 1500 * time.Millisecond
 	buffer  = 500 * time.Millisecond
 )
 
@@ -276,64 +276,74 @@ func TestHandleQueueItemTriggerService(t *testing.T) {
 // - Increase the Pending count, as the async edge is pending until either timeout
 //   or the event is received.
 func TestHandleAsyncService(t *testing.T) {
-	// We assume that when handling the trigger, the pending count already
-	// has a pending count of 1.
+	var id state.Identifier
+
 	ctx := context.Background()
 	data := prepare(ctx, t, asyncF)
-	data.c.Execution.Drivers["mock"] = &mockdriver.Config{
-		Responses: map[string]state.DriverResponse{
-			"1": {Output: map[string]interface{}{"id": 1}},
-			"2": {Output: map[string]interface{}{"id": 2}},
-			"3": {Err: fmt.Errorf("should not run")},
-		},
-	}
 
-	// Ensure that we add async expressions.
-
-	svc := NewService(
-		*data.c,
-		WithExecutionLoader(data.al),
-		WithQueue(data.q),
-		WithState(data.sm),
-	)
-	go func() {
-		err := service.Start(ctx, svc)
-		require.NoError(t, err)
-	}()
-
-	// Create a new run.
-	id := state.Identifier{
-		WorkflowID: data.w.UUID,
-		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
-	}
-
-	_, err := data.sm.New(ctx, state.Input{
-		Workflow:   data.w,
-		Identifier: id,
-		EventData: (event.Event{
-			Name: "test",
-			Data: map[string]interface{}{
-				"data": "ya",
+	t.Run("Setup", func(t *testing.T) {
+		// We assume that when handling the trigger, the pending count already
+		// has a pending count of 1.
+		data.c.Execution.Drivers["mock"] = &mockdriver.Config{
+			Responses: map[string]state.DriverResponse{
+				"1": {Output: map[string]interface{}{"id": 1}},
+				"2": {Output: map[string]interface{}{"id": 2}},
+				"3": {Err: fmt.Errorf("should not run")},
 			},
-		}).Map(),
-	})
-	require.NoError(t, err)
+		}
 
-	// Require that we have a pending count.
+		svc := NewService(
+			*data.c,
+			WithExecutionLoader(data.al),
+			WithQueue(data.q),
+			WithState(data.sm),
+		)
+		go func() {
+			err := service.Start(ctx, svc)
+			require.NoError(t, err)
+		}()
+
+		// Create a new run.
+		id = state.Identifier{
+			WorkflowID: data.w.UUID,
+			RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+		}
+		_, err := data.sm.New(ctx, state.Input{
+			Workflow:   data.w,
+			Identifier: id,
+			EventData: (event.Event{
+				Name: "test",
+				Data: map[string]interface{}{
+					"data": "ya",
+				},
+			}).Map(),
+		})
+		require.NoError(t, err)
+	})
+
 	run, err := data.sm.Load(ctx, id)
 	require.NoError(t, err)
-	require.Equal(t, 1, run.Metadata().Pending)
 
-	// Publish an entry to the queue.
-	err = data.q.Enqueue(ctx, queue.Item{
-		Kind:       queue.KindEdge,
-		Identifier: id,
-		Payload:    queue.PayloadEdge{Edge: inngest.SourceEdge},
-	}, time.Now())
-	require.NoError(t, err)
+	//
+	// 1. Require that we have a pending count of the trigger.
+	//
+	t.Run("Runs source edge from trigger", func(t *testing.T) {
+		require.Equal(t, 1, run.Metadata().Pending)
+
+		// Publish an entry to the queue.
+		err = data.q.Enqueue(ctx, queue.Item{
+			Kind:       queue.KindEdge,
+			Identifier: id,
+			Payload:    queue.PayloadEdge{Edge: inngest.SourceEdge},
+		}, time.Now())
+		require.NoError(t, err)
+	})
 
 	// This should execute all of our items.
 	<-time.After(buffer)
+
+	t.Run("Only has trigger sent", func(t *testing.T) {
+	})
 
 	// We should have only executed the trigger, with no responses saved
 	// and 3 pending.
