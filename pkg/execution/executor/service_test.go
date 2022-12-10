@@ -248,7 +248,7 @@ func TestHandleQueueItemTriggerService(t *testing.T) {
 	require.NoError(t, err)
 
 	// Require that we have a pending count.
-	run, err := data.sm.Load(ctx, id)
+	run, err := data.sm.Load(ctx, id.RunID)
 	require.NoError(t, err)
 	require.Equal(t, 1, run.Metadata().Pending)
 
@@ -263,7 +263,7 @@ func TestHandleQueueItemTriggerService(t *testing.T) {
 	// This should execute all of our items.
 	<-time.After(buffer)
 
-	run, err = data.sm.Load(ctx, id)
+	run, err = data.sm.Load(ctx, id.RunID)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(run.Actions()))
 	require.Equal(t, 0, run.Metadata().Pending)
@@ -321,7 +321,7 @@ func TestHandleAsyncService(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	run, err := data.sm.Load(ctx, id)
+	run, err := data.sm.Load(ctx, id.RunID)
 	require.NoError(t, err)
 
 	//
@@ -349,7 +349,7 @@ func TestHandleAsyncService(t *testing.T) {
 	// and 3 pending.
 	//
 	// This is because all child actions require an event.
-	run, err = data.sm.Load(ctx, id)
+	run, err = data.sm.Load(ctx, id.RunID)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(run.Actions()))
 	require.Equal(t, 3, run.Metadata().Pending)
@@ -383,7 +383,7 @@ func TestHandleAsyncService(t *testing.T) {
 	// We should have exected the first pause.
 	//
 	// This is because all child actions require an event.
-	run, err = data.sm.Load(ctx, id)
+	run, err = data.sm.Load(ctx, id.RunID)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(run.Actions()))
 	require.EqualValues(t, map[string]any{
@@ -395,7 +395,7 @@ func TestHandleAsyncService(t *testing.T) {
 	// our counter should be 0 and we should have only the timeout event
 	// stored
 	<-time.After(timeout + buffer)
-	run, err = data.sm.Load(ctx, id)
+	run, err = data.sm.Load(ctx, id.RunID)
 	require.NoError(t, err)
 	require.EqualValues(t, map[string]any{
 		"1": map[string]any{"id": 1},
@@ -497,7 +497,7 @@ func TestServiceGeneratorState(t *testing.T) {
 
 		<-time.After(buffer)
 
-		run, err := data.sm.Load(ctx, id)
+		run, err := data.sm.Load(ctx, id.RunID)
 		require.NoError(t, err)
 
 		md := run.Metadata()
@@ -579,7 +579,7 @@ func TestServiceRetry(t *testing.T) {
 
 		<-time.After(time.Until(backoff.LinearJitterBackoff(1)) + (2 * time.Second))
 
-		run, err := data.sm.Load(ctx, id)
+		run, err := data.sm.Load(ctx, id.RunID)
 		require.NoError(t, err)
 
 		md := run.Metadata()

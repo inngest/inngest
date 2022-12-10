@@ -132,6 +132,10 @@ type Pause struct {
 	// If so, when the matching pause is returned after processing an event
 	// the function's status is set to cancelled, preventing any future work.
 	Cancel bool `json:"cancel,omitempty"`
+	// Attempt stores the attempt for the current step, if this a pause caused
+	// via an async driver.  This lets the executor resume as-is with the current
+	// context, ensuring that we retry correctly.
+	Attempt int `json:"att,omitempty"`
 }
 
 func (p Pause) Edge() inngest.Edge {

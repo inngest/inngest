@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/oklog/ulid/v2"
 )
 
 var (
@@ -24,7 +25,7 @@ type KeyGenerator interface {
 
 	// RunMetadata stores state regarding the current run identifier, such
 	// as the workflow version, the time the run started, etc.
-	RunMetadata(context.Context, state.Identifier) string
+	RunMetadata(ctx context.Context, runID ulid.ULID) string
 
 	// Event returns the key used to store the specific event for the
 	// given workflow run.
@@ -58,7 +59,7 @@ type KeyGenerator interface {
 	PauseStep(context.Context, state.Identifier, string) string
 
 	// History returns the key used to store a log entry for run hisotry
-	History(context.Context, state.Identifier) string
+	History(ctx context.Context, runID ulid.ULID) string
 }
 
 type DefaultKeyFunc struct {
@@ -69,8 +70,8 @@ func (d DefaultKeyFunc) Idempotency(ctx context.Context, id state.Identifier) st
 	return fmt.Sprintf("%s:key:%s", d.Prefix, id.IdempotencyKey())
 }
 
-func (d DefaultKeyFunc) RunMetadata(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:metadata:%s", d.Prefix, id.RunID)
+func (d DefaultKeyFunc) RunMetadata(ctx context.Context, runID ulid.ULID) string {
+	return fmt.Sprintf("%s:metadata:%s", d.Prefix, runID)
 }
 
 func (d DefaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int) string {
@@ -110,8 +111,8 @@ func (d DefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step
 	return fmt.Sprintf("%s-%s", prefix, step)
 }
 
-func (d DefaultKeyFunc) History(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:history:%s", d.Prefix, id.RunID)
+func (d DefaultKeyFunc) History(ctx context.Context, runID ulid.ULID) string {
+	return fmt.Sprintf("%s:history:%s", d.Prefix, runID)
 }
 
 type QueueKeyGenerator interface {

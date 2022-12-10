@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/oklog/ulid/v2"
 )
 
 type InmemoryLoader interface {
@@ -46,20 +47,22 @@ func (c *Config) Manager(ctx context.Context) (state.Manager, error) {
 // functions in-memory, for development and testing only.
 func NewStateManager() state.Manager {
 	return &mem{
-		state:   map[string]state.State{},
-		pauses:  map[uuid.UUID]state.Pause{},
-		leases:  map[uuid.UUID]time.Time{},
-		history: map[string][]state.History{},
-		lock:    &sync.RWMutex{},
+		idempotency: map[string]struct{}{},
+		state:       map[ulid.ULID]state.State{},
+		pauses:      map[uuid.UUID]state.Pause{},
+		leases:      map[uuid.UUID]time.Time{},
+		history:     map[string][]state.History{},
+		lock:        &sync.RWMutex{},
 	}
 }
 
 type mem struct {
-	state   map[string]state.State
-	pauses  map[uuid.UUID]state.Pause
-	leases  map[uuid.UUID]time.Time
-	history map[string][]state.History
-	lock    *sync.RWMutex
+	idempotency map[string]struct{}
+	state       map[ulid.ULID]state.State
+	pauses      map[uuid.UUID]state.Pause
+	leases      map[uuid.UUID]time.Time
+	history     map[string][]state.History
+	lock        *sync.RWMutex
 
 	callbacks []state.FunctionCallback
 }
@@ -70,9 +73,9 @@ func (m *mem) OnFunctionStatus(f state.FunctionCallback) {
 	m.callbacks = append(m.callbacks, f)
 }
 
-func (m *mem) IsComplete(ctx context.Context, id state.Identifier) (bool, error) {
+func (m *mem) IsComplete(ctx context.Context, runID ulid.ULID) (bool, error) {
 	m.lock.RLock()
-	s, ok := m.state[id.IdempotencyKey()]
+	s, ok := m.state[runID]
 	m.lock.RUnlock()
 	if !ok {
 		// TODO: Return error
@@ -93,6 +96,7 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 			RunType:       input.RunType,
 			OriginalRunID: input.OriginalRunID,
 			Context:       input.Context,
+			Identifier:    input.Identifier,
 		},
 		workflow:   input.Workflow,
 		identifier: input.Identifier,
@@ -101,11 +105,15 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 		errors:     map[string]error{},
 	}
 
-	if _, ok := m.state[input.Identifier.IdempotencyKey()]; ok {
+	if _, ok := m.idempotency[input.Identifier.IdempotencyKey()]; ok {
+		return nil, state.ErrIdentifierExists
+	}
+	if _, ok := m.state[input.Identifier.RunID]; ok {
 		return nil, state.ErrIdentifierExists
 	}
 
-	m.state[input.Identifier.IdempotencyKey()] = s
+	m.idempotency[input.Identifier.IdempotencyKey()] = struct{}{}
+	m.state[input.Identifier.RunID] = s
 
 	m.setHistory(ctx, input.Identifier, state.History{
 		Type:       enums.HistoryTypeFunctionStarted,
@@ -120,16 +128,16 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 
 }
 
-func (m *mem) Load(ctx context.Context, i state.Identifier) (state.State, error) {
+func (m *mem) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	m.lock.RLock()
-	s, ok := m.state[i.IdempotencyKey()]
+	s, ok := m.state[runID]
 	m.lock.RUnlock()
 
 	if ok {
 		return s, nil
 	}
 
-	return nil, fmt.Errorf("state not found with identifier: %s", i.RunID.String())
+	return nil, fmt.Errorf("state not found with identifier: %s", runID.String())
 }
 
 func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
@@ -153,14 +161,14 @@ func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string, 
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	s, ok := m.state[i.IdempotencyKey()]
+	s, ok := m.state[i.RunID]
 	if !ok {
 		return fmt.Errorf("identifier not found")
 	}
 
 	instance := s.(memstate)
 	instance.metadata.Pending++
-	m.state[i.IdempotencyKey()] = instance
+	m.state[i.RunID] = instance
 
 	m.setHistory(ctx, i, state.History{
 		Type:       enums.HistoryTypeStepScheduled,
@@ -185,7 +193,7 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string, 
 		finalStatus = withStatus[0]
 	}
 
-	s, ok := m.state[i.IdempotencyKey()]
+	s, ok := m.state[i.RunID]
 	if !ok {
 		return fmt.Errorf("identifier not found")
 	}
@@ -203,7 +211,7 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string, 
 		})
 	}
 
-	m.state[i.IdempotencyKey()] = instance
+	m.state[i.RunID] = instance
 
 	return nil
 }
@@ -212,7 +220,7 @@ func (m *mem) Cancel(ctx context.Context, i state.Identifier) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	s, ok := m.state[i.IdempotencyKey()]
+	s, ok := m.state[i.RunID]
 	if !ok {
 		return fmt.Errorf("identifier not found")
 	}
@@ -228,7 +236,7 @@ func (m *mem) Cancel(ctx context.Context, i state.Identifier) error {
 
 	instance := s.(memstate)
 	instance.metadata.Status = enums.RunStatusCancelled
-	m.state[i.IdempotencyKey()] = instance
+	m.state[i.RunID] = instance
 
 	go m.runCallbacks(ctx, i, enums.RunStatusCancelled)
 
@@ -245,7 +253,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	s, ok := m.state[i.IdempotencyKey()]
+	s, ok := m.state[i.RunID]
 	if !ok {
 		return s, fmt.Errorf("identifier not found")
 	}
@@ -304,7 +312,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 		})
 	}
 
-	m.state[i.IdempotencyKey()] = instance
+	m.state[i.RunID] = instance
 
 	return instance, nil
 
@@ -401,7 +409,7 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 
 	if pause.DataKey != "" {
 		// Save data
-		s, ok := m.state[pause.Identifier.IdempotencyKey()]
+		s, ok := m.state[pause.Identifier.RunID]
 		if !ok {
 			return fmt.Errorf("identifier not found")
 		}
@@ -410,20 +418,20 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		instance.actions = copyMap(instance.actions)
 		instance.errors = copyMap(instance.errors)
 		instance.actions[pause.DataKey] = data
-		m.state[pause.Identifier.IdempotencyKey()] = instance
+		m.state[pause.Identifier.RunID] = instance
 	}
 
 	delete(m.pauses, id)
 	return nil
 }
 
-func (m *mem) History(ctx context.Context, i state.Identifier) ([]state.History, error) {
+func (m *mem) History(ctx context.Context, runID ulid.ULID) ([]state.History, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	history, ok := m.history[i.RunID.String()]
+	history, ok := m.history[runID.String()]
 	if !ok {
-		return nil, fmt.Errorf("history for run %s not found", i.RunID)
+		return nil, fmt.Errorf("history for run %s not found", runID)
 	}
 
 	return history, nil

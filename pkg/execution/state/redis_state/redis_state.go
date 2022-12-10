@@ -239,10 +239,10 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		return nil, err
 	}
 	metadata := runMetadata{
-		Version:  input.Workflow.Version,
-		Pending:  1,
-		Debugger: input.Debugger,
-		Context:  input.Context,
+		Identifier: input.Identifier,
+		Pending:    1,
+		Debugger:   input.Debugger,
+		Context:    input.Context,
 	}
 	if input.OriginalRunID != nil {
 		metadata.OriginalRunID = input.OriginalRunID.String()
@@ -277,9 +277,9 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			m.kf.Idempotency(ctx, input.Identifier),
 			m.kf.Event(ctx, input.Identifier),
 			m.kf.Workflow(ctx, input.Workflow.UUID, input.Workflow.Version),
-			m.kf.RunMetadata(ctx, input.Identifier),
+			m.kf.RunMetadata(ctx, input.Identifier.RunID),
 			m.kf.Actions(ctx, input.Identifier),
-			m.kf.History(ctx, input.Identifier),
+			m.kf.History(ctx, input.Identifier.RunID),
 		},
 		event,
 		workflow,
@@ -311,16 +311,16 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		nil
 }
 
-func (m mgr) IsComplete(ctx context.Context, id state.Identifier) (bool, error) {
-	val, err := m.r.HGet(ctx, m.kf.RunMetadata(ctx, id), "pending").Result()
+func (m mgr) IsComplete(ctx context.Context, runID ulid.ULID) (bool, error) {
+	val, err := m.r.HGet(ctx, m.kf.RunMetadata(ctx, runID), "pending").Result()
 	if err != nil {
 		return false, err
 	}
 	return val == "0", nil
 }
 
-func (m mgr) metadata(ctx context.Context, id state.Identifier) (*runMetadata, error) {
-	val, err := m.r.HGetAll(ctx, m.kf.RunMetadata(ctx, id)).Result()
+func (m mgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error) {
+	val, err := m.r.HGetAll(ctx, m.kf.RunMetadata(ctx, runID)).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +331,7 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 	status, err := scripts["cancel"].Eval(
 		ctx,
 		m.r,
-		[]string{m.kf.RunMetadata(ctx, id)},
+		[]string{m.kf.RunMetadata(ctx, id.RunID)},
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error cancelling: %w", err)
@@ -350,15 +350,17 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 	return fmt.Errorf("unknown return value cancelling function: %d", status)
 }
 
-func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error) {
+func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	// XXX: Use a pipeliner to improve speed.
-	metadata, err := m.metadata(ctx, id)
+	metadata, err := m.metadata(ctx, runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load metadata; %w", err)
 	}
 
+	id := metadata.Identifier
+
 	// Load the workflow.
-	byt, err := m.r.Get(ctx, m.kf.Workflow(ctx, id.WorkflowID, metadata.Version)).Bytes()
+	byt, err := m.r.Get(ctx, m.kf.Workflow(ctx, id.WorkflowID, metadata.Identifier.WorkflowVersion)).Bytes()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load workflow; %w", err)
 	}
@@ -369,8 +371,8 @@ func (m mgr) Load(ctx context.Context, id state.Identifier) (state.State, error)
 
 	// We must ensure that the workflow UUID and Version are marshalled in JSON.
 	// In the dev server these are blank, so we force-add them here.
-	w.UUID = id.WorkflowID
-	w.Version = metadata.Version
+	w.UUID = metadata.Identifier.WorkflowID
+	w.Version = metadata.Identifier.WorkflowVersion
 
 	// Load the event.
 	byt, err = m.r.Get(ctx, m.kf.Event(ctx, id)).Bytes()
@@ -459,8 +461,8 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		[]string{
 			m.kf.Actions(ctx, i),
 			m.kf.Errors(ctx, i),
-			m.kf.RunMetadata(ctx, i),
-			m.kf.History(ctx, i),
+			m.kf.RunMetadata(ctx, i.RunID),
+			m.kf.History(ctx, i.RunID),
 		},
 		data,
 		r.Step.ID,
@@ -479,13 +481,13 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
 	}
 
-	return m.Load(ctx, i)
+	return m.Load(ctx, i.RunID)
 }
 
 func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, attempt int) error {
 	now := time.Now()
 
-	return m.r.ZAdd(ctx, m.kf.History(ctx, id), &redis.Z{
+	return m.r.ZAdd(ctx, m.kf.History(ctx, id.RunID), &redis.Z{
 		Score: float64(now.UnixMilli()),
 		Member: state.History{
 			Type:       enums.HistoryTypeStepStarted,
@@ -505,7 +507,7 @@ func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, a
 	err := scripts["scheduled"].Eval(
 		ctx,
 		m.r,
-		[]string{m.kf.RunMetadata(ctx, i), m.kf.History(ctx, i)},
+		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
 		state.History{
 			Type:       enums.HistoryTypeStepScheduled,
 			Identifier: i,
@@ -536,7 +538,7 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, a
 	status, err := scripts["finalize"].Eval(
 		ctx,
 		m.r,
-		[]string{m.kf.RunMetadata(ctx, i), m.kf.History(ctx, i)},
+		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
 		state.History{
 			Type:       enums.HistoryTypeFunctionCompleted,
 			Identifier: i,
@@ -733,9 +735,9 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 	return pause, err
 }
 
-func (m mgr) History(ctx context.Context, id state.Identifier) ([]state.History, error) {
+func (m mgr) History(ctx context.Context, runID ulid.ULID) ([]state.History, error) {
 	items, err := m.r.ZRangeArgs(ctx, redis.ZRangeArgs{
-		Key:     m.kf.History(ctx, id),
+		Key:     m.kf.History(ctx, runID),
 		Start:   "-inf",
 		Stop:    "+inf",
 		ByScore: true,
@@ -795,16 +797,7 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 	var err error
 	m := &runMetadata{}
 
-	v, ok := data["version"]
-	if !ok {
-		return nil, fmt.Errorf("no workflow version stored in run metadata")
-	}
-	m.Version, err = strconv.Atoi(v)
-	if err != nil {
-		return nil, fmt.Errorf("invalid workflow version stored in run metadata")
-	}
-
-	v, ok = data["status"]
+	v, ok := data["status"]
 	if !ok {
 		return nil, fmt.Errorf("no status stored in metadata")
 	}
@@ -835,6 +828,13 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 	if val, ok := data["runType"]; ok {
 		m.RunType = val
 	}
+	if val, ok := data["id"]; ok && val != "" {
+		id := state.Identifier{}
+		if err := json.Unmarshal([]byte(val), &id); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal metadata identifier: %s", val)
+		}
+		m.Identifier = id
+	}
 	if val, ok := data["ctx"]; ok && val != "" {
 		ctx := map[string]any{}
 		if err := json.Unmarshal([]byte(val), &ctx); err != nil {
@@ -850,11 +850,8 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 // creating a new run, and stores the triggering event as well as workflow-specific
 // metadata for the invocation.
 type runMetadata struct {
-	Status enums.RunStatus `json:"status"`
-	// Version is required to load the correct workflow Version
-	// for the specific run.
-	Version int `json:"version"`
-
+	Identifier state.Identifier `json:"id"`
+	Status     enums.RunStatus  `json:"status"`
 	// These are the fields for standard state metadata.
 	Pending       int            `json:"pending"`
 	Debugger      bool           `json:"debugger"`
@@ -865,7 +862,7 @@ type runMetadata struct {
 
 func (r runMetadata) Map() map[string]any {
 	return map[string]any{
-		"version":       r.Version,
+		"id":            r.Identifier,
 		"status":        int(r.Status), // Always store this as an int
 		"pending":       r.Pending,
 		"debugger":      r.Debugger,
@@ -877,10 +874,11 @@ func (r runMetadata) Map() map[string]any {
 
 func (r runMetadata) Metadata() state.Metadata {
 	m := state.Metadata{
-		Pending:  r.Pending,
-		Debugger: r.Debugger,
-		Status:   r.Status,
-		Context:  r.Context,
+		Identifier: r.Identifier,
+		Pending:    r.Pending,
+		Debugger:   r.Debugger,
+		Status:     r.Status,
+		Context:    r.Context,
 	}
 
 	if r.RunType != "" {

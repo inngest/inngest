@@ -34,8 +34,8 @@ var (
 
 // Identifier represents the unique identifier for a workflow run.
 type Identifier struct {
-	WorkflowID      uuid.UUID `json:"workflowID"`
-	WorkflowVersion int       `json:"workflowVersion"`
+	WorkflowID      uuid.UUID `json:"wID"`
+	WorkflowVersion int       `json:"wv"`
 	RunID           ulid.ULID `json:"runID"`
 	// Key represents a unique idempotency key used to deduplicate this
 	// workflow run amongst other runs for the same workflow.
@@ -66,6 +66,11 @@ type StepNotification struct {
 // finished.  Functions may have many parallel branches with conditional execution.
 // Given this, no single step can tell whether it's the last step within a function.
 type Metadata struct {
+	// Identifier stores the full identifier for the run, such that the only
+	// thing needed to load the State run is the run ID.
+	Identifier Identifier `json:"id"`
+
+	// Status returns the function status for this run.
 	Status enums.RunStatus `json:"status"`
 
 	// Debugger represents whether this function was started via the debugger.
@@ -98,7 +103,7 @@ type Metadata struct {
 	Context map[string]any `json:"ctx,omitempty"`
 }
 
-// State represents the current state of a workflow.  It is data-structure
+// State represents the current state of a fn run.  It is data-structure
 // agnostic;  each backing store can change the structure of the state to
 // suit its implementation.
 //
@@ -113,8 +118,7 @@ type State interface {
 	// as well as the pending count.
 	Metadata() Metadata
 
-	// Identifier returns the identifier for this particular run, which
-	// returns the RunID and WorkflowID within a state.Identifier struct.
+	// Identifier returns the identifier for this functionrun.
 	Identifier() Identifier
 
 	// RunID returns the ID for the specific run.
@@ -173,14 +177,14 @@ type FunctionCallback func(context.Context, Identifier, enums.RunStatus)
 // Loader allows loading of previously stored state based off of a given Identifier.
 type Loader interface {
 	// Load returns run state for the given identifier.
-	Load(ctx context.Context, i Identifier) (State, error)
+	Load(ctx context.Context, runID ulid.ULID) (State, error)
 
 	// History loads history for the given run identifier.
-	History(ctx context.Context, i Identifier) ([]History, error)
+	History(ctx context.Context, runID ulid.ULID) ([]History, error)
 
 	// IsComplete returns whether the given identifier is complete, ie. the
 	// pending count in the identifier's metadata is zero.
-	IsComplete(ctx context.Context, i Identifier) (complete bool, err error)
+	IsComplete(ctx context.Context, runID ulid.ULID) (complete bool, err error)
 }
 
 // Mutater mutates state for a given identifier, storing the state and returning

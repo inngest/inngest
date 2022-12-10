@@ -150,7 +150,7 @@ func TestExecute_state(t *testing.T) {
 	// assert.Equal(t, len(available), 2)
 	// assert.ElementsMatch(t, []string{"1", "2"}, availableIDs(available))
 	// There should be no state.
-	s, err = sm.Load(ctx, s.Identifier())
+	s, err = sm.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	assert.Equal(t, 0, len(s.Actions()))
 
@@ -161,7 +161,7 @@ func TestExecute_state(t *testing.T) {
 	// assert.Equal(t, 1, len(available))
 	// assert.ElementsMatch(t, []string{"3"}, availableIDs(available))
 	// Ensure we recorded state.
-	s, err = sm.Load(ctx, s.Identifier())
+	s, err = sm.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(s.Actions()))
 	assert.Equal(t, 0, len(s.Errors()))
@@ -174,7 +174,7 @@ func TestExecute_state(t *testing.T) {
 	assert.Equal(t, 2, len(driver.Executed), "function not executed")
 	// assert.Equal(t, 0, len(available), "incorrect number of functions available")
 	// No state should be recorded.
-	s, err = sm.Load(ctx, s.Identifier())
+	s, err = sm.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(s.Actions()))
 	assert.Equal(t, 0, len(s.Errors()))
@@ -185,7 +185,7 @@ func TestExecute_state(t *testing.T) {
 	assert.Equal(t, 3, len(driver.Executed), "function not executed")
 	// assert.Equal(t, 0, len(available), "incorrect number of functions available")
 	// An error should be recorded.
-	s, err = sm.Load(ctx, s.Identifier())
+	s, err = sm.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	assert.Equal(t, 1, len(s.Actions()))
 	assert.Equal(t, 1, len(s.Errors()))
@@ -262,7 +262,7 @@ func TestExecute_Generator(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
 	// Ensure we recorded state.
-	s, err = sm.Load(ctx, s.Identifier())
+	s, err = sm.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	output := s.Actions()
 	assert.Equal(t, 1, len(output))
@@ -290,7 +290,7 @@ func TestExecute_Generator(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
 	// Ensure we recorded state.
-	s, err = sm.Load(ctx, s.Identifier())
+	s, err = sm.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	output = s.Actions()
 	assert.Equal(t, 2, len(output))
@@ -418,7 +418,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(driver.Executed), 0)
 
-	s, err = sm.Load(ctx, s.Identifier())
+	s, err = sm.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	edges, err := state.DefaultEdgeEvaluator.AvailableChildren(ctx, s, inngest.TriggerName)
 	require.NoError(t, err)
@@ -436,7 +436,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 	assert.NoError(t, response.Err)
 	assert.EqualValues(t, *response, driver.Responses["run-step-trigger"])
 
-	s, err = sm.Load(ctx, s.Identifier())
+	s, err = sm.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	edges, err = state.DefaultEdgeEvaluator.AvailableChildren(ctx, s, "run-step-trigger")
 	require.NoError(t, err)
