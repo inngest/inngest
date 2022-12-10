@@ -166,8 +166,9 @@ func checkNew(t *testing.T, m state.Manager) {
 	require.EqualValues(t, input.Map(), s.Event(), "Returned event does not match input")
 	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 	require.EqualValues(t, init.Context, s.Metadata().Context, "Metadata context not saved")
+	require.EqualValues(t, id, s.Metadata().Identifier, "Metadata didn't save Identifier")
 
-	loaded, err := m.Load(ctx, s.Identifier())
+	loaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 
 	found = loaded.Workflow()
@@ -208,7 +209,7 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 	require.EqualValues(t, w, found, "Returned workflow does not match input")
 	require.EqualValues(t, input.Map(), s.Event(), "Returned event does not match input")
 
-	loaded, err := m.Load(ctx, s.Identifier())
+	loaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 
 	found = loaded.Workflow()
@@ -241,7 +242,7 @@ func checkScheduled(t *testing.T, m state.Manager) {
 	wg.Wait()
 
 	// Load the state again.
-	loaded, err := m.Load(ctx, s.Identifier())
+	loaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	// The trigger is always pending, and we do not account for this when
 	// initializing in setup()
@@ -334,7 +335,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	//
 	// Load() the state independently.
 	//
-	reloaded, err := m.Load(ctx, s.Identifier())
+	reloaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, next.Identifier(), reloaded.Identifier())
 	require.EqualValues(t, next.Workflow(), reloaded.Workflow())
@@ -349,7 +350,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
-	_, err := m.Load(ctx, s.Identifier())
+	_, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 
 	r := state.DriverResponse{
@@ -425,7 +426,7 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID, 0)
 	require.NoError(t, err)
 
-	reloaded, err := m.Load(ctx, s.Identifier())
+	reloaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.Equal(t, 0, reloaded.Metadata().Pending)
 }
@@ -466,7 +467,7 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 	}
 	wg.Wait()
 
-	loaded, err := m.Load(ctx, s.Identifier())
+	loaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, 1, loaded.Metadata().Pending, "scheduling and finalizing concurrently should end with 1 (the trigger)")
 }
@@ -663,7 +664,7 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 	require.Error(t, state.ErrPauseNotFound, err)
 
 	// Load function state and assert we have the pause stored in state.
-	reloaded, err := m.Load(ctx, s.Identifier())
+	reloaded, err := m.Load(ctx, s.RunID())
 	require.Nil(t, err)
 	require.Equal(t, pauseData, reloaded.Actions()[pause.DataKey], "Pause data was not stored in the state store")
 }
@@ -713,7 +714,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
 	require.Error(t, state.ErrPauseNotFound, err)
 
 	// Load function state and assert we have the pause stored in state.
-	reloaded, err := m.Load(ctx, s.Identifier())
+	reloaded, err := m.Load(ctx, s.RunID())
 	require.Nil(t, err)
 	require.Equal(t, 1, len(reloaded.Actions()), "Pause data should still be stored if data is nil")
 }
@@ -765,7 +766,7 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 	require.Error(t, state.ErrPauseNotFound, err)
 
 	// Load function state and assert we have the pause stored in state.
-	reloaded, err := m.Load(ctx, s.Identifier())
+	reloaded, err := m.Load(ctx, s.RunID())
 	require.Nil(t, err)
 	require.Equal(t, 0, len(reloaded.Actions()), "Pause data was stored in the state store with no data key provided")
 }
@@ -1238,7 +1239,7 @@ func checkCancel(t *testing.T, m state.Manager) {
 	err = m.Cancel(ctx, s.Identifier())
 	require.NoError(t, err)
 
-	reloaded, err := m.Load(ctx, s.Identifier())
+	reloaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
 }
@@ -1264,7 +1265,7 @@ func checkCancel_cancelled(t *testing.T, m state.Manager) {
 
 	err = m.Cancel(ctx, s.Identifier())
 	require.NoError(t, err)
-	reloaded, err := m.Load(ctx, s.Identifier())
+	reloaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
 
@@ -1294,14 +1295,14 @@ func checkCancel_completed(t *testing.T, m state.Manager) {
 	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID, 0)
 	require.NoError(t, err)
 
-	s, err = m.Load(ctx, s.Identifier())
+	s, err = m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
 
 	err = m.Cancel(ctx, s.Identifier())
 	require.Equal(t, err, state.ErrFunctionComplete)
 
-	s, err = m.Load(ctx, s.Identifier())
+	s, err = m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
 }
@@ -1309,7 +1310,7 @@ func checkCancel_completed(t *testing.T, m state.Manager) {
 func checkFinalizedStatus(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
-	loaded, err := m.Load(ctx, s.Identifier())
+	loaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.Equal(t, enums.RunStatusRunning, loaded.Metadata().Status, fmt.Sprintf("expected status to be %d", enums.RunStatusRunning))
 
@@ -1317,7 +1318,7 @@ func checkFinalizedStatus(t *testing.T, m state.Manager) {
 	err = m.Finalized(ctx, s.Identifier(), inngest.TriggerName, 0)
 	require.NoError(t, err)
 
-	loaded, err = m.Load(ctx, s.Identifier())
+	loaded, err = m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.Equal(t, enums.RunStatusCompleted, loaded.Metadata().Status, "Finalizing step setting pending to 0 should set status to enums.RunStatusComplete")
 	require.Equal(t, 0, loaded.Metadata().Pending)
@@ -1328,14 +1329,14 @@ func checkFinalizedStatus(t *testing.T, m state.Manager) {
 		err = m.Cancel(ctx, s.Identifier())
 		require.NoError(t, err)
 
-		loaded, err := m.Load(ctx, s.Identifier())
+		loaded, err := m.Load(ctx, s.RunID())
 		require.NoError(t, err)
 		require.Equal(t, enums.RunStatusCancelled, loaded.Metadata().Status)
 
 		err = m.Finalized(ctx, s.Identifier(), inngest.TriggerName, 0)
 		require.NoError(t, err)
 
-		loaded, err = m.Load(ctx, s.Identifier())
+		loaded, err = m.Load(ctx, s.RunID())
 		require.NoError(t, err)
 		require.Equal(t, enums.RunStatusCancelled, loaded.Metadata().Status)
 	})
@@ -1348,7 +1349,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 	s := setup(t, m)
 
 	t.Run("New() stores HistoryTypeFunctionStarted", func(t *testing.T) {
-		history, err := m.History(ctx, s.Identifier())
+		history, err := m.History(ctx, s.RunID())
 
 		require.NoError(t, err)
 		require.Equal(t, 1, len(history))
@@ -1362,7 +1363,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 		err := m.Started(ctx, s.Identifier(), w.Steps[0].ID, 2)
 		require.NoError(t, err)
 
-		history, err := m.History(ctx, s.Identifier())
+		history, err := m.History(ctx, s.RunID())
 		require.NoError(t, err)
 		require.Equal(t, 2, len(history))
 
@@ -1387,7 +1388,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 		_, err := m.SaveResponse(ctx, s.Identifier(), r, 2)
 		require.NoError(t, err)
 
-		history, err := m.History(ctx, s.Identifier())
+		history, err := m.History(ctx, s.RunID())
 		require.NoError(t, err)
 		require.Equal(t, 2, len(history))
 
@@ -1416,7 +1417,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 		_, err := m.SaveResponse(ctx, s.Identifier(), r, 2)
 		require.NoError(t, err)
 
-		history, err := m.History(ctx, s.Identifier())
+		history, err := m.History(ctx, s.RunID())
 		require.NoError(t, err)
 		require.Equal(t, 3, len(history))
 
@@ -1444,7 +1445,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 		_, err := m.SaveResponse(ctx, s.Identifier(), r, 2)
 		require.NoError(t, err)
 
-		history, err := m.History(ctx, s.Identifier())
+		history, err := m.History(ctx, s.RunID())
 		require.NoError(t, err)
 		require.Equal(t, 2, len(history))
 
@@ -1466,7 +1467,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 		err := m.Scheduled(ctx, s.Identifier(), w.Steps[0].ID, 2, nil)
 		require.NoError(t, err)
 
-		history, err := m.History(ctx, s.Identifier())
+		history, err := m.History(ctx, s.RunID())
 		require.NoError(t, err)
 		require.Equal(t, 2, len(history))
 
@@ -1486,14 +1487,14 @@ func checkLogs(t *testing.T, m state.Manager) {
 		err := m.Scheduled(ctx, s.Identifier(), w.Steps[0].ID, 2, nil)
 		require.NoError(t, err)
 
-		reloaded, err := m.Load(ctx, s.Identifier())
+		reloaded, err := m.Load(ctx, s.RunID())
 		require.NoError(t, err)
 		require.EqualValues(t, 2, reloaded.Metadata().Pending)
 
 		err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID, 2)
 		require.NoError(t, err)
 
-		history, err := m.History(ctx, s.Identifier())
+		history, err := m.History(ctx, s.RunID())
 		require.NoError(t, err)
 		require.Equal(t, 2, len(history))
 	})
@@ -1507,7 +1508,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 		err := m.Finalized(ctx, s.Identifier(), w.Steps[0].ID, 2)
 		require.NoError(t, err)
 
-		history, err := m.History(ctx, s.Identifier())
+		history, err := m.History(ctx, s.RunID())
 		require.NoError(t, err)
 		require.Equal(t, 2, len(history))
 

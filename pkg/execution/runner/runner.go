@@ -213,7 +213,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 }
 
 func (s *svc) History(ctx context.Context, id state.Identifier) ([]state.History, error) {
-	return s.state.History(ctx, id)
+	return s.state.History(ctx, id.RunID)
 }
 
 func (s *svc) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
@@ -379,7 +379,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			if len(data) == 0 {
 				// The pause had no expression data, so always load
 				// state for the function to retrieve expression data.
-				s, err := s.state.Load(ctx, pause.Identifier)
+				s, err := s.state.Load(ctx, pause.Identifier.RunID)
 				if err != nil {
 					return err
 				}

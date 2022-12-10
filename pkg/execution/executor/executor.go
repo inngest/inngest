@@ -166,7 +166,7 @@ type executor struct {
 func (e *executor) Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error) {
 	var log *zerolog.Logger
 
-	s, err := e.sm.Load(ctx, id)
+	s, err := e.sm.Load(ctx, id.RunID)
 	if err != nil {
 		return nil, err
 	}

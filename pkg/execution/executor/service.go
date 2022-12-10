@@ -246,7 +246,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		return s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt)
 	}
 
-	run, err := s.state.Load(ctx, item.Identifier)
+	run, err := s.state.Load(ctx, item.Identifier.RunID)
 	if err != nil {
 		return fmt.Errorf("unable to load run: %w", err)
 	}

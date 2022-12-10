@@ -30,7 +30,7 @@ redis.call("SETNX", workflowKey, workflow)
 
 local metadataJson = cjson.decode(metadata)
 for k, v in pairs(metadataJson) do
-  if k == "ctx" then
+  if k == "ctx" or k == "id" then
 	  v = cjson.encode(v)
   end
   redis.call("HSET", metadataKey, k, tostring(v))

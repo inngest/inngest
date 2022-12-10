@@ -213,7 +213,7 @@ func (r *RunUI) run(ctx context.Context) {
 			for !*execution.done {
 				var run state.State
 
-				run, err = r.sm.Load(ctx, *runId)
+				run, err = r.sm.Load(ctx, runId.RunID)
 				if err != nil {
 					r.err = err
 					return
@@ -338,7 +338,7 @@ func (r *RunUI) RenderState(run RunUIExecution) string {
 	width, _, _ := term.GetSize(int(os.Stdout.Fd()))
 	s := &strings.Builder{}
 
-	state, err := r.sm.Load(context.Background(), *run.id)
+	state, err := r.sm.Load(context.Background(), run.id.RunID)
 	if err != nil {
 		s.WriteString(RenderError("There was an error loading state: "+err.Error()) + "\n")
 		return s.String()
