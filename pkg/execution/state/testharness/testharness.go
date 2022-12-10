@@ -152,6 +152,10 @@ func checkNew(t *testing.T, m state.Manager) {
 		Identifier: id,
 		Workflow:   w,
 		EventData:  input.Map(),
+		Context: map[string]any{
+			"some": "data",
+			"true": true,
+		},
 	}
 
 	s, err := m.New(ctx, init)
@@ -161,6 +165,7 @@ func checkNew(t *testing.T, m state.Manager) {
 	require.EqualValues(t, w, found, "Returned workflow does not match input")
 	require.EqualValues(t, input.Map(), s.Event(), "Returned event does not match input")
 	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
+	require.EqualValues(t, init.Context, s.Metadata().Context, "Metadata context not saved")
 
 	loaded, err := m.Load(ctx, s.Identifier())
 	require.NoError(t, err)
@@ -1352,6 +1357,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 
 	t.Run("Started() stores HistoryTypeStepStarted with attempt information", func(t *testing.T) {
 		s = setup(t, m)
+		<-time.After(time.Millisecond)
 
 		err := m.Started(ctx, s.Identifier(), w.Steps[0].ID, 2)
 		require.NoError(t, err)
@@ -1372,6 +1378,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 
 	t.Run("SaveResponse() with a non-final error stores HistoryTypeStepErrored", func(t *testing.T) {
 		s = setup(t, m)
+		<-time.After(time.Millisecond)
 
 		r := state.DriverResponse{
 			Step: w.Steps[0],
@@ -1398,12 +1405,14 @@ func checkLogs(t *testing.T, m state.Manager) {
 
 	t.Run("SaveResponse() with a final error stores HistoryTypeStepFailed and HistoryTypeFunctionFailed", func(t *testing.T) {
 		s = setup(t, m)
+		<-time.After(time.Millisecond)
 
 		r := state.DriverResponse{
 			Step: w.Steps[0],
 			Err:  fmt.Errorf("lol"),
 		}
 		r.SetFinal()
+
 		_, err := m.SaveResponse(ctx, s.Identifier(), r, 2)
 		require.NoError(t, err)
 
@@ -1426,6 +1435,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 
 	t.Run("SaveResponse() with step data stores HistoryTypeStepCompleted", func(t *testing.T) {
 		s = setup(t, m)
+		<-time.After(time.Millisecond)
 
 		r := state.DriverResponse{
 			Step:   w.Steps[0],
@@ -1451,6 +1461,8 @@ func checkLogs(t *testing.T, m state.Manager) {
 
 	t.Run("Scheduled() stores HistoryTypeStepScheduled", func(t *testing.T) {
 		s = setup(t, m)
+		<-time.After(time.Millisecond)
+
 		err := m.Scheduled(ctx, s.Identifier(), w.Steps[0].ID, 2, nil)
 		require.NoError(t, err)
 
@@ -1488,6 +1500,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 
 	t.Run("Finalized() stores HistoryTypeFunctionComplete if pending count transitions to 0", func(t *testing.T) {
 		s = setup(t, m)
+		<-time.After(time.Millisecond)
 
 		require.EqualValues(t, 1, s.Metadata().Pending)
 

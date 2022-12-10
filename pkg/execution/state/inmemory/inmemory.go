@@ -92,6 +92,7 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 			Debugger:      input.Debugger,
 			RunType:       input.RunType,
 			OriginalRunID: input.OriginalRunID,
+			Context:       input.Context,
 		},
 		workflow:   input.Workflow,
 		identifier: input.Identifier,
@@ -175,9 +176,14 @@ func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string, 
 	return nil
 }
 
-func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
+func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string, attempt int, withStatus ...enums.RunStatus) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+
+	finalStatus := enums.RunStatusCompleted
+	if len(withStatus) >= 1 {
+		finalStatus = withStatus[0]
+	}
 
 	s, ok := m.state[i.IdempotencyKey()]
 	if !ok {
@@ -187,7 +193,7 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string, 
 	instance := s.(memstate)
 	instance.metadata.Pending--
 	if instance.metadata.Pending == 0 && instance.metadata.Status == enums.RunStatusRunning {
-		instance.metadata.Status = enums.RunStatusCompleted
+		instance.metadata.Status = finalStatus
 		go m.runCallbacks(ctx, i, enums.RunStatusCompleted)
 
 		m.setHistory(ctx, i, state.History{

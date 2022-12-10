@@ -242,6 +242,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		Version:  input.Workflow.Version,
 		Pending:  1,
 		Debugger: input.Debugger,
+		Context:  input.Context,
 	}
 	if input.OriginalRunID != nil {
 		metadata.OriginalRunID = input.OriginalRunID.String()
@@ -523,8 +524,14 @@ func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, a
 	return nil
 }
 
-func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, attempt int) error {
+func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, attempt int, withStatus ...enums.RunStatus) error {
 	now := time.Now()
+
+	// Don't set status by default.
+	finalStatus := -1
+	if len(withStatus) >= 1 {
+		finalStatus = int(withStatus[0])
+	}
 
 	status, err := scripts["finalize"].Eval(
 		ctx,
@@ -536,6 +543,7 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, a
 			CreatedAt:  now,
 		},
 		now.UnixMilli(),
+		int(finalStatus),
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error finalizing: %w", err)
@@ -726,32 +734,26 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 }
 
 func (m mgr) History(ctx context.Context, id state.Identifier) ([]state.History, error) {
-	cmd := m.r.ZScan(ctx, m.kf.History(ctx, id), 0, "", -1)
-	if err := cmd.Err(); err != nil {
+	items, err := m.r.ZRangeArgs(ctx, redis.ZRangeArgs{
+		Key:     m.kf.History(ctx, id),
+		Start:   "-inf",
+		Stop:    "+inf",
+		ByScore: true,
+	}).Result()
+	if err != nil {
 		return nil, err
 	}
 
-	i := cmd.Iterator()
-	if i == nil {
-		return nil, fmt.Errorf("unable to create event iterator")
-	}
-
-	history := []state.History{}
-
-	for i.Next(ctx) {
+	history := make([]state.History, len(items))
+	for n, i := range items {
 		var h state.History
 
-		err := h.UnmarshalBinary([]byte(i.Val()))
+		err := h.UnmarshalBinary([]byte(i))
 		if err != nil {
 			return nil, err
 		}
 
-		history = append(history, h)
-
-		// The redis command will include a "score", meaning the next actual piece
-		// of data we want to access is yet another iteration along. We call this
-		// here so the next loop is looking at the correct data.
-		i.Next(ctx)
+		history[n] = h
 	}
 
 	return history, nil
@@ -833,6 +835,13 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 	if val, ok := data["runType"]; ok {
 		m.RunType = val
 	}
+	if val, ok := data["ctx"]; ok && val != "" {
+		ctx := map[string]any{}
+		if err := json.Unmarshal([]byte(val), &ctx); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal metadata context: %s", val)
+		}
+		m.Context = ctx
+	}
 
 	return m, nil
 }
@@ -847,10 +856,11 @@ type runMetadata struct {
 	Version int `json:"version"`
 
 	// These are the fields for standard state metadata.
-	Pending       int    `json:"pending"`
-	Debugger      bool   `json:"debugger"`
-	RunType       string `json:"runType,omitempty"`
-	OriginalRunID string `json:"originalRunID,omitempty"`
+	Pending       int            `json:"pending"`
+	Debugger      bool           `json:"debugger"`
+	RunType       string         `json:"runType,omitempty"`
+	OriginalRunID string         `json:"originalRunID,omitempty"`
+	Context       map[string]any `json:"ctx,omitempty"`
 }
 
 func (r runMetadata) Map() map[string]any {
@@ -861,6 +871,7 @@ func (r runMetadata) Map() map[string]any {
 		"debugger":      r.Debugger,
 		"runType":       r.RunType,
 		"originalRunID": r.OriginalRunID,
+		"ctx":           r.Context,
 	}
 }
 
@@ -869,6 +880,7 @@ func (r runMetadata) Metadata() state.Metadata {
 		Pending:  r.Pending,
 		Debugger: r.Debugger,
 		Status:   r.Status,
+		Context:  r.Context,
 	}
 
 	if r.RunType != "" {
