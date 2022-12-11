@@ -353,7 +353,8 @@ func (s *svc) functions(ctx context.Context, evt event.Event) error {
 // pauses searches for and triggers all pauses from this event.
 func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 	logger.From(ctx).Trace().Msg("querying for pauses")
-	iter, err := s.state.PausesByEvent(ctx, evt.Name)
+	// TODO: Add workspace ID handling to the open source runner.
+	iter, err := s.state.PausesByEvent(ctx, uuid.UUID{}, evt.Name)
 	if err != nil {
 		return fmt.Errorf("error finding event pauses: %w", err)
 	}

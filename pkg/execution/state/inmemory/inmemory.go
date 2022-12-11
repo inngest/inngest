@@ -360,13 +360,13 @@ func (m *mem) LeasePause(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (m *mem) PausesByEvent(ctx context.Context, eventName string) (state.PauseIterator, error) {
+func (m *mem) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, eventName string) (state.PauseIterator, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	subset := []*state.Pause{}
 	for _, p := range m.pauses {
 		copied := p
-		if p.Event != nil && *p.Event == eventName {
+		if p.Event != nil && *p.Event == eventName && p.WorkspaceID == workspaceID {
 			subset = append(subset, &copied)
 		}
 	}
@@ -379,7 +379,7 @@ func (m *mem) PauseByStep(ctx context.Context, i state.Identifier, actionID stri
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	for _, p := range m.pauses {
-		if p.Identifier.RunID == i.RunID && p.Outgoing == actionID {
+		if p.Identifier.RunID == i.RunID && p.Incoming == actionID {
 			return &p, nil
 		}
 	}
