@@ -579,7 +579,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		// to resume workflows from a given Identifer and Step easily.
 		err = tx.Set(
 			ctx,
-			m.kf.PauseStep(ctx, p.Identifier, p.Outgoing),
+			m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 			p.ID.String(),
 			time.Until(p.Expires.Time()),
 		).Err()
@@ -596,7 +596,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		// NOTE: Because we return an iterator to this set directly for returning pauses
 		// matching an event, we must store the pause within this event again.
 		if p.Event != nil {
-			if err = tx.HSet(ctx, m.kf.PauseEvent(ctx, *p.Event), map[string]any{
+			if err = tx.HSet(ctx, m.kf.PauseEvent(ctx, p.WorkspaceID, *p.Event), map[string]any{
 				p.ID.String(): string(packed),
 			}).Err(); err != nil {
 				return err
@@ -662,7 +662,7 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		}
 		if pause.Event != nil {
 			// Remove this from any event, also.
-			return tx.HDel(ctx, m.kf.PauseEvent(ctx, *pause.Event), pause.ID.String()).Err()
+			return tx.HDel(ctx, m.kf.PauseEvent(ctx, pause.WorkspaceID, *pause.Event), pause.ID.String()).Err()
 		}
 
 		if pause.DataKey != "" {
@@ -675,9 +675,9 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 	}, key)
 }
 
-// PausesByEvent returns all pauses for a given event.
-func (m mgr) PausesByEvent(ctx context.Context, event string) (state.PauseIterator, error) {
-	cmd := m.r.HScan(ctx, m.kf.PauseEvent(ctx, event), 0, "", 0)
+// PausesByEvent returns all pauses for a given event within a workspace.
+func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
+	cmd := m.r.HScan(ctx, m.kf.PauseEvent(ctx, workspaceID, event), 0, "", 0)
 	if err := cmd.Err(); err != nil {
 		return nil, err
 	}

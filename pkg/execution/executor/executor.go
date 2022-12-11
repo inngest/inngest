@@ -314,6 +314,8 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		l = &log
 	}
 
+	// TODO: BEFORE RUNNING ERROR, RETURN FINAL
+
 	definition, err := e.al.Action(ctx, action.DSN, action.Version)
 	if err != nil {
 		return nil, fmt.Errorf("error loading action: %w", err)

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/config/registration"
@@ -160,7 +161,7 @@ func TestEngine_async(t *testing.T) {
 	// And we should have a pause.
 	require.Eventually(t, func() bool {
 		n := 0
-		iter, err := sm.PausesByEvent(ctx, "test/continue")
+		iter, err := sm.PausesByEvent(ctx, uuid.UUID{}, "test/continue")
 		require.NoError(t, err)
 		for iter.Next(ctx) {
 			n++
@@ -182,7 +183,7 @@ func TestEngine_async(t *testing.T) {
 	require.EqualValues(t, 1, len(driver.Executed))
 	require.Eventually(t, func() bool {
 		n := 0
-		iter, err := sm.PausesByEvent(ctx, "test/continue")
+		iter, err := sm.PausesByEvent(ctx, uuid.UUID{}, "test/continue")
 		require.NoError(t, err)
 		for iter.Next(ctx) {
 			n++

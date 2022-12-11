@@ -49,7 +49,7 @@ type KeyGenerator interface {
 	PauseID(context.Context, uuid.UUID) string
 
 	// PauseEvent returns the key used to store data for
-	PauseEvent(context.Context, string) string
+	PauseEvent(context.Context, uuid.UUID, string) string
 
 	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
 	// iterate through all pauses for a given identifier
@@ -98,8 +98,8 @@ func (d DefaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) string {
 	return fmt.Sprintf("%s:pause-lease:%s", d.Prefix, id.String())
 }
 
-func (d DefaultKeyFunc) PauseEvent(ctx context.Context, event string) string {
-	return fmt.Sprintf("%s:pause-events:%s", d.Prefix, event)
+func (d DefaultKeyFunc) PauseEvent(ctx context.Context, workspaceID uuid.UUID, event string) string {
+	return fmt.Sprintf("%s:pause-events:%s:%s", d.Prefix, workspaceID, event)
 }
 
 func (d DefaultKeyFunc) PauseStepPrefix(ctx context.Context, id state.Identifier) string {

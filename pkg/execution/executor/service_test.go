@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
@@ -354,7 +355,7 @@ func TestHandleAsyncService(t *testing.T) {
 	require.Equal(t, 0, len(run.Actions()))
 	require.Equal(t, 3, run.Metadata().Pending)
 
-	pauses, err := data.sm.PausesByEvent(ctx, "async/continue")
+	pauses, err := data.sm.PausesByEvent(ctx, uuid.UUID{}, "async/continue")
 	require.NoError(t, err)
 	require.True(t, pauses.Next(ctx))
 	pause := pauses.Val(ctx)

@@ -774,7 +774,7 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 func checkPausesByEvent_empty(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 
-	iter, err := m.PausesByEvent(ctx, "lol/nothing.my.friend")
+	iter, err := m.PausesByEvent(ctx, uuid.UUID{}, "lol/nothing.my.friend")
 	require.NoError(t, err)
 	require.NotNil(t, iter)
 	require.False(t, iter.Next(ctx))
@@ -787,32 +787,49 @@ func checkPausesByEvent_single(t *testing.T, m state.Manager) {
 
 	evtA := "event/a"
 	evtB := "event/...b"
+	wsA := uuid.New()
+	wsB := uuid.New()
 
 	// Save a pause.
 	pause := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
-		Event:      &evtA,
+		ID:          uuid.New(),
+		WorkspaceID: wsA,
+		Identifier:  s.Identifier(),
+		Outgoing:    inngest.TriggerName,
+		Incoming:    w.Steps[0].ID,
+		Expires:     state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
+		Event:       &evtA,
 	}
 	err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
-	// Save an unrelated pause to another event.
-	unused := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
-		Event:      &evtB,
+	// Save an unrelated pause to another event in the same workspace
+	unusedA := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: wsA,
+		Identifier:  s.Identifier(),
+		Outgoing:    inngest.TriggerName,
+		Incoming:    w.Steps[0].ID,
+		Expires:     state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
+		Event:       &evtB,
 	}
-	err = m.SavePause(ctx, unused)
+	err = m.SavePause(ctx, unusedA)
 	require.NoError(t, err)
 
-	iter, err := m.PausesByEvent(ctx, evtA)
+	// Save an unrelated pause to the same event in a different workspace
+	unusedB := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: wsB,
+		Identifier:  s.Identifier(),
+		Outgoing:    inngest.TriggerName,
+		Incoming:    w.Steps[0].ID,
+		Expires:     state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
+		Event:       &evtA,
+	}
+	err = m.SavePause(ctx, unusedB)
+	require.NoError(t, err)
+
+	iter, err := m.PausesByEvent(ctx, wsA, evtA)
 	require.NoError(t, err)
 	require.NotNil(t, iter)
 	require.True(t, iter.Next(ctx))
@@ -855,7 +872,7 @@ func checkPausesByEvent_multi(t *testing.T, m state.Manager) {
 	err := m.SavePause(ctx, unused)
 	require.NoError(t, err)
 
-	iter, err := m.PausesByEvent(ctx, evtA)
+	iter, err := m.PausesByEvent(ctx, uuid.UUID{}, evtA)
 	require.NoError(t, err)
 	require.NotNil(t, iter)
 
@@ -919,7 +936,7 @@ func checkPausesByEvent_concurrent(t *testing.T, m state.Manager) {
 		pauses = append(pauses, p)
 	}
 
-	iterA, err := m.PausesByEvent(ctx, evtA)
+	iterA, err := m.PausesByEvent(ctx, uuid.UUID{}, evtA)
 	require.NoError(t, err)
 	require.NotNil(t, iterA)
 
@@ -941,7 +958,7 @@ func checkPausesByEvent_concurrent(t *testing.T, m state.Manager) {
 	}
 
 	// Create a new iterator and consume it all.
-	iterB, err := m.PausesByEvent(ctx, evtA)
+	iterB, err := m.PausesByEvent(ctx, uuid.UUID{}, evtA)
 	require.NoError(t, err)
 	require.NotNil(t, iterB)
 	seenB := []string{}
@@ -1015,7 +1032,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 	//
 	// Ensure that the iteration shows everything at first.
 	//
-	iter, err := m.PausesByEvent(ctx, evtA)
+	iter, err := m.PausesByEvent(ctx, uuid.UUID{}, evtA)
 	require.NoError(t, err)
 	require.NotNil(t, iter)
 
@@ -1049,7 +1066,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 	err = m.ConsumePause(ctx, pauses[0].ID, nil)
 	require.NoError(t, err)
 
-	iter, err = m.PausesByEvent(ctx, evtA)
+	iter, err = m.PausesByEvent(ctx, uuid.UUID{}, evtA)
 	require.NoError(t, err)
 	require.NotNil(t, iter)
 
@@ -1113,12 +1130,12 @@ func checkPausesByStep(t *testing.T, m state.Manager) {
 	require.NotNil(t, err)
 	require.Error(t, state.ErrPauseNotFound, err)
 
-	found, err = m.PauseByStep(ctx, s.Identifier(), inngest.TriggerName)
+	found, err = m.PauseByStep(ctx, s.Identifier(), w.Steps[0].ID)
 	require.Nil(t, err)
 	require.NotNil(t, found)
 	require.EqualValues(t, pause, *found)
 
-	found, err = m.PauseByStep(ctx, s.Identifier(), w.Steps[0].ID)
+	found, err = m.PauseByStep(ctx, s.Identifier(), w.Steps[1].ID)
 	require.Nil(t, err)
 	require.NotNil(t, found)
 	require.EqualValues(t, second, *found)

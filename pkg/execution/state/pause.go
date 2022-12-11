@@ -38,8 +38,8 @@ type PauseMutater interface {
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
 // is required to fetch pauses to automatically continue workflows.
 type PauseGetter interface {
-	// PausesByEvent returns all pauses for a given event.
-	PausesByEvent(ctx context.Context, eventName string) (PauseIterator, error)
+	// PausesByEvent returns all pauses for a given event, in a given workspace.
+	PausesByEvent(ctx context.Context, workspaceID uuid.UUID, eventName string) (PauseIterator, error)
 
 	// PauseByStep returns a specific pause for a given workflow run, from a given step.
 	//
@@ -83,6 +83,8 @@ type PauseManager interface {
 // the function as specified by Target.
 type Pause struct {
 	ID uuid.UUID `json:"id"`
+	// WorkspaceID scopes the pause to a specific workspace.
+	WorkspaceID uuid.UUID `json:"wsID"`
 	// Identifier is the specific workflow run to resume.  This is required.
 	Identifier Identifier `json:"identifier"`
 	// Outgoing is the parent step for the pause.
