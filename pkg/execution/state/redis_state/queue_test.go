@@ -10,6 +10,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -544,8 +545,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 	defer rc.Close()
 	q := NewQueue(
 		rc,
-		WithPriorityFinder(func(ctx context.Context, workflowID uuid.UUID) uint {
-			switch workflowID {
+		WithPriorityFinder(func(ctx context.Context, qi *osqueue.Item) uint {
+			switch qi.Identifier.WorkflowID {
 			case idB, idC:
 				return PriorityMax
 			default:
@@ -663,7 +664,7 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	defer rc.Close()
 	q := NewQueue(
 		rc,
-		WithPriorityFinder(func(ctx context.Context, workflowID uuid.UUID) uint {
+		WithPriorityFinder(func(ctx context.Context, item *osqueue.Item) uint {
 			return priority
 		}),
 	)
@@ -696,7 +697,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 	q := queue{
 		kg: defaultQueueKey,
 		r:  rc,
-		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
+		pf: func(ctx context.Context, item *osqueue.Item) uint {
 			return PriorityMin
 		},
 	}

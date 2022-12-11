@@ -75,8 +75,8 @@ func init() {
 	rnd = &frandRNG{RNG: frand.New(), lock: &sync.Mutex{}}
 }
 
-// PriorityFinder returns the priority for a given workflow.
-type PriorityFinder func(ctx context.Context, workflowID uuid.UUID) uint
+// PriorityFinder returns the priority for a given queue item.
+type PriorityFinder func(ctx context.Context, item *osqueue.Item) uint
 
 type QueueOpt func(q *queue)
 
@@ -119,7 +119,7 @@ func WithPollTick(t time.Duration) func(q *queue) {
 func NewQueue(r *redis.Client, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
-		pf: func(ctx context.Context, workflowID uuid.UUID) uint {
+		pf: func(ctx context.Context, item *osqueue.Item) uint {
 			return PriorityDefault
 		},
 		kg:           defaultQueueKey,
@@ -251,7 +251,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 
 	priority := PriorityMin
 	if q.pf != nil {
-		priority = q.pf(ctx, i.WorkflowID)
+		priority = q.pf(ctx, &i.Data)
 	}
 
 	if priority > PriorityMin {
@@ -466,7 +466,7 @@ func (q *queue) Dequeue(ctx context.Context, i QueueItem) error {
 func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	priority := PriorityMin
 	if q.pf != nil {
-		priority = q.pf(ctx, i.WorkflowID)
+		priority = q.pf(ctx, &i.Data)
 	}
 
 	if priority > PriorityMin {
