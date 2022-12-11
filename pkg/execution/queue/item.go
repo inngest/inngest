@@ -22,7 +22,7 @@ const (
 //
 // TODO: Refactor this with the QueueItem in redis state to remove duplicates.
 type Item struct {
-	WorkspaceID uuid.UUID `json:"-"`
+	WorkspaceID uuid.UUID `json:"wsID"`
 	// Kind represents the job type and payload kind stored within Payload.
 	Kind string `json:"kind"`
 	// Identifier represents the unique workflow ID and run ID for the current job.
@@ -51,6 +51,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		Attempt     int              `json:"atts"`
 		MaxAttempts *int             `json:"maxAtts,omitempty"`
 		Payload     json.RawMessage  `json:"payload"`
+		WorkspaceID uuid.UUID        `json:"wsID"`
 	}
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
@@ -62,6 +63,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.Identifier = temp.Identifier
 	i.Attempt = temp.Attempt
 	i.MaxAttempts = temp.MaxAttempts
+	i.WorkspaceID = temp.WorkspaceID
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.
 	if len(temp.Payload) > 0 {

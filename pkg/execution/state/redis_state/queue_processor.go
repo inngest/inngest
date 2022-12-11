@@ -33,9 +33,10 @@ func init() {
 
 func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) error {
 	_, err := q.EnqueueItem(ctx, QueueItem{
-		AtMS:       at.UnixMilli(),
-		WorkflowID: item.Identifier.WorkflowID,
-		Data:       item,
+		AtMS:        at.UnixMilli(),
+		WorkspaceID: item.WorkspaceID,
+		WorkflowID:  item.Identifier.WorkflowID,
+		Data:        item,
 	}, at)
 	logger.From(ctx).Trace().Interface("item", item).Msg("enqueued item")
 	return err
