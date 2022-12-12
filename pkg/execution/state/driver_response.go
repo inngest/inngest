@@ -41,7 +41,12 @@ func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
 		return nil, fmt.Errorf("An event name must be provided when waiting for an event")
 	}
 
-	if err := json.Unmarshal(g.Data, &opts); err != nil {
+	byt, err := json.Marshal(g.Opts)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(byt, &opts); err != nil {
 		return nil, err
 	}
 	return &opts, nil
