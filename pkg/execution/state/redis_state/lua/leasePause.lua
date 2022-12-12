@@ -18,7 +18,6 @@ local currentTime = tonumber(ARGV[1])
 local leaseTTL = tonumber(ARGV[2])
 
 if redis.call("EXISTS", pauseID) ~= 1 then
-	-- Pause no longer exists.
 	return 2
 end
 
@@ -31,6 +30,14 @@ if redis.call("EXISTS", leaseID) == 1 then
 	end
 end
 
--- Add a marker denoting this item as leased.
+-- Add a marker denoting this item as leased.  Use second precision
+-- for the expiry (leaseTTL) and as the value store millisecond precision data.
 redis.call("SETEX", leaseID, leaseTTL, currentTime + (leaseTTL * 1000))
+
+-- Increase the expiry time of the pause so that we can continue to work on this,
+-- if the pause is set to expire before the lease is up.
+if redis.call("TTL", pauseID) < leaseTTL then
+	redis.call("EXPIRE", pauseID, leaseTTL)
+end
+
 return 0

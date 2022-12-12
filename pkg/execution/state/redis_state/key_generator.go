@@ -48,7 +48,7 @@ type KeyGenerator interface {
 	// PauseID returns the key used to store an individual pause from its ID.
 	PauseID(context.Context, uuid.UUID) string
 
-	// PauseEvent returns the key used to store data for
+	// PauseEvent returns the key used to store data for loading pauses by events.
 	PauseEvent(context.Context, uuid.UUID, string) string
 
 	// PauseStep returns the prefix of the key used within PauseStep.  This lets us

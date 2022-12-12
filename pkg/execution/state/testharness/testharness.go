@@ -1011,7 +1011,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
 
-	evtA := "event/a-multi"
+	evtA := "event/a-consumed"
 
 	// Save many a pause.
 	pauses := []state.Pause{}
@@ -1041,16 +1041,10 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 	for iter.Next(ctx) {
 		result := iter.Val(ctx)
 
-		found := false
-		for _, existing := range pauses {
-			if existing.ID == result.ID {
-				found = true
-				break
-			}
-		}
-
+		require.NotNil(t, result.Event)
 		byt, _ := json.MarshalIndent(result, "", "  ")
-		require.True(t, found, "iterator returned pause not in event set:\n%v", string(byt))
+		require.Equal(t, evtA, *result.Event, "iterator returned pause not in event set:\n%v", string(byt))
+
 		// Some iterators may return the same item multiple times (eg. Redis).
 		// Record the items that were seen.
 		seen = append(seen, result.ID.String())
@@ -1058,8 +1052,8 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 	}
 
 	// Sanity check number of seen items.
-	require.GreaterOrEqual(t, len(pauses), n, "didn't iterate through all matching pauses")
-	require.GreaterOrEqual(t, len(pauses), len(seen))
+	require.GreaterOrEqual(t, n, len(pauses), "didn't iterate through all matching pauses")
+	require.GreaterOrEqual(t, len(seen), len(pauses))
 
 	// Consume the first pause, and assert that it doesn't show up in
 	// an iterator.
@@ -1097,6 +1091,68 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 	// Sanity check number of seen items.
 	require.GreaterOrEqual(t, len(pauses)-1, n, "consumed pause returned within iterator")
 	require.GreaterOrEqual(t, len(pauses)-1, len(seen))
+
+	t.Run("It consumes a pause for an event with > 1 pause set up", func(t *testing.T) {
+		wsID := uuid.New()
+		evtA = "consumed/single"
+
+		p1 := state.Pause{
+			ID:          uuid.New(),
+			WorkspaceID: wsID,
+			Identifier:  s.Identifier(),
+			Outgoing:    inngest.TriggerName,
+			Incoming:    w.Steps[0].ID,
+			Expires:     state.Time(time.Now().Add(time.Minute)),
+			Event:       &evtA,
+		}
+		p2 := state.Pause{
+			ID:          uuid.New(),
+			WorkspaceID: wsID,
+			Identifier:  s.Identifier(),
+			Outgoing:    inngest.TriggerName,
+			Incoming:    w.Steps[0].ID,
+			Expires:     state.Time(time.Now().Add(time.Minute).Truncate(time.Second).UTC()),
+			Event:       &evtA,
+		}
+		err := m.SavePause(ctx, p1)
+		require.NoError(t, err)
+		err = m.SavePause(ctx, p2)
+		require.NoError(t, err)
+
+		//
+		// Ensure that the iteration shows everything at first.
+		//
+		iter, err := m.PausesByEvent(ctx, wsID, evtA)
+		require.NoError(t, err)
+		require.NotNil(t, iter)
+
+		n := 0
+		for iter.Next(ctx) {
+			n++
+		}
+
+		// There should be two pauses.
+		require.Equal(t, 2, n)
+
+		err = m.ConsumePause(ctx, p1.ID, map[string]any{"ok": true})
+		require.NoError(t, err)
+
+		//
+		// Ensure that the iteration shows the last event.
+		//
+		iter, err = m.PausesByEvent(ctx, wsID, evtA)
+		require.NoError(t, err)
+		require.NotNil(t, iter)
+
+		n = 0
+		for iter.Next(ctx) {
+			n++
+			val := iter.Val(ctx)
+			require.EqualValues(t, p2, *val)
+		}
+
+		require.Equal(t, 1, n)
+	})
 
 }
 

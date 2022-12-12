@@ -632,47 +632,47 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 }
 
 func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
-	var (
-		marshalledData []byte
-		err            error
-	)
+	p, err := m.PauseByID(ctx, id)
+	if err != nil {
+		return err
+	}
 
-	key := m.kf.PauseID(ctx, id)
-
-	marshalledData, err = json.Marshal(data)
+	marshalledData, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("cannot marshal data to store in state: %w", err)
 	}
 
-	return m.r.Watch(ctx, func(tx *redis.Tx) error {
-		str, err := tx.Get(ctx, key).Result()
-		if err == redis.Nil {
-			return state.ErrPauseNotFound
-		}
-		if err != nil {
-			return err
-		}
+	eventKey := ""
+	if p.Event != nil {
+		eventKey = m.kf.PauseEvent(ctx, p.WorkspaceID, *p.Event)
+	}
+	keys := []string{
+		m.kf.PauseID(ctx, id),
+		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
+		eventKey,
+		m.kf.Actions(ctx, p.Identifier),
+	}
 
-		pause := &state.Pause{}
-		if err = json.Unmarshal([]byte(str), pause); err != nil {
-			return err
-		}
-		if err := tx.Del(ctx, key).Err(); err != nil {
-			return err
-		}
-		if pause.Event != nil {
-			// Remove this from any event, also.
-			return tx.HDel(ctx, m.kf.PauseEvent(ctx, pause.WorkspaceID, *pause.Event), pause.ID.String()).Err()
-		}
+	status, err := scripts["consumePause"].Eval(
+		ctx,
+		m.r,
+		keys,
 
-		if pause.DataKey != "" {
-			if err := m.r.HSet(ctx, m.kf.Actions(ctx, pause.Identifier), pause.DataKey, string(marshalledData)).Err(); err != nil {
-				return err
-			}
-		}
-
+		id.String(),
+		p.DataKey,
+		string(marshalledData),
+	).Int64()
+	if err != nil {
+		return fmt.Errorf("error consuming pause: %w", err)
+	}
+	switch status {
+	case 0:
 		return nil
-	}, key)
+	case 1:
+		return state.ErrPauseNotFound
+	default:
+		return fmt.Errorf("unknown response leasing pause: %d", status)
+	}
 }
 
 // PausesByEvent returns all pauses for a given event within a workspace.
@@ -774,13 +774,12 @@ type iter struct {
 }
 
 func (i *iter) Next(ctx context.Context) bool {
+	// Skip over the key;  we're using HScan which returns key then value.
+	_ = i.ri.Next(ctx)
 	return i.ri.Next(ctx)
 }
 
 func (i *iter) Val(ctx context.Context) *state.Pause {
-	// Skip over the key;  we're using HScan which returns key then value.
-	_ = i.ri.Next(ctx)
-
 	val := i.ri.Val()
 	if val == "" {
 		return nil
