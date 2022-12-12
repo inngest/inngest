@@ -11,6 +11,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -537,6 +538,17 @@ func TestQueuePartitionPeek(t *testing.T) {
 	idB := uuid.New()
 	idC := uuid.New()
 
+	newQueueItem := func(id uuid.UUID) QueueItem {
+		return QueueItem{
+			WorkflowID: id,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					WorkflowID: id,
+				},
+			},
+		}
+	}
+
 	now := time.Now().Truncate(time.Second).UTC()
 	atA, atB, atC := now, now.Add(time.Second), now.Add(2*time.Second)
 
@@ -556,11 +568,11 @@ func TestQueuePartitionPeek(t *testing.T) {
 	)
 	ctx := context.Background()
 
-	_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, atA)
+	_, err := q.EnqueueItem(ctx, newQueueItem(idA), atA)
 	require.NoError(t, err)
-	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idB}, atB)
+	_, err = q.EnqueueItem(ctx, newQueueItem(idB), atB)
 	require.NoError(t, err)
-	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idC}, atC)
+	_, err = q.EnqueueItem(ctx, newQueueItem(idC), atC)
 	require.NoError(t, err)
 
 	t.Run("Sequentially returns indexes in order", func(t *testing.T) {
