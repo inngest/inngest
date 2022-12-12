@@ -167,6 +167,7 @@ func TestQueueRunExtended(t *testing.T) {
 		WithNumWorkers(2500),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	mrand.Seed(time.Now().UnixMicro())
 
@@ -223,22 +224,26 @@ func TestQueueRunExtended(t *testing.T) {
 		t := time.Tick(1000 * time.Millisecond)
 		prev := atomic.LoadInt64(&handled)
 		for {
-			<-t
-			next := atomic.LoadInt64(&handled)
-			added := atomic.LoadInt64(&added)
-			fmt.Printf(
-				"Handled: %d \t Handled delta: %d \t Added: %d \t Remaining: %d\n",
-				next,
-				next-prev,
-				added,
-				added-next,
-			)
-			latencySem.Lock()
-			// NOTE: RUNNING THIS WITH THE RACE CHECKER SIGNIFICANTLY REDUCES LATENCY.
-			// The actual latency should be checked without --race on.
-			fmt.Printf("AVG LATENCY: %dms\n", time.Duration(latencyAvg.GetEWMA()).Milliseconds())
-			latencySem.Unlock()
-			prev = next
+			select {
+			case <-ctx.Done():
+				return
+			case <-t:
+				next := atomic.LoadInt64(&handled)
+				added := atomic.LoadInt64(&added)
+				fmt.Printf(
+					"Handled: %d \t Handled delta: %d \t Added: %d \t Remaining: %d\n",
+					next,
+					next-prev,
+					added,
+					added-next,
+				)
+				latencySem.Lock()
+				// NOTE: RUNNING THIS WITH THE RACE CHECKER SIGNIFICANTLY REDUCES LATENCY.
+				// The actual latency should be checked without --race on.
+				fmt.Printf("AVG LATENCY: %dms\n", time.Duration(latencyAvg.GetEWMA()).Milliseconds())
+				latencySem.Unlock()
+				prev = next
+			}
 		}
 	}()
 

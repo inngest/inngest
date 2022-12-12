@@ -38,7 +38,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		WorkflowID:  item.Identifier.WorkflowID,
 		Data:        item,
 	}, at)
-	logger.From(ctx).Trace().Interface("item", item).Msg("enqueued item")
+	logger.From(ctx).Debug().Interface("item", item).Msg("enqueued item")
 	return err
 }
 
@@ -286,17 +286,24 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 
 	// Continually extend lease in the background while we're working on this job
 	go func() {
-		for range extendLeaseTick.C {
-			if ctx.Err() != nil {
-				// Don't extend lease when the ctx is done.
-				return
-			}
-			leaseID, err = q.ExtendLease(ctx, qi, *leaseID, QueueLeaseDuration)
-			if err != nil && err != ErrQueueItemNotFound {
-				// XXX: Increase counter here.
-				logger.From(ctx).Error().Err(err).Msg("error extending lease")
-				errCh <- fmt.Errorf("error extending lease while processing: %w", err)
-				return
+		for {
+			select {
+			case _, ok := <-doneCh:
+				if !ok {
+					return
+				}
+			case <-extendLeaseTick.C:
+				if ctx.Err() != nil {
+					// Don't extend lease when the ctx is done.
+					return
+				}
+				leaseID, err = q.ExtendLease(ctx, qi, *leaseID, QueueLeaseDuration)
+				if err != nil && err != ErrQueueItemNotFound {
+					// XXX: Increase counter here.
+					logger.From(ctx).Error().Err(err).Msg("error extending lease")
+					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
+					return
+				}
 			}
 		}
 	}()
@@ -335,7 +342,9 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 			errCh <- err
 			return
 		}
-		doneCh <- struct{}{}
+		// Closing this channel prevents the goroutine which extends lease from leaking,
+		// and dequeues the job
+		close(doneCh)
 	}()
 
 	select {
