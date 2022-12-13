@@ -10,12 +10,18 @@ local queueIndexKey       = KEYS[2]   -- queue:sorted:$workflowID - zset
 local partitionKey        = KEYS[3]   -- partition:item - hash: { $workflowID: $partition }
 local partitionCounterKey = KEYS[4]   -- partition:item:$workflowID - hash: { "n": items leased/in-progress, "len": total enqueued }
 local partitionIndexKey   = KEYS[5]   -- partition:sorted - zset
+local idempotencyKey      = KEYS[6]   -- seen:$key
 
 local queueItem      = ARGV[1] -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID        = ARGV[2] -- id
 local queueScore     = tonumber(ARGV[3]) -- vesting time, in seconds
 local workflowID     = ARGV[4] -- $workflowID
 local partitionItem  = ARGV[5] -- {workflow, priority, leasedAt, etc}
+
+-- Check idempotency exists
+if redis.call("EXISTS", idempotencyKey) ~= 0 then
+	return 1
+end
 
 -- Make these a hash to save on memory usage
 if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then

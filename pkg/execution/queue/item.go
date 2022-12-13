@@ -22,6 +22,9 @@ const (
 //
 // TODO: Refactor this with the QueueItem in redis state to remove duplicates.
 type Item struct {
+	// JobID is an internal ID used to deduplicate queue items.
+	JobID *string `json:"-"`
+	// Workspace is the ID that this workspace job belongs to
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// Kind represents the job type and payload kind stored within Payload.
 	Kind string `json:"kind"`

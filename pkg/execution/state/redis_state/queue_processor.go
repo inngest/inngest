@@ -32,14 +32,23 @@ func init() {
 }
 
 func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) error {
+	id := ""
+	if item.JobID != nil {
+		id = *item.JobID
+	}
+
 	_, err := q.EnqueueItem(ctx, QueueItem{
+		ID:          id,
 		AtMS:        at.UnixMilli(),
 		WorkspaceID: item.WorkspaceID,
 		WorkflowID:  item.Identifier.WorkflowID,
 		Data:        item,
 	}, at)
+	if err != nil {
+		return err
+	}
 	logger.From(ctx).Debug().Interface("item", item).Msg("enqueued item")
-	return err
+	return nil
 }
 
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {

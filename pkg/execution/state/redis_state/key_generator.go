@@ -48,7 +48,7 @@ type KeyGenerator interface {
 	// PauseID returns the key used to store an individual pause from its ID.
 	PauseID(context.Context, uuid.UUID) string
 
-	// PauseEvent returns the key used to store data for
+	// PauseEvent returns the key used to store data for loading pauses by events.
 	PauseEvent(context.Context, uuid.UUID, string) string
 
 	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
@@ -129,10 +129,11 @@ type QueueKeyGenerator interface {
 	// PartitionMeta returns the key to store metadata for partitions, eg.
 	// the number of items enqueued, number in progress, etc.
 	PartitionMeta(id string) string
-
 	// Sequential returns the key which allows a worker to claim sequential processing
 	// of the partitions.
 	Sequential() string
+	// Idempotency stores the map for storing idempotency keys in redis
+	Idempotency(key string) string
 }
 
 type DefaultQueueKeyGenerator struct {
@@ -161,4 +162,8 @@ func (d DefaultQueueKeyGenerator) PartitionMeta(id string) string {
 
 func (d DefaultQueueKeyGenerator) Sequential() string {
 	return fmt.Sprintf("%s:queue:sequential", d.Prefix)
+}
+
+func (d DefaultQueueKeyGenerator) Idempotency(key string) string {
+	return fmt.Sprintf("%s:queue:seen:%s", d.Prefix, key)
 }

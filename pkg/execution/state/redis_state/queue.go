@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
 	"sync"
 	"time"
 
 	"golang.org/x/sync/semaphore"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/go-redis/redis/v8"
 	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
@@ -44,8 +46,9 @@ const (
 	PriorityDefault uint = 5
 	PriorityMin     uint = 9
 
-	defaultNumWorkers = 100
-	defaultPollTick   = 10 * time.Millisecond
+	defaultNumWorkers     = 100
+	defaultPollTick       = 10 * time.Millisecond
+	defaultIdempotencyTTL = 12 * time.Hour
 )
 
 var (
@@ -104,6 +107,12 @@ func WithQueueKeyGenerator(kg QueueKeyGenerator) func(q *queue) {
 	}
 }
 
+func WithIdempotencyTTL(t time.Duration) func(q *queue) {
+	return func(q *queue) {
+		q.idempotencyTTL = t
+	}
+}
+
 func WithNumWorkers(n int32) func(q *queue) {
 	return func(q *queue) {
 		q.numWorkers = n
@@ -122,12 +131,13 @@ func NewQueue(r *redis.Client, opts ...QueueOpt) *queue {
 		pf: func(ctx context.Context, item *osqueue.Item) uint {
 			return PriorityDefault
 		},
-		kg:           defaultQueueKey,
-		numWorkers:   defaultNumWorkers,
-		metrics:      tally.NewTestScope("queue", map[string]string{}),
-		wg:           &sync.WaitGroup{},
-		seqLeaseLock: &sync.RWMutex{},
-		pollTick:     defaultPollTick,
+		kg:             defaultQueueKey,
+		numWorkers:     defaultNumWorkers,
+		metrics:        tally.NewTestScope("queue", map[string]string{}),
+		wg:             &sync.WaitGroup{},
+		seqLeaseLock:   &sync.RWMutex{},
+		pollTick:       defaultPollTick,
+		idempotencyTTL: defaultIdempotencyTTL,
 	}
 
 	for _, opt := range opts {
@@ -150,6 +160,7 @@ type queue struct {
 	// metrics allows reporting of metrics
 	metrics tally.Scope
 
+	idempotencyTTL time.Duration
 	// pollTick is the interval between each scan for jobs.
 	pollTick time.Duration
 	// quit is a channel that any method can send on to trigger termination
@@ -179,9 +190,10 @@ type queue struct {
 // QueueItem represents an individually queued work scheduled for some time in the
 // future.
 type QueueItem struct {
-	// ID represents a unique identifier for the queue item.  The ULID
-	// stores when the QueueItem was created.
-	ID ulid.ULID `json:"id"`
+	// ID represents a unique identifier for the queue item.  This can be any
+	// unique string and will be hashed.  Using the same ID provides idempotency
+	// guarantees within the queue's IdempotencyTTL.
+	ID string `json:"id"`
 	// At represents the current time that this QueueItem needs to be executed at,
 	// as a millisecond epoch.  This is the millisecond-level granularity score of
 	// the item.  Note that the score in Redis is second-level, ie this field / 1000.
@@ -245,9 +257,12 @@ func (q QueuePartition) MarshalBinary() ([]byte, error) {
 //
 // The queue score must be added in milliseconds to process sub-second items in order.
 func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error) {
-	if i.ID.Compare(ulid.ULID{}) == 0 {
-		i.ID = ulid.MustNew(ulid.Now(), rnd)
+	if len(i.ID) == 0 {
+		i.ID = ulid.MustNew(ulid.Now(), rnd).String()
 	}
+
+	// Hash the ID.
+	i.ID = hashID(ctx, i.ID)
 
 	priority := PriorityMin
 	if q.pf != nil {
@@ -271,6 +286,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		q.kg.PartitionItem(),                      // Partition item, map
 		q.kg.PartitionMeta(i.WorkflowID.String()), // Partition item
 		q.kg.PartitionIndex(),                     // Global partition queue
+		q.kg.Idempotency(i.ID),
 	}
 	status, err := scripts["queue/enqueue"].Run(
 		ctx,
@@ -278,7 +294,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		keys,
 
 		i,
-		i.ID.String(),
+		i.ID,
 		at.UnixMilli(),
 		i.WorkflowID.String(),
 		qp,
@@ -358,7 +374,9 @@ func (q *queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time,
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q *queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+//
+// itemID must be the hashed ID of the queue item.
+func (q *queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID string, duration time.Duration) (*ulid.ULID, error) {
 	// TODO: Add custom throttling here.
 	leaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
 	if err != nil {
@@ -374,7 +392,7 @@ func (q *queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID ulid.ULI
 		ctx,
 		q.r,
 		keys,
-		itemID.String(),
+		itemID,
 		leaseID.String(),
 		time.Now().UnixMilli(),
 	).Int64()
@@ -415,7 +433,7 @@ func (q *queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID,
 		ctx,
 		q.r,
 		keys,
-		i.ID.String(),
+		i.ID,
 		leaseID.String(),
 		newLeaseID.String(),
 	).Int64()
@@ -442,12 +460,15 @@ func (q *queue) Dequeue(ctx context.Context, i QueueItem) error {
 		q.kg.QueueItem(),
 		q.kg.QueueIndex(i.WorkflowID.String()),
 		q.kg.PartitionMeta(i.WorkflowID.String()),
+		q.kg.Idempotency(i.ID),
 	}
 	status, err := scripts["queue/dequeue"].Run(
 		ctx,
 		q.r,
 		keys,
-		i.ID.String(),
+
+		i.ID,
+		int(q.idempotencyTTL.Seconds()),
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error dequeueing item: %w", err)
@@ -491,7 +512,7 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 		keys,
 
 		i,
-		i.ID.String(),
+		i.ID,
 		at.UnixMilli(),
 		qp.WorkflowID.String(),
 		qp,
@@ -731,6 +752,11 @@ func (q *queue) LeaseSequential(ctx context.Context, duration time.Duration, exi
 	default:
 		return nil, fmt.Errorf("unknown response claiming sequential lease: %d", status)
 	}
+}
+
+func hashID(ctx context.Context, id string) string {
+	ui := xxhash.Sum64String(id)
+	return strconv.FormatUint(ui, 36)
 }
 
 // frandRNG is a fast crypto-secure prng which uses a mutex to guard
