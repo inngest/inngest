@@ -398,6 +398,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 		pauseID := uuid.New()
 		err = s.state.SavePause(ctx, state.Pause{
 			ID:         pauseID,
+			DataKey:    r.Generator.ID,
 			Identifier: item.Identifier,
 			Outgoing:   edge.Edge.Outgoing,
 			Incoming:   edge.Edge.Incoming,

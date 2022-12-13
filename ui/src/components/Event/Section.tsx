@@ -1,5 +1,6 @@
 import { ComponentChild } from "preact";
 import { useMemo } from "preact/hooks";
+import { usePrettyJson } from "../../hooks/usePrettyJson";
 import { useSendEventMutation } from "../../store/devApi";
 import {
   EventStatus,
@@ -9,6 +10,7 @@ import {
 import { selectRun, showEventSendModal } from "../../store/global";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import Button from "../Button";
+import CodeBlock from "../CodeBlock";
 import ContentCard from "../Content/ContentCard";
 import FuncCard from "../Function/FuncCard";
 import TimelineRow from "../Timeline/TimelineRow";
@@ -25,6 +27,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
   // const [pollingInterval, setPollingInterval] = useState(1000);
   const query = useGetEventQuery({ id: eventId }, { pollingInterval: 1000 });
   const event = useMemo(() => query.data?.event, [query.data?.event]);
+  const eventPayload = usePrettyJson(event?.raw);
 
   /**
    * Stop polling for changes when an event is in a final state.
@@ -52,6 +55,11 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
       active
       // button={<Button label="Open Event" icon={<IconFeed />} />}
     >
+      {eventPayload ? (
+        <div className="px-4 pt-4">
+          <CodeBlock tabs={[{ label: "Payload", content: eventPayload }]} />
+        </div>
+      ) : null}
       <div className="pr-4 pt-4">
         <TimelineRow status={EventStatus.Completed} iconOffset={0}>
           <TimelineStaticContent
@@ -104,12 +112,14 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
                       Function waiting for{" "}
                       <strong>{run.waitingFor.eventName}</strong> event
                       {run.waitingFor.expression
-                        ? "matching the expression"
+                        ? " matching the expression:"
                         : ""}
                     </div>
                     {/* <div>Continue button</div> */}
                   </div>
-                  <pre>whassis</pre>
+                  <pre className="bg-slate-900 px-2 py-0.5 rounded border border-slate-700 mt-2">
+                    {run.waitingFor.expression}
+                  </pre>
                 </div>
               );
             } else {
