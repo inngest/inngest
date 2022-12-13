@@ -122,6 +122,52 @@ func TestQueueEnqueueItem(t *testing.T) {
 	})
 }
 
+func TestQueueEnqueueItemIdempotency(t *testing.T) {
+	dur := 2 * time.Second
+
+	r := miniredis.RunT(t)
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	defer rc.Close()
+	// Set idempotency to a second
+	q := NewQueue(rc, WithIdempotencyTTL(dur))
+	ctx := context.Background()
+
+	start := time.Now().Truncate(time.Second)
+
+	t.Run("It enqueues an item only once", func(t *testing.T) {
+		i := QueueItem{ID: "once"}
+
+		item, err := q.EnqueueItem(ctx, i, start)
+		require.NoError(t, err)
+		require.Equal(t, hashID(ctx, "once"), item.ID)
+		require.NotEqual(t, i.ID, item.ID)
+		found := getQueueItem(t, r, item.ID)
+		require.Equal(t, item, found)
+
+		// Ensure we can't enqueue again.
+		_, err = q.EnqueueItem(ctx, i, start)
+		require.Equal(t, ErrQueueItemExists, err)
+
+		// Dequeue
+		err = q.Dequeue(ctx, item)
+		require.NoError(t, err)
+
+		// Ensure we can't enqueue even after dequeue.
+		_, err = q.EnqueueItem(ctx, i, start)
+		require.Equal(t, ErrQueueItemExists, err)
+
+		// Wait for the idempotency TTL to expire
+		r.FastForward(dur)
+
+		item, err = q.EnqueueItem(ctx, i, start)
+		require.NoError(t, err)
+		require.Equal(t, hashID(ctx, "once"), item.ID)
+		require.NotEqual(t, i.ID, item.ID)
+		found = getQueueItem(t, r, item.ID)
+		require.Equal(t, item, found)
+	})
+}
+
 func TestQueuePeek(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
@@ -764,10 +810,10 @@ func TestQueueLeaseSequential(t *testing.T) {
 	})
 }
 
-func getQueueItem(t *testing.T, r *miniredis.Miniredis, id ulid.ULID) QueueItem {
+func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) QueueItem {
 	t.Helper()
 	// Ensure that our data is set up correctly.
-	val := r.HGet(defaultQueueKey.QueueItem(), id.String())
+	val := r.HGet(defaultQueueKey.QueueItem(), id)
 	require.NotEmpty(t, val)
 	i := QueueItem{}
 	err := json.Unmarshal([]byte(val), &i)
@@ -793,7 +839,7 @@ func getPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) QueueParti
 
 func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem, expected time.Time) {
 	t.Helper()
-	score, err := r.ZScore(defaultQueueKey.QueueIndex(item.WorkflowID.String()), item.ID.String())
+	score, err := r.ZScore(defaultQueueKey.QueueIndex(item.WorkflowID.String()), item.ID)
 	parsed := time.UnixMilli(int64(score))
 	require.NoError(t, err)
 	require.WithinDuration(t, expected.Truncate(time.Millisecond), parsed, 10*time.Millisecond)
