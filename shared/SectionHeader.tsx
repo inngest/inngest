@@ -12,11 +12,11 @@ const SectionHeader = ({ title, lede }: SectionHeaderProps) => {
         {title}
       </h2>
       {typeof lede === "string" ? (
-        <p className="text-slate-400 max-w-md lg:max-w-xl text-sm md:text-base leading-5 md:leading-7">
+        <p className="text-indigo-200 max-w-md lg:max-w-xl text-sm md:text-base leading-5 md:leading-7">
           {lede}
         </p>
       ) : (
-        <div className="text-slate-400 max-w-md lg:max-w-xl text-sm md:text-base leading-5 md:leading-7">
+        <div className="text-indigo-200 max-w-md lg:max-w-xl text-sm md:text-base leading-5 md:leading-7">
           {lede}
         </div>
       )}
