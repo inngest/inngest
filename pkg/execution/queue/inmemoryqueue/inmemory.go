@@ -2,6 +2,7 @@ package inmemoryqueue
 
 import (
 	"sync"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/go-redis/redis/v8"
@@ -11,14 +12,8 @@ import (
 )
 
 func init() {
-	r = miniredis.NewMiniRedis()
-	_ = r.Start()
 	registration.RegisterQueue(func() any { return &Config{} })
 }
-
-var (
-	r *miniredis.Miniredis
-)
 
 func New() queue.Queue {
 	r := miniredis.NewMiniRedis()
@@ -28,6 +23,11 @@ func New() queue.Queue {
 		Addr:     r.Addr(),
 		PoolSize: 100,
 	})
+	go func() {
+		for range time.Tick(time.Second) {
+			r.FastForward(time.Second)
+		}
+	}()
 	return redis_state.NewQueue(rc, redis_state.WithNumWorkers(100))
 }
 
