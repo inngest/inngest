@@ -2,10 +2,10 @@ import React, { ReactElement } from "react";
 
 type SectionHeaderProps = {
   title: ReactElement | string;
-  lede: ReactElement | string;
+  lede?: ReactElement | string;
 };
 
-const SectionHeader = ({ title, lede }: SectionHeaderProps) => {
+const SectionHeader = ({ title, lede = "" }: SectionHeaderProps) => {
   return (
     <>
       <h2 className="text-slate-50 font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter ">
