@@ -1,14 +1,16 @@
-import IconBackgroundTasks from "./Icons/IconBackgroundTasks";
-import IconDeploying from "./Icons/IconDeploying";
-import IconDocs from "./Icons/IconDocs";
-import IconFunctions from "./Icons/IconFunctions";
-import IconJourney from "./Icons/IconJourney";
-import IconPatterns from "./Icons/IconPatterns";
-import IconScheduled from "./Icons/IconScheduled";
-import IconSendEvents from "./Icons/IconSendEvents";
-import IconSteps from "./Icons/IconSteps";
-import IconTools from "./Icons/IconTools";
-import IconWritingFns from "./Icons/IconWritingFns";
+import  {
+  IconBackgroundTasks,
+  IconDeploying,
+  IconDocs,
+  IconSDK,
+  IconJourney,
+  IconPatterns,
+  IconScheduled,
+  IconSendEvents,
+  IconSteps,
+  IconTools,
+  IconWritingFns
+} from "../Icons/duotone";
 
 
 const productLinks = {
@@ -18,7 +20,7 @@ const productLinks = {
       title: "TypeScript & JavaScript SDK",
       desc: "Event-driven and and scheduled serverless functions",
       url: "/features/sdk?ref=nav",
-      icon: IconFunctions,
+      icon: IconSDK,
       iconBg: "bg-indigo-500",
     },
     {

@@ -8,6 +8,29 @@ import SectionHeader from "src/shared/SectionHeader";
 import Learning from "src/shared/Cards/Learning";
 import PageContainer from "src/shared/layout/PageContainer";
 
+import {
+  IconSteps,
+  IconGuide,
+  IconSDK,
+  IconTutorial,
+  IconCompiling,
+  IconScheduled,
+  IconBackgroundTasks,
+  IconTools,
+  IconJourney,
+  IconWritingFns,
+  IconSendEvents,
+  IconDeploying,
+  IconDocs,
+  IconPatterns,
+  IconBlog,
+  IconPower,
+  IconFiles,
+  IconCloud,
+  IconServer,
+  IconRetry,
+} from "../../shared/Icons/duotone";
+
 export async function getStaticProps() {
   return {
     props: {
@@ -95,14 +118,14 @@ createFunction<MyEventType>("My handler", "my.event", ({ event }) => {
       title: "Serverless Queues for Next.js",
       description:
         "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
-      type: "Guide",
+      type: "Docs",
       href: "/docs/getting-started",
     },
     {
       title: "Use TypeScript with Inngest",
       description:
         "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
-      type: "Tutorial",
+      type: "Guide",
       href: "/docs/getting-started",
     },
     {
@@ -119,6 +142,7 @@ export default function template() {
   return (
     <PageContainer>
       <Header />
+
       <Container className="my-48">
         <PageHeader title={data.title} lede={data.lede} />
       </Container>
@@ -126,8 +150,8 @@ export default function template() {
       <Container>
         <SectionHeader title="Key Features" />
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-          {data.keyFeatures.map((feature) => (
-            <div className="bg-slate-900/90 p-6 lg:p-8 rounded">
+          {data.keyFeatures.map((feature, i) => (
+            <div key={i} className="bg-slate-900/90 p-6 lg:p-8 rounded">
               <h3 className="text-lg lg:text-xl text-white mb-2.5">
                 {feature.title}
               </h3>
@@ -167,8 +191,8 @@ export default function template() {
           lede="Inngest is the easiest way to build scheduled jobs in your app, no matter what framework or platform you use."
         />
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 xl:gap-16 mt-20">
-          {data.featureOverflow.map((feature) => (
-            <div>
+          {data.featureOverflow.map((feature, i) => (
+            <div key={i}>
               <h3 className="text-slate-50 text-lg lg:text-xl mb-2">
                 {feature.title}
               </h3>
@@ -193,8 +217,9 @@ export default function template() {
           lede="Add Inngest to your stack in a few lines of code, then deploy to your existing provider. You don’t have to change anything to get started."
         />
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-16">
-          {data.learning.map((learningItem) => (
+          {data.learning.map((learningItem, i) => (
             <Learning
+              key={i}
               href={learningItem.href}
               title={learningItem.title}
               description={learningItem.description}

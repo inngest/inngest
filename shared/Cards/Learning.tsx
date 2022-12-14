@@ -1,11 +1,25 @@
 import ArrowRight from "../Icons/ArrowRight";
+import {
+  IconBackgroundTasks,
+  IconDeploying,
+  IconDocs,
+  IconFunctions,
+  IconJourney,
+  IconPatterns,
+  IconGuide,
+  IconScheduled,
+  IconSendEvents,
+  IconSteps,
+  IconTools,
+  IconWritingFns,
+} from "../Icons/duotone";
 
 function getType(type) {
   switch (type) {
     case "GUIDE":
       return {
         label: "Guide",
-        icon: "",
+        icon: <IconGuide size={20} color="indigo" />,
       };
     case "TUTORIAL":
       return {
@@ -15,12 +29,12 @@ function getType(type) {
     case "PATTERN":
       return {
         label: "Pattern",
-        icon: "",
+        icon: <IconPatterns size={32} color="indigo" />,
       };
     case "DOCS":
       return {
         label: "Docs",
-        icon: "",
+        icon: <IconDocs size={32} color="indigo" />,
       };
     case "BLOG":
       return {
@@ -30,7 +44,7 @@ function getType(type) {
     default:
       return {
         label: "Docs",
-        icon: "",
+        icon: <IconDocs size={32} color="indigo" />,
       };
   }
 }
@@ -38,13 +52,17 @@ function getType(type) {
 export default function Learning({ type, href, title, description }) {
   const learningType = getType(type.toUpperCase());
 
+  console.log(learningType);
+
   return (
     <a
       href={href}
-      className="group/learning bg-slate-800/60 hover:bg-slate-800 p-4 xl:p-6 rounded-lg transition-all"
+      className="group/learning bg-slate-800/60 hover:bg-slate-800 p-4 pt-3  xl:p-6 xl:pt-4 rounded-lg transition-all"
     >
-      <span className="mb-2 font-semibold text-sm text-white">{type}</span>
-      <h4 className="text-white mb-1.5 lg:mb-2.5 mt-3 text-lg lg:text-xl">
+      <span className="font-semibold text-sm text-white flex items-center -ml-2">
+        {learningType.icon} {type}
+      </span>
+      <h4 className="text-white mb-1.5 lg:mb-2.5 mt-1.5 text-lg lg:text-xl">
         {title}
       </h4>
       <p className="text-indigo-200 group-hover/learning:text-white transition-color text-sm leading-6">
