@@ -20,7 +20,12 @@ export default function HeaderDropdown({ navLinks }) {
           </h3>
           <div className="grid gri-cols-1 md:grid-cols-2 lg:bg-slate-900">
             {navLinks.links.map((link, i) => (
-              <NavLink key={i} link={link} len={navLinks.links.length} />
+              <NavLink
+                key={i}
+                theme={navLinks.linksTheme}
+                link={link}
+                len={navLinks.links.length}
+              />
             ))}
           </div>
         </div>

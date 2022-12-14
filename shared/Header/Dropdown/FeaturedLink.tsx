@@ -9,7 +9,7 @@ export default function FeaturedLink({ link }) {
       <div
         className={`h-11 w-11 flex flex-shrink-0 items-center justify-center rounded ${link.iconBg}`}
       >
-        <link.icon />
+        <link.icon size={32} />
       </div>
       <div className="pl-3.5">
         <h4 className={`text-base text-white flex items-center`}>

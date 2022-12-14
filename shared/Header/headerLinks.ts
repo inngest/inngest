@@ -32,6 +32,7 @@ const productLinks = {
     },
   ],
   linksTitle: "Use Cases",
+  linksTheme: "indigo",
   links: [
     {
       title: "Scheduled & cron jobs",
@@ -75,6 +76,7 @@ const learnLinks = {
     },
   ],
   linksTitle: "Quick Starts",
+  linksTheme: "blue",
   links: [
     {
       title: "Writing functions",

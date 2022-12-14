@@ -1,3 +1,15 @@
+import {
+  IconSDK,
+  IconSteps,
+  IconDocs,
+  IconPatterns,
+  IconDeploying,
+  IconScheduled,
+  IconBackgroundTasks,
+  IconTools,
+  IconJourney,
+} from "../Icons/duotone";
+
 const footerLinks = [
   {
     name: "Product",
@@ -5,22 +17,27 @@ const footerLinks = [
       {
         label: "Function SDK",
         url: "/features/sdk?ref=footer",
+        icon: IconSDK,
       },
       {
         label: "Step Functions",
         url: "/features/step-functions?ref=footer",
+        icon: IconSteps,
       },
       {
         label: "Documentation",
         url: "/docs?ref=footer",
+        icon: IconDocs,
       },
       {
         label: "Patterns: Async + Event-Driven",
         url: "/patterns?ref=footer",
+        icon: IconPatterns,
       },
       {
         label: "Self Hosting",
         url: "/docs/self-hosting?ref=footer",
+        icon: IconDeploying,
       },
     ],
   },
@@ -30,18 +47,22 @@ const footerLinks = [
       {
         label: "Scheduled & cron jobs",
         url: "/uses/serverless-cron-jobs?ref=footer",
+        icon: IconScheduled,
       },
       {
         label: "Node.js background jobs",
         url: "/uses/serverless-node-background-jobs?ref=footer",
+        icon: IconBackgroundTasks,
       },
       {
         label: "Internal tools",
         url: "/uses/internal-tools?ref=footer",
+        icon: IconTools,
       },
       {
         label: "User Journey Automation",
         url: "/uses/user-journey-automation?ref=footer",
+        icon: IconJourney,
       },
     ],
   },
@@ -53,12 +74,12 @@ const footerLinks = [
         url: "/about?ref=footer",
       },
       {
-        label: "Blog",
-        url: "/blog?ref=footer",
-      },
-      {
         label: "Careers",
         url: "/careers?ref=footer",
+      },
+      {
+        label: "Blog",
+        url: "/blog?ref=footer",
       },
       {
         label: "Contact Us",

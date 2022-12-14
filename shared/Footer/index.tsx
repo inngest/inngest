@@ -9,15 +9,7 @@ import Button from "../Button";
 
 export default function Footer() {
   return (
-    <footer
-      className="mt-20  bg-slate-1000"
-      style={{
-        backgroundImage: "url(/assets/footer/footer-grid.svg)",
-        backgroundSize: "contain",
-        backgroundPosition: "right -40px bottom -400px",
-        backgroundRepeat: "no-repeat",
-      }}
-    >
+    <footer className="mt-20  bg-slate-1000">
       <div className="bg-indigo-600 backdrop-blur text-white">
         {/* <div className="bg-slate-950/40 backdrop-blur text-white"> */}
         <Container className="py-20 lg:py-32">
@@ -56,9 +48,10 @@ export default function Footer() {
                   {footerLink.links.map((link, j) => (
                     <li key={j}>
                       <a
-                        className="text-white text-sm flex group gap-1 hover:text-indigo-400 transition-all"
+                        className="text-white text-sm flex items-center group gap-1.5 hover:text-indigo-400 transition-all"
                         href={link.url}
                       >
+                        {link.icon && <link.icon size={22} color="indigo" />}
                         {link.label}
                       </a>
                     </li>
