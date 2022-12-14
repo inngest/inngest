@@ -1,17 +1,10 @@
 import ArrowRight from "../Icons/ArrowRight";
 import {
-  IconBackgroundTasks,
-  IconDeploying,
   IconDocs,
-  IconFunctions,
-  IconJourney,
   IconPatterns,
   IconGuide,
-  IconScheduled,
-  IconSendEvents,
-  IconSteps,
-  IconTools,
-  IconWritingFns,
+  IconTutorial,
+  IconBlog,
 } from "../Icons/duotone";
 
 function getType(type) {
@@ -19,32 +12,32 @@ function getType(type) {
     case "GUIDE":
       return {
         label: "Guide",
-        icon: <IconGuide size={20} color="indigo" />,
+        icon: IconGuide,
       };
     case "TUTORIAL":
       return {
         label: "Tutorial",
-        icon: "",
+        icon: IconTutorial,
       };
     case "PATTERN":
       return {
         label: "Pattern",
-        icon: <IconPatterns size={32} color="indigo" />,
+        icon: IconPatterns,
       };
     case "DOCS":
       return {
         label: "Docs",
-        icon: <IconDocs size={32} color="indigo" />,
+        icon: IconDocs,
       };
     case "BLOG":
       return {
         label: "Blog",
-        icon: "",
+        icon: IconBlog,
       };
     default:
       return {
         label: "Docs",
-        icon: <IconDocs size={32} color="indigo" />,
+        icon: IconDocs,
       };
   }
 }
@@ -57,12 +50,12 @@ export default function Learning({ type, href, title, description }) {
   return (
     <a
       href={href}
-      className="group/learning bg-slate-800/60 hover:bg-slate-800 p-4 pt-3  xl:p-6 xl:pt-4 rounded-lg transition-all"
+      className="group/learning bg-slate-800/60 hover:bg-slate-800 p-4 pt-4  xl:p-6 xl:pt-5 rounded-lg transition-all"
     >
-      <span className="font-semibold text-sm text-white flex items-center -ml-2">
-        {learningType.icon} {type}
+      <span className="font-semibold text-sm text-white flex items-center gap-1">
+        <learningType.icon size={24} color="indigo" /> {type}
       </span>
-      <h4 className="text-white mb-1.5 lg:mb-2.5 mt-1.5 text-lg lg:text-xl">
+      <h4 className="text-white mb-1.5 lg:mb-2.5 mt-2 text-lg lg:text-xl">
         {title}
       </h4>
       <p className="text-indigo-200 group-hover/learning:text-white transition-color text-sm leading-6">

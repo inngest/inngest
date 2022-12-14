@@ -118,14 +118,14 @@ createFunction<MyEventType>("My handler", "my.event", ({ event }) => {
       title: "Serverless Queues for Next.js",
       description:
         "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
-      type: "Docs",
+      type: "Guide",
       href: "/docs/getting-started",
     },
     {
       title: "Use TypeScript with Inngest",
       description:
         "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
-      type: "Guide",
+      type: "Tutorial",
       href: "/docs/getting-started",
     },
     {
@@ -133,6 +133,20 @@ createFunction<MyEventType>("My handler", "my.event", ({ event }) => {
       description:
         "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
       type: "Pattern",
+      href: "/docs/getting-started",
+    },
+    {
+      title: "Serverless Queues for Next.js",
+      description:
+        "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
+      type: "Docs",
+      href: "/docs/getting-started",
+    },
+    {
+      title: "Use TypeScript with Inngest",
+      description:
+        "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
+      type: "Blog",
       href: "/docs/getting-started",
     },
   ],
