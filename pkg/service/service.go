@@ -102,15 +102,13 @@ func Start(ctx context.Context, s Service) (err error) {
 
 	// Start the pre-run function with the timeout provided.
 	preCh := make(chan error)
-	preCtx, done := context.WithTimeout(ctx, startTimeout(s))
-	defer done()
 	go func() {
 		// Run pre, and signal when complete.
-		err := s.Pre(preCtx)
+		err := s.Pre(ctx)
 		preCh <- err
 	}()
 	select {
-	case <-preCtx.Done():
+	case <-time.After(startTimeout(s)):
 		return ErrPreTimeout
 	case err = <-preCh:
 		close(preCh)
@@ -158,22 +156,18 @@ func Start(ctx context.Context, s Service) (err error) {
 		l.Warn().Msg("service run stopped")
 	}
 
-	// Create a new context here with a separate timeout.  This ensures that
-	// all services get a new timeout to stop their functions, in case the parent
-	// context to Start is already closed.
 	stopCh := make(chan error)
-	stopCtx, stopDone := context.WithTimeout(context.Background(), stopTimeout(s))
-	defer stopDone()
 	go func() {
 		l.Info().Msg("service cleaning up")
-		if err := s.Stop(stopCtx); err != nil && err != context.Canceled {
+		// Create a new context that's not cabcekked,
+		if err := s.Stop(context.Background()); err != nil && err != context.Canceled {
 			stopCh <- err
 			return
 		}
 		stopCh <- nil
 	}()
 	select {
-	case <-stopCtx.Done():
+	case <-time.After(stopTimeout(s)):
 		l.Error().Msg("service did not clean up within timeout")
 		return err
 	case stopErr := <-stopCh:
