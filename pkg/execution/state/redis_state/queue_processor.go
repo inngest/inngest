@@ -155,8 +155,13 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 		case <-q.quit:
 			return
 		case qi := <-q.workers:
-			err := q.process(ctx, qi, f)
+			// Create a new context which isn't cancelled by the parent, when quit.
+			// XXX: When jobs can have their own cancellation signals, move this into
+			// process itself.
+			processCtx, cancel := context.WithCancel(context.Background())
+			err := q.process(processCtx, qi, f)
 			q.sem.Release(1)
+			cancel()
 			if err == nil {
 				continue
 			}
@@ -297,10 +302,8 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 	go func() {
 		for {
 			select {
-			case _, ok := <-doneCh:
-				if !ok {
-					return
-				}
+			case <-doneCh:
+				return
 			case <-extendLeaseTick.C:
 				if ctx.Err() != nil {
 					// Don't extend lease when the ctx is done.
@@ -386,7 +389,6 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 		}
 
 	case <-doneCh:
-		//logger.From(ctx).Debug().Interface("item", qi).Msg("queue item complete")
 		if err := q.Dequeue(ctx, qi); err != nil {
 			return err
 		}
