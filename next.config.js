@@ -14,11 +14,6 @@ module.exports = {
       // Legacy docs pages - These should be able to be removed after we
       // remove all legacy CLI + Cloud docs
       {
-        source: "/docs/quick-start",
-        destination: "/docs",
-        permanent: false,
-      },
-      {
         source: "/docs/function-ide-guide",
         destination: "/docs/cloud/function-ide-guide",
         permanent: false,

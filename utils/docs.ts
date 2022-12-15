@@ -20,9 +20,12 @@ const HiddenSections = [Sections.cloud];
 const TOC = {
   "Getting started": 0,
 
-  "Writing functions": 5,
-  "Sending events": 10,
-  Deploying: 15,
+  "Quick Start Tutorial": 5,
+  "Writing functions": 10,
+  "Sending events": 20,
+  Deploying: 30,
+  Frameworks: 40,
+  Guides: 50,
 
   // "Events": 100,
   CLI: 200,

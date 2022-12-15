@@ -1,5 +1,6 @@
-import { MouseEvent, useState } from "react";
+import { useState } from "react";
 import Head from "next/head";
+import Image from "next/image";
 import styled from "@emotion/styled";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
@@ -81,7 +82,7 @@ export default function DocLayout(props: any) {
         <MDXRemote
           compiledSource={props.post.compiledSource}
           scope={scope}
-          components={{ Code: Code }}
+          components={{ Code, Image }}
         />
 
         <FooterLinks className="grid sm:grid-cols-1 md:grid-cols-2 gap-4 py-8">
