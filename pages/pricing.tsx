@@ -61,7 +61,7 @@ const PLANS: Plan[] = [
       },
       {
         icon: Language,
-        quantity: "1,000",
+        quantity: "10,000",
         text: "function runs/month",
       },
       {
