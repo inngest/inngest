@@ -23,5 +23,5 @@ jobs:
             --exclude '${{steps.deployment.outputs.url}}/test/' \
             --exclude '${{steps.deployment.outputs.url}}/discord' \
             --exclude 'https://www.iubenda.com' \
-            --exclude ' https://stripe.com/docs/api' \
-            --exclude ' https://docs.github.com'
+            --exclude 'https://stripe.com/docs/api' \
+            --exclude 'https://docs.github.com'
