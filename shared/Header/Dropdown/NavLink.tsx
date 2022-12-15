@@ -5,8 +5,6 @@ export default function NavLink({ link, len }) {
       ? "lg:[&:nth-last-child(-n+2)]:border-b-transparent"
       : "lg:[&:last-child]:border-b-transparent";
 
-  console.log(link);
-
   return (
     <a
       href={link.url}

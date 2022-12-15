@@ -79,8 +79,8 @@ export default function Template() {
   return (
     <div>
       <Nav sticky={true} nodemo />
-      <div className="container mx-auto py-32 flex flex-row">
-        <div className="basis-1/2 px-6">
+      <div className="container mx-auto py-32 px-6 flex flex-col gap-16 lg:gap-8 lg:flex-row">
+        <div className="basis-1/2">
           <h1>Background tasks, without the queues or workers</h1>
           <p className="pt-6 subheading">
             Build serverless background tasks without any queues,
@@ -100,7 +100,7 @@ export default function Template() {
             </Button>
           </div>
         </div>
-        <div className="basis-1/2 px-6 flex items-center">
+        <div className="basis-1/2 flex items-center justify-center">
           <CodeWindow
             className="transform-iso shadow-xl relative z-10"
             filename={`functions/after_signup.ts`}

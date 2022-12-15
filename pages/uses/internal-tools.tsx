@@ -120,7 +120,7 @@ export default function Template() {
         }}
         style={{
           backgroundImage:
-            "linear-gradient(135deg, rgba(171, 220, 255, 0.5) 0%, rgba(3, 150, 255, 0.5) 100%);",
+            "linear-gradient(135deg, rgba(171, 220, 255, 0.5) 0%, rgba(3, 150, 255, 0.5) 100%)",
         }}
       />
 
