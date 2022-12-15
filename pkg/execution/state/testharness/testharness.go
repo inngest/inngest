@@ -1041,6 +1041,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 	for iter.Next(ctx) {
 		result := iter.Val(ctx)
 
+		require.NotNil(t, result)
 		require.NotNil(t, result.Event)
 		byt, _ := json.MarshalIndent(result, "", "  ")
 		require.Equal(t, evtA, *result.Event, "iterator returned pause not in event set:\n%v", string(byt))

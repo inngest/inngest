@@ -182,7 +182,7 @@ func WithKeyPrefix(prefix string) Opt {
 }
 
 // WithRedisClient uses an already connected redis client.
-func WithRedisClient(r *redis.Client) Opt {
+func WithRedisClient(r redis.UniversalClient) Opt {
 	return func(m *mgr) {
 		m.r = r
 	}
@@ -214,7 +214,7 @@ func WithFunctionCallbacks(f ...state.FunctionCallback) Opt {
 type mgr struct {
 	expiry time.Duration
 	kf     KeyGenerator
-	r      *redis.Client
+	r      redis.UniversalClient
 
 	callbacks []state.FunctionCallback
 }
@@ -555,57 +555,46 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, a
 	}
 	return nil
 }
-
 func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 	packed, err := json.Marshal(p)
 	if err != nil {
 		return err
 	}
 
-	return m.r.Watch(ctx, func(tx *redis.Tx) error {
-		err := tx.SetNX(
-			ctx,
-			m.kf.PauseID(ctx, p.ID),
-			string(packed),
-			// Add at least 10 minutes to this pause, allowing us to process the
-			// pause by ID for 10 minutes past expiry.
-			time.Until(p.Expires.Time())+(10*time.Minute),
-		).Err()
-		if err != nil {
-			return err
-		}
+	evt := ""
+	if p.Event != nil {
+		evt = *p.Event
+	}
 
-		// Set a reference to the stored pause within the run-id step-id key.  This allows us
-		// to resume workflows from a given Identifer and Step easily.
-		err = tx.Set(
-			ctx,
-			m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
-			p.ID.String(),
-			time.Until(p.Expires.Time()),
-		).Err()
-		if err != nil {
-			return err
-		}
+	keys := []string{
+		m.kf.PauseID(ctx, p.ID),
+		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
+		m.kf.PauseEvent(ctx, p.WorkspaceID, evt),
+	}
 
-		// If we have an event, add this to the event's hash, keyed by ID.
-		//
-		// We store all pauses that are triggered by an event in a key containing
-		// the event name, allowing us to easily load all pauses for an event and
-		// easily remove keys once consumed.
-		//
-		// NOTE: Because we return an iterator to this set directly for returning pauses
-		// matching an event, we must store the pause within this event again.
-		if p.Event != nil {
-			if err = tx.HSet(ctx, m.kf.PauseEvent(ctx, p.WorkspaceID, *p.Event), map[string]any{
-				p.ID.String(): string(packed),
-			}).Err(); err != nil {
-				return err
-			}
-		}
+	status, err := scripts["savePause"].Eval(
+		ctx,
+		m.r,
+		keys,
 
+		string(packed),
+		p.ID.String(),
+		evt,
+		int(time.Until(p.Expires.Time()).Seconds()),
+		// Add at least 10 minutes to this pause, allowing us to process the
+		// pause by ID for 10 minutes past expiry.
+		int(time.Until(p.Expires.Time().Add(10*time.Minute)).Seconds()),
+	).Int64()
+	if err != nil {
+		return fmt.Errorf("error finalizing: %w", err)
+	}
+	switch status {
+	case 0:
 		return nil
-	})
-
+	case 1:
+		return state.ErrPauseAlreadyExists
+	}
+	return fmt.Errorf("unknown response saving pause: %d", status)
 }
 
 func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
