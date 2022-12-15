@@ -25,11 +25,12 @@ var (
 	ErrPauseNotFound = fmt.Errorf("pause not found")
 	// ErrPauseLeased is returned when attempting to lease a pause that is
 	// already leased by another event.
-	ErrPauseLeased       = fmt.Errorf("pause already leased")
-	ErrIdentifierExists  = fmt.Errorf("identifier already exists")
-	ErrFunctionCancelled = fmt.Errorf("function cancelled")
-	ErrFunctionComplete  = fmt.Errorf("function completed")
-	ErrFunctionFailed    = fmt.Errorf("function failed")
+	ErrPauseLeased        = fmt.Errorf("pause already leased")
+	ErrPauseAlreadyExists = fmt.Errorf("pause already exists")
+	ErrIdentifierExists   = fmt.Errorf("identifier already exists")
+	ErrFunctionCancelled  = fmt.Errorf("function cancelled")
+	ErrFunctionComplete   = fmt.Errorf("function completed")
+	ErrFunctionFailed     = fmt.Errorf("function failed")
 )
 
 // Identifier represents the unique identifier for a workflow run.

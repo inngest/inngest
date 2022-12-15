@@ -125,7 +125,7 @@ func WithPollTick(t time.Duration) func(q *queue) {
 	}
 }
 
-func NewQueue(r *redis.Client, opts ...QueueOpt) *queue {
+func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
 		pf: func(ctx context.Context, item *osqueue.Item) uint {
@@ -154,7 +154,7 @@ type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
 	// redis stores the redis connection to use.
-	r  *redis.Client
+	r  redis.UniversalClient
 	pf PriorityFinder
 	kg QueueKeyGenerator
 	// metrics allows reporting of metrics
