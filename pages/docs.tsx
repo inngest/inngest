@@ -13,7 +13,7 @@ import docsSyntaxHighlightingCSS from "../shared/legacy/syntaxHighlightingCSS";
 
 export async function getStaticProps() {
   const { sections } = getAllDocs();
-  return { props: { sections, htmlClassName: "docs" } };
+  return { props: { sections, htmlClassName: "docs", designVersion: "2" } };
 }
 
 export default function DocsHome(props) {
