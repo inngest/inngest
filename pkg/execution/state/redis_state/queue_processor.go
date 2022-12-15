@@ -201,8 +201,14 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 		// TODO: Increase metric for partition contention
 		return nil
 	}
+	if err == ErrPartitionNotFound {
+		// Another worker must have pocessed this partition between
+		// this worker's peek and process.  Increase partition
+		// contention metric and continue.  This is unsolvable.
+		return nil
+	}
 	if err != nil {
-		return err
+		return fmt.Errorf("error leasing partition: %w", err)
 	}
 
 	// Ensure that peek doesn't take longer than the partition lease, to

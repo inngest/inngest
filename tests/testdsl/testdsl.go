@@ -245,7 +245,7 @@ func RequireStepRetries(step string, count int) Proc {
 			}
 		}
 
-		fmt.Printf("> Checking step %s permanently failed after %d retries (waiting %f seconds)\n", step, count-1, time.Until(backoffTime).Seconds())
+		fmt.Printf("> Checking step %s permanently failed after %d retries (waiting %f seconds)\n", step, count-1, time.Until(backoffTime.Add(20*time.Second)).Seconds())
 		if err := timeout(time.Until(backoffTime), func() error {
 			return requireLogFields(ctx, td, map[string]any{
 				"caller":  "executor",
