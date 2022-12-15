@@ -85,7 +85,7 @@ const DocsNav: React.FC<{
           <NavList>
             <NavItem isCurrentPage={router.asPath === "/docs"}>
               <Link href="/docs/">
-                <a className="docs-page">Getting started</a>
+                <a className="docs-page">Introduction</a>
               </Link>
             </NavItem>
             {navSections.map((s) => (

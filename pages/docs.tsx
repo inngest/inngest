@@ -1,20 +1,55 @@
 import Link from "next/link";
 import React from "react";
 import Head from "next/head";
+import Image from "next/image";
 import styled from "@emotion/styled";
 import { Global, css } from "@emotion/react";
 
 import DocsNav from "../shared/Docs/DocsNav";
 import Footer from "../shared/legacy/Footer";
 import Button from "../shared/legacy/Button";
-import ArrowUpRightIcon from "../shared/Icons/ArrowUpRight";
 import { getAllDocs, Categories, Sections } from "../utils/docs";
 import docsSyntaxHighlightingCSS from "../shared/legacy/syntaxHighlightingCSS";
+import SyntaxHighlighter from "react-syntax-highlighter";
+import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 
 export async function getStaticProps() {
   const { sections } = getAllDocs();
   return { props: { sections, htmlClassName: "docs", designVersion: "2" } };
 }
+
+const code = `import { createStepFunction } from "inngest";
+
+type UserSignup = {
+  name: "user/new.signup",
+  data: {
+    email: string;
+    name: string;
+  }
+}
+
+export default createStepFunction<UserSignup>("Signup flow", "user/new.signup", ({ event, tools }) => {
+  // If this step fails it will retry automatically.  It will only
+  // run once if it succeeds ⚡
+  const promo = tools.run("Generate promo code", async () => {
+    const promoCode = await generatePromoCode();
+    return promoCode.code;
+  });
+
+  // Again, if the email provider is down this will retry - but we will only
+  // generate one promo code ⚡
+  tools.run("Send a welcome promo", async () => {
+    await sendEmail({ email: event.data, promo });
+  });
+
+  // You can sleep on any platform! 😴
+  tools.sleep("1 day");
+
+  // This runs exactly 1 day after the user signs up ⏰
+  tools.run("Send drip campaign", async () => {
+    await sendDripCampaign();
+  });
+})`;
 
 export default function DocsHome(props) {
   return (
@@ -24,203 +59,103 @@ export default function DocsHome(props) {
       </Head>
       <DocsContent hasTOC={false} className="pb-16">
         <Hero>
-          <h1>Inngest documentation</h1>
+          <h1>Introduction</h1>
           <p>
-            This documentation will help you become an expert in event-driven
-            serverless functions within minutes.
+            Inngest is an open source platform that adds superpowers to
+            serverless functions.
+          </p>
+          <p>
+            Using our SDK, a single line of code adds retries, queues, sleeps,
+            cron schedules, fan-out jobs, and reliable steps to serverless
+            functions in your existing projects. It's deployable to any
+            platform, without any infrastructure or configuration. And,
+            everything is locally testable via our UI.
+          </p>
+          <p>
+            Learn how to get started in our{" "}
+            <Link href="/docs/quick-start">quick start tutorial</Link>, or
+            continue reading for an example.
           </p>
         </Hero>
 
-        <h2>Quick start</h2>
+        <h2>A small but powerful example</h2>
 
-        <div className="grid pt-4 gap-4 sm:grid-cols-1 xl:grid-cols-3">
-          <Quickstart
-            href="/docs/functions"
-            className="shadow-md rounded-sm p-4 border-2 hover:shadow-2xl"
-          >
-            <p className="text-base my-2 text-color-primary">
-              👩‍💻 &nbsp; Writing functions
-            </p>
-            <p className="text-color-secondary">
-              Learn how to write functions using Typescript or Javascript using
-              any platform or framework
-            </p>
-          </Quickstart>
-          <Quickstart
-            href="/docs/events"
-            className="shadow-md rounded-sm p-4 border-2 hover:shadow-2xl"
-          >
-            <p className="text-base my-2 text-color-primary">
-              📢 &nbsp; Sending events
-            </p>
-            <p className="text-color-secondary">
-              Learn how to trigger background jobs by sending events from your
-              code
-            </p>
-          </Quickstart>
-          <Quickstart
-            href="/docs/deploy"
-            className="shadow-md rounded-sm p-4 border-2 hover:shadow-2xl"
-          >
-            <p className="text-base my-2 text-color-primary">
-              🚢 &nbsp; Deploying
-            </p>
-            <p className="text-color-secondary">
-              Deploy functions to your platform of choice, such as Vercel,
-              Netlify, Cloudflare, or AWS
-            </p>
-          </Quickstart>
+        <p>Adding sleeps, retries, and reliable steps to a function:</p>
+
+        <SyntaxHighlighter
+          language="typescript"
+          showLineNumbers={false}
+          style={syntaxThemeDark}
+          codeTagProps={{ className: "code-window" }}
+          customStyle={{
+            backgroundColor: "var(--shiki-color-background)",
+            fontSize: "0.7rem",
+            padding: "1rem",
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
+
+        <p>
+          In this example, you can reliably run serverless functions even if
+          external APIs are down. You can also sleep or delay work without
+          configuring queues. Plus, all events, jobs, and functions are strictly
+          typed via TypeScript for maximum correctness. Here's how things look
+          when you locally run:
+        </p>
+
+        <div className="text-center">
+          <Image
+            src="/assets/docs/dev-server-example.png"
+            width={800}
+            height={(609 / 900) * 800}
+            quality="100"
+          />
         </div>
 
-        <h2 className="pt-6">What is Inngest?</h2>
+        <h2>Comparisons</h2>
 
         <p>
-          Inngest is a serverless platform that allows you to build, test, and
-          deploy serverless background functions and scheduled tasks — without
-          any infrastructure, queues, or stateful long-running services.
+          Without Inngest, you would have to configure several jobs amongst
+          several different queues, then handle retries yourself. There's also a
+          chance that many promo codes are generated depending on the
+          reliability of that API. With Inngest, you can push this function live
+          and everything happens automatically.
         </p>
 
-        <p>
-          Using Inngest you can write serverless functions triggered by events
-          within your existing code, zero boilerplate or infra required.
-        </p>
+        {/* TODO/DOCS: FUTURE: locally run this and other examples via this repo */}
 
-        <h2 className="pt-4">Key features</h2>
-        <ul>
-          <li>
-            <strong>Fully serverless:</strong> Run background jobs, scheduled
-            functions, and build event-driven systems without any servers,
-            state, or setup
-          </li>
-          <li>
-            <strong>Deploy anywhere</strong>: works with NextJS, Netlify,
-            Vercel, Redwood, Express, Cloudflare, and Lambda
-          </li>
-          <li>
-            <strong>Use your existing code:</strong> write functions within your
-            current project, zero learning required
-          </li>
-          <li>
-            <strong>A complete platform</strong>: complex functionality built in
-            such as event replay, canary deploys, version management and git
-            integration
-          </li>
-          <li>
-            <strong>Fully typed</strong>: Event schemas, versioning, and
-            governance out of the box
-          </li>
-          <li>
-            <strong>Observable</strong>: A full UI for managing and inspecting
-            your functions
-          </li>
-          <li>
-            <strong>Any language:</strong> Use our CLI to write functions using
-            any language
-          </li>
-        </ul>
+        <h2>Getting started</h2>
 
-        <h2 className="pt-4">How it works</h2>
-        <p>
-          Inngest accepts events from your system, then automatically runs
-          functions triggered by those events in the background, with built-in
-          retries if things fail. Events are JSON objects sent via POST request
-          and can be triggered from your own code, from webhooks, or from
-          integrations.
-        </p>
-
-        <h2 className="pt-4">Use cases</h2>
-        <p>
-          Inngest users are typically developers and data engineers. They use
-          Inngest to reliably run background work, serverless functions, and
-          scheduled jobs across a variety of use cases. Common examples include:
-        </p>
+        <p>From here, you might want to:</p>
 
         <ul>
           <li>
-            <p>
-              <b>Building reliable webhooks</b>
-              <br />
-              Inngest acts as a layer which can handle webhook events and that
-              run your functions automatically. The Inngest Cloud dashboard
-              gives your complete observability into what event payloads were
-              received and how your functions ran.
-            </p>
+            <Link href="/docs/quick-start">
+              Get started via our quick-start tutorial
+            </Link>
           </li>
           <li>
-            <p>
-              <b>Serverless background jobs</b>
-              <br />
-              Ensure your API is fast by running your code, asynchronously, in
-              the background, without queues or long-running workers. Background
-              jobs are triggered by events and have built in retries and
-              logging.
-            </p>
+            <Link href="/docs/functions">
+              Learn more about functions and the tools provided
+            </Link>
           </li>
           <li>
-            <p>
-              <b>Scheduled jobs</b>
-              <br />
-              Run your function on a schedule to repeat hourly, daily, weekly or
-              whatever you need.
-            </p>
+            <Link href="/docs/deploy">
+              Learn how to integrate with your platform of choice
+            </Link>
           </li>
-          <li>
-            <p>
-              <b>Internal tools</b>
-              <br />
-              Trigger scripts in your code to run from your own internal tools
-              or third party products like Retool.
-            </p>
-          </li>
-          <li>
-            <p>
-              <b>User journey automation</b>
-              <br />
-              Use customer behavior events to trigger automations to run like
-              drip email campaigns, re-activation campaigns, or reminders.
-            </p>
-          </li>
-          <li>
-            <p>
-              <b>Event-driven systems</b>
-              <br />
-              Developers can send and subscribe to a variety of internal and
-              external events, creating complex event-driven architectures
-              without worrying about infrastructure and boilerplate.
-            </p>
-          </li>
-          <li>
-            <p>
-              <b>Complex pipelines & workflows</b>
-              <br />
-              Build multi-step pipelines and workflows using conditional logic,
-              delays or multiple events.
-            </p>
-          </li>
+          {/* TODO/DOCS: Add a link for this when we add comparisons */}
+          {/* <li><Link href="/docs/">Learn more about how we compare to other tools</Link></li> */}
         </ul>
 
-        <h2 className="pt-4">Ready to get started?</h2>
-        <p className="pb-6">
-          Learn how to write functions in your project within a few seconds
+        <h2>Resources and help</h2>
+
+        <p>
+          If you have any questions we're always around in our{" "}
+          <a href="/discord">Discord community</a> or on{" "}
+          <a href="https://github.com/orgs/inngest/discussions">our GitHub</a>.
         </p>
-
-        <a
-          href="/docs/functions?ref=docs-started"
-          className="button button--primary"
-        >
-          Get started
-        </a>
-
-        {/*
-        <Button
-          kind="black"
-          size="small"
-          href="/quick-starts?ref=docs-started"
-          style={{ display: "inline-block" }}
-        >
-          See quick-starts
-        </Button>
-        */}
       </DocsContent>
     </DocsLayout>
   );
