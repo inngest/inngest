@@ -225,8 +225,18 @@ export const getAllDocs = (() => {
       Object.values(s.categories)
         .sort((a, b) => a.order - b.order)
         .forEach((category) => {
-          category.pages.sort((a, b) => a.order - b.order);
-          category.pages.forEach((p) => sorted.push("/docs/" + p.slug));
+          // Ensure the category index page is first in the overall order
+          const categoryIndexPage = category.pages.find(
+            (p) => p.category === p.title
+          );
+          if (categoryIndexPage) {
+            sorted.push("/docs/" + categoryIndexPage.slug);
+          }
+          const nestedPages = category.pages.filter(
+            (p) => p.category !== p.title
+          );
+          nestedPages.sort((a, b) => a.order - b.order);
+          nestedPages.forEach((p) => sorted.push("/docs/" + p.slug));
         });
     });
 
