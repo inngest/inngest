@@ -37,7 +37,7 @@ export function IconBlog({ size = 20, className = "", color = "transparent" }) {
           id="blog-b"
         />
       </defs>
-      <g fill="none" fill-rule="nonzero">
+      <g fill="none" fillRule="nonzero">
         <use fill="#000" filter="url(#blog-a)" xlinkHref="#blog-b" />
         <use fill="#FFF" xlinkHref="#blog-b" />
         <path

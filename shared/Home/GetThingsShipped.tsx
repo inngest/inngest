@@ -4,11 +4,18 @@ import { useState } from "react";
 import Container from "../layout/Container";
 import classNames from "src/utils/classNames";
 import SectionHeader from "../SectionHeader";
+import {
+  IconBackgroundTasks,
+  IconJourney,
+  IconScheduled,
+  IconTools,
+} from "../Icons/duotone";
 
 export default function GetThingsShipped() {
   const tabs = [
     {
       title: "Background Jobs",
+      icon: IconBackgroundTasks,
       content: [
         {
           title: "Out of the critical path",
@@ -44,6 +51,7 @@ export default createFunction(
     },
     {
       title: "Scheduled Jobs",
+      icon: IconScheduled,
       content: [
         {
           title: "Serverless cron jobs",
@@ -70,6 +78,7 @@ export default createScheduledFunction(
     },
     {
       title: "Webhooks",
+      icon: "",
       content: [
         {
           title: "Build reliable webhooks",
@@ -104,6 +113,7 @@ export default createFunction(
     },
     {
       title: "Internal Tools",
+      icon: IconTools,
       content: [
         {
           title: "Trigger scripts on demand",
@@ -136,6 +146,7 @@ export default createFunction(
     },
     {
       title: "User Journey Automation",
+      icon: IconJourney,
       content: [
         {
           title: "User-behaviour driven",
@@ -164,6 +175,7 @@ export default createStepFunction(
     },
     {
       title: "Event-driven Systems",
+      icon: "",
       content: [
         {
           title: "Design around events",
@@ -240,8 +252,8 @@ export const handleApptCancelled = createFunction("...",
                 key={i}
               >
                 <div className="py-10 pr-8 flex flex-col gap-4">
-                  <h2 className="text-white text-xl font-semibold">
-                    {tab.title}
+                  <h2 className="text-white text-xl font-semibold flex items-center gap-1">
+                    {tab.icon && <tab.icon size={28} />} {tab.title}
                   </h2>
                   {tab.content.map((content, j) => (
                     <div key={j} className="flex flex-col gap-0.5">

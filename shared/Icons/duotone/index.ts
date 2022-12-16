@@ -18,3 +18,4 @@ export { IconFiles } from "./IconFiles";
 export { IconCloud } from "./IconCloud";
 export { IconServer } from "./IconServer";
 export { IconRetry } from "./IconRetry";
+export { IconUnlock } from "./IconUnlock";

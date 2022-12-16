@@ -40,7 +40,7 @@ export function IconPatterns({
           id="patterns-b"
         />
       </defs>
-      <g fill="none" fill-rule="nonzero">
+      <g fill="none" fillRule="nonzero">
         <use fill="#000" filter="url(#patterns-a)" xlinkHref="#patterns-b" />
         <use fill="#FFF" xlinkHref="#patterns-b" />
         <path

@@ -63,7 +63,7 @@ export function IconDeploying({
           id="deploying-d"
         />
       </defs>
-      <g fill="none" fill-rule="nonzero">
+      <g fill="none" fillRule="nonzero">
         <use fill="#000" filter="url(#deploying-a)" xlinkHref="#deploying-b" />
         <use
           fill={theme.color}

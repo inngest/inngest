@@ -40,7 +40,7 @@ export function IconTools({
           id="tools-b"
         />
       </defs>
-      <g fill="none" fill-rule="nonzero">
+      <g fill="none" fillRule="nonzero">
         <rect
           fill={theme.color}
           opacity={theme.opacity}

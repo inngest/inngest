@@ -37,7 +37,7 @@ export function IconDocs({ size = 20, className = "", color = "transparent" }) {
           id="docs-b"
         />
       </defs>
-      <g fill="none" fill-rule="nonzero">
+      <g fill="none" fillRule="nonzero">
         <use fill="#000" filter="url(#docs-a)" xlinkHref="#docs-b" />
         <use fill="#FFF" xlinkHref="#docs-b" />
         <path

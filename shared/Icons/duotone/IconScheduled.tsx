@@ -40,7 +40,7 @@ export function IconScheduled({
           id="scheduled-b"
         />
       </defs>
-      <g fill="none" fill-rule="nonzero">
+      <g fill="none" fillRule="nonzero">
         <path
           d="M6.7621 14.605c.352.2693.7386.4958 1.1519.6716l-.6526 1.1304a.6667.6667 0 1 1-1.1547-.6667l.6554-1.1353Zm5.329.6694a5.3287 5.3287 0 0 0 1.1512-.6728l.6457 1.1185a.6667.6667 0 1 1-1.1547.6667l-.6422-1.1124Z"
           fill="#FFF"

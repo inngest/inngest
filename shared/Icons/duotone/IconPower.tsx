@@ -14,7 +14,7 @@ export function IconPower({
       viewBox="0 0 20 20"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <g fill="none" fill-rule="nonzero">
+      <g fill="none" fillRule="nonzero">
         <circle
           fill={theme.color}
           opacity={theme.opacity}

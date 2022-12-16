@@ -62,7 +62,7 @@ export function IconWritingFns({
           id="writing-fn-d"
         />
       </defs>
-      <g fill="none" fill-rule="nonzero">
+      <g fill="none" fillRule="nonzero">
         <use
           fill="#000"
           filter="url(#writing-fn-a)"

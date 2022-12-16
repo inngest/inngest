@@ -13,7 +13,7 @@ export function IconCloud({
       viewBox="0 0 20 20"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <g fill="none" fill-rule="nonzero">
+      <g fill="none" fillRule="nonzero">
         <path
           d="M6.3513 12.1552c-1.2143-.757-2.018-2.0739-2.018-3.5719 0-2.3472 1.9733-4.25 4.4074-4.25 2.0537 0 3.7793 1.3545 4.2686 3.1875h1.7916c1.5214 0 2.7547 1.1893 2.7547 2.6563 0 1.467-1.2333 2.6562-2.7547 2.6562H8.19c-.7066 0-1.351-.2565-1.8386-.6781Z"
           fill={theme.color}

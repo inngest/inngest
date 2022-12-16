@@ -63,7 +63,7 @@ export function IconSendEvents({
           id="send-events-d"
         />
       </defs>
-      <g fill="none" fill-rule="nonzero">
+      <g fill="none" fillRule="nonzero">
         <use
           fill="#000"
           filter="url(#send-events-a)"

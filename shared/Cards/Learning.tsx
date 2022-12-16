@@ -45,8 +45,6 @@ function getType(type) {
 export default function Learning({ type, href, title, description }) {
   const learningType = getType(type.toUpperCase());
 
-  console.log(learningType);
-
   return (
     <a
       href={href}
