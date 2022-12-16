@@ -115,13 +115,20 @@ func Client(ctx context.Context) client.Client {
 	return client.New()
 }
 
-func AccountID(ctx context.Context) uuid.UUID {
+func ClientID(ctx context.Context) *uuid.UUID {
 	state, err := GetState(ctx)
 	if err != nil {
-		return uuid.UUID{}
+		return nil
 	}
+	return &state.ClientID
+}
 
-	return state.Account.ID
+func AccountID(ctx context.Context) *uuid.UUID {
+	state, err := GetState(ctx)
+	if err != nil || state.Account.ID == (uuid.UUID{}) {
+		return nil
+	}
+	return &state.Account.ID
 }
 
 func AccountIdentifier(ctx context.Context) (string, error) {

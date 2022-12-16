@@ -16,7 +16,6 @@ import (
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
-	"github.com/inngest/inngestgo"
 )
 
 //go:embed static/index.html
@@ -64,12 +63,9 @@ func (a *devapi) addRoutes() {
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
-	tel.Send(r.Context(), inngestgo.Event{
-		Name: "cli/dev.ui.started",
-		Data: map[string]interface{}{
-			"cli": tel.NewMetadata(r.Context()),
-		},
-	})
+	m := tel.NewMetadata(r.Context())
+	tel.SendEvent(r.Context(), "cli/dev_ui.loaded", m)
+	tel.SendMetadata(r.Context(), m)
 	_, _ = w.Write(uiHtml)
 }
 
