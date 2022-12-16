@@ -55,7 +55,7 @@ export type UseCase = {
 };
 
 export const getStaticProps: GetStaticProps = async (ctx) => {
-  const { data } = require(`./cases/${ctx.params.case}.ts`);
+  const { data } = require(`../../data/uses/${ctx.params.case}.ts`);
   const stringData = JSON.stringify(data);
   return {
     props: {
@@ -67,7 +67,7 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
 
 export const getStaticPaths: GetStaticPaths = async () => {
   const fs = require("node:fs");
-  const fileNames = fs.readdirSync("./pages/uses/cases");
+  const fileNames = fs.readdirSync("./data/uses");
 
   const paths = fileNames.map((fileName) => {
     return {

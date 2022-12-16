@@ -1,4 +1,4 @@
-import type { UseCase } from "../[case]";
+import type { UseCase } from "../../pages/uses/[case]";
 
 export const data: UseCase = {
   title: "Serverless queues for TypeScript",
