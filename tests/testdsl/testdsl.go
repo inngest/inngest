@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"path/filepath"
 	"reflect"
@@ -223,8 +224,8 @@ func RequireStepRetries(step string, count int) Proc {
 	return func(ctx context.Context, td *TestData) error {
 		var backoffTime time.Time
 
-		for i := 0; i < (count - 1); i++ {
-			fmt.Printf("> Checking step %s performs attempt %d of %d\n", step, i+1, count-1)
+		for i := 0; i < (count); i++ {
+			fmt.Printf("> Checking step %s performs attempt %d of %d\n", step, i+1, count)
 
 			backoffTime = backoff.LinearJitterBackoff(i + 1).Add(10 * time.Second)
 
@@ -245,11 +246,11 @@ func RequireStepRetries(step string, count int) Proc {
 			}
 		}
 
-		fmt.Printf("> Checking step %s permanently failed after %d retries (waiting %f seconds)\n", step, count-1, time.Until(backoffTime.Add(20*time.Second)).Seconds())
+		fmt.Printf("> Checking step %s permanently failed after %d retries (waiting %f seconds)\n", step, count, time.Until(backoffTime.Add(20*time.Second)).Seconds())
 		if err := timeout(time.Until(backoffTime), func() error {
 			return requireLogFields(ctx, td, map[string]any{
-				"caller":  "executor",
 				"message": "step permanently failed",
+				"attempt": math.Max(0, float64(count-1)),
 				"edge": map[string]any{
 					"incoming": step,
 				},

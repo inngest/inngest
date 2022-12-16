@@ -59,7 +59,7 @@ type EdgeEvaluator interface {
 	// children can be executed based off of the current workflow state.  Some children may not
 	// be executed due to conditional expressions or asynchronous event conditions.  This is
 	// the scheduler's job to manage.
-	AvailableChildren(ctx context.Context, state State, stepID string) ([]inngest.Edge, error)
+	AvailableChildren(ctx context.Context, state State, stepID string) ([]AvailableEdge, error)
 }
 
 // NewEdgeEvaluator returns a new EdgeEvaluator, using the given function to return data for
@@ -84,7 +84,13 @@ type edgeEvaluator struct {
 	datagen   EdgeExpressionDataGen
 }
 
-func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepID string) ([]inngest.Edge, error) {
+type AvailableEdge struct {
+	inngest.Edge
+
+	Step *inngest.Step
+}
+
+func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepID string) ([]AvailableEdge, error) {
 	w := state.Workflow()
 
 	if len(w.Steps) == 0 {
@@ -103,7 +109,7 @@ func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepI
 		return nil, nil
 	}
 
-	future := []inngest.Edge{}
+	future := []AvailableEdge{}
 	for _, edge := range edges {
 		logger.From(ctx).Trace().Interface("edge", edge.WorkflowEdge).Msg("evaluating child edge")
 
@@ -119,7 +125,10 @@ func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepI
 		// We can traverse this edge.  Schedule a new execution from this node.
 		// Scheduling executions needs to be done regardless of whether
 		// the context has cancelled.
-		future = append(future, edge.WorkflowEdge)
+		future = append(future, AvailableEdge{
+			Edge: edge.WorkflowEdge,
+			Step: edge.Incoming.Step,
+		})
 	}
 
 	// Sort the edges which are returned according to incoming string order.
