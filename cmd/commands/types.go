@@ -183,8 +183,13 @@ func typescript(cmd *cobra.Command, args []string) (string, error) {
 
 	// Create a catch-all type that we'll use when creating clients
 	b.WriteString("type GeneratedEvents = Readonly<{\n")
-	for eventId, tsEventName := range eventNames {
-		b.WriteString(fmt.Sprintf("  \"%s\": Readonly<%s>;\n", eventId, tsEventName))
+	unorderedEventIds := make([]string, 0, len(eventNames))
+	for eventId := range eventNames {
+		unorderedEventIds = append(unorderedEventIds, eventId)
+	}
+	sort.Strings(unorderedEventIds)
+	for _, eventId := range unorderedEventIds {
+		b.WriteString(fmt.Sprintf("  \"%s\": Readonly<%s>;\n", eventId, eventNames[eventId]))
 	}
 	b.WriteString("}>;\n\n")
 
