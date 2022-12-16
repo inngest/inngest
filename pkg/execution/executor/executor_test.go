@@ -443,7 +443,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 	require.ElementsMatch(t, []string{"run-step-child"}, availableIDs(edges))
 }
 
-func availableIDs(edges []inngest.Edge) []string {
+func availableIDs(edges []state.AvailableEdge) []string {
 	strs := make([]string, len(edges))
 	for n, e := range edges {
 		strs[n] = e.Incoming
