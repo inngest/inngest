@@ -259,6 +259,11 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	l.Trace().Int("len", len(children)).Msg("evaluated children")
 
 	for _, next := range children {
+		var retries *int
+		if next.Step != nil && next.Step.Retries != nil && next.Step.Retries.Attempts != nil {
+			retries = next.Step.Retries.Attempts
+		}
+
 		// We want to wait for another event to come in to traverse this edge within the DAG.
 		//
 		// Create a new "pause", which informs the state manager that we're pausing the traversal
@@ -313,6 +318,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 					PauseID:   pauseID,
 					OnTimeout: am.OnTimeout,
 				},
+				MaxAttempts: retries,
 			}, expires); err != nil {
 				return fmt.Errorf("unable to enqueue pause timeout: %w", err)
 			}
@@ -332,9 +338,10 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 		// Enqueue the next child in our queue.
 		if err := s.queue.Enqueue(ctx, queue.Item{
-			Kind:       queue.KindEdge,
-			Identifier: item.Identifier,
-			Payload:    queue.PayloadEdge{Edge: next},
+			Kind:        queue.KindEdge,
+			Identifier:  item.Identifier,
+			Payload:     queue.PayloadEdge{Edge: next.Edge},
+			MaxAttempts: retries,
 		}, at); err != nil {
 			return fmt.Errorf("unable to enqueue next step: %w", err)
 		}

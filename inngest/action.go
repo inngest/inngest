@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/inngest/inngest/pkg/consts"
 )
 
 // ActionVersion represents a version of an action defined via its cue configuration.
@@ -40,6 +42,13 @@ type ActionVersion struct {
 	Runtime RuntimeWrapper `json:"runtime"`
 
 	Retries *RetryOptions `json:"retries,omitempty"`
+}
+
+func (av ActionVersion) RetryAttempts() int {
+	if av.Retries != nil && av.Retries.Attempts != nil {
+		return *av.Retries.Attempts
+	}
+	return consts.DefaultRetryCount
 }
 
 type VersionInfo struct {
