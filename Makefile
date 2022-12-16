@@ -1,3 +1,6 @@
+dev:
+	goreleaser build --single-target --snapshot --rm-dist
+
 test:
 	sh -c 'cd ./pkg/cuedefs && cue vet ./tests/... -c'
 	sh -c 'cd ./pkg/cuedefs && cue eval ./tests/... -c'
