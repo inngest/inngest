@@ -16,12 +16,46 @@ import {
   IconTools,
   IconUnlock,
   IconWritingFns,
+  IconProps,
 } from "../../shared/Icons/duotone";
 
+const Icons: { [key: string]: React.FC<IconProps> } = {
+  Retry: IconRetry,
+  Server: IconServer,
+  Tools: IconTools,
+  Unlock: IconUnlock,
+  WritingFns: IconWritingFns,
+};
+
+type IconType = keyof typeof Icons;
+export type UseCase = {
+  title: string;
+  lede: string;
+  keyFeatures: {
+    title: string;
+    img: string;
+    description: string;
+  }[];
+  code: string;
+  featureOverflow: {
+    title: string;
+    description: string;
+    icon: IconType;
+  }[];
+  quote: {
+    text: string;
+    author: string;
+  };
+  learning: {
+    title: string;
+    description: string;
+    type: string;
+    href: string;
+  }[];
+};
+
 export const getStaticProps: GetStaticProps = async (ctx) => {
-  console.log(ctx.params.case);
-  const data = require(`./cases/${ctx.params.case}.ts`);
-  console.log(JSON.stringify(data));
+  const { data } = require(`./cases/${ctx.params.case}.ts`);
   const stringData = JSON.stringify(data);
   return {
     props: {
@@ -42,8 +76,6 @@ export const getStaticPaths: GetStaticPaths = async () => {
       },
     };
   });
-
-  console.log(paths);
 
   return {
     paths,
@@ -168,7 +200,7 @@ createFunction<MyEventType>("My handler", "my.event", ({ event }) => {
 };
 
 export default function useCase({ stringData }) {
-  console.log(stringData);
+  const data: UseCase = JSON.parse(stringData);
   return (
     <PageContainer>
       <Header />
@@ -262,7 +294,9 @@ export default function useCase({ stringData }) {
           {data.featureOverflow.map((feature, i) => (
             <div key={i}>
               <h3 className="text-slate-50 text-lg lg:text-xl mb-2 flex items-center gap-1 -ml-2">
-                {feature.icon && <feature.icon size={30} color="indigo" />}
+                {feature.icon && (
+                  <Icon name={feature.icon} size={30} color="indigo" />
+                )}
                 {feature.title}
               </h3>
               <p className="text-indigo-200 text-sm leading-loose">
@@ -301,3 +335,8 @@ export default function useCase({ stringData }) {
     </PageContainer>
   );
 }
+
+const Icon = ({ name, ...props }: { name: IconType } & IconProps) => {
+  const C = Icons[name];
+  return <C {...props} />;
+};

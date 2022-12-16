@@ -1,3 +1,4 @@
+export type { IconProps } from "./theme";
 export { IconSteps } from "./IconSteps";
 export { IconSDK } from "./IconSDK";
 export { IconTutorial } from "./IconTutorial";

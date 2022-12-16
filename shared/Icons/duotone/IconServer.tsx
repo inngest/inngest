@@ -1,9 +1,9 @@
-import IconTheme from "./theme";
+import IconTheme, { IconProps } from "./theme";
 export function IconServer({
   size = 20,
   className = "",
   color = "transparent",
-}) {
+}: IconProps) {
   const theme = IconTheme(color);
   return (
     <svg
