@@ -401,7 +401,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 
 	if _, serr := e.sm.SaveResponse(ctx, id, *response, attempt); serr != nil {
 		if l != nil {
-			logger.From(ctx).Error().Err(err).Msg("unable to save state")
+			logger.From(ctx).Error().Err(serr).Msg("unable to save state")
 		}
 		err = multierror.Append(err, serr)
 	}
