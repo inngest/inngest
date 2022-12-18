@@ -54,6 +54,11 @@ const productLinks = {
       url: "/uses/user-journey-automation?ref=nav",
       icon: IconJourney,
     },
+    {
+      title: "Serverless queues",
+      url: "/uses/serverless-queues?ref=nav",
+      icon: IconJourney,
+    },
   ]
 };
 
