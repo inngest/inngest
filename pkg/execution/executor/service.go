@@ -201,7 +201,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
-	if err == ErrFunctionRunCancelled {
+	if err == state.ErrFunctionCancelled {
 		_ = s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt)
 		return nil
 	}

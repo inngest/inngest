@@ -18,11 +18,10 @@ import (
 )
 
 var (
-	ErrRuntimeRegistered    = fmt.Errorf("runtime is already registered")
-	ErrNoStateManager       = fmt.Errorf("no state manager provided")
-	ErrNoActionLoader       = fmt.Errorf("no action loader provided")
-	ErrNoRuntimeDriver      = fmt.Errorf("runtime driver for action not found")
-	ErrFunctionRunCancelled = fmt.Errorf("function has been cancelled")
+	ErrRuntimeRegistered = fmt.Errorf("runtime is already registered")
+	ErrNoStateManager    = fmt.Errorf("no state manager provided")
+	ErrNoActionLoader    = fmt.Errorf("no action loader provided")
+	ErrNoRuntimeDriver   = fmt.Errorf("runtime driver for action not found")
 )
 
 // Executor manages executing actions.  It interfaces over a state store to save
@@ -66,7 +65,7 @@ type Executor interface {
 	// and the context terminates, we must store the output or async data in workflow
 	// state then schedule the child functions else the workflow will terminate early.
 	//
-	// Execution will fail with no response and ErrFunctionRunCancelled if this function
+	// Execution will fail with no response and state.ErrFunctionCancelled if this function
 	// run has been cancelled by an external event or process.
 	Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error)
 }
@@ -172,7 +171,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 	}
 
 	if s.Metadata().Status == enums.RunStatusCancelled {
-		return nil, ErrFunctionRunCancelled
+		return nil, state.ErrFunctionCancelled
 	}
 
 	if e.log != nil {
