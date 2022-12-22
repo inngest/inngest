@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
 import styled from "@emotion/styled";
-import Head from "next/head";
-import Footer from "../shared/legacy/Footer";
+// import Footer from "../shared/legacy/Footer";
 import Nav from "../shared/legacy/nav";
-import Content from "../shared/legacy/content";
 
+import Header from "src/shared/Header";
+import Container from "src/shared/layout/Container";
+import Footer from "src/shared/Footer";
 import Block from "../shared/legacy/Block";
+import Button from "src/shared/Button";
 
 const MISSION = "To accelerate the adoption of event-based architecture.";
 
@@ -16,7 +17,7 @@ const TEAM = [
     bio: (
       <>
         Head of Engineering at{" "}
-        <span className="text-almost-black">Uniform Teeth</span>
+        <span className="text-slate-100">Uniform Teeth</span>
       </>
     ),
     avatar: "/assets/team/tony-2022-10-18.jpg",
@@ -26,8 +27,8 @@ const TEAM = [
     role: "Founder",
     bio: (
       <>
-        CTO at <span className="text-almost-black">Buffer</span>. Created{" "}
-        <span className="text-almost-black">Timezone.io</span>.
+        CTO at <span className="text-slate-100">Buffer</span>. Created{" "}
+        <span className="text-slate-100">Timezone.io</span>.
       </>
     ),
     avatar: "/assets/team/dan-f-2022-02-18.jpg",
@@ -43,20 +44,20 @@ const TEAM = [
 const INVESTORS = [
   {
     name: "Afore.vc",
-    logo: "/assets/about/afore-capital-dark.png",
+    logo: "/assets/about/afore-capital-white.png",
     maxWidth: "200px",
   },
   {
     name: "Kleiner Perkins",
-    logo: "/assets/about/kleiner-perkins-dark.png",
+    logo: "/assets/about/kleiner-perkins-white.png",
   },
   {
     name: "Banana Capital",
-    logo: "/assets/about/banana-capital-dark.png",
+    logo: "/assets/about/banana-capital-white.png",
   },
   {
     name: "Comma Capital",
-    logo: "/assets/about/comma-capital-dark.png",
+    logo: "/assets/about/comma-capital-white.png",
   },
 ];
 const ANGELS = [
@@ -82,6 +83,10 @@ const ANGELS = [
 // or potential job applicants
 const FEATURED_BLOG_POSTS: { title: string; href: string }[] = [
   {
+    title: "Completing the Jamstack: What's needed in 2022?",
+    href: "/blog/completing-the-jamstack",
+  },
+  {
     title: "Modern serverless job schedulers",
     href: "/blog/modern-serverless-job-scheduler",
   },
@@ -89,10 +94,6 @@ const FEATURED_BLOG_POSTS: { title: string; href: string }[] = [
     title:
       "Open sourcing Inngest: The serverless event-driven platform for developers",
     href: "/blog/open-source-event-driven-queue",
-  },
-  {
-    title: "Completing the Jamstack: What's needed in 2022?",
-    href: "/blog/completing-the-jamstack",
   },
 ];
 
@@ -103,123 +104,175 @@ export async function getStaticProps() {
         title: "About Us",
         description: MISSION,
       },
+      designVersion: "2",
     },
   };
 }
 
-export default function Home() {
+export default function About() {
   return (
-    <div>
-      <Nav />
-
-      <div>
-        {/* Content layout */}
-        <div className="mx-auto my-12 px-10 lg:px-16 max-w-3xl">
-          <header className="lg:my-24 mt-8">
-            <span className="text-sm font-bold uppercase gradient-text-ltr">
-              Our Mission
-            </span>
-            <h1 className="mt-2 mb-6 pr-4 text-2xl md:text-4xl leading-tight">
-              {MISSION}
-            </h1>
-            <p>
-              We believe that event-based systems can be beautifully simple and
-              we're building the platform to enable developers to build amazing
-              products without the overhead.
-            </p>
-          </header>
-        </div>
-      </div>
-
+    <div className="bg-slate-1000 font-sans">
       <div
-        style={{ backgroundColor: "#f8f7fa" }}
-        className="background-grid-texture"
-      >
-        <div className="container mx-auto px-10 lg:px-16 max-w-3xl py-8">
-          <div className="mx-auto my-6">
-            <h2 className="text-xl sm:text-2xl font-normal">Our Team</h2>
-            <p className="my-2">
-              We've built and scaled event-based architectures for years and
-              think that developers deserve something better. Interested?{" "}
-              <a href="mailto:founders@inngest.com">Drop us a line</a>.
-            </p>
-          </div>
-          <div className="mt-8 mb-6 grid sm:grid-cols-2 md:grid-cols-3 gap-10 items-start">
-            {TEAM.map((person) => {
-              return (
-                <div key={person.name} className="flex flex-col">
-                  <img className="w-20 rounded-lg" src={person.avatar} />
-                  <h3 className="mt-4 mb-3 text-base font-normal">
-                    {person.name}
-                  </h3>
-                  <p
-                    className="text-sm leading-5"
-                    style={{ lineHeight: "1.5em" }}
-                  >
-                    {person.role}
-                    <br />
-                    <span className="text-slate-500">
-                      {person.bio && "Past: "}
-                      {person.bio}
-                    </span>
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+        style={{
+          background: "radial-gradient(circle at center, #13123B, #08090d)",
+        }}
+        className="absolute w-[200vw] -translate-x-1/2 -translate-y-1/2 h-[200vw] rounded-full blur-lg opacity-90"
+      ></div>
+      <Header />
+      <Container>
+        <article>
+          <main className="m-auto max-w-3xl pt-16">
+            <header className="lg:my-24 mt-8">
+              <span className="text-sm font-medium uppercase gradient-text-ltr">
+                Our Mission
+              </span>
+              <h1 className="mt-2 mb-6 pr-4 text-2xl md:text-5xl text-white font-medium tracking-tighter">
+                {MISSION}
+              </h1>
+            </header>
 
-      <div>
-        <div className="container mx-auto px-10 lg:px-16 max-w-3xl py-8">
-          <div className="mx-auto py-6">
-            <h2 className="text-xl sm:text-2xl font-normal">Our Investors</h2>
-          </div>
-          <div className="pb-6 grid sm:grid-cols-2 md:grid-cols-4 gap-10 items-center">
-            {INVESTORS.map((investor) => {
-              return (
-                <img
-                  key={investor.name}
-                  style={{ maxHeight: "50px" }}
-                  src={investor.logo}
-                  alt={investor.name}
-                />
-              );
-            })}
-          </div>
-          <div className="my-8">
-            <div className="grid sm:grid-cols-2 gap-2">
-              {ANGELS.map((a, idx) => (
-                <div key={a.name} className="text-sm">
-                  {a.name} / <span className="text-slate-500">{a.bio}</span>
-                  <br />
-                </div>
-              ))}
+            <div className="mx-auto prose text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
+              <p>
+                We believe that event-based systems can be beautifully simple
+                and we're building the platform to enable developers to build
+                amazing products without the overhead.
+              </p>
+              <p>
+                Inngest is an{" "}
+                <a href="https://github.com/inngest/inngest">open source</a>{" "}
+                platform that enables developers to build amazing products by
+                ensuring serverless functions are reliable, schedulable and
+                event-driven.
+              </p>
+              <p>
+                Two trends have shaped our vision for the Inngest platform:
+                event-driven systems are driving some of the world's greatest
+                products and building these systems is <em>extremely hard</em>.
+              </p>
+              <p>
+                We believe that event-based systems can be beautifully simple
+                and we're building the world's first developer platform that
+                allows people to build event-driven products in minutes. Our aim
+                is to give developers the superpowers they need to just build.
+                Developers deserve first class local tooling and a{" "}
+                <em>platform</em> that gives them everything they need to
+                deliver, not just the underlying <em>plumbing</em> or
+                infrastructure.
+              </p>
+              <p>
+                We're beginning our product journey focused on the early adopter
+                - the person who embraces <em>the developer cloud:</em> modern
+                solutions that put developer experience at the forefront of the
+                product. Our initial goal is to build the absolute best platform
+                and tooling for devs to build anything that runs in the
+                background using events. We're{" "}
+                <a href="https://www.inngest.com/blog/vercel-integration">
+                  partnering with key companies
+                </a>{" "}
+                to fill a{" "}
+                <a href="https://www.inngest.com/blog/completing-the-jamstack">
+                  key gap in the current ecosystem
+                </a>{" "}
+                and bring Inngest to the masses. We have very big plans beyond
+                that - if you're curious, drop us a note.
+              </p>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {FEATURED_BLOG_POSTS.length && (
-        <div>
-          <div className="container mx-auto px-10 lg:px-16 max-w-3xl py-8">
-            <div className="mx-auto py-6">
-              <h2 className="text-xl sm:text-2xl font-normal">From our blog</h2>
-            </div>
-            <div className="">
-              {FEATURED_BLOG_POSTS.map((p, idx) => (
-                <div className="mb-2">
-                  <p key={p.href} className="text-base">
-                    <a href={`${p.href}?ref=about-page`}>→ {p.title}</a>
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+            <div className="my-16 mx-auto max-w-prose text-slate-300">
+              <h2 className="text-xl sm:text-2xl font-normal">Our Team</h2>
+              <p className="my-6">
+                We've built and scaled event-based architectures for years and
+                think that developers deserve something better.
+              </p>
+              <div className="mt-8 mb-6 grid sm:grid-cols-2 md:grid-cols-3 gap-10 items-start">
+                {TEAM.map((person) => {
+                  return (
+                    <div key={person.name} className="flex flex-col">
+                      <img className="w-20 rounded-lg" src={person.avatar} />
+                      <h3 className="mt-4 mb-3 text-base font-normal">
+                        {person.name}
+                      </h3>
+                      <p
+                        className="text-sm leading-5"
+                        style={{ lineHeight: "1.5em" }}
+                      >
+                        {person.role}
+                        <br />
+                        <span className="text-slate-400">
+                          {person.bio && "Past: "}
+                          {person.bio}
+                        </span>
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
 
-      <div style={{ marginTop: 100 }}>
+              <aside className=" max-w-[65ch] m-auto bg-slate-900/20 text-indigo-100 flex flex-col items-start gap-4 leading-relaxed rounded-lg py-5 px-6  my-12 border border-indigo-900/50">
+                <h3 className="text-md lg:text-lg">Want to join the team?</h3>
+                <p className="text-sm lg:text-base">
+                  Inngest is hiring for several positions across engineering and
+                  DevRel. We're just getting started and are looking for people
+                  that want to contribute highly to an early-stage startup
+                  focused on solving developer problems.
+                </p>
+                <Button href="/careers?ref=about" arrow>
+                  View the open roles
+                </Button>
+              </aside>
+
+              <div className="mx-auto py-6">
+                <h2 className="text-xl sm:text-2xl font-normal">
+                  Our Investors
+                </h2>
+              </div>
+              <div className="pb-6 grid sm:grid-cols-2 md:grid-cols-4 gap-10 items-center">
+                {INVESTORS.map((investor) => {
+                  return (
+                    <img
+                      key={investor.name}
+                      style={{ maxHeight: "50px" }}
+                      src={investor.logo}
+                      alt={investor.name}
+                    />
+                  );
+                })}
+              </div>
+              <div className="my-8">
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {ANGELS.map((a, idx) => (
+                    <div key={a.name} className="text-sm">
+                      {a.name} / <span className="text-slate-500">{a.bio}</span>
+                      <br />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {FEATURED_BLOG_POSTS.length && (
+                <>
+                  <div className="mx-auto py-6">
+                    <h2 className="text-xl sm:text-2xl font-normal">
+                      From our blog
+                    </h2>
+                  </div>
+                  <div className="">
+                    {FEATURED_BLOG_POSTS.map((p, idx) => (
+                      <div className="mb-2">
+                        <p key={p.href} className="text-base">
+                          <a href={`${p.href}?ref=about-page`}>→ {p.title}</a>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </main>
+        </article>
+      </Container>
+
+      <div className="mt-48">
         <Footer />
       </div>
     </div>

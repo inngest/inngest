@@ -12,6 +12,8 @@ import Footer from "src/shared/legacy/Footer";
 import { highlight } from "src/utils/code";
 import { getHeadingsAsArray, Heading } from "src/utils/docs";
 
+import { loadMarkdownFile, loadMarkdownFilesMetadata } from "utils/markdown";
+
 import { SECTIONS, Page, Content } from "./index";
 
 const getPatternProps = (slug: string) => {
@@ -20,34 +22,12 @@ const getPatternProps = (slug: string) => {
     .find((a) => a.slug === slug);
 };
 
-const loadPattern = async (slug: string) => {
-  const path = require("node:path");
-  const fs = require("node:fs");
-  const matter = require("gray-matter");
-  const sourceFilename = path.join(`./pages/patterns/_patterns/${slug}.mdx`);
-  const source = fs.readFileSync(sourceFilename, "utf8");
-  const { content, data } = matter(source);
-  const serializedContent = await serialize(content, {
-    scope: { json: JSON.stringify(data) },
-    mdxOptions: {
-      remarkPlugins: [highlight],
-      rehypePlugins: [rehypeSlug, rehypeAutolinkHeadings],
-    },
-  });
-
-  return {
-    content,
-    headings: getHeadingsAsArray(content),
-    ...serializedContent,
-  };
-};
-
 export const getStaticProps: GetStaticProps = async (ctx) => {
   const slug = Array.isArray(ctx?.params?.pattern)
     ? ctx?.params?.pattern[0]
     : ctx?.params?.pattern;
   const pageInfo = getPatternProps(slug || "");
-  const pageData = await loadPattern(slug);
+  const pageData = await loadMarkdownFile("patterns/_patterns", slug);
   return {
     props: {
       ...pageInfo,
@@ -86,6 +66,7 @@ export default function Patterns({
   headings,
   compiledSource,
 }: Props) {
+  console.log(compiledSource);
   const sectionClasses = `max-w-2xl mx-auto px-6 lg:px-4 text-left`;
   return (
     <Page>
