@@ -94,7 +94,6 @@ export default function useCase({ stringData }) {
       </Container>
 
       <Container>
-        <SectionHeader title="Key Features" />
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 mt-8 gap-2">
           {data.keyFeatures.map((feature, i) => (
             <div
@@ -122,10 +121,7 @@ export default function useCase({ stringData }) {
       </Container>
 
       <Container className=" my-40">
-        <SectionHeader
-          title="Queue work"
-          lede="Queue work in just a few lines of code with Inngest."
-        />
+        <SectionHeader title="Queue work in just a few lines of code" />
         <div className="flex mt-16 flex-col lg:flex-row flex-start ">
           <div className="text-slate-200 mb-10 lg:mb-0 lg:pr-20 max-w-[400px] justify-center flex flex-col gap-3">
             <p className="flex items-center gap-3">
@@ -144,7 +140,7 @@ export default function useCase({ stringData }) {
               <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold">
                 3
               </span>{" "}
-              Define your functions with that
+              Define your functions with that event trigger
             </p>
             <p className="text-sm text-slate-300 mt-4">
               Functions trigger as events are received. Inngest calls all
@@ -152,7 +148,7 @@ export default function useCase({ stringData }) {
             </p>
           </div>
           <SyntaxHighlighter
-            language="javascript"
+            language="typescript"
             showLineNumbers={false}
             style={syntaxThemeDark}
             codeTagProps={{ className: "code-window" }}
@@ -170,10 +166,7 @@ export default function useCase({ stringData }) {
       </Container>
 
       <Container className="my-40">
-        <SectionHeader
-          title="Everything you need to build"
-          lede="Inngest is the easiest way to build scheduled jobs in your app, no matter what framework or platform you use."
-        />
+        <SectionHeader title="Everything you need to build" />
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 xl:gap-16 mt-20">
           {data.featureOverflow.map((feature, i) => (
             <div key={i}>
@@ -201,7 +194,7 @@ export default function useCase({ stringData }) {
       <Container>
         <SectionHeader
           title="Learn more"
-          lede="Add Inngest to your stack in a few lines of code, then deploy to your existing provider. You don’t have to change anything to get started."
+          lede="Dive into our resources and learn how Inngest is the best solution for serverless queues for TypeScript."
         />
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-16">
           {data.learning.map((learningItem, i) => (
