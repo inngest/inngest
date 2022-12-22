@@ -45,6 +45,9 @@ export default function Careers(props) {
                 <h1 className="text-white font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter lg:leading-loose">
                   Careers at Inngest
                 </h1>
+                <Button href="#positions" arrow>
+                  Jump to open positions
+                </Button>
               </header>
               <div className="my-20 mx-auto prose prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
                 <AboutInngest heading={true} />
@@ -70,7 +73,7 @@ export default function Careers(props) {
                   are motivated by solving problems for real people. Learn more
                   about our principles here.
                 </p>
-                <h2>Company values & principles</h2>
+                <h2 id="values">Company values & principles</h2>
                 <ul>
                   <li>
                     Pursue an{" "}
@@ -153,7 +156,9 @@ export default function Careers(props) {
 
                 <Benefits />
 
-                <h2 className="mb-12">Open Positions</h2>
+                <h2 id="positions" className="mb-12 scroll-mt-32">
+                  Open Positions
+                </h2>
                 {roles.map((role) => (
                   <div
                     key={role.slug}
