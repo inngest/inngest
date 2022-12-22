@@ -95,7 +95,7 @@ export default function Careers(props) {
                   that cares about the details and agree that simpler is better.
                   Every teammate has a voice in shaping the product. We all
                   dogfood our own product and support{" "}
-                  <a href="https://inngest.com/discord">
+                  <a href="https://www.inngest.com/discord">
                     our community of developers
                   </a>
                   . Context is shared openly and deliberately so every person
