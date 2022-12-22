@@ -11,6 +11,7 @@ import {
   MDXContent,
 } from "utils/markdown";
 import type { Role } from "./index";
+import { AboutInngest, Benefits } from "./index";
 
 const dir = "careers/_roles";
 
@@ -106,64 +107,13 @@ export default function Careers(props) {
                 </p>
               </header>
               <div className="my-20 mx-auto prose prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
-                <p>
-                  Inngest is an{" "}
-                  <a href="https://github.com/inngest/inngest">open source</a>{" "}
-                  platform that enables developers to build amazing products by
-                  ensuring serverless functions are reliable, schedulable and
-                  event-driven.
-                </p>
-                <p>
-                  Two trends have shaped our vision for the Inngest platform:
-                  event-driven systems are driving some of the world's greatest
-                  products and building these systems is <em>extremely hard</em>
-                  .
-                </p>
-                <p>
-                  We believe that event-based systems can be beautifully simple
-                  and we're building the world's first developer platform that
-                  allows people to build event-driven products in minutes. Our
-                  aim is to give developers the superpowers they need to just
-                  build. Developers deserve first class local tooling and a{" "}
-                  <em>platform</em> that gives them everything they need to
-                  deliver, not just the underlying <em>plumbing</em> or
-                  infrastructure.
-                </p>
-                <p>
-                  We're beginning our product journey focused on the early
-                  adopter - the person who embraces{" "}
-                  <em>the developer cloud:</em> modern solutions that put
-                  developer experience at the forefront of the product. Our
-                  initial goal is to build the absolute best platform and
-                  tooling for devs to build anything that runs in the background
-                  using events. We're{" "}
-                  <a href="https://www.inngest.com/blog/vercel-integration">
-                    partnering with key companies
-                  </a>{" "}
-                  to fill a{" "}
-                  <a href="https://www.inngest.com/blog/completing-the-jamstack">
-                    key gap in the current ecosystem
-                  </a>{" "}
-                  and bring Inngest to the masses. We have very big plans beyond
-                  that - if you're curious, drop us a note.
-                </p>
+                <AboutInngest heading={false} />
+
                 <h2>The role</h2>
                 <MDXRemote compiledSource={role.compiledSource} />
-                <h2>What we offer</h2>
-                <ul>
-                  <li>Competitive salary and equity</li>
-                  <li>Remote-first - work from anywhere</li>
-                  <li>Health, dental, and vision insurance (US)</li>
-                  <li>
-                    International employment and payroll via{" "}
-                    <a href="https://www.oysterhr.com/" target="_blank">
-                      OysterHR
-                    </a>
-                  </li>
-                  <li>M2 Macbook Pro</li>
-                  <li>4 weeks vacation + local national holidays</li>
-                  <li>401k (US)</li>
-                </ul>
+
+                <Benefits />
+
                 <h2>How to apply</h2>
                 <p>
                   To apply, send an email to{" "}

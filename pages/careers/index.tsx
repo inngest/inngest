@@ -47,48 +47,8 @@ export default function Careers(props) {
                 </h1>
               </header>
               <div className="my-20 mx-auto prose prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
-                <h2 id="about-inngest">About Inngest</h2>
-                <p>
-                  Inngest is an{" "}
-                  <a href="https://github.com/inngest/inngest">open source</a>{" "}
-                  platform that enables developers to build amazing products by
-                  ensuring serverless functions are reliable, schedulable and
-                  event-driven.
-                </p>
-                <p>
-                  Two trends have shaped our vision for the Inngest platform:
-                  event-driven systems are driving some of the world's greatest
-                  products and building these systems is <em>extremely hard</em>
-                  .
-                </p>
-                <p>
-                  We believe that event-based systems can be beautifully simple
-                  and we're building the world's first developer platform that
-                  allows people to build event-driven products in minutes. Our
-                  aim is to give developers the superpowers they need to just
-                  build. Developers deserve first class local tooling and a{" "}
-                  <em>platform</em> that gives them everything they need to
-                  deliver, not just the underlying <em>plumbing</em> or
-                  infrastructure.
-                </p>
-                <p>
-                  We're beginning our product journey focused on the early
-                  adopter - the person who embraces{" "}
-                  <em>the developer cloud:</em> modern solutions that put
-                  developer experience at the forefront of the product. Our
-                  initial goal is to build the absolute best platform and
-                  tooling for devs to build anything that runs in the background
-                  using events. We're{" "}
-                  <a href="https://www.inngest.com/blog/vercel-integration">
-                    partnering with key companies
-                  </a>{" "}
-                  to fill a{" "}
-                  <a href="https://www.inngest.com/blog/completing-the-jamstack">
-                    key gap in the current ecosystem
-                  </a>{" "}
-                  and bring Inngest to the masses. We have very big plans beyond
-                  that - if you're curious, drop us a note.
-                </p>
+                <AboutInngest heading={true} />
+
                 <h2 id="how-we-work">How we work</h2>
                 <p>
                   We're a small, remote-first team of engineers and designers
@@ -190,21 +150,9 @@ export default function Careers(props) {
                 </p>
                 {/* FUTURE - Backed by key investors - We'll add this section after we've announced our raise and we'll include names devs will know */}
                 {/* <h2>Backed by key investors</h2> */}
-                <h2>What we offer</h2>
-                <ul>
-                  <li>Competitive salary and equity</li>
-                  <li>Remote-first - work from home</li>
-                  <li>Health, dental, and vision insurance (US)</li>
-                  <li>
-                    International employment and payroll via{" "}
-                    <a href="https://www.oysterhr.com/" target="_blank">
-                      OysterHR
-                    </a>
-                  </li>
-                  <li>M2 Macbook Pro</li>
-                  <li>4 weeks vacation + local national holidays</li>
-                  <li>401k (US)</li>
-                </ul>
+
+                <Benefits />
+
                 <h2 className="mb-12">Open Positions</h2>
                 {roles.map((role) => (
                   <div
@@ -234,3 +182,63 @@ export default function Careers(props) {
     </>
   );
 }
+
+export const AboutInngest = ({ heading = false }) => (
+  <>
+    {heading && <h2 id="about-inngest">About Inngest</h2>}
+    <p>
+      Inngest is an <a href="https://github.com/inngest/inngest">open source</a>{" "}
+      platform that enables developers to build amazing products by ensuring
+      serverless functions are reliable, schedulable and event-driven.
+    </p>
+    <p>
+      Two trends have shaped our vision for the Inngest platform: event-driven
+      systems are driving some of the world's greatest products and building
+      these systems is <em>extremely hard</em>.
+    </p>
+    <p>
+      We believe that event-based systems can be beautifully simple and we're
+      building the world's first developer platform that allows people to build
+      event-driven products in minutes. Our aim is to give developers the
+      superpowers they need to just build. Developers deserve first class local
+      tooling and a <em>platform</em> that gives them everything they need to
+      deliver, not just the underlying <em>plumbing</em> or infrastructure.
+    </p>
+    <p>
+      We're beginning our product journey focused on the early adopter - the
+      person who embraces <em>the developer cloud:</em> modern solutions that
+      put developer experience at the forefront of the product. Our initial goal
+      is to build the absolute best platform and tooling for devs to build
+      anything that runs in the background using events. We're{" "}
+      <a href="https://www.inngest.com/blog/vercel-integration">
+        partnering with key companies
+      </a>{" "}
+      to fill a{" "}
+      <a href="https://www.inngest.com/blog/completing-the-jamstack">
+        key gap in the current ecosystem
+      </a>{" "}
+      and bring Inngest to the masses. We have very big plans beyond that - if
+      you're curious, drop us a note.
+    </p>
+  </>
+);
+
+export const Benefits = () => (
+  <>
+    <h2 id="benefits">What we offer</h2>
+    <ul>
+      <li>Competitive salary and equity</li>
+      <li>Remote-first - work from anywhere</li>
+      <li>Health, dental, and vision insurance (US)</li>
+      <li>
+        International employment and payroll via{" "}
+        <a href="https://www.oysterhr.com/" target="_blank">
+          OysterHR
+        </a>
+      </li>
+      <li>M2 Macbook Pro</li>
+      <li>4 weeks vacation + local national holidays</li>
+      <li>401k (US)</li>
+    </ul>
+  </>
+);
