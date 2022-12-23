@@ -113,6 +113,14 @@ func WithIdempotencyTTL(t time.Duration) func(q *queue) {
 	}
 }
 
+// WithIdempotencyTTLFunc returns custom idempotecy durations given a QueueItem.
+// This allows customization of the idempotency TTL based off of specific jobs.
+func WithIdempotencyTTLFunc(f func(context.Context, QueueItem) time.Duration) func(q *queue) {
+	return func(q *queue) {
+		q.idempotencyTTLFunc = f
+	}
+}
+
 func WithNumWorkers(n int32) func(q *queue) {
 	return func(q *queue) {
 		q.numWorkers = n
@@ -160,7 +168,12 @@ type queue struct {
 	// metrics allows reporting of metrics
 	metrics tally.Scope
 
+	// idempotencyTTL is the default or static idempotency duration apply to jobs,
+	// if idempotencyTTLFunc is not defined.
 	idempotencyTTL time.Duration
+	// idempotencyTTLFunc returns an time.Duration representing how long job IDs
+	// remain idempotent.
+	idempotencyTTLFunc func(context.Context, QueueItem) time.Duration
 	// pollTick is the interval between each scan for jobs.
 	pollTick time.Duration
 	// quit is a channel that any method can send on to trigger termination
@@ -462,13 +475,19 @@ func (q *queue) Dequeue(ctx context.Context, i QueueItem) error {
 		q.kg.PartitionMeta(i.WorkflowID.String()),
 		q.kg.Idempotency(i.ID),
 	}
+
+	idempotency := q.idempotencyTTL
+	if q.idempotencyTTLFunc != nil {
+		idempotency = q.idempotencyTTLFunc(ctx, i)
+	}
+
 	status, err := scripts["queue/dequeue"].Run(
 		ctx,
 		q.r,
 		keys,
 
 		i.ID,
-		int(q.idempotencyTTL.Seconds()),
+		int(idempotency.Seconds()),
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error dequeueing item: %w", err)
