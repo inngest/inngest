@@ -1,7 +1,7 @@
 # Inngest
 
 ![Latest release](https://img.shields.io/github/v/release/inngest/inngest?include_prereleases&sort=semver)
-![Test Status](https://img.shields.io/github/workflow/status/inngest/inngest/Go/main?label=tests)
+![Test Status](https://img.shields.io/github/actions/workflow/status/inngest/inngest/go.yaml?branch=main&label=tests)
 ![Discord](https://img.shields.io/discord/842170679536517141?label=discord)
 ![Twitter Follow](https://img.shields.io/twitter/follow/inngest?style=social)
 
