@@ -115,6 +115,7 @@ function MyApp({ Component, pageProps }) {
               first_touch: firstTouch,
               ref: ref,
             },
+            v: "2022-12-27.1",
           });
           if (typeof window !== "undefined" && window._inngestQueue.length) {
             window._inngestQueue.forEach((p) => {

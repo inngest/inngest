@@ -16,6 +16,7 @@ export const trackPageView = (url: string) => {
       first_touch: false,
       ref,
     },
+    v: "2022-12-27.1",
   });
 
   // NOTE - Google Analytics is captured via Google Tag Manager's listening to the History API
