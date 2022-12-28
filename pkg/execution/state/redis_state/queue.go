@@ -365,7 +365,13 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	// workflow IDs in every case.
 	qn := i.Queue()
 
-	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, AtS: at.Unix()}
+	qp := QueuePartition{
+		QueueName:  i.QueueName,
+		WorkflowID: i.WorkflowID,
+		Priority:   priority,
+		AtS:        at.Unix(),
+	}
+
 	keys := []string{
 		q.kg.QueueItem(),       // Queue item
 		q.kg.QueueIndex(qn),    // Queue sorted set

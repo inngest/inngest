@@ -83,12 +83,18 @@ func max(i int) *int {
 }
 
 func TestQueueRunBasic(t *testing.T) {
+	customQueueName := "custom-queue-name"
+
 	r := miniredis.RunT(t)
 	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 50})
 	q := NewQueue(
 		rc,
 		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
+		// Test custom queue names
+		WithKindToQueueMapping(map[string]string{
+			"test-kind": customQueueName,
+		}),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -109,6 +115,18 @@ func TestQueueRunBasic(t *testing.T) {
 			WorkflowID: idB,
 			Data: osqueue.Item{
 				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(1),
+				Identifier: state.Identifier{
+					WorkflowID: idB,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+				},
+			},
+		},
+		{
+			WorkflowID: idB,
+			QueueName:  &customQueueName,
+			Data: osqueue.Item{
+				Kind:        "test-kind",
 				MaxAttempts: max(1),
 				Identifier: state.Identifier{
 					WorkflowID: idB,
