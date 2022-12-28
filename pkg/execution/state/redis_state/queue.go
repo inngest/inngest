@@ -79,7 +79,7 @@ func init() {
 }
 
 // PriorityFinder returns the priority for a given queue item.
-type PriorityFinder func(ctx context.Context, item *osqueue.Item) uint
+type PriorityFinder func(ctx context.Context, item QueueItem) uint
 
 type QueueOpt func(q *queue)
 
@@ -127,16 +127,34 @@ func WithNumWorkers(n int32) func(q *queue) {
 	}
 }
 
+// WithPollTick specifies the interval at which the queue will poll the backing store
+// for available partitions.
 func WithPollTick(t time.Duration) func(q *queue) {
 	return func(q *queue) {
 		q.pollTick = t
 	}
 }
 
+// WithDenyQueueNames specifies that the worker cannot select jobs from queue partitions
+// within the given list of names.  This means that the worker will never work on jobs
+// in the specified queues.
+//
+// NOTE: If this is set and this worker claims the sequential lease, there is no guarantee
+// on latency or fairness in the denied queue partitions.
+func WithDenyQueueNames(queues ...string) func(q *queue) {
+	return func(q *queue) {
+		q.denyQueues = queues
+		q.denyQueueMap = make(map[string]*struct{})
+		for _, i := range queues {
+			q.denyQueueMap[i] = &struct{}{}
+		}
+	}
+}
+
 func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
-		pf: func(ctx context.Context, item *osqueue.Item) uint {
+		pf: func(ctx context.Context, item QueueItem) uint {
 			return PriorityDefault
 		},
 		kg:             defaultQueueKey,
@@ -192,6 +210,11 @@ type queue struct {
 	// prior to leasing items.
 	sem *trackingSemaphore
 
+	// denyQueues provides a denylist ensuring that the queue will never claim
+	// this partition, meaning that no jobs from this queue will run on this worker.
+	denyQueues   []string
+	denyQueueMap map[string]*struct{}
+
 	// seqLeaseID stores the lease ID if this queue is the sequential processor.
 	// all runners attempt to claim this lease automatically.
 	seqLeaseID *ulid.ULID
@@ -212,23 +235,43 @@ type QueueItem struct {
 	// the item.  Note that the score in Redis is second-level, ie this field / 1000.
 	//
 	// This is necessary for rescoring partitions and checking latencies.
-	AtMS        int64     `json:"at"`
-	WorkflowID  uuid.UUID `json:"wfID"`
+	AtMS int64 `json:"at"`
+	// WorkflowID is the workflow ID that this job belongs to.
+	WorkflowID uuid.UUID `json:"wfID"`
+	// WorkspaceID is the workspace that this job belongs to.
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// LeaseID is a ULID which embeds a timestamp denoting when the lease expires.
 	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
 	// Data represents the enqueued data, eg. the edge to process or the pause
 	// to resume.
 	Data osqueue.Item `json:"data"`
+	// QueueName allows placing this job into a specific queue name.  If the QueueName
+	// is nil, the WorkflowID will be used as the queue name.  This allows us to
+	// automatically create partitioned queues for each function within Inngest.
+	//
+	// This should almost always be nil.
+	QueueName *string `json:"queueID,omitempty"`
 }
 
 func (q QueueItem) MarshalBinary() ([]byte, error) {
 	return json.Marshal(q)
 }
 
+// Queue returns the queue name for this queue item.  This is the
+// workflow ID of the QueueItem unless the QueueName is specifically
+// set.
+func (q QueueItem) Queue() string {
+	if q.QueueName == nil {
+		return q.WorkflowID.String()
+	}
+	return *q.QueueName
+}
+
 // QueuePartition represents an individual queue for a workflow.  It stores the
 // time of the earliest job within the workflow.
 type QueuePartition struct {
+	QueueName *string `json:"queue,omitempty"`
+
 	WorkflowID uuid.UUID `json:"wid"`
 
 	Priority uint `json:"p"`
@@ -258,6 +301,13 @@ type QueuePartition struct {
 	LeaseID *ulid.ULID `json:"leaseID"`
 }
 
+func (q QueuePartition) Queue() string {
+	if q.QueueName == nil {
+		return q.WorkflowID.String()
+	}
+	return *q.QueueName
+}
+
 func (q QueuePartition) MarshalBinary() ([]byte, error) {
 	return json.Marshal(q)
 }
@@ -279,7 +329,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 
 	priority := PriorityMin
 	if q.pf != nil {
-		priority = q.pf(ctx, &i.Data)
+		priority = q.pf(ctx, i)
 	}
 
 	if priority > PriorityMin {
@@ -292,13 +342,18 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	// Add the At timestamp.
 	i.AtMS = at.UnixMilli()
 
+	// Get the queue name from the queue item.  This allows utilization of
+	// the partitioned queue for jobs with custom queue names, vs utilizing
+	// workflow IDs in every case.
+	qn := i.Queue()
+
 	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, AtS: at.Unix()}
 	keys := []string{
-		q.kg.QueueItem(),                          // Queue item
-		q.kg.QueueIndex(i.WorkflowID.String()),    // Queue sorted set
-		q.kg.PartitionItem(),                      // Partition item, map
-		q.kg.PartitionMeta(i.WorkflowID.String()), // Partition item
-		q.kg.PartitionIndex(),                     // Global partition queue
+		q.kg.QueueItem(),       // Queue item
+		q.kg.QueueIndex(qn),    // Queue sorted set
+		q.kg.PartitionItem(),   // Partition item, map
+		q.kg.PartitionMeta(qn), // Partition item
+		q.kg.PartitionIndex(),  // Global partition queue
 		q.kg.Idempotency(i.ID),
 	}
 	status, err := scripts["queue/enqueue"].Run(
@@ -309,7 +364,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		i,
 		i.ID,
 		at.UnixMilli(),
-		i.WorkflowID.String(),
+		qn,
 		qp,
 	).Int64()
 	if err != nil {
@@ -325,11 +380,13 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	}
 }
 
-// Peek takes n items from a queue, up until QueuePeekMax.
+// Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
+// function jobs the queue name must be the ID of the workflow;  each workflow has
+// its own queue of jobs using its ID as the queue name.
 //
 // If limit is -1, this will return the first unleased item - representing the next available item in the
 // queue.
-func (q *queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time, limit int64) ([]*QueueItem, error) {
+func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, limit int64) ([]*QueueItem, error) {
 	// Check whether limit is -1, peeking next available time
 	isPeekNext := limit == -1
 
@@ -346,7 +403,7 @@ func (q *queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time,
 		ctx,
 		q.r,
 		[]string{
-			q.kg.QueueIndex(workflowID.String()),
+			q.kg.QueueIndex(queueName),
 			q.kg.QueueItem(),
 		},
 		until.UnixMilli(),
@@ -389,7 +446,7 @@ func (q *queue) Peek(ctx context.Context, workflowID uuid.UUID, until time.Time,
 // lease duration. This returns the newly acquired lease ID on success.
 //
 // itemID must be the hashed ID of the queue item.
-func (q *queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID string, duration time.Duration) (*ulid.ULID, error) {
+func (q *queue) Lease(ctx context.Context, queueName string, itemID string, duration time.Duration) (*ulid.ULID, error) {
 	// TODO: Add custom throttling here.
 	leaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
 	if err != nil {
@@ -398,8 +455,8 @@ func (q *queue) Lease(ctx context.Context, workflowID uuid.UUID, itemID string, 
 
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.QueueIndex(workflowID.String()),
-		q.kg.PartitionMeta(workflowID.String()),
+		q.kg.QueueIndex(queueName),
+		q.kg.PartitionMeta(queueName),
 	}
 	status, err := scripts["queue/lease"].Run(
 		ctx,
@@ -440,7 +497,7 @@ func (q *queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID,
 
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.QueueIndex(i.WorkflowID.String()),
+		q.kg.QueueIndex(i.Queue()),
 	}
 	status, err := scripts["queue/extendLease"].Run(
 		ctx,
@@ -469,10 +526,11 @@ func (q *queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID,
 
 // Dequeue removes an item from the queue entirely.
 func (q *queue) Dequeue(ctx context.Context, i QueueItem) error {
+	qn := i.Queue()
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.QueueIndex(i.WorkflowID.String()),
-		q.kg.PartitionMeta(i.WorkflowID.String()),
+		q.kg.QueueIndex(qn),
+		q.kg.PartitionMeta(qn),
 		q.kg.Idempotency(i.ID),
 	}
 
@@ -506,7 +564,7 @@ func (q *queue) Dequeue(ctx context.Context, i QueueItem) error {
 func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	priority := PriorityMin
 	if q.pf != nil {
-		priority = q.pf(ctx, &i.Data)
+		priority = q.pf(ctx, i)
 	}
 
 	if priority > PriorityMin {
@@ -518,11 +576,18 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 	// Update the At timestamp.
 	i.AtMS = at.UnixMilli()
 
-	qp := QueuePartition{WorkflowID: i.WorkflowID, Priority: priority, AtS: at.Unix()}
+	qn := i.Queue()
+
+	qp := QueuePartition{
+		QueueName:  i.QueueName,
+		WorkflowID: i.WorkflowID,
+		Priority:   priority,
+		AtS:        at.Unix(),
+	}
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.QueueIndex(i.WorkflowID.String()),
-		q.kg.PartitionMeta(i.WorkflowID.String()),
+		q.kg.QueueIndex(qn),
+		q.kg.PartitionMeta(qn),
 		q.kg.PartitionIndex(),
 	}
 	status, err := scripts["queue/requeue"].Run(
@@ -533,7 +598,7 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 		i,
 		i.ID,
 		at.UnixMilli(),
-		qp.WorkflowID.String(),
+		qn,
 		qp,
 	).Int64()
 	if err != nil {
@@ -548,7 +613,11 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 }
 
 // PartitionLease leases a parititon for a given workflow ID.  It returns the new lease ID.
-func (q *queue) PartitionLease(ctx context.Context, wid uuid.UUID, duration time.Duration) (*ulid.ULID, error) {
+//
+// NOTE: This does not check the queue/partition name against allow or denylists;  it assumes
+// that the worker always wants to lease the given queue.  Filtering must be done when peeking
+// when running a worker.
+func (q *queue) PartitionLease(ctx context.Context, queueName string, duration time.Duration) (*ulid.ULID, error) {
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
 	// the pointer and back off.  A question here is enqueuing new items onto the partition
 	// will reset the pointer update, leading to thrash.
@@ -568,7 +637,7 @@ func (q *queue) PartitionLease(ctx context.Context, wid uuid.UUID, duration time
 		q.r,
 		keys,
 
-		wid.String(),
+		queueName,
 		leaseID.String(),
 		now.UnixMilli(),
 		leaseExpires.Unix(),
@@ -603,6 +672,10 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 		limit = PartitionPeekMax
 	}
 
+	// TODO: If this is an allowlist, only peek the given partitions.
+	//       This requires ZMSCORE support within miniredis for testing;  we need
+	//       to add this prior to implementation.
+
 	unix := until.Unix()
 	encoded, err := scripts["queue/partitionPeek"].Run(
 		ctx,
@@ -621,14 +694,28 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 	weights := []float64{}
 	items := make([]*QueuePartition, len(encoded))
 
+	ignored := 0
 	for n, i := range encoded {
 		item := &QueuePartition{}
 		if err = json.Unmarshal([]byte(i), item); err != nil {
 			return nil, fmt.Errorf("error reading partition item: %w", err)
 		}
-		items[n] = item
+
+		// Ignore any denied queues if they're explicitly in the denylist.  Because
+		// we allocate the len(encoded) amount, we also want to track the number of
+		// ignored queues to use the correct index when setting our items;  this ensures
+		// that we don't access items with an index and get nil pointers.
+		if len(q.denyQueues) > 0 && q.denyQueueMap[item.Queue()] != nil {
+			ignored++
+			continue
+		}
+
+		items[n-ignored] = item
 		weights = append(weights, float64(10-item.Priority))
 	}
+
+	// Remove any ignored items from the slice.
+	items = items[0 : len(items)-ignored]
 
 	// Some scanners run sequentially, ensuring we always work on the functions with
 	// the oldest run at times in order, no matter the priority.
@@ -659,12 +746,12 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 //
 // This is used after peeking and passing all queue items onto workers; we then take the next
 // unleased available time for the queue item and requeue the partition.
-func (q *queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at time.Time) error {
+func (q *queue) PartitionRequeue(ctx context.Context, queueName string, at time.Time) error {
 	keys := []string{
 		q.kg.PartitionItem(),
 		q.kg.PartitionIndex(),
-		q.kg.PartitionMeta(workflowID.String()),
-		q.kg.QueueIndex(workflowID.String()),
+		q.kg.PartitionMeta(queueName),
+		q.kg.QueueIndex(queueName),
 		q.kg.QueueItem(),
 	}
 	status, err := scripts["queue/partitionRequeue"].Run(
@@ -672,7 +759,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at t
 		q.r,
 		keys,
 
-		workflowID.String(),
+		queueName,
 		at.Unix(),
 		QueuePeekMax,
 	).Int64()
@@ -693,12 +780,12 @@ func (q *queue) PartitionRequeue(ctx context.Context, workflowID uuid.UUID, at t
 
 // PartitionDequeue removes a partition pointer from the queue.  This is used when peeking and
 // receiving zero items to run.
-func (q *queue) PartitionDequeue(ctx context.Context, workflowID uuid.UUID, at time.Time) error {
+func (q *queue) PartitionDequeue(ctx context.Context, queueName string, at time.Time) error {
 	panic("unimplemented: requeueing partitions handles this.")
 }
 
 // PartitionReprioritize reprioritizes a workflow's QueueItems within the queue.
-func (q *queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID, priority uint) error {
+func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, priority uint) error {
 	if priority > PriorityMin {
 		return ErrPriorityTooLow
 	}
@@ -711,7 +798,7 @@ func (q *queue) PartitionReprioritize(ctx context.Context, workflowID uuid.UUID,
 		ctx,
 		q.r,
 		keys,
-		workflowID.String(),
+		queueName,
 		priority,
 	).Int64()
 	if err != nil {

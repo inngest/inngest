@@ -56,7 +56,6 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		go q.worker(ctx, f)
 	}
 
-	// Attempt to be the worker which processes items sequentially.
 	go q.claimSequentialLease(ctx)
 
 	tick := time.NewTicker(q.pollTick)
@@ -196,7 +195,7 @@ func (q *queue) scan(ctx context.Context, f osqueue.RunFunc) error {
 
 func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osqueue.RunFunc) error {
 	// Attempt to lease items
-	_, err := q.PartitionLease(ctx, p.WorkflowID, PartitionLeaseDuration)
+	_, err := q.PartitionLease(ctx, p.Queue(), PartitionLeaseDuration)
 	if err == ErrPartitionAlreadyLeased {
 		// TODO: Increase metric for partition contention
 		return nil
@@ -224,7 +223,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	// order, depending on how long it takes for the item to pass through the channel
 	// to the worker, how long Redis takes to lease the item, etc.
 	fetch := time.Now().Truncate(time.Second).Add(2 * time.Second)
-	queue, err := q.Peek(peekCtx, p.WorkflowID, fetch, q.peekSize())
+	queue, err := q.Peek(peekCtx, p.Queue(), fetch, q.peekSize())
 	if err != nil {
 		return err
 	}
@@ -248,7 +247,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 		//
 		// This is safe:  only one process runs scan(), and we guard the total number of
 		// available workers with the above semaphore.
-		leaseID, err := q.Lease(ctx, item.WorkflowID, item.ID, QueueLeaseDuration)
+		leaseID, err := q.Lease(ctx, item.Queue(), item.ID, QueueLeaseDuration)
 		if err == ErrQueueItemNotFound {
 			// Already handled.
 			q.sem.Release(1)
@@ -273,7 +272,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	// Requeue the partition, which reads the next unleased job or sets a time of
 	// 30 seconds.  This is why we have to lease above, else this may return an item that is
 	// about to be leased and processed by the worker.
-	err = q.PartitionRequeue(ctx, p.WorkflowID, time.Now().Add(PartitionRequeueExtension))
+	err = q.PartitionRequeue(ctx, p.Queue(), time.Now().Add(PartitionRequeueExtension))
 	if err == ErrPartitionGarbageCollected {
 		// Safe;  we're preventing this from wasting cycles in the future.
 		return nil
