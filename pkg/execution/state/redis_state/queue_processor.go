@@ -56,7 +56,17 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		go q.worker(ctx, f)
 	}
 
-	go q.claimSequentialLease(ctx)
+	// Attempt to be the worker which processes items sequentially, only if the
+	// worker hasn't got an allowlist set.  If a worker can only work on several
+	// queues we assume that this worker cannot participate in latency fairness,
+	// and so cannot claim the sequential lease.
+	//
+	// For example, with a systme containing millions of functions, if a worker
+	// can only work on 5 of the functions where `len(allowQueues) == 5` then
+	// the latency priotities for all other queues would be ignored.
+	if len(q.allowQueues) == 0 {
+		go q.claimSequentialLease(ctx)
+	}
 
 	tick := time.NewTicker(q.pollTick)
 

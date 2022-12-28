@@ -700,6 +700,50 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 	})
+
+	// t.Run("It only selects partitions with allowlists", func(t *testing.T) {
+	// 	r := miniredis.RunT(t)
+	// 	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	// 	defer rc.Close()
+	// 	q := NewQueue(
+	// 		rc,
+	// 		WithPriorityFinder(func(ctx context.Context, qi QueueItem) uint {
+	// 			switch qi.Data.Identifier.WorkflowID {
+	// 			case idA:
+	// 				// A is max priority, so likely to come up.
+	// 				return PriorityMax
+	// 			default:
+	// 				return PriorityMin
+	// 			}
+	// 		}),
+	// 		// Only select C
+	// 		WithAllowQueueNames(idC.String()),
+	// 	)
+
+	// 	enqueue(q)
+
+	// 	// This should only select C, as A and B are ignored.
+	// 	items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
+	// 	require.NoError(t, err)
+	// 	require.Len(t, items, 1)
+	// 	require.EqualValues(t, []*QueuePartition{
+	// 		{WorkflowID: idC, Priority: PriorityMin, AtS: atC.Unix()},
+	// 	}, items)
+
+	// 	// Try without sequential scans
+	// 	items, err = q.PartitionPeek(ctx, false, time.Now().Add(time.Hour), PartitionPeekMax)
+	// 	require.NoError(t, err)
+	// 	require.Len(t, items, 1)
+	// 	require.EqualValues(t, []*QueuePartition{
+	// 		{WorkflowID: idC, Priority: PriorityMin, AtS: atC.Unix()},
+	// 	}, items)
+
+	// 	t.Run("allowlists should hide if vesting time is in the future", func(t *testing.T) {
+	// 		items, err = q.PartitionPeek(ctx, false, time.Now().Add(-1*time.Hour), PartitionPeekMax)
+	// 		require.NoError(t, err)
+	// 		require.Len(t, items, 0)
+	// 	})
+	// })
 }
 
 func TestQueuePartitionRequeue(t *testing.T) {

@@ -151,6 +151,23 @@ func WithDenyQueueNames(queues ...string) func(q *queue) {
 	}
 }
 
+// WithAllowQeueNames specifies that the worker that must only select jobs from the
+// given queues.
+//
+// For speed, we only allow the allowlist to be a maximum of 100 queues long.  This
+// list is passed to Redis when peeking partitions each time.
+//
+// NOTE: If this is set, this worker will never be allowed to claim sequential leases,
+// as this assumes that the worker can only run a small subset of queues available. This
+// means that the worker is not able to participate in fairness and latency for all queues.
+//
+// func WithAllowQueueNames(queues ...string) func(q *queue) {
+// 	return func(q *queue) {
+// 		q.allowQueues = queues
+// 		q.allowQueuesJSON, _ = json.Marshal(queues)
+// 	}
+// }
+
 func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
@@ -214,6 +231,12 @@ type queue struct {
 	// this partition, meaning that no jobs from this queue will run on this worker.
 	denyQueues   []string
 	denyQueueMap map[string]*struct{}
+
+	// allowQueues provides an allowlist of queue names, ensuring that the worker only
+	// peeks and claims queues with names from this list.
+	allowQueues []string
+	// allowQueuesJSON stores a JSON-encoded representation of allow queues.
+	allowQueuesJSON []byte
 
 	// seqLeaseID stores the lease ID if this queue is the sequential processor.
 	// all runners attempt to claim this lease automatically.
