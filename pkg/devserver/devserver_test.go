@@ -167,7 +167,7 @@ func TestEngine_async(t *testing.T) {
 			n++
 		}
 		return n == 1
-	}, 100*time.Millisecond, 10*time.Millisecond)
+	}, 200*time.Millisecond, 10*time.Millisecond)
 
 	// 3.
 	// Once we have the pause, we can send another event.  This shouldn't continue
@@ -189,7 +189,7 @@ func TestEngine_async(t *testing.T) {
 			n++
 		}
 		return n == 1
-	}, 100*time.Millisecond, 10*time.Millisecond)
+	}, 200*time.Millisecond, 10*time.Millisecond)
 
 	// 4.
 	// Finally, assert that sending an event which matches the pause conditions

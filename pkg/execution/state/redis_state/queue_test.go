@@ -886,7 +886,7 @@ func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item QueueItem
 	score, err := r.ZScore(defaultQueueKey.QueueIndex(item.WorkflowID.String()), item.ID)
 	parsed := time.UnixMilli(int64(score))
 	require.NoError(t, err)
-	require.WithinDuration(t, expected.Truncate(time.Millisecond), parsed, 10*time.Millisecond)
+	require.WithinDuration(t, expected.Truncate(time.Millisecond), parsed, 15*time.Millisecond)
 }
 
 func requirePartitionScoreEquals(t *testing.T, r *miniredis.Miniredis, wid uuid.UUID, expected time.Time) {
