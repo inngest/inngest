@@ -751,9 +751,8 @@ func (m mgr) History(ctx context.Context, runID ulid.ULID) ([]state.History, err
 }
 
 func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
-	// Give all callbacks 5 seconds to run in total.
-	callCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// Replace the context so that this isn't cancelled by any parents.
+	callCtx := context.Background()
 	for _, f := range m.callbacks {
 		go func(fn state.FunctionCallback) {
 			fn(callCtx, id, status)
