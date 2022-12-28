@@ -8,13 +8,24 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/oklog/ulid/v2"
 )
 
-var prefixGzip = []byte("1:")
+var (
+	// DefaultHistoryEncoding represents the encoding used when storing data within Redis.
+	// This can be changed on init to change how we globally store history.
+	DefaultHistoryEncoding = HistoryEncodingGZIP
+)
+
+const (
+	HistoryEncodingJSON = "0:"
+	HistoryEncodingGZIP = "1:"
+)
 
 type History struct {
+	ID         ulid.ULID         `json:"id"`
 	Type       enums.HistoryType `json:"type"`
-	Identifier Identifier        `json:"id"`
+	Identifier Identifier        `json:"run"`
 	CreatedAt  time.Time         `json:"createdAt"`
 	Data       any               `json:"data"`
 }
@@ -24,13 +35,16 @@ func (h *History) UnmarshalJSON(data []byte) error {
 	// correctly unmarshal the Data field into the correct struct
 	// type.
 	m := struct {
+		ID         ulid.ULID         `json:"id"`
 		Type       enums.HistoryType `json:"type"`
-		Identifier Identifier        `json:"id"`
+		Identifier Identifier        `json:"run"`
 		CreatedAt  time.Time         `json:"createdAt"`
+		Data       json.RawMessage   `json:"data"`
 	}{}
 	if err := json.Unmarshal(data, &m); err != nil {
 		return err
 	}
+	h.ID = m.ID
 	h.Type = m.Type
 	h.Identifier = m.Identifier
 	h.CreatedAt = m.CreatedAt
@@ -41,13 +55,20 @@ func (h *History) UnmarshalJSON(data []byte) error {
 		enums.HistoryTypeStepCompleted,
 		enums.HistoryTypeStepErrored,
 		enums.HistoryTypeStepFailed:
-		v := struct {
-			Data HistoryStep `json:"data"`
-		}{}
-		if err := json.Unmarshal(data, &v); err != nil {
+		// Assume that for step history items we must have a HistoryStep
+		// struct within data.
+		v := HistoryStep{}
+		if err := json.Unmarshal(m.Data, &v); err != nil {
 			return err
 		}
-		h.Data = v.Data
+		h.Data = v
+	default:
+		// For other items, unmarshal as JSON
+		v := map[string]any{}
+		if err := json.Unmarshal(m.Data, &v); err != nil {
+			return err
+		}
+		h.Data = v
 	}
 
 	return nil
@@ -59,6 +80,10 @@ func (h History) MarshalBinary() (data []byte, err error) {
 		return nil, err
 	}
 
+	if DefaultHistoryEncoding == HistoryEncodingJSON {
+		return jsonByt, nil
+	}
+
 	var b bytes.Buffer
 	w := gzip.NewWriter(&b)
 	if _, err := w.Write(jsonByt); err != nil {
@@ -67,7 +92,7 @@ func (h History) MarshalBinary() (data []byte, err error) {
 	if err := w.Close(); err != nil {
 		return nil, err
 	}
-	return append([]byte(prefixGzip), b.Bytes()...), nil
+	return append([]byte(HistoryEncodingGZIP), b.Bytes()...), nil
 }
 
 func (h *History) UnmarshalBinary(data []byte) error {
@@ -75,11 +100,11 @@ func (h *History) UnmarshalBinary(data []byte) error {
 		return fmt.Errorf("history must be prefixed; invalid data length")
 	}
 
-	prefix, data := data[0:2], data[2:]
+	prefix, suffix := data[0:2], data[2:]
 
 	switch string(prefix) {
-	case string(prefixGzip):
-		r, err := gzip.NewReader(bytes.NewReader(data))
+	case string(HistoryEncodingGZIP):
+		r, err := gzip.NewReader(bytes.NewReader(suffix))
 		if err != nil {
 			return fmt.Errorf("could not un-gzip data: %w", err)
 		}
@@ -87,9 +112,19 @@ func (h *History) UnmarshalBinary(data []byte) error {
 			return err
 		}
 		return nil
+	case string(HistoryEncodingJSON):
+		if err := json.Unmarshal(suffix, h); err != nil {
+			return err
+		}
+		return nil
+	default:
+		// The default is JSON-encoded, assuming the entire
+		// data is JSON
+		if err := json.Unmarshal(data, h); err != nil {
+			return err
+		}
+		return nil
 	}
-
-	return fmt.Errorf("history had no recognised prefix")
 }
 
 type HistoryFunctionCancelled struct {
