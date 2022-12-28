@@ -37,17 +37,25 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		id = *item.JobID
 	}
 
+	var queueName *string
+	if name, ok := q.queueKindMapping[item.Kind]; ok {
+		queueName = &name
+	}
+
 	_, err := q.EnqueueItem(ctx, QueueItem{
 		ID:          id,
 		AtMS:        at.UnixMilli(),
 		WorkspaceID: item.WorkspaceID,
 		WorkflowID:  item.Identifier.WorkflowID,
 		Data:        item,
+		// Only use the queue name if provided by queueKindMapping.
+		// Otherwise, this defaults to WorkflowID.
+		QueueName: queueName,
 	}, at)
 	if err != nil {
 		return err
 	}
-	logger.From(ctx).Debug().Interface("item", item).Msg("enqueued item")
+
 	return nil
 }
 
@@ -373,7 +381,7 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 			// XXX: Increase errored count
 			qi.Data.Attempt += 1
 			at := backoff.LinearJitterBackoff(qi.Data.Attempt)
-			logger.From(ctx).Info().Err(err).Int64("at_ms", at.UnixMilli()).Interface("item", qi).Msg("requeuing job")
+			logger.From(ctx).Info().Err(err).Int64("at_ms", at.UnixMilli()).Msg("requeuing job")
 			if err := q.Requeue(ctx, qi, at); err != nil {
 				logger.From(ctx).Error().Err(err).Interface("item", qi).Msg("error requeuing job")
 				return err
