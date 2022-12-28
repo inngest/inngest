@@ -151,19 +151,35 @@ func WithDenyQueueNames(queues ...string) func(q *queue) {
 	}
 }
 
+// WithKindToQueueMapping maps queue.Item.Kind strings to queue names.  For example,
+// when pushing a queue.Item with a kind of PayloadEdge, this job can be mapped to
+// a specific queue name here.
+//
+// The mapping must be provided in terms of item kind to queue name.  If the item
+// kind doesn't exist in the mapping the job's queue name will be left nil.  This
+// means that the item will be placed in the workflow ID's queue.
+func WithKindToQueueMapping(mapping map[string]string) func(q *queue) {
+	// XXX: Refactor osqueue.Item and this package to resolve these interfaces
+	// and clean up this function.
+	return func(q *queue) {
+		q.queueKindMapping = mapping
+	}
+}
+
 func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
 		pf: func(ctx context.Context, item QueueItem) uint {
 			return PriorityDefault
 		},
-		kg:             defaultQueueKey,
-		numWorkers:     defaultNumWorkers,
-		metrics:        tally.NewTestScope("queue", map[string]string{}),
-		wg:             &sync.WaitGroup{},
-		seqLeaseLock:   &sync.RWMutex{},
-		pollTick:       defaultPollTick,
-		idempotencyTTL: defaultIdempotencyTTL,
+		kg:               defaultQueueKey,
+		numWorkers:       defaultNumWorkers,
+		metrics:          tally.NewTestScope("queue", map[string]string{}),
+		wg:               &sync.WaitGroup{},
+		seqLeaseLock:     &sync.RWMutex{},
+		pollTick:         defaultPollTick,
+		idempotencyTTL:   defaultIdempotencyTTL,
+		queueKindMapping: make(map[string]string),
 	}
 
 	for _, opt := range opts {
@@ -209,6 +225,8 @@ type queue struct {
 	// being processed.  This lets us check whether there's capacity in the queue
 	// prior to leasing items.
 	sem *trackingSemaphore
+	// queueKindMapping stores a map of job kind => queue names
+	queueKindMapping map[string]string
 
 	// denyQueues provides a denylist ensuring that the queue will never claim
 	// this partition, meaning that no jobs from this queue will run on this worker.
