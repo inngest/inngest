@@ -175,8 +175,11 @@ func TestQueuePeek(t *testing.T) {
 	q := NewQueue(rc)
 	ctx := context.Background()
 
+	// The default blank UUID
+	workflowID := uuid.UUID{}
+
 	t.Run("It returns none with no items enqueued", func(t *testing.T) {
-		items, err := q.Peek(ctx, uuid.UUID{}, time.Now().Add(time.Hour), 10)
+		items, err := q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, len(items))
 	})
@@ -194,7 +197,7 @@ func TestQueuePeek(t *testing.T) {
 		ic, err := q.EnqueueItem(ctx, QueueItem{}, c)
 		require.NoError(t, err)
 
-		items, err := q.Peek(ctx, uuid.UUID{}, time.Now().Add(time.Hour), 10)
+		items, err := q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.EqualValues(t, 3, len(items))
 		require.EqualValues(t, []*QueueItem{&ia, &ib, &ic}, items)
@@ -203,24 +206,24 @@ func TestQueuePeek(t *testing.T) {
 		id, err := q.EnqueueItem(ctx, QueueItem{}, d)
 		require.NoError(t, err)
 
-		items, err = q.Peek(ctx, uuid.UUID{}, time.Now().Add(time.Hour), 10)
+		items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 10)
 		require.NoError(t, err)
 		require.EqualValues(t, 4, len(items))
 		require.EqualValues(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
 
 		t.Run("It should limit the list", func(t *testing.T) {
-			items, err = q.Peek(ctx, uuid.UUID{}, time.Now().Add(time.Hour), 2)
+			items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 2)
 			require.NoError(t, err)
 			require.EqualValues(t, 2, len(items))
 			require.EqualValues(t, []*QueueItem{&ia, &ib}, items)
 		})
 
 		t.Run("It should apply a peek offset", func(t *testing.T) {
-			items, err = q.Peek(ctx, uuid.UUID{}, time.Now().Add(-1*time.Hour), QueuePeekMax)
+			items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(-1*time.Hour), QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, len(items))
 
-			items, err = q.Peek(ctx, uuid.UUID{}, c, QueuePeekMax)
+			items, err = q.Peek(ctx, workflowID.String(), c, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*QueueItem{&ia, &ib, &ic}, items)
@@ -228,10 +231,10 @@ func TestQueuePeek(t *testing.T) {
 
 		t.Run("It should remove any leased items from the list", func(t *testing.T) {
 			// Lease step B, and it should be removed.
-			leaseID, err := q.Lease(ctx, ia.WorkflowID, ia.ID, 50*time.Millisecond)
+			leaseID, err := q.Lease(ctx, ia.Queue(), ia.ID, 50*time.Millisecond)
 			require.NoError(t, err)
 
-			items, err = q.Peek(ctx, uuid.UUID{}, d, QueuePeekMax)
+			items, err = q.Peek(ctx, workflowID.String(), d, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*QueueItem{&ib, &ic, &id}, items)
@@ -239,7 +242,7 @@ func TestQueuePeek(t *testing.T) {
 			// When the lease expires it should re-appear
 			<-time.After(52 * time.Millisecond)
 
-			items, err = q.Peek(ctx, uuid.UUID{}, d, QueuePeekMax)
+			items, err = q.Peek(ctx, workflowID.String(), d, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 4, len(items))
 			ia.LeaseID = leaseID
@@ -265,8 +268,10 @@ func TestQueueLease(t *testing.T) {
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
+		require.Equal(t, item.Queue(), item.WorkflowID.String())
+
 		now := time.Now()
-		id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+		id, err := q.Lease(ctx, item.Queue(), item.ID, time.Second)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -282,7 +287,7 @@ func TestQueueLease(t *testing.T) {
 
 		t.Run("Leasing again should fail", func(t *testing.T) {
 			for i := 0; i < 50; i++ {
-				id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+				id, err := q.Lease(ctx, item.Queue(), item.ID, time.Second)
 				require.Equal(t, ErrQueueItemAlreadyLeased, err)
 				require.Nil(t, id)
 				<-time.After(5 * time.Millisecond)
@@ -292,7 +297,7 @@ func TestQueueLease(t *testing.T) {
 		t.Run("Leasing an expired lease should succeed", func(t *testing.T) {
 			<-time.After(1005 * time.Millisecond)
 			now := time.Now()
-			id, err := q.Lease(ctx, item.WorkflowID, item.ID, 5*time.Second)
+			id, err := q.Lease(ctx, item.Queue(), item.ID, 5*time.Second)
 			require.NoError(t, err)
 			require.NoError(t, err)
 
@@ -302,7 +307,7 @@ func TestQueueLease(t *testing.T) {
 			require.WithinDuration(t, now.Add(5*time.Second), ulid.Time(item.LeaseID.Time()), 20*time.Millisecond)
 
 			t.Run("Expired does not increase partition in-progress count", func(t *testing.T) {
-				val := r.HGet(defaultQueueKey.PartitionMeta(item.WorkflowID.String()), "n")
+				val := r.HGet(defaultQueueKey.PartitionMeta(item.Queue()), "n")
 				require.NotEmpty(t, val)
 				require.Equal(t, "1", val)
 			})
@@ -316,7 +321,7 @@ func TestQueueLease(t *testing.T) {
 
 			requireItemScoreEquals(t, r, item, start)
 
-			_, err = q.Lease(ctx, item.WorkflowID, item.ID, time.Minute)
+			_, err = q.Lease(ctx, item.Queue(), item.ID, time.Minute)
 			require.NoError(t, err)
 
 			requireItemScoreEquals(t, r, item, start.Add(time.Minute))
@@ -340,7 +345,7 @@ func TestQueueExtendLease(t *testing.T) {
 		require.Nil(t, item.LeaseID)
 
 		now := time.Now()
-		id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+		id, err := q.Lease(ctx, item.Queue(), item.ID, time.Second)
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
@@ -395,7 +400,7 @@ func TestQueueDequeue(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, QueueItem{}, start)
 		require.NoError(t, err)
 
-		id, err := q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+		id, err := q.Lease(ctx, item.Queue(), item.ID, time.Second)
 		require.NoError(t, err)
 
 		err = q.Dequeue(ctx, item)
@@ -413,7 +418,7 @@ func TestQueueDequeue(t *testing.T) {
 		})
 
 		t.Run("It should remove the item from the queue index", func(t *testing.T) {
-			items, err := q.Peek(ctx, item.WorkflowID, time.Now().Add(time.Hour), 10)
+			items, err := q.Peek(ctx, item.Queue(), time.Now().Add(time.Hour), 10)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, len(items))
 		})
@@ -449,7 +454,7 @@ func TestQueueRequeue(t *testing.T) {
 
 		item, err := q.EnqueueItem(ctx, QueueItem{}, now)
 		require.NoError(t, err)
-		_, err = q.Lease(ctx, item.WorkflowID, item.ID, time.Second)
+		_, err = q.Lease(ctx, item.Queue(), item.ID, time.Second)
 		require.NoError(t, err)
 
 		// Assert partition index is original
@@ -529,7 +534,7 @@ func TestQueuePartitionLease(t *testing.T) {
 
 	t.Run("It leases a partition", func(t *testing.T) {
 		// Lease the first item
-		leaseID, err := q.PartitionLease(ctx, idA, time.Until(leaseUntil))
+		leaseID, err := q.PartitionLease(ctx, idA.String(), time.Until(leaseUntil))
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
@@ -556,7 +561,7 @@ func TestQueuePartitionLease(t *testing.T) {
 		})
 
 		t.Run("It can't lease an existing partition lease", func(t *testing.T) {
-			id, err := q.PartitionLease(ctx, idA, time.Second*29)
+			id, err := q.PartitionLease(ctx, idA.String(), time.Second*29)
 			require.Equal(t, ErrPartitionAlreadyLeased, err)
 			require.Nil(t, id)
 
@@ -571,7 +576,7 @@ func TestQueuePartitionLease(t *testing.T) {
 
 		requirePartitionScoreEquals(t, r, idA, leaseUntil)
 
-		id, err := q.PartitionLease(ctx, idA, time.Second*5)
+		id, err := q.PartitionLease(ctx, idA.String(), time.Second*5)
 		require.Nil(t, err)
 		require.NotNil(t, id)
 
@@ -603,8 +608,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 	defer rc.Close()
 	q := NewQueue(
 		rc,
-		WithPriorityFinder(func(ctx context.Context, qi *osqueue.Item) uint {
-			switch qi.Identifier.WorkflowID {
+		WithPriorityFinder(func(ctx context.Context, qi QueueItem) uint {
+			switch qi.Data.Identifier.WorkflowID {
 			case idB, idC:
 				return PriorityMax
 			default:
@@ -614,12 +619,15 @@ func TestQueuePartitionPeek(t *testing.T) {
 	)
 	ctx := context.Background()
 
-	_, err := q.EnqueueItem(ctx, newQueueItem(idA), atA)
-	require.NoError(t, err)
-	_, err = q.EnqueueItem(ctx, newQueueItem(idB), atB)
-	require.NoError(t, err)
-	_, err = q.EnqueueItem(ctx, newQueueItem(idC), atC)
-	require.NoError(t, err)
+	enqueue := func(q *queue) {
+		_, err := q.EnqueueItem(ctx, newQueueItem(idA), atA)
+		require.NoError(t, err)
+		_, err = q.EnqueueItem(ctx, newQueueItem(idB), atB)
+		require.NoError(t, err)
+		_, err = q.EnqueueItem(ctx, newQueueItem(idC), atC)
+		require.NoError(t, err)
+	}
+	enqueue(q)
 
 	t.Run("Sequentially returns indexes in order", func(t *testing.T) {
 		items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
@@ -656,6 +664,42 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.Greater(t, c, 300)
 		require.Greater(t, b, 300)
 	})
+
+	t.Run("It ignores partitions with denylists", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+		defer rc.Close()
+		q := NewQueue(
+			rc,
+			WithPriorityFinder(func(ctx context.Context, qi QueueItem) uint {
+				switch qi.Data.Identifier.WorkflowID {
+				case idA:
+					// A is max priority, so likely to come up.
+					return PriorityMax
+				default:
+					return PriorityMin
+				}
+			}),
+			// Ignore A
+			WithDenyQueueNames(idA.String()),
+		)
+
+		enqueue(q)
+
+		// This should only select B and C, as id A is ignored.
+		items, err := q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
+		require.NoError(t, err)
+		require.Len(t, items, 2)
+		require.EqualValues(t, []*QueuePartition{
+			{WorkflowID: idB, Priority: PriorityMin, AtS: atB.Unix()},
+			{WorkflowID: idC, Priority: PriorityMin, AtS: atC.Unix()},
+		}, items)
+
+		// Try without sequential scans
+		items, err = q.PartitionPeek(ctx, false, time.Now().Add(time.Hour), PartitionPeekMax)
+		require.NoError(t, err)
+		require.Len(t, items, 2)
+	})
 }
 
 func TestQueuePartitionRequeue(t *testing.T) {
@@ -673,18 +717,18 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	t.Run("Doesn't requeue the partition if there's an unleased job", func(t *testing.T) {
 		requirePartitionScoreEquals(t, r, idA, now)
 		next := now.Add(time.Hour)
-		err := q.PartitionRequeue(ctx, idA, next)
+		err := q.PartitionRequeue(ctx, idA.String(), next)
 		require.NoError(t, err)
 		requirePartitionScoreEquals(t, r, idA, now)
 	})
 
 	t.Run("Requeus the partition with a leased job", func(t *testing.T) {
-		_, err := q.Lease(ctx, idA, qi.ID, 10*time.Second)
+		_, err := q.Lease(ctx, idA.String(), qi.ID, 10*time.Second)
 		require.NoError(t, err)
 
 		requirePartitionScoreEquals(t, r, idA, now)
 		next := now.Add(time.Hour)
-		err = q.PartitionRequeue(ctx, idA, next)
+		err = q.PartitionRequeue(ctx, idA.String(), next)
 		require.NoError(t, err)
 		requirePartitionScoreEquals(t, r, idA, next)
 	})
@@ -692,10 +736,10 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	t.Run("It removes any lease when requeueing", func(t *testing.T) {
 		next := now.Add(5 * time.Second)
 
-		_, err := q.PartitionLease(ctx, idA, time.Minute)
+		_, err := q.PartitionLease(ctx, idA.String(), time.Minute)
 		require.NoError(t, err)
 
-		err = q.PartitionRequeue(ctx, idA, next)
+		err = q.PartitionRequeue(ctx, idA.String(), next)
 		require.NoError(t, err)
 		requirePartitionScoreEquals(t, r, idA, next)
 
@@ -707,7 +751,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		err := q.Dequeue(ctx, qi)
 		require.NoError(t, err)
 
-		err = q.PartitionRequeue(ctx, idA, time.Now().Add(time.Minute))
+		err = q.PartitionRequeue(ctx, idA.String(), time.Now().Add(time.Minute))
 		require.Equal(t, ErrPartitionGarbageCollected, err)
 	})
 }
@@ -722,7 +766,7 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	defer rc.Close()
 	q := NewQueue(
 		rc,
-		WithPriorityFinder(func(ctx context.Context, item *osqueue.Item) uint {
+		WithPriorityFinder(func(ctx context.Context, item QueueItem) uint {
 			return priority
 		}),
 	)
@@ -736,14 +780,14 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 
 	t.Run("It updates priority", func(t *testing.T) {
 		priority = PriorityMax
-		err = q.PartitionReprioritize(ctx, idA, PriorityMax)
+		err = q.PartitionReprioritize(ctx, idA.String(), PriorityMax)
 		require.NoError(t, err)
 		second := getPartition(t, r, idA)
 		require.Equal(t, second.Priority, PriorityMax)
 	})
 
 	t.Run("It doesn't accept min priorities", func(t *testing.T) {
-		err = q.PartitionReprioritize(ctx, idA, PriorityMin+1)
+		err = q.PartitionReprioritize(ctx, idA.String(), PriorityMin+1)
 		require.Equal(t, ErrPriorityTooLow, err)
 	})
 }
@@ -755,7 +799,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 	q := queue{
 		kg: defaultQueueKey,
 		r:  rc,
-		pf: func(ctx context.Context, item *osqueue.Item) uint {
+		pf: func(ctx context.Context, item QueueItem) uint {
 			return PriorityMin
 		},
 	}
