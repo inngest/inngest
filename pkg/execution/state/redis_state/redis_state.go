@@ -264,11 +264,10 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		}
 	}
 
-	history := state.History{
-		Type:       enums.HistoryTypeFunctionStarted,
-		Identifier: input.Identifier,
-		CreatedAt:  time.UnixMilli(int64(input.Identifier.RunID.Time())),
-	}
+	history := state.NewHistory()
+	history.Type = enums.HistoryTypeFunctionStarted
+	history.Identifier = input.Identifier
+	history.CreatedAt = time.UnixMilli(int64(input.Identifier.RunID.Time()))
 
 	status, err := scripts["new"].Eval(
 		ctx,
@@ -445,6 +444,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		if r.Final() {
 			typ = enums.HistoryTypeStepFailed
 			funcFailHistory = state.History{
+				ID:         state.HistoryID(),
 				Type:       enums.HistoryTypeFunctionFailed,
 				Identifier: i,
 				CreatedAt:  now,
@@ -453,6 +453,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 	}
 
 	stepHistory := state.History{
+		ID:         state.HistoryID(),
 		Type:       typ,
 		Identifier: i,
 		CreatedAt:  now,
@@ -499,6 +500,7 @@ func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, at
 	return m.r.ZAdd(ctx, m.kf.History(ctx, id.RunID), &redis.Z{
 		Score: float64(now.UnixMilli()),
 		Member: state.History{
+			ID:         state.HistoryID(),
 			Type:       enums.HistoryTypeStepStarted,
 			Identifier: id,
 			CreatedAt:  now,
@@ -518,6 +520,7 @@ func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, a
 		m.r,
 		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
 		state.History{
+			ID:         state.HistoryID(),
 			Type:       enums.HistoryTypeStepScheduled,
 			Identifier: i,
 			CreatedAt:  now,
@@ -549,6 +552,7 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, a
 		m.r,
 		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
 		state.History{
+			ID:         state.HistoryID(),
 			Type:       enums.HistoryTypeFunctionCompleted,
 			Identifier: i,
 			CreatedAt:  now,
