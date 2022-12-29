@@ -350,6 +350,15 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 	return fmt.Errorf("unknown return value cancelling function: %d", status)
 }
 
+func (m mgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, error) {
+	metadata, err := m.metadata(ctx, runID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load metadata: %w", err)
+	}
+	meta := metadata.Metadata()
+	return &meta, nil
+}
+
 func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	// XXX: Use a pipeliner to improve speed.
 	metadata, err := m.metadata(ctx, runID)

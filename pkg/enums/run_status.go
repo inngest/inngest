@@ -21,6 +21,15 @@ const (
 	RunStatusCancelled
 )
 
+// RunStatusEnded returns whether the function has ended based off of the
+// run status.
+func RunStatusEnded(s RunStatus) bool {
+	if s == RunStatusCancelled || s == RunStatusCompleted || s == RunStatusFailed {
+		return true
+	}
+	return false
+}
+
 func (r RunStatus) MarshalBinary() ([]byte, error) {
 	byt := []byte{}
 	return strconv.AppendInt(byt, int64(r), 10), nil

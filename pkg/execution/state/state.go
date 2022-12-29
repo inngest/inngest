@@ -177,6 +177,10 @@ type FunctionCallback func(context.Context, Identifier, enums.RunStatus)
 
 // Loader allows loading of previously stored state based off of a given Identifier.
 type Loader interface {
+	// Metadata returns run metadata for the given identifier.  It may be cheaper
+	// than a full load in cases where only the metadata is necessary.
+	Metadata(ctx context.Context, runID ulid.ULID) (*Metadata, error)
+
 	// Load returns run state for the given identifier.
 	Load(ctx context.Context, runID ulid.ULID) (State, error)
 
