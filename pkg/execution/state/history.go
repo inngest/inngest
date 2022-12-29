@@ -5,6 +5,8 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"math"
+	"sync"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -17,7 +19,7 @@ var (
 	// This can be changed on init to change how we globally store history.
 	DefaultHistoryEncoding = HistoryEncodingGZIP
 
-	rnd *frand.RNG
+	rnd *frandRNG
 )
 
 const (
@@ -26,7 +28,7 @@ const (
 )
 
 func init() {
-	rnd = frand.New()
+	rnd = &frandRNG{RNG: frand.New(), lock: &sync.Mutex{}}
 }
 
 // NewHistory returns a new history struct with an ID created at the time of
@@ -174,4 +176,42 @@ type HistoryStepWaiting struct {
 	EventName  *string   `json:"eventName"`
 	Expression *string   `json:"expression"`
 	ExpiryTime time.Time `json:"expiry"`
+}
+
+// frandRNG is a fast crypto-secure prng which uses a mutex to guard
+// parallel reads.  It also implements the x/exp/rand.Source interface
+// by adding a Seed() method which does nothing.
+type frandRNG struct {
+	*frand.RNG
+	lock *sync.Mutex
+}
+
+func (f *frandRNG) Read(b []byte) (int, error) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.RNG.Read(b)
+}
+
+func (f *frandRNG) Uint64() uint64 {
+	return f.Uint64n(math.MaxUint64)
+}
+
+func (f *frandRNG) Uint64n(n uint64) uint64 {
+	// sampled.Take calls Uint64n, which must be guarded by a lock in order
+	// to be thread-safe.
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.RNG.Uint64n(n)
+}
+
+func (f *frandRNG) Float64() float64 {
+	// sampled.Take also calls Float64, which must be guarded by a lock in order
+	// to be thread-safe.
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.RNG.Float64()
+}
+
+func (f *frandRNG) Seed(seed uint64) {
+	// Do nothing.
 }
