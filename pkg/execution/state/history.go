@@ -9,18 +9,37 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
+	"lukechampine.com/frand"
 )
 
 var (
 	// DefaultHistoryEncoding represents the encoding used when storing data within Redis.
 	// This can be changed on init to change how we globally store history.
 	DefaultHistoryEncoding = HistoryEncodingGZIP
+
+	rnd *frand.RNG
 )
 
 const (
 	HistoryEncodingJSON = "0:"
 	HistoryEncodingGZIP = "1:"
 )
+
+func init() {
+	rnd = frand.New()
+}
+
+// NewHistory returns a new history struct with an ID created at the time of
+// invocation
+func NewHistory() History {
+	id, _ := ulid.New(ulid.Now(), rnd)
+	return History{ID: id}
+}
+
+func HistoryID() ulid.ULID {
+	id, _ := ulid.New(ulid.Now(), rnd)
+	return id
+}
 
 type History struct {
 	ID         ulid.ULID         `json:"id"`

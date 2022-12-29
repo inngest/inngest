@@ -116,6 +116,7 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 	m.state[input.Identifier.RunID] = s
 
 	m.setHistory(ctx, input.Identifier, state.History{
+		ID:         state.HistoryID(),
 		Type:       enums.HistoryTypeFunctionStarted,
 		Identifier: input.Identifier,
 		CreatedAt:  time.UnixMilli(int64(input.Identifier.RunID.Time())),
@@ -158,6 +159,7 @@ func (m *mem) Started(ctx context.Context, i state.Identifier, stepID string, at
 	defer m.lock.Unlock()
 
 	m.setHistory(ctx, i, state.History{
+		ID:         state.HistoryID(),
 		Type:       enums.HistoryTypeStepStarted,
 		Identifier: i,
 		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
@@ -184,6 +186,7 @@ func (m *mem) Scheduled(ctx context.Context, i state.Identifier, stepID string, 
 	m.state[i.RunID] = instance
 
 	m.setHistory(ctx, i, state.History{
+		ID:         state.HistoryID(),
 		Type:       enums.HistoryTypeStepScheduled,
 		Identifier: i,
 		CreatedAt:  time.UnixMilli(int64(i.RunID.Time())),
@@ -218,6 +221,7 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string, 
 		go m.runCallbacks(ctx, i, enums.RunStatusCompleted)
 
 		m.setHistory(ctx, i, state.History{
+			ID:         state.HistoryID(),
 			Type:       enums.HistoryTypeFunctionCompleted,
 			Identifier: i,
 			CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
@@ -254,6 +258,7 @@ func (m *mem) Cancel(ctx context.Context, i state.Identifier) error {
 	go m.runCallbacks(ctx, i, enums.RunStatusCancelled)
 
 	m.setHistory(ctx, i, state.History{
+		ID:         state.HistoryID(),
 		Type:       enums.HistoryTypeFunctionCancelled,
 		Identifier: i,
 		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
@@ -283,6 +288,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 		delete(instance.errors, r.Step.ID)
 
 		m.setHistory(ctx, i, state.History{
+			ID:         state.HistoryID(),
 			Type:       enums.HistoryTypeStepCompleted,
 			Identifier: i,
 			CreatedAt:  now,
@@ -302,6 +308,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 		}
 
 		m.setHistory(ctx, i, state.History{
+			ID:         state.HistoryID(),
 			Type:       typ,
 			Identifier: i,
 			CreatedAt:  now,
@@ -319,6 +326,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 		instance.metadata.Status = enums.RunStatusFailed
 		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
 		m.setHistory(ctx, i, state.History{
+			ID:         state.HistoryID(),
 			Type:       enums.HistoryTypeFunctionFailed,
 			Identifier: i,
 			CreatedAt:  now,
@@ -342,6 +350,7 @@ func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
 	m.pauses[p.ID] = p
 
 	m.setHistory(ctx, p.Identifier, state.History{
+		ID:         state.HistoryID(),
 		Type:       enums.HistoryTypeStepWaiting,
 		Identifier: p.Identifier,
 		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
