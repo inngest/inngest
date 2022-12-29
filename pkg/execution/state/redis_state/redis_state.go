@@ -751,16 +751,47 @@ func (m mgr) History(ctx context.Context, runID ulid.ULID) ([]state.History, err
 	history := make([]state.History, len(items))
 	for n, i := range items {
 		var h state.History
-
 		err := h.UnmarshalBinary([]byte(i))
 		if err != nil {
 			return nil, err
 		}
-
 		history[n] = h
 	}
 
 	return history, nil
+}
+
+func (m mgr) DeleteHistory(ctx context.Context, runID ulid.ULID, historyID ulid.ULID) error {
+	// Fetch the items from the zset, and remove if the ID matches.
+	//
+	// XXX: We can make this more efficient by recording a map and zset as separate
+	// keys.
+	key := m.kf.History(ctx, runID)
+	items, err := m.r.ZRangeArgs(ctx, redis.ZRangeArgs{
+		Key:     key,
+		Start:   "-inf",
+		Stop:    "+inf",
+		ByScore: true,
+	}).Result()
+	if err != nil {
+		return err
+	}
+
+	for _, i := range items {
+		var h state.History
+		err := h.UnmarshalBinary([]byte(i))
+		if err != nil {
+			return err
+		}
+		if h.ID == historyID {
+			if err := m.r.ZRem(ctx, key, i).Err(); err != nil {
+				return err
+			}
+			return nil
+		}
+	}
+
+	return nil
 }
 
 func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {

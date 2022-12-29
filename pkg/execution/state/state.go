@@ -244,6 +244,12 @@ type Mutater interface {
 	SaveResponse(ctx context.Context, i Identifier, r DriverResponse, attempt int) (State, error)
 }
 
+// HistoryDeleter is an optional interface a state can implement, deleting specific history items
+// for a run.
+type HistoryDeleter interface {
+	DeleteHistory(ctx context.Context, runID ulid.ULID, historyID ulid.ULID) error
+}
+
 // Input is the input for creating new state.  The required fields are Workflow,
 // Identifier and Input;  the rest of the data is stored within the state store as
 // metadata.
