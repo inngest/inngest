@@ -128,6 +128,19 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 
 }
 
+func (m *mem) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, error) {
+	m.lock.RLock()
+	s, ok := m.state[runID]
+	m.lock.RUnlock()
+
+	if ok {
+		m := s.Metadata()
+		return &m, nil
+	}
+
+	return nil, fmt.Errorf("state not found with identifier: %s", runID.String())
+}
+
 func (m *mem) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	m.lock.RLock()
 	s, ok := m.state[runID]
