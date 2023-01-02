@@ -45,9 +45,18 @@ function MyApp({ Component, pageProps }) {
     !pageProps?.meta?.title &&
     process.env.NODE_ENV !== "production"
   ) {
-    console.warn(
-      "WARNING: meta tags are not set for this page, please set via getStaticProps"
-    );
+    const INNGEST_SDK_URLS = [
+      "/api/inngest",
+      "/x/inngest",
+      "/.redwood/functions/inngest",
+      "/.netlify/functions/inngest",
+    ];
+    // Ignore the dev server polling for functions
+    if (!INNGEST_SDK_URLS.includes(router.asPath)) {
+      console.warn(
+        `WARNING: meta tags are not set for this page, please set via getStaticProps (${router.asPath})`
+      );
+    }
   }
   const disableMetadata = pageProps?.meta?.disabled === true;
 
