@@ -133,11 +133,6 @@ export default function About() {
 
             <div className="mx-auto prose text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
               <p>
-                We believe that event-based systems can be beautifully simple
-                and we're building the platform to enable developers to build
-                amazing products without the overhead.
-              </p>
-              <p>
                 Inngest is an{" "}
                 <a href="https://github.com/inngest/inngest">open source</a>{" "}
                 platform that enables developers to build amazing products by
