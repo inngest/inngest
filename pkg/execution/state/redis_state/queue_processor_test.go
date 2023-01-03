@@ -258,7 +258,7 @@ func TestQueueRunExtended(t *testing.T) {
 				latencySem.Lock()
 				// NOTE: RUNNING THIS WITH THE RACE CHECKER SIGNIFICANTLY REDUCES LATENCY.
 				// The actual latency should be checked without --race on.
-				fmt.Printf("AVG LATENCY: %dms\n", time.Duration(latencyAvg.GetEWMA()).Milliseconds())
+				fmt.Printf("AVG LATENCY: %dms\n", time.Duration(latencyAvg.Value()).Milliseconds())
 				latencySem.Unlock()
 				prev = next
 			}

@@ -28,7 +28,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber-go/tally/internal/identity"
+	"github.com/uber-go/tally/v4/internal/identity"
 )
 
 var (
@@ -195,9 +195,7 @@ func (t *timer) RecordStopwatch(stopwatchStart time.Time) {
 func (t *timer) snapshot() []time.Duration {
 	t.unreported.RLock()
 	snap := make([]time.Duration, len(t.unreported.values))
-	for i := range t.unreported.values {
-		snap[i] = t.unreported.values[i]
-	}
+	copy(snap, t.unreported.values)
 	t.unreported.RUnlock()
 	return snap
 }
@@ -432,10 +430,8 @@ func (h *histogram) snapshotDurations() map[time.Duration]int64 {
 }
 
 type histogramBucket struct {
-	valueUpperBound      float64
-	durationUpperBound   time.Duration
-	cachedValueBucket    CachedHistogramBucket
-	cachedDurationBucket CachedHistogramBucket
+	valueUpperBound    float64
+	durationUpperBound time.Duration
 }
 
 func durationLowerBound(buckets []histogramBucket, i int) time.Duration {
@@ -519,10 +515,13 @@ var NullStatsReporter StatsReporter = nullStatsReporter{}
 
 func (r nullStatsReporter) ReportCounter(name string, tags map[string]string, value int64) {
 }
+
 func (r nullStatsReporter) ReportGauge(name string, tags map[string]string, value float64) {
 }
+
 func (r nullStatsReporter) ReportTimer(name string, tags map[string]string, interval time.Duration) {
 }
+
 func (r nullStatsReporter) ReportHistogramValueSamples(
 	name string,
 	tags map[string]string,
@@ -542,9 +541,11 @@ func (r nullStatsReporter) ReportHistogramDurationSamples(
 	samples int64,
 ) {
 }
+
 func (r nullStatsReporter) Capabilities() Capabilities {
 	return capabilitiesNone
 }
+
 func (r nullStatsReporter) Flush() {
 }
 
