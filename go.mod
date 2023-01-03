@@ -6,15 +6,16 @@ require (
 	cuelang.org/go v0.4.2
 	github.com/99designs/gqlgen v0.17.12
 	github.com/AlecAivazis/survey/v2 v2.3.4
+	github.com/VividCortex/ewma v1.2.0
 	github.com/alecthomas/chroma v0.10.0
 	github.com/alicebob/miniredis/v2 v2.21.0
 	github.com/aws/aws-sdk-go v1.43.31
+	github.com/cespare/xxhash/v2 v2.1.2
 	github.com/charmbracelet/bubbles v0.10.3
 	github.com/charmbracelet/bubbletea v0.20.0
 	github.com/charmbracelet/glamour v0.5.0
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
-	github.com/emperorearth/vitess v2.0.0+incompatible
 	github.com/fergusstrange/embedded-postgres v1.17.0
 	github.com/fsouza/go-dockerclient v1.7.9
 	github.com/go-chi/chi/v5 v5.0.7
@@ -51,7 +52,7 @@ require (
 	github.com/stretchr/testify v1.7.1
 	github.com/tidwall/sjson v1.2.5
 	github.com/tonyhb/enumer v1.2.0
-	github.com/uber-go/tally v3.5.0+incompatible
+	github.com/uber-go/tally/v4 v4.1.4
 	github.com/vektah/gqlparser/v2 v2.4.6
 	github.com/xhit/go-str2duration/v2 v2.0.0
 	gocloud.dev v0.25.0
@@ -98,7 +99,6 @@ require (
 	github.com/aws/smithy-go v1.11.2 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/bxcodec/faker/v3 v3.8.0 // indirect
-	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/charmbracelet/harmonica v0.1.0 // indirect
 	github.com/cockroachdb/apd/v2 v2.0.2 // indirect
 	github.com/containerd/cgroups v1.0.2 // indirect

@@ -16,7 +16,7 @@ import (
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
-	"github.com/uber-go/tally"
+	"github.com/uber-go/tally/v4"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"lukechampine.com/frand"
 )
@@ -91,7 +91,7 @@ func WithName(name string) func(q *queue) {
 
 func WithMetricsScope(scope tally.Scope) func(q *queue) {
 	return func(q *queue) {
-		q.metrics = scope
+		q.scope = scope
 	}
 }
 
@@ -174,7 +174,7 @@ func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
 		},
 		kg:               defaultQueueKey,
 		numWorkers:       defaultNumWorkers,
-		metrics:          tally.NewTestScope("queue", map[string]string{}),
+		scope:            tally.NoopScope,
 		wg:               &sync.WaitGroup{},
 		seqLeaseLock:     &sync.RWMutex{},
 		pollTick:         defaultPollTick,
@@ -200,7 +200,7 @@ type queue struct {
 	pf PriorityFinder
 	kg QueueKeyGenerator
 	// metrics allows reporting of metrics
-	metrics tally.Scope
+	scope tally.Scope
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.

@@ -8,11 +8,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/emperorearth/vitess/go/ewma"
+	"github.com/VividCortex/ewma"
 	"github.com/inngest/inngest/pkg/backoff"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
+	"github.com/uber-go/tally/v4"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -22,12 +23,26 @@ const (
 )
 
 var (
-	latencyAvg *ewma.EWMA
+	latencyAvg ewma.MovingAverage
 	latencySem *sync.Mutex
+
+	latencyBuckets = tally.DurationBuckets{
+		time.Millisecond,
+		5 * time.Millisecond,
+		10 * time.Millisecond,
+		25 * time.Millisecond,
+		50 * time.Millisecond,
+		100 * time.Millisecond,
+		250 * time.Millisecond,
+		500 * time.Millisecond,
+		time.Second,
+		10 * time.Second,
+		time.Minute,
+	}
 )
 
 func init() {
-	latencyAvg = ewma.NewEWMA(ewma.DefaultWeightingFactor)
+	latencyAvg = ewma.NewMovingAverage()
 	latencySem = &sync.Mutex{}
 }
 
@@ -41,6 +56,10 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 	if name, ok := q.queueKindMapping[item.Kind]; ok {
 		queueName = &name
 	}
+
+	go q.scope.Tagged(map[string]string{
+		"kind": item.Kind,
+	}).Counter("queue_items_enqueued_total").Inc(1)
 
 	_, err := q.EnqueueItem(ctx, QueueItem{
 		ID:          id,
@@ -138,14 +157,25 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 			if err == ErrSequentialAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
+				q.seqLeaseLock.Lock()
+				q.seqLeaseID = nil
+				q.seqLeaseLock.Unlock()
 				continue
 			}
 			if err != nil {
 				logger.From(ctx).Error().Err(err).Msg("error claiming sequential lease")
+				q.seqLeaseLock.Lock()
+				q.seqLeaseID = nil
+				q.seqLeaseLock.Unlock()
 				continue
 			}
 
 			q.seqLeaseLock.Lock()
+			if q.seqLeaseID == nil {
+				// Only track this if we're creating a new lease, not if we're renewing
+				// a lease.
+				go q.scope.Counter("queue_sequential_lease_claims_total").Inc(1)
+			}
 			q.seqLeaseID = leaseID
 			q.seqLeaseLock.Unlock()
 		}
@@ -295,7 +325,9 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 	var err error
 	leaseID := qi.LeaseID
 
-	// TODO Verify we have lease.
+	scope := q.scope.Tagged(map[string]string{
+		"kind": qi.Data.Kind,
+	})
 
 	// Allow the main runner to block until this work is done
 	q.wg.Add(1)
@@ -353,20 +385,28 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 		go func() {
 			// Track the latency on average globally.  Do this in a goroutine so that it doesn't
 			// at all delay the job during concurrenty locking contention.
-			latencySem.Lock()
-			defer latencySem.Unlock()
 			latency := time.Since(time.UnixMilli(qi.AtMS))
-			latencyAvg.AddValue(float64(latency))
-			// XXX: Add indinvidual latency to metrics
+
+			// Update the ewma
+			latencySem.Lock()
+			latencyAvg.Add(float64(latency))
+			scope.Gauge("queue_item_latency_ewma").Update(latencyAvg.Value())
+			latencySem.Unlock()
+
+			// Set the metrics historgram and gauge, which reports the ewma value.
+			scope.Histogram("queue_item_latency_dutation", latencyBuckets).RecordDuration(latency)
 		}()
 
+		go scope.Counter("queue_items_started_total").Inc(1)
 		err := f(jobCtx, qi.Data)
 		extendLeaseTick.Stop()
 		if err != nil {
-			// XXX: Increase counter for queue item error
+			go scope.Counter("queue_items_errored_total").Inc(1)
 			errCh <- err
 			return
 		}
+		go scope.Counter("queue_items_complete_total").Inc(1)
+
 		// Closing this channel prevents the goroutine which extends lease from leaking,
 		// and dequeues the job
 		close(doneCh)
