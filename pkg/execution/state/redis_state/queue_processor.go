@@ -394,7 +394,7 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 			latencySem.Unlock()
 
 			// Set the metrics historgram and gauge, which reports the ewma value.
-			scope.Histogram("queue_item_latency_dutation", latencyBuckets).RecordDuration(latency)
+			scope.Histogram("queue_item_latency_duration", latencyBuckets).RecordDuration(latency)
 		}()
 
 		go scope.Counter("queue_items_started_total").Inc(1)
