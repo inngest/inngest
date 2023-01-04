@@ -124,20 +124,20 @@ export default function useCase({ stringData }) {
         <SectionHeader title="Queue work in just a few lines of code" />
         <div className="flex mt-16 flex-col lg:flex-row flex-start ">
           <div className="text-slate-200 mb-10 lg:mb-0 lg:pr-20 max-w-[400px] justify-center flex flex-col gap-3">
-            <p className="flex items-center gap-3">
-              <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold">
+            <p className="flex items-start gap-3">
+              <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold shrink-0">
                 1
               </span>{" "}
               Define your event payload type
             </p>
-            <p className="flex items-center gap-3">
-              <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold">
+            <p className="flex items-start gap-3">
+              <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold shrink-0">
                 2
               </span>{" "}
               Send events with type{" "}
             </p>
-            <p className="flex items-center gap-3">
-              <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold">
+            <p className="flex items-start gap-3">
+              <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold shrink-0">
                 3
               </span>{" "}
               Define your functions with that event trigger
