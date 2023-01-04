@@ -16,7 +16,6 @@ import {
   Doc,
   Docs,
 } from "../../utils/docs";
-import Code from "../../shared/legacy/Code";
 import { DocsLayout, DocsContent } from "../docs";
 import { highlight } from "../../utils/code";
 
@@ -82,7 +81,7 @@ export default function DocLayout(props: any) {
         <MDXRemote
           compiledSource={props.post.compiledSource}
           scope={scope}
-          components={{ Code, Image }}
+          components={{ Image }}
         />
 
         <FooterLinks className="grid sm:grid-cols-1 md:grid-cols-2 gap-4 py-8">
