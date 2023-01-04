@@ -355,7 +355,7 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 					return
 				}
 				leaseID, err = q.ExtendLease(ctx, qi, *leaseID, QueueLeaseDuration)
-				if err != nil && err != ErrQueueItemNotFound {
+				if err != nil && err != ErrQueueItemNotFound && err != context.Canceled {
 					// XXX: Increase counter here.
 					logger.From(ctx).Error().Err(err).Msg("error extending lease")
 					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
@@ -390,7 +390,7 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 			// Update the ewma
 			latencySem.Lock()
 			latencyAvg.Add(float64(latency))
-			scope.Gauge("queue_item_latency_ewma").Update(latencyAvg.Value())
+			scope.Gauge("queue_item_latency_ewma").Update(latencyAvg.Value() / 1e6)
 			latencySem.Unlock()
 
 			// Set the metrics historgram and gauge, which reports the ewma value.
