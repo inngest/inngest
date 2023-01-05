@@ -5,6 +5,7 @@ import styled from "@emotion/styled";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
 import rehypeSlug from "rehype-slug";
+import rehypeRaw from "rehype-raw";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 // local
 import {

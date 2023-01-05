@@ -95,6 +95,12 @@
     "zod": "^3.18.0"
   },
   "devDependencies": {
+    "@storybook/addon-actions": "^6.5.15",
+    "@storybook/addon-essentials": "^6.5.15",
+    "@storybook/addon-interactions": "^6.5.15",
+    "@storybook/addon-links": "^6.5.15",
+    "@storybook/react": "^6.5.15",
+    "@storybook/testing-library": "^0.0.13",
     "@types/lodash.shuffle": "^4.2.7",
     "@types/marked": "^4.0.5"
   }
