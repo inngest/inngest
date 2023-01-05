@@ -101,22 +101,20 @@ export default function LibraryExamplePage(props: Props) {
                   <Link
                     key={example.id}
                     href={`/quick-starts/${example.id}?ref=quick-starts/${props.id}`}
-                    passHref
+                    className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-black transition-all transform hover:scale-105 hover:shadow-lg flex-1"
                   >
-                    <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-black transition-all transform hover:scale-105 hover:shadow-lg flex-1">
-                      <div className="font semi-bold text-white">
-                        {example.name}
+                    <div className="font semi-bold text-white">
+                      {example.name}
+                    </div>
+                    {example.description ? (
+                      <div className="font-xs text-gray-200">
+                        {example.description}
                       </div>
-                      {example.description ? (
-                        <div className="font-xs text-gray-200">
-                          {example.description}
-                        </div>
-                      ) : null}
-                      <div className="flex-1" />
-                      <a className="text-blue-500 font-semibold text-right">
-                        Explore →
-                      </a>
-                    </a>
+                    ) : null}
+                    <div className="flex-1" />
+                    <span className="text-blue-500 font-semibold text-right">
+                      Explore →
+                    </span>
                   </Link>
                 </div>
               ))}

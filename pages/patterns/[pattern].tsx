@@ -62,7 +62,6 @@ export default function Patterns({
   headings,
   compiledSource,
 }: Props) {
-  console.log(compiledSource);
   const sectionClasses = `max-w-2xl mx-auto px-6 lg:px-4 text-left`;
   return (
     <Page>
@@ -76,13 +75,12 @@ export default function Patterns({
             <div className="flex flex-col gap-4">
               <header className="mt-2">
                 <p className="text-xs font-normal flex gap-1">
-                  <Link href="/patterns" passHref>
-                    <a className="text-almost-black transition-all duration-300 hover:-translate-x-0.5">
-                      <span className="text-slate-400">←</span> Patterns{" "}
-                      <span className="text-slate-400">
-                        Async + Event-Driven
-                      </span>
-                    </a>
+                  <Link
+                    href="/patterns"
+                    className="text-almost-black transition-all duration-300 hover:-translate-x-0.5"
+                  >
+                    <span className="text-slate-400">←</span> Patterns{" "}
+                    <span className="text-slate-400">Async + Event-Driven</span>
                   </Link>
                 </p>
 
@@ -122,10 +120,11 @@ export default function Patterns({
             <MDXRemote compiledSource={compiledSource} components={{}} />
 
             <p className="mt-24 text-2xl font-normal flex gap-1">
-              <Link href="/patterns" passHref>
-                <a className="text-almost-black transition-all	duration-300 hover:-translate-x-1">
-                  <span className="text-slate-400">←</span> View All Patterns
-                </a>
+              <Link
+                href="/patterns"
+                className="text-almost-black transition-all	duration-300 hover:-translate-x-1"
+              >
+                <span className="text-slate-400">←</span> View All Patterns
               </Link>
             </p>
           </div>

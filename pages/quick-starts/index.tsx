@@ -119,39 +119,37 @@ export default function LibraryExamplesPage(props: Props) {
               <Link
                 key={example.id}
                 href={`/quick-starts/${example.id}?ref=quick-starts`}
-                passHref
+                className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-white transition-all transform hover:scale-105 hover:shadow-lg flex-1"
               >
-                <a className="rounded-lg border border-gray-200 p-6 flex flex-col space-y-2 bg-white transition-all transform hover:scale-105 hover:shadow-lg flex-1">
-                  <div className="text-black">{example.name}</div>
-                  {example.description ? (
-                    <div className="text-sm text-gray-500">
-                      {example.description}
-                    </div>
-                  ) : null}
-                  {example.tags.length ? (
-                    <div className="flex flex-row flex-wrap gap-1">
-                      {example.tags.map((tag) => (
-                        <Tag
-                          key={tag}
-                          name={tag}
-                          onSelect={() => {
-                            setActiveTags((currTags) => {
-                              if (currTags.includes(tag)) {
-                                return currTags.filter((t) => t !== tag);
-                              }
+                <div className="text-black">{example.name}</div>
+                {example.description ? (
+                  <div className="text-sm text-gray-500">
+                    {example.description}
+                  </div>
+                ) : null}
+                {example.tags.length ? (
+                  <div className="flex flex-row flex-wrap gap-1">
+                    {example.tags.map((tag) => (
+                      <Tag
+                        key={tag}
+                        name={tag}
+                        onSelect={() => {
+                          setActiveTags((currTags) => {
+                            if (currTags.includes(tag)) {
+                              return currTags.filter((t) => t !== tag);
+                            }
 
-                              return [...currTags, tag];
-                            });
-                          }}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className="flex-1" />
-                  <a className="text-blue-500 font-semibold text-right">
-                    Explore →
-                  </a>
-                </a>
+                            return [...currTags, tag];
+                          });
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                <div className="flex-1" />
+                <span className="text-blue-500 font-semibold text-right">
+                  Explore →
+                </span>
               </Link>
             </div>
           ))}

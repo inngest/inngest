@@ -64,14 +64,15 @@ export default function BlogLayout(props) {
       },
     ],
   };
+  const title = `${scope.heading} - Inngest Blog`;
 
   return (
     <>
       <Head>
-        <title>{scope.heading} → Inngest Blog</title>
+        <title>{title}</title>
         <meta name="description" content={scope.subtitle}></meta>
         <meta name="title" content={scope.heading}></meta>
-        <meta property="og:title" content={`${scope.heading} → Inngest Blog`} />
+        <meta property="og:title" content={`${scope.heading} - Inngest Blog`} />
         <meta property="og:description" content={scope.subtitle} />
         <meta property="og:type" content="article" />
         <meta

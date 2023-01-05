@@ -84,8 +84,8 @@ const DocsNav: React.FC<{
         <Nav>
           <NavList>
             <NavItem isCurrentPage={router.asPath === "/docs"}>
-              <Link href="/docs/">
-                <a className="docs-page">Introduction</a>
+              <Link href="/docs/" className="docs-page">
+                Introduction
               </Link>
             </NavItem>
             {navSections.map((s) => (
@@ -197,14 +197,13 @@ const DocsNavItem: React.FC<{
   return (
     <NavItem key={title} isCurrentPage={isCurrentPage}>
       {doc && doc.reading?.words > 0 ? (
-        <Link href={`/docs/${doc.slug}`}>
-          <a
-            className="docs-page"
-            dangerouslySetInnerHTML={{
-              __html: formattedTitle,
-            }}
-          ></a>
-        </Link>
+        <Link
+          href={`/docs/${doc.slug}`}
+          className="docs-page"
+          dangerouslySetInnerHTML={{
+            __html: formattedTitle,
+          }}
+        ></Link>
       ) : (
         <span
           className="docs-category"
