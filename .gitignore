@@ -1,9 +1,10 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# dependencies - Use yarn :)
 /node_modules
 /.pnp
 .pnp.js
+package-lock.json
 
 /.cache
 

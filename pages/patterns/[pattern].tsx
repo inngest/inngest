@@ -3,16 +3,12 @@ import styled from "@emotion/styled";
 import { GetStaticProps, GetStaticPaths } from "next";
 import Link from "next/link";
 import { MDXRemote } from "next-mdx-remote";
-import { serialize } from "next-mdx-remote/serialize";
-import rehypeSlug from "rehype-slug";
-import rehypeAutolinkHeadings from "rehype-autolink-headings";
 
 import Nav from "src/shared/legacy/nav";
 import Footer from "src/shared/legacy/Footer";
-import { highlight } from "src/utils/code";
-import { getHeadingsAsArray, Heading } from "src/utils/docs";
+import { Heading } from "src/utils/docs";
 
-import { loadMarkdownFile, loadMarkdownFilesMetadata } from "utils/markdown";
+import { loadMarkdownFile } from "utils/markdown";
 
 import { SECTIONS, Page, Content } from "./index";
 

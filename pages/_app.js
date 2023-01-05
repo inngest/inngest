@@ -37,8 +37,9 @@ function MyApp({ Component, pageProps }) {
     };
   }, [router.events]);
 
-  const metaTitle =
-    pageProps?.meta?.title || "You Send Events. We Run Your Code.";
+  const metaTitle = `Inngest - ${
+    pageProps?.meta?.title || "You Send Events. We Run Your Code."
+  }`;
   // Warn during local dev
   if (
     !pageProps.disabled &&
@@ -70,7 +71,7 @@ function MyApp({ Component, pageProps }) {
         {/* Sections of the site like the blog and docs set these using different data */}
         {!disableMetadata && (
           <>
-            <title>Inngest - {metaTitle}</title>
+            <title>{metaTitle}</title>
             {pageProps?.meta?.description && (
               <>
                 <meta

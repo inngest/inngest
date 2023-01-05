@@ -2,6 +2,7 @@ import styled from "@emotion/styled";
 import Head from "next/head";
 import Image from "next/image";
 import rehypeSlug from "rehype-slug";
+import rehypeRaw from "rehype-raw";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
 import Footer from "../../shared/Footer";
@@ -9,7 +10,7 @@ import Nav from "../../shared/legacy/nav";
 import Callout from "../../shared/legacy/Callout";
 import syntaxHighlightingCSS from "../../shared/legacy/syntaxHighlightingCSS";
 import { Wrapper } from "../../shared/legacy/blog";
-import { highlight } from "../../utils/code";
+import { rehypeShiki } from "../../utils/code";
 import ThemeToggleButton from "../../shared/legacy/ThemeToggleButton";
 import Tags from "../../shared/Blog/Tags";
 
@@ -222,11 +223,18 @@ export async function getStaticProps({ params }) {
   //   compiledSource: string,
   //   scope: string,
   // }
+  const nodeTypes = [
+    "mdxFlowExpression",
+    "mdxJsxFlowElement",
+    "mdxJsxTextElement",
+    "mdxTextExpression",
+    "mdxjsEsm",
+  ];
   const post = await serialize(content, {
     scope: { json: JSON.stringify(data) },
     mdxOptions: {
-      remarkPlugins: [highlight],
-      rehypePlugins: [rehypeSlug],
+      remarkPlugins: [rehypeShiki],
+      rehypePlugins: [[rehypeRaw, { passThrough: nodeTypes }], rehypeSlug],
     },
   });
   return {

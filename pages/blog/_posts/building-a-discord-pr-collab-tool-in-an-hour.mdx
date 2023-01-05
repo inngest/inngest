@@ -10,7 +10,7 @@ At Inngest, we use Discord to collaborate across our remote team for all of our 
 
 In this post, we’ll walk through the architecture behind this kind of tool using AWS, and how you can build similar services rapidly using our platform.
 
-<h2>Requirements</h2>
+## Requirements
 
 We want to centralize our PR discussions in discord using *threads* so that we have a single place to discuss each PR.  This means we need to:
 
@@ -19,7 +19,7 @@ We want to centralize our PR discussions in discord using *threads* so that we h
 - Forward GH comments in the relevant Discord thread
 - Plus the associated SDLC flow, such as renaming threads when PRs are updated, or notifying users when reviews are approved or rejected
 
-<h2>Architecture</h2>
+## Architecture
 
 We’re reacting to events sent from GitHub in real-time, then running associated logic depending on the type of event.  In order to do this, you’d have the following architecture:
 
@@ -30,11 +30,11 @@ We’re reacting to events sent from GitHub in real-time, then running associate
 
 In short, the events flow from GitHub to the webhook handler, which pushes them to a queue.  Your worker subscribes to the queue and then handles each incoming event asynchronously.  The worker checks the state store to see if the event has already been processed, and if not, it runs business logic to create a thread or post a comment, depending on the type of event.
 
-<h2>A typical AWS build</h2>
+## A typical AWS build
 
 While this is a perfect use case for Inngest's event-driven platform, let's talk about a typical AWS build-out for this architecture so that you can understand the full picture.  This is what we're building:
 
-<img src="/assets/blog/aws-webhooks.svg" alt="AWS Webhook architecture" />
+![AWS Webhook architecture](/assets/blog/aws-webhooks.svg)
 
 Within AWS, you’d have to:
 
@@ -46,7 +46,7 @@ Within AWS, you’d have to:
 
 All in, this could take days to weeks, depending on how comfortable you are with Terraform, Lambda, the associated configuration, and idempotent processing… as well as all of the hand-rolled code and config for manually dealing with these that then has to be maintained/updated.
 
-<h2>Building with Inngest</h2>
+## Building with Inngest
 
 As we mentioned, this is a perfect use case for Inngest.  Instead of creating and maintaining a complex web of services, config, and code, you set up GitHub to push webhook events to Inngest, deploy simple functions for each event with one command with the Inngest CLI, and we handle everything else.  In effect, this is the diagram:
 
@@ -56,7 +56,7 @@ It handles the queues, retries, throttling, idempotency, and logging for you, al
 
 Plus, because Inngest stores events in an event store, you can use real data from events to test your functions locally.  This is a massive improvement to the development process.  You don’t need to run [ngrok](https://ngrok.com/), manually trigger webhooks to test, or push deploy to production and hope bugs are fixed — as running [`inngest run --replay`](https://www.inngest.com/docs/cli/run) will run your functions locally with past data.
 
-<h2>Building using Inngest</h2>
+## Building using Inngest
 
 The process for building this on Inngest is easy:
 
@@ -69,7 +69,7 @@ The process for building this on Inngest is easy:
 
 There’s no configuration of queues, notifications, dead-letter queues, idempotency, or stateful workers — things just work.  The most amount of time spent on the build was looking at the Discord API and creating a new Discord bot and auth token!
 
-<h2>The code and build process</h2>
+## The code and build process
 
 You can view the full code for the discord PR management tool here: [https://github.com/inngest/olotl](https://github.com/inngest/olotl).  It’s separated into a few functions, each of which respond to an individual event from GitHub automatically:
 
@@ -85,7 +85,7 @@ This generates a scaffold using your language of choice (eg. Typescript, Golang,
 
 After running `inngest init` we used the [discordgo](https://github.com/bwmarrin/discordgo), allowing us to create and manage threads and comments.
 
-<h2>Testing the functions</h2>
+## Testing the functions
 
 Okay, so we’ve ran `inngest init` and added some code to create threads in Discord.  Now we need to run the code locally and test it.
 
@@ -93,7 +93,7 @@ Using Inngest, you can run `inngest run --replay` to run the function locally us
 
 By continually developing and running `inngest run --replay` you can be sure your functions work before publishing them live. Then, run `inngest deploy` to deploy functions once you’re ready.
 
-<h2>Wrapping up</h2>
+## Wrapping up
 
 By using our own platform, we were able to an awesome PR collaboration tool for Discord in an hour, without spending days configuring, testing and developing the architecture ourselves.
 

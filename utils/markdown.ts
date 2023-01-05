@@ -1,8 +1,9 @@
 import { serialize } from "next-mdx-remote/serialize";
 import rehypeSlug from "rehype-slug";
+import rehypeRaw from "rehype-raw";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 
-import { highlight } from "src/utils/code";
+import { rehypeShiki } from "src/utils/code";
 import { getHeadingsAsArray, Heading } from "src/utils/docs";
 
 export type MDXFileMetadata = {
@@ -77,11 +78,22 @@ export async function loadMarkdownFile<T>(
   const sourceFilename = path.join("./pages", dir, `${slug}.mdx`);
   const source = fs.readFileSync(sourceFilename, "utf8");
   const { content, data } = matter(source);
+  const nodeTypes = [
+    "mdxFlowExpression",
+    "mdxJsxFlowElement",
+    "mdxJsxTextElement",
+    "mdxTextExpression",
+    "mdxjsEsm",
+  ];
   const serializedContent = await serialize(content, {
     // scope: { json: JSON.stringify(data) },
     mdxOptions: {
-      remarkPlugins: [highlight],
-      rehypePlugins: [rehypeSlug, rehypeAutolinkHeadings],
+      remarkPlugins: [rehypeShiki],
+      rehypePlugins: [
+        [rehypeRaw, { passThrough: nodeTypes }],
+        rehypeSlug,
+        rehypeAutolinkHeadings,
+      ],
     },
   });
 
