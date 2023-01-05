@@ -232,6 +232,9 @@ func (q *queue) scan(ctx context.Context, f osqueue.RunFunc) error {
 }
 
 func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osqueue.RunFunc) error {
+	ctx, span := q.tracer.Start(ctx, "processPartition")
+	defer span.End()
+
 	// Attempt to lease items
 	_, err := q.PartitionLease(ctx, p.Queue(), PartitionLeaseDuration)
 	if err == ErrPartitionAlreadyLeased {
@@ -322,6 +325,9 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 }
 
 func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) error {
+	ctx, span := q.tracer.Start(ctx, "process")
+	defer span.End()
+
 	var err error
 	leaseID := qi.LeaseID
 
@@ -398,8 +404,10 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 		}()
 
 		go scope.Counter("queue_items_started_total").Inc(1)
+		span.AddEvent("function start")
 		err := f(jobCtx, qi.Data)
 		extendLeaseTick.Stop()
+		span.AddEvent("function end start")
 		if err != nil {
 			go scope.Counter("queue_items_errored_total").Inc(1)
 			errCh <- err
