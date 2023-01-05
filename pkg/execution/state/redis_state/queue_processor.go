@@ -20,6 +20,14 @@ import (
 const (
 	ErrMaxConsecutiveProcessErrors = 20
 	minWorkersFree                 = 5
+
+	counterQueueItemsStarted     = "queue_items_started_total"
+	counterQueueItemsErrored     = "queue_items_errored_total"
+	counterQueueItemsComplete    = "queue_items_complete_total"
+	counterQueueItemsEnqueued    = "queue_items_enqueued_total"
+	gaugeQueueItemLatencyEWMA    = "queue_item_latency_ewma"
+	histogramItemLatency         = "queue_item_latency_duration"
+	counterSequentialLeaseClaims = "queue_sequential_lease_claims_total"
 )
 
 var (
@@ -59,7 +67,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 
 	go q.scope.Tagged(map[string]string{
 		"kind": item.Kind,
-	}).Counter("queue_items_enqueued_total").Inc(1)
+	}).Counter(counterQueueItemsEnqueued).Inc(1)
 
 	_, err := q.EnqueueItem(ctx, QueueItem{
 		ID:          id,
@@ -174,7 +182,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 			if q.seqLeaseID == nil {
 				// Only track this if we're creating a new lease, not if we're renewing
 				// a lease.
-				go q.scope.Counter("queue_sequential_lease_claims_total").Inc(1)
+				go q.scope.Counter(counterSequentialLeaseClaims).Inc(1)
 			}
 			q.seqLeaseID = leaseID
 			q.seqLeaseLock.Unlock()
@@ -396,24 +404,24 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 			// Update the ewma
 			latencySem.Lock()
 			latencyAvg.Add(float64(latency))
-			scope.Gauge("queue_item_latency_ewma").Update(latencyAvg.Value() / 1e6)
+			scope.Gauge(gaugeQueueItemLatencyEWMA).Update(latencyAvg.Value() / 1e6)
 			latencySem.Unlock()
 
 			// Set the metrics historgram and gauge, which reports the ewma value.
-			scope.Histogram("queue_item_latency_duration", latencyBuckets).RecordDuration(latency)
+			scope.Histogram(histogramItemLatency, latencyBuckets).RecordDuration(latency)
 		}()
 
-		go scope.Counter("queue_items_started_total").Inc(1)
+		go scope.Counter(counterQueueItemsStarted).Inc(1)
 		span.AddEvent("function start")
 		err := f(jobCtx, qi.Data)
 		extendLeaseTick.Stop()
 		span.AddEvent("function end start")
 		if err != nil {
-			go scope.Counter("queue_items_errored_total").Inc(1)
+			go scope.Counter(counterQueueItemsErrored).Inc(1)
 			errCh <- err
 			return
 		}
-		go scope.Counter("queue_items_complete_total").Inc(1)
+		go scope.Counter(counterQueueItemsComplete).Inc(1)
 
 		// Closing this channel prevents the goroutine which extends lease from leaking,
 		// and dequeues the job
