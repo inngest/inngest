@@ -25,7 +25,7 @@ require (
 	github.com/goccy/go-json v0.10.0
 	github.com/golang/mock v1.6.0
 	github.com/google/cel-go v0.11.4
-	github.com/google/go-cmp v0.5.7
+	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/gosimple/slug v1.12.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -49,12 +49,13 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.8.1
 	github.com/tidwall/sjson v1.2.5
 	github.com/tonyhb/enumer v1.2.0
 	github.com/uber-go/tally/v4 v4.1.4
 	github.com/vektah/gqlparser/v2 v2.4.6
 	github.com/xhit/go-str2duration/v2 v2.0.0
+	go.opentelemetry.io/otel/trace v1.11.2
 	gocloud.dev v0.25.0
 	gocloud.dev/pubsub/natspubsub v0.25.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
@@ -191,6 +192,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zclconf/go-cty v1.8.3 // indirect
 	go.opencensus.io v0.23.0 // indirect
+	go.opentelemetry.io/otel v1.11.2 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/crypto v0.0.0-20220331220935-ae2d96664a29 // indirect
 	golang.org/x/exp v0.0.0-20210126221216-84987778548c // indirect
@@ -206,5 +208,5 @@ require (
 	gopkg.in/ini.v1 v1.66.2 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

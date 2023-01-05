@@ -17,6 +17,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
 	"github.com/uber-go/tally/v4"
+	"go.opentelemetry.io/otel/trace"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"lukechampine.com/frand"
 )
@@ -135,6 +136,12 @@ func WithPollTick(t time.Duration) func(q *queue) {
 	}
 }
 
+func WithTracer(t trace.Tracer) func(q *queue) {
+	return func(q *queue) {
+		q.tracer = t
+	}
+}
+
 // WithDenyQueueNames specifies that the worker cannot select jobs from queue partitions
 // within the given list of names.  This means that the worker will never work on jobs
 // in the specified queues.
@@ -174,12 +181,13 @@ func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
 		},
 		kg:               defaultQueueKey,
 		numWorkers:       defaultNumWorkers,
-		scope:            tally.NoopScope,
 		wg:               &sync.WaitGroup{},
 		seqLeaseLock:     &sync.RWMutex{},
 		pollTick:         defaultPollTick,
 		idempotencyTTL:   defaultIdempotencyTTL,
 		queueKindMapping: make(map[string]string),
+		scope:            tally.NoopScope,
+		tracer:           trace.NewNoopTracerProvider().Tracer("redis_queue"),
 	}
 
 	for _, opt := range opts {
@@ -199,8 +207,6 @@ type queue struct {
 	r  redis.UniversalClient
 	pf PriorityFinder
 	kg QueueKeyGenerator
-	// metrics allows reporting of metrics
-	scope tally.Scope
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
@@ -239,6 +245,11 @@ type queue struct {
 	// seqLeaseLock ensures that there are no data races writing to
 	// or reading from seqLeaseID in parallel.
 	seqLeaseLock *sync.RWMutex
+
+	// metrics allows reporting of metrics
+	scope tally.Scope
+	// tracer is the tracer to use for opentelemetry tracing.
+	tracer trace.Tracer
 }
 
 // QueueItem represents an individually queued work scheduled for some time in the
@@ -338,6 +349,9 @@ func (q QueuePartition) MarshalBinary() ([]byte, error) {
 //
 // The queue score must be added in milliseconds to process sub-second items in order.
 func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error) {
+	ctx, span := q.tracer.Start(ctx, "EnqueueItem")
+	defer span.End()
+
 	if len(i.ID) == 0 {
 		i.ID = ulid.MustNew(ulid.Now(), rnd).String()
 	}
@@ -411,6 +425,9 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 // If limit is -1, this will return the first unleased item - representing the next available item in the
 // queue.
 func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, limit int64) ([]*QueueItem, error) {
+	ctx, span := q.tracer.Start(ctx, "Peek")
+	defer span.End()
+
 	// Check whether limit is -1, peeking next available time
 	isPeekNext := limit == -1
 
@@ -471,6 +488,9 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 //
 // itemID must be the hashed ID of the queue item.
 func (q *queue) Lease(ctx context.Context, queueName string, itemID string, duration time.Duration) (*ulid.ULID, error) {
+	ctx, span := q.tracer.Start(ctx, "Lease")
+	defer span.End()
+
 	// TODO: Add custom throttling here.
 	leaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
 	if err != nil {
@@ -514,6 +534,9 @@ func (q *queue) Lease(ctx context.Context, queueName string, itemID string, dura
 // Renewing a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
 func (q *queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+	ctx, span := q.tracer.Start(ctx, "ExtendLease")
+	defer span.End()
+
 	newLeaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
@@ -586,6 +609,9 @@ func (q *queue) Dequeue(ctx context.Context, i QueueItem) error {
 
 // Requeue requeues an item in the future.
 func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
+	ctx, span := q.tracer.Start(ctx, "Requeue")
+	defer span.End()
+
 	priority := PriorityMin
 	if q.pf != nil {
 		priority = q.pf(ctx, i)
@@ -642,6 +668,9 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 // that the worker always wants to lease the given queue.  Filtering must be done when peeking
 // when running a worker.
 func (q *queue) PartitionLease(ctx context.Context, queueName string, duration time.Duration) (*ulid.ULID, error) {
+	ctx, span := q.tracer.Start(ctx, "PartitionLease")
+	defer span.End()
+
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
 	// the pointer and back off.  A question here is enqueuing new items onto the partition
 	// will reset the pointer update, leading to thrash.
@@ -689,6 +718,9 @@ func (q *queue) PartitionLease(ctx context.Context, queueName string, duration t
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
 func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
+	ctx, span := q.tracer.Start(ctx, "PartitionPeek")
+	defer span.End()
+
 	if limit > PartitionPeekMax {
 		return nil, ErrPartitionPeekMaxExceedsLimits
 	}
@@ -771,6 +803,9 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 // This is used after peeking and passing all queue items onto workers; we then take the next
 // unleased available time for the queue item and requeue the partition.
 func (q *queue) PartitionRequeue(ctx context.Context, queueName string, at time.Time) error {
+	ctx, span := q.tracer.Start(ctx, "PartitionRequeue")
+	defer span.End()
+
 	keys := []string{
 		q.kg.PartitionItem(),
 		q.kg.PartitionIndex(),
