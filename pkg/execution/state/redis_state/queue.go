@@ -718,9 +718,6 @@ func (q *queue) PartitionLease(ctx context.Context, queueName string, duration t
 // randomly, with higher priority partitions more likely to be selected.  This reduces
 // lease contention amongst multiple shared-nothing workers.
 func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]*QueuePartition, error) {
-	ctx, span := q.tracer.Start(ctx, "PartitionPeek")
-	defer span.End()
-
 	if limit > PartitionPeekMax {
 		return nil, ErrPartitionPeekMaxExceedsLimits
 	}
