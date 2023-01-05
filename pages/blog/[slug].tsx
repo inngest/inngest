@@ -10,7 +10,8 @@ import Nav from "../../shared/legacy/nav";
 import Callout from "../../shared/legacy/Callout";
 import syntaxHighlightingCSS from "../../shared/legacy/syntaxHighlightingCSS";
 import { Wrapper } from "../../shared/legacy/blog";
-import { rehypeShiki } from "../../utils/code";
+import { rehypePrependCode, rehypeShiki } from "../../utils/code";
+import { rehypeParseCodeBlocks } from "../../mdx/rehype.mjs";
 import ThemeToggleButton from "../../shared/legacy/ThemeToggleButton";
 import Tags from "../../shared/Blog/Tags";
 
@@ -234,8 +235,13 @@ export async function getStaticProps({ params }) {
   const post = await serialize(content, {
     scope: { json: JSON.stringify(data) },
     mdxOptions: {
-      remarkPlugins: [rehypeShiki],
-      rehypePlugins: [[rehypeRaw, { passThrough: nodeTypes }], rehypeSlug],
+      rehypePlugins: [
+        rehypeParseCodeBlocks,
+        rehypePrependCode,
+        rehypeShiki,
+        [rehypeRaw, { passThrough: nodeTypes }],
+        rehypeSlug,
+      ],
     },
   });
   return {

@@ -1509,6 +1509,14 @@
     "@jridgewell/resolve-uri" "3.1.0"
     "@jridgewell/sourcemap-codec" "1.4.14"
 
+"@mdx-js/loader@^2.2.1":
+  version "2.2.1"
+  resolved "https://registry.yarnpkg.com/@mdx-js/loader/-/loader-2.2.1.tgz#71634e87659cd29240933d174a151a4d4ab3b70c"
+  integrity sha512-J4E8A5H+xtk4otZiEZ5AXl61Tj04Avm5MqLQazITdI3+puVXVnTTuZUKM1oNHTtfDIfOl0uMt+o/Ij+x6Fvf+g==
+  dependencies:
+    "@mdx-js/mdx" "^2.0.0"
+    source-map "^0.7.0"
+
 "@mdx-js/mdx@^1.6.22":
   version "1.6.22"
   resolved "https://registry.yarnpkg.com/@mdx-js/mdx/-/mdx-1.6.22.tgz#8a723157bf90e78f17dc0f27995398e6c731f1ba"
@@ -1534,7 +1542,7 @@
     unist-builder "2.0.3"
     unist-util-visit "2.0.3"
 
-"@mdx-js/mdx@^2.2.1":
+"@mdx-js/mdx@^2.0.0", "@mdx-js/mdx@^2.2.1":
   version "2.2.1"
   resolved "https://registry.yarnpkg.com/@mdx-js/mdx/-/mdx-2.2.1.tgz#611af1b68135c94eb467eb07e006fa1d8eebe029"
   integrity sha512-hZ3ex7exYLJn6FfReq8yTvA6TE53uW9UHJQM9IlSauOuS55J9y8RtA7W+dzp6Yrzr00/U1sd7q+Wf61q6SfiTQ==
@@ -1609,6 +1617,13 @@
   integrity sha512-SBrOFS8PC3nQ5aeZmawJkjKkWjwK9RoxvBSv/86nZp0ubdoVQoko8r8htALd9ufp16NhacCdqhu9bzZLDWtALQ==
   dependencies:
     glob "7.1.7"
+
+"@next/mdx@^13.1.1":
+  version "13.1.1"
+  resolved "https://registry.yarnpkg.com/@next/mdx/-/mdx-13.1.1.tgz#ca3daf4903a97af65b994d87da342395e488f349"
+  integrity sha512-a588olt++s7vcuhlgrNOBpZUqlbr9vr94NjA3ixM9AgL8fnwJ/GgxEMsrcsp2gPw91lzBlumBfjK6Lc3k3m23Q==
+  dependencies:
+    source-map "^0.7.0"
 
 "@next/swc-android-arm-eabi@13.1.1":
   version "13.1.1"
@@ -1748,6 +1763,21 @@
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/@rushstack/eslint-patch/-/eslint-patch-1.2.0.tgz#8be36a1f66f3265389e90b5f9c9962146758f728"
   integrity sha512-sXo/qW2/pAcmT43VoRKOJbDOfV3cYpq3szSVfIThQXNt+E4DfKj361vaAt3c88U5tPUxzEswam7GW48PJqtKAg==
+
+"@sindresorhus/slugify@^2.1.1":
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/@sindresorhus/slugify/-/slugify-2.1.1.tgz#3076b0e95dd2cd05e5da2dd8efa38fe153a0cfe0"
+  integrity sha512-XokPHZ+q6FtQGEi1hnfvARVJJVPEhwHQTPHPPuNHaN6zcHjzYNynhhHMopa1wNPqLAFOwpsbintunEqWecXJMg==
+  dependencies:
+    "@sindresorhus/transliterate" "^1.0.0"
+    escape-string-regexp "^5.0.0"
+
+"@sindresorhus/transliterate@^1.0.0":
+  version "1.6.0"
+  resolved "https://registry.yarnpkg.com/@sindresorhus/transliterate/-/transliterate-1.6.0.tgz#2309fff65a868047e6d2dd70dec747c5b36a8327"
+  integrity sha512-doH1gimEu3A46VX6aVxpHTeHrytJAG6HgdxntYnCFiIFHEM/ZGpG8KiZGBChchjQmG0XFIBL552kBTjVcMZXwQ==
+  dependencies:
+    escape-string-regexp "^5.0.0"
 
 "@storybook/addon-actions@6.5.15", "@storybook/addon-actions@^6.5.15":
   version "6.5.15"
@@ -3279,7 +3309,7 @@ acorn@^7.0.0, acorn@^7.4.1:
   resolved "https://registry.npmjs.org/acorn/-/acorn-7.4.1.tgz"
   integrity sha512-nQyp0o1/mNdbTO1PO6kHkwSrmgZ0MT/jCCpNiwbUjGoRN4dlBhqJtoQuCnEOKzgTVwg0ZWiCoQy6SxMebQVh8A==
 
-acorn@^8.0.0, acorn@^8.5.0:
+acorn@^8.0.0, acorn@^8.5.0, acorn@^8.8.1:
   version "8.8.1"
   resolved "https://registry.yarnpkg.com/acorn/-/acorn-8.8.1.tgz#0a3f9cbecc4ec3bea6f0a80b66ae8dd2da250b73"
   integrity sha512-7zFpHzhnqYKrkYdUjF1HI1bzd0VygEGX8lFk4k5zVMqHEoES+P+7TKI+EvLO9WVMJ8eekdO0aDEK044xTXwPPA==
@@ -5574,6 +5604,11 @@ escape-string-regexp@^4.0.0:
   resolved "https://registry.yarnpkg.com/escape-string-regexp/-/escape-string-regexp-4.0.0.tgz#14ba83a5d373e3d311e5afca29cf5bfad965bf34"
   integrity sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==
 
+escape-string-regexp@^5.0.0:
+  version "5.0.0"
+  resolved "https://registry.yarnpkg.com/escape-string-regexp/-/escape-string-regexp-5.0.0.tgz#4683126b500b61762f2dbebace1806e8be31b1c8"
+  integrity sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==
+
 escodegen@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/escodegen/-/escodegen-2.0.0.tgz#5e32b12833e8aa8fa35e1bf0befa89380484c7dd"
@@ -5767,7 +5802,7 @@ estree-util-to-js@^1.1.0:
     astring "^1.8.0"
     source-map "^0.7.0"
 
-estree-util-visit@^1.0.0:
+estree-util-visit@^1.0.0, estree-util-visit@^1.2.0:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/estree-util-visit/-/estree-util-visit-1.2.0.tgz#aa0311a9c2f2aa56e9ae5e8b9d87eac14e4ec8f8"
   integrity sha512-wdsoqhWueuJKsh5hqLw3j8lwFqNStm92VcwtAOAny8g/KS/l5Y8RISjR4k5W6skCj3Nirag/WUCMS0Nfy3sgsg==
@@ -8404,6 +8439,15 @@ mdurl@^1.0.0:
   resolved "https://registry.yarnpkg.com/mdurl/-/mdurl-1.0.1.tgz#fe85b2ec75a59037f2adfec100fd6c601761152e"
   integrity sha512-/sKlQJCBYVY9Ers9hqzKou4H6V5UWc/M59TH2dvkt+84itfnq7uFOMLpOiOS4ujvHP4etln18fmIxA5R5fll0g==
 
+mdx-annotations@^0.1.1:
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/mdx-annotations/-/mdx-annotations-0.1.1.tgz#b8d43ba43d11288c3f81b6dfa5fa361b8d0e5705"
+  integrity sha512-/MdUge3y4ZsnU15Hdhd5ktYHA2JwhRm93nSaReQ8OBNatvDcydELMbF7ltgvpDRruVciMDaQdwIBOGZU0KulpQ==
+  dependencies:
+    acorn "^8.8.1"
+    estree-util-visit "^1.2.0"
+    unist-util-visit "^4.1.1"
+
 media-typer@0.3.0:
   version "0.3.0"
   resolved "https://registry.yarnpkg.com/media-typer/-/media-typer-0.3.0.tgz#8710d7af0aa626f8fffa1ce00168545263255748"
@@ -9058,7 +9102,7 @@ nested-error-stacks@^2.0.0, nested-error-stacks@^2.1.0:
   resolved "https://registry.yarnpkg.com/nested-error-stacks/-/nested-error-stacks-2.1.1.tgz#26c8a3cee6cc05fbcf1e333cd2fc3e003326c0b5"
   integrity sha512-9iN1ka/9zmX1ZvLV9ewJYEk9h7RyRRtqdK0woXcqohu8EWIerfPUjYJPg0ULy0UqP7cslmdGc8xKDJcojlKiaw==
 
-next-mdx-remote@^4.2.0:
+next-mdx-remote@^4.2.1:
   version "4.2.1"
   resolved "https://registry.yarnpkg.com/next-mdx-remote/-/next-mdx-remote-4.2.1.tgz#1aee0207b029487100ef49740be210595fe04e50"
   integrity sha512-PcVF1r5XTBjiNVXw0GyaIcOwQsklHo36+7ycfmtJb52TIkT0nM4Hzv4wgJwNg7+jvTbap99qWsMwdKUYR9WxAA==
@@ -10523,6 +10567,15 @@ reading-time@^1.5.0:
   resolved "https://registry.npmjs.org/reading-time/-/reading-time-1.5.0.tgz"
   integrity sha512-onYyVhBNr4CmAxFsKS7bz+uTLRakypIe4R+5A824vBSkQy/hB3fZepoVEf8OVAxzLvK+H/jm9TzpI3ETSm64Kg==
 
+recma-nextjs-static-props@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/recma-nextjs-static-props/-/recma-nextjs-static-props-1.0.0.tgz#99c1f0782adf0f5c43e78a2a8991c8e0f42031d8"
+  integrity sha512-szo+rOZFU6mR0YWZi3e3dSqcEQU+E0f7GIyfMfntHeJccH1s9ODP0HWUeK7No0lcY1smRCcC43JrpoekzuX4Aw==
+  dependencies:
+    "@types/estree" "*"
+    periscopic "^3.0.0"
+    unified "^10.0.0"
+
 redent@^1.0.0:
   version "1.0.0"
   resolved "https://registry.npmjs.org/redent/-/redent-1.0.0.tgz"
@@ -10615,6 +10668,17 @@ rehype-autolink-headings@^6.1.1:
     hast-util-has-property "^2.0.0"
     hast-util-heading-rank "^2.0.0"
     hast-util-is-element "^2.0.0"
+    unified "^10.0.0"
+    unist-util-visit "^4.0.0"
+
+rehype-mdx-title@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/rehype-mdx-title/-/rehype-mdx-title-2.0.0.tgz#f5ab8c273150f5b395f5029c97bf440c8c33376a"
+  integrity sha512-IemxnNjM+mrABwH2V0UQjg5YULJmN55dF+zEajmoDgjnuAESIIm54iSKR0VwKpFrvQ9hWLn88RTr2deqwSOw0A==
+  dependencies:
+    "@types/hast" "^2.0.0"
+    estree-util-is-identifier-name "^2.0.0"
+    hast-util-to-string "^2.0.0"
     unified "^10.0.0"
     unist-util-visit "^4.0.0"
 
