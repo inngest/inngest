@@ -92,7 +92,16 @@
     "unist-util-visit": "^4.1.1",
     "urql": "^2.0.5",
     "uuid": "^8.3.2",
-    "zod": "^3.18.0"
+    "zod": "^3.18.0",
+    "@algolia/autocomplete-core": "^1.7.3",
+    "@algolia/autocomplete-preset-algolia": "^1.7.3",
+    "@headlessui/react": "^1.7.6",    
+    "algoliasearch": "^4.14.2",    
+    "clsx": "^1.2.0",
+    "focus-visible": "^5.2.0",
+    "framer-motion": "7.8.1",    
+    "postcss-focus-visible": "^6.0.4",    
+    "zustand": "^4.1.4"
   },
   "devDependencies": {
     "@storybook/addon-actions": "^6.5.15",
