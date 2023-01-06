@@ -183,27 +183,28 @@ function NavigationGroup({ group, className }) {
   );
 }
 
+const baseDir = "/new-docs"
 export const navigation = [
   {
     title: "Guides",
     links: [
-      { title: "Introduction", href: "/" },
-      { title: "Quickstart", href: "/quickstart" },
-      { title: "SDKs", href: "/sdks" },
-      { title: "Authentication", href: "/authentication" },
-      { title: "Pagination", href: "/pagination" },
-      { title: "Errors", href: "/errors" },
-      { title: "Webhooks", href: "/webhooks" },
+      { title: "Introduction", href: `${baseDir}/` },
+      { title: "Quickstart", href: `${baseDir}/quickstart` },
+      { title: "SDKs", href: `${baseDir}/sdks` },
+      { title: "Authentication", href: `${baseDir}/authentication` },
+      { title: "Pagination", href: `${baseDir}/pagination` },
+      { title: "Errors", href: `${baseDir}/errors` },
+      { title: "Webhooks", href: `${baseDir}/webhooks` },
     ],
   },
   {
     title: "Resources",
     links: [
-      { title: "Contacts", href: "/contacts" },
-      { title: "Conversations", href: "/conversations" },
-      { title: "Messages", href: "/messages" },
-      { title: "Groups", href: "/groups" },
-      { title: "Attachments", href: "/attachments" },
+      { title: "Contacts", href: `${baseDir}/contacts` },
+      { title: "Conversations", href: `${baseDir}/conversations` },
+      { title: "Messages", href: `${baseDir}/messages` },
+      { title: "Groups", href: `${baseDir}/groups` },
+      { title: "Attachments", href: `${baseDir}/attachments` },
     ],
   },
 ];

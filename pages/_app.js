@@ -2,17 +2,40 @@ import React, { useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import Script from "next/script";
+import { MDXProvider } from "@mdx-js/react";
+
 import { trackPageView } from "../utils/tracking";
 import { getOpenGraphImageURL } from "../utils/social";
 import { useAnonId } from "../shared/legacy/trackingHooks";
 import "../styles/globals.css";
 import * as fullstory from "@fullstory/browser";
+import * as mdxComponents from "src/shared/NewDocs/mdx";
+
+import { Layout as DocsLayout } from "../shared/NewDocs/Layout";
 
 import PageBanner from "../shared/legacy/PageBanner";
+
+function DefaultLayout({ children }) {
+  const router = useRouter();
+  return (
+    <>
+      {router.pathname !== "/sign-up" && (
+        <PageBanner href="/blog/vercel-integration?ref=page-banner">
+          Announcing our new Vercel integration
+        </PageBanner>
+      )}
+      {children}
+    </>
+  );
+}
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
   const { anonId, existing } = useAnonId();
+
+  // Temp Layout swapping before we move to "app" dir
+  const isNewDocs = !!router.asPath.match(/^\/new-docs/);
+  const Layout = isNewDocs ? DocsLayout : DefaultLayout;
 
   useEffect(() => {
     fullstory.init({ orgId: "o-1CVB8R-na1" });
@@ -23,6 +46,8 @@ function MyApp({ Component, pageProps }) {
     }
     if (pageProps.designVersion) {
       htmlEl.classList.add(`v${pageProps.designVersion}`);
+    } else if (isNewDocs) {
+      htmlEl.classList.add(`v2`);
     } else {
       htmlEl.classList.add(`v1`);
     }
@@ -103,13 +128,11 @@ function MyApp({ Component, pageProps }) {
         )}
         <link rel="canonical" href={canonicalUrl} />
       </Head>
-      {router.pathname !== "/sign-up" && (
-        <PageBanner href="/blog/vercel-integration?ref=page-banner">
-          Announcing our new Vercel integration
-        </PageBanner>
-      )}
-
-      <Component {...pageProps} />
+      <MDXProvider components={mdxComponents}>
+        <Layout {...pageProps}>
+          <Component {...pageProps} />
+        </Layout>
+      </MDXProvider>
       <Script
         id="js-inngest-sdk-script"
         strategy="afterInteractive"
