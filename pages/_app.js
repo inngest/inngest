@@ -2,14 +2,12 @@ import React, { useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import Script from "next/script";
-import { MDXProvider } from "@mdx-js/react";
 
 import { trackPageView } from "../utils/tracking";
 import { getOpenGraphImageURL } from "../utils/social";
 import { useAnonId } from "../shared/legacy/trackingHooks";
 import "../styles/globals.css";
 import * as fullstory from "@fullstory/browser";
-import * as mdxComponents from "src/shared/NewDocs/mdx";
 
 import { Layout as DocsLayout } from "../shared/NewDocs/Layout";
 
@@ -128,11 +126,11 @@ function MyApp({ Component, pageProps }) {
         )}
         <link rel="canonical" href={canonicalUrl} />
       </Head>
-      <MDXProvider components={mdxComponents}>
-        <Layout {...pageProps}>
-          <Component {...pageProps} />
-        </Layout>
-      </MDXProvider>
+
+      <Layout {...pageProps}>
+        <Component {...pageProps} />
+      </Layout>
+
       <Script
         id="js-inngest-sdk-script"
         strategy="afterInteractive"
