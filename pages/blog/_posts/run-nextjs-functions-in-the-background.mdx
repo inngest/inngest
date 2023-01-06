@@ -56,9 +56,9 @@ export default serve("My App", [ weeklyDigest ], {
   signingKey: process.env.INNGEST_SIGNING_KEY
 });
 ```
-<!-- TODO - Replace w/ below when new inngest-js is out:
+{/* TODO - Replace w/ below when new inngest-js is out:
   export default serve("My App", [ sendWeeklyDigest ]);
--->
+*/}
 
 Let's break down what we're doing in the code above. We use [the Inngest SDK](https://github.com/inngest/inngest-js) (`npm install inngest`) to define our function and serve it. We start with defining a schedule function (aka Cron Job). This tells Inngest what to call the function, what schedule to run it on, and what code to run:
 
@@ -91,7 +91,7 @@ export default serve("My App", [
   runDailyReport,
 ], { signingKey: process.env.INNGEST_SIGNING_KEY });
 ```
-<!-- TODO - update this with new SDK -->
+{/* TODO - update this with new SDK */}
 
 Great! You've done all the hard work already. You can always add or remove functions as your app grows. The best part is your code stays in your existing repo right alongside everything else. Go ahead and merge your code and let your platform automatically deploy your code.
 
@@ -193,9 +193,9 @@ export default serve("My App", [ welcomeEmail ], {
   signingKey: process.env.INNGEST_SIGNING_KEY
 });
 ```
-<!-- TODO - Replace w/ below when new inngest-js is out:
+{/* TODO - Replace w/ below when new inngest-js is out:
   export default serve("My App", [ sendWeeklyDigest ]);
--->
+*/}
 
 > Bonus: Inngest SDK's has [first-class TypeScript support - click to learn more](/docs/typescript?ref=blog-run-nextjs-functions-in-the-background)
 

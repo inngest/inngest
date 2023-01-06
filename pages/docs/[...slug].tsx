@@ -5,7 +5,6 @@ import styled from "@emotion/styled";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
 import rehypeSlug from "rehype-slug";
-import rehypeRaw from "rehype-raw";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 // local
 import {
@@ -18,7 +17,8 @@ import {
   Docs,
 } from "../../utils/docs";
 import { DocsLayout, DocsContent } from "../docs";
-import { rehypeShiki } from "../../utils/code";
+import { rehypeParseCodeBlocks } from "../../mdx/rehype.mjs";
+import { rehypePrependCode, rehypeShiki } from "../../utils/code";
 
 export default function DocLayout(props: any) {
   const scope: DocScope = JSON.parse(props.post.scope.json);
@@ -193,19 +193,13 @@ export async function getStaticProps({ params }) {
 
   // Add categories to the scope such that we can show them in the UI.
   const scope = { ...docs.scope };
-  const nodeTypes = [
-    "mdxFlowExpression",
-    "mdxJsxFlowElement",
-    "mdxJsxTextElement",
-    "mdxTextExpression",
-    "mdxjsEsm",
-  ];
   const post = await serialize(content, {
     scope: { json: JSON.stringify(scope) },
     mdxOptions: {
-      remarkPlugins: [rehypeShiki],
       rehypePlugins: [
-        [rehypeRaw, { passThrough: nodeTypes }],
+        rehypeParseCodeBlocks,
+        rehypePrependCode,
+        rehypeShiki,
         rehypeSlug,
         rehypeAutolinkHeadings,
       ],

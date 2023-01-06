@@ -107,6 +107,7 @@ export default function DocsHome(props) {
         <div className="text-center">
           <Image
             src="/assets/docs/dev-server-example.png"
+            alt="Inngest Dev Server screenshot"
             width={800}
             height={(609 / 900) * 800}
             quality="100"

@@ -13,7 +13,7 @@ Inngest allows you to build functions which coordinate between events using a fe
 ```typescript
 import { createStepFunction } from "inngest";
 
-// This is the data received whenever the `cart/product.added` event is received. 
+// This is the data received whenever the `cart/product.added` event is received.
 type Added = {
   name: "cart/product.added"
   data: {
@@ -95,11 +95,11 @@ It's possible to handle these flows within standard applications by:
 
 These are both possible within Inngest and using traditional queueing systems, although these approaches typically have more code and distributed state to maintain, increasing the chances of bugs and breaking changes.
 
-<!--
+{/*
 Additional resources
 
 - TODO: Link to SDK `tools.waitForEvent` docs
 - TODO: Link to SDK `tools.run` docs
 - TODO: Link to SDK `tools.sleep` docs for alternative approaches
 - TODO: Link to auto-cancellation
--->
+*/}

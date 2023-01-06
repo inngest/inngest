@@ -90,6 +90,7 @@ export default function BlogLayout(props) {
                     <Image
                       className="rounded-t-lg lg:rounded-t-none lg:rounded-r-lg group-hover:rounded-lg"
                       src={focus.image}
+                      alt={`Featured image for ${focus.heading} blog post`}
                       width={900}
                       height={900 / 2}
                       quality={95}
@@ -112,6 +113,7 @@ export default function BlogLayout(props) {
                         <Image
                           className="rounded-lg"
                           src={item.image}
+                          alt={`Featured image for ${item.heading} blog post`}
                           width={720}
                           height={720 / 2}
                         />

@@ -3,7 +3,8 @@ import rehypeSlug from "rehype-slug";
 import rehypeRaw from "rehype-raw";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 
-import { rehypeShiki } from "src/utils/code";
+import { rehypeParseCodeBlocks } from "src/mdx/rehype.mjs";
+import { rehypePrependCode, rehypeShiki } from "src/utils/code";
 import { getHeadingsAsArray, Heading } from "src/utils/docs";
 
 export type MDXFileMetadata = {
@@ -88,9 +89,10 @@ export async function loadMarkdownFile<T>(
   const serializedContent = await serialize(content, {
     // scope: { json: JSON.stringify(data) },
     mdxOptions: {
-      remarkPlugins: [rehypeShiki],
       rehypePlugins: [
-        [rehypeRaw, { passThrough: nodeTypes }],
+        rehypeParseCodeBlocks,
+        rehypePrependCode,
+        rehypeShiki,
         rehypeSlug,
         rehypeAutolinkHeadings,
       ],

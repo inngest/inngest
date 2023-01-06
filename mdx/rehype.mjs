@@ -39,8 +39,6 @@ export function rehypeShiki() {
             node.properties.language
           );
 
-          console.log(tokens);
-
           textNode.value = shiki.renderToHtml(tokens, {
             elements: {
               pre: ({ children }) => children,

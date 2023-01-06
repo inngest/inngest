@@ -6,13 +6,8 @@ import rehypeRaw from "rehype-raw";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
 import Footer from "../../shared/Footer";
-import Nav from "../../shared/legacy/nav";
-import Callout from "../../shared/legacy/Callout";
-import syntaxHighlightingCSS from "../../shared/legacy/syntaxHighlightingCSS";
-import { Wrapper } from "../../shared/legacy/blog";
 import { rehypePrependCode, rehypeShiki } from "../../utils/code";
 import { rehypeParseCodeBlocks } from "../../mdx/rehype.mjs";
-import ThemeToggleButton from "../../shared/legacy/ThemeToggleButton";
 import Tags from "../../shared/Blog/Tags";
 
 // MDX Components
@@ -125,6 +120,7 @@ export default function BlogLayout(props) {
                   <Image
                     className="rounded-lg shadow-lg"
                     src={scope.image}
+                    alt={`Featured image for ${scope.heading} blog post`}
                     width={768}
                     height={768 / 2}
                     quality={95}
