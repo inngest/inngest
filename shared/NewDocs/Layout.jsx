@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Head from "next/head"
+import Head from "next/head";
 import { MDXProvider } from "@mdx-js/react";
 import { motion } from "framer-motion";
 
@@ -14,7 +14,6 @@ import { SectionProvider } from "./SectionProvider";
 export function Layout({ children, sections = [] }) {
   return (
     <MDXProvider components={mdxComponents}>
-
       <Head>
         <script dangerouslySetInnerHTML={{ __html: modeScript }} />
       </Head>
@@ -40,7 +39,7 @@ export function Layout({ children, sections = [] }) {
           </div>
         </div>
       </SectionProvider>
-      </MDXProvider>
+    </MDXProvider>
   );
 }
 
@@ -78,4 +77,4 @@ const modeScript = `
     disableTransitionsTemporarily()
     updateMode()
   }
-`
+`;

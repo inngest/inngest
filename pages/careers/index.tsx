@@ -41,7 +41,7 @@ export default function Careers(props) {
         <Header />
         <Container>
           <article>
-            <main className="m-auto max-w-3xl pt-16">
+            <main className="m-auto max-w-[65ch] pt-16">
               <header className="pt-12 lg:pt-24 max-w-[65ch] m-auto">
                 <h1 className="text-white font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter lg:leading-loose">
                   Careers at Inngest
