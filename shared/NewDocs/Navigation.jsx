@@ -264,7 +264,7 @@ export const navigation = [
       { title: "Installation", href: `${baseDir}/cli/installation` },
       {
         title: "Writing and running functions",
-        href: `${baseDir}/cli/writing-and-running-fuctions`,
+        href: `${baseDir}/cli/writing-and-running-functions`,
       },
       {
         title: "Deploying functions",
