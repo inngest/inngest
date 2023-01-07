@@ -37,9 +37,8 @@ function MyApp({ Component, pageProps }) {
     };
   }, [router.events]);
 
-  const metaTitle = `Inngest - ${
-    pageProps?.meta?.title || "You Send Events. We Run Your Code."
-  }`;
+  const title = pageProps?.meta?.title || "You Send Events. We Run Your Code.";
+  const metaTitle = `Inngest - ${title}`;
   // Warn during local dev
   if (
     !pageProps.disabled &&
@@ -88,7 +87,7 @@ function MyApp({ Component, pageProps }) {
               property="og:image"
               content={
                 pageProps?.meta?.image ||
-                "/assets/og-image-default-2022-10-20.jpg"
+                `/api/og?title=${encodeURIComponent(title)}`
               }
             />
             <meta property="og:url" content={canonicalUrl} />

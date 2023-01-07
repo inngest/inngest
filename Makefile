@@ -6,8 +6,6 @@ build:
 .PHONY: build-prod
 build-prod:
 	yarn build
-	yarn next export
-	yarn render-social-preview-images
 
 .PHONY: cloudflare-build
 cloudflare-build:

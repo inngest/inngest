@@ -43,7 +43,7 @@ export default function DocLayout(props: any) {
       : `${process.env.NEXT_PUBLIC_HOST}/assets/social-previews/${flattenedSlug}.png`;
   const socialImage = scope.image
     ? `${process.env.NEXT_PUBLIC_HOST}${scope.image}`
-    : generatedPreviewImage;
+    : `/api/og?title=${encodeURIComponent(titleWithCategory)}`;
 
   return (
     <DocsLayout sections={sections}>

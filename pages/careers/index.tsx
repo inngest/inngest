@@ -18,7 +18,7 @@ export async function getStaticProps({ params }) {
     props: {
       roles: JSON.stringify(roles),
       meta: {
-        title: `We're Hiring!`,
+        title: `Careers at Inngest`,
       },
       designVersion: "2",
     },
