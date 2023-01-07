@@ -88,7 +88,6 @@ function tokensToHast(lines) {
     // Enable some custom error highlighting that matches Twoslash
     const ErrorLineRegex = /\/\/ Error: /;
     if (line?.[0]?.content.match(ErrorLineRegex)) {
-      console.log(line?.[0]?.content);
       const clean = line?.[0]?.content.replace(ErrorLineRegex, "");
       const errorNode = u(
         "element",
