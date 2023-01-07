@@ -10,19 +10,18 @@ jobs:
         uses: patrickedqvist/wait-for-vercel-preview@v1.2.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          max_timeout: 240
+          max_timeout: 480
 
       - name: Display deployment URL
         run: "echo Preview URL: ${{steps.deployment.outputs.url}}"
 
-      # NOTE - broken-link-checker does not properly follow Next's 308 permanent redirects (e.g. /discord)
-      - if: steps.deployment.outputs.url != ''
-        run: |
-          npx broken-link-checker ${{steps.deployment.outputs.url}} \
-            --recursive --host-requests 10 --requests 10 --follow \
-            --exclude '${{steps.deployment.outputs.url}}/test/' \
-            --exclude '${{steps.deployment.outputs.url}}/discord' \
-            --exclude 'https://www.inngest.com/discord' \
-            --exclude 'https://www.iubenda.com' \
-            --exclude 'https://stripe.com/docs/api' \
-            --exclude 'https://docs.github.com'
+      - uses: actions/checkout@v2.1.0
+
+        # Just install only the deps we need
+      - name: Install dependencies
+        if: steps.deployment.outputs.url != ''
+        run: yarn add broken-link-checker @types/node
+
+      - name: Run broken-link-checker
+        if: steps.deployment.outputs.url != ''
+        run: yarn broken-link-checker ${{steps.deployment.outputs.url}}
