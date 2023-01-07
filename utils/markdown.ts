@@ -4,7 +4,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 
 import { rehypeParseCodeBlocks } from "src/mdx/rehype.mjs";
-import { rehypePrependCode, rehypeShiki } from "src/utils/code";
+import { rehypeRemoveTwoSlashMarkup, rehypeShiki } from "src/utils/code";
 import { getHeadingsAsArray, Heading } from "src/utils/docs";
 
 export type MDXFileMetadata = {
@@ -91,7 +91,7 @@ export async function loadMarkdownFile<T>(
     mdxOptions: {
       rehypePlugins: [
         rehypeParseCodeBlocks,
-        rehypePrependCode,
+        rehypeRemoveTwoSlashMarkup,
         rehypeShiki,
         rehypeSlug,
         rehypeAutolinkHeadings,

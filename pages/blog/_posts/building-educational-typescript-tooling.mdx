@@ -62,6 +62,7 @@ type Hobby = "dancing" | "romancing" | "typescript";
 
 // The compiler will make sure we account for every hobby!
 const myHobbies: Record<Hobby, boolean> = {
+// Error: Property 'romancing' is missing in type '{ readonly dancing: false; readonly typescript: true; }' but required in type 'Record<Hobby, boolean>'.
   dancing: false,
   typescript: true,
 } as const;
@@ -148,6 +149,7 @@ const on = (
 };
 
 on("event", () => console.log("Something happened"));
+// Error: Argument of type '"event"' is not assignable to parameter of type '"server.start" | "server.stop"'.
 ```
 
 Awesome! Not only are we now protected from making mistakes, but we also get to _discover_ events we can listen to via autocomplete in our IDE.

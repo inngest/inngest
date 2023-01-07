@@ -6,7 +6,7 @@ import rehypeRaw from "rehype-raw";
 import { serialize } from "next-mdx-remote/serialize";
 import { MDXRemote } from "next-mdx-remote";
 import Footer from "../../shared/Footer";
-import { rehypePrependCode, rehypeShiki } from "../../utils/code";
+import { rehypeRemoveTwoSlashMarkup, rehypeShiki } from "../../utils/code";
 import { rehypeParseCodeBlocks } from "../../mdx/rehype.mjs";
 import Tags from "../../shared/Blog/Tags";
 
@@ -233,7 +233,7 @@ export async function getStaticProps({ params }) {
     mdxOptions: {
       rehypePlugins: [
         rehypeParseCodeBlocks,
-        rehypePrependCode,
+        rehypeRemoveTwoSlashMarkup,
         rehypeShiki,
         [rehypeRaw, { passThrough: nodeTypes }],
         rehypeSlug,

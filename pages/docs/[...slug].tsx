@@ -18,7 +18,7 @@ import {
 } from "../../utils/docs";
 import { DocsLayout, DocsContent } from "../docs";
 import { rehypeParseCodeBlocks } from "../../mdx/rehype.mjs";
-import { rehypePrependCode, rehypeShiki } from "../../utils/code";
+import { rehypeRemoveTwoSlashMarkup, rehypeShiki } from "../../utils/code";
 
 export default function DocLayout(props: any) {
   const scope: DocScope = JSON.parse(props.post.scope.json);
@@ -198,7 +198,7 @@ export async function getStaticProps({ params }) {
     mdxOptions: {
       rehypePlugins: [
         rehypeParseCodeBlocks,
-        rehypePrependCode,
+        rehypeRemoveTwoSlashMarkup,
         rehypeShiki,
         rehypeSlug,
         rehypeAutolinkHeadings,
