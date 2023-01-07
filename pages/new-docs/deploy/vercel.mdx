@@ -1,4 +1,39 @@
 # Vercel
 
+Inngest enables you to host your functions on Vercel using their [serverless functions platform](https://vercel.com/docs/concepts/functions/serverless-functions). This allows you to deploy your Inngest functions right alongside your existing website and API functions running on Vercel.
 
-some more content
+Inngest will call your functions securely via HTTP request on-demand, whether triggered by an event or on a schedule in the case of cron jobs.
+
+## Hosting Inngest functions on Vercel
+
+After you've written your functions using [Next.js](/docs/frameworks/nextjs?ref=docs-deploy-vercel) or Vercel's [Express-like](/docs/frameworks/express?ref=docs-deploy-vercel) functions within your project, you need to serve them via the `serve` handler. Using the `serve` handler, create a Vercel/Next.js function at the `/api/inngest` endpoint. Here's an example in a Next.js app:
+
+```js
+// ./pages/api/inngest.js
+import { serve } from "inngest/next";
+import firstFunction from "../../inngest/first";
+import anotherFunction from "../../inngest/another";
+
+export default serve("Your app's name", [ firstFunction, anotherFunction ]);
+```
+
+## Deploying to Vercel
+
+Installing [Inngest's official Vercel integraiton](https://vercel.com/integrations/inngest) does 3 things:
+
+1. Automatically sets the required `INNGEST_SIGNING_KEY` environment variable to securely communicate with Inngest's API
+2. Automatically sets the `INNGEST_EVENT_KEY` environment variable to enable your application to send events ([docs](/docs/creating-an-event-key))
+3. Automatically deploys new functions to Inngest every time you deploy updated code to Vercel - no need to change your existing workflow!
+
+<a href="https://vercel.com/integrations/inngest" className="button button--primary" style={{ marginBottom: "1rem" }}>
+  <img src="/assets/brand-logos/vercel-icon-light.svg" className="button-icon" />
+  Install the Inngest Vercel integration
+</a>
+
+After you're installed, every new deploy to Vercel will update functions in [the Inngest dashboard](https://app.inngest.com/functions) within a few seconds!
+
+---
+
+### Manually registering functions
+
+While we strongly recommend our Vercel integration, you can still use Inngest by manually telling Inngest that you've deployed updated functions. You can register your app [via the Inngest UI](/docs/deploy#registering-via-the-ui) or [via our API with a curl request](/docs/deploy#registering-via-the-api).

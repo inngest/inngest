@@ -1,7 +1,245 @@
 # Multi-Step Functions
 
-Attachments are how you share things in Protocol — they allow you to send all sorts of files to your contacts and groups. On this page, we'll dive into the different attachment endpoints you can use to manage attachments programmatically. We'll look at how to query, upload, update, and delete attachments. {{ className: 'lead' }}
+Use Inngest's multi-step functions to safely coordinate between events, delay execution for hours or _days_, and conditionally run code based on the result of previous steps and incoming events.
 
-## The attachment model
+Critically, multi-step functions are written in code, not config, meaning you create readable, obvious functionality that's easy to maintain.
 
-The attachment model contains all the information about the files you send to your contacts and groups, including the name, type, and size.
+## Benefits
+
+Writing multi-step functions provide you with some easy-to-use tools to create intuitive flows for your system.
+
+- Run retryable blocks of code to maximum reliability
+- Pause execution and Wait for an event matching rules before continuing
+- Pause for an amount of time or until a specified time
+
+This makes building reliable, distributed code simple. By wrapping asynchronous actions such as API calls in retryable blocks, we can ensure reliability when coordinating across many services.
+
+## Writing
+
+Multi-step functions are written using either the `createStepFunction()` helper or the `Inngest#createStepFunction()` method.
+
+First, let's look at a simple single-step function.
+
+```ts
+import { createFunction } from "inngest";
+
+createFunction(
+  "Activation email",
+  "app/user.created",
+  async ({ event }) => {
+    await sendEmail({ email: event.user.email, template: "welcome" });
+  }
+);
+```
+
+This function will send a user an email when they sign up. Nice and simple.
+
+We have a new requirement, though, that we should send the user another email if they haven't created a post on our platform within 24 hours of signing up. We have a `app/post.created` event that is fired when this happens, so we can use that (or here, the absence of that) to trigger the second email.
+
+First, let's convert out function to a multi-step function. To do this, we'll do a few things:
+
+- Use `createStepFunction()` instead of `createFunction()`
+- Change our provided handler to be non-async
+- Add a new `tools` argument
+- Wrap our `sendEmail()` call in a `tools.run()` call
+
+```ts
+import { createStepFunction } from "inngest";
+
+createStepFunction(
+  "Activation email",
+  "app/user.created",
+  ({ event, tools }) => {
+    tools.run("Send welcome email", () =>
+      sendEmail({ email: event.user.email, template: "welcome" })
+    );
+  }
+);
+```
+
+Great! Now we have a multi-step function.
+
+The main difference is that we've wrapped our `sendEmail()` call in a `tools.run()` call. This is how we tell Inngest that this is an individual step in our function. This step can be retried independently, just like a single-step function would.
+
+Once our welcome email is sent, we want to wait at most 24 hours for our user to create a post. If they haven't created one by then, we want to send them a reminder email.
+
+To do this, we can use the `waitForEvent` tool. This tool will wait for a matching event to be fired, and then return the event data. If the event is not fired within the timeout, it will return `null`, which we can use to decide whether to send the reminder email.
+
+```ts
+import { createStepFunction } from "inngest";
+
+createStepFunction(
+  "Activation email",
+  "app/user.created",
+  ({ event, tools }) => {
+    tools.run("Send welcome email", () =>
+      sendEmail({ email: event.user.email, template: "welcome" })
+    );
+
+    // Wait for an "app/post.created" event
+    const postCreated = tools.waitForEvent("app/post.created", {
+      match: "data.user.id", // the field "data.user.id" must match
+      timeout: "24h", // wait at most 24 hours
+    });
+  }
+);
+```
+
+Now we have our `postCreated` variable, which will be `null` if the user hasn't created a post within 24 hours, or the event data if they have.
+
+Finally, we can use this to send the reminder email if the user hasn't created a post by running another block of code with `tools.run()`.
+
+```ts
+import { createStepFunction } from "inngest";
+
+createStepFunction(
+  "Activation email",
+  "app/user.created",
+  ({ event, tools }) => {
+    tools.run("Send welcome email", () =>
+      sendEmail({ email: event.user.email, template: "welcome" })
+    );
+
+    // Wait for an "app/post.created" event
+    const postCreated = tools.waitForEvent("app/post.created", {
+      match: "data.user.id", // the field "data.user.id" must match
+      timeout: "24h", // wait at most 24 hours
+    });
+
+    if (!postCreated) {
+      // If no post was created, send a reminder email
+      tools.run("Send reminder email", () =>
+        sendEmail({ email: event.user.email, template: "reminder" })
+      );
+    }
+  }
+);
+```
+
+That's it! We've now written a multi-step function that will send a welcome email, and then send a reminder email if the user hasn't created a post within 24 hours.
+
+Most importantly, we had to write no config to do this. We can use all the power of JavaScript to write our functions and all the power of Inngest's tools to coordinate between events and steps.
+
+## Tools
+
+Inngest provides a number of tools to help you write multi-step functions. These tools are available in the `tools` argument of your function.
+
+- [`run`](#run) - Run synchronous or asynchronous code as a retryable step in your function
+- [`waitForEvent`](#waitforevent) - Wait for an event to be fired, and return the event data
+- [`sleep`](#sleep) - Sleep for a given amount of time
+- [`sleepUntil`](#sleepuntil) - Sleep until a given time
+
+### `run()`
+
+Use `tools.run()` to run synchronous or asynchronous code as a retryable step in your function.
+
+It takes a name for the block (for you, so you can easily see which steps ran) and a function to run when the block is triggered, then returns a Promise that resolves to the return value of the given function.
+
+For example, I could fetch a random user from the database in a lottery draw:
+
+```ts
+const user = await tools.run("Get random user", () => getRandomUser());
+```
+
+### `waitForEvent()`
+
+Use `tools.waitForEvent()` to wait for a particular event to be received before continuing. It returns a Promise that is resolved with the received event.
+
+```ts
+const postCreated = tools.waitForEvent("app/post.created", {
+  timeout: "30 minutes",
+});
+```
+
+A `timeout` must be provided as the maximum time to wait for the event. If this timeout is reached, the tool will resolve with `null` instead of the event data.
+
+### `sleep()`
+
+Use `tools.sleep()` to wait for a specified amount of time before continuing.
+
+```ts
+tools.sleep("30 minutes");
+tools.sleep(1000 * 60 * 30);
+```
+
+`time` can be specified using a `number` of milliseconds or an `ms`-compatible
+time string like `"1 hour"`, `"30 mins"`, or `"2.5d"`. See the [ms](https://npm.im/ms) package for more information.
+
+To wait until a particular date, use `tools.sleepUntil()` instead.
+
+### `sleepUntil()`
+
+Use `tools.sleepUntil()` to wait until a particular date before continuing by
+passing a `Date`.
+
+```ts
+const tomorrow = new Date();
+tomorrow.setDate(tomorrow.getDate() + 1);
+
+tools.sleepUntil(tomorrow);
+```
+
+To wait a particular amount of time, use `tools.sleep()` instead.
+
+## Gotchas
+
+### My function is running twice
+
+Inngest will communicate with your function multiple times throughout a single run and will use your use of tools to smartly memoise state.
+
+For this reason, placing business logic outside of a `tools.run()` call is a bad idea, as this will be run every time Inngest communicates with your function.
+
+### I want to run asynchronous code
+
+Easy! To run some asynchronous code, perform a call to `tools.run()`, providing an `async` function, like so:
+
+```ts
+tools.run("Do something", async () => {
+  // your code
+});
+```
+
+Ideally, each call to `tools.run()` is a single retryable action, so it's usually a good idea provide a synchronous function and return a promise.
+
+For example, the below code is problematic.
+
+```ts
+tools.run("Create alert", async () => {
+  const alertId = await createAlert();
+  await sendAlertLinkToSlack(alertId);
+});
+```
+
+If `createAlert()` succeeds but `sendAlertLinkToSlack()` fails, the code will be retried and an alert will be created every time the step is retried.
+
+Instead, we should split out asynchronous actions in to multiple steps so they're retried independently.
+
+```ts
+const alertId = tools.run("Create alert", () => createAlert());
+
+tools.run("Send alert link", () => sendAlertLinkToSlack(alertId));
+```
+
+### My variable isn't updating
+
+Because Inngest communicates with your function multiple times, memoising state as it goes, code within calls to `tools.run()` is not called on every invocation.
+
+This can be confusing if you're using steps to update variables within the function's closure, like so:
+
+```ts
+let userId;
+
+tools.run("Get user", async () => {
+  userId = await getRandomUserId()
+});
+
+console.log(userId); // undefined
+```
+
+Instead, make sure that any variables needed for the overall function are _returned_ from calls to `tools.run()`:
+
+```ts
+const userId = tools.run("Get user", () => getRandomUserId());
+
+console.log(userId); // 123
+```

@@ -1,4 +1,97 @@
 # Testing functions
 
+You can test functions locally, across any framework, by using our CLI.  The CLI
+provides everything you need to receive events and run functions on your machine.
 
-some more content
+Follow along to learn how to:
+
+- View the SDK dashboard
+- Run the CLI
+- Test functions using the SDK and CLI together
+
+
+## View the SDK dashboard
+
+The SDK provides a built-in UI via the  [`serve` handler for your framework
+(read the docs here)](/docs/functions#serving),
+which shows you all of your registered functions and allows you to send test events
+to trigger your functions. Follow these steps to see the SDK UI:
+
+1. Ensure you're serving the Inngest SDK for your framework
+2. Run your project, eg. via `yarn dev` for NextJS
+3. Browse to your site's URL at `/api/inngest`, eg. `http://localhost:3000/api/inngest`.
+
+You will see the following UI:
+
+![SDK UI](/assets/docs/sdk/sdk-ui.png)
+
+## Run the CLI
+
+The CLI runs Inngest locally, allowing you to process events and run functions on
+your own machine.
+
+To run the CLI, copy the command from the header of your SDK UI. The command looks
+similar to the following, using your own URL/port:
+
+```bash
+npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
+```
+
+The CLI will automatically connect to your project, initialize your functions,
+and start an HTTP server which accepts events from your project.  When events
+are received, the CLI will run your functions automatically, and show output
+in the CLI's logs.
+
+Once you've started the dev server, you should see your functions registered
+and ready to go in the output! In addition, our SDK debug page will now show
+that we're connected to the dev server.
+
+![Connected](/assets/docs/top_bar_connected.png)
+
+<details>
+  <summary><strong>Check dev server logs</strong></summary>
+
+  ```sh
+  12:10PM INF overriding config to log step output within dev server
+  12:10PM INF executor > starting queue backend=inmemory
+  12:10PM INF runner > starting event stream backend=inmemory
+  12:10PM INF runner > starting queue backend=inmemory
+  12:10PM INF runner > initializing scheduled messages len=0
+  12:10PM INF executor > service starting
+  12:10PM INF devserver > service starting
+  12:10PM INF executor > subscribing to function queue
+  12:10PM INF api > starting server addr=0.0.0.0:8288
+  12:10PM INF runner > service starting
+  12:10PM INF runner > subscribing to events topic=events
+  12:11PM INF devserver > registered functions app="My Next.js App" framework=nextjs len=1 sdk=js:v0.6.0 url=http://localhost:3001/api/inngest
+  ```
+</details>
+
+## Testing functions
+
+With the CLI running, your SDK UI page should show that you're connected to
+the dev server.
+
+You can use the SDK UI to send test events to the CLI. Enter your event into
+the input box and hit send to send the event to Inngest.  Any functions
+that subscribe to your event will run in the background!
+
+Here's an example:
+
+![Send an event](/assets/docs/sdk/send-event.png)
+
+<details>
+  <summary><strong>Check dev server logs</strong></summary>
+
+  ```sh
+  12:18PM INF api > publishing event event={"data":{"name":"Inngest"},"id":"01GFX481B6482Y32VSQFB6BJJY","name":"demo/event.sent"} event_name=demo/event.sent id=01GFX481B6482Y32VSQFB6BJJY
+  12:18PM INF runner > received message event=demo/event.sent id=01GFX481B6482Y32VSQFB6BJJY
+  12:18PM INF runner > initializing fn event=demo/event.sent function=my-next-js-app-hello-world id=01GFX481B6482Y32VSQFB6BJJY
+  12:18PM INF executor > executing action dsn=inngest.com/my-next-js-app-hello-world-step-step-test run_id=01GFX481H2KSDE7JNHR1Y0XT1J scopes=null step=step version=null
+  12:18PM INF output > step output attempt=0 fn_id=my-next-js-app-hello-world fn_name="Hello World" output={"body":{"message":"Hello, Inngest!"},"status":200} run_id=01GFX481H2KSDE7JNHR1Y0XT1J step=step
+  ```
+</details>
+
+From here, learn how to send events to Inngest using the SDK.  In development, with
+the dev server running, events will automatically be sent to your local CLI and will
+trigger functions locally.

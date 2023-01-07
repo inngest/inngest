@@ -205,6 +205,10 @@ export const navigation = [
         title: "Multi-step Functions",
         href: `${baseDir}/functions/multi-step`,
       },
+      {
+        title: "Retries and Failures",
+        href: `${baseDir}/functions/retries`,
+      },
     ],
   },
   {
@@ -287,6 +291,10 @@ export const navigation = [
         href: `${baseDir}/cli/login`,
       },
     ],
+  },
+  {
+    title: "SDK",
+    links: [{ title: "Installation", href: `${baseDir}/sdk/serve` }],
   },
 ];
 

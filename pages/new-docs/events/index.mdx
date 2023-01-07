@@ -1,4 +1,57 @@
 # Events
 
+Firstly, make sure you have the [`inngest`](https://www.npmjs.com/package/inngest) package installed via NPM or yarn:
 
-some more content
+```bash
+npm install inngest  # or yarn add inngest
+```
+
+Start with creating an `Inngest` client. An "Event Key" is required to send events ([How to create an Event Key](/docs/creating-an-event-key)):
+
+```typescript
+import { Inngest } from 'inngest';
+
+// Recommended: Set an INNGEST_EVENT_KEY environment variable for automatic configuration:
+const inngest = new Inngest({ name: "Your app name" });
+
+// Or you can pass the eventKey explicitly to the constructor:
+const inngest = new Inngest({ name: "Your app name", eventKey: "xyz..." });
+```
+
+Then, sending an event is simple, just call the the `send()` method with your event payload ([Read about the payload format](/docs/event-format-and-structure)):
+
+```typescript
+// This sends an event to Inngest.
+await inngest.send({
+  // The event name
+  name: "demo/demo.event",
+  // The event's data
+  data: {
+    account: {
+      id: 123,
+      email: "test@example.com",
+    },
+    cartID: "ed12c8bde",
+    like: true,
+  }
+});
+```
+
+Sending this event, named `demo/demo.event`, to Inngest will do two things:
+
+1. Automatically run any [functions](/docs/functions) that are triggered by this specific event, passing the event payload to the function's argumnts.
+2. Create a new event version, if it doesn't already exist, in Inngest Cloud and infer the event payload's structure, [generating a Type for use with TypeScript](/docs/typescript)
+
+<aside>
+
+⚡️ When you send an event, Inngest will automatically run any functions that are triggered by the same event name — in parallel, in the background, without configuring any queues.
+
+</aside>
+
+### Advanced usage
+
+There's more you can do with events, such as [user identification](/docs/event-format-and-structure#optional-fields), event versioning, and filtering for each key.
+
+## Next up
+
+Next up, learn how to [deploy your functions](/docs/deploy) by registering them with Inngest.
