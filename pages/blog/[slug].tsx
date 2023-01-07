@@ -14,7 +14,7 @@ import Tags from "../../shared/Blog/Tags";
 import DiscordCTA from "../../shared/Blog/DiscordCTA";
 import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
-import Button from "src/shared/Button";
+import { Button } from "src/shared/Button";
 import IconCalendar from "src/shared/Icons/Calendar";
 const components = {
   DiscordCTA,

@@ -6,7 +6,7 @@ import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
 import Footer from "src/shared/Footer";
 import Block from "../shared/legacy/Block";
-import Button from "src/shared/Button";
+import { Button } from "src/shared/Button";
 
 const MISSION = "To accelerate the adoption of event-based architecture.";
 

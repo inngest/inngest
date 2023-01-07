@@ -4,7 +4,7 @@ import { MDXRemote } from "next-mdx-remote";
 import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
 import Footer from "src/shared/Footer";
-import Button from "src/shared/Button";
+import { Button } from "src/shared/Button";
 import {
   loadMarkdownFile,
   loadMarkdownFilesMetadata,

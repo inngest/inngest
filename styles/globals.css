@@ -94,7 +94,7 @@ html.docs {
 /** Themes - Light is default */
 :root.dark,
 body.dark-theme {
-  --bg-color: var(--bg-color-d);
+  --bg-color: #080d19;
   --highlight-color: var(--black);
   --stroke-color: #525661;
   --font-color-primary: var(--color-white);

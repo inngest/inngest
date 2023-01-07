@@ -3,8 +3,9 @@ import Link from "next/link";
 import clsx from "clsx";
 import { motion, useScroll, useTransform } from "framer-motion";
 
-import { Button } from "./Button";
-import { Logo } from "./Logo";
+import { Button } from "../Button";
+
+import Logo from "../Icons/Logo";
 import {
   MobileNavigation,
   useIsInsideMobileNavigation,
@@ -44,7 +45,7 @@ export const Header = forwardRef(function Header({ className }, ref) {
           "backdrop-blur-sm dark:backdrop-blur lg:left-72 xl:left-80",
         isInsideMobileNavigation
           ? "bg-white dark:bg-slate-900"
-          : "bg-white/[var(--bg-opacity-light)] dark:bg-slate-900/[var(--bg-opacity-dark)]"
+          : "bg-white/[var(--bg-opacity-light)] dark:bg-slate-950/[var(--bg-opacity-dark)]"
       )}
       style={{
         "--bg-opacity-light": bgOpacityLight,
@@ -78,8 +79,13 @@ export const Header = forwardRef(function Header({ className }, ref) {
           <MobileSearch />
           <ModeToggle />
         </div>
-        <div className="hidden min-[416px]:contents">
-          <Button href="#">Sign in</Button>
+        <div className="hidden min-[416px]:flex items-center gap-3">
+          <Button href="/login" size="sm" variant="secondary">
+            Log in
+          </Button>
+          <Button href="/sign-up" size="sm" arrow>
+            Sign up
+          </Button>
         </div>
       </div>
     </motion.div>

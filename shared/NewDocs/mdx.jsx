@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { Heading } from "./Heading";
 
 export const a = Link;
-export { Button } from "./Button";
+export { Button } from "../Button";
 export { CodeGroup, Code as code, Pre as pre } from "./Code";
 
 export const h2 = function H2(props) {

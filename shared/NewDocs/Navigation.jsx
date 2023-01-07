@@ -183,28 +183,109 @@ function NavigationGroup({ group, className }) {
   );
 }
 
-const baseDir = "/new-docs"
+const baseDir = "/new-docs";
 export const navigation = [
   {
-    title: "Guides",
+    title: "Introduction",
     links: [
-      { title: "Introduction", href: `${baseDir}/` },
-      { title: "Quickstart", href: `${baseDir}/quickstart` },
-      { title: "SDKs", href: `${baseDir}/sdks` },
-      { title: "Authentication", href: `${baseDir}/authentication` },
-      { title: "Pagination", href: `${baseDir}/pagination` },
-      { title: "Errors", href: `${baseDir}/errors` },
-      { title: "Webhooks", href: `${baseDir}/webhooks` },
+      { title: "Overview", href: `${baseDir}/` },
+      { title: "Quick Start Tutorial", href: `${baseDir}/quickstart` },
+      { title: "Using TypeScript", href: `${baseDir}/typescript` },
     ],
   },
   {
-    title: "Resources",
+    title: "Functions",
     links: [
-      { title: "Contacts", href: `${baseDir}/contacts` },
-      { title: "Conversations", href: `${baseDir}/conversations` },
-      { title: "Messages", href: `${baseDir}/messages` },
-      { title: "Groups", href: `${baseDir}/groups` },
-      { title: "Attachments", href: `${baseDir}/attachments` },
+      { title: "Writing Functions", href: `${baseDir}/functions` },
+      {
+        title: "Testing Functions",
+        href: `${baseDir}/functions/testing-functions`,
+      },
+      {
+        title: "Multi-step Functions",
+        href: `${baseDir}/functions/multi-step`,
+      },
+    ],
+  },
+  {
+    title: "Events",
+    links: [
+      { title: "Sending Events", href: `${baseDir}/events` },
+      {
+        title: "Event Format",
+        href: `${baseDir}/events/event-format-and-structure`,
+      },
+      {
+        title: "Creating an Event Key",
+        href: `${baseDir}/events/creating-an-event-key`,
+      },
+    ],
+  },
+  {
+    title: "Deploying",
+    links: [
+      { title: "Overview", href: `${baseDir}/deploy` },
+      { title: "Vercel", href: `${baseDir}/deploy/vercel` },
+      { title: "Netlify", href: `${baseDir}/deploy/netlify` },
+      { title: "Cloudflare Pages", href: `${baseDir}/deploy/cloudflare` },
+      { title: "Inngest Cloud", href: `${baseDir}/deploy/inngest-cloud` },
+      { title: "AWS Lambda", href: `${baseDir}/deploy/aws-lambda` },
+    ],
+  },
+  {
+    title: "Frameworks",
+    links: [
+      { title: "Overview", href: `${baseDir}/frameworks` },
+      { title: "Next.js", href: `${baseDir}/frameworks/nextjs` },
+      { title: "Express", href: `${baseDir}/frameworks/express` },
+      {
+        title: "Cloudflare Pages",
+        href: `${baseDir}/frameworks/cloudflare-pages`,
+      },
+      { title: "RedwoodJS", href: `${baseDir}/frameworks/redwoodjs` },
+    ],
+  },
+  {
+    title: "Guides",
+    links: [
+      {
+        title: "Overview",
+        href: `${baseDir}/guides`,
+      },
+      {
+        title: "Trigger code from Retool",
+        href: `${baseDir}/guides/trigger-your-code-from-retool`,
+      },
+    ],
+  },
+  {
+    title: "CLI",
+    links: [
+      { title: "Installation", href: `${baseDir}/cli/installation` },
+      {
+        title: "Writing and running functions",
+        href: `${baseDir}/cli/writing-and-running-fuctions`,
+      },
+      {
+        title: "Deploying functions",
+        href: `${baseDir}/cli/deploying-functions`,
+      },
+      {
+        title: "init",
+        href: `${baseDir}/cli/init`,
+      },
+      {
+        title: "run",
+        href: `${baseDir}/cli/run`,
+      },
+      {
+        title: "deploy",
+        href: `${baseDir}/cli/deploy`,
+      },
+      {
+        title: "login",
+        href: `${baseDir}/cli/login`,
+      },
     ],
   },
 ];
@@ -225,7 +306,10 @@ export function Navigation(props) {
         ))}
         <li className="sticky bottom-0 z-10 mt-6 min-[416px]:hidden">
           <Button href="#" variant="filled" className="w-full">
-            Sign in
+            Log in
+          </Button>
+          <Button href="#" variant="filled" className="w-full">
+            Sign up
           </Button>
         </li>
       </ul>

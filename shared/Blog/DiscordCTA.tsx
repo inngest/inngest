@@ -1,7 +1,7 @@
 import React from "react";
 import styled from "@emotion/styled";
 
-import Button from "../Button";
+import { Button } from "../Button";
 import DiscordLogo from "../Icons/Discord";
 
 const DiscordCTA: React.FC<{ size?: "default" | "small" }> = ({
@@ -16,7 +16,7 @@ const DiscordCTA: React.FC<{ size?: "default" | "small" }> = ({
       <p className="text-slate-400 mb-6 mt-2 text-sm">
         Ask questions, give feedback, and share feature requests
       </p>
-      <Button href={process.env.NEXT_PUBLIC_DISCORD_URL} arrow>
+      <Button variant="secondary" href={process.env.NEXT_PUBLIC_DISCORD_URL} arrow>
         Join our Discord!
       </Button>
     </div>

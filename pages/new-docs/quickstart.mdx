@@ -5,48 +5,49 @@ export const description =
 
 This guide will get you all set up and ready to use the Protocol API. We'll cover how to get started using one of our API clients and how to make your first API request. We'll also look at where to go next to find all the information you need to take full advantage of our powerful REST API. {{ className: 'lead' }}
 
-<Note>
-  Before you can make requests to the Protocol API, you will need to grab your
-  API key from your dashboard. You find it under [Settings &raquo; API](#).
-</Note>
+This quick start walks you step-by-step through everything you need to get started.  It'll take approximately 5 minutes.  You will learn how to:
 
-## Choose your client
+- Run Inngest on your machine for local testing
+- Add Inngest to an existing Next.js project ([other frameworks are also supported](/docs/frameworks))
+- Write your first function
+- Trigger your function from the development UI
+- Trigger your function from code
 
-Before making your first API request, you need to pick which API client you will use. In addition to good ol' cURL HTTP requests, Protocol offers clients for JavaScript, Python, and PHP. In the following example, you can see how to install each client.
+Afterwards you'll be ready to [deploy your app to any platform](/docs/deploy), then build [advanced functions using our guides](/docs/guides)!  Let's get started.
+
+## 1. Run Inngest locally
+
+Before integrating Inngest we will start the [open-source development server](https://www.github.com/inngest/inngest).  Run the following command in your terminal:
+
+You should see the following output:
 
 <CodeGroup>
 
-```bash {{ title: 'cURL' }}
-# cURL is most likely already installed on your machine
-curl --version
-```
-
 ```bash {{ language: 'js' }}
-# Install the Protocol JavaScript SDK
-npm install @example/protocol-api --save
-```
+$ npx inngest-cli@latest dev
 
-```bash {{ language: 'python' }}
-# Install the Protocol Python SDK
-pip install protocol_api
-```
+12:38PM INF runner > starting event stream backend=inmemory
+12:38PM INF executor > starting queue backend=inmemory
+12:38PM INF devserver > autodiscovering locally hosted SDKs
+12:38PM INF executor > service starting
+12:38PM INF coreapi > service starting
+12:38PM INF devserver > service starting
+12:38PM INF executor > subscribing to function queue
+12:38PM INF runner > starting queue backend=inmemory
+12:38PM INF coreapi > starting server addr=0.0.0.0:8300
+12:38PM INF api > starting server addr=0.0.0.0:8288
+12:38PM INF runner > initializing scheduled messages len=0
+12:38PM INF runner > service starting
+12:38PM INF runner > subscribing to events topic=events
 
-```bash {{ language: 'php' }}
-# Install the Protocol PHP SDK
-composer require protocol/sdk
+        Inngest dev server online at 0.0.0.0:8288, visible at the following URLs:
+
+          - http://127.0.0.1:8288 (http://localhost:8288)
 ```
 
 </CodeGroup>
 
-<div className="not-prose">
-  <Button
-    href="/sdks"
-    variant="text"
-    arrow="right"
-    children="Check out our list of first-party SDKs"
-  />
-</div>
-
+This runs Inngest locally.  We'll use this to test our functions as we write them.  With this running you can visit `http://localhost:8288` to see the development UI:
 ## Making your first API request
 
 After picking your preferred client, you are ready to make your first call to the Protocol API. Below, you can see how to send a GET request to the Conversations endpoint to get a list of all your conversations. In the cURL example, results are limited to ten conversations, the default page length for each client.
