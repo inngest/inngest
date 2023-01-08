@@ -191,8 +191,8 @@ a {
 }
 
 /** Copy relationship: everything but home. **/
- li > ol,
- li > ul {
+:root.v1 li > ol,
+:root.v1 li > ul {
   margin: 1rem 0;
 }
 

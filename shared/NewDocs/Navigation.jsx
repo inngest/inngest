@@ -67,7 +67,7 @@ function VisibleSectionHighlight({ group, pathname }) {
       (section) => section.id === visibleSections[0]
     )
   );
-  let itemHeight = remToPx(2);
+  let itemHeight = remToPx(1.76);
   let height = isPresent
     ? Math.max(1, visibleSections.length) * itemHeight
     : itemHeight;
@@ -88,15 +88,15 @@ function VisibleSectionHighlight({ group, pathname }) {
 }
 
 function ActivePageMarker({ group, pathname }) {
-  let itemHeight = remToPx(2);
-  let offset = remToPx(0.25);
+  let itemHeight = 28;
+  let offset = remToPx(0.27);
   let activePageIndex = group.links.findIndex((link) => link.href === pathname);
   let top = offset + activePageIndex * itemHeight;
 
   return (
     <motion.div
       layout
-      className="absolute left-2 h-6 w-px bg-indigo-500"
+      className="absolute left-2 h-[20px] w-px bg-indigo-500"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { delay: 0.2 } }}
       exit={{ opacity: 0 }}
