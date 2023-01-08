@@ -4,7 +4,7 @@ export function Button({
   children,
   variant = "primary",
   size = "md",
-  arrow = false,
+  arrow,
   ...props
 }) {
   const sizes = {
@@ -24,9 +24,12 @@ export function Button({
       href={props.href}
       className={`group inline-flex items-center gap-0.5 rounded-full font-medium tracking-tight transition-all ${variants[variant]} ${sizes[size]} ${props.className}`}
     >
+      {arrow && arrow === "left" ? (
+        <ArrowRight className="group-hover:-translate-x-1 transition-transform rotate-180 duration-150 -ml-1.5" />
+      ) : null}
       {children}
-      {arrow ? (
-        <ArrowRight className="group-hover:translate-x-1 relative top-px transition-transform duration-150  -mr-1.5" />
+      {arrow && arrow === "right" ? (
+        <ArrowRight className="group-hover:translate-x-1 transition-transform duration-150  -mr-1.5" />
       ) : null}
     </a>
   );

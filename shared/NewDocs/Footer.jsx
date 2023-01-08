@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { Transition } from "@headlessui/react";
 
-import { Button } from "./Button";
+import { Button } from "../Button";
 import { navigation } from "./Navigation";
 
 function CheckIcon(props) {
@@ -108,6 +108,7 @@ function PageLink({ label, page, previous = false }) {
         aria-label={`${label}: ${page.title}`}
         variant="secondary"
         arrow={previous ? "left" : "right"}
+        size="sm"
       >
         {label}
       </Button>

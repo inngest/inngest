@@ -83,7 +83,7 @@ export const Header = forwardRef(function Header({ className }, ref) {
           <Button href="/login" size="sm" variant="secondary">
             Log in
           </Button>
-          <Button href="/sign-up" size="sm" arrow>
+          <Button href="/sign-up" size="sm" arrow="right">
             Sign up
           </Button>
         </div>
