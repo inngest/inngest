@@ -63,6 +63,9 @@ function MyApp({ Component, pageProps }) {
   const canonicalUrl = `https://www.inngest.com${
     router.asPath === "/" ? "" : router.asPath
   }`.split("?")[0];
+  const ogImage =
+    pageProps?.meta?.image ||
+    `https://www.inngest.com/api/og?title=${encodeURIComponent(title)}`;
 
   return (
     <>
@@ -83,13 +86,7 @@ function MyApp({ Component, pageProps }) {
                 />
               </>
             )}
-            <meta
-              property="og:image"
-              content={
-                pageProps?.meta?.image ||
-                `/api/og?title=${encodeURIComponent(title)}`
-              }
-            />
+            <meta property="og:image" content={ogImage} />
             <meta property="og:url" content={canonicalUrl} />
             <meta property="og:title" content={metaTitle} />
             <meta name="twitter:card" content="summary_large_image" />
@@ -101,13 +98,7 @@ function MyApp({ Component, pageProps }) {
                 content={pageProps?.meta?.description}
               />
             )}
-            <meta
-              name="twitter:image"
-              content={
-                pageProps?.meta?.image ||
-                `/api/og?title=${encodeURIComponent(title)}`
-              }
-            />
+            <meta name="twitter:image" content={ogImage} />
           </>
         )}
         <link rel="canonical" href={canonicalUrl} />
