@@ -1,0 +1,119 @@
+---
+category: Guides
+title: Self-hosting
+slug: self-hosting
+order: 200
+hide: true
+---
+
+It's possible to self host the components of Inngest, and manage the entire system within your own
+environment.
+
+## Explore the architecture
+
+There are multiple components to Inngest, each of which will need to be created:
+
+- The **state system**, which records state for function runs
+- The **queueing system**, which schedules and invokes particular steps within a function
+- The **messaging system**, which acts as an event bus for incoming events
+- The **data store**, which is a persisted data store for function & action version metadata
+- The **core api service**, which manages source keys, function metadata, and action metadata
+- The **event api service**, which accepts events and publishes them to the messaging system
+- The **runner service**, which receives events from the messaging system and enqueues functions
+- The **executor service**, which executes individual steps within a function
+
+You can read more about the architecture of Inngest in our
+[architecture docs](https://github.com/inngest/inngest#project-architecture).
+
+
+## Requirements
+
+**Backing systems**
+
+The state systems, queueing systems, messaging systems, and data store must be highly available.  We have multiple
+drivers for each, and recommend using widely available systems such as hosted Redis, SQS/SNS, or
+Google Pub/Sub.
+
+**Service resources (RAM, CPU, etc.)**
+
+There are two primary factors which determine the resources that your services need:
+
+- **Events per second**;  the number of events you send Inngest per second.  This impacts the memory
+  and CPU required for the event API, runner, and state store.
+- **Function execution**;  the frequency and intensity of the functions you execute.  Long running,
+  demanding functions require a greater reserve of CPU and RAM for allocation within executors. Many
+  short running functions per second adds load to your state store.
+
+**Ports and networking**
+
+At it's core, the only requirement is that events can be ingested via the event service, which
+requires plain HTTP(s) support.  The services communicate via backing systems (eg. NATS) and are
+currently shared-nothing;  they do not communicate directly.
+
+## Running services
+
+At a high level, Inngest's services can be served via the `inngest serve` command
+[using the CLI](https://github.com/inngest/inngest/). One or or more services at a time can be
+served from a single process.  For example:
+
+- `inngest serve executor` runs the executor service.
+- `inngest serve event-api runner` runs the event API and the runner together in a single process.
+
+When serving multiple services at once, if one service terminates the process will safely stop the
+other services and terminate.
+
+**Docker images**
+
+[Docker images are available](https://hub.docker.com/r/inngest/inngest) to run services:
+
+```
+docker run -d --restart always --name runner inngest/inngest:latest inngest serve runner
+```
+
+## Configuration
+
+You can configure services via a `config.cue` file within:
+
+- `/etc/inngest/config.cue`
+- Via the `-c` flag, eg. `inngest serve -c ./path/to/config.cue runner`
+- Via the `INNGEST_CONFIG` environment variable (eg. if you store config in a secrets manager).  The
+  env variable must be the full escaped config file.
+
+[You can view the configuration specification here](https://github.com/inngest/inngest/blob/main/pkg/cuedefs/config/config.cue),
+with example configuration files in two places:
+
+- [Example hosting stacks have configuration files](https://github.com/inngest/inngest/tree/main/hosting-stacks)
+- [Each end-to-end test has example configuration files](https://github.com/inngest/inngest/tree/main/tests/configs)
+
+**Environment variables**
+
+Config can contain environment variables for interpolation.  An example:
+
+```
+package main
+import (
+	config "inngest.com/defs/config"
+)
+config.#Config & {
+  state: {
+    service: {
+      backend: "redis"
+      // REDIS_HOST will be replaced with the environment variable's value.
+      host: "${REDIS_HOST}"
+    }
+  }
+}
+```
+
+## Example self-hosting stacks
+
+We have example self-hosting stacks documented within our CLI repo.  These document a range of self
+hosting environments, from AWS stacks using ECS to single machines via Docker Compose.
+
+[View the example stacks here.](https://github.com/inngest/inngest/tree/main/hosting-stacks)
+
+## Support
+
+We offer support for self-hosting.  For a detailed self-hosting guide and support information,
+reach out to us at hello@inngest.com for more information, or
+[speak to us on Discord](/discord).
