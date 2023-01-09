@@ -92,6 +92,22 @@ function MyApp({ Component, pageProps }) {
             />
             <meta property="og:url" content={canonicalUrl} />
             <meta property="og:title" content={`Inngest - ${metaTitle}`} />
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:site" content="@inngest" />
+            <meta name="twitter:title" content={metaTitle} />
+            {pageProps?.meta?.description && (
+              <meta
+                name="twitter:description"
+                content={pageProps?.meta?.description}
+              />
+            )}
+            <meta
+              name="twitter:image"
+              content={
+                pageProps?.meta?.image ||
+                `/api/og?title=${encodeURIComponent(title)}`
+              }
+            />
           </>
         )}
         <link rel="canonical" href={canonicalUrl} />

@@ -19,6 +19,7 @@ export async function getStaticProps({ params }) {
       roles: JSON.stringify(roles),
       meta: {
         title: `Careers at Inngest`,
+        description: `We're hiring!`,
       },
       designVersion: "2",
     },
