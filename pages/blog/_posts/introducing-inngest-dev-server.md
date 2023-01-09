@@ -34,10 +34,10 @@ There is no need to run a queue or an event stream and configure publishers or c
 
 Under the hood the DevServer does a few things to make it all come together.
 
-First, the DevServer recursively searches your project directory for functions configured with `inngest.json` (or `.cue`) files ([docs](/docs/functions/inngest-json-configuration)). As each function is found, the DevServer does two things:
+First, the DevServer recursively searches your project directory for functions configured with `inngest.json` (or `.cue`) files (**NOTE** - `inngest.json` has been deprecated in favor of [the Inngest SDK](/docs/quick-start)). As each function is found, the DevServer does two things:
 
 - Each function's event trigger (or scheduled trigger) is registered by the DevServer. This creates a map of events-to-functions.
-- Functions are built using each's own `Dockerfile`(s) just as with the `inngest run` command ([docs](/docs/cli/run)).
+- Functions are built using each's own `Dockerfile`(s) just as with the `inngest run` command (**NOTE** - This has been deprecated in favor of [the Inngest SDK](/docs/quick-start)).
 
 Simultaneously, an API server is started on `localhost:9999` (or another port of your choosing). This API matches the production Inngest Source API for ingesting event payloads.
 

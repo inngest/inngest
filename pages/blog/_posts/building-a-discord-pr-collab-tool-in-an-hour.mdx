@@ -79,7 +79,7 @@ You can view the full code for the discord PR management tool here: [https://git
     - When the PR is updated (eg. it switches from draft to ready to review, or the title is changed), we need to udpate the thread and send messages accordingly.
 - Other functions, such as `issue-comment`, handle sending messages to discord when reviews or comments are published.
 
-In order to create these functions we run `inngest init` ([see the docs here](/docs/cli/writing-and-running-fuctions)), then walk through the init process to create new functions that are automatically triggered by their respective events.
+In order to create these functions we run `inngest init` (**NOTE** - This has been deprecated in favor of [the Inngest SDK](/docs/quick-start)), then walk through the init process to create new functions that are automatically triggered by their respective events.
 
 This generates a scaffold using your language of choice (eg. Typescript, Golang, Python, or Ruby), and allows you to dive into coding immediately.
 
