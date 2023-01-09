@@ -91,7 +91,7 @@ function MyApp({ Component, pageProps }) {
               }
             />
             <meta property="og:url" content={canonicalUrl} />
-            <meta property="og:title" content={`Inngest - ${metaTitle}`} />
+            <meta property="og:title" content={metaTitle} />
             <meta name="twitter:card" content="summary_large_image" />
             <meta name="twitter:site" content="@inngest" />
             <meta name="twitter:title" content={metaTitle} />
