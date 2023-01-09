@@ -61,6 +61,13 @@ The easiest option for sending events in this case is a single HTTP2 POST reques
 
 And what about functions? We also added indirection here, too. Each function has one or more steps; they’re DAGs. Here’s how you define a function:
 
+<aside className="max-w-[65ch] m-auto bg-indigo-900/20 text-indigo-100 leading-relaxed rounded-lg py-0 px-6  my-12 border border-indigo-900/50">
+  👋 **Note** - This approach has been deprecated in favor of the Inngest SDK.
+
+[Check out the quick start guide for an even better experience](/docs/quick-start).
+
+</aside>
+
 ```json
 {
   "name": "A beautiful background function",
@@ -96,7 +103,7 @@ And what about functions? We also added indirection here, too. Each function has
 
 As you can see, this (contrived) function has two steps in a waterfall-style sequence. Further, each step in a function has its own runtime. We have multiple runtimes that specify how to execute functions.
 
-If you have functions which you want to host on Lambda, that works. If you have containers, that’s great too! [To keep things simple we pass in the event & function context as an argument. We’ll read the step’s output from stdout](https://www.inngest.com/docs/functions/function-input-and-output). Again, no SDK required — it’s all language builtins.
+If you have functions which you want to host on Lambda, that works. If you have containers, that’s great too! To keep things simple we pass in the event & function context as an argument. We’ll read the step’s output from stdout. Again, no SDK required — it’s all language builtins.
 
 ### Wrapping up
 

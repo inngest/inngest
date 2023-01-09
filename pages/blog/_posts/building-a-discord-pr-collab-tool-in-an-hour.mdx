@@ -48,24 +48,30 @@ All in, this could take days to weeks, depending on how comfortable you are with
 
 ## Building with Inngest
 
+<aside className="max-w-[65ch] m-auto bg-indigo-900/20 text-indigo-100 leading-relaxed rounded-lg py-0 px-6  my-12 border border-indigo-900/50">
+  👋 **Note** - This approach has been deprecated in favor of the Inngest SDK.
+
+  [Check out the quick start guide for an even better experience](/docs/quick-start).
+</aside>
+
 As we mentioned, this is a perfect use case for Inngest.  Instead of creating and maintaining a complex web of services, config, and code, you set up GitHub to push webhook events to Inngest, deploy simple functions for each event with one command with the Inngest CLI, and we handle everything else.  In effect, this is the diagram:
 
 ![](/assets/product/declarative-functions.png)
 
 It handles the queues, retries, throttling, idempotency, and logging for you, allowing you to focus on the important part of your product:  the code that runs when events are received.
 
-Plus, because Inngest stores events in an event store, you can use real data from events to test your functions locally.  This is a massive improvement to the development process.  You don’t need to run [ngrok](https://ngrok.com/), manually trigger webhooks to test, or push deploy to production and hope bugs are fixed — as running [`inngest run --replay`](https://www.inngest.com/docs/cli/run) will run your functions locally with past data.
+Plus, because Inngest stores events in an event store, you can use real data from events to test your functions locally.  This is a massive improvement to the development process.  You don’t need to run [ngrok](https://ngrok.com/), manually trigger webhooks to test, or push deploy to production and hope bugs are fixed — as running `inngest run --replay` will run your functions locally with past data.
 
 ## Building using Inngest
 
 The process for building this on Inngest is easy:
 
-1. [Create a new GitHub webhook in Inngest](https://www.inngest.com/docs/event-webhooks)
+1. [Create a new GitHub webhook in Inngest](/docs/event-webhooks)
 2. [Copy the webhook URL into your own repository.](https://docs.github.com/en/developers/webhooks-and-events/webhooks/creating-webhooks#setting-up-a-webhook)  Events will automatically flow through to Inngest and be recorded for you to develop with in the future.  We’ll also automatically create types for these events for fast development. ⚡
-3. Run [`inngest init`](https://www.inngest.com/docs/cli/init) which will guide you through creagting new a new serverless function triggered by the `pull_request` GitHub event.
+3. Run `inngest init` which will guide you through creating new a new serverless function triggered by the `pull_request` GitHub event.
 4. Write the business logic to handle the event, such as creating a new Discord thread (example below!)
-5. Run [`inngest run --replay`](https://www.inngest.com/docs/cli/run) to test the function locally
-6. When you’re happy, run [`inngest deploy`](https://www.inngest.com/docs/cli/deploy) to deploy the function.
+5. Run `inngest run --replay` to test the function locally
+6. When you’re happy, run `inngest deploy` to deploy the function.
 
 There’s no configuration of queues, notifications, dead-letter queues, idempotency, or stateful workers — things just work.  The most amount of time spent on the build was looking at the Discord API and creating a new Discord bot and auth token!
 
@@ -97,6 +103,6 @@ By continually developing and running `inngest run --replay` you can be sure you
 
 By using our own platform, we were able to an awesome PR collaboration tool for Discord in an hour, without spending days configuring, testing and developing the architecture ourselves.
 
-If you’re interested in getting started with Inngest you can [sign up for free](https://www.inngest.com/sign-up), [browse quick start examples](https://www.inngest.com/quick-starts), and [read the docs here](https://www.inngest.com/docs).
+If you’re interested in getting started with Inngest you can [sign up for free](/sign-up), and [read the docs here](/docs).
 
 [We’re also around in our discord](/discord) if you’d like to hang out with us, discuss event driven architecture, and ask us any questions!

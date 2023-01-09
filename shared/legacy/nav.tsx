@@ -115,14 +115,6 @@ const NavContent: React.FC<Props> = (props: Props) => {
                     </small>
                   </p>
                 </a>
-                {/* <a href="/quick-starts?ref=nav" className="rounded-lg p-4">
-                  <p>Quick starts</p>
-                  <p className="pt-1 text-slate-400">
-                    <small>
-                      Example projects to reference when using Inngest
-                    </small>
-                  </p>
-                </a> */}
               </div>
             </div>
           </Hoverable>

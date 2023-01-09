@@ -31,7 +31,6 @@ const Footer = () => {
           </div>
           <div>
             <p>Use Cases</p>
-            <a href="/quick-starts?ref=footer">Quick-starts</a>
             <a href="/uses/serverless-node-background-jobs?ref=footer">
               Node.js background jobs
             </a>

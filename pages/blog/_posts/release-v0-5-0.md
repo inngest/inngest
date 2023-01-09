@@ -27,18 +27,18 @@ inngest run --replay
 
 How is this possible? Inngest is event-driven, and we store all of the events that flow through your system. This lets us take those historic events and pipe them through to your local functions. It’s a completely different approach than you might be used to with eg. SQS or RabbitMQ, which enables much better development practices than previously available.
 
-You can [read the documentation for historic replay here](https://www.inngest.com/docs/cli/run).
+You can ~~read the documentation for historic replay here~~ (**NOTE** - This has been deprecated in favor of [the Inngest SDK](/docs/quick-start)).
 
 ## Self hosting beta
 
-While we offer our [hosted cloud](https://www.inngest.com/sign-up?ref=v0.5.0) which lets you start using Inngest in minutes, we’ve also added a new command to the CLI: `inngest serve`. This lets you run the core Inngest services to accept events, initialize functions, execute functions, and deploy new versions to your own infrastructure. The backends are entirely configurable; you can choose any messaging system for processing incoming events by [changing your config file](https://github.com/inngest/inngest/blob/main/pkg/cuedefs/config/config.cue).
+While we offer our [hosted cloud](/sign-up?ref=v0.5.0) which lets you start using Inngest in minutes, we’ve also added a new command to the CLI: `inngest serve`. This lets you run the core Inngest services to accept events, initialize functions, execute functions, and deploy new versions to your own infrastructure. The backends are entirely configurable; you can choose any messaging system for processing incoming events by [changing your config file](https://github.com/inngest/inngest/blob/main/pkg/cuedefs/config/config.cue).
 
 [We’ve included example self-hosting stacks](https://github.com/inngest/inngest/tree/main/hosting-stacks/), which include all of the terraform and configuration you need to get started. We’ve also added some benchmarking:
 
 - A single 1GB / 0.5vCPU event API can process 110 requests per second with a p99 latency of 35ms, without breaking ~35mb ram usage.
 - It’s easy to scale to thousands of requests per second, as the services themselves are shared nothing.
 
-If you’re interested in self-hosting, you can [read the docs here](https://www.inngest.com/docs/self-hosting) and [chat with us on discord](/discord) if you have any questions
+If you’re interested in self-hosting, you can [read the docs here](/docs/self-hosting) and [chat with us on discord](/discord) if you have any questions
 
 ## Other changes
 

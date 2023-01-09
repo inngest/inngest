@@ -181,9 +181,6 @@ export default function () {
         </p>
 
         <div className="flex justify-center pt-12">
-          <Button kind="outline" href="/quick-starts">
-            View examples
-          </Button>
           <Button kind="outline" href="/docs">
             View docs
           </Button>
