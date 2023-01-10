@@ -327,7 +327,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 				return nil
 			}
 			if err == ErrQueueItemAlreadyLeased {
-				q.scope.Counter(counterQueueItemLeaseConflict).Inc(1)
+				q.scope.Counter(counterQueueItemsLeaseConflict).Inc(1)
 				q.sem.Release(1)
 				logger.From(ctx).
 					Warn().
@@ -345,6 +345,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 			// a semaphore.
 			item.LeaseID = leaseID
 			q.workers <- *item
+			return nil
 		})
 	}
 
