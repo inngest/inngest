@@ -74,8 +74,8 @@ createFunction<MyEventType>("My handler", "my.event", ({ event }) => {
     },
   ],
   quote: {
-    text: "A quote from a happy customer about how Inngest is the best event-driven system out there.",
-    author: "Someone important, cool company",
+    text: "It's sensational - This is the best way to test a background job",
+    author: "Garrett Tolbert, Vercel",
   },
   learning: [
     {
