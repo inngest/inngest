@@ -14,6 +14,7 @@ import { useMobileNavigationStore } from "./MobileNavigation";
 import { ModeToggle } from "./ModeToggle";
 import { MobileSearch, Search } from "./Search";
 import SocialBadges from "./SocialBadges";
+import { headerLinks } from "./Navigation";
 
 function TopLevelNavItem({ href, children }) {
   return (
@@ -76,8 +77,9 @@ export const Header = forwardRef(function Header({ className }, ref) {
       <div className="flex items-center gap-5">
         <nav className="hidden lg:block mr-4">
           <ul role="list" className="flex items-center gap-8">
-            <TopLevelNavItem href="#">Docs</TopLevelNavItem>
-            <TopLevelNavItem href="#">Patterns</TopLevelNavItem>
+          {headerLinks.map((link)=> (
+            <TopLevelNavItem key={link.title} href={link.href}>{link.title}</TopLevelNavItem>
+          ))}
           </ul>
         </nav>
         <div className="hidden lg:block">
@@ -89,10 +91,10 @@ export const Header = forwardRef(function Header({ className }, ref) {
           <ModeToggle />
         </div>
         <div className="hidden sm:flex items-center gap-3">
-          <Button href="/login" size="sm" variant="secondary">
+          <Button href={process.env.NEXT_PUBLIC_LOGIN_URL} size="sm" variant="secondary">
             Log in
           </Button>
-          <Button href="/sign-up" size="sm" arrow="right">
+          <Button href={process.env.NEXT_PUBLIC_SIGNUP_URL} size="sm" arrow="right">
             Sign up
           </Button>
         </div>

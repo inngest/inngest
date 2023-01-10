@@ -1,12 +1,19 @@
+import { AnchorHTMLAttributes } from "react";
 import classNames from "src/utils/classNames";
 import ArrowRight from "./Icons/ArrowRight";
-export function Button({
-  children,
-  variant = "primary",
-  size = "md",
-  arrow,
-  ...props
-}) {
+
+type ButtonProps = {
+  variant?: "primary" | "secondary";
+  size?: "sm" | "md" | "lg";
+  className?: string;
+  arrow?: "left" | "right";
+  children?: React.ReactNode;
+} & AnchorHTMLAttributes<HTMLAnchorElement>;
+
+export function Button(
+  { children, variant = "primary", size = "md", arrow, ...props },
+  ButtonProps
+) {
   const sizes = {
     sm: "text-sm px-4 py-1.5",
     md: "text-sm px-6 py-2.5",

@@ -32,7 +32,10 @@ function FeedbackButton(props) {
   );
 }
 
-const FeedbackForm = forwardRef(function FeedbackForm({ onSubmit }, ref) {
+const FeedbackForm = forwardRef(function FeedbackForm(
+  { onSubmit }: HTMLFormElement,
+  ref
+) {
   return (
     <form
       ref={ref}

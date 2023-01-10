@@ -1,7 +1,7 @@
-import { useId } from 'react'
+import { useId } from "react";
 
 export function GridPattern({ width, height, x, y, squares, ...props }) {
-  let patternId = useId()
+  let patternId = useId();
 
   return (
     <svg aria-hidden="true" {...props}>
@@ -38,5 +38,5 @@ export function GridPattern({ width, height, x, y, squares, ...props }) {
         </svg>
       )}
     </svg>
-  )
+  );
 }

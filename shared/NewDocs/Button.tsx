@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link, { LinkProps } from "next/link";
 import clsx from "clsx";
 
 function ArrowIcon(props) {
@@ -26,13 +26,20 @@ const variantStyles = {
   text: "text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-500",
 };
 
+type ButtonProps = {
+  variant?: "primary" | "secondary" | "filled" | "outline" | "text";
+  className?: string;
+  arrow: "left" | "right";
+  children?: React.ReactNode;
+} & LinkProps;
+
 export function Button({
   variant = "primary",
   className,
   children,
   arrow,
   ...props
-}) {
+}: ButtonProps): JSX.Element {
   let Component = props.href ? Link : "button";
 
   className = clsx(

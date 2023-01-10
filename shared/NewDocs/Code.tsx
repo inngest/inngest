@@ -1,6 +1,11 @@
 import {
   Children,
   createContext,
+  ReactChild,
+  ReactChildren,
+  ReactElement,
+  ReactFragment,
+  ReactNode,
   useContext,
   useEffect,
   useRef,
@@ -116,8 +121,15 @@ function CodePanelHeader({ tag, label }) {
   );
 }
 
-function CodePanel({ tag, label, code, children }) {
-  let child = Children.only(children);
+type CodePanelProps = {
+  tag?: string;
+  label?: string;
+  code?: string;
+  children?: React.ReactChildren;
+};
+
+function CodePanel({ tag, label, code, children }: CodePanelProps) {
+  let child = Children.only<any>(children);
 
   return (
     <div className="group dark:bg-white/2.5">
@@ -135,7 +147,17 @@ function CodePanel({ tag, label, code, children }) {
   );
 }
 
-function CodeGroupHeader({ title, children, selectedIndex }) {
+type CodeGroupHeaderProps = {
+  title?: string;
+  children: ReactChildren;
+  selectedIndex?: number;
+};
+
+function CodeGroupHeader({
+  title,
+  children,
+  selectedIndex,
+}: CodeGroupHeaderProps) {
   let hasTabs = Children.count(children) > 1;
 
   if (!title && !hasTabs) {
@@ -151,7 +173,7 @@ function CodeGroupHeader({ title, children, selectedIndex }) {
       )}
       {hasTabs && (
         <Tab.List className="-mb-px flex gap-4 text-xs font-medium">
-          {Children.map(children, (child, childIndex) => (
+          {Children.map<ReactNode, any>(children, (child, childIndex) => (
             <Tab
               className={clsx(
                 "border-b py-3 transition focus:[&:not(:focus-visible)]:outline-none",
@@ -188,8 +210,8 @@ function CodeGroupPanels({ children, ...props }) {
 }
 
 function usePreventLayoutShift() {
-  let positionRef = useRef();
-  let rafRef = useRef();
+  let positionRef = useRef<HTMLElement>();
+  let rafRef = useRef<number>();
 
   useEffect(() => {
     return () => {
@@ -200,7 +222,7 @@ function usePreventLayoutShift() {
   return {
     positionRef,
     preventLayoutShift(callback) {
-      let initialTop = positionRef.current.getBoundingClientRect().top;
+      let initialTop = positionRef.current?.getBoundingClientRect().top;
 
       callback();
 
@@ -212,7 +234,11 @@ function usePreventLayoutShift() {
   };
 }
 
-const usePreferredLanguageStore = create((set) => ({
+type PreferredLanguageStore = {
+  preferredLanguages: string[];
+  addPreferredLanguage: (string) => void;
+};
+const usePreferredLanguageStore = create<PreferredLanguageStore>((set) => ({
   preferredLanguages: [],
   addPreferredLanguage: (language) =>
     set((state) => ({
@@ -254,11 +280,18 @@ function useTabGroupProps(availableLanguages) {
 
 const CodeGroupContext = createContext(false);
 
-export function CodeGroup({ children, title, ...props }) {
-  let languages = Children.map(children, (child) => getPanelTitle(child.props));
+type CodeGroupProps = {
+  title?: string;
+  children: ReactChildren;
+};
+
+export function CodeGroup({ children, title, ...props }: CodeGroupProps) {
+  let languages = Children.map<string, any>(children, (child) =>
+    getPanelTitle(child.props)
+  );
   let tabGroupProps = useTabGroupProps(languages);
   let hasTabs = Children.count(children) > 1;
-  let Container = hasTabs ? Tab.Group : "div";
+  let Container: typeof Tab["Group"] | "div" = hasTabs ? Tab.Group : "div";
   let containerProps = hasTabs ? tabGroupProps : {};
   let headerProps = hasTabs
     ? { selectedIndex: tabGroupProps.selectedIndex }

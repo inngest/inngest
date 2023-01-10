@@ -228,7 +228,7 @@ export const navigation = [
   {
     title: "Deploying",
     links: [
-      { title: "Overview", href: `${baseDir}/deploy` },
+      { title: "How to Deploy", href: `${baseDir}/deploy` },
       { title: "Vercel", href: `${baseDir}/deploy/vercel` },
       { title: "Netlify", href: `${baseDir}/deploy/netlify` },
       { title: "Cloudflare Pages", href: `${baseDir}/deploy/cloudflare` },
@@ -250,10 +250,10 @@ export const navigation = [
   {
     title: "Guides",
     links: [
-      {
-        title: "Overview",
-        href: `${baseDir}/guides`,
-      },
+      // {
+      //   title: "Overview",
+      //   href: `${baseDir}/guides`,
+      // },
       {
         title: "Trigger code from Retool",
         href: `${baseDir}/guides/trigger-your-code-from-retool`,
@@ -261,8 +261,19 @@ export const navigation = [
     ],
   },
   {
-    title: "SDK",
+    title: "SDK Reference",
     links: [{ title: "Serve", href: `${baseDir}/sdk/serve` }],
+  },
+];
+
+export const headerLinks = [
+  {
+    title: "Docs",
+    href: baseDir,
+  },
+  {
+    title: "Patterns",
+    href: "/patterns?ref=docs",
   },
 ];
 
@@ -270,8 +281,11 @@ export function Navigation(props) {
   return (
     <nav {...props}>
       <ul role="list">
-        <TopLevelNavItem href="/docs">Docs</TopLevelNavItem>
-        <TopLevelNavItem href="/patterns">Patterns</TopLevelNavItem>
+        {headerLinks.map((link) => (
+          <TopLevelNavItem key={link.title} href={link.href}>
+            {link.title}
+          </TopLevelNavItem>
+        ))}
         {navigation.map((group, groupIndex) => (
           <NavigationGroup
             key={group.title}
@@ -280,10 +294,19 @@ export function Navigation(props) {
           />
         ))}
         <li className="sticky bottom-0 z-10 mt-6 sm:hidden gap-2 flex dark:bg-slate-900">
-          <Button href="#" variant="secondary" className="w-full">
+          <Button
+            href={process.env.NEXT_PUBLIC_LOGIN_URL}
+            variant="secondary"
+            className="w-full"
+          >
             Log in
           </Button>
-          <Button href="#" variant="primary" arrow="right" className="w-full">
+          <Button
+            href={process.env.NEXT_PUBLIC_SIGNUP_URL}
+            variant="primary"
+            arrow="right"
+            className="w-full"
+          >
             Sign up
           </Button>
         </li>
