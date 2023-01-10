@@ -101,6 +101,7 @@ export default function useCase({ stringData }) {
               className="max-w-[600px] m-auto md:m-0 bg-slate-950/80 overflow-hidden rounded-lg border-slate-900/10"
             >
               <Image
+                alt={`Graphic of ${feature.title}`}
                 className="rounded-t-lg lg:rounded-t-none lg:rounded-r-lg group-hover:rounded-lg"
                 src={`/assets/use-cases/${feature.img}`}
                 width={600}
