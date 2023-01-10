@@ -232,8 +232,6 @@ export const navigation = [
       { title: "Vercel", href: `${baseDir}/deploy/vercel` },
       { title: "Netlify", href: `${baseDir}/deploy/netlify` },
       { title: "Cloudflare Pages", href: `${baseDir}/deploy/cloudflare` },
-      { title: "Inngest Cloud", href: `${baseDir}/deploy/inngest-cloud` },
-      { title: "AWS Lambda", href: `${baseDir}/deploy/aws-lambda` },
     ],
   },
   {
@@ -259,36 +257,6 @@ export const navigation = [
       {
         title: "Trigger code from Retool",
         href: `${baseDir}/guides/trigger-your-code-from-retool`,
-      },
-    ],
-  },
-  {
-    title: "CLI",
-    links: [
-      { title: "Installation", href: `${baseDir}/cli/installation` },
-      {
-        title: "Writing and running functions",
-        href: `${baseDir}/cli/writing-and-running-functions`,
-      },
-      {
-        title: "Deploying functions",
-        href: `${baseDir}/cli/deploying-functions`,
-      },
-      {
-        title: "init",
-        href: `${baseDir}/cli/init`,
-      },
-      {
-        title: "run",
-        href: `${baseDir}/cli/run`,
-      },
-      {
-        title: "deploy",
-        href: `${baseDir}/cli/deploy`,
-      },
-      {
-        title: "login",
-        href: `${baseDir}/cli/login`,
       },
     ],
   },

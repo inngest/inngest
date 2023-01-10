@@ -163,7 +163,7 @@ function SmallPrint() {
   return (
     <div className="flex flex-col items-center justify-between gap-5 border-t border-slate-900/5 pt-8 dark:border-white/5 sm:flex-row">
       <p className="text-xs text-slate-600 dark:text-slate-400">
-        &copy; Copyright {new Date().getFullYear()}. All rights reserved.
+        &copy; {new Date().getFullYear()} Inngest Inc. All rights reserved.
       </p>
       <SocialBadges />
     </div>

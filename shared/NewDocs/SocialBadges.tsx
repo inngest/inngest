@@ -40,14 +40,11 @@ function SocialLink({ href, icon: Icon, children }) {
 export default function SocialBadges() {
   return (
     <div className="flex gap-4">
-      <SocialLink
-        href="https://github.com/inngest/inngest-js"
-        icon={GitHubIcon}
-      >
-        Follow us on GitHub
+      <SocialLink href="https://github.com/inngest/inngest" icon={GitHubIcon}>
+        Star our open source repo
       </SocialLink>
       <SocialLink href="https://discord.gg/EuesV2ZSnX" icon={DiscordIcon}>
-        Join our Discord server
+        Join our Discord community
       </SocialLink>
       <SocialLink href="https://twitter.com/inngest" icon={TwitterIcon}>
         Follow us on Twitter
