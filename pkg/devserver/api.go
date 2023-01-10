@@ -111,7 +111,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	req := &sdk.RegisterRequest{}
 	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		logger.From(ctx).Warn().Msgf("Invalid request:\n%w", err)
+		logger.From(ctx).Warn().Msgf("Invalid request:\n%s", err)
 		a.err(ctx, w, 400, fmt.Errorf("Invalid request: %w", err))
 		return
 	}
@@ -132,7 +132,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
 	// signing key and warn if the user has an invalid key.
 	if err := req.Validate(ctx); err != nil {
-		logger.From(ctx).Warn().Msgf("At least one function is invalid:\n%w", err)
+		logger.From(ctx).Warn().Msgf("At least one function is invalid:\n%s", err)
 		a.err(ctx, w, 400, fmt.Errorf("At least one function is invalid:\n%w", err))
 		return
 	}
@@ -171,7 +171,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	for _, fn := range req.Functions {
 		h.FunctionIDs = append(h.FunctionIDs, fn.ID)
 		if err := a.devserver.loader.AddFunction(ctx, &fn); err != nil {
-			logger.From(ctx).Warn().Msgf("Error adding your function:\n%w", err)
+			logger.From(ctx).Warn().Msgf("Error adding your function:\n%s", err)
 			a.err(ctx, w, 400, err)
 			return
 		}
@@ -179,7 +179,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 
 	// Re-initialize our cron manager.
 	if err := a.devserver.runner.InitializeCrons(ctx); err != nil {
-		logger.From(ctx).Warn().Msgf("Error initializing crons:\n%w", err)
+		logger.From(ctx).Warn().Msgf("Error initializing crons:\n%s", err)
 		a.err(ctx, w, 400, err)
 		return
 	}

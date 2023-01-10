@@ -295,7 +295,8 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	}
 
 	eg := errgroup.Group{}
-	for _, item := range queue {
+	for _, qi := range queue {
+		item := qi
 		if item.LeaseID != nil && ulid.Time(item.LeaseID.Time()).After(time.Now()) {
 			q.scope.Counter(counterQueueItemsProcessLeaseExists).Inc(1)
 			continue
