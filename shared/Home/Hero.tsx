@@ -17,11 +17,8 @@ export default function Hero() {
         <HeroImg />
         <div className="max-w-[760px] relative pr-10 lg:px-auto m-x-auto py-10 rounded-lg">
           <h1 className="text-4xl leading-[48px] sm:text-5xl sm:leading-[58px] lg:text-6xl font-semibold lg:leading-[68px] tracking-[-2px] text-slate-50 mb-5">
-            <span className="text-indigo-300">Ship</span> Background Jobs
-            <span className="text-indigo-300">,</span> Crons
-            <span className="text-indigo-300">,</span> Webhooks
-            <span className="text-indigo-300">, and</span> Reliable Workflows{" "}
-            <span className="text-indigo-300">in record time</span>
+            Ship Background Jobs, Crons, Webhooks, and Reliable Workflows in
+            record time
           </h1>
           <p className="text-sm md:text-base text-slate-300 max-w-xl leading-6 md:leading-7">
             Use TypeScript to build, test, and deploy serverless functions
