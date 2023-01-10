@@ -1,51 +1,58 @@
-import { forwardRef, Fragment, useEffect, useId, useRef, useState } from 'react'
-import { useRouter } from 'next/router'
-import { createAutocomplete } from '@algolia/autocomplete-core'
-import { getAlgoliaResults } from '@algolia/autocomplete-preset-algolia'
-import { Dialog, Transition } from '@headlessui/react'
-import algoliasearch from 'algoliasearch/lite'
-import clsx from 'clsx'
+import {
+  forwardRef,
+  Fragment,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
+import { useRouter } from "next/router";
+import { createAutocomplete } from "@algolia/autocomplete-core";
+import { getAlgoliaResults } from "@algolia/autocomplete-preset-algolia";
+import { Dialog, Transition } from "@headlessui/react";
+import algoliasearch from "algoliasearch/lite";
+import clsx from "clsx";
 
 const searchClient = algoliasearch(
   process.env.NEXT_PUBLIC_DOCSEARCH_APP_ID,
   process.env.NEXT_PUBLIC_DOCSEARCH_API_KEY
-)
+);
 
 function useAutocomplete() {
-  let id = useId()
-  let router = useRouter()
-  let [autocompleteState, setAutocompleteState] = useState({})
+  let id = useId();
+  let router = useRouter();
+  let [autocompleteState, setAutocompleteState] = useState({});
 
   let [autocomplete] = useState(() =>
     createAutocomplete({
       id,
-      placeholder: 'Find something...',
+      placeholder: "Find something...",
       defaultActiveItemId: 0,
       onStateChange({ state }) {
-        setAutocompleteState(state)
+        setAutocompleteState(state);
       },
       shouldPanelOpen({ state }) {
-        return state.query !== ''
+        return state.query !== "";
       },
       navigator: {
         navigate({ itemUrl }) {
-          autocomplete.setIsOpen(true)
-          router.push(itemUrl)
+          autocomplete.setIsOpen(true);
+          router.push(itemUrl);
         },
       },
       getSources() {
         return [
           {
-            sourceId: 'documentation',
+            sourceId: "documentation",
             getItemInputValue({ item }) {
-              return item.query
+              return item.query;
             },
             getItemUrl({ item }) {
-              let url = new URL(item.url)
-              return `${url.pathname}${url.hash}`
+              let url = new URL(item.url);
+              return `${url.pathname}${url.hash}`;
             },
             onSelect({ itemUrl }) {
-              router.push(itemUrl)
+              router.push(itemUrl);
             },
             getItems({ query }) {
               return getAlgoliaResults({
@@ -58,44 +65,44 @@ function useAutocomplete() {
                       hitsPerPage: 5,
                       highlightPreTag:
                         '<mark class="underline bg-transparent text-indigo-500">',
-                      highlightPostTag: '</mark>',
+                      highlightPostTag: "</mark>",
                     },
                   },
                 ],
-              })
+              });
             },
           },
-        ]
+        ];
       },
     })
-  )
+  );
 
-  return { autocomplete, autocompleteState }
+  return { autocomplete, autocompleteState };
 }
 
 function resolveResult(result) {
-  let allLevels = Object.keys(result.hierarchy)
+  let allLevels = Object.keys(result.hierarchy);
   let hierarchy = Object.entries(result._highlightResult.hierarchy).filter(
     ([, { value }]) => Boolean(value)
-  )
-  let levels = hierarchy.map(([level]) => level)
+  );
+  let levels = hierarchy.map(([level]) => level);
 
   let level =
-    result.type === 'content'
+    result.type === "content"
       ? levels.pop()
       : levels
           .filter(
             (level) =>
               allLevels.indexOf(level) <= allLevels.indexOf(result.type)
           )
-          .pop()
+          .pop();
 
   return {
     titleHtml: result._highlightResult.hierarchy[level].value,
     hierarchyHtml: hierarchy
       .slice(0, levels.indexOf(level))
       .map(([, { value }]) => value),
-  }
+  };
 }
 
 function SearchIcon(props) {
@@ -107,7 +114,7 @@ function SearchIcon(props) {
         d="M12.01 12a4.25 4.25 0 1 0-6.02-6 4.25 4.25 0 0 0 6.02 6Zm0 0 3.24 3.25"
       />
     </svg>
-  )
+  );
 }
 
 function NoResultsIcon(props) {
@@ -119,11 +126,11 @@ function NoResultsIcon(props) {
         d="M12.01 12a4.237 4.237 0 0 0 1.24-3c0-.62-.132-1.207-.37-1.738M12.01 12A4.237 4.237 0 0 1 9 13.25c-.635 0-1.237-.14-1.777-.388M12.01 12l3.24 3.25m-3.715-9.661a4.25 4.25 0 0 0-5.975 5.908M4.5 15.5l11-11"
       />
     </svg>
-  )
+  );
 }
 
 function LoadingIcon(props) {
-  let id = useId()
+  let id = useId();
 
   return (
     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
@@ -148,18 +155,18 @@ function LoadingIcon(props) {
         </linearGradient>
       </defs>
     </svg>
-  )
+  );
 }
 
 function SearchResult({ result, resultIndex, autocomplete, collection }) {
-  let id = useId()
-  let { titleHtml, hierarchyHtml } = resolveResult(result)
+  let id = useId();
+  let { titleHtml, hierarchyHtml } = resolveResult(result);
 
   return (
     <li
       className={clsx(
-        'group block cursor-default px-4 py-3 aria-selected:bg-slate-50 dark:aria-selected:bg-slate-800/50',
-        resultIndex > 0 && 'border-t border-slate-100 dark:border-slate-800'
+        "group block cursor-default px-4 py-3 aria-selected:bg-slate-50 dark:aria-selected:bg-slate-800/50",
+        resultIndex > 0 && "border-t border-slate-100 dark:border-slate-800"
       )}
       aria-labelledby={`${id}-hierarchy ${id}-title`}
       {...autocomplete.getItemProps({
@@ -185,8 +192,8 @@ function SearchResult({ result, resultIndex, autocomplete, collection }) {
               <span
                 className={
                   itemIndex === items.length - 1
-                    ? 'sr-only'
-                    : 'mx-2 text-slate-300 dark:text-slate-700'
+                    ? "sr-only"
+                    : "mx-2 text-slate-300 dark:text-slate-700"
                 }
               >
                 /
@@ -196,7 +203,7 @@ function SearchResult({ result, resultIndex, autocomplete, collection }) {
         </div>
       )}
     </li>
-  )
+  );
 }
 
 function SearchResults({ autocomplete, query, collection }) {
@@ -205,14 +212,14 @@ function SearchResults({ autocomplete, query, collection }) {
       <div className="p-6 text-center">
         <NoResultsIcon className="mx-auto h-5 w-5 stroke-slate-900 dark:stroke-slate-600" />
         <p className="mt-2 text-xs text-slate-700 dark:text-slate-400">
-          Nothing found for{' '}
+          Nothing found for{" "}
           <strong className="break-words font-semibold text-slate-900 dark:text-white">
             &lsquo;{query}&rsquo;
           </strong>
           . Please try again.
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -227,14 +234,14 @@ function SearchResults({ autocomplete, query, collection }) {
         />
       ))}
     </ul>
-  )
+  );
 }
 
 const SearchInput = forwardRef(function SearchInput(
   { autocomplete, autocompleteState, onClose },
   inputRef
 ) {
-  let inputProps = autocomplete.getInputProps({})
+  let inputProps = autocomplete.getInputProps({});
 
   return (
     <div className="group relative flex h-12">
@@ -242,30 +249,30 @@ const SearchInput = forwardRef(function SearchInput(
       <input
         ref={inputRef}
         className={clsx(
-          'flex-auto appearance-none bg-transparent pl-10 text-slate-900 outline-none placeholder:text-slate-500 focus:w-full focus:flex-none dark:text-white sm:text-sm [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden',
-          autocompleteState.status === 'stalled' ? 'pr-11' : 'pr-4'
+          "flex-auto appearance-none bg-transparent pl-10 text-slate-900 outline-none placeholder:text-slate-500 focus:w-full focus:flex-none dark:text-white sm:text-sm [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden [&::-webkit-search-results-button]:hidden [&::-webkit-search-results-decoration]:hidden",
+          autocompleteState.status === "stalled" ? "pr-11" : "pr-4"
         )}
         {...inputProps}
         onKeyDown={(event) => {
           if (
-            event.key === 'Escape' &&
+            event.key === "Escape" &&
             !autocompleteState.isOpen &&
-            autocompleteState.query === ''
+            autocompleteState.query === ""
           ) {
-            onClose()
+            onClose();
           } else {
-            inputProps.onKeyDown(event)
+            inputProps.onKeyDown(event);
           }
         }}
       />
-      {autocompleteState.status === 'stalled' && (
+      {autocompleteState.status === "stalled" && (
         <div className="absolute inset-y-0 right-3 flex items-center">
           <LoadingIcon className="h-5 w-5 animate-spin stroke-slate-200 text-slate-900 dark:stroke-slate-800 dark:text-indigo-400" />
         </div>
       )}
     </div>
-  )
-})
+  );
+});
 
 function AlgoliaLogo(props) {
   return (
@@ -283,17 +290,17 @@ function AlgoliaLogo(props) {
       />
       <path d="M8.725.001C4.356.001.795 3.523.732 7.877c-.064 4.422 3.524 8.085 7.946 8.111a7.94 7.94 0 0 0 3.849-.96.187.187 0 0 0 .034-.305l-.748-.663a.528.528 0 0 0-.555-.094 6.461 6.461 0 0 1-2.614.513c-3.574-.043-6.46-3.016-6.404-6.59a6.493 6.493 0 0 1 6.485-6.38h6.485v11.527l-3.68-3.269a.271.271 0 0 0-.397.042 3.014 3.014 0 0 1-5.416-1.583 3.02 3.02 0 0 1 3.008-3.248 3.02 3.02 0 0 1 3.005 2.75.537.537 0 0 0 .176.356l.958.85a.187.187 0 0 0 .308-.106c.07-.37.094-.755.067-1.15a4.536 4.536 0 0 0-4.23-4.2A4.53 4.53 0 0 0 4.203 7.87c-.067 2.467 1.954 4.593 4.421 4.648a4.498 4.498 0 0 0 2.756-.863l4.808 4.262a.32.32 0 0 0 .531-.239V.304a.304.304 0 0 0-.303-.303h-7.69Z" />
     </svg>
-  )
+  );
 }
 
 function SearchButton(props) {
-  let [modifierKey, setModifierKey] = useState()
+  let [modifierKey, setModifierKey] = useState();
 
   useEffect(() => {
     setModifierKey(
-      /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform) ? '⌘' : 'Ctrl '
-    )
-  }, [])
+      /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform) ? "⌘" : "Ctrl "
+    );
+  }, []);
 
   return (
     <>
@@ -318,62 +325,62 @@ function SearchButton(props) {
         <SearchIcon className="h-5 w-5 stroke-slate-900 dark:stroke-white" />
       </button>
     </>
-  )
+  );
 }
 
 function SearchDialog({ open, setOpen, className }) {
-  let router = useRouter()
-  let formRef = useRef()
-  let panelRef = useRef()
-  let inputRef = useRef()
-  let { autocomplete, autocompleteState } = useAutocomplete()
+  let router = useRouter();
+  let formRef = useRef();
+  let panelRef = useRef();
+  let inputRef = useRef();
+  let { autocomplete, autocompleteState } = useAutocomplete();
 
   useEffect(() => {
     if (!open) {
-      return
+      return;
     }
 
     function onRouteChange() {
-      setOpen(false)
+      setOpen(false);
     }
 
-    router.events.on('routeChangeStart', onRouteChange)
-    router.events.on('hashChangeStart', onRouteChange)
+    router.events.on("routeChangeStart", onRouteChange);
+    router.events.on("hashChangeStart", onRouteChange);
 
     return () => {
-      router.events.off('routeChangeStart', onRouteChange)
-      router.events.off('hashChangeStart', onRouteChange)
-    }
-  }, [open, setOpen, router])
+      router.events.off("routeChangeStart", onRouteChange);
+      router.events.off("hashChangeStart", onRouteChange);
+    };
+  }, [open, setOpen, router]);
 
   useEffect(() => {
     if (open) {
-      return
+      return;
     }
 
     function onKeyDown(event) {
-      if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
-        event.preventDefault()
-        setOpen(true)
+      if (event.key === "k" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setOpen(true);
       }
     }
 
-    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener("keydown", onKeyDown);
 
     return () => {
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [open, setOpen])
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open, setOpen]);
 
   return (
     <Transition.Root
       show={open}
       as={Fragment}
-      afterLeave={() => autocomplete.setQuery('')}
+      afterLeave={() => autocomplete.setQuery("")}
     >
       <Dialog
         onClose={setOpen}
-        className={clsx('fixed inset-0 z-50', className)}
+        className={clsx("fixed inset-0 z-50", className)}
       >
         <Transition.Child
           as={Fragment}
@@ -424,7 +431,7 @@ function SearchDialog({ open, setOpen, className }) {
                           collection={autocompleteState.collections[0]}
                         />
                         <p className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-2 text-xs text-slate-400 dark:border-slate-800 dark:text-slate-500">
-                          Search by{' '}
+                          Search by{" "}
                           <AlgoliaLogo className="h-4 fill-[#003DFF] dark:fill-slate-400" />
                         </p>
                       </>
@@ -437,41 +444,41 @@ function SearchDialog({ open, setOpen, className }) {
         </div>
       </Dialog>
     </Transition.Root>
-  )
+  );
 }
 
 function useSearchProps() {
-  let buttonRef = useRef()
-  let [open, setOpen] = useState(false)
+  let buttonRef = useRef();
+  let [open, setOpen] = useState(false);
 
   return {
     buttonProps: {
       ref: buttonRef,
       onClick() {
-        setOpen(true)
+        setOpen(true);
       },
     },
     dialogProps: {
       open,
       setOpen(open) {
-        let { width, height } = buttonRef.current.getBoundingClientRect()
+        let { width, height } = buttonRef.current.getBoundingClientRect();
         if (!open || (width !== 0 && height !== 0)) {
-          setOpen(open)
+          setOpen(open);
         }
       },
     },
-  }
+  };
 }
 
 export function Search() {
-  let [modifierKey, setModifierKey] = useState()
-  let { buttonProps, dialogProps } = useSearchProps()
+  let [modifierKey, setModifierKey] = useState();
+  let { buttonProps, dialogProps } = useSearchProps();
 
   useEffect(() => {
     setModifierKey(
-      /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform) ? '⌘' : 'Ctrl '
-    )
-  }, [])
+      /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform) ? "⌘" : "Ctrl "
+    );
+  }, []);
 
   return (
     <div className="hidden lg:block lg:max-w-md lg:flex-auto">
@@ -489,14 +496,14 @@ export function Search() {
       </button>
       <SearchDialog className="hidden lg:block" {...dialogProps} />
     </div>
-  )
+  );
 }
 
 export function MobileSearch() {
-  let { buttonProps, dialogProps } = useSearchProps()
+  let { buttonProps, dialogProps } = useSearchProps();
 
   return (
-    <div className="contents lg:hidden">
+    <div className="contents lg:hidden hidden">
       <button
         type="button"
         className="flex h-6 w-6 items-center justify-center rounded-md transition hover:bg-slate-900/5 dark:hover:bg-white/5 lg:hidden focus:[&:not(:focus-visible)]:outline-none"
@@ -507,5 +514,5 @@ export function MobileSearch() {
       </button>
       <SearchDialog className="lg:hidden" {...dialogProps} />
     </div>
-  )
+  );
 }

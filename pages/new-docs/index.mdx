@@ -38,11 +38,46 @@ type UserSignup = {
   }
 }
 
-export default createStepFunction("Signup flow", "user/new.signup", ({ event, tools }) => {})
+export default createStepFunction<UserSignup>("Signup flow", "user/new.signup", ({ event, tools }) => {
+  // If this step fails it will retry automatically.  It will only
+  // run once if it succeeds ⚡
+  const promo = tools.run("Generate promo code", async () => {
+    const promoCode = await generatePromoCode();
+    return promoCode.code;
+  });
+
+  // Again, if the email provider is down this will retry - but we will only
+  // generate one promo code ⚡
+  tools.run("Send a welcome promo", async () => {
+    await sendEmail({ email: event.data, promo });
+  });
+
+  // You can sleep on any platform! 😴
+  tools.sleep("1 day");
+
+  // This runs exactly 1 day after the user signs up ⏰
+  tools.run("Send drip campaign", async () => {
+    await sendDripCampaign();
+  });
+})
 ```
 
 </CodeGroup>
 
+In this example, you can reliably run serverless functions even if external APIs are down. You can also sleep or delay work without configuring queues. Plus, all events, jobs, and functions are strictly typed via TypeScript for maximum correctness. Here's how things look when you locally run:
+
+![SDK UI](/assets/docs/dev-server-example.png)
+
+
+### Comparisons
+
+Without Inngest, you would have to configure several jobs amongst several different queues, then handle retries yourself. There's also a chance that many promo codes are generated depending on the reliability of that API. With Inngest, you can push this function live and everything happens automatically.
+
 <Guides />
 
 <Resources />
+
+
+### Resources and help
+
+If you have any questions we're always around in our [Discord community](https://discord.gg/EuesV2ZSnX) or on [GitHub](https://github.com/inngest/inngest).

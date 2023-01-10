@@ -19,6 +19,9 @@ Before integrating Inngest we will start the [open-source development server](ht
 
 You should see the following output:
 
+<details>
+  <summary><strong>You should see the following output:</strong></summary>
+
 <CodeGroup>
 
 ```bash {{ language: 'js' }}
@@ -45,18 +48,22 @@ $ npx inngest-cli@latest dev
 
 </CodeGroup>
 
+</details>
+
 This runs Inngest locally.  We'll use this to test our functions as we write them.  With this running you can visit `http://localhost:8288` to see the development UI:
 
 <img src="/assets/docs/quick-start/dev-server-startup-screen.png" style={{ maxWidth: "800px;" }}/>
 
 Let's get started with adding Inngest to a project!
 
-
 ## 2. Add Inngest to a Next.js project
 
 Inngest runs your functions securely via an API endpoint at `/api/inngest`.  The first step is to add this API endpoint to your project.
 
-### Prerequisite: Create a new Next.js project
+
+<details>
+  <summary><strong>Prerequisite: Create a new Next.js project</strong></summary>
+
 
 
 Let's start a new Next.js project by running `create-next-app` in your terminal:
@@ -66,6 +73,7 @@ npx create-next-app@latest --ts --eslint inngest-guide
 ```
 
 You can answer the questions however you'd like.  This creates a new `inngest-guide` directory containing your project.  Open this directory in your terminal and code editor, then we can start adding Inngest!
+</details>
 
 ### Install the Inngest SDK
 
@@ -193,6 +201,7 @@ export default async function handler(req, res) {
 }
 ```
 
+<Callout>
 Sending events requires an ["**event key**"](/docs/events) to send data to Inngest in production. For local development, we only need a placeholder key. Create an `.env.local` file in your project and add the following environment variable:
 
 ```shell
@@ -200,6 +209,8 @@ INNGEST_EVENT_KEY="local"
 ```
 
 After adding this, restart the `npm run dev` command that you have running.
+
+</Callout>
 
 Every time this API route is requested, an event is sent to Inngest. To test it, drop this new API route's URL in your web browser: `http://localhost:3000/api/hello` (change your port if you're app is running elsewhere). With the `send` function you now can:
 

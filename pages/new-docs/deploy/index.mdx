@@ -11,11 +11,11 @@ Follow along to learn:
 Firstly, you need to deploy functions as an API to your platform.  Depending on your platform of choice,
 you'll want to deploy Inngest's serve functionality as a single serverless function available via HTTP.
 
-<aside>
+<Note>
 
 💁 Inngest deploys a single serverless API endpoint that hosts all registered functions
 
-</aside>
+</Note>
 
 ## Registering live functions with Inngest
 
@@ -28,16 +28,10 @@ There are several ways you can register your functions with Inngest:
 
 Automatically deploy your Inngest functions on each deployment of your site. If your platform isn't listed, you can still register using the methods below!
 
-<div className="button-container">
-  <a href="/docs/deploy/vercel?ref=docs-deploy" className="button button--guide">
-    <img src="/assets/brand-logos/vercel-dark.svg" className="logo" alt="Vercel deployment documentation"/>
-    Learn how to install our official Vercel integration →
-  </a>
-  <a href="/docs/deploy/netlify?ref=docs-deploy" className="button button--guide">
-    <img src="/assets/brand-logos/netlify-dark.svg" className="logo" alt="Netlify deployment documentation"/>
-    Learn how to install our official Netlify plugin →
-  </a>
-</div>
+<ButtonCol>
+<ButtonDeploy href="/docs/deploy/vercel?ref=docs-deploy" type="vercel" label="Learn how to install our official Vercel integration →" />
+<ButtonDeploy href="/docs/deploy/vercel?ref=docs-deploy" type="vercel" label="Learn how to install our official Netlify integration →" />
+</ButtonCol>
 
 ### Registering via the UI
 

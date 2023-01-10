@@ -29,12 +29,45 @@ function InfoIcon(props) {
 
 export function Note({ children }) {
   return (
-    <div className="my-6 flex gap-2.5 rounded-2xl border border-indigo-500/20 bg-indigo-50/50 p-4 leading-6 text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/5 dark:text-indigo-200 dark:[--tw-prose-links:theme(colors.white)] dark:[--tw-prose-links-hover:theme(colors.indigo.300)]">
+    <div className="my-6 flex gap-2.5 rounded-xl border border-indigo-500/20 bg-indigo-50/50 p-4 leading-6 text-indigo-900 dark:border-indigo-500/30 dark:bg-indigo-500/5 dark:text-indigo-200 dark:[--tw-prose-links:theme(colors.white)] dark:[--tw-prose-links-hover:theme(colors.indigo.300)]">
       <InfoIcon className="mt-1 h-4 w-4 flex-none fill-indigo-500 stroke-white dark:fill-indigo-200/20 dark:stroke-indigo-200" />
       <div className="[&>:first-child]:mt-0 [&>:last-child]:mb-0">
         {children}
       </div>
     </div>
+  );
+}
+
+export function Callout({ children }) {
+  return (
+    <div className="border border-transparent dark:border-indigo-600/20 text-indigo-600 dark:text-indigo-200 bg-indigo-600/10 rounded-lg p-6  [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+      {children}
+    </div>
+  );
+}
+
+export function ButtonCol({ children }) {
+  return (
+    <div className="flex flex-col lg:flex-row gap-4 w-full justify-between">
+      {children}
+    </div>
+  );
+}
+
+export function ButtonDeploy({ label, type, href }) {
+  return (
+    <a
+      href={href}
+      className=" bg-indigo-200 hover:bg-indigo-300/60 hover:shadow-md dark:bg-indigo-900/20 block rounded-lg p-4 group/deploy dark:hover:bg-indigo-800/40 dark:borde dark:border-indigo-500/20 no-underline transition-all"
+    >
+      <img
+        src={`/assets/docs/logos/${type}.svg`}
+        className="w-24 mt-0 mb-2 pt-2 pb-1"
+      />
+      <span className="text-slate-700 dark:text-slate-100 text-sm">
+        {label}
+      </span>
+    </a>
   );
 }
 

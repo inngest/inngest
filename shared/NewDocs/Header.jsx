@@ -41,7 +41,7 @@ export const Header = forwardRef(function Header({ className }, ref) {
       ref={ref}
       className={clsx(
         className,
-        "fixed inset-x-0 top-0 z-50 flex h-14 items-center justify-end gap-12 px-4 transition sm:px-6 lg:z-30 lg:px-8",
+        "fixed inset-x-0 top-0 z-50 flex h-14 items-center justify-between lg:justify-end gap-12 px-4 transition sm:px-6 lg:z-30 lg:px-8",
         !isInsideMobileNavigation &&
           "backdrop-blur-sm dark:backdrop-blur lg:left-72 xl:left-80",
         isInsideMobileNavigation
@@ -63,18 +63,32 @@ export const Header = forwardRef(function Header({ className }, ref) {
       {/* <Search /> */}
       <div className="flex items-center gap-5 lg:hidden">
         <MobileNavigation />
-        <Link href="/" aria-label="Home">
-          <Logo className="h-6" />
-        </Link>
+        <a
+          href="/new-docs"
+          className="flex gap-1.5 group/logo items-center pt-1"
+        >
+          <Logo className="w-20 text-indigo-500 dark:text-white" />
+          <span className="text-slate-700 dark:text-indigo-400 text-base group-hover/logo:text-white transition-color font-semibold">
+            Docs
+          </span>
+        </a>
       </div>
       <div className="flex items-center gap-5">
-        <SocialBadges />
-        <div className="hidden md:block md:h-5 md:w-px md:bg-slate-900/10 md:dark:bg-white/15" />
+        <nav className="hidden lg:block mr-4">
+          <ul role="list" className="flex items-center gap-8">
+            <TopLevelNavItem href="#">Docs</TopLevelNavItem>
+            <TopLevelNavItem href="#">Patterns</TopLevelNavItem>
+          </ul>
+        </nav>
+        <div className="hidden lg:block">
+          <SocialBadges />
+        </div>
+        <div className="hidden lg:block md:h-5 md:w-px md:bg-slate-900/10 md:dark:bg-white/15" />
         <div className="flex gap-4">
           <MobileSearch />
           <ModeToggle />
         </div>
-        <div className="hidden min-[416px]:flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-3">
           <Button href="/login" size="sm" variant="secondary">
             Log in
           </Button>

@@ -17,7 +17,7 @@ function useInitialValue(value, condition = true) {
 
 function TopLevelNavItem({ href, children }) {
   return (
-    <li className="md:hidden">
+    <li className="lg:hidden">
       <Link
         href={href}
         className="block py-1 text-sm text-slate-600 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
@@ -294,7 +294,7 @@ export const navigation = [
   },
   {
     title: "SDK",
-    links: [{ title: "Installation", href: `${baseDir}/sdk/serve` }],
+    links: [{ title: "Serve", href: `${baseDir}/sdk/serve` }],
   },
 ];
 
@@ -302,21 +302,20 @@ export function Navigation(props) {
   return (
     <nav {...props}>
       <ul role="list">
-        <TopLevelNavItem href="#">API</TopLevelNavItem>
-        <TopLevelNavItem href="#">Documentation</TopLevelNavItem>
-        <TopLevelNavItem href="#">Support</TopLevelNavItem>
+        <TopLevelNavItem href="/docs">Docs</TopLevelNavItem>
+        <TopLevelNavItem href="/patterns">Patterns</TopLevelNavItem>
         {navigation.map((group, groupIndex) => (
           <NavigationGroup
             key={group.title}
             group={group}
-            className={groupIndex === 0 && "md:mt-0"}
+            className={groupIndex === 0 && "lg:mt-0"}
           />
         ))}
-        <li className="sticky bottom-0 z-10 mt-6 min-[416px]:hidden">
-          <Button href="#" variant="filled" className="w-full">
+        <li className="sticky bottom-0 z-10 mt-6 sm:hidden gap-2 flex dark:bg-slate-900">
+          <Button href="#" variant="secondary" className="w-full">
             Log in
           </Button>
-          <Button href="#" variant="filled" className="w-full">
+          <Button href="#" variant="primary" arrow="right" className="w-full">
             Sign up
           </Button>
         </li>
