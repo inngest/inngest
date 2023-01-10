@@ -15,7 +15,17 @@ import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cj
 
 export async function getStaticProps() {
   const { sections } = getAllDocs();
-  return { props: { sections, htmlClassName: "docs", designVersion: "2" } };
+  return {
+    props: {
+      sections,
+      meta: {
+        title: `Documentation & Guides`,
+        description: `Learn how to use Inngest`,
+      },
+      htmlClassName: "docs",
+      designVersion: "2",
+    },
+  };
 }
 
 const code = `import { createStepFunction } from "inngest";
