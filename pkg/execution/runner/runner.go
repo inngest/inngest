@@ -184,7 +184,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 	logger.From(ctx).
 		Info().
 		Int("len", len(fns)).
-		Msg("initializing scheduled messages")
+		Msg("initializing scheduled functions")
 
 	for _, f := range fns {
 		fn := f
