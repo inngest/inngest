@@ -1,7 +1,4 @@
-import resolveConfig from "tailwindcss/resolveConfig";
-import tailwindConfig from "tailwind.config.js";
-
-const twConfig = resolveConfig(tailwindConfig);
+import tailwindColors from "tailwindcss/colors";
 
 export type IconProps = {
   size?: number;
@@ -11,8 +8,8 @@ export type IconProps = {
 
 export default function IconTheme(color: string = "transparent") {
   return {
-    color:
-      color === "transparent" ? "#FFFFFF" : twConfig.theme.colors[color]["500"],
+    // NOTE - This only reads from Tailwind color constants, not any theme overrides in tailwind.config.js
+    color: color === "transparent" ? "#FFFFFF" : tailwindColors[color]["500"],
     opacity: color === "transparent" ? 0.3 : 1,
   };
 }
