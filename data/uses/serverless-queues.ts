@@ -79,39 +79,26 @@ createFunction<MyEventType>("My handler", "my.event", ({ event }) => {
   },
   learning: [
     {
-      title: "Serverless Queues for Next.js",
+      title: "Quick Start Tutorial",
       description:
-        "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
-      type: "Guide",
-      href: "/docs/getting-started",
-    },
-    {
-      title: "Use TypeScript with Inngest",
-      description:
-        "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
+        "A step-by-step guide to learn how to build with Inngest in less than 5 minutes.",
       type: "Tutorial",
-      href: "/docs/getting-started",
+      href: "/docs/quick-start",
     },
     {
-      title: "Running Background Jobs",
+      title: "Using TypeScript with Inngest",
       description:
-        "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
-      type: "Pattern",
-      href: "/docs/getting-started",
-    },
-    {
-      title: "Serverless Queues for Next.js",
-      description:
-        "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
+        "Learn how our SDK gives you typesafety from sending events to running functions.",
       type: "Docs",
-      href: "/docs/getting-started",
+      href: "/docs/typescript",
     },
-    {
-      title: "Use TypeScript with Inngest",
-      description:
-        "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
-      type: "Blog",
-      href: "/docs/getting-started",
-    },
+    // TODO/DOCS - Add guide for background jobs when complete
+    // {
+    //   title: "Running Background Jobs",
+    //   description:
+    //     "How to background jobs without the queues and workers.",
+    //   type: "Guide",
+    //   href: "/docs/guides/background-jobs",
+    // },
   ],
 };

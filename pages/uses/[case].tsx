@@ -49,7 +49,7 @@ export type UseCase = {
   learning: {
     title: string;
     description: string;
-    type: string;
+    type: "Docs" | "Tutorial" | "Guide" | "Pattern" | "Blog";
     href: string;
   }[];
 };
