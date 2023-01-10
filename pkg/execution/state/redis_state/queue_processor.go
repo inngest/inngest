@@ -14,20 +14,29 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/uber-go/tally/v4"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
 
 const (
-	ErrMaxConsecutiveProcessErrors = 20
-	minWorkersFree                 = 5
+	minWorkersFree = 5
 
-	counterQueueItemsStarted     = "queue_items_started_total"
-	counterQueueItemsErrored     = "queue_items_errored_total"
-	counterQueueItemsComplete    = "queue_items_complete_total"
-	counterQueueItemsEnqueued    = "queue_items_enqueued_total"
-	gaugeQueueItemLatencyEWMA    = "queue_item_latency_ewma"
-	histogramItemLatency         = "queue_item_latency_duration"
-	counterSequentialLeaseClaims = "queue_sequential_lease_claims_total"
+	// Mtric consts
+	counterQueueItemsStarted            = "queue_items_started_total"              // Queue item started
+	counterQueueItemsErrored            = "queue_items_errored_total"              // Queue item errored
+	counterQueueItemsComplete           = "queue_items_complete_total"             // Queue item finished
+	counterQueueItemsEnqueued           = "queue_items_enqueued_total"             // Item enqueued
+	counterQueueItemsProcessLeaseExists = "queue_items_process_lease_exists_total" // Scanned an item with an exisitng lease
+	counterQueueItemsLeaseConflict      = "queue_items_lease_conflict_total"       // Attempt to lease an item with an existing lease
+	counterQueueItemsGone               = "queue_items_gone_total"                 // Attempt to lease a dequeued item
+	counterSequentialLeaseClaims        = "queue_sequential_lease_claims_total"    // Sequential lease claimed by worker
+	counterPartitionProcessNoCapacity   = "partition_process_no_capacity_total"    // Processing items but there's no more capacity
+	counterPartitionProcessItems        = "partition_process_items_total"          // Leased a queue item within a partition to begin work
+	counterPartitionProcess             = "partition_process_total"
+	counterPartitionLeaseConflict       = "partition_lease_conflict_total"
+	counterPartitionGone                = "partition_gone_total"
+	gaugeQueueItemLatencyEWMA           = "queue_item_latency_ewma"
+	histogramItemLatency                = "queue_item_latency_duration"
 )
 
 var (
@@ -220,6 +229,10 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 }
 
 func (q *queue) scan(ctx context.Context, f osqueue.RunFunc) error {
+	if q.capacity() == 0 {
+		return nil
+	}
+
 	partitions, err := q.PartitionPeek(ctx, q.isSequential(), time.Now(), PartitionPeekMax)
 	if err != nil {
 		return err
@@ -227,7 +240,9 @@ func (q *queue) scan(ctx context.Context, f osqueue.RunFunc) error {
 
 	for _, p := range partitions {
 		if q.capacity() == 0 {
-			// no available workers for partition
+			// no longer any available workers for partition, so we can skip
+			// work
+			q.scope.Counter("scan_no_capacity_total").Inc(1)
 			return nil
 		}
 		if err := q.processPartition(ctx, p, f); err != nil {
@@ -240,19 +255,21 @@ func (q *queue) scan(ctx context.Context, f osqueue.RunFunc) error {
 }
 
 func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osqueue.RunFunc) error {
+	q.scope.Counter(counterPartitionProcess).Inc(1)
 	ctx, span := q.tracer.Start(ctx, "processPartition")
 	defer span.End()
 
 	// Attempt to lease items
 	_, err := q.PartitionLease(ctx, p.Queue(), PartitionLeaseDuration)
 	if err == ErrPartitionAlreadyLeased {
-		// TODO: Increase metric for partition contention
+		q.scope.Counter(counterPartitionLeaseConflict).Inc(1)
 		return nil
 	}
 	if err == ErrPartitionNotFound {
 		// Another worker must have pocessed this partition between
 		// this worker's peek and process.  Increase partition
 		// contention metric and continue.  This is unsolvable.
+		q.scope.Counter(counterPartitionGone).Inc(1)
 		return nil
 	}
 	if err != nil {
@@ -277,49 +294,68 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 		return err
 	}
 
+	eg := errgroup.Group{}
 	for _, item := range queue {
 		if item.LeaseID != nil && ulid.Time(item.LeaseID.Time()).After(time.Now()) {
-			// TODO: Increase metric for queue contention
+			q.scope.Counter(counterQueueItemsProcessLeaseExists).Inc(1)
 			continue
 		}
 
 		// Cbeck if there's capacity in our queue atomically prior to leasing our tiems.
 		if !q.sem.TryAcquire(1) {
+			q.scope.Counter(counterPartitionProcessNoCapacity).Inc(1)
 			break
 		}
 
-		// Attempt to lease this item before passing this to a worker.  We have to do this
-		// synchronously as we need to lease prior to requeueing the partition pointer. If
-		// we don't do this here, the workers may not lease the items before calling Peek
-		// to re-enqeueu the pointer, which then increases contention - as we requeue a
-		// pointer too early.
-		//
-		// This is safe:  only one process runs scan(), and we guard the total number of
-		// available workers with the above semaphore.
-		leaseID, err := q.Lease(ctx, item.Queue(), item.ID, QueueLeaseDuration)
-		if err == ErrQueueItemNotFound {
-			// Already handled.
-			q.sem.Release(1)
-			continue
-		}
-		if err == ErrQueueItemAlreadyLeased {
-			// XXX: Increase counter for lease contention
-			q.sem.Release(1)
-			logger.From(ctx).Warn().Interface("item", item).Msg("worker attempting to claim existing lease")
-			continue
-		}
-		if err != nil {
-			q.sem.Release(1)
-			return fmt.Errorf("error leasing in process: %w", err)
-		}
+		// Within a goroutine attempt to lease this item.  This lets us concurrently lease
+		// items within the partition to process as fast as possible.
+		eg.Go(func() error {
+			q.scope.Counter(counterPartitionProcessItems).Inc(1)
 
-		// Assign the lease ID and pass this to be handled by the available worker.
-		item.LeaseID = leaseID
-		q.workers <- *item
+			// Attempt to lease this item before passing this to a worker.  We have to do this
+			// synchronously as we need to lease prior to requeueing the partition pointer. If
+			// we don't do this here, the workers may not lease the items before calling Peek
+			// to re-enqeueu the pointer, which then increases contention - as we requeue a
+			// pointer too early.
+			//
+			// This is safe:  only one process runs scan(), and we guard the total number of
+			// available workers with the above semaphore.
+			leaseID, err := q.Lease(ctx, item.Queue(), item.ID, QueueLeaseDuration)
+			if err == ErrQueueItemNotFound {
+				q.scope.Counter(counterQueueItemsGone).Inc(1)
+				q.sem.Release(1)
+				return nil
+			}
+			if err == ErrQueueItemAlreadyLeased {
+				q.scope.Counter(counterQueueItemLeaseConflict).Inc(1)
+				q.sem.Release(1)
+				logger.From(ctx).
+					Warn().
+					Interface("item", item).
+					Msg("worker attempting to claim existing lease")
+				return nil
+			}
+			if err != nil {
+				q.sem.Release(1)
+				return fmt.Errorf("error leasing in process: %w", err)
+			}
+
+			// Assign the lease ID and pass this to be handled by the available worker.
+			// There should always be capacity on this queue as we track capacity via
+			// a semaphore.
+			item.LeaseID = leaseID
+			q.workers <- *item
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		// The lease for the partition will expire and we will be able to restart
+		// work in the future.
+		return err
 	}
 
 	// Requeue the partition, which reads the next unleased job or sets a time of
-	// 30 seconds.  This is why we have to lease above, else this may return an item that is
+	// 30 seconds.  This is why we have to lease items above, else this may return an item that is
 	// about to be leased and processed by the worker.
 	err = q.PartitionRequeue(ctx, p.Queue(), time.Now().Add(PartitionRequeueExtension))
 	if err == ErrPartitionGarbageCollected {
@@ -415,7 +451,7 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 		span.AddEvent("function start")
 		err := f(jobCtx, qi.Data)
 		extendLeaseTick.Stop()
-		span.AddEvent("function end start")
+		span.AddEvent("function end")
 		if err != nil {
 			go scope.Counter(counterQueueItemsErrored).Inc(1)
 			errCh <- err
