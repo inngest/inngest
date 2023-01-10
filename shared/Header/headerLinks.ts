@@ -1,4 +1,4 @@
-import  {
+import {
   IconBackgroundTasks,
   IconDeploying,
   IconDocs,
@@ -9,9 +9,8 @@ import  {
   IconSendEvents,
   IconSteps,
   IconTools,
-  IconWritingFns
+  IconWritingFns,
 } from "../Icons/duotone";
-
 
 const productLinks = {
   featuredTitle: "Product",
@@ -35,6 +34,11 @@ const productLinks = {
   linksTheme: "indigo",
   links: [
     {
+      title: "Serverless queues",
+      url: "/uses/serverless-queues?ref=nav",
+      icon: IconJourney,
+    },
+    {
       title: "Scheduled & cron jobs",
       url: "/uses/serverless-cron-jobs?ref=nav",
       icon: IconScheduled,
@@ -54,12 +58,7 @@ const productLinks = {
       url: "/uses/user-journey-automation?ref=nav",
       icon: IconJourney,
     },
-    {
-      title: "Serverless queues",
-      url: "/uses/serverless-queues?ref=nav",
-      icon: IconJourney,
-    },
-  ]
+  ],
 };
 
 const learnLinks = {
@@ -98,10 +97,7 @@ const learnLinks = {
       url: "/docs/deploy?ref=nav",
       icon: IconDeploying,
     },
-  ]
+  ],
 };
 
-export {
-  productLinks,
-  learnLinks
-};
+export { productLinks, learnLinks };

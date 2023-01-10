@@ -45,6 +45,11 @@ const footerLinks = [
     name: "Use Cases",
     links: [
       {
+        label: "Serverless queues for TypeScript",
+        url: "/uses/serverless-queues?ref=footer",
+        icon: IconJourney,
+      },
+      {
         label: "Scheduled & cron jobs",
         url: "/uses/serverless-cron-jobs?ref=footer",
         icon: IconScheduled,
