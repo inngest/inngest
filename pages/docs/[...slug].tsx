@@ -19,6 +19,7 @@ import {
 import { DocsLayout, DocsContent } from "../docs";
 import { rehypeParseCodeBlocks } from "../../mdx/rehype.mjs";
 import { rehypeRemoveTwoSlashMarkup, rehypeShiki } from "../../utils/code";
+import { getOpenGraphImageURL } from "../../utils/social";
 
 export default function DocLayout(props: any) {
   const scope: DocScope = JSON.parse(props.post.scope.json);
@@ -43,9 +44,7 @@ export default function DocLayout(props: any) {
       : `${process.env.NEXT_PUBLIC_HOST}/assets/social-previews/${flattenedSlug}.png`;
   const socialImage = scope.image
     ? `${process.env.NEXT_PUBLIC_HOST}${scope.image}`
-    : `${process.env.NEXT_PUBLIC_HOST}/api/og?title=${encodeURIComponent(
-        titleWithCategory
-      )}`;
+    : getOpenGraphImageURL({ title: titleWithCategory });
 
   return (
     <DocsLayout sections={sections}>
