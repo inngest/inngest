@@ -52,11 +52,12 @@ export function rehypeShiki() {
   };
 }
 
+const tagsToAddIds = ["h2", "h3", "h4"];
 function rehypeSlugify() {
   return (tree) => {
     let slugify = slugifyWithCounter();
     visit(tree, "element", (node) => {
-      if (node.tagName === "h2" && !node.properties.id) {
+      if (tagsToAddIds.includes(node.tagName) && !node.properties.id) {
         node.properties.id = slugify(toString(node));
       }
     });
