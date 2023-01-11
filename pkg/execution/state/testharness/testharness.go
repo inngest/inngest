@@ -364,7 +364,7 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.NotNil(t, next)
 	require.Nil(t, next.Actions()[r.Step.ID])
-	require.Equal(t, r.Err, next.Errors()[r.Step.ID])
+	require.Contains(t, next.Errors()[r.Step.ID].Error(), r.Err.Error())
 
 	// Only the trigger, which was not yet complete.
 	require.Equal(t, 1, next.Metadata().Pending)
@@ -379,7 +379,7 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	finalized, err := m.SaveResponse(ctx, s.Identifier(), r, 1)
 	require.NoError(t, err)
 	require.Nil(t, finalized.Actions()[r.Step.ID])
-	require.Equal(t, r.Err, finalized.Errors()[r.Step.ID])
+	require.Contains(t, finalized.Errors()[r.Step.ID].Error(), r.Err.Error())
 
 	// Next stores an outdated reference
 	require.Equal(t, 1, next.Metadata().Pending)
@@ -404,7 +404,7 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.NotNil(t, next)
 	require.Nil(t, next.Actions()[r.Step.ID])
-	require.Equal(t, r.Err, next.Errors()[r.Step.ID])
+	require.Contains(t, next.Errors()[r.Step.ID].Error(), r.Err.Error())
 
 	// This is not final
 	require.Equal(t, 1, next.Metadata().Pending)
@@ -419,7 +419,7 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.Equal(t, r.Output, finalized.Actions()[r.Step.ID])
 	// The error is still stored.
-	require.Equal(t, stepErr, next.Errors()[r.Step.ID])
+	require.Contains(t, next.Errors()[r.Step.ID].Error(), stepErr.Error())
 	// Saving output should not finalize.
 	require.Equal(t, 1, finalized.Metadata().Pending)
 

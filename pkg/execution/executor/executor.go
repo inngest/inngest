@@ -269,35 +269,37 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 		err      error
 	)
 
-	if stepID != inngest.TriggerName {
-		var step *inngest.Step
-		for _, s := range w.Steps {
-			if s.ID == stepID {
-				step = &s
-				break
-			}
+	if stepID == inngest.TriggerName {
+		return nil, nil
+	}
+
+	var step *inngest.Step
+	for _, s := range w.Steps {
+		if s.ID == stepID {
+			step = &s
+			break
 		}
-		if step == nil {
-			// This isn't fixable.
-			return nil, newFinalError(fmt.Errorf("unknown vertex: %s", stepID))
-		}
-		response, err = e.executeAction(ctx, id, step, s, attempt)
-		if err != nil {
-			return nil, err
-		}
-		if response.Err != nil {
-			// This action errored.  We've stored this in our state manager already;
-			// return the response error only.  We can use the same variable for both
-			// the response and the error to indicate an error value.
-			return response, response
-		}
-		if response.Scheduled {
-			// This action is not yet complete, so we can't traverse
-			// its children.  We assume that the driver is responsible for
-			// retrying and coordinating async state here;  the executor's
-			// job is to execute the action only.
-			return response, nil
-		}
+	}
+	if step == nil {
+		// This isn't fixable.
+		return nil, newFinalError(fmt.Errorf("unknown vertex: %s", stepID))
+	}
+	response, err = e.executeAction(ctx, id, step, s, attempt)
+	if err != nil {
+		return nil, err
+	}
+	if response.Err != nil {
+		// This action errored.  We've stored this in our state manager already;
+		// return the response error only.  We can use the same variable for both
+		// the response and the error to indicate an error value.
+		return response, response
+	}
+	if response.Scheduled {
+		// This action is not yet complete, so we can't traverse
+		// its children.  We assume that the driver is responsible for
+		// retrying and coordinating async state here;  the executor's
+		// job is to execute the action only.
+		return response, nil
 	}
 
 	return response, err

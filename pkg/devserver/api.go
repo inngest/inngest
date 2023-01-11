@@ -2,9 +2,11 @@ package devserver
 
 import (
 	"context"
+	"embed"
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"strings"
 	"time"
@@ -20,6 +22,9 @@ import (
 
 //go:embed static/index.html
 var uiHtml []byte
+
+//go:embed static/assets
+var static embed.FS
 
 var (
 	// signingKeyErrorLoggedCount ensures that we log the signing key message once
@@ -58,6 +63,12 @@ func (a *devapi) addRoutes() {
 	})
 
 	a.Get("/", a.UI)
+
+	// Go embeds files relative to the current source, which embeds
+	// all assets under ./static/assets.  We remove the ./static
+	// directory by using fs.Sub: https://pkg.go.dev/io/fs#Sub.
+	assetsFS, _ := fs.Sub(static, "static")
+	a.Get("/assets/*", http.FileServer(http.FS(assetsFS)).ServeHTTP)
 	a.Get("/dev", a.Info)
 	a.Post("/fn/register", a.Register)
 }

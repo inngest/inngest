@@ -116,6 +116,14 @@ const FunctionRunTimelineRow = ({
   name,
   last,
 }: FunctionRunTimelineRowProps) => {
+
+  const json = useMemo(() => { 
+    try {
+      return JSON.parse(output || "");
+    } catch(e) {
+      return null;
+    }
+  }, [output]);
   const payload = usePrettyJson(output);
 
   const { label, status } = useMemo(() => {
@@ -152,11 +160,19 @@ const FunctionRunTimelineRow = ({
     };
   }, [rowType, eventType, name]);
 
+  const tabs = [{ label: "Output", content: payload || "" }];
+
+  // sdkError stores the error contents of the SDK response.
+  const sdkError = !!json?.error && (json?.output?.body || json?.output)
+  if (!!sdkError) {
+    tabs.push({ label: "Error", content: sdkError });
+  }
+
   return (
     <TimelineRow status={status} iconOffset={0} bottomLine={!last}>
       <TimelineFuncProgress label={label} date={createdAt} id="">
         {payload ? (
-          <CodeBlock tabs={[{ label: "Payload", content: payload }]} />
+          <CodeBlock tabs={tabs} />
         ) : null}
       </TimelineFuncProgress>
     </TimelineRow>
