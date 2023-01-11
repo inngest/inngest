@@ -1,5 +1,5 @@
 import classNames from "src/utils/classNames";
-import Button from "../Button";
+import { Button } from "../Button";
 
 export default function PlanCard({ type = "light", content }) {
   return (
@@ -64,7 +64,7 @@ export default function PlanCard({ type = "light", content }) {
         </ul>
       </div>
       <div className="px-12 pb-4 mt-4 mb-4">
-        <Button href={content.cta.href} arrow full>
+        <Button href={content.cta.href} arrow="right" full>
           {content.cta.text}
         </Button>
       </div>
