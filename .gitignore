@@ -17,6 +17,7 @@ package-lock.json
 
 # production
 /build
+/public/sitemap*
 
 # misc
 .DS_Store
