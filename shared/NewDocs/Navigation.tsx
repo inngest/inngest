@@ -30,10 +30,16 @@ function TopLevelNavItem({ href, children }) {
 
 function NavLink({
   href,
-  tag = null,
-  active = false,
+  tag,
+  active,
   isAnchorLink = false,
   children,
+}: {
+  href: string;
+  tag?: any;
+  active: boolean;
+  isAnchorLink?: boolean;
+  children: React.ReactNode;
 }) {
   return (
     <Link

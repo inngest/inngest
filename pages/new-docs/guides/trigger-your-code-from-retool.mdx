@@ -65,7 +65,7 @@ Using [the Inngest SDK](/features/sdk?ref=retool-guide) you can define your Inng
 mkdir -p inngest
 ```
 
-Now we'll create a file in this directory for our function - `runBackfillForUser.js`. This will be our Inngest function which will import our existing backfill code, use the `user_id` from the event payload to run that code, and return a http status code in our response to tell Inngest [if it should be retried or not](/docs/reference/functions/retries?ref=retool-guide).
+Now we'll create a file in this directory for our function - `runBackfillForUser.js`. This will be our Inngest function which will import our existing backfill code, use the `user_id` from the event payload to run that code, and return a http status code in our response to tell Inngest [if it should be retried or not](/docs/functions/retries?ref=retool-guide).
 
 
 ```js

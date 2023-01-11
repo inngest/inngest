@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Head from "next/head";
+import { Router } from "next/router";
 import { MDXProvider } from "@mdx-js/react";
 import { motion } from "framer-motion";
 
@@ -10,6 +11,16 @@ import Logo from "../Icons/Logo";
 import { Navigation } from "./Navigation";
 import { Prose } from "./Prose";
 import { SectionProvider } from "./SectionProvider";
+import { useMobileNavigationStore } from "./MobileNavigation";
+
+// Unsure if this should be here or in the _app and conditionally run only on docs
+function onRouteChange() {
+  useMobileNavigationStore.getState().close();
+}
+
+Router.events.on("hashChangeStart", onRouteChange);
+Router.events.on("routeChangeComplete", onRouteChange);
+Router.events.on("routeChangeError", onRouteChange);
 
 export function Layout({ children, sections = [] }) {
   return (
