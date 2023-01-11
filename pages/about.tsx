@@ -211,7 +211,7 @@ export default function About() {
                   that want to contribute highly to an early-stage startup
                   focused on solving developer problems.
                 </p>
-                <Button href="/careers?ref=about" arrow>
+                <Button href="/careers?ref=about" arrow="right">
                   View the open roles
                 </Button>
               </aside>

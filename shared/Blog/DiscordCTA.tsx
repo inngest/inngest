@@ -16,7 +16,11 @@ const DiscordCTA: React.FC<{ size?: "default" | "small" }> = ({
       <p className="text-slate-400 mb-6 mt-2 text-sm">
         Ask questions, give feedback, and share feature requests
       </p>
-      <Button variant="secondary" href={process.env.NEXT_PUBLIC_DISCORD_URL} arrow>
+      <Button
+        variant="secondary"
+        href={process.env.NEXT_PUBLIC_DISCORD_URL}
+        arrow="right"
+      >
         Join our Discord!
       </Button>
     </div>

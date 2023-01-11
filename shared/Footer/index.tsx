@@ -24,7 +24,7 @@ export default function Footer() {
           </code>
           <Button
             className="mt-4"
-            arrow
+            arrow="right"
             variant="secondary"
             href="/sign-up?ref=callout"
           >

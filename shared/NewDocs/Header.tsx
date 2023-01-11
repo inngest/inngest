@@ -29,7 +29,10 @@ function TopLevelNavItem({ href, children }) {
   );
 }
 
-export const Header = forwardRef(function Header({ className }, ref) {
+export const Header = forwardRef<HTMLDivElement>(function Header(
+  { className }: { className?: string },
+  ref
+) {
   let { isOpen: mobileNavIsOpen } = useMobileNavigationStore();
   let isInsideMobileNavigation = useIsInsideMobileNavigation();
 
@@ -49,10 +52,12 @@ export const Header = forwardRef(function Header({ className }, ref) {
           ? "bg-white dark:bg-slate-900"
           : "bg-white/[var(--bg-opacity-light)] dark:bg-slate-950/[var(--bg-opacity-dark)]"
       )}
-      style={{
-        "--bg-opacity-light": bgOpacityLight,
-        "--bg-opacity-dark": bgOpacityDark,
-      }}
+      style={
+        {
+          "--bg-opacity-light": bgOpacityLight,
+          "--bg-opacity-dark": bgOpacityDark,
+        } as any
+      }
     >
       <div
         className={clsx(
@@ -77,9 +82,11 @@ export const Header = forwardRef(function Header({ className }, ref) {
       <div className="flex items-center gap-5">
         <nav className="hidden lg:block mr-4">
           <ul role="list" className="flex items-center gap-8">
-          {headerLinks.map((link)=> (
-            <TopLevelNavItem key={link.title} href={link.href}>{link.title}</TopLevelNavItem>
-          ))}
+            {headerLinks.map((link) => (
+              <TopLevelNavItem key={link.title} href={link.href}>
+                {link.title}
+              </TopLevelNavItem>
+            ))}
           </ul>
         </nav>
         <div className="hidden lg:block">
@@ -91,10 +98,18 @@ export const Header = forwardRef(function Header({ className }, ref) {
           <ModeToggle />
         </div>
         <div className="hidden sm:flex items-center gap-3">
-          <Button href={process.env.NEXT_PUBLIC_LOGIN_URL} size="sm" variant="secondary">
+          <Button
+            href={process.env.NEXT_PUBLIC_LOGIN_URL}
+            size="sm"
+            variant="secondary"
+          >
             Log in
           </Button>
-          <Button href={process.env.NEXT_PUBLIC_SIGNUP_URL} size="sm" arrow="right">
+          <Button
+            href={process.env.NEXT_PUBLIC_SIGNUP_URL}
+            size="sm"
+            arrow="right"
+          >
             Sign up
           </Button>
         </div>

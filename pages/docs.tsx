@@ -1,5 +1,5 @@
 import Link from "next/link";
-import React from "react";
+import React, { ReactNode } from "react";
 import Head from "next/head";
 import Image from "next/image";
 import styled from "@emotion/styled";
@@ -174,6 +174,7 @@ export default function DocsHome(props) {
 
 export const DocsLayout: React.FC<{
   sections: { section: Sections; categories: Categories; hide: boolean }[];
+  children: ReactNode;
 }> = ({ children, sections }) => {
   return (
     <>

@@ -32,7 +32,9 @@ const ConfirmContext = React.createContext<Context>({
 });
 
 // Confirm renders the confirm component in the root of our app.
-export const ConfirmWrapper: React.FC<{}> = (props) => {
+export const ConfirmWrapper: React.FC<{ children: React.ReactNode }> = (
+  props
+) => {
   const resolve = React.useRef<() => void | null>(null);
   const reject = React.useRef<() => void | null>(null);
 

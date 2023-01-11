@@ -1,4 +1,4 @@
-import { forwardRef, Fragment, useState } from "react";
+import React, { forwardRef, Fragment, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Transition } from "@headlessui/react";
@@ -32,10 +32,10 @@ function FeedbackButton(props) {
   );
 }
 
-const FeedbackForm = forwardRef(function FeedbackForm(
-  { onSubmit }: HTMLFormElement,
-  ref
-) {
+const FeedbackForm = forwardRef<
+  HTMLFormElement,
+  { onSubmit: React.FormEventHandler }
+>(function FeedbackForm({ onSubmit }, ref) {
   return (
     <form
       ref={ref}
@@ -54,7 +54,10 @@ const FeedbackForm = forwardRef(function FeedbackForm(
   );
 });
 
-const FeedbackThanks = forwardRef(function FeedbackThanks(_props, ref) {
+const FeedbackThanks = forwardRef<HTMLDivElement, {}>(function FeedbackThanks(
+  _props,
+  ref
+) {
   return (
     <div
       ref={ref}

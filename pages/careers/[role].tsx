@@ -137,7 +137,7 @@ export default function Careers(props) {
                 <p className="text-sm lg:text-base">
                   Have any questions about a role?
                 </p>
-                <Button href="mailto:careers@inngest.com" arrow>
+                <Button href="mailto:careers@inngest.com" arrow="right">
                   Email us
                 </Button>
               </aside>

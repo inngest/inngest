@@ -56,6 +56,15 @@ function Anchor({ id, inView, children }) {
   );
 }
 
+type HeadingProps = {
+  level: 1 | 2 | 3 | 4 | 5;
+  children: React.ReactNode;
+  id: string;
+  tag?: string;
+  label?: string;
+  anchor?: boolean;
+};
+
 export function Heading({
   level = 2,
   children,
@@ -64,8 +73,8 @@ export function Heading({
   label,
   anchor = true,
   ...props
-}) {
-  let Component = `h${level}`;
+}: HeadingProps) {
+  let Component: "h1" | "h2" | "h3" | "h4" | "h5" = `h${level}`;
   let ref = useRef();
   let registerHeading = useSectionStore((s) => s.registerHeading);
 

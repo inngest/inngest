@@ -1,13 +1,25 @@
-import Link from "next/link";
+import Link, { LinkProps } from "next/link";
 import clsx from "clsx";
 
 import { Heading } from "./Heading";
+import React from "react";
 
-export const a = Link;
+// export const a: React.FunctionComponent<LinkProps> = (props) => (
+//   <Link {...props} />
+// );
+
+export const a: React.FunctionComponent<
+  React.AnchorHTMLAttributes<HTMLAnchorElement>
+> = ({ children, href, target, rel, download }) => (
+  <Link href={href} target={target} rel={rel} download={download}>
+    {children}
+  </Link>
+);
+
 export { Button } from "../Button";
 export { CodeGroup, Code as code, Pre as pre } from "./Code";
 
-export const h2 = function H2(props) {
+export const h2: React.FC<any> = function H2(props) {
   return <Heading level={2} {...props} />;
 };
 

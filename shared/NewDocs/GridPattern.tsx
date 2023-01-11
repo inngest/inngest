@@ -1,6 +1,22 @@
 import { useId } from "react";
 
-export function GridPattern({ width, height, x, y, squares, ...props }) {
+type GridPatternProps = {
+  className?: string;
+  width: number;
+  height: number;
+  x?: string;
+  y?: string;
+  squares?: [number, number][];
+};
+
+export function GridPattern({
+  width,
+  height,
+  x,
+  y,
+  squares,
+  ...props
+}: GridPatternProps) {
   let patternId = useId();
 
   return (

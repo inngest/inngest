@@ -29,7 +29,7 @@ const variantStyles = {
 type ButtonProps = {
   variant?: "primary" | "secondary" | "filled" | "outline" | "text";
   className?: string;
-  arrow: "left" | "right";
+  arrow?: "left" | "right";
   children?: React.ReactNode;
 } & LinkProps;
 

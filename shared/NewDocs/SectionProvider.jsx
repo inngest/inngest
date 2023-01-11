@@ -9,6 +9,14 @@ import { createStore, useStore } from "zustand";
 
 import { remToPx } from "../../utils/remToPx";
 
+// type Section = { id: string; headingRef: any; offsetRem: string };
+// type State = {
+//   sections?: Section[];
+//   visibleSections?: Section[];
+//   setVisibleSections?: (sections: Section[]) => void;
+//   registerHeading?: (Section) => void;
+// };
+
 function createSectionStore(sections) {
   return createStore((set) => ({
     sections,

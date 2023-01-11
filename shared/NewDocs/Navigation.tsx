@@ -28,7 +28,13 @@ function TopLevelNavItem({ href, children }) {
   );
 }
 
-function NavLink({ href, tag, active, isAnchorLink = false, children }) {
+function NavLink({
+  href,
+  tag = null,
+  active = false,
+  isAnchorLink = false,
+  children,
+}) {
   return (
     <Link
       href={href}

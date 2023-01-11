@@ -10,10 +10,13 @@ type ButtonProps = {
   children?: React.ReactNode;
 } & AnchorHTMLAttributes<HTMLAnchorElement>;
 
-export function Button(
-  { children, variant = "primary", size = "md", arrow, ...props },
-  ButtonProps
-) {
+export function Button({
+  children,
+  variant = "primary",
+  size = "md",
+  arrow,
+  ...props
+}: ButtonProps) {
   const sizes = {
     sm: "text-sm px-4 py-1.5",
     md: "text-sm px-6 py-2.5",

@@ -23,7 +23,7 @@ import UsersGroup from "../shared/Icons/UsersGroup";
 type Plan = {
   name: string;
   cost: string;
-  description: React.ReactFragment | string;
+  description: React.ReactElement | string;
   cta: {
     href: string;
     text: string;

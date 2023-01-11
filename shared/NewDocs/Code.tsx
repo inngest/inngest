@@ -1,10 +1,6 @@
-import {
+import React, {
   Children,
   createContext,
-  ReactChild,
-  ReactChildren,
-  ReactElement,
-  ReactFragment,
   ReactNode,
   useContext,
   useEffect,
@@ -125,7 +121,7 @@ type CodePanelProps = {
   tag?: string;
   label?: string;
   code?: string;
-  children?: React.ReactChildren;
+  children?: React.ReactNode;
 };
 
 function CodePanel({ tag, label, code, children }: CodePanelProps) {
@@ -149,7 +145,7 @@ function CodePanel({ tag, label, code, children }: CodePanelProps) {
 
 type CodeGroupHeaderProps = {
   title?: string;
-  children: ReactChildren;
+  children: React.ReactNode;
   selectedIndex?: number;
 };
 
@@ -282,7 +278,7 @@ const CodeGroupContext = createContext(false);
 
 type CodeGroupProps = {
   title?: string;
-  children: ReactChildren;
+  children: React.ReactNode;
 };
 
 export function CodeGroup({ children, title, ...props }: CodeGroupProps) {

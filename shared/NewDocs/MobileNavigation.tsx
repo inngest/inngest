@@ -40,12 +40,20 @@ export function useIsInsideMobileNavigation() {
   return useContext(IsInsideMobileNavigationContext);
 }
 
-export const useMobileNavigationStore = create((set) => ({
-  isOpen: false,
-  open: () => set({ isOpen: true }),
-  close: () => set({ isOpen: false }),
-  toggle: () => set((state) => ({ isOpen: !state.isOpen })),
-}));
+type MobileNavigationStore = {
+  isOpen: boolean;
+  open: () => void;
+  close: () => void;
+  toggle: () => void;
+};
+export const useMobileNavigationStore = create<MobileNavigationStore>(
+  (set) => ({
+    isOpen: false,
+    open: () => set({ isOpen: true }),
+    close: () => set({ isOpen: false }),
+    toggle: () => set((state) => ({ isOpen: !state.isOpen })),
+  })
+);
 
 export function MobileNavigation() {
   let isInsideMobileNavigation = useIsInsideMobileNavigation();

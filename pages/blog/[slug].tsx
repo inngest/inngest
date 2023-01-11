@@ -157,7 +157,10 @@ export default function BlogLayout(props) {
                   platform lets you build serverless background tasks and
                   scheduled jobs using events - zero infrastructure required.{" "}
                 </p>
-                <Button href="https://www.inngest.com?ref=blog-post" arrow>
+                <Button
+                  href="https://www.inngest.com?ref=blog-post"
+                  arrow="right"
+                >
                   Give it a try
                 </Button>
               </aside>
