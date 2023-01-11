@@ -43,6 +43,9 @@ var (
 
 	hc = http.Client{
 		Timeout: timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return fmt.Errorf("The request to your Inngest API was redirected.  This is usually an issue with how you've set up your project's authentication or redirects.  Please remove redirects for the Inngest API.")
+		},
 	}
 )
 
