@@ -32,8 +32,9 @@ export default function PlanCard({ type = "light", content }) {
           {content.description}
         </p>
         <ul className="flex flex-col mt-6">
-          {content.features.map((feature) => (
+          {content.features.map((feature, i) => (
             <li
+              key={i}
               className={classNames(
                 type === "dark" ? `odd:bg-slate-600/10` : `odd:bg-slate-400/10`,
                 `flex flex-col py-2.5 `
