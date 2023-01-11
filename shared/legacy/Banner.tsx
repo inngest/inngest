@@ -1,6 +1,6 @@
 import styled from "@emotion/styled";
 
-type Props = { className?: string };
+type Props = { className?: string; children: React.ReactNode };
 
 const Banner: React.FC<Props> = (props) => {
   return <Wrapper className={props.className}>{props.children}</Wrapper>;

@@ -27,9 +27,13 @@ import PlanCard from "src/shared/Pricing/PlanCard";
 type Plan = {
   name: string;
   cost: string;
+<<<<<<< HEAD
   costTime?: string;
   description: React.ReactFragment | string;
   popular?: boolean;
+=======
+  description: React.ReactElement | string;
+>>>>>>> main
   cta: {
     href: string;
     text: string;

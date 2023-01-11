@@ -66,7 +66,7 @@ Plus, because Inngest stores events in an event store, you can use real data fro
 
 The process for building this on Inngest is easy:
 
-1. [Create a new GitHub webhook in Inngest](/docs/event-webhooks)
+1. Create a new GitHub webhook in Inngest
 2. [Copy the webhook URL into your own repository.](https://docs.github.com/en/developers/webhooks-and-events/webhooks/creating-webhooks#setting-up-a-webhook)  Events will automatically flow through to Inngest and be recorded for you to develop with in the future.  We’ll also automatically create types for these events for fast development. ⚡
 3. Run `inngest init` which will guide you through creating new a new serverless function triggered by the `pull_request` GitHub event.
 4. Write the business logic to handle the event, such as creating a new Discord thread (example below!)

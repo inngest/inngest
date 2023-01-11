@@ -130,7 +130,7 @@ The first step is **choosing your event message** to send to your background fun
 }
 ```
 
-To start, we'll send this event in our existing `/api/signup` route defined in the following file. We'll use the [Inngest SDK](https://github.com/inngest/inngest-js) (`npm install inngest`) to send our event with the data captured during signup with an `INNGEST_EVENT_KEY` [that you can create here](/docs/creating-an-event-key?ref=blog-run-nextjs-functions-in-the-background):
+To start, we'll send this event in our existing `/api/signup` route defined in the following file. We'll use the [Inngest SDK](https://github.com/inngest/inngest-js) (`npm install inngest`) to send our event with the data captured during signup with an `INNGEST_EVENT_KEY` [that you can create here](/docs/events/creating-an-event-key?ref=blog-run-nextjs-functions-in-the-background):
 
 ```js twoslash title="/pages/api/signup.js"
 import { Inngest } from "inngest";

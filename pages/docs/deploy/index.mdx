@@ -1,0 +1,76 @@
+# Deploying
+
+Follow along to learn:
+
+- How to deploy to your platform of choice
+- How to register your functions with Inngest after your deploy
+
+
+## Deploying to your platform
+
+Firstly, you need to deploy functions as an API to your platform.  Depending on your platform of choice,
+you'll want to deploy Inngest's serve functionality as a single serverless function available via HTTP.
+
+<Note>
+
+💁 Inngest deploys a single serverless API endpoint that hosts all registered functions
+
+</Note>
+
+## Registering live functions with Inngest
+
+Now that your function API is live, we need to let Inngest know which functions you’ve deployed; which events or schedules cause them to run; and the URL in which they’re hosted.
+
+
+There are several ways you can register your functions with Inngest:
+
+### Registering automatically
+
+Automatically deploy your Inngest functions on each deployment of your site. If your platform isn't listed, you can still register using the methods below!
+
+<ButtonCol>
+<ButtonDeploy href="/docs/deploy/vercel?ref=docs-deploy" type="vercel" label="Learn how to install our official Vercel integration" />
+<ButtonDeploy href="/docs/deploy/vercel?ref=docs-deploy" type="netlify" label="Learn how to install our official Netlify integration" />
+</ButtonCol>
+
+### Registering via the UI
+
+You can add your endpoint’s URL to Inngest via the dashboard:
+
+<video controls autoPlay loop muted>
+  <source
+    src="/assets/docs/sdk-deploy.mp4"
+    type="video/mp4"
+  />
+</video>
+
+
+
+### Registering via the API
+
+You can register your function’s endpoints with a single PUT call to your function endpoint:
+
+```bash
+curl -X PUT https://www.example.com/api/inngest
+```
+
+This can be built in to your CI/CD process so that *after your site has deployed* you make this call to register your functions.  The guides for each platform talk about how to do this in more detail.
+
+If, for some reason, you can’t create a PUT call to your endpoint you can register functions via Inngest’s own API by sending the URL in a PUT request:
+
+```bash
+curl -X PUT --data '{"url":"https://www.example.com/api/inngest"}' https://api.inngest.com/fn/register
+```
+
+<aside>
+
+💁 You'll need to register your functions with Inngest after each deploy.  This can be automated for each platform you deploy to.
+
+</aside>
+
+
+## Next up
+
+This getting started guide has shown you how to write functions, send events to trigger them, deploy them, and register the functions with Inngest.
+
+From here, read our in-depth platform guides to learn how Inngest works for your platform of choice.

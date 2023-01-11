@@ -6,7 +6,7 @@ import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
 import Footer from "src/shared/Footer";
 import Block from "../shared/legacy/Block";
-import Button from "src/shared/Button";
+import { Button } from "src/shared/Button";
 
 const MISSION = "To accelerate the adoption of event-based architecture.";
 
@@ -211,7 +211,7 @@ export default function About() {
                   that want to contribute highly to an early-stage startup
                   focused on solving developer problems.
                 </p>
-                <Button href="/careers?ref=about" arrow>
+                <Button href="/careers?ref=about" arrow="right">
                   View the open roles
                 </Button>
               </aside>

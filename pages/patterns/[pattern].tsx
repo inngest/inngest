@@ -6,9 +6,7 @@ import { MDXRemote } from "next-mdx-remote";
 
 import Nav from "src/shared/legacy/nav";
 import Footer from "src/shared/legacy/Footer";
-import { Heading } from "src/utils/docs";
-
-import { loadMarkdownFile } from "utils/markdown";
+import { loadMarkdownFile, Heading } from "utils/markdown";
 
 import { SECTIONS, Page, Content } from "./index";
 

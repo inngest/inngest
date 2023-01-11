@@ -6,6 +6,7 @@ import { css } from "@emotion/react";
 type Props = {
   onClose: () => void;
   footer?: React.ReactNode;
+  children: React.ReactNode;
 };
 
 const Modal: React.FC<Props> = ({ onClose, children, footer }) => {

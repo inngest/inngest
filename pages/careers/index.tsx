@@ -1,7 +1,7 @@
 import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
 import Footer from "../../shared/Footer";
-import Button from "src/shared/Button";
+import { Button } from "src/shared/Button";
 
 import { loadMarkdownFilesMetadata, MDXFileMetadata } from "utils/markdown";
 
@@ -41,12 +41,12 @@ export default function Careers(props) {
         <Header />
         <Container>
           <article>
-            <main className="m-auto max-w-3xl pt-16">
+            <main className="m-auto max-w-[65ch] pt-16">
               <header className="pt-12 lg:pt-24 max-w-[65ch] m-auto">
                 <h1 className="text-white font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter lg:leading-loose">
                   Careers at Inngest
                 </h1>
-                <Button href="#positions" arrow>
+                <Button href="#positions" arrow="right">
                   Jump to open positions
                 </Button>
               </header>
@@ -176,7 +176,7 @@ export default function Careers(props) {
                 <p className="text-sm lg:text-base">
                   Have any questions about a role?
                 </p>
-                <Button href="mailto:careers@inngest.com" arrow>
+                <Button href="mailto:careers@inngest.com" arrow="right">
                   Email us
                 </Button>
               </aside>

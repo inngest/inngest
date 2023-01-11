@@ -1,0 +1,48 @@
+# Cloudflare Pages
+
+
+Inngest allows you to deploy your event-driven functions to [Cloudflare Pages](https://pages.cloudflare.com/).
+
+## Deploying to Cloudflare Pages
+
+1. [Write your functions](/docs/functions)
+2. [Serve your functions](/docs/frameworks/cloudflare-pages)
+3. [Set environment variables](https://developers.cloudflare.com/pages/get-started/#environment-variables) for your deployment
+  - `NODE_VERSION: 16`
+  - `INNGEST_SIGNING_KEY: ***` - from [your dashboard secrets](https://app.inngest.com/secrets)
+
+##  Registering your functions
+
+Now that your function API is live, we need to let Inngest know which functions you’ve deployed; which events or schedules cause them to run; and the URL in which they’re hosted.
+
+
+There are several ways you can register your functions with Inngest:
+
+### Registering via the UI
+
+You can add your endpoint’s URL to Inngest via the dashboard:
+
+<video controls autoPlay loop muted>
+  <source
+    src="/assets/docs/sdk-deploy.mp4"
+    type="video/mp4"
+  />
+</video>
+
+
+
+### Registering via the API
+
+You can register your function’s endpoints with a single PUT call to your function endpoint:
+
+```bash
+curl -X PUT https://www.example.com/api/inngest
+```
+
+This can be built in to your CI/CD process so that *after your site has deployed* you make this call to register your functions.  The guides for each platform talk about how to do this in more detail.
+
+If, for some reason, you can’t create a PUT call to your endpoint you can register functions via Inngest’s own API by sending the URL in a PUT request:
+
+```bash
+curl -X PUT --data '{"url":"https://www.example.com/api/inngest"}' https://api.inngest.com/fn/register
+```

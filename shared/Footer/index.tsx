@@ -5,7 +5,7 @@ import Twitter from "../Icons/Twitter";
 import Container from "../layout/Container";
 import footerLinks from "./footerLinks";
 import StatusWidget from "../StatusWidget";
-import Button from "../Button";
+import { Button } from "../Button";
 
 export default function Footer() {
   return (
@@ -24,8 +24,8 @@ export default function Footer() {
           </code>
           <Button
             className="mt-4"
-            arrow
-            kind="secondary"
+            arrow="right"
+            variant="secondary"
             href="/sign-up?ref=callout"
           >
             Get started for free
