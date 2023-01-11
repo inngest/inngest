@@ -61,7 +61,9 @@ function MyApp({ Component, pageProps }) {
     };
   }, [router.events]);
 
-  const title = pageProps?.meta?.title || "You Send Events. We Run Your Code.";
+  const title =
+    pageProps?.meta?.title ||
+    "Reliable serverless background functions on any platform";
   const metaTitle = `Inngest - ${title}`;
   const disableMetadata =
     pageProps?.meta?.disabled === true || router.asPath.match(/^\/docs/);
