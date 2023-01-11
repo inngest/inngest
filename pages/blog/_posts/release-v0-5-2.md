@@ -25,6 +25,4 @@ Using `inngest init` is the easiest way to create new serverless functions. You�
 
 ![v0.5.2](/assets/blog/init-0.5.2.gif)
 
-We’re using the new init flags and process in our guide to running [Prisma.js background jobs](https://www.inngest.com/docs/guides/prisma-background-jobs).
-
 Happy building! If you have any questions or feedback feel free to [join us in our discord](/discord) — we’re hacking there!
