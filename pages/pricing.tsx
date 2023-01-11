@@ -8,7 +8,7 @@ import Callout from "../shared/legacy/Callout";
 
 import Block from "../shared/legacy/Block";
 import IconList from "../shared/legacy/IconList";
-import Button from "../shared/Button";
+// import Button from "../shared/Button";
 
 import Workflow from "../shared/Icons/Workflow";
 import Language from "../shared/Icons/Language";
@@ -27,13 +27,9 @@ import PlanCard from "src/shared/Pricing/PlanCard";
 type Plan = {
   name: string;
   cost: string;
-<<<<<<< HEAD
   costTime?: string;
   description: React.ReactFragment | string;
   popular?: boolean;
-=======
-  description: React.ReactElement | string;
->>>>>>> main
   cta: {
     href: string;
     text: string;
