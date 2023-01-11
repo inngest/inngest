@@ -4,8 +4,11 @@ export default function Button({
   children,
   kind = "primary",
   arrow = false,
+  full = false,
   ...props
 }) {
+  const fullWidth = full ? "w-full" : "";
+
   return (
     <a
       href={props.href}
@@ -13,7 +16,7 @@ export default function Button({
         kind === "primary"
           ? `bg-indigo-500  hover:bg-indigo-400`
           : `bg-slate-800  hover:bg-slate-700`,
-        `group inline-flex items-center gap-0.5 rounded-full text-sm font-medium pl-4 pr-4 py-2.5   tracking-tight transition-all text-white ${props.className}`
+        `group inline-flex items-center gap-0.5 rounded-full text-sm font-medium pl-4 pr-4 py-2.5 justify-center tracking-tight transition-all text-white ${props.className} ${fullWidth}`
       )}
     >
       {children}

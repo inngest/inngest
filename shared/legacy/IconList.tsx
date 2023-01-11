@@ -29,9 +29,6 @@ const IconList: React.FC<IconListProps> = ({
     >
       {items.map((item, idx) => (
         <ListItem key={idx}>
-          <IconWrapper circle={circles}>
-            <item.icon size="0.8em" color="#fff" />
-          </IconWrapper>
           <span>
             {item.quantity ? (
               <>
