@@ -1,4 +1,4 @@
-import { createContext, Fragment, useContext } from "react";
+import { createContext, Fragment, useContext, useEffect } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { motion } from "framer-motion";
 import create from "zustand";
@@ -59,6 +59,17 @@ export function MobileNavigation() {
   let isInsideMobileNavigation = useIsInsideMobileNavigation();
   let { isOpen, toggle, close } = useMobileNavigationStore();
   let ToggleIcon = isOpen ? XIcon : MenuIcon;
+
+  // Headless UI doesn't always removing their "portal" dom element,
+  // so we remove it manually if needed
+  useEffect(() => {
+    if (!isInsideMobileNavigation && !isOpen) {
+      const portalRoot = document.getElementById("headlessui-portal-root");
+      if (portalRoot) {
+        portalRoot.remove();
+      }
+    }
+  }, [isInsideMobileNavigation, isOpen]);
 
   return (
     <IsInsideMobileNavigationContext.Provider value={true}>
