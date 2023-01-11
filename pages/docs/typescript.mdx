@@ -82,7 +82,7 @@ const inngest = new Inngest<
 >({ name: "My App" });
 ```
 
-TypeScript will also enforce your custom events being the right shape - see [Event Format](/docs/event-format-and-structure) for more details.
+TypeScript will also enforce your custom events being the right shape - see [Event Format](/docs/events/event-format-and-structure) for more details.
 
 By design, these custom types are silently overidden as the events pass through Inngest and become generated types. This helps to ensure you're accounting for the _actual_ data found in the payloads as opposed to what you _hope_ is present when you first define the type.
 

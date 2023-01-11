@@ -201,7 +201,7 @@ export const navigation = [
     title: "Introduction",
     links: [
       { title: "Overview", href: `${baseDir}` },
-      { title: "Quick Start Tutorial", href: `${baseDir}/quickstart` },
+      { title: "Quick Start Tutorial", href: `${baseDir}/quick-start` },
       { title: "Using TypeScript", href: `${baseDir}/typescript` },
     ],
   },

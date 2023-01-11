@@ -48,7 +48,7 @@ app.post("/api/connectSource", async (req, res) => {
 });
 ```
 
-Functions are defined by declaring which event(s) should trigger it. When matching events are received, all corresponding functions run in the background automatically.  Any returned value is logged and any error thrown will inform Inngest to [retry to the function](/docs/reference/functions/retries?ref=patterns).
+Functions are defined by declaring which event(s) should trigger it. When matching events are received, all corresponding functions run in the background automatically.  Any returned value is logged and any error thrown will inform Inngest to [retry to the function](/docs/functions/retries?ref=patterns).
 
 ```js
 import { createFunction } from "inngest";

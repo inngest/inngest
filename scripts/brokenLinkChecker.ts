@@ -10,6 +10,7 @@ const options = {
     "https://www.iubenda.com",
     "https://stripe.com/docs/api",
     "https://docs.github.com",
+    "https://docs.retool.com",
   ],
 };
 
