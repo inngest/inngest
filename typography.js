@@ -207,6 +207,9 @@ module.exports = ({ theme }) => ({
         marginTop: theme("spacing.8"),
         marginBottom: theme("spacing.8"),
       },
+      video: {
+        maxWidth: "100%",
+      },
       "figure > *": {
         marginTop: "0",
         marginBottom: "0",
