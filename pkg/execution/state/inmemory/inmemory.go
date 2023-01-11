@@ -307,6 +307,11 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 			typ = enums.HistoryTypeStepFailed
 		}
 
+		data := map[string]any{
+			"error":  r.Err.Error(),
+			"output": r.Output,
+		}
+
 		m.setHistory(ctx, i, state.History{
 			ID:         state.HistoryID(),
 			Type:       typ,
@@ -315,7 +320,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 			Data: state.HistoryStep{
 				ID:      r.Step.ID,
 				Name:    r.Step.Name,
-				Data:    r.Err.Error(),
+				Data:    data,
 				Attempt: attempt,
 			},
 		})

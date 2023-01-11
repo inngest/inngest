@@ -3,7 +3,6 @@ package redis_state
 import (
 	"context"
 	"embed"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"regexp"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config/registration"
@@ -440,7 +440,10 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		}
 	} else {
 		typ = enums.HistoryTypeStepErrored
-		data = r.Err.Error()
+		data = output(map[string]any{
+			"error":  r.Err.Error(),
+			"output": r.Output,
+		})
 		if r.Final() {
 			typ = enums.HistoryTypeStepFailed
 			funcFailHistory = state.History{
@@ -923,4 +926,12 @@ func (r runMetadata) Metadata() state.Metadata {
 		m.OriginalRunID = &id
 	}
 	return m
+}
+
+// output is a map which implements BinaryMarshaller, for inserting data within
+// history items.
+type output map[string]any
+
+func (o output) MarshalBinary() ([]byte, error) {
+	return json.Marshal(o)
 }
