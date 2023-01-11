@@ -5,7 +5,6 @@ import rehypeAutolinkHeadings from "rehype-autolink-headings";
 
 import { rehypeParseCodeBlocks } from "src/mdx/rehype.mjs";
 import { rehypeRemoveTwoSlashMarkup, rehypeShiki } from "src/utils/code";
-import { getHeadingsAsArray, Heading } from "src/utils/docs";
 
 export type MDXFileMetadata = {
   slug: string;
@@ -106,3 +105,53 @@ export async function loadMarkdownFile<T>(
     ...serializedContent,
   };
 }
+
+// Backcompat with the above way of loading and rendering markdown
+// This can be removed when everything is ported to the new @next/mdx setup like /docs
+export type Heading = {
+  order: number;
+  title: string;
+  slug: string;
+  subheadings: [{ title: string; slug: string }];
+};
+
+export type Headings = {
+  [title: string]: Heading;
+};
+
+export const getHeadings = (content: string): Headings => {
+  // Get headers for table of contents.
+  const headings = {};
+  let h2 = null; // store the current heading we're in
+  let order = 0;
+
+  (content.match(/^###? (.*)/gm) || []).forEach((heading) => {
+    const title = heading.replace(/^###? /, "");
+    if (heading.indexOf("## ") === 0) {
+      h2 = title;
+      headings[title] = { title, slug: toSlug(title), subheadings: [], order };
+      order++;
+      return;
+    }
+    // add this subheading to the current heading list.
+    (headings[h2]?.subheadings || []).push({ title, slug: toSlug(title) });
+  });
+  return headings;
+};
+
+export const getHeadingsAsArray = (content: string): Heading[] => {
+  const headingsObj = getHeadings(content);
+  return Object.keys(headingsObj)
+    .map((key) => headingsObj[key])
+    .sort((a, b) => a.order - b.order);
+};
+
+const toSlug = (s: string) => {
+  s = s.replace(/[^a-zA-Z0-9 :]/g, "");
+  // rehype's `rehypeSlug` plugin converts "foo: one"  to "foo--one", and doesn't
+  // remove multple slashes.  It does convert multiple spaces to just one slash.
+  s = s.replace(/ +/g, "-");
+  s = s.replace(/[:&]/g, "-");
+  s = s.replace(/--/g, "-");
+  return s.toLowerCase();
+};

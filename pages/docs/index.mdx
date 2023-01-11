@@ -1,14 +1,14 @@
-import { Guides } from 'src/shared/NewDocs/Guides'
-import { Resources } from 'src/shared/NewDocs/Resources'
-import { HeroPattern } from 'src/shared/NewDocs/HeroPattern'
+import { Guides } from 'src/shared/Docs/Guides'
+import { Resources } from 'src/shared/Docs/Resources'
+import { HeroPattern } from 'src/shared/Docs/HeroPattern'
 
 export const description =
   'Learn everything there is to know about the Protocol API and integrate Protocol into your product.'
 
-export const sections = [
-  { title: 'Guides', id: 'guides' },
+{/*export const sections = [
+   { title: 'Guides', id: 'guides' },
   { title: 'Resources', id: 'resources' },
-]
+]*/}
 
 # Welcome to Inngest
 
@@ -16,9 +16,11 @@ Inngest is an open source platform that adds superpowers to serverless functions
 
 Using our SDK, a single line of code adds retries, queues, sleeps, cron schedules, fan-out jobs, and reliable steps to serverless functions in your existing projects. It's deployable to any platform, without any infrastructure or configuration. And, everything is locally testable via our UI.
 
+Learn how to get started:
+
 <div className="not-prose mb-16 mt-6 flex gap-3">
-  <Button size="sm" href="/quickstart" arrow="right">Quickstart</Button>
-  <Button size="sm" href="/sdks" variant="secondary">Second Action</Button>
+  <Button size="sm" href="/quick-start" arrow="right">Quick start tutorial</Button>
+  {/* <Button size="sm" href="/sdks" variant="secondary">Second Action</Button> */}
 </div>
 
 ## A small but powerful example {{ anchor: false }}

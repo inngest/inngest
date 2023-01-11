@@ -195,7 +195,7 @@ function NavigationGroup({ group, className }) {
   );
 }
 
-const baseDir = "/new-docs";
+const baseDir = "/docs";
 export const navigation = [
   {
     title: "Introduction",

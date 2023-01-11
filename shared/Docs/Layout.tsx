@@ -4,7 +4,7 @@ import { Router } from "next/router";
 import { MDXProvider } from "@mdx-js/react";
 import { motion } from "framer-motion";
 
-import * as mdxComponents from "src/shared/NewDocs/mdx";
+import * as mdxComponents from "src/shared/Docs/mdx";
 import { Footer } from "./Footer";
 import { Header } from "./Header";
 import Logo from "../Icons/Logo";
@@ -52,7 +52,7 @@ export function Layout({ children, sections = [], title }) {
             >
               <div className="hidden lg:flex">
                 <a
-                  href="/new-docs"
+                  href="/docs"
                   className="flex gap-1.5 group/logo items-center"
                 >
                   <Logo className="w-20 text-indigo-500 dark:text-white" />

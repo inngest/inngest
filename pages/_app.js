@@ -9,7 +9,7 @@ import { useAnonId } from "../shared/legacy/trackingHooks";
 import "../styles/globals.css";
 import * as fullstory from "@fullstory/browser";
 
-import { Layout as DocsLayout } from "../shared/NewDocs/Layout";
+import { Layout as DocsLayout } from "../shared/Docs/Layout";
 
 import PageBanner from "../shared/legacy/PageBanner";
 
@@ -32,8 +32,8 @@ function MyApp({ Component, pageProps }) {
   const { anonId, existing } = useAnonId();
 
   // Temp Layout swapping before we move to "app" dir
-  const isNewDocs = !!router.asPath.match(/^\/new-docs/);
-  const Layout = isNewDocs ? DocsLayout : DefaultLayout;
+  const isDocs = !!router.asPath.match(/^\/docs/);
+  const Layout = isDocs ? DocsLayout : DefaultLayout;
 
   useEffect(() => {
     fullstory.init({ orgId: "o-1CVB8R-na1" });
@@ -44,7 +44,7 @@ function MyApp({ Component, pageProps }) {
     }
     if (pageProps.designVersion) {
       htmlEl.classList.add(`v${pageProps.designVersion}`);
-    } else if (isNewDocs) {
+    } else if (isDocs) {
       htmlEl.classList.add(`v2`);
     } else {
       htmlEl.classList.add(`v1`);
@@ -63,9 +63,11 @@ function MyApp({ Component, pageProps }) {
 
   const title = pageProps?.meta?.title || "You Send Events. We Run Your Code.";
   const metaTitle = `Inngest - ${title}`;
+  const disableMetadata =
+    pageProps?.meta?.disabled === true || router.asPath.match(/^\/docs/);
   // Warn during local dev
   if (
-    !pageProps.disabled &&
+    !disableMetadata &&
     !pageProps?.meta?.title &&
     process.env.NODE_ENV !== "production"
   ) {
@@ -82,9 +84,6 @@ function MyApp({ Component, pageProps }) {
       );
     }
   }
-  const disableMetadata =
-    pageProps?.meta?.disabled === true ||
-    router.asPath.match(/^\/docs|\/new-docs/);
 
   const canonicalUrl = `https://www.inngest.com${
     router.asPath === "/" ? "" : router.asPath
