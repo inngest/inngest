@@ -41,7 +41,7 @@ export function Layout({ children, sections = [] }) {
                   className="flex gap-1.5 group/logo items-center"
                 >
                   <Logo className="w-20 text-indigo-500 dark:text-white" />
-                  <span className="text-slate-700 dark:text-indigo-400 text-base group-hover/logo:text-white transition-color font-semibold">
+                  <span className="mb-0.5 text-slate-700 dark:text-indigo-400 text-base group-hover/logo:text-slate-500 dark:group-hover/logo:text-white transition-color font-semibold">
                     Docs
                   </span>
                 </a>
