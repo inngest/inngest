@@ -181,7 +181,7 @@ export function Footer() {
 
   return (
     <footer className="mx-auto max-w-2xl space-y-10 pb-16 lg:max-w-5xl">
-      <Feedback key={router.pathname} />
+      {/* <Feedback key={router.pathname} /> */}
       <PageNavigation />
       <SmallPrint />
     </footer>
