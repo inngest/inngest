@@ -202,23 +202,24 @@ export const navigation = [
     links: [
       { title: "Overview", href: `${baseDir}` },
       { title: "Quick Start Tutorial", href: `${baseDir}/quick-start` },
-      { title: "Using TypeScript", href: `${baseDir}/typescript` },
     ],
   },
   {
-    title: "Functions",
+    title: "Using the SDK",
     links: [
       { title: "Writing Functions", href: `${baseDir}/functions` },
-      {
-        title: "Testing Functions",
-        href: `${baseDir}/functions/testing-functions`,
-      },
+      { title: "Sending Events", href: `${baseDir}/events` },
       {
         title: "Multi-step Functions",
         href: `${baseDir}/functions/multi-step`,
       },
       {
-        title: "Retries and Failures",
+        title: "Local Development",
+        href: `${baseDir}/functions/testing-functions`,
+      },
+      { title: "Using TypeScript", href: `${baseDir}/typescript` },
+      {
+        title: "Handling Errors & Retries",
         href: `${baseDir}/functions/retries`,
       },
     ],
@@ -226,7 +227,6 @@ export const navigation = [
   {
     title: "Events",
     links: [
-      { title: "Sending Events", href: `${baseDir}/events` },
       {
         title: "Event Format",
         href: `${baseDir}/events/event-format-and-structure`,
@@ -235,15 +235,6 @@ export const navigation = [
         title: "Creating an Event Key",
         href: `${baseDir}/events/creating-an-event-key`,
       },
-    ],
-  },
-  {
-    title: "Deploying",
-    links: [
-      { title: "How to Deploy", href: `${baseDir}/deploy` },
-      { title: "Vercel", href: `${baseDir}/deploy/vercel` },
-      { title: "Netlify", href: `${baseDir}/deploy/netlify` },
-      { title: "Cloudflare Pages", href: `${baseDir}/deploy/cloudflare` },
     ],
   },
   {
@@ -257,6 +248,15 @@ export const navigation = [
         href: `${baseDir}/frameworks/cloudflare-pages`,
       },
       { title: "RedwoodJS", href: `${baseDir}/frameworks/redwoodjs` },
+    ],
+  },
+  {
+    title: "Deploying",
+    links: [
+      { title: "How to Deploy", href: `${baseDir}/deploy` },
+      { title: "Vercel", href: `${baseDir}/deploy/vercel` },
+      { title: "Netlify", href: `${baseDir}/deploy/netlify` },
+      { title: "Cloudflare Pages", href: `${baseDir}/deploy/cloudflare` },
     ],
   },
   {
