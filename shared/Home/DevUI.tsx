@@ -46,7 +46,7 @@ export default function DevUI() {
                     </div>
                   </div>
                   <a
-                    href="/docs/functions?ref=homepage-dev-tools"
+                    href="/docs/quick-start?ref=homepage-dev-tools"
                     className="group flex items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2  bg-indigo-500 hover:bg-indigo-400 transition-all text-white"
                   >
                     Learn more

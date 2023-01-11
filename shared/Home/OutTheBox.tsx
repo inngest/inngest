@@ -24,7 +24,7 @@ export default function OutTheBox() {
               trigger one or multiple functions.
             </p>
             <a
-              href="/docs/functions?ref=homepage-everything-you-need"
+              href="/docs/quick-start?ref=homepage-everything-you-need"
               className="group inline-flex mt-4 items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2  bg-slate-800 hover:bg-slate-700 transition-all text-white"
             >
               Learn more
