@@ -49,7 +49,7 @@ const PLANS: Plan[] = [
     name: "Hobby",
     cost: "$0",
     costTime: "/month",
-    description: <>Get to market fast</>,
+    description: "Get to market fast",
     cta: {
       href: "/sign-up?ref=pricing-hobby",
       text: "Start building",
@@ -88,7 +88,7 @@ const PLANS: Plan[] = [
     name: "Team",
     cost: "$20",
     costTime: "/month",
-    description: <>More room to grow</>,
+    description: "More room to grow",
     popular: true,
     cta: {
       href: "/sign-up?ref=pricing-team",
@@ -127,7 +127,7 @@ const PLANS: Plan[] = [
   {
     name: "Enterprise",
     cost: "Flexible",
-    description: <>Powerful access for any scale</>,
+    description: "Powerful access for any scale",
     cta: {
       href: "/contact?ref=pricing-advanced",
       text: "Get in touch",
