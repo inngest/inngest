@@ -12,6 +12,7 @@ import { Navigation } from "./Navigation";
 import { Prose } from "./Prose";
 import { SectionProvider } from "./SectionProvider";
 import { useMobileNavigationStore } from "./MobileNavigation";
+import { getOpenGraphImageURL } from "../../utils/social";
 
 // Unsure if this should be here or in the _app and conditionally run only on docs
 function onRouteChange() {
@@ -22,11 +23,25 @@ Router.events.on("hashChangeStart", onRouteChange);
 Router.events.on("routeChangeComplete", onRouteChange);
 Router.events.on("routeChangeError", onRouteChange);
 
-export function Layout({ children, sections = [] }) {
+export function Layout({ children, sections = [], title }) {
+  const metaTitle = `${title} - Inngest Documentation`;
+  const metaDescription = `Inngest documentation for ${title}`;
+  const metaImage = getOpenGraphImageURL({ title });
+
   return (
     <div className="dark:bg-slate-1000">
       <MDXProvider components={mdxComponents}>
         <Head>
+          <title>{metaTitle}</title>
+          <meta name="description" content={metaDescription}></meta>
+          <meta property="og:title" content={metaTitle} />
+          <meta property="og:description" content={metaDescription} />
+          <meta property="og:type" content="article" />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:site" content="@inngest" />
+          <meta name="twitter:title" content={metaTitle} />
+          <meta name="twitter:image" content={metaImage} />
+
           <script dangerouslySetInnerHTML={{ __html: modeScript }} />
         </Head>
         <SectionProvider sections={sections}>

@@ -82,7 +82,9 @@ function MyApp({ Component, pageProps }) {
       );
     }
   }
-  const disableMetadata = pageProps?.meta?.disabled === true;
+  const disableMetadata =
+    pageProps?.meta?.disabled === true ||
+    router.asPath.match(/^\/docs|\/new-docs/);
 
   const canonicalUrl = `https://www.inngest.com${
     router.asPath === "/" ? "" : router.asPath
@@ -93,6 +95,9 @@ function MyApp({ Component, pageProps }) {
   return (
     <>
       <Head>
+        {/* Set this for all pages */}
+        <meta property="og:url" content={canonicalUrl} />
+
         {/* Sections of the site like the blog and docs set these using different data */}
         {!disableMetadata && (
           <>
@@ -110,7 +115,6 @@ function MyApp({ Component, pageProps }) {
               </>
             )}
             <meta property="og:image" content={ogImage} />
-            <meta property="og:url" content={canonicalUrl} />
             <meta property="og:title" content={metaTitle} />
             <meta name="twitter:card" content="summary_large_image" />
             <meta name="twitter:site" content="@inngest" />
