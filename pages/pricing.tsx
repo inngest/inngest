@@ -66,6 +66,14 @@ const FEATURES: Feature[] = [
     },
   },
   {
+    name: "Concurrent Functions",
+    plans: {
+      Hobby: "1",
+      Team: "100",
+      Enterprise: "Custom",
+    },
+  },
+  {
     name: "Automatic Retries",
     plans: {
       Hobby: true,
@@ -140,6 +148,10 @@ const PLANS: Plan[] = [
       },
       {
         quantity: "1",
+        text: "Concurrent Function",
+      },
+      {
+        quantity: "1",
         text: "Seat",
       },
       {
@@ -179,6 +191,10 @@ const PLANS: Plan[] = [
         text: "Function runs/month",
       },
       {
+        quantity: "100",
+        text: "Concurrent Functions",
+      },
+      {
         quantity: "20",
         text: "Seats",
       },
@@ -215,6 +231,10 @@ const PLANS: Plan[] = [
       {
         quantity: "10m+",
         text: "Function runs/month",
+      },
+      {
+        quantity: "Custom",
+        text: "Concurrent Functions",
       },
       {
         quantity: "20+",
@@ -334,21 +354,6 @@ export default function Pricing() {
                 </p>
               </FAQRow>
 
-              <FAQRow question={`What's a "function run"?`}>
-                <p>
-                  A function run a single function step that runs as part of a
-                  function. A step is any part of your function that uses our
-                  SDKs available tools, like tools.run or tools.sleep. Read more
-                  about steps{" "}
-                  <a
-                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
-                    href="/docs/functions/multi-step"
-                  >
-                    here
-                  </a>
-                  .
-                </p>
-              </FAQRow>
               <FAQRow question={`What's a function "step"?`}>
                 <p>
                   Inngest functions can be broken down into separate parts, or
@@ -385,11 +390,47 @@ export default function Pricing() {
                 </p>
               </FAQRow>
 
+              <FAQRow question={`What's a "function run"?`}>
+                <p>
+                  A function run is a single function step that runs as part of
+                  a function. A step is any part of your function that uses our
+                  SDKs available tools, like{" "}
+                  <code className="bg-slate-800 text-slate-200">tools.run</code>{" "}
+                  or{" "}
+                  <code className="bg-slate-800 text-slate-200">
+                    tools.sleep
+                  </code>
+                  . Read more about steps{" "}
+                  <a
+                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
+                    href="/docs/functions/multi-step"
+                  >
+                    here
+                  </a>
+                  .
+                </p>
+              </FAQRow>
+
               <FAQRow question={`How are my functions run?`}>
                 <p>
                   Your functions are hosted in your existing application on{" "}
                   <span className="italic">any platform</span>. We’ll call your
                   functions securely via HTTP request on-demand.
+                </p>
+              </FAQRow>
+              <FAQRow question={`What are concurrency limits?`}>
+                <p>
+                  As Inngest runs your function any time an event is received,
+                  you may have any number of events received within a short
+                  period of time (e.g. 10ms). Inngest can run all of these
+                  functions concurrently (in parallel). Our Hobby plan only
+                  allows one function to run at a time. Our paid plans offer
+                  substantial concurrency to enable you to parallelize workloads
+                  and keep your system efficient and performant.
+                </p>
+                <p>
+                  Sleeps and other pauses do not count towards your concurrency
+                  limit as your function isn't running while waiting.
                 </p>
               </FAQRow>
               <FAQRow question={`Can I get a demo of the product?`}>
