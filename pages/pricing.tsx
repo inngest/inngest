@@ -44,8 +44,8 @@ const FEATURES: Feature[] = [
   {
     name: "Events",
     plans: {
-      Hobby: "50",
-      Team: "100",
+      Hobby: "unlimited",
+      Team: "unlimited",
       Enterprise: "Unlimited",
     },
   },
@@ -157,7 +157,7 @@ const PLANS: Plan[] = [
   },
   {
     name: "Team",
-    cost: "$20*",
+    cost: "From $20*",
     costTime: "/month",
     description: "From Startup to scale-up",
     popular: true,
@@ -279,7 +279,7 @@ export default function Pricing() {
           <p className="text-slate-200 text-sm text-center">
             *Team plan starts at $20/month for 100,000 function runs.
             <br />
-            Additional runs are available to purchase for $20 per 100,000.
+            Additional runs are available to purchase for $10 per 100,000.
           </p>
 
           <ComparisonTable plans={PLANS} features={FEATURES} />
