@@ -1,33 +1,53 @@
 import classNames from "src/utils/classNames";
 import { Button } from "../Button";
 
-export default function PlanCard({ type = "light", content }) {
+export default function PlanCard({ variant = "light", content }) {
+  const theme = {
+    light: {
+      cardBG: "bg-slate-100 last:bg-white",
+      price: "text-indigo-500",
+      row: "odd:bg-slate-400/10",
+      primary: "text-slate-800",
+      secondary: "text-slate-600",
+      description: "text-slate-600",
+    },
+    dark: {
+      cardBG: "bg-slate-900/90",
+      price: "text-indigo-400",
+      row: "odd:bg-slate-400/10",
+      primary: "text-white",
+      secondary: "text-slate-400",
+      description: "text-slate-200",
+    },
+  };
+
   return (
     <div
-      className={classNames(
-        type === "dark"
-          ? `bg-slate-900 text-slate-100`
-          : `bg-slate-200 last:bg-white`,
-        `w-full first:rounded-l-lg last:rounded-r-lg flex flex-col justify-between text-center `
-      )}
+      className={`w-full rounded-lg md:rounded-l-none md:rounded-r-none md:first:rounded-l-lg md:last:rounded-r-lg flex flex-col justify-between text-center ${theme[variant].cardBG}`}
     >
       <div className="pt-8">
         {content.popular && (
-          <div className="-mt-10 mb-2.5 block">
-            <div className=" bg-indigo-500 inline-block rounded-full text-white text-sm font-semibold tracking-tight leading-none py-2 px-4">
+          <div className="-mt-11 mb-3.5 block">
+            <div className=" bg-indigo-500 inline-block shadow-lg rounded-full text-white text-sm font-semibold tracking-tight leading-none py-2 px-4">
               Most Popular
             </div>
           </div>
         )}
-        <h2 className="text-lg font-semibold">{content.name}</h2>
-        <p className="text-3xl mt-2 font-bold tracking-tight text-indigo-500">
+        <h2 className={`text-lg font-semibold ${theme[variant].primary}`}>
+          {content.name}
+        </h2>
+        <p
+          className={`text-3xl mt-2 -mr-4 font-bold tracking-tight text-indigo-500 ${theme[variant].price}`}
+        >
           {content.cost}
+          <span
+            className={`text-sm font-medium ml-0.5 ${theme[variant].secondary}`}
+          >
+            /mo
+          </span>
         </p>
         <p
-          className={classNames(
-            type === "dark" ? `text-slate-200` : `text-slate-600`,
-            `text-sm mt-2 font-medium`
-          )}
+          className={`text-sm mt-2 font-medium  ${theme[variant].description}`}
         >
           {content.description}
         </p>
@@ -36,25 +56,22 @@ export default function PlanCard({ type = "light", content }) {
             <li
               key={i}
               className={classNames(
-                type === "dark" ? `odd:bg-slate-600/10` : `odd:bg-slate-400/10`,
+                variant === "dark"
+                  ? `odd:bg-slate-600/10`
+                  : `odd:bg-slate-400/10`,
                 `flex flex-col py-2.5 `
               )}
             >
               {feature.quantity && (
-                <span
-                  className={classNames(
-                    type == "dark" ? `text-slate-200` : `text-slate-800`,
-                    `font-semibold`
-                  )}
-                >
+                <span className={`font-semibold ${theme[variant].primary}`}>
                   {feature.quantity}
                 </span>
               )}
               <span
                 className={classNames(
                   feature.quantity
-                    ? `font-medium text-sm text-slate-500`
-                    : `font-semibold mt-2 text-slate-800`,
+                    ? `font-medium text-sm ${theme[variant].secondary}`
+                    : `font-semibold mt-2 ${theme[variant].primary}`,
                   `  tracking-tight`
                 )}
               >
