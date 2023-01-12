@@ -1,36 +1,22 @@
-import { useEffect } from "react";
-import styled from "@emotion/styled";
-import Head from "next/head";
-import Footer from "../shared/legacy/Footer";
-import Nav from "../shared/legacy/nav";
-import Content from "../shared/legacy/content";
-import Callout from "../shared/legacy/Callout";
-
-import Block from "../shared/legacy/Block";
-import IconList from "../shared/legacy/IconList";
-import Button from "../shared/legacy/Button";
-
-import Workflow from "../shared/Icons/Workflow";
-import Language from "../shared/Icons/Language";
-import ArrowCaretCircleRight from "../shared/Icons/ArrowCaretCircleRight";
-import Plus from "../shared/Icons/Plus";
-import ListCheck from "../shared/Icons/ListCheck";
-import UserVoice from "../shared/Icons/UserVoice";
-
-import Functions from "../shared/Icons/Play";
-import UsersGroup from "../shared/Icons/UsersGroup";
+import Footer from "../shared/Footer";
+import Header from "src/shared/Header";
+import Container from "src/shared/layout/Container";
+import { FAQRow } from "src/shared/Pricing/FAQ";
+import PlanCard from "src/shared/Pricing/PlanCard";
+import ComparisonTable from "src/shared/Pricing/ComparisionTable";
 
 type Plan = {
   name: string;
   cost: string;
-  description: React.ReactElement | string;
+  costTime?: string;
+  description: React.ReactFragment | string;
+  popular?: boolean;
   cta: {
     href: string;
     text: string;
   };
   features: {
-    icon: React.FC<any>;
-    quantity: string;
+    quantity?: string;
     text: string;
   }[];
   resources: {
@@ -39,75 +25,141 @@ type Plan = {
   };
 };
 
-const PLANS: Plan[] = [
+type Feature = {
+  name: string;
+  plans: {
+    [key: string]: string | boolean;
+  };
+};
+
+const FEATURES: Feature[] = [
   {
-    name: "Community",
-    cost: "free",
-    description: (
-      <>
-        Powerful enough to be useful, and <strong>always free</strong>. Perfect
-        for getting started.
-      </>
-    ),
-    cta: {
-      href: "/sign-up?ref=pricing-free",
-      text: "Sign up for free →",
-    },
-    features: [
-      {
-        icon: ArrowCaretCircleRight,
-        quantity: "3",
-        text: "functions",
-      },
-      {
-        icon: Language,
-        quantity: "10,000",
-        text: "function runs/month",
-      },
-      {
-        icon: UsersGroup,
-        quantity: "3",
-        text: "seats",
-      },
-      {
-        icon: ListCheck,
-        quantity: "1 week",
-        text: "log retention",
-      },
-    ],
-    resources: {
-      ram: "256mb",
-      maxRuntime: "15 min",
+    name: "Functions",
+    plans: {
+      Hobby: "50",
+      Team: "100",
+      Enterprise: "Unlimited",
     },
   },
   {
-    name: "Startup",
-    cost: "$50/mo",
-    description: <>Get to market fast.</>,
+    name: "Events",
+    plans: {
+      Hobby: "Unlimited",
+      Team: "Unlimited",
+      Enterprise: "Unlimited",
+    },
+  },
+  {
+    name: "Function runs/month",
+    plans: {
+      Hobby: "50K",
+      Team: "100K - 1M",
+      Enterprise: "Unlimited",
+    },
+  },
+  {
+    name: "Seats",
+    plans: {
+      Hobby: "1",
+      Team: "20",
+      Enterprise: "20+",
+    },
+  },
+  {
+    name: "Concurrent Functions",
+    plans: {
+      Hobby: "1",
+      Team: "100",
+      Enterprise: "Custom",
+    },
+  },
+  {
+    name: "Automatic Retries",
+    plans: {
+      Hobby: true,
+      Team: true,
+      Enterprise: true,
+    },
+  },
+  {
+    name: "Step Functions",
+    plans: {
+      Hobby: true,
+      Team: true,
+      Enterprise: true,
+    },
+  },
+  {
+    name: "Scheduled Functions",
+    plans: {
+      Hobby: true,
+      Team: true,
+      Enterprise: true,
+    },
+  },
+  {
+    name: "Local Dev Server",
+    plans: {
+      Hobby: true,
+      Team: true,
+      Enterprise: true,
+    },
+  },
+  {
+    name: "Event Coordination",
+    plans: {
+      Hobby: true,
+      Team: true,
+      Enterprise: true,
+    },
+  },
+  {
+    name: "Versioning",
+    plans: {
+      Hobby: true,
+      Team: true,
+      Enterprise: true,
+    },
+  },
+];
+
+const PLANS: Plan[] = [
+  {
+    name: "Hobby",
+    cost: "$0",
+    costTime: "/month",
+    description: "Bring your project to life",
     cta: {
-      href: "/sign-up?ref=pricing-startup",
-      text: "Start building →",
+      href: "/sign-up?ref=pricing-hobby",
+      text: "Start building",
     },
     features: [
       {
-        icon: ArrowCaretCircleRight,
-        quantity: "25",
-        text: "functions",
+        quantity: "50",
+        text: "Functions",
       },
       {
-        icon: Language,
-        quantity: "25,000",
-        text: "function runs/month",
+        quantity: "Unlimited",
+        text: "Events",
       },
       {
-        icon: UsersGroup,
-        quantity: "5",
-        text: "seats",
+        quantity: "50k",
+        text: "Function runs/month",
       },
       {
-        icon: ListCheck,
-        quantity: "1 month",
-        text: "log retention",
+        quantity: "1",
+        text: "Concurrent Function",
+      },
+      {
+        quantity: "1",
+        text: "Seat",
+      },
+      {
+        quantity: "1 day",
+        text: "History",
+      },
+      {
+        text: "Discord support",
       },
     ],
     resources: {
@@ -117,37 +169,41 @@ const PLANS: Plan[] = [
   },
   {
     name: "Team",
-    cost: "$200/mo",
-    description: <>More room to grow.</>,
+    cost: "From $20*",
+    costTime: "/month",
+    description: "From Startup to scale-up",
+    popular: true,
     cta: {
       href: "/sign-up?ref=pricing-team",
-      text: "Start building →",
+      text: "Start building",
     },
     features: [
       {
-        icon: ArrowCaretCircleRight,
         quantity: "100",
-        text: "functions",
+        text: "Functions",
       },
       {
-        icon: Language,
-        quantity: "100,000",
-        text: "function runs/month",
+        quantity: "Unlimited",
+        text: "Events",
       },
       {
-        icon: UsersGroup,
+        quantity: "100k - 10m",
+        text: "Function runs/month",
+      },
+      {
+        quantity: "100",
+        text: "Concurrent Functions",
+      },
+      {
         quantity: "20",
-        text: "seats",
+        text: "Seats",
       },
       {
-        icon: ListCheck,
-        quantity: "3 month",
-        text: "log retention",
+        quantity: "7 days",
+        text: "History",
       },
       {
-        icon: UserVoice,
-        quantity: "Dedicated",
-        text: "support",
+        text: "Email support",
       },
     ],
     resources: {
@@ -156,43 +212,40 @@ const PLANS: Plan[] = [
     },
   },
   {
-    name: "Custom",
-    cost: "Flexible pricing",
-    description: <>Powerful access for any scale.</>,
+    name: "Enterprise",
+    cost: "Flexible",
+    description: "Powerful access for any scale",
     cta: {
       href: "/contact?ref=pricing-advanced",
       text: "Get in touch",
     },
     features: [
       {
-        icon: ArrowCaretCircleRight,
+        quantity: "Unlimited",
+        text: "Functions",
+      },
+      {
+        quantity: "Unlimited",
+        text: "Events",
+      },
+      {
+        quantity: "10m+",
+        text: "Function runs/month",
+      },
+      {
         quantity: "Custom",
-        text: "functions",
+        text: "Concurrent Functions",
       },
       {
-        icon: Language,
-        quantity: "Millions",
-        text: "of function runs/month",
+        quantity: "20+",
+        text: "Seats",
       },
       {
-        icon: UsersGroup,
-        quantity: "Custom",
-        text: "seats",
+        quantity: "90 Days",
+        text: "History",
       },
       {
-        icon: ListCheck,
-        quantity: "6+ month",
-        text: "log retention",
-      },
-      {
-        icon: ListCheck,
-        quantity: "6+ month",
-        text: "log retention",
-      },
-      {
-        icon: UserVoice,
-        quantity: "Dedicated",
-        text: "support",
+        text: "Email support",
       },
     ],
     resources: {
@@ -205,6 +258,7 @@ const PLANS: Plan[] = [
 export async function getStaticProps() {
   return {
     props: {
+      designVersion: "2",
       meta: {
         title: "Pricing",
         description: "Simple pricing. Powerful functionality.",
@@ -214,376 +268,264 @@ export async function getStaticProps() {
 }
 
 export default function Pricing() {
-  const toggleFAQ = (e) => {
-    e.currentTarget.classList.toggle("active");
-  };
-
   return (
-    <>
-      <Nav />
+    <div className="bg-slate-1000 font-sans">
+      <Header />
 
-      <Hero>
-        <h1 className="text-3xl lg:text-5xl">
-          Simple pricing.
-          <br />
-          Powerful functionality.
-        </h1>
-      </Hero>
-
-      <Content>
-        <Grid>
-          <FreePlanBlock visibleOn="desktop" color="primary">
-            <PlanHeader flexDirection="row">
-              <div>
-                <h3>{PLANS[0].name}</h3>
-                <p>{PLANS[0].description}</p>
-              </div>
-              <div>
-                <Button kind="outline" href={PLANS[0].cta.href}>
-                  {PLANS[0].cta.text}
-                </Button>
-              </div>
-            </PlanHeader>
-            <IconList items={PLANS[0].features} />
-          </FreePlanBlock>
-          <FreePlanBlock visibleOn="mobile" color="primary">
-            <PlanHeader flexDirection="column">
-              <div>
-                <h3>{PLANS[0].name}</h3>
-                <p>{PLANS[0].description}</p>
-              </div>
-            </PlanHeader>
-            <IconList direction="vertical" items={PLANS[0].features} />
-            <Button kind="outline" href={PLANS[0].cta.href}>
-              {PLANS[0].cta.text}
-            </Button>
-          </FreePlanBlock>
-
-          {PLANS.slice(1).map((plan, idx) => (
-            <PlanBlock key={plan.name}>
-              <PlanHeader flexDirection="column">
-                <div>
-                  <h3>{plan.name}</h3>
-                  <p>{plan.description}</p>
-                  <p className="cost">{plan.cost}</p>
-                </div>
-              </PlanHeader>
-              <IconList direction="vertical" items={plan.features} />
-              <Button kind="outline" href={plan.cta.href}>
-                {plan.cta.text}
-              </Button>
-            </PlanBlock>
-          ))}
-        </Grid>
-
-        <SectionInfo>
-          All plans include uncapped events per month, scheduled functions,
-          support via Email & Discord.
-        </SectionInfo>
-
-        <SectionHeader>
-          <h2>Resource limits</h2>
-          <SectionInfo>Bring any workload</SectionInfo>
-        </SectionHeader>
-
-        <ComparisonTable>
-          <div key={"headers"} className="plan-column">
-            <div>&nbsp;</div>
-            <div className="table-header">Memory</div>
-            <div className="table-header">Max runtime</div>
-          </div>
-          {PLANS.map((plan) => (
-            <div key={plan.name} className="plan-column">
-              <div className="table-header">{plan.name}</div>
-              <div>{plan.resources.ram}</div>
-              <div>{plan.resources.maxRuntime}</div>
+      <div
+        style={{
+          backgroundImage: "url(/assets/pricing/table-bg.png)",
+          backgroundPosition: "center -30px",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "1800px 1200px",
+        }}
+      >
+        <Container>
+          <h1 className="text-3xl lg:text-5xl text-white mt-20 mb-28 font-semibold tracking-tight">
+            Simple pricing.
+            <br />
+            Powerful functionality.
+          </h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-8 lg:gap-8 text-center mb-8">
+            <div className="md:col-span-2 rounded-lg flex flex-col gap-y-8 md:gap-y-0 md:flex-row items-stretch">
+              <PlanCard content={PLANS[0]} />
+              <PlanCard content={PLANS[1]} />
             </div>
-          ))}
-        </ComparisonTable>
-
-        <FAQGrid>
-          <h2 style={{ margin: "2rem 0" }}>FAQs</h2>
-          <div onClick={toggleFAQ}>
-            <h3>What's a "function?"</h3>
-            <p>
-              A function is a single serverless function or step function.
-              Functions can run automatically (each time an event is received),
-              on a schedule, or manually via forms (in the case of internal
-              tools, or one-offs).
-            </p>
-            <p>
-              Functions allow you to chain logic together, coordinate between
-              events, and create complex user flows and operational logic for
-              your company.
-            </p>
+            <div className="flex items-stretch">
+              <PlanCard content={PLANS[2]} variant="dark" />
+            </div>
           </div>
 
-          <div onClick={toggleFAQ}>
-            <h3>What languages do you support?</h3>
-            <p>
-              Every language. Anything that you can put in a Docker container we
-              can run from JavaScript to Go to Python to Perl to Bash.
-            </p>
+          <p className="text-slate-200 text-sm text-center">
+            *Team plan starts at $20/month for 100,000 function runs.
+            <br />
+            Additional runs are available to purchase for $10 per 100,000.
+          </p>
+
+          <ComparisonTable plans={PLANS} features={FEATURES} />
+
+          <div className="xl:grid xl:grid-cols-4 mt-20 pt-12 border-t border-slate-900">
+            <div>
+              <h2 className="text-white mb-6 xl:mb-0 text-4xl font-semibold leading-tight tracking-tight mt-10">
+                Frequently <br className="hidden xl:block" />
+                asked <br className="hidden xl:block" />
+                questions
+              </h2>
+            </div>
+            <div className="col-span-3 text-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4 gap-x-12">
+              <FAQRow question={`What's a "function"?`}>
+                <p>
+                  We consider a function a single function defined with the{" "}
+                  <a
+                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
+                    href="/docs/functions"
+                  >
+                    Inngest SDK
+                  </a>
+                  . A function can be triggered by an event or run on a schedule
+                  (cron).
+                </p>
+                <p>
+                  Functions can contain multiple “steps” to reliably run parts
+                  of your function or add things like sleeping/pausing a
+                  function for a period of time. You can define a step using
+                  available tools in our SDKs like{" "}
+                  <code className="bg-slate-800 text-slate-200">tools.run</code>
+                  ,{" "}
+                  <code className="bg-slate-800 text-slate-200">
+                    tools.sleep
+                  </code>
+                  ,
+                  <code className="bg-slate-800 text-slate-200">
+                    tools.sleepUntil
+                  </code>{" "}
+                  and{" "}
+                  <code className="bg-slate-800 text-slate-200">
+                    tools.waitForEvent
+                  </code>
+                  . Read more in our{" "}
+                  <a
+                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
+                    href="/docs/functions/multi-step"
+                  >
+                    documentation
+                  </a>
+                  .
+                </p>
+              </FAQRow>
+
+              <FAQRow question={`What's a function "step"?`}>
+                <p>
+                  Inngest functions can be broken down into separate parts, or
+                  “steps” which run independently. Steps are defined using our
+                  SDK’s{" "}
+                  <code className="bg-slate-800 text-slate-200">tools</code>.
+                  For example, any code within{" "}
+                  <code className="bg-slate-800 text-slate-200">tools.run</code>{" "}
+                  will be retried up to 3 times independently of the rest of
+                  your code ensuring your function is reliable. You can also add
+                  delays in the middle of your functions for minutes, hours or
+                  days using{" "}
+                  <code className="bg-slate-800 text-slate-200">
+                    tools.sleep
+                  </code>{" "}
+                  or{" "}
+                  <code className="bg-slate-800 text-slate-200">
+                    tools.sleepUntil
+                  </code>
+                  . You can also wait for additional events to trigger
+                  additional logic with{" "}
+                  <code className="bg-slate-800 text-slate-200">
+                    tools.waitForEvent
+                  </code>{" "}
+                  which enables you to build functions that pause while they
+                  wait for additional input. Read more about steps{" "}
+                  <a
+                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
+                    href="/docs/functions/multi-step"
+                  >
+                    here
+                  </a>
+                  .
+                </p>
+              </FAQRow>
+
+              <FAQRow question={`What's a "function run"?`}>
+                <p>
+                  A function run is a single function step that runs as part of
+                  a function. A step is any part of your function that uses our
+                  SDKs available tools, like{" "}
+                  <code className="bg-slate-800 text-slate-200">tools.run</code>{" "}
+                  or{" "}
+                  <code className="bg-slate-800 text-slate-200">
+                    tools.sleep
+                  </code>
+                  . Read more about steps{" "}
+                  <a
+                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
+                    href="/docs/functions/multi-step"
+                  >
+                    here
+                  </a>
+                  .
+                </p>
+              </FAQRow>
+
+              <FAQRow question={`How are my functions run?`}>
+                <p>
+                  Your functions are hosted in your existing application on{" "}
+                  <span className="italic">any platform</span>. We’ll call your
+                  functions securely via HTTP request on-demand.
+                </p>
+              </FAQRow>
+              <FAQRow question={`What are concurrency limits?`}>
+                <p>
+                  As Inngest runs your function any time an event is received,
+                  you may have any number of events received within a short
+                  period of time (e.g. 10ms). Inngest can run all of these
+                  functions concurrently (in parallel). Our Hobby plan only
+                  allows one function to run at a time. Our paid plans offer
+                  substantial concurrency to enable you to parallelize workloads
+                  and keep your system efficient and performant.
+                </p>
+                <p>
+                  Sleeps and other pauses do not count towards your concurrency
+                  limit as your function isn't running while waiting.
+                </p>
+              </FAQRow>
+              <FAQRow question={`Can I get a demo of the product?`}>
+                <p>
+                  Yes! We would be happy to demo Inngest for you and understand
+                  the needs of your team. Email us at{" "}
+                  <a
+                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
+                    href="mailto:hello@inngest.com"
+                  >
+                    hello@inngest.com
+                  </a>{" "}
+                  to set up a call.
+                </p>
+              </FAQRow>
+              <FAQRow question={`What languages do you support?`}>
+                <p>
+                  We currently have an SDK for JavaScript/TypeScript, but plan
+                  to expand to Go, Python and others in the future.{" "}
+                  <a
+                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
+                    href="mailto:hello@inngest.com"
+                  >
+                    Let us know
+                  </a>{" "}
+                  if you're interested in an SDK that we don't currently have.
+                  up a call.
+                </p>
+              </FAQRow>
+              <FAQRow question={`How long can my functions run for?`}>
+                <p>
+                  Inngest functions are invoked via http, so each function step
+                  can run as long as your platform or server supports, for
+                  example, Vercel’s Pro plan runs functions for up to 60 seconds
+                  which means that if your function needs to run longer than
+                  that, you can break it up into multiple steps (see: What is a
+                  function step?).
+                </p>
+              </FAQRow>
+              <FAQRow
+                question={`Can multiple functions be triggered by the same event?`}
+              >
+                <p>
+                  Yep! Any number of functions can be triggered by the same
+                  event enabling useful{" "}
+                  <a
+                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
+                    href="/patterns"
+                  >
+                    design patterns
+                  </a>{" "}
+                  like fan-out.
+                </p>
+              </FAQRow>
+              <FAQRow question={`Do you charge for events?`}>
+                <p>
+                  Nope. You can send any event to Inngest via and SDK or a
+                  webhook at any scale. We only charge for the code that you
+                  run: the “function runs.” We encourage teams to send any/all
+                  events to the Inngest platform which then can allow them to
+                  add new functions at any time.
+                </p>
+              </FAQRow>
+              <FAQRow question={`Can I select a region for my data?`}>
+                <p>
+                  Not yet, but it’s in our roadmap. If you have a specific
+                  roadmap in mind or would like to be one of the first people to
+                  have access,{" "}
+                  <a
+                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
+                    href="mailto:hello@inngest.com"
+                  >
+                    shoot us a message
+                  </a>
+                  .
+                </p>
+              </FAQRow>
+              <FAQRow question={`Can I self host inngest?`}>
+                <p>
+                  If you're interested in self-hosting Inngest,{" "}
+                  <a
+                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
+                    href="mailto:hello@inngest.com"
+                  >
+                    reach out with your needs
+                  </a>
+                  .
+                </p>
+              </FAQRow>
+            </div>
           </div>
-
-          <div onClick={toggleFAQ}>
-            <h3>Do you charge for events?</h3>
-            <p>
-              We're currently accepting all events, uncapped. Our "soft" limit
-              is 1M events/mo across free and paid plans, and from 50M events/mo
-              on custom plans.
-            </p>
-          </div>
-
-          <div onClick={toggleFAQ}>
-            <h3>What's a "function run?"</h3>
-            <p>
-              A run is a single executed step in a function. If your function
-              only has 1 step, it's only 1 run
-            </p>
-          </div>
-
-          <div onClick={toggleFAQ}>
-            <h3>What if I need higher resource limits?</h3>
-            <p>
-              If you need something more than what is listed above or something
-              custom, <a href="/contact">get in touch with us</a>.
-            </p>
-          </div>
-
-          <div onClick={toggleFAQ}>
-            <h3>What if I need to run more functions?</h3>
-            <p>
-              That's okay! We'll alert you when you're nearing your cap and will
-              throttle your functions after hitting the limit. You can purchase
-              more capacity at the same rate as your plan includes.
-            </p>
-            <p>
-              We also offer overage forgiveness for those times that we all know
-              happen. We dislike surprise costs as much as you.
-            </p>
-          </div>
-
-          <div onClick={toggleFAQ}>
-            <h3>What is event coordination, and how can I use it?</h3>
-            <p>
-              Event coordination allows you to wait for specific events from
-              within a function. For example, after creating a shopping cart you
-              might want to wait for the "order created" event for up to 24
-              hours. If this event is received, the person who created the
-              shopping cart checked out. If the event isn't received within 24
-              hours, you can run logic to handle churn.
-            </p>
-            <p>
-              We allow you to coordinate between events and wait up to 6 months
-              for new events. That's... quite some time.
-            </p>
-          </div>
-
-          <div onClick={toggleFAQ}>
-            <h3>Is there a limit to how often I can run scheduled function?</h3>
-            <p>
-              In the community edition, functions are limited to 15 minute
-              intervals and may be throttled for fair usage. Paid plans can run
-              scheduled functions every minute, and are not subject to
-              throttling. Custom plans have their own dedicated pools for
-              managing functions.
-            </p>
-          </div>
-
-          <div onClick={toggleFAQ}>
-            <h3>Can I self-host Inngest?</h3>
-            <p>
-              If you'd like to self-host Inngest or the executor platform{" "}
-              <a href="/contact">reach out to us with your needs</a>.
-            </p>
-          </div>
-        </FAQGrid>
-
-        <Callout ctaRef="pricing-callout-end" />
-      </Content>
-
-      <div style={{ marginTop: 100 }}>
-        <Footer />
+        </Container>
       </div>
-    </>
+
+      <Footer />
+    </div>
   );
 }
-
-const Hero = styled.div`
-  padding: calc(var(--nav-height) + 10vh) 0 10vh;
-  margin-top: calc(var(--nav-height) * -1);
-  text-align: center;
-
-  h1 + p {
-    font-size: 22px;
-    line-height: 1.45;
-    opacity: 0.8;
-  }
-  p {
-    font-family: var(--font);
-  }
-`;
-
-const PlanHeader = styled.div<{
-  flexDirection: "row" | "column";
-}>`
-  display: flex;
-  flex-direction: ${(props) => props.flexDirection || "row"};
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-
-  @media (max-width: 1000px) {
-    flex-direction: column;
-  }
-
-  p {
-    margin: 1rem 0;
-  }
-
-  .cost {
-    font-size: 1.4rem;
-  }
-`;
-
-const Grid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-gap: 2rem 2rem;
-  margin: 2rem 0;
-
-  small {
-    opacity: 0.5;
-    font-size: 100%;
-  }
-  @media (max-width: 1000px) {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  @media (max-width: 680px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const PlanBlock = styled(Block)`
-  display: flex;
-  flex-direction: column;
-
-  background: linear-gradient(
-    135deg,
-    hsl(330deg 82% 10%) 0%,
-    hsl(239deg 82% 10%) 100%
-  );
-
-  .icon-list {
-    flex-grow: 1;
-    margin-bottom: 2rem;
-  }
-`;
-
-const FreePlanBlock = styled(PlanBlock)<{ visibleOn: string }>`
-  grid-column: 1 / span 3;
-
-  display: ${({ visibleOn }) => (visibleOn === "desktop" ? "flex" : "none")};
-
-  color: var(--black);
-  background: linear-gradient(
-    135deg,
-    hsl(332deg 30% 95%) 0%,
-    hsl(240deg 30% 95%) 100%
-  );
-
-  .icon-list svg {
-    color: var(--color-white);
-  }
-
-  @media (min-width: 1000px) {
-    .icon-list {
-      margin-bottom: 0;
-    }
-  }
-
-  @media (max-width: 1000px) {
-    display: ${({ visibleOn }) => (visibleOn !== "desktop" ? "flex" : "none")};
-    grid-column: 1;
-  }
-`;
-
-const SectionHeader = styled.div`
-  margin: 4rem 0 2rem;
-  text-align: center;
-`;
-
-const SectionInfo = styled.p`
-  margin: 1rem auto;
-  max-width: 44rem;
-  line-height: 1.5rem;
-  text-align: center;
-`;
-
-const ComparisonTable = styled.div`
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  grid-gap: 1rem;
-  max-width: 840px;
-  padding: 1rem 1.4rem;
-  margin: 1rem auto;
-  border: 1px solid var(--stroke-color);
-  border-radius: var(--border-radius);
-
-  .table-header {
-    font-family: var(--font);
-    font-weight: bold;
-  }
-  .plan-column {
-    display: grid;
-    grid-row-gap: 1rem;
-  }
-
-  // invert the columns on small screens
-  @media (max-width: 840px) {
-    grid-template-columns: 1fr;
-    grid-template-rows: repeat(3, 1fr);
-    grid-gap: 0.5rem;
-    padding: 0.8rem 1rem;
-    font-size: 0.75rem;
-
-    .plan-column {
-      grid-template-columns: repeat(3, 1fr);
-      grid-gap: 0.5rem;
-    }
-  }
-`;
-
-const FAQGrid = styled.div`
-  display: grid;
-  max-width: 44rem;
-  margin: 2rem auto 3rem;
-
-  div {
-    cursor: pointer;
-
-    h3 {
-      margin: 1rem 0;
-      font-family: var(--font);
-      font-size: 1.2em;
-    }
-    p:not(:last-of-type) {
-      margin-bottom: 1rem;
-    }
-    p:last-of-type {
-      margin: 0 0 2rem;
-    }
-
-    & + div {
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    & p {
-      display: none;
-    }
-    &.active p {
-      display: block;
-    }
-  }
-`;

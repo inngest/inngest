@@ -32,12 +32,12 @@ export default function Header() {
         `sticky backdrop-blur-sm top-0 left-0 right-0 z-50 transition-colors duration-200`
       )}
     >
-      <Container className="flex justify-between items-center px-0 md:px-0">
+      <Container className="flex justify-between items-center px-8 md:px-0">
         <div className="flex  items-center w-full">
           <div
             className={classNames(
               menuState ? `bg-slate-900` : ``,
-              `lg:bg-transparent flex px-6 md:px-10 items-center py-5 lg:py-0 w-full lg:w-auto lg:px-0 justify-between`
+              `lg:bg-transparent flex items-center py-5 lg:py-0 w-full lg:w-auto lg:px-0 justify-between`
             )}
           >
             <a href="/" className="mr-4">

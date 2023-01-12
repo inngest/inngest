@@ -7,6 +7,7 @@ type ButtonProps = {
   size?: "sm" | "md" | "lg";
   className?: string;
   arrow?: "left" | "right";
+  full?: boolean;
   children?: React.ReactNode;
 } & AnchorHTMLAttributes<HTMLAnchorElement>;
 
@@ -15,6 +16,7 @@ export function Button({
   variant = "primary",
   size = "md",
   arrow,
+  full = false,
   ...props
 }: ButtonProps) {
   const sizes = {
@@ -29,10 +31,12 @@ export function Button({
       "bg-slate-100 hover:bg-slate-300 text-slate-800 dark:bg-slate-800  dark:hover:bg-slate-700 dark:text-slate-100",
   };
 
+  const width = full ? "w-full" : "";
+
   return (
     <a
       href={props.href}
-      className={`group inline-flex items-center gap-0.5 rounded-full font-medium tracking-tight transition-all ${variants[variant]} ${sizes[size]} ${props.className}`}
+      className={`group inline-flex items-center justify-center gap-0.5 rounded-full font-medium tracking-tight transition-all ${variants[variant]} ${sizes[size]} ${props.className} ${width}`}
     >
       {arrow && arrow === "left" ? (
         <ArrowRight className="group-hover:-translate-x-1 transition-transform rotate-180 duration-150 -ml-1.5" />
