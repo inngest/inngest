@@ -44,8 +44,8 @@ const FEATURES: Feature[] = [
   {
     name: "Events",
     plans: {
-      Hobby: "unlimited",
-      Team: "unlimited",
+      Hobby: "Unlimited",
+      Team: "Unlimited",
       Enterprise: "Unlimited",
     },
   },
