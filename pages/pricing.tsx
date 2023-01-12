@@ -282,10 +282,6 @@ export default function Pricing() {
             Additional runs are available to purchase for $20 per 100,000.
           </p>
 
-          <h2 className="text-white mt-32 mb-8 text-4xl font-semibold">
-            Compare all plans
-          </h2>
-
           <ComparisonTable plans={PLANS} features={FEATURES} />
 
           <div className="xl:grid xl:grid-cols-4 mt-20 pt-12 border-t border-slate-900">

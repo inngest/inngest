@@ -2,7 +2,10 @@ import { Button } from "../Button";
 
 export default function ComparisonTable({ plans, features }) {
   return (
-    <div className="hidden md:block">
+    <div className="hidden lg:block">
+      <h2 className="text-white mt-32 mb-8 text-4xl font-semibold">
+        Compare all plans
+      </h2>
       <table className="text-slate-200 w-full table-fixed">
         <thead>
           <tr className="border-b border-slate-900">
@@ -44,34 +47,30 @@ export default function ComparisonTable({ plans, features }) {
           {features.map((feature, i) => (
             <tr key={i} className="h-14 border-t border-slate-900">
               <td className="font-medium">{feature.name}</td>
-              {plans.map((plan, i) =>
+              {plans.map((plan, j) =>
                 typeof feature.plans[plan.name] === "string" ? (
-                  <td key={i} className="px-6 text-sm font-medium">
+                  <td key={j} className="px-6 text-sm font-medium">
                     {feature.plans[plan.name]}
                   </td>
                 ) : (
-                  <>
+                  <td className="px-6" key={j}>
                     {feature.plans[plan.name] === true ? (
-                      <td className="px-6" key={i}>
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                          className="w-5 h-5 text-green-400"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </td>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="w-5 h-5 text-green-400"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
                     ) : (
-                      <td className="px-6 text-slate-700" key={i}>
-                        -
-                      </td>
+                      <span className="text-slate-800">-</span>
                     )}
-                  </>
+                  </td>
                 )
               )}
             </tr>
