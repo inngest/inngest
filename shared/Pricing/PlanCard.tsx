@@ -55,12 +55,7 @@ export default function PlanCard({ variant = "light", content }) {
           {content.features.map((feature, i) => (
             <li
               key={i}
-              className={classNames(
-                variant === "dark"
-                  ? `odd:bg-slate-600/10`
-                  : `odd:bg-slate-400/10`,
-                `flex flex-col py-2.5 `
-              )}
+              className={`flex flex-col py-2.5 ${theme[variant].row}`}
             >
               {feature.quantity && (
                 <span className={`font-semibold ${theme[variant].primary}`}>
@@ -71,7 +66,7 @@ export default function PlanCard({ variant = "light", content }) {
                 className={classNames(
                   feature.quantity
                     ? `font-medium text-sm ${theme[variant].secondary}`
-                    : `font-semibold mt-2 ${theme[variant].primary}`,
+                    : `font-semibold my-2 ${theme[variant].primary}`,
                   `  tracking-tight`
                 )}
               >
@@ -81,7 +76,7 @@ export default function PlanCard({ variant = "light", content }) {
           ))}
         </ul>
       </div>
-      <div className="px-12 pb-4 mt-4 mb-4">
+      <div className="px-12 py-2 mt-4 mb-4">
         <Button href={content.cta.href} arrow="right" full>
           {content.cta.text}
         </Button>
