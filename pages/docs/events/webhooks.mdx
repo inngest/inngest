@@ -1,0 +1,46 @@
+
+{/*
+  NOTE - This page is hidden from the docs for now, but is discoverable from the Inngest Cloud UI
+  on the Webhook source page ("View Docs") button.
+*/}
+
+# Webhooks
+
+In addition to [sending events via our SDK](/docs/events), you can also configure your any webhook to send data to Inngest.
+
+Our Webhook feature, allows you to create a unique URL to start sending events to Inngest.
+
+## Why use Inngest for webhooks?
+
+When [building performant and scalable webhooks](/blog/building-webhooks-that-scale), the webhook endpoint needs to respond very quickly and then you need to be able to process that event asynchronously. Inngest is designed to do just this. There are also t
+
+**Retries** - Sometimes processing of webhook events fails due to a networking blip or third party API outage. Inngest automatically retries your functions so you can be confident that your app is processing webhook data reliably.
+
+**Event history & replay** - Often you need to understand what data has been sent from a third party webhook and inspect particular payloads to understand how your function's code may have failed. Inngest stores all inbound events and enables you to replay a particular event that may have failed. You can also copy this event payload and use it with the Inngest Dev Server to debug problems locally.
+
+## Creating webhooks
+
+You can create a new webhook within Inngest by heading to "Sources" and [selecting "Webhooks" tab](https://app.inngest.com/sources/new#Webhook).
+
+When creating a webhook you will be prompted to give it a name and can optionally specify a transform and filter list. A transform allows you to change the event's structure before we process it, and filters allow you to allow or deny specific events or IPs from using the webhook.
+
+## Transforms
+
+Transforms allow you to change an incoming event's structure before we process it. Each event we process must match our [event format](/docs/event-format-and-structure) by having **at least** the `name` and `data` field. You can specify ES6+ [JavaScript](https://developer.mozilla.org/en-US/docs/Web/JavaScript) code which transforms an incoming event when creating a webhook.
+
+The transform **must return an object containing a `name` and `data` field**:
+
+```javascript
+function transform(evt, headers = {}) {
+  const name =
+    headers["X-Github-Event"] || evt?.headers["X-Github-Event"] || "";
+  return {
+    // Use the event as the data without modification
+    data: evt,
+    // Add an event name, prefixed with "github." based off of the X-Github-Event data
+    name: "github." + name.trim().replace("Event", "").toLowerCase(),
+  };
+}
+```
+The above example shows a GitHub transform, using the incoming event data to create a new `name` field.
+You can use almost all ES6 features, and our UI allows you to preview the transform prior to saving the webhook. Transforms can be modified at any time.

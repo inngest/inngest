@@ -15,17 +15,11 @@ async function redirects() {
       destination: "http://eepurl.com/hI3dCr",
       permanent: true,
     },
-    // Legacy docs pages - These should be able to be removed after we
-    // remove all legacy CLI + Cloud docs
     {
-      source: "/docs/function-ide-guide",
-      destination: "/docs/cloud/function-ide-guide",
-      permanent: false,
-    },
-    {
-      source: "/docs/using-the-inngest-cli",
-      destination: "/docs/cloud/using-the-inngest-cli",
-      permanent: false,
+      // From the UI's source editing page:
+      source: "/docs/event-webhooks",
+      destination: "/docs/events/webhooks",
+      permanent: true,
     },
   ];
 }
