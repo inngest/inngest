@@ -28,8 +28,8 @@ export default function Header() {
   return (
     <header
       className={classNames(
-        scroll ? `bg-slate-1000/80 shadow-lg ` : "",
-        `sticky backdrop-blur-sm top-0 left-0 right-0 z-50 transition-colors duration-200`
+        scroll ? `bg-slate-1000/80 ` : "",
+        `sticky backdrop-blur top-0 left-0 right-0 z-50 transition-colors duration-200`
       )}
     >
       <Container className="flex justify-between items-center px-8 md:px-0">

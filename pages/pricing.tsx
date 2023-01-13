@@ -269,9 +269,8 @@ export async function getStaticProps() {
 
 export default function Pricing() {
   return (
-    <div className="bg-slate-1000 font-sans">
+    <div className="font-sans">
       <Header />
-
       <div
         style={{
           backgroundImage: "url(/assets/pricing/table-bg.png)",

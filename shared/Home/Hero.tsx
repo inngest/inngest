@@ -6,13 +6,6 @@ import Container from "../layout/Container";
 export default function Hero() {
   return (
     <div className="relative">
-      <div
-        style={{
-          background: "radial-gradient(circle at center, #13123B, #08090d)",
-        }}
-        className="absolute w-[200vw] -translate-x-1/2 -translate-y-1/2 h-[200vw] rounded-full blur-lg opacity-90"
-      ></div>
-
       <Container className="pt-20 pb-16 md:pt-36 md:pb-28 lg:pt-36 lg:pb-40 xl:pt-40 xl:pb-32  2xl:pt-56 2xl:pb-48  flex items-center">
         <HeroImg />
         <div className="max-w-[760px] relative pr-10 lg:px-auto m-x-auto py-10 rounded-lg">

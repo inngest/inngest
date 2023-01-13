@@ -7,6 +7,29 @@
 @tailwind components;
 @tailwind utilities;
 
+
+/* Crutch until we can remove old page templates */
+
+
+.v2 body {
+  background-color: "#080D19";
+  background-image: linear-gradient(
+    to bottom,
+    #121139 0%,
+    #080D19 100vh
+  );
+}
+
+
+.gradient {
+  display: none;
+}
+
+.v1 .page-banner {
+  font-size: 14px;
+  padding: 6px 0;
+}
+
 /** Standard **/
 
 @supports (font-variation-settings: normal) {
