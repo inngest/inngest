@@ -7,7 +7,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/config"
-	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/enums"
@@ -92,7 +91,6 @@ func start(ctx context.Context, opts StartOpts, loader *inmemorydatastore.FSLoad
 		executor.WithEnvReader(envreader),
 		executor.WithState(sm),
 	)
-	coreapi := coreapi.NewService(opts.Config, coreapi.WithRunner(runner))
 
 	// Add notifications to the state manager so that we can store new function runs
 	// in the core API service.
@@ -106,7 +104,7 @@ func start(ctx context.Context, opts StartOpts, loader *inmemorydatastore.FSLoad
 		})
 	}
 
-	return service.StartAll(ctx, ds, runner, exec, coreapi)
+	return service.StartAll(ctx, ds, runner, exec)
 }
 
 func prepareDockerImages(ctx context.Context, dir string) (*inmemorydatastore.FSLoader, error) {

@@ -25,10 +25,13 @@ export const devApi = createApi({
         /**
          * In dev mode, always assume that the dev server API is available at 8288. This
          * allows us to use a separate hot-reloading port for the UI when developing.
+         *
+         * NOTE: This has been removed to allow people to run `inngest dev --port 8111`:
+         * users run multiple copies of inngest - one for dev, one for tests - as mock
+         * environments.
          */
         if (import.meta.env.DEV) {
           const localDevUrl = new URL(url, devUrl);
-          localDevUrl.port = "8288";
           url = localDevUrl.href;
         }
 
