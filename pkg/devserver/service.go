@@ -88,6 +88,9 @@ func (d *devserver) Pre(ctx context.Context) error {
 		APIReadWriter: datarw,
 		Runner:        d.runner,
 	})
+	if err != nil {
+		return err
+	}
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -95,7 +98,11 @@ func (d *devserver) Pre(ctx context.Context) error {
 
 	// Merge the dev server API (for handling files & registration) with the data
 	// API into the event API router.
-	d.apiservice = api.NewService(d.opts.Config, api.Mount{"/", devAPI}, api.Mount{"/v0", core.Router})
+	d.apiservice = api.NewService(
+		d.opts.Config,
+		api.Mount{At: "/", Router: devAPI},
+		api.Mount{At: "/v0", Router: core.Router},
+	)
 
 	// Fetch workspace information in the background, retrying if this
 	// errors out.  This is optimistic, and it doesn't matter if it fails.
