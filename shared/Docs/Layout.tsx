@@ -52,7 +52,7 @@ export function Layout({ children, sections = [], title }) {
             >
               <div className="hidden lg:flex">
                 <a
-                  href="/docs"
+                  href="/"
                   className="flex gap-1.5 group/logo items-center"
                 >
                   <Logo className="w-20 text-indigo-500 dark:text-white" />
