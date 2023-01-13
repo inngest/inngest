@@ -240,19 +240,6 @@ export const navigation = [
     ],
   },
   {
-    title: "Frameworks",
-    links: [
-      { title: "Overview", href: `${baseDir}/frameworks` },
-      { title: "Next.js", href: `${baseDir}/frameworks/nextjs` },
-      { title: "Express", href: `${baseDir}/frameworks/express` },
-      {
-        title: "Cloudflare Pages",
-        href: `${baseDir}/frameworks/cloudflare-pages`,
-      },
-      { title: "RedwoodJS", href: `${baseDir}/frameworks/redwoodjs` },
-    ],
-  },
-  {
     title: "Deploying",
     links: [
       { title: "How to Deploy", href: `${baseDir}/deploy` },
