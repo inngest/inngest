@@ -61,7 +61,6 @@
     "heroicons": "^2.0.13",
     "highlight.js": "^11.6.0",
     "inngest": "^0.5.0",
-    "inngest-sdk": "^1.0.1",
     "lodash.debounce": "^4.0.8",
     "lodash.shuffle": "^4.2.0",
     "lodash.throttle": "^4.1.1",
