@@ -11,7 +11,7 @@
 /* Crutch until we can remove old page templates */
 
 
-.v2 body {
+.v2:not(.docs) body {
   background-color: "#080D19";
   background-image: linear-gradient(
     to bottom,
