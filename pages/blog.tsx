@@ -43,14 +43,7 @@ export default function BlogLayout(props) {
         <meta property="og:description" content={description} />
       </Head>
 
-      <div className="bg-slate-1000 font-sans">
-        <div
-          style={{
-            background: "radial-gradient(circle at center, #13123B, #08090d)",
-          }}
-          className="absolute w-[200vw] -translate-x-1/2 -translate-y-1/2 h-[200vw] rounded-full blur-lg opacity-90"
-        ></div>
-
+      <div className="font-sans">
         <Header />
         <Container className="pt-8">
           <div className="flex flex-col lg:flex-row gap-2 lg:gap-4 items-start lg:items-center">
