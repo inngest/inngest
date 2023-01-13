@@ -27,7 +27,7 @@ export async function getStaticProps() {
 
 export default function Home() {
   return (
-    <div className="home bg-slate-1000 font-sans">
+    <div className="home bg-slate-1000 font-sans overflow-x-hidden">
       <Header />
 
       <Hero />
