@@ -16,14 +16,16 @@ This makes building reliable, distributed code simple. By wrapping asynchronous 
 
 ## Writing
 
-Multi-step functions are written using either the `createStepFunction()` helper or the `Inngest#createStepFunction()` method.
+Multi-step functions are written using either the `createStepFunction()` method on the `Inngest` client.
 
 First, let's look at a simple single-step function.
 
 ```ts
-import { createFunction } from "inngest";
+import { Inngest } from "inngest";
 
-createFunction(
+const inngest = new Inngest({ name: "My App" })
+
+export default inngest.createFunction(
   "Activation email",
   "app/user.created",
   async ({ event }) => {
@@ -44,9 +46,7 @@ First, let's convert out function to a multi-step function. To do this, we'll do
 - Wrap our `sendEmail()` call in a `tools.run()` call
 
 ```ts
-import { createStepFunction } from "inngest";
-
-createStepFunction(
+export default inngest.createStepFunction(
   "Activation email",
   "app/user.created",
   ({ event, tools }) => {
@@ -66,9 +66,7 @@ Once our welcome email is sent, we want to wait at most 24 hours for our user to
 To do this, we can use the `waitForEvent` tool. This tool will wait for a matching event to be fired, and then return the event data. If the event is not fired within the timeout, it will return `null`, which we can use to decide whether to send the reminder email.
 
 ```ts
-import { createStepFunction } from "inngest";
-
-createStepFunction(
+export default inngest.createStepFunction(
   "Activation email",
   "app/user.created",
   ({ event, tools }) => {
@@ -90,9 +88,7 @@ Now we have our `postCreated` variable, which will be `null` if the user hasn't 
 Finally, we can use this to send the reminder email if the user hasn't created a post by running another block of code with `tools.run()`.
 
 ```ts
-import { createStepFunction } from "inngest";
-
-createStepFunction(
+export default inngest.createStepFunction(
   "Activation email",
   "app/user.created",
   ({ event, tools }) => {
@@ -148,10 +144,13 @@ Use `tools.waitForEvent()` to wait for a particular event to be received before 
 ```ts
 const postCreated = tools.waitForEvent("app/post.created", {
   timeout: "30 minutes",
+  match: "data.post_id",
 });
 ```
 
 A `timeout` must be provided as the maximum time to wait for the event. If this timeout is reached, the tool will resolve with `null` instead of the event data.
+
+To match a particular event, you can use the `match` option. This is as key which is used to compare the function's initial event payload and the event payload that you're waiting for. The above example will make sure that the initial event's `data.post_id` value exactly matches the `app/post.created`'s `data.post_id` - Any `app/post.created` that does not match will be ignored by this wait.
 
 ### `sleep()`
 

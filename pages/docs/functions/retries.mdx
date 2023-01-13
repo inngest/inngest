@@ -9,7 +9,7 @@ There are two ways that functions are determined to have failed:
 * A function throws an error:
 
 ```js
-export default createFunction("My Function", "demo/some.event", ({ event }) => {
+export default inngest.createFunction("My Function", "demo/some.event", ({ event }) => {
   throw new Error("Something failed!")
 })
 ```
@@ -17,7 +17,7 @@ export default createFunction("My Function", "demo/some.event", ({ event }) => {
 * A function returns a non-`2xx` status code with it's response:
 
 ```js
-export default createFunction("My Function", "demo/some.event", ({ event }) => {
+export default inngest.createFunction("My Function", "demo/some.event", ({ event }) => {
   const result = somethingElse()
   return {
     status: result.ok ? 200 : 500,
