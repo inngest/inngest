@@ -1,118 +1,197 @@
-# Serve
+# Serving the Inngest API
 
-The `serve()` handler is an HTTP handler that enables Inngest to remotely read your functions configurations and call your functions on-demand. This handler enables you to host your function code on any platform and have Inngest call them via HTTP.
+Inngest works by serving an HTTP API endpoint which exposes your functions for us to call on-demand.
+The first thing you'll need to do is to add and serve the Inngest API in your project.
 
-An `INNGEST_SIGNING_KEY` is required to securely communicate with the Inngest platform, either via environment variable (_recommend_) or it can be passed explicitly through the options argument.
+## Setting up the API
 
-The `serve()` handler uses different HTTP request methods (`GET`, `PUT`, `POST`) to excute it's required actions.
+Inngest provides a `serve()` handler which adds an API endpoint to your router.  **You should always 
+serve our API at `/api/inngest`**, as this makes automated deploys much easier.  If you need to
+change the API URL skip to [configuring the API Path](#configuring-the-api-path).
 
-## How to use
+We provide framework-specific bindings to make this easy for common platforms:
 
-There are multiple `serve()` handlers that can be imported from the SDK depending on your applicaiton's framework (e.g. `"inngest/next"`), but all have the same arguments and options. The handler should be accessible on it's own HTTP route in your app. We recommend setting this up for `/api/inngest`.
+- [Cloudflare](#framework-cloudflare)
+- [DigitalOcean functions](#framework-digitalocean-functions)
+- [Express](#framework-express)
+- [Fresh (Deno)](#framework-fresh-deno)
+- [NextJS](#framework-nextjs)
+- [Redwood](#framework-redwood)
+- [Remix](#framework-remix)
 
-### Next.js
+Each of these bindings wrap our base API which implemnts the core logic, so adding support for new
+frameworks is easy.  [Want us to add support for another platform?  Come say hi in our discord](/discord)
+or [drop us a note](/contact).
 
-The Next.js handler should be set up to run as an API route ([reference](https://nextjs.org/docs/api-routes/introduction)):
+## Signing key
+
+You'll need to your signing key to an `INNGEST_SIGNING_KEY` environment variable in your hosting
+provider or `.env` file locally.  This lets the SDK securely communicate with Inngest.  If you can't
+provide this as a signing key, you can pass it in to `serve` when setting up your framework.  [Read
+the reference for more information](/docs/sdk/reference/serve#reference).
+
+## Framework: Cloudflare
+
+You can import the Inngest API server when using <a href="https://developers.cloudflare.com/pages/platform/functions/" target="_blank" rel="nofollow">Cloudflare pages functions</a> or workers within `/functions/api/inngest.js`:
 
 ```typescript
-// ./pages/api/inngest.js
-import { serve } from "inngest/next";
-import someFunction from "../../inngest/someFunction";
-import anotherFunction from "../../inngest/anotherFunction";
+import { serve } from "inngest/cloudflare";
+import fnA from "src/inngest/fnA"; // Your own function
 
-export default serve("My App", [someFunction, anotherFunction]);
+export const onRequest = serve(
+  "My App", // Your app name
+  [fnA],    // A list of functions to expose.  This can be empty to start.
+);
 ```
 
-### Express.js
 
-The Express handler should be passed to `app.use()` ([reference](https://expressjs.com/en/4x/api.html#app.use)) or `router.use()` ([reference](https://expressjs.com/en/4x/api.html#router.use)) to handle all HTTP methods:
+## Framework: DigitalOcean Functions
+
+The DigitalOcean serve function allows you to deploy Inngest to DigitalOcean serverless functions.
+Because DigitalOcean doesn't provide the request URL in its function arguments, you **must** include
+the function URL and path when configuring your handler:
+
+```typescript
+import { serve } from "inngest/digitalocean";
+import fnA from "src/inngest/fnA"; // Your own function
+
+const run = serve(
+  "My app", // Your app name
+  [fnA],    // A list of functions to expose.  This can be empty to start.
+  {
+    // Your digitalocean hostname.  This is required otherwise your functions won't work.
+    serveHost: "https://faas-sfo3-your-url.doserverless.co"
+    // And your DO path, also required.
+    servePath: "/api/v1/web/fn-your-uuid/inngest"
+  },
+);
+
+async function main(args) {
+  return await run(args);
+}
+
+// IMPORTANT: Makes the function available as a module in the project.
+// This is required for any functions that require external dependencies.
+module.exports.main = main;
+```
+
+## Framework: Express
+
+You can serve Inngest functions within your existing Express app, deployed to any hosting provider
+like render, fly, AWS, K8S, etc:
 
 ```typescript
 import { serve } from "inngest/express";
-import someFunction from "../../inngest/someFunction";
-import anotherFunction from "../../inngest/anotherFunction";
+import fnA from "src/inngest/fnA"; // Your own function
 
-app.use("/api/inngest", serve("My App", [someFunction, anotherFunction]));
+// Important:  ensure you add JSON middleware to process incoming JSON POST payloads.
+app.use(express.json())
+app.use(
+  // Expose the middleware on our recommended path at `/api/inngest`.
+  "/api/inngest",
+  serve("My express app", [fnA]),
+);
 ```
 
-### Cloudflare Pages
+You must ensure you're using the `express.json()` middleware otherwise your functions won't be
+executed.
 
-The Cloudflare Pages handler should be exported with as the `onRequest` handler ([reference](https://developers.cloudflare.com/pages/platform/functions/#writing-your-first-function)):
+## Framework: Fresh (Deno)
+
+Inngest works with Deno's <a href="https://fresh.deno.dev/" target="_blank" rel="nofollow">Fresh
+framework</a> via the `esm.sh` CDN.  Add the serve handler to `./api/inngest.ts` as follows:
 
 ```typescript
-// ./functions/api/inngest.ts
-import { serve } from "inngest/cloudflare";
-import someFunction from "../../inngest/someFunction";
-import anotherFunction from "../../inngest/anotherFunction";
+import { Inngest } from "https://esm.sh/inngest@0.9.0"
+import { serve } from "https://esm.sh/inngest@0.9.0/deno/fresh"
 
-export const onRequest = serve("My App", [someFunction, anotherFunction]);
+// This creates a new Inngest instance and defines functions.  You'd typically do this in another
+// file and import these functions to be served, instead of doing everything in this API.
+const inngest = new Inngest({ name: "App name" });
+const fn = inngest.createFunction(
+  "Signup flow",
+  "user/signup",
+  () => {},
+);
+
+// Serve the Inngest API.
+export const handler = serve(inngest, [fn]);
 ```
 
----
+## Framework: NextJS
 
-Want to see support for another framework or platform? [Drop us a note](https://www.inngest.com/contact)
-
-## Reference
-
-**`serve` syntax**
+Inngest has first class support for NextJS API routes, allowing you to easily create the Inngest API.
+Add the following within `./pages/api/inngest.ts`:
 
 ```typescript
-serve(appName, [functions]);
-serve(appName, [functions], options);
+import { serve } from "inngest/next";
+import fnA from "src/inngest/fnA"; // Your own function
+
+export default serve(
+  "My next app", // Your app name
+  [fnA],    // A list of functions to expose.  This can be empty to start.
+);
 ```
 
-**`serve` arguments**
+## Framework: Redwood
 
-- **`appName`**:  The name of your app or microservice, used to group all functions together
-- **`[functions]`**: An array of all functions to enable
-- **`options`**: An optional object of options, with the type:
+You can add Inngest to [Redwood](https://redwoodjs.com/) easily.  Add the following to
+`api/src/functions/inngest.ts`:
 
-```ts
-type Options = {
-  /**
-   * A key used to sign requests to and from Inngest in order to prove that the
-   * source is legitimate.
-   *
-   * You must provide a signing key to communicate securely with Inngest. If
-   * your key is not provided here, we'll try to retrieve it from the
-   * `INNGEST_SIGNING_KEY` environment variable.
-   *
-   * You can retrieve your signing key from the Inngest UI inside the "Secrets"
-   * section at {@link https://app.inngest.com/secrets}. We highly recommend
-   * that you add this to your platform's available environment variables as
-   * `INNGEST_SIGNING_KEY`.
-   *
-   * If no key can be found, you will not be able to register your functions or
-   * receive events from Inngest.
-   */
-  signingKey?: string;
+```typescript
+import { serve } from 'inngest/redwood'
+import fnA from "src/inngest/fnA"; // Your own function
 
-  /**
-   * Controls whether a landing page with introspection capabilities is shown
-   * when a `GET` request is performed to this handler.
-   *
-   * Defaults to true if NODE_ENV !== production.
-   *
-   * This page is highly recommended when getting started in development,
-   * testing, or staging environments.
-   */
-  landingPage?: boolean;
-
-  /**
-   * The URL used to register functions with Inngest.
-   * Defaults to https://api.inngest.com/fn/register
-   */
-  inngestRegisterUrl?: string;
-
-  /**
-   * If provided, will override the used `fetch` implementation. Useful for
-   * giving the library a particular implementation if accessing it is not done
-   * via globals.
-   *
-   * By default the library will try to use the native Web API fetch, falling
-   * back to a Node implementation if no global fetch can be found.
-   */
-  fetch?: typeof fetch;
-}
+export const handler = serve(
+  "My Redwood app", // Your app name
+  [fnA],    // A list of functions to expose.  This can be empty to start.
+  {
+    servePath: "/api/inngest",
+  },
+);
 ```
+
+You should also update your `redwood.toml` to add `apiUrl = "/api"`, ensuring your API is served
+at the `/api` root.
+
+## Framework: Remix
+
+You can add Inngest to Remix easily.  Add the following to `./app/routes/api/inngest.ts`:
+
+```typescript
+import { serve } from "inngest/remix";
+
+const handler = serve(
+  "My remix app", // Your app name
+  [],             // A list of functions to expose.  This can be empty to start.
+);
+
+export { handler as loader, handler as action };
+```
+
+## Configuring the API path
+
+If you can't serve the API at `/inngest/api`, you can configure the path via the serve handler:
+
+```typescript
+serve(
+  "Your app name", // App name
+  [], // Functions to expose
+  {
+    // Overwrite the default serve path.
+    servePath: "/api/v1/inngest"
+  }
+);
+```
+
+Note that when deploying to providers like Vercel, we always expect that your API is hosted at
+`/inngest/api` and automated deploys will fail.  [You can read more on deploying in our deploy docs.](/docs/deploy)
+
+## How the API works
+
+The API works by exposing a single endpoint at `/api/inngest` which handles three RESTful http methods:
+
+- `GET`:  Returns a getting started UI and metadata about your functions **in development only**
+- `POST`:  Runs a function, using the request's post data as incoming function state.
+- `PUT`:  Triggers a deploy, which makes the SDK push functions to Inngest using the signing key. 
 

@@ -207,6 +207,8 @@ export const navigation = [
   {
     title: "Using the SDK",
     links: [
+      { title: "SDK Overview", href: `${baseDir}/sdk/overview` },
+      { title: "Serving the API", href: `${baseDir}/sdk/serve` },
       { title: "Writing Functions", href: `${baseDir}/functions` },
       { title: "Sending Events", href: `${baseDir}/events` },
       {
@@ -274,7 +276,7 @@ export const navigation = [
   },
   {
     title: "SDK Reference",
-    links: [{ title: "Serve", href: `${baseDir}/sdk/serve` }],
+    links: [{ title: "Serve", href: `${baseDir}/sdk/reference/serve` }],
   },
 ];
 

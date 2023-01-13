@@ -1,0 +1,107 @@
+# Serve
+
+The `serve()` handler is an HTTP handler that enables Inngest to remotely read your functions configurations and call your functions on-demand. This handler enables you to host your function code on any platform and have Inngest call them via HTTP.
+
+An `INNGEST_SIGNING_KEY` is required to securely communicate with the Inngest platform, either via environment variable (_recommend_) or it can be passed explicitly through the options argument.
+
+The `serve()` handler uses different HTTP request methods (`GET`, `PUT`, `POST`) to excute it's required actions.
+
+## Reference
+
+**`serve` syntax**
+
+```typescript
+serve(appName, [functions]);
+serve(appName, [functions], options);
+```
+
+**`serve` arguments**
+
+- **`appName`**:  The name of your app or microservice, used to group all functions together
+- **`[functions]`**: An array of all functions to enable
+- **`options`**: An optional object of options, with the type:
+
+```ts
+type Options = {
+  /**
+   * A key used to sign requests to and from Inngest in order to prove that the
+   * source is legitimate.
+   *
+   * You must provide a signing key to communicate securely with Inngest. If
+   * your key is not provided here, we'll try to retrieve it from the
+   * `INNGEST_SIGNING_KEY` environment variable.
+   *
+   * You can retrieve your signing key from the Inngest UI inside the "Secrets"
+   * section at {@link https://app.inngest.com/secrets}. We highly recommend
+   * that you add this to your platform's available environment variables as
+   * `INNGEST_SIGNING_KEY`.
+   *
+   * If no key can be found, you will not be able to register your functions or
+   * receive events from Inngest.
+   */
+  signingKey?: string;
+
+  /**
+   * Your domain name.  This is the host used to access the Inngest serve endpoint, e.g.:
+   *
+   *     "https://myapp.com"
+   *
+   * By default, the library will try to infer this using request details such
+   * as the "Host" header and request path, but sometimes this isn't possible
+   * (e.g. when running in a more controlled environments such as AWS Lambda or
+   * when dealing with proxies/rediects).
+   *
+   * Provide the custom hostname here to ensure that the path is reported
+   * correctly when registering functions with Inngest.
+   *
+   * To also provide a custom path, use `servePath`.
+   */
+  serveHost?: string;
+
+  /**
+   * The path to the Inngest serve endpoint. e.g.:
+   *
+   *     "/some/long/path/to/inngest/endpoint"
+   *
+   * By default, the library will try to infer this using request details such
+   * as the "Host" header and request path, but sometimes this isn't possible
+   * (e.g. when running in a more controlled environments such as AWS Lambda or
+   * when dealing with proxies/rediects).
+   *
+   * Provide the custom path (excluding the hostname) here to ensure that the
+   * path is reported correctly when registering functions with Inngest.
+   *
+   * To also provide a custom hostname, use `serveHost`.
+   */
+  servePath?: string;
+
+
+  /**
+   * Controls whether a landing page with introspection capabilities is shown
+   * when a `GET` request is performed to this handler.
+   *
+   * Defaults to true if NODE_ENV !== production.
+   *
+   * This page is highly recommended when getting started in development,
+   * testing, or staging environments.
+   */
+  landingPage?: boolean;
+
+  /**
+   * The URL used to register functions with Inngest.
+   * Defaults to https://api.inngest.com/fn/register
+   */
+  inngestRegisterUrl?: string;
+
+  /**
+   * If provided, will override the used `fetch` implementation. Useful for
+   * giving the library a particular implementation if accessing it is not done
+   * via globals.
+   *
+   * By default the library will try to use the native Web API fetch, falling
+   * back to a Node implementation if no global fetch can be found.
+   */
+  fetch?: typeof fetch;
+}
+```
+
