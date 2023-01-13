@@ -21,7 +21,13 @@ import (
 // APIs can be mounted to this service to provide additional functionality.
 //
 // XXX (tonyhb): refactor this to remove extra mounts.
-func NewService(c config.Config, mounts ...chi.Router) service.Service {
+
+type Mount struct {
+	At     string
+	Router chi.Router
+}
+
+func NewService(c config.Config, mounts ...Mount) service.Service {
 	return &apiServer{
 		config: c,
 		mounts: mounts,
@@ -33,7 +39,7 @@ type apiServer struct {
 	api       *API
 	publisher pubsub.Publisher
 
-	mounts []chi.Router
+	mounts []Mount
 }
 
 func (a *apiServer) Name() string {
@@ -54,7 +60,7 @@ func (a *apiServer) Pre(ctx context.Context) error {
 	a.api = api.(*API)
 
 	for _, m := range a.mounts {
-		api.Mount("/", m)
+		api.Mount(m.At, m.Router)
 	}
 
 	a.publisher, err = pubsub.NewPublisher(ctx, a.config.EventStream.Service)

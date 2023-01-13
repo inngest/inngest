@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/inngest/clistate"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/cli"
+	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/logger"
@@ -76,7 +77,25 @@ func (d *devserver) Pre(ctx context.Context) error {
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
 	devAPI := newDevAPI(d)
-	d.apiservice = api.NewService(d.opts.Config, devAPI)
+
+	datarw, err := d.opts.Config.DataStore.Service.Concrete.ReadWriter(ctx)
+	if err != nil {
+		return err
+	}
+	core, err := coreapi.NewCoreApi(coreapi.Options{
+		Config:        d.opts.Config,
+		Logger:        logger.From(ctx),
+		APIReadWriter: datarw,
+		Runner:        d.runner,
+	})
+
+	// Create a new data API directly in the devserver.  This allows us to inject
+	// the data API into the dev server port, providing a single router for the dev
+	// server UI, events, and API for loading data.
+
+	// Merge the dev server API (for handling files & registration) with the data
+	// API into the event API router.
+	d.apiservice = api.NewService(d.opts.Config, api.Mount{"/", devAPI}, api.Mount{"/v0", core.Router})
 
 	// Fetch workspace information in the background, retrying if this
 	// errors out.  This is optimistic, and it doesn't matter if it fails.
