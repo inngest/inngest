@@ -23,23 +23,42 @@ Router.events.on("hashChangeStart", onRouteChange);
 Router.events.on("routeChangeComplete", onRouteChange);
 Router.events.on("routeChangeError", onRouteChange);
 
-export function Layout({ children, sections = [], title }) {
-  const metaTitle = `${title} - Inngest Documentation`;
-  const metaDescription = `Inngest documentation for ${title}`;
-  const metaImage = getOpenGraphImageURL({ title });
+type Props = {
+  children: React.ReactNode;
+  sections: [];
+  /* The title automatically pulled from the h1 tag in each mdx file */
+  title: string;
+  /* The optional title used for meta tags (set via export const metaTitle = '...') */
+  metaTitle?: string;
+  /* The optional description */
+  description?: string;
+};
+
+export function Layout({
+  children,
+  sections = [],
+  title,
+  metaTitle,
+  description,
+}: Props) {
+  const preferredTitle: string = metaTitle || title;
+  const pageTitle = `${preferredTitle} - Inngest Documentation`;
+  const metaDescription =
+    description || `Inngest documentation for ${preferredTitle}`;
+  const metaImage = getOpenGraphImageURL({ title: preferredTitle });
 
   return (
     <div className="dark:bg-slate-1000">
       <MDXProvider components={mdxComponents}>
         <Head>
-          <title>{metaTitle}</title>
+          <title>{pageTitle}</title>
           <meta name="description" content={metaDescription}></meta>
-          <meta property="og:title" content={metaTitle} />
+          <meta property="og:title" content={pageTitle} />
           <meta property="og:description" content={metaDescription} />
           <meta property="og:type" content="article" />
           <meta name="twitter:card" content="summary_large_image" />
           <meta name="twitter:site" content="@inngest" />
-          <meta name="twitter:title" content={metaTitle} />
+          <meta name="twitter:title" content={pageTitle} />
           <meta name="twitter:image" content={metaImage} />
 
           <script dangerouslySetInnerHTML={{ __html: modeScript }} />

@@ -1,5 +1,5 @@
 // Use the image version to bust social network's caches
-const openGraphImageVersion = 1;
+const openGraphImageVersion = 2;
 
 /*
  * Generates a URL to dynamically generate an open graph image for posts on social media

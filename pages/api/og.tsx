@@ -33,6 +33,7 @@ export default async function handler(req: NextApiRequest) {
     const title = hasTitle
       ? searchParams.get("title")?.slice(0, 100)
       : "Inngest";
+    const isLongTitle = title.length > 40;
 
     return new ImageResponse(
       (
@@ -61,7 +62,7 @@ export default async function handler(req: NextApiRequest) {
           />
           <div
             style={{
-              fontSize: 110,
+              fontSize: isLongTitle ? 84 : 110,
               fontStyle: "normal",
               fontWeight: 500,
               letterSpacing: "-2.4px",
