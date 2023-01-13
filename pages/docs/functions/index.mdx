@@ -137,58 +137,34 @@ type Events = {
 export const inngest = new Inngest<Events>({ name: "My App" });
 ```
 
-You can then import this `inngest` client into TODO
-
-Or use individual events if using the `createFunction` helper directly.
+You can then import this `inngest` client into where you're creating functions or sending events:
 
 ```typescript
 import { inngest } from "./client";
-import { DemoEvent } from "./__generated__/inngest";
 
-const fn = createFunction<DemoEvent>("Demo function", "demo/demo.event", job);
-```
-
-Finally, sometimes you want to provide type safety before an event has reached your Inngest Cloud account. For this, we can pass extra custom event types to the generated `Events` type which will be silently overridden when these events appear in Inngest.
-
-```typescript
-const inngest = new Inngest<
-  Events<{
-    "app/user.created": { data: { id: string } };
-    "app/user.updated": AppUserUpdated;
-  }>
->({ name: "My App" });
+export default inngest.createFunction("Add to Intercom", "app/user.created", ({ event }) => ...);
 ```
 
 You can learn more about the Inngest SDK's TypeScript support on our [Using with TypeScript](/docs/typescript) page.
 
 ## Serving
 
-You can host your functions right in your existing application on _any platform_. Inngest will call your functions securely via HTTP request on-demand.
-
-To enable Inngest to access and call your functions, you need to set up the `serve()` handler to be accessible on it's own route. We recommend setting this up for `/api/inngest`. The `serve()` handler requires an `INNGEST_SIGNING_KEY` to be set as an environment variable, or explicitly passed as an options argument. For example, in a Next.js app, it looks like this:
+For Inngest to be able to call your functions, you need to serve them through an API endpoint. There is [a more in-depth and pre-framework documentation in here](/docs/sdk/serve), but after that is set up, you need add all of your functions to your `serve` handler. For example, in a [Next.js](/docs/sdk/serve#framework-next-js) project:
 
 ```typescript
-// ./pages/api/inngest.ts
-// Import the Next.js serve function
+// File: ./pages/api/inngest.ts
 import { serve } from "inngest/next";
+import addToIntercom from "../../inngest/addToIntercom";
+import sendWeeklyDigestCron from "../../inngest/sendWeeklyDigestCron";
 
-// Create or import your function(s)
-const fn = createFunction<DemoEvent>("Demo function", "demo/demo.event", job);
-
-// Serve them
-export default serve("My App", [fn, anotherFn]);
+// You need to serve all functions, event driven or scheduled:
+export default serve("My App", [addToIntercom, sendWeeklyDigestCron]);
 ```
 
+The `serve` handler enables Inngest to remotely and securely call your functions running on _any platform_. Check out [those docs for a deeper dive](/docs/sdk/serve).
 
-For a complete reference of the `serve()` handler, <a href="/docs/sdk/serve">view the reference documentation</a>.<br/>
-For in-depth guides for particular frameworks, find yours in the navigation under **"Frameworks."**
-
+## Show all served functions
 
 Now that your functions are being served via HTTP, open the route in your browser to view the SDK debug page. It will show you whether your functions are set up correctly, prompt you with what to change if not, and show you any next steps needed along the way!
 
 ![The SDK's local dashboard showing success](/assets/docs/sdk/landing.png)
-
-## Next up
-
-- **Triggering functions**: next, you’ll run through how you can trigger these functions by sending events.
-- **Deploying**: then, you’ll learn how to deploy to your platform of choice so that they’re live.
