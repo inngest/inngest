@@ -84,7 +84,7 @@ You can answer the questions however you'd like.  This creates a new `inngest-gu
 Within your Next.js project root, add the Inngest JS SDK via NPM or Yarn:
 
 ```shell
-npm install inngest # or: yarn add inngest
+npm install inngest # or yarn add inngest
 ```
 
 ### Add the API handler
@@ -110,9 +110,11 @@ This sets up the API endpoint for hosting and calling functions!  We'll update t
 Let's write your first reliable serverless function!  Create a new file at `./inngest/demo.ts` - you will have to make a new folder.  Within this file, add the following code:
 
 ```typescript
-import { createStepFunction } from "inngest";
+import { Inngest } from "inngest";
 
-export default createStepFunction("My first function", "test/demo", ({ event, tools }) => {
+const inngest = new Inngest({ name: "My app name" });
+
+export default inngest.createStepFunction("My first function", "test/demo", ({ event, tools }) => {
   tools.sleep("1 second");
   return { event, body: "hello!" }
 });

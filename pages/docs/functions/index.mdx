@@ -5,7 +5,7 @@ Follow along to learn how to:
 - Write a background function triggered by an event
 - Write a scheduled function
 
-Writing functions is the same no matter what platform you deploy to — so this example can be used for any TypeScript or JavaScript project (such as NextJS, Netlify, or Lambda).
+Writing functions is the same no matter what platform you deploy to — so this example can be used for any TypeScript or JavaScript project (such as Next.js, Netlify, or RedwoodJS).
 
 ## Install the SDK
 
@@ -17,20 +17,20 @@ npm install inngest  # or yarn add inngest
 
 ## Writing a background function
 
-Copy the following code into a new file in your project, for example within `./inngest/function.ts`
+Copy the following code into a new file in your project, for example within `./inngest/myFunction.ts`
 
 ```typescript
-import { createFunction } from "inngest";
+import { Inngest } from "inngest";
 
-// This function runs the code and will be called in the background.
-const job = async ({ event }) => {
-  return "hello!"; // You can write whatever you want here.
-}
+const inngest = new Inngest({ name: "My app" });
 
-export const demoFunction = createFunction<DemoEvent>(
-  "Demo function",   // The name of your function, used for observability.
-  "demo/demo.event", // The event that triggers this function.
-  job,               // The function code, defined above.
+export default inngest.createFunction(
+  "Import product images",   // The name of your function, used for observability.
+  "product.imported", // The event that triggers this function.
+  // This code will be called every time an event payload is received
+  async ({ event }) => {
+    return copyAllImagesToS3(event.data.imageURLs); // You can write whatever you want here.
+  }
 )
 ```
 
@@ -50,17 +50,17 @@ Using events to trigger functions has many benefits:
 The following code defines a scheduled function, which runs automatically using the specified cron schedule:
 
 ```typescript
-import { createScheduledFunction } from "inngest";
+import { Inngest } from "inngest";
 
-// This code will be called by the scheduled function.
-const job = async () => {
-  return "hello!"; // You can write whatever you want here.
-}
+const inngest = new Inngest({ name: "My app" });
 
-export createScheduledFunction(
-  "Demo function", // The name of your function, used for observability.
-  "0 * * * *",     // The cron syntax for the function
-  job,             // The function code, defined above.
+export default inngest.createScheduledFunction(
+  "Weekly digest email", // The name of your function, used for observability.
+  "0 9 * * MON",         // The cron syntax for the function
+  // This code will be called on the schedule above
+  async () => {
+    return await sendDigestToAllUsers(); // You can write whatever you want here.
+  }
 )
 ```
 
@@ -73,13 +73,13 @@ The following code defines a multi-step function, which you can use to coordinat
 Check out the <a href="/docs/functions/multi-step">Multi-step functions</a> page for more!
 
 ```typescript
-export default createStepFunction(
+export default inngest.createStepFunction(
   "Activation email",
   "app/user.created",
   ({ event, tools }) => {
     // Send the user a welcome email
     tools.run("Send welcome email", () =>
-      sendEmail({ email: event.user.email, template: "welcome" })
+      sendEmail({ email: event.data.email, template: "welcome" })
     );
 
     // Wait for the user to create an order, by waiting and
@@ -116,25 +116,33 @@ The Inngest SDK lets you strictly type all of your code against your real produc
 - Encourage discoverability of your events via autocomplete
 - Give you instant feedback as to whether your code will run as intended
 
-To use generated event types, just run the `types` command on the Inngest CLI. You can do this via `npx`:
-
-```sh
-npx inngest-cli types ts [--output my/file.ts]
-```
-
-This will - by default - create a file at `./__generated__/inngest.ts` with all of your event types. You can then pass these in to a `new Inngest()` client.
-
 ```typescript
+// file: inngest/client.ts
 import { Inngest } from "inngest";
-import { Events } from "./__generated__/inngest";
 
-const inngest = new Inngest<Events>({ name: "My App" });
+type AppUserCreated = {
+  name: "app/user.created";
+  data: {
+    email: string;
+  }
+  user: {
+    id: string;
+  }
+}
+
+type Events = {
+  "app/user.created": AppUserCreated;
+}
+
+export const inngest = new Inngest<Events>({ name: "My App" });
 ```
+
+You can then import this `inngest` client into TODO
 
 Or use individual events if using the `createFunction` helper directly.
 
 ```typescript
-import { createFunction } from "inngest";
+import { inngest } from "./client";
 import { DemoEvent } from "./__generated__/inngest";
 
 const fn = createFunction<DemoEvent>("Demo function", "demo/demo.event", job);

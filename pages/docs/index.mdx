@@ -30,7 +30,7 @@ Adding sleeps, retries, and reliable steps to a function:
 <CodeGroup>
 
 ```ts {{ language: 'ts' }}
-import { createStepFunction } from "inngest";
+import { Inngest } from "inngest";
 
 type UserSignup = {
   name: "user/new.signup",
@@ -40,7 +40,9 @@ type UserSignup = {
   }
 }
 
-export default createStepFunction<UserSignup>("Signup flow", "user/new.signup", ({ event, tools }) => {
+const inngest = new Inngest({ name: "My app" })
+
+export default inngest.createStepFunction<UserSignup>("Signup flow", "user/new.signup", ({ event, tools }) => {
   // If this step fails it will retry automatically.  It will only
   // run once if it succeeds ⚡
   const promo = tools.run("Generate promo code", async () => {
