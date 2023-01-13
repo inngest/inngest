@@ -51,10 +51,7 @@ export function Layout({ children, sections = [], title }) {
               className="fixed inset-y-0 left-0 z-40 contents w-72 overflow-y-auto border-r border-slate-900/10 px-6 pt-4 pb-8 dark:border-white/10 lg:block xl:w-80"
             >
               <div className="hidden lg:flex">
-                <a
-                  href="/"
-                  className="flex gap-1.5 group/logo items-center"
-                >
+                <a href="/" className="flex gap-1.5 group/logo items-center">
                   <Logo className="w-20 text-indigo-500 dark:text-white" />
                   <span className="mb-0.5 text-slate-700 dark:text-indigo-400 text-base group-hover/logo:text-slate-500 dark:group-hover/logo:text-white transition-color font-semibold">
                     Docs
