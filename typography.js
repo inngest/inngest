@@ -204,12 +204,18 @@ module.exports = ({ theme }) => ({
 
       // Media
       "img, video, figure": {
+        maxWidth: theme("maxWidth.2xl"),
         marginTop: theme("spacing.8"),
         marginBottom: theme("spacing.8"),
+        "@screen lg": {
+          maxWidth: theme("maxWidth.3xl"),
+        },
       },
-      video: {
+      "img, video": {
         width: "100%",
-        maxWidth: theme("maxWidth.2xl"),
+        "@screen lg": {
+          width: "inherit",
+        },
       },
       "figure > *": {
         marginTop: "0",
