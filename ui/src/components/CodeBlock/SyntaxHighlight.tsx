@@ -40,5 +40,14 @@ export const SyntaxHighlight = ({
   language = "json",
   className,
 }: SyntaxHighlightProps) => {
-  return <Refractor language={language} value={code} className={className} />;
+
+  // Some types are dyanmically asserted to be string;  this is a
+  // safety check in case an API fails to respond with what we expect.
+  // Refractor will throw an error and break the UI.
+  let value = code;
+  if (typeof code !== "string") {
+    value = JSON.stringify(code);
+  }
+
+  return <Refractor language={language} value={value} className={className} />;
 };
