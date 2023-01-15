@@ -1,0 +1,73 @@
+# Enqueueing future jobs
+
+You can enqueue jobs in the future within Inngest easily.  Inngest offers two ways to run jobs in the future:  delaying jobs for a specific amount of time (eg. run in 1 day), or running code at a specific date and time.  There are some benefits to enqueuing jobs using Inngest:
+
+- It works across any provider or platform
+- Delaying jobs is durable, and works across server restarts, serverless functions, and redeploys
+- You can enqueue jobs into the far future
+- Serverless functions are fully supported on all platforms
+- Our SDK bypasses serverless function timeouts on all platforms
+- You never need to manage queues or backlogs
+
+**Platform support**
+
+**This works across all providers and platforms**, whether you run serverless functions or use servers like express.  **It also bypasses serverless function timeouts** on all platforms, so you can sleep for a longer time than your provider supports.
+
+## Delaying jobs
+
+You can delay jobs using the `tools.sleep` utility:
+
+```tsx
+import { Inngest } from "inngest";
+
+const client = new Inngest({ app: "Signup flow" });
+
+export const fn = client.createFunction(
+  "Send signup email",
+  "user/created",
+  ({ event, tools }) => {
+    tools.sleep("1 hour");
+    tools.run("Do some work in the future", async () => {
+      // This runs after 1 hour
+    });
+  }
+);
+```
+
+For more information on `tools.sleep` read the tool documentation](/docs/functions/multi-step#sleep)
+
+
+## Running at specific times
+
+You can run jobs at a specific time using the `tools.sleepUntil` utility:
+
+```tsx
+import { Inngest } from "inngest";
+
+const client = new Inngest({ app: "Signup flow" });
+
+export const fn = client.createFunction(
+  "Send signup email",
+  "user/created",
+  ({ event, tools }) => {
+    tools.sleepUntil("2023-04-01T12:30:00");
+
+    // You can also sleep until a timestamp within the event data.  This lets you
+    // pass in a time for you to run the job:
+    tools.sleepUntil(event.data.run_at); // Assuming event.data.run_at is a timestamp.
+    
+    tools.run("Do some work in the future", async () => {
+      // This runs at the specified time.
+    });
+  }
+);
+```
+
+For more information on `tools.sleepUntil` read the tool documentation](/docs/functions/multi-step#sleep-until)
+
+## How it works
+
+In both methods, **the function controls when it runs**.  You control the flow of your code by calling `sleep` or `sleepUntil` within your function directly,
+instead of using the queue to manage your code's timing.  This keeps your logic together and makes your code easier to modify.
+
+Inngest *stops the function from running* for whatever time is specified.  When you call `tools.sleep` or `tools.sleepUntil` the function automatically stops running any future work. The function then tells the Inngest executor that it should be re-invoked at a future time.  We re-call the function at the next step, skipping any previous work.  This is how we bypass serverless function time limits and work across server restarts or redeploys.

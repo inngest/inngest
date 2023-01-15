@@ -255,6 +255,10 @@ export const navigation = [
         title: "Background jobs",
         href: `${baseDir}/guides/background-jobs`,
       },
+      {
+        title: "Enqueueing future jobs",
+        href: `${baseDir}/guides/enqueueing-future-jobs`,
+      },
       // {
       //   title: "Overview",
       //   href: `${baseDir}/guides`,
