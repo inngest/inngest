@@ -2,6 +2,7 @@ package expressions
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -119,6 +120,14 @@ func celDeclarations() []*exprpb.Decl {
 				decls.String,
 			),
 		),
+		decls.NewFunction(
+			"json_parse",
+			decls.NewOverload(
+				"json_parse",
+				[]*expr.Type{decls.String},
+				decls.Any,
+			),
+		),
 
 		// Time functions
 		decls.NewFunction(
@@ -198,6 +207,15 @@ func celOverloads() []*functions.Overload {
 				str, _ := i.Value().(string)
 				byt, _ := base64.StdEncoding.DecodeString(str)
 				return types.String(byt)
+			},
+		},
+		{
+			Operator: "json_parse",
+			Unary: func(i ref.Val) ref.Val {
+				str, _ := i.Value().(string)
+				mapped := map[string]interface{}{}
+				_ = json.Unmarshal([]byte(str), &mapped)
+				return types.NewStringInterfaceMap(types.DefaultTypeAdapter, mapped)
 			},
 		},
 		{

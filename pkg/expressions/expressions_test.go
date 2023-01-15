@@ -113,6 +113,47 @@ func TestEvaluateExpression(t *testing.T) {
 			false,
 			"",
 		},
+		// Base64 decoding a JSON map and accesing object
+		{
+			`json_parse(b64decode(event.data.encoded)).nested.data`,
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{
+						"encoded": "eyJuZXN0ZWQiOnsiZGF0YSI6InllYSJ9fQ==",
+						// this is the JSON-decoded base64 string above.
+						"decoded": map[string]any{
+							"nested": map[string]any{
+								"data": "yea",
+							},
+						},
+					},
+				},
+			},
+			"yea",
+			nil,
+			false,
+			"",
+		},
+		{
+			`json_parse(b64decode(event.data.encoded)).nested.data == "yea"`,
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{
+						"encoded": "eyJuZXN0ZWQiOnsiZGF0YSI6InllYSJ9fQ==",
+						// this is the JSON-decoded base64 string above.
+						"decoded": map[string]any{
+							"nested": map[string]any{
+								"data": "yea",
+							},
+						},
+					},
+				},
+			},
+			true,
+			nil,
+			false,
+			"",
+		},
 
 		// Basic boolean expressions
 		{
