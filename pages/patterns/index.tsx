@@ -157,7 +157,7 @@ export default function Patterns() {
             {SECTIONS.map((s, idx) => (
               <div
                 key={s.title}
-                className="gap-y-6 xl:gap-y-8 flex flex-col xl:grid xl:grid-cols-4 bg-slate-900/20 rounded-lg p-6"
+                className="gap-y-6 xl:gap-y-8 flex flex-col xl:grid xl:grid-cols-4 md:bg-slate-900/20 rounded-lg md:px-3 md:py-6 lg:p-6"
               >
                 <div className="flex items-center gap-4 xl:block">
                   <div className="w-10 h-10 bg-indigo-500 flex items-center justify-center text-lg font-bold text-white rounded">
@@ -174,7 +174,7 @@ export default function Patterns() {
                       href={`/patterns/${slug}`}
                       className="flex flex-col justify-between bg-slate-900 rounded-lg hover:bg-slate-50 group/card transition-all"
                     >
-                      <div className="px-8 py-6 h-full flex flex-col justify-between">
+                      <div className="px-6 py-4 lg:px-8 lg:py-6 h-full flex flex-col justify-between">
                         <div>
                           <h2 className="text-lg text-white group-hover/card:text-slate-700 font-semibold tracking-tight">
                             {title}

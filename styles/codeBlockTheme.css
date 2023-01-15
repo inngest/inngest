@@ -27,7 +27,7 @@ pre.shiki {
 }
 
 pre.shiki .line {
-  min-height: 1em;
+  /* min-height: 1em; */
 }
 
 pre.shiki .language-id {

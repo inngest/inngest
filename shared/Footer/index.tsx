@@ -25,7 +25,7 @@ export default function Footer() {
           <Button
             className="mt-4"
             arrow="right"
-            variant="secondary"
+            variant="tertiary"
             href="/sign-up?ref=callout"
           >
             Get started for free
