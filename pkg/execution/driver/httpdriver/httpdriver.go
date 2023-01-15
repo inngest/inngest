@@ -113,11 +113,22 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 	var body interface{}
 	body = json.RawMessage(byt)
 
-	// Is the response valid JSON?  If so, ensure that we don't re-marshal the
-	// JSON string.
-	respjson := map[string]interface{}{}
-	if err := json.Unmarshal(byt, &respjson); err == nil {
-		body = respjson
+	if len(byt) > 0 {
+		// Is the response valid JSON?  If so, ensure that we don't re-marshal the
+		// JSON string.
+		respjson := map[string]interface{}{}
+		if err := json.Unmarshal(byt, &respjson); err == nil {
+			body = respjson
+		} else {
+			// This isn't a map, so check the first character for json encoding.  If this isn't
+			// a string or array, then the body must be treated as text.
+			//
+			// This is a stop-gap safety check to see if SDKs respond with text that's not JSON,
+			// in the case of an internal issue or a host processing error we can't control.
+			if byt[0] != '[' && byt[0] != '"' {
+				body = string(byt)
+			}
+		}
 	}
 
 	// Add an error to driver.Response if the status code isn't 2XX.
