@@ -1,6 +1,7 @@
 package expressions
 
 import (
+	"encoding/base64"
 	"strings"
 	"time"
 
@@ -111,6 +112,16 @@ func celDeclarations() []*exprpb.Decl {
 			),
 		),
 		decls.NewFunction(
+			"b64decode",
+			decls.NewOverload(
+				"b64decode",
+				[]*expr.Type{decls.String},
+				decls.String,
+			),
+		),
+
+		// Time functions
+		decls.NewFunction(
 			"date",
 			decls.NewOverload(
 				"to_date",
@@ -179,6 +190,14 @@ func celOverloads() []*functions.Overload {
 			Unary: func(i ref.Val) ref.Val {
 				str, _ := i.Value().(string)
 				return types.String(strings.ToUpper(str))
+			},
+		},
+		{
+			Operator: "b64decode",
+			Unary: func(i ref.Val) ref.Val {
+				str, _ := i.Value().(string)
+				byt, _ := base64.StdEncoding.DecodeString(str)
+				return types.String(byt)
 			},
 		},
 		{
