@@ -63,72 +63,69 @@ export default function Patterns({
   compiledSource,
 }: Props) {
   return (
-    <div>
+    <div className="relative">
       <Header />
       <div className="fixed top-0 right-0 left-0 h-5 z-50 bg-green-500 sm:bg-blue-500 md:bg-indigo-500 lg:bg-purple-500 xl:bg-red-500 "></div>
 
       <div
+        className="top-0 left-0 right-0 m-auto bottom-0 absolute z-0 opacity-20"
         style={{
-          backgroundImage: "url(/assets/pricing/table-bg.png)",
-          backgroundPosition: "center -30px",
+          backgroundImage: "url(/assets/patterns/hero-blur.png)",
+          backgroundPosition: "center 140px",
           backgroundRepeat: "no-repeat",
           backgroundSize: "1800px 1200px",
         }}
-      >
-        <Container className="pt-12 pb-20">
-          <div className="text-left max-w-[65ch] m-auto lg:max-w-none">
-            <header>
-              <Button
-                href="/patterns"
-                variant="secondary"
-                size="sm"
-                arrow="left"
+      ></div>
+
+      <Container className="pt-12 pb-20">
+        <div className="text-left max-w-[65ch] m-auto lg:max-w-none">
+          <header>
+            <Button href="/patterns" variant="secondary" size="sm" arrow="left">
+              Back to Patterns
+            </Button>
+
+            <h1 className="text-white font-semibold text-3xl mt-8 sm:text-5xl tracking-tighter">
+              {title}
+            </h1>
+          </header>
+          <p className=" text-slate-300 text-base md:text-lg mt-2 mb-6 max-w-[640px]">
+            {subtitle}
+          </p>
+          <div className="flex gap-2">
+            {tags.map((t) => (
+              <span
+                key={t}
+                className="py-1 px-2 rounded bg-slate-800 text-slate-300 group-hover/card:bg-slate-200 group-hover/card:text-slate-500 transition-all font-medium text-xs"
               >
-                Back to Patterns
-              </Button>
-
-              <h1 className="text-white font-semibold text-3xl mt-8 sm:text-5xl tracking-tighter">
-                {title}
-              </h1>
-            </header>
-            <p className=" text-slate-300 text-base md:text-lg mt-2 mb-6 max-w-[640px]">
-              {subtitle}
-            </p>
-            <div className="flex gap-2">
-              {tags.map((t) => (
-                <span
-                  key={t}
-                  className="py-1 px-2 rounded bg-slate-800 text-slate-300 group-hover/card:bg-slate-200 group-hover/card:text-slate-500 transition-all font-medium text-xs"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
+                {t}
+              </span>
+            ))}
           </div>
-        </Container>
-        <div className="bg-slate-1000/80">
-          <Container className="lg:grid lg:grid-cols-4 pt-20">
-            <aside className="max-w-[65ch] bg-slate-500/20 sm:rounded p-6 -mx-6 sm:mx-auto mb-12 lg:col-start-4">
-              <h3 className="text-sm text-slate-400 font-medium">Jump to</h3>
-              <ol className="mt-4 flex flex-col gap-1">
-                {headings.map((h) => (
-                  <li key={h.slug} className=" ">
-                    <a
-                      href={`#${h.slug}`}
-                      className="text-white text-sm font-medium"
-                    >
-                      {h.title}
-                    </a>
-                  </li>
-                ))}
-              </ol>
-            </aside>
+        </div>
+      </Container>
+      <div className="bg-slate-1000/80">
+        <Container className="lg:grid lg:grid-cols-3 sm:pt-8 md:pt-12 lg:pt-20">
+          <aside className="max-w-[65ch] bg-slate-500/20 sm:rounded p-6 xl:p-8 lg:sticky top-32 -mx-6 sm:mx-auto mb-12 lg:col-start-4 self-start ">
+            <h3 className="text-sm text-slate-400 font-medium">Jump to</h3>
+            <ol className="mt-2 flex flex-col gap-1">
+              {headings.map((h) => (
+                <li key={h.slug} className=" ">
+                  <a
+                    href={`#${h.slug}`}
+                    className="text-white text-sm font-medium tracking-tight xl:text-base hover:underline transition-all"
+                  >
+                    {h.title}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </aside>
 
-            {/* <article className="col-span-3 row-start-1 col-start-1 xl:col-start-2 xl:col-span-3 max-w-[65ch] prose m-auto mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert"> */}
-            <article className="lg:col-span-3 lg:col-start-1 lg:row-start-1 max-w-[65ch] lg:max-w-none m-auto lg:m-0 prose mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-400 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
-              <MDXRemote compiledSource={compiledSource} components={{}} />
-            </article>
-            {/* <div className="col-start-2 col-span-3 max-w-[65ch]">
+          {/* <article className="col-span-3 row-start-1 col-start-1 xl:col-start-2 xl:col-span-3 max-w-[65ch] prose m-auto mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert"> */}
+          <article className="lg:col-span-3 lg:pr-20 lg:col-start-1 lg:row-start-1 max-w-[65ch] lg:max-w-none m-auto lg:m-0 prose mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-400 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
+            <MDXRemote compiledSource={compiledSource} components={{}} />
+          </article>
+          {/* <div className="col-start-2 col-span-3 max-w-[65ch]">
           <Button
             href="/patterns"
             variant="secondary"
@@ -139,9 +136,9 @@ export default function Patterns({
             Back to Patterns
           </Button>
         </div> */}
-          </Container>
-        </div>
+        </Container>
       </div>
+
       <Footer />
     </div>
   );
