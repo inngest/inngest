@@ -112,7 +112,7 @@ export default function Patterns({
                 <li key={h.slug} className=" ">
                   <a
                     href={`#${h.slug}`}
-                    className="text-white text-sm font-medium tracking-tight xl:text-base hover:underline transition-all leading-tight "
+                    className="text-white text-sm font-medium tracking-tight  hover:underline transition-all leading-tight "
                   >
                     {h.title}
                   </a>
