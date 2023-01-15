@@ -226,8 +226,11 @@ Because Inngest communicates with your function multiple times, memoising state 
 This can be confusing if you're using steps to update variables within the function's closure, like so:
 
 ```ts
+// THIS IS WRONG!  tools.run only runs once and is skipped for future
+// steps, so userID will not be defined.
 let userId;
 
+// Do NOT do this!  Instead, return data from tools.run.
 tools.run("Get user", async () => {
   userId = await getRandomUserId()
 });
@@ -238,6 +241,7 @@ console.log(userId); // undefined
 Instead, make sure that any variables needed for the overall function are _returned_ from calls to `tools.run()`:
 
 ```ts
+// This is the right way to set variables within tools.run :)
 const userId = tools.run("Get user", () => getRandomUserId());
 
 console.log(userId); // 123

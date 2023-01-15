@@ -259,6 +259,10 @@ export const navigation = [
         title: "Enqueueing future jobs",
         href: `${baseDir}/guides/enqueueing-future-jobs`,
       },
+      {
+        title: "Scheduled functions",
+        href: `${baseDir}/guides/scheduled-functions`,
+      },
       // {
       //   title: "Overview",
       //   href: `${baseDir}/guides`,

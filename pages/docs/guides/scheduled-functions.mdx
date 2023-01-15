@@ -1,0 +1,43 @@
+# Scheduled functions
+
+You can create scheduled jobs using cron schedules within Inngest natively.  Inngest’s cron schedules also support timezones, allowing you to schedule work in whatever timezone you need work to run in.
+
+You can create scheduled functions that run in any timezone using the `createScheduledFunction` helper:
+
+```tsx
+import { Inngest } from "inngest";
+
+const client = new Inngest({ app: "Signup flow" });
+
+export const fn = client.createScheduledFunction(
+  "Send weekly debrief",
+  "TZ=Europe/Paris 0 12 * * 5",
+  ({ event, tools }) => {
+    const users = tools.run("Load users", () => {
+      return db.load("SELECT * FROM users");
+    });
+
+    users.forEach(u => {
+      // This uses a 'fan-out' pattern to invoke another function
+      // concurrently (with its own retries) to send digests to users.
+      // It's possile to use `tools.run` here, though this pattern works
+      // best with many users.
+      tools.send({
+        name: "app/send-weekly-digest",
+        data: {
+          user_id: u.id,
+          email: u.email,
+        }
+      });
+    });
+  }
+);
+```
+
+You can read more ab
+
+<aside>
+👉 Note: You’ll need to [serve this function in your inngest API](/docs/sdk/serve) for the function to be available to Inngest.
+</aside>
+
+On the free plan, if your function fails 20 times consecutively it will automatically be paused.
