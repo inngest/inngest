@@ -53,11 +53,109 @@ func TestEvaluateExpression(t *testing.T) {
 		expr string
 		data map[string]interface{}
 
-		expected  bool
+		expected  any
 		earliest  *time.Time
 		shouldErr bool
 		errMsg    string
 	}{
+		// Returning data
+		{
+			"event.data.name",
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{
+						"name": "Tester McTestyFace",
+					},
+				},
+			},
+			"Tester McTestyFace",
+			nil,
+			false,
+			"",
+		},
+		{
+			"uppercase(event.data.name) + ' is my name'",
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{
+						"name": "Tester McTestyFace",
+					},
+				},
+			},
+			"TESTER MCTESTYFACE is my name",
+			nil,
+			false,
+			"",
+		},
+
+		// Base64 decoding
+		{
+			`b64decode("aGkgdGhlcmUh") + " - b64 data"`,
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{},
+				},
+			},
+			"hi there! - b64 data",
+			nil,
+			false,
+			"",
+		},
+		{
+			`b64decode("aGkgdGhlcmUh") == "hi there!"`,
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{},
+				},
+			},
+			true,
+			nil,
+			false,
+			"",
+		},
+		// Base64 decoding a JSON map and accesing object
+		{
+			`json_parse(b64decode(event.data.encoded)).nested.data`,
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{
+						"encoded": "eyJuZXN0ZWQiOnsiZGF0YSI6InllYSJ9fQ==",
+						// this is the JSON-decoded base64 string above.
+						"decoded": map[string]any{
+							"nested": map[string]any{
+								"data": "yea",
+							},
+						},
+					},
+				},
+			},
+			"yea",
+			nil,
+			false,
+			"",
+		},
+		{
+			`json_parse(b64decode(event.data.encoded)).nested.data == "yea"`,
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{
+						"encoded": "eyJuZXN0ZWQiOnsiZGF0YSI6InllYSJ9fQ==",
+						// this is the JSON-decoded base64 string above.
+						"decoded": map[string]any{
+							"nested": map[string]any{
+								"data": "yea",
+							},
+						},
+					},
+				},
+			},
+			true,
+			nil,
+			false,
+			"",
+		},
+
+		// Basic boolean expressions
 		{
 			"null > 0",
 			map[string]interface{}{
