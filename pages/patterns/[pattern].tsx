@@ -1,14 +1,16 @@
 import React from "react";
-import styled from "@emotion/styled";
 import { GetStaticProps, GetStaticPaths } from "next";
 import Link from "next/link";
 import { MDXRemote } from "next-mdx-remote";
 
-import Nav from "src/shared/legacy/nav";
-import Footer from "src/shared/legacy/Footer";
+import Container from "src/shared/layout/Container";
+import Header from "../../shared/Header";
+import Footer from "../../shared/Footer";
 import { loadMarkdownFile, Heading } from "utils/markdown";
-
-import { SECTIONS, Page, Content } from "./index";
+import * as MDXComponents from "../../shared/Patterns/mdx";
+import { SECTIONS } from "./index";
+import { Button } from "src/shared/Button";
+import DebugBreakpoints from "src/shared/DebugBreakpoints";
 
 const getPatternProps = (slug: string) => {
   return SECTIONS.map((s) => s.articles)
@@ -26,6 +28,7 @@ export const getStaticProps: GetStaticProps = async (ctx) => {
     props: {
       ...pageInfo,
       ...pageData,
+      designVersion: "2",
       meta: {
         title: "Patterns: Async + Event-Driven",
         description:
@@ -60,110 +63,86 @@ export default function Patterns({
   headings,
   compiledSource,
 }: Props) {
-  const sectionClasses = `max-w-2xl mx-auto px-6 lg:px-4 text-left`;
   return (
-    <Page>
-      <Nav sticky={true} />
+    <div className="relative">
+      <Header />
 
-      <Content>
-        {/* Background styles */}
-        <div>
-          {/* Content layout */}
-          <div className={`${sectionClasses} mt-28 mb-14`}>
-            <div className="flex flex-col gap-4">
-              <header className="mt-2">
-                <p className="text-xs font-normal flex gap-1">
-                  <Link
-                    href="/patterns"
-                    className="text-almost-black transition-all duration-300 hover:-translate-x-0.5"
-                  >
-                    <span className="text-slate-400">←</span> Patterns{" "}
-                    <span className="text-slate-400">Async + Event-Driven</span>
-                  </Link>
-                </p>
+      <div
+        className="top-0 left-0 right-0 m-auto bottom-0 absolute z-0 opacity-20"
+        style={{
+          backgroundImage: "url(/assets/patterns/hero-blur.png)",
+          backgroundPosition: "center 140px",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "1800px 1200px",
+        }}
+      ></div>
 
-                <h1 className="mt-2 tracking-tight">{title}</h1>
-              </header>
-              <p className="my-2 text-slate-600">{subtitle}</p>
-              <div className="flex gap-2">
-                {tags.map((t) => (
-                  <span
-                    key={t}
-                    className="py-1 px-2 rounded-full bg-slate-100 text-slate-600"
-                    style={{ fontSize: "0.6rem" }}
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </div>
+      <Container className="pt-12 pb-20">
+        <div className="text-left max-w-[65ch] m-auto lg:max-w-none">
+          <header>
+            <Button href="/patterns" variant="secondary" size="sm" arrow="left">
+              Back to Patterns
+            </Button>
+
+            <h1 className="text-white font-semibold text-3xl mt-8 sm:text-5xl tracking-tighter">
+              {title}
+            </h1>
+          </header>
+          <p className=" text-indigo-200 text-base md:text-lg mt-2 mb-6 max-w-[640px]">
+            {subtitle}
+          </p>
+          <div className="flex gap-2">
+            {tags.map((t) => (
+              <span
+                key={t}
+                className="py-1 px-2 rounded bg-slate-800 text-slate-300 group-hover/card:bg-slate-200 group-hover/card:text-slate-500 transition-all font-medium text-xs"
+              >
+                {t}
+              </span>
+            ))}
           </div>
         </div>
+      </Container>
+      <div className="bg-slate-1000/80">
+        <Container className="lg:grid lg:grid-cols-3 sm:pt-8 md:pt-12 lg:pt-20">
+          <aside className="max-w-[65ch] lg:max-w-[320px] xl:max-w-[400px] bg-slate-500/20 sm:rounded p-6 pr-8 xl:pr-12 xl:p-8 lg:sticky top-32 -mx-6 sm:mx-auto mb-12 lg:col-start-4 self-start ">
+            <h3 className="text-sm text-slate-400 font-medium">Jump to</h3>
+            <ol className="mt-2 flex flex-col gap-2">
+              {headings.map((h) => (
+                <li key={h.slug} className=" ">
+                  <a
+                    href={`#${h.slug}`}
+                    className="text-white text-sm font-medium tracking-tight  hover:underline transition-all leading-tight "
+                  >
+                    {h.title}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </aside>
 
-        {/* Background styles */}
-        <JumpLinks className={`${sectionClasses}`}>
-          <h3 className="text-sm">Jump to</h3>
-          <ol className="mt-2">
-            {headings.map((h) => (
-              <li key={h.slug} className="text-xs">
-                <a href={`#${h.slug}`}>→ {h.title}</a>
-              </li>
-            ))}
-          </ol>
-        </JumpLinks>
+          {/* <article className="col-span-3 row-start-1 col-start-1 xl:col-start-2 xl:col-span-3 max-w-[65ch] prose m-auto mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert"> */}
+          <article className="lg:col-span-3 lg:pr-12 xl:pr-20 lg:col-start-1 lg:row-start-1 max-w-[65ch] lg:max-w-none m-auto lg:m-0 prose mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-400 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
+            <MDXRemote
+              compiledSource={compiledSource}
+              components={MDXComponents}
+            />
+          </article>
+          {/* <div className="col-start-2 col-span-3 max-w-[65ch]">
+          <Button
+            href="/patterns"
+            variant="secondary"
+            size="sm"
+            arrow="left"
+            className="col-start-2 place-self-start"
+          >
+            Back to Patterns
+          </Button>
+        </div> */}
+        </Container>
+      </div>
 
-        <Article>
-          {/* Content layout */}
-          <div className={`${sectionClasses} my-14`}>
-            <MDXRemote compiledSource={compiledSource} components={{}} />
-
-            <p className="mt-24 text-2xl font-normal flex gap-1">
-              <Link
-                href="/patterns"
-                className="text-almost-black transition-all	duration-300 hover:-translate-x-1"
-              >
-                <span className="text-slate-400">←</span> View All Patterns
-              </Link>
-            </p>
-          </div>
-        </Article>
-      </Content>
       <Footer />
-    </Page>
+    </div>
   );
 }
-
-const JumpLinks = styled.aside`
-  @media (min-width: calc(840px + 2 * (300px + 1rem))) {
-    position: fixed;
-    top: calc(
-      32px + 87px + 7rem + 2rem
-    ); // banner + nav + header margin(s) + backlink
-    right: 1rem;
-  }
-`;
-
-const Article = styled.article`
-  // For vertical margin for scroll anchors
-  h2,
-  h3 {
-    scroll-margin-top: 120px; /* Height of nav + margin */
-  }
-
-  h2 {
-    margin: 1.5rem 0 1rem;
-    font-size: 1.25rem;
-    line-height: 1.75rem;
-    letter-spacing: -0.025em;
-  }
-  ol,
-  ul {
-    margin: 1.5rem 0 1.5rem 1.5rem;
-  }
-  ol {
-    list-style: decimal;
-  }
-  ul {
-    list-style: circle;
-  }
-`;

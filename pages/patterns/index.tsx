@@ -2,8 +2,10 @@ import React from "react";
 import styled from "@emotion/styled";
 import Link from "next/link";
 
-import Nav from "src/shared/legacy/nav";
-import Footer from "src/shared/legacy/Footer";
+import Header from "../../shared/Header";
+import Footer from "../../shared/Footer";
+import Container from "../../shared/layout/Container";
+import ArrowRight from "src/shared/Icons/ArrowRight";
 
 interface Section {
   title: string;
@@ -114,6 +116,7 @@ const zeroPad = (n: number, digits = 2): string => {
 export async function getStaticProps() {
   return {
     props: {
+      designVersion: "2",
       meta: {
         title: "Patterns: Async + Event-Driven",
         description:
@@ -125,100 +128,112 @@ export async function getStaticProps() {
 }
 
 export default function Patterns() {
-  const sectionClasses = `max-w-2xl mx-auto text-left`;
   return (
-    <Page>
-      <Nav sticky={true} />
+    <div>
+      <Header />
 
-      <Content className="py-28">
-        {/* Background styles */}
-        <div>
-          {/* Content layout */}
-          <div className={`${sectionClasses}mb-14 px-6 lg:px-4 flex gap-16`}>
-            <div className="flex flex-col gap-4">
-              <header className="mt-2">
-                <h1 className="text-5xl font-normal flex flex-col gap-2">
-                  Patterns{" "}
-                  <span className="text-xl font-medium text-slate-400">
-                    Async + Event-Driven
-                  </span>
-                </h1>
-              </header>
-              <p className="my-4 text-slate-600">
-                Building with events sometimes requires a different way to look
-                at the problem & solution. These common patterns walk through
-                what the solutions look like with or without using events.
-              </p>
-            </div>
-            <div style={{ maxWidth: "30%" }} className="hidden sm:block">
-              <img
-                src="/assets/patterns/patterns-hero.png"
-                className="max-w-full rounded-lg"
-              />
-            </div>
-          </div>
-        </div>
+      <div
+        style={{
+          backgroundImage: "url(/assets/pricing/table-bg.png)",
+          backgroundPosition: "center -30px",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "1800px 1200px",
+        }}
+      >
+        <Container>
+          <h1 className="text-3xl lg:text-5xl text-white mt-12 md:mt-20 font-semibold tracking-tight">
+            Patterns
+          </h1>
+          <p className="text-xl text-slate-100">Async + Event-Driven</p>
+          <p className="my-4 text-indigo-200 max-w-xl  mb-16 md:mb-28">
+            Building with events sometimes requires a different way to look at
+            the problem & solution. These common patterns walk through what the
+            solutions look like with or without using events.
+          </p>
 
-        {/* Background styles */}
-        <section>
-          {/* Content layout */}
-          <div className={`${sectionClasses} my-14 px-6 lg:px-4`}>
+          <section className="flex flex-col gap-12">
+            {/* Content layout */}
+
             {SECTIONS.map((s, idx) => (
-              <div key={s.title} className="my-8">
-                <div className="flex">
-                  <div className="w-11 text-2xl font-bold text-slate-400">
+              <div
+                key={s.title}
+                className="gap-y-6 xl:gap-y-8 flex flex-col xl:grid xl:grid-cols-4 md:bg-slate-900/20 rounded-lg md:px-3 md:py-6 lg:p-6"
+              >
+                <div className="flex items-center gap-4 xl:block">
+                  <div className="w-10 h-10 bg-indigo-500 flex items-center justify-center text-lg font-bold text-white rounded">
                     {zeroPad(idx + 1)}
                   </div>
-                  <h2 className="text-2xl">{s.title}</h2>
+                  <h2 className="text-xl xl:mt-4 text-white font-medium tracking-tight">
+                    {s.title}
+                  </h2>
                 </div>
-                <div className="ml-11 my-6 flex flex-col gap-6">
+                <div className="grid col-span-3 md:grid-cols-2 gap-x-6 gap-y-6">
                   {s.articles.map(({ title, subtitle, tags, slug }) => (
                     <Link
                       key={slug}
                       href={`/patterns/${slug}`}
-                      className="flex flex-col text-almost-black"
+                      className="flex flex-col justify-between bg-slate-900 rounded-lg hover:bg-slate-50 group/card transition-all"
                     >
-                      <h2 className="text-lg text-color-dark-purple">
-                        {title}
-                      </h2>
-                      <p className="text-sm mt-1 mb-3">{subtitle}</p>
-                      <div className="flex gap-2">
+                      <div className="px-6 py-4 lg:px-8 lg:py-6 h-full flex flex-col justify-between">
+                        <div>
+                          <h2 className="text-lg text-white group-hover/card:text-slate-700 font-semibold tracking-tight">
+                            {title}
+                          </h2>
+                          <p className="text-sm mt-1 mb-3 text-indigo-200 group-hover/card:text-slate-500 font-regular tracking-tight">
+                            {subtitle}.
+                          </p>
+                        </div>
+                        <span className="text-sm text-indigo-400 font-medium group-hover/card:text-indigo-500 transition-all flex items-center gap-1">
+                          Read pattern
+                          <ArrowRight className="group-hover/card:translate-x-1 transition-transform duration-150  -mr-1.5" />
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 bg-slate-950 group-hover/card:bg-slate-100  rounded-b-lg py-3 px-6 border-t border-slate-800/60 group-hover/card:border-slate-200 transition-all">
                         {tags.map((t) => (
                           <span
                             key={t}
-                            className="py-1 px-2 rounded-full bg-slate-100 text-slate-600"
-                            style={{ fontSize: "0.6rem" }}
+                            className="py-1 px-2 rounded bg-slate-800 text-slate-300 group-hover/card:bg-slate-200 group-hover/card:text-slate-500 transition-all font-medium text-xs"
                           >
                             {t}
                           </span>
                         ))}
                       </div>
                     </Link>
+                    // <Link
+                    //   key={slug}
+                    //   href={`/patterns/${slug}`}
+                    //   className="flex flex-col bg-white rounded-lg"
+                    // >
+                    //   <div className="px-8 py-6">
+                    //     <h2 className="text-lg text-slate-700 font-semibold tracking-tight">
+                    //       {title}
+                    //     </h2>
+                    //     <p className="text-sm mt-1 mb-3 text-slate-600 font-regular tracking-tight">
+                    //       {subtitle}.
+                    //     </p>
+                    //     <span className="text-sm text-indigo-500 font-medium">
+                    //       Read pattern
+                    //     </span>
+                    //   </div>
+                    //   <div className="flex gap-2 bg-slate-100 rounded-b-lg py-3 px-6 border-t border-slate-200/60">
+                    //     {tags.map((t) => (
+                    //       <span
+                    //         key={t}
+                    //         className="py-1 px-2 rounded bg-slate-200 text-slate-600 font-medium text-xs"
+                    //       >
+                    //         {t}
+                    //       </span>
+                    //     ))}
+                    //   </div>
+                    // </Link>
                   ))}
                 </div>
               </div>
             ))}
-          </div>
-        </section>
-      </Content>
+          </section>
+        </Container>
+      </div>
       <Footer />
-    </Page>
+    </div>
   );
 }
-
-export const Page = styled.div`
-  background: radial-gradient(
-    circle at 34% 290px,
-    rgb(223 217 229 / 70%) 0,
-    transparent 12%,
-    transparent 100%
-  );
-  background-repeat: no-repeat;
-`;
-
-export const Content = styled.div`
-  --font: "Inter", Helvetica, "SF Pro Display", -apple-system,
-    BlinkMacSystemFont, Roboto, Open Sans, sans-serif;
-  --font-heading: var(--font);
-  font-family: var(--font);
-`;
