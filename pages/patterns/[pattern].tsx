@@ -7,7 +7,7 @@ import Container from "src/shared/layout/Container";
 import Header from "../../shared/Header";
 import Footer from "../../shared/Footer";
 import { loadMarkdownFile, Heading } from "utils/markdown";
-
+import * as MDXComponents from "../../shared/Patterns/mdx";
 import { SECTIONS } from "./index";
 import { Button } from "src/shared/Button";
 import DebugBreakpoints from "src/shared/DebugBreakpoints";
@@ -88,7 +88,7 @@ export default function Patterns({
               {title}
             </h1>
           </header>
-          <p className=" text-slate-300 text-base md:text-lg mt-2 mb-6 max-w-[640px]">
+          <p className=" text-indigo-200 text-base md:text-lg mt-2 mb-6 max-w-[640px]">
             {subtitle}
           </p>
           <div className="flex gap-2">
@@ -105,7 +105,7 @@ export default function Patterns({
       </Container>
       <div className="bg-slate-1000/80">
         <Container className="lg:grid lg:grid-cols-3 sm:pt-8 md:pt-12 lg:pt-20">
-          <aside className="max-w-[65ch] bg-slate-500/20 sm:rounded p-6 xl:p-8 lg:sticky top-32 -mx-6 sm:mx-auto mb-12 lg:col-start-4 self-start ">
+          <aside className="max-w-[65ch] bg-slate-500/20 sm:rounded p-6 pr-8 xl:pr-12 xl:p-8 lg:sticky top-32 -mx-6 sm:mx-auto mb-12 lg:col-start-4 self-start ">
             <h3 className="text-sm text-slate-400 font-medium">Jump to</h3>
             <ol className="mt-2 flex flex-col gap-1">
               {headings.map((h) => (
@@ -123,7 +123,10 @@ export default function Patterns({
 
           {/* <article className="col-span-3 row-start-1 col-start-1 xl:col-start-2 xl:col-span-3 max-w-[65ch] prose m-auto mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert"> */}
           <article className="lg:col-span-3 lg:pr-20 lg:col-start-1 lg:row-start-1 max-w-[65ch] lg:max-w-none m-auto lg:m-0 prose mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-400 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
-            <MDXRemote compiledSource={compiledSource} components={{}} />
+            <MDXRemote
+              compiledSource={compiledSource}
+              components={MDXComponents}
+            />
           </article>
           {/* <div className="col-start-2 col-span-3 max-w-[65ch]">
           <Button
