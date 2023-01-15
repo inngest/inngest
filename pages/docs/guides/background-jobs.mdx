@@ -22,7 +22,7 @@ const client = new Inngest({ app: "Signup flow" });
 
 export const fn = client.createFunction(
   "Send signup email",   // Function name
-  "user/created",        // 
+  "user/created",        // Trigger
   ({ event, tools }) => {
 
     // This runs in the background any time the `user/created` event is
