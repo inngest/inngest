@@ -10,6 +10,7 @@ import { loadMarkdownFile, Heading } from "utils/markdown";
 
 import { SECTIONS } from "./index";
 import { Button } from "src/shared/Button";
+import DebugBreakpoints from "src/shared/DebugBreakpoints";
 
 const getPatternProps = (slug: string) => {
   return SECTIONS.map((s) => s.articles)
@@ -65,7 +66,6 @@ export default function Patterns({
   return (
     <div className="relative">
       <Header />
-      <div className="fixed top-0 right-0 left-0 h-5 z-50 bg-green-500 sm:bg-blue-500 md:bg-indigo-500 lg:bg-purple-500 xl:bg-red-500 "></div>
 
       <div
         className="top-0 left-0 right-0 m-auto bottom-0 absolute z-0 opacity-20"
