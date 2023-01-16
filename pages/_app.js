@@ -46,9 +46,12 @@ function MyApp({ Component, pageProps }) {
     if (pageProps.designVersion) {
       htmlEl.classList.add(`v${pageProps.designVersion}`);
     } else if (isDocs) {
-      htmlEl.classList.add(`v2`, `docs`);
+      htmlEl.classList.add(`v2`);
     } else {
       htmlEl.classList.add(`v1`);
+    }
+    if (isDocs) {
+      htmlEl.classList.add(`docs`);
     }
   });
   useEffect(() => {
