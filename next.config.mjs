@@ -3,6 +3,19 @@ import { remarkPlugins } from "./mdx/remark.mjs";
 import { rehypePlugins } from "./mdx/rehype.mjs";
 import { recmaPlugins } from "./mdx/recma.mjs";
 
+// All permanent redirects (source -> destination)
+const legacyDocsUrls = [
+  ["/docs/what-is-inngest", "/docs"],
+  ["/docs/reference/functions/retries", "/docs/functions/retries"],
+  ["/docs/creating-an-event-key", "/docs/events/creating-an-event-key"],
+  ["/docs/writing-and-running-fuctions", "/docs/functions"], //typo
+  ["/docs/cli/steps/", "/docs/functions/multi-step"],
+  ["/docs/local-development", "/docs/functions/testing-functions"],
+  ["/docs/events/sources/sdks", "/docs/events"],
+  ["/docs/deploying-fuctions", "/docs/deploy"],
+  ["/docs/how-inngest-works", "/docs"], // TODO/DOCS redirect this to new concepts page
+];
+
 async function redirects() {
   return [
     {
@@ -19,6 +32,16 @@ async function redirects() {
       // From the UI's source editing page:
       source: "/docs/event-webhooks",
       destination: "/docs/events/webhooks",
+      permanent: true,
+    },
+    ...legacyDocsUrls.map(([source, destination]) => ({
+      source,
+      destination,
+      permanent: true,
+    })),
+    {
+      source: "/library/:path*",
+      destination: "/patterns",
       permanent: true,
     },
   ];

@@ -92,13 +92,11 @@ createFunction<MyEventType>("My handler", "my.event", ({ event }) => {
       type: "Docs",
       href: "/docs/typescript",
     },
-    // TODO/DOCS - Add guide for background jobs when complete
-    // {
-    //   title: "Running Background Jobs",
-    //   description:
-    //     "How to background jobs without the queues and workers.",
-    //   type: "Guide",
-    //   href: "/docs/guides/background-jobs",
-    // },
+    {
+      title: "Running Background Jobs",
+      description: "How to background jobs without the queues and workers.",
+      type: "Guide",
+      href: "/docs/guides/background-jobs",
+    },
   ],
 };
