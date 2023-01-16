@@ -19,12 +19,12 @@ import { headerLinks } from "./Navigation";
 function TopLevelNavItem({ href, children }) {
   return (
     <li>
-      <Link
+      <a
         href={href}
         className="text-sm leading-5 text-slate-600 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
       >
         {children}
-      </Link>
+      </a>
     </li>
   );
 }
