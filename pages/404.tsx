@@ -40,9 +40,9 @@ const getCode = ({ pathname }) => {
   return `inngest.send({
   name: "website/page.not.found",
   data: {
-    pathname: "${pathname}"
+    path: "${pathname}"
   },
-  v: "2022-01-16.1",
+  v: "2022-01-16.2",
   ts: ${new Date().valueOf()},
 })`;
 };
@@ -122,9 +122,9 @@ const TrackPageNotFound = ({ pathname }) => {
         Inngest.event({
           name: "website/page.not.found",
           data: {
-            pathname: "${pathname}",
+            path: "${pathname}",
           },
-          v: "2022-01-16.1"
+          v: "2022-01-16.2"
         });
       `,
       }}
