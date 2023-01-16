@@ -97,10 +97,10 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 }
 
 // GetEdge returns the edge from the enqueued item, if the payload is of type PayloadEdge.
-func GetEdge(i Item) (*inngest.Edge, error) {
+func GetEdge(i Item) (*PayloadEdge, error) {
 	switch v := i.Payload.(type) {
 	case PayloadEdge:
-		return &v.Edge, nil
+		return &v, nil
 	default:
 		return nil, fmt.Errorf("unable to get edge from payload type: %T", v)
 	}
@@ -110,6 +110,10 @@ func GetEdge(i Item) (*inngest.Edge, error) {
 // the incoming step of the edge.
 type PayloadEdge struct {
 	Edge inngest.Edge `json:"edge"`
+	// StackIndex represents the current index within the run state
+	// when enqueueing the next step.  This is necessary to calculate
+	// steps with parallelism within SDKs.
+	StackIndex int `json:"idx"`
 }
 
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.

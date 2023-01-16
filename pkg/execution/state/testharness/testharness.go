@@ -108,6 +108,7 @@ func CheckState(t *testing.T, gen Generator) {
 		"SaveResponse/Error":                 checkSaveResponse_error,
 		"SaveResponse/OutputOverwritesError": checkSaveResponse_outputOverwritesError,
 		"SaveResponse/Concurrent":            checkSaveResponse_concurrent,
+		"SaveResponse/Stack":                 checkSaveResponse_stack,
 		"SavePause":                          checkSavePause,
 		"LeasePause":                         checkLeasePause,
 		"ConsumePause":                       checkConsumePause,
@@ -267,7 +268,10 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 		},
 	}
 
-	next, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+	_, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+	require.NoError(t, err)
+
+	next, err := m.Load(ctx, s.Identifier().RunID)
 	require.NoError(t, err)
 	require.NotNil(t, next)
 
@@ -306,8 +310,13 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 		},
 	}
 
-	next, err = m.SaveResponse(ctx, s.Identifier(), r2, 1)
+	_, err = m.SaveResponse(ctx, s.Identifier(), r2, 1)
 	require.NoError(t, err)
+
+	next, err = m.Load(ctx, s.Identifier().RunID)
+	require.NoError(t, err)
+	require.NotNil(t, next)
+
 	require.EqualValues(t, s.Identifier(), next.Identifier())
 	require.EqualValues(t, s.Workflow(), next.Workflow())
 	require.EqualValues(t, s.Event(), next.Event())
@@ -360,9 +369,13 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	require.True(t, r.Retryable())
 	require.False(t, r.Final())
 
-	next, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+	_, err = m.SaveResponse(ctx, s.Identifier(), r, 0)
+	require.NoError(t, err)
+
+	next, err := m.Load(ctx, s.Identifier().RunID)
 	require.NoError(t, err)
 	require.NotNil(t, next)
+
 	require.Nil(t, next.Actions()[r.Step.ID])
 	require.Contains(t, next.Errors()[r.Step.ID].Error(), r.Err.Error())
 
@@ -376,8 +389,13 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	require.False(t, r.Retryable())
 	require.True(t, r.Final())
 
-	finalized, err := m.SaveResponse(ctx, s.Identifier(), r, 1)
+	_, err = m.SaveResponse(ctx, s.Identifier(), r, 1)
 	require.NoError(t, err)
+
+	finalized, err := m.Load(ctx, s.Identifier().RunID)
+	require.NoError(t, err)
+	require.NotNil(t, next)
+
 	require.Nil(t, finalized.Actions()[r.Step.ID])
 	require.Contains(t, finalized.Errors()[r.Step.ID].Error(), r.Err.Error())
 
@@ -400,9 +418,13 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 	require.True(t, r.Retryable())
 	require.False(t, r.Final())
 
-	next, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+	_, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+	require.NoError(t, err)
+
+	next, err := m.Load(ctx, s.Identifier().RunID)
 	require.NoError(t, err)
 	require.NotNil(t, next)
+
 	require.Nil(t, next.Actions()[r.Step.ID])
 	require.Contains(t, next.Errors()[r.Step.ID].Error(), r.Err.Error())
 
@@ -415,8 +437,13 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 	}
 	require.False(t, r.Final())
 
-	finalized, err := m.SaveResponse(ctx, s.Identifier(), r, 1)
+	_, err = m.SaveResponse(ctx, s.Identifier(), r, 1)
 	require.NoError(t, err)
+
+	finalized, err := m.Load(ctx, s.Identifier().RunID)
+	require.NoError(t, err)
+	require.NotNil(t, finalized)
+
 	require.Equal(t, r.Output, finalized.Actions()[r.Step.ID])
 	// The error is still stored.
 	require.Contains(t, next.Errors()[r.Step.ID].Error(), stepErr.Error())
@@ -470,6 +497,74 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 	loaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, 1, loaded.Metadata().Pending, "scheduling and finalizing concurrently should end with 1 (the trigger)")
+}
+
+func checkSaveResponse_stack(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	t.Run("It modifies the stack with step output", func(t *testing.T) {
+		r := state.DriverResponse{
+			Step: w.Steps[0],
+			Output: map[string]interface{}{
+				"status": float64(200),
+				"body": map[string]any{
+					"ok": true,
+				},
+			},
+		}
+		idx, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, idx)
+
+		next, err := m.Load(ctx, s.Identifier().RunID)
+		require.NoError(t, err)
+
+		stack := next.Stack()
+		require.EqualValues(t, 1, len(stack))
+		require.Equal(t, []string{w.Steps[0].ID}, stack)
+	})
+
+	t.Run("It doesn't amend the stack with temporary non-final errors", func(t *testing.T) {
+		r := state.DriverResponse{
+			Step: w.Steps[1],
+			Err:  fmt.Errorf("an absolutely terrible yet intermittent, non-final, retryable error"),
+		}
+		require.True(t, r.Retryable())
+		require.False(t, r.Final())
+
+		idx, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+		require.NoError(t, err)
+		require.EqualValues(t, 0, idx)
+
+		next, err := m.Load(ctx, s.Identifier().RunID)
+		require.NoError(t, err)
+
+		stack := next.Stack()
+		require.EqualValues(t, 1, len(stack))
+		require.Equal(t, []string{w.Steps[0].ID}, stack)
+	})
+
+	t.Run("It modifies the stack with a final error", func(t *testing.T) {
+		r := state.DriverResponse{
+			Step: w.Steps[1],
+			Err:  fmt.Errorf("an absolutely terrible yet intermittent, non-final, retryable error"),
+		}
+		r.SetFinal()
+		require.False(t, r.Retryable())
+		require.True(t, r.Final())
+
+		idx, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
+		require.NoError(t, err)
+		require.EqualValues(t, 2, idx)
+
+		next, err := m.Load(ctx, s.Identifier().RunID)
+		require.NoError(t, err)
+
+		stack := next.Stack()
+		require.EqualValues(t, 2, len(stack))
+		require.Equal(t, []string{w.Steps[0].ID, w.Steps[1].ID}, stack)
+	})
 }
 
 func checkSavePause(t *testing.T, m state.Manager) {

@@ -130,6 +130,14 @@ func (m *MockState) Metadata() Metadata {
 	return ret0
 }
 
+// Metadata mocks base method.
+func (m *MockState) Stack() []string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Stack")
+	ret0, _ := ret[0].([]string)
+	return ret0
+}
+
 // Metadata indicates an expected call of Metadata.
 func (mr *MockStateMockRecorder) Metadata() *gomock.Call {
 	mr.mock.ctrl.T.Helper()

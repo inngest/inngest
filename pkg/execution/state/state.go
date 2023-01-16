@@ -128,6 +128,11 @@ type State interface {
 	// WorkflowID returns the workflow ID for the run
 	WorkflowID() uuid.UUID
 
+	// Stack returns a slice of step IDs representing the order in which
+	// data is saved to the state store.  This, in effect, strongly orders
+	// function steps so that we know the sequence of completed steps.
+	Stack() []string
+
 	// Event is the root data that triggers the workflow, which is typically
 	// an Inngest event.
 	Event() map[string]interface{}
@@ -229,7 +234,9 @@ type Mutater interface {
 	Started(ctx context.Context, i Identifier, stepID string, attempt int) error
 
 	// Finalized increases the finalized count for a run's metadata. This must be called after
-	// storing a response and scheduling all child steps.
+	// storing a response and scheduling all child steps.  This MUST happen after child steps
+	// else the distributed waitgroup doesn't work;  the counter will go to 0 before being re-increased
+	// to N child steps.
 	//
 	// If a status is provided, the function status will be set _if_ there are no more in-progress
 	// steps running for this function run.  This lets the executor specify failed statuses if
@@ -242,10 +249,14 @@ type Mutater interface {
 	// SaveResponse saves the driver response for the attempt to the backing state store.
 	//
 	// If the response is an error, this must store the error for the specific attempt, allowing
-	// visibility into each error when executing a step.
+	// visibility into each error when executing a step. If DriverResponse is final, this must push
+	// the step ID to the stack.
 	//
 	// Attempt is zero-indexed.
-	SaveResponse(ctx context.Context, i Identifier, r DriverResponse, attempt int) (State, error)
+	//
+	// This returns the position of this step in the stack, if the stack is modified.  For temporary
+	// errors the stack position is 0, ie. unmodified.
+	SaveResponse(ctx context.Context, i Identifier, r DriverResponse, attempt int) (int, error)
 }
 
 // HistoryDeleter is an optional interface a state can implement, deleting specific history items

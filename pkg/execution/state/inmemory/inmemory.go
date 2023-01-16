@@ -288,13 +288,13 @@ func (m *mem) Cancel(ctx context.Context, i state.Identifier) error {
 	return nil
 }
 
-func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (state.State, error) {
+func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (int, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	s, ok := m.state[i.RunID]
 	if !ok {
-		return s, fmt.Errorf("identifier not found")
+		return 0, fmt.Errorf("identifier not found")
 	}
 	instance := s.(memstate)
 
@@ -306,6 +306,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 
 	if r.Err == nil {
 		instance.actions[r.Step.ID] = r.Output
+		instance.stack = append(instance.stack, r.Step.ID)
 		delete(instance.errors, r.Step.ID)
 
 		m.setHistory(ctx, i, state.History{
@@ -350,6 +351,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 	if r.Final() {
 		instance.metadata.Pending--
 		instance.metadata.Status = enums.RunStatusFailed
+		instance.stack = append(instance.stack, r.Step.ID)
 		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
 		m.setHistory(ctx, i, state.History{
 			ID:         state.HistoryID(),
@@ -361,7 +363,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 
 	m.state[i.RunID] = instance
 
-	return instance, nil
+	return len(instance.stack), nil
 
 }
 
@@ -446,20 +448,22 @@ func (m *mem) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error)
 	return &pause, nil
 }
 
-func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
+func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) (int, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	pause, ok := m.pauses[id]
 	if !ok {
-		return state.ErrPauseNotFound
+		return 0, state.ErrPauseNotFound
 	}
+
+	defer delete(m.pauses, id)
 
 	if pause.DataKey != "" {
 		// Save data
 		s, ok := m.state[pause.Identifier.RunID]
 		if !ok {
-			return fmt.Errorf("identifier not found")
+			return 0, fmt.Errorf("identifier not found")
 		}
 		instance := s.(memstate)
 		// Copy the maps so that any previous state references aren't updated.
@@ -467,10 +471,11 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		instance.errors = copyMap(instance.errors)
 		instance.actions[pause.DataKey] = data
 		m.state[pause.Identifier.RunID] = instance
+		instance.stack = append(instance.stack, pause.DataKey)
+		return len(instance.stack), nil
 	}
 
-	delete(m.pauses, id)
-	return nil
+	return 0, nil
 }
 
 func (m *mem) History(ctx context.Context, runID ulid.ULID) ([]state.History, error) {

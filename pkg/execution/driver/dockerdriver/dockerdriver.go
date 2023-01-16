@@ -59,7 +59,7 @@ func (d *dockerExec) SetEnvReader(r env.EnvReader) {
 	d.envreader = r
 }
 
-func (d *dockerExec) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, wf inngest.Step) (*state.DriverResponse, error) {
+func (d *dockerExec) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, edge inngest.Edge, wf inngest.Step, idx int) (*state.DriverResponse, error) {
 	var (
 		h   *handle
 		err error
@@ -76,7 +76,7 @@ func (d *dockerExec) Execute(ctx context.Context, s state.State, action inngest.
 		})
 	}()
 
-	h, err = d.start(ctx, s, wf)
+	h, err = d.start(ctx, s, wf, idx)
 	if err != nil {
 		return nil, err
 	}
@@ -125,8 +125,8 @@ func (d *dockerExec) Execute(ctx context.Context, s state.State, action inngest.
 }
 
 // start creates and runs the container.
-func (d *dockerExec) start(ctx context.Context, state state.State, wa inngest.Step) (*handle, error) {
-	opts, err := d.startOpts(ctx, state, wa)
+func (d *dockerExec) start(ctx context.Context, state state.State, wa inngest.Step, idx int) (*handle, error) {
+	opts, err := d.startOpts(ctx, state, wa, idx)
 	if err != nil {
 		return nil, err
 	}
@@ -151,8 +151,8 @@ func (d *dockerExec) start(ctx context.Context, state state.State, wa inngest.St
 	return nil, fmt.Errorf("unable to start container")
 }
 
-func (d *dockerExec) startOpts(ctx context.Context, state state.State, wa inngest.Step) (docker.CreateContainerOptions, error) {
-	marshalled, err := driver.MarshalV1(ctx, state, wa)
+func (d *dockerExec) startOpts(ctx context.Context, state state.State, wa inngest.Step, idx int) (docker.CreateContainerOptions, error) {
+	marshalled, err := driver.MarshalV1(ctx, state, wa, idx)
 	if err != nil {
 		return docker.CreateContainerOptions{}, fmt.Errorf("error marshalling state")
 	}

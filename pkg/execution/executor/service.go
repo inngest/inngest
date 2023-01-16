@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/xhit/go-str2duration/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 type Opt func(s *svc)
@@ -190,14 +191,15 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		Int("attempt", item.Attempt).
 		Logger()
 
-	edge, err := queue.GetEdge(item)
+	payload, err := queue.GetEdge(item)
 	if err != nil {
 		return fmt.Errorf("unable to get edge from queue item: %w", err)
 	}
+	edge := payload.Edge
 
 	l.Debug().Interface("edge", edge).Msg("processing step")
 
-	resp, err := s.exec.Execute(ctx, item.Identifier, edge.Incoming, item.Attempt)
+	resp, idx, err := s.exec.Execute(ctx, item.Identifier, edge, item.Attempt, payload.StackIndex)
 
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
@@ -237,7 +239,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		//
 		// We keep invoking Generator-based functions until they provide no more
 		// yields, signalling they're done.
-		err := s.scheduleGeneratorResponse(ctx, item, resp)
+		err := s.scheduleGeneratorResponse(ctx, item, resp, idx)
 		if err != nil {
 			return fmt.Errorf("unable to schedule generator response: %w", err)
 		}
@@ -302,6 +304,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 				Event:      &am.Event,
 				Expression: am.Match,
 				OnTimeout:  am.OnTimeout,
+				StackIndex: idx,
 			})
 			if err != nil {
 				return fmt.Errorf("error saving edge pause: %w", err)
@@ -337,10 +340,14 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		l.Debug().Str("outgoing", next.Outgoing).Time("at", at).Msg("scheduling next step")
 
 		// Enqueue the next child in our queue.
+		next.Edge.StepPlanned = ""
 		if err := s.queue.Enqueue(ctx, queue.Item{
-			Kind:        queue.KindEdge,
-			Identifier:  item.Identifier,
-			Payload:     queue.PayloadEdge{Edge: next.Edge},
+			Kind:       queue.KindEdge,
+			Identifier: item.Identifier,
+			Payload: queue.PayloadEdge{
+				Edge:       next.Edge,
+				StackIndex: idx,
+			},
 			MaxAttempts: retries,
 		}, at); err != nil {
 			return fmt.Errorf("unable to enqueue next step: %w", err)
@@ -354,8 +361,6 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		// Hopefully, if the backing implementation is the same (eg. a database which
 		// hosts the queue and the state store), Enqueue increases the pending count
 		// and this is a no-op - things should be atomic where possible.
-		//
-		// TODO: Add a unit test to ensure WG is 0 at the end of execution.
 		if err := s.state.Scheduled(ctx, item.Identifier, next.Incoming, 0, &at); err != nil {
 			return fmt.Errorf("unable to schedule next step: %w", err)
 		}
@@ -373,7 +378,8 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	return nil
 }
 
-func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r *state.DriverResponse) error {
+// scheduleGeneratorResponse handles a specific generator opcode.
+func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r *state.DriverResponse, stackIndex int) error {
 	if r.Generator == nil {
 		return fmt.Errorf("unable to handle non-generator response")
 	}
@@ -383,74 +389,112 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 		return fmt.Errorf("unknown queue item type handling generator: %T", item.Payload)
 	}
 
-	switch r.Generator.Op {
-	case enums.OpcodeNone:
-		return nil
-	case enums.OpcodeWaitForEvent:
-		opts, err := r.Generator.WaitForEventOpts()
-		if err != nil {
-			return fmt.Errorf("unable to parse wait for event opts: %w", err)
-		}
-		expires, err := opts.Expires()
-		if err != nil {
-			return fmt.Errorf("unable to parse wait for event expires: %w", err)
-		}
+	// We reuse this item so clear out the job ID for re-enqueues.
+	item.JobID = nil
 
-		// This should also increase the waitgroup count, as we have an
-		// edge that is outstanding.
-		if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
-			return fmt.Errorf("unable to schedule wait for event: %w", err)
-		}
+	eg := errgroup.Group{}
 
-		pauseID := uuid.New()
-		err = s.state.SavePause(ctx, state.Pause{
-			ID:         pauseID,
-			DataKey:    r.Generator.ID,
-			Identifier: item.Identifier,
-			Outgoing:   edge.Edge.Outgoing,
-			Incoming:   edge.Edge.Incoming,
-			Expires:    state.Time(expires),
-			Event:      &opts.Event,
-			Expression: opts.If,
+	for _, val := range r.Generator {
+		gen := val
+		eg.Go(func() error {
+			switch gen.Op {
+			case enums.OpcodeNone:
+				// OpcodeNone essentially terminates this "thread" or execution path.  We don't need to do
+				// anything - including scheduling future steps.
+				//
+				// This is necessary for parallelization:  we may fan out from 1 step -> 10 parallel steps,
+				// then need to coalesce back to a single thread after all 10 have finished.  We expect
+				// drivers/the SDK to return OpcodeNone for all but the last of parallel steps.
+				return nil
+			case enums.OpcodeWaitForEvent:
+				opts, err := gen.WaitForEventOpts()
+				if err != nil {
+					return fmt.Errorf("unable to parse wait for event opts: %w", err)
+				}
+				expires, err := opts.Expires()
+				if err != nil {
+					return fmt.Errorf("unable to parse wait for event expires: %w", err)
+				}
+
+				// This should also increase the waitgroup count, as we have an
+				// edge that is outstanding.
+				if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
+					return fmt.Errorf("unable to schedule wait for event: %w", err)
+				}
+
+				pauseID := uuid.New()
+				err = s.state.SavePause(ctx, state.Pause{
+					ID:         pauseID,
+					DataKey:    gen.ID,
+					Identifier: item.Identifier,
+					Outgoing:   edge.Edge.Outgoing,
+					Incoming:   edge.Edge.Incoming,
+					Expires:    state.Time(expires),
+					Event:      &opts.Event,
+					Expression: opts.If,
+					StackIndex: stackIndex,
+				})
+				if err != nil {
+					return err
+				}
+				// SDK-based event coordination is called both when an event is received
+				// OR on timeout, depending on which happens first.  Both routes consume
+				// the pause so this race will conclude by calling the function once, as only
+				// one thread can lease and consume a pause;  the other will find that the
+				// pause is no longer available and return.
+				return s.queue.Enqueue(ctx, queue.Item{
+					Kind:       queue.KindPause,
+					Identifier: item.Identifier,
+					Payload: queue.PayloadPauseTimeout{
+						PauseID:   pauseID,
+						OnTimeout: true,
+					},
+				}, expires)
+			case enums.OpcodeSleep:
+				// Re-enqueue the exact same edge after a sleep.
+				dur, err := gen.SleepDuration()
+				if err != nil {
+					return err
+				}
+				at := time.Now().Add(dur)
+
+				if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, &at); err != nil {
+					return err
+				}
+				return s.queue.Enqueue(ctx, item, time.Now().Add(dur))
+			case enums.OpcodeStepPlanned:
+				if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
+					return err
+				}
+
+				// Ensure we run the generator ID that was planned.
+				edge.Edge.StepPlanned = gen.ID
+				edge.StackIndex = stackIndex
+				item.Payload = edge
+				// Ensure that if this step is planned multiple times by an erroneous SDK we only
+				// enqueue it once during the idempotency period.
+				jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
+				item.JobID = &jobID
+
+				return s.queue.Enqueue(ctx, item, time.Now())
+			case enums.OpcodeStep:
+				// Re-enqueue the exact same edge to run now.
+				if err := s.state.Scheduled(ctx, item.Identifier, "step", 0, nil); err != nil {
+					return err
+				}
+				// This item has no generator ID, as we don't know what step we're about
+				// to invoke.
+				edge.StackIndex = stackIndex
+				edge.Edge.StepPlanned = ""
+				item.Payload = edge
+				return s.queue.Enqueue(ctx, item, time.Now())
+			default:
+				return fmt.Errorf("unknown opcode: %s", gen.Op.String())
+			}
 		})
-		if err != nil {
-			return err
-		}
-		// SDK-based event coordination is called both when an event is received
-		// OR on timeout, depending on which happens first.  Both routes consume
-		// the pause so this race will conclude by calling the function once, as only
-		// one thread can lease and consume a pause;  the other will find that the
-		// pause is no longer available and return.
-		return s.queue.Enqueue(ctx, queue.Item{
-			Kind:       queue.KindPause,
-			Identifier: item.Identifier,
-			Payload: queue.PayloadPauseTimeout{
-				PauseID:   pauseID,
-				OnTimeout: true,
-			},
-		}, expires)
-	case enums.OpcodeSleep:
-		// Re-enqueue the exact same edge after a sleep.
-		dur, err := r.Generator.SleepDuration()
-		if err != nil {
-			return err
-		}
-		at := time.Now().Add(dur)
-
-		if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, &at); err != nil {
-			return err
-		}
-		return s.queue.Enqueue(ctx, item, time.Now().Add(dur))
-	case enums.OpcodeStep:
-		// Re-enqueue the exact same edge to run now.
-		if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
-			return err
-		}
-		return s.queue.Enqueue(ctx, item, time.Now())
 	}
 
-	// Enqueue the next child in our queue.
-	return fmt.Errorf("unknown opcode: %s", r.Generator.Op.String())
+	return eg.Wait()
 }
 
 func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
@@ -474,7 +518,8 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	if err := s.state.ConsumePause(ctx, pause.ID, nil); err != nil {
+	idx, err := s.state.ConsumePause(ctx, pause.ID, nil)
+	if err != nil {
 		return fmt.Errorf("error consuming timeout pause: %w", err)
 	}
 
@@ -485,7 +530,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		if err := s.queue.Enqueue(ctx, queue.Item{
 			Kind:       queue.KindEdge,
 			Identifier: item.Identifier,
-			Payload:    queue.PayloadEdge{Edge: pause.Edge()},
+			Payload:    queue.PayloadEdge{Edge: pause.Edge(), StackIndex: idx},
 		}, time.Now()); err != nil {
 			return fmt.Errorf("error enqueueing timeout step: %w", err)
 		}

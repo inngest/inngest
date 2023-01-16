@@ -424,7 +424,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 		if pause.OnTimeout {
 			// Delete this pause, as an event has occured which matches
 			// the timeout.
-			if err := s.state.ConsumePause(ctx, pause.ID, nil); err != nil {
+			if _, err := s.state.ConsumePause(ctx, pause.ID, nil); err != nil {
 				return err
 			}
 		}
@@ -447,9 +447,20 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			return err
 		}
 
+		logger.From(ctx).Debug().
+			Str("pause_id", pause.ID.String()).
+			Str("run_id", pause.Identifier.RunID.String()).
+			Msg("consuming pause")
+
+		idx, err := s.state.ConsumePause(ctx, pause.ID, evtMap)
+		if err != nil {
+			return err
+		}
+
 		logger.From(ctx).Info().
 			Str("pause_id", pause.ID.String()).
 			Str("run_id", pause.Identifier.RunID.String()).
+			Int("idx", idx).
 			Msg("resuming function")
 
 		// Schedule an execution from the pause's entrypoint.
@@ -462,18 +473,11 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 					Edge: inngest.Edge{
 						Incoming: pause.Incoming,
 					},
+					StackIndex: idx,
 				},
 			},
 			time.Now(),
 		); err != nil {
-			return err
-		}
-
-		logger.From(ctx).Debug().
-			Str("pause_id", pause.ID.String()).
-			Str("run_id", pause.Identifier.RunID.String()).
-			Msg("consuming pause")
-		if err := s.state.ConsumePause(ctx, pause.ID, evtMap); err != nil {
 			return err
 		}
 	}

@@ -32,7 +32,7 @@ type PauseMutater interface {
 	//
 	// Any data passed when consuming a pause will be stored within function run state
 	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, id uuid.UUID, data any) error
+	ConsumePause(ctx context.Context, id uuid.UUID, data any) (int, error)
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
@@ -138,6 +138,9 @@ type Pause struct {
 	// via an async driver.  This lets the executor resume as-is with the current
 	// context, ensuring that we retry correctly.
 	Attempt int `json:"att,omitempty"`
+	// StackIndex represents the index of the function stack at the time this
+	// pause was enqueued.
+	StackIndex int `json:"idx,omitempty"`
 }
 
 func (p Pause) Edge() inngest.Edge {

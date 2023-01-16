@@ -93,13 +93,15 @@ func (s Step) RetryCount() int {
 	if s.Retries != nil && s.Retries.Attempts != nil {
 		return *s.Retries.Attempts
 	}
-
 	return consts.DefaultRetryCount
 }
 
 type Edge struct {
 	Outgoing string `json:"outgoing"`
 	Incoming string `json:"incoming"`
+	// StepPlanned is the ID of the generator step planned via enums.OpcodeStepPlanned,
+	// if this edge represents running a yielded generator step within a DAG.
+	StepPlanned string `json:"gen,omitempty"`
 	// Metadata specifies the type of edge to use.  This defaults
 	// to EdgeTypeEdge - a basic link that can conditionally run.
 	Metadata *EdgeMetadata `json:"metadata,omitempty"`

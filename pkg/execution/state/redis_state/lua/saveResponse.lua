@@ -15,6 +15,7 @@ local actionKey   = KEYS[1]
 local errorKey    = KEYS[2]
 local metadataKey = KEYS[3]
 local historyKey  = KEYS[4]
+local stackKey 	  = KEYS[5]
 
 local data    = ARGV[1]
 local stepID  = ARGV[2]
@@ -28,7 +29,7 @@ if isError == 0 then
 	-- Save the step output under step data.
 	redis.call("HSET", actionKey, stepID, data)
 	redis.call("ZADD", historyKey, logTime, stepLog)
-	return 0
+	return tonumber(redis.call("RPUSH", stackKey, stepID))
 end
 
 -- Set the step error key.
@@ -38,8 +39,7 @@ if isFinal == 0 then
 	return 0
 end
 
-redis.call("HINCRBY", metadataKey, "pending", -1) 
+redis.call("HINCRBY", metadataKey, "pending", -1)
 redis.call("HSET", metadataKey, "status", 2)  -- Mark as failed
 redis.call("ZADD", historyKey, logTime+1, failLog) -- The function failed log
-
-return 0
+return tonumber(redis.call("RPUSH", stackKey, stepID)) -- Mutate the stack for permanent final errors

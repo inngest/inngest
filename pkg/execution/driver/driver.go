@@ -13,7 +13,14 @@ type Driver interface {
 	inngest.Runtime
 
 	// Execute executes the given action for the given step.
-	Execute(ctx context.Context, s state.State, av inngest.ActionVersion, step inngest.Step) (*state.DriverResponse, error)
+	Execute(
+		ctx context.Context,
+		s state.State,
+		av inngest.ActionVersion,
+		edge inngest.Edge,
+		step inngest.Step,
+		stackIndex int,
+	) (*state.DriverResponse, error)
 }
 
 // EnvManager is a driver which reads and utilizes environment variables when
@@ -23,8 +30,13 @@ type EnvManager interface {
 	SetEnvReader(r env.EnvReader)
 }
 
+type FunctionStack struct {
+	Stack   []string `json:"stack"`
+	Current int      `json:"current"`
+}
+
 // MarshalV1 marshals state as an input to driver runtimes.
-func MarshalV1(ctx context.Context, s state.State, step inngest.Step) ([]byte, error) {
+func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex int) ([]byte, error) {
 	data := map[string]interface{}{
 		"event": s.Event(),
 		"steps": s.Actions(),
@@ -37,6 +49,10 @@ func MarshalV1(ctx context.Context, s state.State, step inngest.Step) ([]byte, e
 			"step_id": step.ID,
 			// XXX: Pass in opentracing context within ctx.
 			"run_id": s.RunID(),
+			"stack": FunctionStack{
+				Stack:   s.Stack(),
+				Current: stackIndex,
+			},
 		},
 	}
 	return json.Marshal(data)

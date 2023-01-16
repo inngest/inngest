@@ -24,6 +24,7 @@ func NewStateInstance(
 	event map[string]any,
 	actions map[string]any,
 	errors map[string]error,
+	stack []string,
 ) state.State {
 	return &memstate{
 		workflow:   w,
@@ -32,6 +33,7 @@ func NewStateInstance(
 		event:      event,
 		actions:    actions,
 		errors:     errors,
+		stack:      stack,
 	}
 }
 
@@ -45,6 +47,8 @@ type memstate struct {
 	// Event is the root data that triggers the workflow, which is typically
 	// an Inngest event.
 	event map[string]interface{}
+
+	stack []string
 
 	// Actions stores a map of all output from each individual action
 	actions map[string]any
@@ -71,6 +75,10 @@ func (s memstate) WorkflowID() uuid.UUID {
 
 func (s memstate) RunID() ulid.ULID {
 	return s.identifier.RunID
+}
+
+func (s memstate) Stack() []string {
+	return s.stack
 }
 
 func (s memstate) Event() map[string]interface{} {

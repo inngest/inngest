@@ -144,7 +144,7 @@ func TestExecute_state(t *testing.T) {
 
 	// Executing the trigger does nothing but validate which descendents from the trigger
 	// in the dag can run.
-	_, err = exec.Execute(ctx, s.Identifier(), inngest.TriggerName, 0)
+	_, idx, err := exec.Execute(ctx, s.Identifier(), inngest.TriggerName, 0, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, len(driver.Executed), 0)
 	// assert.Equal(t, len(available), 2)
@@ -155,7 +155,7 @@ func TestExecute_state(t *testing.T) {
 	assert.Equal(t, 0, len(s.Actions()))
 
 	// Run the first item.
-	_, err = exec.Execute(ctx, s.Identifier(), "1", 0)
+	_, idx, err = exec.Execute(ctx, s.Identifier(), "1", 0, idx)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
 	// assert.Equal(t, 1, len(available))
@@ -169,7 +169,7 @@ func TestExecute_state(t *testing.T) {
 	// Test "scheduled" responses.  The driver should respond with a Scheduled
 	// message, which means that the function has begun execution but no further
 	// actions are available.
-	_, err = exec.Execute(ctx, s.Identifier(), "4", 0)
+	_, idx, err = exec.Execute(ctx, s.Identifier(), "4", 0, idx)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(driver.Executed), "function not executed")
 	// assert.Equal(t, 0, len(available), "incorrect number of functions available")
@@ -180,7 +180,7 @@ func TestExecute_state(t *testing.T) {
 	assert.Equal(t, 0, len(s.Errors()))
 
 	// Test "error" responses
-	_, err = exec.Execute(ctx, s.Identifier(), "5", 0)
+	_, _, err = exec.Execute(ctx, s.Identifier(), "5", 0, idx)
 	assert.Error(t, err)
 	assert.Equal(t, 3, len(driver.Executed), "function not executed")
 	// assert.Equal(t, 0, len(available), "incorrect number of functions available")
@@ -231,11 +231,13 @@ func TestExecute_Generator(t *testing.T) {
 	responses := map[string]state.DriverResponse{
 		"step": {
 			Output: map[string]interface{}{"id": 1},
-			Generator: &state.GeneratorOpcode{
-				Op: enums.OpcodeStep,
-				ID: "1:some-id",
-				// JSON encoded string
-				Data: []byte(`"hello"`),
+			Generator: []*state.GeneratorOpcode{
+				{
+					Op: enums.OpcodeStep,
+					ID: "1:some-id",
+					// JSON encoded string
+					Data: []byte(`"hello"`),
+				},
 			},
 		},
 	}
@@ -253,12 +255,12 @@ func TestExecute_Generator(t *testing.T) {
 
 	// Executing the trigger does nothing but validate which descendents from the trigger
 	// in the dag can run.
-	_, err = exec.Execute(ctx, s.Identifier(), inngest.TriggerName, 0)
+	_, idx, err := exec.Execute(ctx, s.Identifier(), inngest.TriggerName, 0, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, len(driver.Executed), 0)
 
 	// Execute the first generator step.
-	_, err = exec.Execute(ctx, s.Identifier(), "step", 0)
+	_, idx, err = exec.Execute(ctx, s.Identifier(), "step", 0, idx)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
 	// Ensure we recorded state.
@@ -277,16 +279,18 @@ func TestExecute_Generator(t *testing.T) {
 	driver.Responses = map[string]state.DriverResponse{
 		"step": {
 			Output: map[string]interface{}{"id": 1},
-			Generator: &state.GeneratorOpcode{
-				Op:   enums.OpcodeStep,
-				ID:   "2:another-id",
-				Data: byt,
+			Generator: []*state.GeneratorOpcode{
+				{
+					Op:   enums.OpcodeStep,
+					ID:   "2:another-id",
+					Data: byt,
+				},
 			},
 		},
 	}
 
 	// Execute the second generator step.
-	_, err = exec.Execute(ctx, s.Identifier(), "step", 0)
+	_, _, err = exec.Execute(ctx, s.Identifier(), "step", 0, idx)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
 	// Ensure we recorded state.
@@ -414,7 +418,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = exec.Execute(ctx, s.Identifier(), inngest.TriggerName, 0)
+	_, idx, err := exec.Execute(ctx, s.Identifier(), inngest.TriggerName, 0, 0)
 	require.NoError(t, err)
 	require.Equal(t, len(driver.Executed), 0)
 
@@ -430,7 +434,7 @@ func TestExecute_edge_expressions(t *testing.T) {
 	require.ElementsMatch(t, []string{}, availableIDs(edges))
 
 	// Run the next step.
-	response, err := exec.Execute(ctx, s.Identifier(), "run-step-trigger", 0)
+	response, _, err := exec.Execute(ctx, s.Identifier(), "run-step-trigger", 0, idx)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(driver.Executed))
 	assert.NoError(t, response.Err)

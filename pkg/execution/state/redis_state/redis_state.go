@@ -306,6 +306,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			input.EventData,
 			input.Steps,
 			map[string]error{},
+			make([]string, 0),
 		),
 		nil
 }
@@ -442,10 +443,12 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 
 	meta := metadata.Metadata()
 
-	return inmemory.NewStateInstance(*w, id, meta, event, actions, errors), nil
+	stack := m.r.LRange(ctx, m.kf.Stack(ctx, id.RunID), 0, -1).Val()
+
+	return inmemory.NewStateInstance(*w, id, meta, event, actions, errors, stack), nil
 }
 
-func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (state.State, error) {
+func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (int, error) {
 	var (
 		data            any
 		err             error
@@ -458,7 +461,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 	if r.Err == nil {
 		typ = enums.HistoryTypeStepCompleted
 		if data, err = json.Marshal(r.Output); err != nil {
-			return nil, fmt.Errorf("error marshalling step output: %w", err)
+			return 0, fmt.Errorf("error marshalling step output: %w", err)
 		}
 	} else {
 		typ = enums.HistoryTypeStepErrored
@@ -490,7 +493,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		},
 	}
 
-	err = scripts["saveResponse"].Eval(
+	index, err := scripts["saveResponse"].Eval(
 		ctx,
 		m.r,
 		[]string{
@@ -498,6 +501,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 			m.kf.Errors(ctx, i),
 			m.kf.RunMetadata(ctx, i.RunID),
 			m.kf.History(ctx, i.RunID),
+			m.kf.Stack(ctx, i.RunID),
 		},
 		data,
 		r.Step.ID,
@@ -506,9 +510,9 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		stepHistory,
 		funcFailHistory,
 		now.UnixMilli(),
-	).Err()
+	).Int()
 	if err != nil {
-		return nil, fmt.Errorf("error finalizing: %w", err)
+		return 0, fmt.Errorf("error finalizing: %w", err)
 	}
 
 	if r.Err != nil && r.Final() {
@@ -516,7 +520,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
 	}
 
-	return m.Load(ctx, i.RunID)
+	return index, nil
 }
 
 func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, attempt int) error {
@@ -669,15 +673,15 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
+func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) (int, error) {
 	p, err := m.PauseByID(ctx, id)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	marshalledData, err := json.Marshal(data)
 	if err != nil {
-		return fmt.Errorf("cannot marshal data to store in state: %w", err)
+		return 0, fmt.Errorf("cannot marshal data to store in state: %w", err)
 	}
 
 	eventKey := ""
@@ -689,9 +693,10 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		eventKey,
 		m.kf.Actions(ctx, p.Identifier),
+		m.kf.Stack(ctx, p.Identifier.RunID),
 	}
 
-	status, err := scripts["consumePause"].Eval(
+	stackCount, err := scripts["consumePause"].Eval(
 		ctx,
 		m.r,
 		keys,
@@ -699,18 +704,11 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		id.String(),
 		p.DataKey,
 		string(marshalledData),
-	).Int64()
+	).Int()
 	if err != nil {
-		return fmt.Errorf("error consuming pause: %w", err)
+		return 0, fmt.Errorf("error consuming pause: %w", err)
 	}
-	switch status {
-	case 0:
-		return nil
-	case 1:
-		return state.ErrPauseNotFound
-	default:
-		return fmt.Errorf("unknown response leasing pause: %d", status)
-	}
+	return stackCount, nil
 }
 
 // PausesByEvent returns all pauses for a given event within a workspace.
