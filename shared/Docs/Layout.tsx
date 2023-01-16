@@ -42,7 +42,9 @@ export function Layout({
   description,
 }: Props) {
   const preferredTitle: string = metaTitle || title;
-  const pageTitle = `${preferredTitle} - Inngest Documentation`;
+  const pageTitle = preferredTitle
+    ? `${preferredTitle} - Inngest Documentation`
+    : `Inngest Documentation`;
   const metaDescription =
     description || `Inngest documentation for ${preferredTitle}`;
   const metaImage = getOpenGraphImageURL({ title: preferredTitle });

@@ -50,7 +50,7 @@ export function IconCompiling({
       <g
         id="Compiling"
         stroke="none"
-        stroke-width="1"
+        strokeWidth="1"
         fill="none"
         fillRule="evenodd"
       >
