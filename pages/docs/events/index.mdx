@@ -24,34 +24,62 @@ Then, sending an event is simple, just call the the `send()` method with your ev
 // This sends an event to Inngest.
 await inngest.send({
   // The event name
-  name: "demo/demo.event",
+  name: "storefront/cart.checkout.completed",
   // The event's data
   data: {
     account: {
       id: 123,
       email: "test@example.com",
     },
-    cartID: "ed12c8bde",
-    like: true,
+    cartId: "ed12c8bde",
+    itemIds: ["9f08sdh84", "sdf098487", "0fnun498n"],
   }
 });
 ```
 
-Sending this event, named `demo/demo.event`, to Inngest will do two things:
+<Callout>
 
-1. Automatically run any [functions](/docs/functions) that are triggered by this specific event, passing the event payload to the function's argumnts.
-2. Create a new event version, if it doesn't already exist, in Inngest Cloud and infer the event payload's structure, [generating a Type for use with TypeScript](/docs/typescript)
+👉 You should always use `await` or `.then()` with `send()` to ensure that the event has been sent to Inngest. Serverless platforms may terminate early and prevent an event from being successfully sent.
 
-<aside>
+</Callout>
 
-⚡️ When you send an event, Inngest will automatically run any functions that are triggered by the same event name — in parallel, in the background, without configuring any queues.
+Sending this event, named `storefront/cart.checkout.completed`, to Inngest will do two things:
 
-</aside>
+1. Automatically run any [functions](/docs/functions) that are triggered by this specific event, passing the event payload to the function's arguments.
+2. Store the event payload in Inngest cloud, creating a new event type and event version if it doesn't already exist.
 
-### Advanced usage
+<Callout>
+
+💡 One event can trigger multiple functions, enabling you to consume a single event in multiple ways. This is different than traditional message queues where only one worker can consume a single message.
+
+</Callout>
+
+## Sending multiple events at once
+
+You can also send multiple events in a single `send` call. This enables you to send a batch of events very easily. You can send up to `512kb` in a single call which means you can send anywhere between 10 and 1000 typically sized payloads at once.
+
+```typescript
+await inngest.send([
+  { name: "storefront/cart.checkout.completed", data: { ... } },
+  { name: "storefront/coupon.used", data: { ... } },
+  { name: "storefront/loyalty.program.joined", data: { ... } },
+])
+```
+
+This is especially useful if you have an array of data in your app and you want to send an event for each item in the array:
+
+```typescript
+// Let's say
+const importedItems = await api.fetchAllItems();
+const events = importedItems.map((item) => ({
+  name: "storefront/item.imported",
+  data: {
+    ...item,
+  }
+}));
+await inngest.send(events);
+```
+
+## Advanced usage
 
 There's more you can do with events, such as [user identification](/docs/events/event-format-and-structure#optional-fields), event versioning, and filtering for each key.
-
-## Next up
-
-Next up, learn how to [deploy your functions](/docs/deploy) by registering them with Inngest.
