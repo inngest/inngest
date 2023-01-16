@@ -10,6 +10,7 @@ import {
   IconSteps,
   IconTools,
   IconWritingFns,
+  IconCompiling,
 } from "../Icons/duotone";
 
 const productLinks = {
@@ -82,6 +83,11 @@ const learnLinks = {
   linksTitle: "Quick Starts",
   linksTheme: "blue",
   links: [
+    {
+      title: "Quick start tutorial",
+      url: "/docs/quick-start?ref=nav",
+      icon: IconCompiling,
+    },
     {
       title: "Writing functions",
       url: "/docs/functions?ref=nav",
