@@ -18,9 +18,9 @@ a new Inngest function [as outlined in the function documentation](/docs/functio
 ```typescript
 import { Inngest } from "inngest";
 
-const client = new Inngest({ app: "Signup flow" });
+const inngest = new Inngest({ app: "Signup flow" });
 
-export const fn = client.createFunction(
+export const fn = inngest.createStepFunction(
   "Send signup email",   // Function name
   "user/created",        // Trigger
   ({ event, tools }) => {
@@ -59,7 +59,7 @@ export const fn = client.createFunction(
 You can **trigger this background function by sending an event** to Inngest:
 
 ```typescript
-client.send({
+inngest.send({
   name: "user/created", // This matches the event used in `createFunction`
   data: {
     email: "test@example.com",
@@ -68,7 +68,7 @@ client.send({
 ```
 
 When you send an event to Inngest, we automatically find any functions that are triggered by the event name and automatically run those functions in the background.  The entire JSON object you pass in to
-`client.send` will be available to your functions.
+`inngest.send` will be available to your functions.
 
 <aside>
 👉 You can create many functions which listen to the same event, and all of them will run in the background

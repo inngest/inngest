@@ -7,9 +7,9 @@ You can create scheduled functions that run in any timezone using the `createSch
 ```tsx
 import { Inngest } from "inngest";
 
-const client = new Inngest({ app: "Signup flow" });
+const inngest = new Inngest({ app: "Signup flow" });
 
-export const fn = client.createScheduledFunction(
+export const fn = inngest.createScheduledFunction(
   "Send weekly debrief",
   "TZ=Europe/Paris 0 12 * * 5",
   ({ event, tools }) => {
