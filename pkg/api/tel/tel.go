@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	EventName = "cli/command.executed"
-	key       = "5_Jx-3FAkDMeddntV-KlZy1sbjY8UU1cqn2viGMPlv9Gq-0tWYaukPkUVbD04Zo-1SO2AF2dwnMv7rcHyhJzVQ"
+	EventName   = "cli/command.executed"
+	CIEventName = "cli/ci.command.executed"
+	key         = "5_Jx-3FAkDMeddntV-KlZy1sbjY8UU1cqn2viGMPlv9Gq-0tWYaukPkUVbD04Zo-1SO2AF2dwnMv7rcHyhJzVQ"
 )
 
 var (
@@ -60,8 +61,12 @@ func (m *Metadata) SetCobraCmd(cmd *cobra.Command) {
 }
 
 func (m *Metadata) Event() inngestgo.Event {
+	name := EventName
+	if isCI() {
+		name = CIEventName
+	}
 	return inngestgo.Event{
-		Name: EventName,
+		Name: name,
 		Data: map[string]any{
 			"account_id":  m.AccountID,
 			"device_id":   m.DeviceID,
@@ -79,6 +84,9 @@ func SendMetadata(ctx context.Context, m *Metadata) {
 	Send(ctx, m.Event())
 }
 func SendEvent(ctx context.Context, name string, m *Metadata) {
+	if isCI() {
+		return
+	}
 	evt := m.Event()
 	evt.Name = name
 	Send(ctx, evt)
@@ -98,6 +106,10 @@ func Send(ctx context.Context, e inngestgo.Event) {
 
 func Wait() {
 	wg.Wait()
+}
+
+func isCI() bool {
+	return os.Getenv("CI") == "true"
 }
 
 // Disabled returns whether telemetry is disabled.
