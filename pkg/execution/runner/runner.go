@@ -121,6 +121,10 @@ func (s *svc) Pre(ctx context.Context) error {
 		return err
 	}
 
+	return nil
+}
+
+func (s *svc) Run(ctx context.Context) error {
 	// Each runner service is responsible for initializing cron-based executions.
 	// As the runners are shared-nothing, there is contention when running multiple
 	// services;  each individual service will attempt to create a new cron execution
@@ -136,10 +140,6 @@ func (s *svc) Pre(ctx context.Context) error {
 		return err
 	}
 
-	return nil
-}
-
-func (s *svc) Run(ctx context.Context) error {
 	l := logger.From(ctx)
 	l.Info().
 		Str("topic", s.config.EventStream.Service.TopicName()).
@@ -194,7 +194,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 				continue
 			}
 			_, err := s.cronmanager.AddFunc(t.Cron, func() {
-				err := s.initialize(ctx, fn, event.Event{
+				err := s.initialize(context.Background(), fn, event.Event{
 					ID:   time.Now().UTC().Format(time.RFC3339),
 					Name: "inngest/scheduled.timer",
 				})
