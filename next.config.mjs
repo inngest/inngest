@@ -8,11 +8,16 @@ const legacyDocsUrls = [
   ["/docs/what-is-inngest", "/docs"],
   ["/docs/reference/functions/retries", "/docs/functions/retries"],
   ["/docs/creating-an-event-key", "/docs/events/creating-an-event-key"],
+  [
+    "/docs/event-format-and-structure",
+    "/docs/events/event-format-and-structure",
+  ],
   ["/docs/writing-and-running-fuctions", "/docs/functions"], //typo
   ["/docs/cli/steps/", "/docs/functions/multi-step"],
   ["/docs/local-development", "/docs/functions/testing-functions"],
   ["/docs/events/sources/sdks", "/docs/events"],
   ["/docs/deploying-fuctions", "/docs/deploy"],
+  ["/docs/functions/introduction", "/docs/functions"],
   ["/docs/how-inngest-works", "/docs"], // TODO/DOCS redirect this to new concepts page
 ];
 
