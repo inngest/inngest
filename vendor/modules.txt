@@ -812,8 +812,8 @@ github.com/opencontainers/go-digest
 ## explicit
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.3
-## explicit; go 1.13
+# github.com/opencontainers/runc v1.1.2
+## explicit; go 1.16
 github.com/opencontainers/runc/libcontainer/user
 # github.com/pascaldekloe/name v0.0.0-20180628100202-0fd16699aae1
 ## explicit
