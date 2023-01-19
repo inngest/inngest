@@ -1,0 +1,99 @@
+# Local development
+
+Inngest's tooling makes it easy to test your functions locally with any framework using the Inngest dev server.
+
+## Inngest Dev Server
+
+The Inngest dev server is an [open source](https://github.com/inngest/inngest) environment that:
+
+1. Runs a fast, in-memory version of Inngest on your machine
+2. Provides a browser interface for sending events and viewing events and function runs
+
+![Dev Server Demo](/assets/docs/local-development/dev-server-demo.gif)
+
+To start the dev server is a single command. It will scan for ports and common endpoints for an Inngest `serve` API endpoint ([list of ports](https://github.com/inngest/inngest/blob/ea67219e7e7c33451416249f98fd5ca48e99ba28/pkg/devserver/discovery.go#L15-L28)):
+
+```shell
+npx inngest-cli@latest dev
+# You can also tell the local URL for the dev server to check
+npx inngest-cli@latest dev -u http://localhost:3333/api/inngest
+```
+
+You can now open the dev server's browser interface on `http://localhost:8288`.
+
+### How functions are loaded by the Dev Server
+
+The dev server polls your app locally for any new or changed functions. Then as events are sent, the dev server calls your functions directly, just as Inngest would do in production over the public internet.
+
+<img
+  src="/assets/docs/local-development/dev-server-diagram.png"
+  width="800"
+  height={800/1800*674}
+  quality="95"
+/>
+
+
+### Sending events to the Dev Server
+
+There are different ways that you can send events to the dev server when testing locally:
+
+1. Using the Inngest SDK
+2. Using the "Send event" button in the Dev Server's interface
+3. Via HTTP request (e.g. curl)
+
+#### Using the Inngest SDK
+
+When using the Inngest SDK locally, it tries to detect if the dev server is running on your machine. If it's running, the event will be sent there.
+
+```ts
+const inngest = new Inngest({ name: "My App" });
+await inngest.send({
+  name: "user.avatar.uploaded",
+  data: { url: "https://a-bucket.s3.us-west-2.amazonaws.com/..." }
+});
+```
+
+**Note** - During local development, you can use a dummy value for your `INNGEST_EVENT_KEY` environment variable. The dev server does not validate keys locally.
+
+#### Using the "Send event" button
+
+The dev server's interface also has a "Send event" button on the top right that enables you to enter any JSON event payload and send it manually. This is useful for testing out different variants of event payloads with your functions.
+
+<img
+  src="/assets/docs/local-development/dev-server-send-event.png"
+  width="600"
+  height={600/2288*1310}
+  className="max-w-2xl"
+  quality="95"
+/>
+
+#### Via HTTP request
+
+All events are sent to Inngest using a simple HTTP API with a JSON body. Here is an example of a curl request to the local dev server's `/e/<EVENT_KEY>` endpoint running on the default port of `8228` using a dummy event key of `123`:
+
+```shell
+curl -X POST -v "http://localhost:8288/e/123" \
+  -d '{
+    "name": "user.avatar.uploaded",
+    "data": { "url": "https://a-bucket.s3.us-west-2.amazonaws.com/..." }
+  }'
+```
+
+<Callout>
+  💡 Since you can send events via HTTP, this means you can send events with any programming language or from your favorite testing tools like Postman.
+</Callout>
+
+
+## Inngest SDK Debug page
+
+When developing locally, by default, the [SDK's `serve` API endpoint](/docs/sdk/serve) will display a landing page that allows you to check that your functions have been successfully served.
+
+To view this, you can visit the route where (default `/api/inngest`) on your local serve, e.g. `http://localhost:3000/api/inngest`. In the below screenshot, you can see that a single function is being served:
+
+<img
+  src="/assets/docs/sdk/sdk-ui.png"
+  width="600"
+  height={600/2436*1479}
+  className="max-w-2xl"
+  quality="95"
+/>

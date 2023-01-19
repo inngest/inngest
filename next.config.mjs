@@ -5,6 +5,7 @@ import { recmaPlugins } from "./mdx/recma.mjs";
 
 // All permanent redirects (source -> destination)
 const legacyDocsUrls = [
+  ["/docs/functions/testing-functions", "/docs/local-development"],
   ["/docs/what-is-inngest", "/docs"],
   ["/docs/reference/functions/retries", "/docs/functions/retries"],
   ["/docs/creating-an-event-key", "/docs/events/creating-an-event-key"],
@@ -14,7 +15,6 @@ const legacyDocsUrls = [
   ],
   ["/docs/writing-and-running-fuctions", "/docs/functions"], //typo
   ["/docs/cli/steps/", "/docs/functions/multi-step"],
-  ["/docs/local-development", "/docs/functions/testing-functions"],
   ["/docs/events/sources/sdks", "/docs/events"],
   ["/docs/deploying-fuctions", "/docs/deploy"],
   ["/docs/functions/introduction", "/docs/functions"],

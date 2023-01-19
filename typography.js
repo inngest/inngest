@@ -213,9 +213,6 @@ module.exports = ({ theme }) => ({
       },
       "img, video": {
         width: "100%",
-        "@screen lg": {
-          width: "inherit",
-        },
       },
       "figure > *": {
         marginTop: "0",

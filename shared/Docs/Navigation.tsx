@@ -217,7 +217,7 @@ export const navigation = [
       },
       {
         title: "Local Development",
-        href: `${baseDir}/functions/testing-functions`,
+        href: `${baseDir}/local-development`,
       },
       { title: "Using TypeScript", href: `${baseDir}/typescript` },
       {
