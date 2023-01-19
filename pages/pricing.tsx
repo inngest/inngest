@@ -50,7 +50,7 @@ const FEATURES: Feature[] = [
     },
   },
   {
-    name: "Function runs/month",
+    name: "Function steps/month",
     plans: {
       Hobby: "50K",
       Team: "100K - 1M",
@@ -144,7 +144,7 @@ const PLANS: Plan[] = [
       },
       {
         quantity: "50k",
-        text: "Function runs/month",
+        text: "Function steps/month",
       },
       {
         quantity: "1",
@@ -188,7 +188,7 @@ const PLANS: Plan[] = [
       },
       {
         quantity: "100k - 10m",
-        text: "Function runs/month",
+        text: "Function steps/month",
       },
       {
         quantity: "100",
@@ -230,7 +230,7 @@ const PLANS: Plan[] = [
       },
       {
         quantity: "10m+",
-        text: "Function runs/month",
+        text: "Function steps/month",
       },
       {
         quantity: "Custom",
@@ -296,16 +296,21 @@ export default function Pricing() {
           </div>
 
           <p className="text-slate-200 text-sm text-center">
-            *Team plan starts at $20/month for 100,000 function runs.
+            *Team plan starts at $20/month for 100,000 function steps (
+            <a href="#faq">?</a>).
             <br />
-            Additional runs are available to purchase for $10 per 100,000.
+            Additional function steps are available to purchase for $10 per
+            100,000.
           </p>
 
           <ComparisonTable plans={PLANS} features={FEATURES} />
 
           <div className="xl:grid xl:grid-cols-4 mt-20 pt-12 border-t border-slate-900">
             <div>
-              <h2 className="text-white mb-6 xl:mb-0 text-4xl font-semibold leading-tight tracking-tight mt-10">
+              <h2
+                id="faq"
+                className="text-white mb-6 xl:mb-0 text-4xl font-semibold leading-tight tracking-tight mt-10"
+              >
                 Frequently <br className="hidden xl:block" />
                 asked <br className="hidden xl:block" />
                 questions
@@ -314,19 +319,23 @@ export default function Pricing() {
             <div className="col-span-3 text-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4 gap-x-12">
               <FAQRow question={`What's a "function"?`}>
                 <p>
-                  We consider a function a single function defined with the{" "}
+                  A function is defined with the{" "}
                   <a
                     className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
                     href="/docs/functions"
                   >
                     Inngest SDK
                   </a>
-                  . A function can be triggered by an event or run on a schedule
-                  (cron).
+                  using{" "}
+                  <code className="bg-slate-800 text-slate-200">
+                    createFunction
+                  </code>{" "}
+                  or similar. A function can be triggered by an event or run on
+                  a schedule (cron).
                 </p>
                 <p>
                   Functions can contain multiple “steps” to reliably run parts
-                  of your function or add things like sleeping/pausing a
+                  of your function or add functionality like sleeping/pausing a
                   function for a period of time. You can define a step using
                   available tools in our SDKs like{" "}
                   <code className="bg-slate-800 text-slate-200">tools.run</code>
@@ -353,12 +362,14 @@ export default function Pricing() {
                 </p>
               </FAQRow>
 
-              <FAQRow question={`What's a function "step"?`}>
+              <FAQRow question={`What's a "function step"?`}>
                 <p>
                   Inngest functions can be broken down into separate parts, or
                   “steps” which run independently. Steps are defined using our
                   SDK’s{" "}
                   <code className="bg-slate-800 text-slate-200">tools</code>.
+                </p>
+                <p>
                   For example, any code within{" "}
                   <code className="bg-slate-800 text-slate-200">tools.run</code>{" "}
                   will be retried up to 3 times independently of the rest of
@@ -372,7 +383,7 @@ export default function Pricing() {
                   <code className="bg-slate-800 text-slate-200">
                     tools.sleepUntil
                   </code>
-                  . You can also wait for additional events to trigger
+                  . You function can also wait for additional events to trigger
                   additional logic with{" "}
                   <code className="bg-slate-800 text-slate-200">
                     tools.waitForEvent
@@ -389,24 +400,40 @@ export default function Pricing() {
                 </p>
               </FAQRow>
 
-              <FAQRow question={`What's a "function run"?`}>
+              <FAQRow question={`How are "function steps" billed?`}>
                 <p>
-                  A function run is a single function step that runs as part of
-                  a function. A step is any part of your function that uses our
-                  SDKs available tools, like{" "}
+                  Since Inngest invokes and individually retries each function
+                  step, each time a step is called, it counts towards your
+                  monthly limit. If a function is retried 3 times, that counts
+                  for 3 function steps billed.
+                </p>
+                <p>
+                  <strong className="text-slate-200">Scenario 1:</strong>
+                  "Function A" does not use any{" "}
+                  <code className="bg-slate-800 text-slate-200">tools</code>, it
+                  is considered a "single step function." If it is called once
+                  and is completed successfully, that is 1 function step.
+                </p>
+                <p>
+                  <strong className="text-slate-200">Scenario 2:</strong>{" "}
+                  "Function B" has 3 steps defined using both{" "}
                   <code className="bg-slate-800 text-slate-200">tools.run</code>{" "}
-                  or{" "}
+                  and
                   <code className="bg-slate-800 text-slate-200">
                     tools.sleep
                   </code>
-                  . Read more about steps{" "}
-                  <a
-                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
-                    href="/docs/functions/multi-step"
-                  >
-                    here
-                  </a>
-                  .
+                  . If it is called once and is completed successfully, that is
+                  3 function steps.
+                </p>
+                <p>
+                  <strong className="text-slate-200">Scenario 3:</strong>{" "}
+                  "Function C" has 3 steps defined using both{" "}
+                  <code className="bg-slate-800 text-slate-200">tools.run</code>
+                  . If it is called once and the first step succeeds, but the
+                  second step fails 3 times due to{" "}
+                  <a href="/docs/functions/retries">retries</a>, that is 4
+                  function steps. The last step is never called due to the
+                  failure, so it is not billed.
                 </p>
               </FAQRow>
 
@@ -415,6 +442,12 @@ export default function Pricing() {
                   Your functions are hosted in your existing application on{" "}
                   <span className="italic">any platform</span>. We’ll call your
                   functions securely via HTTP request on-demand.
+                </p>
+                <p>
+                  Each function step is called as a separate HTTP request
+                  enabling things like having a function{" "}
+                  <code className="bg-slate-800 text-slate-200">sleep</code> for
+                  minutes, hours or days.
                 </p>
               </FAQRow>
               <FAQRow question={`What are concurrency limits?`}>
@@ -488,7 +521,7 @@ export default function Pricing() {
                 <p>
                   Nope. You can send any event to Inngest via and SDK or a
                   webhook at any scale. We only charge for the code that you
-                  run: the “function runs.” We encourage teams to send any/all
+                  run: the “function steps.” We encourage teams to send any/all
                   events to the Inngest platform which then can allow them to
                   add new functions at any time.
                 </p>
