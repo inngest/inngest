@@ -21,18 +21,20 @@ import (
 var (
 	DefaultExecutor = executor{
 		client: &http.Client{
-			Timeout: 15 * time.Minute,
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				if len(via) > 10 {
-					return fmt.Errorf("stopped after 10 redirects")
-				}
-				// If we're redirected we want to ensure that we retain the HTTP method.
-				req.Method = via[0].Method
-				return nil
-			},
+			Timeout:       15 * time.Minute,
+			CheckRedirect: CheckRedirect,
 		},
 	}
 )
+
+func CheckRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) > 10 {
+		return fmt.Errorf("stopped after 10 redirects")
+	}
+	// If we're redirected we want to ensure that we retain the HTTP method.
+	req.Method = via[0].Method
+	return nil
+}
 
 func Execute(ctx context.Context, s state.State, action inngest.ActionVersion, step inngest.Step) (*state.DriverResponse, error) {
 	return DefaultExecutor.Execute(ctx, s, action, step)
