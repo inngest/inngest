@@ -22,6 +22,14 @@ var (
 	DefaultExecutor = executor{
 		client: &http.Client{
 			Timeout: 15 * time.Minute,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) > 10 {
+					return fmt.Errorf("stopped after 10 redirects")
+				}
+				// If we're redirected we want to ensure that we retain the HTTP method.
+				req.Method = via[0].Method
+				return nil
+			},
 		},
 	}
 )
@@ -48,7 +56,6 @@ func Sign(ctx context.Context, key, body []byte) string {
 	}
 
 	now := time.Now().Unix()
-
 	mac := hmac.New(sha256.New, key)
 
 	_, _ = mac.Write(body)
@@ -71,27 +78,12 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, rt.URL, bytes.NewBuffer(input))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Add("Content-Type", "application/json")
-
-	if len(e.signingKey) > 0 {
-		req.Header.Add("X-Inngest-Signature", Sign(ctx, e.signingKey, input))
-	}
-
-	resp, err := e.client.Do(req)
+	byt, status, err := e.do(ctx, rt.URL, input)
 	if err != nil {
 		return nil, err
 	}
 
-	byt, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode == 206 {
+	if status == 206 {
 		// This is a generator-based function returning opcodes.
 		gen := &state.GeneratorOpcode{}
 		if err := json.Unmarshal(byt, gen); err != nil {
@@ -133,16 +125,37 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 
 	// Add an error to driver.Response if the status code isn't 2XX.
 	err = nil
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		err = fmt.Errorf("invalid status code: %d", resp.StatusCode)
+	if status < 200 || status > 299 {
+		err = fmt.Errorf("invalid status code: %d", status)
 	}
 
 	return &state.DriverResponse{
 		Output: map[string]interface{}{
-			"status": resp.StatusCode,
+			"status": status,
 			"body":   body,
 		},
 		Err:           err,
 		ActionVersion: action.Version,
 	}, nil
+}
+
+func (e executor) do(ctx context.Context, url string, input []byte) ([]byte, int, error) {
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(input))
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Add("Content-Type", "application/json")
+
+	if len(e.signingKey) > 0 {
+		req.Header.Add("X-Inngest-Signature", Sign(ctx, e.signingKey, input))
+	}
+	resp, err := e.client.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	byt, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
+	if err != nil {
+		return nil, 0, err
+	}
+	return byt, resp.StatusCode, nil
 }
