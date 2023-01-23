@@ -309,7 +309,7 @@ export default function Pricing() {
             <div>
               <h2
                 id="faq"
-                className="text-white mb-6 xl:mb-0 text-4xl font-semibold leading-tight tracking-tight mt-10"
+                className="scroll-mt-32 text-white mb-6 xl:mb-0 text-4xl font-semibold leading-tight tracking-tight mt-10"
               >
                 Frequently <br className="hidden xl:block" />
                 asked <br className="hidden xl:block" />
