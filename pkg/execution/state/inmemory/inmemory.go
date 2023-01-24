@@ -351,7 +351,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 	if r.Final() {
 		instance.metadata.Pending--
 		instance.metadata.Status = enums.RunStatusFailed
-		instance.stack = append(instance.stack, r.Step.ID)
+		// instance.stack = append(instance.stack, r.Step.ID)
 		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
 		m.setHistory(ctx, i, state.History{
 			ID:         state.HistoryID(),
@@ -457,7 +457,7 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) (int, er
 		return 0, state.ErrPauseNotFound
 	}
 
-	defer delete(m.pauses, id)
+	idx := 0
 
 	if pause.DataKey != "" {
 		// Save data
@@ -472,10 +472,12 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) (int, er
 		instance.actions[pause.DataKey] = data
 		m.state[pause.Identifier.RunID] = instance
 		instance.stack = append(instance.stack, pause.DataKey)
-		return len(instance.stack), nil
+		idx = len(instance.stack)
 	}
 
-	return 0, nil
+	delete(m.pauses, id)
+
+	return idx, nil
 }
 
 func (m *mem) History(ctx context.Context, runID ulid.ULID) ([]state.History, error) {
