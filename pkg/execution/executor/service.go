@@ -408,6 +408,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 	// We reuse this item so clear out the job ID and response saving for re-enqueues.
 	item.JobID = nil
 	edge.ResponseSaveOnHandle = nil
+	edge.Edge.StepPlanned = ""
 
 	eg := errgroup.Group{}
 
@@ -479,8 +480,12 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 					return err
 				}
 
+				// TODO Do not pass this entire response
+				// We should save to the state store, but not update the stack.
+				// When the step is reprocessed, add to the stack and execute.
 				genRes := r
 				genRes.Generator = []*state.GeneratorOpcode{gen}
+				genRes.Step.ID = gen.ID
 				newEdge := edge
 				newEdge.ResponseSaveOnHandle = genRes
 				item.Payload = newEdge
