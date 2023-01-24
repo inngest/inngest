@@ -392,7 +392,9 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 
 		// If this is a plan step or a noop, we _dont_ want to save the response.  That's because the
 		// step in question didn't actually run.
-		if response.Generator[0].Op == enums.OpcodeStepPlanned || response.Generator[0].Op == enums.OpcodeNone {
+		if response.Generator[0].Op == enums.OpcodeStepPlanned ||
+			response.Generator[0].Op == enums.OpcodeNone ||
+			response.Generator[0].Op == enums.OpcodeSleep {
 			return response, stackIndex, err
 		}
 	} else {
