@@ -66,5 +66,5 @@ func (c *Config) Kill() {
 	if c.inngest == nil {
 		return
 	}
-	c.inngest.Process.Kill()
+	_ = c.inngest.Process.Kill()
 }

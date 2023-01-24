@@ -33,7 +33,6 @@ func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
 	}
 	// If we're redirected we want to ensure that we retain the HTTP method.
 	req.Method = via[0].Method
-
 	req.Body, err = via[0].GetBody()
 	if err != nil {
 		return err
