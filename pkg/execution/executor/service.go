@@ -197,9 +197,25 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	}
 	edge := payload.Edge
 
-	l.Debug().Interface("edge", edge).Msg("processing step")
+	l.Info().Interface("payload", payload).Msg("processing step")
 
-	resp, idx, err := s.exec.Execute(ctx, item.Identifier, edge, item.Attempt, payload.StackIndex)
+	executionIdx := payload.StackIndex
+
+	// If the item is a requeued sleep, we need to adjust state here to show that
+	// the sleep has now been completed.
+	if payload.ResponseSaveOnHandle != nil {
+		// TODO When enqueuing a sleep, create the driver response to go with this
+		// call.
+		idx, err := s.state.SaveResponse(ctx, item.Identifier, *payload.ResponseSaveOnHandle, item.Attempt)
+		if err != nil {
+			return fmt.Errorf("unable to save response: %w", err)
+		}
+		executionIdx = idx
+
+		l.Info().Interface("payload", payload).Msg("processing step")
+	}
+
+	resp, idx, err := s.exec.Execute(ctx, item.Identifier, edge, item.Attempt, executionIdx)
 
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
@@ -389,8 +405,9 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 		return fmt.Errorf("unknown queue item type handling generator: %T", item.Payload)
 	}
 
-	// We reuse this item so clear out the job ID for re-enqueues.
+	// We reuse this item so clear out the job ID and response saving for re-enqueues.
 	item.JobID = nil
+	edge.ResponseSaveOnHandle = nil
 
 	eg := errgroup.Group{}
 
@@ -461,16 +478,31 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 				if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, &at); err != nil {
 					return err
 				}
-				return s.queue.Enqueue(ctx, item, time.Now().Add(dur))
+
+				genRes := r
+				genRes.Generator = []*state.GeneratorOpcode{gen}
+				newEdge := edge
+				newEdge.ResponseSaveOnHandle = genRes
+				item.Payload = newEdge
+
+				return s.queue.Enqueue(ctx, queue.Item{
+					WorkspaceID: item.WorkspaceID,
+					Kind:        queue.KindEdge,
+					Identifier:  item.Identifier,
+					Attempt:     item.Attempt,
+					MaxAttempts: item.MaxAttempts,
+					Payload:     newEdge,
+				}, time.Now().Add(dur))
 			case enums.OpcodeStepPlanned:
 				if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
 					return err
 				}
 
 				// Ensure we run the generator ID that was planned.
-				edge.Edge.StepPlanned = gen.ID
-				edge.StackIndex = stackIndex
-				item.Payload = edge
+				newEdge := edge
+				newEdge.Edge.StepPlanned = gen.ID
+				newEdge.StackIndex = stackIndex
+				item.Payload = newEdge
 				// Ensure that if this step is planned multiple times by an erroneous SDK we only
 				// enqueue it once during the idempotency period.
 				jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
@@ -484,9 +516,10 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 				}
 				// This item has no generator ID, as we don't know what step we're about
 				// to invoke.
-				edge.StackIndex = stackIndex
-				edge.Edge.StepPlanned = ""
-				item.Payload = edge
+				newEdge := edge
+				newEdge.StackIndex = stackIndex
+				newEdge.Edge.StepPlanned = ""
+				item.Payload = newEdge
 				return s.queue.Enqueue(ctx, item, time.Now())
 			default:
 				return fmt.Errorf("unknown opcode: %s", gen.Op.String())

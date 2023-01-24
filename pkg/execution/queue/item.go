@@ -113,7 +113,8 @@ type PayloadEdge struct {
 	// StackIndex represents the current index within the run state
 	// when enqueueing the next step.  This is necessary to calculate
 	// steps with parallelism within SDKs.
-	StackIndex int `json:"idx"`
+	StackIndex           int                   `json:"idx"`
+	ResponseSaveOnHandle *state.DriverResponse `json:"respSaveOnHandle,omitempty"`
 }
 
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.
