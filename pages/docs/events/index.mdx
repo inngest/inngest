@@ -27,12 +27,12 @@ await inngest.send({
   name: "storefront/cart.checkout.completed",
   // The event's data
   data: {
+    cartId: "ed12c8bde",
+    itemIds: ["9f08sdh84", "sdf098487", "0fnun498n"],
     account: {
       id: 123,
       email: "test@example.com",
     },
-    cartId: "ed12c8bde",
-    itemIds: ["9f08sdh84", "sdf098487", "0fnun498n"],
   }
 });
 ```
@@ -69,7 +69,8 @@ await inngest.send([
 This is especially useful if you have an array of data in your app and you want to send an event for each item in the array:
 
 ```typescript
-// Let's say
+// This function call might return 10s or 100s of items, so we can use map
+// to transform the items into event payloads then pass that array to send:
 const importedItems = await api.fetchAllItems();
 const events = importedItems.map((item) => ({
   name: "storefront/item.imported",
@@ -79,6 +80,33 @@ const events = importedItems.map((item) => ({
 }));
 await inngest.send(events);
 ```
+
+## Deduplication
+
+Often, you may need to prevent duplicate events from being sent and therefore processed by Inngest. If your system could possibly send the same event more than once, you will want to ensure that it is not ingested more than once.
+
+To prevent duplicate events, you can add an `id` parameter to the event payload. Once Inngest receives an event with an `id`, any events send with the exact same `id` will be ignored regardless of the event's payload.
+
+```typescript
+await inngest.send({
+  // Your deduplication id must be specific to this event payload.
+  // Use something that will not be used across event types, not a generic value like cartId
+  id: "cart-checkout-completed-ed12c8bde",
+  name: "storefront/cart.checkout.completed",
+  data: {
+    cartId: "ed12c8bde",
+    // ...the rest of the payload's data...
+  }
+});
+```
+
+<Callout>
+
+The `id` is global across all event types, so make sure your `id` isn't a value that will be shared across different event types.
+
+For example, for two events like `storefront/item.imported` and `storefront/item.deleted`, do not use the `item`'s `id` (`9f08sdh84`) as the event deduplication `id`. Instead, combine the item's `id` with the event type to ensure it's specific to that event (e.g. `item-imported-9f08sdh84`).
+
+</Callout>
 
 ## Advanced usage
 
