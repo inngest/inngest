@@ -74,6 +74,19 @@ func (m *mem) OnFunctionStatus(f state.FunctionCallback) {
 	m.callbacks = append(m.callbacks, f)
 }
 
+func (m *mem) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {
+	s, err := m.Load(ctx, runID)
+	if s != nil {
+		return 0, err
+	}
+	for n, i := range s.Stack() {
+		if i == stepID {
+			return n, nil
+		}
+	}
+	return 0, fmt.Errorf("step not found in stack: %s", stepID)
+}
+
 func (m *mem) IsComplete(ctx context.Context, runID ulid.ULID) (bool, error) {
 	m.lock.RLock()
 	s, ok := m.state[runID]
@@ -448,22 +461,20 @@ func (m *mem) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error)
 	return &pause, nil
 }
 
-func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) (int, error) {
+func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	pause, ok := m.pauses[id]
 	if !ok {
-		return 0, state.ErrPauseNotFound
+		return state.ErrPauseNotFound
 	}
-
-	idx := 0
 
 	if pause.DataKey != "" {
 		// Save data
 		s, ok := m.state[pause.Identifier.RunID]
 		if !ok {
-			return 0, fmt.Errorf("identifier not found")
+			return fmt.Errorf("identifier not found")
 		}
 		instance := s.(memstate)
 		// Copy the maps so that any previous state references aren't updated.
@@ -471,13 +482,10 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) (int, er
 		instance.errors = copyMap(instance.errors)
 		instance.actions[pause.DataKey] = data
 		m.state[pause.Identifier.RunID] = instance
-		instance.stack = append(instance.stack, pause.DataKey)
-		idx = len(instance.stack)
 	}
 
 	delete(m.pauses, id)
-
-	return idx, nil
+	return nil
 }
 
 func (m *mem) History(ctx context.Context, runID ulid.ULID) ([]state.History, error) {

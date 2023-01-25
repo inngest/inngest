@@ -168,7 +168,7 @@ func (s *svc) Run(ctx context.Context) error {
 
 		var err error
 		switch item.Kind {
-		case queue.KindEdge:
+		case queue.KindEdge, queue.KindSleep:
 			err = s.handleQueueItem(ctx, item)
 		case queue.KindPause:
 			err = s.handlePauseTimeout(ctx, item)
@@ -199,23 +199,26 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 	l.Info().Interface("payload", payload).Msg("processing step")
 
-	executionIdx := payload.StackIndex
-
-	// If the item is a requeued sleep, we need to adjust state here to show that
-	// the sleep has now been completed.
-	if payload.ResponseSaveOnHandle != nil {
-		// TODO When enqueuing a sleep, create the driver response to go with this
-		// call.
-		idx, err := s.state.SaveResponse(ctx, item.Identifier, *payload.ResponseSaveOnHandle, item.Attempt)
+	// If this is of type sleep, ensure that we save "nil" within the state store
+	// for the outgoing edge ID.  This ensures that we properly increase the stack
+	// for `tools.sleep` within generator functions.
+	var stackIdx int
+	if item.Kind == queue.KindSleep {
+		stackIdx, err = s.state.SaveResponse(ctx, item.Identifier, state.DriverResponse{
+			Step: inngest.Step{ID: edge.Outgoing}, // XXX: Save edge name here.
+		}, 0)
 		if err != nil {
-			return fmt.Errorf("unable to save response: %w", err)
+			return err
 		}
-		executionIdx = idx
-
-		l.Info().Interface("payload", payload).Msg("processing step")
+	} else {
+		// Load the position within the stack for standard edges.
+		stackIdx, err = s.state.StackIndex(ctx, item.Identifier.RunID, edge.Outgoing)
+		if err != nil {
+			return fmt.Errorf("unable to find stack index: %w", err)
+		}
 	}
 
-	resp, idx, err := s.exec.Execute(ctx, item.Identifier, edge, item.Attempt, executionIdx)
+	resp, _, err := s.exec.Execute(ctx, item.Identifier, edge, item.Attempt, stackIdx)
 
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
@@ -255,7 +258,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		//
 		// We keep invoking Generator-based functions until they provide no more
 		// yields, signalling they're done.
-		err := s.scheduleGeneratorResponse(ctx, item, resp, idx)
+		err := s.scheduleGeneratorResponse(ctx, item, resp)
 		if err != nil {
 			return fmt.Errorf("unable to schedule generator response: %w", err)
 		}
@@ -320,7 +323,6 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 				Event:      &am.Event,
 				Expression: am.Match,
 				OnTimeout:  am.OnTimeout,
-				StackIndex: idx,
 			})
 			if err != nil {
 				return fmt.Errorf("error saving edge pause: %w", err)
@@ -356,13 +358,11 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		l.Debug().Str("outgoing", next.Outgoing).Time("at", at).Msg("scheduling next step")
 
 		// Enqueue the next child in our queue.
-		next.Edge.StepPlanned = ""
 		if err := s.queue.Enqueue(ctx, queue.Item{
 			Kind:       queue.KindEdge,
 			Identifier: item.Identifier,
 			Payload: queue.PayloadEdge{
-				Edge:       next.Edge,
-				StackIndex: idx,
+				Edge: next.Edge,
 			},
 			MaxAttempts: retries,
 		}, at); err != nil {
@@ -395,26 +395,34 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 }
 
 // scheduleGeneratorResponse handles a specific generator opcode.
-func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r *state.DriverResponse, stackIndex int) error {
+func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item, r *state.DriverResponse) error {
 	if r.Generator == nil {
 		return fmt.Errorf("unable to handle non-generator response")
 	}
 
-	edge, ok := item.Payload.(queue.PayloadEdge)
+	origEdge, ok := origItem.Payload.(queue.PayloadEdge)
 	if !ok {
-		return fmt.Errorf("unknown queue item type handling generator: %T", item.Payload)
+		return fmt.Errorf("unknown queue item type handling generator: %T", origItem.Payload)
 	}
 
 	// We reuse this item so clear out the job ID and response saving for re-enqueues.
-	item.JobID = nil
-	edge.ResponseSaveOnHandle = nil
-	edge.Edge.StepPlanned = ""
+	origItem.JobID = nil
+	// We're going to re-enqueue this edge to run again.  Generators act as steps;  use
+	// the just-ran generator step as the outgoing step ID.  This lets us know where in
+	// the stack we are, as we have the generator step that just ran as the stack pointer.
+	// Without this we cannot do parallelism.
+	origEdge.Edge.Outgoing = r.Step.ID
+	// We aren't planning any next step;  this will be overwriiten by enums below.
+	origEdge.Edge.IncomingGeneratorStep = ""
 
 	eg := errgroup.Group{}
-
 	for _, val := range r.Generator {
 		gen := val
 		eg.Go(func() error {
+			// Give each goroutine copies of the edge and item to manipulate.
+			edge := origEdge
+			item := origItem
+
 			switch gen.Op {
 			case enums.OpcodeNone:
 				// OpcodeNone essentially terminates this "thread" or execution path.  We don't need to do
@@ -450,7 +458,6 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 					Expires:    state.Time(expires),
 					Event:      &opts.Event,
 					Expression: opts.If,
-					StackIndex: stackIndex,
 				})
 				if err != nil {
 					return err
@@ -480,23 +487,14 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 					return err
 				}
 
-				// TODO Do not pass this entire response
-				// We should save to the state store, but not update the stack.
-				// When the step is reprocessed, add to the stack and execute.
-				genRes := r
-				genRes.Generator = []*state.GeneratorOpcode{gen}
-				genRes.Step.ID = gen.ID
-				newEdge := edge
-				newEdge.ResponseSaveOnHandle = genRes
-				item.Payload = newEdge
-
 				return s.queue.Enqueue(ctx, queue.Item{
 					WorkspaceID: item.WorkspaceID,
-					Kind:        queue.KindEdge,
+					Kind:        queue.KindSleep,
 					Identifier:  item.Identifier,
 					Attempt:     item.Attempt,
 					MaxAttempts: item.MaxAttempts,
-					Payload:     newEdge,
+					// TODO: Save to state store after processing.
+					Payload: edge,
 				}, time.Now().Add(dur))
 			case enums.OpcodeStepPlanned:
 				if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
@@ -504,27 +502,18 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, item queue.Item, r 
 				}
 
 				// Ensure we run the generator ID that was planned.
-				newEdge := edge
-				newEdge.Edge.StepPlanned = gen.ID
-				newEdge.StackIndex = stackIndex
-				item.Payload = newEdge
 				// Ensure that if this step is planned multiple times by an erroneous SDK we only
 				// enqueue it once during the idempotency period.
 				jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
 				item.JobID = &jobID
-
 				return s.queue.Enqueue(ctx, item, time.Now())
 			case enums.OpcodeStep:
 				// Re-enqueue the exact same edge to run now.
-				if err := s.state.Scheduled(ctx, item.Identifier, "step", 0, nil); err != nil {
+				if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
 					return err
 				}
 				// This item has no generator ID, as we don't know what step we're about
 				// to invoke.
-				newEdge := edge
-				newEdge.StackIndex = stackIndex
-				newEdge.Edge.StepPlanned = ""
-				item.Payload = newEdge
 				return s.queue.Enqueue(ctx, item, time.Now())
 			default:
 				return fmt.Errorf("unknown opcode: %s", gen.Op.String())
@@ -556,8 +545,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	idx, err := s.state.ConsumePause(ctx, pause.ID, nil)
-	if err != nil {
+	if err := s.state.ConsumePause(ctx, pause.ID, nil); err != nil {
 		return fmt.Errorf("error consuming timeout pause: %w", err)
 	}
 
@@ -568,7 +556,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		if err := s.queue.Enqueue(ctx, queue.Item{
 			Kind:       queue.KindEdge,
 			Identifier: item.Identifier,
-			Payload:    queue.PayloadEdge{Edge: pause.Edge(), StackIndex: idx},
+			Payload:    queue.PayloadEdge{Edge: pause.Edge()},
 		}, time.Now()); err != nil {
 			return fmt.Errorf("error enqueueing timeout step: %w", err)
 		}

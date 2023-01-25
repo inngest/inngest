@@ -420,7 +420,7 @@ func TestServiceGeneratorState(t *testing.T) {
 
 	// Ensure our step returns a generator response.
 	data.c.Execution.Drivers["mock"] = &mockdriver.Config{
-		DynamicResponses: func(ctx context.Context, run state.State, av inngest.ActionVersion, s inngest.Step, idx int) map[string]state.DriverResponse {
+		DynamicResponses: func(ctx context.Context, run state.State, av inngest.ActionVersion, e inngest.Edge, s inngest.Step, idx int) map[string]state.DriverResponse {
 
 			switch atomic.AddInt32(&counter, 1) {
 			case 1:
@@ -524,7 +524,7 @@ func TestServiceRetry(t *testing.T) {
 
 	// Ensure our step returns a generator response.
 	data.c.Execution.Drivers["mock"] = &mockdriver.Config{
-		DynamicResponses: func(ctx context.Context, run state.State, av inngest.ActionVersion, s inngest.Step, idx int) map[string]state.DriverResponse {
+		DynamicResponses: func(ctx context.Context, run state.State, av inngest.ActionVersion, e inngest.Edge, s inngest.Step, idx int) map[string]state.DriverResponse {
 			switch atomic.AddInt32(&counter, 1) {
 			case 1:
 				// Error first.

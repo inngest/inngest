@@ -97,11 +97,16 @@ func (s Step) RetryCount() int {
 }
 
 type Edge struct {
-	Outgoing string `json:"outgoing"`
+	// Incoming is the name of the step to run.  This is always the name of the
+	// concrete step, even if we're running a generator.
 	Incoming string `json:"incoming"`
 	// StepPlanned is the ID of the generator step planned via enums.OpcodeStepPlanned,
 	// if this edge represents running a yielded generator step within a DAG.
-	StepPlanned string `json:"gen,omitempty"`
+	//
+	// We cannot use "Incoming" here as the incoming name still needs to tbe the generator.
+	IncomingGeneratorStep string `json:"gen,omitempty"`
+	// Outgoing is the name of the generator step or step that last ran.
+	Outgoing string `json:"outgoing"`
 	// Metadata specifies the type of edge to use.  This defaults
 	// to EdgeTypeEdge - a basic link that can conditionally run.
 	Metadata *EdgeMetadata `json:"metadata,omitempty"`

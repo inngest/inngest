@@ -448,6 +448,11 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	return inmemory.NewStateInstance(*w, id, meta, event, actions, errors, stack), nil
 }
 
+func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {
+	panic("TODO")
+	return 0, fmt.Errorf("step not found in stack: %s", stepID)
+}
+
 func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (int, error) {
 	var (
 		data            any
@@ -673,15 +678,15 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) (int, error) {
+func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 	p, err := m.PauseByID(ctx, id)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	marshalledData, err := json.Marshal(data)
 	if err != nil {
-		return 0, fmt.Errorf("cannot marshal data to store in state: %w", err)
+		return fmt.Errorf("cannot marshal data to store in state: %w", err)
 	}
 
 	eventKey := ""
@@ -696,7 +701,7 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) (int, err
 		m.kf.Stack(ctx, p.Identifier.RunID),
 	}
 
-	stackCount, err := scripts["consumePause"].Eval(
+	status, err := scripts["consumePause"].Eval(
 		ctx,
 		m.r,
 		keys,
@@ -704,11 +709,18 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) (int, err
 		id.String(),
 		p.DataKey,
 		string(marshalledData),
-	).Int()
+	).Int64()
 	if err != nil {
-		return 0, fmt.Errorf("error consuming pause: %w", err)
+		return fmt.Errorf("error consuming pause: %w", err)
 	}
-	return stackCount, nil
+	switch status {
+	case 0:
+		return nil
+	case 1:
+		return state.ErrPauseNotFound
+	default:
+		return fmt.Errorf("unknown response leasing pause: %d", status)
+	}
 }
 
 // PausesByEvent returns all pauses for a given event within a workspace.

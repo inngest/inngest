@@ -12,6 +12,7 @@ import (
 
 const (
 	KindEdge  = "edge"
+	KindSleep = "sleep"
 	KindPause = "pause"
 )
 
@@ -74,7 +75,10 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	}
 
 	switch temp.Kind {
-	case KindEdge:
+	case KindEdge, KindSleep:
+		// Edge and Sleep are the same;  the only difference is that the executor
+		// runner should always save nil to the state store using the outgoing edge's
+		// ID when processing a sleep so that the state + stack are updated properly.
 		if len(temp.Payload) == 0 {
 			return nil
 		}
@@ -110,11 +114,6 @@ func GetEdge(i Item) (*PayloadEdge, error) {
 // the incoming step of the edge.
 type PayloadEdge struct {
 	Edge inngest.Edge `json:"edge"`
-	// StackIndex represents the current index within the run state
-	// when enqueueing the next step.  This is necessary to calculate
-	// steps with parallelism within SDKs.
-	StackIndex           int                   `json:"idx"`
-	ResponseSaveOnHandle *state.DriverResponse `json:"respSaveOnHandle,omitempty"`
 }
 
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.

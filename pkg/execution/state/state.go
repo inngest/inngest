@@ -199,6 +199,10 @@ type Loader interface {
 	// IsComplete returns whether the given identifier is complete, ie. the
 	// pending count in the identifier's metadata is zero.
 	IsComplete(ctx context.Context, runID ulid.ULID) (complete bool, err error)
+
+	// StackIndex returns the index for the given step ID within the function stack of
+	// a given run.
+	StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error)
 }
 
 // Mutater mutates state for a given identifier, storing the state and returning

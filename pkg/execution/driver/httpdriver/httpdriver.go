@@ -92,11 +92,11 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 	// If we have a generator step name, ensure we add the step ID parameter
 	parsed, _ := url.Parse(rt.URL)
 	values, _ := url.ParseQuery(parsed.RawQuery)
-	if edge.StepPlanned != "" {
-		values.Set("stepId", edge.StepPlanned)
+	if edge.IncomingGeneratorStep != "" {
+		values.Set("stepId", edge.IncomingGeneratorStep)
 		parsed.RawQuery = values.Encode()
 	} else {
-		values.Set("stepId", "step")
+		values.Set("stepId", edge.Incoming)
 	}
 
 	byt, status, err := e.do(ctx, parsed.String(), input)
