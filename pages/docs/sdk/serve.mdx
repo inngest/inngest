@@ -5,7 +5,7 @@ The first thing you'll need to do is to add and serve the Inngest API in your pr
 
 ## Setting up the API
 
-Inngest provides a `serve()` handler which adds an API endpoint to your router.  **You should always 
+Inngest provides a `serve()` handler which adds an API endpoint to your router.  **You should always
 serve our API at `/api/inngest`**, as this makes automated deploys much easier.  If you need to
 change the API URL skip to [configuring the API Path](#configuring-the-api-path).
 
@@ -15,7 +15,7 @@ We provide framework-specific bindings to make this easy for common platforms:
 - [DigitalOcean functions](#framework-digital-ocean-functions)
 - [Express](#framework-express)
 - [Fresh (Deno)](#framework-fresh-deno)
-- [NextJS](#framework-next-js)
+- [Next.js](#framework-next-js)
 - [Redwood](#framework-redwood)
 - [Remix](#framework-remix)
 
@@ -118,9 +118,9 @@ const fn = inngest.createFunction(
 export const handler = serve(inngest, [fn]);
 ```
 
-## Framework: NextJS
+## Framework: Next.js
 
-Inngest has first class support for NextJS API routes, allowing you to easily create the Inngest API.
+Inngest has first class support for Next.js API routes, allowing you to easily create the Inngest API.
 Add the following within `./pages/api/inngest.ts`:
 
 ```typescript
@@ -131,6 +131,22 @@ export default serve(
   "My next app", // Your app name
   [fnA],    // A list of functions to expose.  This can be empty to start.
 );
+```
+
+## Framework: Nuxt <VersionBadge version="v0.9.2+" />
+
+Inngest has first class support for [Nuxt server routes](https://nuxt.com/docs/guide/directory-structure/server#server-routes), allowing you to easily create the Inngest API.
+Add the following within `./server/api/inngest.ts`:
+
+```typescript
+import { serve } from "inngest/nuxt";
+import fnA from "~~/inngest/fnA"; // Your own function
+import { inngest } from "~~/inngest/client";
+
+export default defineEventHandler(serve(
+  "My Nuxt App", // Your app name
+  [fnA],         // A list of functions to expose.  This can be empty to start.
+));
 ```
 
 ## Framework: Redwood
@@ -193,5 +209,5 @@ The API works by exposing a single endpoint at `/api/inngest` which handles thre
 
 - `GET`:  Returns a getting started UI and metadata about your functions **in development only**
 - `POST`:  Runs a function, using the request's post data as incoming function state.
-- `PUT`:  Triggers a deploy, which makes the SDK push functions to Inngest using the signing key. 
+- `PUT`:  Triggers a deploy, which makes the SDK push functions to Inngest using the signing key.
 
