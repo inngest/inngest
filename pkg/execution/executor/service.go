@@ -407,7 +407,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 
 	// We reuse this item so clear out the job ID and response saving for re-enqueues.
 	origItem.JobID = nil
-	// We aren't planning any next step;  this will be overwriiten by enums below.
+	// We aren't planning any next step;  this will be overwritten by enums below.
 	origEdge.Edge.IncomingGeneratorStep = ""
 	origItem.Payload = origEdge
 
@@ -483,6 +483,13 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 					return err
 				}
 
+				// Set the outgoing edge to the generator ID found for this op, so that
+				// it can be correctly added to the stack upon completion.
+				//
+				// If we don't do this, the previous step ID will be used as the
+				// outgoing, resulting in us overwriting that step's data.
+				edge.Edge.Outgoing = gen.ID
+
 				return s.queue.Enqueue(ctx, queue.Item{
 					WorkspaceID: item.WorkspaceID,
 					Kind:        queue.KindSleep,
@@ -508,6 +515,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 				jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
 				item.JobID = &jobID
 				item.Payload = edge
+				item.Kind = queue.KindEdge
 				return s.queue.Enqueue(ctx, item, time.Now())
 			case enums.OpcodeStep:
 				// Re-enqueue the exact same edge to run now.
@@ -518,6 +526,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 				// Ensure that future steps have this outgoing edge as the parent ID.
 				edge.Edge.Outgoing = gen.ID
 				item.Payload = edge
+				item.Kind = queue.KindEdge
 				return s.queue.Enqueue(ctx, item, time.Now())
 			default:
 				return fmt.Errorf("unknown opcode: %s", gen.Op.String())
