@@ -78,6 +78,40 @@ func Sign(ctx context.Context, key, body []byte) string {
 	return fmt.Sprintf("t=%d&s=%s", now, sig)
 }
 
+func ParseGenerator(ctx context.Context, byt []byte) ([]*state.GeneratorOpcode, error) {
+	// When we return a 206, we always expect that this is
+	// a generator function.  Users SHOULD NOT return a 206
+	// in any other circumstance.
+
+	if len(byt) == 0 {
+		return nil, ErrEmptyResponse
+	}
+
+	// Is this a slice of opcodes or a single opcode?  The SDK can return both:
+	// parallelism was added as an incremental improvement.  It would have been nice
+	// to always return an array and we can enfore this as an SDK requirement in V1+
+	switch byt[0] {
+	case '{':
+		gen := &state.GeneratorOpcode{}
+		if err := json.Unmarshal(byt, gen); err != nil {
+			return nil, fmt.Errorf("error reading generator opcode response: %w", err)
+		}
+		return []*state.GeneratorOpcode{gen}, nil
+	case '[':
+		gen := []*state.GeneratorOpcode{}
+		if err := json.Unmarshal(byt, &gen); err != nil {
+			return nil, fmt.Errorf("error reading generator opcode response: %w", err)
+		}
+		return gen, nil
+	}
+
+	// Finally, if the length of resp.Generator == 0 then this is implicitly an enums.OpcodeNone
+	// step.  This is added to reduce bandwidth across many calls.
+	return []*state.GeneratorOpcode{
+		{Op: enums.OpcodeNone},
+	}, nil
+}
+
 func (e executor) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, edge inngest.Edge, step inngest.Step, idx int) (*state.DriverResponse, error) {
 	rt, ok := action.Runtime.Runtime.(inngest.RuntimeHTTP)
 	if !ok {
@@ -106,49 +140,16 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 
 	if status == 206 {
 		// This is a generator-based function returning opcodes.
-		//
-		// When we return a 206, we always expect that this is
-		// a generator function.  Users SHOULD NOT return a 206
-		// in any other circumstance.
-
-		if len(byt) == 0 {
-			return nil, ErrEmptyResponse
-		}
-
 		resp := &state.DriverResponse{ActionVersion: action.Version}
-
-		// Is this a slice of opcodes or a single opcode?  The SDK can return both:
-		// parallelism was added as an incremental improvement.  It would have been nice
-		// to always return an array and we can enfore this as an SDK requirement in V1+
-		switch byt[0] {
-		case '{':
-			gen := &state.GeneratorOpcode{}
-			if err := json.Unmarshal(byt, gen); err != nil {
-				return nil, fmt.Errorf("error reading generator opcode response: %w", err)
-			}
-			resp.Generator = []*state.GeneratorOpcode{gen}
-		case '[':
-			gen := []*state.GeneratorOpcode{}
-			if err := json.Unmarshal(byt, &gen); err != nil {
-				return nil, fmt.Errorf("error reading generator opcode response: %w", err)
-			}
-			resp.Generator = gen
+		resp.Generator, err = ParseGenerator(ctx, byt)
+		if err != nil {
+			return nil, err
 		}
-
-		// Finally, if the length of resp.Generator == 0 then this is implicitly an enums.OpcodeNone
-		// step.  This is added to reduce bandwidth across many calls.
-		if len(resp.Generator) == 0 {
-			resp.Generator = []*state.GeneratorOpcode{
-				{Op: enums.OpcodeNone},
-			}
-		}
-
 		return resp, nil
 	}
 
 	var body interface{}
 	body = json.RawMessage(byt)
-
 	if len(byt) > 0 {
 		// Is the response valid JSON?  If so, ensure that we don't re-marshal the
 		// JSON string.
