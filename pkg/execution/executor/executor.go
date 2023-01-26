@@ -366,7 +366,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	// set this.
 	response.Step = *action
 
-	if response != nil && response.ActionVersion == nil {
+	if response.ActionVersion == nil {
 		// Set the ActionVersion automatically from the executor, where
 		// provided from the definition.
 		response.ActionVersion = definition.Version

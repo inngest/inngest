@@ -210,7 +210,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		if err != nil {
 			return err
 		}
-	} else {
+	} else if edge.Outgoing != inngest.TriggerName {
 		// Load the position within the stack for standard edges.
 		stackIdx, err = s.state.StackIndex(ctx, item.Identifier.RunID, edge.Outgoing)
 		if err != nil {
@@ -407,13 +407,9 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 
 	// We reuse this item so clear out the job ID and response saving for re-enqueues.
 	origItem.JobID = nil
-	// We're going to re-enqueue this edge to run again.  Generators act as steps;  use
-	// the just-ran generator step as the outgoing step ID.  This lets us know where in
-	// the stack we are, as we have the generator step that just ran as the stack pointer.
-	// Without this we cannot do parallelism.
-	origEdge.Edge.Outgoing = r.Step.ID
 	// We aren't planning any next step;  this will be overwriiten by enums below.
 	origEdge.Edge.IncomingGeneratorStep = ""
+	origItem.Payload = origEdge
 
 	eg := errgroup.Group{}
 	for _, val := range r.Generator {
@@ -453,7 +449,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 					ID:         pauseID,
 					DataKey:    gen.ID,
 					Identifier: item.Identifier,
-					Outgoing:   edge.Edge.Outgoing,
+					Outgoing:   gen.ID,
 					Incoming:   edge.Edge.Incoming,
 					Expires:    state.Time(expires),
 					Event:      &opts.Event,
@@ -501,19 +497,27 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 					return err
 				}
 
-				// Ensure we run the generator ID that was planned.
+				// Planned generator IDs are the same as the actual OpcodeStep IDs.
+				// We can't set edge.Edge.Outgoing here because the step hasn't yet ran.
+				//
+				// We do, though, want to store the incomin step ID name _without_ overriding
+				// the actual DAG step, though.
+				edge.Edge.IncomingGeneratorStep = gen.ID
 				// Ensure that if this step is planned multiple times by an erroneous SDK we only
 				// enqueue it once during the idempotency period.
 				jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
 				item.JobID = &jobID
+				item.Payload = edge
 				return s.queue.Enqueue(ctx, item, time.Now())
 			case enums.OpcodeStep:
 				// Re-enqueue the exact same edge to run now.
 				if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
 					return err
 				}
-				// This item has no generator ID, as we don't know what step we're about
-				// to invoke.
+
+				// Ensure that future steps have this outgoing edge as the parent ID.
+				edge.Edge.Outgoing = gen.ID
+				item.Payload = edge
 				return s.queue.Enqueue(ctx, item, time.Now())
 			default:
 				return fmt.Errorf("unknown opcode: %s", gen.Op.String())

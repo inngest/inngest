@@ -449,7 +449,16 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 }
 
 func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {
-	panic("TODO")
+	stack := m.r.LRange(ctx, m.kf.Stack(ctx, runID), 0, -1).Val()
+	if len(stack) == 0 {
+		return 0, nil
+	}
+	for n, i := range stack {
+		if i == stepID {
+			return n + 1, nil
+		}
+
+	}
 	return 0, fmt.Errorf("step not found in stack: %s", stepID)
 }
 

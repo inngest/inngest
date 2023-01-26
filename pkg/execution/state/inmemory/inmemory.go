@@ -76,12 +76,18 @@ func (m *mem) OnFunctionStatus(f state.FunctionCallback) {
 
 func (m *mem) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {
 	s, err := m.Load(ctx, runID)
-	if s != nil {
+	if s == nil {
 		return 0, err
 	}
+
+	if len(s.Stack()) == 0 {
+		return 0, nil
+	}
+
 	for n, i := range s.Stack() {
+		fmt.Println(i, stepID)
 		if i == stepID {
-			return n, nil
+			return n + 1, nil
 		}
 	}
 	return 0, fmt.Errorf("step not found in stack: %s", stepID)

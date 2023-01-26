@@ -180,7 +180,7 @@ func TestExecute_state(t *testing.T) {
 	assert.Equal(t, 0, len(s.Errors()))
 
 	// Test "error" responses
-	_, idx, err = exec.Execute(ctx, s.Identifier(), inngest.Edge{Outgoing: "3", Incoming: "5"}, 0, idx)
+	_, _, err = exec.Execute(ctx, s.Identifier(), inngest.Edge{Outgoing: "3", Incoming: "5"}, 0, idx)
 	assert.Error(t, err)
 	assert.Equal(t, 3, len(driver.Executed), "function not executed")
 	// assert.Equal(t, 0, len(available), "incorrect number of functions available")
