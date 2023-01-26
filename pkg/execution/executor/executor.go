@@ -397,8 +397,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 			response.Generator[0].Op == enums.OpcodeSleep {
 			return response, stackIndex, err
 		}
-	}
-	if len(response.Generator) > 1 {
+	} else {
 		return response, stackIndex, err
 	}
 
