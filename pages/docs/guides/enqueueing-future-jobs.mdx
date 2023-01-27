@@ -20,7 +20,7 @@ You can delay jobs using the `tools.sleep` utility:
 ```tsx
 import { Inngest } from "inngest";
 
-const inngest = new Inngest({ app: "Signup flow" });
+const inngest = new Inngest({ name: "Signup flow" });
 
 export const fn = inngest.createStepFunction(
   "Send signup email",
@@ -44,7 +44,7 @@ You can run jobs at a specific time using the `tools.sleepUntil` utility:
 ```tsx
 import { Inngest } from "inngest";
 
-const inngest = new Inngest({ app: "Signup flow" });
+const inngest = new Inngest({ name: "Signup flow" });
 
 export const fn = inngest.createStepFunction(
   "Send signup email",

@@ -1,41 +1,72 @@
 # Scheduled functions
 
-You can create scheduled jobs using cron schedules within Inngest natively.  Inngest’s cron schedules also support timezones, allowing you to schedule work in whatever timezone you need work to run in.
+You can create scheduled jobs using cron schedules within Inngest natively.  Inngest's cron schedules also support timezones, allowing you to schedule work in whatever timezone you need work to run in.
 
-You can create scheduled functions that run in any timezone using the `createScheduledFunction` helper:
+You can create scheduled functions that run in any timezone using the SDK's `createScheduledFunction`:
 
 ```tsx
 import { Inngest } from "inngest";
 
-const inngest = new Inngest({ app: "Signup flow" });
+const inngest = new Inngest({ name: "Signup flow" });
 
-export const fn = inngest.createScheduledFunction(
-  "Send weekly debrief",
+// This weekly digest function will run at 12:00pm on Friday in the Paris timezone
+export const prepareWeeklyDigest = inngest.createScheduledFunction(
+  "Prepare weekly digest",
   "TZ=Europe/Paris 0 12 * * 5",
-  ({ event, tools }) => {
-    const users = tools.run("Load users", () => {
-      return db.load("SELECT * FROM users");
+  async () => {
+    // Load all the users from your database:
+    const users = await db.load("SELECT * FROM users");
+
+    // 💡 Since we want to sent a weekly digest to each one of these users
+    // it may take a long time to iterate through each user and send an email.
+
+    // Instead, we'll use this scheduled function to send an event to Inngest
+    // for each user then handle the actual sending of the email in a separate
+    // function triggered by that event.
+
+    // ✨ This is known as a "fan-out" pattern ✨
+
+    // 1️⃣ First, we'll create an event object for every user return in the query:
+    const events = users.map((user) => {
+      return {
+        name: "app/send.weekly.digest",
+        data: {
+          user_id: user.id,
+          email: user.email,
+        }
+      }
     });
 
-    users.forEach(u => {
-      // This uses a 'fan-out' pattern to invoke another function
-      // concurrently (with its own retries) to send digests to users.
-      // It's possile to use `tools.run` here, though this pattern works
-      // best with many users.
-      tools.send({
-        name: "app/send-weekly-digest",
-        data: {
-          user_id: u.id,
-          email: u.email,
-        }
-      });
-    });
+    // 2️⃣ Now, we'll send all events in a single batch:
+    await inngest.send(events);
+
+    // This function can now quickly finish and the rest of the logic will
+    // be handled in the function below ⬇️
   }
 );
+
+// This is a regular Inngest function that will send the actual email for
+// every event that is received (see the above function's inngest.send())
+
+// Since we are "fanning out" with events, these functions can all run in parallel
+export const sendWeeklyDigest = inngest.createFunction(
+  "Send weekly digest email",
+  "app/send.weekly.digest",
+  async ({ event }) => {
+    // 3️⃣ We can now grab the email and user id from the event payload
+    const { email, user_id } = event.data;
+
+    // 4️⃣ Finally, we send the email itself:
+    await email.send("weekly_digest", email, user_id);
+
+    // 🎇 That's it! - We've used two functions to reliably perform a scheduled
+    // task for a large list of users!
+  }
+)
 ```
 
-<aside>
-👉 Note: You’ll need to [serve this function in your inngest API](/docs/sdk/serve) for the function to be available to Inngest.
-</aside>
+<Callout>
+👉 Note: You’ll need to [serve these functions in your Inngest API](/docs/sdk/serve) for the functions to be available to Inngest.
+</Callout>
 
 On the free plan, if your function fails 20 times consecutively it will automatically be paused.

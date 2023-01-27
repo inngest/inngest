@@ -18,7 +18,7 @@ a new Inngest function [as outlined in the function documentation](/docs/functio
 ```typescript
 import { Inngest } from "inngest";
 
-const inngest = new Inngest({ app: "Signup flow" });
+const inngest = new Inngest({ name: "Signup flow" });
 
 export const fn = inngest.createStepFunction(
   "Send signup email",   // Function name
