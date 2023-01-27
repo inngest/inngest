@@ -394,7 +394,8 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		// step in question didn't actually run.
 		if response.Generator[0].Op == enums.OpcodeStepPlanned ||
 			response.Generator[0].Op == enums.OpcodeNone ||
-			response.Generator[0].Op == enums.OpcodeSleep {
+			response.Generator[0].Op == enums.OpcodeSleep ||
+			response.Generator[0].Op == enums.OpcodeWaitForEvent {
 			return response, stackIndex, err
 		}
 	} else {

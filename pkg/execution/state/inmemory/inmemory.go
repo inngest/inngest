@@ -487,6 +487,7 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		instance.actions = copyMap(instance.actions)
 		instance.errors = copyMap(instance.errors)
 		instance.actions[pause.DataKey] = data
+		instance.stack = append(instance.stack, pause.DataKey)
 		m.state[pause.Identifier.RunID] = instance
 	}
 
