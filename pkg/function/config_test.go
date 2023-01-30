@@ -124,15 +124,15 @@ function: defs.#Function & {
   ],
   "edges": [
     {
-      "outgoing": "$trigger",
       "incoming": "first",
+      "outgoing": "$trigger",
       "metadata": {
         "wait": "5m"
       }
     },
     {
-      "outgoing": "first",
-      "incoming": "second"
+      "incoming": "second",
+      "outgoing": "first"
     }
   ]
 }

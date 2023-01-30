@@ -36,7 +36,7 @@ end
 redis.call("HSET", errorKey, stepID, data)
 redis.call("ZADD", historyKey, logTime, stepLog)
 if isFinal == 0 then
-	return 0
+	return tonumber(redis.call("LLEN", stackKey))
 end
 
 redis.call("HINCRBY", metadataKey, "pending", -1)

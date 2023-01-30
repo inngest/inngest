@@ -531,10 +531,11 @@ func (q *queue) peekSize() int64 {
 }
 
 func (q *queue) isSequential() bool {
-	if q.sequentialLease() == nil {
+	l := q.sequentialLease()
+	if l == nil {
 		return false
 	}
-	return ulid.Time(q.sequentialLease().Time()).After(time.Now())
+	return ulid.Time(l.Time()).After(time.Now())
 }
 
 // trackingSemaphore returns a semaphore that tracks closely - but not atomically -

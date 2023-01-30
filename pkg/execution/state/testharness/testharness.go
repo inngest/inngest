@@ -535,11 +535,10 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 
 		idx, err := m.SaveResponse(ctx, s.Identifier(), r, 0)
 		require.NoError(t, err)
-		require.EqualValues(t, 0, idx)
-
+		// The stack should still be 1 from the previous step.
+		require.EqualValues(t, 1, idx)
 		next, err := m.Load(ctx, s.Identifier().RunID)
 		require.NoError(t, err)
-
 		stack := next.Stack()
 		require.EqualValues(t, 1, len(stack))
 		require.Equal(t, []string{w.Steps[0].ID}, stack)
@@ -548,7 +547,7 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 	t.Run("It modifies the stack with a final error", func(t *testing.T) {
 		r := state.DriverResponse{
 			Step: w.Steps[1],
-			Err:  fmt.Errorf("an absolutely terrible yet intermittent, non-final, retryable error"),
+			Err:  fmt.Errorf("a permanent error"),
 		}
 		r.SetFinal()
 		require.False(t, r.Retryable())

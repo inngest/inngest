@@ -193,6 +193,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 		l := e.log.With().
 			Str("run_id", id.RunID.String()).
 			Interface("edge", edge).
+			Str("step", edge.Incoming).
 			Str("fn_name", s.Workflow().Name).
 			Str("fn_id", s.Workflow().ID).
 			Int("attempt", attempt).
@@ -392,13 +393,11 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 
 		// If this is a plan step or a noop, we _dont_ want to save the response.  That's because the
 		// step in question didn't actually run.
-		if response.Generator[0].Op == enums.OpcodeStepPlanned ||
-			response.Generator[0].Op == enums.OpcodeNone ||
-			response.Generator[0].Op == enums.OpcodeSleep ||
-			response.Generator[0].Op == enums.OpcodeWaitForEvent {
+		if response.Generator[0].Op != enums.OpcodeStep {
 			return response, stackIndex, err
 		}
-	} else {
+	}
+	if len(response.Generator) > 1 {
 		return response, stackIndex, err
 	}
 

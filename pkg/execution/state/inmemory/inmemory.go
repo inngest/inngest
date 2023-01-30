@@ -370,7 +370,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 	if r.Final() {
 		instance.metadata.Pending--
 		instance.metadata.Status = enums.RunStatusFailed
-		// instance.stack = append(instance.stack, r.Step.ID)
+		instance.stack = append(instance.stack, r.Step.ID)
 		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
 		m.setHistory(ctx, i, state.History{
 			ID:         state.HistoryID(),

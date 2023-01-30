@@ -290,8 +290,8 @@ workflow: workflows.#Workflow & {
     }
   }]
   edges: [{
-    outgoing: "$trigger"
     incoming: "step-1"
+    outgoing: "$trigger"
   }]
 }`
 
