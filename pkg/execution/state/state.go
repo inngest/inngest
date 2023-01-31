@@ -181,6 +181,10 @@ type Loader interface {
 	// than a full load in cases where only the metadata is necessary.
 	Metadata(ctx context.Context, runID ulid.ULID) (*Metadata, error)
 
+	// Workflow returns the workflow definition for the given run.  It's cheaper
+	// than a full state load.
+	Workflow(ctx context.Context, runID ulid.ULID) (*inngest.Workflow, error)
+
 	// Load returns run state for the given identifier.
 	Load(ctx context.Context, runID ulid.ULID) (State, error)
 
