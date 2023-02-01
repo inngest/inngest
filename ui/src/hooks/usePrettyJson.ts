@@ -1,4 +1,4 @@
-import { useMemo } from "preact/hooks";
+import { useMemo } from "react";
 
 /**
  * Given a JSON string, returns a pretty-printed version of it if it's valid

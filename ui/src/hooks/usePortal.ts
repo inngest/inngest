@@ -1,9 +1,8 @@
-import type { VNode } from "preact";
-import { createPortal } from "preact/compat";
+import { createPortal } from "react-dom";
 
 export const usePortal = () => {
   const container = document.getElementById("modals");
 
-  return (node: VNode<{}>) =>
+  return (node: React.ReactNode) =>
     container ? createPortal(node, container) : null;
 };

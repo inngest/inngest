@@ -1,4 +1,3 @@
-import { ComponentChild } from "preact";
 import { EventStatus, FunctionRunStatus } from "../../store/generated";
 import classNames from "../../utils/classnames";
 import statusStyles from "../../utils/statusStyles";
@@ -11,7 +10,7 @@ interface FuncCardProps {
   id: string;
   status: FunctionRunStatus | EventStatus;
   active?: boolean;
-  contextualBar?: ComponentChild;
+  contextualBar?: React.ReactNode;
   onClick?: () => void;
 }
 

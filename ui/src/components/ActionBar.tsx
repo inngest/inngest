@@ -1,8 +1,8 @@
-import { ComponentChildren } from "preact";
+import React from "react";
 
 interface ActionBarProps {
-  tabs?: ComponentChildren;
-  actions?: ComponentChildren;
+  tabs?: React.ReactNode;
+  actions?: React.ReactNode;
 }
 
 export default function ActionBar({ tabs, actions }: ActionBarProps) {

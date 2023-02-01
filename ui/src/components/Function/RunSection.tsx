@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import ms from "ms";
+import { useEffect, useMemo, useState } from "react";
 import noFnsImg from "../../../assets/images/no-fn-selected.png";
 import { usePrettyJson } from "../../hooks/usePrettyJson";
-import ms from "ms";
 import {
   EventStatus,
   FunctionEventType,
   FunctionRunStatus,
-  FunctionRunEvent,
   StepEventType,
   useGetFunctionRunQuery,
 } from "../../store/generated";
@@ -33,7 +32,6 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
   const timeline = useMemo(() => normalizeSteps(run?.timeline || null), [run]);
   const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
   const dispatch = useAppDispatch();
-
 
   useEffect(() => {
     if (!run?.event?.id) {
@@ -116,11 +114,10 @@ const FunctionRunTimelineRow = ({
   name,
   last,
 }: FunctionRunTimelineRowProps) => {
-
-  const json = useMemo(() => { 
+  const json = useMemo(() => {
     try {
       return JSON.parse(output || "");
-    } catch(e) {
+    } catch (e) {
       return null;
     }
   }, [output]);
@@ -151,7 +148,7 @@ const FunctionRunTimelineRow = ({
           const diff = date - new Date(createdAt).valueOf();
           suffix = `for ${ms(diff, { long: true })}`;
         }
-      } catch(e) {}
+      } catch (e) {}
     }
 
     return {
@@ -163,7 +160,7 @@ const FunctionRunTimelineRow = ({
   const tabs = [{ label: "Output", content: payload || "" }];
 
   // sdkError stores the error contents of the SDK response.
-  const sdkError = !!json?.error && (json?.output?.body || json?.output)
+  const sdkError = !!json?.error && (json?.output?.body || json?.output);
   if (!!sdkError) {
     tabs.push({ label: "Error", content: sdkError });
   }
@@ -171,9 +168,7 @@ const FunctionRunTimelineRow = ({
   return (
     <TimelineRow status={status} iconOffset={0} bottomLine={!last}>
       <TimelineFuncProgress label={label} date={createdAt} id="">
-        {payload ? (
-          <CodeBlock tabs={tabs} />
-        ) : null}
+        {payload ? <CodeBlock tabs={tabs} /> : null}
       </TimelineFuncProgress>
     </TimelineRow>
   );
@@ -229,7 +224,27 @@ const stepEventTypeMap: Record<
 };
 
 // TODO: Normalize this type in generated.ts
-type Timeline = null | Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }>;
+type Timeline = null | Array<
+  | {
+      __typename: "FunctionEvent";
+      createdAt?: any | null;
+      output?: string | null;
+      functionType?: FunctionEventType | null;
+    }
+  | {
+      __typename: "StepEvent";
+      createdAt?: any | null;
+      output?: string | null;
+      name?: string | null;
+      stepType?: StepEventType | null;
+      waitingFor?: {
+        __typename?: "StepEventWait";
+        expiryTime: any;
+        eventName?: string | null;
+        expression?: string | null;
+      } | null;
+    }
+>;
 
 const normalizeSteps = (timeline: Timeline): Timeline => {
   // Normalize the feed here.  The dev server API gives us _every_ event;
@@ -250,7 +265,8 @@ const normalizeSteps = (timeline: Timeline): Timeline => {
         // If the scheduled at time is different to the historical time,
         // show the timestamp.
         const output = JSON.parse(item.output || "null");
-        const diff = new Date(output).valueOf() - new Date(item.createdAt).valueOf();
+        const diff =
+          new Date(output).valueOf() - new Date(item.createdAt).valueOf();
 
         if (output && diff > 999) {
           // Only show "waiting" if we're waiting for longer than a second.  Naturally,
@@ -259,21 +275,22 @@ const normalizeSteps = (timeline: Timeline): Timeline => {
           return { ...item, stepType: StepEventType.Waiting, output };
         }
 
-        const next = timeline[n+1];
+        const next = timeline[n + 1];
         if (!next || next.__typename === "FunctionEvent") return item;
 
         // Don't show this if the next step is started.
         if (next.stepType === "STARTED") return null;
       }
       case StepEventType.Started: {
-        const next = timeline[n+1];
+        const next = timeline[n + 1];
         if (!next || next.__typename === "FunctionEvent") return item;
         // Don't show this if the next step is completed.
-        if (next.stepType === "COMPLETED" || next.stepType === "FAILED") return null;
+        if (next.stepType === "COMPLETED" || next.stepType === "FAILED")
+          return null;
       }
     }
     return item;
   });
 
   return filtered.filter(Boolean) as Timeline;
-}
+};

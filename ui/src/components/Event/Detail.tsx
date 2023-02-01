@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useState } from "react";
 import classNames from "../../utils/classnames";
 
 import TimelineFuncProgress from "../Timeline/TimelineFuncProgress";

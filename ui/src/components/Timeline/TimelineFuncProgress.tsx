@@ -1,11 +1,10 @@
-import { ComponentChildren } from "preact";
 import { Time } from "../Time";
 
 interface TimelineFuncProgressProps {
   label: string;
   date?: string | number;
   id: string;
-  children?: ComponentChildren;
+  children?: React.ReactNode;
 }
 
 export default function TimelineFuncProgress({

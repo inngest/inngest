@@ -1,10 +1,9 @@
-import { ComponentChild } from "preact";
 import { Time } from "../Time";
 
 interface TimelineStaticRowProps {
   label: string;
   date?: string | number;
-  actionBtn?: ComponentChild;
+  actionBtn?: React.ReactNode;
 }
 
 export default function TimelineStaticRow({

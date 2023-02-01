@@ -1,8 +1,7 @@
-import { ComponentChild } from "preact";
 import classNames from "../../utils/classnames";
 
 interface SidebarLinkProps {
-  icon: ComponentChild;
+  icon: React.ReactNode;
   active?: boolean;
   badge?: number;
   onClick?: () => void;
