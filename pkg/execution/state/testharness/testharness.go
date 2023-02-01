@@ -1316,6 +1316,10 @@ func checkCancel(t *testing.T, m state.Manager) {
 	reloaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
+
+	history, err := m.History(ctx, s.RunID())
+	require.NoError(t, err)
+	require.Equal(t, enums.HistoryTypeFunctionCancelled, history[len(history)-1].Type)
 }
 
 func checkCancel_cancelled(t *testing.T, m state.Manager) {

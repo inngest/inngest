@@ -327,10 +327,18 @@ func (m mgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error
 }
 
 func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
+	now := time.Now()
 	status, err := scripts["cancel"].Eval(
 		ctx,
 		m.r,
-		[]string{m.kf.RunMetadata(ctx, id.RunID)},
+		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
+		state.History{
+			ID:         state.HistoryID(),
+			Type:       enums.HistoryTypeFunctionCancelled,
+			Identifier: id,
+			CreatedAt:  now,
+		},
+		now.UnixMilli(),
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error cancelling: %w", err)
