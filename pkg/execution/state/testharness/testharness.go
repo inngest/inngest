@@ -1316,6 +1316,10 @@ func checkCancel(t *testing.T, m state.Manager) {
 	reloaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCancelled, reloaded.Metadata().Status, "Status is not Cancelled")
+
+	history, err := m.History(ctx, s.RunID())
+	require.NoError(t, err)
+	require.Equal(t, enums.HistoryTypeFunctionCancelled, history[len(history)-1].Type)
 }
 
 func checkCancel_cancelled(t *testing.T, m state.Manager) {
@@ -1413,6 +1417,21 @@ func checkFinalizedStatus(t *testing.T, m state.Manager) {
 		loaded, err = m.Load(ctx, s.RunID())
 		require.NoError(t, err)
 		require.Equal(t, enums.RunStatusCancelled, loaded.Metadata().Status)
+	})
+
+	t.Run("It allows Failed statuses which write to history", func(t *testing.T) {
+		s = setup(t, m)
+
+		err = m.Finalized(ctx, s.Identifier(), inngest.TriggerName, 0, enums.RunStatusFailed)
+		require.NoError(t, err)
+
+		loaded, err := m.Load(ctx, s.RunID())
+		require.NoError(t, err)
+		require.Equal(t, enums.RunStatusFailed, loaded.Metadata().Status)
+
+		history, err := m.History(ctx, s.RunID())
+		require.NoError(t, err)
+		require.Equal(t, enums.HistoryTypeFunctionFailed, history[len(history)-1].Type)
 	})
 }
 

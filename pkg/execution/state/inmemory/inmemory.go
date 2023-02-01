@@ -216,13 +216,22 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string, 
 
 	instance := s.(memstate)
 	instance.metadata.Pending--
+
 	if instance.metadata.Pending == 0 && instance.metadata.Status == enums.RunStatusRunning {
 		instance.metadata.Status = finalStatus
 		go m.runCallbacks(ctx, i, enums.RunStatusCompleted)
 
+		status := enums.HistoryTypeFunctionCompleted
+		switch finalStatus {
+		case enums.RunStatusFailed:
+			status = enums.HistoryTypeFunctionFailed
+		case enums.RunStatusCancelled:
+			status = enums.HistoryTypeFunctionCancelled
+		}
+
 		m.setHistory(ctx, i, state.History{
 			ID:         state.HistoryID(),
-			Type:       enums.HistoryTypeFunctionCompleted,
+			Type:       status,
 			Identifier: i,
 			CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
 		})

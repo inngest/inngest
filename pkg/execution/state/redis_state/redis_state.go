@@ -327,10 +327,18 @@ func (m mgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error
 }
 
 func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
+	now := time.Now()
 	status, err := scripts["cancel"].Eval(
 		ctx,
 		m.r,
-		[]string{m.kf.RunMetadata(ctx, id.RunID)},
+		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
+		state.History{
+			ID:         state.HistoryID(),
+			Type:       enums.HistoryTypeFunctionCancelled,
+			Identifier: id,
+			CreatedAt:  now,
+		},
+		now.UnixMilli(),
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error cancelling: %w", err)
@@ -550,13 +558,19 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, a
 		finalStatus = int(withStatus[0])
 	}
 
+	history := enums.HistoryTypeFunctionCompleted
+	switch finalStatus {
+	case int(enums.RunStatusFailed):
+		history = enums.HistoryTypeFunctionFailed
+	}
+
 	status, err := scripts["finalize"].Eval(
 		ctx,
 		m.r,
 		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
 		state.History{
 			ID:         state.HistoryID(),
-			Type:       enums.HistoryTypeFunctionCompleted,
+			Type:       history,
 			Identifier: i,
 			CreatedAt:  now,
 		},
@@ -566,11 +580,16 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, a
 	if err != nil {
 		return fmt.Errorf("error finalizing: %w", err)
 	}
+	if status == 1 && len(withStatus) == 1 {
+		// go m.runCallbacks(ctx, i, withStatus[0])
+		return nil
+	}
 	if status == 1 {
 		go m.runCallbacks(ctx, i, enums.RunStatusCompleted)
 	}
 	return nil
 }
+
 func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 	packed, err := json.Marshal(p)
 	if err != nil {
