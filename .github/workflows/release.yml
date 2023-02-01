@@ -58,7 +58,13 @@ jobs:
         run: |
           npm config set git-tag-version false
           npm version ${{ github.ref_name }}
-          npm publish --access public
+
+          prerelease=$(echo ${{ github.ref_name }} | awk -F '-' '{print $2}' | awk -F '.' '{print $1}')
+          if [ -z "$prerelease" ]; then
+            npm publish --access public
+          else
+            npm publish --tag $prerelease --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
