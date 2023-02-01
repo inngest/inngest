@@ -1,36 +1,73 @@
 import styled from "@emotion/styled";
 import React, { useState } from "react";
-import CodeWindow from "src/shared/legacy/CodeWindow";
+import SyntaxHighlighter from "react-syntax-highlighter";
+import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
+
+import CodeWindow, { removeLeadingSpaces } from "src/shared/legacy/CodeWindow";
 
 const defaultCode = `
-  import { createFunction } from "inngest"
+  import { inngest } from "./client"
 
-  createFunction("Signup", "app/user.signup", async ({ event }) => {
+  export default inngest.createFunction("Signup", "app/user.signup", async ({ event }) => {
     // ...
   })
 `;
 
+export async function getStaticProps() {
+  return {
+    props: {
+      designVersion: "2",
+    },
+  };
+}
+
 export default function CodeSnippet() {
   const [code, setCode] = useState<string>(defaultCode);
-  const [filename, setFilename] = useState<string>("");
-  const [backgroundColor, setBackgroundColor] = useState<string>("#ffffff");
+  const [filename, setFilename] = useState<string>("function.ts");
+  // const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [backgroundColor, setBackgroundColor] = useState<string>("#080D19");
   const [borderColor, setBorderColor] = useState<string>("#94a3b8");
-  const [zoom, setZoom] = useState<string>("160");
+  const [zoom, setZoom] = useState<string>("150");
   return (
-    <Container>
+    <Container style={{ backgroundColor }}>
       <div className="py-36">
-        <CodeWindow
+        {/* <CodeWindow
           snippet={code}
           filename={filename}
           className="inline-block my-8 pr-8 border-2"
+          theme={theme}
           style={{
-            backgroundColor,
             borderColor,
             transform: `scale(${zoom}%)`,
           }}
-        />
+        /> */}
+        <div
+          className="inline-block max-w-full overflow-x-scroll bg-slate-950/80 backdrop-blur-md border border-slate-800/60 rounded-lg overflow-hidden shadow-lg"
+          style={{ transform: `scale(${zoom}%)` }}
+        >
+          <h6 className="text-slate-300 w-full bg-slate-950/50 text-center text-xs py-1.5 border-b border-slate-800/50">
+            {filename}
+          </h6>
+
+          <SyntaxHighlighter
+            language="typescript"
+            showLineNumbers={false}
+            style={syntaxThemeDark}
+            codeTagProps={{ className: "code-window" }}
+            customStyle={{
+              backgroundColor: "transparent",
+              fontSize: "0.7rem",
+              padding: "1.5rem",
+            }}
+          >
+            {removeLeadingSpaces(code)}
+          </SyntaxHighlighter>
+        </div>
       </div>
-      <div className="mt-16 w-full text-xs">
+      <div
+        className="mt-16 w-full text-xs"
+        style={{ backgroundColor: "#080D19", color: "#fff" }}
+      >
         <h2>Controls</h2>
         <div className="my-2">
           <label>
@@ -39,7 +76,10 @@ export default function CodeSnippet() {
               type="color"
               name="color"
               defaultValue={backgroundColor}
-              className="p-0"
+              onChange={(e) => {
+                setBackgroundColor(e.target.value);
+              }}
+              className="p-0 bg-slate-800"
             />
           </label>
         </div>
@@ -53,7 +93,7 @@ export default function CodeSnippet() {
               onChange={(e) => {
                 setBorderColor(e.target.value);
               }}
-              className="p-0"
+              className="p-0 bg-slate-800"
             />
           </label>
         </div>
@@ -62,7 +102,7 @@ export default function CodeSnippet() {
             Zoom{" "}
             <input
               type="number"
-              className="text-xs"
+              className="text-xs bg-slate-800"
               style={{ border: "1px solid #94a3b8" }}
               onChange={(e) => setZoom(e.target.value)}
               defaultValue={zoom}
@@ -74,7 +114,7 @@ export default function CodeSnippet() {
             Filename{" "}
             <input
               type="text"
-              className="text-xs"
+              className="text-xs bg-slate-800"
               style={{ border: "1px solid #94a3b8" }}
               onChange={(e) => setFilename(e.target.value)}
               defaultValue={filename}
@@ -85,10 +125,10 @@ export default function CodeSnippet() {
           <label>
             Code{" "}
             <textarea
-              className="w-full h-64 text-xs font-mono"
-              style={{ border: "1px solid #94a3b8" }}
+              className="w-full h-64 text-xs font-mono bg-slate-800"
+              style={{ border: "1px solid #94a3b8", fontFamily: "monospace" }}
               onChange={(e) => setCode(e.target.value)}
-              defaultValue={code}
+              defaultValue={removeLeadingSpaces(code)}
             ></textarea>
           </label>
         </div>

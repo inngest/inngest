@@ -5,7 +5,7 @@ import {
   atomOneDark as syntaxThemeDark,
 } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 
-const removeLeadingSpaces = (snippet: string): string => {
+export const removeLeadingSpaces = (snippet: string): string => {
   const lines = snippet.split("\n");
   if (!lines[0].replace(/^\s+/, "").length) {
     lines.shift();
