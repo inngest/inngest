@@ -581,7 +581,7 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, a
 		return fmt.Errorf("error finalizing: %w", err)
 	}
 	if status == 1 && len(withStatus) == 1 {
-		// go m.runCallbacks(ctx, i, withStatus[0])
+		go m.runCallbacks(ctx, i, withStatus[0])
 		return nil
 	}
 	if status == 1 {
