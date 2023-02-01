@@ -25,7 +25,7 @@ export const data: UseCase = {
   ],
   code: `// Define your event payload with our standard name & date fields
 type MyEventType = {
-	name: "my.event",
+  name: "my.event",
   data: {
     userId: string
   }
@@ -33,7 +33,7 @@ type MyEventType = {
 
 // Send events to Inngest
 inngest.send<MyEventType>({
-	name: "my.event", data: { userId: "12345" }
+  name: "my.event", data: { userId: "12345" }
 });
 
 // Define your function to handle that event
