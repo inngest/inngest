@@ -12,8 +12,6 @@ The Inngest SDK leverages the full power of TypeScript, providing you with some 
 
 All of this comes together to provide some awesome type inference based on your actual production data.
 
-![Type inference](/assets/docs/typescript/send_welcome_email.gif)
-
 ## Using types
 
 Once your types are generated, there are a few ways we can use them to ensure our functions are protected.
@@ -80,4 +78,81 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   });
   res.status(200).json({ success: true });
 }
+```
+
+### Using with `waitForEvent`
+
+When writing step functions, you can use `waitForEvent` to to, pause the current function until another event is received or the timeout expires - whichever happens first. When you declare your types using the `Inngest` constructor, `waitForEvent` leverages any types that you have:
+
+```ts
+// File: /inngest/client.ts
+import { Inngest } from "inngest";
+
+type UserSignup = {
+  name: "user/new.signup",
+  data: {
+    email: string;
+    user_id: string;
+    name: string;
+  }
+}
+type UserAccountSetupCompleted = {
+  name: "user/account.setup.completed",
+  data: {
+    user_id: string;
+  }
+}
+type Events = {
+  "user/new.signup": UserSignup;
+  "user/account.setup.completed": UserAccountSetupCompleted;
+}
+
+export const inngest = new Inngest<Events>({ name: "My App" });
+```
+
+
+```ts
+// File: /inngest/onboardingDripCampaign.ts
+import { inngest } from "./client";
+
+export default inngest.createStepFunction(
+  "Onboarding drip campaign",
+  "user/new.signup",
+  async ({ event, tools }) => {
+
+  tools.run("Send welcome email", async () => {
+    // "event" will be fully typed provide typesafety within this function
+    return await email.send("welcome", event.data.email);
+  });
+
+  // We wait up to 2 days for the user to set up their account
+  const accountSetupCompleted = tools.waitForEvent("user/account.setup.completed", {
+    timeout: "2d",
+    // ⬇️ This matches both events using the same property
+    // Since both events types are registered above, this is match is typesafe
+    match: "data.user_id"
+  });
+
+  if (!accountSetupCompleted) {
+    tools.run("Send setup account guide", async () => {
+      return await email.send("account_setup_guide", event.data.email);
+    });
+  }
+});
+```
+
+Alternatively, if you don't centrally declare types via the `Inngest` constructor, you can pass a type as a generic to `waitForEvent`:
+
+```ts
+type UserAccountSetupCompleted = {
+  name: "user/account.setup.completed",
+  data: {
+    user_id: string;
+  }
+}
+// ...
+const accountSetupCompleted = tools.waitForEvent<UserAccountSetupCompleted>("user/account.setup.completed", {
+  timeout: "2d",
+  match: "data.user_id"
+});
 ```
