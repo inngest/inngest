@@ -366,17 +366,17 @@ func (m mgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, er
 	return &meta, nil
 }
 
-func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
-	// XXX: Use a pipeliner to improve speed.
+func (m mgr) Workflow(ctx context.Context, runID ulid.ULID) (*inngest.Workflow, error) {
 	metadata, err := m.metadata(ctx, runID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load metadata; %w", err)
+		return nil, fmt.Errorf("failed to load metadata: %w", err)
 	}
+	return m.workflow(ctx, metadata)
+}
 
-	id := metadata.Identifier
-
+func (m mgr) workflow(ctx context.Context, md *runMetadata) (*inngest.Workflow, error) {
 	// Load the workflow.
-	byt, err := m.r.Get(ctx, m.kf.Workflow(ctx, id.WorkflowID, metadata.Identifier.WorkflowVersion)).Bytes()
+	byt, err := m.r.Get(ctx, m.kf.Workflow(ctx, md.Identifier.WorkflowID, md.Identifier.WorkflowVersion)).Bytes()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load workflow; %w", err)
 	}
@@ -384,14 +384,28 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	if err := json.Unmarshal(byt, w); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal workflow; %w", err)
 	}
-
 	// We must ensure that the workflow UUID and Version are marshalled in JSON.
 	// In the dev server these are blank, so we force-add them here.
-	w.UUID = metadata.Identifier.WorkflowID
-	w.Version = metadata.Identifier.WorkflowVersion
+	w.UUID = md.Identifier.WorkflowID
+	w.Version = md.Identifier.WorkflowVersion
+	return w, nil
+}
+
+func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
+	// XXX: Use a pipeliner to improve speed.
+	metadata, err := m.metadata(ctx, runID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load metadata; %w", err)
+	}
+	w, err := m.workflow(ctx, metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load workflow; %w", err)
+	}
+
+	id := metadata.Identifier
 
 	// Load the event.
-	byt, err = m.r.Get(ctx, m.kf.Event(ctx, id)).Bytes()
+	byt, err := m.r.Get(ctx, m.kf.Event(ctx, id)).Bytes()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get event; %w", err)
 	}

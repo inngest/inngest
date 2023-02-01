@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -139,6 +140,17 @@ func (m *mem) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, e
 		return &m, nil
 	}
 
+	return nil, fmt.Errorf("state not found with identifier: %s", runID.String())
+}
+
+func (m *mem) Workflow(ctx context.Context, runID ulid.ULID) (*inngest.Workflow, error) {
+	m.lock.RLock()
+	s, ok := m.state[runID]
+	m.lock.RUnlock()
+	if ok {
+		w := s.Workflow()
+		return &w, nil
+	}
 	return nil, fmt.Errorf("state not found with identifier: %s", runID.String())
 }
 
