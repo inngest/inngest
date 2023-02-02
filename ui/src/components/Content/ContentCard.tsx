@@ -1,12 +1,11 @@
-import { ComponentChild, ComponentChildren } from "preact";
 import classNames from "../../utils/classnames";
 import { Time } from "../Time";
 
 interface ContentCardProps {
-  children: ComponentChildren;
+  children: React.ReactNode;
   title?: string;
   date: string | number;
-  button?: ComponentChild;
+  button?: React.ReactNode;
   id: string;
   active?: boolean;
 }

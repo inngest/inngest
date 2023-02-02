@@ -1,11 +1,5 @@
 import Editor, { useMonaco } from "@monaco-editor/react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePortal } from "../../hooks/usePortal";
 import { useSendEventMutation } from "../../store/devApi";
 import { showEventSendModal } from "../../store/global";
@@ -175,8 +169,8 @@ export const SendEventModal = () => {
             }}
             options={{
               fixedOverflowWidgets: true,
-              formatOnPaste: true,
-              formatOnType: true,
+              formatOnPaste: false,
+              formatOnType: false,
               minimap: {
                 enabled: false,
               },

@@ -1,4 +1,5 @@
-import { render } from "preact";
+import React from "react";
+import ReactDOM from "react-dom/client";
 import { Provider } from "react-redux";
 import { App } from "./app";
 import "./index.css";
@@ -10,11 +11,10 @@ import { store } from "./store/store";
  *
  * Let's avoid the issue here.
  */
-const P = Provider as any;
-
-render(
-  <P store={store}>
-    <App />
-  </P>,
-  document.getElementById("app") as HTMLElement
+ReactDOM.createRoot(document.getElementById("app") as HTMLElement).render(
+  <React.StrictMode>
+    <Provider store={store}>
+      <App />
+    </Provider>
+  </React.StrictMode>
 );

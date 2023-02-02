@@ -1,5 +1,4 @@
-import { ComponentChild } from "preact";
-import { useMemo } from "preact/hooks";
+import { useMemo } from "react";
 import { usePrettyJson } from "../../hooks/usePrettyJson";
 import { useSendEventMutation } from "../../store/devApi";
 import {
@@ -101,7 +100,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
             ? EventStatus.Paused
             : run.status || FunctionRunStatus.Completed;
 
-          let contextBar: ComponentChild | undefined;
+          let contextBar: React.ReactNode | undefined;
 
           if (run.waitingFor?.expiryTime) {
             if (run.waitingFor.eventName) {

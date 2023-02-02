@@ -1,16 +1,16 @@
-import { useState } from 'preact/hooks'
-import classNames from '../../utils/classnames'
+import { useState } from "react";
+import classNames from "../../utils/classnames";
 
 export default function CopyButton({ btnAction }) {
-  const [clickedState, setClickedState] = useState(false)
+  const [clickedState, setClickedState] = useState(false);
 
   const handleClick = () => {
-    setClickedState(true)
-    btnAction()
+    setClickedState(true);
+    btnAction();
     setTimeout(() => {
-      setClickedState(false)
-    }, 1000)
-  }
+      setClickedState(false);
+    }, 1000);
+  };
 
   return (
     <button
@@ -22,7 +22,7 @@ export default function CopyButton({ btnAction }) {
         `flex gap-1.5 items-center  border text-xs  rounded-sm px-2.5 py-1 text-slate-100 transition-all duration-150`
       )}
     >
-      {clickedState ? 'Copied!' : 'Copy'}
+      {clickedState ? "Copied!" : "Copy"}
     </button>
-  )
+  );
 }

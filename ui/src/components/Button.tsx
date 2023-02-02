@@ -1,10 +1,9 @@
-import { ComponentChild } from "preact";
 import classNames from "../utils/classnames";
 
 interface ButtonProps {
   kind?: "primary" | "secondary";
-  label?: ComponentChild;
-  icon?: ComponentChild;
+  label?: React.ReactNode;
+  icon?: React.ReactNode;
   btnAction?: () => void;
 }
 

@@ -77,7 +77,7 @@ export function App() {
 
   return (
     <div
-      class={classNames(
+      className={classNames(
         "w-screen h-screen text-slate-400 text-sm grid overflow-hidden relative",
         contentView === "feed"
           ? "grid-cols-app-sm xl:grid-cols-app 2xl:grid-cols-app-desktop grid-rows-app"

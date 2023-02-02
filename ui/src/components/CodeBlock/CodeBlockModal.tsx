@@ -1,8 +1,7 @@
-import { ComponentChildren } from "preact";
-import { useEffect } from "preact/hooks";
+import { useEffect } from "react";
 
 interface CodeBlockModalProps {
-  children: ComponentChildren;
+  children: React.ReactNode;
   closeModal: () => void;
 }
 

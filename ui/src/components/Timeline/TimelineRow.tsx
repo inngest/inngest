@@ -1,11 +1,10 @@
-import { ComponentChildren } from "preact";
 import { EventStatus, FunctionRunStatus } from "../../store/generated";
 import classNames from "../../utils/classnames";
 import statusStyles from "../../utils/statusStyles";
 
 interface TimelineRowProps {
   status: EventStatus | FunctionRunStatus | null;
-  children: ComponentChildren;
+  children: React.ReactNode;
   topLine?: boolean;
   bottomLine?: boolean;
   iconOffset?: number;
@@ -28,7 +27,7 @@ export default function TimelineRow({
             topLine ? `bg-slate-700/60` : ``,
             `w-[2px] shrink-0 bg-transparent`
           )}
-          style={`flex-basis: ${iconOffset}px`}
+          style={{ flexBasis: `${iconOffset}px` }}
         ></div>
         <div className="basis-[24px] shrink-0 flex items-center">
           <itemStatus.icon />
