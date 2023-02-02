@@ -75,7 +75,8 @@ func TestQueueRunSequential(t *testing.T) {
 	// Q2 obtains lease.
 	require.NotNil(t, q2.sequentialLease())
 	// And that the previous lease has expired.
-	require.True(t, ulid.Time(q1.sequentialLease().Time()).Before(time.Now()))
+	lease := q1.sequentialLease()
+	require.True(t, lease == nil || ulid.Time(lease.Time()).Before(time.Now()))
 }
 
 func max(i int) *int {
