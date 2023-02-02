@@ -113,6 +113,7 @@ func CheckState(t *testing.T, gen Generator) {
 		"LeasePause":                         checkLeasePause,
 		"ConsumePause":                       checkConsumePause,
 		"ConsumePause/WithData":              checkConsumePauseWithData,
+		"ConsumePause/WithData/StackIndex":   checkConsumePauseWithDataIndex,
 		"ConsumePause/WithEmptyData":         checkConsumePauseWithEmptyData,
 		"ConsumePause/WithEmptyDataKey":      checkConsumePauseWithEmptyDataKey,
 		"PausesByEvent/Empty":                checkPausesByEvent_empty,
@@ -761,6 +762,79 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 	reloaded, err := m.Load(ctx, s.RunID())
 	require.Nil(t, err)
 	require.Equal(t, pauseData, reloaded.Actions()[pause.DataKey], "Pause data was not stored in the state store")
+}
+
+func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager) {
+	key := "my-pause-data-stored-for-eternity"
+
+	t.Run("it updates the stack with nil data", func(t *testing.T) {
+		ctx := context.Background()
+		s := setup(t, m)
+
+		// Save a pause.
+		pause := state.Pause{
+			ID:         uuid.New(),
+			Identifier: s.Identifier(),
+			Outgoing:   inngest.TriggerName,
+			Incoming:   w.Steps[0].ID,
+			Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+			DataKey:    key,
+		}
+		err := m.SavePause(ctx, pause)
+		require.NoError(t, err)
+
+		// Consuming the pause should work.
+		err = m.ConsumePause(ctx, pause.ID, nil)
+		require.NoError(t, err)
+
+		// Load function state and assert we have the pause stored in state.
+		reloaded, err := m.Load(ctx, s.RunID())
+		require.Nil(t, err)
+
+		require.Equal(t, 1, len(reloaded.Stack()))
+		require.Equal(t, key, reloaded.Stack()[0])
+
+		require.Equal(t, 1, len(reloaded.Actions()))
+		require.Equal(t, nil, reloaded.Actions()[key])
+	})
+
+	t.Run("it updates the stack with actual data", func(t *testing.T) {
+		ctx := context.Background()
+		s := setup(t, m)
+
+		// Load function state and assert we have the pause stored in state.
+		loaded, err := m.Load(ctx, s.RunID())
+		require.Nil(t, err)
+		require.Equal(t, 0, len(loaded.Stack()))
+
+		// Save a pause.
+		pause := state.Pause{
+			ID:         uuid.New(),
+			Identifier: s.Identifier(),
+			Outgoing:   inngest.TriggerName,
+			Incoming:   w.Steps[0].ID,
+			Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+			DataKey:    key,
+		}
+		err = m.SavePause(ctx, pause)
+		require.NoError(t, err)
+
+		data := map[string]any{"allo": "guvna"}
+
+		// Consuming the pause should work.
+		err = m.ConsumePause(ctx, pause.ID, data)
+		require.NoError(t, err)
+
+		// Load function state and assert we have the pause stored in state.
+		reloaded, err := m.Load(ctx, s.RunID())
+		require.Nil(t, err)
+
+		require.Equal(t, 1, len(reloaded.Stack()))
+		require.Equal(t, key, reloaded.Stack()[0])
+
+		require.Equal(t, 1, len(reloaded.Actions()))
+		require.Equal(t, data, reloaded.Actions()[key])
+	})
 }
 
 func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
