@@ -67,7 +67,22 @@ type Executor interface {
 	//
 	// Execution will fail with no response and state.ErrFunctionCancelled if this function
 	// run has been cancelled by an external event or process.
-	Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error)
+	//
+	// This returns the step's response, the current stack pointer index, and any error.
+	Execute(
+		ctx context.Context,
+		id state.Identifier,
+		// edge represents the edge to run.  This executes the step defined within
+		// Incoming, optionally using the StepPlanned field to execute a substep if
+		// the step is a generator.
+		edge inngest.Edge,
+		// attempt represents the attempt number for this step.
+		attempt int,
+		// stackIndex represents the stack pointer at the time this step was scheduled.
+		// This lets SDKs correctly evaluate parallelism by replaying generated steps in the
+		// right order.
+		stackIndex int,
+	) (*state.DriverResponse, int, error)
 }
 
 // NewExecutor returns a new executor, responsible for running the specific step of a
@@ -162,22 +177,23 @@ type executor struct {
 
 // Execute loads a workflow and the current run state, then executes the
 // workflow via an executor.
-func (e *executor) Execute(ctx context.Context, id state.Identifier, from string, attempt int) (*state.DriverResponse, error) {
+func (e *executor) Execute(ctx context.Context, id state.Identifier, edge inngest.Edge, attempt int, stackIndex int) (*state.DriverResponse, int, error) {
 	var log *zerolog.Logger
 
 	s, err := e.sm.Load(ctx, id.RunID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	if s.Metadata().Status == enums.RunStatusCancelled {
-		return nil, state.ErrFunctionCancelled
+		return nil, 0, state.ErrFunctionCancelled
 	}
 
 	if e.log != nil {
 		l := e.log.With().
 			Str("run_id", id.RunID.String()).
-			Str("step", from).
+			Interface("edge", edge).
+			Str("step", edge.Incoming).
 			Str("fn_name", s.Workflow().Name).
 			Str("fn_id", s.Workflow().ID).
 			Int("attempt", attempt).
@@ -194,10 +210,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 	//
 	// To fix this particular consistency issue, always check to see
 	// if there's output stored for this action ID.
-	if resp, _ := s.ActionID(from); resp != nil {
+	if resp, _ := s.ActionID(edge.Incoming); resp != nil {
 		if log != nil {
 			log.Warn().Msg("step already executed")
 		}
+		// TODO: Index ???
 		// This has already successfully been executed.
 		return &state.DriverResponse{
 			Scheduled: false,
@@ -211,10 +228,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 			// to date;  this *shouldn't* be an issue (but... we need
 			// to check).
 			ActionVersion: nil,
-		}, nil
+		}, 0, nil
 	}
 
-	resp, err := e.run(ctx, w, id, from, s, attempt)
+	resp, idx, err := e.run(ctx, w, id, edge, s, attempt, stackIndex)
 	if log != nil {
 		var (
 			l   *zerolog.Event
@@ -233,7 +250,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 			l = log.Warn().Err(err).Bool("retryable", retryable)
 			msg = "error executing step"
 		}
-		l.Str("run_id", id.RunID.String()).Str("step", from).Msg(msg)
+		l.Str("run_id", id.RunID.String()).Str("step", edge.Incoming).Msg(msg)
 
 		if e.config.LogOutput && resp != nil {
 			// Log the output separately, highlighting it with
@@ -245,7 +262,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 				Interface("generator", resp.Generator).
 				Interface("output", resp.Output).
 				Str("run_id", id.RunID.String()).
-				Str("step", from).
+				Str("step", edge.Incoming).
 				Msg("step output")
 		}
 	}
@@ -256,56 +273,56 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, from string
 		//
 		// The runner is responsible for scheduling jobs and will check
 		// whether the action can be retried.
-		return resp, err
+		return resp, idx, err
 	}
 
-	return resp, nil
+	return resp, idx, nil
 }
 
 // run executes the step with the given step ID.
-func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, stepID string, s state.State, attempt int) (*state.DriverResponse, error) {
+func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, edge inngest.Edge, s state.State, attempt int, stackIndex int) (*state.DriverResponse, int, error) {
 	var (
 		response *state.DriverResponse
 		err      error
 	)
 
-	if stepID == inngest.TriggerName {
-		return nil, nil
+	if edge.Incoming == inngest.TriggerName {
+		return nil, 0, nil
 	}
 
 	var step *inngest.Step
 	for _, s := range w.Steps {
-		if s.ID == stepID {
+		if s.ID == edge.Incoming {
 			step = &s
 			break
 		}
 	}
 	if step == nil {
 		// This isn't fixable.
-		return nil, newFinalError(fmt.Errorf("unknown vertex: %s", stepID))
+		return nil, 0, newFinalError(fmt.Errorf("unknown vertex: %s", edge.Incoming))
 	}
-	response, err = e.executeAction(ctx, id, step, s, attempt)
+	response, idx, err := e.executeAction(ctx, id, step, s, edge, attempt, stackIndex)
 	if err != nil {
-		return nil, err
+		return nil, idx, err
 	}
 	if response.Err != nil {
 		// This action errored.  We've stored this in our state manager already;
 		// return the response error only.  We can use the same variable for both
 		// the response and the error to indicate an error value.
-		return response, response
+		return response, idx, response
 	}
 	if response.Scheduled {
 		// This action is not yet complete, so we can't traverse
 		// its children.  We assume that the driver is responsible for
 		// retrying and coordinating async state here;  the executor's
 		// job is to execute the action only.
-		return response, nil
+		return response, idx, nil
 	}
 
-	return response, err
+	return response, idx, err
 }
 
-func (e *executor) executeAction(ctx context.Context, id state.Identifier, action *inngest.Step, s state.State, attempt int) (*state.DriverResponse, error) {
+func (e *executor) executeAction(ctx context.Context, id state.Identifier, action *inngest.Step, s state.State, edge inngest.Edge, attempt, stackIndex int) (*state.DriverResponse, int, error) {
 	var l *zerolog.Logger
 	if e.log != nil {
 		log := e.log.With().
@@ -315,19 +332,17 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		l = &log
 	}
 
-	// TODO: BEFORE RUNNING ERROR, RETURN FINAL
-
 	definition, err := e.al.Action(ctx, action.DSN, action.Version)
 	if err != nil {
-		return nil, fmt.Errorf("error loading action: %w", err)
+		return nil, 0, fmt.Errorf("error loading action: %w", err)
 	}
 	if definition == nil {
-		return nil, fmt.Errorf("no action returned: %s", action.DSN)
+		return nil, 0, fmt.Errorf("no action returned: %s", action.DSN)
 	}
 
 	d, ok := e.runtimeDrivers[definition.Runtime.RuntimeType()]
 	if !ok {
-		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, definition.Runtime.RuntimeType())
+		return nil, 0, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, definition.Runtime.RuntimeType())
 	}
 
 	if l != nil {
@@ -340,39 +355,50 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	}
 
 	if err := e.sm.Started(ctx, id, action.ID, attempt); err != nil {
-		return nil, fmt.Errorf("error saving started state: %w", err)
+		return nil, 0, fmt.Errorf("error saving started state: %w", err)
 	}
 
-	response, err := d.Execute(ctx, s, *definition, *action)
+	response, err := d.Execute(ctx, s, *definition, edge, *action, stackIndex)
 	if err != nil || response == nil {
-		return nil, fmt.Errorf("error executing action: %w", err)
+		return nil, 0, fmt.Errorf("error executing action: %w", err)
 	}
 
 	// Ensure that the step is always set.  This removes the need for drivers to always
 	// set this.
 	response.Step = *action
 
+	if response.ActionVersion == nil {
+		// Set the ActionVersion automatically from the executor, where
+		// provided from the definition.
+		response.ActionVersion = definition.Version
+	}
+
 	// NOTE: We must ensure that the Step ID is overwritten for Generator steps.  Generator
 	// steps are executed many times until they stop yielding;  each execution returns a
 	// new step ID and data that must be stored independently of the parent generator ID.
 	//
 	// By updating the step ID, we ensure that the data will be saved to the generator's ID.
-	if response.Generator != nil {
-		response.Step.ID = response.Generator.ID
-		response.Step.Name = response.Generator.Name
+	//
+	// We only do this for individual generator steps, as these denote that a single step ran.
+	if len(response.Generator) == 1 {
+		response.Step.ID = response.Generator[0].ID
+		response.Step.Name = response.Generator[0].Name
 		// Unmarshal the generator data into the step.
-		if response.Generator.Data != nil {
-			err = json.Unmarshal(response.Generator.Data, &response.Output)
+		if response.Generator[0].Data != nil {
+			err = json.Unmarshal(response.Generator[0].Data, &response.Output)
 			if err != nil {
 				response.Err = fmt.Errorf("error unmarshalling generator step data as json: %w", err)
 			}
 		}
-	}
 
-	if response.ActionVersion == nil {
-		// Set the ActionVersion automatically from the executor, where
-		// provided from the definition.
-		response.ActionVersion = definition.Version
+		// If this is a plan step or a noop, we _dont_ want to save the response.  That's because the
+		// step in question didn't actually run.
+		if response.Generator[0].Op != enums.OpcodeStep {
+			return response, stackIndex, err
+		}
+	}
+	if len(response.Generator) > 1 {
+		return response, stackIndex, err
 	}
 
 	// This action may have executed _asynchronously_.  That is, it may have been
@@ -384,7 +410,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	//
 	// XXX: We can add a state interface to indicate that the step is pending.
 	if response.Scheduled {
-		return response, nil
+		return response, 0, nil
 	}
 
 	if response.Err != nil && !queue.ShouldRetry(err, attempt, action.RetryCount()) {
@@ -400,14 +426,15 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		logger.From(ctx).Trace().Msg("saving response to state")
 	}
 
-	if _, serr := e.sm.SaveResponse(ctx, id, *response, attempt); serr != nil {
+	idx, serr := e.sm.SaveResponse(ctx, id, *response, attempt)
+	if serr != nil {
 		if l != nil {
 			logger.From(ctx).Error().Err(serr).Msg("unable to save state")
 		}
 		err = multierror.Append(err, serr)
 	}
 
-	return response, err
+	return response, idx, err
 }
 
 type execError struct {

@@ -12,6 +12,7 @@ import (
 
 const (
 	KindEdge  = "edge"
+	KindSleep = "sleep"
 	KindPause = "pause"
 )
 
@@ -74,7 +75,10 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	}
 
 	switch temp.Kind {
-	case KindEdge:
+	case KindEdge, KindSleep:
+		// Edge and Sleep are the same;  the only difference is that the executor
+		// runner should always save nil to the state store using the outgoing edge's
+		// ID when processing a sleep so that the state + stack are updated properly.
 		if len(temp.Payload) == 0 {
 			return nil
 		}
@@ -97,10 +101,10 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 }
 
 // GetEdge returns the edge from the enqueued item, if the payload is of type PayloadEdge.
-func GetEdge(i Item) (*inngest.Edge, error) {
+func GetEdge(i Item) (*PayloadEdge, error) {
 	switch v := i.Payload.(type) {
 	case PayloadEdge:
-		return &v.Edge, nil
+		return &v, nil
 	default:
 		return nil, fmt.Errorf("unable to get edge from payload type: %T", v)
 	}

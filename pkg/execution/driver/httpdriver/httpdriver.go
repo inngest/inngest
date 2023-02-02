@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/inngest/inngest/inngest"
@@ -25,6 +26,8 @@ var (
 			CheckRedirect: CheckRedirect,
 		},
 	}
+
+	ErrEmptyResponse = fmt.Errorf("no response data")
 )
 
 func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
@@ -42,8 +45,8 @@ func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
 	return nil
 }
 
-func Execute(ctx context.Context, s state.State, action inngest.ActionVersion, step inngest.Step) (*state.DriverResponse, error) {
-	return DefaultExecutor.Execute(ctx, s, action, step)
+func Execute(ctx context.Context, s state.State, action inngest.ActionVersion, edge inngest.Edge, step inngest.Step, idx int) (*state.DriverResponse, error) {
+	return DefaultExecutor.Execute(ctx, s, action, edge, step, idx)
 }
 
 type executor struct {
@@ -75,44 +78,78 @@ func Sign(ctx context.Context, key, body []byte) string {
 	return fmt.Sprintf("t=%d&s=%s", now, sig)
 }
 
-func (e executor) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, step inngest.Step) (*state.DriverResponse, error) {
+func ParseGenerator(ctx context.Context, byt []byte) ([]*state.GeneratorOpcode, error) {
+	// When we return a 206, we always expect that this is
+	// a generator function.  Users SHOULD NOT return a 206
+	// in any other circumstance.
+
+	if len(byt) == 0 {
+		return nil, ErrEmptyResponse
+	}
+
+	// Is this a slice of opcodes or a single opcode?  The SDK can return both:
+	// parallelism was added as an incremental improvement.  It would have been nice
+	// to always return an array and we can enfore this as an SDK requirement in V1+
+	switch byt[0] {
+	case '{':
+		gen := &state.GeneratorOpcode{}
+		if err := json.Unmarshal(byt, gen); err != nil {
+			return nil, fmt.Errorf("error reading generator opcode response: %w", err)
+		}
+		return []*state.GeneratorOpcode{gen}, nil
+	case '[':
+		gen := []*state.GeneratorOpcode{}
+		if err := json.Unmarshal(byt, &gen); err != nil {
+			return nil, fmt.Errorf("error reading generator opcode response: %w", err)
+		}
+		return gen, nil
+	}
+
+	// Finally, if the length of resp.Generator == 0 then this is implicitly an enums.OpcodeNone
+	// step.  This is added to reduce bandwidth across many calls.
+	return []*state.GeneratorOpcode{
+		{Op: enums.OpcodeNone},
+	}, nil
+}
+
+func (e executor) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, edge inngest.Edge, step inngest.Step, idx int) (*state.DriverResponse, error) {
 	rt, ok := action.Runtime.Runtime.(inngest.RuntimeHTTP)
 	if !ok {
 		return nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
 	}
 
-	input, err := driver.MarshalV1(ctx, s, step)
+	input, err := driver.MarshalV1(ctx, s, step, idx)
 	if err != nil {
 		return nil, err
 	}
 
-	byt, status, err := e.do(ctx, rt.URL, input)
+	// If we have a generator step name, ensure we add the step ID parameter
+	parsed, _ := url.Parse(rt.URL)
+	values, _ := url.ParseQuery(parsed.RawQuery)
+	if edge.IncomingGeneratorStep != "" {
+		values.Set("stepId", edge.IncomingGeneratorStep)
+		parsed.RawQuery = values.Encode()
+	} else {
+		values.Set("stepId", edge.Incoming)
+	}
+
+	byt, status, err := e.do(ctx, parsed.String(), input)
 	if err != nil {
 		return nil, err
 	}
 
 	if status == 206 {
 		// This is a generator-based function returning opcodes.
-		gen := &state.GeneratorOpcode{}
-		if err := json.Unmarshal(byt, gen); err != nil {
-			// When we return a 206, we always expect that this is
-			// a generator function.  Users SHOULD NOT return a 206
-			// in any other circumstance.
-			return nil, fmt.Errorf("error reading generator opcode response: %w", err)
+		resp := &state.DriverResponse{ActionVersion: action.Version}
+		resp.Generator, err = ParseGenerator(ctx, byt)
+		if err != nil {
+			return nil, err
 		}
-		if gen.Op == enums.OpcodeNone {
-			return nil, fmt.Errorf("invalid opcode returned in response")
-		}
-
-		return &state.DriverResponse{
-			Generator:     gen,
-			ActionVersion: action.Version,
-		}, nil
+		return resp, nil
 	}
 
 	var body interface{}
 	body = json.RawMessage(byt)
-
 	if len(byt) > 0 {
 		// Is the response valid JSON?  If so, ensure that we don't re-marshal the
 		// JSON string.

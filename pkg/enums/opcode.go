@@ -8,6 +8,7 @@ const (
 	// OpcodeNone represents the default opcode 0, which does nothing
 	OpcodeNone Opcode = iota
 	OpcodeStep
+	OpcodeStepPlanned
 	OpcodeSleep
 	OpcodeWaitForEvent
 )

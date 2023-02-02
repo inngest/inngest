@@ -13,6 +13,7 @@ local pauseKey      = KEYS[1]
 local pauseStepKey  = KEYS[2]
 local pauseEventKey = KEYS[3]
 local actionKey     = KEYS[4]
+local stackKey      = KEYS[5]
 
 local pauseID      = ARGV[1]
 local pauseDataKey = ARGV[2] -- used to set data in run state store
@@ -31,7 +32,8 @@ if pauseEventKey ~= "" then
 	redis.call("HDEL", pauseEventKey, pauseID)
 end
 
-if actionKey ~= nil and pauseDataKey ~= "" and pauseDataVal ~= nil then
+if actionKey ~= nil and pauseDataKey ~= "" then
+	redis.call("RPUSH", stackKey, pauseDataKey)
 	redis.call("HSET", actionKey, pauseDataKey, pauseDataVal)
 end
 

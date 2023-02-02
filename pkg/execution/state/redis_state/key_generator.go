@@ -60,6 +60,9 @@ type KeyGenerator interface {
 
 	// History returns the key used to store a log entry for run hisotry
 	History(ctx context.Context, runID ulid.ULID) string
+
+	// Stack returns the key used to store the stack for a given run
+	Stack(ctx context.Context, runID ulid.ULID) string
 }
 
 type DefaultKeyFunc struct {
@@ -113,6 +116,10 @@ func (d DefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step
 
 func (d DefaultKeyFunc) History(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("%s:history:%s", d.Prefix, runID)
+}
+
+func (d DefaultKeyFunc) Stack(ctx context.Context, runID ulid.ULID) string {
+	return fmt.Sprintf("%s:stack:%s", d.Prefix, runID)
 }
 
 type QueueKeyGenerator interface {

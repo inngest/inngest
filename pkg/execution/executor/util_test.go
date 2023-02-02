@@ -27,6 +27,7 @@ func TestParseWait(t *testing.T) {
 			},
 		},
 		nil,
+		[]string{},
 	)
 
 	tests := []struct {

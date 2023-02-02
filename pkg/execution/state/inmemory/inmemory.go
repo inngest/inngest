@@ -74,6 +74,25 @@ func (m *mem) OnFunctionStatus(f state.FunctionCallback) {
 	m.callbacks = append(m.callbacks, f)
 }
 
+func (m *mem) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {
+	s, err := m.Load(ctx, runID)
+	if s == nil {
+		return 0, err
+	}
+
+	if len(s.Stack()) == 0 {
+		return 0, nil
+	}
+
+	for n, i := range s.Stack() {
+		fmt.Println(i, stepID)
+		if i == stepID {
+			return n + 1, nil
+		}
+	}
+	return 0, fmt.Errorf("step not found in stack: %s", stepID)
+}
+
 func (m *mem) IsComplete(ctx context.Context, runID ulid.ULID) (bool, error) {
 	m.lock.RLock()
 	s, ok := m.state[runID]
@@ -288,13 +307,13 @@ func (m *mem) Cancel(ctx context.Context, i state.Identifier) error {
 	return nil
 }
 
-func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (state.State, error) {
+func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (int, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	s, ok := m.state[i.RunID]
 	if !ok {
-		return s, fmt.Errorf("identifier not found")
+		return 0, fmt.Errorf("identifier not found")
 	}
 	instance := s.(memstate)
 
@@ -306,6 +325,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 
 	if r.Err == nil {
 		instance.actions[r.Step.ID] = r.Output
+		instance.stack = append(instance.stack, r.Step.ID)
 		delete(instance.errors, r.Step.ID)
 
 		m.setHistory(ctx, i, state.History{
@@ -350,6 +370,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 	if r.Final() {
 		instance.metadata.Pending--
 		instance.metadata.Status = enums.RunStatusFailed
+		instance.stack = append(instance.stack, r.Step.ID)
 		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
 		m.setHistory(ctx, i, state.History{
 			ID:         state.HistoryID(),
@@ -361,7 +382,7 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 
 	m.state[i.RunID] = instance
 
-	return instance, nil
+	return len(instance.stack), nil
 
 }
 
@@ -466,6 +487,7 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		instance.actions = copyMap(instance.actions)
 		instance.errors = copyMap(instance.errors)
 		instance.actions[pause.DataKey] = data
+		instance.stack = append(instance.stack, pause.DataKey)
 		m.state[pause.Identifier.RunID] = instance
 	}
 

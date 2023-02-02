@@ -420,18 +420,20 @@ func TestServiceGeneratorState(t *testing.T) {
 
 	// Ensure our step returns a generator response.
 	data.c.Execution.Drivers["mock"] = &mockdriver.Config{
-		DynamicResponses: func(ctx context.Context, run state.State, av inngest.ActionVersion, s inngest.Step) map[string]state.DriverResponse {
+		DynamicResponses: func(ctx context.Context, run state.State, av inngest.ActionVersion, e inngest.Edge, s inngest.Step, idx int) map[string]state.DriverResponse {
 
 			switch atomic.AddInt32(&counter, 1) {
 			case 1:
 				// On the first call return a generator step
 				return map[string]state.DriverResponse{
 					"step": {
-						Generator: &state.GeneratorOpcode{
-							Op:   enums.OpcodeStep,
-							ID:   "step 1",
-							Name: "step 1",
-							Data: []byte(`{"ok":true}`),
+						Generator: []*state.GeneratorOpcode{
+							{
+								Op:   enums.OpcodeStep,
+								ID:   "step 1",
+								Name: "step 1",
+								Data: []byte(`{"ok":true}`),
+							},
 						},
 					},
 				}
@@ -439,11 +441,13 @@ func TestServiceGeneratorState(t *testing.T) {
 				// On the second call return a generator step
 				return map[string]state.DriverResponse{
 					"step": {
-						Generator: &state.GeneratorOpcode{
-							Op:   enums.OpcodeStep,
-							ID:   "step 2",
-							Name: "step 2",
-							Data: []byte(`{"ok":true}`),
+						Generator: []*state.GeneratorOpcode{
+							{
+								Op:   enums.OpcodeStep,
+								ID:   "step 2",
+								Name: "step 2",
+								Data: []byte(`{"ok":true}`),
+							},
 						},
 					},
 				}
@@ -520,7 +524,7 @@ func TestServiceRetry(t *testing.T) {
 
 	// Ensure our step returns a generator response.
 	data.c.Execution.Drivers["mock"] = &mockdriver.Config{
-		DynamicResponses: func(ctx context.Context, run state.State, av inngest.ActionVersion, s inngest.Step) map[string]state.DriverResponse {
+		DynamicResponses: func(ctx context.Context, run state.State, av inngest.ActionVersion, e inngest.Edge, s inngest.Step, idx int) map[string]state.DriverResponse {
 			switch atomic.AddInt32(&counter, 1) {
 			case 1:
 				// Error first.

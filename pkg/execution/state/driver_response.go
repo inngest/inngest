@@ -111,7 +111,7 @@ type DriverResponse struct {
 	//    3. We store this in the state, then continue to invoke the function
 	//       with mutated state.  Each tool inside the function (step/wait)
 	//       returns a new opcode which we store in step state.
-	Generator *GeneratorOpcode `json:"generator,omitempty"`
+	Generator []*GeneratorOpcode `json:"generator,omitempty"`
 
 	// Scheduled, if set to true, represents that the action has been
 	// scheduled and will run asynchronously.  The output is not available.
@@ -208,6 +208,10 @@ func (r DriverResponse) Retryable() bool {
 // have their child edges evaluated and should be recorded as final once the next
 // steps are enqueued.  This ensures that the number of scheduled and finalized steps
 // in state only matches once the function ends.
+//
+// Final MUST exist as state stores need to push step IDs to the stack when the response
+// is final.  We must do this prior to calling state.Finalized(), as the stack must be
+// mutated prior to enqueuing steps.
 func (r *DriverResponse) Final() bool {
 	if r.final {
 		return true
