@@ -503,7 +503,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 			ID:      r.Step.ID,
 			Name:    r.Step.Name,
 			Attempt: attempt,
-			Data:    data,
+			Data:    r.Output,
 		},
 	}
 
@@ -526,7 +526,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		now.UnixMilli(),
 	).Int()
 	if err != nil {
-		return 0, fmt.Errorf("error finalizing: %w", err)
+		return 0, fmt.Errorf("error saving response: %w", err)
 	}
 
 	if r.Err != nil && r.Final() {
