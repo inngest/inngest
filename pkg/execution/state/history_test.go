@@ -94,4 +94,27 @@ func TestHistoryBinaryMarshalling(t *testing.T) {
 		_, ok := dec.Data.(HistoryStep)
 		require.True(t, ok)
 	})
+
+	t.Run("Step data", func(t *testing.T) {
+		DefaultHistoryEncoding = HistoryEncodingJSON
+		h := History{
+			ID:        ulid.MustNew(ulid.Now(), rand.Reader),
+			Type:      enums.HistoryTypeFunctionStarted,
+			CreatedAt: time.Now().UTC().Truncate(time.Second),
+			Data: HistoryStep{
+				ID:   "hashid",
+				Name: "Step name",
+				Data: map[string]any{
+					"hello": "guvna",
+				},
+			},
+		}
+
+		byt, err := h.MarshalBinary()
+		require.NoError(t, err)
+		exp, err := json.Marshal(h)
+		require.NoError(t, err)
+		require.Equal(t, exp, byt)
+	})
+
 }
