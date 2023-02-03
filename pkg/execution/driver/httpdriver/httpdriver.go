@@ -91,16 +91,25 @@ func ParseGenerator(ctx context.Context, byt []byte) ([]*state.GeneratorOpcode, 
 	// parallelism was added as an incremental improvement.  It would have been nice
 	// to always return an array and we can enfore this as an SDK requirement in V1+
 	switch byt[0] {
+	// 0.x.x SDKs return a single opcode.
 	case '{':
 		gen := &state.GeneratorOpcode{}
 		if err := json.Unmarshal(byt, gen); err != nil {
 			return nil, fmt.Errorf("error reading generator opcode response: %w", err)
 		}
 		return []*state.GeneratorOpcode{gen}, nil
+	// 1.x.x+ SDKs return an array of opcodes.
 	case '[':
 		gen := []*state.GeneratorOpcode{}
 		if err := json.Unmarshal(byt, &gen); err != nil {
 			return nil, fmt.Errorf("error reading generator opcode response: %w", err)
+		}
+		// Normalize the response to always return at least an empty op code in the
+		// array. With this, a non-generator is represented as an empty array.
+		if len(gen) == 0 {
+			return []*state.GeneratorOpcode{
+				{Op: enums.OpcodeNone},
+			}, nil
 		}
 		return gen, nil
 	}
