@@ -146,8 +146,8 @@ export default function Patterns() {
           </h1>
           <p className="text-xl text-slate-100">Async + Event-Driven</p>
           <p className="my-4 text-indigo-200 max-w-xl  mb-16 md:mb-28">
-            The common patterns listed here are flexible and powerful enough to solve problems
-            across all types of projects and codebases. 
+            The common patterns listed here are flexible and powerful enough to
+            solve problems across all types of projects and codebases.
           </p>
 
           <section className="flex flex-col gap-12">

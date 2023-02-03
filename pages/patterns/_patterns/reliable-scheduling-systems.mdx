@@ -1,4 +1,4 @@
-Sometimes you need to reliably trigger hundreds or thousands of jobs at once, making sure that every job succeeds independently.  For example, you might have a cron which triggers importing thousands of products, or a user might require 100 different API calls at once.
+Sometimes you need to reliably trigger hundreds or thousands of jobs at once, making sure that every job succeeds independently.  For example, you might have a cron which triggers importing thousands of products, or a user might require 100 different OpenAPI calls at once.
 
 You might start by running everything in a single function, or within steps.  However, as the number of jobs grows this becomes slower, more difficult to observe, and more prone to temporary failures.  Instead of doing everything in a single job you should **fan-out** by sending events to trigger new jobs.
 
@@ -8,7 +8,7 @@ In order to manage thousands of jobs at once you'll need to **fan-out to run fun
 
 - The job trigger runs as a single function (eg. a cron for triggering product imports)
 - The function loads the data needed for all future jobs (eg. loading all product IDs)
-- The function sends multiple events which each trigger it's own job
+- It sends new events to trigger jobs in parallel for each job needed.
 
 When you schedule each job independently by sending events, each job gets its own retries and runs in parallel.  This makes your system faster, more observable, and  more resilient to temporary failures.
 
@@ -46,7 +46,7 @@ const postSlackNotification = createFunction("Send Slack Notification",
   async ({ event }) => {
     const reportData = getAccountReportData(event.data.notification.accountId);
 
-    return await app.client.chat.postMessage({
+    await app.client.chat.postMessage({
       channel: event.data.notification.slackChannelId,
       blocks: generateReportSlackBlocks(reportData),
       // ...
