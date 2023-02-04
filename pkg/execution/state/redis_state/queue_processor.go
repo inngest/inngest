@@ -371,9 +371,6 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 }
 
 func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) error {
-	ctx, span := q.tracer.Start(ctx, "process")
-	defer span.End()
-
 	var err error
 	leaseID := qi.LeaseID
 
@@ -450,10 +447,8 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 		}()
 
 		go scope.Counter(counterQueueItemsStarted).Inc(1)
-		span.AddEvent("function start")
 		err := f(jobCtx, qi.Data)
 		extendLeaseTick.Stop()
-		span.AddEvent("function end")
 		if err != nil {
 			go scope.Counter(counterQueueItemsErrored).Inc(1)
 			errCh <- err
