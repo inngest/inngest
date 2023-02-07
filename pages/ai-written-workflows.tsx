@@ -7,6 +7,7 @@ import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cj
 import Header from "../shared/Header";
 import Footer from "../shared/Footer";
 import Container from "../shared/layout/Container";
+import { setErrorMap } from "zod";
 
 export const getStaticProps: GetStaticProps = async (ctx) => {
   return {
@@ -38,6 +39,8 @@ type Selected = {
 export default function Patterns() {
   const [selected, setSelected] = useState<Selected | null>(EXAMPLE_PROMPTS[0]);
   const [history, setHistory] = useState<Selected[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let data = "[]";
@@ -48,6 +51,31 @@ export default function Patterns() {
     }
     setHistory(JSON.parse(data) as Selected[]);
   }, []);
+
+  const onSubmit = async () => {
+    if (loading) {
+      return;
+    }
+    try {
+      setLoading(true);
+      setError("");
+      const result = await fetch("https://inngestabot.deno.dev", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await result.json();
+      setLoading(false);
+      const newHistory = history.concat([data]);
+      setHistory(newHistory); 
+      window?.localStorage?.setItem("ai-sdk-history", JSON.stringify(newHistory));
+    } catch(e) {
+      setLoading(false);
+      console.warn(e);
+      setError("We couldn't generate your function.  Please try again!")
+    }
+  };
 
   return (
     <div>
@@ -68,18 +96,25 @@ export default function Patterns() {
                 What do you need to build?
               </p>
               <textarea
+                disabled={loading}
                 placeholder="Create a function that..."
                 className="width-100 bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-md text-slate-200 shadow-lg w-full h-52"
               />
 
               <div className="flex justify-end">
                 <a
-                  href="sign-up?ref=homepage-hero"
-                  className="group flex items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2  bg-indigo-500 hover:bg-indigo-400 transition-all text-white"
+                  onClick={onSubmit}
+                  className={`group flex items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2 text-white ${loading ? "bg-slate-500" : "bg-indigo-500 hover:bg-indigo-400 text-white"} transition-all`}
                 >
-                  Create your function via ChatGPT
+                  {loading ? "Generating..." : "Create your function via ChatGPT" }
                 </a>
               </div>
+
+              {error !== "" && (
+                <p className="text-orange-600">
+                  {error}
+                </p>
+              )}
 
               <p className="text-xs text-slate-500 mt-12 mb-4 text-center">
                 Your history:
