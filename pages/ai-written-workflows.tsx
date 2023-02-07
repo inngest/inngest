@@ -16,7 +16,6 @@ export const getStaticProps = async () => {
         title: "Write Inngest functions using GPT",
         description:
           "Use GPT to write Inngest workflows and functions via our SDK",
-        image: "/assets/patterns/og-image-patterns.jpg",
       },
     },
   };
