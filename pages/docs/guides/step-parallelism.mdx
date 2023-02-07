@@ -1,10 +1,5 @@
 # Step parallelism
 
-It’s easy to run steps in parallel within a single Inngest function.  You can keep track of of each step’s output and wait for all parallel steps to complete.  This means that parallelism is ideal for situations where you have code that can run concurrently, and you also need to process or combine the results of each step.  There are some benefits to using parallelism within Inngest:
-
-- It uses the standard library.  You don't have to learn another SDK or use platform-specific code.
-- You don’t have to keep track of output from parallel steps;  we do that for you
-- You can run parallel map-reduce without having to keep track of state 
 - If you’re using a serverless platform to host, code will run in true parallelism similar to multi-threading (without shared state)
 - Each step will be individually retried
 
