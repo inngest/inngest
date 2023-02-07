@@ -7,16 +7,15 @@ import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cj
 import Header from "../shared/Header";
 import Footer from "../shared/Footer";
 import Container from "../shared/layout/Container";
-import { setErrorMap } from "zod";
 
-export const getStaticProps: GetStaticProps = async (ctx) => {
+export const getStaticProps = async () => {
   return {
     props: {
       designVersion: "2",
       meta: {
-        title: "Patterns: Async + Event-Driven",
+        title: "Write Inngest functions using GPT",
         description:
-          "A collection of software architecture patterns for asynchronous flows",
+          "Use GPT to write Inngest workflows and functions via our SDK",
         image: "/assets/patterns/og-image-patterns.jpg",
       },
     },
