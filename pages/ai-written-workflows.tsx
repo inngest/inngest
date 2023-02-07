@@ -49,7 +49,11 @@ export default function Patterns() {
     } catch (e) {
       return;
     }
-    setHistory(JSON.parse(data) as Selected[]);
+    const items = JSON.parse(data) as Selected[]
+    setHistory(items);
+    if (items.length > 0) {
+      setSelected(items.reverse[0]);
+    }
   }, []);
 
   const onSubmit = async () => {
