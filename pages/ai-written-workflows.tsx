@@ -67,12 +67,15 @@ export default function Patterns() {
       const data = await result.json();
       setLoading(false);
       const newHistory = history.concat([data]);
-      setHistory(newHistory); 
-      window?.localStorage?.setItem("ai-sdk-history", JSON.stringify(newHistory));
-    } catch(e) {
+      setHistory(newHistory);
+      window?.localStorage?.setItem(
+        "ai-sdk-history",
+        JSON.stringify(newHistory)
+      );
+    } catch (e) {
       setLoading(false);
       console.warn(e);
-      setError("We couldn't generate your function.  Please try again!")
+      setError("We couldn't generate your function.  Please try again!");
     }
   };
 
@@ -103,17 +106,19 @@ export default function Patterns() {
               <div className="flex justify-end">
                 <a
                   onClick={onSubmit}
-                  className={`group flex items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2 text-white ${loading ? "bg-slate-500" : "bg-indigo-500 hover:bg-indigo-400 text-white"} transition-all`}
+                  className={`group flex items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2 text-white ${
+                    loading
+                      ? "bg-slate-500"
+                      : "bg-indigo-500 hover:bg-indigo-400 text-white"
+                  } transition-all`}
                 >
-                  {loading ? "Generating..." : "Create your function via ChatGPT" }
+                  {loading
+                    ? "Generating..."
+                    : "Create your function via ChatGPT"}
                 </a>
               </div>
 
-              {error !== "" && (
-                <p className="text-orange-600">
-                  {error}
-                </p>
-              )}
+              {error !== "" && <p className="text-orange-600">{error}</p>}
 
               <p className="text-xs text-slate-500 mt-12 mb-4 text-center">
                 Your history:
@@ -192,27 +197,40 @@ const PromptUI = ({
 
   return (
     <div
-      className={`border border-slate-700/30 rounded text-slate-300 shadow-lg text-sm mb-4 hover:bg-slate-50 group/card transition-all hover:border-slate-200 cursor-pointer bg-slate-900 ${isSelected && "bg-slate-50"}`}
+      className={`border border-slate-700/30 rounded text-slate-300 shadow-lg text-sm mb-4 hover:bg-slate-50 group/card transition-all hover:border-slate-200 cursor-pointer bg-slate-900 ${
+        isSelected && "bg-slate-50"
+      }`}
       onClick={() => onClick()}
     >
       {prompt.title && (
-        <div className={`px-6 py-4 lg:px-8 lg:py-6 h-full flex flex-col justify-between group-hover/card:text-slate-700 ${isSelected && "text-slate-700"}`}>
+        <div
+          className={`px-6 py-4 lg:px-8 lg:py-6 h-full flex flex-col justify-between group-hover/card:text-slate-700 ${
+            isSelected && "text-slate-700"
+          }`}
+        >
           <p className="font-bold pb-4 tex-slate-200">{prompt.title}</p>
           <p>{prompt.prompt}</p>
         </div>
       )}
-      <div className={`flex flex-wrap gap-2 group-hover/card:bg-slate-100  rounded-b-lg py-3 px-6 group-hover/card:border-slate-200 transition-all ${isSelected ? "border-slate-200 bg-slate-100" : "bg-slate-950"}`}>
+      <div
+        className={`flex flex-wrap gap-2 group-hover/card:bg-slate-100  rounded-b-lg py-3 px-6 group-hover/card:border-slate-200 transition-all ${
+          isSelected ? "border-slate-200 bg-slate-100" : "bg-slate-950"
+        }`}
+      >
         {prompt?.tags?.map((t) => (
           <span
             key={t}
-            className={`py-1 px-2 rounded bg-slate-800 text-slate-300 group-hover/card:bg-slate-200 group-hover/card:text-slate-500 transition-all font-medium text-xs ${isSelected && "text-slate-500 bg-slate-200"}`}>
+            className={`py-1 px-2 rounded bg-slate-800 text-slate-300 group-hover/card:bg-slate-200 group-hover/card:text-slate-500 transition-all font-medium text-xs ${
+              isSelected && "text-slate-500 bg-slate-200"
+            }`}
+          >
             {t}
           </span>
         ))}
       </div>
     </div>
   );
-}
+};
 
 const Output = ({ selected }: { selected: Selected }) => {
   return (
