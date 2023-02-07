@@ -70,8 +70,9 @@ export default function Patterns() {
       });
       const data = await result.json();
       setLoading(false);
-      const newHistory = history.concat([data]);
+      const newHistory = history.concat([{ ...data, prompt: message }]);
       setHistory(newHistory);
+      setSelected({ ...data, prompt: message });
       window?.localStorage?.setItem(
         "ai-sdk-history",
         JSON.stringify(newHistory)
