@@ -40,6 +40,7 @@ export default function Patterns() {
   const [history, setHistory] = useState<Selected[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     let data = "[]";
@@ -60,6 +61,9 @@ export default function Patterns() {
       setError("");
       const result = await fetch("https://inngestabot.deno.dev", {
         method: "POST",
+        body: JSON.stringify({
+          message,
+        }),
         headers: {
           "Content-Type": "application/json",
         },
@@ -101,6 +105,7 @@ export default function Patterns() {
                 disabled={loading}
                 placeholder="Create a function that..."
                 className="width-100 bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-md text-slate-200 shadow-lg w-full h-52"
+                onChange={(e) => setMessage(e.target.value)}
               />
 
               <div className="flex justify-end">
