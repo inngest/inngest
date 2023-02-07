@@ -208,16 +208,16 @@ const PromptUI = ({
       }`}
       onClick={() => onClick()}
     >
-      {prompt.title && (
         <div
           className={`px-6 py-4 lg:px-8 lg:py-6 h-full flex flex-col justify-between group-hover/card:text-slate-700 ${
             isSelected && "text-slate-700"
           }`}
         >
-          <p className="font-bold pb-4 tex-slate-200">{prompt.title}</p>
+          {prompt.title && (
+            <p className="font-bold pb-4 tex-slate-200">{prompt.title}</p>
+          )}
           <p>{prompt.prompt}</p>
         </div>
-      )}
       <div
         className={`flex flex-wrap gap-2 group-hover/card:bg-slate-100  rounded-b-lg py-3 px-6 group-hover/card:border-slate-200 transition-all ${
           isSelected ? "border-slate-200 bg-slate-100" : "bg-slate-950"
