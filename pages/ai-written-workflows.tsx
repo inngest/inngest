@@ -52,7 +52,7 @@ export default function Patterns() {
     const items = JSON.parse(data) as Selected[]
     setHistory(items);
     if (items.length > 0) {
-      setSelected(items.reverse[0]);
+      setSelected(items.reverse()[0]);
     }
   }, []);
 
