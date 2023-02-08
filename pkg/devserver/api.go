@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -31,6 +32,11 @@ var (
 	// every N times, instead of spamming the console every time we poll for functions.
 	signingKeyErrorCount = 0
 )
+
+func init() {
+	// Fix invalid mime type errors when loading JS from our assets on windows.
+	_ = mime.AddExtensionType(".js", "application/javascript")
+}
 
 type devapi struct {
 	chi.Router

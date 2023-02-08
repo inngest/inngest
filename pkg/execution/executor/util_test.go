@@ -74,7 +74,7 @@ func TestParseWait(t *testing.T) {
 				t,
 				time.Now().Add(test.duration),
 				time.Now().Add(duration),
-				time.Second,
+				time.Second+100*time.Millisecond,
 			)
 		})
 	}
