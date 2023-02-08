@@ -4,9 +4,14 @@ import Link from "next/link";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 
+import { MDXRemote } from "next-mdx-remote";
+
 import Header from "../shared/Header";
 import Footer from "../shared/Footer";
 import Container from "../shared/layout/Container";
+import { Button } from "src/shared/Button";
+import Arrow from "src/shared/Icons/Arrow";
+import ArrowRight from "src/shared/Icons/ArrowRight";
 
 export const getStaticProps = async () => {
   return {
@@ -48,7 +53,7 @@ export default function Patterns() {
     } catch (e) {
       return;
     }
-    const items = JSON.parse(data) as Selected[]
+    const items = JSON.parse(data) as Selected[];
     setHistory(items);
     if (items.length > 0) {
       setSelected(items[0]);
@@ -93,98 +98,105 @@ export default function Patterns() {
 
       <div
         style={{
-          backgroundImage: "url(/assets/table-bg-20.png)",
+          backgroundImage: "url(/assets/pricing/table-bg.png)",
           backgroundPosition: "center -30px",
           backgroundRepeat: "no-repeat",
           backgroundSize: "1800px 1200px",
         }}
       >
-        <Container className="pt-20">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="md:bg-slate-900/20 rounded-lg px-8 pb-4">
-              <p className="text-xl text-slate-100 pb-6 font-bold">
-                What do you need to build?
-              </p>
-              <textarea
-                disabled={loading}
-                placeholder="Create a function that..."
-                className="width-100 bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-md text-slate-200 shadow-lg w-full h-52"
-                onChange={(e) => setMessage(e.target.value)}
-              />
+        <Container className="pb-16">
+          <h1 className="text-3xl lg:text-5xl text-white mt-12 md:mt-20 xl:mt-32 font-semibold tracking-tight text-center">
+            GPT-driven workflows
+          </h1>
+          <p className="mt-4 text-indigo-200 max-w-xl text-center m-auto xl:mb-32">
+            Use Inngest's GPT prompts to create reliable, durable step functions
+            deployable to any provider.
+          </p>
 
-              <div className="flex justify-end">
+          <div className="max-w-3xl m-auto my-20">
+            <div className=" bg-white rounded-lg shadow-lg overflow-hidden">
+              <div className="py-6 px-6 w-full">
+                <textarea
+                  disabled={loading}
+                  placeholder="Create a function that..."
+                  className="  backdrop-blur-md border border-slate-700/30 rounded-md text-slate-700 font-medium w-full h-52 focus:outline-none"
+                  onChange={(e) => setMessage(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-between items-center px-4 py-2 bg-slate-100">
+                <span className="text-sm font-medium text-slate-700">
+                  Powered by ChatGPT
+                </span>
                 <a
                   onClick={onSubmit}
-                  className={`group flex items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2 text-white ${
+                  className={`group inline-flex items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-2 text-white ${
                     loading
                       ? "bg-slate-500"
                       : "bg-indigo-500 hover:bg-indigo-400 text-white"
                   } transition-all`}
                 >
-                  {loading
-                    ? "Generating..."
-                    : "Create your function via ChatGPT"}
+                  {loading ? "Generating..." : "Create your function"}
                 </a>
               </div>
-
-              {error !== "" && <p className="text-orange-600">{error}</p>}
-
-              <p className="text-xs text-slate-500 mt-12 mb-4 text-center">
-                Your history:
-              </p>
-
-              <div className="text-xs text-slate-700">
-                {history.length === 0 ? (
-                  <p className="text-center mt-8">
-                    Ya haven't given it a try, yet!
-                  </p>
-                ) : (
-                  history.map((prompt: Selected) => {
-                    return (
-                      <PromptUI
-                        prompt={prompt}
-                        selected={selected}
-                        onClick={() => setSelected(prompt)}
-                      />
-                    );
-                  })
-                )}
-              </div>
-
-              <p className="text-xs text-slate-500 mt-12 mb-4 text-center">
-                Or use an example:
-              </p>
-
-              {EXAMPLE_PROMPTS.map((prompt) => {
-                return (
-                  <PromptUI
-                    prompt={prompt}
-                    selected={selected}
-                    onClick={() => setSelected(prompt)}
-                  />
-                );
-              })}
-
-              <h1 className="text-3xl lg:text-5xl text-white mt-12 md:mt-20 font-semibold tracking-tight">
-                GPT-driven workflows
-              </h1>
-              <p className="my-4 text-indigo-200 max-w-xl">
-                Use Inngest's GPT prompts to create reliable, durable step
-                functions deployable to any provider.
-              </p>
-            </div>
-
-            <div className="md:bg-slate-1000/20 rounded-lg px-8 pb-4">
-              {selected ? (
-                <Output selected={selected} />
-              ) : (
-                <div>
-                  <p className="text-center my-36 text-xs text-slate-500 mb-4">
-                    Enter a prompt or select an example to get started.
-                  </p>
-                </div>
+              {error !== "" && (
+                <p className="text-center text-sm px-4 py-1.5 m-auto text-red-700 font-medium mt-4 bg-red-50/90 rounded-full inline-flex justify-self-center ">
+                  {error}
+                </p>
               )}
             </div>
+          </div>
+
+          <h4 className="text-center mb-4 text-slate-100 text-base">
+            Or use an example:
+          </h4>
+          <div className="grid lg:grid-cols-3 gap-6 mb-20">
+            {EXAMPLE_PROMPTS.map((prompt, i) => {
+              return (
+                <PromptUI
+                  key={i}
+                  prompt={prompt}
+                  selected={selected}
+                  onClick={() => setSelected(prompt)}
+                />
+              );
+            })}
+          </div>
+
+          <div className="lg:grid grid-cols-5 gap-12">
+            <div className=" rounded-lg pb-4 col-span-2 overflow-hidden">
+              <p className="text-lg text-white px-4 font-medium  mb-4">
+                Your history
+              </p>
+
+              <div className="text-xs text-slate-700 px-4 ">
+                {history.length === 0 ? (
+                  <p className="text-slate-300 text-sm leading-relaxed">
+                    You haven't submitted anything yet. Either use the form
+                    above, or check out one of our examples.
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-4">
+                    {history.map((prompt: Selected) => {
+                      return (
+                        <PromptUI
+                          prompt={prompt}
+                          selected={selected}
+                          onClick={() => setSelected(prompt)}
+                          variant="history"
+                        />
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            {selected ? <Output selected={selected} /> : null}
+          </div>
+          <div className="w-full flex mt-24 justify-center">
+            <Button href="https://twitter.com/intent/tweet?text=hello">
+              Tweet this page
+            </Button>
           </div>
         </Container>
       </div>
@@ -197,40 +209,44 @@ const PromptUI = ({
   prompt,
   selected,
   onClick,
+  variant = "example",
 }: {
   prompt: Selected;
   selected?: Selected;
+  variant?: "example" | "history";
   onClick: () => void;
 }) => {
   const isSelected = selected?.prompt === prompt.prompt;
 
   return (
     <div
-      className={`border border-slate-700/30 rounded text-slate-300 shadow-lg text-sm mb-4 hover:bg-slate-50 group/card transition-all hover:border-slate-200 cursor-pointer bg-slate-900 ${
-        isSelected && "bg-slate-50"
+      className={`text-center rounded-lg text-slate-300 shadow-lg text-sm hover:scale-105 origin-center origin group/card transition-all cursor-pointer bg-slate-900 px-6 py-4 lg:px-8 lg:py-6  ${
+        isSelected && "bg-slate-50 scale-105"
       }`}
       onClick={() => onClick()}
     >
-      <div
-        className={`px-6 py-4 lg:px-8 lg:py-6 h-full flex flex-col justify-between group-hover/card:text-slate-700 ${
-          isSelected && "text-slate-700"
-        }`}
-      >
-        {prompt.title && (
-          <p className="font-bold pb-4 tex-slate-200">{prompt.title}</p>
-        )}
-        <p>{prompt.prompt}</p>
-      </div>
-      {prompt.tags && (
-        <div
-          className={`flex flex-wrap gap-2 group-hover/card:bg-slate-100  rounded-b-lg py-3 px-6 group-hover/card:border-slate-200 transition-all ${
-            isSelected ? "border-slate-200 bg-slate-100" : "bg-slate-950"
+      {variant === "example" && (
+        <p
+          className={`font-semibold text-lg text-white mb-4 ${
+            isSelected && "text-indigo-600"
           }`}
         >
+          {prompt.title}
+        </p>
+      )}
+      {variant === "history" && (
+        <p
+          className={`text-left ${isSelected && "text-slate-800 font-medium"}`}
+        >
+          {prompt.prompt}
+        </p>
+      )}
+      {prompt.tags && (
+        <div className={`flex flex-wrap gap-2 transition-all justify-center`}>
           {prompt?.tags?.map((t) => (
             <span
               key={t}
-              className={`py-1 px-2 rounded bg-slate-800 text-slate-300 group-hover/card:bg-slate-200 group-hover/card:text-slate-500 transition-all font-medium text-xs ${
+              className={`py-1 px-2 rounded bg-slate-800 text-slate-300 transition-all font-medium text-xs ${
                 isSelected && "text-slate-500 bg-slate-200"
               }`}
             >
@@ -245,43 +261,91 @@ const PromptUI = ({
 
 const Output = ({ selected }: { selected: Selected }) => {
   return (
-    <div>
-      <p className="mb-4 mt-8 text-xs text-slate-500 mb-4">Prompt:</p>
-      <p className="mb-4 text-slate-200">{selected.prompt}</p>
-
-      <p className="mb-4 mt-8 text-xs text-slate-500 mb-4">
-        Generated Inngest function:
-      </p>
-      <div className="overflow-x-scroll bg-slate-950/80 backdrop-blur-md border border-slate-800/60 rounded-lg overflow-hidden shadow-lg">
-        <h6 className="text-slate-300 w-full bg-slate-950/50 text-center text-xs py-1.5 border-b border-slate-800/50">
-          function.ts
-        </h6>
-        <SyntaxHighlighter
-          language="javascript"
-          showLineNumbers={false}
-          style={syntaxThemeDark}
-          codeTagProps={{ className: "code-window" }}
-          // className="hello"
-          customStyle={{
-            backgroundColor: "transparent",
-            fontSize: "0.7rem",
-            padding: "1.5rem",
-          }}
-        >
-          {selected.reply?.code}
-        </SyntaxHighlighter>
+    <div className="col-span-3 col-start-3">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden mt-8 lg:mt-auto">
+        <p className="text-sm text-slate-600 font-medium bg-slate-100 py-3 px-6">
+          Prompt
+        </p>
+        <p className=" text-slate-600 leading-relaxed text-base py-4 px-6 lg:py-6 lg:px-12">
+          {selected.prompt}
+        </p>
       </div>
 
-      <p className="mb-4 mt-8 text-slate-200">{selected.reply.description}</p>
+      <div className="bg-slate-900/80 rounded-lg overflow-hidden mt-4 lg:mt-8">
+        <h3 className="text-lg text-white py-6 px-8 bg-slate-800/60">
+          Generated Inngest function
+        </h3>
+        <div className="p-4 lg:p-6">
+          <div className="overflow-x-scroll bg-slate-950/80 backdrop-blur-md border border-slate-800/60 rounded-lg overflow-hidden shadow-lg">
+            <h6 className="text-slate-300 w-full bg-slate-950/50 text-center text-xs py-1.5 border-b border-slate-800/50">
+              function.ts
+            </h6>
+            <SyntaxHighlighter
+              language="javascript"
+              showLineNumbers={false}
+              style={syntaxThemeDark}
+              codeTagProps={{ className: "code-window" }}
+              // className="hello"
+              customStyle={{
+                backgroundColor: "transparent",
+                fontSize: "0.7rem",
+                padding: "1.5rem",
+              }}
+            >
+              {selected.reply?.code}
+            </SyntaxHighlighter>
+          </div>
 
-      <p className="text-xs text-slate-500 mt-8 mb-4">References:</p>
-      <ul className="list-disc text-slate-200 ml-4">
-        {selected.reply.references.map((r) => (
-          <li key={r}>
-            <a href={r}>{r}</a>
-          </li>
-        ))}
-      </ul>
+          <p className="mb-4 mt-8 text-slate-200">
+            {selected.reply.description}
+          </p>
+          <div className="border-t pt-8 border-slate-800 flex flex-col gap-4">
+            <p className="text-white">Want to learn more?</p>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              <a
+                href="/docs/quick-start"
+                className="bg-slate-800 rounded-lg px-6 py-5 hover:bg-slate-700/80 group block"
+              >
+                <h4 className="text-white">Quick start guide</h4>
+                <span className="text-sm text-indigo-400 flex items-center mt-2">
+                  Read the docs{" "}
+                  <ArrowRight className="group-hover:translate-x-1 transition-transform duration-150  -mr-1.5" />
+                </span>
+              </a>
+              <a
+                href="/docs/functions"
+                className="bg-slate-800 rounded-lg px-6 py-5 hover:bg-slate-700/80 group block"
+              >
+                <h4 className="text-white">Writing functions</h4>
+                <span className="text-sm text-indigo-400 flex items-center mt-2">
+                  Read the docs{" "}
+                  <ArrowRight className="group-hover:translate-x-1 transition-transform duration-150  -mr-1.5" />
+                </span>
+              </a>
+              <a
+                href="/docs/events"
+                className="bg-slate-800 rounded-lg px-6 py-5 hover:bg-slate-700/80 group block"
+              >
+                <h4 className="text-white">Sending Events</h4>
+                <span className="text-sm text-indigo-400 flex items-center mt-2">
+                  Read the docs{" "}
+                  <ArrowRight className="group-hover:translate-x-1 transition-transform duration-150  -mr-1.5" />
+                </span>
+              </a>
+            </div>
+          </div>
+          <h3 className="text-base text-white pt-8 pb-2">References:</h3>
+          <ul className="list-disc text-slate-200 ml-4 pb-8">
+            {selected.reply.references.map((r) => (
+              <li key={r} className="">
+                <a className="text-indigo-400" href={r}>
+                  {r}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 };
