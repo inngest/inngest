@@ -5,6 +5,7 @@ image: /assets/blog/openai-durable-functions-with-inngest/gpt-driven-workflows.p
 date: 2023-02-09
 author: Jack Williams
 focus: true
+disableCTA: true
 ---
 
 OpenAI Codex is the model that powers GitHub Copilot, an “AI pair programmer” that suggests code in your IDE based on your codebase and billions of lines of open-source repositories.

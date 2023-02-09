@@ -141,25 +141,27 @@ export default function BlogLayout(props) {
                   <Tags tags={scope.tags} />
                 </p>
               </header>
-              <aside className=" max-w-[65ch] m-auto bg-indigo-900/20 text-indigo-100 flex flex-col items-start gap-4 leading-relaxed rounded-lg py-5 px-6  my-12 border border-indigo-900/50">
-                <p className="text-sm lg:text-base">
-                  <a
-                    className="text-indigo-400 font-medium hover:text-white transition-all no-underline hover:underline"
+              {!scope.disableCTA && (
+                <aside className="max-w-[65ch] m-auto bg-indigo-900/20 text-indigo-100 flex flex-col items-start gap-4 leading-relaxed rounded-lg py-5 px-6  my-12 border border-indigo-900/50">
+                  <p className="text-sm lg:text-base">
+                    <a
+                      className="text-indigo-400 font-medium hover:text-white transition-all no-underline hover:underline"
+                      href="https://www.inngest.com?ref=blog-post"
+                    >
+                      Inngest's
+                    </a>{" "}
+                    platform lets you build serverless background tasks and
+                    scheduled jobs using events - zero infrastructure required.{" "}
+                  </p>
+                  <Button
                     href="https://www.inngest.com?ref=blog-post"
+                    arrow="right"
                   >
-                    Inngest's
-                  </a>{" "}
-                  platform lets you build serverless background tasks and
-                  scheduled jobs using events - zero infrastructure required.{" "}
-                </p>
-                <Button
-                  href="https://www.inngest.com?ref=blog-post"
-                  arrow="right"
-                >
-                  Give it a try
-                </Button>
-              </aside>
-              <div className="max-w-[65ch] prose m-auto mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
+                    Give it a try
+                  </Button>
+                </aside>
+              )}
+              <div className="max-w-[65ch] prose m-auto mt-12 mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
                 <MDXRemote
                   compiledSource={props.post.compiledSource}
                   scope={scope}
