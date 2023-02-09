@@ -199,10 +199,10 @@ export default function InngestGPT() {
           </p>
 
           <div
-            className="lg:grid grid-cols-5 gap-12 scroll-mt-32"
+            className="flex flex-col-reverse lg:grid grid-cols-5 gap-12 scroll-mt-32"
             ref={resultRef}
           >
-            <div className=" rounded-lg pb-4 col-span-2 overflow-hidden">
+            <div className="rounded-lg pb-4 col-span-2 overflow-hidden">
               <p className="text-lg text-white px-4 font-medium  mb-4">
                 Your history
               </p>
