@@ -46,52 +46,54 @@ Let's take a use case to demonstrate our approach. A product is a CRM tool that 
 
 
 ```typescript
-import { createStepFunction } from "inngest";
+import { inngest } from "./client";
 
-createStepFunction("Contacts Import and enrichment", "api/contact_list.uploaded",
-  ({ event, tools }) => {
-    const { isValid, errors } = tools.run("Validate upload contents", async () => {
+inngest.createFunction(
+  { name: "Contacts Import and enrichment" },
+  { event: "api/contact_list.uploaded" },
+  async ({ event, step }) => {
+    const { isValid, errors } = await step.run("Validate upload contents", async () => {
       // Download the csv file, validate columns and data in each row
       const { isValid, errors } = downloadAndValidateCSV(event.data.filename);
       return { isValid, errors };
     });
 
     if (!isValid) {
-      return tools.run("Notify user of invalid contents", async () =>
+      return await step.run("Notify user of invalid contents", async () =>
         await sendContactsImportFailedEmail(event.user.id, errors)
       );
     }
 
     // Enrichment may fail at times due to networking blip
-    tools.run("Enrich contracts information", async () => {
+    await step.run("Enrich contracts information", async () => {
       // Call a third party API service to enriches each contact's info
       // then uploads the data to an object store when complete
     });
 
-    const listReviewedEvent = tools.waitForEvent("api/contact_list.reviewed", {
+    const listReviewedEvent = await step.waitForEvent("api/contact_list.reviewed", {
       timeout: "7d",
       match: "data.upload_id", // data.upload_id is in both events and must match to proceed
     })
 
     if (listReviewedEvent.data.is_approved === false) {
-      return tools.run("Delete uploaded contact lists", () => { /* ...*/ });
+      return await step.run("Delete uploaded contact lists", () => { /* ...*/ });
     }
 
-    const { totalUsersAdded } = tools.run("Create contacts in CRM", async () => {
+    const { totalUsersAdded } = await step.run("Create contacts in CRM", async () => {
       const contacts = await downloadEnrichedContactList(event.data.filename);
       const filteredContacts = applyFilters(listReviewedEvent.data.filters);
       return await insertContactsIntoCRMDatabase(event.data.account_id, filteredContacts);
     });
 
-    tools.run("Notify user of successful import", async () =>
+    await step.run("Notify user of successful import", async () =>
       await sendContactsImportSuccessEmail(event.user.id, totalUsersAdded)
     );
   }
 )
 ```
 
-* All code within each `tools.run()` callback will be run independently and will be **retried upon failure, resuming from where the function left off**.
-* Using `tools.waitForEvent()` enable the workflow to wait for additional user interactions or events via [**event coordination**](/patterns/event-coordination-for-lost-customers?ref=blog-build-more-reliable-workflows-with-events).
+* All code within each `step.run()` callback will be run independently and will be **retried upon failure, resuming from where the function left off**.
+* Using `step.waitForEvent()` enable the workflow to wait for additional user interactions or events via [**event coordination**](/patterns/event-coordination-for-lost-customers?ref=blog-build-more-reliable-workflows-with-events).
 * The results of each step, including failures and retries are logged can be inspected on the Inngest dashboard for **complete observability**.
 
 More info on these and other `tools` are [in our docs](/docs/functions/multi-step?ref=blog-build-more-reliable-workflows-with-events#tools).

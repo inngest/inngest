@@ -16,7 +16,7 @@ This makes building reliable, distributed code simple. By wrapping asynchronous 
 
 ## Writing
 
-Multi-step functions are written using either the `createStepFunction()` method on the `Inngest` client.
+Multi-step functions are written using the `createFunction()` method on the `Inngest` client.
 
 First, let's look at a simple single-step function.
 
@@ -40,9 +40,7 @@ We have a new requirement, though, that we should send the user another email if
 
 First, let's convert out function to a multi-step function. To do this, we'll do a few things:
 
-- Use `createStepFunction()` instead of `createFunction()`
-- Change our provided handler to be non-async
-- Add a new `step` argument
+- Add a new `step` argument to your function
 - Wrap our `sendEmail()` call in a `step.run()` call
 
 ```ts
