@@ -21,7 +21,7 @@ Most platform documentation deals with directly or indirectly teaching users con
 
 These written examples, like most documentation, are static; one key example must serve many readers, and those readers must make an extra jump in their heads to attribute the code they’re reading and the concept they are learning to the final problem they’re trying to solve.
 
-When communicating vocally, it’s much easier to give somebody an understanding of a concept by relating it to the one piece of the puzzle they already know. Similarly, by generating code upfront, the reader can apply their specific context to the platform straight away without that second hop.
+When communicating verbally, it’s much easier to give somebody an understanding of a concept by relating it to the one piece of the puzzle they already know. Similarly, by generating code upfront, the reader can apply their specific context to the platform straight away without that second hop.
 
 ## How it’s built
 
@@ -35,14 +35,14 @@ We’ve published the result over at [github.com/inngest/inngestabot](http://git
 
 ### Discord bot integration
 
-In addition to being available on the website, the bot is available for work on our [Discord server](https://example.com), where it dutifully awaits the opportunity to create more functions.
+In addition to being available on the website, the bot is available for work on our [Discord server](https://www.inngest.com/discord), where it dutifully awaits the opportunity to create more functions.
 
 You can ask it to create a function by simply tagging it in a message, like so:
 
 > ***@inngestabot Send a welcome email to a new user.***
 >
 
-Throughout releasing features such as serverless slash commands for Discord bots, much of their functionality still relies on long-lived, serverful connections, for example to listen to incoming messages as we want to here.
+Slash commands for Discord bots still relies on long-lived, serverful connections, for example to listen to incoming messages as requried here. To handle this event in a serverless Inngest function required a workaround.
 
 For this, we placed a tiny piece of Deno code on [Fly.io](http://Fly.io) using [Discordeno](https://deno.land/x/discordeno) that boots up a bot and emits an Inngest event whenever a request to create a function is received.
 
@@ -81,7 +81,8 @@ inngest.createFunction(
   async ({ event, step }) => {
     const { message } = event.data;
 
-    // Generate a reply using our OpenAI Codex endpoint
+    // Generate a reply using our OpenAI Codex endpoint.
+    // OpenAI can sometimes error — `step.run` automatically retries on errors
     const reply = await step.run("Generate reply from OpenAI", async () => {
       const res = await fetch(OPENAI_ENDPOINT, {
         method: "POST",
@@ -102,7 +103,7 @@ inngest.createFunction(
 );
 ```
 
-We make sure to use Inngest’s step tooling here to provide retries to the reply generation and sending the Discord message. We go a bit deeper in the final code, too, also ensuring the bot adds a thinking reaction (🤔) to show that it’s on the case - make sure to check out the [inngest/inngestabot](https://example.com) repo.
+We make sure to use Inngest’s step tooling here to provide retries to the reply generation and sending the Discord message. We go a bit deeper in the final code, too, also ensuring the bot adds a thinking reaction (🤔) to show that it’s on the case - make sure to check out the [inngest/inngestabot](https://github.com/inngest/inngestabot) repo.
 
 ## Future
 
