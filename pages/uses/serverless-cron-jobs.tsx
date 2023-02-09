@@ -24,11 +24,11 @@ export async function getStaticProps() {
 }
 
 const snippet = `
-import { createScheduledFunction } from "inngest";
+import { inngest } from "./client";
 
-createScheduledFunction(
-  "Daily check",
-  "0 0 * * *",
+inngest.createFunction(
+  { name: "Daily check" },
+  { cron: "0 0 * * *" },
   async () => {
     // This function will run every day at Midnight, UTC.
   },

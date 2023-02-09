@@ -1,15 +1,16 @@
+import { useState } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
-import { useState } from "react";
-import Container from "../layout/Container";
 import classNames from "src/utils/classNames";
-import SectionHeader from "../SectionHeader";
+import { stripIndent } from "src/utils/string";
 import {
   IconBackgroundTasks,
   IconJourney,
   IconScheduled,
   IconTools,
 } from "../Icons/duotone";
+import Container from "../layout/Container";
+import SectionHeader from "../SectionHeader";
 
 export default function GetThingsShipped() {
   const tabs = [
@@ -29,24 +30,26 @@ export default function GetThingsShipped() {
         },
       ],
       code: {
-        title: "sendConfirmationSMS.js",
-        content: `import { createFunction } from "inngest"
-import { sendSMS } from "../twilioUtils"
+        title: "sendConfirmationSMS.ts",
+        content: stripIndent(`
+          import { sendSMS } from "../twilioUtils";
+          import { inngest } from "./client";
 
-export default createFunction(
-  "Send confirmation SMS",
-  "app/request.confirmed",
-  async ({ event }) => {
-    const result = await sendSMS({
-      to: event.user.phone,
-      message: "Your request has been confirmed!",
-    })
-    return {
-      status: result.ok ? 200 : 500,
-      body: \`SMS Sent (Message SID: \${result.sid})\`
-    }
-  }
-)`,
+          export default inngest.createFunction(
+            { name: "Send confirmation SMS" },
+            { event: "app/request.confirmed" },
+            async ({ event }) => {
+              const result = await sendSMS({
+                to: event.user.phone,
+                message: "Your request has been confirmed!",
+              });
+
+              return {
+                status: result.ok ? 200 : 500,
+                body: \`SMS Sent (Message SID: \${result.sid})\`,
+              };
+            }
+          );`),
       },
     },
     {
@@ -65,15 +68,16 @@ export default createFunction(
         },
       ],
       code: {
-        title: "sendWeeklyDigest.js",
-        content: `import { createScheduledFunction } from "inngest"
-import { sendWeeklyDigestEmails } from "../emails"
+        title: "sendWeeklyDigest.ts",
+        content: stripIndent(`
+          import { sendWeeklyDigestEmails } from "../emails";
+          import { inngest } from "./client";
 
-export default createScheduledFunction(
-  "Send Weekly Digest",
-  "0 9 * * MON",
-  sendWeeklyDigestEmails
-)`,
+          export default inngest.createFunction(
+            { name: "Send Weekly Digest" },
+            { cron: "0 9 * * MON" },
+            sendWeeklyDigestEmails
+          );`),
       },
     },
     {
@@ -92,23 +96,26 @@ export default createScheduledFunction(
         },
       ],
       code: {
-        title: "handleFailedPayments.js",
-        content: `import { createFunction } from "inngest"
-import {
-  findAccountByCustomerId, downgradeAccount
-} from "../accounts"
-import { sendFailedPaymentEmail } from "../emails"
+        title: "handleFailedPayments.ts",
+        content: stripIndent(`
+          import { downgradeAccount, findAccountByCustomerId } from "../accounts";
+          import { sendFailedPaymentEmail } from "../emails";
+          import { inngest } from "./client";
 
-export default createFunction(
-  "Handle failed payments",
-  "stripe/charge.failed",
-  async ({ event }) => {
-    const account = await = findAccountByCustomerId(event.user.stripe_customer_id)
-    await sendFailedPaymentEmail(account.email)
-    await downgradeAccount(account.id)
-    return { message: "success" }
-  }
-)`,
+          export default inngest.createFunction(
+            { name: "Handle failed payments" },
+            { name: "stripe/charge.failed" },
+            async ({ event, step }) => {
+              const account = await step.run("Get account", () =>
+                findAccountByCustomerId(event.user.stripe_customer_id)
+              );
+
+              await Promise.all([
+                sendFailedPaymentEmail(account.email),
+                downgradeAccount(account.id),
+              ]);
+            }
+          );`),
       },
     },
     {
@@ -127,21 +134,23 @@ export default createFunction(
         },
       ],
       code: {
-        title: "runUserDataBackfill.js",
-        content: `import { createFunction } from "inngest"
-import { runBackfillForUser } from "../scripts"
+        title: "runUserDataBackfill.ts",
+        content: stripIndent(`
+          import { runBackfillForUser } from "../scripts";
+          import { inngest } from "./client";
 
-export default createFunction(
-  "Run user data backfill",
-  "retool/backfill.requested",
-  async ({ event }) => {
-    const result = await runBackfillForUser(event.data.user_id)
-    return {
-      status: result.ok ? 200 : 500,
-      body: \`Ran backfill for user \${event.data.user_id}\`
-    }
-  }
-)`,
+          export default inngest.createFunction(
+            { name: "Run user data backfill" },
+            { event: "retool/backfill.requested" },
+            async ({ event }) => {
+              const result = await runBackfillForUser(event.data.user_id);
+
+              return {
+                status: result.ok ? 200 : 500,
+                body: \`Ran backfill for user \${event.data.user_id}\`,
+              };
+            }
+          );`),
       },
     },
     {
@@ -160,17 +169,39 @@ export default createFunction(
         },
       ],
       code: {
-        title: "userOnboardingCampaign.js",
-        content: `import { createStepFunction } from "inngest"
+        title: "userOnboardingCampaign.ts",
+        content: stripIndent(`
+          import { inngest } from "./client";
 
-export default createStepFunction(
-  "User onboarding campaign",
-  "app/user.signup",
-  /*
-    Coming soon!
-    Join the feedback group on Discord
-  */
-)`,
+          export default inngest.createFunction(
+            { name: "User onboarding campaign" },
+            { event: "app/user.signup" },
+            async ({ event, step }) => {
+              await step.run("Send welcome email", () =>
+                sendEmail({
+                  to: event.user.email,
+                  template: "welcome",
+                })
+              );
+
+              const profileComplete = await step.waitForEvent(
+                "app/user.profile.completed",
+                {
+                  timeout: "24h",
+                  match: "data.userId",
+                }
+              );
+
+              if (!profileComplete) {
+                await step.run("Send reminder email", () =>
+                  sendEmail({
+                    to: event.user.email,
+                    template: "reminder",
+                  })
+                );
+              }
+            }
+          );`),
       },
     },
     {
@@ -189,21 +220,30 @@ export default createStepFunction(
         },
       ],
       code: {
-        title: "eventDriven.js",
-        content: `import { createFunction } from "inngest"
+        title: "eventDriven.ts",
+        content: stripIndent(`
+          import { createFunction } from "inngest";
 
-export const handleApptRequested = createFunction("...",
-  "appointment.requested", // ...
-)
-export const handleApptScheduled = createFunction("...",
-  "appointment.scheduled", // ...
-)
-export const handleApptConfirmed = createFunction("...",
-  "appointment.confirmed", // ...
-)
-export const handleApptCancelled = createFunction("...",
-  "appointment.cancelled", // ...
-)`,
+          export const handleApptRequested = createFunction(
+            "...",
+            "appointment.requested",
+            async () => { /* ... */ }
+          );
+          export const handleApptScheduled = createFunction(
+            "...",
+            "appointment.scheduled",
+            async () => { /* ... */ }
+          );
+          export const handleApptConfirmed = createFunction(
+            "...",
+            "appointment.confirmed",
+            async () => { /* ... */ }
+          );
+          export const handleApptCancelled = createFunction(
+            "...",
+            "appointment.cancelled",
+            async () => { /* ... */ }
+          );`),
       },
     },
   ];
@@ -288,7 +328,7 @@ export const handleApptCancelled = createFunction("...",
                       padding: "1.5rem",
                     }}
                   >
-                    {tab.code.content}
+                    {tab.code.content.trim()}
                   </SyntaxHighlighter>
                 </div>
               </div>

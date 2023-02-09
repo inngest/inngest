@@ -32,15 +32,29 @@ You can set up a webhook with Inngest in 2 ways:
 After connecting your webhook, you'll start to receive events in your Inngest dashboard. Here's an example of using the `stripe/invoice.payment_failed` event ([Stripe docs](https://stripe.com/docs/api/invoices/object))
 
 ```js
-import { createFunction } from "inngest";
+import { inngest } from "./client";
 
-createFunction("Downgrade customer", "stripe/invoice.payment_failed", async ({ event }) => {
-  const invoice = event.data.data.object;
-  const user = await getUserByStripeCustomerId(invoice.customer);
-  await billingUtils.downgradeUser(user.id);
-  await sendDowngradeEmail(user.email);
-  return `Downgraded user plan & ${user.id}`;
-})
+inngest.createFunction(
+  { name: "Downgrade customer" },
+  { event: "stripe/invoice.payment_failed" },
+  async ({ event, step }) => {
+    const invoice = event.data.data.object;
+
+    const user = await step.run("Load user via stripe ID", async () => {
+      return await getUserByStripeCustomerId(invoice.customer);
+    });
+
+    await step.run("Downgrade user", async () => {
+      await billingUtils.downgradeUser(user.id);
+    });
+
+    await step.run("Send email", async () => {
+      sendDowngradeEmail(user.email);
+    });
+
+    return `Downgraded user plan & ${user.id}`;
+  },
+);
 ```
 
 Functions can then be [deployed to several supported platforms](/docs/deploy?ref=patterns).

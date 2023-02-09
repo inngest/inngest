@@ -4,8 +4,13 @@ Follow along to learn how to:
 
 - Write a background function triggered by an event
 - Write a scheduled function
+- Write a durable step function anywhere
 
-Writing functions is the same no matter what platform you deploy to — so this example can be used for any TypeScript or JavaScript project (such as Next.js, Netlify, or RedwoodJS).
+Writing functions is the same no matter what platform you deploy to — so this example can be used for any TypeScript or JavaScript project (such as [Next.js](/docs/sdk/serve#framework-next-js), [Remix](/docs/sdk/serve#framework-remix), or [RedwoodJS](/docs/sdk/serve#framework-redwood)).
+
+<Callout>
+👉 We recommend setting up your API handler first, so you can start testing functions right away. If you haven't done so, check out [Serving the Inngest API](/docs/sdk/serve).
+</Callout>
 
 ## Install the SDK
 
@@ -25,16 +30,17 @@ import { Inngest } from "inngest";
 const inngest = new Inngest({ name: "My app" });
 
 export default inngest.createFunction(
-  "Import product images",   // The name of your function, used for observability.
-  "product.imported", // The event that triggers this function.
-  // This code will be called every time an event payload is received
+  { name: "Import product images" },
+  { event: "shop/product.imported" }, // The event(s) that will trigger this function
+
+  // This function will be called every time an event payload is received
   async ({ event }) => {
     return copyAllImagesToS3(event.data.imageURLs); // You can write whatever you want here.
   }
-)
+);
 ```
 
-This defines a new background job which runs any code that you pass it.  This function is automatically triggered in the background whenever the demo/test.event event is received.  You can test this function using standard tooling such as Jest or Mocha by exporting the job code and running standard unit tests.
+This defines a new background job which runs any code that you pass it.  This function is automatically triggered in the background whenever the `shop/product.imported` event is received.  You can test this function using standard tooling such as Jest or Mocha by exporting the job code and running standard unit tests.
 
 💁 **Why event-driven?**
 
@@ -54,37 +60,42 @@ import { Inngest } from "inngest";
 
 const inngest = new Inngest({ name: "My app" });
 
-export default inngest.createScheduledFunction(
-  "Weekly digest email", // The name of your function, used for observability.
-  "TZ=America/New_York 0 9 * * MON",         // The cron syntax for the function.  TZ= is optional.
-  // This code will be called on the schedule above
+export default inngest.createFunction(
+  { name: "Weekly digest email" }, // The name of your function, used for observability.
+  { cron: "TZ=America/New_York 0 9 * * MON" }, // The cron syntax for the function. TZ= is optional.
+
+  // This function will be called on the schedule above
   async () => {
     return await sendDigestToAllUsers(); // You can write whatever you want here.
   }
-)
+);
 ```
 
-This is very similar to defining an event-driven function, except it uses the `createScheduledFunction` call and a cron schedule to run your function at the specified interval.  This code can be deployed to any platform and will run automatically, without any HTTP calls.
+This is very similar to defining an event-driven function, except it uses a `cron` trigger instead of an `event` to run your function at the specified interval. This code can be deployed to any platform and will run automatically, without any HTTP calls.
 
 ## Writing a multi-step function
 
-The following code defines a multi-step function, which you can use to coordinate between events, work with delays, and safely handle multiple asynchronous steps.
+Any function can become a step function, where each step is individually retriable and tools are provided to coordinate beween events or wait for arbitrary periods of time (up to months)!
 
 Check out the <a href="/docs/functions/multi-step">Multi-step functions</a> page for more!
 
 ```typescript
-export default inngest.createStepFunction(
-  "Activation email",
-  "app/user.created",
-  ({ event, tools }) => {
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ name: "My app" });
+
+export default inngest.createFunction(
+  { name: "Activation email" },
+  { event: "app/user.created" },
+  async ({ event, step }) => {
     // Send the user a welcome email
-    tools.run("Send welcome email", () =>
+    await step.run("Send welcome email", () =>
       sendEmail({ email: event.data.email, template: "welcome" })
     );
 
     // Wait for the user to create an order, by waiting and
     // matching on another event
-    const order = tools.waitForEvent("app/order.created", {
+    const order = await step.waitForEvent("app/order.created", {
       match: "data.user.id",
       timeout: "24h",
     });
@@ -92,7 +103,7 @@ export default inngest.createStepFunction(
     if (!order) {
       // User didn't create an order within 24 hours; send
       // them an activation email
-      tools.run("Send activation email", async () => {
+      await step.run("Send activation email", async () => {
         // Some code here
       });
     }
@@ -102,7 +113,7 @@ export default inngest.createStepFunction(
 
 Use a multi-step function to create a logical flow of actions triggered from an initial event. It's just like writing a regular synchronous function, but Inngest will step in to help coordinate between events, wait for long periods, or retry failed steps.
 
-In this example, we send the user a welcome email when they are created, then send an activation email after 24 hours if they haven't created an order in that time. Each call to `run()` can be retried independently, meaning a failure in one step won't affect any others.
+In this example, we send the user a welcome email when they are created, then send an activation email after 24 hours if they haven't created an order in that time. Each call to `step.run()` can be retried independently, meaning a failure in one step won't affect any others.
 
 Coordinating between events like this often requires a lot of code and infrastructure to handle retries, timeouts, state, queues, and many edge cases. Inngest handles all of this for you, so you can focus on writing the code that matters in a clean, readable format.
 
@@ -124,15 +135,15 @@ type AppUserCreated = {
   name: "app/user.created";
   data: {
     email: string;
-  }
+  };
   user: {
     id: string;
-  }
-}
+  };
+};
 
 type Events = {
   "app/user.created": AppUserCreated;
-}
+};
 
 export const inngest = new Inngest<Events>({ name: "My App" });
 ```
@@ -142,7 +153,11 @@ You can then import this `inngest` client into where you're creating functions o
 ```typescript
 import { inngest } from "./client";
 
-export default inngest.createFunction("Add to Intercom", "app/user.created", ({ event }) => ...);
+export default inngest.createFunction(
+  { name: "Add to Intercom" },
+  { name: "app/user.created" },
+  async ({ event }) => { /* ... */ }
+);
 ```
 
 You can learn more about the Inngest SDK's TypeScript support on our [Using with TypeScript](/docs/typescript) page.

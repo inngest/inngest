@@ -36,7 +36,7 @@ app.post("/api/connectSource", async (req, res) => {
 
   // Send an event for what just happened with pertinent data to be handled async
   const inngest = new Inngest("API");
-  inngest.send({
+  await inngest.send({
     name: "api/source.connected",
     data: { sourceId: source.id, userId: req.user.id },
   });
@@ -51,13 +51,17 @@ app.post("/api/connectSource", async (req, res) => {
 Functions are defined by declaring which event(s) should trigger it. When matching events are received, all corresponding functions run in the background automatically.  Any returned value is logged and any error thrown will inform Inngest to [retry to the function](/docs/functions/retries?ref=patterns).
 
 ```js
-import { createFunction } from "inngest";
+import { inngest } from "./client";
 
-createFunction("Backfill User Data", "api/source.connected", async ({ event }) => {
-  const source = await getSource(event.data.sourceId);
-  await backfillDataForSource(source);
-  return `Successful backfill for ${source.id} (User: ${event.data.userId})`;
-})
+inngest.createFunction(
+  { name: "Backfill User Data" },
+  { event: "api/source.connected" },
+  async ({ event }) => {
+    const source = await getSource(event.data.sourceId);
+    await backfillDataForSource(source);
+    return `Successful backfill for ${source.id} (User: ${event.data.userId})`;
+  },
+)
 ```
 
 Functions can be [deployed in several ways](/docs/deploy?ref=patterns) that fit your current stack or needs.

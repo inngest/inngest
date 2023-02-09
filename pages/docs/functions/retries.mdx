@@ -37,28 +37,31 @@ Steps are individually retried. That means Inngest will handle the type of error
 ```ts
 import { NonRetriableError } from "inngest";
 
-export default inngest.createStepFunction(
-  "Import store items",
-  "ecommerce/import.required",
-  ({ event, tools }) => {
-
-    const items = tools.run("Get items from API", async () => {
+export default inngest.createFunction(
+  { name: "Import store items" },
+  { event: "ecommerce/import.required" },
+  async ({ event, tools }) => {
+    const items = await step.run("Get items from API", async () => {
       // Third party APIs can often fail (e.g. because of a network or rate limit issue),
       // if this call fails, Inngest will attempt to retry this step
       return await ecommerceAPI.getItems(event.data.itemIds);
     });
 
-    const store = tools.run("Get store in database", async () => {
+    const store = await step.run("Get store in database", async () => {
       try {
         return await database.getStore(event.data.storeId);
       } catch (err) {
         // Store was not found - the step and function should not be retried
-        throw new NonRetriableError("Could not find store in database", { cause: err });
+        throw new NonRetriableError("Could not find store in database", {
+          cause: err,
+        });
       }
     });
 
     // If either of the above steps
-    tools.run("Import items for store", () => { /* ... */})
+    await step.run("Import items for store", () => {
+      /* ... */
+    });
   }
 );
 ```

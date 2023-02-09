@@ -20,11 +20,11 @@ export async function getStaticProps() {
 }
 
 const snippet = `
-import { createScheduledFunction } from "inngest";
+import { inngest } from "./client";
 
-createFunction(
-  "After signup",
-  "auth/user.created",
+inngest.createFunction(
+  { name: "After signup" },
+  { event: "auth/user.created" },
   async ({ event }) => {
     // This function runs in the background every time
     // the "auth/user.created" event is received.
@@ -33,21 +33,26 @@ createFunction(
 `;
 
 const fullSnippet = `
-import { createScheduledFunction } from "inngest";
+import { inngest } from "./client";
 
-createFunction(
-  "After signup",
-  "auth/user.created",
-  async ({ event }) => {
+inngest.createFunction(
+  { name: "After signup" },
+  { event: "auth/user.created" },
+  async ({ event, step }) => {
     // Instead of your signup API triggering activation
     // emails and setting up user accounts, your API
     // offloads this work into the background by
     // triggering an event which calls this function.
-    await sendActivationEmail({
-      email: event.user.email,
-      name: event.user.name
+    await step.run("send activation email", async () => {
+      await sendActivationEmail({
+        email: event.user.email,
+        name: event.user.name
+      });
     });
-    await createChurnCampaign({ id: event.user.id });
+
+    await step.run("create churn campaign", await () => {
+      await createChurnCampaign({ id: event.user.id });
+    });
   },
 );
 `;
@@ -60,7 +65,7 @@ export const client = new Inngest({ name: "Your app name" });
 
 // Send an event to Inngest, which triggers any background
 // function that listens to this event.
-client.send({
+await client.send({
   name: "auth/user.created",
   data: {
     plan: "The super awesome new plan",

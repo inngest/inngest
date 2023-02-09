@@ -20,18 +20,18 @@ import { Inngest } from "inngest";
 
 const inngest = new Inngest({ name: "Signup flow" });
 
-export const fn = inngest.createStepFunction(
-  "Send signup email",   // Function name
-  "user/created",        // Trigger
-  ({ event, tools }) => {
+export const fn = inngest.createFunction(
+  { name: "Send signup email" },
+  { event: "user/created" }, // Trigger
+  ({ event, step }) => {
 
     // This runs in the background any time the `user/created` event is
     // sent to Inngest.
     //
     // Whatever event data you send is accessible within `event`.
 
-    tools.run("send the user a signup email", async () => {
-      // Reliably send an email.  Anything in `tools.run` automatically retries
+    await step.run("send the user a signup email", async () => {
+      // Reliably send an email.  Anything in `step.run` automatically retries
       await sesclient.clientsendEmail({
         to: event.data.user_email,
         subject: "Welcome to Inngest!"
@@ -43,9 +43,9 @@ export const fn = inngest.createStepFunction(
     // NOTE: This actually *****stops***** functions and continues execution automatically,
     // across server restarts or serverless functions.  You don't have to worry about
     // scale, memory leaks, connections, or restarts.
-    tools.sleepUntil("2023-02-01T16:30:00");
+    await step.sleepUntil("2023-02-01T16:30:00");
 
-    tools.run("Do some work in the future", async () => {
+    await step.run("Do some work in the future", async () => {
       // Code here runs in the future automatically.
     });
   }
@@ -59,7 +59,7 @@ export const fn = inngest.createStepFunction(
 You can **trigger this background function by sending an event** to Inngest:
 
 ```typescript
-inngest.send({
+await inngest.send({
   name: "user/created", // This matches the event used in `createFunction`
   data: {
     email: "test@example.com",

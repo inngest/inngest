@@ -91,19 +91,23 @@ Within your Next.js project root, add the Inngest JS SDK via NPM or Yarn:
 npm install inngest # or yarn add inngest
 ```
 
-### Add the API handler
+### Create a client and API handler
 
 Create a new file at `./pages/api/inngest.ts` with the following code:
-
-```typescript
-// Within ./pages/api/inngest.ts
+```ts
+import { Inngest } from "inngest";
 import { serve } from "inngest/next";
 
-// Create an API that hosts zero functions.
-export default serve("My app name", []);
+// Create a client to send and receive events
+export const inngest = new Inngest({ name: "My App" });
+
+// Create an API that hosts zero functions
+export default serve(inngest, []);
 ```
 
-Here, we're creating a new API endpoint with an application name and a list of available functions.  You can import serve for other frameworks, though the code is the same — only the import changes.
+Here, we're creating a new Inngest client which we'll use to send and receive events. With this, we create an API endpoint called a "Serve Handler" with a list of available functions.
+
+You can import `serve()` for other frameworks, though the code is the same — only the import changes.
 
 This sets up the API endpoint for hosting and calling functions!  We'll update the array passed in to `serve` with functions as we write them.
 
@@ -111,20 +115,26 @@ This sets up the API endpoint for hosting and calling functions!  We'll update t
 
 ### Defining the function
 
-Let's write your first reliable serverless function!  Create a new file at `./inngest/demo.ts` - you will have to make a new folder.  Within this file, add the following code:
+Let's write your first reliable serverless function! Add the following to your `./pages/api/inngest.ts` file:
 
-```typescript
-import { Inngest } from "inngest";
-
-const inngest = new Inngest({ name: "My app name" });
-
-export default inngest.createStepFunction("My first function", "test/demo", ({ event, tools }) => {
-  tools.sleep("1 second");
-  return { event, body: "hello!" }
-});
+```ts
+const helloWorld = inngest.createFunction(
+  { name: "Hello World" },
+  { event: "test/hello.world" },
+  async ({ event, step }) => {
+    await step.sleep("1s");
+    return { event, body: "Hello, World!" };
+  }
+);
 ```
 
-This creates a new function which will be called in the background any time Inngest receives an event with the name `test/demo`.  This introduces some new concepts:
+We also add this new function to our serve handler.
+
+```ts
+export default serve(inngest, [helloWorld]);
+```
+
+This creates a new function which will be called in the background any time Inngest receives an event with the name `test/hello.world`.  This introduces some new concepts:
 
 {/*  TODO/DOCS: Link these to relevant docs on each when completed (Concepts, guides, references etc.) */}
 - Functions are called by events (or on a schedule), in the background
@@ -132,21 +142,6 @@ This creates a new function which will be called in the background any time Inng
 - Functions will retry automatically if they error.
 
 Instead of calling your function directly as an API with a JSON body, you send a JSON event to Inngest.  Inngest calls all functions listening to this event, and automatically passes the event payload JSON as an function argument.
-
-### Serving the function
-
-Now that you've written your function let's make sure that you serve it from your Inngest API.  Open up the API handler at `./pages/api/inngest.ts` and update the code with the following:
-
-```typescript
-import { serve } from "inngest/next";
-import demoFn from "../../inngest/demo"; // Import your function
-
-export default serve("My app name", [demoFn]); // Serve your function
-```
-
-Here, we're adding your new function to the array of functions that are served by the API. This enables Inngest to discover and call your functions in your app.
-
-{/*  TODO/DOCS: Add a future screenshot which shows this function listed in the dev server, e.g. at "localhost:8288/functions" */}
 
 Now, let's run your function!
 
@@ -160,7 +155,7 @@ To send the event, click on “Send event” in the top right corner then add th
 
 ```json
 {
-  "name": "test/demo",
+  "name": "test/hello.world",
   "data": {
     "email": "test@example.com"
   }
@@ -191,22 +186,20 @@ When you want to run functions reliably in your app, you'll need to send an even
 
 To send an event from your code, you can use the `Inngest` constructor and the `send()` method. Let's send an event from the a “hello” Next.js API function that you can create in `./pages/api/hello.ts`:
 
-```typescript
-import { Inngest } from 'inngest';
-
-const inngest = new Inngest({ name: "My app name" });
+```ts
+import { inngest } from "./inngest";
 
 // Create a simple async Next.js API route handler
 export default async function handler(req, res) {
-	// Send your event payload to Inngest
-	await inngest.send({
-	  name: "test/demo",
-	  data: {
-	    email: "test@example.com"
-	  }
-	});
+  // Send your event payload to Inngest
+  await inngest.send({
+    name: "test/hello.world",
+    data: {
+      email: "test@example.com",
+    },
+  });
 
-  res.status(200).json({ name: 'Hello Inngest!' });
+  res.status(200).json({ name: "Hello Inngest!" });
 }
 ```
 

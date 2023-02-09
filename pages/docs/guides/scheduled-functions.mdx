@@ -2,7 +2,7 @@
 
 You can create scheduled jobs using cron schedules within Inngest natively.  Inngest's cron schedules also support timezones, allowing you to schedule work in whatever timezone you need work to run in.
 
-You can create scheduled functions that run in any timezone using the SDK's `createScheduledFunction`:
+You can create scheduled functions that run in any timezone using the SDK's `createFunction`:
 
 ```tsx
 import { Inngest } from "inngest";
@@ -10,12 +10,12 @@ import { Inngest } from "inngest";
 const inngest = new Inngest({ name: "Signup flow" });
 
 // This weekly digest function will run at 12:00pm on Friday in the Paris timezone
-export const prepareWeeklyDigest = inngest.createScheduledFunction(
-  "Prepare weekly digest",
-  "TZ=Europe/Paris 0 12 * * 5",
-  async () => {
+export const prepareWeeklyDigest = inngest.createFunction(
+  { name: "Prepare weekly digest" },
+  { cron: "TZ=Europe/Paris 0 12 * * 5" },
+  async ({ step }) => {
     // Load all the users from your database:
-    const users = await db.load("SELECT * FROM users");
+    const users = step.run("Load users", async() => await db.load("SELECT * FROM users"));
 
     // 💡 Since we want to sent a weekly digest to each one of these users
     // it may take a long time to iterate through each user and send an email.
@@ -50,8 +50,8 @@ export const prepareWeeklyDigest = inngest.createScheduledFunction(
 
 // Since we are "fanning out" with events, these functions can all run in parallel
 export const sendWeeklyDigest = inngest.createFunction(
-  "Send weekly digest email",
-  "app/send.weekly.digest",
+  { name: "Send weekly digest email" },
+  { event: "app/send.weekly.digest" },
   async ({ event }) => {
     // 3️⃣ We can now grab the email and user id from the event payload
     const { email, user_id } = event.data;

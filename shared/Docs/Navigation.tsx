@@ -208,6 +208,7 @@ export const navigation = [
     title: "Using the SDK",
     links: [
       { title: "SDK Overview", href: `${baseDir}/sdk/overview` },
+      { title: "Migrating to v1", href: `${baseDir}/sdk/v1-migration` },
       { title: "Serving the API & Frameworks", href: `${baseDir}/sdk/serve` },
       { title: "Writing Functions", href: `${baseDir}/functions` },
       { title: "Sending Events", href: `${baseDir}/events` },
@@ -262,6 +263,14 @@ export const navigation = [
       {
         title: "Scheduled functions",
         href: `${baseDir}/guides/scheduled-functions`,
+      },
+      {
+        title: "Step parallelism",
+        href: `${baseDir}/guides/step-parallelism`,
+      },
+      {
+        title: "Fan-out jobs",
+        href: `${baseDir}/guides/fan-out-jobs`,
       },
       // {
       //   title: "Overview",

@@ -1,0 +1,100 @@
+# Step parallelism
+
+It’s easy to run steps in parallel within a single Inngest function.  You can keep track of of each step’s output and wait for all parallel steps to complete.  This means that parallelism is ideal for situations where you have code that can run concurrently, and you also need to process or combine the results of each step.  There are some benefits to using parallelism within Inngest:
+
+- It uses the standard library.  You don't have to learn another SDK or use platform-specific code.
+- You don’t have to keep track of output from parallel steps;  we do that for you
+- You can run parallel map-reduce without having to keep track of state 
+- If you’re using a serverless platform to host, code will run in true parallelism similar to multi-threading (without shared state)
+- Each step will be individually retried
+
+### Platform support
+
+**Parallelism works across all providers and platforms**.  True parallelism is supported for serverless functions;  if you’re using a single Express server you’ll be splitting all parallel jobs amongst a single-threaded node server.
+
+## Running steps in parallel
+
+You can run steps in parallel via `Promise.all`:
+
+- Create each step via `step.run` without awaiting, which returns an unresolved promise.
+- Await all steps via `Promise.all`. This triggers all steps to run in parallel via separate executions.
+
+A common use case is to split work into chunks:
+
+```tsx
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ name: "Signup flow" });
+
+export const fn = inngest.createFunction(
+  { name: "Post-payment flow" },
+  { event: "stripe/charge.created" },
+  async ({ event, step }) => {
+
+    // These steps are not `awaited` and run in parallel when Promise.all
+    // is invoked.
+    const sendEmail = step.run("Confirmation email", async () => {
+      const emailID = await sendEmail(event.data.email);
+      return emailID;
+    });
+
+    const updateUser = step.run("Update user", async () => {
+      return db.updateUserWithCharge(event);
+    });
+
+    // Run both steps in parallel.  Once complete, Promise.all will return all
+    // parallelised state here.
+		//
+		// This ensures that all steps complete as fast as possible, and we still have
+		// access to each step's data once they're compelte.
+    const [emailID, updates] = await Promise.all([sendEmail, updateUser]);
+
+		return { emailID, updates };
+  }
+);
+```
+
+When each step is finished, Inngest will aggregate each step’s state and re-invoke the function with all state available.
+
+## Chunking jobs
+
+A common use case is to chunk work.  For example, when using OpenAI’s APIs you might need to chunk a user’s input and run the API on many chunks, then aggregate all data:
+
+```tsx
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ name: "Signup flow" });
+
+export const fn = inngest.createFunction(
+  { name: "Summarize text" },
+  { event: "app/text.summarize" },
+  async ({ event, step }) => {
+    const chunks = splitTextIntoChunks(event.data.text);
+
+    const summaries = await Promise.all(
+      chunks.map((chunk) =>
+        step.run("Summarize chunk", () => summarizeChunk(chunk))
+      )
+    );
+
+    await step.run("Summarize summaries", () => summarizeSummaries(summaries));
+  }
+);
+```
+
+This allows you to run many independent steps, wait until they’re all finished, then fetch the results from all steps within a few lines.  Doing this in a traditional system would require creating many jobs, polling the status of all jobs, and manually combining state.
+
+## Limitations
+
+Currently, the total data returned from **all** steps must be under 4MB (eg. a single step can return a max of. 4MB, or 4 steps can return a max of 1MB each).  Functions are also limited to a maximum of 1,000 steps.
+
+## Parallelism vs fan-out
+
+Another technique similar to parallelism is fan-out ([read the guide here](/docs/guides/fan-out-jobs)):  when one function sends events to trigger other functions.  Here are the key differences:
+
+- Both patterns run jobs in parallel
+- You can access the output of steps ran in parallel within your function, whereas with fan-out you cannot
+- Parallelism has a limit of 1,000 steps, though you can create as many functions as you’d like using fan-out
+- You can replay events via fan-out, eg. to test functions locally
+- You can retry individual functions easily if they permanently fail, whereas if a step permanently fails (after retrying) the function itself will fail and terminate.
+- Fan-out splits functionality into different functions, using step functions keeps all related logic in a single, easy to read function

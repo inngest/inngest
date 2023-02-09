@@ -26,33 +26,32 @@ export const BETA_TYPEFORM_URL = "https://8qe8m10yfz6.typeform.com/to/F1aj8vLl";
 export const codesnippets = {
   javascript: {
     function: `
-      import { createFunction } from "inngest"
+      import { inngest } from "./client";
 
-      export default createFunction(
-        "My Great Function",
-        "demo/event.name",
+      export default inngest.createFunction(
+        { name: "My Great Function" },
+        { event: "demo/event.name" },
         async ({ event }) => {
           return { message: "success" }
         }
       )
     `,
     scheduledFunction: `
-      import { createScheduledFunction } from "inngest"
+      import { inngest } from "./client";
 
-      const scheduledTask = () => {
-        return { message: "success" }
-      }
-
-      export default createScheduledFunction(
-        "A scheduled function",
-        "0 9 * * MON", // any cron expression
-        scheduledTask
+      export default inngest.createFunction(
+        { name: "A scheduled function" },
+        { cron: "0 9 * * MON" }, // any cron expression
+        async () => {
+          // Do work regulary at 9AM monday...
+          return { message: "success" };
+        }
       )
     `,
     sendEventShort: `
       import { Inngest } from "inngest"
       const inngest = new Inngest({ name: "My App" })
-      inngest.send({
+      await inngest.send({
         name: "demo/event.name",
         data: { something: req.body.something }
       })
@@ -64,7 +63,7 @@ export const codesnippets = {
 
       export default function apiEndpoint(req, res) {
         const success = yourExistingCode(req.body)
-        inngest.send({
+        await inngest.send({
           name: "demo/event.name",
           data: { something: req.body.something }
         })
@@ -85,35 +84,34 @@ export const codesnippets = {
   },
   typescript: {
     function: `
-      import { createFunction } from "inngest"
+      import { inngest } from "./client";
       import { DemoEventTrigger } from "./types"
 
-      export default createFunction<DemoEventTrigger>(
-        "My Great Function",
-        "demo/event.trigger",
+      export default inngest.createFunction<DemoEventTrigger>(
+        { name: "My Great Function" },
+        { event: "demo/event.trigger" },
         async ({ event }) => {
           return { message: "success" }
         }
       )
     `,
     scheduledFunction: `
-      import { createScheduledFunction } from "inngest"
+      import { inngest } from "./client";
 
-      const scheduledTask = () => {
-        return { message: "success" }
-      }
-
-      export default createScheduledFunction(
-        "A scheduled function",
-        "0 9 * * MON", // any cron expression
-        scheduledTask
+      export default inngest.createFunction(
+        { name: "A scheduled function" },
+        { cron: "0 9 * * MON" }, // any cron expression
+        async () => {
+          // Do work regulary at 9AM monday...
+          return { message: "success" };
+        }
       )
     `,
     sendEventShort: `
       import { Inngest } from "inngest"
       import { Events } from "../../__generated__/inngest"
       const inngest = new Inngest<Events>({ name: "My App" })
-      inngest.send({
+      await inngest.send({
         name: "demo/event.name",
         data: { something: req.body.something }
       })
@@ -124,7 +122,7 @@ export const codesnippets = {
 
       const inngest = new Inngest<Events>({ name: "My App" })
 
-      inngest.send({
+      await inngest.send({
         name: "demo/event.name",
         data: { something: req.body.something }
       })

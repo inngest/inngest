@@ -1,9 +1,9 @@
-import Footer from "../shared/Footer";
 import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
+import ComparisonTable from "src/shared/Pricing/ComparisionTable";
 import { FAQRow } from "src/shared/Pricing/FAQ";
 import PlanCard from "src/shared/Pricing/PlanCard";
-import ComparisonTable from "src/shared/Pricing/ComparisionTable";
+import Footer from "../shared/Footer";
 
 type Plan = {
   name: string;
@@ -338,18 +338,17 @@ export default function Pricing() {
                   of your function or add functionality like sleeping/pausing a
                   function for a period of time. You can define a step using
                   available tools in our SDKs like{" "}
-                  <code className="bg-slate-800 text-slate-200">tools.run</code>
-                  ,{" "}
+                  <code className="bg-slate-800 text-slate-200">step.run</code>,{" "}
                   <code className="bg-slate-800 text-slate-200">
-                    tools.sleep
+                    step.sleep
                   </code>
                   ,
                   <code className="bg-slate-800 text-slate-200">
-                    tools.sleepUntil
+                    step.sleepUntil
                   </code>{" "}
                   and{" "}
                   <code className="bg-slate-800 text-slate-200">
-                    tools.waitForEvent
+                    step.waitForEvent
                   </code>
                   . Read more in our{" "}
                   <a
@@ -367,26 +366,27 @@ export default function Pricing() {
                   Inngest functions can be broken down into separate parts, or
                   “steps” which run independently. Steps are defined using our
                   SDK’s{" "}
-                  <code className="bg-slate-800 text-slate-200">tools</code>.
+                  <code className="bg-slate-800 text-slate-200">step</code>{" "}
+                  object.
                 </p>
                 <p>
                   For example, any code within{" "}
-                  <code className="bg-slate-800 text-slate-200">tools.run</code>{" "}
+                  <code className="bg-slate-800 text-slate-200">step.run</code>{" "}
                   will be retried up to 3 times independently of the rest of
                   your code ensuring your function is reliable. You can also add
                   delays in the middle of your functions for minutes, hours or
                   days using{" "}
                   <code className="bg-slate-800 text-slate-200">
-                    tools.sleep
+                    step.sleep
                   </code>{" "}
                   or{" "}
                   <code className="bg-slate-800 text-slate-200">
-                    tools.sleepUntil
+                    step.sleepUntil
                   </code>
                   . You function can also wait for additional events to trigger
                   additional logic with{" "}
                   <code className="bg-slate-800 text-slate-200">
-                    tools.waitForEvent
+                    step.waitForEvent
                   </code>{" "}
                   which enables you to build functions that pause while they
                   wait for additional input. Read more about steps{" "}
@@ -410,17 +410,18 @@ export default function Pricing() {
                 <p>
                   <strong className="text-slate-200">Scenario 1:</strong>
                   "Function A" does not use any{" "}
-                  <code className="bg-slate-800 text-slate-200">tools</code>, it
-                  is considered a "single step function." If it is called once
-                  and is completed successfully, that is 1 function step.
+                  <code className="bg-slate-800 text-slate-200">step</code>{" "}
+                  tools, it is considered a "single step function." If it is
+                  called once and is completed successfully, that is 1 function
+                  step.
                 </p>
                 <p>
                   <strong className="text-slate-200">Scenario 2:</strong>{" "}
                   "Function B" has 3 steps defined using both{" "}
-                  <code className="bg-slate-800 text-slate-200">tools.run</code>{" "}
+                  <code className="bg-slate-800 text-slate-200">step.run</code>{" "}
                   and
                   <code className="bg-slate-800 text-slate-200">
-                    tools.sleep
+                    step.sleep
                   </code>
                   . If it is called once and is completed successfully, that is
                   3 function steps.
@@ -428,8 +429,8 @@ export default function Pricing() {
                 <p>
                   <strong className="text-slate-200">Scenario 3:</strong>{" "}
                   "Function C" has 3 steps defined using both{" "}
-                  <code className="bg-slate-800 text-slate-200">tools.run</code>
-                  . If it is called once and the first step succeeds, but the
+                  <code className="bg-slate-800 text-slate-200">step.run</code>.
+                  If it is called once and the first step succeeds, but the
                   second step fails 3 times due to{" "}
                   <a href="/docs/functions/retries">retries</a>, that is 4
                   function steps. The last step is never called due to the

@@ -1,16 +1,16 @@
-Modern products have increased in both customization, notifications, and _customized notifications_. Let's take a common use case: `X` product adds a feature that enables their users to select when to post a status report to a connected Slack channel via the product's Slackbot. Imagine a sales product where some teams prefer their report on Monday or Friday and at 9am ET or 9am PT.
+Sometimes you need to reliably trigger hundreds or thousands of jobs at once, making sure that every job succeeds independently.  For example, you might have a cron which triggers importing thousands of products, or a user might require 100 different API calls at once.
 
-To start, a simple system may run a long, complex [cron job](/patterns/running-code-on-a-schedule) that checks what is configured to scheduled at that given time slot, then runs all of the code in a loop. Individual errors will have to be caught and logged for future auditing and retries.
-
-As volume increases, the long running job may be more prone to fail for whatever reason (e.g. memory leaks). Each individual task that is scheduled **should be run independently**, allowing for individual **retries** and **parallelization**. After all, this is a scheduling feature &mdash; if a scheduled post is 15 minutes late, is that acceptable for your user?
-
-The key is combining a reliable scheduling system with a reliable system that can process tasks in parallel.
+You might start by running everything in a single function, or within steps.  However, as the number of jobs grows this becomes slower, more difficult to observe, and more prone to temporary failures.  Instead of doing everything in a single job you should **fan-out** by sending events to trigger new jobs.
 
 ## How to implement this pattern
 
-At a basic level, you're combining a cron job with a queue and workers. You define 1 or more cron jobs then have each cron job publish `n` number of messages to a queue for each task that has been scheduled to run at that given time.
+In order to manage thousands of jobs at once you'll need to **fan-out to run functions in parallel**. The fan-out pattern works as follows:
 
-Then a worker will need to be set up to poll for messages and complete each task, all while handling failures, retries, and logging well.
+- The job trigger runs as a single function (eg. a cron for triggering product imports)
+- The function loads the data needed for all future jobs (eg. loading all product IDs)
+- The function sends multiple events which each trigger it's own job
+
+When you schedule each job independently by sending events, each job gets its own retries and runs in parallel.  This makes your system faster, more observable, and  more resilient to temporary failures.
 
 ## How to implement with Inngest
 
@@ -25,31 +25,32 @@ const inngest = new Inngest("Scheduling Backend");
 const slackCron = createScheduledFunction("Slack Notification Cron",
   "0 9,12 * * MON,FRI",
   async () => {
-    const day = new Date().getDay();
-    const hour = new Date().getHours();
-    const notifications = await getNotificationsToRun(day, hour);
-    const payloads = notifications.map((notification) => ({
+    const notifications = await getNotificationsToRun();
+
+    const events = notifications.map((notification) => ({
       name: "app/notification.dispatched",
       data: { notification },
     }));
-    // Inngest can accept individual event payloads or an array for batching
-    // up to 512kb in size
-    await inngest.send(payloads);
+
+    // Send an array of events to Inngest, triggering many jobs in parallel.
+    await inngest.send(events);
+
     return `${notifications.length} notifications dispatched`;
   }
 );
+
 // A function runs for every app/notification.dispatched event to
 // post the notification to Slack
 const postSlackNotification = createFunction("Send Slack Notification",
   "app/notification.dispatched",
   async ({ event }) => {
     const reportData = getAccountReportData(event.data.notification.accountId);
-    const result = await app.client.chat.postMessage({
+
+    return await app.client.chat.postMessage({
       channel: event.data.notification.slackChannelId,
       blocks: generateReportSlackBlocks(reportData),
       // ...
     });
-    return result;
   }
 );
 ```

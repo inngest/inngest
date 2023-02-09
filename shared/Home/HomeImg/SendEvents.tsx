@@ -1,7 +1,8 @@
+import { useState } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
-import { useState } from "react";
 import classNames from "src/utils/classNames";
+import { stripIndent } from "src/utils/string";
 
 export default function SendEvents() {
   const [activeTab, setActiveTab] = useState(0);
@@ -9,49 +10,51 @@ export default function SendEvents() {
   const tabs = [
     {
       title: "Custom Event",
-      payload: `inngest.send({
-    name: "app/user.signup",
-    data: { userId: “...”, email: “...” }
-})`,
+      payload: stripIndent(`inngest.send({
+        name: "app/user.signup",
+        data: { userId: "...", email: "..." },
+      });`),
       fnName: "Create Function",
       fnVersion: 27,
       fnID: "01GGG522ZATDGVQBCND4ZEAS6Z",
-      code: `createFunction("post-signup", "app/user.signup",
-  function ({ event, tools }) {
-    // Send the user an email
-    tools.run("Send an email", async () => {
-      await sendEmail({
-        email: event.user.email,
-        template: "welcome",
-      })
-   })
-})`,
+      code: stripIndent(`inngest.createFunction(
+        { name: "Post-signup" },
+        { event: "app/user.signup" },
+        async ({ event }) => {
+          await sendEmail({
+            email: event.user.email,
+            template: "welcome",
+          });
+        }
+      );`),
     },
     {
       title: "Webhook",
-      payload: `{
-  name: "stripe/charge.failed",
-  data: { ... }
-}`,
+      payload: stripIndent(`{
+        name: "stripe/charge.failed",
+        data: { ... }
+      }`),
       fnName: "Create Function",
       fnVersion: 27,
       fnID: "01GGG522ZATDGVQBCND4ZEAS6Z",
-      code: `import { createFunction } from "inngest"
-import {
-  findAccountByCustomerId, downgradeAccount
-} from "../accounts"
-import { sendFailedPaymentEmail } from "../emails"
+      code: stripIndent(`import { downgradeAccount, findAccountByCustomerId } from "../accounts";
+      import { sendFailedPaymentEmail } from "../emails";
+      import { inngest } from "./client";
 
-export default createStepFunction(
-  "Handle failed payments",
-  "stripe/charge.failed",
-  async ({ event }) => {
-    const account = await = findAccountByCustomerId(event.user.stripe_customer_id)
-    await sendFailedPaymentEmail(account.email)
-    await downgradeAccount(account.id)
-    return { message: "success" }
-  }
-)`,
+      export default inngest.createFunction(
+        { name: "Handle failed payments" },
+        { name: "stripe/charge.failed" },
+        async ({ event, step }) => {
+          const account = await step.run("Get account", () =>
+            findAccountByCustomerId(event.user.stripe_customer_id)
+          );
+
+          await Promise.all([
+            sendFailedPaymentEmail(account.email),
+            downgradeAccount(account.id),
+          ]);
+        }
+      );`),
     },
   ];
 
@@ -92,7 +95,7 @@ export default createStepFunction(
                 padding: "1rem",
               }}
             >
-              {tab.payload}
+              {tab.payload.trim()}
             </SyntaxHighlighter>
           ) : null
         )}
@@ -143,7 +146,7 @@ export default createStepFunction(
                   padding: "1.5rem",
                 }}
               >
-                {tab.code}
+                {tab.code.trim()}
               </SyntaxHighlighter>
             </div>
           ) : null

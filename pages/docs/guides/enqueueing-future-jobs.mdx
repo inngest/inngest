@@ -9,65 +9,65 @@ You can enqueue jobs in the future within Inngest easily.  Inngest offers two wa
 - Our SDK bypasses serverless function timeouts on all platforms
 - You never need to manage queues or backlogs
 
-**Platform support**
+### Platform support
 
 **This works across all providers and platforms**, whether you run serverless functions or use servers like express.  **It also bypasses serverless function timeouts** on all platforms, so you can sleep for a longer time than your provider supports.
 
 ## Delaying jobs
 
-You can delay jobs using the `tools.sleep` utility:
+You can delay jobs using the `step.sleep` utility:
 
 ```tsx
 import { Inngest } from "inngest";
 
 const inngest = new Inngest({ name: "Signup flow" });
 
-export const fn = inngest.createStepFunction(
-  "Send signup email",
-  "user/created",
-  ({ event, tools }) => {
-    tools.sleep("1 hour");
-    tools.run("Do some work in the future", async () => {
+export const fn = inngest.createFunction(
+  { name: "Send signup email" },
+  { event: "user/created" },
+  ({ event, step }) => {
+    await step.sleep("1 hour");
+    await step.run("Do some work in the future", async () => {
       // This runs after 1 hour
     });
   }
 );
 ```
 
-For more information on `tools.sleep` read the tool documentation](/docs/functions/multi-step#sleep)
+For more information on `step.sleep` read the tool documentation](/docs/functions/multi-step#sleep)
 
 
 ## Running at specific times
 
-You can run jobs at a specific time using the `tools.sleepUntil` utility:
+You can run jobs at a specific time using the `step.sleepUntil` utility:
 
 ```tsx
 import { Inngest } from "inngest";
 
 const inngest = new Inngest({ name: "Signup flow" });
 
-export const fn = inngest.createStepFunction(
-  "Send signup email",
-  "user/created",
-  ({ event, tools }) => {
-    tools.sleepUntil("2023-04-01T12:30:00");
+export const fn = inngest.createFunction(
+  { name: "Send signup email" },
+  { event: "user/created" },
+  ({ event, step }) => {
+    await step.sleepUntil("2023-04-01T12:30:00");
 
     // You can also sleep until a timestamp within the event data.  This lets you
     // pass in a time for you to run the job:
-    tools.sleepUntil(event.data.run_at); // Assuming event.data.run_at is a timestamp.
+    await step.sleepUntil(event.data.run_at); // Assuming event.data.run_at is a timestamp.
 
-    tools.run("Do some work in the future", async () => {
+    await step.run("Do some work in the future", async () => {
       // This runs at the specified time.
     });
   }
 );
 ```
 
-For more information on `tools.sleepUntil` [read the tool documentation](/docs/functions/multi-step#sleep-until).
+For more information on `step.sleepUntil` [read the tool documentation](/docs/functions/multi-step#sleep-until).
 
 ## How it works
 
 In both methods, **the function controls when it runs**.  You control the flow of your code by calling `sleep` or `sleepUntil` within your function directly,
 instead of using the queue to manage your code's timing.  This keeps your logic together and makes your code easier to modify.
 
-Inngest *stops the function from running* for whatever time is specified.  When you call `tools.sleep` or `tools.sleepUntil` the function automatically stops running any future work. The function then tells the Inngest executor that it should be re-invoked at a future time.  We re-call the function at the next step, skipping any previous work.  This is how we bypass serverless function time limits and work across server restarts or redeploys.
+Inngest *stops the function from running* for whatever time is specified.  When you call `step.sleep` or `step.sleepUntil` the function automatically stops running any future work. The function then tells the Inngest executor that it should be re-invoked at a future time.  We re-call the function at the next step, skipping any previous work.  This is how we bypass serverless function time limits and work across server restarts or redeploys.

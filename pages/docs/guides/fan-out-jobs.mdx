@@ -1,0 +1,77 @@
+# Fan-out jobs
+
+Sometimes you might need to trigger new functions from existing functions, for example when you’re developing a complex workflow or performing work for more than one object (eg. a group of users, products, orders).  You can achieve this via fan-out, which:
+
+- Allows functions to call other functions, which run in parallel
+- Makes your workflows more reliable, as each function has its own retries and will fail individually on permanent errors
+- Provides insight and tracing, allowing you to see the relationships between functions
+
+## How to fan-out and trigger new functions
+
+In order to trigger new functions you can send an event from any of your existing functions:
+
+```tsx
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ name: "Signup flow" });
+
+export const loadCron = inngest.createFunction(
+  { name: "Weekly activity: load users" },
+  { cron: "0 12 * * 5" },
+  async ({ event, step }) => {
+
+    // Fetch all users
+    const users = await step.run("Fetch users", async () => {
+      return fetchUsers();
+    });
+
+    // For each user, send us an event.  Inngest supports batches of events
+    // as long as the entire payload is less than 512KB.
+    const events = users.map((user) => {
+      return {
+        name: "app/weekly-email-activity.send",
+        data: {
+          ...user,
+        },
+        user,
+      };
+    });
+
+    // Send all events to Inngest, which triggers any functions listening to
+    // the given event names.
+    await step.sendEvent(events);
+
+    // Return the number of users triggered.
+    return { count: users.length };
+  }
+);
+
+const sendReminder = inngest.createFunction(
+  { name: "Weekly activity: send email" },
+  { event: "app/weekly-email-activity.send" },
+  async ({ event, step }) => {
+  const data = await step.run("Load user data", async () => {
+    return loadUserData(event.data.user.id);
+  });
+
+  await step.run("Email user", async () => {
+    sendEmail(event.data.user, data);
+  });
+});
+```
+
+In the above example, we fetch all users within a single step.  This step will retry on error.  Once that’s complete (via `await`), we create an *array of events* which are sent to Inngest via `step.sendEvent`.  Each of these events trigger new functions for specific users.
+
+### Why `step.sendEvent` vs `inngest.send`?
+
+By using `step.sendEvent` Inngest’s SDK can automatically add context and tracing which ties events to the current function run.  If you use `inngest.send` the context around the function run is not present.
+
+## Fan-out vs running steps in parallel
+
+Another technique similar to fan-out is step parallelism ([read the guide here](/docs/guides/step-parallelism)):  when you run steps in parallel within the same function.  Here are the key differences:
+
+- Both patterns run jobs in parallel
+- You can access the output of steps ran in parallel within your function, whereas with fan-out you cannot
+- Parallelism has a limit of 1,000 steps, though you can trigger as many functions as you’d like using fan-out
+- You can replay events via fan-out, eg. to test functions locally
+- You can retry individual functions easily if they permanently fail, whereas if a step permanently fails (after retrying) the function itself will fail and terminate.

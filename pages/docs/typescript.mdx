@@ -115,30 +115,33 @@ export const inngest = new Inngest<Events>({ name: "My App" });
 // File: /inngest/onboardingDripCampaign.ts
 import { inngest } from "./client";
 
-export default inngest.createStepFunction(
-  "Onboarding drip campaign",
-  "user/new.signup",
-  async ({ event, tools }) => {
-
-  tools.run("Send welcome email", async () => {
-    // "event" will be fully typed provide typesafety within this function
-    return await email.send("welcome", event.data.email);
-  });
-
-  // We wait up to 2 days for the user to set up their account
-  const accountSetupCompleted = tools.waitForEvent("user/account.setup.completed", {
-    timeout: "2d",
-    // ⬇️ This matches both events using the same property
-    // Since both events types are registered above, this is match is typesafe
-    match: "data.user_id"
-  });
-
-  if (!accountSetupCompleted) {
-    tools.run("Send setup account guide", async () => {
-      return await email.send("account_setup_guide", event.data.email);
+export default inngest.createFunction(
+  { name: "Onboarding drip campaign" },
+  { event: "user/new.signup" },
+  async ({ event, step }) => {
+    await step.run("Send welcome email", async () => {
+      // "event" will be fully typed provide typesafety within this function
+      return await email.send("welcome", event.data.email);
     });
+
+    // We wait up to 2 days for the user to set up their account
+    const accountSetupCompleted = await step.waitForEvent(
+      "user/account.setup.completed",
+      {
+        timeout: "2d",
+        // ⬇️ This matches both events using the same property
+        // Since both events types are registered above, this is match is typesafe
+        match: "data.user_id",
+      }
+    );
+
+    if (!accountSetupCompleted) {
+      await step.run("Send setup account guide", async () => {
+        return await email.send("account_setup_guide", event.data.email);
+      });
+    }
   }
-});
+);
 ```
 
 Alternatively, if you don't centrally declare types via the `Inngest` constructor, you can pass a type as a generic to `waitForEvent`:
@@ -151,8 +154,12 @@ type UserAccountSetupCompleted = {
   }
 }
 // ...
-const accountSetupCompleted = tools.waitForEvent<UserAccountSetupCompleted>("user/account.setup.completed", {
-  timeout: "2d",
-  match: "data.user_id"
-});
+const accountSetupCompleted =
+  await step.waitForEvent<UserAccountSetupCompleted>(
+    "user/account.setup.completed",
+    {
+      timeout: "2d",
+      match: "data.user_id",
+    }
+  );
 ```

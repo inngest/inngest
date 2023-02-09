@@ -54,7 +54,7 @@ export const SECTIONS: Section[] = [
     articles: [
       {
         title: "Running functions in parallel",
-        subtitle: "Fan-out work to multiple functions using a single event",
+        subtitle: "Trigger multiple functions from a single event",
         tags: ["Architecture"],
         slug: "running-functions-in-parallel",
       },
@@ -79,9 +79,9 @@ export const SECTIONS: Section[] = [
         slug: "#TODO",
       },*/
       {
-        title: "Reliable scheduling systems",
+        title: "Batching jobs via fan-out",
         subtitle:
-          "Combine cron-jobs with event fan-out for auditable scheduling",
+          "Reliably manage thousands of jobs triggered by a single event or cron",
         tags: ["Architecture", "Scheduling"],
         slug: "reliable-scheduling-systems",
       },
@@ -146,9 +146,8 @@ export default function Patterns() {
           </h1>
           <p className="text-xl text-slate-100">Async + Event-Driven</p>
           <p className="my-4 text-indigo-200 max-w-xl  mb-16 md:mb-28">
-            Building with events sometimes requires a different way to look at
-            the problem & solution. These common patterns walk through what the
-            solutions look like with or without using events.
+            The common patterns listed here are flexible and powerful enough to solve problems
+            across all types of projects and codebases. 
           </p>
 
           <section className="flex flex-col gap-12">
