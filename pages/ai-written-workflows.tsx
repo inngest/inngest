@@ -12,6 +12,7 @@ import Container from "../shared/layout/Container";
 import { Button } from "src/shared/Button";
 import Arrow from "src/shared/Icons/Arrow";
 import ArrowRight from "src/shared/Icons/ArrowRight";
+import Twitter from "src/shared/Icons/Twitter";
 
 export const getStaticProps = async () => {
   return {
@@ -125,7 +126,7 @@ export default function InngestGPT() {
               </div>
               <div className="flex justify-between items-center px-4 py-2 bg-slate-100">
                 <span className="text-sm font-medium text-slate-700">
-                  Powered by ChatGPT
+                  Powered by OpenAI
                 </span>
                 <a
                   onClick={onSubmit}
@@ -168,10 +169,10 @@ export default function InngestGPT() {
             </div>
           </div>
 
-          <h4 className="text-center mb-4 text-slate-100 text-base">
+          <h4 className="text-center mb-8 text-slate-100 text-base">
             Or use an example:
           </h4>
-          <div className="grid lg:grid-cols-3 gap-6 mb-20">
+          <div className="grid lg:grid-cols-3 gap-6  mb-10">
             {EXAMPLE_PROMPTS.map((prompt, i) => {
               return (
                 <PromptUI
@@ -183,6 +184,16 @@ export default function InngestGPT() {
               );
             })}
           </div>
+
+          <p className="text-sm text-center md:text-left text-slate-200 mb-10 lg:mb-20 gap-2 rounded-lg border border-slate-100/20 py-2 flex flex-col items-center md:flex-row pr-4 pl-2 max-w-[890px] m-auto ">
+            <span className="bg-slate-100 mt-2 mb-1 md:mt-0 md:mb-0 md:mr-2 rounded px-2.5 py-1 text-sm font-medium tracking-tight  text-slate-800 shadow flex-shrink-0 ">
+              Disclaimer
+            </span>
+            <span>
+              The outputs of this system may be unpredictable and are not
+              guaranteed to be perfect code or morally conscious.
+            </span>
+          </p>
 
           <div className="lg:grid grid-cols-5 gap-12">
             <div className=" rounded-lg pb-4 col-span-2 overflow-hidden">
@@ -198,9 +209,10 @@ export default function InngestGPT() {
                   </p>
                 ) : (
                   <ul className="flex flex-col gap-4">
-                    {history.map((prompt: Selected) => {
+                    {history.map((prompt: Selected, i) => {
                       return (
                         <PromptUI
+                          key={i}
                           prompt={prompt}
                           selected={selected}
                           onClick={() => setSelected(prompt)}
@@ -215,9 +227,17 @@ export default function InngestGPT() {
 
             {selected ? <Output selected={selected} /> : null}
           </div>
-          <div className="w-full flex mt-24 justify-center">
-            <Button href="https://twitter.com/intent/tweet?text=hello">
-              Tweet this page
+          <div className="w-full flex mt-24 justify-center gap-4">
+            <Button
+              href="/blog/ai-personalization-and-the-future-of-developer-docs"
+              variant="secondary"
+            >
+              Read how this page works
+              <ArrowRight className="group-hover:translate-x-1 transition-transform duration-150  -mr-1.5" />
+            </Button>
+            <Button href="https://twitter.com/intent/tweet?text=hello&url=https://inngest.com/ai-written-workflows">
+              <span className="mr-1.5">Tweet this page</span>
+              <Twitter className="mt-0.5" />
             </Button>
           </div>
         </Container>
