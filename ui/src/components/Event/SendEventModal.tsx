@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ulid } from 'ulid';
 import { usePortal } from "../../hooks/usePortal";
 import { useSendEventMutation } from "../../store/devApi";
-import { showEventSendModal } from "../../store/global";
+import { selectEvent, showEventSendModal } from "../../store/global";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { genericiseEvent } from "../../utils/events";
 import CodeBlockModal from "../CodeBlock/CodeBlockModal";
@@ -74,6 +74,7 @@ export const SendEventModal = () => {
       .unwrap()
       .then(() => {
         onClose();
+        dispatch(selectEvent(data.id));
       });
   }, [_sendEvent, input]);
 

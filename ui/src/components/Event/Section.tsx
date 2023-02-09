@@ -7,7 +7,7 @@ import {
   FunctionRunStatus,
   useGetEventQuery,
 } from "../../store/generated";
-import { selectRun, showEventSendModal } from "../../store/global";
+import { selectEvent, selectRun, showEventSendModal } from "../../store/global";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import Button from "../Button";
 import CodeBlock from "../CodeBlock";
@@ -77,12 +77,14 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
                     const eventId = ulid();
 
                     sendEvent(
-                      JSON.stringify({
+                      {
                         ...JSON.parse(event.raw),
                         id: eventId,
                         ts: Date.now(),
-                      })
-                    );
+                      },
+                    ).unwrap().then(() => {
+                      dispatch(selectEvent(eventId));
+                    })
                   }}
                 />
                 <Button
