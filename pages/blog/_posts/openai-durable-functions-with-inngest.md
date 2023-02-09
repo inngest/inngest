@@ -1,7 +1,7 @@
 ---
 heading: "Generate OpenAI Durable Functions with Inngest"
 subtitle: "Providing user-specific examples to learn how to use the Inngest SDK."
-image: /assets/blog/completing-the-jamstack/featured-image.png
+image: /assets/blog/openai-durable-functions-with-inngest/gpt-driven-workflows.png
 date: 2023-02-09
 author: Jack Williams
 focus: true
@@ -11,9 +11,10 @@ OpenAI Codex is the model that powers GitHub Copilot, an “AI pair programmer�
 Today, we’re leveraging that power to release an AI workflow builder, so you can instantly understand how your problem might be solved with Inngest by simply explaining what you’d like to achieve.
 
 <aside>
-📢 Try it out now over at LINK
-
+📢 Try it out now over at [inngest.com/ai-written-workflows](/ai-written-workflows).
 </aside>
+
+![The GPT-driven workflows page](/assets/blog/openai-durable-functions-with-inngest/prompt-examples.png)
 
 ## Why generate code?
 
