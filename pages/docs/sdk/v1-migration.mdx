@@ -31,8 +31,6 @@ import {
   createStepFunction,
 } from "inngest";
 
-const inngest = new Inngest({ name: "My App" });
-
 // ❌ Removed in v1
 inngest.createScheduledFunction(...);
 inngest.createStepFunction(...);
@@ -42,7 +40,11 @@ The following is how we would always create functions without the v0 helpers.
 
 ```ts
 // ✅ Valid in v1
-import { inngest } from "./client";
+import { Inngest } from "inngest";
+
+// We recommend exporting this from ./src/inngest/client.ts, giving you a
+// singleton across your entire app.
+export const inngest = new Inngest({ name: "My App" });
 
 const singleStepFn = inngest.createFunction(
   { name: "Single step" },
