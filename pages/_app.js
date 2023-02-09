@@ -18,8 +18,8 @@ function DefaultLayout({ children }) {
   return (
     <>
       {router.pathname !== "/sign-up" && (
-        <PageBanner href="/blog/vercel-integration?ref=page-banner">
-          Announcing our new Vercel integration
+        <PageBanner href="/ai-personalized-documentation?ref=page-banner">
+          ✨ Try Our AI-Personalized Documentation for Inngest
         </PageBanner>
       )}
       <div className="bg-slate-1000 gradient h-screen w-full absolute top-0 right-0 -z-10 "></div>
