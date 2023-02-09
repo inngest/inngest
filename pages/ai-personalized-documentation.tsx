@@ -110,11 +110,14 @@ export default function InngestGPT() {
       >
         <Container className="pb-16">
           <h1 className="text-3xl lg:text-5xl text-white mt-12 md:mt-20 xl:mt-32 font-semibold tracking-tight text-center">
-            GPT-driven workflows
+            ✨ AI-Personalized Documentation ✨
           </h1>
           <p className="mt-4 text-indigo-200 max-w-xl text-center m-auto xl:mb-32">
-            Use Inngest's GPT prompts to create reliable, durable step functions
-            deployable to any provider.
+            Learn how to use the Inngest SDK with personalized code examples.
+            <br />
+            <a href="/blog/ai-personalization-and-the-future-of-developer-docs?ref=inngestabot">
+              Learn how this works on our blog
+            </a>
           </p>
 
           <div className="max-w-3xl m-auto my-20">
