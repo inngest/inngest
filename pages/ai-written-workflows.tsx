@@ -241,7 +241,10 @@ export default function InngestGPT() {
               Read how this page works
               <ArrowRight className="group-hover:translate-x-1 transition-transform duration-150  -mr-1.5" />
             </Button>
-            <Button href="https://twitter.com/intent/tweet?text=hello&url=https://inngest.com/ai-written-workflows">
+            <Button
+              target="_blank"
+              href="https://twitter.com/intent/tweet?text=Creating%20Personalized%20Developer%20Documentation%20And%20Code%20Examples%20for%20@inngest%20with%20@openai&url=https://inngest.com/ai-written-workflows"
+            >
               <span className="mr-1.5">Tweet this page</span>
               <Twitter className="mt-0.5" />
             </Button>

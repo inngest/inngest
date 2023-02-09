@@ -17,6 +17,7 @@ export function Button({
   size = "md",
   arrow,
   full = false,
+  target = "",
   ...props
 }: ButtonProps) {
   const sizes = {
@@ -36,6 +37,7 @@ export function Button({
 
   return (
     <a
+      target={target}
       href={props.href}
       className={`group inline-flex items-center justify-center gap-0.5 rounded-full font-medium tracking-tight transition-all ${variants[variant]} ${sizes[size]} ${props.className} ${width}`}
     >
