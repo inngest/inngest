@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import styled from "@emotion/styled";
 import Link from "next/link";
 import SyntaxHighlighter from "react-syntax-highlighter";
@@ -47,6 +47,8 @@ export default function InngestGPT() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  const resultRef = useRef(null);
+
   useEffect(() => {
     let data = "[]";
     try {
@@ -86,6 +88,7 @@ export default function InngestGPT() {
         "ai-sdk-history",
         JSON.stringify(newHistory)
       );
+      resultRef.current.scrollIntoView({ block: "start", behavior: "smooth" });
     } catch (e) {
       setLoading(false);
       console.warn(e);
@@ -161,12 +164,12 @@ export default function InngestGPT() {
                   )}
                 </a>
               </div>
-              {error !== "" && (
-                <p className="text-center text-sm px-4 py-1.5 m-auto text-red-700 font-medium mt-4 bg-red-50/90 rounded-full inline-flex justify-self-center ">
-                  {error}
-                </p>
-              )}
             </div>
+            {error !== "" && (
+              <p className="text-center text-sm px-4 py-1.5 m-auto text-red-700 font-medium mt-4 bg-red-50/90 rounded-full inline-flex justify-self-center ">
+                {error}
+              </p>
+            )}
           </div>
 
           <h4 className="text-center mb-8 text-slate-100 text-base">
@@ -195,7 +198,10 @@ export default function InngestGPT() {
             </span>
           </p>
 
-          <div className="lg:grid grid-cols-5 gap-12">
+          <div
+            className="lg:grid grid-cols-5 gap-12 scroll-mt-32"
+            ref={resultRef}
+          >
             <div className=" rounded-lg pb-4 col-span-2 overflow-hidden">
               <p className="text-lg text-white px-4 font-medium  mb-4">
                 Your history
