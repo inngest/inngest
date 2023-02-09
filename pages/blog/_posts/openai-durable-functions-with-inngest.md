@@ -40,9 +40,10 @@ In addition to being available on the website, the bot is available for work on 
 You can ask it to create a function by simply tagging it in a message, like so:
 
 > ***@inngestabot Send a welcome email to a new user.***
->
 
-Slash commands for Discord bots still relies on long-lived, serverful connections, for example to listen to incoming messages as requried here. To handle this event in a serverless Inngest function required a workaround.
+![Example prompt to Inngest discord bot to generate durable workflow that sends a welcome email to a new user](/assets/blog/openai-durable-functions-with-inngest/discord-message.gif)
+
+Slash commands for Discord bots still rely on long-lived, serverful connections, for example to listen to incoming messages as requried here. To handle this event in a serverless Inngest function required a workaround.
 
 For this, we placed a tiny piece of Deno code on [Fly.io](http://Fly.io) using [Discordeno](https://deno.land/x/discordeno) that boots up a bot and emits an Inngest event whenever a request to create a function is received.
 
