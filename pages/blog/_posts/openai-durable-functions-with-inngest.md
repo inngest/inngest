@@ -1,6 +1,6 @@
 ---
 heading: "Generate OpenAI Durable Functions with Inngest"
-subtitle: "Providing user-specific examples to learn how to use the Inngest SDK."
+subtitle: "Providing developer-specific examples to learn how to use the Inngest SDK."
 image: /assets/blog/openai-durable-functions-with-inngest/gpt-driven-workflows.png
 date: 2023-02-09
 author: Jack Williams
@@ -16,17 +16,29 @@ Today, we’re leveraging that power to release an AI workflow builder, so you c
 
 ![The GPT-driven workflows page](/assets/blog/openai-durable-functions-with-inngest/prompt-examples.png)
 
-## Why generate code?
+## Imagination-driven documentation
 
-Most platform documentation deals with directly or indirectly teaching users concepts embedded in that platform’s DNA. Often—and especially in the case of platforms with SDKs such as Inngest—this is achieved using code examples as the major talking point. These can, however, be difficult to parse depending on the reader.
+Most platform documentation deals with directly or indirectly teaching the reader concepts embedded in that platform’s DNA. Often—and especially in the case of platforms with SDKs such as Inngest—this is achieved using code examples as the major talking point. These can, however, be difficult to parse depending on the reader.
 
 These written examples, like most documentation, are static; one key example must serve many readers, and those readers must make an extra jump in their heads to attribute the code they’re reading and the concept they are learning to the final problem they’re trying to solve.
 
 When communicating verbally, it’s much easier to give somebody an understanding of a concept by relating it to the one piece of the puzzle they already know. Similarly, by generating code upfront, the reader can apply their specific context to the platform straight away without that second hop.
 
-## How it’s built
+## Challenges of building with AI
 
-The OpenAI piece of the bot is wonderfully simple, hosted on Deno Deploy.
+As AI's immediate practical applications grow and grow, developers are rushing to leverage the technology where they can. Utilising the pressured current services available, however, isn't an easy ride.
+
+- Responses can be exceedingly slow (over a minute!)
+- Timeouts or other errors can cause requests to fail altogether
+- Limited input sizes require splitting work in to multiple requests
+
+This is not dissimilar to the handling of any API, though most requirements for reliably working with services such as OpenAI use tooling outside that of common serverless platforms.
+
+We've been watching and helping developers leverage Inngest to achieve reliable AI usage with OpenAI and other such services. Our strong ties with serverless platforms such as [Vercel](https://vercel.com/integrations/inngest) (check out our [Quick start tutorial](/docs) to get started) means that these complex, reliable flows can exist in your codebase with no infrastructure requirements whatsoever.
+
+## How the bot is built
+
+The OpenAI piece of the bot is wonderfully simple, hosted on [Deno Deploy](https://deno.com/deploy).
 
 1. User submits a prompt
 2. Merge the user’s prompt with a prompt engineered to teach Codex details of the Inngest SDK
@@ -36,7 +48,7 @@ We’ve published the result over at [github.com/inngest/inngestabot](http://git
 
 ### Discord bot integration
 
-In addition to being available on the website, the bot is available for work on our [Discord server](https://www.inngest.com/discord), where it dutifully awaits the opportunity to create more functions.
+In addition to being available on the website, the bot is available for work on our [community Discord server](https://www.inngest.com/discord), where it dutifully awaits the opportunity to create more functions.
 
 You can ask it to create a function by simply tagging it in a message, like so:
 
@@ -74,7 +86,7 @@ bot.events.messageCreate = async (_b, message) => {
 };
 ```
 
-We then have a tiny Inngest function handling these messages in the background, generating replies and sending them back to Discord. OpenAI responses can be slow, and the Discord bot can get busy, so it’s critical to pull this work to somewhere more scalable using Inngest.
+We then have a tiny Inngest function, again hosted on [Deno Deploy](https://deno.com/deploy) using our [Deno integration](https://www.inngest.com/docs/sdk/serve#framework-fresh-deno), which handles these messages in the background, generating replies and sending them back to Discord. OpenAI responses can be slow, and the Discord bot can get busy, so it’s critical to pull this work to somewhere more scalable using Inngest.
 
 ```ts
 inngest.createFunction(
@@ -83,7 +95,7 @@ inngest.createFunction(
   async ({ event, step }) => {
     const { message } = event.data;
 
-    // Generate a reply using our OpenAI Codex endpoint.
+    // Generate a reply using our OpenAI Codex endpoint
     // OpenAI can sometimes error — `step.run` automatically retries on errors
     const reply = await step.run("Generate reply from OpenAI", async () => {
       const res = await fetch(OPENAI_ENDPOINT, {
@@ -113,8 +125,7 @@ AI’s here to stay, and more obvious patterns are emerging for how it can help 
 
 Make sure to check out Inngest’s offering and see how we might be able to solve your problem today.
 
-- Bot link
-- Quick start link
-- Discord link
-- Repo link
-- Any others?
+- [Write a GPT-driven workflow](/ai-written-workflows)
+- [Get started with Inngest](/docs)
+- Join our [community Discord](/discord)
+- Check out the [inngest/inngestabot](https://github.com/inngest/inngestabot) code
