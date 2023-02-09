@@ -34,16 +34,19 @@ interface Results { sent: number }
 export const sendWeeklyDigestEmailsToAllUsers = async function() : Promise<Results> {
   return { sent: 100 }
 }
+// @filename: ./client.ts
+import { Inngest } from "innest";
+export const inngest = new Inngest({ name: "My app" });
 // @filename: index.ts
 // ---cut---
-import { createScheduledFunction } from "inngest"
+import { inngest } from "./client"
 import { serve } from "inngest/next"
 import { sendWeeklyDigestEmailsToAllUsers } from "../../someExistingCode"
 
 // Your scheduled function
-const weeklyDigest = createScheduledFunction(
-  "Send Weekly Digest",
-  "0 12 * * 1", // At 12:00 every Monday
+const weeklyDigest = inngest.createFunction(
+  { name: "Send Weekly Digest" },
+  { cron: "0 12 * * 1" }, // At 12:00 every Monday
   async () => {
     const results = await sendWeeklyDigestEmailsToAllUsers();
     return {
@@ -63,15 +66,19 @@ export default serve("My App", [ weeklyDigest ], {
 Let's break down what we're doing in the code above. We use [the Inngest SDK](https://github.com/inngest/inngest-js) (`npm install inngest`) to define our function and serve it. We start with defining a schedule function (aka Cron Job). This tells Inngest what to call the function, what schedule to run it on, and what code to run:
 
 ```js
-import { createScheduledFunction } from "inngest"
+import { inngest } from "./client"
 // Arguments:
 // - Function name
 // - Cron-tab expression
-// - The function code to run
-const weeklyDigest = createScheduledFunction("Send Weekly Digest", "0 12 * * 1", () => {
-  /* your code, anything returned will be catpured in Inngest logs */
-  return "Hello!"
-})
+// - The async function code to run
+const weeklyDigest = inngest.createFunction(
+  { name: "Send Weekly Digest" },
+  { cron: "0 12 * * 1" },
+  async () => {
+    /* your code, anything returned will be catpured in Inngest logs */
+    return "Hello!"
+  }
+)
 ```
 
 ### Serving your function
