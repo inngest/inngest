@@ -6,14 +6,15 @@ date: 2023-02-09
 author: Jack Williams
 focus: true
 ---
+
 OpenAI Codex is the model that powers GitHub Copilot, an “AI pair programmer” that suggests code in your IDE based on your codebase and billions of lines of open-source repositories.
 
 Today, we’re leveraging that power to release an AI workflow builder, so you can instantly understand how your problem might be solved with Inngest by simply explaining what you’d like to achieve.
 
 <aside>
-👉 Try it out now at [www.inngest.com/ai-personalized-documentation](/ai-personalized-documentation)
-
-<Button href="/ai-personalized-documentation" arrow="right"><span className="text-white">Go to the tool</span></Button>
+  <Button href="/ai-personalized-documentation" arrow="right">
+    <span className="text-white">Try it out now</span>
+  </Button>
 </aside>
 
 ## Imagination-driven documentation
@@ -54,11 +55,11 @@ In addition to being available on the website, the bot is available for work on 
 
 You can ask it to create a function by simply tagging it in a message, like so:
 
-> ***@inngestabot Send a welcome email to a new user.***
+> **_@inngestabot Send a welcome email to a new user._**
 
 ![Example prompt to Inngest discord bot to generate durable workflow that sends a welcome email to a new user](/assets/blog/openai-durable-functions-with-inngest/discord-message.gif)
 
-Slash commands for Discord bots still rely on long-lived, serverful connections, for example to listen to incoming messages as requried here. To handle this event in a serverless Inngest function required a workaround.
+Slash commands for Discord bots still rely on long-lived, serverful connections, for example to listen to incoming messages as required here. To handle this event in a serverless Inngest function required a workaround.
 
 For this, we placed a tiny piece of Deno code on [Fly.io](http://Fly.io) using [Discordeno](https://deno.land/x/discordeno) that boots up a bot and emits an Inngest event whenever a request to create a function is received.
 
@@ -125,11 +126,10 @@ We make sure to use Inngest’s step tooling here to provide retries to the repl
 
 AI’s here to stay, and more obvious patterns are emerging for how it can help us. There are fantastic examples of AI helping us learn already being demonstrated, such as [Supabase's Clippy](https://supabase.com/blog/chatgpt-supabase-docs?ref=inngest), [Astro's Houston](https://houston.astro.build/) and [Dagster's support bot](https://dagster.io/blog/chatgpt-langchain).
 
- Even specific to just software, personalizing learning experiences will accelerate the pace at which we can build and communicate concepts across the entire community; examples such as this are just the beginning.
+Even specific to just software, personalizing learning experiences will accelerate the pace at which we can build and communicate concepts across the entire community; examples such as this are just the beginning.
 
 Make sure to check out Inngest’s offering and see how we might be able to solve your problem today.
 
-- [Write a GPT-driven workflow](/ai-personalized-documentation)
+- [Try it out now on our site →](/ai-personalized-documentation) (no Discord needed)
 - [Introduction to Inngest](/docs)
-- Join our [community Discord](/discord)
 - Check out the [inngest/inngestabot](https://github.com/inngest/inngestabot) code

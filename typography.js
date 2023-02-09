@@ -338,6 +338,9 @@ module.exports = ({ theme }) => ({
       "> :last-child": {
         marginBottom: "0 !important",
       },
+      ".button:hover": {
+        textDecoration: "none !important",
+      },
     },
   },
   invert: {
