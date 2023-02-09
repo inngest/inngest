@@ -6,7 +6,7 @@ import TimelineRow from "../Timeline/TimelineRow";
 
 export const EventStream = () => {
   const events = useGetEventsStreamQuery(
-    {},
+    undefined,
     { pollingInterval: 1000, refetchOnMountOrArgChange: true }
   );
   const selectedEvent = useAppSelector((state) => state.global.selectedEvent);

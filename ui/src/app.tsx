@@ -56,7 +56,7 @@ export function App() {
   ];
 
   const { hasEvents, isLoading: eventsLoading } = useGetEventsStreamQuery(
-    {},
+    undefined,
     {
       selectFromResult: (result) => ({
         ...result,
@@ -66,7 +66,7 @@ export function App() {
   );
 
   const { hasRuns, isLoading: runsLoading } = useGetFunctionsStreamQuery(
-    {},
+    undefined,
     {
       selectFromResult: (result) => ({
         ...result,

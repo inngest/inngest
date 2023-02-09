@@ -31,7 +31,7 @@ function ListItem({ date, id, badge, status }: ListItemProps) {
 }
 
 export default function HistoricalList() {
-  const events = useGetEventsStreamQuery({}, { pollingInterval: 1000 });
+  const events = useGetEventsStreamQuery(undefined, { pollingInterval: 1000 });
 
   return (
     <div className="flex flex-col overflow-y-scroll">
