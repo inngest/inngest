@@ -11,7 +11,7 @@ In each example, you want to start a function using one event, then _wait some t
 Inngest allows you to build functions which coordinate between events using a few lines fo the SDK:
 
 ```typescript
-import { createStepFunction } from "inngest";
+import { inngest } from "./client";
 
 // This is the data received whenever the `cart/product.added` event is received.
 type Added = {
@@ -26,13 +26,14 @@ type Added = {
   };
 };
 
-export default createStepFunction<Added>(
-  "cart/product.added",
-  ({ event, tools }) => {
+export default inngest.createFunction<Added>(
+  { name: "Product added to cart" },
+  { event: "cart/product.added" },
+  ({ event, step }) => {
     // This function runs as soon as a product is added to the cart.
     // We immediately pause and wait up to 24 hours for the `cart/purchased`
     // event from the same cart_id.
-    const purchased = tools.waitForEvent("cart/purchased", {
+    const purchased = await step.waitForEvent("cart/purchased", {
       timeout: "24h",
       match: "data.cart_id", // The "data.cart_id" field in both events must match.
     });
@@ -45,7 +46,7 @@ export default createStepFunction<Added>(
       return;
     }
 
-    tools.run("Send reminder", () => {
+    await step.run("Send reminder", () => {
       sendCartReminderEmail({ email: event.user.email, cart: event.data.cart_id });
     });
 
@@ -67,7 +68,7 @@ export default createStepFunction<Added>(
 
 In this example we create a function that models key points in the user journey declaratively, without worrying about state or timing in code.
 
-First, we create a function that runs any time a user adds a product to their cart.  We then wait for the checkout event (`cart/purchased`) for up to 24 hours, via `tools.waitForEvent`.  This pauses the function until a matching event is received or the event isn't received within your time specified.
+First, we create a function that runs any time a user adds a product to their cart.  We then wait for the checkout event (`cart/purchased`) for up to 24 hours, via `await step.waitForEvent`.  This pauses the function until a matching event is received or the event isn't received within your time specified.
 
 Inngest resumes the function passing in the received event data, or null if the event was not received within the timeout.  Your code then continues to run from after `waitForEvent`, allowing you to process the incoming event or timeouts easily.
 
@@ -98,8 +99,8 @@ These are both possible within Inngest and using traditional queueing systems, a
 {/*
 Additional resources
 
-- TODO: Link to SDK `tools.waitForEvent` docs
-- TODO: Link to SDK `tools.run` docs
-- TODO: Link to SDK `tools.sleep` docs for alternative approaches
+- TODO: Link to SDK `step.waitForEvent` docs
+- TODO: Link to SDK `step.run` docs
+- TODO: Link to SDK `step.sleep` docs for alternative approaches
 - TODO: Link to auto-cancellation
 */}

@@ -17,13 +17,14 @@ When you schedule each job independently by sending events, each job gets its ow
 Inngest supports scheduled functions and event-triggered functions. Combining the two enables you to [fan-out functions to run in parallel](/patterns/running-functions-in-parallel?ref=patterns). We'll define two these two functions:
 
 ```typescript
-import { createScheduledFunction, createFunction } from "inngest";
+import { inngest } from "./client";
 
 const inngest = new Inngest("Scheduling Backend");
 
 // A scheduled function uses the current time to find notifications to send
-const slackCron = createScheduledFunction("Slack Notification Cron",
-  "0 9,12 * * MON,FRI",
+const slackCron = inngest.createFunction(
+  { name: "Slack Notification Cron" },
+  { cron: "0 9,12 * * MON,FRI" },
   async () => {
     const notifications = await getNotificationsToRun();
 
@@ -41,8 +42,9 @@ const slackCron = createScheduledFunction("Slack Notification Cron",
 
 // A function runs for every app/notification.dispatched event to
 // post the notification to Slack
-const postSlackNotification = createFunction("Send Slack Notification",
-  "app/notification.dispatched",
+const postSlackNotification = inngest.createFunction(
+  { name: "Send Slack Notification" },
+  { event: "app/notification.dispatched" },
   async ({ event }) => {
     const reportData = getAccountReportData(event.data.notification.accountId);
 

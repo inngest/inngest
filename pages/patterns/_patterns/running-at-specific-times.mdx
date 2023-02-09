@@ -15,7 +15,7 @@ import { Inngest } from "inngest";
 const inngest = new Inngest("API");
 
 // Send an event with the time to schedule a blog post in the event data.
-inngest.send({
+await inngest.send({
   name: "blog/post.scheduled",
   data: {
     scheduleAt: "2023-04-01T12:30:00.000Z",
@@ -27,19 +27,19 @@ inngest.send({
 Then, within your function, you can pause until the time in the event:
 
 ```typescript
-import { createStepFunction } from "inngest";
+import { inngest } from "./client";
 
-const delayed = createStepFunction(
-  "Schedule post",
-  "blog/post.scheduled",
-  ({ event, tools }) => {
+const delayed = inngest.createFunction(
+  { name: "Schedule post" },
+  { event: "blog/post.scheduled" },
+  ({ event, step }) => {
     const at = new Date(event.data.scheduleAt);
 
     // Use the built-in `sleepUntil` tool to sleep until the time in the event.
     // This function will pause then resume running the code below at the given time.
-    tools.sleepUntil(at);
+    await step.sleepUntil(at);
 
-    tools.run("Publish post", () => {
+    await step.run("Publish post", () => {
       // Any code here runs at the time in the event.
       schedulePost(event.data.postID);
     });

@@ -45,10 +45,14 @@ export const inngest = new Inngest<Events>({ name: "My App" });
 // File: /inngest/sendWelcomeEmail.ts
 import { inngest } from "./client";
 
-export default inngest.createFunction("Send welcome email", "user/new.signup", async ({ event }) => {
-  // "event" will be fully typed provide typesafety within this function
-  return await email.send("welcome", event.data.email);
-});
+export default inngest.createFunction(
+  { name: "Send welcome email" },
+  { event: "user/new.signup" },
+  async ({ event }) => {
+    // "event" will be fully typed provide typesafety within this function
+    return await email.send("welcome", event.data.email);
+  },
+);
 ```
 
 ### Sending events

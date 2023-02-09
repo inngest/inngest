@@ -9,9 +9,13 @@ There are two ways that functions are determined to have failed:
 * A function throws an error. ✅ This **_will_** be retried ([see retry policies](#retry-policies))
 
 ```ts
-export default inngest.createFunction("Import item data", "import.requested", ({ event }) => {
-  throw new Error("Failed to fetch item from ecommerce API");
-});
+export default inngest.createFunction(
+  { name: "Import item data" },
+  { event: "import.requested" },
+  async ({ event }) => {
+    throw new Error("Failed to fetch item from ecommerce API");
+  },
+);
 ```
 
 * A function throws a non-retriable error. ❌ This **_will not_** be retried.

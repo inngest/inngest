@@ -7,16 +7,16 @@ Rescheduling is very similar.  First, you cancel the current work.  Then, you sc
 Inngest allows you to automatically cancel running or paused/sleeping functions via events:
 
 ```typescript
-import { createStepFunction } from "inngest";
+import { inngest } from "./client";
 
-const func = createStepFunction(
-  "Schedules and cancels automatically", // Name
-  "blog/post.scheduled", // Triggering event
-  ({ event, tools }) => { // Function
+const func = inngest.createFunction(
+  { name: "Schedules and cancels automatically" },
+  { event: "blog/post.scheduled" },
+  ({ event, step }) => {
     // Sleep until the scheduleAt time in the event.
-    tools.sleepUntil(event.data.scheduleAt);
+    await step.sleepUntil(event.data.scheduleAt);
 
-    tools.run("Publish the post", () => {
+    await step.run("Publish the post", () => {
       // Publish the post.
       publishBlogPost(event.data.postID);
     });
