@@ -303,6 +303,15 @@ export function Navigation(props) {
   return (
     <nav {...props}>
       <ul role="list">
+        <li>
+          <Button
+            href="/ai-personalized-documentation?ref=docs"
+            variant="secondary"
+            className="w-full mb-6 xl:hidden"
+          >
+            ✨ Create AI-Personalized Docs
+          </Button>
+        </li>
         {headerLinks.map((link) => (
           <TopLevelNavItem key={link.title} href={link.href}>
             {link.title}

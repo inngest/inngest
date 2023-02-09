@@ -45,7 +45,8 @@ export const Header = forwardRef<HTMLDivElement>(function Header(
       ref={ref}
       className={clsx(
         className,
-        "fixed inset-x-0 top-0 z-50 flex h-14 items-center justify-between lg:justify-end gap-12 px-4 transition sm:px-6 lg:z-30 lg:px-8",
+        // NOTE - if we remove the AI button we may have to add "lg:justify-end"
+        "fixed inset-x-0 top-0 z-50 flex h-14 items-center justify-between gap-12 px-4 transition sm:px-6 lg:z-30 lg:px-8",
         !isInsideMobileNavigation &&
           "backdrop-blur-sm dark:backdrop-blur lg:left-72 xl:left-80",
         isInsideMobileNavigation
@@ -75,6 +76,22 @@ export const Header = forwardRef<HTMLDivElement>(function Header(
             Docs
           </span>
         </a>
+      </div>
+      <div className="flex items-center gap-5">
+        <nav className="hidden lg:block mr-4">
+          <ul role="list" className="flex items-center gap-8">
+            <li>
+              <Button
+                href="/ai-personalized-documentation?ref=docs"
+                variant="tertiary"
+                size="sm"
+                className="w-full hidden xl:inline"
+              >
+                ✨ Create AI-Personalized Documentation
+              </Button>
+            </li>
+          </ul>
+        </nav>
       </div>
       <div className="flex items-center gap-5">
         <nav className="hidden lg:block mr-4">
