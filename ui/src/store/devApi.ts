@@ -11,17 +11,9 @@ export const devApi = createApi({
   reducerPath: "devApi",
   baseQuery: fetchBaseQuery({ baseUrl: devUrl.href }),
   endpoints: (builder) => ({
-    sendEvent: builder.mutation<void, any>({
-      query: (rawPayload) => {
-        /**
-         * Assume we're being given something reasonable and try to prepare it.
-         */
-        const payload =
-          typeof rawPayload === "string" ? JSON.parse(rawPayload) : rawPayload;
-        delete payload.id;
-
+    sendEvent: builder.mutation<void, { id: string, name: string; ts: number, data?: object, user?: object }>({
+      query: (event) => {
         let url = "/e/dev_key";
-
         /**
          * In dev mode, always assume that the dev server API is available at 8288. This
          * allows us to use a separate hot-reloading port for the UI when developing.
@@ -38,7 +30,7 @@ export const devApi = createApi({
         return {
           url,
           method: "POST",
-          body: JSON.stringify(payload),
+          body: event,
         };
       },
     }),

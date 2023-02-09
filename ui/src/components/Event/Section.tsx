@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { ulid } from 'ulid';
 import { usePrettyJson } from "../../hooks/usePrettyJson";
 import { useSendEventMutation } from "../../store/devApi";
 import {
@@ -56,7 +57,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
     >
       {eventPayload ? (
         <div className="px-4 pt-4">
-          <CodeBlock tabs={[{ label: "Payload", content: eventPayload }]} />
+          <CodeBlock tabs={[{ label: "Payload", content: eventPayload }]}/>
         </div>
       ) : null}
       <div className="pr-4 pt-4">
@@ -73,9 +74,12 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
                       return;
                     }
 
+                    const eventId = ulid();
+
                     sendEvent(
                       JSON.stringify({
                         ...JSON.parse(event.raw),
+                        id: eventId,
                         ts: Date.now(),
                       })
                     );

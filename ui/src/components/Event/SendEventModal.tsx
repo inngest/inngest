@@ -1,5 +1,6 @@
 import Editor, { useMonaco } from "@monaco-editor/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ulid } from 'ulid';
 import { usePortal } from "../../hooks/usePortal";
 import { useSendEventMutation } from "../../store/devApi";
 import { showEventSendModal } from "../../store/global";
@@ -40,6 +41,10 @@ export const SendEventModal = () => {
     try {
       data = JSON.parse(input || "");
 
+      if (typeof data.id !== "string") {
+        data.id = ulid();
+      }
+
       if (!data.ts || typeof data.ts !== "number") {
         data.ts = Date.now();
       }
@@ -65,7 +70,7 @@ export const SendEventModal = () => {
       return pushToast("Event payload user must be an object if defined.");
     }
 
-    _sendEvent(JSON.stringify(data))
+    _sendEvent(data)
       .unwrap()
       .then(() => {
         onClose();
