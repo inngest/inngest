@@ -1,6 +1,6 @@
 ---
-heading: "Generate OpenAI Durable Functions with Inngest"
-subtitle: "Providing developer-specific examples to learn how to use the Inngest SDK."
+heading: "AI Personalization and the Future of Developer Docs"
+subtitle: "Providing developer-specific examples to help developers learn how to use the Inngest SDK. The beginning of AI-personalized learning flows for users."
 image: /assets/blog/openai-durable-functions-with-inngest/gpt-driven-workflows.png
 date: 2023-02-09
 author: Jack Williams
@@ -11,10 +11,10 @@ OpenAI Codex is the model that powers GitHub Copilot, an “AI pair programmer�
 Today, we’re leveraging that power to release an AI workflow builder, so you can instantly understand how your problem might be solved with Inngest by simply explaining what you’d like to achieve.
 
 <aside>
-📢 Try it out now over at [inngest.com/ai-written-workflows](/ai-written-workflows).
-</aside>
+👉 Try it out now at [www.inngest.com/ai-personalized-documentation](/ai-personalized-documentation)
 
-![The GPT-driven workflows page](/assets/blog/openai-durable-functions-with-inngest/prompt-examples.png)
+<Button href="/ai-personalized-documentation" arrow="right"><span className="text-white">Go to the tool</span></Button>
+</aside>
 
 ## Imagination-driven documentation
 
@@ -23,6 +23,8 @@ Most platform documentation deals with directly or indirectly teaching the reade
 These written examples, like most documentation, are static; one key example must serve many readers, and those readers must make an extra jump in their heads to attribute the code they’re reading and the concept they are learning to the final problem they’re trying to solve.
 
 When communicating verbally, it’s much easier to give somebody an understanding of a concept by relating it to the one piece of the puzzle they already know. Similarly, by generating code upfront, the reader can apply their specific context to the platform straight away without that second hop.
+
+![Examples of prompts given to the bot to generate code](/assets/blog/openai-durable-functions-with-inngest/prompt-examples.png)
 
 ## Challenges of building with AI
 
@@ -121,11 +123,13 @@ We make sure to use Inngest’s step tooling here to provide retries to the repl
 
 ## Future
 
-AI’s here to stay, and more obvious patterns are emerging for how it can help us. Even specific to software, personalising learning experiences will accelerate the pace at which we can build and communicate concepts across the entire community!
+AI’s here to stay, and more obvious patterns are emerging for how it can help us. There are fantastic examples of AI helping us learn already being demonstrated, such as [Supabase's Clippy](https://supabase.com/blog/chatgpt-supabase-docs?ref=inngest), [Astro's Houston](https://houston.astro.build/) and [Dagster's support bot](https://dagster.io/blog/chatgpt-langchain).
+
+ Even specific to just software, personalizing learning experiences will accelerate the pace at which we can build and communicate concepts across the entire community; examples such as this are just the beginning.
 
 Make sure to check out Inngest’s offering and see how we might be able to solve your problem today.
 
-- [Write a GPT-driven workflow](/ai-written-workflows)
-- [Get started with Inngest](/docs)
+- [Write a GPT-driven workflow](/ai-personalized-documentation)
+- [Introduction to Inngest](/docs)
 - Join our [community Discord](/discord)
 - Check out the [inngest/inngestabot](https://github.com/inngest/inngestabot) code

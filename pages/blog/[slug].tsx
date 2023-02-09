@@ -18,6 +18,7 @@ import { Button } from "src/shared/Button";
 import IconCalendar from "src/shared/Icons/Calendar";
 const components = {
   DiscordCTA,
+  Button,
 };
 
 type Props = {
