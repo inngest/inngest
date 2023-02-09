@@ -1,7 +1,7 @@
 ---
 heading: "AI Personalization and the Future of Developer Docs"
 subtitle: "Providing developer-specific examples to help developers learn how to use the Inngest SDK. The beginning of AI-personalized learning flows for users."
-image: /assets/blog/openai-durable-functions-with-inngest/gpt-driven-workflows.png
+image: /assets/blog/openai-durable-functions-with-inngest/featured-image.png
 date: 2023-02-09
 author: Jack Williams
 focus: true
