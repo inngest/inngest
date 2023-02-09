@@ -25,7 +25,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
   const dispatch = useAppDispatch();
 
   // const [pollingInterval, setPollingInterval] = useState(1000);
-  const query = useGetEventQuery({ id: eventId }, { pollingInterval: 1000 });
+  const query = useGetEventQuery({ id: eventId }, { pollingInterval: 1500 });
   const event = useMemo(() => query.data?.event, [query.data?.event]);
   const eventPayload = usePrettyJson(event?.raw);
 
