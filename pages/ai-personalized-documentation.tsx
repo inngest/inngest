@@ -112,13 +112,26 @@ export default function InngestGPT() {
           <h1 className="text-3xl lg:text-5xl text-white mt-12 md:mt-20 xl:mt-32 font-semibold tracking-tight text-center">
             ✨ AI-Personalized Documentation ✨
           </h1>
-          <p className="mt-4 text-indigo-200 max-w-xl text-center m-auto xl:mb-32">
+          <p className="mt-4 text-indigo-200 max-w-xl text-center m-auto">
             Learn how to use the Inngest SDK with personalized code examples.
-            <br />
-            <a href="/blog/ai-personalization-and-the-future-of-developer-docs?ref=inngestabot">
-              Learn how this works on our blog
-            </a>
           </p>
+
+          <div className="w-full flex flex-col md:flex-row mt-8 justify-center gap-4 xl:mb-32">
+            <Button
+              href="/blog/ai-personalization-and-the-future-of-developer-docs?ref=inngestabot"
+              variant="secondary"
+            >
+              Read how this page works
+              <ArrowRight className="group-hover:translate-x-1 transition-transform duration-150  -mr-1.5" />
+            </Button>
+            <Button
+              target="_blank"
+              href="https://twitter.com/intent/tweet?text=Creating%20Personalized%20Developer%20Documentation%20And%20Code%20Examples%20for%20@inngest%20with%20@openai&url=https://inngest.com/ai-written-workflows"
+            >
+              <span className="mr-1.5">Tweet this page</span>
+              <Twitter className="mt-0.5" />
+            </Button>
+          </div>
 
           <div className="max-w-3xl m-auto my-20">
             <div className=" bg-white rounded-lg shadow-lg overflow-hidden">
@@ -235,22 +248,6 @@ export default function InngestGPT() {
             </div>
 
             {selected ? <Output selected={selected} /> : null}
-          </div>
-          <div className="w-full flex mt-24 justify-center gap-4">
-            <Button
-              href="/blog/ai-personalization-and-the-future-of-developer-docs"
-              variant="secondary"
-            >
-              Read how this page works
-              <ArrowRight className="group-hover:translate-x-1 transition-transform duration-150  -mr-1.5" />
-            </Button>
-            <Button
-              target="_blank"
-              href="https://twitter.com/intent/tweet?text=Creating%20Personalized%20Developer%20Documentation%20And%20Code%20Examples%20for%20@inngest%20with%20@openai&url=https://inngest.com/ai-written-workflows"
-            >
-              <span className="mr-1.5">Tweet this page</span>
-              <Twitter className="mt-0.5" />
-            </Button>
           </div>
         </Container>
       </div>
