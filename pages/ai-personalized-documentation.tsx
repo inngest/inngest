@@ -19,9 +19,9 @@ export const getStaticProps = async () => {
     props: {
       designVersion: "2",
       meta: {
-        title: "Write Inngest functions using GPT",
+        title: "AI-Personalized Documentation",
         description:
-          "Use GPT to write Inngest workflows and functions via our SDK",
+          "Learn how to use the Inngest SDK with personalized code examples, powered by OpenAI",
       },
     },
   };
