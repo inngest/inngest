@@ -39,7 +39,7 @@ type Selected = {
   tags?: string[];
 };
 
-export default function Patterns() {
+export default function InngestGPT() {
   const [selected, setSelected] = useState<Selected | null>(EXAMPLE_PROMPTS[0]);
   const [history, setHistory] = useState<Selected[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -318,9 +318,12 @@ const Output = ({ selected }: { selected: Selected }) => {
             </SyntaxHighlighter>
           </div>
 
-          <p className="mb-4 mt-8 text-slate-200">
-            {selected.reply.description}
-          </p>
+          <p
+            className="mb-4 mt-8 text-slate-200"
+            dangerouslySetInnerHTML={{
+              __html: markdownToHTML(selected.reply.description),
+            }}
+          ></p>
           <div className="border-t pt-8 border-slate-800 flex flex-col gap-4">
             <p className="text-white">Want to learn more?</p>
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -372,6 +375,15 @@ const Output = ({ selected }: { selected: Selected }) => {
   );
 };
 
+const markdownToHTML = (markdown: string): string => {
+  return markdown
+    .replaceAll(/_(.+)_/g, `<em>$1</em>`)
+    .replaceAll(
+      /`(.+)`/g,
+      `<code class="bg-slate-800 text-white text-sm font-semibold py-0.5 px-1.5">$1</code>`
+    );
+};
+
 const EXAMPLE_PROMPTS = [
   {
     tags: ["OpenAI", "Parallelism"],
@@ -379,7 +391,7 @@ const EXAMPLE_PROMPTS = [
     prompt:
       "Create a function that uses OpenAI to summarize text.  It should take a long string of text, splits the text into chunks, uses openAI to summarize the chunks in parallel, then summarizes all summaries.",
     reply: {
-      description: `Here we create a function called "Summarize text" that takes a long string of text, splits the text into chunks, uses openAI to summarize the chunks in parallel, then summarizes all summaries. We use step tooling to run as many actions in parallel as possible and provide retries and durability to each.`,
+      description: `Here we create a function called "_Summarize text_" that takes a long string of text, splits the text into chunks, uses openAI to summarize the chunks in parallel, then summarizes all summaries. We use step tooling to run as many actions in parallel as possible and provide retries and durability to each.`,
       references: ["https://www.inngest.com/docs/functions/multi-step"],
       code: `inngest.createFunction(
   { name: "Summarize text" },
@@ -444,7 +456,7 @@ inngest.createFunction(
     prompt:
       "Create a function triggered by an order being created. It should charge the customer for the product in the order, failing if the charge did not succeed. We then wait for the order to be picked up. If it wasn't picked up within an hour, refund and notify the user. If the order was picked up, send a push notification to the user that it's been collected. We wait again for the order to be delivered this time. If it hasn't been delivered within an hour, refund and notify the user the same as before. If it does get delivered, send a push notification that the order has been delivered, wait 30 minutes, then another push notification asking them to rate their meal.",
     reply: {
-      description: `Here we create a function called "Order processing" triggered by an app/order.created event. It charges the customer for the product in the order, failing if the charge did not succeed. We then wait for the order to be picked up. If it wasn't picked up within an hour, refund and notify the user. If the order was picked up, send a push notification to the user that it's been collected. We wait again for the order to be delivered this time. If it hasn't been delivered within an hour, refund and notify the user the same as before. If it does get delivered, send a push notification that the order has been delivered, wait 30 minutes, then another push notification asking them to rate their meal. We use step tooling to run as many actions in parallel as possible and provide retries and durability to each.`,
+      description: `Here we create a function called "_Order processing_" triggered by an \`app/order.created\` event. It charges the customer for the product in the order, failing if the charge did not succeed. We then wait for the order to be picked up. If it wasn't picked up within an hour, refund and notify the user. If the order was picked up, send a push notification to the user that it's been collected. We wait again for the order to be delivered this time. If it hasn't been delivered within an hour, refund and notify the user the same as before. If it does get delivered, send a push notification that the order has been delivered, wait 30 minutes, then another push notification asking them to rate their meal. We use step tooling to run as many actions in parallel as possible and provide retries and durability to each.`,
       references: ["https://www.inngest.com/docs/functions/multi-step"],
       code: `inngest.createFunction(
   { name: "Order processing" },
