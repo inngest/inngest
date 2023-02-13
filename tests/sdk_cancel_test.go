@@ -12,9 +12,7 @@ import (
 	"github.com/inngest/inngestgo"
 )
 
-func TestSDKCancel(t *testing.T) {
-	// 1. Assert that a function is registered with the name of "sdk-step-test"
-	// 1. Assert that there's an invocation with no steps.
+func TestSDKCancelNotReceived(t *testing.T) {
 	evt := inngestgo.Event{
 		Name: "tests/cancel.test",
 		Data: map[string]any{
@@ -92,6 +90,7 @@ func TestSDKCancel(t *testing.T) {
 				Name: "10s",
 			}}),
 
+			test.After(time.Second),
 			test.Send(inngestgo.Event{
 				Name: "cancel/please",
 				Data: map[string]interface{}{
@@ -114,6 +113,60 @@ func TestSDKCancel(t *testing.T) {
 		)
 		run(t, test)
 	})
+}
+
+func TestSDKCancelReceived(t *testing.T) {
+	evt := inngestgo.Event{
+		Name: "tests/cancel.test",
+		Data: map[string]any{
+			"request_id": "123",
+		},
+		User: map[string]interface{}{},
+	}
+
+	fnID := "test-suite-cancel-test"
+	abstract := Test{
+		Name: "Cancel test",
+		Description: `
+			This test asserts that steps works across the SDK.  This tests steps and sleeps
+			in a serial manner:
+
+			- step.run
+			- step.sleep
+			- step.run
+		`,
+		Function: function.Function{
+			ID:   fnID,
+			Name: "Cancel test",
+			Triggers: []function.Trigger{
+				{
+					EventTrigger: &function.EventTrigger{
+						Event: "tests/cancel.test",
+					},
+				},
+			},
+			Steps: map[string]function.Step{
+				"step": {
+					ID:   "step",
+					Name: "step",
+					Runtime: &inngest.RuntimeWrapper{
+						Runtime: &inngest.RuntimeHTTP{
+							URL: stepURL(fnID, "step"),
+						},
+					},
+				},
+			},
+			Cancel: []function.Cancel{
+				{
+					Event:   "cancel/please",
+					Timeout: strptr("1h"),
+					If:      strptr("async.data.request_id == event.data.request_id"),
+				},
+			},
+		},
+		EventTrigger: evt,
+		Timeout:      20 * time.Second,
+	}
 
 	t.Run("With a cancellation event", func(t *testing.T) {
 		copied := abstract
@@ -141,6 +194,7 @@ func TestSDKCancel(t *testing.T) {
 				Name: "10s",
 			}}),
 
+			test.After(time.Second),
 			test.Send(inngestgo.Event{
 				Name: "cancel/please",
 				Data: map[string]interface{}{

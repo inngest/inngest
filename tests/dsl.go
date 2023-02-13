@@ -194,6 +194,12 @@ func (t *Test) ExpectGeneratorResponse(expected []state.GeneratorOpcode) func() 
 	}
 }
 
+func (t *Test) After(d time.Duration) func() {
+	return func() {
+		<-time.After(d)
+	}
+}
+
 type ExecutorRequest struct {
 	Event inngestgo.Event `json:"event"`
 	Steps map[string]any  `json:"steps"`
