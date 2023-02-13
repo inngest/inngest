@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngestgo"
 )
@@ -21,7 +22,7 @@ func TestSDKFunctions(t *testing.T) {
 	}
 
 	fnID := "test-suite-sdk-function-test"
-	test := Test{
+	test := &Test{
 		Name: "SDK Functions",
 		Description: `
 			This test asserts that functions work across SDKs.
@@ -55,28 +56,23 @@ func TestSDKFunctions(t *testing.T) {
 			},
 		},
 		EventTrigger: evt,
-
-		Assertions: []HTTPAssertion{
-			// First we're only passed the event and context.
-			ExecutorRequest{
-				Event: evt,
-				Ctx: SDKCtx{
-					FnID:   fnID,
-					StepID: "step",
-				},
-			},
-			// And we reply with step data.
-			SDKResponse{
-				Status: 200,
-				Data: map[string]any{
-					"body": "ok",
-					"name": "tests/function.test",
-				},
-			},
-		},
-
-		Timeout: time.Second,
 	}
+
+	test.SetAssertions(
+		// All executor requests should have this event.
+		test.SetRequestEvent(evt),
+		// And the executor should start its requests with this context.
+		test.SetRequestContext(SDKCtx{
+			FnID:   fnID,
+			StepID: "step",
+			Stack: driver.FunctionStack{
+				Current: 0,
+			},
+		}),
+		test.SendTrigger(),
+		test.ExpectRequest("Initial request", "step", time.Second),
+		test.ExpectJSONResponse(200, map[string]any{"name": "tests/function.test", "body": "ok"}),
+	)
 
 	run(t, test)
 }

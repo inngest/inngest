@@ -2,27 +2,21 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/pkg/execution/driver"
-	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/sdk"
-	"github.com/inngest/inngestgo"
-	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -70,131 +64,15 @@ func parseEnvURL(env string) url.URL {
 	return *u
 }
 
-type Test struct {
-	// Name is the human name of the test.
-	Name        string
-	Description string
-
-	// Function is the function to search for, expected to be registered during the SDK handshake.
-	//
-	// While tests can only check one function at a time, the SDK may register many functions
-	// at once.
-	Function function.Function
-
-	// The event to send when testing this function.
-	EventTrigger inngestgo.Event
-
-	Timeout time.Duration
-
-	Assertions []HTTPAssertion
-}
-
-type HTTPAssertion interface {
-	Assert(t *testing.T, input []byte, req *http.Request, resp *http.Response)
-}
-
-type AfterHook interface {
-	RunAfter()
-}
-
-type SDKResponse struct {
-	Status int
-	Data   any
-	After  func()
-}
-
-func (s SDKResponse) RunAfter() {
-	if s.After == nil {
-		return
-	}
-	s.After()
-}
-
-func (s SDKResponse) Assert(t *testing.T, input []byte, req *http.Request, resp *http.Response) {
-	status := resp.StatusCode
-
-	if len(input) == 0 {
-		require.Nil(t, s.Data)
-		require.Equal(t, s.Status, status, "Unexpected SDK status")
-		return
-	}
-
-	switch input[0] {
-	case '[':
-		var actual any
-
-		if s.Status == 206 {
-			// If we expect a 206, unmarshal into opcodes.
-			data := []state.GeneratorOpcode{}
-			err := json.Unmarshal(input, &data)
-			require.NoError(t, err, "unable to marshal SDK response: %s", string(input))
-			actual = data
-		} else {
-			actual = []map[string]any{}
-			err := json.Unmarshal(input, &actual)
-			require.NoError(t, err, "unable to marshal SDK response: %s", string(input))
-		}
-
-		require.EqualValues(t, s.Data, actual, "Unexpected SDK response: %s", string(input))
-		require.Equal(t, s.Status, status, "Unexpected SDK status")
-	case '{':
-		actual := map[string]any{}
-		err := json.Unmarshal(input, &actual)
-		require.NoError(t, err, "unable to marshal SDK response: %s", string(input))
-		require.EqualValues(t, s.Data, actual, "Unexpected SDK response: %s", string(input))
-		require.Equal(t, s.Status, status, "Unexpected SDK status")
-	default:
-		expected, err := json.Marshal(s.Data)
-		require.NoError(t, err, "unable to marshal SDK response: %s", string(input))
-		require.EqualValues(t, string(expected), string(input), "Unexpected SDK response: %s", string(input))
-		require.Equal(t, s.Status, status, "Unexpected SDK status")
-	}
-}
-
-// ExecutorRequest
-type ExecutorRequest struct {
-	Event inngestgo.Event `json:"event"`
-	Steps map[string]any  `json:"steps"`
-	Ctx   SDKCtx          `json:"ctx"`
-
-	// QueryStepID ensures we can validate that the executor's step ID is correct.
-	QueryStepID string `json:"-"`
-}
-
-func (e ExecutorRequest) Assert(t *testing.T, input []byte, req *http.Request, resp *http.Response) {
-	// Ensure the step ID is correct in the executor request
-	if e.QueryStepID != "" {
-		require.EqualValues(t, e.QueryStepID, req.URL.Query().Get("stepId"), "Invalid stepId query parameter from executor")
-	}
-
-	e.QueryStepID = ""
-
-	// Assert that the input can be marshalled into a new executor request.
-	actual := ExecutorRequest{}
-	err := json.Unmarshal(input, &actual)
-	require.NoError(t, err, "unable to marshal executor request")
-
-	e.Ctx.RunID = actual.Ctx.RunID
-
-	require.EqualValues(t, e, actual, "Unexpected executor request data")
-}
-
-type SDKCtx struct {
-	FnID   string               `json:"fn_id"`
-	StepID string               `json:"step_id"`
-	RunID  ulid.ULID            `json:"run_id"`
-	Stack  driver.FunctionStack `json:"stack"`
-}
-
-func run(t *testing.T, test Test) {
+func run(t *testing.T, test *Test) {
 	t.Helper()
+
+	test.requests = make(chan http.Request)
+	test.responses = make(chan http.Response)
 
 	// Ensure that the desired function exists within the SDK.
 	rr, err := introspect(test)
 	require.NoError(t, err, "Introspection error")
-
-	var counter int32
-	done := make(chan bool)
 
 	// Start a new test server which will intercept all requests between the executor and the SDK.
 	//
@@ -207,19 +85,18 @@ func run(t *testing.T, test Test) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		byt, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
-
 		fmt.Printf(" ==> Received executor request:\n\t%s\n", string(byt))
 
-		if int(counter) >= len(test.Assertions) {
-			fmt.Println("")
-			t.Fatalf("Received too many requests from executor:\n\n%s", string(byt))
+		// Recreate reader to re-read in assertion, then pass to assertion.
+		r.Body.Close()
+		r.Body = ioutil.NopCloser(bytes.NewReader(byt))
+
+		select {
+		case test.requests <- *r:
+			// do nothing, success
+		case <-time.After(time.Second):
+			require.Fail(t, "unexpected executor request")
 		}
-
-		// Assert that this request is correct.
-		test.Assertions[counter].Assert(t, byt, r, nil)
-
-		// Increase counter now that assertions have ran.
-		atomic.AddInt32(&counter, 1)
 
 		// Forward this request on to the SDK.
 		url := sdkURL
@@ -234,28 +111,22 @@ func run(t *testing.T, test Test) {
 		// Read the response.
 		byt, err = io.ReadAll(sdkResponse.Body)
 		require.NoError(t, err)
+		sdkResponse.Body.Close()
+		sdkResponse.Body = ioutil.NopCloser(bytes.NewReader(byt))
 
 		fmt.Printf(" ==> Received SDK response:\n\t%s\n", string(byt))
 		fmt.Println("")
 
-		// Assert that the SDK response is correct
-		test.Assertions[counter].Assert(t, byt, r, sdkResponse)
+		select {
+		case test.responses <- *sdkResponse:
+			// do nothing, success
+		case <-time.After(time.Second):
+			require.Fail(t, "unexpected sdk response")
+		}
 
 		// Forward the response from the SDK to the executor.
 		w.WriteHeader(sdkResponse.StatusCode)
 		w.Write(byt)
-
-		if after, ok := test.Assertions[counter].(AfterHook); ok {
-			after.RunAfter()
-		}
-
-		// Increase counter now that assertions have ran.
-		atomic.AddInt32(&counter, 1)
-
-		if atomic.LoadInt32(&counter) == int32(len(test.Assertions)) {
-			// All and responses have come in.
-			done <- true
-		}
 	}))
 	defer srv.Close()
 	localURL, err := url.Parse(srv.URL)
@@ -272,23 +143,17 @@ func run(t *testing.T, test Test) {
 		return
 	}
 
-	client := inngestgo.NewClient(eventKey, inngestgo.WithEndpoint(eventURL.String()))
-	err = client.Send(context.Background(), test.EventTrigger)
-	require.NoError(t, err)
-
-	select {
-	case <-time.After(test.Timeout + buffer):
-		t.Fatalf("Timed out before all request response chains were tested")
-	case <-done:
-		// Wait for an extra second and assert that no other requests come in.
-		<-time.After(buffer)
-		return
+	test.test = t
+	for _, f := range test.chain {
+		f()
 	}
+
+	<-time.After(buffer)
 }
 
 // introspect asserts that the SDK is live and the expected function exists when calling
 // the introspect handler.
-func introspect(test Test) (*sdk.RegisterRequest, error) {
+func introspect(test *Test) (*sdk.RegisterRequest, error) {
 	url := sdkURL
 	url.Path = "/api/inngest"
 	url.RawQuery = "introspect"

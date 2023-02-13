@@ -5,7 +5,7 @@ export const testSdkSteps = inngest.createFunction(
   { event: "tests/step.test" },
   async ({ event, step }) => {
 
-    const data = await step.run("test step", async () => {
+    const data = await step.run("first step", async () => {
       return "first step";
     });
 
