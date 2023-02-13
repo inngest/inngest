@@ -148,7 +148,7 @@ func run(t *testing.T, test *Test) {
 		f()
 	}
 
-	<-time.After(buffer)
+	<-time.After(test.Timeout + buffer)
 }
 
 // introspect asserts that the SDK is live and the expected function exists when calling

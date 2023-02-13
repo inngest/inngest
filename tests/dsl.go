@@ -61,9 +61,13 @@ func (t *Test) SetAssertions(items ...func()) {
 
 // SendTrigger sends the triggering event, kicking off the function run.
 func (t *Test) SendTrigger() func() {
+	return t.Send(t.EventTrigger)
+}
+
+func (t *Test) Send(evt inngestgo.Event) func() {
 	return func() {
 		client := inngestgo.NewClient(eventKey, inngestgo.WithEndpoint(eventURL.String()))
-		err := client.Send(context.Background(), t.EventTrigger)
+		err := client.Send(context.Background(), evt)
 		require.NoError(t.test, err)
 	}
 }
@@ -78,6 +82,13 @@ func (t *Test) SetRequestEvent(event inngestgo.Event) func() {
 func (t *Test) SetRequestContext(ctx SDKCtx) func() {
 	return func() {
 		t.requestCtx = ctx
+	}
+}
+
+// SetRequestEvent
+func (t *Test) SetRequestSteps(steps map[string]any) func() {
+	return func() {
+		t.requestSteps = steps
 	}
 }
 
@@ -194,4 +205,8 @@ type SDKCtx struct {
 	StepID string               `json:"step_id"`
 	RunID  ulid.ULID            `json:"run_id"`
 	Stack  driver.FunctionStack `json:"stack"`
+}
+
+func strptr(s string) *string {
+	return &s
 }
