@@ -98,9 +98,7 @@ func (t *Test) AddRequestStack(s driver.FunctionStack) func() {
 		if t.requestCtx.Stack.Stack == nil {
 			t.requestCtx.Stack.Stack = []string{}
 		}
-		for _, v := range s.Stack {
-			t.requestCtx.Stack.Stack = append(t.requestCtx.Stack.Stack, v)
-		}
+		t.requestCtx.Stack.Stack = append(t.requestCtx.Stack.Stack, s.Stack...)
 		t.requestCtx.Stack.Current = s.Current
 	}
 }

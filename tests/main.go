@@ -126,7 +126,8 @@ func run(t *testing.T, test *Test) {
 
 		// Forward the response from the SDK to the executor.
 		w.WriteHeader(sdkResponse.StatusCode)
-		w.Write(byt)
+		_, err = w.Write(byt)
+		require.NoError(t, err)
 	}))
 	defer srv.Close()
 	localURL, err := url.Parse(srv.URL)
