@@ -29,8 +29,8 @@ jobs:
           sleep 5
           cd ../../
           echo "Running dev server"
-          nohup ./inngest-bin dev &
+          nohup ./inngest-bin dev 2> /tmp/dev-output.txt &
           echo "Ran dev server"
           sleep 5
-          curl http://127.0.0.1:8288/dev
+          curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
           INNGEST_SIGNING_KEY=test API_URL=http://127.0.0.1:8288 SDK_URL=http://127.0.0.1:3000/api/inngest go test ./tests -v
