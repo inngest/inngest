@@ -5,11 +5,9 @@
 ![Discord](https://img.shields.io/discord/842170679536517141?label=discord)
 ![Twitter Follow](https://img.shields.io/twitter/follow/inngest?style=social)
 
-Run reliable serverless functions in the background.  Inngest allows you to schedule, enqueue, and run serverless functions in the background reliably with retries on any platform, with zero infrastructure, fully locally testable.  Learn more: https://www.inngest.com.
-
+Run reliable serverless functions in the background. Inngest allows you to schedule, enqueue, and run serverless functions in the background reliably with retries on any platform, with zero infrastructure, fully locally testable. Learn more: https://www.inngest.com.
 
 <br />
-
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
@@ -26,9 +24,9 @@ The local development UI:
 
 ## Overview
 
-Inngest makes it simple for you to write delayed or background jobs by triggering functions from events — decoupling your code from your application.
+Inngest makes it simple for you to write delayed or background jobs by triggering functions from events — decoupling your code within your application.
 
-- You send events from your application via HTTP (or via third party webhooks, e.g. Stripe)
+- You send events from your application via our SDK (or with a Webhook)
 - Inngest runs your serverless functions that are configured to be triggered by those events, either immediately, or delayed.
 
 Inngest abstracts the complex parts of building a robust, reliable, and scalable architecture away from you so you can focus on writing amazing code and building applications for your users.
@@ -46,30 +44,44 @@ We created Inngest to bring the benefits of event-driven systems to all develope
 
 ## Quick Start
 
+👉 [Read the full quick start guide here](https://www.inngest.com/docs/quick-start?ref=github-inngest-readme)
+
 1. [NPM install our SDK for your typescript project](https://github.com/inngest/inngest-js): `npm install inngest`
-2. Run the Inngest dev server: `npx inngest@latest dev`.  That's _this_ cli.
-3. [Integrate Inngest with your framework in one line](https://www.inngest.com/docs/frameworks/nextjs) via the `serve() handler`
-4. [Write and run functions in your existing framework or project](https://www.inngest.com/docs/functions)
+2. Run the Inngest dev server: `npx inngest@latest dev` (This repo's CLI)
+3. [Integrate Inngest with your framework in one line](https://www.inngest.com/docs/sdk/serve?ref=github-inngest-readme) via the `serve()` handler
+4. [Write and run functions in your existing framework or project](https://www.inngest.com/docs/functions?ref=github-inngest-readme)
 
 Here's an example:
 
-```js
-import { createStepFunction } from "inngest";
+```ts
+import { Inngest } from "inngest";
 
-// This function runs on any platform in the background with retries any time
-// the app/user.signup event is received - automatically.
-export const signupFlow = createStepFunction("post-signup", "app/user.signup",
-  function ({ event, tools }) {
-    // Send the user an email
-    tools.run("Send an email", async () => {
+const inngest = new Inngest({ name: "My App" });
+
+// This function will be invoked by Inngest via HTTP any time the "app/user.signup"
+// event is sent to to Inngest
+export default inngest.createFunction(
+  { name: "User onboarding communication" },
+  { event: "app/user.signup" },
+  async ({ event, step }) => {
+    await step.run("Send welcome email", async () => {
       await sendEmail({
-        email: event.user.email,
+        email: event.data.email,
         template: "welcome",
-      })
-   })
-})
-```
+      });
+    });
+  }
+);
 
+// Elsewhere in your code (e.g. in your sign up handler):
+
+inngest.send({
+  name: "app/user.signup",
+  data: {
+    email: "test@example.com",
+  },
+});
+```
 
 That's it - your function is set up!
 
@@ -108,7 +120,7 @@ For specific information on how the DevServer works and how it compares to produ
 
 - [**Join our online community for support, to give us feedback, or chat with us**](https://www.inngest.com/discord).
 - [Post a question or idea to our Github discussion board](https://github.com/orgs/inngest/discussions)
-- [Read the documentation](https://www.inngest.com/docs)
+- [Read the documentation](https://www.inngest.com/docs?ref=github-inngest-readme)
 - [Explore our public roadmap](https://github.com/orgs/inngest/projects/1/)
 - [Follow us on Twitter](https://twitter.com/inngest)
 - [Join our mailing list](https://www.inngest.com/mailing-list) for release notes and project updates
