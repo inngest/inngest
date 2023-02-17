@@ -31,29 +31,29 @@ type EnvManager interface {
 }
 
 type FunctionStack struct {
-	Stack   []string `json:"stack"`
 	Current int      `json:"current"`
+	Stack   []string `json:"stack"`
 }
 
 // MarshalV1 marshals state as an input to driver runtimes.
 func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex int) ([]byte, error) {
 	data := map[string]interface{}{
-		"event": s.Event(),
-		"steps": s.Actions(),
 		"ctx": map[string]interface{}{
 			// fn_id is used within entrypoints to SDK-based functions in
 			// order to specify the ID of the function to run via RPC.
 			"fn_id": s.Workflow().ID,
-			// step_id is used within entrypoints to SDK-based functions in
-			// order to specify the step of the function to run via RPC.
-			"step_id": step.ID,
 			// XXX: Pass in opentracing context within ctx.
 			"run_id": s.RunID(),
 			"stack": FunctionStack{
-				Stack:   s.Stack(),
 				Current: stackIndex,
+				Stack:   s.Stack(),
 			},
+			// step_id is used within entrypoints to SDK-based functions in
+			// order to specify the step of the function to run via RPC.
+			"step_id": step.ID,
 		},
+		"event": s.Event(),
+		"steps": s.Actions(),
 	}
 	return json.Marshal(data)
 }
