@@ -15,7 +15,9 @@ import (
 	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
+	"github.com/rs/zerolog"
 	"github.com/uber-go/tally/v4"
 	"go.opentelemetry.io/otel/trace"
 	"gonum.org/v1/gonum/stat/sampleuv"
@@ -173,6 +175,12 @@ func WithKindToQueueMapping(mapping map[string]string) func(q *queue) {
 	}
 }
 
+func WithLogger(l *zerolog.Logger) func(q *queue) {
+	return func(q *queue) {
+		q.logger = l
+	}
+}
+
 func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
@@ -188,6 +196,7 @@ func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
 		queueKindMapping: make(map[string]string),
 		scope:            tally.NoopScope,
 		tracer:           trace.NewNoopTracerProvider().Tracer("redis_queue"),
+		logger:           logger.From(context.Background()),
 	}
 
 	for _, opt := range opts {
@@ -233,6 +242,7 @@ type queue struct {
 	sem *trackingSemaphore
 	// queueKindMapping stores a map of job kind => queue names
 	queueKindMapping map[string]string
+	logger           *zerolog.Logger
 
 	// denyQueues provides a denylist ensuring that the queue will never claim
 	// this partition, meaning that no jobs from this queue will run on this worker.
