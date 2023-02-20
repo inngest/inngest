@@ -19,7 +19,7 @@ local queueKey       = KEYS[5]
 
 local workflowID = ARGV[1]
 local at         = tonumber(ARGV[2]) -- time in seconds
-local peekLimit  = tonumber(ARGV[3])
+local forceAt    = tonumber(ARGV[3])
 
 -- $include(get_partition_item.lua)
 local existing = get_partition_item(partitionKey, workflowID)
@@ -37,12 +37,11 @@ if tonumber(redis.call("ZCARD", queueIndex)) == 0 then
 end
 
 -- Peek up to N items from the workflow.
-local items = redis.call("ZRANGE", queueIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, peekLimit)
+local items = redis.call("ZRANGE", queueIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1)
 
-if #items > 0 then
-	-- Take the earliest time available here, and check if it's smaller than
-	-- the partition.
-	-- TODO: We should really only take the non-leased items to reduce waste.
+if #items > 0 and forceAt ~= 1 then
+	-- score = redis.call("ZSCORE", queueIndex, items[0])
+	-- at = math.floor(Vcore / 1000)
 	local encoded = redis.call("HMGET", queueKey, unpack(items))
 	for k, v in pairs(encoded) do
 		local item = cjson.decode(v)

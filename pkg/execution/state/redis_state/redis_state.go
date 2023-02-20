@@ -77,6 +77,10 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 			}
 		}
 		scripts[name] = redis.NewScript(val)
+		// if name == "queue/lease" {
+		// 	fmt.Println(name)
+		// 	fmt.Println(val)
+		// }
 	}
 }
 

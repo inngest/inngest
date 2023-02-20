@@ -9,7 +9,10 @@ Output:
 ]]
 
 local queueKey      = KEYS[1]
-local queueIndexKey = KEYS[2]
+-- We update the lease time in each concurrency queue, also
+local accountConcurrencyKey   = KEYS[2] -- Account concurrency level
+local partitionConcurrencyKey = KEYS[3] -- Partition/function level concurrency
+local customConcurrencyKey    = KEYS[4] -- Optional for eg. for concurrency amongst steps 
 
 local queueID         = ARGV[1]
 local currentLeaseKey = ARGV[2]
@@ -37,6 +40,14 @@ item.leaseID = newLeaseKey
 -- Update the item's lease key.
 redis.call("HSET", queueKey, queueID, cjson.encode(item))
 -- Update the item's score in our sorted index.
-redis.call("ZADD", queueIndexKey, math.floor(nextTime / 1000), item.id)
+
+-- Add the item to all keys
+redis.call("ZADD", partitionConcurrencyKey, nextTime, item.id)
+if accountConcurrencyKey ~= nil and accountConcurrencyKey ~= "" then
+	redis.call("ZADD", accountConcurrencyKey, nextTime, item.id)
+end
+if customConcurrencyKey ~= nil and customConcurrencyKey ~= "" then
+	redis.call("ZADD", customConcurrencyKey, nextTime, item.id)
+end
 
 return 0

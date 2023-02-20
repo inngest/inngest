@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	PartitionSelectionMax int64 = 20
+	PartitionSelectionMax int64 = 35
 	PartitionPeekMax      int64 = PartitionSelectionMax * 3
 
 	// PartitionLeaseDuration dictates how long a worker holds the lease for
@@ -37,21 +37,34 @@ const (
 	PartitionLeaseDuration = 4 * time.Second
 	// PartitionRequeueExtension is the length of time that we extend a partition's
 	// vesting time when requeueing by default.
-	PartitionRequeueExtension       = 30 * time.Second
-	QueueSelectionMax         int64 = 50
-	QueuePeekMax              int64 = 1000
-	QueuePeekDefault          int64 = QueueSelectionMax * 3
-	QueueLeaseDuration              = 10 * time.Second
-	SequentialLeaseDuration         = 10 * time.Second
-	SequentialLeaseMax              = 20 * time.Second
+	PartitionRequeueExtension = 30 * time.Second
+
+	// PartitionConcurrencyLimitRequeueExtension is the length of time that a partition
+	// is requeued if there is no global or partition(function) capacity because of
+	// concurrency limits.
+	//
+	// This is short, as there are still functions that are due to run (ie vesting < now),
+	// but long enough to reduce thrash.
+	//
+	// This means that jobs not started because of concurrency limits incur up to this amount
+	// of additional latency.
+	PartitionConcurrencyLimitRequeueExtension = time.Second * 2
+
+	QueueSelectionMax       int64 = 50
+	QueuePeekMax            int64 = 1000
+	QueuePeekDefault        int64 = QueueSelectionMax * 3
+	QueueLeaseDuration            = 10 * time.Second
+	SequentialLeaseDuration       = 10 * time.Second
+	SequentialLeaseMax            = 20 * time.Second
 
 	PriorityMax     uint = 0
 	PriorityDefault uint = 5
 	PriorityMin     uint = 9
 
-	defaultNumWorkers     = 100
-	defaultPollTick       = 10 * time.Millisecond
-	defaultIdempotencyTTL = 12 * time.Hour
+	defaultNumWorkers           = 100
+	defaultPollTick             = 10 * time.Millisecond
+	defaultIdempotencyTTL       = 12 * time.Hour
+	defaultPartitionConcurrency = 100 // TODO: add function to override.
 )
 
 var (
@@ -70,6 +83,8 @@ var (
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
 	ErrSequentialAlreadyLeased       = fmt.Errorf("sequential scanner already leased")
 	ErrSequentialLeaseExceedsLimits  = fmt.Errorf("sequential lease duration exceeds the maximum of %d seconds", int(SequentialLeaseMax.Seconds()))
+	ErrPartitionConcurrencyLimit     = fmt.Errorf("At partition concurrency limit")
+	ErrConcurrencyLimit              = fmt.Errorf("At concurrency limit")
 )
 
 var (
@@ -181,6 +196,41 @@ func WithLogger(l *zerolog.Logger) func(q *queue) {
 	}
 }
 
+// WithCustomConcurrencyKeyGenerator assigns a function that returns concurrency keys
+// for a given queue item, eg. a step in a function.
+func WithCustomConcurrencyKeyGenerator(f QueueItemConcurrencyKeyGenerator) func(q *queue) {
+	return func(q *queue) {
+		q.customConcurrencyGen = f
+	}
+}
+
+// WithPartitionConcurrencyKeyGenerator assigns a function that returns concurrency keys
+// for a given partition.
+func WithPartitionConcurrencyKeyGenerator(f PartitionConcurrencyKeyGenerator) func(q *queue) {
+	return func(q *queue) {
+		q.partitionConcurrencyGen = f
+	}
+}
+
+func WithAccountConcurrencyKeyGenerator(f QueueItemConcurrencyKeyGenerator) func(q *queue) {
+	return func(q *queue) {
+		q.accountConcurrencyGen = f
+	}
+}
+
+// QueueItemConcurrencyKeyGenerator returns concurrenc keys given a queue item to limits.
+//
+// Each queue item can have its own concurrency keys.  For example, you can define
+// concurrency limits for steps within a function.  This ensures that there will never be
+// more than N concurrent items running at once.
+type QueueItemConcurrencyKeyGenerator func(ctx context.Context, i QueueItem) (string, int)
+
+// PartitionConcurrencyKeyGenerator returns a concurrency key and limit for a given partition
+// (function).
+//
+// This allows partitions (read: functions) to set their own concurrency limits.
+type PartitionConcurrencyKeyGenerator func(ctx context.Context, p QueuePartition) (string, int)
+
 func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
@@ -197,6 +247,9 @@ func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
 		scope:            tally.NoopScope,
 		tracer:           trace.NewNoopTracerProvider().Tracer("redis_queue"),
 		logger:           logger.From(context.Background()),
+		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
+			return p.Queue(), 10_000
+		},
 	}
 
 	for _, opt := range opts {
@@ -204,7 +257,7 @@ func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
 	}
 
 	q.sem = &trackingSemaphore{Weighted: semaphore.NewWeighted(int64(q.numWorkers))}
-	q.workers = make(chan QueueItem, q.numWorkers)
+	q.workers = make(chan processItem, q.numWorkers)
 
 	return q
 }
@@ -216,6 +269,10 @@ type queue struct {
 	r  redis.UniversalClient
 	pf PriorityFinder
 	kg QueueKeyGenerator
+
+	accountConcurrencyGen   QueueItemConcurrencyKeyGenerator
+	partitionConcurrencyGen PartitionConcurrencyKeyGenerator
+	customConcurrencyGen    QueueItemConcurrencyKeyGenerator
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
@@ -235,7 +292,7 @@ type queue struct {
 	numWorkers int32
 	// workers is a buffered channel which allows scanners to send queue items
 	// to workers to be processed
-	workers chan QueueItem
+	workers chan processItem
 	// sem stores a semaphore controlling the number of jobs currently
 	// being processed.  This lets us check whether there's capacity in the queue
 	// prior to leasing items.
@@ -260,6 +317,14 @@ type queue struct {
 	scope tally.Scope
 	// tracer is the tracer to use for opentelemetry tracing.
 	tracer trace.Tracer
+}
+
+// processItem references the queue partition and queue item to be processed by a worker.
+// both items need to be passed to a worker as both items are needed to generate concurrency
+// keys to extend leases and dequeue.
+type processItem struct {
+	P QueuePartition
+	I QueueItem
 }
 
 // QueueItem represents an individually queued work scheduled for some time in the
@@ -497,9 +562,26 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 // lease duration. This returns the newly acquired lease ID on success.
 //
 // itemID must be the hashed ID of the queue item.
-func (q *queue) Lease(ctx context.Context, queueName string, itemID string, duration time.Duration) (*ulid.ULID, error) {
+//
+// NOTE: This function signature is getting quite out of hand.
+func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration) (*ulid.ULID, error) {
 	ctx, span := q.tracer.Start(ctx, "Lease")
 	defer span.End()
+
+	var (
+		ak, pk, ck string // account, partition, custom concurrency key
+		ac, pc, cc int    // account, partiiton, custom concurrency max
+	)
+
+	// required
+	pk, pc = q.partitionConcurrencyGen(ctx, p)
+	// optional
+	if q.accountConcurrencyGen != nil {
+		ak, ac = q.accountConcurrencyGen(ctx, item)
+	}
+	if q.customConcurrencyGen != nil {
+		ck, cc = q.customConcurrencyGen(ctx, item) // Get the custom concurrency key, if available.
+	}
 
 	// TODO: Add custom throttling here.
 	leaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
@@ -509,19 +591,26 @@ func (q *queue) Lease(ctx context.Context, queueName string, itemID string, dura
 
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.QueueIndex(queueName),
-		q.kg.PartitionMeta(queueName),
+		q.kg.QueueIndex(item.Queue()),
+		q.kg.PartitionMeta(item.Queue()),
+		q.kg.Concurrency(ak),
+		q.kg.Concurrency(pk),
+		q.kg.Concurrency(ck),
 	}
 	status, err := scripts["queue/lease"].Run(
 		ctx,
 		q.r,
 		keys,
-		itemID,
+
+		item.ID,
 		leaseID.String(),
 		time.Now().UnixMilli(),
+		ac,
+		pc,
+		cc,
 	).Int64()
 	if err != nil {
-		return nil, fmt.Errorf("error leasing pause: %w", err)
+		return nil, fmt.Errorf("error leasing queue item: %w", err)
 	}
 	switch status {
 	case 0:
@@ -530,6 +619,8 @@ func (q *queue) Lease(ctx context.Context, queueName string, itemID string, dura
 		return nil, ErrQueueItemNotFound
 	case 2:
 		return nil, ErrQueueItemAlreadyLeased
+	case 3:
+		return nil, ErrConcurrencyLimit
 	default:
 		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)
 	}
@@ -543,9 +634,24 @@ func (q *queue) Lease(ctx context.Context, queueName string, itemID string, dura
 //
 // Renewing a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-func (q *queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	ctx, span := q.tracer.Start(ctx, "ExtendLease")
 	defer span.End()
+
+	var (
+		ak, pk, ck string // account, partition, custom concurrency key
+	)
+	// required
+	pk, _ = q.partitionConcurrencyGen(ctx, p)
+	// optional
+	if q.accountConcurrencyGen != nil {
+		ak, _ = q.accountConcurrencyGen(ctx, i)
+	}
+	if q.customConcurrencyGen != nil {
+		ck, _ = q.customConcurrencyGen(ctx, i)
+	}
+
+	// TODO: EXTEND LEASE IN CONCURRENCY QUEUES
 
 	newLeaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
 	if err != nil {
@@ -554,7 +660,9 @@ func (q *queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID,
 
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.QueueIndex(i.Queue()),
+		q.kg.Concurrency(ak),
+		q.kg.Concurrency(pk),
+		q.kg.Concurrency(ck),
 	}
 	status, err := scripts["queue/extendLease"].Run(
 		ctx,
@@ -582,13 +690,29 @@ func (q *queue) ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID,
 }
 
 // Dequeue removes an item from the queue entirely.
-func (q *queue) Dequeue(ctx context.Context, i QueueItem) error {
+func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) error {
+	var (
+		ak, pk, ck string // account, partition, custom concurrency key
+	)
+	// required
+	pk, _ = q.partitionConcurrencyGen(ctx, p)
+	// optional
+	if q.accountConcurrencyGen != nil {
+		ak, _ = q.accountConcurrencyGen(ctx, i)
+	}
+	if q.customConcurrencyGen != nil {
+		ck, _ = q.customConcurrencyGen(ctx, i)
+	}
+
 	qn := i.Queue()
 	keys := []string{
 		q.kg.QueueItem(),
 		q.kg.QueueIndex(qn),
 		q.kg.PartitionMeta(qn),
 		q.kg.Idempotency(i.ID),
+		q.kg.Concurrency(ak),
+		q.kg.Concurrency(pk),
+		q.kg.Concurrency(ck),
 	}
 
 	idempotency := q.idempotencyTTL
@@ -677,9 +801,17 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 // NOTE: This does not check the queue/partition name against allow or denylists;  it assumes
 // that the worker always wants to lease the given queue.  Filtering must be done when peeking
 // when running a worker.
-func (q *queue) PartitionLease(ctx context.Context, queueName string, duration time.Duration) (*ulid.ULID, error) {
+func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration time.Duration) (*ulid.ULID, int64, error) {
 	ctx, span := q.tracer.Start(ctx, "PartitionLease")
 	defer span.End()
+
+	var (
+		concurrencyKey string
+		concurrency    = defaultPartitionConcurrency
+	)
+	if q.partitionConcurrencyGen != nil {
+		concurrencyKey, concurrency = q.partitionConcurrencyGen(ctx, p)
+	}
 
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
 	// the pointer and back off.  A question here is enqueuing new items onto the partition
@@ -688,36 +820,45 @@ func (q *queue) PartitionLease(ctx context.Context, queueName string, duration t
 	leaseExpires := now.Add(duration).UTC().Truncate(time.Millisecond)
 	leaseID, err := ulid.New(ulid.Timestamp(leaseExpires), rnd)
 	if err != nil {
-		return nil, fmt.Errorf("error generating id: %w", err)
+		return nil, 0, fmt.Errorf("error generating id: %w", err)
 	}
 
 	keys := []string{
 		q.kg.PartitionItem(),
 		q.kg.PartitionIndex(),
+		q.kg.Concurrency(concurrencyKey),
 	}
-	status, err := scripts["queue/partitionLease"].Run(
+	result, err := scripts["queue/partitionLease"].Run(
 		ctx,
 		q.r,
 		keys,
 
-		queueName,
+		p.Queue(),
 		leaseID.String(),
 		now.UnixMilli(),
 		leaseExpires.Unix(),
+		concurrency,
+		// TODO: Partition concurrency defer amount
 	).Int64()
 	if err != nil {
-		return nil, fmt.Errorf("error leasing partition: %w", err)
+		return nil, 0, fmt.Errorf("error leasing partition: %w", err)
 	}
-	switch status {
+	switch result {
 	case 0:
-		return &leaseID, nil
-	case 1:
-		return nil, ErrPartitionNotFound
-	case 2:
-		return nil, ErrPartitionAlreadyLeased
+		return nil, 0, ErrPartitionConcurrencyLimit
+	case -1:
+		return nil, 0, ErrPartitionNotFound
+	case -2:
+		return nil, 0, ErrPartitionAlreadyLeased
 	default:
-		return nil, fmt.Errorf("unknown response enqueueing item: %d", status)
+		// result is the available concurrency within this partition
+		return &leaseID, result, nil
 	}
+}
+
+func (q *queue) PartitionLeaseByID(ctx context.Context, id string, duration time.Duration) (*ulid.ULID, int64, error) {
+	// Fetch the partition.
+	return nil, 0, nil
 }
 
 // PartitionPeek returns up to PartitionSelectionMax partition items from the queue. This
@@ -809,7 +950,11 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 //
 // This is used after peeking and passing all queue items onto workers; we then take the next
 // unleased available time for the queue item and requeue the partition.
-func (q *queue) PartitionRequeue(ctx context.Context, queueName string, at time.Time) error {
+//
+// forceAt is used to enforce the given queue time.  This is used when partitions are at a
+// concurrency limit;  we don't want to scan the partition next time, so we force the partition
+// to be at a specific time instead of taking the earliest available queue item time
+func (q *queue) PartitionRequeue(ctx context.Context, queueName string, at time.Time, forceAt bool) error {
 	ctx, span := q.tracer.Start(ctx, "PartitionRequeue")
 	defer span.End()
 
@@ -820,6 +965,10 @@ func (q *queue) PartitionRequeue(ctx context.Context, queueName string, at time.
 		q.kg.QueueIndex(queueName),
 		q.kg.QueueItem(),
 	}
+	force := 0
+	if forceAt {
+		force = 1
+	}
 	status, err := scripts["queue/partitionRequeue"].Run(
 		ctx,
 		q.r,
@@ -827,7 +976,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, queueName string, at time.
 
 		queueName,
 		at.Unix(),
-		QueuePeekMax,
+		force,
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error requeueing partition: %w", err)
@@ -878,6 +1027,12 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 	default:
 		return fmt.Errorf("unknown response reprioritizing partition: %d", status)
 	}
+}
+
+func (q *queue) InProgress(ctx context.Context, concurrencyKey string) (int64, error) {
+	s := time.Now().UnixMilli()
+
+	return q.r.ZCount(ctx, q.kg.Concurrency(concurrencyKey), fmt.Sprintf("%d", s), "+inf").Result()
 }
 
 // LeaseSequential allows a worker to lease sequential processing.  If leased, this allows a worker

@@ -141,6 +141,10 @@ type QueueKeyGenerator interface {
 	Sequential() string
 	// Idempotency stores the map for storing idempotency keys in redis
 	Idempotency(key string) string
+	// ConcurrencyKey returns a key for a given concurrency string.  This stores an ordered
+	// zset of items that are in progress for the given concurrency key, giving us a total count
+	// of in-progress leased items.
+	Concurrency(key string) string
 }
 
 type DefaultQueueKeyGenerator struct {
@@ -173,4 +177,12 @@ func (d DefaultQueueKeyGenerator) Sequential() string {
 
 func (d DefaultQueueKeyGenerator) Idempotency(key string) string {
 	return fmt.Sprintf("%s:queue:seen:%s", d.Prefix, key)
+}
+
+func (d DefaultQueueKeyGenerator) Concurrency(key string) string {
+	if key == "" {
+		// None supplied.
+		return ""
+	}
+	return fmt.Sprintf("%s:concurrency:%s", d.Prefix, key)
 }
