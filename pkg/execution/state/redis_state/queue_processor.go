@@ -232,7 +232,8 @@ func (q *queue) scan(ctx context.Context, f osqueue.RunFunc) error {
 		return nil
 	}
 
-	partitions, err := q.PartitionPeek(ctx, q.isSequential(), time.Now(), PartitionPeekMax)
+	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
+	partitions, err := q.PartitionPeek(ctx, q.isSequential(), time.Now().Add(time.Second), PartitionPeekMax)
 	if err != nil {
 		return err
 	}
