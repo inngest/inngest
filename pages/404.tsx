@@ -37,7 +37,7 @@ export async function getStaticProps() {
 }
 
 const getCode = ({ pathname }) => {
-  return `inngest.send({
+  return `await inngest.send({
   name: "website/page.not.found",
   data: {
     path: "${pathname}"

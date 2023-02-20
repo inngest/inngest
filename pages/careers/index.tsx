@@ -14,9 +14,10 @@ type RoleMetadata = Role & MDXFileMetadata;
 
 export async function getStaticProps({ params }) {
   const roles = await loadMarkdownFilesMetadata<Role>("careers/_roles");
+  const visibleRoles = roles.filter((r) => !r.hidden);
   return {
     props: {
-      roles: JSON.stringify(roles),
+      roles: JSON.stringify(visibleRoles),
       meta: {
         title: `Careers at Inngest`,
         description: `We're hiring!`,

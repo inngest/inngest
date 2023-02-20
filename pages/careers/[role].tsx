@@ -30,7 +30,8 @@ export async function getStaticProps({ params }) {
 
 export async function getStaticPaths() {
   const roles = await loadMarkdownFilesMetadata(dir);
-  const paths = roles.map((role) => `/careers/${role.slug}`);
+  const visibleRoles = roles.filter((r) => !r.hidden);
+  const paths = visibleRoles.map((role) => `/careers/${role.slug}`);
   return { paths, fallback: false };
 }
 
