@@ -443,7 +443,7 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 			// Set the metrics historgram and gauge, which reports the ewma value.
 			scope.Histogram(histogramItemLatency, latencyBuckets).RecordDuration(latency)
 
-			q.logger.Trace().
+			q.logger.Debug().
 				Str("job_id", qi.ID).
 				Int64("latency_ms", latency.Milliseconds()).
 				Msg("processing job")
@@ -470,9 +470,9 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 		jobCancel()
 
 		if osqueue.ShouldRetry(err, qi.Data.Attempt, qi.Data.GetMaxAttempts()) {
-			// XXX: Increase errored count
-			qi.Data.Attempt += 1
 			at := backoff.LinearJitterBackoff(qi.Data.Attempt)
+			qi.Data.Attempt += 1
+			qi.AtMS = at.UnixMilli()
 			q.logger.Debug().Err(err).Int64("at_ms", at.UnixMilli()).Msg("requeuing job")
 			if err := q.Requeue(ctx, qi, at); err != nil {
 				q.logger.Error().Err(err).Interface("item", qi).Msg("error requeuing job")
