@@ -11,7 +11,6 @@ import (
 	"github.com/VividCortex/ewma"
 	"github.com/inngest/inngest/pkg/backoff"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/uber-go/tally/v4"
 	"golang.org/x/sync/errgroup"
@@ -104,7 +103,7 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 
 	tick := time.NewTicker(q.pollTick)
 
-	logger.From(ctx).Debug().Msg("starting queue worker")
+	q.logger.Debug().Msg("starting queue worker")
 
 LOOP:
 	for {
@@ -116,7 +115,7 @@ LOOP:
 		case err := <-q.quit:
 			// An inner function received an error which was deemed irrecoverable, so
 			// we're quitting the queue.
-			logger.From(ctx).Error().Err(err).Msg("quitting runner internally")
+			q.logger.Error().Err(err).Msg("quitting runner internally")
 			tick.Stop()
 			break LOOP
 		case <-tick.C:
@@ -135,7 +134,7 @@ LOOP:
 			if err := q.scan(ctx, f); err != nil {
 				// On scan errors, halt the worker entirely.
 				if errors.Unwrap(err) != context.Canceled {
-					logger.From(ctx).Error().Err(err).Msg("error scanning partition pointers")
+					q.logger.Error().Err(err).Msg("error scanning partition pointers")
 				}
 				break LOOP
 			}
@@ -180,7 +179,7 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 				continue
 			}
 			if err != nil {
-				logger.From(ctx).Error().Err(err).Msg("error claiming sequential lease")
+				q.logger.Error().Err(err).Msg("error claiming sequential lease")
 				q.seqLeaseLock.Lock()
 				q.seqLeaseID = nil
 				q.seqLeaseLock.Unlock()
@@ -223,7 +222,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 			// We handle the error individually within process, requeueing
 			// the item into the queue.  Here, the worker can continue as
 			// usual to process the next item.
-			logger.From(ctx).Error().Err(err).Msg("error processing queue item")
+			q.logger.Error().Err(err).Msg("error processing queue item")
 		}
 	}
 }
@@ -246,7 +245,7 @@ func (q *queue) scan(ctx context.Context, f osqueue.RunFunc) error {
 			return nil
 		}
 		if err := q.processPartition(ctx, p, f); err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error processing partition")
+			q.logger.Error().Err(err).Msg("error processing partition")
 			return err
 		}
 	}
@@ -330,7 +329,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 			if err == ErrQueueItemAlreadyLeased {
 				q.scope.Counter(counterQueueItemsLeaseConflict).Inc(1)
 				q.sem.Release(1)
-				logger.From(ctx).
+				q.logger.
 					Warn().
 					Interface("item", item).
 					Msg("worker attempting to claim existing lease")
@@ -406,7 +405,7 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 				leaseID, err = q.ExtendLease(ctx, qi, *leaseID, QueueLeaseDuration)
 				if err != nil && err != ErrQueueItemNotFound && err != context.Canceled {
 					// XXX: Increase counter here.
-					logger.From(ctx).Error().Err(err).Msg("error extending lease")
+					q.logger.Error().Err(err).Msg("error extending lease")
 					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
 					return
 				}
@@ -425,17 +424,16 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 
 		if delay > 0 {
 			<-time.After(delay)
-			logger.From(ctx).Trace().
+			q.logger.Trace().
 				Int64("at", qi.AtMS).
 				Int64("ms", delay.Milliseconds()).
 				Msg("delaying job in memory")
 		}
 
+		// Track the latency on average globally.  Do this in a goroutine so that it doesn't
+		// at all delay the job during concurrenty locking contention.
+		latency := time.Since(time.UnixMilli(qi.AtMS))
 		go func() {
-			// Track the latency on average globally.  Do this in a goroutine so that it doesn't
-			// at all delay the job during concurrenty locking contention.
-			latency := time.Since(time.UnixMilli(qi.AtMS))
-
 			// Update the ewma
 			latencySem.Lock()
 			latencyAvg.Add(float64(latency))
@@ -444,6 +442,11 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 
 			// Set the metrics historgram and gauge, which reports the ewma value.
 			scope.Histogram(histogramItemLatency, latencyBuckets).RecordDuration(latency)
+
+			q.logger.Trace().
+				Str("job_id", qi.ID).
+				Int64("latency_ms", latency.Milliseconds()).
+				Msg("processing job")
 		}()
 
 		go scope.Counter(counterQueueItemsStarted).Inc(1)
@@ -470,9 +473,9 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 			// XXX: Increase errored count
 			qi.Data.Attempt += 1
 			at := backoff.LinearJitterBackoff(qi.Data.Attempt)
-			logger.From(ctx).Info().Err(err).Int64("at_ms", at.UnixMilli()).Msg("requeuing job")
+			q.logger.Debug().Err(err).Int64("at_ms", at.UnixMilli()).Msg("requeuing job")
 			if err := q.Requeue(ctx, qi, at); err != nil {
-				logger.From(ctx).Error().Err(err).Interface("item", qi).Msg("error requeuing job")
+				q.logger.Error().Err(err).Interface("item", qi).Msg("error requeuing job")
 				return err
 			}
 			return nil
@@ -480,7 +483,7 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		logger.From(ctx).Info().Interface("item", qi).Msg("dequeueing failed job")
+		q.logger.Info().Interface("item", qi).Msg("dequeueing failed job")
 		if err := q.Dequeue(ctx, qi); err != nil {
 			return err
 		}
