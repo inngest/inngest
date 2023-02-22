@@ -55,11 +55,22 @@ var (
 		10 * time.Second,
 		time.Minute,
 	}
+
+	startedAtKey = startedAtCtxKey{}
 )
 
 func init() {
 	latencyAvg = ewma.NewMovingAverage()
 	latencySem = &sync.Mutex{}
+}
+
+// startedAtCtxKey is a context key which records when the queue item starts,
+// available via context.
+type startedAtCtxKey struct{}
+
+func GetItemStart(ctx context.Context) (time.Time, bool) {
+	t, ok := ctx.Value(startedAtKey).(time.Time)
+	return t, ok
 }
 
 func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) error {
@@ -430,6 +441,8 @@ func (q *queue) process(ctx context.Context, qi QueueItem, f osqueue.RunFunc) er
 				Int64("ms", delay.Milliseconds()).
 				Msg("delaying job in memory")
 		}
+
+		jobCtx = context.WithValue(jobCtx, startedAtKey, time.Now())
 
 		// Track the latency on average globally.  Do this in a goroutine so that it doesn't
 		// at all delay the job during concurrenty locking contention.

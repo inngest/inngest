@@ -43,6 +43,9 @@ func TestQueueRunSequential(t *testing.T) {
 	// Run the queue.  After running this worker should claim the sequential lease.
 	go func() {
 		_ = q1.Run(q1ctx, func(ctx context.Context, item osqueue.Item) error {
+			time, ok := GetItemStart(ctx)
+			require.True(t, ok)
+			require.NotZero(t, time)
 			return nil
 		})
 	}()
