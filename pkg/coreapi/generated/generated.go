@@ -962,6 +962,7 @@ enum StepEventType {
   ERRORED
   FAILED
   WAITING
+  LOG
 }
 
 type StepEvent {

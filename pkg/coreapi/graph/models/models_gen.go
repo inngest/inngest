@@ -279,6 +279,7 @@ const (
 	StepEventTypeErrored   StepEventType = "ERRORED"
 	StepEventTypeFailed    StepEventType = "FAILED"
 	StepEventTypeWaiting   StepEventType = "WAITING"
+	StepEventTypeLog       StepEventType = "LOG"
 )
 
 var AllStepEventType = []StepEventType{
@@ -288,11 +289,12 @@ var AllStepEventType = []StepEventType{
 	StepEventTypeErrored,
 	StepEventTypeFailed,
 	StepEventTypeWaiting,
+	StepEventTypeLog,
 }
 
 func (e StepEventType) IsValid() bool {
 	switch e {
-	case StepEventTypeScheduled, StepEventTypeStarted, StepEventTypeCompleted, StepEventTypeErrored, StepEventTypeFailed, StepEventTypeWaiting:
+	case StepEventTypeScheduled, StepEventTypeStarted, StepEventTypeCompleted, StepEventTypeErrored, StepEventTypeFailed, StepEventTypeWaiting, StepEventTypeLog:
 		return true
 	}
 	return false

@@ -230,6 +230,7 @@ export enum StepEventType {
   Completed = 'COMPLETED',
   Errored = 'ERRORED',
   Failed = 'FAILED',
+  Log = 'LOG',
   Scheduled = 'SCHEDULED',
   Started = 'STARTED',
   Waiting = 'WAITING'

@@ -188,6 +188,8 @@ func stepEventEnum(h enums.HistoryType) models.StepEventType {
 		return models.StepEventTypeFailed
 	case enums.HistoryTypeStepWaiting:
 		return models.StepEventTypeWaiting
+	case enums.HistoryTypeStepLog:
+		return models.StepEventTypeLog
 	}
 
 	return models.StepEventTypeScheduled
