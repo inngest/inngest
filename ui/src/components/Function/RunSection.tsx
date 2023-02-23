@@ -151,11 +151,21 @@ const FunctionRunTimelineRow = ({
       } catch (e) {}
     }
 
+    let label = `${prefix} ${stepData.label} ${suffix}`;
+
+    if (
+      stepData.label === "log" &&
+      typeof json?.[0] === "string" &&
+      json?.[0]
+    ) {
+      label = `${json[0]} log`;
+    }
+
     return {
       ...stepData,
-      label: `${prefix} ${stepData.label} ${suffix}`.trim(),
+      label: label.trim(),
     };
-  }, [rowType, eventType, name]);
+  }, [rowType, eventType, name, json]);
 
   const tabs = [{ label: "Output", content: payload || "" }];
 
@@ -220,6 +230,10 @@ const stepEventTypeMap: Record<
   [StepEventType.Waiting]: {
     label: "waiting",
     status: EventStatus.Paused,
+  },
+  [StepEventType.Log]: {
+    label: "log",
+    status: EventStatus.Completed,
   },
 };
 
