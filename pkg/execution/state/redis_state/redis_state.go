@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/inmemory"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -535,6 +536,37 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 	}
 
 	return index, nil
+}
+
+func (m mgr) Log(ctx context.Context, i state.Identifier, stepID string, data any) error {
+	now := time.Now()
+
+	historyLog := state.History{
+		ID:         state.HistoryID(),
+		Type:       enums.HistoryTypeStepLog,
+		Identifier: i,
+		CreatedAt:  now,
+		Data: state.HistoryStep{
+			ID:   stepID,
+			Data: data,
+		},
+	}
+
+	logger.From(ctx).Info().Interface("history", historyLog).Msg("saving history log")
+
+	err := m.r.ZAdd(
+		ctx,
+		m.kf.History(ctx, i.RunID),
+		&redis.Z{
+			Score:  float64(now.UnixMilli()),
+			Member: historyLog,
+		},
+	).Err()
+	if err != nil {
+		return fmt.Errorf("failed to save log; %w", err)
+	}
+
+	return nil
 }
 
 func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, attempt int) error {

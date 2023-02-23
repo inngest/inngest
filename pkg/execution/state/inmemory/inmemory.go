@@ -386,6 +386,18 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 
 }
 
+func (m *mem) Log(ctx context.Context, i state.Identifier, stepID string, data any) error {
+	m.setHistory(ctx, i, state.History{
+		ID:         state.HistoryID(),
+		Type:       enums.HistoryTypeStepLog,
+		Identifier: i,
+		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+		Data:       data,
+	})
+
+	return nil
+}
+
 func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()

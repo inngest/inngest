@@ -261,6 +261,8 @@ type Mutater interface {
 	// This returns the position of this step in the stack, if the stack is modified.  For temporary
 	// errors the stack position is 0, ie. unmodified.
 	SaveResponse(ctx context.Context, i Identifier, r DriverResponse, attempt int) (int, error)
+
+	Log(ctx context.Context, i Identifier, stepID string, data any) error
 }
 
 // HistoryDeleter is an optional interface a state can implement, deleting specific history items

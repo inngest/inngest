@@ -528,6 +528,11 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 				item.Payload = edge
 				item.Kind = queue.KindEdge
 				return s.queue.Enqueue(ctx, item, time.Now())
+			case enums.OpcodeLog:
+				if err := s.state.Log(ctx, item.Identifier, gen.ID, gen.Data); err != nil {
+					return fmt.Errorf("unable to log: %w", err)
+				}
+				return nil
 			default:
 				return fmt.Errorf("unknown opcode: %s", gen.Op.String())
 			}
