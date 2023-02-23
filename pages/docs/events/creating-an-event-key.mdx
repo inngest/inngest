@@ -13,7 +13,7 @@ const inngest = new Inngest({ name: "Your app name" });
 const inngest = new Inngest({ name: "Your app name", eventKey: "xyz..." });
 
 // With the Event Key, you're now ready to send data:
-inngest.send(...)
+await inngest.send({ ... })
 ```
 
 \* Our [Vercel integration](/docs/deploy/vercel) automatically sets the `INNGEST_EVENT_KEY` as an environment variable for you

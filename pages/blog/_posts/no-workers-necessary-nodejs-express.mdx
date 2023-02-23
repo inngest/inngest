@@ -38,9 +38,16 @@ This post is all about a *simple* approach, so our goal is for you to have as fe
 To write a background task with Inngest, run `npm install inngest` and determine where you want to send your event from. For this example, we'll send an `account.created` event when a user signs up to our app:
 
 ```js
-app.post("/signup", (req, res) => {
+import { Inngest } from "inngest"
+
+const inngest = new Inngest({ name: "My App" })
+
+app.post("/signup", async (req, res) => {
   const account = await createAccount(req.body)
-  inngest.send({ name: "account.created", data: { account_id: account.id } })
+  await inngest.send({
+    name: "account.created",
+    data: { account_id: account.id, email: account.email }
+  })
   res.redirect("/dashboard/welcome")
 })
 ```
@@ -48,12 +55,18 @@ app.post("/signup", (req, res) => {
 Then you create a new file for your function code that utilizes that same event:
 
 ```js
-import { createFunction } from "inngest"
-export default createFunction("My fn", "account.created", ({ event }) => {
-  // Do something fun, e.g. post to a company Slack channel
-  // or send a welcome email
-  return { message: "Hello world!" }
-})
+import { Inngest } from "inngest"
+
+const inngest = new Inngest({ name: "My App" })
+
+export default inngest.createFunction(
+  { name: "My fn" },
+  { event: "account.created" },
+  async ({ event }) => {
+    // Do something like send a welcome email:
+    await sendWelcomeEmail(event.data.email)
+  }
+)
 ```
 
 Lastly, we need to serve our functions securely with Inngest' Express.js `serve` handler. We import our function and pass it to the handler.
@@ -61,9 +74,7 @@ Lastly, we need to serve our functions securely with Inngest' Express.js `serve`
 ```js
 import { serve } from "inngest/express"
 import myFn from "../inngest/myfn"
-app.use("/api/inngest", serve("My App", process.env.INNGEST_SIGNING_KEY, [
-  myFn,
-]))
+app.use("/api/inngest", serve("My App", [ myFn ]))
 ```
 
 That's all the code that you need - Inngest will use [a signing key](https://app.inngest.com/secrets) to securely communicate with your server and we're ready to ship. After you have deployed your code, you need to tell Inngest where your code and, now, functions are running. It's a simple ping via the Inngest Cloud dashboard (docs + demo) or with a curl request:
@@ -74,12 +85,10 @@ curl -X PUT https://yourappsdomain.com/api/inngest
 
 <aside className="flex flex-row gap-4 items-center">
   <div>🔜</div>
-  <div>During the beta phase of our SDK development, this is the recommended flow, but we plan to automate this completely in the weeks ahead. <a href="https://eepurl.com/hI3dCr">Join our mailing list to get updates about SDK releases</a>.</div>
+  <div>We plan to add a fully automatic deployments to remove the above step. Join our Discord community to be the first to know!</div>
 </aside>
 
-
-> _[You can read the full Express.js guide in our docs here →](/docs/frameworks/express?ref=blog-no-workers-necessary)_
-
+➡️ _[You can read the full Express.js guide in our docs here →](/docs/frameworks/express?ref=blog-no-workers-necessary)_
 
 We now can move unnecessarily blocking code out of the critical path of our app into background tasks without any new infrastructure to set up! The Inngest Cloud dashboard also gives you access to logs of all of your events as well as the results of every function that you run - Observability out-of-the-box.
 
@@ -112,9 +121,7 @@ We now can move unnecessarily blocking code out of the critical path of our app 
 
 Yes, there are limitations to this approach due to http timeouts and potential extra load put on your backend server. While we think that the HTTP-based approach will work for most apps getting started with background jobs, we definitely think that background tasks should be serverless whenever possible.
 
-We're actively developing how you can easily deploy any function that you create to a number of serverless platforms like AWS Lambda or Inngest Cloud without a single change to your code. A true “*lift and shift*.” This gives you the flexibility of where you want your code to run.
-
-As of publishing, Inngest's SDK is in beta and already supports serverless functions on Vercel and Netlify with Cloudflare coming later this week. [Join our mailing list to stay up to date for future platform announcements](https://eepurl.com/hI3dCr).
+You can use the Inngest's SDK with several serverless friendly frameworks and platforms like [Next.js, Vercel, Netlify, Remix, Fresh (Deno), Cloudflare Pages, Digital Ocean Functions, and RedwoodJS](/docs/sdk/serve?ref=blog-no-workers-necessary).
 
 ## Conclusion
 
