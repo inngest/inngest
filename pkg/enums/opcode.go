@@ -11,4 +11,5 @@ const (
 	OpcodeStepPlanned
 	OpcodeSleep
 	OpcodeWaitForEvent
+	OpcodeLog
 )

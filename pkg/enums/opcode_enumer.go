@@ -8,9 +8,9 @@ import (
 	"fmt"
 )
 
-const _OpcodeName = "NoneStepStepPlannedSleepWaitForEvent"
+const _OpcodeName = "NoneStepStepPlannedSleepWaitForEventLog"
 
-var _OpcodeIndex = [...]uint8{0, 4, 8, 19, 24, 36}
+var _OpcodeIndex = [...]uint8{0, 4, 8, 19, 24, 36, 39}
 
 func (i Opcode) String() string {
 	if i < 0 || i >= Opcode(len(_OpcodeIndex)-1) {
@@ -19,7 +19,7 @@ func (i Opcode) String() string {
 	return _OpcodeName[_OpcodeIndex[i]:_OpcodeIndex[i+1]]
 }
 
-var _OpcodeValues = []Opcode{0, 1, 2, 3, 4}
+var _OpcodeValues = []Opcode{0, 1, 2, 3, 4, 5}
 
 var _OpcodeNameToValueMap = map[string]Opcode{
 	_OpcodeName[0:4]:   0,
@@ -27,6 +27,7 @@ var _OpcodeNameToValueMap = map[string]Opcode{
 	_OpcodeName[8:19]:  2,
 	_OpcodeName[19:24]: 3,
 	_OpcodeName[24:36]: 4,
+	_OpcodeName[36:39]: 5,
 }
 
 // OpcodeFromString retrieves an enum value from the enum constants string name.

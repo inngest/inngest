@@ -18,6 +18,7 @@ const (
 	HistoryTypeStepCompleted //
 	HistoryTypeStepErrored   //
 	HistoryTypeStepFailed
+	HistoryTypeStepLog
 
 	HistoryTypeStepWaiting
 )
