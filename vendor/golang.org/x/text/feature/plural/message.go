@@ -6,7 +6,7 @@ package plural
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"reflect"
 	"strconv"
 
@@ -35,13 +35,13 @@ type Interface interface {
 // The cases argument are pairs of selectors and messages. Selectors are of type
 // string or Form. Messages are of type string or catalog.Message. A selector
 // matches an argument if:
-//    - it is "other" or Other
-//    - it matches the plural form of the argument: "zero", "one", "two", "few",
-//      or "many", or the equivalent Form
-//    - it is of the form "=x" where x is an integer that matches the value of
-//      the argument.
-//    - it is of the form "<x" where x is an integer that is larger than the
-//      argument.
+//   - it is "other" or Other
+//   - it matches the plural form of the argument: "zero", "one", "two", "few",
+//     or "many", or the equivalent Form
+//   - it is of the form "=x" where x is an integer that matches the value of
+//     the argument.
+//   - it is of the form "<x" where x is an integer that is larger than the
+//     argument.
 //
 // The format argument determines the formatting parameters for which to
 // determine the plural form. This is especially relevant for non-integer
@@ -56,7 +56,7 @@ type Interface interface {
 func Selectf(arg int, format string, cases ...interface{}) catalog.Message {
 	var p parser
 	// Intercept the formatting parameters of format by doing a dummy print.
-	fmt.Fprintf(ioutil.Discard, format, &p)
+	fmt.Fprintf(io.Discard, format, &p)
 	m := &message{arg, kindDefault, 0, cases}
 	switch p.verb {
 	case 'g':

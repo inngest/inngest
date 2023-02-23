@@ -226,6 +226,10 @@ func (b *listParser) Continue(node ast.Node, reader text.Reader, pc Context) Sta
 		}
 	}
 
+	if lastIsEmpty && indent < offset {
+		return Close
+	}
+
 	// Non empty items can not exist next to an empty list item
 	// with blank lines. So we need to close the current list
 	//
