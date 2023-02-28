@@ -98,7 +98,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		}
 	}
 
-	diff := time.Now().Sub(start).Seconds()
+	diff := time.Since(start).Seconds()
 	require.Greater(t, int(diff), 10, "10 jobs should have taken at least 10 seconds")
 	require.Less(t, int(diff), 25, "10 jobs should have taken fewer than 25 seconds") // an extra 1.5x latency due to shifting of partitions for churn
 }

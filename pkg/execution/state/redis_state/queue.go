@@ -14,6 +14,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
+	"github.com/hashicorp/go-multierror"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
@@ -50,12 +51,12 @@ const (
 	// of additional latency.
 	PartitionConcurrencyLimitRequeueExtension = time.Second * 2
 
-	QueueSelectionMax       int64 = 50
-	QueuePeekMax            int64 = 1000
-	QueuePeekDefault        int64 = QueueSelectionMax * 3
-	QueueLeaseDuration            = 10 * time.Second
-	SequentialLeaseDuration       = 10 * time.Second
-	SequentialLeaseMax            = 20 * time.Second
+	QueueSelectionMax   int64 = 50
+	QueuePeekMax        int64 = 1000
+	QueuePeekDefault    int64 = QueueSelectionMax * 3
+	QueueLeaseDuration        = 10 * time.Second
+	ConfigLeaseDuration       = 10 * time.Second
+	ConfigLeaseMax            = 20 * time.Second
 
 	PriorityMax     uint = 0
 	PriorityDefault uint = 5
@@ -81,8 +82,8 @@ var (
 	ErrPartitionAlreadyLeased        = fmt.Errorf("partition already leased")
 	ErrPartitionPeekMaxExceedsLimits = fmt.Errorf("peek exceeded the maximum limit of %d", PartitionPeekMax)
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
-	ErrSequentialAlreadyLeased       = fmt.Errorf("sequential scanner already leased")
-	ErrSequentialLeaseExceedsLimits  = fmt.Errorf("sequential lease duration exceeds the maximum of %d seconds", int(SequentialLeaseMax.Seconds()))
+	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
+	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
 	ErrPartitionConcurrencyLimit     = fmt.Errorf("At partition concurrency limit")
 	ErrConcurrencyLimit              = fmt.Errorf("At concurrency limit")
 )
@@ -237,16 +238,17 @@ func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
 		pf: func(ctx context.Context, item QueueItem) uint {
 			return PriorityDefault
 		},
-		kg:               defaultQueueKey,
-		numWorkers:       defaultNumWorkers,
-		wg:               &sync.WaitGroup{},
-		seqLeaseLock:     &sync.RWMutex{},
-		pollTick:         defaultPollTick,
-		idempotencyTTL:   defaultIdempotencyTTL,
-		queueKindMapping: make(map[string]string),
-		scope:            tally.NoopScope,
-		tracer:           trace.NewNoopTracerProvider().Tracer("redis_queue"),
-		logger:           logger.From(context.Background()),
+		kg:                 defaultQueueKey,
+		numWorkers:         defaultNumWorkers,
+		wg:                 &sync.WaitGroup{},
+		seqLeaseLock:       &sync.RWMutex{},
+		scavengerLeaseLock: &sync.RWMutex{},
+		pollTick:           defaultPollTick,
+		idempotencyTTL:     defaultIdempotencyTTL,
+		queueKindMapping:   make(map[string]string),
+		scope:              tally.NoopScope,
+		tracer:             trace.NewNoopTracerProvider().Tracer("redis_queue"),
+		logger:             logger.From(context.Background()),
 		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
 			return p.Queue(), 10_000
 		},
@@ -312,6 +314,13 @@ type queue struct {
 	// seqLeaseLock ensures that there are no data races writing to
 	// or reading from seqLeaseID in parallel.
 	seqLeaseLock *sync.RWMutex
+
+	// scavengerLeaseID stores the lease ID if this queue is the scavenger processor.
+	// all runners attempt to claim this lease automatically.
+	scavengerLeaseID *ulid.ULID
+	// scavengerLeaseLock ensures that there are no data races writing to
+	// or reading from scavengerLeaseID in parallel.
+	scavengerLeaseLock *sync.RWMutex
 
 	// metrics allows reporting of metrics
 	scope tally.Scope
@@ -588,9 +597,10 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		q.kg.QueueItem(),
 		q.kg.QueueIndex(item.Queue()),
 		q.kg.PartitionMeta(item.Queue()),
-		q.kg.Concurrency(ak),
-		q.kg.Concurrency(pk),
-		q.kg.Concurrency(ck),
+		q.kg.Concurrency("account", ak),
+		q.kg.Concurrency("p", pk),
+		q.kg.Concurrency("custom", ck),
+		q.kg.ConcurrencyIndex(),
 	}
 	status, err := scripts["queue/lease"].Run(
 		ctx,
@@ -603,6 +613,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		ac,
 		pc,
 		cc,
+		p.Queue(),
 	).Int64()
 	if err != nil {
 		return nil, fmt.Errorf("error leasing queue item: %w", err)
@@ -655,9 +666,9 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 
 	keys := []string{
 		q.kg.QueueItem(),
-		q.kg.Concurrency(ak),
-		q.kg.Concurrency(pk),
-		q.kg.Concurrency(ck),
+		q.kg.Concurrency("account", ak),
+		q.kg.Concurrency("p", pk),
+		q.kg.Concurrency("custom", ck),
 	}
 	status, err := scripts["queue/extendLease"].Run(
 		ctx,
@@ -705,9 +716,10 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		q.kg.QueueIndex(qn),
 		q.kg.PartitionMeta(qn),
 		q.kg.Idempotency(i.ID),
-		q.kg.Concurrency(ak),
-		q.kg.Concurrency(pk),
-		q.kg.Concurrency(ck),
+		q.kg.Concurrency("account", ak),
+		q.kg.Concurrency("p", pk),
+		q.kg.Concurrency("custom", ck),
+		q.kg.ConcurrencyIndex(),
 	}
 
 	idempotency := q.idempotencyTTL
@@ -722,6 +734,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 
 		i.ID,
 		int(idempotency.Seconds()),
+		p.Queue(),
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error dequeueing item: %w", err)
@@ -782,9 +795,10 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		q.kg.QueueIndex(qn),
 		q.kg.PartitionMeta(qn),
 		q.kg.PartitionIndex(),
-		q.kg.Concurrency(ak),
-		q.kg.Concurrency(pk),
-		q.kg.Concurrency(ck),
+		q.kg.Concurrency("account", ak),
+		q.kg.Concurrency("p", pk),
+		q.kg.Concurrency("custom", ck),
+		q.kg.ConcurrencyIndex(),
 	}
 	status, err := scripts["queue/requeue"].Run(
 		ctx,
@@ -838,7 +852,7 @@ func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration t
 	keys := []string{
 		q.kg.PartitionItem(),
 		q.kg.PartitionIndex(),
-		q.kg.Concurrency(concurrencyKey),
+		q.kg.Concurrency("p", concurrencyKey),
 	}
 	result, err := scripts["queue/partitionLease"].Run(
 		ctx,
@@ -902,7 +916,7 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 		},
 		unix,
 		limit,
-	).StringSlice()
+	).Slice()
 	if err != nil {
 		return nil, fmt.Errorf("error peeking partition items: %w", err)
 	}
@@ -912,8 +926,13 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 
 	ignored := 0
 	for n, i := range encoded {
+		if i == nil {
+			ignored++
+			continue
+		}
+
 		item := &QueuePartition{}
-		if err = json.Unmarshal([]byte(i), item); err != nil {
+		if err = json.Unmarshal([]byte(i.(string)), item); err != nil {
 			return nil, fmt.Errorf("error reading partition item: %w", err)
 		}
 
@@ -1041,13 +1060,93 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 	}
 }
 
-func (q *queue) InProgress(ctx context.Context, concurrencyKey string) (int64, error) {
+func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey string) (int64, error) {
 	s := time.Now().UnixMilli()
-	return q.r.ZCount(ctx, q.kg.Concurrency(concurrencyKey), fmt.Sprintf("%d", s), "+inf").Result()
+	return q.r.ZCount(ctx, q.kg.Concurrency(prefix, concurrencyKey), fmt.Sprintf("%d", s), "+inf").Result()
 }
 
-// LeaseSequential allows a worker to lease sequential processing.  If leased, this allows a worker
-// to peek partitions sequentially.  Leasing this key works similar to leasing partitions or queue items:
+// Scavenge attempts to find jobs that may have been lost due to killed workers.  Workers are shared
+// nothing, and each item in a queue has a lease.  If a worker dies, it will not finish the job and
+// cannot renew the item's lease.
+//
+// We scan all partition concurrency queues - queues of leases - to find leases that have expired.
+func (q *queue) Scavenge(ctx context.Context) (int, error) {
+	// Find all items that have an expired lease - eg. where the min time for a lease is between
+	// (0-now] in unix milliseconds.
+	now := fmt.Sprintf("%d", time.Now().UnixMilli())
+	pKeys, err := q.r.ZRangeArgs(ctx, redis.ZRangeArgs{
+		Key:     q.kg.ConcurrencyIndex(),
+		Start:   "-inf",
+		Stop:    now,
+		ByScore: true,
+		Count:   100,
+	}).Result()
+	if err != nil {
+		return 0, fmt.Errorf("error scavenging for lost items: %w", err)
+	}
+
+	counter := 0
+
+	// Each of the items is a concurrency queue with lost items.
+	var resultErr error
+	for _, partition := range pKeys {
+		// Fetch the partition.  This uses the concurrency:p: prefix,
+		// so remove the prefix from the item.
+		partitionJSON, err := q.r.HGet(ctx, q.kg.PartitionItem(), partition).Result()
+		if err == redis.Nil {
+			continue
+		}
+		if err != nil {
+			resultErr = multierror.Append(resultErr, fmt.Errorf("error finding partition '%s' during scavenge: %w", partition, err))
+			continue
+		}
+
+		itemIDs, err := q.r.ZRangeArgs(ctx, redis.ZRangeArgs{
+			Key:     q.kg.Concurrency("p", partition),
+			Start:   "-inf",
+			Stop:    now,
+			ByScore: true,
+			Count:   100,
+		}).Result()
+		if err != nil && err != redis.Nil {
+			resultErr = multierror.Append(resultErr, fmt.Errorf("error querying partition concurrency queue '%s' during scavenge: %w", partition, err))
+			continue
+		}
+		if len(itemIDs) == 0 {
+			continue
+		}
+
+		p := QueuePartition{}
+		if err := json.Unmarshal([]byte(partitionJSON), &p); err != nil {
+			resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling partition '%s': %w", partitionJSON, err))
+			continue
+		}
+
+		// Fetch the queue item, then requeue.
+		jobs, err := q.r.HMGet(ctx, q.kg.QueueItem(), itemIDs...).Result()
+		if err != nil && err != redis.Nil {
+			resultErr = multierror.Append(resultErr, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partition, err))
+			continue
+		}
+		for _, item := range jobs {
+			qi := QueueItem{}
+			if err := json.Unmarshal([]byte(item.(string)), &qi); err != nil {
+				resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
+				continue
+			}
+			if err := q.Requeue(ctx, p, qi, time.Now()); err != nil {
+				resultErr = multierror.Append(resultErr, fmt.Errorf("error requeueing job '%s': %w", item, err))
+				continue
+			}
+			counter++
+		}
+	}
+
+	return counter, resultErr
+}
+
+// ConfigLease allows a worker to lease config keys for sequential or scavenger processing.
+// Leasing this key works similar to leasing partitions or queue items:
 //
 // - If the key isn't leased, a new lease is accepted.
 // - If the lease is expired, a new lease is accepted.
@@ -1055,9 +1154,11 @@ func (q *queue) InProgress(ctx context.Context, concurrencyKey string) (int64, e
 //   grant a lease.
 //
 // This returns the new lease ID on success.
-func (q *queue) LeaseSequential(ctx context.Context, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
-	if duration > SequentialLeaseMax {
-		return nil, ErrSequentialLeaseExceedsLimits
+//
+// If the sequential key is leased, this allows a worker to peek partitions sequentially.
+func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
+	if duration > ConfigLeaseMax {
+		return nil, ErrConfigLeaseExceedsLimits
 	}
 
 	now := time.Now()
@@ -1071,24 +1172,24 @@ func (q *queue) LeaseSequential(ctx context.Context, duration time.Duration, exi
 		existing = existingLeaseID[0].String()
 	}
 
-	status, err := scripts["queue/sequentialLease"].Run(
+	status, err := scripts["queue/configLease"].Run(
 		ctx,
 		q.r,
-		[]string{q.kg.Sequential()},
+		[]string{key},
 		now.UnixMilli(),
 		newLeaseID.String(),
 		existing,
 	).Int64()
 	if err != nil {
-		return nil, fmt.Errorf("error claiming sequential lease: %w", err)
+		return nil, fmt.Errorf("error claiming config lease: %w", err)
 	}
 	switch status {
 	case 0:
 		return &newLeaseID, nil
 	case 1:
-		return nil, ErrSequentialAlreadyLeased
+		return nil, ErrConfigAlreadyLeased
 	default:
-		return nil, fmt.Errorf("unknown response claiming sequential lease: %d", status)
+		return nil, fmt.Errorf("unknown response claiming config lease: %d", status)
 	}
 }
 

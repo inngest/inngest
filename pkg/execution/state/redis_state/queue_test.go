@@ -3,7 +3,6 @@ package redis_state
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -234,26 +233,41 @@ func TestQueuePeek(t *testing.T) {
 		t.Run("It should remove any leased items from the list", func(t *testing.T) {
 			p := QueuePartition{WorkflowID: ia.WorkflowID}
 
-			// Lease step B, and it should be removed.
-			leaseID, err := q.Lease(ctx, p, ia, 50*time.Millisecond)
+			// Lease step A, and it should be removed.
+			_, err := q.Lease(ctx, p, ia, 50*time.Millisecond)
 			require.NoError(t, err)
 
 			items, err = q.Peek(ctx, workflowID.String(), d, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*QueueItem{&ib, &ic, &id}, items)
+		})
 
 		t.Run("Expired leases should move back via scavenging", func(t *testing.T) {
+			// Run scavenging.
+			caught, err := q.Scavenge(ctx)
+			require.NoError(t, err)
+			require.EqualValues(t, 0, caught)
+
 			// When the lease expires it should re-appear
-			<-time.After(52 * time.Millisecond)
+			<-time.After(55 * time.Millisecond)
 
 			// Run scavenging.
+			scavengeAt := time.Now().UnixMilli()
+			caught, err = q.Scavenge(ctx)
+			require.NoError(t, err)
+			require.EqualValues(t, 1, caught)
 
 			items, err = q.Peek(ctx, workflowID.String(), d, QueuePeekMax)
 			require.NoError(t, err)
 			require.EqualValues(t, 4, len(items))
-			ia.LeaseID = leaseID
-			// NOTE: item A should have an expired lease ID.
+
+			require.EqualValues(t, ia.ID, items[0].ID)
+			// NOTE: Scavenging requeues items, and so the time will have changed.
+			require.GreaterOrEqual(t, items[0].AtMS, scavengeAt)
+			require.Greater(t, items[0].AtMS, ia.AtMS)
+			ia.LeaseID = nil
+			ia.AtMS = items[0].AtMS
 			require.EqualValues(t, []*QueueItem{&ia, &ib, &ic, &id}, items)
 		})
 	})
@@ -291,7 +305,7 @@ func TestQueueLease(t *testing.T) {
 		t.Run("It should add the item to the partition queue", func(t *testing.T) {
 			key, _ := q.partitionConcurrencyGen(ctx, p)
 			require.EqualValues(t, uuid.UUID{}.String(), key)
-			count, err := q.InProgress(ctx, key)
+			count, err := q.InProgress(ctx, "p", key)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, count)
 		})
@@ -311,7 +325,7 @@ func TestQueueLease(t *testing.T) {
 			// Now expired
 			t.Run("After expiry, no items should be in progress", func(t *testing.T) {
 				key, _ := q.partitionConcurrencyGen(ctx, p)
-				count, err := q.InProgress(ctx, key)
+				count, err := q.InProgress(ctx, "p", key)
 				require.NoError(t, err)
 				require.EqualValues(t, 0, count)
 			})
@@ -328,7 +342,7 @@ func TestQueueLease(t *testing.T) {
 
 			t.Run("Leasing an expired key has one in-progress", func(t *testing.T) {
 				key, _ := q.partitionConcurrencyGen(ctx, p)
-				count, err := q.InProgress(ctx, key)
+				count, err := q.InProgress(ctx, "p", key)
 				require.NoError(t, err)
 				require.EqualValues(t, 1, count)
 			})
@@ -474,7 +488,7 @@ func TestQueueExtendLease(t *testing.T) {
 		t.Run("It extends the score of the partition concurrency queue", func(t *testing.T) {
 			at := ulid.Time(nextID.Time())
 			pkey, _ := q.partitionConcurrencyGen(ctx, p)
-			scores := concurrencyQueueScores(t, r, q.kg.Concurrency(pkey), time.Now())
+			scores := concurrencyQueueScores(t, r, q.kg.Concurrency("p", pkey), time.Now())
 			require.Len(t, scores, 1)
 			// Ensure that the score matches the lease.
 			require.Equal(t, at, scores[item.ID])
@@ -528,7 +542,7 @@ func TestQueueDequeue(t *testing.T) {
 		t.Run("The lease exists in the partition queue", func(t *testing.T) {
 			key, _ := q.partitionConcurrencyGen(ctx, p)
 			require.EqualValues(t, uuid.UUID{}.String(), key)
-			count, err := q.InProgress(ctx, key)
+			count, err := q.InProgress(ctx, "p", key)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, count)
 		})
@@ -556,7 +570,7 @@ func TestQueueDequeue(t *testing.T) {
 		t.Run("It should remove the item from the concurrency partition's queue", func(t *testing.T) {
 			key, _ := q.partitionConcurrencyGen(ctx, p)
 			require.EqualValues(t, uuid.UUID{}.String(), key)
-			count, err := q.InProgress(ctx, key)
+			count, err := q.InProgress(ctx, "p", key)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, count)
 		})
@@ -596,10 +610,10 @@ func TestQueueRequeue(t *testing.T) {
 		pi := QueuePartition{WorkflowID: item.WorkflowID, Priority: testPriority}
 		requirePartitionScoreEquals(t, r, pi.WorkflowID, now.Truncate(time.Second))
 
-		requireInProgress(t, r, item.WorkflowID, 1)
+		requirePartitionInProgress(t, q, item.WorkflowID, 1)
 
 		next := now.Add(time.Hour)
-		err = q.Requeue(ctx, item, next)
+		err = q.Requeue(ctx, p, item, next)
 		require.NoError(t, err)
 
 		t.Run("It should re-enqueue the item with the future time", func(t *testing.T) {
@@ -612,7 +626,7 @@ func TestQueueRequeue(t *testing.T) {
 		})
 
 		t.Run("It should decrease the in-progress count", func(t *testing.T) {
-			requireInProgress(t, r, item.WorkflowID, 0)
+			requirePartitionInProgress(t, q, item.WorkflowID, 0)
 		})
 
 		t.Run("It should update the partition's earliest time, if earliest", func(t *testing.T) {
@@ -627,7 +641,7 @@ func TestQueueRequeue(t *testing.T) {
 			requirePartitionScoreEquals(t, r, pi.WorkflowID, now)
 
 			next := now.Add(2 * time.Hour)
-			err = q.Requeue(ctx, item, next)
+			err = q.Requeue(ctx, pi, item, next)
 			require.NoError(t, err)
 
 			requirePartitionScoreEquals(t, r, pi.WorkflowID, now)
@@ -958,22 +972,22 @@ func TestQueueLeaseSequential(t *testing.T) {
 	t.Run("It claims sequential leases", func(t *testing.T) {
 		now := time.Now()
 		dur := 500 * time.Millisecond
-		leaseID, err = q.LeaseSequential(ctx, dur)
+		leaseID, err = q.ConfigLease(ctx, q.kg.Sequential(), dur)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
 	})
 
 	t.Run("It doesn't allow leasing without an existing lease ID", func(t *testing.T) {
-		id, err := q.LeaseSequential(ctx, time.Second)
-		require.Equal(t, ErrSequentialAlreadyLeased, err)
+		id, err := q.ConfigLease(ctx, q.kg.Sequential(), time.Second)
+		require.Equal(t, ErrConfigAlreadyLeased, err)
 		require.Nil(t, id)
 	})
 
 	t.Run("It doesn't allow leasing with an invalid lease ID", func(t *testing.T) {
 		newULID := ulid.MustNew(ulid.Now(), rnd)
-		id, err := q.LeaseSequential(ctx, time.Second, &newULID)
-		require.Equal(t, ErrSequentialAlreadyLeased, err)
+		id, err := q.ConfigLease(ctx, q.kg.Sequential(), time.Second, &newULID)
+		require.Equal(t, ErrConfigAlreadyLeased, err)
 		require.Nil(t, id)
 	})
 
@@ -982,7 +996,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 
 		now := time.Now()
 		dur := 50 * time.Millisecond
-		leaseID, err = q.LeaseSequential(ctx, dur, leaseID)
+		leaseID, err = q.ConfigLease(ctx, q.kg.Sequential(), dur, leaseID)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
@@ -993,7 +1007,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 
 		now := time.Now()
 		dur := 50 * time.Millisecond
-		leaseID, err = q.LeaseSequential(ctx, dur)
+		leaseID, err = q.ConfigLease(ctx, q.kg.Sequential(), dur)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
@@ -1011,11 +1025,11 @@ func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) QueueItem {
 	return i
 }
 
-func requireInProgress(t *testing.T, r *miniredis.Miniredis, workflowID uuid.UUID, count int) {
+func requirePartitionInProgress(t *testing.T, q *queue, workflowID uuid.UUID, count int) {
 	t.Helper()
-	val := r.HGet(defaultQueueKey.PartitionMeta(workflowID.String()), "n")
-	require.NotEmpty(t, val)
-	require.Equal(t, fmt.Sprintf("%d", count), val)
+	actual, err := q.InProgress(context.Background(), "p", workflowID.String())
+	require.NoError(t, err)
+	require.EqualValues(t, count, actual)
 }
 
 func getPartition(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) QueuePartition {

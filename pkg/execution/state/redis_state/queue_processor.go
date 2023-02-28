@@ -113,6 +113,7 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	}
 
 	go q.claimSequentialLease(ctx)
+	go q.runScavenger(ctx)
 
 	tick := time.NewTicker(q.pollTick)
 
@@ -165,8 +166,8 @@ LOOP:
 // work on partitions sequentially;  this reduces contention.
 func (q *queue) claimSequentialLease(ctx context.Context) {
 	// Attempt to claim the lease immediately.
-	leaseID, err := q.LeaseSequential(ctx, SequentialLeaseDuration, q.sequentialLease())
-	if err != ErrSequentialAlreadyLeased && err != nil {
+	leaseID, err := q.ConfigLease(ctx, q.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
+	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
 	}
@@ -175,15 +176,15 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 	q.seqLeaseID = leaseID
 	q.seqLeaseLock.Unlock()
 
-	tick := time.NewTicker(SequentialLeaseDuration / 3)
+	tick := time.NewTicker(ConfigLeaseDuration / 3)
 	for {
 		select {
 		case <-ctx.Done():
 			tick.Stop()
 			return
 		case <-tick.C:
-			leaseID, err := q.LeaseSequential(ctx, SequentialLeaseDuration, q.sequentialLease())
-			if err == ErrSequentialAlreadyLeased {
+			leaseID, err := q.ConfigLease(ctx, q.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
+			if err == ErrConfigAlreadyLeased {
 				// This is expected; every time there is > 1 runner listening to the
 				// queue there will be contention.
 				q.seqLeaseLock.Lock()
@@ -207,6 +208,67 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 			}
 			q.seqLeaseID = leaseID
 			q.seqLeaseLock.Unlock()
+		}
+	}
+}
+
+func (q *queue) runScavenger(ctx context.Context) {
+	// Attempt to claim the lease immediately.
+	leaseID, err := q.ConfigLease(ctx, q.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
+	if err != ErrConfigAlreadyLeased && err != nil {
+		q.quit <- err
+		return
+	}
+
+	q.scavengerLeaseLock.Lock()
+	q.scavengerLeaseID = leaseID // no-op if not leased
+	q.scavengerLeaseLock.Unlock()
+
+	tick := time.NewTicker(ConfigLeaseDuration / 3)
+	scavenge := time.NewTicker(30 * time.Second)
+
+	for {
+		select {
+		case <-ctx.Done():
+			tick.Stop()
+			scavenge.Stop()
+			return
+		case <-scavenge.C:
+			// Scavenge the items
+			if q.isScavenger() {
+				count, err := q.Scavenge(ctx)
+				if err != nil {
+					q.logger.Error().Err(err).Msg("error claiming scavenger lease")
+				}
+				q.logger.Info().Int("len", count).Msg("scavenged lost jobs")
+			}
+		case <-tick.C:
+			// Attempt to re-lease the lock.
+			leaseID, err := q.ConfigLease(ctx, q.kg.Scavenger(), ConfigLeaseDuration, q.scavengerLease())
+			if err == ErrConfigAlreadyLeased {
+				// This is expected; every time there is > 1 runner listening to the
+				// queue there will be contention.
+				q.scavengerLeaseLock.Lock()
+				q.scavengerLeaseID = nil
+				q.scavengerLeaseLock.Unlock()
+				continue
+			}
+			if err != nil {
+				q.logger.Error().Err(err).Msg("error claiming scavenger lease")
+				q.scavengerLeaseLock.Lock()
+				q.scavengerLeaseID = nil
+				q.scavengerLeaseLock.Unlock()
+				continue
+			}
+
+			q.scavengerLeaseLock.Lock()
+			if q.scavengerLeaseID == nil {
+				// Only track this if we're creating a new lease, not if we're renewing
+				// a lease.
+				go q.scope.Counter(counterSequentialLeaseClaims).Inc(1)
+			}
+			q.scavengerLeaseID = leaseID
+			q.scavengerLeaseLock.Unlock()
 		}
 	}
 }
@@ -259,7 +321,9 @@ func (q *queue) scan(ctx context.Context, f osqueue.RunFunc) error {
 			return nil
 		}
 		if err := q.processPartition(ctx, p, f); err != nil {
-			q.logger.Error().Err(err).Msg("error processing partition")
+			if errors.Unwrap(err) != context.Canceled {
+				q.logger.Error().Err(err).Msg("error processing partition")
+			}
 			return err
 		}
 	}
@@ -272,7 +336,18 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	ctx, span := q.tracer.Start(ctx, "processPartition")
 	defer span.End()
 
-	// Attempt to lease items
+	// Attempt to lease items.  This checks partition-level concurrency limits
+	//
+	// For oprimization, because this is the only thread that can be leasing
+	// jobs for this partition, we store the partition limit and current count
+	// as a variable and iterate in the loop without loading keys from the state
+	// store.
+	//
+	// There's no way to know when queue items finish processing;  we don't
+	// store average runtimes for queue items (and we don't know because
+	// items are dynamic generators).  This means that we have to delay
+	// processing the partition by N seconds, meaning the latency is increased by
+	// up to this period for scheduled items behind the concurrency limits.
 	_, capacity, err := q.PartitionLease(ctx, *p, PartitionLeaseDuration)
 	if err == ErrPartitionConcurrencyLimit {
 		q.scope.Counter(counterPartitionConcurrencyLimitReached).Inc(1)
@@ -291,27 +366,6 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	}
 	if err != nil {
 		return fmt.Errorf("error leasing partition: %w", err)
-	}
-
-	// TODO: Check global and partition-level concurrency limits here.
-	//       If there's no capacity on global, then no capacity on
-	//       partition level limits then re-queue the partition for the future.
-	//
-	//       For oprimization, because this is the only thread that can be leasing
-	//       jobs for this partition, we store the partition limit and current count
-	//       as a variable and iterate in the loop without loading keys from the state
-	//       store.
-	//
-	//       There's no way to know when queue items finish processing;  we don't
-	//       store average runtimes for queue items (and we don't know because
-	//       items are dynamic generators).  This means that we have to delay
-	//       processing the partition by N seconds, meaning the latency is increased by
-	//       up to this period for scheduled items behind the concurrency limits.
-	globalConcurrencyLimit := 100
-	partitionConcurrencyLimit := 100
-	if globalConcurrencyLimit == 0 || partitionConcurrencyLimit == 0 {
-		// TODO: Requeue partition and stop.
-		// TODO: Counter for thrash.
 	}
 
 	// Ensure that peek doesn't take longer than the partition lease, to
@@ -340,19 +394,9 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 			continue
 		}
 
-		// Check the local in-memory counters for global and partition-level concurrency
+		// Check the local in-memory counters for partition-level concurrency
 		// limits here.  If we're at max from this local state, we can stop processing items.
-		//
-		// This _may_ be slightly out of date (in the order of nanoseconds) but this prevents
-		// thrashing in the case of a large number of queue items to process with small concurrency
-		// limits.
-		if globalConcurrencyLimit == 0 || partitionConcurrencyLimit == 0 {
-			q.scope.Counter(counterConcurrencyLimit).Inc(1)
-			break
-		}
-
 		if capacity == 0 {
-			// No capacity in the function/partition queue
 			q.scope.Counter(counterConcurrencyLimit).Inc(1)
 			break
 		}
@@ -368,7 +412,6 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 		// Within a goroutine attempt to lease this item.  This lets us concurrently lease
 		// items within the partition to process as fast as possible.
 		eg.Go(func() error {
-
 			q.scope.Counter(counterPartitionProcessItems).Inc(1)
 			// Attempt to lease this item before passing this to a worker.  We have to do this
 			// synchronously as we need to lease prior to requeueing the partition pointer. If
@@ -479,6 +522,13 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 	defer jobCancel()
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Always retry this job.
+				errCh <- osqueue.AlwaysRetry(fmt.Errorf("job panicked: %v", r))
+			}
+		}()
+
 		// This job may be up to 1999 ms in the future, as explained in processPartition.
 		// Just... wait until the job is available.
 		delay := time.Until(time.UnixMilli(qi.AtMS))
@@ -536,9 +586,13 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 			at := backoff.LinearJitterBackoff(qi.Data.Attempt)
 			qi.Data.Attempt += 1
 			qi.AtMS = at.UnixMilli()
-			q.logger.Debug().Err(err).Int64("at_ms", at.UnixMilli()).Msg("requeuing job")
+			q.logger.Warn().Err(err).Int64("at_ms", at.UnixMilli()).Msg("requeuing job")
 			if err := q.Requeue(ctx, p, qi, at); err != nil {
 				q.logger.Error().Err(err).Interface("item", qi).Msg("error requeuing job")
+				return err
+			}
+			if _, ok := err.(osqueue.QuitError); ok {
+				q.quit <- err
 				return err
 			}
 			return nil
@@ -577,6 +631,18 @@ func (q *queue) sequentialLease() *ulid.ULID {
 	return &copied
 }
 
+// scavengerLease is a helper method for concurrently reading the sequential
+// lease ID.
+func (q *queue) scavengerLease() *ulid.ULID {
+	q.scavengerLeaseLock.RLock()
+	defer q.scavengerLeaseLock.RUnlock()
+	if q.scavengerLeaseID == nil {
+		return nil
+	}
+	copied := *q.scavengerLeaseID
+	return &copied
+}
+
 func (q *queue) capacity() int64 {
 	return int64(q.numWorkers) - atomic.LoadInt64(&q.sem.counter)
 }
@@ -593,6 +659,14 @@ func (q *queue) peekSize() int64 {
 
 func (q *queue) isSequential() bool {
 	l := q.sequentialLease()
+	if l == nil {
+		return false
+	}
+	return ulid.Time(l.Time()).After(time.Now())
+}
+
+func (q *queue) isScavenger() bool {
+	l := q.scavengerLease()
 	if l == nil {
 		return false
 	}

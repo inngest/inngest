@@ -14,9 +14,12 @@ local idempotencyKey = KEYS[4]
 local accountConcurrencyKey   = KEYS[5] -- Account concurrency level
 local partitionConcurrencyKey = KEYS[6] -- Partition (function) concurrency level
 local customConcurrencyKey    = KEYS[7] -- Optional for eg. for concurrency amongst steps 
+-- We push pointers to partition concurrency items to the partition concurrency item
+local concurrencyPointer      = KEYS[8]
 
-local queueID = ARGV[1]
+local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
+local partitionName  = ARGV[3]
 
 -- $include(get_queue_item.lua)
 -- Fetch this item to see if it was in progress prior to deleting.
@@ -44,6 +47,22 @@ if accountConcurrencyKey ~= nil and accountConcurrencyKey ~= "" then
 end
 if customConcurrencyKey ~= nil and customConcurrencyKey ~= "" then
 	redis.call("ZREM", customConcurrencyKey, item.id)
+end
+
+-- Get the earliest item in the partition concurrency set.  We may be requeueing
+-- the only in-progress job and should remove this from the partition concurrency
+-- pointers, if this exists.
+local concurrencyScores = redis.call("ZRANGE", partitionConcurrencyKey, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+if concurrencyScores == false then
+	redis.call("ZREM", concurrencyPointer, partitionName)
+else
+	local earliestLease = tonumber(concurrencyScores[2])
+	if earliestLease == nil then
+		redis.call("ZREM", concurrencyPointer, partitionName)
+	else
+		-- Ensure that we update the score with the earliest lease
+		redis.call("ZADD", concurrencyPointer, earliestLease, partitionName)
+	end
 end
 
 return 0

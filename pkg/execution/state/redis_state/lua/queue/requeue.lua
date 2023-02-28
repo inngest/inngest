@@ -16,6 +16,8 @@ local partitionIndexKey = KEYS[4] -- partition:sorted - zset
 local accountConcurrencyKey   = KEYS[5] -- Account concurrency level
 local partitionConcurrencyKey = KEYS[6] -- When leasing an item we need to place the lease into this key.
 local customConcurrencyKey    = KEYS[7] -- Optional for eg. for concurrency amongst steps 
+-- We push pointers to partition concurrency items to the partition concurrency item
+local concurrencyPointer      = KEYS[8]
 
 local queueItem      = ARGV[1] -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID        = ARGV[2] -- id
@@ -31,7 +33,8 @@ end
 
 if item.leaseID ~= nil and item.leaseID ~= cjson.null then
 	-- Remove total number in progress if there's a lease.
-	-- TODO: IS THIS NECESSARY ANY MORE?
+	-- XXX: This is unused and is a rough indicator.  Use concurrency queues for
+	-- an actual indicator.
 	redis.call("HINCRBY", partitionKey, "n", -1)
 end
 
@@ -65,6 +68,22 @@ if currentScore == false or tonumber(currentScore) ~= earliestTime then
 	redis.call("ZADD", partitionIndexKey, earliestTime, partitionIndex)
 	-- Update the partition item too
 	redis.call("HSET", partitionKey, "item", partitionItem)
+end
+
+-- Get the earliest item in the partition concurrency set.  We may be requeueing
+-- the only in-progress job and should remove this from the partition concurrency
+-- pointers, if this exists.
+local concurrencyScores = redis.call("ZRANGE", partitionConcurrencyKey, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+if concurrencyScores == false then
+	redis.call("ZREM", concurrencyPointer, partitionIndex)
+else
+	local earliestLease = tonumber(concurrencyScores[2])
+	if earliestLease == nil then
+		redis.call("ZREM", concurrencyPointer, partitionIndex)
+	else
+		-- Ensure that we update the score with the earliest lease
+		redis.call("ZADD", concurrencyPointer, earliestLease, partitionIndex)
+	end
 end
 
 return 0
