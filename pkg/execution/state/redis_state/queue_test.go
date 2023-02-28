@@ -243,8 +243,11 @@ func TestQueuePeek(t *testing.T) {
 			require.EqualValues(t, 3, len(items))
 			require.EqualValues(t, []*QueueItem{&ib, &ic, &id}, items)
 
+		t.Run("Expired leases should move back via scavenging", func(t *testing.T) {
 			// When the lease expires it should re-appear
 			<-time.After(52 * time.Millisecond)
+
+			// Run scavenging.
 
 			items, err = q.Peek(ctx, workflowID.String(), d, QueuePeekMax)
 			require.NoError(t, err)

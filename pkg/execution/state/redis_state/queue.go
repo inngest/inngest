@@ -560,10 +560,6 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 //
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
-//
-// itemID must be the hashed ID of the queue item.
-//
-// NOTE: This function signature is getting quite out of hand.
 func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration) (*ulid.ULID, error) {
 	ctx, span := q.tracer.Start(ctx, "Lease")
 	defer span.End()
@@ -583,7 +579,6 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		ck, cc = q.customConcurrencyGen(ctx, item) // Get the custom concurrency key, if available.
 	}
 
-	// TODO: Add custom throttling here.
 	leaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
@@ -742,7 +737,7 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 }
 
 // Requeue requeues an item in the future.
-func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
+func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error {
 	ctx, span := q.tracer.Start(ctx, "Requeue")
 	defer span.End()
 
@@ -753,6 +748,20 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 
 	if priority > PriorityMin {
 		return ErrPriorityTooLow
+	}
+
+	var (
+		ak, pk, ck string // account, partition, custom concurrency key
+	)
+
+	// required
+	pk, _ = q.partitionConcurrencyGen(ctx, p)
+	// optional
+	if q.accountConcurrencyGen != nil {
+		ak, _ = q.accountConcurrencyGen(ctx, i)
+	}
+	if q.customConcurrencyGen != nil {
+		ck, _ = q.customConcurrencyGen(ctx, i) // Get the custom concurrency key, if available.
 	}
 
 	// Unset any lease ID as this is requeued.
@@ -773,6 +782,9 @@ func (q *queue) Requeue(ctx context.Context, i QueueItem, at time.Time) error {
 		q.kg.QueueIndex(qn),
 		q.kg.PartitionMeta(qn),
 		q.kg.PartitionIndex(),
+		q.kg.Concurrency(ak),
+		q.kg.Concurrency(pk),
+		q.kg.Concurrency(ck),
 	}
 	status, err := scripts["queue/requeue"].Run(
 		ctx,
@@ -1031,7 +1043,6 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 
 func (q *queue) InProgress(ctx context.Context, concurrencyKey string) (int64, error) {
 	s := time.Now().UnixMilli()
-
 	return q.r.ZCount(ctx, q.kg.Concurrency(concurrencyKey), fmt.Sprintf("%d", s), "+inf").Result()
 }
 

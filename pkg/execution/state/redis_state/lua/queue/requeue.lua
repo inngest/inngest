@@ -12,6 +12,10 @@ local queueKey          = KEYS[1] -- queue:item - hash: { $itemID: $item }
 local queueIndexKey     = KEYS[2] -- queue:sorted:$workflowID - zset
 local partitionKey      = KEYS[3] -- partition:item:$workflowID - hash { n: $leased, len: $enqueued }
 local partitionIndexKey = KEYS[4] -- partition:sorted - zset
+-- We push our queue item ID into each concurrency queue
+local accountConcurrencyKey   = KEYS[5] -- Account concurrency level
+local partitionConcurrencyKey = KEYS[6] -- When leasing an item we need to place the lease into this key.
+local customConcurrencyKey    = KEYS[7] -- Optional for eg. for concurrency amongst steps 
 
 local queueItem      = ARGV[1] -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID        = ARGV[2] -- id
@@ -27,12 +31,22 @@ end
 
 if item.leaseID ~= nil and item.leaseID ~= cjson.null then
 	-- Remove total number in progress if there's a lease.
+	-- TODO: IS THIS NECESSARY ANY MORE?
 	redis.call("HINCRBY", partitionKey, "n", -1)
 end
 
 redis.call("HSET", queueKey, queueID, queueItem) 
 -- Update the queue score
 redis.call("ZADD", queueIndexKey, queueScore, queueID)
+
+-- Remove this from all in-progress queues
+redis.call("ZREM", partitionConcurrencyKey, item.id)
+if accountConcurrencyKey ~= nil and accountConcurrencyKey ~= "" then
+	redis.call("ZREM", accountConcurrencyKey, item.id)
+end
+if customConcurrencyKey ~= nil and customConcurrencyKey ~= "" then
+	redis.call("ZREM", customConcurrencyKey, item.id)
+end
 
 -- Fetch partition index;  ensure this is the same as our lowest queue item score
 local currentScore = redis.call("ZSCORE", partitionIndexKey, partitionIndex)
