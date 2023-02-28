@@ -85,7 +85,4 @@ end
 -- Remove the item from our sorted index, as this is now on the queue.
 redis.call("ZREM", queueIndexKey, item.id)
 
--- Update the item's score in our sorted index.
--- redis.call("ZADD", queueIndexKey, nextTime, item.id)
-
 return 0

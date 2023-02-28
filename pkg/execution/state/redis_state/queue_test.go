@@ -852,7 +852,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 
 	p := QueuePartition{WorkflowID: qi.WorkflowID}
 
-	t.Run("Doesn't requeue the partition if there's an unleased job", func(t *testing.T) {
+	t.Run("Uses the next job item's time when requeueing with another job", func(t *testing.T) {
 		requirePartitionScoreEquals(t, r, idA, now)
 		next := now.Add(time.Hour)
 		err := q.PartitionRequeue(ctx, idA.String(), next, false)
@@ -860,26 +860,13 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		requirePartitionScoreEquals(t, r, idA, now)
 	})
 
-	t.Run("Requeus the partition with a leased job", func(t *testing.T) {
-		p := QueuePartition{WorkflowID: qi.WorkflowID}
-
-		_, err := q.Lease(ctx, p, qi, 10*time.Second)
-		require.NoError(t, err)
-
-		requirePartitionScoreEquals(t, r, idA, now)
-		next := now.Add(time.Hour)
-		err = q.PartitionRequeue(ctx, idA.String(), next, false)
-		require.NoError(t, err)
-		requirePartitionScoreEquals(t, r, idA, next)
-	})
-
+	next := now.Add(5 * time.Second)
 	t.Run("It removes any lease when requeueing", func(t *testing.T) {
-		next := now.Add(5 * time.Second)
 
 		_, _, err := q.PartitionLease(ctx, QueuePartition{WorkflowID: idA}, time.Minute)
 		require.NoError(t, err)
 
-		err = q.PartitionRequeue(ctx, idA.String(), next, false)
+		err = q.PartitionRequeue(ctx, idA.String(), next, true)
 		require.NoError(t, err)
 		requirePartitionScoreEquals(t, r, idA, next)
 
@@ -887,12 +874,28 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		require.Nil(t, loaded.LeaseID)
 	})
 
-	t.Run("It removes the partition if there are no jobs available", func(t *testing.T) {
-		err := q.Dequeue(ctx, p, qi)
+	t.Run("Deletes the partition with an empty queue and a leased job", func(t *testing.T) {
+		p := QueuePartition{WorkflowID: qi.WorkflowID}
+
+		requirePartitionScoreEquals(t, r, idA, next)
+
+		// Leasing the only job available moves the job into the concurrency queue,
+		// so the partition should be empty. when requeeing.
+		_, err := q.Lease(ctx, p, qi, 10*time.Second)
 		require.NoError(t, err)
 
+		requirePartitionScoreEquals(t, r, idA, next)
+
+		next := now.Add(time.Hour)
+		err = q.PartitionRequeue(ctx, idA.String(), next, false)
+		require.Error(t, ErrPartitionGarbageCollected, err)
+	})
+
+	t.Run("It returns a partition not found error if deleted", func(t *testing.T) {
+		err := q.Dequeue(ctx, p, qi)
+		require.NoError(t, err)
 		err = q.PartitionRequeue(ctx, idA.String(), time.Now().Add(time.Minute), false)
-		require.Equal(t, ErrPartitionGarbageCollected, err)
+		require.Equal(t, ErrPartitionNotFound, err)
 	})
 }
 

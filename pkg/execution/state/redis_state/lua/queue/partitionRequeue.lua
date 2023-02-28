@@ -36,7 +36,7 @@ if tonumber(redis.call("ZCARD", queueIndex)) == 0 then
 	return 2
 end
 
--- Peek up to N items from the workflow.
+-- Peek up the next available item from the queue
 local items = redis.call("ZRANGE", queueIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1)
 
 if #items > 0 and forceAt ~= 1 then
