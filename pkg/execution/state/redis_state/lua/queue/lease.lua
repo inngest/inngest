@@ -73,7 +73,7 @@ end
 item.leaseID = newLeaseKey
 redis.call("HSET", queueKey, queueID, cjson.encode(item))
 
--- Add the item to all keys
+-- Add the item to all concurrency keys
 redis.call("ZADD", partitionConcurrencyKey, nextTime, item.id)
 if accountConcurrencyKey ~= nil and accountConcurrencyKey ~= "" then
 	redis.call("ZADD", accountConcurrencyKey, nextTime, item.id)

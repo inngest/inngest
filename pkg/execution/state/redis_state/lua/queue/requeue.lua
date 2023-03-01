@@ -64,7 +64,7 @@ local queueScore = redis.call("ZRANGE", queueIndexKey, "-inf", "+inf", "BYSCORE"
 local earliestTime = math.floor(tonumber(queueScore[2]) / 1000)
 
 -- earliest is a table containing {item, score}
-if currentScore == false or tonumber(currentScore) ~= earliestTime then
+if currentScore == false or tonumber(currentScore) ~= earliestTime or tonumber(currentScore) == nil then
 	redis.call("ZADD", partitionIndexKey, earliestTime, partitionIndex)
 	-- Update the partition item too
 	redis.call("HSET", partitionKey, "item", partitionItem)

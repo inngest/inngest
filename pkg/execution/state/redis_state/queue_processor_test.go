@@ -167,6 +167,58 @@ func TestQueueRunBasic(t *testing.T) {
 	// XXX: Assert metrics are correct.
 }
 
+func TestQueueRunRetry(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 50})
+	q := NewQueue(
+		rc,
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(10),
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	idA := uuid.New()
+	items := []QueueItem{
+		{
+			WorkflowID: idA,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(3),
+				Identifier: state.Identifier{
+					WorkflowID: idA,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+				},
+			},
+		},
+	}
+
+	var counter int32
+	go func() {
+		_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			atomic.AddInt32(&counter, 1)
+			if atomic.LoadInt32(&counter) == 1 {
+				return fmt.Errorf("retry this step once")
+			}
+			return nil
+		})
+	}()
+
+	for _, item := range items {
+		_, err := q.EnqueueItem(ctx, item, time.Now())
+		require.NoError(t, err)
+	}
+
+	<-time.After(2*time.Second + 15*time.Second)
+	require.EqualValues(t, 2, atomic.LoadInt32(&counter), r.Dump())
+	cancel()
+
+	<-time.After(time.Second)
+
+	r.Close()
+	rc.Close()
+}
+
 // TestQueueRunExtended runs an extended in-memory test which:
 // - Enqueues 1-150 jobs every 0-100ms, for one of 1,0000 random functions
 // - Each job can be scheduled from now -> 10s in the future

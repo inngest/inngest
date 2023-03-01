@@ -507,7 +507,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 					return
 				}
 				leaseID, err = q.ExtendLease(ctx, p, qi, *leaseID, QueueLeaseDuration)
-				if err != nil && err != ErrQueueItemNotFound && err != context.Canceled {
+				if err != nil && err != ErrQueueItemNotFound && errors.Unwrap(err) != context.Canceled {
 					// XXX: Increase counter here.
 					q.logger.Error().Err(err).Msg("error extending lease")
 					errCh <- fmt.Errorf("error extending lease while processing: %w", err)

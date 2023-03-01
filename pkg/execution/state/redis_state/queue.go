@@ -657,8 +657,6 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		ck, _ = q.customConcurrencyGen(ctx, i)
 	}
 
-	// TODO: EXTEND LEASE IN CONCURRENCY QUEUES
-
 	newLeaseID, err := ulid.New(ulid.Timestamp(time.Now().Add(duration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
@@ -666,6 +664,8 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 
 	keys := []string{
 		q.kg.QueueItem(),
+		q.kg.QueueIndex(i.Queue()),
+		q.kg.PartitionIndex(),
 		q.kg.Concurrency("account", ak),
 		q.kg.Concurrency("p", pk),
 		q.kg.Concurrency("custom", ck),
@@ -677,6 +677,7 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		i.ID,
 		leaseID.String(),
 		newLeaseID.String(),
+		p.Queue(),
 	).Int64()
 	if err != nil {
 		return nil, fmt.Errorf("error extending lease: %w", err)
@@ -995,6 +996,7 @@ func (q *queue) PartitionRequeue(ctx context.Context, queueName string, at time.
 		q.kg.PartitionMeta(queueName),
 		q.kg.QueueIndex(queueName),
 		q.kg.QueueItem(),
+		q.kg.Concurrency("p", queueName),
 	}
 	force := 0
 	if forceAt {

@@ -912,6 +912,8 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		err := q.Dequeue(ctx, p, qi)
 		require.NoError(t, err)
 		err = q.PartitionRequeue(ctx, idA.String(), time.Now().Add(time.Minute), false)
+		require.Equal(t, ErrPartitionGarbageCollected, err)
+		err = q.PartitionRequeue(ctx, idA.String(), time.Now().Add(time.Minute), false)
 		require.Equal(t, ErrPartitionNotFound, err)
 	})
 }

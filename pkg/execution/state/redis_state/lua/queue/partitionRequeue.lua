@@ -16,6 +16,7 @@ local partitionIndex = KEYS[2]
 local partitionMeta  = KEYS[3]
 local queueIndex     = KEYS[4]
 local queueKey       = KEYS[5]
+local partitionConcurrencyKey = KEYS[6] -- We can only GC a partition if no running jobs occur.
 
 local workflowID = ARGV[1]
 local at         = tonumber(ARGV[2]) -- time in seconds
@@ -29,7 +30,7 @@ end
 
 -- If there are no items in the workflow queue, we can safely remove the
 -- partition.
-if tonumber(redis.call("ZCARD", queueIndex)) == 0 then
+if tonumber(redis.call("ZCARD", queueIndex)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
 	redis.call("HDEL", partitionKey, workflowID) -- Remove the item
 	redis.call("DEL", partitionMeta) -- Remove the meta
 	redis.call("ZREM", partitionIndex, workflowID) -- Remove the index
