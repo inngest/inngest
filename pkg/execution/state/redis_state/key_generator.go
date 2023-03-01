@@ -144,7 +144,7 @@ type QueueKeyGenerator interface {
 	Scavenger() string
 	// Idempotency stores the map for storing idempotency keys in redis
 	Idempotency(key string) string
-	// ConcurrencyKey returns a key for a given concurrency string.  This stores an ordered
+	// Concurrency returns a key for a given concurrency string.  This stores an ordered
 	// zset of items that are in progress for the given concurrency key, giving us a total count
 	// of in-progress leased items.
 	Concurrency(prefix, key string) string
