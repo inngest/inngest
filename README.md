@@ -29,7 +29,7 @@ Inngest makes it simple for you to write delayed or background jobs by triggerin
 - You send events from your application via our SDK (or with a Webhook)
 - Inngest runs your serverless functions that are configured to be triggered by those events, either immediately, or delayed.
 
-Inngest abstracts the complex parts of building a robust, reliable, and scalable architecture away from you so you can focus on writing amazing code and building applications for your users.
+Inngest abstracts the complex parts of building a robust, reliable, and scalable architecture away from you, so you can focus on writing amazing code and building applications for your users.
 
 We created Inngest to bring the benefits of event-driven systems to all developers, without having to write any code themselves. We believe that:
 
@@ -89,7 +89,7 @@ That's it - your function is set up!
 
 ## Project Architecture
 
-Fundamentally, there are two core pieces to Inngest: _events_ and _functions_. Functions have several sub-components for managing complex functionality (eg. steps, edges, triggers), but high level an event triggers a function, much like you schedule a job via an RPC call to a queue. Except, in Inngest, **functions are declarative**. They specify which events they react to, their schedules and delays, and the steps in their sequence.
+Fundamentally, there are two core pieces to Inngest: _events_ and _functions_. Functions have several subcomponents for managing complex functionality (eg. steps, edges, triggers), but high level an event triggers a function, much like you schedule a job via an RPC call to a queue. Except, in Inngest, **functions are declarative**. They specify which events they react to, their schedules and delays, and the steps in their sequence.
 
 <br />
 
@@ -97,20 +97,20 @@ Fundamentally, there are two core pieces to Inngest: _events_ and _functions_. F
   <img src=".github/assets/architecture-0.5.0.png" alt="Open Source Architecture" width="660" />
 </p>
 
-Inngest's architecture is made up of 6 core components:
+Inngest’s architecture is made up of 6 core components:
 
 - **Event API** receives events from clients through a simple POST request, pushing them to the **message queue**.
 - **Event Stream** acts as a buffer between the **API** and the **Runner**, buffering incoming messages to ensure QoS before passing messages to be executed.<br />
 - A **Runner** coordinates the execution of functions and a specific run’s **State**. When a new function execution is required, this schedules running the function’s steps from the trigger via the **executor.** Upon each step’s completion, this schedules execution of subsequent steps via iterating through the function’s **Edges.**
 - **Executor** manages executing the individual steps of a function, via _drivers_ for each step’s runtime. It loads the specific code to execute via the **DataStore.** It also interfaces over the **State** store to save action data as each finishes or fails.
-  - **Drivers** run the specific action code for a step, eg. within Docker or WASM. This allows us to support a variety of runtimes.
+  - **Drivers** run the specific action code for a step, e.g. within Docker or WASM. This allows us to support a variety of runtimes.
 - **State** stores data about events and given function runs, including the outputs and errors of individual actions, and what’s enqueued for the future.
 - **DataStore** stores persisted system data including Functions and Actions version metadata.
-- **Core API** is the main interface for writing to the DataStore. The CLI uses this to deploy new funtions and manage other key resources.
+- **Core API** is the main interface for writing to the DataStore. The CLI uses this to deploy new functions and manage other key resources.
 
 And, in this CLI:
 
-- The **DevServer** combines all of the components and basic drivers for each into a single system which loads all functions on disk, handles incoming events via the API and executes functions, all returning a readable output to the developer. (_Note - the DevServer does not run a Core API as functions are loaded directly from disk_)
+- The **DevServer** combines all the components and basic drivers for each into a single system which loads all functions on disk, handles incoming events via the API and executes functions, all returning a readable output to the developer. (_Note - the DevServer does not run a Core API as functions are loaded directly from disk_)
 
 For specific information on how the DevServer works and how it compares to production [read this doc](/docs/DEVSERVER_ARCHITECTURE.md).
 
@@ -119,7 +119,7 @@ For specific information on how the DevServer works and how it compares to produ
 ## Community
 
 - [**Join our online community for support, to give us feedback, or chat with us**](https://www.inngest.com/discord).
-- [Post a question or idea to our Github discussion board](https://github.com/orgs/inngest/discussions)
+- [Post a question or idea to our GitHub discussion board](https://github.com/orgs/inngest/discussions)
 - [Read the documentation](https://www.inngest.com/docs?ref=github-inngest-readme)
 - [Explore our public roadmap](https://github.com/orgs/inngest/projects/1/)
 - [Follow us on Twitter](https://twitter.com/inngest)
