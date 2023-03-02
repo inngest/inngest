@@ -240,7 +240,9 @@ func (q *queue) runScavenger(ctx context.Context) {
 				if err != nil {
 					q.logger.Error().Err(err).Msg("error claiming scavenger lease")
 				}
-				q.logger.Info().Int("len", count).Msg("scavenged lost jobs")
+				if count > 0 {
+					q.logger.Info().Int("len", count).Msg("scavenged lost jobs")
+				}
 			}
 		case <-tick.C:
 			// Attempt to re-lease the lock.

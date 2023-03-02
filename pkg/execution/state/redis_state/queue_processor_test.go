@@ -148,12 +148,16 @@ func TestQueueRunBasic(t *testing.T) {
 		})
 	}()
 
-	for _, item := range items {
-		_, err := q.EnqueueItem(ctx, item, time.Now())
+	for n, item := range items {
+		at := time.Now()
+		if n == len(items)-1 {
+			at = time.Now().Add(10 * time.Second)
+		}
+		_, err := q.EnqueueItem(ctx, item, at)
 		require.NoError(t, err)
 	}
 
-	<-time.After(2 * time.Second)
+	<-time.After(12 * time.Second)
 	require.EqualValues(t, int32(len(items)), atomic.LoadInt32(&handled))
 	cancel()
 
