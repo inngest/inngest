@@ -152,11 +152,13 @@ func (s *svc) Run(ctx context.Context) error {
 }
 
 func (s *svc) Stop(ctx context.Context) error {
-	cronCtx := s.cronmanager.Stop()
-	select {
-	case <-cronCtx.Done():
-	case <-ctx.Done():
-		return fmt.Errorf("error waiting for scheduled executions to finish")
+	if s.cronmanager != nil {
+		cronCtx := s.cronmanager.Stop()
+		select {
+		case <-cronCtx.Done():
+		case <-ctx.Done():
+			return fmt.Errorf("error waiting for scheduled executions to finish")
+		}
 	}
 	return nil
 }
@@ -410,15 +412,27 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			// XXX: When cancelling a workflow we should delete all other pauses
 			// for the same function run.  This should happen in the state store
 			// directly.
+
+			logger.From(ctx).Debug().
+				Str("pause_id", pause.ID.String()).
+				Str("run_id", pause.Identifier.RunID.String()).
+				Msg("cancelling function")
+
 			if err := s.state.Cancel(ctx, pause.Identifier); err != nil {
 				switch err {
 				case state.ErrFunctionCancelled, state.ErrFunctionComplete, state.ErrFunctionFailed:
 					// We can safely ignore these errors.
-					return nil
+					continue
 				default:
 					return err
 				}
 			}
+
+			// Consume the pause and continue
+			if err := s.state.ConsumePause(ctx, pause.ID, evtMap); err != nil {
+				return err
+			}
+			continue
 		}
 
 		if pause.OnTimeout {
