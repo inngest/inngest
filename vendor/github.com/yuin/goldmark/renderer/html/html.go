@@ -198,16 +198,24 @@ func (r *Renderer) writeLines(w util.BufWriter, source []byte, n ast.Node) {
 var GlobalAttributeFilter = util.NewBytesFilter(
 	[]byte("accesskey"),
 	[]byte("autocapitalize"),
+	[]byte("autofocus"),
 	[]byte("class"),
 	[]byte("contenteditable"),
-	[]byte("contextmenu"),
 	[]byte("dir"),
 	[]byte("draggable"),
-	[]byte("dropzone"),
+	[]byte("enterkeyhint"),
 	[]byte("hidden"),
 	[]byte("id"),
+	[]byte("inert"),
+	[]byte("inputmode"),
+	[]byte("is"),
+	[]byte("itemid"),
 	[]byte("itemprop"),
+	[]byte("itemref"),
+	[]byte("itemscope"),
+	[]byte("itemtype"),
 	[]byte("lang"),
+	[]byte("part"),
 	[]byte("slot"),
 	[]byte("spellcheck"),
 	[]byte("style"),
@@ -743,6 +751,7 @@ func (d *defaultWriter) Write(writer util.BufWriter, source []byte) {
 			d.RawWrite(writer, source[n:i])
 			d.RawWrite(writer, replacementCharacter)
 			n = i + 1
+			escaped = false
 			continue
 		}
 		if c == '&' {
@@ -810,6 +819,7 @@ var bPng = []byte("png;")
 var bGif = []byte("gif;")
 var bJpeg = []byte("jpeg;")
 var bWebp = []byte("webp;")
+var bSvg = []byte("svg;")
 var bJs = []byte("javascript:")
 var bVb = []byte("vbscript:")
 var bFile = []byte("file:")
@@ -821,7 +831,8 @@ func IsDangerousURL(url []byte) bool {
 	if bytes.HasPrefix(url, bDataImage) && len(url) >= 11 {
 		v := url[11:]
 		if bytes.HasPrefix(v, bPng) || bytes.HasPrefix(v, bGif) ||
-			bytes.HasPrefix(v, bJpeg) || bytes.HasPrefix(v, bWebp) {
+			bytes.HasPrefix(v, bJpeg) || bytes.HasPrefix(v, bWebp) ||
+			bytes.HasPrefix(v, bSvg) {
 			return false
 		}
 		return true
