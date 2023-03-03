@@ -16,10 +16,11 @@ local partitionIndex = KEYS[2]
 local partitionMeta  = KEYS[3]
 local queueIndex     = KEYS[4]
 local queueKey       = KEYS[5]
+local partitionConcurrencyKey = KEYS[6] -- We can only GC a partition if no running jobs occur.
 
 local workflowID = ARGV[1]
 local at         = tonumber(ARGV[2]) -- time in seconds
-local peekLimit  = tonumber(ARGV[3])
+local forceAt    = tonumber(ARGV[3])
 
 -- $include(get_partition_item.lua)
 local existing = get_partition_item(partitionKey, workflowID)
@@ -29,20 +30,19 @@ end
 
 -- If there are no items in the workflow queue, we can safely remove the
 -- partition.
-if tonumber(redis.call("ZCARD", queueIndex)) == 0 then
+if tonumber(redis.call("ZCARD", queueIndex)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
 	redis.call("HDEL", partitionKey, workflowID) -- Remove the item
 	redis.call("DEL", partitionMeta) -- Remove the meta
 	redis.call("ZREM", partitionIndex, workflowID) -- Remove the index
 	return 2
 end
 
--- Peek up to N items from the workflow.
-local items = redis.call("ZRANGE", queueIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, peekLimit)
+-- Peek up the next available item from the queue
+local items = redis.call("ZRANGE", queueIndex, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1)
 
-if #items > 0 then
-	-- Take the earliest time available here, and check if it's smaller than
-	-- the partition.
-	-- TODO: We should really only take the non-leased items to reduce waste.
+if #items > 0 and forceAt ~= 1 then
+	-- score = redis.call("ZSCORE", queueIndex, items[0])
+	-- at = math.floor(Vcore / 1000)
 	local encoded = redis.call("HMGET", queueKey, unpack(items))
 	for k, v in pairs(encoded) do
 		local item = cjson.decode(v)

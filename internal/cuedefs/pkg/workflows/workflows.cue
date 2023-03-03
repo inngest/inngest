@@ -16,6 +16,11 @@ import (
 	// The workflow name.
 	name: string
 
+	// The concurrency limit for this function.  This indicates the total number
+	// of parallel steps that can occur within copies of this function.
+	// 0 means use the max available within your account.
+	concurrency?: >=0
+
 	// The triggers which start a workflow.
 	//
 	// If this is a scheduled trigger, only one trigger may exist.

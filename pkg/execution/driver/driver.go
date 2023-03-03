@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/function/env"
@@ -55,5 +56,11 @@ func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex
 			},
 		},
 	}
-	return json.Marshal(data)
+
+	j, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return jcs.Transform(j)
 }
