@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { ulid } from 'ulid';
 import { usePrettyJson } from "../../hooks/usePrettyJson";
 import { useSendEventMutation } from "../../store/devApi";
 import {
@@ -6,7 +7,7 @@ import {
   FunctionRunStatus,
   useGetEventQuery,
 } from "../../store/generated";
-import { selectRun, showEventSendModal } from "../../store/global";
+import { selectEvent, selectRun, showEventSendModal } from "../../store/global";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import Button from "../Button";
 import CodeBlock from "../CodeBlock";
@@ -24,7 +25,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
   const dispatch = useAppDispatch();
 
   // const [pollingInterval, setPollingInterval] = useState(1000);
-  const query = useGetEventQuery({ id: eventId }, { pollingInterval: 1000 });
+  const query = useGetEventQuery({ id: eventId }, { pollingInterval: 1500 });
   const event = useMemo(() => query.data?.event, [query.data?.event]);
   const eventPayload = usePrettyJson(event?.raw);
 
@@ -56,7 +57,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
     >
       {eventPayload ? (
         <div className="px-4 pt-4">
-          <CodeBlock tabs={[{ label: "Payload", content: eventPayload }]} />
+          <CodeBlock tabs={[{ label: "Payload", content: eventPayload }]}/>
         </div>
       ) : null}
       <div className="pr-4 pt-4">
@@ -73,12 +74,17 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
                       return;
                     }
 
+                    const eventId = ulid();
+
                     sendEvent(
-                      JSON.stringify({
+                      {
                         ...JSON.parse(event.raw),
+                        id: eventId,
                         ts: Date.now(),
-                      })
-                    );
+                      },
+                    ).unwrap().then(() => {
+                      dispatch(selectEvent(eventId));
+                    })
                   }}
                 />
                 <Button
