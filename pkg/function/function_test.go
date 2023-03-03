@@ -273,8 +273,9 @@ import (
 )
 
 workflow: workflows.#Workflow & {
-  id:   "magical-id"
-  name: "Foo"
+  concurrency: 0
+  id:          "magical-id"
+  name:        "Foo"
   triggers: [{
     event:      "test.event.plz"
     expression: "event.version >= 2"

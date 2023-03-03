@@ -95,6 +95,7 @@ function: defs.#Function & {
 }
 -- workflow.json --
 {
+  "concurrency": 0,
   "id": "some-id",
   "name": "test",
   "throttle": {
