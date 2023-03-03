@@ -240,6 +240,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	}
 	metadata := runMetadata{
 		Identifier: input.Identifier,
+		Name:       input.Workflow.Name,
 		Pending:    1,
 		Debugger:   input.Debugger,
 		Context:    input.Context,
@@ -914,6 +915,9 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 	if val, ok := data["originalRunID"]; ok {
 		m.OriginalRunID = val
 	}
+	if val, ok := data["name"]; ok {
+		m.Name = val
+	}
 	if val, ok := data["runType"]; ok {
 		m.RunType = val
 	}
@@ -941,6 +945,7 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 type runMetadata struct {
 	Identifier state.Identifier `json:"id"`
 	Status     enums.RunStatus  `json:"status"`
+	Name       string           `json:"name"`
 	// These are the fields for standard state metadata.
 	Pending       int            `json:"pending"`
 	Debugger      bool           `json:"debugger"`
@@ -954,6 +959,7 @@ func (r runMetadata) Map() map[string]any {
 		"id":            r.Identifier,
 		"status":        int(r.Status), // Always store this as an int
 		"pending":       r.Pending,
+		"name":          r.Name,
 		"debugger":      r.Debugger,
 		"runType":       r.RunType,
 		"originalRunID": r.OriginalRunID,
@@ -964,6 +970,7 @@ func (r runMetadata) Map() map[string]any {
 func (r runMetadata) Metadata() state.Metadata {
 	m := state.Metadata{
 		Identifier: r.Identifier,
+		Name:       r.Name,
 		Pending:    r.Pending,
 		Debugger:   r.Debugger,
 		Status:     r.Status,

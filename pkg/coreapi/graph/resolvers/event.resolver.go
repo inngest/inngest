@@ -46,7 +46,7 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 		}
 
 		runs = append(runs, &models.FunctionRun{
-			ID:           m.OriginalRunID.String(),
+			ID:           m.Identifier.RunID.String(),
 			Name:         &name,
 			Status:       &status,
 			PendingSteps: &pending,

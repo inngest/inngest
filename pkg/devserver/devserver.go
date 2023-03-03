@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/alicebob/miniredis/v2"
+	"github.com/go-redis/redis/v8"
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
@@ -15,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/function/env"
 	"github.com/inngest/inngest/pkg/service"
@@ -71,16 +75,57 @@ func start(ctx context.Context, opts StartOpts, loader *inmemorydatastore.FSLoad
 		return err
 	}
 
-	sm, err := opts.Config.State.Service.Concrete.Manager(ctx)
+	rc, err := createInmemoryRedis()
 	if err != nil {
 		return err
 	}
+
+	var sm state.Manager
+	t := runner.NewTracker()
+	sm, err = redis_state.New(
+		ctx,
+		redis_state.WithRedisClient(rc),
+		redis_state.WithFunctionCallbacks(func(ctx context.Context, i state.Identifier, rs enums.RunStatus) {
+			switch rs {
+			case enums.RunStatusRunning:
+				// Add this to the in-memory tracker.
+				// XXX: Switch to sqlite.
+				s, err := sm.Load(ctx, i.RunID)
+				if err != nil {
+					return
+				}
+				t.Add(s.Event()["id"].(string), s.Metadata())
+			}
+		}),
+	)
+	if err != nil {
+		return err
+	}
+
+	queue := redis_state.NewQueue(
+		rc,
+		redis_state.WithIdempotencyTTL(time.Hour),
+		redis_state.WithNumWorkers(100),
+		redis_state.WithPartitionConcurrencyKeyGenerator(func(ctx context.Context, p redis_state.QueuePartition) (string, int) {
+			// Ensure that we return the correct concurrency values per
+			// partition.
+			funcs, _ := loader.Functions(ctx)
+			for _, f := range funcs {
+				if f.ID == p.WorkflowID.String() {
+					return p.Queue(), f.Concurrency
+				}
+			}
+			return p.Queue(), 10_000
+		}),
+	)
 
 	runner := runner.NewService(
 		opts.Config,
 		runner.WithExecutionLoader(loader),
 		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
+		runner.WithQueue(queue),
+		runner.WithTracker(t),
 	)
 
 	// The devserver embeds the event API.
@@ -90,21 +135,25 @@ func start(ctx context.Context, opts StartOpts, loader *inmemorydatastore.FSLoad
 		executor.WithExecutionLoader(loader),
 		executor.WithEnvReader(envreader),
 		executor.WithState(sm),
+		executor.WithQueue(queue),
 	)
 
-	// Add notifications to the state manager so that we can store new function runs
-	// in the core API service.
-	if notify, ok := sm.(state.FunctionNotifier); ok {
-		notify.OnFunctionStatus(func(ctx context.Context, id state.Identifier, rs enums.RunStatus) {
-			switch rs {
-			case enums.RunStatusRunning:
-				// A new function was added, so add this to the core API
-				// for listing functions by XYZ.
-			}
-		})
-	}
-
 	return service.StartAll(ctx, ds, runner, exec)
+}
+
+func createInmemoryRedis() (redis.UniversalClient, error) {
+	r := miniredis.NewMiniRedis()
+	_ = r.Start()
+	rc := redis.NewClient(&redis.Options{
+		Addr:     r.Addr(),
+		PoolSize: 100,
+	})
+	go func() {
+		for range time.Tick(time.Second) {
+			r.FastForward(time.Second)
+		}
+	}()
+	return rc, rc.Ping(context.Background()).Err()
 }
 
 func prepareDockerImages(ctx context.Context, dir string) (*inmemorydatastore.FSLoader, error) {

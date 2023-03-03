@@ -8,8 +8,8 @@ import (
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/function"
+	"github.com/oklog/ulid/v2"
 )
 
 func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error) {
@@ -17,27 +17,19 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 		return nil, fmt.Errorf("function run id is required")
 	}
 
-	metadata, err := r.Runner.Runs(ctx, "")
+	runID, err := ulid.Parse(query.FunctionRunID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Invalid run ID: %w", err)
 	}
 
-	var targetRun *state.Metadata
-
-	for _, m := range metadata {
-		if m.OriginalRunID.String() == query.FunctionRunID {
-			targetRun = &m
-			break
-		}
-	}
-
-	if targetRun == nil {
-		return nil, nil
+	state, err := r.Runner.StateManager().Load(ctx, runID)
+	if err != nil {
+		return nil, fmt.Errorf("Run ID not found: %w", err)
 	}
 
 	status := models.FunctionRunStatusRunning
 
-	switch targetRun.Status {
+	switch state.Metadata().Status {
 	case enums.RunStatusCompleted:
 		status = models.FunctionRunStatusCompleted
 	case enums.RunStatusFailed:
@@ -46,22 +38,17 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 		status = models.FunctionRunStatusCancelled
 	}
 
-	var startedAt time.Time
-
-	if targetRun.OriginalRunID != nil {
-		startedAt = time.UnixMilli(int64(targetRun.OriginalRunID.Time()))
-	}
-
-	name := string(targetRun.Name)
-	pending := int(targetRun.Pending)
+	startedAt := ulid.Time(runID.Time())
+	name := state.Metadata().Name
 
 	// Don't let pending be negative for clients
+	pending := state.Metadata().Pending
 	if pending < 0 {
 		pending = 0
 	}
 
 	return &models.FunctionRun{
-		ID:           targetRun.OriginalRunID.String(),
+		ID:           runID.String(),
 		Name:         &name,
 		Status:       &status,
 		PendingSteps: &pending,
@@ -89,11 +76,7 @@ func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionR
 			status = models.FunctionRunStatusCancelled
 		}
 
-		var startedAt time.Time
-
-		if m.OriginalRunID != nil {
-			startedAt = time.UnixMilli(int64(m.OriginalRunID.Time()))
-		}
+		startedAt := time.UnixMilli(int64(m.Identifier.RunID.Time()))
 
 		name := string(m.Name)
 		pending := int(m.Pending)
@@ -104,7 +87,7 @@ func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionR
 		}
 
 		runs = append(runs, &models.FunctionRun{
-			ID:           m.OriginalRunID.String(),
+			ID:           m.Identifier.RunID.String(),
 			Name:         &name,
 			Status:       &status,
 			PendingSteps: &pending,

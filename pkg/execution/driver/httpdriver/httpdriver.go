@@ -158,7 +158,7 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 	}
 
 	var body interface{}
-	body = json.RawMessage(byt)
+	body = []byte(byt)
 	if len(byt) > 0 {
 		// Is the response valid JSON?  If so, ensure that we don't re-marshal the
 		// JSON string.

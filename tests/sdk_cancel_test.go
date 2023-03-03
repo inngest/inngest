@@ -95,7 +95,7 @@ func TestSDKCancelNotReceived(t *testing.T) {
 				Name: "cancel/please",
 				Data: map[string]interface{}{
 					// This request ID doesn't match.
-					"request_id": "12345",
+					"request_id": "lol no",
 				},
 			}),
 

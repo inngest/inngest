@@ -17,7 +17,6 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/inmemory"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/logger"
@@ -39,6 +38,7 @@ type Opt func(s *svc)
 type Runner interface {
 	service.Service
 
+	StateManager() state.Manager
 	InitializeCrons(ctx context.Context) error
 	History(ctx context.Context, id state.Identifier) ([]state.History, error)
 	Runs(ctx context.Context, eventId string) ([]state.Metadata, error)
@@ -60,6 +60,20 @@ func WithEventManager(e event.Manager) func(s *svc) {
 func WithStateManager(sm state.Manager) func(s *svc) {
 	return func(s *svc) {
 		s.state = sm
+	}
+}
+
+func WithQueue(q queue.Queue) func(s *svc) {
+	return func(s *svc) {
+		s.queue = q
+	}
+}
+
+// WithTracker is used in the dev server to track runs.
+func WithTracker(t *Tracker) func(s *svc) {
+	// XXX: Replace with sqlite urgently.
+	return func(s *svc) {
+		s.tracker = t
 	}
 }
 
@@ -86,6 +100,8 @@ type svc struct {
 	// cronmanager allows the creation of new scheduled functions.
 	cronmanager *cron.Cron
 	em          *event.Manager
+
+	tracker *Tracker
 }
 
 func (s svc) Name() string {
@@ -115,10 +131,11 @@ func (s *svc) Pre(ctx context.Context) error {
 		}
 	}
 
-	logger.From(ctx).Info().Str("backend", s.config.Queue.Service.Backend).Msg("starting queue")
-	s.queue, err = s.config.Queue.Service.Concrete.Queue()
-	if err != nil {
-		return err
+	if s.queue == nil {
+		s.queue, err = s.config.Queue.Service.Concrete.Queue()
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -214,12 +231,16 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 	return nil
 }
 
+func (s *svc) StateManager() state.Manager {
+	return s.state
+}
+
 func (s *svc) History(ctx context.Context, id state.Identifier) ([]state.History, error) {
 	return s.state.History(ctx, id.RunID)
 }
 
 func (s *svc) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
-	return s.state.(inmemory.InmemoryLoader).Runs(ctx, eventId)
+	return s.tracker.Runs(ctx, eventId)
 }
 
 func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error) {
@@ -579,4 +600,32 @@ func Initialize(ctx context.Context, fn function.Function, evt event.Event, s st
 	}
 
 	return &id, nil
+}
+
+func NewTracker() (t *Tracker) {
+	return &Tracker{
+		l:      &sync.RWMutex{},
+		evtIDs: make(map[string][]state.Metadata),
+	}
+}
+
+type Tracker struct {
+	l      *sync.RWMutex
+	evtIDs map[string][]state.Metadata
+}
+
+func (t *Tracker) Add(evtID string, sm state.Metadata) {
+	t.l.Lock()
+	defer t.l.Unlock()
+	if _, ok := t.evtIDs[evtID]; !ok {
+		t.evtIDs[evtID] = []state.Metadata{sm}
+		return
+	}
+	t.evtIDs[evtID] = append(t.evtIDs[evtID], sm)
+}
+
+func (t *Tracker) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
+	t.l.RLock()
+	defer t.l.RUnlock()
+	return t.evtIDs[eventId], nil
 }
