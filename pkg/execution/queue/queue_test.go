@@ -16,12 +16,6 @@ func (r retryableError) Retryable() bool {
 	return r.retry
 }
 
-type alwaysRetry struct {
-	error
-}
-
-func (alwaysRetry) AlwaysRetryable() {}
-
 func TestShouldRetry(t *testing.T) {
 	tests := []struct {
 		err      error

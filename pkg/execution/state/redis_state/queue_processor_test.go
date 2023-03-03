@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,12 +32,10 @@ func TestQueueRunSequential(t *testing.T) {
 
 	q1 := NewQueue(
 		rc,
-		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 	)
 	q2 := NewQueue(
 		rc,
-		// We can't add more than 8128 goroutines when detecting race conditions.
 		WithNumWorkers(10),
 	)
 
@@ -64,7 +63,7 @@ func TestQueueRunSequential(t *testing.T) {
 	// Q2 has no lease.
 	require.Nil(t, q2.sequentialLease())
 
-	<-time.After(SequentialLeaseDuration)
+	<-time.After(ConfigLeaseDuration)
 
 	// Q1 retains lease.
 	require.NotNil(t, q1.sequentialLease())
@@ -73,7 +72,7 @@ func TestQueueRunSequential(t *testing.T) {
 	// Cancel q1, temrinating the queue with the sequential lease.
 	q1cancel()
 
-	<-time.After(SequentialLeaseDuration * 2)
+	<-time.After(ConfigLeaseDuration * 2)
 
 	// Q2 obtains lease.
 	require.NotNil(t, q2.sequentialLease())
@@ -149,12 +148,16 @@ func TestQueueRunBasic(t *testing.T) {
 		})
 	}()
 
-	for _, item := range items {
-		_, err := q.EnqueueItem(ctx, item, time.Now())
+	for n, item := range items {
+		at := time.Now()
+		if n == len(items)-1 {
+			at = time.Now().Add(10 * time.Second)
+		}
+		_, err := q.EnqueueItem(ctx, item, at)
 		require.NoError(t, err)
 	}
 
-	<-time.After(2 * time.Second)
+	<-time.After(12 * time.Second)
 	require.EqualValues(t, int32(len(items)), atomic.LoadInt32(&handled))
 	cancel()
 
@@ -168,17 +171,75 @@ func TestQueueRunBasic(t *testing.T) {
 	// XXX: Assert metrics are correct.
 }
 
+func TestQueueRunRetry(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 50})
+	q := NewQueue(
+		rc,
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(10),
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	idA := uuid.New()
+	items := []QueueItem{
+		{
+			WorkflowID: idA,
+			Data: osqueue.Item{
+				Kind:        osqueue.KindEdge,
+				MaxAttempts: max(3),
+				Identifier: state.Identifier{
+					WorkflowID: idA,
+					RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+				},
+			},
+		},
+	}
+
+	var counter int32
+	go func() {
+		_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			atomic.AddInt32(&counter, 1)
+			if atomic.LoadInt32(&counter) == 1 {
+				return fmt.Errorf("retry this step once")
+			}
+			return nil
+		})
+	}()
+
+	for _, item := range items {
+		_, err := q.EnqueueItem(ctx, item, time.Now())
+		require.NoError(t, err)
+	}
+
+	<-time.After(2*time.Second + 15*time.Second)
+	require.EqualValues(t, 2, atomic.LoadInt32(&counter), r.Dump())
+	cancel()
+
+	<-time.After(time.Second)
+
+	r.Close()
+	rc.Close()
+}
+
 // TestQueueRunExtended runs an extended in-memory test which:
 // - Enqueues 1-150 jobs every 0-100ms, for one of 1,0000 random functions
 // - Each job can be scheduled from now -> 10s in the future
 // - Each job can take from 0->7500ms to complete.
 //
-// We assert that all jobs are handled within 100ms of budget.
+// We randomly kill workers and assert that jobs are complete.
 //
 // NOTE: When this runs with the race decetor (--race), the throughput of goroutines
 // is severely limited.  This means that we need to extend the time in which we can
 // process jobs.
 func TestQueueRunExtended(t *testing.T) {
+	var handled int64
+
+	jobCompleteMax := int32(12_500) // ms
+	delayMax := int32(15_000)       // ms
+
+	l := logger.From(context.Background()).Level(zerolog.InfoLevel)
 	r := miniredis.RunT(t)
 	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
 	defer rc.Close()
@@ -186,10 +247,60 @@ func TestQueueRunExtended(t *testing.T) {
 		rc,
 		// We can't add more than 8128 goroutines when detecting race conditions,
 		// so lower the number of workers.
-		WithNumWorkers(2500),
+		WithNumWorkers(1000),
+		WithLogger(&l),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	go func() {
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+
+			go func() {
+
+				defer func() {
+					if err := recover(); err != nil {
+						fmt.Println(err)
+					}
+				}()
+
+				// Create new queues every 5 seconds that bring up workers and fail
+				// randomly, between 1 and 10 seconds in.
+				ctx, cancel := context.WithCancel(context.Background())
+				q := NewQueue(
+					rc,
+					// We can't add more than 8128 goroutines when detecting race conditions,
+					// so lower the number of workers.
+					WithNumWorkers(1000),
+					WithLogger(&l),
+				)
+
+				go func() {
+					_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+						// Wait up to N seconds to complete.
+						<-time.After(time.Duration(mrand.Int31n(atomic.LoadInt32(&jobCompleteMax))) * time.Millisecond)
+						// Increase handled when job is done.
+						atomic.AddInt64(&handled, 1)
+						return nil
+					})
+				}()
+
+				<-time.After(time.Duration(mrand.Int31n(30)+5) * time.Second)
+				fmt.Println("Cancelling worker")
+				cancel()
+				if mrand.Int31n(30) == 1 {
+					fmt.Println("Panicking worker")
+					panic("fail")
+				}
+			}()
+
+			<-time.After(5 * time.Second)
+		}
+
+	}()
 
 	mrand.Seed(time.Now().UnixMicro())
 
@@ -198,10 +309,6 @@ func TestQueueRunExtended(t *testing.T) {
 		funcs[n] = uuid.New()
 	}
 
-	jobCompleteMax := int32(12_500) // ms
-	delayMax := int32(15_000)       // ms
-
-	var handled int64
 	go func() {
 		_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
 			// Wait up to N seconds to complete.
@@ -260,7 +367,7 @@ func TestQueueRunExtended(t *testing.T) {
 					added-next,
 				)
 				latencySem.Lock()
-				// NOTE: RUNNING THIS WITH THE RACE CHECKER SIGNIFICANTLY REDUCES LATENCY.
+				// NOTE: RUNNING THIS WITH THE RACE CHECKER SIGNIFICANTLY INCREASES LATENCY.
 				// The actual latency should be checked without --race on.
 				fmt.Printf("AVG LATENCY: %dms\n", time.Duration(latencyAvg.Value()).Milliseconds())
 				latencySem.Unlock()

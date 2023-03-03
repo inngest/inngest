@@ -85,7 +85,6 @@ func (m *mem) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (i
 	}
 
 	for n, i := range s.Stack() {
-		fmt.Println(i, stepID)
 		if i == stepID {
 			return n + 1, nil
 		}
