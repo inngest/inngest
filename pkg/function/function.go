@@ -48,6 +48,8 @@ type Function struct {
 	// ID is the immutable random ID for the function.
 	ID string `json:"id"`
 
+	Concurrency int `json:"concurrency"`
+
 	// Trigger represnets the trigger for the function.
 	Triggers []Trigger `json:"triggers"`
 
