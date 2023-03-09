@@ -15,6 +15,7 @@ import (
 	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
@@ -219,6 +220,12 @@ func WithAccountConcurrencyKeyGenerator(f QueueItemConcurrencyKeyGenerator) func
 	}
 }
 
+func WithConcurrencyService(s concurrency.ConcurrencyAdder) func(q *queue) {
+	return func(q *queue) {
+		q.concurrencyService = s
+	}
+}
+
 // QueueItemConcurrencyKeyGenerator returns concurrenc keys given a queue item to limits.
 //
 // Each queue item can have its own concurrency keys.  For example, you can define
@@ -275,6 +282,10 @@ type queue struct {
 	accountConcurrencyGen   QueueItemConcurrencyKeyGenerator
 	partitionConcurrencyGen PartitionConcurrencyKeyGenerator
 	customConcurrencyGen    QueueItemConcurrencyKeyGenerator
+	// concurrencyService is an external concurrency limiter used when pulling
+	// jobs off of the queue.  It is only invoked for jobs with a non-zero function ID,
+	// eg. for jobs that run a function.
+	concurrencyService concurrency.ConcurrencyAdder
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.

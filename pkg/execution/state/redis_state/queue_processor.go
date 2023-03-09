@@ -10,6 +10,7 @@ import (
 
 	"github.com/VividCortex/ewma"
 	"github.com/inngest/inngest/pkg/backoff"
+	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/oklog/ulid/v2"
 	"github.com/uber-go/tally/v4"
@@ -353,7 +354,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	_, capacity, err := q.PartitionLease(ctx, *p, PartitionLeaseDuration)
 	if err == ErrPartitionConcurrencyLimit {
 		q.scope.Counter(counterPartitionConcurrencyLimitReached).Inc(1)
-		return q.PartitionRequeue(ctx, p.Queue(), time.Now().Add(PartitionConcurrencyLimitRequeueExtension), true)
+		return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if err == ErrPartitionAlreadyLeased {
 		q.scope.Counter(counterPartitionLeaseConflict).Inc(1)
@@ -414,6 +415,19 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 		// Within a goroutine attempt to lease this item.  This lets us concurrently lease
 		// items within the partition to process as fast as possible.
 		eg.Go(func() error {
+			// Ensure there's room within the concurrency queue, first.  This is typically
+			// more constrained.
+			if q.concurrencyService != nil {
+				err := q.concurrencyService.Add(ctx, item.WorkflowID, item.Data)
+				if err == concurrency.ErrAtConcurrencyLimit {
+					// return this package-specific error.
+					return ErrConcurrencyLimit
+				}
+				if err != nil {
+					return fmt.Errorf("error checking concurrency service limits: %w", err)
+				}
+			}
+
 			q.scope.Counter(counterPartitionProcessItems).Inc(1)
 			// Attempt to lease this item before passing this to a worker.  We have to do this
 			// synchronously as we need to lease prior to requeueing the partition pointer. If
@@ -428,7 +442,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 			case ErrPartitionConcurrencyLimit, ErrConcurrencyLimit:
 				q.scope.Counter(counterConcurrencyLimit).Inc(1)
 				q.sem.Release(1)
-				return nil
+				return err
 			case ErrQueueItemNotFound:
 				q.scope.Counter(counterQueueItemsGone).Inc(1)
 				q.sem.Release(1)
@@ -459,7 +473,14 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	if err := eg.Wait(); err != nil {
 		// The lease for the partition will expire and we will be able to restart
 		// work in the future.
-		return err
+		switch err {
+		case ErrPartitionConcurrencyLimit, ErrConcurrencyLimit:
+			// Requeue this partition as we hit concurrency limits.
+			q.scope.Counter(counterConcurrencyLimit).Inc(1)
+			return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		default:
+			return err
+		}
 	}
 
 	// Requeue the partition, which reads the next unleased job or sets a time of
