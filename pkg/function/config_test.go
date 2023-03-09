@@ -18,6 +18,7 @@ const exampleTxtar = `
 {
   "name": "test",
   "id": "some-id",
+  "concurrency": 0,
   "triggers": [
     {
       "event": "test.event",
@@ -535,8 +536,9 @@ import (
 )
 
 function: defs.#Function & {
-  name: "test"
-  id:   "wut"
+  name:        "test"
+  id:          "wut"
+  concurrency: 0
   triggers: [{
     event: "test.event"
   }]

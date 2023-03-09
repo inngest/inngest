@@ -1,8 +1,9 @@
 package v1
 
 #Function: {
-	id:   string
-	name: string
+	id:           string
+	name:         string
+	concurrency?: uint
 
 	// triggers represent how the function is invoked.
 	triggers: [...#Trigger]
