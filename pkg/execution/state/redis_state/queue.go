@@ -564,6 +564,8 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 			// Leased item, don't return.
 			continue
 		}
+		// The nested osqueue.Item never has an ID set;  always re-set it
+		qi.Data.JobID = &qi.ID
 		result[n] = qi
 		n++
 
