@@ -1023,6 +1023,7 @@ func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) QueueItem {
 	require.NotEmpty(t, val)
 	i := QueueItem{}
 	err := json.Unmarshal([]byte(val), &i)
+	i.Data.JobID = &i.ID
 	require.NoError(t, err)
 	return i
 }

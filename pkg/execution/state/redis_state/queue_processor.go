@@ -157,6 +157,7 @@ LOOP:
 	}
 
 	// Wait for all in-progress items to complete.
+	q.logger.Info().Msg("queue waiting to quit")
 	q.wg.Wait()
 
 	return nil
@@ -415,15 +416,21 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 		// Within a goroutine attempt to lease this item.  This lets us concurrently lease
 		// items within the partition to process as fast as possible.
 		eg.Go(func() error {
+			// NOTE: If this ends in an error, we must _always_ release an item from the
+			// semaphore to free capacity.  This will happen automatically when the worker
+			// finishes processing a queue item on success.
+
 			// Ensure there's room within the concurrency queue, first.  This is typically
 			// more constrained.
 			if q.concurrencyService != nil {
 				err := q.concurrencyService.Add(ctx, item.WorkflowID, item.Data)
 				if err == concurrency.ErrAtConcurrencyLimit {
 					// return this package-specific error.
+					q.sem.Release(1)
 					return ErrConcurrencyLimit
 				}
 				if err != nil {
+					q.sem.Release(1)
 					return fmt.Errorf("error checking concurrency service limits: %w", err)
 				}
 			}
