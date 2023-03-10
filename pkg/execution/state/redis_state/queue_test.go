@@ -191,11 +191,11 @@ func TestQueuePeek(t *testing.T) {
 		c := b.Add(2 * time.Second)
 		d := c.Add(2 * time.Second)
 
-		ia, err := q.EnqueueItem(ctx, QueueItem{}, a)
+		ia, err := q.EnqueueItem(ctx, QueueItem{ID: "a"}, a)
 		require.NoError(t, err)
-		ib, err := q.EnqueueItem(ctx, QueueItem{}, b)
+		ib, err := q.EnqueueItem(ctx, QueueItem{ID: "b"}, b)
 		require.NoError(t, err)
-		ic, err := q.EnqueueItem(ctx, QueueItem{}, c)
+		ic, err := q.EnqueueItem(ctx, QueueItem{ID: "c"}, c)
 		require.NoError(t, err)
 
 		items, err := q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 10)
@@ -204,7 +204,7 @@ func TestQueuePeek(t *testing.T) {
 		require.EqualValues(t, []*QueueItem{&ia, &ib, &ic}, items)
 		require.NotEqualValues(t, []*QueueItem{&ib, &ia, &ic}, items)
 
-		id, err := q.EnqueueItem(ctx, QueueItem{}, d)
+		id, err := q.EnqueueItem(ctx, QueueItem{ID: "d"}, d)
 		require.NoError(t, err)
 
 		items, err = q.Peek(ctx, workflowID.String(), time.Now().Add(time.Hour), 10)

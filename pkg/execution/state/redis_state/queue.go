@@ -469,6 +469,10 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	// Add the At timestamp.
 	i.AtMS = at.UnixMilli()
 
+	if i.Data.JobID == nil {
+		i.Data.JobID = &i.ID
+	}
+
 	// Get the queue name from the queue item.  This allows utilization of
 	// the partitioned queue for jobs with custom queue names, vs utilizing
 	// workflow IDs in every case.
