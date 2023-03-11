@@ -6,7 +6,7 @@ Inngest will call your functions securely via HTTP request on-demand, whether tr
 
 ## Hosting Inngest functions on Vercel
 
-After you've written your functions using [Next.js](/docs/frameworks/nextjs?ref=docs-deploy-vercel) or Vercel's [Express-like](/docs/frameworks/express?ref=docs-deploy-vercel) functions within your project, you need to serve them via the `serve` handler. Using the `serve` handler, create a Vercel/Next.js function at the `/api/inngest` endpoint. Here's an example in a Next.js app:
+After you've written your functions using [Next.js](/docs/sdk/serve?ref=docs-deploy-vercel#framework-next-js) or Vercel's [Express-like](/docs/sdk/serve?ref=docs-deploy-vercel#framework-express) functions within your project, you need to serve them via the `serve` handler. Using the `serve` handler, create a Vercel/Next.js function at the `/api/inngest` endpoint. Here's an example in a Next.js app:
 
 ```js
 // ./pages/api/inngest.js

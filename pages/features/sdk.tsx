@@ -147,7 +147,7 @@ export const codesnippets = {
 
 export const worksWithBrands = [
   {
-    docs: "/docs/frameworks/nextjs",
+    docs: "/docs/sdk/serve#framework-next-js",
     logo: "/assets/brand-logos/next-js-dark.svg",
     brand: "Next.js",
     height: "50%",
@@ -168,21 +168,21 @@ export const worksWithBrands = [
     type: "platform",
   },
   {
-    docs: "/docs/frameworks/express", // TODO - change to guide when launched
+    docs: "/docs/sdk/serve#framework-express",
     logo: "/assets/brand-logos/express-js-dark.svg",
     brand: "Express.js",
     height: "80%",
     type: "framework",
   },
   {
-    docs: "/docs/frameworks/cloudflare-pages",
+    docs: "/docs/sdk/serve#framework-cloudflare",
     logo: "/assets/brand-logos/cloudflare-dark.svg",
     brand: "Cloudflare Pages",
     height: "80%",
     type: "platform",
   },
   {
-    docs: "/docs/frameworks/redwoodjs",
+    docs: "/docs/sdk/serve#framework-redwood",
     logo: "/assets/brand-logos/redwoodjs-dark.svg",
     brand: "RedwoodJS",
     height: "80%",
@@ -395,10 +395,9 @@ export default function FeaturesSDK() {
                 done: true,
                 text: (
                   <>
-                    <a href="/docs/frameworks/nextjs?ref=features-sdk">
-                      Next.js
-                    </a>{" "}
-                    & <a href="/docs/frameworks/express">Express.js</a> support
+                    <a href="/docs/sdk/serve#framework-next-js">Next.js</a> &{" "}
+                    <a href="/docs/sdk/serve#framework-express">Express.js</a>{" "}
+                    support
                   </>
                 ),
               },
@@ -469,7 +468,7 @@ export default function FeaturesSDK() {
                 .height,
               description:
                 "Trigger background and scheduled functions using our Next.js adapter",
-              href: "/docs/frameworks/nextjs",
+              href: "/docs/sdk/serve?ref=features-sdk-guides#framework-next-js",
             },
             {
               type: "Framework Guide",
@@ -479,7 +478,7 @@ export default function FeaturesSDK() {
                 .height,
               description:
                 "Run background jobs without workers or setting up a queue",
-              href: "/docs/frameworks/express",
+              href: "/docs/sdk/serve?ref=features-sdk-guides#framework-express",
             },
             {
               type: "Platform Guide",
@@ -489,11 +488,11 @@ export default function FeaturesSDK() {
                 .height,
               description:
                 "Use our Netlify plugin to automate deployments of your functions",
-              href: "/docs/deploy/netlify",
+              href: "/docs/deploy/netlify?ref=features-sdk-guides",
             },
           ].map((i) => (
             <a
-              href={`${i.href}?ref=features-sdk-guides`}
+              href={i.href}
               className="text-color-primary flex transition-all	hover:-translate-y-1"
             >
               <div className="p-6 h-full w-full flex flex-col rounded-md border-2 border-slate-800">

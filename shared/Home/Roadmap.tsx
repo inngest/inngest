@@ -105,14 +105,14 @@ export default function Roadmap() {
               <div>
                 <a
                   className="text-indigo-400"
-                  href="/docs/frameworks/nextjs?ref=features-sdk-roadmap"
+                  href="/docs/sdk/serve?ref=features-sdk-roadmap#framework-next-js"
                 >
                   Next.js
                 </a>{" "}
                 &amp;{" "}
                 <a
                   className="text-indigo-400"
-                  href="/docs/frameworks/express?ref=features-sdk-roadmap"
+                  href="/docs/sdk/serve?ref=features-sdk-roadmap#framework-express"
                 >
                   Express.js
                 </a>{" "}

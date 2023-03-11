@@ -19,6 +19,10 @@ const legacyDocsUrls = [
   ["/docs/deploying-fuctions", "/docs/deploy"],
   ["/docs/functions/introduction", "/docs/functions"],
   ["/docs/how-inngest-works", "/docs"], // TODO/DOCS redirect this to new concepts page
+  ["/docs/frameworks/cloudflare-pages", "/docs/sdk/serve#framework-cloudflare"],
+  ["/docs/frameworks/express", "/docs/sdk/serve#framework-express"],
+  ["/docs/frameworks/nextjs", "/docs/sdk/serve#framework-next-js"],
+  ["/docs/frameworks/redwoodjs", "/docs/sdk/serve#framework-redwood"],
 ];
 
 async function redirects() {
