@@ -12,6 +12,8 @@ const options = {
     "https://docs.github.com",
     "https://docs.retool.com",
     "https://youtu.be",
+    "https://svelte.dev",
+    "https://deno.land",
   ],
 };
 
