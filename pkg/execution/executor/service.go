@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/function/env"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/xhit/go-str2duration/v2"
 	"golang.org/x/sync/errgroup"
@@ -142,6 +143,11 @@ func (s *svc) Pre(ctx context.Context) error {
 		drivers = append(drivers, d)
 	}
 
+	pb, err := pubsub.NewPublisher(ctx, s.config.EventStream.Service)
+	if err != nil {
+		return fmt.Errorf("failed to create publisher: %w", err)
+	}
+
 	s.exec, err = NewExecutor(
 		WithActionLoader(s.data),
 		WithStateManager(s.state),
@@ -150,6 +156,8 @@ func (s *svc) Pre(ctx context.Context) error {
 		),
 		WithLogger(logger.From(ctx)),
 		WithConfig(s.config.Execution),
+		WithEventStream(s.config.EventStream),
+		WithPublisher(pb),
 	)
 	if err != nil {
 		return err
