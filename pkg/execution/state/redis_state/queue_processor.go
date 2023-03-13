@@ -449,6 +449,8 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 			case ErrPartitionConcurrencyLimit, ErrConcurrencyLimit:
 				q.scope.Counter(counterConcurrencyLimit).Inc(1)
 				q.sem.Release(1)
+				// Since the queue is at capacity, return the error so that we
+				// don't keep hammering with "does the queue have room?" logic.
 				return err
 			case ErrQueueItemNotFound:
 				q.scope.Counter(counterQueueItemsGone).Inc(1)
