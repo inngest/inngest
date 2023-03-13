@@ -5,6 +5,11 @@ import (
 	"sync"
 )
 
+const (
+	EventReceivedName = "event/event.received"
+	FnFailedName      = "inngest/function.failed"
+)
+
 type Manager struct {
 	events map[string]Event
 	l      *sync.RWMutex

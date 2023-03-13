@@ -104,8 +104,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) error {
 		ctx,
 		a.config.EventStream.Service.TopicName(),
 		pubsub.Message{
-			// TODO: Move this into a const.
-			Name:      "event/event.received",
+			Name:      event.EventReceivedName,
 			Data:      string(byt),
 			Timestamp: time.Now(),
 		},
