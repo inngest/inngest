@@ -18,6 +18,7 @@ import (
 )
 
 func TestQueuePartitionConcurrency(t *testing.T) {
+
 	r := miniredis.RunT(t)
 	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 50})
 	defer rc.Close()
@@ -47,8 +48,9 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	)
 
 	var (
-		counter_1  int32
-		counter_10 int32
+		counter_1   int32
+		counter_10  int32
+		jobDuration = 2 * time.Second
 	)
 
 	// Run the queue.
@@ -62,7 +64,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 			case limit_10:
 				atomic.AddInt32(&counter_10, 1)
 			}
-			<-time.After(time.Second)
+			<-time.After(jobDuration)
 			return nil
 		})
 	}()
@@ -84,10 +86,10 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		}
 	}
 
-	<-time.After(time.Second)
+	<-time.After(jobDuration)
 
 	require.EqualValues(t, 10, atomic.LoadInt32(&counter_10), "Should have hit all 10 items with a concurrency limit of 10")
-	require.EqualValues(t, 1, atomic.LoadInt32(&counter_1), "Should have only run a single job")
+	require.EqualValues(t, int32(1), atomic.LoadInt32(&counter_1), "Should have only run a single job")
 
 	// TODO: Assert that the counterPartitionConcurrencyLimitReached counter isn't crazy high - we
 	// don't want to be churning on the partition.
@@ -100,5 +102,5 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 
 	diff := time.Since(start).Seconds()
 	require.Greater(t, int(diff), 10, "10 jobs should have taken at least 10 seconds")
-	require.Less(t, int(diff), 25, "10 jobs should have taken fewer than 25 seconds") // an extra 1.5x latency due to shifting of partitions for churn
+	require.Less(t, int(diff), 40, "10 jobs should have taken fewer than 40 seconds") // an extra 2x latency due to race checker
 }

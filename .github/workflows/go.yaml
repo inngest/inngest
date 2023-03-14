@@ -22,10 +22,10 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.50.1
           ./bin/golangci-lint run --verbose
-  test:
+  test-linux-race:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -35,3 +35,16 @@ jobs:
           go-version: 1.18
       - name: Test
         run: go test $(go list ./... | grep -v tests) -race -count=1
+  test-windows:
+    strategy:
+      matrix:
+        os: [windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
+      - name: Test
+        run: go test $(go list ./... | grep -v tests) -count=1
