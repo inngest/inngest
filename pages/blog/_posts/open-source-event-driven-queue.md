@@ -1,5 +1,4 @@
 ---
-focus: true
 heading: "Open sourcing Inngest"
 subtitle: "The open source, serverless event-driven platform for developers."
 image: "/assets/blog/open-source-event-driven-queue.jpg"

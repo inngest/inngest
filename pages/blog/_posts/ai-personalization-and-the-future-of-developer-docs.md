@@ -4,7 +4,6 @@ subtitle: "Providing developer-specific examples to help developers learn how to
 image: /assets/blog/openai-durable-functions-with-inngest/featured-image.png
 date: 2023-02-09
 author: Jack Williams
-focus: true
 disableCTA: true
 ---
 

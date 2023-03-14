@@ -24,7 +24,7 @@ export default function BlogLayout(props) {
         .filter((post) => !post.hide)
         .sort((a, z) => z.date.localeCompare(a.date));
 
-  const focus = visiblePosts.find((c) => c.focus);
+  const focus = visiblePosts.find((c) => c.focus) ?? visiblePosts[0];
   const rest = visiblePosts
     .filter((c) => !focus || c.slug !== focus.slug)
     .sort((a, z) => z.date.localeCompare(a.date));
