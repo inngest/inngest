@@ -1599,7 +1599,8 @@ func checkFinalizedStatus(t *testing.T, m state.Manager) {
 
 		history, err := m.History(ctx, s.RunID())
 		require.NoError(t, err)
-		require.Equal(t, enums.HistoryTypeFunctionFailed, history[len(history)-1].Type)
+		last := history[len(history)-1].Type
+		require.Equal(t, enums.HistoryTypeFunctionFailed, last, "Wrong history status: %s (%#v)", last, history)
 	})
 }
 
