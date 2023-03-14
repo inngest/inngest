@@ -15,6 +15,7 @@ import (
 	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
@@ -219,6 +220,12 @@ func WithAccountConcurrencyKeyGenerator(f QueueItemConcurrencyKeyGenerator) func
 	}
 }
 
+func WithConcurrencyService(s concurrency.ConcurrencyAdder) func(q *queue) {
+	return func(q *queue) {
+		q.concurrencyService = s
+	}
+}
+
 // QueueItemConcurrencyKeyGenerator returns concurrenc keys given a queue item to limits.
 //
 // Each queue item can have its own concurrency keys.  For example, you can define
@@ -275,6 +282,10 @@ type queue struct {
 	accountConcurrencyGen   QueueItemConcurrencyKeyGenerator
 	partitionConcurrencyGen PartitionConcurrencyKeyGenerator
 	customConcurrencyGen    QueueItemConcurrencyKeyGenerator
+	// concurrencyService is an external concurrency limiter used when pulling
+	// jobs off of the queue.  It is only invoked for jobs with a non-zero function ID,
+	// eg. for jobs that run a function.
+	concurrencyService concurrency.ConcurrencyAdder
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
@@ -458,6 +469,10 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	// Add the At timestamp.
 	i.AtMS = at.UnixMilli()
 
+	if i.Data.JobID == nil {
+		i.Data.JobID = &i.ID
+	}
+
 	// Get the queue name from the queue item.  This allows utilization of
 	// the partitioned queue for jobs with custom queue names, vs utilizing
 	// workflow IDs in every case.
@@ -553,6 +568,8 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 			// Leased item, don't return.
 			continue
 		}
+		// The nested osqueue.Item never has an ID set;  always re-set it
+		qi.Data.JobID = &qi.ID
 		result[n] = qi
 		n++
 

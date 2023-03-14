@@ -222,9 +222,10 @@ func (f Function) Validate(ctx context.Context) error {
 // the function used purely for execution.
 func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 	w := inngest.Workflow{
-		Name:     f.Name,
-		ID:       f.ID,
-		Triggers: make([]inngest.Trigger, len(f.Triggers)),
+		Name:        f.Name,
+		ID:          f.ID,
+		Triggers:    make([]inngest.Trigger, len(f.Triggers)),
+		Concurrency: f.Concurrency,
 	}
 
 	// TODO: Refactor these into shared structs and definitions, extend.
