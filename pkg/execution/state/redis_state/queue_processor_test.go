@@ -247,7 +247,7 @@ func TestQueueRunExtended(t *testing.T) {
 		rc,
 		// We can't add more than 8128 goroutines when detecting race conditions,
 		// so lower the number of workers.
-		WithNumWorkers(1000),
+		WithNumWorkers(200),
 		WithLogger(&l),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -274,7 +274,7 @@ func TestQueueRunExtended(t *testing.T) {
 					rc,
 					// We can't add more than 8128 goroutines when detecting race conditions,
 					// so lower the number of workers.
-					WithNumWorkers(1000),
+					WithNumWorkers(200),
 					WithLogger(&l),
 				)
 
