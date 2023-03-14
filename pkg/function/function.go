@@ -48,6 +48,8 @@ type Function struct {
 	// ID is the immutable random ID for the function.
 	ID string `json:"id"`
 
+	Concurrency int `json:"concurrency"`
+
 	// Trigger represnets the trigger for the function.
 	Triggers []Trigger `json:"triggers"`
 
@@ -220,9 +222,10 @@ func (f Function) Validate(ctx context.Context) error {
 // the function used purely for execution.
 func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
 	w := inngest.Workflow{
-		Name:     f.Name,
-		ID:       f.ID,
-		Triggers: make([]inngest.Trigger, len(f.Triggers)),
+		Name:        f.Name,
+		ID:          f.ID,
+		Triggers:    make([]inngest.Trigger, len(f.Triggers)),
+		Concurrency: f.Concurrency,
 	}
 
 	// TODO: Refactor these into shared structs and definitions, extend.

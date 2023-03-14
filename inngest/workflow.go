@@ -25,7 +25,8 @@ type Workflow struct {
 	// Version represents the workflow version, if this is loaded from a
 	// persistent store.
 	Version int `json:"-"`
-
+	// Concurrency indicates the total concurrency for this function.
+	Concurrency int `json:"concurrency"`
 	// ID is the immutable human identifier for the workflow.  This acts
 	// similarly to a git repository name;  a single workflow ID can contain
 	// many workflow versions.

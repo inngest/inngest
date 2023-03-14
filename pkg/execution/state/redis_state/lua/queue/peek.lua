@@ -1,6 +1,6 @@
 --[[
 
-Peek returns items from the queue in order.
+Peek returns items from the queue that are unleased and the vesting time <= peekUntil
 
 ]]
 

@@ -24,7 +24,8 @@
     "react-redux": "^8.0.5",
     "react-refractor": "^2.1.7",
     "react-timeago": "^7.1.0",
-    "refractor": "^4.8.0"
+    "refractor": "^4.8.0",
+    "ulid": "^2.3.0"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "2.13.11",

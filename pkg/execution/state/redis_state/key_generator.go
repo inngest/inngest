@@ -139,8 +139,19 @@ type QueueKeyGenerator interface {
 	// Sequential returns the key which allows a worker to claim sequential processing
 	// of the partitions.
 	Sequential() string
+	// Scavenger returns the key which allows a worker to claim scavenger processing
+	// of the partitions for lost jobs
+	Scavenger() string
 	// Idempotency stores the map for storing idempotency keys in redis
 	Idempotency(key string) string
+	// Concurrency returns a key for a given concurrency string.  This stores an ordered
+	// zset of items that are in progress for the given concurrency key, giving us a total count
+	// of in-progress leased items.
+	Concurrency(prefix, key string) string
+	// ConcurrencyIndex returns a key for storing pointers to partition concurrency queues that
+	// have in-progress work.  This allows us to scan and scavenge jobs in concurrency queues where
+	// leases have expired (in the case of failed workers)
+	ConcurrencyIndex() string
 }
 
 type DefaultQueueKeyGenerator struct {
@@ -171,6 +182,22 @@ func (d DefaultQueueKeyGenerator) Sequential() string {
 	return fmt.Sprintf("%s:queue:sequential", d.Prefix)
 }
 
+func (d DefaultQueueKeyGenerator) Scavenger() string {
+	return fmt.Sprintf("%s:queue:scavenger", d.Prefix)
+}
+
 func (d DefaultQueueKeyGenerator) Idempotency(key string) string {
 	return fmt.Sprintf("%s:queue:seen:%s", d.Prefix, key)
+}
+
+func (d DefaultQueueKeyGenerator) Concurrency(prefix, key string) string {
+	if key == "" {
+		// None supplied.
+		return ""
+	}
+	return fmt.Sprintf("%s:concurrency:%s:%s", d.Prefix, prefix, key)
+}
+
+func (d DefaultQueueKeyGenerator) ConcurrencyIndex() string {
+	return fmt.Sprintf("%s:concurrency:sorted", d.Prefix)
 }

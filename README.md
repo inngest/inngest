@@ -127,4 +127,9 @@ For specific information on how the DevServer works and how it compares to produ
 
 ## Contributing
 
-We’re excited to embrace the community! We’re happy for any and all contributions, whether they’re feature requests, ideas, bug reports, or PRs. While we’re open source, we don’t have expectations that people do our work for us — so any contributions are indeed very much appreciated. Feel free to hack on anything and submit a PR.
+We’re excited to embrace the community! We’re happy for any and all contributions, whether they’re
+feature requests, ideas, bug reports, or PRs. While we’re open source, we don’t have expectations
+that people do our work for us — so any contributions are indeed very much appreciated. Feel free to
+hack on anything and submit a PR.
+
+Check out our [contributing guide](/docs/CONTRIBUTING.md) to get started.

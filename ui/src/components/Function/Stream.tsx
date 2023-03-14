@@ -9,8 +9,8 @@ import TimelineRow from "../Timeline/TimelineRow";
 
 export const FuncStream = () => {
   const functions = useGetFunctionsStreamQuery(
-    {},
-    { pollingInterval: 1000, refetchOnMountOrArgChange: true }
+    undefined,
+    { pollingInterval: 1500 }
   );
   const selectedRun = useAppSelector((state) => state.global.selectedRun);
   const dispatch = useAppDispatch();

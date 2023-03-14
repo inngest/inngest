@@ -67,3 +67,13 @@ func ShouldRetry(err error, attempt int, max int) bool {
 	// Check max attempts.
 	return (attempt + 1) < max
 }
+
+func AlwaysRetry(err error) error {
+	return alwaysRetry{error: err}
+}
+
+type alwaysRetry struct {
+	error
+}
+
+func (a alwaysRetry) AlwaysRetryable() {}
