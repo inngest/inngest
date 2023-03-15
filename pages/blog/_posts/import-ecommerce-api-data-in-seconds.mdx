@@ -51,45 +51,47 @@ First, we're going to use the [Inngest SDK](/docs?ref=blog-import-ecommerce) to 
 
 ```typescript
 await inngest.send({
-    name: "shopify/import.requested",
-    data: { storeId: 1462924, userId: 9357925756 },
-});
+  name: "shopify/import.requested",
+  data: { storeId: 1462924, userId: 9357925756 },
+})
+
 ```
 
 Here's some example code of an Inngest function that runs whenever the above event is sent, with a max concurrency of `10`. This function iterates over all pages combining all products into a single array. Each API request is performed with retries within `step.run()`.
 
 ```typescript
 export default inngest.createFunction(
-    { name: "Shopify Product Import", concurrency: 10 },
-    { event: "shopify/import.requested" },
-    async ({ event, step }) => {
-        const allProducts = [];
-        let cursor = null;
-        let hasMore = true;
+  { name: "Shopify Product Import", concurrency: 10 },
+  { event: "shopify/import.requested" },
+  async ({ event, step }) => {
+    const allProducts = []
+    let cursor = null
+    let hasMore = true
 
-        // Use the event's "data" to pass key info like IDs
-        const session = await database.getShopifySession(event.data.storeId);
+    // Use the event's "data" to pass key info like IDs
+    const session = await database.getShopifySession(event.data.storeId)
 
-        while (hasMore) {
-            // step.run will be retried automatically if the request fails
-            const page = await step.run("Fetch products", async () => {
-                return await shopify.rest.Product.all({
-                    session,
-                    since_id: cursor,
-                });
-            });
-            // Combine all of the data into a single list
-            allProducts.push(...page.products);
-            if (page.products.length === 50) {
-                cursor = page.products[49].id;
-            } else {
-                hasMore = false;
-            }
-        }
-
-        // Now we have the entire list of products within allProducts!
+    while (hasMore) {
+      // step.run will be retried automatically if the request fails
+      const page = await step.run("Fetch products", async () => {
+        return await shopify.rest.Product.all({
+          session,
+          since_id: cursor,
+        })
+      })
+      // Combine all of the data into a single list
+      allProducts.push(...page.products)
+      if (page.products.length === 50) {
+        cursor = page.products[49].id
+      } else {
+        hasMore = false
+      }
     }
-);
+
+    // Now we have the entire list of products within allProducts!
+  }
+)
+
 ```
 
 You now know the key concepts for Inngest:
@@ -102,52 +104,54 @@ With these concepts you can now add a series of steps that writes to your databa
 
 ```typescript
 inngest.createFunction(
-    { name: "Shopify Product Import", concurrency: 10 },
-    { event: "shopify/import.requested" },
-    async ({ event, step }) => {
-        // --- See first code snippet above for the setup ---
+  { name: "Shopify Product Import", concurrency: 10 },
+  { event: "shopify/import.requested" },
+  async ({ event, step }) => {
+    // --- See first code snippet above for the setup ---
 
-        for (let product of allProducts) {
-            await step.run("Import product", async () => {
-                await database.upsertProduct({
-                    storeId: event.data.storeId,
-                    product,
-                });
-            });
-        }
+    for (let product of allProducts) {
+      await step.run("Import product", async () => {
+        await database.upsertProduct({
+          storeId: event.data.storeId,
+          product,
+        })
+      })
     }
-);
+  }
+)
+
 ```
 
 Even better, since `step.run()` returns a `Promise`, you can use `Promise.all()` here to kick off all steps in parallel and let Inngest manage the concurrency!
 
 ```typescript
 inngest.createFunction(
-    { name: "Shopify Product Import", concurrency: 10 },
-    { event: "shopify/import.requested" },
-    async ({ event, step }) => {
-        // --- See first code snippet above for the setup ---
+  { name: "Shopify Product Import", concurrency: 10 },
+  { event: "shopify/import.requested" },
+  async ({ event, step }) => {
+    // --- See first code snippet above for the setup ---
 
-        // Since step.run return a Promise, we iterate over all products
-        // creating an array of step.run Promises - Inngest can handle it all!
-        Promise.all(
-            allProducts.map((product) =>
-                step.run("Import product", async () => {
-                    await database.upsertProduct({
-                        storeId: event.data.storeId,
-                        product,
-                    });
-                })
-            )
-        );
+    // Since step.run return a Promise, we iterate over all products
+    // creating an array of step.run Promises - Inngest can handle it all!
+    Promise.all(
+      allProducts.map((product) =>
+        step.run("Import product", async () => {
+          await database.upsertProduct({
+            storeId: event.data.storeId,
+            product,
+          })
+        })
+      )
+    )
 
-        // Tell the user the import has been completed
-        await step.run("Import completed notification", async () => {
-            const user = await database.getUser(event.data.userId);
-            await sentEmail(user.email, "import_completed");
-        });
-    }
-);
+    // Tell the user the import has been completed
+    await step.run("Import completed notification", async () => {
+      const user = await database.getUser(event.data.userId)
+      await sentEmail(user.email, "import_completed")
+    })
+  }
+)
+
 ```
 
 You can combine these step tools in any way that you want. For example, you may prefer to batch your database inserts or you may want an additional step for each product that fetches and imports [all product images](https://shopify.dev/docs/api/admin-rest/2023-01/resources/product-image#get-products-product-id-images) into your database or copies them to your image storage bucket.
@@ -160,63 +164,62 @@ Let's look at an example that fetches all images and copies those images to our 
 
 ```typescript
 inngest.createFunction(
-    { name: "Shopify Product Import", concurrency: 10 },
-    { event: "shopify/import.requested" },
-    async ({ event, step }) => {
-        // --- See first code snippet above for the setup ---
+  { name: "Shopify Product Import", concurrency: 10 },
+  { event: "shopify/import.requested" },
+  async ({ event, step }) => {
+    // --- See first code snippet above for the setup ---
 
-        for (let product of allProducts) {
-            // Fetch all images from each product
-            const response = await step.run(
-                "Fetch images product",
-                async () => {
-                    return await shopify.rest.Image.all({
-                        session: session,
-                        product_id: product.id,
-                    });
-                }
-            );
-            // Turn the image list into a series of events to send
-            const events = response.images.map((image) => ({
-                name: "shopify/copy.image",
-                data: {
-                    imageId: image.id,
-                    imageUrl: image.src,
-                    storeId: event.data.storeId,
-                    productId: product.id,
-                },
-            }));
-            // Now, we send events in bulk to Inngest
-            await step.sendEvent(events);
-        }
+    for (let product of allProducts) {
+      // Fetch all images from each product
+      const response = await step.run("Fetch images product", async () => {
+        return await shopify.rest.Image.all({
+          session: session,
+          product_id: product.id,
+        })
+      })
+      // Turn the image list into a series of events to send
+      const events = response.images.map((image) => ({
+        name: "shopify/copy.image",
+        data: {
+          imageId: image.id,
+          imageUrl: image.src,
+          storeId: event.data.storeId,
+          productId: product.id,
+        },
+      }))
+      // Now, we send events in bulk to Inngest
+      await step.sendEvent(events)
     }
-);
+  }
+)
+
 ```
 
 Now that we have a `"shopify/copy.image"` event - we can write another function with higher concurrency (`50`) since our image bucket's API has much higher rate limits (S3 supports 3,500/sec).
 
 ```typescript
 inngest.createFunction(
-    { name: "Shopify Copy Image to S3", concurrency: 20 },
-    { event: "shopify/copy.image" },
-    async ({ event, step }) => {
-        const { imageId, storeId, productId } = event.data;
-        await step.run("Copy image", async () => {
-            const res = await fetch(event.data.imageUrl);
-            const blob = await res.blob();
-            const ext = path.extname(event.data.imageUrl);
-            const uploadedImage = await s3
-                .upload({
-                    Bucket: process.env.AWS_S3_BUCKET_NAME,
-                    Key: `/${storeId}/${productId}/${imageId}.${ext}`,
-                    ContentType: res.headers.get("content-type"),
-                    Body: blob,
-                })
-                .promise();
-            return uploadedImage.Location;
-        });
-    }
-);
+  { name: "Shopify Copy Image to S3", concurrency: 20 },
+  { event: "shopify/copy.image" },
+  async ({ event, step }) => {
+    const { imageId, storeId, productId } = event.data
+    await step.run("Copy image", async () => {
+      const res = await fetch(event.data.imageUrl)
+      const blob = await res.blob()
+      const ext = path.extname(event.data.imageUrl)
+      const uploadedImage = await s3
+        .upload({
+          Bucket: process.env.AWS_S3_BUCKET_NAME,
+          Key: `/${storeId}/${productId}/${imageId}.${ext}`,
+          ContentType: res.headers.get("content-type"),
+          Body: blob,
+        })
+        .promise()
+      return uploadedImage.Location
+    })
+  }
+)
+
 ```
 
 That's it! We successfully separated work into different jobs using fan-out. Since we decoupled the jobs, we can even trigger this `"shopify/copy.image"` event from other parts of our code allowing this logic to be re-used! Faster, more reliable and still simple!
