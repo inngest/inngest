@@ -606,8 +606,8 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, a
 		m.r,
 		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
 		state.History{
-			ID:         state.HistoryID(),
-			GroupID:    state.GroupIDFromContext(ctx),
+			ID: state.HistoryID(),
+			// Function completions have no group ID.
 			Type:       history,
 			Identifier: i,
 			CreatedAt:  now,
