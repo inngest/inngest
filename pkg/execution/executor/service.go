@@ -2,6 +2,8 @@ package executor
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/coredata"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -19,6 +22,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/oklog/ulid/v2"
 	"github.com/xhit/go-str2duration/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -143,9 +147,9 @@ func (s *svc) Pre(ctx context.Context) error {
 		drivers = append(drivers, d)
 	}
 
-	pb, err := pubsub.NewPublisher(ctx, s.config.EventStream.Service)
+	failureHandler, err := s.getFailureHandler(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create publisher: %w", err)
+		return fmt.Errorf("failed to create failure handler: %w", err)
 	}
 
 	s.exec, err = NewExecutor(
@@ -156,14 +160,57 @@ func (s *svc) Pre(ctx context.Context) error {
 		),
 		WithLogger(logger.From(ctx)),
 		WithConfig(s.config.Execution),
-		WithEventStream(s.config.EventStream),
-		WithPublisher(pb),
+		WithFailureHandler(&failureHandler),
 	)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (s *svc) getFailureHandler(ctx context.Context) (func(context.Context, state.Identifier, state.State, state.DriverResponse) error, error) {
+	pb, err := pubsub.NewPublisher(ctx, s.config.EventStream.Service)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create publisher: %w", err)
+	}
+
+	topicName := s.config.EventStream.Service.Concrete.TopicName()
+
+	return func(ctx context.Context, id state.Identifier, s state.State, r state.DriverResponse) error {
+		now := time.Now()
+		evt := event.Event{
+			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
+			Name:      event.FnFailedName,
+			Timestamp: now.UnixMilli(),
+			Data: map[string]interface{}{
+				"function_id": id.WorkflowID.String(),
+				"run_id":      id.RunID.String(),
+				"error":       r.Err.Error(),
+				"event":       s.Event(),
+			},
+		}
+
+		byt, err := json.Marshal(evt)
+		if err != nil {
+			return fmt.Errorf("error marshalling failure event: %w", err)
+		}
+
+		err = pb.Publish(
+			ctx,
+			topicName,
+			pubsub.Message{
+				Name:      event.EventReceivedName,
+				Data:      string(byt),
+				Timestamp: now,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("error publishing failure event: %w", err)
+		}
+
+		return nil
+	}, nil
 }
 
 func (s *svc) Run(ctx context.Context) error {

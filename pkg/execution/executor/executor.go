@@ -2,23 +2,18 @@ package executor
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/pubsub"
-	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
 )
 
@@ -116,10 +111,6 @@ func NewExecutor(opts ...ExecutorOpt) (Executor, error) {
 		return nil, ErrNoActionLoader
 	}
 
-	if m.pb == nil {
-		return nil, ErrNoPublisher
-	}
-
 	return m, nil
 }
 
@@ -157,18 +148,9 @@ func WithConfig(c config.Execution) ExecutorOpt {
 	}
 }
 
-// WithPublisher sets the publisher to use when publishing events.
-func WithPublisher(p pubsub.Publisher) ExecutorOpt {
+func WithFailureHandler(f *func(context.Context, state.Identifier, state.State, state.DriverResponse) error) ExecutorOpt {
 	return func(e Executor) error {
-		e.(*executor).pb = p
-		return nil
-	}
-}
-
-// WithEventStream sets the event stream to use when publishing events.
-func WithEventStream(es config.EventStream) ExecutorOpt {
-	return func(e Executor) error {
-		e.(*executor).es = es
+		e.(*executor).failureHandler = f
 		return nil
 	}
 }
@@ -196,12 +178,11 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 type executor struct {
 	log    *zerolog.Logger
 	config config.Execution
-	es     config.EventStream
 
 	sm             state.Manager
-	pb             pubsub.Publisher
 	al             coredata.ExecutionActionLoader
 	runtimeDrivers map[string]driver.Driver
+	failureHandler *func(context.Context, state.Identifier, state.State, state.DriverResponse) error
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -335,11 +316,9 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 		return nil, idx, err
 	}
 	if response.Err != nil {
-		if response.Final() {
-			// This is a final error, so the function is no longer retrying.
-			// In these cases, we want to fire a new event.
-			if err := e.sendFailureEvent(ctx, id, s, *response); err != nil {
-				return nil, idx, err
+		if response.Final() && e.failureHandler != nil {
+			if err := (*e.failureHandler)(ctx, id, s, *response); err != nil {
+				logger.From(ctx).Error().Err(err).Msg("error handling failure in executor fail handler")
 			}
 		}
 
@@ -357,41 +336,6 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 	}
 
 	return response, idx, err
-}
-
-func (e *executor) sendFailureEvent(ctx context.Context, id state.Identifier, s state.State, r state.DriverResponse) error {
-	now := time.Now()
-	evt := event.Event{
-		ID:        ulid.MustNew(ulid.Now(), rand.Reader).String(),
-		Name:      event.FnFailedName,
-		Timestamp: now.UnixMilli(),
-		Data: map[string]interface{}{
-			"function_id": id.WorkflowID.String(),
-			"run_id":      id.RunID.String(),
-			"error":       r.Err.Error(),
-			"event":       s.Event(),
-		},
-	}
-
-	byt, err := json.Marshal(evt)
-	if err != nil {
-		return fmt.Errorf("error marshalling failure event: %w", err)
-	}
-
-	err = e.pb.Publish(
-		ctx,
-		e.es.Service.Concrete.TopicName(),
-		pubsub.Message{
-			Name:      event.EventReceivedName,
-			Data:      string(byt),
-			Timestamp: now,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("error publishing failure event: %w", err)
-	}
-
-	return nil
 }
 
 func (e *executor) executeAction(ctx context.Context, id state.Identifier, action *inngest.Step, s state.State, edge inngest.Edge, attempt, stackIndex int) (*state.DriverResponse, int, error) {
