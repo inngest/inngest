@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 	"github.com/uber-go/tally/v4"
 	"golang.org/x/sync/errgroup"
@@ -554,6 +555,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
 	// arguments.
 	jobCtx = osqueue.WithJobID(jobCtx, qi.ID)
+	// Same with the group ID, if it exists.
+	if qi.Data.GroupID != "" {
+		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)
+	}
 
 	go func() {
 		defer func() {
