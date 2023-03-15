@@ -400,10 +400,14 @@ func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
 		Type:       enums.HistoryTypeStepWaiting,
 		Identifier: p.Identifier,
 		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
-		Data: state.HistoryStepWaiting{
-			EventName:  p.Event,
-			Expression: p.Expression,
-			ExpiryTime: time.Time(p.Expires),
+		Data: state.HistoryStep{
+			ID:   p.Incoming,
+			Name: p.StepName,
+			Data: state.HistoryStepWaitingData{
+				EventName:  p.Event,
+				Expression: p.Expression,
+				ExpiryTime: time.Time(p.Expires),
+			},
 		},
 	})
 
@@ -489,6 +493,23 @@ func (m *mem) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		instance.stack = append(instance.stack, pause.DataKey)
 		m.state[pause.Identifier.RunID] = instance
 	}
+
+	stepID := pause.Incoming
+	if pause.DataKey != "" {
+		stepID = pause.DataKey
+	}
+	m.setHistory(ctx, pause.Identifier, state.History{
+		ID:         state.HistoryID(),
+		GroupID:    state.GroupIDFromContext(ctx),
+		Type:       enums.HistoryTypeStepCompleted,
+		Identifier: pause.Identifier,
+		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+		Data: state.HistoryStep{
+			ID:   stepID,
+			Name: pause.StepName,
+			Data: data,
+		},
+	})
 
 	delete(m.pauses, id)
 	return nil

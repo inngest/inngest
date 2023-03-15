@@ -98,7 +98,8 @@ func (h *History) UnmarshalJSON(data []byte) error {
 		enums.HistoryTypeStepStarted,
 		enums.HistoryTypeStepCompleted,
 		enums.HistoryTypeStepErrored,
-		enums.HistoryTypeStepFailed:
+		enums.HistoryTypeStepFailed,
+		enums.HistoryTypeStepWaiting:
 		// Assume that for step history items we must have a HistoryStep
 		// struct within data.
 		v := HistoryStep{}
@@ -194,7 +195,7 @@ type HistoryStep struct {
 
 // HistoryStepWaiting is stored within HistoryStep when we create a pause to wait
 // for an event
-type HistoryStepWaiting struct {
+type HistoryStepWaitingData struct {
 	// EventName is the name of the event we're waiting for.
 	EventName  *string   `json:"eventName"`
 	Expression *string   `json:"expression"`

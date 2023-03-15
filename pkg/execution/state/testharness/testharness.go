@@ -692,6 +692,7 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
+		StepName:   w.Steps[0].Name,
 		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 	}
 	err = m.SavePause(ctx, pause)
@@ -713,7 +714,12 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 		history, err := m.History(ctx, s.RunID())
 		require.NoError(t, err)
 		require.Equal(t, 3, len(history))
-		require.Equal(t, enums.HistoryTypeStepCompleted, history[len(history)-1].Type)
+		last := history[len(history)-1]
+		require.Equal(t, enums.HistoryTypeStepCompleted, last.Type)
+		hs, ok := last.Data.(state.HistoryStep)
+		require.True(t, ok)
+		require.Equal(t, w.Steps[0].ID, hs.ID)
+		require.Equal(t, w.Steps[0].Name, hs.Name)
 	})
 
 	t.Run("Consuming a pause again fails", func(t *testing.T) {
