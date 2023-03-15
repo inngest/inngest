@@ -138,6 +138,9 @@ type Pause struct {
 	// via an async driver.  This lets the executor resume as-is with the current
 	// context, ensuring that we retry correctly.
 	Attempt int `json:"att,omitempty"`
+	// GroupID stores the group ID for this step and history, allowing us to correlate
+	// event receives with other history items.
+	GroupID string `json:"groupID"`
 }
 
 func (p Pause) Edge() inngest.Edge {
