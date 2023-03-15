@@ -13,11 +13,10 @@ const (
 	HistoryTypeFunctionFailed
 	HistoryTypeFunctionCancelled
 
-	HistoryTypeStepScheduled //
-	HistoryTypeStepStarted   //
-	HistoryTypeStepCompleted //
-	HistoryTypeStepErrored   //
-	HistoryTypeStepFailed
-
-	HistoryTypeStepWaiting
+	HistoryTypeStepScheduled
+	HistoryTypeStepStarted
+	HistoryTypeStepCompleted
+	HistoryTypeStepErrored // Errored
+	HistoryTypeStepFailed  // Permanently failed
+	HistoryTypeStepWaiting // Waiting for an event
 )

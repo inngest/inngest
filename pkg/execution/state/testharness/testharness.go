@@ -571,6 +571,10 @@ func checkSavePause(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
 
+	history, err := m.History(ctx, s.RunID())
+	require.NoError(t, err)
+	require.Equal(t, 1, len(history))
+
 	// Save a pause.
 	pause := state.Pause{
 		ID:         uuid.New(),
@@ -579,8 +583,15 @@ func checkSavePause(t *testing.T, m state.Manager) {
 		Incoming:   w.Steps[0].ID,
 		Expires:    state.Time(time.Now().Add(5 * time.Second)),
 	}
-	err := m.SavePause(ctx, pause)
+	err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
+
+	t.Run("It stores history", func(t *testing.T) {
+		history, err := m.History(ctx, s.RunID())
+		require.NoError(t, err)
+		require.Equal(t, 2, len(history))
+		require.Equal(t, enums.HistoryTypeStepWaiting, history[len(history)-1].Type)
+	})
 
 	// XXX: Saving a pause with a past expiry is a noop.
 }
@@ -686,13 +697,30 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 	err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
-	// Consuming the pause should work.
-	err = m.ConsumePause(ctx, pause.ID, nil)
+	// There now should be 2 items.
+	history, err := m.History(ctx, s.RunID())
 	require.NoError(t, err)
+	require.Equal(t, 2, len(history))
+	require.Equal(t, enums.HistoryTypeStepWaiting, history[len(history)-1].Type)
 
-	err = m.ConsumePause(ctx, pause.ID, nil)
-	require.NotNil(t, err)
-	require.Error(t, state.ErrPauseNotFound, err)
+	t.Run("Consuming a pause works", func(t *testing.T) {
+		// Consuming the pause should work.
+		err = m.ConsumePause(ctx, pause.ID, nil)
+		require.NoError(t, err)
+	})
+
+	t.Run("It stores history saying step completed", func(t *testing.T) {
+		history, err := m.History(ctx, s.RunID())
+		require.NoError(t, err)
+		require.Equal(t, 3, len(history))
+		require.Equal(t, enums.HistoryTypeStepCompleted, history[len(history)-1].Type)
+	})
+
+	t.Run("Consuming a pause again fails", func(t *testing.T) {
+		err = m.ConsumePause(ctx, pause.ID, nil)
+		require.NotNil(t, err)
+		require.Error(t, state.ErrPauseNotFound, err)
+	})
 
 	//
 	// Assert that completing a leased pause fails.
