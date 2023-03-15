@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -19,7 +20,8 @@ var (
 	// This can be changed on init to change how we globally store history.
 	DefaultHistoryEncoding = HistoryEncodingGZIP
 
-	rnd *frandRNG
+	rnd         *frandRNG
+	groupCtxVal = groupIDValType{}
 )
 
 const (
@@ -29,6 +31,18 @@ const (
 
 func init() {
 	rnd = &frandRNG{RNG: frand.New(), lock: &sync.Mutex{}}
+}
+
+// WithGroupID returns a context that stores the given group ID inside.
+func WithGroupID(ctx context.Context, groupID string) context.Context {
+	return context.WithValue(ctx, groupCtxVal, groupID)
+}
+
+// GroupIDFromContext returns the group ID given the current context, or an
+// empty string if there's no group ID.
+func GroupIDFromContext(ctx context.Context) string {
+	str, _ := ctx.Value(groupCtxVal).(string)
+	return str
 }
 
 // NewHistory returns a new history struct with an ID created at the time of
@@ -224,3 +238,5 @@ func (f *frandRNG) Float64() float64 {
 func (f *frandRNG) Seed(seed uint64) {
 	// Do nothing.
 }
+
+type groupIDValType struct{}

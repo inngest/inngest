@@ -335,6 +335,7 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
 		state.History{
 			ID:         state.HistoryID(),
+			GroupID:    state.GroupIDFromContext(ctx),
 			Type:       enums.HistoryTypeFunctionCancelled,
 			Identifier: id,
 			CreatedAt:  now,
@@ -487,6 +488,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 			typ = enums.HistoryTypeStepFailed
 			funcFailHistory = state.History{
 				ID:         state.HistoryID(),
+				GroupID:    state.GroupIDFromContext(ctx),
 				Type:       enums.HistoryTypeFunctionFailed,
 				Identifier: i,
 				CreatedAt:  now,
@@ -496,6 +498,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 
 	stepHistory := state.History{
 		ID:         state.HistoryID(),
+		GroupID:    state.GroupIDFromContext(ctx),
 		Type:       typ,
 		Identifier: i,
 		CreatedAt:  now,
@@ -544,6 +547,7 @@ func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, at
 		Score: float64(now.UnixMilli()),
 		Member: state.History{
 			ID:         state.HistoryID(),
+			GroupID:    state.GroupIDFromContext(ctx),
 			Type:       enums.HistoryTypeStepStarted,
 			Identifier: id,
 			CreatedAt:  now,
@@ -564,6 +568,7 @@ func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, a
 		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
 		state.History{
 			ID:         state.HistoryID(),
+			GroupID:    state.GroupIDFromContext(ctx),
 			Type:       enums.HistoryTypeStepScheduled,
 			Identifier: i,
 			CreatedAt:  now,
@@ -602,6 +607,7 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, a
 		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
 		state.History{
 			ID:         state.HistoryID(),
+			GroupID:    state.GroupIDFromContext(ctx),
 			Type:       history,
 			Identifier: i,
 			CreatedAt:  now,
