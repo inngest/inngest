@@ -705,6 +705,10 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 	require.Equal(t, enums.HistoryTypeStepWaiting, history[len(history)-1].Type)
 
 	t.Run("Consuming a pause works", func(t *testing.T) {
+		// Add 1ms, ensuring that the step completed history
+		// item is always after the pause history item. history is MS precision,
+		// and without this there's a small but real chance of flakiness.
+		<-time.After(time.Millisecond)
 		// Consuming the pause should work.
 		err = m.ConsumePause(ctx, pause.ID, nil)
 		require.NoError(t, err)
@@ -1873,6 +1877,9 @@ func setup(t *testing.T, m state.Manager) state.State {
 
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
+	// Add a millisecond so that this history item always comes first.  There
+	// are some race conditions here, as history items are MS precision.
+	<-time.After(time.Millisecond)
 
 	return s
 }

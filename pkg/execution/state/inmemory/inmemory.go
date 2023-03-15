@@ -395,14 +395,20 @@ func (m *mem) SavePause(ctx context.Context, p state.Pause) error {
 
 	m.pauses[p.ID] = p
 
+	stepID := p.Incoming
+	if p.DataKey != "" {
+		stepID = p.DataKey
+	}
+
 	m.setHistory(ctx, p.Identifier, state.History{
 		ID:         state.HistoryID(),
 		Type:       enums.HistoryTypeStepWaiting,
 		Identifier: p.Identifier,
 		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
 		Data: state.HistoryStep{
-			ID:   p.Incoming,
-			Name: p.StepName,
+			ID:      stepID,
+			Name:    p.StepName,
+			Attempt: p.Attempt,
 			Data: state.HistoryStepWaitingData{
 				EventName:  p.Event,
 				Expression: p.Expression,
