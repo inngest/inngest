@@ -15,13 +15,9 @@ export function rehypeRemoveTwoSlashMarkup() {
         const cut = textNode.value.split("---cut---\n");
         const code = cut.length > 1 ? cut.pop() : cut[0];
         // Remove comment queries: "//   ^?"
-        const removeQueries = code.replace(/\/\/\s+\^\?\s/m, "ok");
-        const removeErrorStatements = removeQueries.replace(
-          /\/\/ [@errors|@noErrors].+\n/m,
-          ""
-        );
+        const removeQueries = code.replace(/\/\/\s+\^\?\s/m, "");
 
-        textNode.value = removeErrorStatements;
+        textNode.value = removeQueries;
       }
     });
   };

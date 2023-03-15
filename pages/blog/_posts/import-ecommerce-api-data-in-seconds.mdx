@@ -54,7 +54,6 @@ await inngest.send({
   name: "shopify/import.requested",
   data: { storeId: 1462924, userId: 9357925756 },
 })
-
 ```
 
 Here's some example code of an Inngest function that runs whenever the above event is sent, with a max concurrency of `10`. This function iterates over all pages combining all products into a single array. Each API request is performed with retries within `step.run()`.

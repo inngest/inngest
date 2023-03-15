@@ -57,7 +57,6 @@ Nice! I'm worried, though, that if I have multiple objects tracking hobbies, I m
 We can do this using a `Record<>` type, where we specify the keys and values we want in our object.
 
 ```ts twoslash
-// @errors: 2741
 type Hobby = "dancing" | "romancing" | "typescript";
 
 // The compiler will make sure we account for every hobby!
@@ -139,7 +138,6 @@ Great. That works, and it's definitely TypeScript, but it's not the best. For a 
 Let's add a simple union type to make this much easier to write.
 
 ```ts twoslash
-// @errors: 2345
 const on = (
   event: "server.start" | "server.stop",
   fn: (...args: any[]) => any
