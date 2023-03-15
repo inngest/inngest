@@ -44,7 +44,14 @@ func HistoryID() ulid.ULID {
 }
 
 type History struct {
-	ID         ulid.ULID         `json:"id"`
+	ID ulid.ULID `json:"id"`
+	// GroupID allows multiple history items to be correlated with each other,
+	// grouping them into a single step.
+	//
+	// We need this for generator steps;  there are multiple history items for
+	// a single step, but we only have data for eg. the step name in the last
+	// history item (code can run any step, and we don't know that ahead of time).
+	GroupID    string            `json:"gid"`
 	Type       enums.HistoryType `json:"type"`
 	Identifier Identifier        `json:"run"`
 	CreatedAt  time.Time         `json:"createdAt"`
@@ -57,6 +64,7 @@ func (h *History) UnmarshalJSON(data []byte) error {
 	// type.
 	m := struct {
 		ID         ulid.ULID         `json:"id"`
+		GroupID    string            `json:"gid"`
 		Type       enums.HistoryType `json:"type"`
 		Identifier Identifier        `json:"run"`
 		CreatedAt  time.Time         `json:"createdAt"`
@@ -66,6 +74,7 @@ func (h *History) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	h.ID = m.ID
+	h.GroupID = m.GroupID
 	h.Type = m.Type
 	h.Identifier = m.Identifier
 	h.CreatedAt = m.CreatedAt

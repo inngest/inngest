@@ -522,8 +522,6 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 	extendLeaseTick := time.NewTicker(QueueLeaseDuration / 2)
 	defer extendLeaseTick.Stop()
 
-	// XXX: Increase / defer decrease gauge for items processing
-
 	errCh := make(chan error)
 	doneCh := make(chan struct{})
 
@@ -552,6 +550,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 	// XXX: Add a max job time here, configurable.
 	jobCtx, jobCancel := context.WithCancel(ctx)
 	defer jobCancel()
+	// Add the job ID to the queue context.  This allows any logic that handles the run function
+	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
+	// arguments.
+	jobCtx = osqueue.WithJobID(jobCtx, qi.ID)
 
 	go func() {
 		defer func() {
