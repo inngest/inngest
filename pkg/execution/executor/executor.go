@@ -22,8 +22,6 @@ var (
 	ErrNoStateManager    = fmt.Errorf("no state manager provided")
 	ErrNoActionLoader    = fmt.Errorf("no action loader provided")
 	ErrNoRuntimeDriver   = fmt.Errorf("runtime driver for action not found")
-	ErrNoEventStream     = fmt.Errorf("no event stream provided")
-	ErrNoPublisher       = fmt.Errorf("no publisher provided")
 )
 
 // Executor manages executing actions.  It interfaces over a state store to save
