@@ -496,6 +496,13 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		}
 	}
 
+	stepOutput := false
+	if len(r.Generator) == 0 && typ == enums.HistoryTypeStepCompleted {
+		// This is only the step output if the step is complete and this
+		// isn't a generator response.
+		stepOutput = true
+	}
+
 	stepHistory := state.History{
 		ID:         state.HistoryID(),
 		GroupID:    state.GroupIDFromContext(ctx),
@@ -503,10 +510,11 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		Identifier: i,
 		CreatedAt:  now,
 		Data: state.HistoryStep{
-			ID:      r.Step.ID,
-			Name:    r.Step.Name,
-			Attempt: attempt,
-			Data:    r.Output,
+			ID:         r.Step.ID,
+			Name:       r.Step.Name,
+			Attempt:    attempt,
+			Data:       r.Output,
+			StepOutput: stepOutput,
 		},
 	}
 

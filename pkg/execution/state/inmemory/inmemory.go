@@ -333,10 +333,11 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 			Identifier: i,
 			CreatedAt:  now,
 			Data: state.HistoryStep{
-				ID:      r.Step.ID,
-				Name:    r.Step.Name,
-				Data:    r.Output,
-				Attempt: attempt,
+				ID:         r.Step.ID,
+				Name:       r.Step.Name,
+				Data:       r.Output,
+				Attempt:    attempt,
+				StepOutput: len(r.Generator) == 0,
 			},
 		})
 	} else {
