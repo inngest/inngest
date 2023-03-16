@@ -144,6 +144,8 @@ func TestQueueRunBasic(t *testing.T) {
 		_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
 			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
 			atomic.AddInt32(&handled, 1)
+			id := osqueue.JobIDFromContext(ctx)
+			require.NotEmpty(t, id, "No job ID was passed via context")
 			return nil
 		})
 	}()
@@ -247,7 +249,7 @@ func TestQueueRunExtended(t *testing.T) {
 		rc,
 		// We can't add more than 8128 goroutines when detecting race conditions,
 		// so lower the number of workers.
-		WithNumWorkers(1000),
+		WithNumWorkers(200),
 		WithLogger(&l),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -274,7 +276,7 @@ func TestQueueRunExtended(t *testing.T) {
 					rc,
 					// We can't add more than 8128 goroutines when detecting race conditions,
 					// so lower the number of workers.
-					WithNumWorkers(1000),
+					WithNumWorkers(200),
 					WithLogger(&l),
 				)
 

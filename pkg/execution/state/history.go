@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -19,7 +20,8 @@ var (
 	// This can be changed on init to change how we globally store history.
 	DefaultHistoryEncoding = HistoryEncodingGZIP
 
-	rnd *frandRNG
+	rnd         *frandRNG
+	groupCtxVal = groupIDValType{}
 )
 
 const (
@@ -29,6 +31,18 @@ const (
 
 func init() {
 	rnd = &frandRNG{RNG: frand.New(), lock: &sync.Mutex{}}
+}
+
+// WithGroupID returns a context that stores the given group ID inside.
+func WithGroupID(ctx context.Context, groupID string) context.Context {
+	return context.WithValue(ctx, groupCtxVal, groupID)
+}
+
+// GroupIDFromContext returns the group ID given the current context, or an
+// empty string if there's no group ID.
+func GroupIDFromContext(ctx context.Context) string {
+	str, _ := ctx.Value(groupCtxVal).(string)
+	return str
 }
 
 // NewHistory returns a new history struct with an ID created at the time of
@@ -44,7 +58,14 @@ func HistoryID() ulid.ULID {
 }
 
 type History struct {
-	ID         ulid.ULID         `json:"id"`
+	ID ulid.ULID `json:"id"`
+	// GroupID allows multiple history items to be correlated with each other,
+	// grouping them into a single step.
+	//
+	// We need this for generator steps;  there are multiple history items for
+	// a single step, but we only have data for eg. the step name in the last
+	// history item (code can run any step, and we don't know that ahead of time).
+	GroupID    string            `json:"gid"`
 	Type       enums.HistoryType `json:"type"`
 	Identifier Identifier        `json:"run"`
 	CreatedAt  time.Time         `json:"createdAt"`
@@ -57,6 +78,7 @@ func (h *History) UnmarshalJSON(data []byte) error {
 	// type.
 	m := struct {
 		ID         ulid.ULID         `json:"id"`
+		GroupID    string            `json:"gid"`
 		Type       enums.HistoryType `json:"type"`
 		Identifier Identifier        `json:"run"`
 		CreatedAt  time.Time         `json:"createdAt"`
@@ -66,6 +88,7 @@ func (h *History) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	h.ID = m.ID
+	h.GroupID = m.GroupID
 	h.Type = m.Type
 	h.Identifier = m.Identifier
 	h.CreatedAt = m.CreatedAt
@@ -75,7 +98,8 @@ func (h *History) UnmarshalJSON(data []byte) error {
 		enums.HistoryTypeStepStarted,
 		enums.HistoryTypeStepCompleted,
 		enums.HistoryTypeStepErrored,
-		enums.HistoryTypeStepFailed:
+		enums.HistoryTypeStepFailed,
+		enums.HistoryTypeStepWaiting:
 		// Assume that for step history items we must have a HistoryStep
 		// struct within data.
 		v := HistoryStep{}
@@ -171,7 +195,7 @@ type HistoryStep struct {
 
 // HistoryStepWaiting is stored within HistoryStep when we create a pause to wait
 // for an event
-type HistoryStepWaiting struct {
+type HistoryStepWaitingData struct {
 	// EventName is the name of the event we're waiting for.
 	EventName  *string   `json:"eventName"`
 	Expression *string   `json:"expression"`
@@ -215,3 +239,5 @@ func (f *frandRNG) Float64() float64 {
 func (f *frandRNG) Seed(seed uint64) {
 	// Do nothing.
 }
+
+type groupIDValType struct{}

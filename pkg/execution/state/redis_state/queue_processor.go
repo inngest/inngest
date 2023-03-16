@@ -10,7 +10,9 @@ import (
 
 	"github.com/VividCortex/ewma"
 	"github.com/inngest/inngest/pkg/backoff"
+	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 	"github.com/uber-go/tally/v4"
 	"golang.org/x/sync/errgroup"
@@ -156,6 +158,7 @@ LOOP:
 	}
 
 	// Wait for all in-progress items to complete.
+	q.logger.Info().Msg("queue waiting to quit")
 	q.wg.Wait()
 
 	return nil
@@ -353,7 +356,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	_, capacity, err := q.PartitionLease(ctx, *p, PartitionLeaseDuration)
 	if err == ErrPartitionConcurrencyLimit {
 		q.scope.Counter(counterPartitionConcurrencyLimitReached).Inc(1)
-		return q.PartitionRequeue(ctx, p.Queue(), time.Now().Add(PartitionConcurrencyLimitRequeueExtension), true)
+		return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 	}
 	if err == ErrPartitionAlreadyLeased {
 		q.scope.Counter(counterPartitionLeaseConflict).Inc(1)
@@ -414,6 +417,25 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 		// Within a goroutine attempt to lease this item.  This lets us concurrently lease
 		// items within the partition to process as fast as possible.
 		eg.Go(func() error {
+			// NOTE: If this ends in an error, we must _always_ release an item from the
+			// semaphore to free capacity.  This will happen automatically when the worker
+			// finishes processing a queue item on success.
+
+			// Ensure there's room within the concurrency queue, first.  This is typically
+			// more constrained.
+			if q.concurrencyService != nil {
+				err := q.concurrencyService.Add(ctx, item.WorkflowID, item.Data)
+				if err == concurrency.ErrAtConcurrencyLimit {
+					// return this package-specific error.
+					q.sem.Release(1)
+					return ErrConcurrencyLimit
+				}
+				if err != nil {
+					q.sem.Release(1)
+					return fmt.Errorf("error checking concurrency service limits: %w", err)
+				}
+			}
+
 			q.scope.Counter(counterPartitionProcessItems).Inc(1)
 			// Attempt to lease this item before passing this to a worker.  We have to do this
 			// synchronously as we need to lease prior to requeueing the partition pointer. If
@@ -428,7 +450,9 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 			case ErrPartitionConcurrencyLimit, ErrConcurrencyLimit:
 				q.scope.Counter(counterConcurrencyLimit).Inc(1)
 				q.sem.Release(1)
-				return nil
+				// Since the queue is at capacity, return the error so that we
+				// don't keep hammering with "does the queue have room?" logic.
+				return err
 			case ErrQueueItemNotFound:
 				q.scope.Counter(counterQueueItemsGone).Inc(1)
 				q.sem.Release(1)
@@ -459,7 +483,14 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 	if err := eg.Wait(); err != nil {
 		// The lease for the partition will expire and we will be able to restart
 		// work in the future.
-		return err
+		switch err {
+		case ErrPartitionConcurrencyLimit, ErrConcurrencyLimit:
+			// Requeue this partition as we hit concurrency limits.
+			q.scope.Counter(counterConcurrencyLimit).Inc(1)
+			return q.PartitionRequeue(ctx, p.Queue(), time.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
+		default:
+			return err
+		}
 	}
 
 	// Requeue the partition, which reads the next unleased job or sets a time of
@@ -492,8 +523,6 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 	extendLeaseTick := time.NewTicker(QueueLeaseDuration / 2)
 	defer extendLeaseTick.Stop()
 
-	// XXX: Increase / defer decrease gauge for items processing
-
 	errCh := make(chan error)
 	doneCh := make(chan struct{})
 
@@ -522,6 +551,14 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 	// XXX: Add a max job time here, configurable.
 	jobCtx, jobCancel := context.WithCancel(ctx)
 	defer jobCancel()
+	// Add the job ID to the queue context.  This allows any logic that handles the run function
+	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
+	// arguments.
+	jobCtx = osqueue.WithJobID(jobCtx, qi.ID)
+	// Same with the group ID, if it exists.
+	if qi.Data.GroupID != "" {
+		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)
+	}
 
 	go func() {
 		defer func() {
