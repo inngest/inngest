@@ -1516,6 +1516,9 @@ func checkCancel(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
+	// Add time so that the history ticks a millisecond
+	<-time.After(time.Millisecond)
+
 	err = m.Cancel(ctx, s.Identifier())
 	require.NoError(t, err)
 
@@ -1547,6 +1550,9 @@ func checkCancel_cancelled(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
+	// Add time so that the history ticks a millisecond
+	<-time.After(time.Millisecond)
+
 	err = m.Cancel(ctx, s.Identifier())
 	require.NoError(t, err)
 	reloaded, err := m.Load(ctx, s.RunID())
@@ -1576,12 +1582,18 @@ func checkCancel_completed(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
+	// Add time so that the history ticks a millisecond
+	<-time.After(time.Millisecond)
+
 	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID, 0)
 	require.NoError(t, err)
 
 	s, err = m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
+
+	// Add time so that the history ticks a millisecond
+	<-time.After(time.Millisecond)
 
 	err = m.Cancel(ctx, s.Identifier())
 	require.Equal(t, err, state.ErrFunctionComplete)
