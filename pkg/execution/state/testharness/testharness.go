@@ -571,6 +571,10 @@ func checkSavePause(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
 
+	history, err := m.History(ctx, s.RunID())
+	require.NoError(t, err)
+	require.Equal(t, 1, len(history))
+
 	// Save a pause.
 	pause := state.Pause{
 		ID:         uuid.New(),
@@ -579,8 +583,15 @@ func checkSavePause(t *testing.T, m state.Manager) {
 		Incoming:   w.Steps[0].ID,
 		Expires:    state.Time(time.Now().Add(5 * time.Second)),
 	}
-	err := m.SavePause(ctx, pause)
+	err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
+
+	t.Run("It stores history", func(t *testing.T) {
+		history, err := m.History(ctx, s.RunID())
+		require.NoError(t, err)
+		require.Equal(t, 2, len(history))
+		require.Equal(t, enums.HistoryTypeStepWaiting, history[len(history)-1].Type)
+	})
 
 	// XXX: Saving a pause with a past expiry is a noop.
 }
@@ -681,18 +692,45 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 		Identifier: s.Identifier(),
 		Outgoing:   inngest.TriggerName,
 		Incoming:   w.Steps[0].ID,
+		StepName:   w.Steps[0].Name,
 		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 	}
 	err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
-	// Consuming the pause should work.
-	err = m.ConsumePause(ctx, pause.ID, nil)
+	// There now should be 2 items.
+	history, err := m.History(ctx, s.RunID())
 	require.NoError(t, err)
+	require.Equal(t, 2, len(history))
+	require.Equal(t, enums.HistoryTypeStepWaiting, history[len(history)-1].Type)
 
-	err = m.ConsumePause(ctx, pause.ID, nil)
-	require.NotNil(t, err)
-	require.Error(t, state.ErrPauseNotFound, err)
+	t.Run("Consuming a pause works", func(t *testing.T) {
+		// Add 1ms, ensuring that the step completed history
+		// item is always after the pause history item. history is MS precision,
+		// and without this there's a small but real chance of flakiness.
+		<-time.After(time.Millisecond)
+		// Consuming the pause should work.
+		err = m.ConsumePause(ctx, pause.ID, nil)
+		require.NoError(t, err)
+	})
+
+	t.Run("It stores history saying step completed", func(t *testing.T) {
+		history, err := m.History(ctx, s.RunID())
+		require.NoError(t, err)
+		require.Equal(t, 3, len(history))
+		last := history[len(history)-1]
+		require.Equal(t, enums.HistoryTypeStepCompleted, last.Type)
+		hs, ok := last.Data.(state.HistoryStep)
+		require.True(t, ok)
+		require.Equal(t, w.Steps[0].ID, hs.ID)
+		require.Equal(t, w.Steps[0].Name, hs.Name)
+	})
+
+	t.Run("Consuming a pause again fails", func(t *testing.T) {
+		err = m.ConsumePause(ctx, pause.ID, nil)
+		require.NotNil(t, err)
+		require.Error(t, state.ErrPauseNotFound, err)
+	})
 
 	//
 	// Assert that completing a leased pause fails.
@@ -1478,6 +1516,9 @@ func checkCancel(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
+	// Add time so that the history ticks a millisecond
+	<-time.After(time.Millisecond)
+
 	err = m.Cancel(ctx, s.Identifier())
 	require.NoError(t, err)
 
@@ -1509,6 +1550,9 @@ func checkCancel_cancelled(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
+	// Add time so that the history ticks a millisecond
+	<-time.After(time.Millisecond)
+
 	err = m.Cancel(ctx, s.Identifier())
 	require.NoError(t, err)
 	reloaded, err := m.Load(ctx, s.RunID())
@@ -1538,12 +1582,18 @@ func checkCancel_completed(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 
+	// Add time so that the history ticks a millisecond
+	<-time.After(time.Millisecond)
+
 	err = m.Finalized(ctx, s.Identifier(), w.Steps[0].ID, 0)
 	require.NoError(t, err)
 
 	s, err = m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, enums.RunStatusCompleted, s.Metadata().Status, "Status is not Complete after finalizing")
+
+	// Add time so that the history ticks a millisecond
+	<-time.After(time.Millisecond)
 
 	err = m.Cancel(ctx, s.Identifier())
 	require.Equal(t, err, state.ErrFunctionComplete)
@@ -1839,6 +1889,9 @@ func setup(t *testing.T, m state.Manager) state.State {
 
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
+	// Add a millisecond so that this history item always comes first.  There
+	// are some race conditions here, as history items are MS precision.
+	<-time.After(time.Millisecond)
 
 	return s
 }

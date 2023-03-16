@@ -91,6 +91,8 @@ type Pause struct {
 	Outgoing string `json:"outgoing"`
 	// Incoming is the step to run after the pause completes.
 	Incoming string `json:"incoming"`
+	// StepName is the readable step name of the step to save within history.
+	StepName string `json:"stepName"`
 	// Expires is a time at which the pause can no longer be consumed.  This
 	// gives each pause of a function a TTL.  This is required.
 	//
@@ -138,6 +140,9 @@ type Pause struct {
 	// via an async driver.  This lets the executor resume as-is with the current
 	// context, ensuring that we retry correctly.
 	Attempt int `json:"att,omitempty"`
+	// GroupID stores the group ID for this step and history, allowing us to correlate
+	// event receives with other history items.
+	GroupID string `json:"groupID"`
 }
 
 func (p Pause) Edge() inngest.Edge {

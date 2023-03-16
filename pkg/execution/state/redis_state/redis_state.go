@@ -335,6 +335,7 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
 		state.History{
 			ID:         state.HistoryID(),
+			GroupID:    state.GroupIDFromContext(ctx),
 			Type:       enums.HistoryTypeFunctionCancelled,
 			Identifier: id,
 			CreatedAt:  now,
@@ -487,6 +488,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 			typ = enums.HistoryTypeStepFailed
 			funcFailHistory = state.History{
 				ID:         state.HistoryID(),
+				GroupID:    state.GroupIDFromContext(ctx),
 				Type:       enums.HistoryTypeFunctionFailed,
 				Identifier: i,
 				CreatedAt:  now,
@@ -496,6 +498,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 
 	stepHistory := state.History{
 		ID:         state.HistoryID(),
+		GroupID:    state.GroupIDFromContext(ctx),
 		Type:       typ,
 		Identifier: i,
 		CreatedAt:  now,
@@ -544,6 +547,7 @@ func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, at
 		Score: float64(now.UnixMilli()),
 		Member: state.History{
 			ID:         state.HistoryID(),
+			GroupID:    state.GroupIDFromContext(ctx),
 			Type:       enums.HistoryTypeStepStarted,
 			Identifier: id,
 			CreatedAt:  now,
@@ -564,6 +568,7 @@ func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, a
 		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
 		state.History{
 			ID:         state.HistoryID(),
+			GroupID:    state.GroupIDFromContext(ctx),
 			Type:       enums.HistoryTypeStepScheduled,
 			Identifier: i,
 			CreatedAt:  now,
@@ -601,7 +606,8 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, a
 		m.r,
 		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
 		state.History{
-			ID:         state.HistoryID(),
+			ID: state.HistoryID(),
+			// Function completions have no group ID.
 			Type:       history,
 			Identifier: i,
 			CreatedAt:  now,
@@ -637,6 +643,30 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		m.kf.PauseID(ctx, p.ID),
 		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
 		m.kf.PauseEvent(ctx, p.WorkspaceID, evt),
+		m.kf.History(ctx, p.Identifier.RunID),
+	}
+
+	stepID := p.Incoming
+	if p.DataKey != "" {
+		stepID = p.DataKey
+	}
+	now := time.Now()
+	log := state.History{
+		ID:         state.HistoryID(),
+		GroupID:    state.GroupIDFromContext(ctx),
+		Type:       enums.HistoryTypeStepWaiting,
+		Identifier: p.Identifier,
+		CreatedAt:  now,
+		Data: state.HistoryStep{
+			ID:      stepID,
+			Name:    p.StepName,
+			Attempt: p.Attempt,
+			Data: state.HistoryStepWaitingData{
+				EventName:  p.Event,
+				Expression: p.Expression,
+				ExpiryTime: time.Time(p.Expires),
+			},
+		},
 	}
 
 	status, err := scripts["savePause"].Eval(
@@ -651,6 +681,8 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
 		int(time.Until(p.Expires.Time().Add(10*time.Minute)).Seconds()),
+		log,
+		now.UnixMilli(),
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error finalizing: %w", err)
@@ -708,6 +740,26 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		eventKey,
 		m.kf.Actions(ctx, p.Identifier),
 		m.kf.Stack(ctx, p.Identifier.RunID),
+		m.kf.History(ctx, p.Identifier.RunID),
+	}
+
+	stepID := p.Incoming
+	if p.DataKey != "" {
+		stepID = p.DataKey
+	}
+	now := time.Now()
+	log := state.History{
+		ID:         state.HistoryID(),
+		GroupID:    state.GroupIDFromContext(ctx),
+		Type:       enums.HistoryTypeStepCompleted,
+		Identifier: p.Identifier,
+		CreatedAt:  now,
+		Data: state.HistoryStep{
+			ID:      stepID,
+			Name:    p.StepName,
+			Attempt: p.Attempt,
+			Data:    data,
+		},
 	}
 
 	status, err := scripts["consumePause"].Eval(
@@ -718,6 +770,8 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		id.String(),
 		p.DataKey,
 		string(marshalledData),
+		log,
+		now.UnixMilli(),
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("error consuming pause: %w", err)

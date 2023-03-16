@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -16,6 +17,24 @@ const (
 	KindPause = "pause"
 )
 
+type jobIDValType struct{}
+
+var (
+	jobCtxVal = jobIDValType{}
+)
+
+// WithJobID returns a context that stores the given job ID inside.
+func WithJobID(ctx context.Context, jobID string) context.Context {
+	return context.WithValue(ctx, jobCtxVal, jobID)
+}
+
+// JobIDFromContext returns the job ID given the current context, or an
+// empty string if there's no job ID.
+func JobIDFromContext(ctx context.Context) string {
+	str, _ := ctx.Value(jobCtxVal).(string)
+	return str
+}
+
 // Item represents an item stored within a queue.
 //
 // Note that each individual implementation may wrap this to add their own fields,
@@ -25,6 +44,11 @@ const (
 type Item struct {
 	// JobID is an internal ID used to deduplicate queue items.
 	JobID *string `json:"-"`
+	// GroupID allows tracking step history across many jobs;  if a step is scheduled,
+	// then runs and fails, it's rescheduled.  We want the same group ID to be stored
+	// across the lifetime of a step so that we can correlate all history entries across
+	// a specific step.
+	GroupID string `json:"groupID,omitempty"`
 	// Workspace is the ID that this workspace job belongs to
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// Kind represents the job type and payload kind stored within Payload.
@@ -50,12 +74,13 @@ func (i Item) GetMaxAttempts() int {
 
 func (i *Item) UnmarshalJSON(b []byte) error {
 	type kind struct {
+		GroupID     string           `json:"groupID"`
+		WorkspaceID uuid.UUID        `json:"wsID"`
 		Kind        string           `json:"kind"`
 		Identifier  state.Identifier `json:"identifier"`
 		Attempt     int              `json:"atts"`
 		MaxAttempts *int             `json:"maxAtts,omitempty"`
 		Payload     json.RawMessage  `json:"payload"`
-		WorkspaceID uuid.UUID        `json:"wsID"`
 	}
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
@@ -63,11 +88,12 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("error unmarshalling queue item: %w", err)
 	}
 
+	i.GroupID = temp.GroupID
+	i.WorkspaceID = temp.WorkspaceID
 	i.Kind = temp.Kind
 	i.Identifier = temp.Identifier
 	i.Attempt = temp.Attempt
 	i.MaxAttempts = temp.MaxAttempts
-	i.WorkspaceID = temp.WorkspaceID
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.
 	if len(temp.Payload) > 0 {
