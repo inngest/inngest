@@ -562,7 +562,7 @@ func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, at
 func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
 	now := time.Now()
 
-	if at.After(time.Now()) {
+	if at != nil && at.After(time.Now()) {
 		// No need to save time if it's after.
 		at = nil
 	}
