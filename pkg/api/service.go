@@ -5,7 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -86,6 +88,12 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) error {
 	ctx = logger.With(ctx, l)
 
 	l.Debug().Str("event", e.Name).Msg("handling event")
+
+	if strings.HasPrefix(strings.ToLower(e.Name), "inngest/") {
+		err := fmt.Errorf("event name %q is reserved for internal use", e.Name)
+		l.Error().Err(err).Msg("reserved event name rejected")
+		return err
+	}
 
 	if e.ID == "" {
 		// Always ensure that the event has an ID, for idempotency.
