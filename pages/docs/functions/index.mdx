@@ -31,7 +31,7 @@ const inngest = new Inngest({ name: "My app" });
 
 export default inngest.createFunction(
   { name: "Import product images" },
-  { event: "shop/product.imported" }, // The event(s) that will trigger this function
+  { event: "shop/product.imported" }, // The event that will trigger this function
 
   // This function will be called every time an event payload is received
   async ({ event }) => {
