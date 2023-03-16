@@ -573,6 +573,11 @@ func (m *mem) setHistory(ctx context.Context, i state.Identifier, entry state.Hi
 	m.history[i.RunID.String()] = append(m.history[i.RunID.String()], entry)
 }
 
+func (m *mem) SaveHistory(ctx context.Context, i state.Identifier, h state.History) error {
+	m.setHistory(ctx, i, h)
+	return nil
+}
+
 func (m mem) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
 	for _, f := range m.callbacks {
 		go func(fn state.FunctionCallback) {

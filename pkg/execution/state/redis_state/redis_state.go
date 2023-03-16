@@ -908,6 +908,14 @@ func (m mgr) DeleteHistory(ctx context.Context, runID ulid.ULID, historyID ulid.
 	return nil
 }
 
+func (m mgr) SaveHistory(ctx context.Context, i state.Identifier, h state.History) error {
+	hkey := m.kf.History(ctx, i.RunID)
+	return m.r.ZAdd(ctx, hkey, &redis.Z{
+		Score:  float64(h.CreatedAt.UnixMilli()),
+		Member: h,
+	}).Err()
+}
+
 func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
 	// Replace the context so that this isn't cancelled by any parents.
 	callCtx := context.Background()
