@@ -186,7 +186,7 @@ func (s *svc) getFailureHandler(ctx context.Context) (func(context.Context, stat
 			Data: map[string]interface{}{
 				"function_id": s.Workflow().ID,
 				"run_id":      id.RunID.String(),
-				"error":       r.Err.Error(),
+				"error":       r.UserError(),
 				"event":       s.Event(),
 			},
 		}
