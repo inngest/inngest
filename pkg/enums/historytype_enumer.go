@@ -8,9 +8,9 @@ import (
 	"fmt"
 )
 
-const _HistoryTypeName = "NoneFunctionStartedFunctionCompletedFunctionFailedFunctionCancelledStepScheduledStepStartedStepCompletedStepErroredStepFailedStepWaiting"
+const _HistoryTypeName = "NoneFunctionStartedFunctionCompletedFunctionFailedFunctionCancelledStepScheduledStepStartedStepCompletedStepErroredStepFailedStepWaitingStepSleeping"
 
-var _HistoryTypeIndex = [...]uint8{0, 4, 19, 36, 50, 67, 80, 91, 104, 115, 125, 136}
+var _HistoryTypeIndex = [...]uint8{0, 4, 19, 36, 50, 67, 80, 91, 104, 115, 125, 136, 148}
 
 func (i HistoryType) String() string {
 	if i < 0 || i >= HistoryType(len(_HistoryTypeIndex)-1) {
@@ -19,7 +19,7 @@ func (i HistoryType) String() string {
 	return _HistoryTypeName[_HistoryTypeIndex[i]:_HistoryTypeIndex[i+1]]
 }
 
-var _HistoryTypeValues = []HistoryType{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+var _HistoryTypeValues = []HistoryType{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
 
 var _HistoryTypeNameToValueMap = map[string]HistoryType{
 	_HistoryTypeName[0:4]:     0,
@@ -33,6 +33,7 @@ var _HistoryTypeNameToValueMap = map[string]HistoryType{
 	_HistoryTypeName[104:115]: 8,
 	_HistoryTypeName[115:125]: 9,
 	_HistoryTypeName[125:136]: 10,
+	_HistoryTypeName[136:148]: 11,
 }
 
 // HistoryTypeFromString retrieves an enum value from the enum constants string name.
