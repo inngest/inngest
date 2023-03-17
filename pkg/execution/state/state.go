@@ -261,6 +261,11 @@ type Mutater interface {
 	// This returns the position of this step in the stack, if the stack is modified.  For temporary
 	// errors the stack position is 0, ie. unmodified.
 	SaveResponse(ctx context.Context, i Identifier, r DriverResponse, attempt int) (int, error)
+
+	// SaveHistory allows saving arbitrary history records for a function run.  While most
+	// state store mutations save history automatically, in some circumstances (eg. generator noops)
+	// it's important to be able to manually save history.
+	SaveHistory(ctx context.Context, i Identifier, h History) error
 }
 
 // HistoryDeleter is an optional interface a state can implement, deleting specific history items

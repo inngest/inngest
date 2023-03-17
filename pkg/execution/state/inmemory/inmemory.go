@@ -333,10 +333,11 @@ func (m *mem) SaveResponse(ctx context.Context, i state.Identifier, r state.Driv
 			Identifier: i,
 			CreatedAt:  now,
 			Data: state.HistoryStep{
-				ID:      r.Step.ID,
-				Name:    r.Step.Name,
-				Data:    r.Output,
-				Attempt: attempt,
+				ID:         r.Step.ID,
+				Name:       r.Step.Name,
+				Data:       r.Output,
+				Attempt:    attempt,
+				StepOutput: len(r.Generator) == 0,
 			},
 		})
 	} else {
@@ -571,6 +572,11 @@ func (m *mem) setHistory(ctx context.Context, i state.Identifier, entry state.Hi
 		m.history[i.RunID.String()] = []state.History{}
 	}
 	m.history[i.RunID.String()] = append(m.history[i.RunID.String()], entry)
+}
+
+func (m *mem) SaveHistory(ctx context.Context, i state.Identifier, h state.History) error {
+	m.setHistory(ctx, i, h)
+	return nil
 }
 
 func (m mem) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {

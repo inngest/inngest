@@ -99,7 +99,8 @@ func (h *History) UnmarshalJSON(data []byte) error {
 		enums.HistoryTypeStepCompleted,
 		enums.HistoryTypeStepErrored,
 		enums.HistoryTypeStepFailed,
-		enums.HistoryTypeStepWaiting:
+		enums.HistoryTypeStepWaiting,
+		enums.HistoryTypeStepSleeping:
 		// Assume that for step history items we must have a HistoryStep
 		// struct within data.
 		v := HistoryStep{}
@@ -177,7 +178,6 @@ type HistoryFunctionCancelled struct {
 	Data any                    `json:"data"`
 }
 
-// TODO Add tracking of the parent steps so that we can create a visual DAG
 type HistoryStep struct {
 	// ID stores the step ID.  This is the key used within the state
 	// store to represent the step's data.
@@ -187,10 +187,11 @@ type HistoryStep struct {
 	// needed for the UI.
 	Name    string `json:"name"`
 	Attempt int    `json:"attempt"`
-	// Opcode stores the generator opcode for this step, if any.
-	Opcode enums.Opcode `json:"opcode"`
 	// Data stores data for this event, dependent on the history type.
 	Data any `json:"data"`
+	// StepOutput indicates whether this history item represents the
+	// final step output.
+	StepOutput bool `json:"stepOutput"`
 }
 
 // HistoryStepWaiting is stored within HistoryStep when we create a pause to wait
