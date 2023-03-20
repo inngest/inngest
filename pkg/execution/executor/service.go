@@ -160,7 +160,7 @@ func (s *svc) Pre(ctx context.Context) error {
 		),
 		WithLogger(logger.From(ctx)),
 		WithConfig(s.config.Execution),
-		WithFailureHandler(&failureHandler),
+		WithFailureHandler(failureHandler),
 	)
 	if err != nil {
 		return err

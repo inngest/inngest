@@ -85,6 +85,9 @@ type Executor interface {
 	) (*state.DriverResponse, int, error)
 }
 
+// FailureHandler is a function that handles failures in the executor.
+type FailureHandler func(context.Context, state.Identifier, state.State, state.DriverResponse) error
+
 // NewExecutor returns a new executor, responsible for running the specific step of a
 // function (using the available drivers) and storing the step's output or error.
 //
@@ -146,7 +149,7 @@ func WithConfig(c config.Execution) ExecutorOpt {
 	}
 }
 
-func WithFailureHandler(f *func(context.Context, state.Identifier, state.State, state.DriverResponse) error) ExecutorOpt {
+func WithFailureHandler(f FailureHandler) ExecutorOpt {
 	return func(e Executor) error {
 		e.(*executor).failureHandler = f
 		return nil
@@ -180,7 +183,7 @@ type executor struct {
 	sm             state.Manager
 	al             coredata.ExecutionActionLoader
 	runtimeDrivers map[string]driver.Driver
-	failureHandler *func(context.Context, state.Identifier, state.State, state.DriverResponse) error
+	failureHandler FailureHandler
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -315,7 +318,7 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 	}
 	if response.Err != nil {
 		if response.Final() && e.failureHandler != nil {
-			if err := (*e.failureHandler)(ctx, id, s, *response); err != nil {
+			if err := e.failureHandler(ctx, id, s, *response); err != nil {
 				logger.From(ctx).Error().Err(err).Msg("error handling failure in executor fail handler")
 			}
 		}
