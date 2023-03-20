@@ -26,7 +26,7 @@ var (
 		// Other common ports
 		8000, 8080, 8081, 8888,
 		// Redwood
-		8910, 8911,
+		8910, 8911, 8912, 8913, 8914, 8915,
 	}
 
 	// Paths indicate the paths we attempt to hit when a web server is available.

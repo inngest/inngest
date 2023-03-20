@@ -496,6 +496,13 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		}
 	}
 
+	stepOutput := false
+	if len(r.Generator) == 0 && typ == enums.HistoryTypeStepCompleted {
+		// This is only the step output if the step is complete and this
+		// isn't a generator response.
+		stepOutput = true
+	}
+
 	stepHistory := state.History{
 		ID:         state.HistoryID(),
 		GroupID:    state.GroupIDFromContext(ctx),
@@ -503,10 +510,11 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		Identifier: i,
 		CreatedAt:  now,
 		Data: state.HistoryStep{
-			ID:      r.Step.ID,
-			Name:    r.Step.Name,
-			Attempt: attempt,
-			Data:    r.Output,
+			ID:         r.Step.ID,
+			Name:       r.Step.Name,
+			Attempt:    attempt,
+			Data:       r.Output,
+			StepOutput: stepOutput,
 		},
 	}
 
@@ -562,8 +570,8 @@ func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, at
 func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
 	now := time.Now()
 
-	if at != nil && at.After(time.Now()) {
-		// No need to save time if it's after.
+	if at != nil && at.Before(time.Now()) {
+		// No need to save time if it's before now.
 		at = nil
 	}
 
@@ -906,6 +914,14 @@ func (m mgr) DeleteHistory(ctx context.Context, runID ulid.ULID, historyID ulid.
 	}
 
 	return nil
+}
+
+func (m mgr) SaveHistory(ctx context.Context, i state.Identifier, h state.History) error {
+	hkey := m.kf.History(ctx, i.RunID)
+	return m.r.ZAdd(ctx, hkey, &redis.Z{
+		Score:  float64(h.CreatedAt.UnixMilli()),
+		Member: h,
+	}).Err()
 }
 
 func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
