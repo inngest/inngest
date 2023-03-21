@@ -18,6 +18,7 @@ We provide framework-specific bindings to make this easy for common platforms:
 - [Next.js](#framework-next-js)
 - [Redwood](#framework-redwood)
 - [Remix](#framework-remix)
+- [Custom](#custom-frameworks)
 
 Each of these bindings wrap our base API which implemnts the core logic, so adding support for new
 frameworks is easy.  [Want us to add support for another platform?  Come say hi in our discord](/discord)
@@ -210,3 +211,8 @@ The API works by exposing a single endpoint at `/api/inngest` which handles thre
 - `POST`:  Runs a function, using the request's post data as incoming function state.
 - `PUT`:  Triggers a deploy, which makes the SDK push functions to Inngest using the signing key.
 
+## Custom frameworks
+
+While Inngest provides some first-party tooling for popular frameworks, they're all created using a standard interface that any framework can use.
+
+To create your own handler, check out the [example handler](https://github.com/inngest/inngest-js/blob/main/src/examples/handler.ts) in our TS SDK to understand how it works.
