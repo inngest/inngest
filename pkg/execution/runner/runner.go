@@ -236,7 +236,7 @@ func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
-	if m.Name != "event/event.received" {
+	if m.Name != event.EventReceivedName {
 		return fmt.Errorf("unknown event type: %s", m.Name)
 	}
 

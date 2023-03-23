@@ -3,6 +3,7 @@ package state
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/inngest/inngest/inngest"
@@ -235,4 +236,47 @@ func (r DriverResponse) Error() string {
 
 func (r DriverResponse) Unwrap() error {
 	return r.Err
+}
+
+type UserError struct {
+	Name    string      `json:"name"`
+	Message string      `json:"message"`
+	Stack   string      `json:"stack"`
+	Cause   string      `json:"cause,omitempty"`
+	Status  json.Number `json:"status,omitempty"`
+}
+
+// UserError returns the error that the user reported for this response. Can be
+// used to safely fetch the error from the response.
+//
+// Will return nil if there is no error.
+func (r DriverResponse) UserError() *UserError {
+	mapped, ok := r.Output.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	body, ok := mapped["body"]
+	if !ok {
+		return nil
+	}
+
+	byt, ok := body.(json.RawMessage)
+	if !ok {
+		return nil
+	}
+
+	// The body is a stringified JSON object, so we need to unescape it first.
+	s, err := strconv.Unquote(string(byt))
+	if err != nil {
+		return nil
+	}
+
+	var output UserError
+
+	if err := json.Unmarshal([]byte(s), &output); err != nil {
+		return nil
+	}
+
+	return &output
 }
