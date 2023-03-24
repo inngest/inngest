@@ -225,6 +225,8 @@ export const navigation = [
         title: "Handling Errors & Retries",
         href: `${baseDir}/functions/retries`,
       },
+      { title: "Concurrency", href: `${baseDir}/functions/concurrency` },
+      { title: "Cancellation", href: `${baseDir}/functions/cancellation` },
     ],
   },
   {

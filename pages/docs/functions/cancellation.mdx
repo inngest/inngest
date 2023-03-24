@@ -1,0 +1,65 @@
+# Cancellation
+
+```ts
+inngest.createFunction(
+  {
+    name: "Sync contacts",
+    cancelOn: [{
+      event: "app/user.deleted", match: "data.userId" }],
+  }
+  // ...
+);
+```
+
+Cancellation allows you to stop the execution of a function when a specific event is received. This is useful for handling scenarios where a long-running function should be terminated early due to changes elsewhere in your system.
+
+The API for this is similar to the [`step.waitForEvent()`](/docs/functions/multi-step#wait-for-event) tool, allowing you to specify the incoming event and different methods for matching pieces of data within.
+
+## Common use
+
+The most common use case for cancellation is to cancel a function's execution if a specific field in the incoming event matches the same field in the triggering event. For example, you might want to cancel a function if the `data.userId` field in the incoming event matches the `data.userId` field in the triggering event, as in the initial example.
+
+To make this more explicit, consider the following event payloads:
+
+The triggering event:
+
+```json
+{
+  "type": "app/user.created",
+  "data": {
+    "userId": "123",
+    "name": "John Doe"
+  }
+}
+```
+
+The incoming event we've specified in `cancelOn`:
+
+```json
+{
+  "type": "app/user.deleted",
+  "data": {
+    "userId": "123"
+  }
+}
+```
+
+In this case, the function will be canceled because the `data.userId` field in both events is `"123"`.
+
+## Further examples
+
+### With timeout
+
+Cancel a function's execution if a matching event is received within a given amount of time from the function being triggered.
+
+```ts
+inngest.createFunction(
+  {
+    name: "Sync contacts",
+    cancelOn: [{ event: "app/user.deleted", timeout: "1h" }],
+  }
+  // ...
+);
+```
+
+This is useful when you want to limit the time window for cancellation, ensuring that the function will continue to execute if no matching event is received within the specified time frame.

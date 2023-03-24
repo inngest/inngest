@@ -1,0 +1,32 @@
+# Concurrency
+
+```ts
+inngest.createFunction(
+  { name: "Sync contacts", concurrency: 5 },
+  // ...
+);
+```
+
+Limit the number of concurrently-running function steps by setting the `concurrency` option when creating a function.
+
+A value of `0`, `undefined`, or not providing the option means the maximum concurrency for your account will be used.
+
+<Callout>
+The current concurrency option controls the number of concurrent _steps_ that can be running at any one time.
+
+Because a single function run can contain multiple steps, it's possible that more functions than the concurrency limit are triggered, but only the set number of steps will ever be running.
+</Callout>
+
+The maximum possible concurrency that can be set is based on your plan.
+
+- Hobby (free): 1
+- Team: 100
+- Enterprise: [contact us](/contact?ref=pricing-advanced)
+
+## Benefits
+
+Being able to control the concurrency of function runs provides you with a few key benefits, mostly around dealing with external services and buffering traffic spikes.
+
+- **Handling rate limits** - Most external APIs (and even the platform you're hosted on) will have rate limits and usage quotas which restrict the number of requests that you can within a certain time period. Limiting the concurrency of your function runs ensures you stay safely within these limits.
+
+- **Resource limitations** such as maximum database connections are especially prevalent in serverless offerings and still exist even if you're maintaining your own clusters. Limiting concurrency ensures you don't overload these resources when spikes of traffic arrive.
