@@ -33,6 +33,15 @@ type AutocompleteState = {
   collections?: any[];
 };
 
+// Headless UI doesn't always removing their "portal" dom element,
+// so we remove it manually if needed
+function removePortal() {
+  const portalRoot = document.getElementById("headlessui-portal-root");
+  if (portalRoot) {
+    portalRoot.remove();
+  }
+}
+
 function useAutocomplete() {
   let id = useId();
   let router = useRouter();
@@ -69,6 +78,7 @@ function useAutocomplete() {
               return `${url.pathname}${url.hash}`;
             },
             onSelect({ itemUrl }) {
+              removePortal();
               router.push(itemUrl);
             },
             getItems({ query }) {
@@ -480,10 +490,6 @@ function SearchDialog({ open, setOpen, className }) {
                           query={autocompleteState.query}
                           collection={autocompleteState.collections[0]}
                         />
-                        <p className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-2 text-xs text-slate-400 dark:border-slate-800 dark:text-slate-500">
-                          Search by{" "}
-                          <AlgoliaLogo className="h-4 fill-[#003DFF] dark:fill-slate-400" />
-                        </p>
                       </>
                     )}
                   </div>
@@ -538,10 +544,9 @@ export function Search() {
         {...buttonProps}
       >
         <SearchIcon className="h-5 w-5 stroke-current" />
-        Find something...
-        <kbd className="ml-auto text-2xs text-slate-400 dark:text-slate-500">
-          <kbd className="font-sans">{modifierKey}</kbd>
-          <kbd className="font-sans">K</kbd>
+        Search documentation...
+        <kbd className="ml-auto text-xs font-sans text-slate-500 dark:text-slate-400">
+          {modifierKey}K
         </kbd>
       </button>
       <SearchDialog className="hidden lg:block" {...dialogProps} />
@@ -553,7 +558,7 @@ export function MobileSearch() {
   let { buttonProps, dialogProps } = useSearchProps();
 
   return (
-    <div className="contents lg:hidden hidden">
+    <div className="contents lg:hidden">
       <button
         type="button"
         className="flex h-6 w-6 items-center justify-center rounded-md transition hover:bg-slate-900/5 dark:hover:bg-white/5 lg:hidden focus:[&:not(:focus-visible)]:outline-none"

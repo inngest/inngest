@@ -249,11 +249,8 @@ a {
 }
 
 kbd {
-  background-color: #eee;
+  /* background-color: rgb(30 41 59 / 0.025); */
   border-radius: 3px;
-  border: 1px solid #b4b4b4;
-  box-shadow: 0 1px 1px rgb(0 0 0 / 20%),
-    0 2px 0 0 rgb(255 255 255 / 70%) inset;
   color: #333;
   display: inline-block;
   font-size: 0.85em;

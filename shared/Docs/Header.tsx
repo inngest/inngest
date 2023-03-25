@@ -67,7 +67,7 @@ export const Header = forwardRef<HTMLDivElement>(function Header(
             "bg-slate-900/7.5 dark:bg-white/7.5"
         )}
       />
-      {/* <Search /> */}
+      <Search />
       <div className="flex items-center gap-5 lg:hidden">
         <MobileNavigation />
         <a href="/" className="flex gap-1.5 group/logo items-center pt-1">
@@ -76,22 +76,6 @@ export const Header = forwardRef<HTMLDivElement>(function Header(
             Docs
           </span>
         </a>
-      </div>
-      <div className="flex items-center gap-5">
-        <nav className="hidden lg:block mr-4">
-          <ul role="list" className="flex items-center gap-8">
-            <li>
-              <Button
-                href="/ai-personalized-documentation?ref=docs"
-                variant="tertiary"
-                size="sm"
-                className="w-full hidden xl:inline"
-              >
-                ✨ Create AI-Personalized Documentation
-              </Button>
-            </li>
-          </ul>
-        </nav>
       </div>
       <div className="flex items-center gap-5">
         <nav className="hidden lg:block mr-4">
