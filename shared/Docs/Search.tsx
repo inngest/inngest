@@ -33,15 +33,6 @@ type AutocompleteState = {
   collections?: any[];
 };
 
-// Headless UI doesn't always removing their "portal" dom element,
-// so we remove it manually if needed
-function removePortal() {
-  const portalRoot = document.getElementById("headlessui-portal-root");
-  if (portalRoot) {
-    portalRoot.remove();
-  }
-}
-
 function useAutocomplete() {
   let id = useId();
   let router = useRouter();
@@ -78,7 +69,6 @@ function useAutocomplete() {
               return `${url.pathname}${url.hash}`;
             },
             onSelect({ itemUrl }) {
-              removePortal();
               router.push(itemUrl);
             },
             getItems({ query }) {
@@ -386,6 +376,19 @@ function SearchButton(props) {
   );
 }
 
+function cleanup() {
+  // Remove overflow hidden style
+  const htmlEl = document.documentElement;
+  htmlEl.style.overflow = "";
+
+  // Headless UI doesn't always removing their "portal" dom element,
+  // so we remove it manually if needed and set the overflow to
+  const portalRoot = document.getElementById("headlessui-portal-root");
+  if (portalRoot) {
+    portalRoot.remove();
+  }
+}
+
 function SearchDialog({ open, setOpen, className }) {
   let router = useRouter();
   let formRef = useRef();
@@ -430,6 +433,11 @@ function SearchDialog({ open, setOpen, className }) {
     };
   }, [open, setOpen]);
 
+  function onClose(...args) {
+    setOpen(...args);
+    cleanup();
+  }
+
   return (
     <Transition.Root
       show={open}
@@ -437,7 +445,7 @@ function SearchDialog({ open, setOpen, className }) {
       afterLeave={() => autocomplete.setQuery("")}
     >
       <Dialog
-        onClose={setOpen}
+        onClose={onClose}
         className={clsx("fixed inset-0 z-50", className)}
       >
         <Transition.Child
