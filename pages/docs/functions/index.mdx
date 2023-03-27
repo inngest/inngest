@@ -34,7 +34,7 @@ export default inngest.createFunction(
   { event: "shop/product.imported" }, // The event that will trigger this function
 
   // This function will be called every time an event payload is received
-  async ({ event }) => {
+  async ({ event, step }) => {
     return copyAllImagesToS3(event.data.imageURLs); // You can write whatever you want here.
   }
 );
@@ -65,7 +65,7 @@ export default inngest.createFunction(
   { cron: "TZ=America/New_York 0 9 * * MON" }, // The cron syntax for the function. TZ= is optional.
 
   // This function will be called on the schedule above
-  async () => {
+  async ({ step }) => {
     return await sendDigestToAllUsers(); // You can write whatever you want here.
   }
 );
@@ -156,7 +156,7 @@ import { inngest } from "./client";
 export default inngest.createFunction(
   { name: "Add to Intercom" },
   { name: "app/user.created" },
-  async ({ event }) => { /* ... */ }
+  async ({ event, step }) => { /* ... */ }
 );
 ```
 
