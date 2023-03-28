@@ -464,6 +464,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 				if doneErr != nil && doneErr != concurrency.ErrKeyNotFound {
 					// Return both the lease error and the error for removing
 					// the concurrency key.
+					q.sem.Release(1)
 					return multierror.Append(err, doneErr)
 				}
 			}
