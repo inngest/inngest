@@ -34,17 +34,17 @@ export const fn = inngest.createFunction(
     });
 
     const updateUser = step.run("Update user", async () => {
-      return db.updateUserWithCharge(event);
-    });
+        return db.updateUserWithCharge(event);
+        });
 
     // Run both steps in parallel.  Once complete, Promise.all will return all
     // parallelised state here.
-		//
-		// This ensures that all steps complete as fast as possible, and we still have
-		// access to each step's data once they're compelte.
+    //
+    // This ensures that all steps complete as fast as possible, and we still have
+    // access to each step's data once they're compelte.
     const [emailID, updates] = await Promise.all([sendEmail, updateUser]);
 
-		return { emailID, updates };
+    return { emailID, updates };
   }
 );
 ```
