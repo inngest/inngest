@@ -220,7 +220,7 @@ func WithAccountConcurrencyKeyGenerator(f QueueItemConcurrencyKeyGenerator) func
 	}
 }
 
-func WithConcurrencyService(s concurrency.ConcurrencyAdder) func(q *queue) {
+func WithConcurrencyService(s concurrency.ConcurrencyService) func(q *queue) {
 	return func(q *queue) {
 		q.concurrencyService = s
 	}
@@ -285,7 +285,7 @@ type queue struct {
 	// concurrencyService is an external concurrency limiter used when pulling
 	// jobs off of the queue.  It is only invoked for jobs with a non-zero function ID,
 	// eg. for jobs that run a function.
-	concurrencyService concurrency.ConcurrencyAdder
+	concurrencyService concurrency.ConcurrencyService
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/VividCortex/ewma"
+	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -446,6 +447,27 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 			// This is safe:  only one process runs scan(), and we guard the total number of
 			// available workers with the above semaphore.
 			leaseID, err := q.Lease(ctx, *p, *item, QueueLeaseDuration)
+			if err != nil && q.concurrencyService != nil {
+				// NOTE: Always remove the concurrency key if leasing failed.
+				//
+				// There's a race condition here;  the key may not be found if
+				// there's contention on the worker item.
+				//
+				// w1: add to concurrency
+				// w1: lease
+				// w2: add to concurrency
+				// w1: remove concurrency key
+				// w2: attempt to lease; not found error
+				// w2: remove concurrency
+				// w2: concurrency key not found
+				doneErr := q.concurrencyService.Done(ctx, item.WorkflowID, item.Data)
+				if doneErr != nil && doneErr != concurrency.ErrKeyNotFound {
+					// Return both the lease error and the error for removing
+					// the concurrency key.
+					return multierror.Append(err, doneErr)
+				}
+			}
+
 			switch err {
 			case ErrPartitionConcurrencyLimit, ErrConcurrencyLimit:
 				q.scope.Counter(counterConcurrencyLimit).Inc(1)
