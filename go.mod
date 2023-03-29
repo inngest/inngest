@@ -1,6 +1,6 @@
 module github.com/inngest/inngest
 
-go 1.18
+go 1.20
 
 require (
 	cuelang.org/go v0.4.2
