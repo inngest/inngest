@@ -419,8 +419,6 @@ github.com/containerd/containerd/sys
 # github.com/cpuguy83/go-md2man/v2 v2.0.1
 ## explicit; go 1.11
 github.com/cpuguy83/go-md2man/v2/md2man
-# github.com/cyberphone/json-canonicalization v0.0.0-20220623050100-57a0ce2678a7
-## explicit
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
@@ -817,8 +815,8 @@ github.com/opencontainers/go-digest
 ## explicit
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.3
-## explicit; go 1.13
+# github.com/opencontainers/runc v1.1.5
+## explicit; go 1.16
 github.com/opencontainers/runc/libcontainer/user
 # github.com/pascaldekloe/name v0.0.0-20180628100202-0fd16699aae1
 ## explicit
