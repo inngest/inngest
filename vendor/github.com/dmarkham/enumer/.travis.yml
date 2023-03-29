@@ -1,0 +1,29 @@
+language: go
+dist: xenial
+matrix:
+  allow_failures:
+  - go: master
+  include:
+  - go: 1.17.x
+  - go: 1.18.x
+env:
+  global:
+  - GO111MODULE=on
+after_success:
+- make build-cli
+- bash <(curl -s https://codecov.io/bash)
+deploy:
+  provider: releases
+  api_key:
+    secure: VnwZNdY9ryTKIStuy8vJUq3QwyDQe9RVstjLB6kdSj+LE9bg6MDOSYtoN/ricdL0xqYctvYTWpWrt4TNzGOgrzRPV6EriMs0dy4JL1Q+teKWM1Q7/AwTZqINZ4SbczibX+Y66BqB39Ca5+b8Qg6ijP2wu1Yiss9ro9XIdVvNib4/tg1bas1JtDueGTJPm3wYIMexNHP+nGqo6LCSoAO1ul6aEnGb0JlHQkdUKNT05XAQXcNwzuylQ+ckfttMTeBJkeag5xl20hh0g7EYUh+JtQkfkfazyug5PqjO+nxHfdHn1EHq5CTX679UTOM/0EIXqC8LyKIux0p2+4cufAwuArsw9X0e0ui3qL0389Ac+6D3F0fC6we4/BDT79C1DBpdw+eK+wO2roWqSGRymlhbjG5sVmYERDF831OdAy8/7w+pI3NKlGL+BiYEjhRKR33ldRuwf8X82MtWJCVht67guxLHSq09HE9i774yP0aw3h4LmeI2lGdVD2tsb/awhjVnNL3jMylimU7am2qW6Kb6hGXMv8WENX5QmpgXkm0VUT2TCopKjL6fOefJYW0FpPJjb9wFrSdT7csXwu/XhoQTnNBMEKc1FDqX9pb2m/BNvHAnZdwawBS9ysLnMcORGL11Wql+p1D1xfvIGFB1rQs/xdPRJ0/pao+cS6+hLxi1fyI=
+  skip_cleanup: true
+  file:
+  - cli/build/enumer.linux-amd64.tar.gz
+  - cli/build/enumer.darwin-amd64.tar.gz
+  - cli/build/enumer.darwin-arm64.tar.gz
+  - cli/build/enumer.windows-amd64.exe.tar.gz
+  - cli/build/sha256sum.txt
+  on:
+    go: 1.17.x
+    repo: dmarkham/enumer
+    tags: true

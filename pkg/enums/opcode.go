@@ -1,4 +1,4 @@
-//go:generate go run github.com/tonyhb/enumer -trimprefix=Opcode -type=Opcode -json -text
+//go:generate go run github.com/dmarkham/enumer -trimprefix=Opcode -type=Opcode -json -text
 
 package enums
 

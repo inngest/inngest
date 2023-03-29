@@ -3,34 +3,29 @@
 // techniques such as snake_case, Lisp-case, CamelCase and (Java) property keys.
 package name
 
-import "unicode"
+import (
+	"strings"
+	"unicode"
+)
 
 // CamelCase returns the medial capitals form of word sequence s.
 // The input can be any case or even just a bunch of words.
 // Upper case sequences (abbreviations) are preserved.
-// Argument upper sets the letter case for the first rune. Use true for
-// UpperCamelCase and false for lowerCamelCase.
+// Argument upper forces the letter case for the first rune. Use
+// true for UpperCamelCase and false for lowerCamelCase.
 func CamelCase(s string, upper bool) string {
-	if s == "" {
-		return ""
-	}
+	var b strings.Builder
+	b.Grow(len(s))
 
-	out := make([]rune, 1, len(s)+5)
 	for i, r := range s {
 		if i == 0 {
 			if upper {
-				r = unicode.ToUpper(r)
+				b.WriteRune(unicode.ToUpper(r))
+			} else {
+				b.WriteRune(unicode.ToLower(r))
 			}
-			out[0] = r
-			continue
-		}
-
-		if i == 1 {
-			if !upper && unicode.Is(unicode.Lower, r) {
-				out[0] = unicode.ToLower(out[0])
-			}
-
 			upper = false
+			continue
 		}
 
 		switch {
@@ -42,15 +37,14 @@ func CamelCase(s string, upper bool) string {
 			fallthrough
 		case unicode.IsNumber(r):
 			upper = false
-			out = append(out, r)
+			b.WriteRune(r)
 
 		default:
 			upper = true
-
 		}
 	}
 
-	return string(out)
+	return b.String()
 }
 
 // SnakeCase is an alias for Delimit(s, '_').
@@ -68,48 +62,53 @@ func DotSeparated(s string) string {
 // Upper case sequences (abbreviations) are preserved. Use
 // strings.ToLower and strings.ToUpper to enforce a letter case.
 func Delimit(s string, sep rune) string {
-	out := make([]rune, 0, len(s)+5)
+	var b strings.Builder
+	b.Grow(len(s) + len(s)/4)
 
+	var last rune // previous rune; pending write
+	sepDist := 1  // distance between a sep and the current rune r
 	for _, r := range s {
 		switch {
 		case unicode.IsUpper(r):
-			if last := len(out) - 1; last >= 0 && unicode.IsLower(out[last]) {
-				out = append(out, sep)
-			}
-
-		case unicode.IsLetter(r):
-			if i := len(out) - 1; i >= 0 {
-				if last := out[i]; unicode.IsUpper(last) {
-					out = out[:i]
-					if i > 0 && out[i-1] != sep {
-						out = append(out, sep)
-					}
-					out = append(out, unicode.ToLower(last))
+			if unicode.IsLower(last) {
+				if b.Len() == 0 {
+					last = unicode.ToUpper(last)
+				} else {
+					b.WriteRune(last)
+					last = sep
+					sepDist = 1
 				}
 			}
 
-		case !unicode.IsNumber(r):
-			if i := len(out); i != 0 && out[i-1] != sep {
-				out = append(out, sep)
+		case unicode.IsLetter(r): // lower-case
+			if unicode.IsUpper(last) {
+				if sepDist > 2 {
+					b.WriteRune(sep)
+				}
+				last = unicode.ToLower(last)
 			}
-			continue
 
+		case !unicode.IsNumber(r):
+			if last == 0 || last == sep {
+				continue
+			}
+			r = sep
+			sepDist = 0
 		}
-		out = append(out, r)
+
+		if last != 0 {
+			b.WriteRune(last)
+		}
+		last = r
+		sepDist++
 	}
 
-	if len(out) == 0 {
-		return ""
+	if last != 0 && last != sep {
+		if b.Len() == 0 {
+			last = unicode.ToUpper(last)
+		}
+		b.WriteRune(last)
 	}
 
-	// trim tailing separator
-	if i := len(out) - 1; out[i] == sep {
-		out = out[:i]
-	}
-
-	if len(out) == 1 {
-		out[0] = unicode.ToLower(out[0])
-	}
-
-	return string(out)
+	return b.String()
 }
