@@ -10,11 +10,13 @@ import (
 
 var (
 	ErrAtConcurrencyLimit = fmt.Errorf("at concurrency limit")
+	ErrKeyNotFound        = fmt.Errorf("concurrency key not found")
 )
 
-// ConcurrencyAdder adds items to external concurrency queues, returning an ErrAtConcurrencyLimit
-// if it's not possible to add the item due to capacity issues.
-type ConcurrencyAdder interface {
+// ConcurrencyService defines a concurrency service which tracks concurrency by function IDs.  As
+// items are claimed.  This service lives outside of the state store and queue, allowing transactionality
+// at a higher level.
+type ConcurrencyService interface {
 	// Add inserts a new item into the concurrency service.  This
 	// will count towards concurrency limits until the specified timeout or until the key is
 	// removed via a call to Done().
@@ -22,19 +24,12 @@ type ConcurrencyAdder interface {
 	// Add must return an ErrAtConcurrencyLimit if there is no capacity for the given
 	// function ID/key.
 	Add(ctx context.Context, functionID uuid.UUID, qi queue.Item) error
-}
-
-// ConcurrencyService defines a concurrency service which tracks concurrency by function IDs.  As
-// items are claimed.  This service lives outside of the state store and queue, allowing transactionality
-// at a higher level.
-type ConcurrencyService interface {
-	ConcurrencyAdder
 
 	// Done removes the given key from concurrency limits for a function.
 	//
 	// It is expected that Done is manually called outside of the state store and queue; the
 	// implementer must decide how to complete items and remove them from concurrency limits.
-	Done(ctx context.Context, functionID uuid.UUID, key string) error
+	Done(ctx context.Context, functionID uuid.UUID, qi queue.Item) error
 
 	// Check returns whether there's capacity within concurrency limits for a given
 	// function ID.
