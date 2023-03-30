@@ -11,6 +11,7 @@ type Timestamp struct {
 	timestamp  *time.Time
 	hasBeenSet bool
 	layout     string
+	location   *time.Location
 }
 
 // Timestamp constructor
@@ -31,9 +32,22 @@ func (t *Timestamp) SetLayout(layout string) {
 	t.layout = layout
 }
 
+// Set perceived timezone of the to-be parsed time string
+func (t *Timestamp) SetLocation(loc *time.Location) {
+	t.location = loc
+}
+
 // Parses the string value to timestamp
 func (t *Timestamp) Set(value string) error {
-	timestamp, err := time.Parse(t.layout, value)
+	var timestamp time.Time
+	var err error
+
+	if t.location != nil {
+		timestamp, err = time.ParseInLocation(t.layout, value, t.location)
+	} else {
+		timestamp, err = time.Parse(t.layout, value)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -58,6 +72,25 @@ func (t *Timestamp) Get() interface{} {
 	return *t
 }
 
+// clone timestamp
+func (t *Timestamp) clone() *Timestamp {
+	tc := &Timestamp{
+		timestamp:  nil,
+		hasBeenSet: t.hasBeenSet,
+		layout:     t.layout,
+		location:   nil,
+	}
+	if t.timestamp != nil {
+		tts := *t.timestamp
+		tc.timestamp = &tts
+	}
+	if t.location != nil {
+		loc := *t.location
+		tc.location = &loc
+	}
+	return tc
+}
+
 // TakesValue returns true of the flag takes a value, otherwise false
 func (f *TimestampFlag) TakesValue() bool {
 	return true
@@ -76,7 +109,7 @@ func (f *TimestampFlag) GetCategory() string {
 // GetValue returns the flags value as string representation and an empty
 // string if the flag takes no value at all.
 func (f *TimestampFlag) GetValue() string {
-	if f.Value != nil {
+	if f.Value != nil && f.Value.timestamp != nil {
 		return f.Value.timestamp.String()
 	}
 	return ""
@@ -87,7 +120,11 @@ func (f *TimestampFlag) GetDefaultText() string {
 	if f.DefaultText != "" {
 		return f.DefaultText
 	}
-	return f.GetValue()
+	if f.defaultValue != nil && f.defaultValue.timestamp != nil {
+		return f.defaultValue.timestamp.String()
+	}
+
+	return ""
 }
 
 // GetEnvVars returns the env vars for this flag
@@ -104,9 +141,13 @@ func (f *TimestampFlag) Apply(set *flag.FlagSet) error {
 		f.Value = &Timestamp{}
 	}
 	f.Value.SetLayout(f.Layout)
+	f.Value.SetLocation(f.Timezone)
+
+	f.defaultValue = f.Value.clone()
 
 	if f.Destination != nil {
 		f.Destination.SetLayout(f.Layout)
+		f.Destination.SetLocation(f.Timezone)
 	}
 
 	if val, source, found := flagFromEnvOrFile(f.EnvVars, f.FilePath); found {
@@ -130,6 +171,15 @@ func (f *TimestampFlag) Apply(set *flag.FlagSet) error {
 // Get returns the flag’s value in the given Context.
 func (f *TimestampFlag) Get(ctx *Context) *time.Time {
 	return ctx.Timestamp(f.Name)
+}
+
+// RunAction executes flag action if set
+func (f *TimestampFlag) RunAction(c *Context) error {
+	if f.Action != nil {
+		return f.Action(c, c.Timestamp(f.Name))
+	}
+
+	return nil
 }
 
 // Timestamp gets the timestamp from a flag name

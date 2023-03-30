@@ -1,6 +1,6 @@
-// Package name implements naming conventions.
-// The functions offer flexible parsing and strict formatting for label
-// techniques such as snake_case, Lisp-case, CamelCase and (Java) property keys.
+// Package name implements various naming conventions. The two categories are
+// delimiter-separated and letter case-separated words. Each of the formatting
+// functions support both techniques for input, without any context.
 package name
 
 import (
@@ -8,105 +8,120 @@ import (
 	"unicode"
 )
 
-// CamelCase returns the medial capitals form of word sequence s.
-// The input can be any case or even just a bunch of words.
-// Upper case sequences (abbreviations) are preserved.
-// Argument upper forces the letter case for the first rune. Use
-// true for UpperCamelCase and false for lowerCamelCase.
+// CamelCase returns the medial capitals form of the words in s.
+// Words consist of Unicode letters and/or numbers in any order.
+// Upper case sequences [abbreviations] are preserved.
+//
+// Argument upper forces the letter case for the first rune.
+// Use true for UpperCamelCase, a.k.a. PascalCase.
+// Use false for lowerCamelCase, a.k.a. dromedaryCase.
+//
+// BUG(pascaldekloe): Abbreviations at the beginning of a name
+// may look odd in lowerCamelCase, i.e., "tCPConn".
+//
+// BUG(pascaldekloe): CamelCase concatenates abbreviations by
+// design, i.e., "DB-API" becomes "DBAPI".
 func CamelCase(s string, upper bool) string {
 	var b strings.Builder
 	b.Grow(len(s))
 
-	for i, r := range s {
-		if i == 0 {
-			if upper {
-				b.WriteRune(unicode.ToUpper(r))
-			} else {
-				b.WriteRune(unicode.ToLower(r))
-			}
-			upper = false
-			continue
-		}
-
+	// The conversion keeps any camel-casing as is.
+	for _, r := range s {
 		switch {
 		case unicode.IsLetter(r):
 			if upper {
 				r = unicode.ToUpper(r)
+			} else if b.Len() == 0 {
+				// force only on beginning of name
+				r = unicode.ToLower(r)
 			}
 
 			fallthrough
 		case unicode.IsNumber(r):
-			upper = false
 			b.WriteRune(r)
+			upper = false // mark continuation
 
 		default:
-			upper = true
+			// delimiter found
+			upper = true // mark begin
 		}
 	}
 
 	return b.String()
 }
 
-// SnakeCase is an alias for Delimit(s, '_').
+// SnakeCase returns Delimit(s, '_'), a.k.a. the snake_case.
 func SnakeCase(s string) string {
 	return Delimit(s, '_')
 }
 
-// DotSeparated is an alias for Delimit(s, '.').
+// DotSeparated returns Delimit(s, '.'), a.k.a. the dot notation.
 func DotSeparated(s string) string {
 	return Delimit(s, '.')
 }
 
-// Delimit returns word sequence s delimited with separator sep.
-// The input can be any case or even just a bunch of words.
-// Upper case sequences (abbreviations) are preserved. Use
-// strings.ToLower and strings.ToUpper to enforce a letter case.
+// Delimit returns the words in s delimited with separator sep.
+// Words consist of Unicode letters and/or numbers in any order.
+// Upper case sequences [abbreviations] are preserved.
+// Use strings.ToLower or ToUpper to enforce one letter case.
 func Delimit(s string, sep rune) string {
 	var b strings.Builder
-	b.Grow(len(s) + len(s)/4)
+	b.Grow(len(s) + (len(s)+1)/4)
 
-	var last rune // previous rune; pending write
-	sepDist := 1  // distance between a sep and the current rune r
+	var last rune   // previous rune is a pending write
+	var wordLen int // number of runes in word up until last
 	for _, r := range s {
 		switch {
+		case wordLen == 0:
+			if unicode.IsLetter(r) || unicode.IsNumber(r) {
+				if b.Len() == 0 { // special case
+					last = unicode.ToUpper(r)
+				} else { // delimit previous word
+					b.WriteRune(sep)
+					last = r
+				}
+				wordLen = 1
+			}
+
+			continue
+
 		case unicode.IsUpper(r):
-			if unicode.IsLower(last) {
-				if b.Len() == 0 {
-					last = unicode.ToUpper(last)
-				} else {
-					b.WriteRune(last)
-					last = sep
-					sepDist = 1
+			if !unicode.IsUpper(last) {
+				if b.Len() != 0 {
+					b.WriteRune(last) // end of word
+					last = sep        // enqueue separator instead
+					wordLen = 0       // r is new begin
 				}
 			}
 
 		case unicode.IsLetter(r): // lower-case
 			if unicode.IsUpper(last) {
-				if sepDist > 2 {
+				if wordLen > 1 {
+					// delimit previous word
 					b.WriteRune(sep)
+					wordLen = 1
 				}
 				last = unicode.ToLower(last)
 			}
 
 		case !unicode.IsNumber(r):
-			if last == 0 || last == sep {
-				continue
+			// delimiter found
+			if wordLen != 0 {
+				// flush pending
+				b.WriteRune(last)
+				wordLen = 0
 			}
-			r = sep
-			sepDist = 0
+
+			continue
 		}
 
-		if last != 0 {
-			b.WriteRune(last)
-		}
+		b.WriteRune(last)
 		last = r
-		sepDist++
+		wordLen++
 	}
 
-	if last != 0 && last != sep {
-		if b.Len() == 0 {
-			last = unicode.ToUpper(last)
-		}
+	if wordLen != 0 {
+		// flush pending
 		b.WriteRune(last)
 	}
 
