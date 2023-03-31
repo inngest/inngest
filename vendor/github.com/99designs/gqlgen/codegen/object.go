@@ -25,14 +25,15 @@ const (
 type Object struct {
 	*ast.Definition
 
-	Type               types.Type
-	ResolverInterface  types.Type
-	Root               bool
-	Fields             []*Field
-	Implements         []*ast.Definition
-	DisableConcurrency bool
-	Stream             bool
-	Directives         []*Directive
+	Type                    types.Type
+	ResolverInterface       types.Type
+	Root                    bool
+	Fields                  []*Field
+	Implements              []*ast.Definition
+	DisableConcurrency      bool
+	Stream                  bool
+	Directives              []*Directive
+	PointersInUmarshalInput bool
 }
 
 func (b *builder) buildObject(typ *ast.Definition) (*Object, error) {
@@ -42,11 +43,12 @@ func (b *builder) buildObject(typ *ast.Definition) (*Object, error) {
 	}
 	caser := cases.Title(language.English, cases.NoLower)
 	obj := &Object{
-		Definition:         typ,
-		Root:               b.Schema.Query == typ || b.Schema.Mutation == typ || b.Schema.Subscription == typ,
-		DisableConcurrency: typ == b.Schema.Mutation,
-		Stream:             typ == b.Schema.Subscription,
-		Directives:         dirs,
+		Definition:              typ,
+		Root:                    b.Schema.Query == typ || b.Schema.Mutation == typ || b.Schema.Subscription == typ,
+		DisableConcurrency:      typ == b.Schema.Mutation,
+		Stream:                  typ == b.Schema.Subscription,
+		Directives:              dirs,
+		PointersInUmarshalInput: b.Config.ReturnPointersInUmarshalInput,
 		ResolverInterface: types.NewNamed(
 			types.NewTypeName(0, b.Config.Exec.Pkg(), caser.String(typ.Name)+"Resolver", nil),
 			nil,
@@ -149,6 +151,16 @@ func (o *Object) IsReserved() bool {
 
 func (o *Object) Description() string {
 	return o.Definition.Description
+}
+
+func (o *Object) HasField(name string) bool {
+	for _, f := range o.Fields {
+		if f.Name == name {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (os Objects) ByName(name string) *Object {

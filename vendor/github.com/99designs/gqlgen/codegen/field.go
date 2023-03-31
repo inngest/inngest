@@ -3,6 +3,7 @@ package codegen
 import (
 	"errors"
 	"fmt"
+	goast "go/ast"
 	"go/types"
 	"log"
 	"reflect"
@@ -502,7 +503,21 @@ func (f *Field) ResolverType() string {
 	return fmt.Sprintf("%s().%s(%s)", f.Object.Definition.Name, f.GoFieldName, f.CallArgs())
 }
 
+func (f *Field) IsInputObject() bool {
+	return f.Object.Kind == ast.InputObject
+}
+
+func (f *Field) IsRoot() bool {
+	return f.Object.Root
+}
+
 func (f *Field) ShortResolverDeclaration() string {
+	return f.ShortResolverSignature(nil)
+}
+
+// ShortResolverSignature is identical to ShortResolverDeclaration,
+// but respects previous naming (return) conventions, if any.
+func (f *Field) ShortResolverSignature(ft *goast.FuncType) string {
 	if f.Object.Kind == ast.InputObject {
 		return fmt.Sprintf("(ctx context.Context, obj %s, data %s) error",
 			templates.CurrentImports.LookupType(f.Object.Reference()),
@@ -523,9 +538,25 @@ func (f *Field) ShortResolverDeclaration() string {
 	if f.Object.Stream {
 		result = "<-chan " + result
 	}
-
-	res += fmt.Sprintf(") (%s, error)", result)
+	// Named return.
+	var namedV, namedE string
+	if ft != nil {
+		if ft.Results != nil && len(ft.Results.List) > 0 && len(ft.Results.List[0].Names) > 0 {
+			namedV = ft.Results.List[0].Names[0].Name
+		}
+		if ft.Results != nil && len(ft.Results.List) > 1 && len(ft.Results.List[1].Names) > 0 {
+			namedE = ft.Results.List[1].Names[0].Name
+		}
+	}
+	res += fmt.Sprintf(") (%s %s, %s error)", namedV, result, namedE)
 	return res
+}
+
+func (f *Field) GoResultName() (string, bool) {
+	name := fmt.Sprintf("%v", f.TypeReference.GO)
+	splits := strings.Split(name, "/")
+
+	return splits[len(splits)-1], strings.HasPrefix(name, "[]")
 }
 
 func (f *Field) ComplexitySignature() string {
@@ -562,7 +593,7 @@ func (f *Field) CallArgs() string {
 	for _, arg := range f.Args {
 		tmp := "fc.Args[" + strconv.Quote(arg.Name) + "].(" + templates.CurrentImports.LookupType(arg.TypeReference.GO) + ")"
 
-		if types.IsInterface(arg.TypeReference.GO) {
+		if iface, ok := arg.TypeReference.GO.(*types.Interface); ok && iface.Empty() {
 			tmp = fmt.Sprintf(`
 				func () interface{} {
 					if fc.Args["%s"] == nil {

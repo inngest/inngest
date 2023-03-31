@@ -1,4 +1,4 @@
-//go:generate go run github.com/tonyhb/enumer -trimprefix=HistoryType -type=HistoryType -json -text
+//go:generate go run github.com/dmarkham/enumer -trimprefix=HistoryType -type=HistoryType -json -text
 
 package enums
 
