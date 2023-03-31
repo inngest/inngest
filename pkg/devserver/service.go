@@ -27,7 +27,7 @@ const (
 	SDKPollInterval = 5 * time.Second
 )
 
-func newService(opts StartOpts, loader *inmemory.FSLoader, runner runner.Runner) *devserver {
+func newService(opts StartOpts, loader *inmemory.ReadWriter, runner runner.Runner) *devserver {
 	return &devserver{
 		runner:        runner,
 		loader:        loader,
@@ -58,7 +58,7 @@ type devserver struct {
 	urlLock *sync.Mutex
 
 	// loader stores all registered functions in the dev server.
-	loader *inmemory.FSLoader
+	loader *inmemory.ReadWriter
 
 	// workspaces stores the Inngest workspaces, if the CLI is authenticated.
 	workspaces    []client.Workspace
@@ -78,10 +78,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 	// registering functions.
 	devAPI := newDevAPI(d)
 
-	datarw, err := d.opts.Config.DataStore.Service.Concrete.ReadWriter(ctx)
-	if err != nil {
-		return err
-	}
+	datarw := d.loader
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		Config:        d.opts.Config,
 		Logger:        logger.From(ctx),

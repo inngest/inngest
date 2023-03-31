@@ -25,7 +25,6 @@ require (
 	github.com/goccy/go-json v0.10.0
 	github.com/golang/mock v1.6.0
 	github.com/google/cel-go v0.11.4
-	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/gosimple/slug v1.12.0
 	github.com/gowebpki/jcs v1.0.0
@@ -123,6 +122,7 @@ require (
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/wire v0.5.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.2.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect

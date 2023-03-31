@@ -10,7 +10,7 @@ import {
 import { EventStatus, FunctionRunStatus } from "../store/generated";
 
 export default function statusStyles(
-  status: EventStatus | FunctionRunStatus | null
+  status: EventStatus | FunctionRunStatus | "Registered" | null
 ) {
   switch (status) {
     case FunctionRunStatus.Running:
@@ -50,6 +50,12 @@ export default function statusStyles(
       return {
         text: "text-white",
         icon: IconStatusNoFn,
+        fnBG: "bg-slate-800 group-hover:bg-slate-700",
+      };
+    case "Registered":
+      return {
+        text: "text-white",
+        icon: IconStatusCompleted,
         fnBG: "bg-slate-800 group-hover:bg-slate-700",
       };
     default:

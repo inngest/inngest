@@ -70,6 +70,14 @@ type ExecutionDriversConfig struct {
 	Docker *ExecutionDockerDriverConfig `json:"docker"`
 }
 
+type Function struct {
+	Name        *string            `json:"name"`
+	ID          *string            `json:"id"`
+	Concurrency *int               `json:"concurrency"`
+	Triggers    []*FunctionTrigger `json:"triggers"`
+	URL         *string            `json:"url"`
+}
+
 type FunctionEvent struct {
 	Workspace   *Workspace         `json:"workspace"`
 	FunctionRun *FunctionRun       `json:"functionRun"`
@@ -99,6 +107,11 @@ type FunctionRunQuery struct {
 
 type FunctionRunsQuery struct {
 	WorkspaceID string `json:"workspaceId"`
+}
+
+type FunctionTrigger struct {
+	Event *string `json:"event"`
+	Cron  *string `json:"cron"`
 }
 
 type StepEvent struct {

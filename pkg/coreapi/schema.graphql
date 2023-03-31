@@ -87,6 +87,19 @@ enum EventStatus {
   NO_FUNCTIONS
 }
 
+type Function {
+  name: String
+  id: String
+  concurrency: Int
+  triggers: [FunctionTrigger!]
+  url: String
+}
+
+type FunctionTrigger {
+  event: String
+  cron: String
+}
+
 enum FunctionRunStatus {
   COMPLETED
   FAILED

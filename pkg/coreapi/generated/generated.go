@@ -91,6 +91,14 @@ type ComplexityRoot struct {
 		Docker func(childComplexity int) int
 	}
 
+	Function struct {
+		Concurrency func(childComplexity int) int
+		ID          func(childComplexity int) int
+		Name        func(childComplexity int) int
+		Triggers    func(childComplexity int) int
+		URL         func(childComplexity int) int
+	}
+
 	FunctionEvent struct {
 		CreatedAt   func(childComplexity int) int
 		FunctionRun func(childComplexity int) int
@@ -109,6 +117,11 @@ type ComplexityRoot struct {
 		Timeline     func(childComplexity int) int
 		WaitingFor   func(childComplexity int) int
 		Workspace    func(childComplexity int) int
+	}
+
+	FunctionTrigger struct {
+		Cron  func(childComplexity int) int
+		Event func(childComplexity int) int
 	}
 
 	FunctionVersion struct {
@@ -134,6 +147,7 @@ type ComplexityRoot struct {
 		Events        func(childComplexity int, query models.EventsQuery) int
 		FunctionRun   func(childComplexity int, query models.FunctionRunQuery) int
 		FunctionRuns  func(childComplexity int, query models.FunctionRunsQuery) int
+		Functions     func(childComplexity int) int
 	}
 
 	StepEvent struct {
@@ -181,6 +195,7 @@ type QueryResolver interface {
 	ActionVersion(ctx context.Context, query models.ActionVersionQuery) (*client.ActionVersion, error)
 	Event(ctx context.Context, query models.EventQuery) (*models.Event, error)
 	Events(ctx context.Context, query models.EventsQuery) ([]*models.Event, error)
+	Functions(ctx context.Context) ([]*models.Function, error)
 	FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error)
 	FunctionRuns(ctx context.Context, query models.FunctionRunsQuery) ([]*models.FunctionRun, error)
 }
@@ -368,6 +383,41 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ExecutionDriversConfig.Docker(childComplexity), true
 
+	case "Function.concurrency":
+		if e.complexity.Function.Concurrency == nil {
+			break
+		}
+
+		return e.complexity.Function.Concurrency(childComplexity), true
+
+	case "Function.id":
+		if e.complexity.Function.ID == nil {
+			break
+		}
+
+		return e.complexity.Function.ID(childComplexity), true
+
+	case "Function.name":
+		if e.complexity.Function.Name == nil {
+			break
+		}
+
+		return e.complexity.Function.Name(childComplexity), true
+
+	case "Function.triggers":
+		if e.complexity.Function.Triggers == nil {
+			break
+		}
+
+		return e.complexity.Function.Triggers(childComplexity), true
+
+	case "Function.url":
+		if e.complexity.Function.URL == nil {
+			break
+		}
+
+		return e.complexity.Function.URL(childComplexity), true
+
 	case "FunctionEvent.createdAt":
 		if e.complexity.FunctionEvent.CreatedAt == nil {
 			break
@@ -465,6 +515,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionRun.Workspace(childComplexity), true
+
+	case "FunctionTrigger.cron":
+		if e.complexity.FunctionTrigger.Cron == nil {
+			break
+		}
+
+		return e.complexity.FunctionTrigger.Cron(childComplexity), true
+
+	case "FunctionTrigger.event":
+		if e.complexity.FunctionTrigger.Event == nil {
+			break
+		}
+
+		return e.complexity.FunctionTrigger.Event(childComplexity), true
 
 	case "FunctionVersion.config":
 		if e.complexity.FunctionVersion.Config == nil {
@@ -617,6 +681,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.FunctionRuns(childComplexity, args["query"].(models.FunctionRunsQuery)), true
+
+	case "Query.functions":
+		if e.complexity.Query.Functions == nil {
+			break
+		}
+
+		return e.complexity.Query.Functions(childComplexity), true
 
 	case "StepEvent.createdAt":
 		if e.complexity.StepEvent.CreatedAt == nil {
@@ -812,6 +883,9 @@ input UpdateActionVersionInput {
   # Get all events sent
   events(query: EventsQuery!): [Event!]
 
+  # Get all functions registered
+  functions: [Function!]
+
   # Get an individual function run
   functionRun(query: FunctionRunQuery!): FunctionRun
 
@@ -931,6 +1005,19 @@ enum EventStatus {
 
   # The event triggered no functions.
   NO_FUNCTIONS
+}
+
+type Function {
+  name: String
+  id: String
+  concurrency: Int
+  triggers: [FunctionTrigger!]
+  url: String
+}
+
+type FunctionTrigger {
+  event: String
+  cron: String
 }
 
 enum FunctionRunStatus {
@@ -2218,6 +2305,217 @@ func (ec *executionContext) fieldContext_ExecutionDriversConfig_docker(ctx conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Function_name(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Function_name(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Function_name(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Function",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Function_id(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Function_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Function_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Function",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Function_concurrency(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Function_concurrency(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Concurrency, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Function_concurrency(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Function",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Function_triggers(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Function_triggers(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Triggers, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*models.FunctionTrigger)
+	fc.Result = res
+	return ec.marshalOFunctionTrigger2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionTriggerᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Function_triggers(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Function",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "event":
+				return ec.fieldContext_FunctionTrigger_event(ctx, field)
+			case "cron":
+				return ec.fieldContext_FunctionTrigger_cron(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FunctionTrigger", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Function_url(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Function_url(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.URL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Function_url(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Function",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _FunctionEvent_workspace(ctx context.Context, field graphql.CollectedField, obj *models.FunctionEvent) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_FunctionEvent_workspace(ctx, field)
 	if err != nil {
@@ -2850,6 +3148,88 @@ func (ec *executionContext) fieldContext_FunctionRun_event(ctx context.Context, 
 				return ec.fieldContext_Event_functionRuns(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Event", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionTrigger_event(ctx context.Context, field graphql.CollectedField, obj *models.FunctionTrigger) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionTrigger_event(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Event, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionTrigger_event(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionTrigger",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionTrigger_cron(ctx context.Context, field graphql.CollectedField, obj *models.FunctionTrigger) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionTrigger_cron(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cron, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionTrigger_cron(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionTrigger",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -3628,6 +4008,59 @@ func (ec *executionContext) fieldContext_Query_events(ctx context.Context, field
 	if fc.Args, err = ec.field_Query_events_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_functions(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_functions(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Functions(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*models.Function)
+	fc.Result = res
+	return ec.marshalOFunction2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_functions(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "name":
+				return ec.fieldContext_Function_name(ctx, field)
+			case "id":
+				return ec.fieldContext_Function_id(ctx, field)
+			case "concurrency":
+				return ec.fieldContext_Function_concurrency(ctx, field)
+			case "triggers":
+				return ec.fieldContext_Function_triggers(ctx, field)
+			case "url":
+				return ec.fieldContext_Function_url(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Function", field.Name)
+		},
 	}
 	return fc, nil
 }
@@ -6867,6 +7300,47 @@ func (ec *executionContext) _ExecutionDriversConfig(ctx context.Context, sel ast
 	return out
 }
 
+var functionImplementors = []string{"Function"}
+
+func (ec *executionContext) _Function(ctx context.Context, sel ast.SelectionSet, obj *models.Function) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, functionImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Function")
+		case "name":
+
+			out.Values[i] = ec._Function_name(ctx, field, obj)
+
+		case "id":
+
+			out.Values[i] = ec._Function_id(ctx, field, obj)
+
+		case "concurrency":
+
+			out.Values[i] = ec._Function_concurrency(ctx, field, obj)
+
+		case "triggers":
+
+			out.Values[i] = ec._Function_triggers(ctx, field, obj)
+
+		case "url":
+
+			out.Values[i] = ec._Function_url(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var functionEventImplementors = []string{"FunctionEvent", "FunctionRunEvent"}
 
 func (ec *executionContext) _FunctionEvent(ctx context.Context, sel ast.SelectionSet, obj *models.FunctionEvent) graphql.Marshaler {
@@ -6996,6 +7470,35 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var functionTriggerImplementors = []string{"FunctionTrigger"}
+
+func (ec *executionContext) _FunctionTrigger(ctx context.Context, sel ast.SelectionSet, obj *models.FunctionTrigger) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, functionTriggerImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FunctionTrigger")
+		case "event":
+
+			out.Values[i] = ec._FunctionTrigger_event(ctx, field, obj)
+
+		case "cron":
+
+			out.Values[i] = ec._FunctionTrigger_cron(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -7208,6 +7711,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_events(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
+		case "functions":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_functions(ctx, field)
 				return res
 			}
 
@@ -7766,6 +8289,16 @@ func (ec *executionContext) unmarshalNEventsQuery2githubᚗcomᚋinngestᚋinnge
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNFunction2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunction(ctx context.Context, sel ast.SelectionSet, v *models.Function) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Function(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNFunctionRun2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRun(ctx context.Context, sel ast.SelectionSet, v *models.FunctionRun) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -7794,6 +8327,16 @@ func (ec *executionContext) unmarshalNFunctionRunQuery2githubᚗcomᚋinngestᚋ
 func (ec *executionContext) unmarshalNFunctionRunsQuery2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRunsQuery(ctx context.Context, v interface{}) (models.FunctionRunsQuery, error) {
 	res, err := ec.unmarshalInputFunctionRunsQuery(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFunctionTrigger2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionTrigger(ctx context.Context, sel ast.SelectionSet, v *models.FunctionTrigger) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FunctionTrigger(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface{}) (string, error) {
@@ -8298,6 +8841,53 @@ func (ec *executionContext) marshalOExecutionDriversConfig2ᚖgithubᚗcomᚋinn
 	return ec._ExecutionDriversConfig(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOFunction2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Function) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNFunction2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunction(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) unmarshalOFunctionEventType2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionEventType(ctx context.Context, v interface{}) (*models.FunctionEventType, error) {
 	if v == nil {
 		return nil, nil
@@ -8429,6 +9019,53 @@ func (ec *executionContext) marshalOFunctionRunStatus2ᚖgithubᚗcomᚋinngest�
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOFunctionTrigger2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionTriggerᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.FunctionTrigger) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNFunctionTrigger2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionTrigger(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalOFunctionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋfunctionᚐFunctionVersion(ctx context.Context, sel ast.SelectionSet, v *function.FunctionVersion) graphql.Marshaler {

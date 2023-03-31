@@ -13,16 +13,14 @@ import (
 func NewCmdDev() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
-		Short:   "Run the inngest dev server",
-		Example: "inngest dev -p 1234",
+		Short:   "Run the Inngest dev server",
+		Example: "inngest dev -u http://localhost:3000/api/inngest",
 		Run:     doDev,
 	}
 
 	cmd.Flags().String("host", "", "host to run the API on")
 	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
-	cmd.Flags().String("dir", ".", "directory to load functions from")
 	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
-	cmd.Flags().Bool("docker", false, "enable docker-based steps")
 
 	return cmd
 }
@@ -48,12 +46,10 @@ func doDev(cmd *cobra.Command, args []string) {
 	}
 
 	urls, _ := cmd.Flags().GetStringSlice("sdk-url")
-	docker, _ := strconv.ParseBool(cmd.Flag("docker").Value.String())
 	opts := devserver.StartOpts{
 		Config:       *conf,
-		RootDir:      cmd.Flag("dir").Value.String(),
 		URLs:         urls,
-		Docker:       docker,
+		Docker:       false,
 		Autodiscover: len(urls) == 0,
 	}
 
