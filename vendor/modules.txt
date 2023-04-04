@@ -432,7 +432,7 @@ github.com/dlclark/regexp2/syntax
 # github.com/dmarkham/enumer v1.5.8
 ## explicit; go 1.17
 github.com/dmarkham/enumer
-# github.com/docker/docker v20.10.7+incompatible
+# github.com/docker/docker v20.10.24+incompatible
 ## explicit
 github.com/docker/docker/api/types/blkiodev
 github.com/docker/docker/api/types/container
