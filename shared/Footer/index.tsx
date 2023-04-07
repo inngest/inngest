@@ -17,7 +17,7 @@ export default function Footer() {
             Ready to start building?
           </h4>
           <p className="text-sm lg:text-base max-w-xl text-indigo-100">
-            Enqueue and schedule reliable serverless functions in record time.
+            Ship reliable serverless functions in record time.
           </p>
           <code className="text-sm text-white block mt-8 mr-4">
             <span className="text-indigo-300">$</span> npx inngest-cli dev

@@ -16,6 +16,7 @@ import Header from "src/shared/Header";
 import Container from "src/shared/layout/Container";
 import { Button } from "src/shared/Button";
 import IconCalendar from "src/shared/Icons/Calendar";
+import CTACallout from "src/shared/CTACallout";
 const components = {
   DiscordCTA,
   Button,
@@ -142,24 +143,25 @@ export default function BlogLayout(props) {
                 </p>
               </header>
               {!scope.disableCTA && (
-                <aside className="max-w-[65ch] m-auto bg-indigo-900/20 text-indigo-100 flex flex-col items-start gap-4 leading-relaxed rounded-lg py-5 px-6  my-12 border border-indigo-900/50">
-                  <p className="text-sm lg:text-base">
-                    <a
-                      className="text-indigo-400 font-medium hover:text-white transition-all no-underline hover:underline"
-                      href="https://www.inngest.com?ref=blog-post"
-                    >
-                      Inngest's
-                    </a>{" "}
-                    platform lets you build serverless background tasks and
-                    scheduled jobs using events - zero infrastructure required.{" "}
-                  </p>
-                  <Button
-                    href="https://www.inngest.com?ref=blog-post"
-                    arrow="right"
-                  >
-                    Give it a try
-                  </Button>
-                </aside>
+                <CTACallout
+                  text={
+                    <>
+                      <a
+                        className="text-indigo-400 font-medium hover:text-white transition-all no-underline hover:underline"
+                        href="https://www.inngest.com?ref=blog-post"
+                      >
+                        Inngest's
+                      </a>{" "}
+                      platform lets you build serverless background tasks and
+                      scheduled jobs using events - zero infrastructure
+                      required.
+                    </>
+                  }
+                  cta={{
+                    href: "https://www.inngest.com?ref=blog-post",
+                    text: "Give it a try",
+                  }}
+                />
               )}
               <div className="max-w-[65ch] prose m-auto mt-12 mb-20 prose-img:rounded-lg prose-code:bg-slate-800 prose-code:tracking-tight text-slate-300 prose-a:text-indigo-400 prose-a:no-underline hover:prose-a:underline hover:prose-a:text-white prose-a:font-medium prose-a:transition-all prose-invert">
                 <MDXRemote
