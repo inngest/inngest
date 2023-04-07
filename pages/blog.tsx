@@ -56,7 +56,7 @@ export default function BlogLayout(props) {
             {focus && (
               <a
                 className="relative flex flex-col-reverse lg:flex-row xl:w-4/5 bg-indigo-600 rounded-lg mb-32 group   shadow-lg"
-                href={`/blog/${focus.slug}`}
+                href={focus.redirect ?? `/blog/${focus.slug}`}
               >
                 <div className="absolute top-0 bottom-0 -left-[40px] -right-[40px] rounded-lg bg-indigo-500 opacity-20 rotate-1 -z-0 mx-5"></div>
                 <div className="lg:w-2/5 p-8 flex flex-col items-start justify-between relative z-10">
@@ -97,7 +97,7 @@ export default function BlogLayout(props) {
               {rest.map((item) => (
                 <li key={item.slug}>
                   <a
-                    href={`/blog/${item.slug}`}
+                    href={item.redirect ?? `/blog/${item.slug}`}
                     className="group flex flex-col rounded-lg ease-out transition-all "
                   >
                     {item.image && (
