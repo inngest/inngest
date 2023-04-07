@@ -31,7 +31,11 @@ export default function Ocoya() {
 
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-20 my-24">
           <div className="md:w-1/2">
-            <img src="/img/ocoya.svg" alt="Ocoya" className="mb-12 w-80" />
+            <img
+              src="/assets/customers/ocoya.svg"
+              alt="Ocoya"
+              className="mb-12 w-80"
+            />
 
             <div className={proseBaseClasses}>
               <p>
@@ -51,7 +55,7 @@ export default function Ocoya() {
           </div>
 
           <img
-            src="https://cdn.arcade.software/cdn-cgi/image/fit=scale-down,format=auto,width=3840/extension-uploads/f3e1955b-ff3e-4d1b-b889-f1e18c963f8a.png"
+            src="/assets/customers/ocoya-screenshot.png"
             alt="Ocoya UI"
             className="w-[80%] md:w-1/2 md:max-w-xl rounded-md"
           />
@@ -124,7 +128,7 @@ export default function Ocoya() {
             </blockquote>
             <figcaption className="mt-4 ml-6 flex flex-row items-center gap-4 text-slate-300 text-base">
               <img
-                src="https://uploads-ssl.webflow.com/605dd4e52b25d35391c43725/62601246e6eb58a12097f7a2_profile_0.png"
+                src="/assets/customers/ocoya-aivaras-tumas.png"
                 className="w-10"
                 style={{ margin: 0 }}
               />
