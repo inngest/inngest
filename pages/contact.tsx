@@ -1,15 +1,8 @@
-import styled from "@emotion/styled";
-import Head from "next/head";
-import Footer from "../shared/legacy/Footer";
-import Nav from "../shared/legacy/nav";
-import Content from "../shared/legacy/content";
+import { useEffect, useState } from "react";
 
-import Workflow from "../shared/Icons/Workflow";
-import Language from "../shared/Icons/Language";
-import Lightning from "../shared/Icons/Lightning";
-import Support from "../shared/Icons/Support";
-import Audit from "../shared/Icons/Audit";
-import { useState } from "react";
+import Header from "src/shared/Header";
+import Container from "src/shared/layout/Container";
+import Footer from "src/shared/Footer";
 
 const CONTACT_KEY =
   "Z-ymc97Dae8u4HHybHknc4DGRb51u6NnTOUaW-qG71ah1ZqsJfRcI6SaHg5APWutNcnMcaN3oZrZky-VQxBIyw";
@@ -19,8 +12,8 @@ export async function getStaticProps() {
     props: {
       meta: {
         title: "Contact Us",
-        description: "Build event serverless event-driven systems in seconds",
       },
+      designVersion: "2",
     },
   };
 }
@@ -28,29 +21,108 @@ export async function getStaticProps() {
 export default function Contact() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [msg, setMsg] = useState("");
-  const [sent, isSent] = useState(false);
+  const [message, setMessage] = useState("");
+  const [disabled, setDisabled] = useState<boolean>(false);
+  const [buttonCopy, setButtonCopy] = useState("Send");
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    setDisabled(true);
+    let ref = "";
+    try {
+      const u = new URLSearchParams(window.location.search);
+      if (u.get("ref")) {
+        ref = u.get("ref");
+      }
+    } catch (err) {
+      // noop
+    }
     try {
       await window.Inngest.event(
         {
           name: "contact.form.sent",
-          data: { email, name, message: msg },
+          data: { email, name, message, ref },
           user: { email, name },
+          v: "2023-04-07.1",
         },
         { key: CONTACT_KEY }
       );
     } catch (e) {
       console.warn("Message not sent");
+      setButtonCopy("Message not sent");
     }
-    isSent(true);
+    setDisabled(false);
+    setButtonCopy("Sent!");
   };
 
   return (
+    <div className="font-sans text-slate-200">
+      <Header />
+      <Container>
+        <main className="m-auto max-w-[65ch] pt-16 pb-8">
+          <header className="pt-12 lg:pt-24 max-w-[65ch] m-auto">
+            <h1 className="text-white font-medium text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-4 tracking-tighter lg:leading-loose">
+              Get in touch
+            </h1>
+            <p>
+              Have a question about the product or want a demo? <br />
+              Complete the form below or{" "}
+              <a href="mailto:hello@inngest.com">email us</a>.
+            </p>
+          </header>
+
+          <form
+            onSubmit={onSubmit}
+            className="my-12 p-6 bg-indigo-900/20 text-indigo-100 flex flex-col items-start gap-4 rounded-lg border border-indigo-900/50"
+          >
+            <label className="w-full flex flex-col gap-2">
+              Your name
+              <input
+                type="text"
+                name="name"
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="w-full p-3 bg-slate-1000/40 border border-indigo-900/50 outline-none rounded-md"
+              />
+            </label>
+            <label className="w-full flex flex-col gap-2">
+              Company email
+              <input
+                type="email"
+                name="email"
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full p-3 bg-slate-1000/40 border border-indigo-900/50 outline-none rounded-md"
+              />
+            </label>
+            <label className="w-full flex flex-col gap-2">
+              What can we help you with?
+              <textarea
+                name="message"
+                required
+                onChange={(e) => setMessage(e.target.value)}
+                className="w-full p-3 bg-slate-1000/40 border border-indigo-900/50 outline-none rounded-md"
+              />
+            </label>
+            <div className="mt-4 w-full flex flex-row justify-items-end">
+              <button
+                type="submit"
+                disabled={disabled}
+                className={`button group inline-flex items-center justify-center gap-0.5 rounded-full font-medium tracking-tight transition-all text-sm px-10 py-2.5 text-white bg-indigo-500 hover:bg-indigo-400 ${
+                  disabled ? "opacity-50" : ""
+                }`}
+              >
+                {buttonCopy}
+              </button>
+            </div>
+          </form>
+        </main>
+      </Container>
+      <Footer />
+    </div>
+  );
+  /*let x = (
     <>
-      <Nav />
 
       <Hero className="pt-16 pb-12">
         <h1 className="pb-4">Contact us</h1>
@@ -105,83 +177,5 @@ export default function Contact() {
         <Footer />
       </div>
     </>
-  );
+  );*/
 }
-
-const Hero = styled.div`
-  position: relative;
-  z-index: 2;
-  overflow: hidden;
-  text-align: center;
-
-  h1 + p {
-    font-size: 22px;
-    line-height: 1.45;
-    opacity: 0.8;
-  }
-`;
-
-const Inner = styled.div`
-  form {
-    border: 1px solid #ffffff19;
-    border-radius: 7px;
-    background: var(--bg-color-d);
-    color: #fff;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-    padding: 0 2rem 2rem;
-    max-width: 600px;
-    margin: 0 auto;
-    position: relative;
-
-    > div:last-of-type {
-      display: flex;
-      justify-content: flex-end;
-      width: 100%;
-    }
-
-    &:after {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: absolute;
-      content: "Your message has been sent.  We'll be in touch shortly.";
-      background: var(--bg-dark);
-      top: 0;
-      left: 0;
-      bottom: 0;
-      right: 0;
-      pointer-events: none;
-      transition: all 0.3s;
-      opacity: 0;
-    }
-
-    &.sent:after {
-      opacity: 1;
-    }
-  }
-
-  h3 {
-    margin: 2rem 0 0;
-  }
-
-  label,
-  input,
-  textarea {
-    display: block;
-  }
-  label {
-    margin: 2rem 0 0;
-  }
-  input,
-  textarea {
-    margin-top: 0.5rem;
-    width: 100%;
-  }
-  textarea {
-    min-height: 10rem;
-  }
-
-  button {
-    margin: 2rem 0 0;
-  }
-`;

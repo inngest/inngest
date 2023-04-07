@@ -205,9 +205,9 @@ a {
   font-size: 0.9rem;
 }
 
- input,
- textarea,
- select {
+:root.v1 input,
+:root.v1 textarea,
+:root.v1 select {
   border: 0;
   padding: 0.5rem 0.5rem;
   border-radius: var(--border-radius);
