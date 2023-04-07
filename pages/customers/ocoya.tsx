@@ -113,6 +113,27 @@ export default function Ocoya() {
             Inngest, providing a better customer experience than ever before.
           </p>
 
+          <figure className="my-12">
+            <blockquote className="text-lg">
+              At Ocoya, we were struggling with the complexities of managing our
+              social media and e-commerce workflows. Thanks to Inngest, we were
+              able to simplify our development process, speed up our time to
+              market, and deliver a better customer experience. Inngest has
+              become an essential tool in our tech stack, enabling us to focus
+              on delivering a world-class product to our users.
+            </blockquote>
+            <figcaption className="mt-4 ml-6 flex flex-row items-center gap-4 text-slate-300 text-base">
+              <img
+                src="https://uploads-ssl.webflow.com/605dd4e52b25d35391c43725/62601246e6eb58a12097f7a2_profile_0.png"
+                className="w-10"
+                style={{ margin: 0 }}
+              />
+              <span>
+                Aivaras Tumas, <cite>CEO & Co-founder &middot; Ocoya</cite>
+              </span>
+            </figcaption>
+          </figure>
+
           <h2 className="text-xl lg:text-3xl text-white mb-8 font-semibold tracking-tight">
             Moving forward
           </h2>
