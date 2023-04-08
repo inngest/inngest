@@ -8,6 +8,7 @@ import FullyManaged from "../shared/Home/FullyManaged";
 import Roadmap from "../shared/Home/Roadmap";
 import SocialCTA from "../shared/Home/SocialCTA";
 import Footer from "../shared/Footer";
+import CustomerQuote from "src/shared/CustomerQuote";
 
 import Patterns from "src/shared/Home/Patterns";
 import GetThingsShipped from "src/shared/Home/GetThingsShipped";
@@ -36,13 +37,28 @@ export default function Home() {
 
       <DevUI />
 
+      <CustomerQuote
+        className="mb-20"
+        logo="/assets/customers/ocoya.svg"
+        text="At Ocoya, we were struggling with the complexities of managing our
+              social media and e-commerce workflows. Thanks to Inngest, we were
+              able to simplify our development process, speed up our time to
+              market, and deliver a better customer experience. Inngest has
+              become an essential tool in our tech stack, enabling us to focus
+              on delivering a world-class product to our users."
+        cta={{
+          href: "/customers/ocoya?ref=homepage",
+          text: "Read the case study",
+        }}
+      />
+
       <OutTheBox />
 
-      <Patterns />
+      <GetThingsShipped />
 
       <FullyManaged />
 
-      <GetThingsShipped />
+      <Patterns />
 
       <Roadmap />
 
