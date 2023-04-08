@@ -27,22 +27,26 @@ export default function CustomerQuote({
 }: CustomerQuoteProps) {
   return (
     <aside
-      className={`${className} max-w-5xl mx-auto flex flex-row items-center`}
+      className={`${className} max-w-5xl mx-auto px-4 flex flex-col md:flex-row items-center`}
     >
-      <div className="relative">
+      <div className="relative max-w-[80%]">
         <div className="absolute z-0 w-full h-full rounded-lg backdrop-blur bg-white/5"></div>
         <div
-          className="relative z-10 m-5 py-5 px-14 h-96 w-72 flex items-center rounded-lg"
+          className="relative z-10 m-5 py-5 px-14 h-36 md:h-96 md:w-72 flex items-center rounded-lg"
           style={{
             backgroundColor: `hsla(235,79%,63%,1)`,
             backgroundImage: MeshGradient,
           }}
         >
-          <img src={logo} alt={`Customer logo`} />
+          <img
+            src={logo}
+            alt={`Customer logo`}
+            className="w-[100%] md:max-w-full"
+          />
         </div>
       </div>
-      <div className="p-5 -ml-16 border border-slate-200/30 rounded-lg">
-        <div className="p-6 pl-24 flex flex-col items-start	gap-6 rounded-lg text-white bg-slate-1000/50">
+      <div className="p-5 -mt-8 md:mt-0 md:-ml-16 border border-slate-200/30 rounded-lg">
+        <div className="p-6 pt-8 md:pt-6 md:pl-24 flex flex-col items-start	gap-6 rounded-lg text-white bg-slate-1000/50">
           <p className="text-lg lg:text-xl">&ldquo;{text}&rdquo;</p>
           <Button href={cta.href} variant="secondary" arrow="right">
             {cta.text}
