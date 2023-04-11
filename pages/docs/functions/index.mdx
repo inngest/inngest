@@ -155,7 +155,7 @@ import { inngest } from "./client";
 
 export default inngest.createFunction(
   { name: "Add to Intercom" },
-  { name: "app/user.created" },
+  { event: "app/user.created" },
   async ({ event, step }) => { /* ... */ }
 );
 ```
