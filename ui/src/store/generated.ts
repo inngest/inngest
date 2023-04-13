@@ -101,11 +101,11 @@ export type ExecutionDriversConfig = {
 
 export type Function = {
   __typename?: 'Function';
-  concurrency?: Maybe<Scalars['Int']>;
+  concurrency: Scalars['Int'];
   id: Scalars['String'];
-  name?: Maybe<Scalars['String']>;
+  name: Scalars['String'];
   triggers?: Maybe<Array<FunctionTrigger>>;
-  url?: Maybe<Scalars['String']>;
+  url: Scalars['String'];
 };
 
 export type FunctionEvent = {
@@ -157,9 +157,14 @@ export type FunctionRunsQuery = {
 
 export type FunctionTrigger = {
   __typename?: 'FunctionTrigger';
-  cron?: Maybe<Scalars['String']>;
-  event?: Maybe<Scalars['String']>;
+  type: FunctionTriggerTypes;
+  value: Scalars['String'];
 };
+
+export enum FunctionTriggerTypes {
+  Cron = 'CRON',
+  Event = 'EVENT'
+}
 
 export type FunctionVersion = {
   __typename?: 'FunctionVersion';
@@ -297,7 +302,7 @@ export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __type
 export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetFunctionsQuery = { __typename?: 'Query', functions?: Array<{ __typename?: 'Function', id: string, name?: string | null, url?: string | null, triggers?: Array<{ __typename?: 'FunctionTrigger', event?: string | null, cron?: string | null }> | null }> | null };
+export type GetFunctionsQuery = { __typename?: 'Query', functions?: Array<{ __typename?: 'Function', id: string, name: string, url: string, triggers?: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> | null };
 
 
 export const GetEventsStreamDocument = `
@@ -394,8 +399,8 @@ export const GetFunctionsDocument = `
     id
     name
     triggers {
-      event
-      cron
+      type
+      value
     }
     url
   }

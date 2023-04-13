@@ -88,16 +88,21 @@ enum EventStatus {
 }
 
 type Function {
-  name: String
+  name: String!
   id: String!
-  concurrency: Int
+  concurrency: Int!
   triggers: [FunctionTrigger!]
-  url: String
+  url: String!
+}
+
+enum FunctionTriggerTypes {
+  EVENT
+  CRON
 }
 
 type FunctionTrigger {
-  event: String
-  cron: String
+  type: FunctionTriggerTypes!
+  value: String!
 }
 
 enum FunctionRunStatus {

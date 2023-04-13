@@ -98,8 +98,8 @@ export const FUNCTIONS = gql`
       id
       name
       triggers {
-        event
-        cron
+        type
+        value
       }
       url
     }

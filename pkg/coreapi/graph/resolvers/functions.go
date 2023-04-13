@@ -21,19 +21,17 @@ func (r *queryResolver) Functions(ctx context.Context) ([]*models.Function, erro
 
 	var functions []*models.Function
 	for _, fn := range fns {
-		id := string(fn.ID)
-		name := string(fn.Name)
-		concurrency := int(fn.Concurrency)
-
 		var triggers []*models.FunctionTrigger
 
 		for _, trigger := range fn.Triggers {
 			t := &models.FunctionTrigger{}
 			if trigger.EventTrigger != nil {
-				t.Event = &trigger.Event
+				t.Type = models.FunctionTriggerTypesEvent
+				t.Value = trigger.Event
 			}
 			if trigger.CronTrigger != nil {
-				t.Cron = &trigger.Cron
+				t.Type = models.FunctionTriggerTypesCron
+				t.Value = trigger.Cron
 			}
 			triggers = append(triggers, t)
 		}
@@ -48,14 +46,13 @@ func (r *queryResolver) Functions(ctx context.Context) ([]*models.Function, erro
 		if !ok {
 			return nil, fmt.Errorf("failed to parse function runtime data")
 		}
-		url := rt.URL
 
 		functions = append(functions, &models.Function{
-			ID:          &id,
-			Name:        &name,
-			Concurrency: &concurrency,
+			ID:          fn.ID,
+			Name:        fn.Name,
+			Concurrency: fn.Concurrency,
 			Triggers:    triggers,
-			URL:         &url,
+			URL:         rt.URL,
 		})
 	}
 

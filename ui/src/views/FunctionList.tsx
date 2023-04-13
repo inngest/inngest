@@ -25,9 +25,7 @@ export const FunctionList = () => {
         ) : functions?.length ? (
           <div className="flex flex-col items-center basis-[36px] gap-4 max-w-xl">
             {functions.map((f, idx) => {
-              const triggers = f?.triggers
-                ?.map((t) => t.event || t.cron)
-                .join(", ");
+              const triggers = f.triggers?.map((t) => t.value).join(", ");
               const cleanUrl = new URL(f.url || "");
               cleanUrl.search = "";
               return (
