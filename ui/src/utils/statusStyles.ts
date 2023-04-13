@@ -9,8 +9,12 @@ import {
 } from "../icons";
 import { EventStatus, FunctionRunStatus } from "../store/generated";
 
+export enum FunctionStatus {
+  Registered = "REGISTERED",
+}
+
 export default function statusStyles(
-  status: EventStatus | FunctionRunStatus | "Registered" | null
+  status: EventStatus | FunctionRunStatus | FunctionStatus | null
 ) {
   switch (status) {
     case FunctionRunStatus.Running:
@@ -52,7 +56,7 @@ export default function statusStyles(
         icon: IconStatusNoFn,
         fnBG: "bg-slate-800 group-hover:bg-slate-700",
       };
-    case "Registered":
+    case FunctionStatus.Registered:
       return {
         text: "text-white",
         icon: IconStatusCompleted,

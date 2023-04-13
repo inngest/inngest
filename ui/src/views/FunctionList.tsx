@@ -4,6 +4,7 @@ import { BlankSlate } from "../components/Blank";
 import { useAppDispatch } from "../store/hooks";
 import { showDocs } from "../store/global";
 import noResultsImg from "../../assets/images/no-results.png";
+import { FunctionStatus } from "../utils/statusStyles";
 
 export const FunctionList = () => {
   const dispatch = useAppDispatch();
@@ -34,7 +35,7 @@ export const FunctionList = () => {
                   key={f?.id || idx}
                   title={f?.name || "Missing function name"}
                   id={f?.id || "Invalid ID generated"}
-                  status="Registered"
+                  status={FunctionStatus.Registered}
                   badge={triggers}
                   contextualBar={
                     <div className="text-3xs">{cleanUrl.toString()}</div>

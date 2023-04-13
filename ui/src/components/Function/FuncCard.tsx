@@ -1,6 +1,6 @@
 import { EventStatus, FunctionRunStatus } from "../../store/generated";
 import classNames from "../../utils/classnames";
-import statusStyles from "../../utils/statusStyles";
+import statusStyles, { FunctionStatus } from "../../utils/statusStyles";
 import { Time } from "../Time";
 
 interface FuncCardProps {
@@ -8,7 +8,7 @@ interface FuncCardProps {
   date?: string | number;
   badge?: string | number;
   id: string;
-  status: FunctionRunStatus | EventStatus | "Registered";
+  status: FunctionRunStatus | EventStatus | FunctionStatus;
   active?: boolean;
   contextualBar?: React.ReactNode;
   onClick?: () => void;
