@@ -89,7 +89,7 @@ enum EventStatus {
 
 type Function {
   name: String
-  id: String
+  id: String!
   concurrency: Int
   triggers: [FunctionTrigger!]
   url: String
