@@ -271,6 +271,33 @@ func (m *mem) Finalized(ctx context.Context, i state.Identifier, stepID string, 
 
 	return nil
 }
+func (m *mem) SetStatus(ctx context.Context, id state.Identifier, status enums.RunStatus) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	s, ok := m.state[id.RunID]
+	if !ok {
+		return fmt.Errorf("identifier not found")
+	}
+
+	instance := s.(memstate)
+	instance.metadata.Status = status
+	m.state[id.RunID] = instance
+
+	go m.runCallbacks(ctx, id, enums.RunStatusCancelled)
+
+	m.setHistory(ctx, id, state.History{
+		ID:         state.HistoryID(),
+		Type:       enums.HistoryTypeFunctionStatusUpdated,
+		Identifier: id,
+		CreatedAt:  time.UnixMilli(time.Now().UnixMilli()),
+		Data: map[string]any{
+			"status": status.String(),
+		},
+	})
+
+	return nil
+}
 
 func (m *mem) Cancel(ctx context.Context, i state.Identifier) error {
 	m.lock.Lock()

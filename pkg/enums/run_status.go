@@ -19,12 +19,14 @@ const (
 	// RunStatusCancelled indicates that the function has been cancelled prior
 	// to any errors
 	RunStatusCancelled
+	// RunStatusOverflowed indicates that the function had too many steps ran.
+	RunStatusOverflowed
 )
 
 // RunStatusEnded returns whether the function has ended based off of the
 // run status.
 func RunStatusEnded(s RunStatus) bool {
-	if s == RunStatusCancelled || s == RunStatusCompleted || s == RunStatusFailed {
+	if s == RunStatusCancelled || s == RunStatusCompleted || s == RunStatusFailed || s == RunStatusOverflowed {
 		return true
 	}
 	return false

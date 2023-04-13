@@ -124,6 +124,7 @@ func CheckState(t *testing.T, gen Generator) {
 		"PauseByStep":                        checkPausesByStep,
 		"PauseByID":                          checkPauseByID,
 		"Idempotency":                        checkIdempotency,
+		"SetStatus":                          checkSetStatus,
 		"Cancel":                             checkCancel,
 		"Cancel/AlreadyCompleted":            checkCancel_completed,
 		"Cancel/AlreadyCancelled":            checkCancel_cancelled,
@@ -1494,6 +1495,41 @@ func checkIdempotency(t *testing.T, m state.Manager) {
 	wg.Wait()
 	assert.Equal(t, int32(1), atomic.LoadInt32(&okCount), "Must have saved the run ID once")
 	assert.Equal(t, int32(99), atomic.LoadInt32(&errCount), "Must have errored 99 times when the run ID exists")
+}
+
+func checkSetStatus(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{
+		WorkflowID: w.UUID,
+		RunID:      runID,
+		Key:        runID.String(),
+	}
+
+	init := state.Input{
+		Identifier: id,
+		Workflow:   w,
+		EventData:  input.Map(),
+	}
+
+	s, err := m.New(ctx, init)
+	require.NoError(t, err)
+	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
+
+	// Add time so that the history ticks a millisecond
+	<-time.After(time.Millisecond)
+
+	err = m.SetStatus(ctx, s.Identifier(), enums.RunStatusOverflowed)
+	require.NoError(t, err)
+
+	reloaded, err := m.Load(ctx, s.RunID())
+	require.NoError(t, err)
+	require.EqualValues(t, enums.RunStatusOverflowed, reloaded.Metadata().Status, "Status is not Overflowed")
+
+	history, err := m.History(ctx, s.RunID())
+	require.NoError(t, err)
+	require.Equal(t, enums.HistoryTypeFunctionStatusUpdated, history[len(history)-1].Type)
 }
 
 func checkCancel(t *testing.T, m state.Manager) {

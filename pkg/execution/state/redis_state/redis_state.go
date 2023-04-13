@@ -359,6 +359,35 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 	return fmt.Errorf("unknown return value cancelling function: %d", status)
 }
 
+func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.RunStatus) error {
+	now := time.Now()
+	ret, err := scripts["setStatus"].Eval(
+		ctx,
+		m.r,
+		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
+		status,
+		state.History{
+			ID:         state.HistoryID(),
+			GroupID:    state.GroupIDFromContext(ctx),
+			Type:       enums.HistoryTypeFunctionStatusUpdated,
+			Identifier: id,
+			CreatedAt:  now,
+			Data: map[string]any{
+				"status": status.String(),
+			},
+		},
+		now.UnixMilli(),
+	).Int64()
+	if err != nil {
+		return fmt.Errorf("error cancelling: %w", err)
+	}
+	if ret == 0 {
+		go m.runCallbacks(ctx, id, status)
+		return nil
+	}
+	return fmt.Errorf("unknown return value cancelling function: %d", status)
+}
+
 func (m mgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, error) {
 	metadata, err := m.metadata(ctx, runID)
 	if err != nil {
