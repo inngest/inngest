@@ -13,11 +13,13 @@ import { Layout as DocsLayout } from "../shared/Docs/Layout";
 
 import PageBanner from "../shared/legacy/PageBanner";
 
+const DISABLE_BANNER = true;
+
 function DefaultLayout({ children }) {
   const router = useRouter();
   return (
     <>
-      {router.pathname !== "/sign-up" && (
+      {!DISABLE_BANNER && router.pathname !== "/sign-up" && (
         <PageBanner href="/ai-personalized-documentation?ref=page-banner">
           ✨ Try Our AI-Personalized Documentation for Inngest
         </PageBanner>

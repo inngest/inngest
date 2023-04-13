@@ -305,7 +305,7 @@ export function Navigation(props) {
   return (
     <nav {...props}>
       <ul role="list">
-        <li>
+        {/* <li>
           <Button
             href="/ai-personalized-documentation?ref=docs"
             variant="secondary"
@@ -313,7 +313,7 @@ export function Navigation(props) {
           >
             ✨ Create AI-Personalized Docs
           </Button>
-        </li>
+        </li> */}
         {headerLinks.map((link) => (
           <TopLevelNavItem key={link.title} href={link.href}>
             {link.title}
