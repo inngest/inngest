@@ -2,7 +2,7 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import { createSlice } from "@reduxjs/toolkit";
 
 const initialState: {
-  contentView: "feed" | "docs";
+  contentView: "feed" | "functions" | "docs";
   docsPath: string | null;
   sidebarTab: "events" | "functions";
   selectedEvent: string | null;
@@ -38,6 +38,9 @@ const globalState = createSlice({
     showFeed(state) {
       state.contentView = "feed";
     },
+    showFunctions(state) {
+      state.contentView = "functions";
+    },
     showDocs(state, action: PayloadAction<`/${string}` | null | undefined>) {
       state.contentView = "docs";
 
@@ -63,6 +66,7 @@ export const {
   selectRun,
   setSidebarTab,
   showDocs,
+  showFunctions,
   showFeed,
   showEventSendModal,
 } = globalState.actions;

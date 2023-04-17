@@ -6,11 +6,58 @@ import (
 	"sort"
 	"time"
 
+	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/function"
 )
+
+func (r *queryResolver) Functions(ctx context.Context) ([]*models.Function, error) {
+	fns, err := r.APIReadWriter.Functions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var functions []*models.Function
+	for _, fn := range fns {
+		var triggers []*models.FunctionTrigger
+
+		for _, trigger := range fn.Triggers {
+			t := &models.FunctionTrigger{}
+			if trigger.EventTrigger != nil {
+				t.Type = models.FunctionTriggerTypesEvent
+				t.Value = trigger.Event
+			}
+			if trigger.CronTrigger != nil {
+				t.Type = models.FunctionTriggerTypesCron
+				t.Value = trigger.Cron
+			}
+			triggers = append(triggers, t)
+		}
+
+		avs, _, err := fn.Actions(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load function configuration")
+		}
+
+		av := avs[0]
+		rt, ok := av.Runtime.Runtime.(inngest.RuntimeHTTP)
+		if !ok {
+			return nil, fmt.Errorf("failed to parse function runtime data")
+		}
+
+		functions = append(functions, &models.Function{
+			ID:          fn.ID,
+			Name:        fn.Name,
+			Concurrency: fn.Concurrency,
+			Triggers:    triggers,
+			URL:         rt.URL,
+		})
+	}
+
+	return functions, nil
+}
 
 func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error) {
 	if query.FunctionRunID == "" {

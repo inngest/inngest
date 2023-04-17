@@ -99,6 +99,15 @@ export type ExecutionDriversConfig = {
   docker?: Maybe<ExecutionDockerDriverConfig>;
 };
 
+export type Function = {
+  __typename?: 'Function';
+  concurrency: Scalars['Int'];
+  id: Scalars['String'];
+  name: Scalars['String'];
+  triggers?: Maybe<Array<FunctionTrigger>>;
+  url: Scalars['String'];
+};
+
 export type FunctionEvent = {
   __typename?: 'FunctionEvent';
   createdAt?: Maybe<Scalars['Time']>;
@@ -146,6 +155,17 @@ export type FunctionRunsQuery = {
   workspaceId?: Scalars['ID'];
 };
 
+export type FunctionTrigger = {
+  __typename?: 'FunctionTrigger';
+  type: FunctionTriggerTypes;
+  value: Scalars['String'];
+};
+
+export enum FunctionTriggerTypes {
+  Cron = 'CRON',
+  Event = 'EVENT'
+}
+
 export type FunctionVersion = {
   __typename?: 'FunctionVersion';
   config: Scalars['String'];
@@ -187,6 +207,7 @@ export type Query = {
   events?: Maybe<Array<Event>>;
   functionRun?: Maybe<FunctionRun>;
   functionRuns?: Maybe<Array<FunctionRun>>;
+  functions?: Maybe<Array<Function>>;
 };
 
 
@@ -278,6 +299,11 @@ export type GetFunctionRunQueryVariables = Exact<{
 
 export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null, event?: { __typename?: 'Event', id: string, raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
 
+export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetFunctionsQuery = { __typename?: 'Query', functions?: Array<{ __typename?: 'Function', id: string, name: string, url: string, triggers?: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> | null };
+
 
 export const GetEventsStreamDocument = `
     query GetEventsStream {
@@ -367,6 +393,19 @@ export const GetFunctionRunDocument = `
   }
 }
     `;
+export const GetFunctionsDocument = `
+    query GetFunctions {
+  functions {
+    id
+    name
+    triggers {
+      type
+      value
+    }
+    url
+  }
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -382,9 +421,12 @@ const injectedRtkApi = api.injectEndpoints({
     GetFunctionRun: build.query<GetFunctionRunQuery, GetFunctionRunQueryVariables>({
       query: (variables) => ({ document: GetFunctionRunDocument, variables })
     }),
+    GetFunctions: build.query<GetFunctionsQuery, GetFunctionsQueryVariables | void>({
+      query: (variables) => ({ document: GetFunctionsDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery } = injectedRtkApi;
+export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery } = injectedRtkApi;
 

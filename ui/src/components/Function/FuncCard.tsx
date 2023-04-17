@@ -1,14 +1,14 @@
 import { EventStatus, FunctionRunStatus } from "../../store/generated";
 import classNames from "../../utils/classnames";
-import statusStyles from "../../utils/statusStyles";
+import statusStyles, { FunctionStatus } from "../../utils/statusStyles";
 import { Time } from "../Time";
 
 interface FuncCardProps {
   title: string;
-  date: string | number;
+  date?: string | number;
   badge?: string | number;
   id: string;
-  status: FunctionRunStatus | EventStatus;
+  status: FunctionRunStatus | EventStatus | FunctionStatus;
   active?: boolean;
   contextualBar?: React.ReactNode;
   onClick?: () => void;
@@ -31,8 +31,9 @@ export default function FuncCard({
       className={classNames(
         active
           ? `outline outline-2 outline-indigo-400 outline-offset-3 bg-slate-900 border-slate-700/50`
-          : `hover:bg-slate-800`,
-        `px-5 py-3.5 bg-slate-800/50 w-full rounded-lg hover:bg-slate-800/80 block cursor-pointer`
+          : null,
+        `px-5 py-3.5 bg-slate-800/50 w-full rounded-lg block`,
+        onClick ? "hover:bg-slate-800/80 cursor-pointer" : null
       )}
       onClick={
         onClick
@@ -46,13 +47,15 @@ export default function FuncCard({
       <div>
         <div className="flex items-start justify-between">
           <div>
-            <span className="text-2xs mt-1 block leading-none">
-              <Time date={date} />
-            </span>
-            <h2 className="text-white mt-2">{title}</h2>
+            {date ? (
+              <span className="text-2xs mt-1 mb-2 block leading-none">
+                <Time date={date} />
+              </span>
+            ) : null}
+            <h2 className="text-white">{title}</h2>
           </div>
           {badge ? (
-            <div className="flex items-center px-2 py-2 rounded-sm bg-slate-800 text-2xs leading-none text-slate-50">
+            <div className="flex items-center px-2 py-2 mb-2 rounded-sm bg-slate-800 text-2xs leading-none text-slate-50">
               {badge}
             </div>
           ) : null}

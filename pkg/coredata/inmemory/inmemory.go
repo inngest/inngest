@@ -44,6 +44,7 @@ func New(ctx context.Context) (*ReadWriter, error) {
 	}, nil
 }
 
+// TODO - Remove FS Loader
 // FSLoader is a function and action loader which returns functions and actions
 // by reading the given filesystem path recursively, loading functions and actions
 // from function definitions.

@@ -37,11 +37,16 @@ type ExecutionActionLoader interface {
 }
 
 type APIReadWriter interface {
+	APIFunctionReader
 	APIFunctionWriter
 	APIActionReader
 	APIActionWriter
 }
 
+type APIFunctionReader interface {
+	// Functions returns all functions.
+	Functions(ctx context.Context) ([]function.Function, error)
+}
 type APIFunctionWriter interface {
 	// Create a new function
 	CreateFunctionVersion(ctx context.Context, f function.Function, live bool, env string) (function.FunctionVersion, error)

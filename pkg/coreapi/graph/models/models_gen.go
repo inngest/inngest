@@ -70,6 +70,14 @@ type ExecutionDriversConfig struct {
 	Docker *ExecutionDockerDriverConfig `json:"docker"`
 }
 
+type Function struct {
+	Name        string             `json:"name"`
+	ID          string             `json:"id"`
+	Concurrency int                `json:"concurrency"`
+	Triggers    []*FunctionTrigger `json:"triggers"`
+	URL         string             `json:"url"`
+}
+
 type FunctionEvent struct {
 	Workspace   *Workspace         `json:"workspace"`
 	FunctionRun *FunctionRun       `json:"functionRun"`
@@ -99,6 +107,11 @@ type FunctionRunQuery struct {
 
 type FunctionRunsQuery struct {
 	WorkspaceID string `json:"workspaceId"`
+}
+
+type FunctionTrigger struct {
+	Type  FunctionTriggerTypes `json:"type"`
+	Value string               `json:"value"`
 }
 
 type StepEvent struct {
@@ -267,6 +280,47 @@ func (e *FunctionRunStatus) UnmarshalGQL(v interface{}) error {
 }
 
 func (e FunctionRunStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type FunctionTriggerTypes string
+
+const (
+	FunctionTriggerTypesEvent FunctionTriggerTypes = "EVENT"
+	FunctionTriggerTypesCron  FunctionTriggerTypes = "CRON"
+)
+
+var AllFunctionTriggerTypes = []FunctionTriggerTypes{
+	FunctionTriggerTypesEvent,
+	FunctionTriggerTypesCron,
+}
+
+func (e FunctionTriggerTypes) IsValid() bool {
+	switch e {
+	case FunctionTriggerTypesEvent, FunctionTriggerTypesCron:
+		return true
+	}
+	return false
+}
+
+func (e FunctionTriggerTypes) String() string {
+	return string(e)
+}
+
+func (e *FunctionTriggerTypes) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FunctionTriggerTypes(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FunctionTriggerTypes", str)
+	}
+	return nil
+}
+
+func (e FunctionTriggerTypes) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

@@ -6,6 +6,7 @@ import BG from "./components/BG";
 import { BlankSlate } from "./components/Blank";
 import Button from "./components/Button";
 import ContentFrame from "./components/Content/ContentFrame";
+import { FunctionList } from "./views/FunctionList";
 import { Docs } from "./components/Docs";
 import { EventSection } from "./components/Event/Section";
 import { SendEventModal } from "./components/Event/SendEventModal";
@@ -16,7 +17,7 @@ import Header from "./components/Header";
 import Sidebar from "./components/Sidebar/Sidebar";
 import SidebarLink from "./components/Sidebar/SidebarLink";
 import TimelineScrollContainer from "./components/Timeline/TimelineScrollContainer";
-import { IconBook, IconFeed } from "./icons";
+import { IconBook, IconFeed, IconFunction } from "./icons";
 import "./index.css";
 import {
   useGetEventsStreamQuery,
@@ -25,6 +26,7 @@ import {
 import {
   setSidebarTab,
   showDocs,
+  showFunctions,
   showEventSendModal,
   showFeed,
 } from "./store/global";
@@ -94,6 +96,11 @@ export function App() {
           active={contentView === "feed"}
           badge={20}
           onClick={() => dispatch(showFeed())}
+        />
+        <SidebarLink
+          icon={<IconFunction />}
+          active={contentView === "functions"}
+          onClick={() => dispatch(showFunctions())}
         />
         <SidebarLink
           icon={<IconBook />}
@@ -180,6 +187,8 @@ export function App() {
             />
           )}
         </>
+      ) : contentView === "functions" ? (
+        <FunctionList />
       ) : (
         <Docs />
       )}

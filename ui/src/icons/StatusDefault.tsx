@@ -7,8 +7,8 @@ export function IconStatusDefault() {
         r="4"
         transform="translate(0 -32)"
         fill="#64748B"
-        fill-rule="evenodd"
+        fillRule="evenodd"
       />
     </svg>
-  )
+  );
 }

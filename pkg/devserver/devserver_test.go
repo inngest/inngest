@@ -49,7 +49,7 @@ func TestEngine_async(t *testing.T) {
 	sm, err := conf.State.Service.Concrete.Manager(ctx)
 	require.NoError(t, err)
 
-	el := &inmemorydatastore.FSLoader{
+	el := &inmemorydatastore.ReadWriter{
 		MemoryExecutionLoader: &inmemorydatastore.MemoryExecutionLoader{},
 	}
 	err = el.SetFunctions(ctx, []*function.Function{

@@ -91,3 +91,17 @@ export const FUNCTION_RUN = gql`
     }
   }
 `;
+
+export const FUNCTIONS = gql`
+  query GetFunctions {
+    functions {
+      id
+      name
+      triggers {
+        type
+        value
+      }
+      url
+    }
+  }
+`;
