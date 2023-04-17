@@ -20,7 +20,7 @@ var (
 		2 * time.Hour,
 	}
 
-	backoffLen = len(BackoffTable) + 1
+	backoffLen = len(BackoffTable) - 1
 
 	DefaultBackoff BackoffFunc = TableBackoff
 )
