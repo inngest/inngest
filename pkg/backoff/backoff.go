@@ -8,6 +8,7 @@ import (
 
 var (
 	BackoffTable = []time.Duration{
+		15 * time.Second,
 		30 * time.Second,
 		time.Minute,
 		2 * time.Minute,
