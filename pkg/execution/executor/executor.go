@@ -156,6 +156,13 @@ func WithFailureHandler(f FailureHandler) ExecutorOpt {
 	}
 }
 
+func WithStepLimits(limit uint) ExecutorOpt {
+	return func(e Executor) error {
+		e.(*executor).steplimit = limit
+		return nil
+	}
+}
+
 // WithRuntimeDrivers specifies the drivers available to use when executing steps
 // of a function.
 //
@@ -184,6 +191,8 @@ type executor struct {
 	al             coredata.ExecutionActionLoader
 	runtimeDrivers map[string]driver.Driver
 	failureHandler FailureHandler
+
+	steplimit uint
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -196,8 +205,20 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 		return nil, 0, err
 	}
 
-	if s.Metadata().Status == enums.RunStatusCancelled {
+	md := s.Metadata()
+
+	if md.Status == enums.RunStatusCancelled {
 		return nil, 0, state.ErrFunctionCancelled
+	}
+
+	if e.steplimit != 0 && len(s.Actions()) >= int(e.steplimit) {
+		// Update this function's state to overflowed, if running.
+		if md.Status == enums.RunStatusRunning {
+			if err := e.sm.SetStatus(ctx, id, enums.RunStatusOverflowed); err != nil {
+				return nil, 0, err
+			}
+		}
+		return nil, 0, state.ErrFunctionOverflowed
 	}
 
 	if e.log != nil {

@@ -12,6 +12,7 @@ const (
 	HistoryTypeFunctionCompleted
 	HistoryTypeFunctionFailed
 	HistoryTypeFunctionCancelled
+	HistoryTypeFunctionStatusUpdated
 
 	HistoryTypeStepScheduled
 	HistoryTypeStepStarted

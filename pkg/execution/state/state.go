@@ -31,6 +31,7 @@ var (
 	ErrFunctionCancelled  = fmt.Errorf("function cancelled")
 	ErrFunctionComplete   = fmt.Errorf("function completed")
 	ErrFunctionFailed     = fmt.Errorf("function failed")
+	ErrFunctionOverflowed = fmt.Errorf("function has too many steps")
 )
 
 // Identifier represents the unique identifier for a workflow run.
@@ -220,6 +221,9 @@ type Mutater interface {
 	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
 	// future execution of steps.
 	Cancel(ctx context.Context, i Identifier) error
+
+	// SetStatus sets a status specifically.
+	SetStatus(ctx context.Context, i Identifier, status enums.RunStatus) error
 
 	// scheduled increases the scheduled count for a run's metadata.
 	//

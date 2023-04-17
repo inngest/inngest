@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _HistoryTypeName = "NoneFunctionStartedFunctionCompletedFunctionFailedFunctionCancelledStepScheduledStepStartedStepCompletedStepErroredStepFailedStepWaitingStepSleeping"
+const _HistoryTypeName = "NoneFunctionStartedFunctionCompletedFunctionFailedFunctionCancelledFunctionStatusUpdatedStepScheduledStepStartedStepCompletedStepErroredStepFailedStepWaitingStepSleeping"
 
-var _HistoryTypeIndex = [...]uint8{0, 4, 19, 36, 50, 67, 80, 91, 104, 115, 125, 136, 148}
+var _HistoryTypeIndex = [...]uint8{0, 4, 19, 36, 50, 67, 88, 101, 112, 125, 136, 146, 157, 169}
 
-const _HistoryTypeLowerName = "nonefunctionstartedfunctioncompletedfunctionfailedfunctioncancelledstepscheduledstepstartedstepcompletedsteperroredstepfailedstepwaitingstepsleeping"
+const _HistoryTypeLowerName = "nonefunctionstartedfunctioncompletedfunctionfailedfunctioncancelledfunctionstatusupdatedstepscheduledstepstartedstepcompletedsteperroredstepfailedstepwaitingstepsleeping"
 
 func (i HistoryType) String() string {
 	if i < 0 || i >= HistoryType(len(_HistoryTypeIndex)-1) {
@@ -30,16 +30,17 @@ func _HistoryTypeNoOp() {
 	_ = x[HistoryTypeFunctionCompleted-(2)]
 	_ = x[HistoryTypeFunctionFailed-(3)]
 	_ = x[HistoryTypeFunctionCancelled-(4)]
-	_ = x[HistoryTypeStepScheduled-(5)]
-	_ = x[HistoryTypeStepStarted-(6)]
-	_ = x[HistoryTypeStepCompleted-(7)]
-	_ = x[HistoryTypeStepErrored-(8)]
-	_ = x[HistoryTypeStepFailed-(9)]
-	_ = x[HistoryTypeStepWaiting-(10)]
-	_ = x[HistoryTypeStepSleeping-(11)]
+	_ = x[HistoryTypeFunctionStatusUpdated-(5)]
+	_ = x[HistoryTypeStepScheduled-(6)]
+	_ = x[HistoryTypeStepStarted-(7)]
+	_ = x[HistoryTypeStepCompleted-(8)]
+	_ = x[HistoryTypeStepErrored-(9)]
+	_ = x[HistoryTypeStepFailed-(10)]
+	_ = x[HistoryTypeStepWaiting-(11)]
+	_ = x[HistoryTypeStepSleeping-(12)]
 }
 
-var _HistoryTypeValues = []HistoryType{HistoryTypeNone, HistoryTypeFunctionStarted, HistoryTypeFunctionCompleted, HistoryTypeFunctionFailed, HistoryTypeFunctionCancelled, HistoryTypeStepScheduled, HistoryTypeStepStarted, HistoryTypeStepCompleted, HistoryTypeStepErrored, HistoryTypeStepFailed, HistoryTypeStepWaiting, HistoryTypeStepSleeping}
+var _HistoryTypeValues = []HistoryType{HistoryTypeNone, HistoryTypeFunctionStarted, HistoryTypeFunctionCompleted, HistoryTypeFunctionFailed, HistoryTypeFunctionCancelled, HistoryTypeFunctionStatusUpdated, HistoryTypeStepScheduled, HistoryTypeStepStarted, HistoryTypeStepCompleted, HistoryTypeStepErrored, HistoryTypeStepFailed, HistoryTypeStepWaiting, HistoryTypeStepSleeping}
 
 var _HistoryTypeNameToValueMap = map[string]HistoryType{
 	_HistoryTypeName[0:4]:          HistoryTypeNone,
@@ -52,20 +53,22 @@ var _HistoryTypeNameToValueMap = map[string]HistoryType{
 	_HistoryTypeLowerName[36:50]:   HistoryTypeFunctionFailed,
 	_HistoryTypeName[50:67]:        HistoryTypeFunctionCancelled,
 	_HistoryTypeLowerName[50:67]:   HistoryTypeFunctionCancelled,
-	_HistoryTypeName[67:80]:        HistoryTypeStepScheduled,
-	_HistoryTypeLowerName[67:80]:   HistoryTypeStepScheduled,
-	_HistoryTypeName[80:91]:        HistoryTypeStepStarted,
-	_HistoryTypeLowerName[80:91]:   HistoryTypeStepStarted,
-	_HistoryTypeName[91:104]:       HistoryTypeStepCompleted,
-	_HistoryTypeLowerName[91:104]:  HistoryTypeStepCompleted,
-	_HistoryTypeName[104:115]:      HistoryTypeStepErrored,
-	_HistoryTypeLowerName[104:115]: HistoryTypeStepErrored,
-	_HistoryTypeName[115:125]:      HistoryTypeStepFailed,
-	_HistoryTypeLowerName[115:125]: HistoryTypeStepFailed,
-	_HistoryTypeName[125:136]:      HistoryTypeStepWaiting,
-	_HistoryTypeLowerName[125:136]: HistoryTypeStepWaiting,
-	_HistoryTypeName[136:148]:      HistoryTypeStepSleeping,
-	_HistoryTypeLowerName[136:148]: HistoryTypeStepSleeping,
+	_HistoryTypeName[67:88]:        HistoryTypeFunctionStatusUpdated,
+	_HistoryTypeLowerName[67:88]:   HistoryTypeFunctionStatusUpdated,
+	_HistoryTypeName[88:101]:       HistoryTypeStepScheduled,
+	_HistoryTypeLowerName[88:101]:  HistoryTypeStepScheduled,
+	_HistoryTypeName[101:112]:      HistoryTypeStepStarted,
+	_HistoryTypeLowerName[101:112]: HistoryTypeStepStarted,
+	_HistoryTypeName[112:125]:      HistoryTypeStepCompleted,
+	_HistoryTypeLowerName[112:125]: HistoryTypeStepCompleted,
+	_HistoryTypeName[125:136]:      HistoryTypeStepErrored,
+	_HistoryTypeLowerName[125:136]: HistoryTypeStepErrored,
+	_HistoryTypeName[136:146]:      HistoryTypeStepFailed,
+	_HistoryTypeLowerName[136:146]: HistoryTypeStepFailed,
+	_HistoryTypeName[146:157]:      HistoryTypeStepWaiting,
+	_HistoryTypeLowerName[146:157]: HistoryTypeStepWaiting,
+	_HistoryTypeName[157:169]:      HistoryTypeStepSleeping,
+	_HistoryTypeLowerName[157:169]: HistoryTypeStepSleeping,
 }
 
 var _HistoryTypeNames = []string{
@@ -74,13 +77,14 @@ var _HistoryTypeNames = []string{
 	_HistoryTypeName[19:36],
 	_HistoryTypeName[36:50],
 	_HistoryTypeName[50:67],
-	_HistoryTypeName[67:80],
-	_HistoryTypeName[80:91],
-	_HistoryTypeName[91:104],
-	_HistoryTypeName[104:115],
-	_HistoryTypeName[115:125],
+	_HistoryTypeName[67:88],
+	_HistoryTypeName[88:101],
+	_HistoryTypeName[101:112],
+	_HistoryTypeName[112:125],
 	_HistoryTypeName[125:136],
-	_HistoryTypeName[136:148],
+	_HistoryTypeName[136:146],
+	_HistoryTypeName[146:157],
+	_HistoryTypeName[157:169],
 }
 
 // HistoryTypeString retrieves an enum value from the enum constants string name.
