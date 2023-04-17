@@ -183,7 +183,7 @@ func (i impl) Run(ctx context.Context, f queue.RunFunc) error {
 		err := f(ctx, w.Item)
 		if queue.ShouldRetry(err, w.Item.Attempt, w.Item.GetMaxAttempts()) {
 			w.Item.Attempt += 1
-			return i.Enqueue(ctx, w.Item, backoff.LinearJitterBackoff(w.Item.Attempt))
+			return i.Enqueue(ctx, w.Item, backoff.DefaultBackoff(w.Item.Attempt))
 		}
 		return nil
 	}, int64(i.config.Concurrency))

@@ -645,7 +645,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 		jobCancel()
 
 		if osqueue.ShouldRetry(err, qi.Data.Attempt, qi.Data.GetMaxAttempts()) {
-			at := backoff.LinearJitterBackoff(qi.Data.Attempt)
+			at := backoff.DefaultBackoff(qi.Data.Attempt)
 			qi.Data.Attempt += 1
 			qi.AtMS = at.UnixMilli()
 			q.logger.Warn().Err(err).Int64("at_ms", at.UnixMilli()).Msg("requeuing job")

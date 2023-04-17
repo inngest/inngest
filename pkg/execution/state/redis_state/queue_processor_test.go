@@ -215,7 +215,7 @@ func TestQueueRunRetry(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	<-time.After(2*time.Second + 15*time.Second)
+	<-time.After(2*time.Second + 45*time.Second)
 	require.EqualValues(t, 2, atomic.LoadInt32(&counter), r.Dump())
 	cancel()
 
