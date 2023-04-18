@@ -52,6 +52,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
       title={event.name || "unknown"}
       date={event.createdAt}
       id={eventId}
+      idPrefix={"Event ID"}
       active
       // button={<Button label="Open Event" icon={<IconFeed />} />}
     >

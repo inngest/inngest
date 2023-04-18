@@ -7,6 +7,7 @@ interface ContentCardProps {
   date: string | number;
   button?: React.ReactNode;
   id: string;
+  idPrefix?: string;
   active?: boolean;
 }
 
@@ -16,6 +17,7 @@ export default function ContentCard({
   date,
   button,
   id,
+  idPrefix = "",
   active = false,
 }: ContentCardProps) {
   return (
@@ -41,7 +43,7 @@ export default function ContentCard({
 
         <div className="flex items-center justify-between">
           {button && button}
-          <span className="text-3xs leading-none">{id}</span>
+          <span className="text-3xs leading-none">{[idPrefix, id].filter(Boolean).join(": ")}</span>
         </div>
       </div>
       <div className="overflow-y-scroll flex-1">{children}</div>

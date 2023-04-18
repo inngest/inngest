@@ -61,7 +61,7 @@ export default function FuncCard({
           ) : null}
         </div>
         <div className="flex items-center justify-between mt-2">
-          <span className="text-3xs leading-none">{id}</span>
+          <span className="text-3xs leading-none">Run ID: {id}</span>
           <span className="text-3xs leading-none flex items-center">
             <itemStatus.icon />
             <span className="ml-2">{status}</span>
