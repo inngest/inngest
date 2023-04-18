@@ -70,6 +70,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       title={run.name || "Unknown"}
       date={run.startedAt}
       id={run.id}
+      idPrefix={"Run ID"}
       // button={<Button label="Open Function" icon={<IconFeed />} />}
     >
       <div className="flex justify-end px-4 border-t border-slate-800/50 pt-4 mt-4">
