@@ -305,6 +305,9 @@ module.exports = ({ theme }) => ({
       ":is(a, blockquote, thead th) strong": {
         color: "inherit",
       },
+      pre: {
+        borderRadius: theme("borderRadius.md"),
+      },
       code: {
         color: "var(--tw-prose-code)",
         borderRadius: theme("borderRadius.md"),
