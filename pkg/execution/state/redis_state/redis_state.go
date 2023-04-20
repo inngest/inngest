@@ -517,7 +517,6 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 			typ = enums.HistoryTypeStepFailed
 			funcFailHistory = state.History{
 				ID:         state.HistoryID(),
-				GroupID:    state.GroupIDFromContext(ctx),
 				Type:       enums.HistoryTypeFunctionFailed,
 				Identifier: i,
 				CreatedAt:  now,
@@ -526,7 +525,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 	}
 
 	stepOutput := false
-	if len(r.Generator) == 0 && typ == enums.HistoryTypeStepCompleted {
+	if len(r.Generator) == 0 && (typ == enums.HistoryTypeStepCompleted || typ == enums.HistoryTypeStepFailed) {
 		// This is only the step output if the step is complete and this
 		// isn't a generator response.
 		stepOutput = true
