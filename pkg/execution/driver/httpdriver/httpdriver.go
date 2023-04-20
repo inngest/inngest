@@ -211,5 +211,26 @@ func (e executor) do(ctx context.Context, url string, input []byte) ([]byte, int
 	if err != nil {
 		return nil, 0, fmt.Errorf("error reading response body: %w", err)
 	}
-	return byt, resp.StatusCode, nil
+
+	// If the responding status code is 201 Created, the response has been
+	// streamed back to us. In this case, the response body will be namespaced
+	// under the "body" key, and the status code will be namespaced under the
+	// "status" key.
+	//
+	// Only SDK versions that include the status in the body are expected to
+	// send a 201 status code and namespace in this way, so failing to parse
+	// here is an error.
+	if resp.StatusCode != 201 {
+		return byt, resp.StatusCode, nil
+	}
+
+	var body struct {
+		StatusCode int    `json:"status"`
+		Body       string `json:"body"`
+	}
+	if err := json.Unmarshal(byt, &body); err != nil {
+		return nil, 0, fmt.Errorf("error reading response body to check for status code: %w", err)
+	}
+	return []byte(body.Body), body.StatusCode, nil
+
 }
