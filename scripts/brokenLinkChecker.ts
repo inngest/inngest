@@ -14,6 +14,8 @@ const options = {
     "https://youtu.be",
     "https://svelte.dev",
     "https://deno.land",
+    "https://the-guild.dev/graphql/yoga-server",
+    "https://envelop.dev"
   ],
 };
 

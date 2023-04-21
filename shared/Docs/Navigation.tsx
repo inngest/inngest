@@ -282,6 +282,10 @@ export const navigation = [
         title: "Trigger code from Retool",
         href: `${baseDir}/guides/trigger-your-code-from-retool`,
       },
+      {
+        title: "Instrumenting GraphQL",
+        href: `${baseDir}/guides/instrumenting-graphql`,
+      },
     ],
   },
   {

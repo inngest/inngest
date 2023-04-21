@@ -1,0 +1,129 @@
+# Instrumenting GraphQL
+
+{/* Intro discussing what instrumenting GraphQL means */}
+
+When building with GraphQL, you can give your event-driven application a kick-start by instrumenting every query and mutation, sending events when one is successfully executed.
+
+{/* Describe that we can use a plugin for this, and how it's compatible */}
+{/* Mention Redwood */}
+
+We can do this using an an [Envelop](https://envelop.dev/) plugin, `useInngest`, for [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server) and servers or frameworks powered by Yoga, such as [RedwoodJS](https://www.redwoodjs.com/).
+
+{/* Discuss the benefits of this */}
+
+By instrumenting with the `useInngest` plugin:
+
+- Get an immediate set of events to react to that automatically grows with your GraphQL API.
+- No changes to your existing resolvers are ever needed.
+- Utilise fine-grained control over what events are sent such as operations (queries, mutations, or subscriptions), introspection events, when GraphQL errors occur, if result data should be included, type and schema coordinate denlylists, and more.
+- Automatically capture context such as user data.
+
+{/* Show code adding this to a simple Yoga schema */}
+
+## Getting Started
+
+```sh
+npm install envelop-plugin-inngest # or yarn add
+```
+
+### Usage example
+
+Using `useInngest` just requires that you have an Inngest client (see the [Quick start](/docs/quick-start)) set up with an appropriate event key (see [Creating an event key](https://www.inngest.com/docs/events/creating-an-event-key)).
+
+Here's a single-file example of how to add the plugin.
+
+```ts
+import { useInngest } from "envelop-plugin-inngest";
+import { createSchema, createYoga } from "graphql-yoga";
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ name: "My App" });
+
+// Provide your schema
+const yoga = createYoga({
+  schema: createSchema({
+    typeDefs: /* GraphQL */ `
+      type Query {
+        greetings: String!
+      }
+    `,
+    resolvers: {
+      Query: {
+        greetings: () => "Hello World!",
+      },
+    },
+  }),
+
+  // Add the plugin to the server. RedwoodJS users can use the
+  // `extraPlugins` option instead.
+  plugins: [useInngest({ inngestClient: inngest })],
+});
+
+// Start the server and explore http://localhost:4000/graphql
+const server = createServer(yoga);
+
+server.listen(4000, () => {
+  console.info("Server is running on http://localhost:4000/graphql");
+});
+```
+
+{/* Discuss and show screenshots of example events */}
+
+### Output events
+
+Once the plugin is installed, an event will be sent for all successful GraphQL operations, resulting in a ready-to-use set of events that you can react to immediately.
+
+Here's an example event sent from a mutation to create a new item in a user's cart:
+
+```json
+{
+  "name": "graphql/create-cart-item.mutation",
+  "data": {
+    "identifiers": [
+      {
+        "id": 27,
+        "typename": "CartItem"
+      }
+    ],
+    "operation": {
+      "id": "create-cart-item",
+      "name": "CreateCartItem",
+      "type": "mutation"
+    },
+    "result": {
+      "data": {
+        "createCartItem": {
+          "id": 27,
+          "productId": "123"
+        }
+      }
+    },
+    "types": [
+      "CartItem"
+    ],
+    "variables": {}
+  },
+  "id": "01GXXAQ1M0A1SFVGEHACRF4K1C"
+}
+```
+
+### Reacting to events
+
+We can react to this event by creating a new Inngest function with the event as the trigger.
+
+```ts
+inngest.createFunction(
+  { name: "Send cart alert" },
+  { event: "graphql/create-cart-item.mutation" },
+  async ({ event }) => {
+    await sendSlackMessage(
+      "#marketing",
+      `Someone added product #${event.data.identifiers[0].id} to their cart!`
+    );
+  }
+);
+```
+
+{/* To get more info, see the `envelop-plugin-inngest` repo */}
+
+For more info on how to customize the events sent check out the [envelop-plugin-inngest](https://github.com/inngest/envelop-plugin-inngest) repository, or see [Writing functions](https://www.inngest.com/docs/functions) to learn how to react to these events in different ways.
