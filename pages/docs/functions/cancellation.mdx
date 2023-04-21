@@ -4,8 +4,9 @@
 inngest.createFunction(
   {
     name: "Sync contacts",
-    cancelOn: [{
-      event: "app/user.deleted", match: "data.userId" }],
+    cancelOn: [
+      { event: "app/user.deleted", match: "data.userId" }
+    ],
   }
   // ...
 );
