@@ -11,7 +11,6 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/cespare/xxhash/v2"
-	"github.com/go-redis/redis/v8"
 	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
@@ -20,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
+	"github.com/rueian/rueidis"
 	"github.com/uber-go/tally/v4"
 	"go.opentelemetry.io/otel/trace"
 	"gonum.org/v1/gonum/stat/sampleuv"
@@ -239,7 +239,7 @@ type QueueItemConcurrencyKeyGenerator func(ctx context.Context, i QueueItem) (st
 // This allows partitions (read: functions) to set their own concurrency limits.
 type PartitionConcurrencyKeyGenerator func(ctx context.Context, p QueuePartition) (string, int)
 
-func NewQueue(r redis.UniversalClient, opts ...QueueOpt) *queue {
+func NewQueue(r rueidis.Client, opts ...QueueOpt) *queue {
 	q := &queue{
 		r: r,
 		pf: func(ctx context.Context, item QueueItem) uint {
@@ -275,7 +275,7 @@ type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
 	// redis stores the redis connection to use.
-	r  redis.UniversalClient
+	r  rueidis.Client
 	pf PriorityFinder
 	kg QueueKeyGenerator
 
@@ -493,17 +493,23 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		q.kg.PartitionIndex(),  // Global partition queue
 		q.kg.Idempotency(i.ID),
 	}
-	status, err := scripts["queue/enqueue"].Run(
-		ctx,
-		q.r,
-		keys,
 
+	args, err := StrSlice([]any{
 		i,
 		i.ID,
 		at.UnixMilli(),
 		qn,
 		qp,
-	).Int64()
+	})
+	if err != nil {
+		return i, err
+	}
+	status, err := scripts["queue/enqueue"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
 	if err != nil {
 		return i, fmt.Errorf("error enqueueing item: %w", err)
 	}
@@ -539,16 +545,22 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 		limit = QueuePeekMax
 	}
 
-	items, err := scripts["queue/peek"].Run(
+	args, err := StrSlice([]any{
+		until.UnixMilli(),
+		limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+	items, err := scripts["queue/peek"].Exec(
 		ctx,
 		q.r,
 		[]string{
 			q.kg.QueueIndex(queueName),
 			q.kg.QueueItem(),
 		},
-		until.UnixMilli(),
-		limit,
-	).StringSlice()
+		args,
+	).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error peeking queue items: %w", err)
 	}
@@ -619,11 +631,7 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		q.kg.Concurrency("custom", ck),
 		q.kg.ConcurrencyIndex(),
 	}
-	status, err := scripts["queue/lease"].Run(
-		ctx,
-		q.r,
-		keys,
-
+	args, err := StrSlice([]any{
 		item.ID,
 		leaseID.String(),
 		time.Now().UnixMilli(),
@@ -631,7 +639,16 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 		pc,
 		cc,
 		p.Queue(),
-	).Int64()
+	})
+	if err != nil {
+		return nil, err
+	}
+	status, err := scripts["queue/lease"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
 	if err != nil {
 		return nil, fmt.Errorf("error leasing queue item: %w", err)
 	}
@@ -687,15 +704,22 @@ func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, 
 		q.kg.Concurrency("p", pk),
 		q.kg.Concurrency("custom", ck),
 	}
-	status, err := scripts["queue/extendLease"].Run(
-		ctx,
-		q.r,
-		keys,
+
+	args, err := StrSlice([]any{
 		i.ID,
 		leaseID.String(),
 		newLeaseID.String(),
 		p.Queue(),
-	).Int64()
+	})
+	if err != nil {
+		return nil, err
+	}
+	status, err := scripts["queue/extendLease"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
 	if err != nil {
 		return nil, fmt.Errorf("error extending lease: %w", err)
 	}
@@ -745,15 +769,20 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 		idempotency = q.idempotencyTTLFunc(ctx, i)
 	}
 
-	status, err := scripts["queue/dequeue"].Run(
-		ctx,
-		q.r,
-		keys,
-
+	args, err := StrSlice([]any{
 		i.ID,
 		int(idempotency.Seconds()),
 		p.Queue(),
-	).Int64()
+	})
+	if err != nil {
+		return err
+	}
+	status, err := scripts["queue/dequeue"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error dequeueing item: %w", err)
 	}
@@ -818,17 +847,23 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 		q.kg.Concurrency("custom", ck),
 		q.kg.ConcurrencyIndex(),
 	}
-	status, err := scripts["queue/requeue"].Run(
-		ctx,
-		q.r,
-		keys,
 
+	args, err := StrSlice([]any{
 		i,
 		i.ID,
 		at.UnixMilli(),
 		qn,
 		qp,
-	).Int64()
+	})
+	if err != nil {
+		return err
+	}
+	status, err := scripts["queue/requeue"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error requeueing item: %w", err)
 	}
@@ -872,18 +907,25 @@ func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration t
 		q.kg.PartitionIndex(),
 		q.kg.Concurrency("p", concurrencyKey),
 	}
-	result, err := scripts["queue/partitionLease"].Run(
-		ctx,
-		q.r,
-		keys,
 
+	args, err := StrSlice([]any{
 		p.Queue(),
 		leaseID.String(),
 		now.UnixMilli(),
 		leaseExpires.Unix(),
 		concurrency,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	result, err := scripts["queue/partitionLease"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
 		// TODO: Partition concurrency defer amount
-	).Int64()
+
+	).AsInt64()
 	if err != nil {
 		return nil, 0, fmt.Errorf("error leasing partition: %w", err)
 	}
@@ -925,16 +967,24 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 	//       to add this prior to implementation.
 
 	unix := until.Unix()
-	encoded, err := scripts["queue/partitionPeek"].Run(
+
+	args, err := StrSlice([]any{
+		unix,
+		limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	encoded, err := scripts["queue/partitionPeek"].Exec(
 		ctx,
 		q.r,
 		[]string{
 			q.kg.PartitionIndex(),
 			q.kg.PartitionItem(),
 		},
-		unix,
-		limit,
-	).Slice()
+		args,
+	).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error peeking partition items: %w", err)
 	}
@@ -944,13 +994,13 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 
 	ignored := 0
 	for n, i := range encoded {
-		if i == nil {
+		if i == "" {
 			ignored++
 			continue
 		}
 
 		item := &QueuePartition{}
-		if err = json.Unmarshal([]byte(i.(string)), item); err != nil {
+		if err = json.Unmarshal([]byte(i), item); err != nil {
 			return nil, fmt.Errorf("error reading partition item: %w", err)
 		}
 
@@ -1019,15 +1069,21 @@ func (q *queue) PartitionRequeue(ctx context.Context, queueName string, at time.
 	if forceAt {
 		force = 1
 	}
-	status, err := scripts["queue/partitionRequeue"].Run(
-		ctx,
-		q.r,
-		keys,
+	args, err := StrSlice([]any{
 
 		queueName,
 		at.Unix(),
 		force,
-	).Int64()
+	})
+	if err != nil {
+		return err
+	}
+	status, err := scripts["queue/partitionRequeue"].Exec(
+		ctx,
+		q.r,
+		keys,
+		args,
+	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error requeueing partition: %w", err)
 	}
@@ -1058,14 +1114,21 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 		return ErrPriorityTooHigh
 	}
 
+	args, err := StrSlice([]any{
+		queueName,
+		priority,
+	})
+	if err != nil {
+		return err
+	}
+
 	keys := []string{q.kg.PartitionItem()}
-	status, err := scripts["queue/partitionReprioritize"].Run(
+	status, err := scripts["queue/partitionReprioritize"].Exec(
 		ctx,
 		q.r,
 		keys,
-		queueName,
-		priority,
-	).Int64()
+		args,
+	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error enqueueing item: %w", err)
 	}
@@ -1081,7 +1144,12 @@ func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, pri
 
 func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey string) (int64, error) {
 	s := time.Now().UnixMilli()
-	return q.r.ZCount(ctx, q.kg.Concurrency(prefix, concurrencyKey), fmt.Sprintf("%d", s), "+inf").Result()
+	cmd := q.r.B().Zcount().
+		Key(q.kg.Concurrency(prefix, concurrencyKey)).
+		Min(fmt.Sprintf("%d", s)).
+		Max("+inf").
+		Build()
+	return q.r.Do(ctx, cmd).AsInt64()
 }
 
 // Scavenge attempts to find jobs that may have been lost due to killed workers.  Workers are shared
@@ -1093,13 +1161,16 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 	// Find all items that have an expired lease - eg. where the min time for a lease is between
 	// (0-now] in unix milliseconds.
 	now := fmt.Sprintf("%d", time.Now().UnixMilli())
-	pKeys, err := q.r.ZRangeArgs(ctx, redis.ZRangeArgs{
-		Key:     q.kg.ConcurrencyIndex(),
-		Start:   "-inf",
-		Stop:    now,
-		ByScore: true,
-		Count:   100,
-	}).Result()
+
+	cmd := q.r.B().Zrange().
+		Key(q.kg.ConcurrencyIndex()).
+		Min("-inf").
+		Max(now).
+		Byscore().
+		Limit(0, 100).
+		Build()
+
+	pKeys, err := q.r.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return 0, fmt.Errorf("error scavenging for lost items: %w", err)
 	}
@@ -1111,8 +1182,8 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 	for _, partition := range pKeys {
 		// Fetch the partition.  This uses the concurrency:p: prefix,
 		// so remove the prefix from the item.
-		partitionJSON, err := q.r.HGet(ctx, q.kg.PartitionItem(), partition).Result()
-		if err == redis.Nil {
+		partitionJSON, err := q.r.Do(ctx, q.r.B().Hget().Key(q.kg.PartitionItem()).Field(partition).Build()).AsBytes()
+		if err == rueidis.Nil {
 			continue
 		}
 		if err != nil {
@@ -1120,14 +1191,15 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 			continue
 		}
 
-		itemIDs, err := q.r.ZRangeArgs(ctx, redis.ZRangeArgs{
-			Key:     q.kg.Concurrency("p", partition),
-			Start:   "-inf",
-			Stop:    now,
-			ByScore: true,
-			Count:   100,
-		}).Result()
-		if err != nil && err != redis.Nil {
+		cmd := q.r.B().Zrange().
+			Key(q.kg.Concurrency("p", partition)).
+			Min("-inf").
+			Max(now).
+			Byscore().
+			Limit(0, 100).
+			Build()
+		itemIDs, err := q.r.Do(ctx, cmd).AsStrSlice()
+		if err != nil && err != rueidis.Nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error querying partition concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
 		}
@@ -1142,14 +1214,15 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 		}
 
 		// Fetch the queue item, then requeue.
-		jobs, err := q.r.HMGet(ctx, q.kg.QueueItem(), itemIDs...).Result()
-		if err != nil && err != redis.Nil {
+		cmd = q.r.B().Hmget().Key(q.kg.QueueItem()).Field(itemIDs...).Build()
+		jobs, err := q.r.Do(ctx, cmd).AsStrSlice()
+		if err != nil && err != rueidis.Nil {
 			resultErr = multierror.Append(resultErr, fmt.Errorf("error fetching jobs for concurrency queue '%s' during scavenge: %w", partition, err))
 			continue
 		}
 		for _, item := range jobs {
 			qi := QueueItem{}
-			if err := json.Unmarshal([]byte(item.(string)), &qi); err != nil {
+			if err := json.Unmarshal([]byte(item), &qi); err != nil {
 				resultErr = multierror.Append(resultErr, fmt.Errorf("error unmarshalling job '%s': %w", item, err))
 				continue
 			}
@@ -1191,14 +1264,21 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 		existing = existingLeaseID[0].String()
 	}
 
-	status, err := scripts["queue/configLease"].Run(
-		ctx,
-		q.r,
-		[]string{key},
+	args, err := StrSlice([]any{
 		now.UnixMilli(),
 		newLeaseID.String(),
 		existing,
-	).Int64()
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	status, err := scripts["queue/configLease"].Exec(
+		ctx,
+		q.r,
+		[]string{key},
+		args,
+	).AsInt64()
 	if err != nil {
 		return nil, fmt.Errorf("error claiming config lease: %w", err)
 	}

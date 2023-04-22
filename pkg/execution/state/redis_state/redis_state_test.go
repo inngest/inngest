@@ -6,13 +6,13 @@ import (
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/testharness"
 	"github.com/oklog/ulid/v2"
+	"github.com/rueian/rueidis"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,21 +20,17 @@ func TestStateHarness(t *testing.T) {
 	r := miniredis.RunT(t)
 	sm, err := New(
 		context.Background(),
-		WithConnectOpts(redis.Options{
-			Addr: r.Addr(),
-			// Make the pool size less than the 100 concurrent items we run,
-			// to ensure contention works.
-			//
-			// NOTE: Sometimes, when running with the race detector,
-			// we'll hit an internal 8128 goroutine limit.  See:
-			// https://github.com/golang/go/issues/47056
-			PoolSize: 75,
+		WithKeyPrefix("{test}:"),
+		WithConnectOpts(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
 		}),
 	)
 	require.NoError(t, err)
 
 	create := func() (state.Manager, func()) {
 		return sm, func() {
+			// fmt.Println(r.Dump())
 			r.FlushAll()
 		}
 	}
@@ -46,15 +42,9 @@ func BenchmarkNew(b *testing.B) {
 	r := miniredis.RunT(b)
 	sm, err := New(
 		context.Background(),
-		WithConnectOpts(redis.Options{
-			Addr: r.Addr(),
-			// Make the pool size less than the 100 concurrent items we run,
-			// to ensure contention works.
-			//
-			// NOTE: Sometimes, when running with the race detector,
-			// we'll hit an internal 8128 goroutine limit.  See:
-			// https://github.com/golang/go/issues/47056
-			PoolSize: 75,
+		WithConnectOpts(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
 		}),
 	)
 	require.NoError(b, err)

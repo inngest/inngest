@@ -42,11 +42,12 @@ require (
 	github.com/mattn/go-isatty v0.0.17
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/muesli/reflow v0.3.0
-	github.com/oklog/ulid/v2 v2.0.2
+	github.com/oklog/ulid/v2 v2.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.5.3
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rs/zerolog v1.26.1
+	github.com/rueian/rueidis v0.0.100
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.10.1
@@ -55,7 +56,7 @@ require (
 	github.com/uber-go/tally/v4 v4.1.4
 	github.com/vektah/gqlparser/v2 v2.5.1
 	github.com/xhit/go-str2duration/v2 v2.0.0
-	go.opentelemetry.io/otel/trace v1.11.2
+	go.opentelemetry.io/otel/trace v1.14.0
 	gocloud.dev v0.25.0
 	gocloud.dev/pubsub/natspubsub v0.25.0
 	golang.org/x/sync v0.1.0
@@ -192,7 +193,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zclconf/go-cty v1.8.3 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	go.opentelemetry.io/otel v1.11.2 // indirect
+	go.opentelemetry.io/otel v1.14.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/crypto v0.0.0-20220331220935-ae2d96664a29 // indirect
 	golang.org/x/exp v0.0.0-20210126221216-84987778548c // indirect
