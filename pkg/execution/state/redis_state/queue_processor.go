@@ -447,7 +447,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osque
 			// This is safe:  only one process runs scan(), and we guard the total number of
 			// available workers with the above semaphore.
 			leaseID, err := q.Lease(ctx, *p, *item, QueueLeaseDuration)
-			if err != nil && q.concurrencyService != nil {
+			if err != nil && q.concurrencyService != nil && err != ErrQueueItemAlreadyLeased {
 				// NOTE: Always remove the concurrency key if leasing failed.
 				//
 				// There's a race condition here;  the key may not be found if
