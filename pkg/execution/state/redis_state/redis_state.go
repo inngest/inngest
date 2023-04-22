@@ -911,7 +911,7 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 
 // PausesByEvent returns all pauses for a given event within a workspace.
 func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
-	cmd := m.r.B().Hscan().Key(m.kf.PauseEvent(ctx, workspaceID, event)).Cursor(0).Count(0).Build()
+	cmd := m.r.B().Hscan().Key(m.kf.PauseEvent(ctx, workspaceID, event)).Cursor(0).Build()
 	scan, err := m.r.Do(ctx, cmd).AsScanEntry()
 	if err != nil {
 		return nil, err
