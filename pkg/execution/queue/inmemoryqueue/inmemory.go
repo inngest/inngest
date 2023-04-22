@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/go-redis/redis/v8"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/rueian/rueidis"
 )
 
 func init() {
@@ -19,16 +19,25 @@ func New() queue.Queue {
 	r := miniredis.NewMiniRedis()
 	_ = r.Start()
 
-	rc := redis.NewClient(&redis.Options{
-		Addr:     r.Addr(),
-		PoolSize: 100,
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
+	if err != nil {
+		panic(err.Error())
+	}
 	go func() {
 		for range time.Tick(time.Second) {
 			r.FastForward(time.Second)
 		}
 	}()
-	return redis_state.NewQueue(rc, redis_state.WithNumWorkers(100))
+	return redis_state.NewQueue(
+		rc,
+		redis_state.WithNumWorkers(100),
+		redis_state.WithQueueKeyGenerator(redis_state.DefaultQueueKeyGenerator{
+			Prefix: "{root}",
+		}),
+	)
 }
 
 type Config struct {
