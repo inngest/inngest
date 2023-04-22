@@ -49,7 +49,7 @@ type Event struct {
 	// Data is a key-value map of data belonging to the event.  This should
 	// include all relevant data.  For example, a "signup.new" event may include
 	// the user's email, their plan information, the signup method, etc.
-	Data map[string]interface{} `json:"data"`
+	Data any `json:"data"`
 
 	// User is a key-value map of data belonging to the user that authored the
 	// event.  This data will be upserted into the contact store.

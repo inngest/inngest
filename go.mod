@@ -22,7 +22,6 @@ require (
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-chi/cors v1.2.1
 	github.com/go-git/go-git/v5 v5.4.2
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/goccy/go-json v0.10.0
 	github.com/golang/mock v1.6.0
 	github.com/google/cel-go v0.11.4
@@ -33,7 +32,7 @@ require (
 	github.com/hashicorp/terraform v0.15.3
 	github.com/inngest/cuetypescript v0.0.0-20220302153725-a00e933fdf87
 	github.com/inngest/event-schemas v0.0.0-20220323133008-96be406e1ea4
-	github.com/inngest/inngestgo v0.4.0
+	github.com/inngest/inngestgo v0.4.3-0.20230422124325-038ad9913809
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/joho/godotenv v1.3.0
 	github.com/karrick/godirwalk v1.17.0
@@ -108,7 +107,6 @@ require (
 	github.com/containerd/containerd v1.6.0-rc.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
 	github.com/docker/docker v20.10.7+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
