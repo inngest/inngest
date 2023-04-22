@@ -15,12 +15,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	defaultQueueKey.Prefix = "{queue}"
+}
+
 const testPriority = PriorityDefault
 
 func TestQueueEnqueueItem(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -129,7 +134,8 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -179,7 +185,8 @@ func TestQueuePeek(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -289,7 +296,8 @@ func TestQueueLease(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -469,7 +477,8 @@ func TestQueueExtendLease(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -546,7 +555,8 @@ func TestQueueDequeue(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -618,7 +628,8 @@ func TestQueueRequeue(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -691,7 +702,8 @@ func TestQueuePartitionLease(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -795,7 +807,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -863,7 +876,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 		r := miniredis.RunT(t)
 
 		rc, err := rueidis.NewClient(rueidis.ClientOption{
-			InitAddress: []string{r.Addr()},
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
 		})
 		require.NoError(t, err)
 		defer rc.Close()
@@ -906,7 +920,8 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -978,7 +993,8 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -1017,7 +1033,8 @@ func TestQueueLeaseSequential(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()

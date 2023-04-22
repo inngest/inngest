@@ -39,12 +39,12 @@ local partitionName        = ARGV[7]
 if check_concurrency(currentTime, partitionConcurrencyKey, partitionConcurrency) <= 0 then
 	return 3
 end
-if accountConcurrencyKey ~= "" then
+if accountConcurrency > 0 then
 	if check_concurrency(currentTime, accountConcurrencyKey, accountConcurrency) <= 0 then
 		return 3
 	end
 end
-if customConcurrencyKey ~= "" then
+if customConcurrency > 0 then
 	if check_concurrency(currentTime, customConcurrencyKey, customConcurrency) <= 0 then
 		return 3
 	end
@@ -75,10 +75,14 @@ redis.call("HSET", queueKey, queueID, cjson.encode(item))
 
 -- Add the item to all concurrency keys
 redis.call("ZADD", partitionConcurrencyKey, nextTime, item.id)
-if accountConcurrencyKey ~= nil and accountConcurrencyKey ~= "" then
+
+-- NOTE: We check if concurrency > 0 here because this disables concurrency.  AccountID
+-- and custom concurrency items may not be set, but the keys need to be set for clustered
+-- mode.
+if accountConcurrency > 0 then
 	redis.call("ZADD", accountConcurrencyKey, nextTime, item.id)
 end
-if customConcurrencyKey ~= nil and customConcurrencyKey ~= "" then
+if customConcurrency > 0 then
 	redis.call("ZADD", customConcurrencyKey, nextTime, item.id)
 end
 

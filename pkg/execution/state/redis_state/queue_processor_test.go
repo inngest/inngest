@@ -20,11 +20,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	defaultQueueKey.Prefix = "{queue}"
+}
+
 func TestQueueRunSequential(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -96,7 +101,8 @@ func TestQueueRunBasic(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -188,7 +194,8 @@ func TestQueueRunRetry(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
@@ -262,7 +269,8 @@ func TestQueueRunExtended(t *testing.T) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()

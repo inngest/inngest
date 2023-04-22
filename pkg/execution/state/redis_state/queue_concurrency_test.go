@@ -17,12 +17,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	defaultQueueKey.Prefix = "{queue}"
+}
+
 func TestQueuePartitionConcurrency(t *testing.T) {
 
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress: []string{r.Addr()},
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
 	})
 	require.NoError(t, err)
 	defer rc.Close()
