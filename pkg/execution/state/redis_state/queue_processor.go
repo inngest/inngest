@@ -648,7 +648,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 			at := backoff.DefaultBackoff(qi.Data.Attempt)
 			qi.Data.Attempt += 1
 			qi.AtMS = at.UnixMilli()
-			q.logger.Warn().Err(err).Int64("at_ms", at.UnixMilli()).Msg("requeuing job")
+			q.logger.Warn().Err(err).
+				Str("queue", qi.Queue()).
+				Int64("at_ms", at.UnixMilli()).
+				Msg("requeuing job")
 			if err := q.Requeue(ctx, p, qi, at); err != nil {
 				q.logger.Error().Err(err).Interface("item", qi).Msg("error requeuing job")
 				return err
