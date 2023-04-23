@@ -1,76 +1,53 @@
 # Deploying
 
-Follow along to learn:
+Inngest allows you to host your function code on any platform then invokes your functions via HTTP. To deploy functions to Inngest, all you need to do is tell Inngest _where_ to find them!
 
-- How to deploy to your platform of choice
-- How to register your functions with Inngest after your deploy
+## How functions are "deployed"
 
+Since your code is hosted on another platform, you need to **register** _where_ your functions are hosted with Inngest. For example, if you set up the `serve` handler ([see docs](/docs/sdk/serve)) at `/api/inngest`, and your domain is `https://myapp.com`, you'll need to inform Inngest that your functions are hosted at `https://myapp.com/api/inngest`.
 
-## Deploying to your platform
+You need to do this every time your functions are updated so Inngest can register the latest versions of your functions.
 
-Firstly, you need to deploy functions as an API to your platform.  Depending on your platform of choice,
-you'll want to deploy Inngest's serve functionality as a single serverless function available via HTTP.
+![How deploying Inngest functions works](/assets/docs/deploy/how-deploying-works.png)
 
-<Note>
+<Callout>
 
-💁 Inngest deploys a single serverless API endpoint that hosts all registered functions
+Inngest uses the `INNGEST_SIGNING_KEY` to securely communicate with your application and identify the correct environment to register your functions.
 
-</Note>
+</Callout>
 
-## Registering live functions with Inngest
+## How to deploy
 
-Now that your function API is live, we need to let Inngest know which functions you’ve deployed; which events or schedules cause them to run; and the URL in which they’re hosted.
-
-
-There are several ways you can register your functions with Inngest:
-
-### Registering automatically
-
-Automatically deploy your Inngest functions on each deployment of your site. If your platform isn't listed, you can still register using the methods below!
+### Deploying automatically with an integration
 
 <ButtonCol>
 <ButtonDeploy href="/docs/deploy/vercel?ref=docs-deploy" type="vercel" label="Learn how to install our official Vercel integration" />
 <ButtonDeploy href="/docs/deploy/vercel?ref=docs-deploy" type="netlify" label="Learn how to install our official Netlify integration" />
 </ButtonCol>
 
-### Registering via the UI
+### Deploying manually via the Inngest dashboard
 
-You can add your endpoint’s URL to Inngest via the dashboard:
+1. Deploy your application with it's `serve` handler endpoint to the platform of your choosing.
+2. In the Inngest dashboard, select your environment (e.g. "Production").
+3. Select the "Deploys" tab at the top then the "Deploy" button at the top right.
+4. Within the modal add the full URL where your `serve` handler is set up and click "Deploy."
 
-<video controls autoPlay loop muted>
-  <source
-    src="/assets/docs/sdk-deploy.mp4"
-    type="video/mp4"
-  />
-</video>
+![How deploying Inngest functions works](/assets/docs/deploy/dashboard-deploy-modal.png)
 
+### Deploying manually via curl
 
-
-### Registering via the API
-
-You can register your function’s endpoints with a single PUT call to your function endpoint:
+If you're prefer to deploy from your machine or automate this within a CI/CD pipeline, you can send a simple `PUT` request to your own application's `serve` endpoint:
 
 ```bash
-curl -X PUT https://www.example.com/api/inngest
+curl -X PUT https://myapp.com/api/inngest
 ```
 
-This can be built in to your CI/CD process so that *after your site has deployed* you make this call to register your functions.  The guides for each platform talk about how to do this in more detail.
+This request will trigger your application to register your functions with the Inngest API, securely, using your environment's `INNGEST_SIGNING_KEY`.
 
-If, for some reason, you can’t create a PUT call to your endpoint you can register functions via Inngest’s own API by sending the URL in a PUT request:
+<Callout>
 
-```bash
-curl -X PUT --data '{"url":"https://www.example.com/api/inngest"}' https://api.inngest.com/fn/register
-```
+**Tip** - You'll need to ensure that the latest version of your application is live on your platform before registering with Inngest. Some platforms have rolling deploys that take seconds or minutes until the latest version of your application is live.
 
-<aside>
+This is especially important when setting up your own automated process.
 
-💁 You'll need to register your functions with Inngest after each deploy.  This can be automated for each platform you deploy to.
-
-</aside>
-
-
-## Next up
-
-This getting started guide has shown you how to write functions, send events to trigger them, deploy them, and register the functions with Inngest.
-
-From here, read our in-depth platform guides to learn how Inngest works for your platform of choice.
+</Callout>
