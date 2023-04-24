@@ -1,6 +1,7 @@
 package redis_state
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/inngest"
@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/inmemory"
 	"github.com/oklog/ulid/v2"
+	"github.com/rueian/rueidis"
 )
 
 //go:embed lua/*
@@ -26,7 +27,7 @@ var embedded embed.FS
 
 var (
 	// scripts stores all embedded lua scripts on initialization
-	scripts = map[string]*redis.Script{}
+	scripts = map[string]*rueidis.Lua{}
 	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
 )
 
@@ -76,7 +77,7 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 				val = strings.ReplaceAll(val, include[0], string(byt))
 			}
 		}
-		scripts[name] = redis.NewScript(val)
+		scripts[name] = rueidis.NewLuaScript(val)
 	}
 }
 
@@ -85,7 +86,7 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 type Config struct {
 	// DSN contains the entire configuration in a single string, if
 	// provided (eg. redis://user:pass@host:port/db)
-	DSN *string
+	// DSN *string
 
 	Host       string
 	Port       int
@@ -112,30 +113,28 @@ func (c Config) Manager(ctx context.Context) (state.Manager, error) {
 
 	return New(
 		ctx,
-		WithConnectOpts(*opts),
-		WithExpiration(c.Expiry),
+		WithConnectOpts(opts),
 		WithKeyGenerator(DefaultKeyFunc{Prefix: c.KeyPrefix}),
 	)
 }
 
-func (c Config) ConnectOpts() (*redis.Options, error) {
-	if c.DSN != nil {
-		return redis.ParseURL(*c.DSN)
-	}
+func (c Config) ConnectOpts() (rueidis.ClientOption, error) {
+	// TODO
+	// if c.DSN != nil {
+	// 	return redis.ParseURL(*c.DSN)
+	// }
 
-	opts := redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", c.Host, c.Port),
-		DB:       c.DB,
-		Username: c.Username,
-		Password: c.Password,
+	opts := rueidis.ClientOption{
+		InitAddress: []string{fmt.Sprintf("%s:%d", c.Host, c.Port)},
+		ShuffleInit: true,
+		SelectDB:    c.DB,
+		Username:    c.Username,
+		Password:    c.Password,
 	}
-	if c.MaxRetries != nil {
-		opts.MaxRetries = *c.MaxRetries
-	}
-	if c.PoolSize != nil {
-		opts.PoolSize = *c.PoolSize
-	}
-	return &opts, nil
+	// if c.PoolSize != nil {
+	// 	opts.PoolSize = *c.PoolSize
+	// }
+	return opts, nil
 }
 
 // Opt represents an option to use when creating a redis-backed state store.
@@ -155,20 +154,27 @@ func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 	}
 
 	if m.r == nil {
-		m.r = redis.NewClient(&redis.Options{
-			Addr:     "localhost:6379",
-			Password: "",
-			DB:       0,
+		var err error
+		m.r, err = rueidis.NewClient(rueidis.ClientOption{
+			InitAddress: []string{"localhost:6379"},
+			Password:    "",
 		})
+		return m, err
 	}
 
-	return m, m.r.Ping(ctx).Err()
+	return m, nil
 }
 
 // WithConnectOpts allows you to customize the options used to connect to Redis.
-func WithConnectOpts(o redis.Options) Opt {
+//
+// This panics if the client cannot connect.
+func WithConnectOpts(o rueidis.ClientOption) Opt {
 	return func(m *mgr) {
-		m.r = redis.NewClient(&o)
+		var err error
+		m.r, err = rueidis.NewClient(o)
+		if err != nil {
+			panic(fmt.Errorf("unable to connect to redis with client opts: %w", err))
+		}
 	}
 }
 
@@ -182,7 +188,7 @@ func WithKeyPrefix(prefix string) Opt {
 }
 
 // WithRedisClient uses an already connected redis client.
-func WithRedisClient(r redis.UniversalClient) Opt {
+func WithRedisClient(r rueidis.Client) Opt {
 	return func(m *mgr) {
 		m.r = r
 	}
@@ -196,13 +202,6 @@ func WithKeyGenerator(kf KeyGenerator) Opt {
 	}
 }
 
-// WithExpiration specifies the TTL to use when setting values in Redis.
-func WithExpiration(ttl time.Duration) Opt {
-	return func(m *mgr) {
-		m.expiry = ttl
-	}
-}
-
 // WithOnComplete supplies a callback which is triggered any time a function
 // run completes.
 func WithFunctionCallbacks(f ...state.FunctionCallback) Opt {
@@ -212,9 +211,8 @@ func WithFunctionCallbacks(f ...state.FunctionCallback) Opt {
 }
 
 type mgr struct {
-	expiry time.Duration
-	kf     KeyGenerator
-	r      redis.UniversalClient
+	kf KeyGenerator
+	r  rueidis.Client
 
 	callbacks []state.FunctionCallback
 }
@@ -269,7 +267,19 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	history.Identifier = input.Identifier
 	history.CreatedAt = time.UnixMilli(int64(input.Identifier.RunID.Time()))
 
-	status, err := scripts["new"].Eval(
+	args, err := StrSlice([]any{
+		event,
+		workflow,
+		metadataByt,
+		stepsByt,
+		history,
+		history.CreatedAt.UnixMilli(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	status, err := scripts["new"].Exec(
 		ctx,
 		m.r,
 		[]string{
@@ -280,14 +290,8 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			m.kf.Actions(ctx, input.Identifier),
 			m.kf.History(ctx, input.Identifier.RunID),
 		},
-		event,
-		workflow,
-		metadataByt,
-		stepsByt,
-		m.expiry,
-		history,
-		history.CreatedAt.UnixMilli(),
-	).Int64()
+		args,
+	).AsInt64()
 
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
@@ -312,15 +316,17 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 }
 
 func (m mgr) IsComplete(ctx context.Context, runID ulid.ULID) (bool, error) {
-	val, err := m.r.HGet(ctx, m.kf.RunMetadata(ctx, runID), "pending").Result()
+	cmd := m.r.B().Hget().Key(m.kf.RunMetadata(ctx, runID)).Field("pending").Build()
+	val, err := m.r.Do(ctx, cmd).AsBytes()
 	if err != nil {
 		return false, err
 	}
-	return val == "0", nil
+	return bytes.Equal(val, []byte("0")), nil
 }
 
 func (m mgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error) {
-	val, err := m.r.HGetAll(ctx, m.kf.RunMetadata(ctx, runID)).Result()
+	cmd := m.r.B().Hgetall().Key(m.kf.RunMetadata(ctx, runID)).Build()
+	val, err := m.r.Do(ctx, cmd).AsStrMap()
 	if err != nil {
 		return nil, err
 	}
@@ -329,10 +335,8 @@ func (m mgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error
 
 func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 	now := time.Now()
-	status, err := scripts["cancel"].Eval(
-		ctx,
-		m.r,
-		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
+
+	args, err := StrSlice([]any{
 		state.History{
 			ID:         state.HistoryID(),
 			GroupID:    state.GroupIDFromContext(ctx),
@@ -341,7 +345,17 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 			CreatedAt:  now,
 		},
 		now.UnixMilli(),
-	).Int64()
+	})
+	if err != nil {
+		return err
+	}
+
+	status, err := scripts["cancel"].Exec(
+		ctx,
+		m.r,
+		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
+		args,
+	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error cancelling: %w", err)
 	}
@@ -361,11 +375,9 @@ func (m mgr) Cancel(ctx context.Context, id state.Identifier) error {
 
 func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.RunStatus) error {
 	now := time.Now()
-	ret, err := scripts["setStatus"].Eval(
-		ctx,
-		m.r,
-		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
-		status,
+
+	args, err := StrSlice([]any{
+		int(status),
 		state.History{
 			ID:         state.HistoryID(),
 			GroupID:    state.GroupIDFromContext(ctx),
@@ -377,7 +389,17 @@ func (m mgr) SetStatus(ctx context.Context, id state.Identifier, status enums.Ru
 			},
 		},
 		now.UnixMilli(),
-	).Int64()
+	})
+	if err != nil {
+		return err
+	}
+
+	ret, err := scripts["setStatus"].Exec(
+		ctx,
+		m.r,
+		[]string{m.kf.RunMetadata(ctx, id.RunID), m.kf.History(ctx, id.RunID)},
+		args,
+	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error cancelling: %w", err)
 	}
@@ -407,7 +429,8 @@ func (m mgr) Workflow(ctx context.Context, runID ulid.ULID) (*inngest.Workflow, 
 
 func (m mgr) workflow(ctx context.Context, md *runMetadata) (*inngest.Workflow, error) {
 	// Load the workflow.
-	byt, err := m.r.Get(ctx, m.kf.Workflow(ctx, md.Identifier.WorkflowID, md.Identifier.WorkflowVersion)).Bytes()
+	cmd := m.r.B().Get().Key(m.kf.Workflow(ctx, md.Identifier.WorkflowID, md.Identifier.WorkflowVersion)).Build()
+	byt, err := m.r.Do(ctx, cmd).AsBytes()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load workflow; %w", err)
 	}
@@ -424,6 +447,7 @@ func (m mgr) workflow(ctx context.Context, md *runMetadata) (*inngest.Workflow, 
 
 func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	// XXX: Use a pipeliner to improve speed.
+
 	metadata, err := m.metadata(ctx, runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load metadata; %w", err)
@@ -436,7 +460,8 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	id := metadata.Identifier
 
 	// Load the event.
-	byt, err := m.r.Get(ctx, m.kf.Event(ctx, id)).Bytes()
+	cmd := m.r.B().Get().Key(m.kf.Event(ctx, id)).Build()
+	byt, err := m.r.Do(ctx, cmd).AsBytes()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get event; %w", err)
 	}
@@ -446,7 +471,8 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	}
 
 	// Load the actions.  This is a map of step IDs to JSON-encoded results.
-	rmap, err := m.r.HGetAll(ctx, m.kf.Actions(ctx, id)).Result()
+	cmd = m.r.B().Hgetall().Key(m.kf.Actions(ctx, id)).Build()
+	rmap, err := m.r.Do(ctx, cmd).AsStrMap()
 	if err != nil {
 		return nil, fmt.Errorf("failed loading actions; %w", err)
 	}
@@ -462,7 +488,8 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 
 	// Load the errors.  This is a map of step IDs to error strings.
 	// The original error type is not preserved.
-	rmap, err = m.r.HGetAll(ctx, m.kf.Errors(ctx, id)).Result()
+	cmd = m.r.B().Hgetall().Key(m.kf.Errors(ctx, id)).Build()
+	rmap, err = m.r.Do(ctx, cmd).AsStrMap()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load errors; %w", err)
 	}
@@ -473,13 +500,21 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 
 	meta := metadata.Metadata()
 
-	stack := m.r.LRange(ctx, m.kf.Stack(ctx, id.RunID), 0, -1).Val()
+	cmd = m.r.B().Lrange().Key(m.kf.Stack(ctx, id.RunID)).Start(0).Stop(-1).Build()
+	stack, err := m.r.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error fetching stack: %w", err)
+	}
 
 	return inmemory.NewStateInstance(*w, id, meta, event, actions, errors, stack), nil
 }
 
 func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {
-	stack := m.r.LRange(ctx, m.kf.Stack(ctx, runID), 0, -1).Val()
+	cmd := m.r.B().Lrange().Key(m.kf.Stack(ctx, runID)).Start(0).Stop(-1).Build()
+	stack, err := m.r.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		return 0, err
+	}
 	if len(stack) == 0 {
 		return 0, nil
 	}
@@ -546,7 +581,20 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		},
 	}
 
-	index, err := scripts["saveResponse"].Eval(
+	args, err := StrSlice([]any{
+		data,
+		r.Step.ID,
+		r.Err != nil,
+		r.Final(),
+		stepHistory,
+		funcFailHistory,
+		now.UnixMilli(),
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	index, err := scripts["saveResponse"].Exec(
 		ctx,
 		m.r,
 		[]string{
@@ -556,14 +604,8 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 			m.kf.History(ctx, i.RunID),
 			m.kf.Stack(ctx, i.RunID),
 		},
-		data,
-		r.Step.ID,
-		r.Err != nil,
-		r.Final(),
-		stepHistory,
-		funcFailHistory,
-		now.UnixMilli(),
-	).Int()
+		args,
+	).AsInt64()
 	if err != nil {
 		return 0, fmt.Errorf("error saving response: %w", err)
 	}
@@ -573,26 +615,31 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		go m.runCallbacks(ctx, i, enums.RunStatusFailed)
 	}
 
-	return index, nil
+	return int(index), nil
 }
 
 func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, attempt int) error {
 	now := time.Now()
-
-	return m.r.ZAdd(ctx, m.kf.History(ctx, id.RunID), &redis.Z{
-		Score: float64(now.UnixMilli()),
-		Member: state.History{
-			ID:         state.HistoryID(),
-			GroupID:    state.GroupIDFromContext(ctx),
-			Type:       enums.HistoryTypeStepStarted,
-			Identifier: id,
-			CreatedAt:  now,
-			Data: state.HistoryStep{
-				ID:      stepID,
-				Attempt: attempt,
-			},
+	byt, err := json.Marshal(state.History{
+		ID:         state.HistoryID(),
+		GroupID:    state.GroupIDFromContext(ctx),
+		Type:       enums.HistoryTypeStepStarted,
+		Identifier: id,
+		CreatedAt:  now,
+		Data: state.HistoryStep{
+			ID:      stepID,
+			Attempt: attempt,
 		},
-	}).Err()
+	})
+	if err != nil {
+		return err
+	}
+	cmd := m.r.B().Zadd().
+		Key(m.kf.History(ctx, id.RunID)).
+		ScoreMember().
+		ScoreMember(float64(now.UnixMilli()), string(byt)).
+		Build()
+	return m.r.Do(ctx, cmd).Error()
 }
 
 func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
@@ -603,10 +650,7 @@ func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, a
 		at = nil
 	}
 
-	err := scripts["scheduled"].Eval(
-		ctx,
-		m.r,
-		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
+	args, err := StrSlice([]any{
 		state.History{
 			ID:         state.HistoryID(),
 			GroupID:    state.GroupIDFromContext(ctx),
@@ -620,7 +664,17 @@ func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, a
 			},
 		},
 		now.UnixMilli(),
-	).Err()
+	})
+	if err != nil {
+		return err
+	}
+
+	err = scripts["scheduled"].Exec(
+		ctx,
+		m.r,
+		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
+		args,
+	).Error()
 	if err != nil {
 		return fmt.Errorf("error updating scheduled state: %w", err)
 	}
@@ -642,10 +696,7 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, a
 		history = enums.HistoryTypeFunctionFailed
 	}
 
-	status, err := scripts["finalize"].Eval(
-		ctx,
-		m.r,
-		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
+	args, err := StrSlice([]any{
 		state.History{
 			ID: state.HistoryID(),
 			// Function completions have no group ID.
@@ -655,7 +706,17 @@ func (m mgr) Finalized(ctx context.Context, i state.Identifier, stepID string, a
 		},
 		now.UnixMilli(),
 		int(finalStatus),
-	).Int64()
+	})
+	if err != nil {
+		return err
+	}
+
+	status, err := scripts["finalize"].Exec(
+		ctx,
+		m.r,
+		[]string{m.kf.RunMetadata(ctx, i.RunID), m.kf.History(ctx, i.RunID)},
+		args,
+	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error finalizing: %w", err)
 	}
@@ -710,21 +771,27 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		},
 	}
 
-	status, err := scripts["savePause"].Eval(
-		ctx,
-		m.r,
-		keys,
-
+	args, err := StrSlice([]any{
 		string(packed),
 		p.ID.String(),
 		evt,
 		int(time.Until(p.Expires.Time()).Seconds()),
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
-		int(time.Until(p.Expires.Time().Add(10*time.Minute)).Seconds()),
+		int(time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()),
 		log,
 		now.UnixMilli(),
-	).Int64()
+	})
+	if err != nil {
+		return err
+	}
+
+	status, err := scripts["savePause"].Exec(
+		ctx,
+		m.r,
+		keys,
+		args,
+	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error finalizing: %w", err)
 	}
@@ -738,13 +805,20 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 }
 
 func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
-	status, err := scripts["leasePause"].Eval(
+	args, err := StrSlice([]any{
+		time.Now().UnixMilli(),
+		state.PauseLeaseDuration.Seconds(),
+	})
+	if err != nil {
+		return err
+	}
+
+	status, err := scripts["leasePause"].Exec(
 		ctx,
 		m.r,
 		[]string{m.kf.PauseID(ctx, id), m.kf.PauseLease(ctx, id)},
-		time.Now().UnixMilli(),
-		state.PauseLeaseDuration.Seconds(),
-	).Int64()
+		args,
+	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error leasing pause: %w", err)
 	}
@@ -771,7 +845,9 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		return fmt.Errorf("cannot marshal data to store in state: %w", err)
 	}
 
-	eventKey := ""
+	// Add a default event here, which is null and overwritten by everything.  This is necessary
+	// to keep the same cluster key.
+	eventKey := m.kf.PauseEvent(ctx, p.WorkspaceID, "-")
 	if p.Event != nil {
 		eventKey = m.kf.PauseEvent(ctx, p.WorkspaceID, *p.Event)
 	}
@@ -803,17 +879,23 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 		},
 	}
 
-	status, err := scripts["consumePause"].Eval(
-		ctx,
-		m.r,
-		keys,
-
+	args, err := StrSlice([]any{
 		id.String(),
 		p.DataKey,
 		string(marshalledData),
 		log,
 		now.UnixMilli(),
-	).Int64()
+	})
+	if err != nil {
+		return err
+	}
+
+	status, err := scripts["consumePause"].Exec(
+		ctx,
+		m.r,
+		keys,
+		args,
+	).AsInt64()
 	if err != nil {
 		return fmt.Errorf("error consuming pause: %w", err)
 	}
@@ -829,22 +911,18 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 
 // PausesByEvent returns all pauses for a given event within a workspace.
 func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
-	cmd := m.r.HScan(ctx, m.kf.PauseEvent(ctx, workspaceID, event), 0, "", 0)
-	if err := cmd.Err(); err != nil {
+	cmd := m.r.B().Hscan().Key(m.kf.PauseEvent(ctx, workspaceID, event)).Cursor(0).Build()
+	scan, err := m.r.Do(ctx, cmd).AsScanEntry()
+	if err != nil {
 		return nil, err
 	}
-
-	i := cmd.Iterator()
-	if i == nil {
-		return nil, fmt.Errorf("unable to create event iterator")
-	}
-
-	return &iter{ri: i}, nil
+	return &iter{i: -1, vals: scan}, nil
 }
 
 func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) {
-	str, err := m.r.Get(ctx, m.kf.PauseID(ctx, id)).Result()
-	if err == redis.Nil {
+	cmd := m.r.B().Get().Key(m.kf.PauseID(ctx, id)).Build()
+	str, err := m.r.Do(ctx, cmd).ToString()
+	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
 	}
 	if err != nil {
@@ -861,8 +939,10 @@ func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) 
 // has deferred results which must be continued by resuming the specific pause set
 // up for the given step ID.
 func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID string) (*state.Pause, error) {
-	str, err := m.r.Get(ctx, m.kf.PauseStep(ctx, i, actionID)).Result()
-	if err == redis.Nil {
+	cmd := m.r.B().Get().Key(m.kf.PauseStep(ctx, i, actionID)).Build()
+	str, err := m.r.Do(ctx, cmd).ToString()
+
+	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
 	}
 	if err != nil {
@@ -874,8 +954,10 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 		return nil, err
 	}
 
-	str, err = m.r.Get(ctx, m.kf.PauseID(ctx, id)).Result()
-	if err == redis.Nil {
+	cmd = m.r.B().Get().Key(m.kf.PauseID(ctx, id)).Build()
+	byt, err := m.r.Do(ctx, cmd).AsBytes()
+
+	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
 	}
 	if err != nil {
@@ -883,17 +965,13 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 	}
 
 	pause := &state.Pause{}
-	err = json.Unmarshal([]byte(str), pause)
+	err = json.Unmarshal(byt, pause)
 	return pause, err
 }
 
 func (m mgr) History(ctx context.Context, runID ulid.ULID) ([]state.History, error) {
-	items, err := m.r.ZRangeArgs(ctx, redis.ZRangeArgs{
-		Key:     m.kf.History(ctx, runID),
-		Start:   "-inf",
-		Stop:    "+inf",
-		ByScore: true,
-	}).Result()
+	cmd := m.r.B().Zrange().Key(m.kf.History(ctx, runID)).Min("-inf").Max("+inf").Byscore().Build()
+	items, err := m.r.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return nil, err
 	}
@@ -917,12 +995,9 @@ func (m mgr) DeleteHistory(ctx context.Context, runID ulid.ULID, historyID ulid.
 	// XXX: We can make this more efficient by recording a map and zset as separate
 	// keys.
 	key := m.kf.History(ctx, runID)
-	items, err := m.r.ZRangeArgs(ctx, redis.ZRangeArgs{
-		Key:     key,
-		Start:   "-inf",
-		Stop:    "+inf",
-		ByScore: true,
-	}).Result()
+
+	cmd := m.r.B().Zrange().Key(key).Min("-inf").Max("+inf").Byscore().Build()
+	items, err := m.r.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return err
 	}
@@ -934,7 +1009,8 @@ func (m mgr) DeleteHistory(ctx context.Context, runID ulid.ULID, historyID ulid.
 			return err
 		}
 		if h.ID == historyID {
-			if err := m.r.ZRem(ctx, key, i).Err(); err != nil {
+			cmd = m.r.B().Zrem().Key(key).Member(i).Build()
+			if err := m.r.Do(ctx, cmd).Error(); err != nil {
 				return err
 			}
 			return nil
@@ -946,10 +1022,18 @@ func (m mgr) DeleteHistory(ctx context.Context, runID ulid.ULID, historyID ulid.
 
 func (m mgr) SaveHistory(ctx context.Context, i state.Identifier, h state.History) error {
 	hkey := m.kf.History(ctx, i.RunID)
-	return m.r.ZAdd(ctx, hkey, &redis.Z{
-		Score:  float64(h.CreatedAt.UnixMilli()),
-		Member: h,
-	}).Err()
+
+	byt, err := json.Marshal(h)
+	if err != nil {
+		return err
+	}
+
+	cmd := m.r.B().Zadd().
+		Key(hkey).
+		ScoreMember().
+		ScoreMember(float64(h.CreatedAt.UnixMilli()), string(byt)).
+		Build()
+	return m.r.Do(ctx, cmd).Error()
 }
 
 func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums.RunStatus) {
@@ -963,23 +1047,34 @@ func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums
 }
 
 type iter struct {
-	ri *redis.ScanIterator
+	i    int
+	vals rueidis.ScanEntry
 }
 
 func (i *iter) Next(ctx context.Context) bool {
-	// Skip over the key;  we're using HScan which returns key then value.
-	_ = i.ri.Next(ctx)
-	return i.ri.Next(ctx)
+	if len(i.vals.Elements) == 0 || i.i >= (len(i.vals.Elements)-1) {
+		return false
+	}
+	// Skip the ID
+	i.i++
+	// Get the value.
+	i.i++
+	return true
 }
 
 func (i *iter) Val(ctx context.Context) *state.Pause {
-	val := i.ri.Val()
+	if i.i == -1 || i.i >= len(i.vals.Elements) {
+		return nil
+	}
+
+	val := i.vals.Elements[i.i]
 	if val == "" {
 		return nil
 	}
 
 	pause := &state.Pause{}
-	if err := json.Unmarshal([]byte(val), pause); err != nil {
+	err := json.Unmarshal([]byte(val), pause)
+	if err != nil {
 		return nil
 	}
 	return pause
@@ -1089,4 +1184,37 @@ type output map[string]any
 
 func (o output) MarshalBinary() ([]byte, error) {
 	return json.Marshal(o)
+}
+
+func StrSlice(args []any) ([]string, error) {
+	res := make([]string, len(args))
+	for i, item := range args {
+		if s, ok := item.(fmt.Stringer); ok {
+			res[i] = s.String()
+			continue
+		}
+
+		switch v := item.(type) {
+		case string:
+			res[i] = v
+		case []byte:
+			res[i] = rueidis.BinaryString(v)
+		case int:
+			res[i] = strconv.Itoa(v)
+		case bool:
+			// Use 1 and 0 to signify true/false.
+			if v {
+				res[i] = "1"
+			} else {
+				res[i] = "0"
+			}
+		default:
+			byt, err := json.Marshal(item)
+			if err != nil {
+				return nil, err
+			}
+			res[i] = rueidis.BinaryString(byt)
+		}
+	}
+	return res, nil
 }

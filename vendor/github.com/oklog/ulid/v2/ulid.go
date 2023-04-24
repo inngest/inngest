@@ -23,6 +23,7 @@ import (
 	"math"
 	"math/bits"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -119,6 +120,32 @@ func MustNew(ms uint64, entropy io.Reader) ULID {
 		panic(err)
 	}
 	return id
+}
+
+var (
+	entropy     io.Reader
+	entropyOnce sync.Once
+)
+
+// DefaultEntropy returns a thread-safe per process monotonically increasing
+// entropy source.
+func DefaultEntropy() io.Reader {
+	entropyOnce.Do(func() {
+		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+		entropy = &LockedMonotonicReader{
+			MonotonicReader: Monotonic(rng, 0),
+		}
+	})
+	return entropy
+}
+
+// Make returns an ULID with the current time in Unix milliseconds and
+// monotonically increasing entropy for the same millisecond.
+// It is safe for concurrent use, leveraging a sync.Pool underneath for minimal
+// contention.
+func Make() (id ULID) {
+	// NOTE: MustNew can't panic since DefaultEntropy never returns an error.
+	return MustNew(Now(), DefaultEntropy())
 }
 
 // Parse parses an encoded ULID, returning an error in case of failure.
@@ -234,9 +261,14 @@ func MustParseStrict(ulid string) ULID {
 	return id
 }
 
+// Bytes returns bytes slice representation of ULID.
+func (id ULID) Bytes() []byte {
+	return id[:]
+}
+
 // String returns a lexicographically sortable string encoded ULID
-// (26 characters, non-standard base 32) e.g. 01AN4Z07BY79KA1307SR9X4MV3
-// Format: tttttttttteeeeeeeeeeeeeeee where t is time and e is entropy
+// (26 characters, non-standard base 32) e.g. 01AN4Z07BY79KA1307SR9X4MV3.
+// Format: tttttttttteeeeeeeeeeeeeeee where t is time and e is entropy.
 func (id ULID) String() string {
 	ulid := make([]byte, EncodedSize)
 	_ = id.MarshalTextTo(ulid)
@@ -464,19 +496,38 @@ func (id *ULID) Scan(src interface{}) error {
 	return ErrScanValue
 }
 
-// Value implements the sql/driver.Valuer interface. This returns the value
-// represented as a byte slice. If instead a string is desirable, a wrapper
-// type can be created that calls String().
+// Value implements the sql/driver.Valuer interface, returning the ULID as a
+// slice of bytes, by invoking MarshalBinary. If your use case requires a string
+// representation instead, you can create a wrapper type that calls String()
+// instead.
 //
-//	// stringValuer wraps a ULID as a string-based driver.Valuer.
-// 	type stringValuer ULID
+//    type stringValuer ulid.ULID
 //
-//	func (id stringValuer) Value() (driver.Value, error) {
-//		return ULID(id).String(), nil
-//	}
+//    func (v stringValuer) Value() (driver.Value, error) {
+//        return ulid.ULID(v).String(), nil
+//    }
 //
-//	// Example usage.
-//	db.Exec("...", stringValuer(id))
+//    // Example usage.
+//    db.Exec("...", stringValuer(id))
+//
+// All valid ULIDs, including zero-value ULIDs, return a valid Value with a nil
+// error. If your use case requires zero-value ULIDs to return a non-nil error,
+// you can create a wrapper type that special-cases this behavior.
+//
+//    var zeroValueULID ulid.ULID
+//
+//    type invalidZeroValuer ulid.ULID
+//
+//    func (v invalidZeroValuer) Value() (driver.Value, error) {
+//        if ulid.ULID(v).Compare(zeroValueULID) == 0 {
+//            return nil, fmt.Errorf("zero value")
+//        }
+//        return ulid.ULID(v).Value()
+//    }
+//
+//    // Example usage.
+//    db.Exec("...", invalidZeroValuer(id))
+//
 func (id ULID) Value() (driver.Value, error) {
 	return id.MarshalBinary()
 }
@@ -507,11 +558,28 @@ func Monotonic(entropy io.Reader, inc uint64) *MonotonicEntropy {
 		m.inc = math.MaxUint32
 	}
 
-	if rng, ok := entropy.(*rand.Rand); ok {
+	if rng, ok := entropy.(rng); ok {
 		m.rng = rng
 	}
 
 	return &m
+}
+
+type rng interface{ Int63n(n int64) int64 }
+
+// LockedMonotonicReader wraps a MonotonicReader with a sync.Mutex for
+// safe concurrent use.
+type LockedMonotonicReader struct {
+	mu sync.Mutex
+	MonotonicReader
+}
+
+// MonotonicRead synchronizes calls to the wrapped MonotonicReader.
+func (r *LockedMonotonicReader) MonotonicRead(ms uint64, p []byte) (err error) {
+	r.mu.Lock()
+	err = r.MonotonicReader.MonotonicRead(ms, p)
+	r.mu.Unlock()
+	return err
 }
 
 // MonotonicEntropy is an opaque type that provides monotonic entropy.
@@ -521,7 +589,7 @@ type MonotonicEntropy struct {
 	inc     uint64
 	entropy uint80
 	rand    [8]byte
-	rng     *rand.Rand
+	rng     rng
 }
 
 // MonotonicRead implements the MonotonicReader interface.

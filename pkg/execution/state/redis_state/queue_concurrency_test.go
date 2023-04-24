@@ -9,19 +9,29 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
+	"github.com/rueian/rueidis"
 	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	defaultQueueKey.Prefix = "{queue}"
+}
 
 func TestQueuePartitionConcurrency(t *testing.T) {
 
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 50})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
 	defer rc.Close()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

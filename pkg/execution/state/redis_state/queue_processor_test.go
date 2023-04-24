@@ -10,20 +10,30 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
+	"github.com/rueian/rueidis"
 	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	defaultQueueKey.Prefix = "{queue}"
+}
+
 func TestQueueRunSequential(t *testing.T) {
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 50})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
 	defer rc.Close()
+
 	ctx := context.Background()
 
 	q1ctx, q1cancel := context.WithCancel(ctx)
@@ -89,7 +99,14 @@ func TestQueueRunBasic(t *testing.T) {
 	customQueueName := "custom-queue-name"
 
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 50})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
 	q := NewQueue(
 		rc,
 		// We can't add more than 8128 goroutines when detecting race conditions.
@@ -175,7 +192,14 @@ func TestQueueRunBasic(t *testing.T) {
 
 func TestQueueRunRetry(t *testing.T) {
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 50})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
 	q := NewQueue(
 		rc,
 		// We can't add more than 8128 goroutines when detecting race conditions.
@@ -243,7 +267,14 @@ func TestQueueRunExtended(t *testing.T) {
 
 	l := logger.From(context.Background()).Level(zerolog.InfoLevel)
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
 	defer rc.Close()
 	q := NewQueue(
 		rc,

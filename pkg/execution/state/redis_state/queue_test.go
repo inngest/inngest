@@ -7,19 +7,27 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
+	"github.com/rueian/rueidis"
 	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	defaultQueueKey.Prefix = "{queue}"
+}
 
 const testPriority = PriorityDefault
 
 func TestQueueEnqueueItem(t *testing.T) {
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
 	defer rc.Close()
 	q := NewQueue(rc)
 	ctx := context.Background()
@@ -125,7 +133,11 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 	dur := 2 * time.Second
 
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
 	defer rc.Close()
 	// Set idempotency to a second
 	q := NewQueue(rc, WithIdempotencyTTL(dur))
@@ -171,8 +183,14 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 
 func TestQueuePeek(t *testing.T) {
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
 	defer rc.Close()
+
 	q := NewQueue(rc)
 	ctx := context.Background()
 
@@ -276,8 +294,14 @@ func TestQueuePeek(t *testing.T) {
 
 func TestQueueLease(t *testing.T) {
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
 	defer rc.Close()
+
 	q := NewQueue(rc)
 	ctx := context.Background()
 
@@ -451,8 +475,14 @@ func TestQueueLease(t *testing.T) {
 
 func TestQueueExtendLease(t *testing.T) {
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
 	defer rc.Close()
+
 	q := NewQueue(rc)
 	ctx := context.Background()
 
@@ -523,8 +553,14 @@ func TestQueueExtendLease(t *testing.T) {
 
 func TestQueueDequeue(t *testing.T) {
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
 	defer rc.Close()
+
 	q := NewQueue(rc)
 	ctx := context.Background()
 
@@ -590,8 +626,14 @@ func TestQueueDequeue(t *testing.T) {
 
 func TestQueueRequeue(t *testing.T) {
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
 	defer rc.Close()
+
 	q := NewQueue(rc)
 	ctx := context.Background()
 
@@ -658,12 +700,18 @@ func TestQueuePartitionLease(t *testing.T) {
 	pA := QueuePartition{WorkflowID: idA}
 
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
 	defer rc.Close()
+
 	q := NewQueue(rc)
 	ctx := context.Background()
 
-	_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, atA)
+	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, atA)
 	require.NoError(t, err)
 	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idB}, atB)
 	require.NoError(t, err)
@@ -757,8 +805,14 @@ func TestQueuePartitionPeek(t *testing.T) {
 	atA, atB, atC := now, now.Add(time.Second), now.Add(2*time.Second)
 
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
 	defer rc.Close()
+
 	q := NewQueue(
 		rc,
 		WithPriorityFinder(func(ctx context.Context, qi QueueItem) uint {
@@ -820,7 +874,14 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 	t.Run("It ignores partitions with denylists", func(t *testing.T) {
 		r := miniredis.RunT(t)
-		rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
 		defer rc.Close()
 		q := NewQueue(
 			rc,
@@ -857,8 +918,14 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 func TestQueuePartitionRequeue(t *testing.T) {
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
 	defer rc.Close()
+
 	q := NewQueue(rc)
 	ctx := context.Background()
 	idA := uuid.New()
@@ -924,7 +991,14 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 
 	priority := PriorityMin
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
 	defer rc.Close()
 	q := NewQueue(
 		rc,
@@ -934,7 +1008,7 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	)
 	ctx := context.Background()
 
-	_, err := q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
+	_, err = q.EnqueueItem(ctx, QueueItem{WorkflowID: idA}, now)
 	require.NoError(t, err)
 
 	first := getPartition(t, r, idA)
@@ -957,7 +1031,14 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 func TestQueueLeaseSequential(t *testing.T) {
 	ctx := context.Background()
 	r := miniredis.RunT(t)
-	rc := redis.NewClient(&redis.Options{Addr: r.Addr(), PoolSize: 100})
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
 	q := queue{
 		kg: defaultQueueKey,
 		r:  rc,
@@ -968,7 +1049,6 @@ func TestQueueLeaseSequential(t *testing.T) {
 
 	var (
 		leaseID *ulid.ULID
-		err     error
 	)
 
 	t.Run("It claims sequential leases", func(t *testing.T) {

@@ -192,8 +192,8 @@ func (d DefaultQueueKeyGenerator) Idempotency(key string) string {
 
 func (d DefaultQueueKeyGenerator) Concurrency(prefix, key string) string {
 	if key == "" {
-		// None supplied.
-		return ""
+		// None supplied; this means ignore.
+		return fmt.Sprintf("%s:-", d.Prefix)
 	}
 	return fmt.Sprintf("%s:concurrency:%s:%s", d.Prefix, prefix, key)
 }

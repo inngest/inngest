@@ -102,7 +102,7 @@ func (a apiClient) Send(ctx context.Context, e Event) error {
 	defer resp.Body.Close()
 
 	switch resp.StatusCode {
-	case 200, 201:
+	case 200,201:
 		return nil
 	case 400:
 		return fmt.Errorf("invalid event data")
