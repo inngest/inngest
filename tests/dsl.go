@@ -57,6 +57,8 @@ type Test struct {
 
 func (t *Test) SetAssertions(items ...func()) {
 	t.chain = items
+	// Assert requestSteps is non-nil
+	t.requestSteps = map[string]any{}
 }
 
 // SendTrigger sends the triggering event, kicking off the function run.
@@ -82,6 +84,10 @@ func (t *Test) SetRequestEvent(event inngestgo.Event) func() {
 func (t *Test) SetRequestContext(ctx SDKCtx) func() {
 	return func() {
 		t.requestCtx = ctx
+		if t.requestCtx.Stack.Stack == nil {
+			// Normalize to a non-nil slice
+			t.requestCtx.Stack.Stack = []string{}
+		}
 	}
 }
 

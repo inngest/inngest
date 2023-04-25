@@ -133,6 +133,11 @@ caniuse-lite@^1.0.30001406:
   resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001451.tgz#2e197c698fc1373d63e1406d6607ea4617c613f1"
   integrity sha512-XY7UbUpGRatZzoRft//5xOa69/1iGJRBlrieH6QYrkKLIFn3m7OVEJ81dSrKoy2BnKsdbX5cLrOispZNYo9v2w==
 
+canonicalize@^1.0.8:
+  version "1.0.8"
+  resolved "https://registry.yarnpkg.com/canonicalize/-/canonicalize-1.0.8.tgz#24d1f1a00ed202faafd9bf8e63352cd4450c6df1"
+  integrity sha512-0CNTVCLZggSh7bc5VkX5WWPWO+cyZbNd07IHIsSXLia/eAq+r836hgk+8BKoEh7949Mda87VUOitx5OddVj64A==
+
 client-only@0.0.1:
   version "0.0.1"
   resolved "https://registry.yarnpkg.com/client-only/-/client-only-0.0.1.tgz#38bba5d403c41ab150bff64a95c85013cf73bca1"
@@ -190,17 +195,18 @@ inherits@^2.0.3:
   resolved "https://registry.yarnpkg.com/inherits/-/inherits-2.0.4.tgz#0fa2c64f932917c3433a0ded55363aae37416b7c"
   integrity sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==
 
-inngest@1.1.0:
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/inngest/-/inngest-1.1.0.tgz#55ea2d0c545859134b2a34df6145382c3ccd74d7"
-  integrity sha512-cZyZndnVIPo7yi7sfOUg7AwaoSPlpgagVVyHXMgLMZgTq241RKObodCq9isaC2SRSNOh01Y6D9W/bh06VFvu/w==
+inngest@1.7.1:
+  version "1.7.1"
+  resolved "https://registry.yarnpkg.com/inngest/-/inngest-1.7.1.tgz#4bf99f87d40e0a8b15542fb8c669ac5082eed267"
+  integrity sha512-HfXM6bbP0kkAAMA9HrD07ZEg+0hWlBLhl2bzf8HNjTNUHKTgvUeRAoHebjxLNwQcSxz0yGNd858cNfawUJ4VcQ==
   dependencies:
     buffer "^6.0.3"
+    canonicalize "^1.0.8"
     cross-fetch "^3.1.5"
     h3 "^1.0.2"
     hash.js "^1.1.7"
-    json-stringify-deterministic "^1.0.8"
     ms "^2.1.3"
+    queue-microtask "^1.2.3"
     serialize-error-cjs "^0.1.3"
     type-fest "^3.5.1"
     zod "^3.19.1"
@@ -214,11 +220,6 @@ iron-webcrypto@^0.4.0:
   version "4.0.0"
   resolved "https://registry.yarnpkg.com/js-tokens/-/js-tokens-4.0.0.tgz#19203fb59991df98e3a287050d4647cdeaf32499"
   integrity sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==
-
-json-stringify-deterministic@^1.0.8:
-  version "1.0.8"
-  resolved "https://registry.yarnpkg.com/json-stringify-deterministic/-/json-stringify-deterministic-1.0.8.tgz#675eaf26f18ebac0197c5e4d2d4dcc2ab3750948"
-  integrity sha512-rkJID3qeigo3VCrEcxX1333fTBBxW89YrdYcZexMnL/WdB8u0zctyG63e/DpahRJyrWCDhh7IQhiR7u2XEDQ4Q==
 
 loose-envify@^1.1.0:
   version "1.4.0"
@@ -287,6 +288,11 @@ postcss@8.4.14:
     nanoid "^3.3.4"
     picocolors "^1.0.0"
     source-map-js "^1.0.2"
+
+queue-microtask@^1.2.3:
+  version "1.2.3"
+  resolved "https://registry.yarnpkg.com/queue-microtask/-/queue-microtask-1.2.3.tgz#4929228bbc724dfac43e0efb058caf7b6cfb6243"
+  integrity sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==
 
 radix3@^1.0.0:
   version "1.0.0"

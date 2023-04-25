@@ -85,16 +85,9 @@ func TestSDKSteps(t *testing.T) {
 
 		test.SendTrigger(),
 
-		// Expect the first opcode planning the step
+		// Expect to run the first step immediately, no plan included.  The SDK
+		// optimizes single steps to run immediately.
 		test.ExpectRequest("Initial request plan", "step", time.Second),
-		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-			Op:   enums.OpcodeStepPlanned,
-			ID:   hashes["first step"],
-			Name: "first step",
-		}}),
-
-		// Rerun the executor, run the step
-		test.ExpectRequest("Initial request run", hashes["first step"], time.Second),
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 			Op:   enums.OpcodeStep,
 			ID:   hashes["first step"],
@@ -129,12 +122,6 @@ func TestSDKSteps(t *testing.T) {
 
 		// After the wait we should re-invoke the request _again_
 		test.ExpectRequest("Post wait", "step", 3*time.Second),
-		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-			Op:   enums.OpcodeStepPlanned,
-			ID:   hashes["second step"],
-			Name: "second step",
-		}}),
-		test.ExpectRequest("Post wait", hashes["second step"], time.Second),
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 			Op:   enums.OpcodeStep,
 			ID:   hashes["second step"],
