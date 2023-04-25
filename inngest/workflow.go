@@ -42,7 +42,7 @@ type Workflow struct {
 	Cancel   []Cancel  `json:"cancel,omitempty"`
 }
 
-type Throttle struct {
+type RateLimit struct {
 	// Count is how often the function can be called within the specified period
 	Count uint `json:"count"`
 	// Period represents the time period for throttling the function

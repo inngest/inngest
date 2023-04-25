@@ -5,11 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"os"
-	"path/filepath"
-	"reflect"
+	"net/url"
 	"sort"
-	"strconv"
 	"strings"
 
 	petname "github.com/dustinkirkland/golang-petname"
@@ -41,14 +38,20 @@ const (
 // A function may be simple (ie. only having a single step) or complex (ie. many
 // steps).  Simple functions are easy:  run the single step's action.  Complex functions
 // represent steps as a DAG, with edges between the trigger and each step.
+//
+// NOTE: As we push towards SDK-based generator functions, the notion of DAGs with arbitrary
+// non-root nodes has been temporarily removed.  Edges cannot be defined, and any steps included
+// are always ran after the trigger, eg. immediately in parallel after the event is received.
 type Function struct {
+	// V represents the configuration version.
+	V int `json:"v,omitempty"`
+
 	// Name is the descriptive name for the function
 	Name string `json:"name"`
 
-	// ID is the immutable random ID for the function.
-	ID string `json:"id"`
-
-	Concurrency int `json:"concurrency"`
+	// Concurrency allows limiting the concurrency of running functions, optionally constrained
+	// by an individual concurrency key.
+	Concurrency *Concurrency `json:"concurrency,omitempty"`
 
 	// Trigger represnets the trigger for the function.
 	Triggers []Trigger `json:"triggers"`
@@ -56,44 +59,46 @@ type Function struct {
 	// Idempotency allows the specification of an idempotency key by templating event
 	// data, eg:
 	//
-	//  `{{ event.data.order_id }}`.
+	//  `event.data.order_id`.
 	//
 	// When specified, a function will run at most once per 24 hours for the given unique
 	// key.
 	Idempotency *string `json:"idempotency,omitempty"`
 
-	// Throttle allows specifying custom throttling for the function.
-	Throttle *inngest.Throttle `json:"throttle,omitempty"`
+	// RateLimit allows specifying custom rate limiting for the function.
+	RateLimit *inngest.RateLimit `json:"rateLimit,omitempty"`
 
-	// Actions represents the actions to take for this function.  If empty, this assumes
-	// that we have a single action specified in the current directory using
-	Steps map[string]Step `json:"steps,omitempty"`
+	// Retries allows specifying the number of retries to attempt across all steps in the
+	// function.
+	Retries *int `json:"retries,omitempty"`
 
 	// Cancel specifies cancellation signals for the function
 	Cancel []Cancel `json:"cancel,omitempty"`
 
-	// dir is an internal field which maps the root directory for the function
-	dir string
+	// Actions represents the actions to take for this function.  If empty, this assumes
+	// that we have a single action specified in the current directory using
+	Steps map[string]Step `json:"steps,omitempty"`
 }
 
-type After struct {
-	// Step represents the step name to run after.
-	Step string `json:"step,omitempty"`
+// Step represents a single unit of code (action) which runs as part of a step function, in a DAG.
+type Step struct {
+	// Name is the name for the given step in a function.
+	Name string `json:"name"`
+	// URI represents how this function is invoked, eg https://example.com/api/inngest?step=foo,
+	// or arn://xyz for lambda functions.
+	URI string `json:"uri"`
 
-	// Wait represents a duration that we should wait before continuing with
-	// this step, eg. "24h" or "1h30m".
-	Wait *string `json:"wait,omitempty"`
+	// Retries optionally overrides retries for this step, allowing steps to have differing retry
+	// counts to the core function.
+	Retries *int `json:"retries"`
+	// ConcurrencyKey allows steps to share concurrency slots across multiple functions, eg. for
+	// rate limiting across multiple functions.
+	ConcurrencyKey *string `json:"concurrencyKey"`
+}
 
-	If string `json:"if,omitempty"`
-
-	// Async, when specified, indicates that we must wait for another event
-	// to be received before continuing with this step.  Note that we may
-	// specify expressions within an Async block to only continue with specific
-	// event data.
-	Async *inngest.AsyncEdgeMetadata `json:"async,omitempty"`
-
-	// TODO: support multiple steps all finishing prior to running this once.
-	// Steps []string `json:"steps,omitempty"`
+type Concurrency struct {
+	Limit int     `json:"limit"`
+	Key   *string `json:"key"`
 }
 
 // Cancel represents a cancellation signal for a function.  When specified, this
@@ -105,51 +110,14 @@ type Cancel struct {
 	If      *string `json:"if"`
 }
 
-// New returns a new, empty function with a randomly generated ID.
-func New() (*Function, error) {
-	id, err := RandomID()
-	if err != nil {
-		return nil, err
-	}
-	return &Function{
-		ID:    id,
-		Steps: map[string]Step{},
-	}, nil
-}
-
-// Dir returns the absolute directory that this function is written to
-func (f Function) Dir() string {
-	return f.dir
-}
-
 // Slug returns the function slug
 func (f Function) Slug() string {
 	return strings.ToLower(slug.Make(f.Name))
 }
 
-// MarshalCUE formats a function into canonical cue configuration.
-func (f Function) MarshalCUE() ([]byte, error) {
-	return formatCue(f)
-}
-
 // Validate returns an error if the function definition is invalid.
 func (f Function) Validate(ctx context.Context) error {
-	// Store the fn path in context for validating triggers.
-	ctx = context.WithValue(ctx, pathCtxKey, f.dir)
-
 	var err error
-	if f.ID == "" {
-		err = multierror.Append(err, fmt.Errorf("A function ID is required"))
-	}
-
-	id := f.ID
-	if strings.Contains(id, "/") {
-		id = strings.Split(id, "/")[1]
-	}
-	if slug.Make(id) != id {
-		err = multierror.Append(err, fmt.Errorf("A function ID must contain lowercase letters, numbers, and dashes only (eg. 'my-greatest-function-ef81b2')"))
-	}
-
 	if f.Name == "" {
 		err = multierror.Append(err, fmt.Errorf("A function name is required"))
 	}
@@ -162,17 +130,19 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
-	for k, step := range f.Steps {
-		if k == "" || step.ID == "" {
-			return fmt.Errorf("A step must have an ID defined")
+	for _, step := range f.Steps {
+		if step.Name == "" {
+			err = multierror.Append(err, fmt.Errorf("All steps must have a name"))
 		}
-
-		id := step.ID
-		if strings.Contains(id, "/") {
-			id = strings.Split(id, "/")[1]
+		uri, err := url.Parse(step.URI)
+		if err != nil {
+			err = multierror.Append(err, fmt.Errorf("Steps must have a valid URI"))
 		}
-		if slug.Make(id) != id {
-			err = multierror.Append(err, fmt.Errorf("A step ID must contain lowercase letters, numbers, and dashes only (eg. 'my-greatest-function-ef81b2')"))
+		switch uri.Scheme {
+		case "http", "https":
+			continue
+		default:
+			err = multierror.Append(err, fmt.Errorf("Non-HTTP steps are not yet supported"))
 		}
 	}
 
@@ -217,102 +187,9 @@ func (f Function) Validate(ctx context.Context) error {
 	return err
 }
 
-// Workflow produces the workflow.cue definition for a function.  Our executor
-// runs a "workflow", which is a DAG of the function steps.  Its a subset of
-// the function used purely for execution.
-func (f Function) Workflow(ctx context.Context) (*inngest.Workflow, error) {
-	w := inngest.Workflow{
-		Name:        f.Name,
-		ID:          f.ID,
-		Triggers:    make([]inngest.Trigger, len(f.Triggers)),
-		Concurrency: f.Concurrency,
-	}
-
-	// TODO: Refactor these into shared structs and definitions, extend.
-	// This is really ugly, and is a symptom of functions coming after
-	// workflows and not being truly first class in the executor.
-
-	for n, t := range f.Triggers {
-		if t.EventTrigger != nil {
-			w.Triggers[n].EventTrigger = &inngest.EventTrigger{
-				Event:      t.EventTrigger.Event,
-				Expression: t.EventTrigger.Expression,
-			}
-			continue
-		}
-		if t.CronTrigger != nil {
-			w.Triggers[n].CronTrigger = &inngest.CronTrigger{
-				Cron: t.CronTrigger.Cron,
-			}
-			continue
-		}
-		return nil, fmt.Errorf("unknown trigger type")
-	}
-
-	if f.Throttle != nil {
-		w.Throttle = f.Throttle
-	}
-
-	if f.Idempotency != nil {
-		w.Throttle = &inngest.Throttle{
-			Key:    f.Idempotency,
-			Count:  1,
-			Period: "24h",
-		}
-	}
-
-	for _, c := range f.Cancel {
-		w.Cancel = append(w.Cancel, inngest.Cancel{
-			Event:   c.Event,
-			Timeout: c.Timeout,
-			If:      c.If,
-		})
-	}
-
-	// This has references to actions.  Create the actions then reference them
-	// from the workflow.
-	versions, edges, err := f.Actions(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	for n, a := range versions {
-		// TODO: remove this n^n loop with a refactoring of how we consider
-		// actions to be defined within a workflow, plus data type changes.
-		var found Step
-		for _, s := range f.Steps {
-			if s.DSN(ctx, f) == a.DSN {
-				found = s
-				break
-			}
-		}
-
-		step := inngest.Step{
-			ClientID: uint(n) + 1,
-			ID:       found.ID,
-			Name:     a.Name,
-			DSN:      a.DSN,
-			Retries:  a.Retries,
-		}
-
-		if a.Version != nil {
-			step.Version = &inngest.VersionConstraint{
-				Major: &a.Version.Major,
-				Minor: &a.Version.Minor,
-			}
-		}
-
-		w.Steps = append(w.Steps, step)
-	}
-
-	w.Edges = edges
-
-	return &w, nil
-}
-
 // Actions produces configuration for each step of the function.  Each config
 // file specifies how to run the code.
-func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []inngest.Edge, error) {
+func (f Function) Actions(ctx context.Context) ([]Step, []inngest.Edge, error) {
 	// This has no defined actions, which means its an implicit
 	// single action invocation.  We assume that a Dockerfile
 	// exists in the project root, and that we can build the
@@ -322,284 +199,33 @@ func (f Function) Actions(ctx context.Context) ([]inngest.ActionVersion, []innge
 		return nil, nil, fmt.Errorf("This function has no steps")
 	}
 
-	avs := []inngest.ActionVersion{}
-	edges := []inngest.Edge{}
+	steps := make([]Step, len(f.Steps))
+	edges := make([]inngest.Edge, len(f.Steps))
 
+	n := 0
 	for _, s := range f.Steps {
-		step := s
-		av, err := f.action(ctx, step)
-		if err != nil {
-			return nil, nil, err
-		}
-		avs = append(avs, av)
-
-		// We support barebones function definitions with a single step.  Any time
-		// a single step is specified without an After block, it's ran automatically
-		// from the trigger.
-		if len(step.After) == 0 {
-			edges = append(edges, inngest.Edge{
-				Outgoing: inngest.TriggerName,
-				Incoming: step.ID,
-			})
-			continue
-		}
-
-		// For each of the "after" items, add an edge.
-		for _, after := range step.After {
-			var metadata *inngest.EdgeMetadata
-			if after.Async != nil || after.Wait != nil || after.If != "" {
-				metadata = &inngest.EdgeMetadata{
-					If:                after.If,
-					Wait:              after.Wait,
-					AsyncEdgeMetadata: after.Async,
-				}
-			}
-
-			edges = append(edges, inngest.Edge{
-				Outgoing: after.Step,
-				Incoming: step.ID,
-				Metadata: metadata,
-			})
+		steps[n] = s
+		edges[n] = inngest.Edge{
+			Outgoing: inngest.TriggerName,
+			Incoming: s.Name,
 		}
 	}
 
 	// Ensure that the actions and edges are sorted by name, giving us
 	// deterministic output.
-	sort.SliceStable(avs, func(i, j int) bool {
-		return avs[i].DSN < avs[j].DSN
+	sort.SliceStable(steps, func(i, j int) bool {
+		return steps[i].Name < steps[j].Name
 	})
 	sort.SliceStable(edges, func(i, j int) bool {
 		return edges[i].Outgoing < edges[j].Outgoing
 	})
-
-	return avs, edges, nil
-}
-
-func (f Function) action(ctx context.Context, s Step) (inngest.ActionVersion, error) {
-	id := s.DSN(ctx, f)
-
-	if s.Runtime == nil {
-		s.Runtime = &defaultRuntime
-	}
-
-	a := inngest.ActionVersion{
-		Name:    s.Name,
-		DSN:     id,
-		Runtime: *s.Runtime,
-		Retries: s.Retries,
-	}
-
-	if s.Version != nil {
-		a.Version = &inngest.VersionInfo{
-			Major: *s.Version.Major,
-			Minor: *s.Version.Minor,
-		}
-	}
-
-	if s.Runtime.Runtime == nil {
-		return a, fmt.Errorf("no runtime specified")
-	}
-	if s.Runtime.RuntimeType() != "http" {
-		// Non-HTTP actions can read secrets;  http actions are external APIs and so
-		// don't need secret access.
-		a.Scopes = []string{"secret:read:*"}
-	}
-	return a, nil
-}
-
-func (f *Function) canonicalize(ctx context.Context, path string) error {
-	f.dir = path
-	// dir should point to the dir, not the file.
-	if strings.HasSuffix(path, JsonConfigName) || strings.HasSuffix(path, CueConfigName) {
-		f.dir = filepath.Dir(path)
-	}
-
-	if f.Idempotency != nil {
-		// Replace the throttle field with idempotency.
-		f.Throttle = &inngest.Throttle{
-			Key:    f.Idempotency,
-			Count:  1,
-			Period: "24h",
-		}
-	}
-
-	if len(f.Steps) == 0 {
-		// Create the default action used when no steps are specified.
-		// This assumes that we're writing a single step function using
-		// custom code with the docker executor, and that the code is
-		// in the current directory.
-		var majorVersion uint = 1
-		var minorVersion uint = 1
-
-		f.Steps = map[string]Step{}
-		f.Steps[DefaultStepName] = Step{
-			ID:      DefaultStepName,
-			Name:    f.Name,
-			Path:    "file://.",
-			Runtime: &defaultRuntime,
-			After: []After{
-				{
-					Step: inngest.TriggerName,
-				},
-			},
-			Version: &inngest.VersionConstraint{
-				Major: &majorVersion,
-				Minor: &minorVersion,
-			},
-		}
-	}
-
-	for n, s := range f.Steps {
-		if s.Runtime == nil {
-			s.Runtime = DefaultRuntime()
-			f.Steps[n] = s
-		}
-
-		version, err := f.action(ctx, s)
-		if err != nil {
-			return err
-		}
-
-		if version.Version != nil {
-			s.Version = &inngest.VersionConstraint{
-				Major: &version.Version.Major,
-				Minor: &version.Version.Minor,
-			}
-
-			f.Steps[n] = s
-		}
-
-		if len(s.After) == 0 {
-			s.After = []After{
-				{
-					Step: inngest.TriggerName,
-				},
-			}
-			f.Steps[n] = s
-		}
-	}
-
-	return nil
-}
-
-// WriteToDisk writes the function and associated event schemas to disk.
-//
-// When we read a function's `inngest` configuration file, we parse the
-// event schemas from the triggers and add the definitions to the parsed
-// struct.
-//
-// This function creates an interim function definition file which has
-// simplified definitions for writing a consistent, small configuration
-// file.
-//
-// In essence, this performs the _opposite_ of canonicalization: instead
-// of adding defaults we remove them so that defaults aren't included
-// within the JSON file.
-func (f Function) WriteToDisk(ctx context.Context) error {
-	// For new functions, dir might be empty.
-	if f.dir == "" {
-		dirname := f.Slug()
-		relative := "./" + dirname
-		f.dir, _ = filepath.Abs(relative)
-	}
-
-	if err := f.writeTriggersToDisk(ctx); err != nil {
-		return err
-	}
-
-	// If Idempotency is set we don't need a throttle;  it's implied, and
-	// we can remove this from the config.
-	if f.Idempotency != nil {
-		f.Throttle = nil
-	}
-
-	for n, s := range f.Steps {
-		// If this is a basic docker runtime we can omit it.
-		if s.Runtime != nil {
-			ok := reflect.DeepEqual(*s.Runtime, defaultRuntime)
-			if ok {
-				// Remove this from the step.
-				s.Runtime = nil
-				f.Steps[n] = s
-			}
-		}
-
-		// If this step is "after" and it has no metadata, name, expression, etc.
-		// we can also omit this.
-		if len(s.After) == 1 {
-			ok := reflect.DeepEqual(s.After[0], defaultAfter)
-			if ok {
-				// Remove this from the step.
-				s.After = nil
-				f.Steps[n] = s
-			}
-		}
-	}
-
-	byt, err := MarshalJSON(f)
-	if err != nil {
-		return fmt.Errorf("Step '%s' already exists in this function", f.ID)
-	}
-
-	if err := os.WriteFile(filepath.Join(f.Dir(), "inngest.json"), byt, 0644); err != nil {
-		return fmt.Errorf("Step '%s' already exists in this function", f.ID)
-	}
-
-	return nil
-}
-
-func (f Function) writeTriggersToDisk(ctx context.Context) error {
-	if err := upsertDir(filepath.Join(f.dir, "events")); err != nil {
-		return fmt.Errorf("error making events directory: %w", err)
-	}
-
-	// For each event within the function create a new event file.
-	for n, trigger := range f.Triggers {
-		if trigger.EventTrigger == nil {
-			continue
-		}
-
-		if trigger.EventTrigger.Definition == nil || trigger.EventTrigger.Definition.Def == "" {
-			// Use an empty event format.
-			trigger.EventTrigger.Definition = &EventDefinition{
-				Format: FormatCue,
-				Synced: false,
-				Def:    fmt.Sprintf(evtDefinition, strconv.Quote(trigger.Event)),
-			}
-		}
-
-		cue, err := trigger.Definition.Cue(ctx)
-		if err != nil {
-			// XXX: We would like to log this as a warning.
-			continue
-		}
-
-		name := fmt.Sprintf("%s.cue", slug.Make(trigger.Event))
-		path := filepath.Join(f.dir, "events", name)
-		if err := os.WriteFile(path, []byte(cue), 0644); err != nil {
-			return fmt.Errorf("error writing event definition: %w", err)
-		}
-		f.Triggers[n].Definition.Def = fmt.Sprintf("file://./events/%s", name)
-	}
-	return nil
-}
-
-func upsertDir(path string) error {
-	if exists(path) {
-		return nil
-	}
-	return os.MkdirAll(path, 0755)
-}
-
-func exists(path string) bool {
-	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
+	return steps, edges, nil
 }
 
 // DeterministicUUID returns a deterministic V3 UUID based off of the SHA1
-// hash of the function's ID.
+// hash of the function's name.
 func DeterministicUUID(f Function) uuid.UUID {
-	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(f.ID))
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(f.Name))
 }
 
 func RandomID() (string, error) {

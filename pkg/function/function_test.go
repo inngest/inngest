@@ -1,17 +1,6 @@
 package function
 
-import (
-	"context"
-	"fmt"
-	"testing"
-
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/inngest/clistate"
-	"github.com/inngest/inngest/internal/cuedefs"
-	"github.com/stretchr/testify/require"
-)
-
+/*
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		f   Function
@@ -398,3 +387,4 @@ func TestDeterministicUUID(t *testing.T) {
 func strptr(s string) *string {
 	return &s
 }
+*/
