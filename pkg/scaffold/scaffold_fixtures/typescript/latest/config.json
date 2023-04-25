@@ -1,6 +1,0 @@
-{
-	"name": "ts latest",
-	"description": "desc, using latest node",
-	"targets": ["inngest"],
-	"postSetup": "none"
-}

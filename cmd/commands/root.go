@@ -65,18 +65,12 @@ func Execute() {
 	}
 
 	// Register Top Level Commands
-	rootCmd.AddCommand(NewCmdBuild())
 	rootCmd.AddCommand(NewCmdLogin())
-	rootCmd.AddCommand(NewCmdWorkflows())
 	rootCmd.AddCommand(NewCmdWorkspaces())
-	rootCmd.AddCommand(NewCmdInit())
 	rootCmd.AddCommand(NewCmdRun())
-	rootCmd.AddCommand(NewCmdDeploy())
-	rootCmd.AddCommand(NewCmdActions())
 	rootCmd.AddCommand(NewCmdDev())
 	rootCmd.AddCommand(NewCmdVersion())
 	rootCmd.AddCommand(NewCmdServe())
-	rootCmd.AddCommand(NewCmdSteps())
 	rootCmd.AddCommand(NewCmdTypes())
 
 	if err := rootCmd.Execute(); err != nil {
