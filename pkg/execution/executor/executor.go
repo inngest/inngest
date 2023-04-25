@@ -335,7 +335,7 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 	}
 	response, idx, err := e.executeAction(ctx, id, step, s, edge, attempt, stackIndex)
 	if err != nil {
-		return nil, idx, err
+		return response, idx, err
 	}
 	if response.Err != nil {
 		if response.Final() && e.failureHandler != nil {
@@ -372,7 +372,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 
 	definition, err := e.al.Action(ctx, action.DSN, action.Version)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error loading action: %w", err)
+		return nil, 0, fmt.Errorf("error loading step: %w", err)
 	}
 	if definition == nil {
 		return nil, 0, fmt.Errorf("no action returned: %s", action.DSN)
@@ -397,8 +397,16 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 	}
 
 	response, err := d.Execute(ctx, s, *definition, edge, *action, stackIndex)
-	if err != nil || response == nil {
-		return nil, 0, fmt.Errorf("error executing action: %w", err)
+	if response == nil {
+		// Add an error response here.
+		response = &state.DriverResponse{
+			Step: *action,
+			Err:  err,
+		}
+	}
+	if err != nil && response.Err == nil {
+		// Set the response error
+		response.Err = err
 	}
 
 	// Ensure that the step is always set.  This removes the need for drivers to always
