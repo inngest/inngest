@@ -7,7 +7,6 @@ import (
 	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/function/env"
 )
 
 type Driver interface {
@@ -22,13 +21,6 @@ type Driver interface {
 		step inngest.Step,
 		stackIndex int,
 	) (*state.DriverResponse, error)
-}
-
-// EnvManager is a driver which reads and utilizes environment variables when
-// executing actions.  For example, the Docker driver utilizes an EnvReader to
-// read specific env variables for each exectuion.
-type EnvManager interface {
-	SetEnvReader(r env.EnvReader)
 }
 
 type FunctionStack struct {

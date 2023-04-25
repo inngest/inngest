@@ -6,7 +6,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/config/registration"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
-	"github.com/inngest/inngest/pkg/execution/driver/dockerdriver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/queue/inmemoryqueue"
 	"github.com/inngest/inngest/pkg/execution/state/inmemory"
@@ -32,8 +31,7 @@ func defaultConfig() *Config {
 		},
 		Execution: Execution{
 			Drivers: map[string]registration.DriverConfig{
-				"docker": &dockerdriver.Config{},
-				"http":   &httpdriver.Config{},
+				"http": &httpdriver.Config{},
 			},
 		},
 		EventStream: EventStream{
