@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/inngest/client"
 	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/client"
 )
 
 type ReadWriter interface {
@@ -23,11 +23,11 @@ type ExecutionLoader interface {
 
 type ExecutionFunctionLoader interface {
 	// Functions returns all functions.
-	Functions(ctx context.Context) ([]function.Function, error)
+	Functions(ctx context.Context) ([]inngest.Function, error)
 	// FunctionsScheduled returns all scheduled functions available.
-	FunctionsScheduled(ctx context.Context) ([]function.Function, error)
+	FunctionsScheduled(ctx context.Context) ([]inngest.Function, error)
 	// FunctionsByTrigger returns functions for the given trigger by event name.
-	FunctionsByTrigger(ctx context.Context, eventName string) ([]function.Function, error)
+	FunctionsByTrigger(ctx context.Context, eventName string) ([]inngest.Function, error)
 }
 
 type ExecutionActionLoader interface {
