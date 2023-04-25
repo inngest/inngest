@@ -4,25 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"sort"
-	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/oklog/ulid/v2"
 )
 
 // TODO Duplicate code. Move to field-level resolvers and add dataloaders.
 func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]*models.FunctionRun, error) {
-	metadata, err := r.Runner.Runs(ctx, obj.ID)
+	state, err := r.Runner.Runs(ctx, obj.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	var runs []*models.FunctionRun
 
-	for _, m := range metadata {
+	for _, s := range state {
 		status := models.FunctionRunStatusRunning
 
-		switch m.Status {
+		switch s.Metadata().Status {
 		case enums.RunStatusCompleted:
 			status = models.FunctionRunStatusCompleted
 		case enums.RunStatusFailed:
@@ -31,14 +31,10 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 			status = models.FunctionRunStatusCancelled
 		}
 
-		var startedAt time.Time
+		startedAt := ulid.Time(s.Metadata().Identifier.RunID.Time())
 
-		if m.OriginalRunID != nil {
-			startedAt = time.UnixMilli(int64(m.OriginalRunID.Time()))
-		}
-
-		name := string(m.Name)
-		pending := int(m.Pending)
+		name := s.Workflow().Name
+		pending := s.Metadata().Pending
 
 		// Don't let pending be negative for clients
 		if pending < 0 {
@@ -46,7 +42,7 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 		}
 
 		runs = append(runs, &models.FunctionRun{
-			ID:           m.OriginalRunID.String(),
+			ID:           s.Metadata().Identifier.RunID.String(),
 			Name:         &name,
 			Status:       &status,
 			PendingSteps: &pending,
@@ -62,15 +58,15 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 }
 
 func (r *eventResolver) PendingRuns(ctx context.Context, obj *models.Event) (*int, error) {
-	metadata, err := r.Runner.Runs(ctx, obj.ID)
+	state, err := r.Runner.Runs(ctx, obj.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	var pending int
 
-	for _, m := range metadata {
-		if m.Status == enums.RunStatusRunning {
+	for _, s := range state {
+		if s.Metadata().Status == enums.RunStatusRunning {
 			pending++
 		}
 	}
@@ -79,14 +75,14 @@ func (r *eventResolver) PendingRuns(ctx context.Context, obj *models.Event) (*in
 }
 
 func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.EventStatus, error) {
-	metadata, err := r.Runner.Runs(ctx, obj.ID)
+	state, err := r.Runner.Runs(ctx, obj.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	status := models.EventStatusNoFunctions
 
-	if len(metadata) == 0 {
+	if len(state) == 0 {
 		return &status, nil
 	}
 
@@ -94,7 +90,8 @@ func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.
 	var failedRuns int
 	var isRunning bool
 
-	for _, m := range metadata {
+	for _, s := range state {
+		m := s.Metadata()
 		if m.Status == enums.RunStatusFailed {
 			failedRuns++
 			continue
@@ -107,7 +104,7 @@ func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.
 	}
 
 	if failedRuns > 0 {
-		if failedRuns == len(metadata) {
+		if failedRuns == len(state) {
 			status = models.EventStatusFailed
 		} else {
 			status = models.EventStatusPartiallyFailed

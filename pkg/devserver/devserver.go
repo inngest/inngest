@@ -2,7 +2,9 @@ package devserver
 
 import (
 	"context"
+	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/enums"
@@ -10,8 +12,10 @@ import (
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/function/env"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/rueian/rueidis"
 )
 
 // StartOpts configures the dev server
@@ -56,16 +60,63 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 		return err
 	}
 
-	sm, err := opts.Config.State.Service.Concrete.Manager(ctx)
+	rc, err := createInmemoryRedis(ctx)
 	if err != nil {
 		return err
 	}
+
+	var sm state.Manager
+	t := runner.NewTracker()
+	sm, err = redis_state.New(
+		ctx,
+		redis_state.WithRedisClient(rc),
+		redis_state.WithKeyGenerator(redis_state.DefaultKeyFunc{
+			Prefix: "{state}",
+		}),
+		redis_state.WithFunctionCallbacks(func(ctx context.Context, i state.Identifier, rs enums.RunStatus) {
+			switch rs {
+			case enums.RunStatusRunning:
+				// Add this to the in-memory tracker.
+				// XXX: Switch to sqlite.
+				s, err := sm.Load(ctx, i.RunID)
+				if err != nil {
+					return
+				}
+				t.Add(s.Event()["id"].(string), i)
+			}
+		}),
+	)
+	if err != nil {
+		return err
+	}
+
+	queue := redis_state.NewQueue(
+		rc,
+		redis_state.WithIdempotencyTTL(time.Hour),
+		redis_state.WithNumWorkers(100),
+		redis_state.WithQueueKeyGenerator(&redis_state.DefaultQueueKeyGenerator{
+			Prefix: "{queue}",
+		}),
+		redis_state.WithPartitionConcurrencyKeyGenerator(func(ctx context.Context, p redis_state.QueuePartition) (string, int) {
+			// Ensure that we return the correct concurrency values per
+			// partition.
+			funcs, _ := loader.Functions(ctx)
+			for _, f := range funcs {
+				if f.ID == p.WorkflowID.String() {
+					return p.Queue(), f.Concurrency
+				}
+			}
+			return p.Queue(), 10_000
+		}),
+	)
 
 	runner := runner.NewService(
 		opts.Config,
 		runner.WithExecutionLoader(loader),
 		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
+		runner.WithQueue(queue),
+		runner.WithTracker(t),
 	)
 
 	// The devserver embeds the event API.
@@ -90,4 +141,22 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 	}
 
 	return service.StartAll(ctx, ds, runner, exec)
+}
+
+func createInmemoryRedis(ctx context.Context) (rueidis.Client, error) {
+	r := miniredis.NewMiniRedis()
+	_ = r.Start()
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		for range time.Tick(time.Second) {
+			r.FastForward(time.Second)
+		}
+	}()
+	return rc, nil
 }

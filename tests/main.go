@@ -149,7 +149,9 @@ func run(t *testing.T, test *Test) {
 		f()
 	}
 
+	fmt.Println(" ==> Waiting for extraneous requests")
 	<-time.After(test.Timeout + buffer)
+	fmt.Printf("\n\n")
 }
 
 // introspect asserts that the SDK is live and the expected function exists when calling
