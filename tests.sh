@@ -4,7 +4,7 @@ sh -c 'cd ./tests/js && yarn dev > /dev/null 2> /dev/null' &
 
 sleep 2
 
-go run ./cmd/main.go dev > dev-stdout.txt 2> dev-stderr.txt &
+go run ./cmd/main.go dev --no-discovery > dev-stdout.txt 2> dev-stderr.txt &
 
 sleep 2
 
