@@ -21,6 +21,7 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().String("host", "", "host to run the API on")
 	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
 	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
+	cmd.Flags().Bool("no-discovery", false, "Disable autodiscovery")
 
 	return cmd
 }
@@ -46,11 +47,20 @@ func doDev(cmd *cobra.Command, args []string) {
 	}
 
 	urls, _ := cmd.Flags().GetStringSlice("sdk-url")
+
+	// Run auto-discovery if no URLs are provided, unless we've
+	// explicitly disabled it.
+	discover := true
+	noDiscovery, _ := cmd.Flags().GetBool("no-discovery")
+	if len(urls) > 0 || noDiscovery {
+		discover = false
+	}
+
 	opts := devserver.StartOpts{
 		Config:       *conf,
 		URLs:         urls,
 		Docker:       false,
-		Autodiscover: len(urls) == 0,
+		Autodiscover: discover,
 	}
 
 	err = devserver.New(ctx, opts)

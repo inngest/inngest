@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"sort"
-	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/oklog/ulid/v2"
 )
 
 // TODO Duplicate code. Move to field-level resolvers and add dataloaders.
@@ -31,11 +31,7 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 			status = models.FunctionRunStatusCancelled
 		}
 
-		var startedAt time.Time
-
-		if m.OriginalRunID != nil {
-			startedAt = time.UnixMilli(int64(m.OriginalRunID.Time()))
-		}
+		startedAt := ulid.Time(m.Identifier.RunID.Time())
 
 		name := string(m.Name)
 		pending := int(m.Pending)
@@ -46,7 +42,7 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 		}
 
 		runs = append(runs, &models.FunctionRun{
-			ID:           m.OriginalRunID.String(),
+			ID:           m.Identifier.RunID.String(),
 			Name:         &name,
 			Status:       &status,
 			PendingSteps: &pending,
