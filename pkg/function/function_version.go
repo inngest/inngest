@@ -2,6 +2,8 @@ package function
 
 import (
 	"time"
+
+	"github.com/inngest/inngest/pkg/inngest"
 )
 
 // FunctionVersion represents a given version of a function stored or used by the Inngest system
@@ -16,7 +18,7 @@ type FunctionVersion struct {
 
 	// Function config is loaded as a config string then parsed into a Function struct
 	Config   string
-	Function Function
+	Function inngest.Function
 
 	ValidFrom *time.Time
 	ValidTo   *time.Time

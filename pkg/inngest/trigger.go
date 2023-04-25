@@ -1,4 +1,4 @@
-package function
+package inngest
 
 import (
 	"context"

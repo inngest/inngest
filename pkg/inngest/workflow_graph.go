@@ -75,7 +75,7 @@ func (l LookupVertex) Hashcode() interface{} {
 // Vertex represents an action or the trigger within our workflow graph
 type Vertex struct {
 	Root bool
-	Step *Step
+	Step *WorkflowStep
 }
 
 func (g Vertex) Hashcode() interface{} {

@@ -1,4 +1,4 @@
-package function
+package inngest
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/xhit/go-str2duration/v2"
 )
@@ -66,7 +65,7 @@ type Function struct {
 	Idempotency *string `json:"idempotency,omitempty"`
 
 	// RateLimit allows specifying custom rate limiting for the function.
-	RateLimit *inngest.RateLimit `json:"rateLimit,omitempty"`
+	RateLimit *RateLimit `json:"rateLimit,omitempty"`
 
 	// Retries allows specifying the number of retries to attempt across all steps in the
 	// function.
@@ -78,22 +77,6 @@ type Function struct {
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
 	Steps map[string]Step `json:"steps,omitempty"`
-}
-
-// Step represents a single unit of code (action) which runs as part of a step function, in a DAG.
-type Step struct {
-	// Name is the name for the given step in a function.
-	Name string `json:"name"`
-	// URI represents how this function is invoked, eg https://example.com/api/inngest?step=foo,
-	// or arn://xyz for lambda functions.
-	URI string `json:"uri"`
-
-	// Retries optionally overrides retries for this step, allowing steps to have differing retry
-	// counts to the core function.
-	Retries *int `json:"retries"`
-	// ConcurrencyKey allows steps to share concurrency slots across multiple functions, eg. for
-	// rate limiting across multiple functions.
-	ConcurrencyKey *string `json:"concurrencyKey"`
 }
 
 type Concurrency struct {
@@ -156,7 +139,7 @@ func (f Function) Validate(ctx context.Context) error {
 	for _, edge := range edges {
 		_, incoming := f.Steps[edge.Incoming]
 		_, outgoing := f.Steps[edge.Outgoing]
-		if edge.Outgoing != inngest.TriggerName && !outgoing {
+		if edge.Outgoing != TriggerName && !outgoing {
 			err = multierror.Append(err, fmt.Errorf("unknown step '%s' for edge '%v'", edge.Outgoing, edge))
 		}
 		if !incoming {
@@ -189,7 +172,7 @@ func (f Function) Validate(ctx context.Context) error {
 
 // Actions produces configuration for each step of the function.  Each config
 // file specifies how to run the code.
-func (f Function) Actions(ctx context.Context) ([]Step, []inngest.Edge, error) {
+func (f Function) Actions(ctx context.Context) ([]Step, []Edge, error) {
 	// This has no defined actions, which means its an implicit
 	// single action invocation.  We assume that a Dockerfile
 	// exists in the project root, and that we can build the
@@ -200,13 +183,13 @@ func (f Function) Actions(ctx context.Context) ([]Step, []inngest.Edge, error) {
 	}
 
 	steps := make([]Step, len(f.Steps))
-	edges := make([]inngest.Edge, len(f.Steps))
+	edges := make([]Edge, len(f.Steps))
 
 	n := 0
 	for _, s := range f.Steps {
 		steps[n] = s
-		edges[n] = inngest.Edge{
-			Outgoing: inngest.TriggerName,
+		edges[n] = Edge{
+			Outgoing: TriggerName,
 			Incoming: s.Name,
 		}
 	}

@@ -33,46 +33,17 @@ type Workflow struct {
 	//
 	// When deploying a specific workflow version we read the cue configuration
 	// and upsert a version to the given ID.
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	Throttle *Throttle `json:"throttle,omitempty"`
-	Triggers []Trigger `json:"triggers"`
-	Steps    []Step    `json:"actions"`
-	Edges    []Edge    `json:"edges"`
-	Cancel   []Cancel  `json:"cancel,omitempty"`
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	RateLimit *RateLimit     `json:"throttle,omitempty"`
+	Triggers  []Trigger      `json:"triggers"`
+	Steps     []WorkflowStep `json:"actions"`
+	Edges     []Edge         `json:"edges"`
+	Cancel    []Cancel       `json:"cancel,omitempty"`
 }
 
-type RateLimit struct {
-	// Count is how often the function can be called within the specified period
-	Count uint `json:"count"`
-	// Period represents the time period for throttling the function
-	Period string `json:"period"`
-	// Key is an optional string to constrain throttling using event data.  For
-	// example, if you want to throttle incoming notifications based off of a user's
-	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
-	// that we throttle functions for each user independently.
-	Key *string `json:"key"`
-}
-
-// Trigger represents the starting point for a workflow
-type Trigger struct {
-	*EventTrigger
-	*CronTrigger
-}
-
-// EventTrigger represents an event that triggers this workflow.
-type EventTrigger struct {
-	Event      string  `json:"event"`
-	Expression *string `json:"expression"`
-}
-
-// CronTrigger represents the cron schedule that triggers this workflow
-type CronTrigger struct {
-	Cron string `json:"cron"`
-}
-
-// Step is a reference to an action within a workflow.
-type Step struct {
+// WorkflowStep is a reference to an action within a workflow.
+type WorkflowStep struct {
 	// ID is a string-based identifier for the step, used to reference
 	// the step's output in code.
 	ID string `json:"id"`
@@ -90,11 +61,23 @@ type Step struct {
 }
 
 // RetryCount returns the number of retries for this step.
-func (s Step) RetryCount() int {
+func (s WorkflowStep) RetryCount() int {
 	if s.Retries != nil && s.Retries.Attempts != nil {
 		return *s.Retries.Attempts
 	}
 	return consts.DefaultRetryCount
+}
+
+type RateLimit struct {
+	// Count is how often the function can be called within the specified period
+	Count uint `json:"count"`
+	// Period represents the time period for throttling the function
+	Period string `json:"period"`
+	// Key is an optional string to constrain throttling using event data.  For
+	// example, if you want to throttle incoming notifications based off of a user's
+	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
+	// that we throttle functions for each user independently.
+	Key *string `json:"key"`
 }
 
 type Edge struct {
@@ -150,13 +133,4 @@ type VersionConstraint struct {
 type RetryOptions struct {
 	// Attempts is the maximum number of times to retry.
 	Attempts *int `json:"attempts,omitempty"`
-}
-
-// Cancel represents a cancellation signal for a function.  When specified, this
-// will set up pauses which automatically cancel the function based off of matching
-// events and expressions.
-type Cancel struct {
-	Event   string  `json:"event"`
-	Timeout *string `json:"timeout"`
-	If      *string `json:"if"`
 }
