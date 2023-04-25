@@ -530,6 +530,7 @@ func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (in
 func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.DriverResponse, attempt int) (int, error) {
 	var (
 		data            any
+		result          any
 		err             error
 		typ             enums.HistoryType
 		funcFailHistory state.History
@@ -538,6 +539,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 	now := time.Now()
 
 	if r.Err == nil {
+		result = r.Output
 		typ = enums.HistoryTypeStepCompleted
 		if data, err = json.Marshal(r.Output); err != nil {
 			return 0, fmt.Errorf("error marshalling step output: %w", err)
@@ -548,6 +550,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 			"error":  r.Err.Error(),
 			"output": r.Output,
 		})
+		result = data
 		if r.Final() {
 			typ = enums.HistoryTypeStepFailed
 			funcFailHistory = state.History{
@@ -576,7 +579,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 			ID:         r.Step.ID,
 			Name:       r.Step.Name,
 			Attempt:    attempt,
-			Data:       r.Output,
+			Data:       result,
 			StepOutput: stepOutput,
 		},
 	}
