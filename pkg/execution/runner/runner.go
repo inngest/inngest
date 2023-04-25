@@ -41,7 +41,7 @@ type Runner interface {
 	StateManager() state.Manager
 	InitializeCrons(ctx context.Context) error
 	History(ctx context.Context, id state.Identifier) ([]state.History, error)
-	Runs(ctx context.Context, eventId string) ([]state.Metadata, error)
+	Runs(ctx context.Context, eventId string) ([]state.State, error)
 	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
@@ -241,8 +241,17 @@ func (s *svc) History(ctx context.Context, id state.Identifier) ([]state.History
 	return s.state.History(ctx, id.RunID)
 }
 
-func (s *svc) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
-	return s.tracker.Runs(ctx, eventId)
+func (s *svc) Runs(ctx context.Context, eventID string) ([]state.State, error) {
+	items, _ := s.tracker.Runs(ctx, eventID)
+	result := make([]state.State, len(items))
+	for n, i := range items {
+		state, err := s.state.Load(ctx, i)
+		if err != nil {
+			return nil, err
+		}
+		result[n] = state
+	}
+	return result, nil
 }
 
 func (s *svc) StateManager() state.Manager {
@@ -609,29 +618,31 @@ func Initialize(ctx context.Context, fn function.Function, evt event.Event, s st
 	return &id, nil
 }
 
+// NewTracker returns a crappy in-memory tracker used for registering function runs.
+//
 func NewTracker() (t *Tracker) {
 	return &Tracker{
 		l:      &sync.RWMutex{},
-		evtIDs: make(map[string][]state.Metadata),
+		evtIDs: map[string][]ulid.ULID{},
 	}
 }
 
 type Tracker struct {
 	l      *sync.RWMutex
-	evtIDs map[string][]state.Metadata
+	evtIDs map[string][]ulid.ULID
 }
 
-func (t *Tracker) Add(evtID string, sm state.Metadata) {
+func (t *Tracker) Add(evtID string, id state.Identifier) {
 	t.l.Lock()
 	defer t.l.Unlock()
 	if _, ok := t.evtIDs[evtID]; !ok {
-		t.evtIDs[evtID] = []state.Metadata{sm}
+		t.evtIDs[evtID] = []ulid.ULID{id.RunID}
 		return
 	}
-	t.evtIDs[evtID] = append(t.evtIDs[evtID], sm)
+	t.evtIDs[evtID] = append(t.evtIDs[evtID], id.RunID)
 }
 
-func (t *Tracker) Runs(ctx context.Context, eventId string) ([]state.Metadata, error) {
+func (t *Tracker) Runs(ctx context.Context, eventId string) ([]ulid.ULID, error) {
 	t.l.RLock()
 	defer t.l.RUnlock()
 	return t.evtIDs[eventId], nil

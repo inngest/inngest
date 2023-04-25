@@ -85,7 +85,7 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 	}
 
 	startedAt := ulid.Time(runID.Time())
-	name := "" // TODO
+	name := state.Workflow().Name
 
 	pending := state.Metadata().Pending
 	if pending < 0 {
@@ -102,14 +102,15 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 }
 
 func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionRunsQuery) ([]*models.FunctionRun, error) {
-	metadata, err := r.Runner.Runs(ctx, "")
+	state, err := r.Runner.Runs(ctx, "")
 	if err != nil {
 		return nil, err
 	}
 
 	var runs []*models.FunctionRun
 
-	for _, m := range metadata {
+	for _, s := range state {
+		m := s.Metadata()
 		status := models.FunctionRunStatusRunning
 
 		switch m.Status {
@@ -123,7 +124,7 @@ func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionR
 
 		startedAt := ulid.Time(m.Identifier.RunID.Time())
 
-		name := "" // TODO
+		name := s.Workflow().Name
 		pending := int(m.Pending)
 
 		// Don't let pending be negative for clients

@@ -82,7 +82,7 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 				if err != nil {
 					return
 				}
-				t.Add(s.Event()["id"].(string), s.Metadata())
+				t.Add(s.Event()["id"].(string), i)
 			}
 		}),
 	)
