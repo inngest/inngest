@@ -227,6 +227,7 @@ export const navigation = [
       },
       { title: "Concurrency", href: `${baseDir}/functions/concurrency` },
       { title: "Cancellation", href: `${baseDir}/functions/cancellation` },
+      { title: "Streaming", href: `${baseDir}/streaming` },
     ],
   },
   {
