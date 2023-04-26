@@ -3,7 +3,6 @@ package state
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/inngest/inngest/inngest"
@@ -238,45 +237,45 @@ func (r DriverResponse) Unwrap() error {
 	return r.Err
 }
 
-type UserError struct {
-	Name    string      `json:"name"`
-	Message string      `json:"message"`
-	Stack   string      `json:"stack"`
-	Cause   string      `json:"cause,omitempty"`
-	Status  json.Number `json:"status,omitempty"`
-}
-
 // UserError returns the error that the user reported for this response. Can be
 // used to safely fetch the error from the response.
 //
 // Will return nil if there is no error.
-func (r DriverResponse) UserError() *UserError {
-	mapped, ok := r.Output.(map[string]interface{})
-	if !ok {
-		return nil
+//
+// An ideal error is in the type:
+//
+//	type UserError struct {
+//	        Name    string      `json:"name"`
+//	        Message string      `json:"message"`
+//	        Stack   string      `json:"stack"`
+//	        Cause   string      `json:"cause,omitempty"`
+//	        Status  json.Number `json:"status,omitempty"`
+//	}
+//
+// However, no types are defined, and we use any error we can get our hands on!
+func (r DriverResponse) UserError() map[string]any {
+	if r.Output == nil && r.Err != nil {
+		return map[string]any{
+			"error": r.Err,
+		}
 	}
 
-	body, ok := mapped["body"]
-	if !ok {
-		return nil
+	mapped, ok := r.Output.(map[string]any)
+	if ok && mapped["body"] != nil {
+		// Attempt to fetch the JS/SDK error from the body.
+		if bodyAsMap, ok := mapped["body"].(map[string]any); ok {
+			return bodyAsMap
+		}
+		return mapped
+	}
+	if ok {
+		return mapped
 	}
 
-	byt, ok := body.(json.RawMessage)
-	if !ok {
-		return nil
+	// TODO: Add error logging properly to help with debugging
+	// unknow errors
+
+	return map[string]any{
+		"error": "Unknown error running SDK",
 	}
-
-	// The body is a stringified JSON object, so we need to unescape it first.
-	s, err := strconv.Unquote(string(byt))
-	if err != nil {
-		return nil
-	}
-
-	var output UserError
-
-	if err := json.Unmarshal([]byte(s), &output); err != nil {
-		return nil
-	}
-
-	return &output
 }
