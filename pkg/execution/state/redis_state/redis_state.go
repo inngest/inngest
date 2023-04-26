@@ -13,11 +13,10 @@ import (
 
 	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/inmemory"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 	"github.com/rueian/rueidis"
 )
@@ -303,7 +302,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 
 	go m.runCallbacks(ctx, input.Identifier, enums.RunStatusRunning)
 
-	return inmemory.NewStateInstance(
+	return state.NewStateInstance(
 			input.Workflow,
 			input.Identifier,
 			metadata.Metadata(),
@@ -506,7 +505,7 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 
-	return inmemory.NewStateInstance(*w, id, meta, event, actions, errors, stack), nil
+	return state.NewStateInstance(*w, id, meta, event, actions, errors, stack), nil
 }
 
 func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {

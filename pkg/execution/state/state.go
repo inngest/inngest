@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -114,6 +114,8 @@ type Metadata struct {
 type State interface {
 	// Workflow returns the concrete workflow that is being executed
 	// for the given run.
+	//
+	// TODO: Implemnent WorkflowFetcher and remove this from state.
 	Workflow() inngest.Workflow
 
 	// Metadata returns the run metadata, including the started at time

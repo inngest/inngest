@@ -3,10 +3,10 @@ package sdk
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
 )
 
 var (
@@ -38,7 +38,7 @@ type RegisterRequest struct {
 	// AppName represents a namespaced app name for each deployed function.
 	AppName string `json:"appName"`
 	// Functions represents all functions hosted within this deploy.
-	Functions []function.Function `json:"functions"`
+	Functions []inngest.Function `json:"functions"` // TODO: This is a custom datatype
 	// Hash represents the commit checksum for the deploy.
 	Hash *string `json:"hash"`
 }
@@ -53,7 +53,7 @@ func (f RegisterRequest) Validate(ctx context.Context) error {
 
 	for _, fn := range f.Functions {
 		if len(fn.Steps) == 0 {
-			return fmt.Errorf("Function has no steps: %s", fn.ID)
+			return fmt.Errorf("Function has no steps: %s", fn.Name)
 		}
 
 		for _, step := range fn.Steps {
@@ -61,13 +61,12 @@ func (f RegisterRequest) Validate(ctx context.Context) error {
 				err = multierror.Append(err, verr)
 			}
 
-			if step.Runtime == nil || step.Runtime.RuntimeType() != inngest.RuntimeTypeHTTP {
-				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid driver. Only HTTP drivers may be used with SDK functions.", step.ID))
-				continue
+			uri, perr := url.Parse(step.URI)
+			if perr != nil {
+				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid URI", step.ID))
 			}
-
-			if runtime, _ := step.Runtime.Runtime.(inngest.RuntimeHTTP); runtime.URL == "" {
-				err = multierror.Append(err, fmt.Errorf("Step '%s' has no URL specified as its entrypoint", step.ID))
+			if uri.Scheme != "http" && uri.Scheme != "https" {
+				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid driver. Only HTTP drivers may be used with SDK functions.", step.ID))
 				continue
 			}
 		}

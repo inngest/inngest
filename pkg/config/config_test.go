@@ -7,8 +7,6 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
-	"github.com/inngest/inngest/pkg/execution/queue/inmemoryqueue"
-	"github.com/inngest/inngest/pkg/execution/state/inmemory"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/stretchr/testify/require"
 )
@@ -38,18 +36,6 @@ func defaultConfig() *Config {
 			Service: MessagingService{
 				Backend:  "inmemory",
 				Concrete: &InMemoryMessaging{Topic: "events"},
-			},
-		},
-		Queue: Queue{
-			Service: QueueService{
-				Backend:  "inmemory",
-				Concrete: &inmemoryqueue.Config{},
-			},
-		},
-		State: State{
-			Service: StateService{
-				Backend:  "inmemory",
-				Concrete: &inmemory.Config{},
 			},
 		},
 		DataStore: DataStore{

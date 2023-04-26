@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/inngest/inngest/inngest/clistate"
-	"github.com/inngest/inngest/inngest/version"
+	"github.com/inngest/inngest/pkg/inngest/clistate"
+	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/inngest/inngestgo"
 	"github.com/spf13/cobra"
 )

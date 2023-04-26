@@ -45,6 +45,9 @@ type Function struct {
 	// V represents the configuration version.
 	V int `json:"v,omitempty"`
 
+	// ID is an internal surrogate key representing this function.
+	ID uuid.UUID `json:"id"`
+
 	// Name is the descriptive name for the function
 	Name string `json:"name"`
 

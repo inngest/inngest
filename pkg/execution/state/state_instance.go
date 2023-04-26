@@ -1,13 +1,12 @@
-package inmemory
+package state
 
 import (
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
 
-// NewStateInstance returns an in-memory state.State implementation with the given data.
+// NewStateInstance returns an in-memory State implementation with the given data.
 //
 // The state.State functions return only data - they do not allow for returning errors. This
 // means that all state for a run should be loaded ahead of execution instead of just-in-time.
@@ -19,13 +18,13 @@ import (
 // This is safe to use and fulfils that requirement.
 func NewStateInstance(
 	w inngest.Workflow,
-	id state.Identifier,
-	metadata state.Metadata,
+	id Identifier,
+	metadata Metadata,
 	event map[string]any,
 	actions map[string]any,
 	errors map[string]error,
 	stack []string,
-) state.State {
+) State {
 	return &memstate{
 		workflow:   w,
 		identifier: id,
@@ -40,9 +39,9 @@ func NewStateInstance(
 type memstate struct {
 	workflow inngest.Workflow
 
-	identifier state.Identifier
+	identifier Identifier
 
-	metadata state.Metadata
+	metadata Metadata
 
 	// Event is the root data that triggers the workflow, which is typically
 	// an Inngest event.
@@ -57,11 +56,11 @@ type memstate struct {
 	errors map[string]error
 }
 
-func (s memstate) Metadata() state.Metadata {
+func (s memstate) Metadata() Metadata {
 	return s.metadata
 }
 
-func (s memstate) Identifier() state.Identifier {
+func (s memstate) Identifier() Identifier {
 	return s.identifier
 }
 
@@ -97,7 +96,7 @@ func (s memstate) ActionID(id string) (any, error) {
 	data, hasAction := s.Actions()[id]
 	err, hasError := s.Errors()[id]
 	if !hasAction && !hasError {
-		return nil, state.ErrStepIncomplete
+		return nil, ErrStepIncomplete
 	}
 	return data, err
 }

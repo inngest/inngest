@@ -13,10 +13,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/inngest/inngest/inngest/client"
-	"github.com/inngest/inngest/inngest/version"
 	"github.com/inngest/inngest/pkg/api/tel"
-	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
 )
@@ -89,31 +88,15 @@ func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
 // Info returns information about the dev server and its registered functions.
 func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 	a.devserver.handlerLock.Lock()
-	a.devserver.workspaceLock.RLock()
 
 	defer a.devserver.handlerLock.Unlock()
-	defer a.devserver.workspaceLock.RUnlock()
-
-	workspaces := DevWorkspaces{}
-	for _, w := range a.devserver.workspaces {
-		if w.Name != "default" {
-			continue
-		}
-		if w.Test {
-			workspaces.Test = w
-		} else {
-			workspaces.Prod = w
-		}
-	}
 
 	funcs, _ := a.devserver.loader.Functions(r.Context())
 	ir := InfoResponse{
-		Version:       version.Print(),
-		StartOpts:     a.devserver.opts,
-		Authenticated: len(a.devserver.workspaces) > 0,
-		Functions:     funcs,
-		Handlers:      a.devserver.handlers,
-		Workspaces:    workspaces,
+		Version:   version.Print(),
+		StartOpts: a.devserver.opts,
+		Functions: funcs,
+		Handlers:  a.devserver.handlers,
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	byt, _ := json.MarshalIndent(ir, "", "  ")
@@ -181,12 +164,12 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// Reset function IDs;  we'll add these as we iterate through the requests.
-	h.FunctionIDs = []string{}
+	h.Functions = []string{}
 	h.UpdatedAt = time.Now()
 
 	// For each function, add it to our loader.
 	for _, fn := range req.Functions {
-		h.FunctionIDs = append(h.FunctionIDs, fn.ID)
+		h.Functions = append(h.Functions, fn.Name)
 		if err := a.devserver.loader.AddFunction(ctx, &fn); err != nil {
 			logger.From(ctx).Warn().Msgf("Error adding your function:\n%s", err)
 			a.err(ctx, w, 400, err)
@@ -221,15 +204,9 @@ func (a devapi) err(ctx context.Context, w http.ResponseWriter, status int, err 
 
 type InfoResponse struct {
 	// Version lists the version of the development server
-	Version       string              `json:"version"`
-	Authenticated bool                `json:"authed"`
-	StartOpts     StartOpts           `json:"startOpts"`
-	Functions     []function.Function `json:"functions"`
-	Handlers      []SDKHandler        `json:"handlers"`
-	Workspaces    DevWorkspaces       `json:"workspaces"`
-}
-
-type DevWorkspaces struct {
-	Prod client.Workspace `json:"prod"`
-	Test client.Workspace `json:"test"`
+	Version       string             `json:"version"`
+	Authenticated bool               `json:"authed"`
+	StartOpts     StartOpts          `json:"startOpts"`
+	Functions     []inngest.Function `json:"functions"`
+	Handlers      []SDKHandler       `json:"handlers"`
 }

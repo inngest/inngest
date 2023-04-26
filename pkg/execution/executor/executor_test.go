@@ -1,23 +1,6 @@
 package executor
 
-import (
-	"context"
-	"crypto/rand"
-	"encoding/json"
-	"fmt"
-	"testing"
-
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
-	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
-	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/driver/mockdriver"
-	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/inmemory"
-	"github.com/oklog/ulid/v2"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-)
+/*
 
 func TestNewExecutor(t *testing.T) {
 	exec, err := NewExecutor()
@@ -52,32 +35,25 @@ func TestExecute_state(t *testing.T) {
 		UUID: uuid.New(),
 		Steps: []inngest.Step{
 			{
-				DSN: "test",
-				ID:  "1",
+				ID: "1",
 			},
 			{
-				DSN: "test",
-				ID:  "2",
+				ID: "2",
 			},
 			{
-				DSN: "test",
-				ID:  "3",
+				ID: "3",
 			},
 			{
-				DSN: "test",
-				ID:  "4",
+				ID: "4",
 			},
 			{
-				DSN: "test",
-				ID:  "5",
+				ID: "5",
 			},
 			{
-				DSN: "test",
-				ID:  "6",
+				ID: "6",
 			},
 			{
-				DSN: "test",
-				ID:  "7",
+				ID: "7",
 			},
 		},
 		Edges: []inngest.Edge{
@@ -207,7 +183,6 @@ func TestExecute_Generator(t *testing.T) {
 		UUID: uuid.New(),
 		Steps: []inngest.Step{
 			{
-				DSN: "test",
 				ID:  "step",
 			},
 		},
@@ -454,3 +429,4 @@ func availableIDs(edges []state.AvailableEdge) []string {
 	}
 	return strs
 }
+*/

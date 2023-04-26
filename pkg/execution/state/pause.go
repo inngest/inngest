@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/inngest"
 )
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.

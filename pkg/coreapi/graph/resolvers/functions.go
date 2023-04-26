@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
 

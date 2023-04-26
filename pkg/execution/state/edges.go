@@ -6,8 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 )
 
@@ -87,7 +87,7 @@ type edgeEvaluator struct {
 type AvailableEdge struct {
 	inngest.Edge
 
-	Step *inngest.Step
+	Step *inngest.WorkflowStep
 }
 
 func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepID string) ([]AvailableEdge, error) {
@@ -125,6 +125,8 @@ func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepI
 		// We can traverse this edge.  Schedule a new execution from this node.
 		// Scheduling executions needs to be done regardless of whether
 		// the context has cancelled.
+		//
+		// TODO: MAKE THESE REGULAR OL STEP EDGES
 		future = append(future, AvailableEdge{
 			Edge: edge.WorkflowEdge,
 			Step: edge.Incoming.Step,

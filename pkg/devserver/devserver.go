@@ -15,7 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/function"
-	"github.com/inngest/inngest/pkg/function/env"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/rueian/rueidis"
 )
@@ -49,18 +48,6 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) error {
-	funcs, err := loader.Functions(ctx)
-	if err != nil {
-		return err
-	}
-
-	// create a new env reader which will load .env files from functions directly, each
-	// time the executor runs.
-	envreader, err := env.NewReader(funcs)
-	if err != nil {
-		return err
-	}
-
 	rc, err := createInmemoryRedis(ctx)
 	if err != nil {
 		return err
@@ -135,7 +122,6 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 	exec := executor.NewService(
 		opts.Config,
 		executor.WithExecutionLoader(loader),
-		executor.WithEnvReader(envreader),
 		executor.WithState(sm),
 		executor.WithQueue(queue),
 	)

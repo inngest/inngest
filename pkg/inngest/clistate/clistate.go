@@ -10,8 +10,8 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest/client"
-	"github.com/inngest/inngest/inngest/log"
+	"github.com/inngest/inngest/pkg/inngest/client"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
@@ -195,22 +195,6 @@ func IsProd() bool {
 		}
 	}
 	return false
-}
-
-// Workspace returns the current workspace, based off of the current environment.
-func Workspace(ctx context.Context) (client.Workspace, error) {
-	all, err := Client(ctx).Workspaces(ctx)
-	if err != nil {
-		return client.Workspace{}, nil
-	}
-
-	for _, ws := range all {
-		// FIXME: change the way we handle default workspaces.
-		if ws.Name == "default" && ws.Test != IsProd() {
-			return ws, nil
-		}
-	}
-	return client.Workspace{}, fmt.Errorf("no workspace found")
 }
 
 func RequireState(ctx context.Context) *State {

@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/inngest/client"
 	"github.com/inngest/inngest/internal/cuedefs"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/coredata"
 	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/client"
 	"github.com/inngest/inngest/pkg/logger"
 	"golang.org/x/sync/errgroup"
 )
@@ -64,16 +64,7 @@ func (f *FSLoader) ReadDir(ctx context.Context) error {
 		Debug().
 		Str("dir", f.root).
 		Msg("scanning directory for functions")
-
-	fns, err := function.LoadRecursive(ctx, f.root)
-	if err != nil {
-		return err
-	}
-	for _, fn := range fns {
-		f.functions = append(f.functions, *fn)
-	}
-
-	return f.MemoryExecutionLoader.SetFunctions(ctx, fns)
+	return f.MemoryExecutionLoader.SetFunctions(ctx, nil)
 }
 
 // NewFSLoader returns an ExecutionLoader which reads functions from the given
@@ -109,7 +100,7 @@ type MemoryExecutionLoader struct {
 	*memactionloader
 
 	// functions stores all functions which were found within the given filesystem.
-	functions []function.Function
+	functions []inngest.Function
 
 	// actions stores all actions parsed and read from functions within the filesystem.
 	actions []inngest.ActionVersion
@@ -117,7 +108,7 @@ type MemoryExecutionLoader struct {
 	l sync.RWMutex
 }
 
-func (m *MemoryExecutionLoader) AddFunction(ctx context.Context, fn *function.Function) error {
+func (m *MemoryExecutionLoader) AddFunction(ctx context.Context, fn *inngest.Function) error {
 	m.l.Lock()
 	defer m.l.Unlock()
 
@@ -167,11 +158,11 @@ func (m *MemoryExecutionLoader) AddFunction(ctx context.Context, fn *function.Fu
 	return nil
 }
 
-func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*function.Function) error {
+func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*inngest.Function) error {
 	m.l.Lock()
 	defer m.l.Unlock()
 
-	m.functions = []function.Function{}
+	m.functions = []inngest.Function{}
 	m.actions = []inngest.ActionVersion{}
 
 	// Validate all functions.
@@ -209,15 +200,15 @@ func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*function.
 	return nil
 }
 
-func (m *MemoryExecutionLoader) Functions(ctx context.Context) ([]function.Function, error) {
+func (m *MemoryExecutionLoader) Functions(ctx context.Context) ([]inngest.Function, error) {
 	return m.functions[:], nil
 }
 
-func (m *MemoryExecutionLoader) FunctionsScheduled(ctx context.Context) ([]function.Function, error) {
+func (m *MemoryExecutionLoader) FunctionsScheduled(ctx context.Context) ([]inngest.Function, error) {
 	m.l.RLock()
 	defer m.l.RUnlock()
 
-	fns := []function.Function{}
+	fns := []inngest.Function{}
 	for _, fn := range m.functions {
 		for _, t := range fn.Triggers {
 			if t.CronTrigger != nil {
@@ -229,11 +220,11 @@ func (m *MemoryExecutionLoader) FunctionsScheduled(ctx context.Context) ([]funct
 	return fns, nil
 }
 
-func (m *MemoryExecutionLoader) FunctionsByTrigger(ctx context.Context, eventName string) ([]function.Function, error) {
+func (m *MemoryExecutionLoader) FunctionsByTrigger(ctx context.Context, eventName string) ([]inngest.Function, error) {
 	m.l.RLock()
 	defer m.l.RUnlock()
 
-	fns := []function.Function{}
+	fns := []inngest.Function{}
 	for _, fn := range m.functions {
 		for _, t := range fn.Triggers {
 			if t.EventTrigger != nil && t.Event == eventName {
@@ -329,15 +320,14 @@ func NewInMemoryAPIFunctionWriter() *MemoryAPIFunctionWriter {
 	return loader
 }
 
-func (m *MemoryAPIFunctionWriter) CreateFunctionVersion(ctx context.Context, f function.Function, live bool, env string) (function.FunctionVersion, error) {
+func (m *MemoryAPIFunctionWriter) CreateFunctionVersion(ctx context.Context, f inngest.Function, live bool, env string) (function.FunctionVersion, error) {
 	now := time.Now()
 	fv := function.FunctionVersion{
-		FunctionID: f.ID,
-		Version:    uint(1),
-		Function:   f,
-		ValidFrom:  &now,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		Version:   uint(1),
+		Function:  f,
+		ValidFrom: &now,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 	return fv, nil
 }

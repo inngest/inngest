@@ -3,7 +3,7 @@ package commands
 import (
 	"fmt"
 
-	"github.com/inngest/inngest/inngest/version"
+	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/spf13/cobra"
 )
 

@@ -4,11 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 )
 
@@ -37,28 +36,22 @@ func TestSDKCancelNotReceived(t *testing.T) {
 			- step.sleep
 			- step.run
 		`,
-		Function: function.Function{
-			ID:   fnID,
+		Function: inngest.Function{
 			Name: "Cancel test",
-			Triggers: []function.Trigger{
+			Triggers: []inngest.Trigger{
 				{
-					EventTrigger: &function.EventTrigger{
+					EventTrigger: &inngest.EventTrigger{
 						Event: "tests/cancel.test",
 					},
 				},
 			},
-			Steps: map[string]function.Step{
+			Steps: map[string]inngest.Step{
 				"step": {
-					ID:   "step",
 					Name: "step",
-					Runtime: &inngest.RuntimeWrapper{
-						Runtime: &inngest.RuntimeHTTP{
-							URL: stepURL(fnID, "step"),
-						},
-					},
+					URI:  stepURL(fnID, "step"),
 				},
 			},
-			Cancel: []function.Cancel{
+			Cancel: []inngest.Cancel{
 				{
 					Event:   "cancel/please",
 					Timeout: strptr("1h"),
@@ -162,28 +155,22 @@ func TestSDKCancelReceived(t *testing.T) {
 			- step.sleep
 			- step.run
 		`,
-		Function: function.Function{
-			ID:   fnID,
+		Function: inngest.Function{
 			Name: "Cancel test",
-			Triggers: []function.Trigger{
+			Triggers: []inngest.Trigger{
 				{
-					EventTrigger: &function.EventTrigger{
+					EventTrigger: &inngest.EventTrigger{
 						Event: "tests/cancel.test",
 					},
 				},
 			},
-			Steps: map[string]function.Step{
+			Steps: map[string]inngest.Step{
 				"step": {
-					ID:   "step",
 					Name: "step",
-					Runtime: &inngest.RuntimeWrapper{
-						Runtime: &inngest.RuntimeHTTP{
-							URL: stepURL(fnID, "step"),
-						},
-					},
+					URI:  stepURL(fnID, "step"),
 				},
 			},
-			Cancel: []function.Cancel{
+			Cancel: []inngest.Cancel{
 				{
 					Event:   "cancel/please",
 					Timeout: strptr("1h"),

@@ -60,6 +60,18 @@ type WorkflowStep struct {
 	Cancel []Cancel `json:"cancel,omitempty"`
 }
 
+func (ws WorkflowStep) Step() Step {
+	s := Step{
+		ID:   ws.ID,
+		Name: ws.Name,
+	}
+	// TODO: URI
+	if ws.Retries != nil {
+		s.Retries = ws.Retries.Attempts
+	}
+	return s
+}
+
 // RetryCount returns the number of retries for this step.
 func (s WorkflowStep) RetryCount() int {
 	if s.Retries != nil && s.Retries.Attempts != nil {

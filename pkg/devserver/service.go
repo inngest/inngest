@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/inngest/inngest/inngest/client"
-	"github.com/inngest/inngest/inngest/clistate"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/coreapi"
@@ -31,13 +29,12 @@ const (
 
 func newService(opts StartOpts, loader *inmemory.ReadWriter, runner runner.Runner) *devserver {
 	return &devserver{
-		runner:        runner,
-		loader:        loader,
-		opts:          opts,
-		urls:          opts.URLs,
-		urlLock:       &sync.Mutex{},
-		handlerLock:   &sync.Mutex{},
-		workspaceLock: &sync.RWMutex{},
+		runner:      runner,
+		loader:      loader,
+		opts:        opts,
+		urls:        opts.URLs,
+		urlLock:     &sync.Mutex{},
+		handlerLock: &sync.Mutex{},
 	}
 }
 
@@ -63,10 +60,6 @@ type devserver struct {
 
 	// loader stores all registered functions in the dev server.
 	loader *inmemory.ReadWriter
-
-	// workspaces stores the Inngest workspaces, if the CLI is authenticated.
-	workspaces    []client.Workspace
-	workspaceLock *sync.RWMutex
 
 	// handlers are updated by the API (d.apiservice) when registering functions.
 	handlers    []SDKHandler
@@ -107,10 +100,6 @@ func (d *devserver) Pre(ctx context.Context) error {
 		api.Mount{At: "/v0", Router: core.Router},
 		api.Mount{At: "/debug", Handler: middleware.Profiler()},
 	)
-
-	// Fetch workspace information in the background, retrying if this
-	// errors out.  This is optimistic, and it doesn't matter if it fails.
-	go d.fetchWorkspaces(ctx)
 
 	if d.opts.Autodiscover {
 		// Autodiscover the URLs that are hosting Inngest SDKs on the local machine.
@@ -154,28 +143,6 @@ func (d *devserver) Run(ctx context.Context) error {
 
 func (d *devserver) Stop(ctx context.Context) error {
 	return d.apiservice.Stop(ctx)
-}
-
-func (d *devserver) fetchWorkspaces(ctx context.Context) {
-	var err error
-	// If we're not authenticated, ensure that we poll for auth in the background.
-	// This lets us fetch account-related information to share with SDKs.
-	for {
-		if ctx.Err() != nil {
-			return
-		}
-
-		d.workspaceLock.Lock()
-		d.workspaces, err = clistate.Client(ctx).Workspaces(ctx)
-		d.workspaceLock.Unlock()
-		if err == nil {
-			return
-		}
-		// Poll seconds, as we may log in and share state from another CLI
-		// invocation.  This prevents you from having to reboot the dev server
-		// after logging in to fetch account information.
-		<-time.After(30 * time.Second)
-	}
 }
 
 // Autodiscover attempts to run autodiscovery while the dev server is running.
@@ -233,10 +200,10 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 
 // SDKHandler represents a handler that has registered with the dev server.
 type SDKHandler struct {
-	FunctionIDs []string            `json:"functionIDs"`
-	SDK         sdk.RegisterRequest `json:"sdk"`
-	CreatedAt   time.Time           `json:"createdAt"`
-	UpdatedAt   time.Time           `json:"updatedAt"`
+	Functions []string            `json:"functionIDs"`
+	SDK       sdk.RegisterRequest `json:"sdk"`
+	CreatedAt time.Time           `json:"createdAt"`
+	UpdatedAt time.Time           `json:"updatedAt"`
 }
 
 func localIPs() []*net.IPNet {

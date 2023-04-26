@@ -5,16 +5,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/inmemory"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/stretchr/testify/require"
 )
 
 func TestParseWait(t *testing.T) {
 	ctx := context.Background()
 
-	state := inmemory.NewStateInstance(
+	state := state.NewStateInstance(
 		inngest.Workflow{},
 		state.Identifier{},
 		state.Metadata{},

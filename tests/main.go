@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/stretchr/testify/require"
 )
@@ -198,17 +197,21 @@ func register(serverURL url.URL, rr sdk.RegisterRequest) error {
 	// Register functions using _this_ host and the introspection request
 	for n, fn := range rr.Functions {
 		for key, step := range fn.Steps {
-			rt := step.Runtime.Runtime.(inngest.RuntimeHTTP)
-			// Take the URL and replace the host with our server's URL.
-			parsed, err := url.Parse(rt.URL)
-			if err != nil {
-				return err
-			}
-			serverURL.Path = "/"
-			serverURL.RawQuery = parsed.RawQuery
-			rt.URL = serverURL.String()
-			step.Runtime.Runtime = rt
-			fn.Steps[key] = step
+			/*
+				rt := step.Runtime.Runtime.(inngest.RuntimeHTTP)
+				// Take the URL and replace the host with our server's URL.
+				parsed, err := url.Parse(rt.URL)
+				if err != nil {
+					return err
+				}
+				serverURL.Path = "/"
+				serverURL.RawQuery = parsed.RawQuery
+				rt.URL = serverURL.String()
+				step.Runtime.Runtime = rt
+				fn.Steps[key] = step
+			*/
+			// TODO
+			_, _ = key, step
 		}
 		rr.Functions[n] = fn
 	}

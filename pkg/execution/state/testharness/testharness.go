@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,7 +38,7 @@ var (
 				},
 			},
 		},
-		Steps: []inngest.Step{
+		Steps: []inngest.WorkflowStep{
 			{
 				ID:       "step-a",
 				ClientID: 1,
@@ -82,7 +82,7 @@ var (
 func init() {
 	// Copy the workflow and make 1000 scheduled steps.
 	for i := 1; i <= 100; i++ {
-		n100.Steps = append(n100.Steps, inngest.Step{
+		n100.Steps = append(n100.Steps, inngest.WorkflowStep{
 			ID:       fmt.Sprintf("step-%d", i),
 			ClientID: uint(i),
 			Name:     fmt.Sprintf("Step %d", i),
@@ -261,7 +261,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	s := setup(t, m)
 
 	r := state.DriverResponse{
-		Step: w.Steps[0],
+		Step: w.Steps[0].Step(),
 		Output: map[string]interface{}{
 			"status": float64(200),
 			"body": map[string]any{
@@ -302,7 +302,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	// as the second attempt.
 	//
 	r2 := state.DriverResponse{
-		Step: w.Steps[1],
+		Step: w.Steps[1].Step(),
 		Output: map[string]interface{}{
 			"status": float64(200),
 			"body": map[string]any{
@@ -365,7 +365,7 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	require.NoError(t, err)
 
 	r := state.DriverResponse{
-		Step: w.Steps[0],
+		Step: w.Steps[0].Step(),
 		Err:  fmt.Errorf("an absolutely terrible yet intermittent, non-final, retryable error"),
 	}
 	require.True(t, r.Retryable())
@@ -414,7 +414,7 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 
 	stepErr := fmt.Errorf("an absolutely terrible yet intermittent, non-final, retryable error")
 	r := state.DriverResponse{
-		Step: w.Steps[0],
+		Step: w.Steps[0].Step(),
 		Err:  stepErr,
 	}
 	require.True(t, r.Retryable())
@@ -479,7 +479,7 @@ func checkSaveResponse_concurrent(t *testing.T, m state.Manager) {
 		go func() {
 			defer wg.Done()
 			r := state.DriverResponse{
-				Step: n100.Steps[n],
+				Step: n100.Steps[n].Step(),
 				Output: map[string]interface{}{
 					"status": float64(200),
 					"body": map[string]any{
@@ -507,7 +507,7 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 
 	t.Run("It modifies the stack with step output", func(t *testing.T) {
 		r := state.DriverResponse{
-			Step: w.Steps[0],
+			Step: w.Steps[0].Step(),
 			Output: map[string]interface{}{
 				"status": float64(200),
 				"body": map[string]any{
@@ -529,7 +529,7 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 
 	t.Run("It doesn't amend the stack with temporary non-final errors", func(t *testing.T) {
 		r := state.DriverResponse{
-			Step: w.Steps[1],
+			Step: w.Steps[1].Step(),
 			Err:  fmt.Errorf("an absolutely terrible yet intermittent, non-final, retryable error"),
 		}
 		require.True(t, r.Retryable())
@@ -548,7 +548,7 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 
 	t.Run("It modifies the stack with a final error", func(t *testing.T) {
 		r := state.DriverResponse{
-			Step: w.Steps[1],
+			Step: w.Steps[1].Step(),
 			Err:  fmt.Errorf("a permanent error"),
 		}
 		r.SetFinal()
@@ -1729,7 +1729,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 		<-time.After(time.Millisecond)
 
 		r := state.DriverResponse{
-			Step: w.Steps[0],
+			Step: w.Steps[0].Step(),
 			Err:  fmt.Errorf("lol"),
 		}
 		_, err := m.SaveResponse(ctx, s.Identifier(), r, 2)
@@ -1756,7 +1756,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 		<-time.After(time.Millisecond)
 
 		r := state.DriverResponse{
-			Step: w.Steps[0],
+			Step: w.Steps[0].Step(),
 			Err:  fmt.Errorf("lol"),
 		}
 		r.SetFinal()
@@ -1786,7 +1786,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 		<-time.After(time.Millisecond)
 
 		r := state.DriverResponse{
-			Step:   w.Steps[0],
+			Step:   w.Steps[0].Step(),
 			Output: map[string]any{"ok": true},
 		}
 		_, err := m.SaveResponse(ctx, s.Identifier(), r, 2)

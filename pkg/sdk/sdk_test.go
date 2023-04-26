@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,20 +18,19 @@ func TestRegisterRequestValidate(t *testing.T) {
 		{
 			name: "No functions",
 			r: RegisterRequest{
-				Functions: []function.Function{},
+				Functions: []inngest.Function{},
 			},
 			err: ErrNoFunctions,
 		},
 		{
 			name: "no steps",
 			r: RegisterRequest{
-				Functions: []function.Function{
+				Functions: []inngest.Function{
 					{
-						ID:   "lol",
 						Name: "lol",
-						Triggers: []function.Trigger{
+						Triggers: []inngest.Trigger{
 							{
-								EventTrigger: &function.EventTrigger{
+								EventTrigger: &inngest.EventTrigger{
 									Event: "my/event",
 								},
 							},
@@ -45,18 +43,17 @@ func TestRegisterRequestValidate(t *testing.T) {
 		{
 			name: "no driver",
 			r: RegisterRequest{
-				Functions: []function.Function{
+				Functions: []inngest.Function{
 					{
-						ID:   "lol",
 						Name: "lol",
-						Triggers: []function.Trigger{
+						Triggers: []inngest.Trigger{
 							{
-								EventTrigger: &function.EventTrigger{
+								EventTrigger: &inngest.EventTrigger{
 									Event: "my/event",
 								},
 							},
 						},
-						Steps: map[string]function.Step{
+						Steps: map[string]inngest.Step{
 							"step-id": {
 								ID:   "step-id",
 								Name: "This is my first step.  It's a goodun, but it uses docker",
@@ -70,24 +67,21 @@ func TestRegisterRequestValidate(t *testing.T) {
 		{
 			name: "docker driver",
 			r: RegisterRequest{
-				Functions: []function.Function{
+				Functions: []inngest.Function{
 					{
-						ID:   "lol",
 						Name: "lol",
-						Triggers: []function.Trigger{
+						Triggers: []inngest.Trigger{
 							{
-								EventTrigger: &function.EventTrigger{
+								EventTrigger: &inngest.EventTrigger{
 									Event: "my/event",
 								},
 							},
 						},
-						Steps: map[string]function.Step{
+						Steps: map[string]inngest.Step{
 							"step-id": {
 								ID:   "step-id",
 								Name: "This is my first step.  It's a goodun, but it uses docker",
-								Runtime: &inngest.RuntimeWrapper{
-									Runtime: inngest.RuntimeDocker{},
-								},
+								URI:  "docker://foo-bar/baz",
 							},
 						},
 					},
@@ -98,26 +92,21 @@ func TestRegisterRequestValidate(t *testing.T) {
 		{
 			name: "valid",
 			r: RegisterRequest{
-				Functions: []function.Function{
+				Functions: []inngest.Function{
 					{
-						ID:   "lol",
 						Name: "lol",
-						Triggers: []function.Trigger{
+						Triggers: []inngest.Trigger{
 							{
-								EventTrigger: &function.EventTrigger{
+								EventTrigger: &inngest.EventTrigger{
 									Event: "my/event",
 								},
 							},
 						},
-						Steps: map[string]function.Step{
+						Steps: map[string]inngest.Step{
 							"step-id": {
 								ID:   "step-id",
 								Name: "This is my first step.  It's a goodun, but it uses docker",
-								Runtime: &inngest.RuntimeWrapper{
-									Runtime: inngest.RuntimeHTTP{
-										URL: "https://www.example.net/lol/what",
-									},
-								},
+								URI:  "https://www.example.net/lol/what",
 							},
 						},
 					},

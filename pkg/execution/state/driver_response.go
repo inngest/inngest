@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -133,11 +133,6 @@ type DriverResponse struct {
 	// Err represents the error from the action, if the action errored.
 	// If the action terminated successfully this must be nil.
 	Err error `json:"err"`
-
-	// ActionVersion returns the version of the action executed, as some workflows
-	// may have ranges.  This must be included in a driver.Response as this is the
-	// return result from an executor.
-	ActionVersion *inngest.VersionInfo `json:"actionVersion"`
 
 	// final indicates whether the error has been marked as final.  This occurs
 	// when the response errors and the executor detects that this is the final

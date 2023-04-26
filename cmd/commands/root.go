@@ -66,12 +66,9 @@ func Execute() {
 
 	// Register Top Level Commands
 	rootCmd.AddCommand(NewCmdLogin())
-	rootCmd.AddCommand(NewCmdWorkspaces())
-	rootCmd.AddCommand(NewCmdRun())
 	rootCmd.AddCommand(NewCmdDev())
 	rootCmd.AddCommand(NewCmdVersion())
 	rootCmd.AddCommand(NewCmdServe())
-	rootCmd.AddCommand(NewCmdTypes())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

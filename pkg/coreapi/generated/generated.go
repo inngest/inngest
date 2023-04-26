@@ -14,7 +14,6 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
-	"github.com/inngest/inngest/inngest/client"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/function"
 	gqlparser "github.com/vektah/gqlparser/v2"
@@ -41,7 +40,6 @@ type Config struct {
 type ResolverRoot interface {
 	Event() EventResolver
 	FunctionRun() FunctionRunResolver
-	Mutation() MutationResolver
 	Query() QueryResolver
 }
 
@@ -49,21 +47,6 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
-	ActionVersion struct {
-		Config       func(childComplexity int) int
-		CreatedAt    func(childComplexity int) int
-		DSN          func(childComplexity int) int
-		Name         func(childComplexity int) int
-		ValidFrom    func(childComplexity int) int
-		ValidTo      func(childComplexity int) int
-		VersionMajor func(childComplexity int) int
-		VersionMinor func(childComplexity int) int
-	}
-
-	Config struct {
-		Execution func(childComplexity int) int
-	}
-
 	Event struct {
 		CreatedAt    func(childComplexity int) int
 		FunctionRuns func(childComplexity int) int
@@ -76,19 +59,6 @@ type ComplexityRoot struct {
 		Status       func(childComplexity int) int
 		TotalRuns    func(childComplexity int) int
 		Workspace    func(childComplexity int) int
-	}
-
-	ExecutionConfig struct {
-		Drivers func(childComplexity int) int
-	}
-
-	ExecutionDockerDriverConfig struct {
-		Namespace func(childComplexity int) int
-		Registry  func(childComplexity int) int
-	}
-
-	ExecutionDriversConfig struct {
-		Docker func(childComplexity int) int
 	}
 
 	Function struct {
@@ -134,20 +104,12 @@ type ComplexityRoot struct {
 		Version    func(childComplexity int) int
 	}
 
-	Mutation struct {
-		CreateActionVersion func(childComplexity int, input models.CreateActionVersionInput) int
-		DeployFunction      func(childComplexity int, input models.DeployFunctionInput) int
-		UpdateActionVersion func(childComplexity int, input models.UpdateActionVersionInput) int
-	}
-
 	Query struct {
-		ActionVersion func(childComplexity int, query models.ActionVersionQuery) int
-		Config        func(childComplexity int) int
-		Event         func(childComplexity int, query models.EventQuery) int
-		Events        func(childComplexity int, query models.EventsQuery) int
-		FunctionRun   func(childComplexity int, query models.FunctionRunQuery) int
-		FunctionRuns  func(childComplexity int, query models.FunctionRunsQuery) int
-		Functions     func(childComplexity int) int
+		Event        func(childComplexity int, query models.EventQuery) int
+		Events       func(childComplexity int, query models.EventsQuery) int
+		FunctionRun  func(childComplexity int, query models.FunctionRunQuery) int
+		FunctionRuns func(childComplexity int, query models.FunctionRunsQuery) int
+		Functions    func(childComplexity int) int
 	}
 
 	StepEvent struct {
@@ -185,14 +147,7 @@ type FunctionRunResolver interface {
 	Timeline(ctx context.Context, obj *models.FunctionRun) ([]models.FunctionRunEvent, error)
 	Event(ctx context.Context, obj *models.FunctionRun) (*models.Event, error)
 }
-type MutationResolver interface {
-	DeployFunction(ctx context.Context, input models.DeployFunctionInput) (*function.FunctionVersion, error)
-	CreateActionVersion(ctx context.Context, input models.CreateActionVersionInput) (*client.ActionVersion, error)
-	UpdateActionVersion(ctx context.Context, input models.UpdateActionVersionInput) (*client.ActionVersion, error)
-}
 type QueryResolver interface {
-	Config(ctx context.Context) (*models.Config, error)
-	ActionVersion(ctx context.Context, query models.ActionVersionQuery) (*client.ActionVersion, error)
 	Event(ctx context.Context, query models.EventQuery) (*models.Event, error)
 	Events(ctx context.Context, query models.EventsQuery) ([]*models.Event, error)
 	Functions(ctx context.Context) ([]*models.Function, error)
@@ -214,69 +169,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	ec := executionContext{nil, e}
 	_ = ec
 	switch typeName + "." + field {
-
-	case "ActionVersion.config":
-		if e.complexity.ActionVersion.Config == nil {
-			break
-		}
-
-		return e.complexity.ActionVersion.Config(childComplexity), true
-
-	case "ActionVersion.createdAt":
-		if e.complexity.ActionVersion.CreatedAt == nil {
-			break
-		}
-
-		return e.complexity.ActionVersion.CreatedAt(childComplexity), true
-
-	case "ActionVersion.dsn":
-		if e.complexity.ActionVersion.DSN == nil {
-			break
-		}
-
-		return e.complexity.ActionVersion.DSN(childComplexity), true
-
-	case "ActionVersion.name":
-		if e.complexity.ActionVersion.Name == nil {
-			break
-		}
-
-		return e.complexity.ActionVersion.Name(childComplexity), true
-
-	case "ActionVersion.validFrom":
-		if e.complexity.ActionVersion.ValidFrom == nil {
-			break
-		}
-
-		return e.complexity.ActionVersion.ValidFrom(childComplexity), true
-
-	case "ActionVersion.validTo":
-		if e.complexity.ActionVersion.ValidTo == nil {
-			break
-		}
-
-		return e.complexity.ActionVersion.ValidTo(childComplexity), true
-
-	case "ActionVersion.versionMajor":
-		if e.complexity.ActionVersion.VersionMajor == nil {
-			break
-		}
-
-		return e.complexity.ActionVersion.VersionMajor(childComplexity), true
-
-	case "ActionVersion.versionMinor":
-		if e.complexity.ActionVersion.VersionMinor == nil {
-			break
-		}
-
-		return e.complexity.ActionVersion.VersionMinor(childComplexity), true
-
-	case "Config.execution":
-		if e.complexity.Config.Execution == nil {
-			break
-		}
-
-		return e.complexity.Config.Execution(childComplexity), true
 
 	case "Event.createdAt":
 		if e.complexity.Event.CreatedAt == nil {
@@ -354,34 +246,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Event.Workspace(childComplexity), true
-
-	case "ExecutionConfig.drivers":
-		if e.complexity.ExecutionConfig.Drivers == nil {
-			break
-		}
-
-		return e.complexity.ExecutionConfig.Drivers(childComplexity), true
-
-	case "ExecutionDockerDriverConfig.namespace":
-		if e.complexity.ExecutionDockerDriverConfig.Namespace == nil {
-			break
-		}
-
-		return e.complexity.ExecutionDockerDriverConfig.Namespace(childComplexity), true
-
-	case "ExecutionDockerDriverConfig.registry":
-		if e.complexity.ExecutionDockerDriverConfig.Registry == nil {
-			break
-		}
-
-		return e.complexity.ExecutionDockerDriverConfig.Registry(childComplexity), true
-
-	case "ExecutionDriversConfig.docker":
-		if e.complexity.ExecutionDriversConfig.Docker == nil {
-			break
-		}
-
-		return e.complexity.ExecutionDriversConfig.Docker(childComplexity), true
 
 	case "Function.concurrency":
 		if e.complexity.Function.Concurrency == nil {
@@ -579,61 +443,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.FunctionVersion.Version(childComplexity), true
 
-	case "Mutation.createActionVersion":
-		if e.complexity.Mutation.CreateActionVersion == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_createActionVersion_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.CreateActionVersion(childComplexity, args["input"].(models.CreateActionVersionInput)), true
-
-	case "Mutation.deployFunction":
-		if e.complexity.Mutation.DeployFunction == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_deployFunction_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.DeployFunction(childComplexity, args["input"].(models.DeployFunctionInput)), true
-
-	case "Mutation.updateActionVersion":
-		if e.complexity.Mutation.UpdateActionVersion == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_updateActionVersion_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.UpdateActionVersion(childComplexity, args["input"].(models.UpdateActionVersionInput)), true
-
-	case "Query.actionVersion":
-		if e.complexity.Query.ActionVersion == nil {
-			break
-		}
-
-		args, err := ec.field_Query_actionVersion_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.ActionVersion(childComplexity, args["query"].(models.ActionVersionQuery)), true
-
-	case "Query.config":
-		if e.complexity.Query.Config == nil {
-			break
-		}
-
-		return e.complexity.Query.Config(childComplexity), true
-
 	case "Query.event":
 		if e.complexity.Query.Event == nil {
 			break
@@ -782,13 +591,10 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	ec := executionContext{rc, e}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputActionVersionQuery,
-		ec.unmarshalInputCreateActionVersionInput,
-		ec.unmarshalInputDeployFunctionInput,
 		ec.unmarshalInputEventQuery,
 		ec.unmarshalInputEventsQuery,
 		ec.unmarshalInputFunctionRunQuery,
 		ec.unmarshalInputFunctionRunsQuery,
-		ec.unmarshalInputUpdateActionVersionInput,
 	)
 	first := true
 
@@ -801,21 +607,6 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			first = false
 			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
 			data := ec._Query(ctx, rc.Operation.SelectionSet)
-			var buf bytes.Buffer
-			data.MarshalGQL(&buf)
-
-			return &graphql.Response{
-				Data: buf.Bytes(),
-			}
-		}
-	case ast.Mutation:
-		return func(ctx context.Context) *graphql.Response {
-			if !first {
-				return nil
-			}
-			first = false
-			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
-			data := ec._Mutation(ctx, rc.Operation.SelectionSet)
 			var buf bytes.Buffer
 			data.MarshalGQL(&buf)
 
@@ -849,34 +640,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "../mutations.graphql", Input: `type Mutation {
-  deployFunction(input: DeployFunctionInput!): FunctionVersion
-
-  createActionVersion(input: CreateActionVersionInput!): ActionVersion
-  updateActionVersion(input: UpdateActionVersionInput!): ActionVersion
-}
-
-input DeployFunctionInput {
-  env: Environment
-  config: String!
-  live: Boolean
-}
-
-input CreateActionVersionInput {
-  config: String!
-}
-
-input UpdateActionVersionInput {
-  dsn: String!
-  versionMajor: Int!
-  versionMinor: Int!
-  enabled: Boolean
-}
-`, BuiltIn: false},
 	{Name: "../query.graphql", Input: `type Query {
-  config: Config
-  actionVersion(query: ActionVersionQuery!): ActionVersion
-
   # Get an individual event
   event(query: EventQuery!): Event
 
@@ -919,41 +683,14 @@ input FunctionRunsQuery {
 }
 `, BuiltIn: false},
 	{Name: "../schema.graphql", Input: `scalar Time
+
 """
 The environment for the function to be run: ` + "`" + `"prod"` + "`" + ` or ` + "`" + `"test"` + "`" + `
 """
 scalar Environment
 
-type Config {
-  execution: ExecutionConfig
-}
-
-type ExecutionConfig {
-  drivers: ExecutionDriversConfig
-}
-
-type ExecutionDriversConfig {
-  docker: ExecutionDockerDriverConfig
-}
-
-type ExecutionDockerDriverConfig {
-  registry: String
-  namespace: String
-}
-
 type Workspace {
   id: ID!
-}
-
-type ActionVersion {
-  dsn: String!
-  name: String!
-  versionMajor: Int!
-  versionMinor: Int!
-  createdAt: Time!
-  validFrom: Time
-  validTo: Time
-  config: String!
 }
 
 type FunctionVersion {
@@ -1094,51 +831,6 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
 // region    ***************************** args.gotpl *****************************
 
-func (ec *executionContext) field_Mutation_createActionVersion_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 models.CreateActionVersionInput
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNCreateActionVersionInput2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCreateActionVersionInput(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["input"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_deployFunction_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 models.DeployFunctionInput
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNDeployFunctionInput2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐDeployFunctionInput(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["input"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_updateActionVersion_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 models.UpdateActionVersionInput
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNUpdateActionVersionInput2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐUpdateActionVersionInput(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["input"] = arg0
-	return args, nil
-}
-
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -1151,21 +843,6 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		}
 	}
 	args["name"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Query_actionVersion_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 models.ActionVersionQuery
-	if tmp, ok := rawArgs["query"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("query"))
-		arg0, err = ec.unmarshalNActionVersionQuery2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐActionVersionQuery(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["query"] = arg0
 	return args, nil
 }
 
@@ -1266,397 +943,6 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ************************** directives.gotpl **************************
 
 // region    **************************** field.gotpl *****************************
-
-func (ec *executionContext) _ActionVersion_dsn(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ActionVersion_dsn(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.DSN, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ActionVersion_dsn(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ActionVersion",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ActionVersion_name(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ActionVersion_name(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Name, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ActionVersion_name(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ActionVersion",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ActionVersion_versionMajor(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ActionVersion_versionMajor(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.VersionMajor()
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint)
-	fc.Result = res
-	return ec.marshalNInt2uint(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ActionVersion_versionMajor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ActionVersion",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ActionVersion_versionMinor(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ActionVersion_versionMinor(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.VersionMinor()
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint)
-	fc.Result = res
-	return ec.marshalNInt2uint(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ActionVersion_versionMinor(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ActionVersion",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ActionVersion_createdAt(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ActionVersion_createdAt(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.CreatedAt, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*time.Time)
-	fc.Result = res
-	return ec.marshalNTime2ᚖtimeᚐTime(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ActionVersion_createdAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ActionVersion",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Time does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ActionVersion_validFrom(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ActionVersion_validFrom(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ValidFrom, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*time.Time)
-	fc.Result = res
-	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ActionVersion_validFrom(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ActionVersion",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Time does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ActionVersion_validTo(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ActionVersion_validTo(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ValidTo, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*time.Time)
-	fc.Result = res
-	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ActionVersion_validTo(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ActionVersion",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Time does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ActionVersion_config(ctx context.Context, field graphql.CollectedField, obj *client.ActionVersion) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ActionVersion_config(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Config, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ActionVersion_config(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ActionVersion",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Config_execution(ctx context.Context, field graphql.CollectedField, obj *models.Config) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Config_execution(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Execution, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*models.ExecutionConfig)
-	fc.Result = res
-	return ec.marshalOExecutionConfig2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐExecutionConfig(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Config_execution(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Config",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "drivers":
-				return ec.fieldContext_ExecutionConfig_drivers(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type ExecutionConfig", field.Name)
-		},
-	}
-	return fc, nil
-}
 
 func (ec *executionContext) _Event_id(ctx context.Context, field graphql.CollectedField, obj *models.Event) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Event_id(ctx, field)
@@ -2131,180 +1417,6 @@ func (ec *executionContext) fieldContext_Event_functionRuns(ctx context.Context,
 				return ec.fieldContext_FunctionRun_event(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ExecutionConfig_drivers(ctx context.Context, field graphql.CollectedField, obj *models.ExecutionConfig) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ExecutionConfig_drivers(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Drivers, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*models.ExecutionDriversConfig)
-	fc.Result = res
-	return ec.marshalOExecutionDriversConfig2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐExecutionDriversConfig(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ExecutionConfig_drivers(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ExecutionConfig",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "docker":
-				return ec.fieldContext_ExecutionDriversConfig_docker(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type ExecutionDriversConfig", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ExecutionDockerDriverConfig_registry(ctx context.Context, field graphql.CollectedField, obj *models.ExecutionDockerDriverConfig) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ExecutionDockerDriverConfig_registry(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Registry, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ExecutionDockerDriverConfig_registry(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ExecutionDockerDriverConfig",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ExecutionDockerDriverConfig_namespace(ctx context.Context, field graphql.CollectedField, obj *models.ExecutionDockerDriverConfig) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ExecutionDockerDriverConfig_namespace(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Namespace, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ExecutionDockerDriverConfig_namespace(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ExecutionDockerDriverConfig",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ExecutionDriversConfig_docker(ctx context.Context, field graphql.CollectedField, obj *models.ExecutionDriversConfig) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_ExecutionDriversConfig_docker(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Docker, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*models.ExecutionDockerDriverConfig)
-	fc.Result = res
-	return ec.marshalOExecutionDockerDriverConfig2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐExecutionDockerDriverConfig(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_ExecutionDriversConfig_docker(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ExecutionDriversConfig",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "registry":
-				return ec.fieldContext_ExecutionDockerDriverConfig_registry(ctx, field)
-			case "namespace":
-				return ec.fieldContext_ExecutionDockerDriverConfig_namespace(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type ExecutionDockerDriverConfig", field.Name)
 		},
 	}
 	return fc, nil
@@ -3556,329 +2668,6 @@ func (ec *executionContext) fieldContext_FunctionVersion_updatedAt(ctx context.C
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Time does not have child fields")
 		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_deployFunction(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_deployFunction(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().DeployFunction(rctx, fc.Args["input"].(models.DeployFunctionInput))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*function.FunctionVersion)
-	fc.Result = res
-	return ec.marshalOFunctionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋfunctionᚐFunctionVersion(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Mutation_deployFunction(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "functionId":
-				return ec.fieldContext_FunctionVersion_functionId(ctx, field)
-			case "version":
-				return ec.fieldContext_FunctionVersion_version(ctx, field)
-			case "config":
-				return ec.fieldContext_FunctionVersion_config(ctx, field)
-			case "validFrom":
-				return ec.fieldContext_FunctionVersion_validFrom(ctx, field)
-			case "validTo":
-				return ec.fieldContext_FunctionVersion_validTo(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_FunctionVersion_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_FunctionVersion_updatedAt(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type FunctionVersion", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_deployFunction_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_createActionVersion(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_createActionVersion(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateActionVersion(rctx, fc.Args["input"].(models.CreateActionVersionInput))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*client.ActionVersion)
-	fc.Result = res
-	return ec.marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚋinngestᚋclientᚐActionVersion(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Mutation_createActionVersion(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "dsn":
-				return ec.fieldContext_ActionVersion_dsn(ctx, field)
-			case "name":
-				return ec.fieldContext_ActionVersion_name(ctx, field)
-			case "versionMajor":
-				return ec.fieldContext_ActionVersion_versionMajor(ctx, field)
-			case "versionMinor":
-				return ec.fieldContext_ActionVersion_versionMinor(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_ActionVersion_createdAt(ctx, field)
-			case "validFrom":
-				return ec.fieldContext_ActionVersion_validFrom(ctx, field)
-			case "validTo":
-				return ec.fieldContext_ActionVersion_validTo(ctx, field)
-			case "config":
-				return ec.fieldContext_ActionVersion_config(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type ActionVersion", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_createActionVersion_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Mutation_updateActionVersion(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_updateActionVersion(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().UpdateActionVersion(rctx, fc.Args["input"].(models.UpdateActionVersionInput))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*client.ActionVersion)
-	fc.Result = res
-	return ec.marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚋinngestᚋclientᚐActionVersion(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Mutation_updateActionVersion(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Mutation",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "dsn":
-				return ec.fieldContext_ActionVersion_dsn(ctx, field)
-			case "name":
-				return ec.fieldContext_ActionVersion_name(ctx, field)
-			case "versionMajor":
-				return ec.fieldContext_ActionVersion_versionMajor(ctx, field)
-			case "versionMinor":
-				return ec.fieldContext_ActionVersion_versionMinor(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_ActionVersion_createdAt(ctx, field)
-			case "validFrom":
-				return ec.fieldContext_ActionVersion_validFrom(ctx, field)
-			case "validTo":
-				return ec.fieldContext_ActionVersion_validTo(ctx, field)
-			case "config":
-				return ec.fieldContext_ActionVersion_config(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type ActionVersion", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_updateActionVersion_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_config(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_config(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Config(rctx)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*models.Config)
-	fc.Result = res
-	return ec.marshalOConfig2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConfig(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_config(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "execution":
-				return ec.fieldContext_Config_execution(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Config", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_actionVersion(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_actionVersion(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().ActionVersion(rctx, fc.Args["query"].(models.ActionVersionQuery))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*client.ActionVersion)
-	fc.Result = res
-	return ec.marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚋinngestᚋclientᚐActionVersion(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_actionVersion(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "dsn":
-				return ec.fieldContext_ActionVersion_dsn(ctx, field)
-			case "name":
-				return ec.fieldContext_ActionVersion_name(ctx, field)
-			case "versionMajor":
-				return ec.fieldContext_ActionVersion_versionMajor(ctx, field)
-			case "versionMinor":
-				return ec.fieldContext_ActionVersion_versionMinor(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_ActionVersion_createdAt(ctx, field)
-			case "validFrom":
-				return ec.fieldContext_ActionVersion_validFrom(ctx, field)
-			case "validTo":
-				return ec.fieldContext_ActionVersion_validTo(ctx, field)
-			case "config":
-				return ec.fieldContext_ActionVersion_config(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type ActionVersion", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_actionVersion_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
 	}
 	return fc, nil
 }
@@ -6708,78 +5497,6 @@ func (ec *executionContext) unmarshalInputActionVersionQuery(ctx context.Context
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputCreateActionVersionInput(ctx context.Context, obj interface{}) (models.CreateActionVersionInput, error) {
-	var it models.CreateActionVersionInput
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"config"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "config":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("config"))
-			it.Config, err = ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		}
-	}
-
-	return it, nil
-}
-
-func (ec *executionContext) unmarshalInputDeployFunctionInput(ctx context.Context, obj interface{}) (models.DeployFunctionInput, error) {
-	var it models.DeployFunctionInput
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"env", "config", "live"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "env":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("env"))
-			it.Env, err = ec.unmarshalOEnvironment2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEnvironment(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "config":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("config"))
-			it.Config, err = ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "live":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("live"))
-			it.Live, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		}
-	}
-
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputEventQuery(ctx context.Context, obj interface{}) (models.EventQuery, error) {
 	var it models.EventQuery
 	asMap := map[string]interface{}{}
@@ -6932,58 +5649,6 @@ func (ec *executionContext) unmarshalInputFunctionRunsQuery(ctx context.Context,
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputUpdateActionVersionInput(ctx context.Context, obj interface{}) (models.UpdateActionVersionInput, error) {
-	var it models.UpdateActionVersionInput
-	asMap := map[string]interface{}{}
-	for k, v := range obj.(map[string]interface{}) {
-		asMap[k] = v
-	}
-
-	fieldsInOrder := [...]string{"dsn", "versionMajor", "versionMinor", "enabled"}
-	for _, k := range fieldsInOrder {
-		v, ok := asMap[k]
-		if !ok {
-			continue
-		}
-		switch k {
-		case "dsn":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("dsn"))
-			it.Dsn, err = ec.unmarshalNString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "versionMajor":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("versionMajor"))
-			it.VersionMajor, err = ec.unmarshalNInt2int(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "versionMinor":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("versionMinor"))
-			it.VersionMinor, err = ec.unmarshalNInt2int(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "enabled":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("enabled"))
-			it.Enabled, err = ec.unmarshalOBoolean2ᚖbool(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		}
-	}
-
-	return it, nil
-}
-
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -7014,102 +5679,6 @@ func (ec *executionContext) _FunctionRunEvent(ctx context.Context, sel ast.Selec
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
-
-var actionVersionImplementors = []string{"ActionVersion"}
-
-func (ec *executionContext) _ActionVersion(ctx context.Context, sel ast.SelectionSet, obj *client.ActionVersion) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, actionVersionImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ActionVersion")
-		case "dsn":
-
-			out.Values[i] = ec._ActionVersion_dsn(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "name":
-
-			out.Values[i] = ec._ActionVersion_name(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "versionMajor":
-
-			out.Values[i] = ec._ActionVersion_versionMajor(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "versionMinor":
-
-			out.Values[i] = ec._ActionVersion_versionMinor(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "createdAt":
-
-			out.Values[i] = ec._ActionVersion_createdAt(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "validFrom":
-
-			out.Values[i] = ec._ActionVersion_validFrom(ctx, field, obj)
-
-		case "validTo":
-
-			out.Values[i] = ec._ActionVersion_validTo(ctx, field, obj)
-
-		case "config":
-
-			out.Values[i] = ec._ActionVersion_config(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var configImplementors = []string{"Config"}
-
-func (ec *executionContext) _Config(ctx context.Context, sel ast.SelectionSet, obj *models.Config) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, configImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("Config")
-		case "execution":
-
-			out.Values[i] = ec._Config_execution(ctx, field, obj)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
 
 var eventImplementors = []string{"Event"}
 
@@ -7233,85 +5802,6 @@ func (ec *executionContext) _Event(ctx context.Context, sel ast.SelectionSet, ob
 				return innerFunc(ctx)
 
 			})
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var executionConfigImplementors = []string{"ExecutionConfig"}
-
-func (ec *executionContext) _ExecutionConfig(ctx context.Context, sel ast.SelectionSet, obj *models.ExecutionConfig) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, executionConfigImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ExecutionConfig")
-		case "drivers":
-
-			out.Values[i] = ec._ExecutionConfig_drivers(ctx, field, obj)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var executionDockerDriverConfigImplementors = []string{"ExecutionDockerDriverConfig"}
-
-func (ec *executionContext) _ExecutionDockerDriverConfig(ctx context.Context, sel ast.SelectionSet, obj *models.ExecutionDockerDriverConfig) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, executionDockerDriverConfigImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ExecutionDockerDriverConfig")
-		case "registry":
-
-			out.Values[i] = ec._ExecutionDockerDriverConfig_registry(ctx, field, obj)
-
-		case "namespace":
-
-			out.Values[i] = ec._ExecutionDockerDriverConfig_namespace(ctx, field, obj)
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var executionDriversConfigImplementors = []string{"ExecutionDriversConfig"}
-
-func (ec *executionContext) _ExecutionDriversConfig(ctx context.Context, sel ast.SelectionSet, obj *models.ExecutionDriversConfig) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, executionDriversConfigImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("ExecutionDriversConfig")
-		case "docker":
-
-			out.Values[i] = ec._ExecutionDriversConfig_docker(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -7615,54 +6105,6 @@ func (ec *executionContext) _FunctionVersion(ctx context.Context, sel ast.Select
 	return out
 }
 
-var mutationImplementors = []string{"Mutation"}
-
-func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, mutationImplementors)
-	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
-		Object: "Mutation",
-	})
-
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		innerCtx := graphql.WithRootFieldContext(ctx, &graphql.RootFieldContext{
-			Object: field.Name,
-			Field:  field,
-		})
-
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("Mutation")
-		case "deployFunction":
-
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_deployFunction(ctx, field)
-			})
-
-		case "createActionVersion":
-
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_createActionVersion(ctx, field)
-			})
-
-		case "updateActionVersion":
-
-			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_updateActionVersion(ctx, field)
-			})
-
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -7682,46 +6124,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
-		case "config":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_config(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
-		case "actionVersion":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_actionVersion(ctx, field)
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
 		case "event":
 			field := field
 
@@ -8280,11 +6682,6 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
-func (ec *executionContext) unmarshalNActionVersionQuery2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐActionVersionQuery(ctx context.Context, v interface{}) (models.ActionVersionQuery, error) {
-	res, err := ec.unmarshalInputActionVersionQuery(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -8298,16 +6695,6 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 		}
 	}
 	return res
-}
-
-func (ec *executionContext) unmarshalNCreateActionVersionInput2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCreateActionVersionInput(ctx context.Context, v interface{}) (models.CreateActionVersionInput, error) {
-	res, err := ec.unmarshalInputCreateActionVersionInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalNDeployFunctionInput2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐDeployFunctionInput(ctx context.Context, v interface{}) (models.DeployFunctionInput, error) {
-	res, err := ec.unmarshalInputDeployFunctionInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNEvent2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEvent(ctx context.Context, sel ast.SelectionSet, v *models.Event) graphql.Marshaler {
@@ -8463,32 +6850,6 @@ func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel as
 		}
 	}
 	return res
-}
-
-func (ec *executionContext) unmarshalNTime2ᚖtimeᚐTime(ctx context.Context, v interface{}) (*time.Time, error) {
-	res, err := graphql.UnmarshalTime(v)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNTime2ᚖtimeᚐTime(ctx context.Context, sel ast.SelectionSet, v *time.Time) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	res := graphql.MarshalTime(*v)
-	if res == graphql.Null {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-	}
-	return res
-}
-
-func (ec *executionContext) unmarshalNUpdateActionVersionInput2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐUpdateActionVersionInput(ctx context.Context, v interface{}) (models.UpdateActionVersionInput, error) {
-	res, err := ec.unmarshalInputUpdateActionVersionInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {
@@ -8744,13 +7105,6 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
-func (ec *executionContext) marshalOActionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚋinngestᚋclientᚐActionVersion(ctx context.Context, sel ast.SelectionSet, v *client.ActionVersion) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._ActionVersion(ctx, sel, v)
-}
-
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -8774,30 +7128,6 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 		return graphql.Null
 	}
 	res := graphql.MarshalBoolean(*v)
-	return res
-}
-
-func (ec *executionContext) marshalOConfig2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConfig(ctx context.Context, sel ast.SelectionSet, v *models.Config) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._Config(ctx, sel, v)
-}
-
-func (ec *executionContext) unmarshalOEnvironment2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEnvironment(ctx context.Context, v interface{}) (*models.Environment, error) {
-	if v == nil {
-		return nil, nil
-	}
-	tmp, err := graphql.UnmarshalString(v)
-	res := models.Environment(tmp)
-	return &res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalOEnvironment2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEnvironment(ctx context.Context, sel ast.SelectionSet, v *models.Environment) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	res := graphql.MarshalString(string(*v))
 	return res
 }
 
@@ -8869,27 +7199,6 @@ func (ec *executionContext) marshalOEventStatus2ᚖgithubᚗcomᚋinngestᚋinng
 		return graphql.Null
 	}
 	return v
-}
-
-func (ec *executionContext) marshalOExecutionConfig2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐExecutionConfig(ctx context.Context, sel ast.SelectionSet, v *models.ExecutionConfig) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._ExecutionConfig(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOExecutionDockerDriverConfig2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐExecutionDockerDriverConfig(ctx context.Context, sel ast.SelectionSet, v *models.ExecutionDockerDriverConfig) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._ExecutionDockerDriverConfig(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOExecutionDriversConfig2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐExecutionDriversConfig(ctx context.Context, sel ast.SelectionSet, v *models.ExecutionDriversConfig) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._ExecutionDriversConfig(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOFunction2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Function) graphql.Marshaler {
@@ -9117,13 +7426,6 @@ func (ec *executionContext) marshalOFunctionTrigger2ᚕᚖgithubᚗcomᚋinngest
 	}
 
 	return ret
-}
-
-func (ec *executionContext) marshalOFunctionVersion2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋfunctionᚐFunctionVersion(ctx context.Context, sel ast.SelectionSet, v *function.FunctionVersion) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._FunctionVersion(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v interface{}) (*string, error) {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/internal/cuedefs"
+	"github.com/inngest/inngest/pkg/inngest"
 )
 
 // Parse parses an action.  This differs from inngest.ParseAction as we automatically

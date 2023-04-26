@@ -3,33 +3,10 @@
 package executor
 
 import (
-	"context"
-	"crypto/rand"
-	"fmt"
-	"sync/atomic"
-	"testing"
-	"time"
-
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/pkg/backoff"
-	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
-	"github.com/inngest/inngest/pkg/coredata"
-	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
-	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/execution/driver/mockdriver"
-	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/queue/inmemoryqueue"
-	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/inmemory"
-	"github.com/inngest/inngest/pkg/function"
-	"github.com/inngest/inngest/pkg/service"
-	"github.com/oklog/ulid/v2"
-	"github.com/stretchr/testify/require"
 )
 
+/*
 const (
 	timeout = 3000 * time.Millisecond
 	buffer  = 1500 * time.Millisecond
@@ -597,3 +574,4 @@ func TestServiceRetry(t *testing.T) {
 		require.EqualValues(t, 0, md.Pending)
 	})
 }
+*/

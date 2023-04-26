@@ -37,9 +37,9 @@ func NewGraph(w Workflow) (Graph, error) {
 	// all of our actions for us.
 	for _, e := range w.Edges {
 		edge := GraphEdge{
-			WorkflowEdge: e,
-			Outgoing:     vertices[e.Outgoing],
-			Incoming:     vertices[e.Incoming],
+			Edge:     e,
+			Outgoing: vertices[e.Outgoing],
+			Incoming: vertices[e.Incoming],
 		}
 		g.Connect(edge)
 	}
@@ -92,7 +92,7 @@ func (g Vertex) ID() string {
 // Edge inherits functionality from simple.Edge and includes our workflow edge
 // connecting two actions.
 type GraphEdge struct {
-	WorkflowEdge Edge
+	Edge Edge
 
 	Outgoing Vertex
 	Incoming Vertex

@@ -4,9 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/execution/driver"
-	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 )
 
@@ -33,25 +32,20 @@ func TestSDKFunctions(t *testing.T) {
 			- Handle incoming event triggers
 			- Respond with the correct, expected data
 		`,
-		Function: function.Function{
-			ID:   fnID,
+		Function: inngest.Function{
 			Name: "SDK Function Test",
-			Triggers: []function.Trigger{
+			Triggers: []inngest.Trigger{
 				{
-					EventTrigger: &function.EventTrigger{
+					EventTrigger: &inngest.EventTrigger{
 						Event: "tests/function.test",
 					},
 				},
 			},
-			Steps: map[string]function.Step{
+			Steps: map[string]inngest.Step{
 				"step": {
 					ID:   "step",
 					Name: "step",
-					Runtime: &inngest.RuntimeWrapper{
-						Runtime: &inngest.RuntimeHTTP{
-							URL: stepURL(fnID, "step"),
-						},
-					},
+					URI:  stepURL(fnID, "step"),
 				},
 			},
 		},
