@@ -81,7 +81,7 @@ func (a *apiServer) Run(ctx context.Context) error {
 	return err
 }
 
-func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) error {
+func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, error) {
 	// ctx is the request context, so we need to re-add
 	// the caller here.
 	l := logger.From(ctx).With().Str("caller", "api").Logger()
@@ -92,7 +92,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) error {
 	if strings.HasPrefix(strings.ToLower(e.Name), "inngest/") {
 		err := fmt.Errorf("event name %q is reserved for internal use", e.Name)
 		l.Error().Err(err).Msg("reserved event name rejected")
-		return err
+		return "", err
 	}
 
 	if e.ID == "" {
@@ -103,12 +103,12 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) error {
 	byt, err := json.Marshal(e)
 	if err != nil {
 		l.Error().Err(err).Msg("error unmarshalling event as JSON")
-		return err
+		return "", err
 	}
 
 	l.Info().Str("event_name", e.Name).Str("id", e.ID).Interface("event", e).Msg("publishing event")
 
-	return a.publisher.Publish(
+	err = a.publisher.Publish(
 		ctx,
 		a.config.EventStream.Service.TopicName(),
 		pubsub.Message{
@@ -117,6 +117,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) error {
 			Timestamp: time.Now(),
 		},
 	)
+	return e.ID, err
 }
 
 func (a *apiServer) Stop(ctx context.Context) error {

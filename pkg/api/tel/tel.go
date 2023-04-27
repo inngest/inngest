@@ -99,7 +99,7 @@ func Send(ctx context.Context, e inngestgo.Event) {
 
 	wg.Add(1)
 	go func() {
-		_ = client.Send(ctx, e)
+		_, _ = client.Send(ctx, e)
 		defer wg.Done()
 	}()
 }
