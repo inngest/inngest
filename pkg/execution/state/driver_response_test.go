@@ -218,6 +218,55 @@ func TestDriverResponseFinal(t *testing.T) {
 	}
 }
 
+func TestDriverResponseUserError(t *testing.T) {
+	tests := []struct {
+		name     string
+		r        DriverResponse
+		expected map[string]any
+	}{
+		{
+			name: "with no Output and Err",
+			r:    DriverResponse{Output: nil, Err: fmt.Errorf("something went wrong")},
+			expected: map[string]any{
+				"error": fmt.Errorf("something went wrong"),
+			},
+		},
+		{
+			name: "with Output and body",
+			r: DriverResponse{Output: map[string]any{
+				"body": map[string]any{
+					"error": "this is an error",
+				},
+			}},
+			expected: map[string]any{
+				"error": "this is an error",
+			},
+		},
+		{
+			name: "with Output and no body",
+			r: DriverResponse{Output: map[string]any{
+				"data": "error response",
+			}},
+			expected: map[string]any{
+				"data": "error response",
+			},
+		},
+		{
+			name: "non map Output",
+			r:    DriverResponse{Output: "YOLO"},
+			expected: map[string]any{
+				"error": "Unknown error running SDK",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.expected, test.r.UserError())
+		})
+	}
+}
+
 func TestGeneratorSleepDuration(t *testing.T) {
 	// Check that this works with a timestamp
 	at := time.Now().Truncate(time.Second).Add(time.Minute)
