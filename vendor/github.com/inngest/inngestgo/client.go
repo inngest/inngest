@@ -11,7 +11,7 @@ import (
 // Client represents a client used to send events to Inngest.
 type Client interface {
 	// Send sends the specific event to the ingest API.
-	Send(context.Context, Event) error
+	Send(context.Context, Event) (string, error)
 }
 
 // NewClient returns a concrete client initialized with the given ingest key,
@@ -76,14 +76,14 @@ type apiClient struct {
 	endpoint  *string
 }
 
-func (a apiClient) Send(ctx context.Context, e Event) error {
+func (a apiClient) Send(ctx context.Context, e Event) (string, error) {
 	if err := e.Validate(); err != nil {
-		return fmt.Errorf("error validating event: %w", err)
+		return "", fmt.Errorf("error validating event: %w", err)
 	}
 
 	byt, err := json.Marshal(e)
 	if err != nil {
-		return fmt.Errorf("error marshalling event to json: %w", err)
+		return "", fmt.Errorf("error marshalling event to json: %w", err)
 	}
 
 	ep := defaultEndpoint
@@ -94,7 +94,7 @@ func (a apiClient) Send(ctx context.Context, e Event) error {
 	url := fmt.Sprintf("%s/e/%s", ep, a.ingestKey)
 	resp, err := a.Post(url, "application/json", bytes.NewBuffer(byt))
 	if err != nil {
-		return fmt.Errorf("error sending event request: %w", err)
+		return "", fmt.Errorf("error sending event request: %w", err)
 	}
 
 	// There is no body to read;  the ingest API responds with status codes representing
@@ -102,16 +102,28 @@ func (a apiClient) Send(ctx context.Context, e Event) error {
 	defer resp.Body.Close()
 
 	switch resp.StatusCode {
-	case 200,201:
-		return nil
+	case 200, 201:
+		ids := EventAPIResponse{}
+		_ = json.NewDecoder(resp.Body).Decode(&ids)
+		if len(ids.IDs) == 1 {
+			return ids.IDs[0], nil
+		}
+		return "", nil
 	case 400:
-		return fmt.Errorf("invalid event data")
+		return "", fmt.Errorf("invalid event data")
 	case 401:
-		return fmt.Errorf("unknown ingest key")
+		return "", fmt.Errorf("unknown ingest key")
 	case 403:
 		// The ingest key has an IP or event type allow/denylist.
-		return fmt.Errorf("this ingest key is not authorized to send this event")
+		return "", fmt.Errorf("this ingest key is not authorized to send this event")
 	}
 
-	return fmt.Errorf("unknown status code sending event: %d", resp.StatusCode)
+	return "", fmt.Errorf("unknown status code sending event: %d", resp.StatusCode)
+}
+
+// EventAPIResponse is the API response sent when responding to incoming events.
+type EventAPIResponse struct {
+	IDs    []string `json:"ids"`
+	Status int      `json:"status"`
+	Error  error    `json:"error,omitempty"`
 }

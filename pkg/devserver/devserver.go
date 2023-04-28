@@ -47,7 +47,6 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) error {
-
 	funcs, err := loader.Functions(ctx)
 	if err != nil {
 		return err
@@ -121,6 +120,11 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 
 	// The devserver embeds the event API.
 	ds := newService(opts, loader, runner)
+	// embed the tracker
+	ds.tracker = t
+	ds.state = sm
+
+	// Create an executor.
 	exec := executor.NewService(
 		opts.Config,
 		executor.WithExecutionLoader(loader),

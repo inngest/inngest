@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/execution/runner"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
@@ -49,7 +50,9 @@ type devserver struct {
 	opts StartOpts
 
 	// runner stores the runner
-	runner runner.Runner
+	runner  runner.Runner
+	tracker *runner.Tracker
+	state   state.Manager
 
 	apiservice service.Service
 
@@ -84,6 +87,8 @@ func (d *devserver) Pre(ctx context.Context) error {
 		Logger:        logger.From(ctx),
 		APIReadWriter: datarw,
 		Runner:        d.runner,
+		Tracker:       d.tracker,
+		State:         d.state,
 	})
 	if err != nil {
 		return err

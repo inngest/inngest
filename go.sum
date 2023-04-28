@@ -922,8 +922,8 @@ github.com/inngest/event-schemas v0.0.0-20220323133008-96be406e1ea4 h1:8Y2Q7ueHw
 github.com/inngest/event-schemas v0.0.0-20220323133008-96be406e1ea4/go.mod h1:9t3eazMCsHjLm5mZOMqB0Ac/pTZiJqLzr++WFL240PI=
 github.com/inngest/golorem v0.0.0-20220323014825-15bf7a53bf79 h1:Z5wDJxZTie5JaOcNZ5gcJLu3dpd/rZ1UWeJyKBhgCHg=
 github.com/inngest/golorem v0.0.0-20220323014825-15bf7a53bf79/go.mod h1:jrbJIsFaGv6GkS2KnYp9p1Mq8RrEpoMQCgd9bOVZGnc=
-github.com/inngest/inngestgo v0.4.3-0.20230422124325-038ad9913809 h1:2GbeYZp4u9TOEo2uoquxaSBMHb19hDNS64E+eDVn3Lo=
-github.com/inngest/inngestgo v0.4.3-0.20230422124325-038ad9913809/go.mod h1:X1vKvgoYfUm7iHDniddfdZ5HPzGcwY1sTx1ud4wUbRw=
+github.com/inngest/inngestgo v0.4.3-0.20230427225702-be10dcbf5ec7 h1:5zc3LG3TMDClG1jrxCQ6xaZBJOkfkls7YlMehy+f7Gw=
+github.com/inngest/inngestgo v0.4.3-0.20230427225702-be10dcbf5ec7/go.mod h1:X1vKvgoYfUm7iHDniddfdZ5HPzGcwY1sTx1ud4wUbRw=
 github.com/intel/goresctrl v0.2.0/go.mod h1:+CZdzouYFn5EsxgqAQTEzMfwKwuc0fVdMrT9FCCAVRQ=
 github.com/j-keck/arping v0.0.0-20160618110441-2cf9dc699c56/go.mod h1:ymszkNOg6tORTn+6F6j+Jc8TOr5osrynvN6ivFWZ2GA=
 github.com/j-keck/arping v1.0.2/go.mod h1:aJbELhR92bSk7tp79AWM/ftfc90EfEi2bQJrbBFOsPw=

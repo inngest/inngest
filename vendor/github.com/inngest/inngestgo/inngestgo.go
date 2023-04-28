@@ -105,9 +105,9 @@ func Timestamp(t time.Time) int64 {
 }
 
 // Send uses the DefaultClient to send the given event.
-func Send(ctx context.Context, e Event) error {
+func Send(ctx context.Context, e Event) (string, error) {
 	if DefaultClient == nil {
-		return fmt.Errorf("no default client initialized for inngest")
+		return "", fmt.Errorf("no default client initialized for inngest")
 	}
 	return DefaultClient.Send(ctx, e)
 }

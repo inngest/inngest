@@ -449,10 +449,10 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			// for the same function run.  This should happen in the state store
 			// directly.
 
-			logger.From(ctx).Debug().
+			logger.From(ctx).Info().
 				Str("pause_id", pause.ID.String()).
 				Str("run_id", pause.Identifier.RunID.String()).
-				Msg("cancelling function")
+				Msg("cancelling function via event")
 
 			if err := s.state.Cancel(ctx, pause.Identifier); err != nil {
 				switch err {
@@ -619,7 +619,6 @@ func Initialize(ctx context.Context, fn function.Function, evt event.Event, s st
 }
 
 // NewTracker returns a crappy in-memory tracker used for registering function runs.
-//
 func NewTracker() (t *Tracker) {
 	return &Tracker{
 		l:      &sync.RWMutex{},
@@ -633,6 +632,10 @@ type Tracker struct {
 }
 
 func (t *Tracker) Add(evtID string, id state.Identifier) {
+	if t.l == nil {
+		return
+	}
+
 	t.l.Lock()
 	defer t.l.Unlock()
 	if _, ok := t.evtIDs[evtID]; !ok {
@@ -643,6 +646,9 @@ func (t *Tracker) Add(evtID string, id state.Identifier) {
 }
 
 func (t *Tracker) Runs(ctx context.Context, eventId string) ([]ulid.ULID, error) {
+	if t.l == nil {
+		return nil, nil
+	}
 	t.l.RLock()
 	defer t.l.RUnlock()
 	return t.evtIDs[eventId], nil

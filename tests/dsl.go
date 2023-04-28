@@ -53,6 +53,8 @@ type Test struct {
 	requestSteps map[string]any
 	// lastResponse stores the last response time
 	lastResponse time.Time
+
+	lastEventID *string
 }
 
 func (t *Test) SetAssertions(items ...func()) {
@@ -66,11 +68,20 @@ func (t *Test) SendTrigger() func() {
 	return t.Send(t.EventTrigger)
 }
 
+func (t *Test) Func(f func() error) func() {
+	return func() {
+		t.test.Helper()
+		err := f()
+		require.NoError(t.test, err)
+	}
+}
+
 func (t *Test) Send(evt inngestgo.Event) func() {
 	return func() {
 		client := inngestgo.NewClient(eventKey, inngestgo.WithEndpoint(eventURL.String()))
-		err := client.Send(context.Background(), evt)
+		id, err := client.Send(context.Background(), evt)
 		require.NoError(t.test, err)
+		t.lastEventID = &id
 	}
 }
 

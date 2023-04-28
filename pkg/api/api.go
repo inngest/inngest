@@ -2,19 +2,21 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/coreapi/apiutil"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/eventstream"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 )
 
-type EventHandler func(context.Context, *event.Event) error
+type EventHandler func(context.Context, *event.Event) (string, error)
 
 type Options struct {
 	Config config.Config
@@ -99,15 +101,8 @@ func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	defer r.Body.Close()
-
-	if r.ContentLength > int64(a.config.EventAPI.MaxSize) {
-		a.writeResponse(w, apiResponse{
-			StatusCode: http.StatusRequestEntityTooLarge,
-			Error:      "Payload larger than maximum allowed",
-		})
-		return
-	}
 
 	key := chi.URLParam(r, "key")
 	if key == "" {
@@ -118,47 +113,59 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Implement key matching from core data loader.
+	// Create a new channel which receives a stream of events from the incoming HTTP request
+	byteStream := make(chan json.RawMessage)
+	eg := errgroup.Group{}
+	eg.Go(func() error {
+		return eventstream.ParseStream(ctx, r.Body, byteStream, a.config.EventAPI.MaxSize)
+	})
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, int64(a.config.EventAPI.MaxSize)))
-	if err != nil {
-		a.writeResponse(w, apiResponse{
-			StatusCode: http.StatusBadRequest,
-			Error:      "Could not read event payload",
-		})
-		return
-	}
+	// Create a new channel which holds all event IDs as a slice.
+	var (
+		ids    = []string{}
+		idChan = make(chan string)
+	)
+	eg.Go(func() error {
+		for item := range idChan {
+			ids = append(ids, item)
+		}
+		return nil
+	})
 
-	events, err := parseBody(body)
-	if err != nil {
-		a.writeResponse(w, apiResponse{
-			StatusCode: http.StatusBadRequest,
-			Error:      "Unable to process event payload",
-		})
-		return
-	}
-
-	eg := &errgroup.Group{}
-	for _, evt := range events {
-		copied := evt
-		eg.Go(func() error {
-			if err := a.handler(r.Context(), copied); err != nil {
-				a.log.Error().Str("event", copied.Name).Err(err).Msg("error handling event")
+	// Process those incoming events
+	eg.Go(func() error {
+		// TODO: Iterate through event stream and process event.
+		for byt := range byteStream {
+			evt := event.Event{}
+			if err := json.Unmarshal(byt, &evt); err != nil {
 				return err
 			}
-			return nil
-		})
-	}
+			id, err := a.handler(r.Context(), &evt)
+			if err != nil {
+				a.log.Error().Str("event", evt.Name).Err(err).Msg("error handling event")
+				return err
+			}
+			idChan <- id
+		}
+
+		// Close the idChan so that we stop appending to the ID slice.
+		close(idChan)
+		return nil
+	})
 
 	if err := eg.Wait(); err != nil {
-		a.writeResponse(w, apiResponse{
-			StatusCode: http.StatusBadRequest,
-			Error:      err.Error(),
+		w.WriteHeader(400)
+		_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
+			IDs:    ids,
+			Status: 400,
+			Error:  err,
 		})
+		return
 	}
 
-	a.writeResponse(w, apiResponse{
-		StatusCode: http.StatusOK,
-		Message:    fmt.Sprintf("Received %d events", len(events)),
+	w.WriteHeader(200)
+	_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
+		IDs:    ids,
+		Status: 200,
 	})
 }

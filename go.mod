@@ -32,7 +32,7 @@ require (
 	github.com/hashicorp/terraform v0.15.3
 	github.com/inngest/cuetypescript v0.0.0-20220302153725-a00e933fdf87
 	github.com/inngest/event-schemas v0.0.0-20220323133008-96be406e1ea4
-	github.com/inngest/inngestgo v0.4.3-0.20230422124325-038ad9913809
+	github.com/inngest/inngestgo v0.4.3-0.20230427225702-be10dcbf5ec7
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/joho/godotenv v1.3.0
 	github.com/karrick/godirwalk v1.17.0
