@@ -59,7 +59,6 @@ func doDev(cmd *cobra.Command, args []string) {
 	opts := devserver.StartOpts{
 		Config:       *conf,
 		URLs:         urls,
-		Docker:       false,
 		Autodiscover: discover,
 	}
 

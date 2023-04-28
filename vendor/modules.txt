@@ -416,17 +416,6 @@ github.com/hashicorp/terraform/tfdiags
 # github.com/inconshreveable/mousetrap v1.0.0
 ## explicit
 github.com/inconshreveable/mousetrap
-# github.com/inngest/cuetypescript v0.0.0-20220302153725-a00e933fdf87
-## explicit; go 1.17
-github.com/inngest/cuetypescript
-github.com/inngest/cuetypescript/generation
-# github.com/inngest/event-schemas v0.0.0-20220323133008-96be406e1ea4
-## explicit; go 1.17
-github.com/inngest/event-schemas/events/marshalling/jsonschema
-github.com/inngest/event-schemas/pkg/fakedata
-# github.com/inngest/golorem v0.0.0-20220323014825-15bf7a53bf79
-## explicit
-github.com/inngest/golorem
 # github.com/inngest/inngestgo v0.4.3-0.20230427225702-be10dcbf5ec7
 ## explicit; go 1.18
 github.com/inngest/inngestgo

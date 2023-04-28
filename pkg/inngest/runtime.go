@@ -7,8 +7,7 @@ import (
 )
 
 const (
-	RuntimeTypeDocker = "docker"
-	RuntimeTypeHTTP   = "http"
+	RuntimeTypeHTTP = "http"
 )
 
 type Runtime interface {
@@ -36,13 +35,6 @@ func (r *RuntimeWrapper) UnmarshalJSON(b []byte) error {
 	}
 
 	switch typ {
-	case RuntimeTypeDocker:
-		docker := RuntimeDocker{}
-		if err := json.Unmarshal(b, &docker); err != nil {
-			return err
-		}
-		r.Runtime = docker
-		return nil
 	case RuntimeTypeHTTP:
 		rt := RuntimeHTTP{}
 		if err := json.Unmarshal(b, &rt); err != nil {
@@ -53,31 +45,6 @@ func (r *RuntimeWrapper) UnmarshalJSON(b []byte) error {
 	default:
 		return fmt.Errorf("unknown runtime type: %s", typ)
 	}
-}
-
-type RuntimeDocker struct {
-	Entrypoint []string `json:"entrypoint,omitempty"`
-	Memory     *int     `json:"memory"`
-	Dockerfile string   `json:"dockerfile,omitempty"`
-}
-
-// MarshalJSON implements the JSON marshal interface so that cue can format this
-// correctly when serializing actions.
-func (r RuntimeDocker) MarshalJSON() ([]byte, error) {
-	data := map[string]interface{}{
-		"type": RuntimeTypeDocker,
-	}
-	if len(r.Entrypoint) > 0 {
-		data["entrypoint"] = r.Entrypoint
-	}
-	if r.Dockerfile != "" {
-		data["dockerfile"] = r.Dockerfile
-	}
-	return json.Marshal(data)
-}
-
-func (RuntimeDocker) RuntimeType() string {
-	return RuntimeTypeDocker
 }
 
 type RuntimeHTTP struct {

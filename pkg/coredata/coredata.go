@@ -2,11 +2,8 @@ package coredata
 
 import (
 	"context"
-	"errors"
 
-	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/client"
 )
 
 type ReadWriter interface {
@@ -45,21 +42,11 @@ type APIReadWriter interface {
 
 type APIFunctionReader interface {
 	// Functions returns all functions.
-	Functions(ctx context.Context) ([]function.Function, error)
+	Functions(ctx context.Context) ([]inngest.Function, error)
 }
 type APIFunctionWriter interface {
-	// Create a new function
-	CreateFunctionVersion(ctx context.Context, f function.Function, live bool, env string) (function.FunctionVersion, error)
 }
 type APIActionReader interface {
-	// Find a given action by an exact version number
-	ActionVersion(ctx context.Context, dsn string, version *inngest.VersionConstraint) (client.ActionVersion, error)
 }
 type APIActionWriter interface {
-	// Create a a new action version
-	CreateActionVersion(ctx context.Context, av inngest.ActionVersion) (client.ActionVersion, error)
-	// Update an action version, e.g. when updating a Docker image has been successfully pushed to the registry
-	UpdateActionVersion(ctx context.Context, dsn string, version inngest.VersionInfo, enabled bool) (client.ActionVersion, error)
 }
-
-var ErrActionVersionNotFound error = errors.New("action version not found")

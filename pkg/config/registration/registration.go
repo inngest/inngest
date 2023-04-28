@@ -76,8 +76,8 @@ type DriverConfig interface {
 type QueueConfig interface {
 	QueueName() string
 	Queue() (queue.Queue, error)
-	Producer() (queue.Producer, error)
-	Consumer() (queue.Consumer, error)
+	//Producer() (queue.Producer, error)
+	//Consumer() (queue.Consumer, error)
 }
 
 type StateConfig interface {

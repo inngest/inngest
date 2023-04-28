@@ -77,7 +77,7 @@ type Config struct {
 	Responses map[string]state.DriverResponse
 	// DynamicResponses allows users to specify a function which allows
 	// steps to return different data on each execution invocation.
-	DynamicResponses func(context.Context, state.State, inngest.ActionVersion, inngest.Edge, inngest.Step, int) map[string]state.DriverResponse
+	DynamicResponses func(context.Context, state.State, inngest.Edge, inngest.Step, int) map[string]state.DriverResponse
 	// driver stores the driver once, as a singleton per config instance.
 	driver driver.Driver
 	Driver string

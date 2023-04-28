@@ -82,6 +82,13 @@ type Function struct {
 	Steps map[string]Step `json:"steps,omitempty"`
 }
 
+func (f Function) ConcurrencyLimit() int {
+	if f.Concurrency == nil {
+		return 0
+	}
+	return f.Concurrency.Limit
+}
+
 type Concurrency struct {
 	Limit int     `json:"limit"`
 	Key   *string `json:"key"`

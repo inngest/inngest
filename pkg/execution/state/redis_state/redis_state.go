@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/enums"
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
@@ -32,7 +33,8 @@ var (
 
 func init() {
 	// register the redis driver
-	registration.RegisterState(func() any { return &Config{} })
+	registration.RegisterState(func() any { return registration.StateConfig(&Config{}) })
+	registration.RegisterQueue(func() any { return registration.QueueConfig(&queueConfig{}) })
 
 	// read the lua scripts
 	entries, err := embedded.ReadDir("lua")
@@ -80,6 +82,13 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 	}
 }
 
+type queueConfig struct{}
+
+func (c queueConfig) QueueName() string             { return "redis" }
+func (c queueConfig) Queue() (osqueue.Queue, error) { return nil, nil }
+func (c queueConfig) Consumer() osqueue.Consumer    { return nil }
+func (c queueConfig) Producer() osqueue.Producer    { return nil }
+
 // Config registers the configuration for the in-memory state store,
 // and provides a factory for the state manager based off of the config.
 type Config struct {
@@ -118,11 +127,6 @@ func (c Config) Manager(ctx context.Context) (state.Manager, error) {
 }
 
 func (c Config) ConnectOpts() (rueidis.ClientOption, error) {
-	// TODO
-	// if c.DSN != nil {
-	// 	return redis.ParseURL(*c.DSN)
-	// }
-
 	opts := rueidis.ClientOption{
 		InitAddress: []string{fmt.Sprintf("%s:%d", c.Host, c.Port)},
 		ShuffleInit: true,
@@ -130,9 +134,6 @@ func (c Config) ConnectOpts() (rueidis.ClientOption, error) {
 		Username:    c.Username,
 		Password:    c.Password,
 	}
-	// if c.PoolSize != nil {
-	// 	opts.PoolSize = *c.PoolSize
-	// }
 	return opts, nil
 }
 

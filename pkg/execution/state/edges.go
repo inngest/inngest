@@ -111,7 +111,7 @@ func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepI
 
 	future := []AvailableEdge{}
 	for _, edge := range edges {
-		logger.From(ctx).Trace().Interface("edge", edge.WorkflowEdge).Msg("evaluating child edge")
+		logger.From(ctx).Trace().Interface("edge", edge.Edge).Msg("evaluating child edge")
 
 		ok, err := i.canTraverseEdge(ctx, state, edge)
 		if err != nil {
@@ -128,7 +128,7 @@ func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepI
 		//
 		// TODO: MAKE THESE REGULAR OL STEP EDGES
 		future = append(future, AvailableEdge{
-			Edge: edge.WorkflowEdge,
+			Edge: edge.Edge,
 			Step: edge.Incoming.Step,
 		})
 	}
@@ -147,23 +147,23 @@ func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepI
 // asynchronous edges which wait for an event mathing a condition to be traversed (at some
 // point in the future, with a TTL).
 func (i edgeEvaluator) canTraverseEdge(ctx context.Context, s State, edge inngest.GraphEdge) (bool, error) {
-	l := logger.From(ctx).With().Interface("edge", edge.WorkflowEdge).Logger()
+	l := logger.From(ctx).With().Interface("edge", edge.Edge).Logger()
 
 	if edge.Outgoing.ID() != inngest.TriggerName && !s.ActionComplete(edge.Outgoing.ID()) {
 		l.Trace().Bool("traverse", false).Msg("edge incomplete")
 		return false, nil
 	}
 
-	exprdata := i.datagen(ctx, s, edge.WorkflowEdge.Outgoing)
+	exprdata := i.datagen(ctx, s, edge.Edge.Outgoing)
 
-	if edge.WorkflowEdge.Metadata != nil && edge.WorkflowEdge.Metadata.If != "" {
-		l.Trace().Str("expression", edge.WorkflowEdge.Metadata.If).Msg("evaluating edge expression")
+	if edge.Edge.Metadata != nil && edge.Edge.Metadata.If != "" {
+		l.Trace().Str("expression", edge.Edge.Metadata.If).Msg("evaluating edge expression")
 
-		ok, _, err := i.evaluator(ctx, edge.WorkflowEdge.Metadata.If, exprdata)
+		ok, _, err := i.evaluator(ctx, edge.Edge.Metadata.If, exprdata)
 		if err != nil || !ok {
 			l.Trace().
 				Bool("traverse", false).
-				Str("expression", edge.WorkflowEdge.Metadata.If).
+				Str("expression", edge.Edge.Metadata.If).
 				Err(err).
 				Msg("expression false")
 			return ok, err

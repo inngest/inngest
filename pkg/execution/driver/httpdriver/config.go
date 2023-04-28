@@ -1,9 +1,8 @@
 package httpdriver
 
 import (
-	"github.com/inngest/inngest/pkg/execution/driver"
-
 	"github.com/inngest/inngest/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/execution/driver"
 )
 
 func init() {

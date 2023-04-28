@@ -7,6 +7,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
+	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -25,15 +26,12 @@ type StartOpts struct {
 	RootDir      string        `json:"dir"`
 	URLs         []string      `json:"urls"`
 	Autodiscover bool          `json:"autodiscover"`
-	Docker       bool          `json:"docker"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
 // development.
 //
 // It runs all available services from `inngest serve`, plus:
-//
-// - Builds locally defined docker-based functions using Buildx
 // - Adds development-specific APIs for communicating with the SDK.
 func New(ctx context.Context, opts StartOpts) error {
 	// The dev server _always_ logs output for development.
@@ -91,12 +89,11 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 			// partition.
 			funcs, _ := loader.Functions(ctx)
 			for _, f := range funcs {
-				id := f.ID
 				if _, err := uuid.Parse(f.ID); err != nil {
 					id = function.DeterministicUUID(f).String()
 				}
 				if id == p.WorkflowID.String() && f.Concurrency > 0 {
-					return p.Queue(), f.Concurrency
+					return p.Queue(), f.ConcurrencyLimit()
 				}
 			}
 			return p.Queue(), 10_000

@@ -1,6 +1,10 @@
 package inngest
 
-import "github.com/inngest/inngest/pkg/consts"
+import (
+	"net/url"
+
+	"github.com/inngest/inngest/pkg/consts"
+)
 
 // Step represents a single unit of code (action) which runs as part of a step function, in a DAG.
 type Step struct {
@@ -26,4 +30,14 @@ func (s Step) RetryCount() int {
 		return *s.Retries
 	}
 	return consts.DefaultRetryCount
+}
+
+func (s Step) Driver() string {
+	uri, _ := url.Parse(s.URI)
+	switch uri.Scheme {
+	case "http", "https":
+		return "http"
+	default:
+		return ""
+	}
 }

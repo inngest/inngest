@@ -6,14 +6,10 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
-	"time"
 
-	"github.com/inngest/inngest/internal/cuedefs"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/coredata"
-	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/client"
 	"github.com/inngest/inngest/pkg/logger"
 	"golang.org/x/sync/errgroup"
 )
@@ -102,28 +98,12 @@ type MemoryExecutionLoader struct {
 	// functions stores all functions which were found within the given filesystem.
 	functions []inngest.Function
 
-	// actions stores all actions parsed and read from functions within the filesystem.
-	actions []inngest.ActionVersion
-
 	l sync.RWMutex
 }
 
 func (m *MemoryExecutionLoader) AddFunction(ctx context.Context, fn *inngest.Function) error {
 	m.l.Lock()
 	defer m.l.Unlock()
-
-	actions, _, _ := fn.Actions(ctx)
-
-	// Ensure that this action has a version.  In the case of development servers,
-	// actions aren't versioned: so we auto-fill a v1.1.
-	for n, a := range actions {
-		if a.Version == nil {
-			actions[n].Version = &inngest.VersionInfo{
-				Major: 1,
-				Minor: 1,
-			}
-		}
-	}
 
 	// Is this function and its actions already present?  If so, remove them.
 	for n, f := range m.functions {
@@ -133,21 +113,11 @@ func (m *MemoryExecutionLoader) AddFunction(ctx context.Context, fn *inngest.Fun
 		}
 	}
 	m.functions = append(m.functions, *fn)
-	m.actions = []inngest.ActionVersion{}
-
-	// Add all functions for each event again.
-	for _, fn := range m.functions {
-		actions, _, _ := fn.Actions(ctx)
-		m.actions = append(m.actions, actions...)
-	}
 
 	// recreate the in-memory action loader.
 	m.memactionloader = &memactionloader{
 		Actions: make(map[string][]inngest.ActionVersion),
 		lock:    &sync.RWMutex{},
-	}
-	for _, a := range m.actions {
-		m.memactionloader.Add(a)
 	}
 
 	logger.From(ctx).
@@ -163,7 +133,6 @@ func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*inngest.F
 	defer m.l.Unlock()
 
 	m.functions = []inngest.Function{}
-	m.actions = []inngest.ActionVersion{}
 
 	// Validate all functions.
 	eg := &errgroup.Group{}
@@ -178,8 +147,6 @@ func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*inngest.F
 	}
 
 	for _, fn := range f {
-		actions, _, _ := fn.Actions(ctx)
-		m.actions = append(m.actions, actions...)
 		m.functions = append(m.functions, *fn)
 	}
 
@@ -187,9 +154,6 @@ func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*inngest.F
 	m.memactionloader = &memactionloader{
 		Actions: make(map[string][]inngest.ActionVersion),
 		lock:    &sync.RWMutex{},
-	}
-	for _, a := range m.actions {
-		m.memactionloader.Add(a)
 	}
 
 	logger.From(ctx).
@@ -320,18 +284,6 @@ func NewInMemoryAPIFunctionWriter() *MemoryAPIFunctionWriter {
 	return loader
 }
 
-func (m *MemoryAPIFunctionWriter) CreateFunctionVersion(ctx context.Context, f inngest.Function, live bool, env string) (function.FunctionVersion, error) {
-	now := time.Now()
-	fv := function.FunctionVersion{
-		Version:   uint(1),
-		Function:  f,
-		ValidFrom: &now,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	return fv, nil
-}
-
 type MemoryAPIReadWriter struct {
 	*MemoryAPIFunctionWriter
 	*MemoryAPIActionLoader
@@ -352,58 +304,4 @@ func NewInMemoryAPIActionLoader() *MemoryAPIActionLoader {
 	return &MemoryAPIActionLoader{
 		memactionloader: NewInMemoryActionLoader(),
 	}
-}
-
-func (m *MemoryAPIActionLoader) ActionVersion(ctx context.Context, dsn string, vc *inngest.VersionConstraint) (client.ActionVersion, error) {
-	av, err := m.Action(ctx, dsn, vc)
-	if err != nil {
-		return client.ActionVersion{}, err
-	}
-	clientActionVersion := client.ActionVersion{
-		ActionVersion: *av,
-		Name:          av.Name,
-		DSN:           av.DSN,
-		Config:        "",
-	}
-	return clientActionVersion, nil
-}
-func (m *MemoryAPIActionLoader) CreateActionVersion(ctx context.Context, av inngest.ActionVersion) (client.ActionVersion, error) {
-	config, err := cuedefs.FormatAction(av)
-	if err != nil {
-		return client.ActionVersion{}, err
-	}
-	// Stub out with existing method
-	m.Add(av)
-	newActionVersion := client.ActionVersion{
-		ActionVersion: av,
-		Name:          av.Name,
-		DSN:           av.DSN,
-		Config:        config,
-	}
-	return newActionVersion, nil
-}
-func (m *MemoryAPIActionLoader) UpdateActionVersion(ctx context.Context, dsn string, version inngest.VersionInfo, enabled bool) (client.ActionVersion, error) {
-	// NOTE - use constraint so we can re-use m.Action for now
-	vc := &inngest.VersionConstraint{
-		Major: &version.Major,
-		Minor: &version.Minor,
-	}
-	existing, err := m.Action(ctx, dsn, vc)
-	if err != nil {
-		return client.ActionVersion{}, err
-	}
-
-	updatedActionVersion := client.ActionVersion{
-		ActionVersion: *existing,
-		Name:          existing.Name,
-		DSN:           existing.DSN,
-		Config:        "",
-	}
-	if enabled {
-		now := time.Now()
-		updatedActionVersion.ValidFrom = &now
-	}
-	// TODO - Add imageSha256 to be sent to function and set
-
-	return updatedActionVersion, nil
 }

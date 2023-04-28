@@ -12,9 +12,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/spf13/cobra"
-
-	// Import the default drivers, queues, and state stores.
-	_ "github.com/inngest/inngest/pkg/config/defaults"
 )
 
 const (
@@ -56,11 +53,7 @@ func serve(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	locs := []string{}
-	if serveConf != "" {
-		locs = []string{serveConf}
-	}
-	conf, err := config.Load(ctx, locs...)
+	conf, err := config.Dev(ctx)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)

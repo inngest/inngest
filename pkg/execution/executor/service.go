@@ -119,7 +119,6 @@ func (s *svc) Pre(ctx context.Context) error {
 			drivers...,
 		),
 		WithLogger(logger.From(ctx)),
-		WithConfig(s.config.Execution),
 		WithFailureHandler(failureHandler),
 	)
 	if err != nil {

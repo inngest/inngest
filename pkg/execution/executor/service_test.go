@@ -2,10 +2,6 @@
 
 package executor
 
-import (
-	_ "github.com/inngest/inngest/pkg/config/defaults"
-)
-
 /*
 const (
 	timeout = 3000 * time.Millisecond
