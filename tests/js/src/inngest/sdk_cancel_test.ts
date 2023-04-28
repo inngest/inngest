@@ -3,7 +3,7 @@ import { inngest } from "@/inngest/client";
 export const testCancel = inngest.createFunction(
   {
     name: "Cancel test",
-    cancel: [
+    cancelOn: [
       {
         event: "cancel/please",
         timeout: "1h",
@@ -13,7 +13,6 @@ export const testCancel = inngest.createFunction(
   },
   { event: "tests/cancel.test" },
   async ({ event, step }) => {
-
     // Wait for 10 seconds.
     await step.sleep("10s");
 

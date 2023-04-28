@@ -449,7 +449,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			// for the same function run.  This should happen in the state store
 			// directly.
 
-			logger.From(ctx).Debug().
+			logger.From(ctx).Info().
 				Str("pause_id", pause.ID.String()).
 				Str("run_id", pause.Identifier.RunID.String()).
 				Msg("cancelling function")
