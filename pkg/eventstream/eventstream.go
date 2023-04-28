@@ -52,8 +52,6 @@ func ParseStream(ctx context.Context, r io.Reader, stream chan json.RawMessage, 
 		return ErrInvalidRequestBody
 	}
 
-	i := 0
-
 	switch delim {
 	case '{':
 		// We've already peeked the first char.  Read all, then prepend a '{'
@@ -75,6 +73,7 @@ func ParseStream(ctx context.Context, r io.Reader, stream chan json.RawMessage, 
 
 		stream <- data
 	case '[':
+		i := 0
 		// Parse a stream of tokens
 		for d.More() {
 			if i == MaxEvents {
