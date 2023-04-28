@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/coredata"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
@@ -150,6 +151,10 @@ func (a CoreAPI) CancelRun(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
+	logger.From(ctx).Info().
+		Str("run_id", runID.String()).
+		Msg("cancelling function")
 
 	if err := apiutil.CancelRun(ctx, a.state, *runID); err != nil {
 		_ = publicerr.WriteHTTP(w, err)

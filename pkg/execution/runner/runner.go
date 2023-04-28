@@ -452,7 +452,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			logger.From(ctx).Info().
 				Str("pause_id", pause.ID.String()).
 				Str("run_id", pause.Identifier.RunID.String()).
-				Msg("cancelling function")
+				Msg("cancelling function via event")
 
 			if err := s.state.Cancel(ctx, pause.Identifier); err != nil {
 				switch err {
