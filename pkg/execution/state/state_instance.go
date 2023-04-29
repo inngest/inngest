@@ -17,7 +17,7 @@ import (
 //
 // This is safe to use and fulfils that requirement.
 func NewStateInstance(
-	w inngest.Workflow,
+	f inngest.Function,
 	id Identifier,
 	metadata Metadata,
 	event map[string]any,
@@ -26,7 +26,7 @@ func NewStateInstance(
 	stack []string,
 ) State {
 	return &memstate{
-		workflow:   w,
+		function:   f,
 		identifier: id,
 		metadata:   metadata,
 		event:      event,
@@ -37,7 +37,7 @@ func NewStateInstance(
 }
 
 type memstate struct {
-	workflow inngest.Workflow
+	function inngest.Function
 
 	identifier Identifier
 
@@ -64,8 +64,8 @@ func (s memstate) Identifier() Identifier {
 	return s.identifier
 }
 
-func (s memstate) Workflow() inngest.Workflow {
-	return s.workflow
+func (s memstate) Function() inngest.Function {
+	return s.function
 }
 
 func (s memstate) WorkflowID() uuid.UUID {

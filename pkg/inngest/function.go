@@ -37,16 +37,18 @@ const (
 // A function may be simple (ie. only having a single step) or complex (ie. many
 // steps).  Simple functions are easy:  run the single step's action.  Complex functions
 // represent steps as a DAG, with edges between the trigger and each step.
-//
-// NOTE: As we push towards SDK-based generator functions, the notion of DAGs with arbitrary
-// non-root nodes has been temporarily removed.  Edges cannot be defined, and any steps included
-// are always ran after the trigger, eg. immediately in parallel after the event is received.
 type Function struct {
-	// V represents the configuration version.
-	V int `json:"v,omitempty"`
+	// ConfigVersion represents the configuration version.  This lets us add or change
+	// JSON definitions within functions when unmarshalling.
+	ConfigVersion int `json:"cv,omitempty"`
 
 	// ID is an internal surrogate key representing this function.
 	ID uuid.UUID `json:"id"`
+
+	// FunctionVersion represents the version of this specific function.  The same
+	// function ID may be updated many times over the lifetime of a function; this
+	// represents the specific version for the functon ID.
+	FunctionVersion int `json:"fv"`
 
 	// Name is the descriptive name for the function
 	Name string `json:"name"`
@@ -80,6 +82,9 @@ type Function struct {
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
 	Steps []Step `json:"steps,omitempty"`
+
+	// Edges represent edges between steps in the dag.
+	Edges []Edge `json:"edges,omitempty"`
 }
 
 func (f Function) ConcurrencyLimit() int {
@@ -139,28 +144,14 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
-	_, edges, aerr := f.Actions(ctx)
+	edges, aerr := f.AllEdges(ctx)
 	if aerr != nil {
 		err = multierror.Append(err, aerr)
 		return err
 	}
 
-	stepmap := map[string]Step{}
-	for _, s := range f.Steps {
-		stepmap[s.Name] = s
-	}
-
-	// Validate edges exist.
+	// Validate edges.
 	for _, edge := range edges {
-		_, incoming := stepmap[edge.Incoming]
-		_, outgoing := stepmap[edge.Outgoing]
-		if edge.Outgoing != TriggerName && !outgoing {
-			err = multierror.Append(err, fmt.Errorf("unknown step '%s' for edge '%v'", edge.Outgoing, edge))
-		}
-		if !incoming {
-			err = multierror.Append(err, fmt.Errorf("unknown step '%s' for edge '%v'", edge.Incoming, edge))
-		}
-
 		// Ensure that any expressions are also valid.
 		if edge.Metadata == nil {
 			continue
@@ -185,39 +176,61 @@ func (f Function) Validate(ctx context.Context) error {
 	return err
 }
 
-// Actions produces configuration for each step of the function.  Each config
-// file specifies how to run the code.
-func (f Function) Actions(ctx context.Context) ([]Step, []Edge, error) {
+// AllEdges produces edge configuration for steps defined within the function.
+// If no edges for a step exists, an automatic step from the tirgger is added.
+func (f Function) AllEdges(ctx context.Context) ([]Edge, error) {
 	// This has no defined actions, which means its an implicit
 	// single action invocation.  We assume that a Dockerfile
 	// exists in the project root, and that we can build the
 	// image which contains all of the code necessary to run
 	// the function.
 	if len(f.Steps) == 0 {
-		return nil, nil, fmt.Errorf("This function has no steps")
+		return nil, fmt.Errorf("This function has no steps")
 	}
 
-	steps := make([]Step, len(f.Steps))
-	edges := make([]Edge, len(f.Steps))
+	edges := []Edge{}
 
-	n := 0
+	// O1 lookup of steps.
+	stepmap := map[string]Step{}
+	// Track whether incoming edges exist for each step
+	seen := map[string]bool{}
 	for _, s := range f.Steps {
-		steps[n] = s
-		edges[n] = Edge{
-			Outgoing: TriggerName,
-			Incoming: s.Name,
-		}
+		stepmap[s.Name] = s
+		seen[s.Name] = false
 	}
 
-	// Ensure that the actions and edges are sorted by name, giving us
+	var err error
+
+	// Map all edges for incoming steps.
+	for _, edge := range f.Edges {
+		if _, ok := seen[edge.Incoming]; !ok {
+			err = multierror.Append(
+				err,
+				fmt.Errorf("Step '%s' doesn't exist within edge", edge.Incoming),
+			)
+			continue
+		}
+		seen[edge.Incoming] = true
+		edges = append(edges, edge)
+	}
+
+	// For all unseen edges, add a trigger edge.
+	for step, ok := range seen {
+		if ok {
+			continue
+		}
+		edges = append(edges, Edge{
+			Outgoing: TriggerName,
+			Incoming: step,
+		})
+	}
+
+	// Ensure that the edges are sorted by name, giving us
 	// deterministic output.
-	sort.SliceStable(steps, func(i, j int) bool {
-		return steps[i].Name < steps[j].Name
-	})
 	sort.SliceStable(edges, func(i, j int) bool {
 		return edges[i].Outgoing < edges[j].Outgoing
 	})
-	return steps, edges, nil
+	return edges, nil
 }
 
 // DeterministicUUID returns a deterministic V3 UUID based off of the SHA1

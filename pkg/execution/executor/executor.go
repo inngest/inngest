@@ -228,8 +228,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 			Str("run_id", id.RunID.String()).
 			Interface("edge", edge).
 			Str("step", edge.Incoming).
-			Str("fn_name", s.Workflow().Name).
-			Str("fn_id", s.Workflow().ID).
+			Str("fn_name", s.Function().Name).
+			Str("fn_id", s.Function().ID.String()).
 			Int("attempt", attempt).
 			Logger()
 		log = &l

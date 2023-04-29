@@ -1,6 +1,7 @@
 package inngest
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hashicorp/terraform/dag"
@@ -10,11 +11,11 @@ import (
 type Graph struct {
 	dag.AcyclicGraph
 
-	workflow Workflow
-	source   Vertex
+	fn     Function
+	source Vertex
 }
 
-func NewGraph(w Workflow) (Graph, error) {
+func NewGraph(ctx context.Context, fn Function) (Graph, error) {
 	var g dag.AcyclicGraph
 
 	// Create a new root vertex, representing the trigger: the root of the workflow.
@@ -25,7 +26,13 @@ func NewGraph(w Workflow) (Graph, error) {
 	vertices := map[string]Vertex{
 		"$root": source,
 	}
-	for _, s := range w.Steps {
+
+	edges, err := fn.AllEdges(ctx)
+	if err != nil {
+		return Graph{}, err
+	}
+
+	for _, s := range fn.Steps {
 		step := s
 		v := Vertex{Step: &step}
 		vertices[step.ID] = v
@@ -35,7 +42,7 @@ func NewGraph(w Workflow) (Graph, error) {
 	// Iterate through edges and add them to the graph.  Adding an edge adds
 	// both vertices to the graph if they are not yet present, so this adds
 	// all of our actions for us.
-	for _, e := range w.Edges {
+	for _, e := range edges {
 		edge := GraphEdge{
 			Edge:     e,
 			Outgoing: vertices[e.Outgoing],
@@ -46,13 +53,13 @@ func NewGraph(w Workflow) (Graph, error) {
 
 	return Graph{
 		AcyclicGraph: g,
-		workflow:     w,
+		fn:           fn,
 		source:       source,
 	}, nil
 }
 
-func (g Graph) Workflow() Workflow {
-	return g.workflow
+func (g Graph) Function() Function {
+	return g.fn
 }
 
 func (g Graph) From(id string) []GraphEdge {
@@ -75,7 +82,7 @@ func (l LookupVertex) Hashcode() interface{} {
 // Vertex represents an action or the trigger within our workflow graph
 type Vertex struct {
 	Root bool
-	Step *WorkflowStep
+	Step *Step
 }
 
 func (g Vertex) Hashcode() interface{} {

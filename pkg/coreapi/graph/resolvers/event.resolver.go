@@ -33,7 +33,7 @@ func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]
 
 		startedAt := ulid.Time(s.Metadata().Identifier.RunID.Time())
 
-		name := s.Workflow().Name
+		name := s.Function().Name
 		pending := s.Metadata().Pending
 
 		// Don't let pending be negative for clients

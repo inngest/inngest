@@ -72,7 +72,7 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 	}
 
 	startedAt := ulid.Time(runID.Time())
-	name := state.Workflow().Name
+	name := state.Function().Name
 
 	pending := state.Metadata().Pending
 	if pending < 0 {
@@ -111,7 +111,7 @@ func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionR
 
 		startedAt := ulid.Time(m.Identifier.RunID.Time())
 
-		name := s.Workflow().Name
+		name := s.Function().Name
 		pending := int(m.Pending)
 
 		// Don't let pending be negative for clients

@@ -9,6 +9,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"golang.org/x/sync/errgroup"
@@ -126,6 +127,15 @@ func (m *MemoryExecutionLoader) AddFunction(ctx context.Context, fn *inngest.Fun
 		Msg("added functions")
 
 	return nil
+}
+
+func (m *MemoryExecutionLoader) LoadFunction(ctx context.Context, id state.Identifier) (*inngest.Function, error) {
+	for _, fn := range m.functions {
+		if fn.ID == id.WorkflowID {
+			return &fn, nil
+		}
+	}
+	return nil, fmt.Errorf("Function ID '%s' not found for run ID '%s'", id.WorkflowID, id.RunID)
 }
 
 func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*inngest.Function) error {

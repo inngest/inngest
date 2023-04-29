@@ -87,17 +87,17 @@ type edgeEvaluator struct {
 type AvailableEdge struct {
 	inngest.Edge
 
-	Step *inngest.WorkflowStep
+	Step *inngest.Step
 }
 
 func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepID string) ([]AvailableEdge, error) {
-	w := state.Workflow()
+	fn := state.Function()
 
-	if len(w.Steps) == 0 {
+	if len(fn.Steps) == 0 {
 		return nil, fmt.Errorf("empty workflow returned from state")
 	}
 
-	g, err := inngest.NewGraph(w)
+	g, err := inngest.NewGraph(ctx, fn)
 	if err != nil {
 		return nil, err
 	}
@@ -125,8 +125,6 @@ func (i edgeEvaluator) AvailableChildren(ctx context.Context, state State, stepI
 		// We can traverse this edge.  Schedule a new execution from this node.
 		// Scheduling executions needs to be done regardless of whether
 		// the context has cancelled.
-		//
-		// TODO: MAKE THESE REGULAR OL STEP EDGES
 		future = append(future, AvailableEdge{
 			Edge: edge.Edge,
 			Step: edge.Incoming.Step,

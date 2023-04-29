@@ -333,6 +333,7 @@ func (s *svc) functions(ctx context.Context, evt event.Event) error {
 	var errs error
 	wg := &sync.WaitGroup{}
 	for _, fn := range fns {
+
 		// We want to initialize each function concurrently;  some of these
 		// may have expressions that take ~tens of milliseconds to run, and
 		// each function should have as little latency as possible.
@@ -533,7 +534,10 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 }
 
 func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Event) error {
-	logger.From(ctx).Info().Str("function", fn.Name).Msg("initializing fn")
+	logger.From(ctx).Info().
+		Str("function_id", fn.ID.String()).
+		Str("function", fn.Name).
+		Msg("initializing fn")
 	_, err := Initialize(ctx, fn, evt, s.state, s.queue)
 	return err
 }
@@ -555,14 +559,13 @@ func Initialize(ctx context.Context, fn inngest.Function, evt event.Event, s sta
 	}
 
 	id := state.Identifier{
-		WorkflowID: fn.ID,
-		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
-		Key:        evt.ID,
+		WorkflowID:      fn.ID,
+		WorkflowVersion: fn.FunctionVersion,
+		RunID:           ulid.MustNew(ulid.Now(), rand.Reader),
+		Key:             evt.ID,
 	}
 
-	// TODO: INPUT / WORKFLOW
 	if _, err := s.New(ctx, state.Input{
-		// Workflow:   *flow,
 		Identifier: id,
 		EventData:  evt.Map(),
 	}); err != nil {

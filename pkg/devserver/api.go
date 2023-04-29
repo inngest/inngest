@@ -173,6 +173,9 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 
 	// For each function, add it to our loader.
 	for _, fn := range funcs {
+		// Create a new UUID for the function.
+		fn.ID = inngest.DeterministicUUID(*fn)
+
 		h.Functions = append(h.Functions, fn.Name)
 		if err := a.devserver.loader.AddFunction(ctx, fn); err != nil {
 			logger.From(ctx).Warn().Msgf("Error adding your function:\n%s", err)

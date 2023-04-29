@@ -35,7 +35,7 @@ func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex
 		"ctx": map[string]interface{}{
 			// fn_id is used within entrypoints to SDK-based functions in
 			// order to specify the ID of the function to run via RPC.
-			"fn_id": s.Workflow().ID,
+			"fn_id": s.Function().ID,
 			// env is the name of the environment that the function is running in.
 			// though this is self-discoverable most of the time, for static envs
 			// the SDK has no knowledge of the name as it only has a signing key.

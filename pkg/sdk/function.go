@@ -65,7 +65,6 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 			// no concurrency keys are yet provided by the SDK
 		}
 		if step.Retries != nil {
-			fmt.Println("FUCKING RETRIES BRO", step.Retries)
 			atts := step.Retries.Attempts
 			funcStep.Retries = &atts
 		}

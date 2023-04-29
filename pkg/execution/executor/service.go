@@ -143,7 +143,7 @@ func (s *svc) getFailureHandler(ctx context.Context) (func(context.Context, stat
 			Name:      event.FnFailedName,
 			Timestamp: now.UnixMilli(),
 			Data: map[string]interface{}{
-				"function_id": s.Workflow().ID,
+				"function_id": s.Function().ID,
 				"run_id":      id.RunID.String(),
 				"error":       r.UserError(),
 				"event":       s.Event(),
@@ -294,10 +294,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	l.Trace().Int("len", len(children)).Msg("evaluated children")
 
 	for _, next := range children {
-		var retries *int
-		if next.Step != nil && next.Step.Retries != nil && next.Step.Retries.Attempts != nil {
-			retries = next.Step.Retries.Attempts
-		}
+		retries := next.Step.RetryCount()
 
 		// We want to wait for another event to come in to traverse this edge within the DAG.
 		//
@@ -353,7 +350,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 					PauseID:   pauseID,
 					OnTimeout: am.OnTimeout,
 				},
-				MaxAttempts: retries,
+				MaxAttempts: &retries,
 			}, expires); err != nil {
 				return fmt.Errorf("unable to enqueue pause timeout: %w", err)
 			}
@@ -378,7 +375,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 			Payload: queue.PayloadEdge{
 				Edge: next.Edge,
 			},
-			MaxAttempts: retries,
+			MaxAttempts: &retries,
 		}, at); err != nil {
 			return fmt.Errorf("unable to enqueue next step: %w", err)
 		}
