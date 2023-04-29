@@ -10,7 +10,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
@@ -31,33 +30,30 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 
 	// This uses the ame
 	fnID := "test-suite-cancel-test"
+	retries := 10
 	abstract := Test{
 		Name: "Cancel via API test",
 		Description: `
 			This test asserts that the V0 cancellation API works as expected, cancelling functions.
 		`,
-		Function: function.Function{
-			ID:   fnID,
+		Function: inngest.Function{
 			Name: "Cancel test",
-			Triggers: []function.Trigger{
+			Triggers: []inngest.Trigger{
 				{
-					EventTrigger: &function.EventTrigger{
+					EventTrigger: &inngest.EventTrigger{
 						Event: "tests/cancel.test",
 					},
 				},
 			},
-			Steps: map[string]function.Step{
-				"step": {
-					ID:   "step",
-					Name: "step",
-					Runtime: &inngest.RuntimeWrapper{
-						Runtime: &inngest.RuntimeHTTP{
-							URL: stepURL(fnID, "step"),
-						},
-					},
+			Steps: []inngest.Step{
+				{
+					ID:      "step",
+					Name:    "step",
+					URI:     stepURL(fnID, "step"),
+					Retries: &retries,
 				},
 			},
-			Cancel: []function.Cancel{
+			Cancel: []inngest.Cancel{
 				{
 					Event:   "cancel/please",
 					Timeout: strptr("1h"),

@@ -38,31 +38,43 @@ type RegisterRequest struct {
 	// AppName represents a namespaced app name for each deployed function.
 	AppName string `json:"appName"`
 	// Functions represents all functions hosted within this deploy.
-	Functions []inngest.Function `json:"functions"` // TODO: This is a custom datatype
-	// Hash represents the commit checksum for the deploy.
-	Hash *string `json:"hash"`
+	Functions []SDKFunction `json:"functions"`
 }
 
-func (f RegisterRequest) Validate(ctx context.Context) error {
+// Parse parses the incoming
+func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error) {
 	// Ensure that there are no functions with the same ID.
 	if len(f.Functions) == 0 {
-		return ErrNoFunctions
+		return nil, ErrNoFunctions
 	}
 
+	// err is a multierror which stores all function and validation errors for easy
+	// reporting and debugging.
 	var err error
 
-	for _, fn := range f.Functions {
-		if len(fn.Steps) == 0 {
-			return fmt.Errorf("Function has no steps: %s", fn.Name)
+	funcs := make([]*inngest.Function, len(f.Functions))
+
+	for n, sdkFn := range f.Functions {
+		var ferr error
+		if len(sdkFn.Steps) == 0 {
+			err = multierror.Append(err, fmt.Errorf("Function has no steps: %s", sdkFn.Name))
+			continue
+		}
+
+		fn, ferr := sdkFn.Function()
+		if err != nil {
+			err = multierror.Append(err, ferr)
+			continue
+		}
+		funcs[n] = fn
+
+		if ferr := fn.Validate(ctx); ferr != nil {
+			err = multierror.Append(err, ferr)
 		}
 
 		for _, step := range fn.Steps {
-			if verr := fn.Validate(ctx); verr != nil {
-				err = multierror.Append(err, verr)
-			}
-
-			uri, perr := url.Parse(step.URI)
-			if perr != nil {
+			uri, ferr := url.Parse(step.URI)
+			if ferr != nil {
 				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid URI", step.ID))
 			}
 			if uri.Scheme != "http" && uri.Scheme != "https" {
@@ -72,5 +84,5 @@ func (f RegisterRequest) Validate(ctx context.Context) error {
 		}
 	}
 
-	return err
+	return funcs, err
 }

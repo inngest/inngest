@@ -131,7 +131,8 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 
 	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
 	// signing key and warn if the user has an invalid key.
-	if err := req.Validate(ctx); err != nil {
+	funcs, err := req.Parse(ctx)
+	if err != nil {
 		logger.From(ctx).Warn().Msgf("At least one function is invalid:\n%s", err)
 		a.err(ctx, w, 400, fmt.Errorf("At least one function is invalid:\n%w", err))
 		return
@@ -146,10 +147,13 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 
 		// Check if the checksum exists and is the same.  If so, we can ignore
 		// this request.
-		if item.SDK.Hash != nil && req.Hash != nil && *item.SDK.Hash == *req.Hash {
-			_, _ = w.Write([]byte(`{"ok":true, "skipped": true}`))
-			return
-		}
+		/*
+			TODO: FIX THIS
+			if item.SDK.Hash != nil && req.Hash != nil && *item.SDK.Hash == *req.Hash {
+				_, _ = w.Write([]byte(`{"ok":true, "skipped": true}`))
+				return
+			}
+		*/
 
 		// Remove this item from the handlers list.
 		h = &item
@@ -168,9 +172,9 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	h.UpdatedAt = time.Now()
 
 	// For each function, add it to our loader.
-	for _, fn := range req.Functions {
+	for _, fn := range funcs {
 		h.Functions = append(h.Functions, fn.Name)
-		if err := a.devserver.loader.AddFunction(ctx, &fn); err != nil {
+		if err := a.devserver.loader.AddFunction(ctx, fn); err != nil {
 			logger.From(ctx).Warn().Msgf("Error adding your function:\n%s", err)
 			a.err(ctx, w, 400, err)
 			return

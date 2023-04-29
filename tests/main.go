@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/stretchr/testify/require"
 )
@@ -176,8 +176,13 @@ func introspect(test *Test) (*sdk.RegisterRequest, error) {
 		return nil, err
 	}
 
+	funcs, err := data.Parse(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	found := false
-	for _, f := range data.Functions {
+	for _, f := range funcs {
 		actual, _ := json.MarshalIndent(f, "", "  ")
 		if bytes.Equal(expected, actual) {
 			found = true
@@ -185,7 +190,7 @@ func introspect(test *Test) (*sdk.RegisterRequest, error) {
 		}
 	}
 
-	response, _ := json.MarshalIndent(data, "", "  ")
+	response, _ := json.MarshalIndent(funcs, "", "  ")
 	if !found {
 		return nil, fmt.Errorf("Expected function not found:\n%s\n\nIntrospection:\n%s", string(expected), string(response))
 	}
@@ -215,10 +220,6 @@ func register(serverURL url.URL, rr sdk.RegisterRequest) error {
 		}
 		rr.Functions[n] = fn
 	}
-
-	// Randomize the hash.
-	hash := uuid.New().String()
-	rr.Hash = &hash
 
 	byt, err := json.Marshal(rr)
 	if err != nil {

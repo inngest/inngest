@@ -41,8 +41,8 @@ func TestSDKFunctions(t *testing.T) {
 					},
 				},
 			},
-			Steps: map[string]inngest.Step{
-				"step": {
+			Steps: []inngest.Step{
+				{
 					ID:   "step",
 					Name: "step",
 					URI:  stepURL(fnID, "step"),

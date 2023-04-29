@@ -79,7 +79,7 @@ type Function struct {
 
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
-	Steps map[string]Step `json:"steps,omitempty"`
+	Steps []Step `json:"steps,omitempty"`
 }
 
 func (f Function) ConcurrencyLimit() int {
@@ -145,10 +145,15 @@ func (f Function) Validate(ctx context.Context) error {
 		return err
 	}
 
+	stepmap := map[string]Step{}
+	for _, s := range f.Steps {
+		stepmap[s.Name] = s
+	}
+
 	// Validate edges exist.
 	for _, edge := range edges {
-		_, incoming := f.Steps[edge.Incoming]
-		_, outgoing := f.Steps[edge.Outgoing]
+		_, incoming := stepmap[edge.Incoming]
+		_, outgoing := stepmap[edge.Outgoing]
 		if edge.Outgoing != TriggerName && !outgoing {
 			err = multierror.Append(err, fmt.Errorf("unknown step '%s' for edge '%v'", edge.Outgoing, edge))
 		}

@@ -25,6 +25,7 @@ func TestSDKCancelNotReceived(t *testing.T) {
 		"After the sleep": "425e4dc05acdef771b3b59a9ebbaae6377bebfc3",
 	}
 
+	retries := 10
 	fnID := "test-suite-cancel-test"
 	abstract := Test{
 		Name: "Cancel test",
@@ -45,10 +46,11 @@ func TestSDKCancelNotReceived(t *testing.T) {
 					},
 				},
 			},
-			Steps: map[string]inngest.Step{
-				"step": {
-					Name: "step",
-					URI:  stepURL(fnID, "step"),
+			Steps: []inngest.Step{
+				{
+					Name:    "step",
+					URI:     stepURL(fnID, "step"),
+					Retries: &retries,
 				},
 			},
 			Cancel: []inngest.Cancel{
@@ -144,6 +146,7 @@ func TestSDKCancelReceived(t *testing.T) {
 		User: map[string]interface{}{},
 	}
 
+	retries := 10
 	fnID := "test-suite-cancel-test"
 	abstract := Test{
 		Name: "Cancel test",
@@ -164,10 +167,11 @@ func TestSDKCancelReceived(t *testing.T) {
 					},
 				},
 			},
-			Steps: map[string]inngest.Step{
-				"step": {
-					Name: "step",
-					URI:  stepURL(fnID, "step"),
+			Steps: []inngest.Step{
+				{
+					Name:    "step",
+					URI:     stepURL(fnID, "step"),
+					Retries: &retries,
 				},
 			},
 			Cancel: []inngest.Cancel{
