@@ -62,7 +62,7 @@ func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error)
 		}
 
 		fn, ferr := sdkFn.Function()
-		if err != nil {
+		if ferr != nil {
 			err = multierror.Append(err, ferr)
 			continue
 		}

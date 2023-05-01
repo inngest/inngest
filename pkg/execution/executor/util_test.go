@@ -14,7 +14,7 @@ func TestParseWait(t *testing.T) {
 	ctx := context.Background()
 
 	state := state.NewStateInstance(
-		inngest.Workflow{},
+		inngest.Function{},
 		state.Identifier{},
 		state.Metadata{},
 		map[string]any{

@@ -17,12 +17,6 @@ import (
 	"github.com/xhit/go-str2duration/v2"
 )
 
-var (
-	// pathCtxKey stores the function path within context,
-	// necessary for validation.
-	pathCtxKey = struct{}{}
-)
-
 const (
 	DefaultStepName = "step-1"
 )
@@ -132,8 +126,8 @@ func (f Function) Validate(ctx context.Context) error {
 		if step.Name == "" {
 			err = multierror.Append(err, fmt.Errorf("All steps must have a name"))
 		}
-		uri, err := url.Parse(step.URI)
-		if err != nil {
+		uri, serr := url.Parse(step.URI)
+		if serr != nil {
 			err = multierror.Append(err, fmt.Errorf("Steps must have a valid URI"))
 		}
 		switch uri.Scheme {
@@ -146,8 +140,7 @@ func (f Function) Validate(ctx context.Context) error {
 
 	edges, aerr := f.AllEdges(ctx)
 	if aerr != nil {
-		err = multierror.Append(err, aerr)
-		return err
+		return multierror.Append(err, aerr)
 	}
 
 	// Validate edges.
@@ -195,8 +188,8 @@ func (f Function) AllEdges(ctx context.Context) ([]Edge, error) {
 	// Track whether incoming edges exist for each step
 	seen := map[string]bool{}
 	for _, s := range f.Steps {
-		stepmap[s.Name] = s
-		seen[s.Name] = false
+		stepmap[s.ID] = s
+		seen[s.ID] = false
 	}
 
 	var err error

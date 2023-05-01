@@ -22,14 +22,14 @@ complex: defs.#Function & {
 	idempotency: "{{ event.data.foo }}"
 	steps: {
 		first: {
-			runtime: defs.#RuntimeDocker
+			runtime: defs.#RuntimeHTTP & {url: "http://www.example.com"}
 			after: [{
 				step: "$trigger"
 				wait: "5m"
 			}]
 		}
 		second: {
-			runtime: defs.#RuntimeDocker
+			runtime: defs.#RuntimeHTTP & {url: "http://www.example.com"}
 			after: [{
 				step: "first"
 			}]

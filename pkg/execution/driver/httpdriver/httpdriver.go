@@ -160,9 +160,10 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 		uri.RawQuery = values.Encode()
 	} else {
 		values.Set("stepId", edge.Incoming)
+		uri.RawQuery = values.Encode()
 	}
 
-	byt, status, duration, err := e.do(ctx, parsed.String(), input)
+	byt, status, duration, err := e.do(ctx, uri.String(), input)
 	if err != nil {
 		return nil, err
 	}
@@ -170,9 +171,9 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 	if status == 206 {
 		// This is a generator-based function returning opcodes.
 		resp := &state.DriverResponse{
-			ActionVersion: action.Version,
-			Duration:      duration,
-			OutputSize:    len(byt),
+			Step:       step,
+			Duration:   duration,
+			OutputSize: len(byt),
 		}
 		resp.Generator, err = ParseGenerator(ctx, byt)
 		if err != nil {
@@ -210,14 +211,14 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 	}
 
 	return &state.DriverResponse{
+		Step: step,
 		Output: map[string]interface{}{
 			"status": status,
 			"body":   body,
 		},
-		Err:           err,
-		ActionVersion: action.Version,
-		Duration:      duration,
-		OutputSize:    len(byt),
+		Err:        err,
+		Duration:   duration,
+		OutputSize: len(byt),
 	}, nil
 }
 

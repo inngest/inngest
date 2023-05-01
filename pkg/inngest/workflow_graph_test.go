@@ -1,13 +1,14 @@
 package inngest
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestGraph_create(t *testing.T) {
-	w := Workflow{
+	w := Function{
 		Steps: []Step{
 			{
 				ID:   "first",
@@ -38,12 +39,12 @@ func TestGraph_create(t *testing.T) {
 		},
 	}
 
-	_, err := NewGraph(w)
+	_, err := NewGraph(context.Background(), w)
 	require.NoError(t, err)
 }
 
 func TestGraph_lookup(t *testing.T) {
-	w := Workflow{
+	w := Function{
 		Steps: []Step{
 			{
 				ID:   "first",
@@ -74,17 +75,20 @@ func TestGraph_lookup(t *testing.T) {
 		},
 	}
 
-	g, err := NewGraph(w)
+	g, err := NewGraph(context.Background(), w)
 	require.NoError(t, err)
 
 	// Nodes from trigger
 	edges := g.EdgesFrom(LookupVertex{TriggerName})
 	require.Equal(t, 1, len(edges))
+	require.NotNil(t, edges[0].Target())
+	require.NotNil(t, edges[0].Target().(Vertex).Step)
 	require.Equal(t, "first", edges[0].Target().(Vertex).Step.ID)
 
 	// a helper func.
 	from := g.From(TriggerName)
 	require.Equal(t, 1, len(from))
+	require.NotNil(t, from[0].Incoming.Step)
 	require.Equal(t, "first", from[0].Incoming.Step.ID)
 
 	// Nodes from first vertex.

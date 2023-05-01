@@ -70,7 +70,7 @@ func TestSDKSteps(t *testing.T) {
 		test.SetRequestEvent(evt),
 		// And the executor should start its requests with this context.
 		test.SetRequestContext(SDKCtx{
-			FnID:   fnID,
+			FnID:   inngest.DeterministicUUID(test.Function).String(),
 			StepID: "step",
 			Stack: driver.FunctionStack{
 				Current: 0,

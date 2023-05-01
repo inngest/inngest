@@ -274,19 +274,17 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 		l.Str("run_id", id.RunID.String()).Str("step", edge.Incoming).Msg(msg)
 
 		if resp != nil {
-			/*
-				// Log the output separately, highlighting it with
-				// a different caller.  This lets users scan for
-				// output easily, and if we build a TUI to filter on
-				// caller to show only step outputs, etc.
-				log.Info().
-					Str("caller", "output").
-					Interface("generator", resp.Generator).
-					Interface("output", resp.Output).
-					Str("run_id", id.RunID.String()).
-					Str("step", edge.Incoming).
-					Msg("step output")
-			*/
+			// Log the output separately, highlighting it with
+			// a different caller.  This lets users scan for
+			// output easily, and if we build a TUI to filter on
+			// caller to show only step outputs, etc.
+			log.Info().
+				Str("caller", "output").
+				Interface("generator", resp.Generator).
+				Interface("output", resp.Output).
+				Str("run_id", id.RunID.String()).
+				Str("step", edge.Incoming).
+				Msg("step output")
 		}
 	}
 
