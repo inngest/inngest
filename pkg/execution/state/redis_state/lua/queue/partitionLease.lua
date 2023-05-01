@@ -2,9 +2,10 @@
 
 Output:
  +1-N: Successfully leased item, with remaining partition capacity left
-    0: No capacity left, not leased
-   -1: Partition item not found
-   -2: Partition item already leased
+    0: Success, no concurrency limits
+   -1: No capacity left, not leased
+   -2: Partition item not found
+   -3: Partition item already leased
 
 ]]
 
@@ -24,12 +25,12 @@ local concurrency = tonumber(ARGV[5]) -- concurrency limit for this partition
 
 local existing = get_partition_item(partitionKey, partitionID)
 if existing == nil or existing == false then
-	return -1
+	return -2
 end
 
 -- Check for an existing lease.
 if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and decode_ulid_time(existing.leaseID) > currentTime then
-	return -2
+	return -3
 end
 
 local now_seconds = math.floor(currentTime / 1000)
@@ -43,7 +44,7 @@ if concurrency > 0 and #partitionConcurrencyKey > 0 then
 		-- There's no capacity available.  Increase the score for this partition so that
 		-- it's not immediately re-scanned.
 		redis.call("ZADD", partitionIndexKey, leaseTime, partitionID)
-		return 0
+		return -1
 	end
 end
 
