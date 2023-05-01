@@ -49,6 +49,7 @@ func TestSDKCancelNotReceived(t *testing.T) {
 			Steps: []inngest.Step{
 				{
 					Name:    "step",
+					ID:      "step",
 					URI:     stepURL(fnID, "step"),
 					Retries: &retries,
 				},
@@ -73,7 +74,7 @@ func TestSDKCancelNotReceived(t *testing.T) {
 			test.SetRequestEvent(evt),
 			// And the executor should start its requests with this context.
 			test.SetRequestContext(SDKCtx{
-				FnID:   fnID,
+				FnID:   inngest.DeterministicUUID(abstract.Function).String(),
 				StepID: "step",
 				Stack: driver.FunctionStack{
 					Current: 0,
@@ -169,6 +170,7 @@ func TestSDKCancelReceived(t *testing.T) {
 			},
 			Steps: []inngest.Step{
 				{
+					ID:      "step",
 					Name:    "step",
 					URI:     stepURL(fnID, "step"),
 					Retries: &retries,
@@ -196,7 +198,7 @@ func TestSDKCancelReceived(t *testing.T) {
 			test.SetRequestSteps(map[string]any{}),
 			// And the executor should start its requests with this context.
 			test.SetRequestContext(SDKCtx{
-				FnID:   fnID,
+				FnID:   inngest.DeterministicUUID(abstract.Function).String(),
 				StepID: "step",
 				Stack: driver.FunctionStack{
 					Current: 0,
