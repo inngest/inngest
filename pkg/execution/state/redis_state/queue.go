@@ -954,8 +954,6 @@ func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration t
 	if err != nil {
 		return nil, 0, err
 	}
-	fmt.Println("PART LEASE", keys)
-	fmt.Printf("%#v\n", args)
 	result, err := scripts["queue/partitionLease"].Exec(
 		ctx,
 		q.r,
@@ -975,6 +973,12 @@ func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration t
 	case -3:
 		return nil, 0, ErrPartitionAlreadyLeased
 	default:
+		// If there's no concurrency limit for this partition, return a default
+		// amount so that processing the partition has reasonable limits.
+		if concurrency == 0 {
+			return &leaseID, QueuePeekDefault, nil
+		}
+
 		// result is the available concurrency within this partition
 		return &leaseID, result, nil
 	}
