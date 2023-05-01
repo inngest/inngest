@@ -122,6 +122,9 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 		executor.WithExecutionLoader(loader),
 		executor.WithState(sm),
 		executor.WithQueue(queue),
+		executor.WithExecutorOpts(
+			executor.WithFunctionLoader(loader),
+		),
 	)
 
 	// Add notifications to the state manager so that we can store new function runs

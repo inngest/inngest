@@ -40,6 +40,12 @@ func WithState(sm state.Manager) func(s *svc) {
 	}
 }
 
+func WithExecutorOpts(opts ...ExecutorOpt) func(s *svc) {
+	return func(s *svc) {
+		s.opts = opts
+	}
+}
+
 func WithQueue(q queue.Queue) func(s *svc) {
 	return func(s *svc) {
 		s.queue = q
@@ -66,6 +72,8 @@ type svc struct {
 	exec Executor
 
 	wg sync.WaitGroup
+
+	opts []ExecutorOpt
 }
 
 func (s *svc) Name() string {
@@ -112,7 +120,7 @@ func (s *svc) Pre(ctx context.Context) error {
 		return fmt.Errorf("failed to create failure handler: %w", err)
 	}
 
-	s.exec, err = NewExecutor(
+	opts := []ExecutorOpt{
 		WithActionLoader(s.data),
 		WithStateManager(s.state),
 		WithRuntimeDrivers(
@@ -120,7 +128,10 @@ func (s *svc) Pre(ctx context.Context) error {
 		),
 		WithLogger(logger.From(ctx)),
 		WithFailureHandler(failureHandler),
-	)
+	}
+	opts = append(opts, s.opts...)
+
+	s.exec, err = NewExecutor(opts...)
 	if err != nil {
 		return err
 	}

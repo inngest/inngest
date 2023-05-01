@@ -84,9 +84,6 @@ type Executor interface {
 	) (*state.DriverResponse, int, error)
 }
 
-// FunctionLoader returns an inngest.Function for a given function run.
-type FunctionLoader func(ctx context.Context, id state.Identifier) (inngest.Function, error)
-
 // FailureHandler is a function that handles failures in the executor.
 type FailureHandler func(context.Context, state.Identifier, state.State, state.DriverResponse) error
 
@@ -137,7 +134,7 @@ func WithStateManager(sm state.Manager) ExecutorOpt {
 	}
 }
 
-func WithFunctionLoader(l FunctionLoader) ExecutorOpt {
+func WithFunctionLoader(l state.FunctionLoader) ExecutorOpt {
 	return func(e Executor) error {
 		e.(*executor).fl = l
 		return nil
@@ -190,7 +187,7 @@ type executor struct {
 
 	sm             state.Manager
 	al             coredata.ExecutionActionLoader
-	fl             FunctionLoader
+	fl             state.FunctionLoader
 	runtimeDrivers map[string]driver.Driver
 	failureHandler FailureHandler
 
@@ -312,11 +309,15 @@ func (e *executor) run(ctx context.Context, id state.Identifier, edge inngest.Ed
 		err      error
 	)
 
+	if e.fl == nil {
+		return nil, 0, fmt.Errorf("no function loader specified running step")
+	}
+
 	if edge.Incoming == inngest.TriggerName {
 		return nil, 0, nil
 	}
 
-	f, err := e.fl(ctx, id)
+	f, err := e.fl.LoadFunction(ctx, id)
 	if err != nil {
 		return nil, 0, fmt.Errorf("error loading function for run: %w", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -523,6 +524,9 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
 		}
 	}
 
+	// XXX: If we haven't been able to lease a single item, ensure we enqueue this
+	// for a minimum of 5 seconds.
+
 	// Requeue the partition, which reads the next unleased job or sets a time of
 	// 30 seconds.  This is why we have to lease items above, else this may return an item that is
 	// about to be leased and processed by the worker.
@@ -594,6 +598,8 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 		defer func() {
 			if r := recover(); r != nil {
 				// Always retry this job.
+				stack := debug.Stack()
+				q.logger.Error().Err(fmt.Errorf("%v", r)).Str("stack", string(stack)).Msg("job panicked")
 				errCh <- osqueue.AlwaysRetry(fmt.Errorf("job panicked: %v", r))
 			}
 		}()
