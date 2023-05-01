@@ -13,7 +13,7 @@ var (
 )
 
 // MaxEvents is the maximum number of events we can parse in a single batch.
-const MaxEvents = 1_000
+const MaxEvents = 10_000
 
 // ParseStream parses a reader, publishing a stream of JSON-encoded events to the given channel,
 // ensuring that no individual event is too large.
