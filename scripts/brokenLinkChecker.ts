@@ -15,13 +15,15 @@ const options = {
     "https://svelte.dev",
     "https://deno.land",
     "https://the-guild.dev/graphql/yoga-server",
-    "https://envelop.dev"
+    "https://envelop.dev",
+    "https://twitter.com",
   ],
 };
 
 const brokenReasonsToIgnore = ["HTTP_308"];
 
 const seen = [];
+const uniqueURLs = {};
 
 function hasBeenSeen({ pathname, link, text }): boolean {
   return !!seen.find(function (l) {
@@ -47,6 +49,7 @@ function logBrokenLink(result) {
     link,
     text,
   });
+  uniqueURLs[link] = uniqueURLs.hasOwnProperty(link) ? uniqueURLs[link] + 1 : 1;
   console.log(`BROKEN LINK on ${pathname}: ${result.brokenReason}
   href=${link}
   text=${text}`);
@@ -72,6 +75,11 @@ const siteChecker = new blc.SiteChecker(options, {
   end: function () {
     console.log(
       `\nFound ${brokenLinks} broken links out of ${linksChecked} total links across ${pagesChecked} pages\n`
+    );
+    console.log(
+      Object.keys(uniqueURLs)
+        .map((u) => ` - ${u} (${uniqueURLs[u]})`)
+        .join(`\n`)
     );
     if (brokenLinks > 0) {
       process.exit(1);
