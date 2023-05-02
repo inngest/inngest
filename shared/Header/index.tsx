@@ -86,6 +86,15 @@ export default function Header() {
                     Blog
                   </a>
                 </li>
+                <li>
+                  <a
+                    href="https://roadmap.inngest.com/roadmap?ref=nav"
+                    target="_blank"
+                    className="flex items-center text-white font-medium px-7 md:px-10 lg:px-5 py-2 text-sm  hover:opacity-60"
+                  >
+                    Roadmap
+                  </a>
+                </li>
               </ul>
               <ul className="flex lg:items-center mt-6 lg:mt-0 md:px-3">
                 <li>
