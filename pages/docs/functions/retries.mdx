@@ -115,7 +115,7 @@ To illustrate how this logic might work, let's use the above code and explain ho
 
 ## Retry policies
 
-By default, each function is retried 3 times using [exponential backoff](https://github.com/inngest/inngest/blob/main/pkg/backoff/backoff.go) with jitter.
+By default, each function is retried 3 times using [backoff](https://github.com/inngest/inngest/blob/main/pkg/backoff/backoff.go#L10-L22) with jitter.
 
 * **Successful** - No error thrown. This will not be retried.
 * **Non-retriable error** - A `NonRetriableError` was thrown (think: `404`). This will not be retried.
