@@ -1,11 +1,19 @@
 import { useRouter } from "next/router";
 import styled from "@emotion/styled";
-import Nav from "../shared/legacy/nav";
-import Button from "../shared/legacy/Button";
-import IconList from "../shared/legacy/IconList";
-import Check from "../shared/Icons/Check";
+import Logo from "../shared/Icons/Logo";
 import { useState } from "react";
 import { useAnonId } from "src/shared/legacy/trackingHooks";
+
+export async function getStaticProps() {
+  return {
+    props: {
+      designVersion: "2",
+      meta: {
+        title: "Sign up to Inngest",
+      },
+    },
+  };
+}
 
 const api = process.env.NEXT_PUBLIC_API_HOST || "https://api.inngest.com";
 const appURL = process.env.NEXT_PUBLIC_APP_HOST || "https://app.inngest.com";
@@ -70,215 +78,112 @@ const SignUp = () => {
   };
 
   return (
-    <>
-      <Nav nolinks />
+    <Wrapper className="flex h-screen w-screen">
+      <div className="flex h-full w-full items-center justify-items-center overflow-y-scroll bg-white px-4 sm:w-2/3 md:w-1/2">
+        <div className="mx-auto my-8 w-80 text-center">
+          <Logo className="mb-8 flex justify-center" />
+          <h2 className="text-slate-800 font-semibold">Sign up for Inngest Cloud</h2>
+          <div className="my-5 flex flex-col gap-4 text-center">
+            <a
+              className="inline-flex flex-shrink-0 items-center gap-1 justify-center overflow-hidden text-sm font-regular rounded-[6px] transition-all shadow-outline-secondary-light font-medium px-6 py-2.5 bg-gray-900 text-white shadow-sm hover:bg-gray-700 hover:text-white"
+              href={apiURL(
+                `/v1/login/oauth/github/redirect?anonid=${anonId}&to=${loc}&search=${b64search}`
+              )}
+            >
+              <img
+                src="https://legacy.inngest.com/assets/gh-mark.png"
+                alt="GitHub"
+                className="mr-2 w-4 h-4"
+              />
+              <span>
+                Sign up with <b>GitHub</b>
+              </span>
+            </a>
 
-      <div className="mx-auto max-w-3xl px-8">
-        <Header className="py-16 text-center">
-          <h2>Sign up for Inngest Cloud</h2>
-          <p className="mt-4">
-            The features and functionality that get out of your way and let you
-            build.
-          </p>
-        </Header>
-        <PopUpHeader className="mb-6 text-center">
-          <h2 className="text-xl">
-            Sign up for Inngest Cloud {to !== "/" && "to continue"}
-          </h2>
-        </PopUpHeader>
-
-        <Content className="grid gap-12">
-          <div className="signup">
-            <div className="buttons">
-              <Button
-                href={apiURL(
-                  `/v1/login/oauth/github/redirect?anonid=${anonId}&to=${loc}&search=${b64search}`
-                )}
-                kind="black"
-              >
-                <img
-                  src="https://app.inngest.com/assets/gh-mark.png"
-                  alt="GitHub"
-                  width="20"
-                />
-                <span>
-                  Sign up with <b>GitHub</b>
-                </span>
-              </Button>
-
-              <Button
-                href={apiURL(
-                  `/v1/login/oauth/google/redirect?anonid=${anonId}&to=${loc}&search=${b64search}`
-                )}
-                kind="black"
-                style={{ marginLeft: 0 }}
-              >
-                <img
-                  src="https://app.inngest.com/assets/icons/google.svg"
-                  alt="Google"
-                  width="20"
-                />
-                <span>
-                  Sign up with <b>Google</b>
-                </span>
-              </Button>
+            <a
+              className="inline-flex flex-shrink-0 items-center gap-1 justify-center overflow-hidden text-sm font-regular rounded-[6px] transition-all shadow-outline-secondary-light font-medium px-6 py-2.5 bg-slate-700 text-white shadow-sm hover:bg-slate-500 hover:text-white"
+              href={apiURL(
+                `/v1/login/oauth/google/redirect?anonid=${anonId}&to=${loc}&search=${b64search}`
+              )}
+              style={{ marginLeft: 0 }}
+            >
+              <img
+                src="https://legacy.inngest.com/assets/icons/google.svg"
+                alt="Google"
+                className="mr-2 w-4 h-4"
+              />
+              <span>
+                Sign up with <b>Google</b>
+              </span>
+            </a>
+          </div>
+          <form
+            className="flex flex-col gap-4 border-b border-t border-slate-300 pb-6 pt-4 text-center"
+            action=""
+            onSubmit={handleSubmit}
+          >
+            <p className="text-center text-sm font-medium text-slate-600">
+              Or sign up with email
+            </p>
+            {error && <p className="text-red-800">{error}</p>}
+            <div className="flex flex-col gap-1">
+              <input
+                type="email"
+                name="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="border border-slate-300 placeholder-slate-500 shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline text-sm px-3.5 py-3 rounded-lg"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <input
+                type="password"
+                name="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="border border-slate-300 placeholder-slate-500 shadow outline-2 outline-offset-2 outline-indigo-500 transition-all focus:outline text-sm px-3.5 py-3 rounded-lg"
+              />
             </div>
 
-            <form className="form" action="" onSubmit={handleSubmit}>
-              <label>
-                Email
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </label>
-              <label>
-                Password
-                <input
-                  type="password"
-                  name="password"
-                  placeholder="Create a strong password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </label>
-
-              {error && <p className="error">{error}</p>}
-
-              <Button type="submit" kind="primary" disabled={loading}>
-                Sign up via email
-              </Button>
-            </form>
-          </div>
-
-          <div className="details">
-            <h5>Try Inngest for free</h5>
-            <IconList
-              direction="vertical"
-              items={[
-                "No queues to configure",
-                "Full event history",
-                "Serverless functions",
-                "Any programming language",
-                "Step function support with DAGs",
-                "Bring your whole team",
-              ].map((text) => ({
-                icon: Check,
-                text,
-              }))}
-            />
-          </div>
-        </Content>
+            <button
+              className="inline-flex flex-shrink-0 items-center gap-1 justify-center overflow-hidden text-sm font-regular rounded-[6px] transition-all bg-gradient-to-b from-[#6d7bfe] to-[#6366f1] hover:from-[#7986fd] hover:to-[#7679f9] text-shadow text-white font-medium px-6 py-2.5"
+              type="submit"
+              disabled={loading}
+            >
+              Sign up via email
+            </button>
+          </form>
+          <p className="mt-4 text-center text-sm font-medium text-slate-700">
+            Do you already have an account?{" "}
+            <a
+              className="underline"
+              href="https://app.inngest.com/login?ref=nav"
+            >
+              Sign in here
+            </a>
+          </p>
+        </div>
       </div>
-    </>
+      <div className="mesh-gradient hidden w-1/3 sm:block md:w-1/2" />
+    </Wrapper>
   );
 };
 
-const Header = styled.header`
-  // Hide for short pop-up windows, e.g. Vercel integration flow (e.g. 800x600)
-  @media (max-height: 800px) and (min-width: 640px) {
-    display: none;
-  }
-`;
-const PopUpHeader = styled.div`
-  display: none;
-  @media (max-height: 800px) and (min-width: 640px) {
-    display: block;
-  }
-`;
-
-const Content = styled.div`
-  grid-template-columns: repeat(2, 1fr);
-
-  .signup {
-    display: grid;
-    gap: 2rem;
-  }
-
-  .buttons {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-
-    button + button,
-    a + a {
-      margin: 0.75rem 0 0 0;
-    }
-    a img {
-      margin: 0 1rem 0 0;
-    }
-  }
-
-  .form,
-  .buttons > a {
-    box-shadow: 0 0 80px rgba(255, 255, 255, 0.06);
-  }
-
-  .form {
-    padding: 2rem;
-    border-radius: var(--border-radius);
-    background: linear-gradient(
-      135deg,
-      hsl(332deg 30% 95%) 0%,
-      hsl(240deg 30% 95%) 100%
-    );
-    display: flex;
-    flex-direction: column;
-  }
-
-  label {
-    font-size: 0.85rem;
-    display: flex;
-    flex-direction: column;
-  }
-  label + label {
-    margin: 1.25rem 0 0;
-  }
-  input {
-    margin: 0.2rem 0 0;
-  }
-  button {
-    margin: 2.5rem 0 0;
-  }
-
-  .error {
-    text-align: center;
-    margin: 2rem 0 -1rem;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: red;
-  }
-
-  .details {
-    opacity: 0.85;
-    font-size: 0.85rem;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-
-    ul {
-      margin: 2rem 0;
-    }
-  }
-
-  // mobile
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
-
-  // Hide for short pop-up windows, e.g. Vercel integration flow (e.g. 800x600)
-  @media (max-height: 800px) and (min-width: 640px) {
-    grid-template-columns: 1fr;
-    .signup {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-    }
-    .details {
-      display: none;
-    }
+const Wrapper = styled.div`
+  .mesh-gradient {
+    background-color: hsla(240, 100%, 72%, 1);
+    background-image: radial-gradient(
+        at 62% 96%,
+        hsla(191, 100%, 59%, 0.85) 0px,
+        transparent 50%
+      ),
+      radial-gradient(at 48% 9%, hsla(275, 100%, 69%, 1) 0px, transparent 50%),
+      radial-gradient(at 8% 11%, hsla(240, 100%, 69%, 1) 0px, transparent 50%),
+      radial-gradient(at 3% 93%, hsla(0, 78%, 70%, 0.6) 0px, transparent 50%),
+      radial-gradient(at 89% 26%, hsla(266, 100%, 57%, 1) 0px, transparent 50%),
+      radial-gradient(at 84% 79%, hsla(240, 100%, 70%, 1) 0px, transparent 50%);
   }
 `;
 
