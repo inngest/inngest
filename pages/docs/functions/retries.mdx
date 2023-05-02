@@ -121,4 +121,21 @@ By default, each function is retried 3 times using [exponential backoff](https:/
 * **Non-retriable error** - A `NonRetriableError` was thrown (think: `404`). This will not be retried.
 * **Error** - Any error was thrown indicating a potentially temporary failure (think: `500`). **This will be retried according to the retry policy (3 times, by default)**.
 
-_Note - We're planning to enable customization of the retry policy and timing in a future release._
+You can customize the number of retries directly from your function configuration:
+
+```typescript
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ name: "My app" });
+
+export default inngest.createFunction(
+  {
+    name: "Handle form",
+    retries: 10, // Choose the number of retries you'd liie.
+  },
+  { event: "api/form.submitted" },
+  }
+);
+```
+
+[Retries follow this backoff schedule](https://github.com/inngest/inngest/blob/main/pkg/backoff/backoff.go#L10-L22), with 0-30 seconds of random jitter added.
