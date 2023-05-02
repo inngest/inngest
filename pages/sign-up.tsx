@@ -91,7 +91,7 @@ const SignUp = () => {
               )}
             >
               <img
-                src="https://legacy.inngest.com/assets/gh-mark.png"
+                src="/assets/ui-assets/source-logos/github-mark-white.png"
                 alt="GitHub"
                 className="mr-2 w-4 h-4"
               />
@@ -108,7 +108,7 @@ const SignUp = () => {
               style={{ marginLeft: 0 }}
             >
               <img
-                src="https://legacy.inngest.com/assets/icons/google.svg"
+                src="/assets/ui-assets/icons/google.svg"
                 alt="Google"
                 className="mr-2 w-4 h-4"
               />
@@ -159,7 +159,7 @@ const SignUp = () => {
             Do you already have an account?{" "}
             <a
               className="underline"
-              href="https://app.inngest.com/login?ref=nav"
+              href="https://app.inngest.com/login?ref=signup"
             >
               Log in here
             </a>
