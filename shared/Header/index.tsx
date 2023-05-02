@@ -95,12 +95,21 @@ export default function Header() {
                     Roadmap
                   </a>
                 </li>
+                <li>
+                  <a
+                    href="https://roadmap.inngest.com/changelog?ref=nav"
+                    target="_blank"
+                    className="flex items-center text-white font-medium px-7 md:px-10 lg:px-5 py-2 text-sm  hover:opacity-60"
+                  >
+                    Changelog
+                  </a>
+                </li>
               </ul>
-              <ul className="flex lg:items-center mt-6 lg:mt-0 md:px-3">
+              <ul className="flex flex-shrink-0 lg:items-center mt-6 lg:mt-0 md:px-3 lg:hidden xl:flex">
                 <li>
                   <a
                     href="https://github.com/inngest/inngest"
-                    className="flex items-center text-white font-medium px-3.5 py-2 text-sm ml-4  hover:opacity-60"
+                    className="flex flex-shrink-0 items-center text-white font-medium px-3.5 py-2 text-sm ml-4  hover:opacity-60"
                   >
                     <Github />
                   </a>
@@ -108,7 +117,7 @@ export default function Header() {
                 <li>
                   <a
                     href="https://discord.gg/EuesV2ZSnX"
-                    className="flex items-center text-white font-medium px-3.5 py-2 text-sm  hover:opacity-60"
+                    className="flex flex-shrink-0 items-center text-white font-medium px-3.5 py-2 text-sm  hover:opacity-60"
                   >
                     <Discord />
                   </a>
@@ -116,7 +125,7 @@ export default function Header() {
                 <li>
                   <a
                     href="https://twitter.com/inngest"
-                    className="flex items-center text-white font-medium px-3.5 py-2 text-sm hover:opacity-60"
+                    className="flex flex-shrink-0 items-center text-white font-medium px-3.5 py-2 text-sm hover:opacity-60"
                   >
                     <Twitter />
                   </a>
