@@ -60,7 +60,7 @@ export default function Home() {
 
       <Patterns />
 
-      <Roadmap />
+      {/* <Roadmap /> */}
 
       <SocialCTA />
 
