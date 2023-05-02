@@ -161,7 +161,7 @@ const SignUp = () => {
               className="underline"
               href="https://app.inngest.com/login?ref=nav"
             >
-              Sign in here
+              Log in here
             </a>
           </p>
         </div>
