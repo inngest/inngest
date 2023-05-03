@@ -500,8 +500,10 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		return i, ErrPriorityTooHigh
 	}
 
-	// Add the At timestamp.
-	i.AtMS = at.UnixMilli()
+	// Add the At timestamp, if not included.
+	if i.AtMS == 0 {
+		i.AtMS = at.UnixMilli()
+	}
 
 	if i.Data.JobID == nil {
 		i.Data.JobID = &i.ID
