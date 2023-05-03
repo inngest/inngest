@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"testing"
 	"time"
@@ -20,6 +21,96 @@ func init() {
 }
 
 const testPriority = PriorityDefault
+
+func TestQueueItemScore(t *testing.T) {
+	parse := func(layout, val string) time.Time {
+		t, _ := time.Parse(layout, val)
+		return t
+	}
+
+	start := parse(time.RFC3339, "2023-01-01T12:30:30.000Z")
+	old := parse(time.RFC3339, "2022-09-01T12:30:30.000Z")
+
+	tests := []struct {
+		name     string
+		qi       QueueItem
+		expected int64
+	}{
+		{
+			name:     "Current edge queue",
+			expected: start.UnixMilli(),
+			qi: QueueItem{
+				AtMS: start.UnixMilli(),
+				Data: osqueue.Item{
+					Kind: osqueue.KindEdge,
+					Identifier: state.Identifier{
+						RunID: ulid.MustNew(uint64(start.UnixMilli()), rand.Reader),
+					},
+				},
+			},
+		},
+		{
+			name:     "Item with old run",
+			expected: old.UnixMilli(),
+			qi: QueueItem{
+				AtMS: start.UnixMilli(),
+				Data: osqueue.Item{
+					Kind: osqueue.KindEdge,
+					Identifier: state.Identifier{
+						RunID: ulid.MustNew(uint64(old.UnixMilli()), rand.Reader),
+					},
+				},
+			},
+		},
+		// Edge cases
+		{
+			name:     "Item with old run, 2nd attempt",
+			expected: start.UnixMilli(),
+			qi: QueueItem{
+				AtMS: start.UnixMilli(),
+				Data: osqueue.Item{
+					Kind:    osqueue.KindEdge,
+					Attempt: 2,
+					Identifier: state.Identifier{
+						RunID: ulid.MustNew(uint64(old.UnixMilli()), rand.Reader),
+					},
+				},
+			},
+		},
+		{
+			name:     "Item within leeway",
+			expected: start.UnixMilli(),
+			qi: QueueItem{
+				AtMS: start.UnixMilli(),
+				Data: osqueue.Item{
+					Kind:    osqueue.KindEdge,
+					Attempt: 2,
+					Identifier: state.Identifier{
+						RunID: ulid.MustNew(uint64(start.UnixMilli()-1_000), rand.Reader),
+					},
+				},
+			},
+		},
+		{
+			name:     "Sleep",
+			expected: start.UnixMilli(),
+			qi: QueueItem{
+				AtMS: start.UnixMilli(),
+				Data: osqueue.Item{
+					Kind: osqueue.KindSleep,
+					Identifier: state.Identifier{
+						RunID: ulid.MustNew(uint64(old.UnixMilli()), rand.Reader),
+					},
+				},
+			},
+		},
+	}
+
+	for _, item := range tests {
+		actual := item.qi.Score()
+		require.Equal(t, item.expected, actual)
+	}
+}
 
 func TestQueueEnqueueItem(t *testing.T) {
 	r := miniredis.RunT(t)

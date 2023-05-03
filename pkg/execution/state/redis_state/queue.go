@@ -63,6 +63,10 @@ const (
 	PriorityDefault uint = 5
 	PriorityMin     uint = 9
 
+	// FunctionStartScoreBufferTime is the grace period used to compare function start
+	// times to edg enqueue times.
+	FunctionStartScoreBufferTime = 10 * time.Second
+
 	defaultNumWorkers           = 100
 	defaultPollTick             = 10 * time.Millisecond
 	defaultIdempotencyTTL       = 12 * time.Hour
@@ -375,6 +379,36 @@ type QueueItem struct {
 	//
 	// This should almost always be nil.
 	QueueName *string `json:"queueID,omitempty"`
+}
+
+// Score returns the score (time that the item should run) for the queue item.
+//
+// NOTE: In order to prioritize finishing older function runs with a busy function
+// queue, we sometimes use the function run's "started at" time to enqueue edges which
+// run steps.  This lets us push older function steps to the beginning of the queue,
+// ensuring they run before other newer function runs.
+//
+// We can ONLY do this for the first attempt, and we can ONLY do this for edges that
+// are not sleeps (eg. immediate runs)
+func (q QueueItem) Score() int64 {
+	// If this is not an edge, we can ignore this.
+	if q.Data.Kind != osqueue.KindEdge || q.Data.Attempt > 0 {
+		return q.AtMS
+	}
+
+	// If this is > 2 seconds in the future, don't mess with the time.
+	// This prevents any accidental fudging of future run times, even if the
+	// kind is edge (which should never exist... but, better to be safe).
+	if q.AtMS > time.Now().Add(2*time.Second).UnixMilli() {
+		return q.AtMS
+	}
+
+	// Only fudge the numbers if the run is older than the buffer time.
+	startAt := int64(q.Data.Identifier.RunID.Time())
+	if q.AtMS-startAt > FunctionStartScoreBufferTime.Milliseconds() {
+		return startAt
+	}
+	return q.AtMS
 }
 
 func (q QueueItem) MarshalBinary() ([]byte, error) {
