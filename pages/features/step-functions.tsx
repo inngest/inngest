@@ -104,7 +104,11 @@ export default function FeaturesSDK() {
             snippet={codesnippets.main}
           />
           <div className="mt-10 flex flex-wrap gap-6 justify-center items-center">
-            <Button href="/sign-up" kind="primary" size="medium">
+            <Button
+              href="/sign-up?ref=feature-step-functions"
+              kind="primary"
+              size="medium"
+            >
               Get started
             </Button>
           </div>
@@ -233,7 +237,11 @@ export default function FeaturesSDK() {
             </h2>
           </header>
           <div className="my-10 flex flex-col sm:flex-row flex-wrap gap-6 justify-center items-center">
-            <Button href="/sign-up" kind="outline" style={{ margin: 0 }}>
+            <Button
+              href="/sign-up?ref=feature-step-functions"
+              kind="outline"
+              style={{ margin: 0 }}
+            >
               Sign up in a minute
             </Button>
             <Button href="/discord" kind="outline" style={{ margin: 0 }}>

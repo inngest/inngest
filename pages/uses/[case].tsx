@@ -31,13 +31,19 @@ type IconType = keyof typeof Icons;
 export type UseCase = {
   slug?: string;
   title: string;
+  heroImage?: string;
   lede: string;
   keyFeatures: {
     title: string;
-    img: string;
-    description: string;
+    img?: string;
+    description: string; // can be HTML
   }[];
-  code: string;
+  codeSection: {
+    title: string;
+    steps: string[];
+    description?: string;
+    code: string;
+  };
   featureOverflow: {
     title: string;
     description: string;
@@ -47,16 +53,19 @@ export type UseCase = {
     text: string;
     author: string;
   };
-  learning: {
-    title: string;
+  learnMore: {
     description: string;
-    type: "Docs" | "Tutorial" | "Guide" | "Pattern" | "Blog";
-    href: string;
-  }[];
+    resources: {
+      title: string;
+      description: string;
+      type: "Docs" | "Tutorial" | "Guide" | "Pattern" | "Blog";
+      href: string;
+    }[];
+  };
 };
 
 export const getStaticProps: GetStaticProps = async (ctx) => {
-  const { data } = require(`../../data/uses/${ctx.params.case}.ts`);
+  const { data } = require(`../../data/uses/${ctx.params.case}.tsx`);
   const stringData = JSON.stringify({ ...data, slug: ctx.params.case });
   return {
     props: {
@@ -73,7 +82,7 @@ export const getStaticPaths: GetStaticPaths = async () => {
   const paths = fileNames.map((fileName) => {
     return {
       params: {
-        case: fileName.replace(/\.ts$/, ""),
+        case: fileName.replace(/\.tsx$/, ""),
       },
     };
   });
@@ -90,10 +99,11 @@ export default function useCase({ stringData }) {
     <PageContainer>
       <Header />
 
-      <Container className="my-48">
+      <Container>
         <PageHeader
           title={data.title}
           lede={data.lede}
+          image={data.heroImage}
           ctas={[
             {
               href: `/sign-up?ref=use-case-${data.slug}`,
@@ -111,21 +121,24 @@ export default function useCase({ stringData }) {
               key={i}
               className="max-w-[600px] m-auto md:m-0 bg-slate-950/80 overflow-hidden rounded-lg border-slate-900/10"
             >
-              <Image
-                alt={`Graphic of ${feature.title}`}
-                className="rounded-t-lg lg:rounded-t-none lg:rounded-r-lg group-hover:rounded-lg"
-                src={`/assets/use-cases/${feature.img}`}
-                width={600}
-                height={340}
-                quality={95}
-              />
+              {Boolean(feature.img) && (
+                <Image
+                  alt={`Graphic of ${feature.title}`}
+                  className="rounded-t-lg lg:rounded-t-none lg:rounded-r-lg group-hover:rounded-lg"
+                  src={`/assets/use-cases/${feature.img}`}
+                  width={600}
+                  height={340}
+                  quality={95}
+                />
+              )}
               <div className="p-6 lg:p-10">
                 <h3 className="text-lg lg:text-xl text-white mb-2.5">
                   {feature.title}
                 </h3>
-                <p className="text-sm text-indigo-200 leading-6">
-                  {feature.description}
-                </p>
+                <p
+                  className="text-sm text-indigo-100 leading-6"
+                  dangerouslySetInnerHTML={{ __html: feature.description }}
+                ></p>
               </div>
             </div>
           ))}
@@ -133,30 +146,19 @@ export default function useCase({ stringData }) {
       </Container>
 
       <Container className=" my-40">
-        <SectionHeader title="Queue work in just a few lines of code" />
+        <SectionHeader title={data.codeSection.title} />
         <div className="flex mt-16 flex-col lg:flex-row flex-start ">
           <div className="text-slate-200 mb-10 lg:mb-0 lg:pr-20 max-w-[400px] justify-center flex flex-col gap-3">
-            <p className="flex items-start gap-3">
-              <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold shrink-0">
-                1
-              </span>{" "}
-              Define your event payload type
-            </p>
-            <p className="flex items-start gap-3">
-              <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold shrink-0">
-                2
-              </span>{" "}
-              Send events with type{" "}
-            </p>
-            <p className="flex items-start gap-3">
-              <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold shrink-0">
-                3
-              </span>{" "}
-              Define your functions with that event trigger
-            </p>
+            {data.codeSection.steps.map((step, idx) => (
+              <p className="flex items-start gap-3">
+                <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold shrink-0">
+                  {idx + 1}
+                </span>{" "}
+                {step}
+              </p>
+            ))}
             <p className="text-sm text-slate-300 mt-4">
-              Functions trigger as events are received. Inngest calls all
-              matching functions via HTTP.
+              {data.codeSection.description}
             </p>
           </div>
           <SyntaxHighlighter
@@ -172,7 +174,7 @@ export default function useCase({ stringData }) {
               display: "inline-flex",
             }}
           >
-            {data.code}
+            {data.codeSection.code}
           </SyntaxHighlighter>
         </div>
       </Container>
@@ -204,12 +206,9 @@ export default function useCase({ stringData }) {
       </Container>
 
       <Container>
-        <SectionHeader
-          title="Learn more"
-          lede="Dive into our resources and learn how Inngest is the best solution for serverless queues for TypeScript."
-        />
+        <SectionHeader title="Learn more" lede={data.learnMore.description} />
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-16">
-          {data.learning.map((learningItem, i) => (
+          {data.learnMore.resources.map((learningItem, i) => (
             <Learning
               key={i}
               href={learningItem.href}

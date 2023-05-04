@@ -223,6 +223,19 @@ a {
   margin-top: 0.75rem;
 }
 
+ /* Basic inline code highlighting */
+:root.v1 p code,
+:root.v1 li code {
+  background: var(--color-light-gray);
+  color: var(--color-dark-purple);
+}
+p code,
+li code {
+  background: rgba(0,0,0,0.5);
+  padding: 0.1em 0.3em 0.15em;
+  border-radius: 3px;
+}
+
 @media (max-width: 980px) {
   :root.v1 h1 {
     font-size: 3rem;
@@ -744,13 +757,4 @@ ul.check li {
   .blog-image-container\:2 {
     grid-template-columns: repeat(2, 1fr);
   }
-}
-
-/* Basic inline code highlighting */
-p code,
-li code {
-  background: var(--color-light-gray);
-  padding: 0.1em 0.3em 0.15em;
-  border-radius: 3px;
-  color: var(--color-dark-purple);
 }

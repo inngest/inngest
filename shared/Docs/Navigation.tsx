@@ -340,7 +340,7 @@ export function Navigation(props) {
             Log in
           </Button>
           <Button
-            href={process.env.NEXT_PUBLIC_SIGNUP_URL}
+            href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=docs-mobile-nav`}
             variant="primary"
             arrow="right"
             className="w-full"

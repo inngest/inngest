@@ -23,24 +23,41 @@ export const data: UseCase = {
         "Failures happen. Inngest retries your functions automatically. The dead letter queue is a thing of the past.",
     },
   ],
-  code: `// Define your event payload with our standard name & date fields
-type MyEventType = {
-  name: "my.event",
-  data: {
-    userId: string
+  codeSection: {
+    title: "Queue work in just a few lines of code",
+    steps: [
+      "Define your event payload type",
+      "Send events with type",
+      "Define your functions with that event trigger",
+    ],
+    description:
+      "Functions trigger as events are received. Inngest calls all matching functions via HTTP.",
+    code: `// Define your event payload with our standard name & date fields
+type Events = {
+  "user.signup" : {
+    name: "user.signup",
+    data: {
+      userId: string
+    }
   }
 }
+const inngest = new Inngest<Events>({ name: "My App" });
 
 // Send events to Inngest
-inngest.send<MyEventType>({
-  name: "my.event", data: { userId: "12345" }
+await inngest.send({
+  name: "user.signup", data: { userId: "12345" }
 });
 
 // Define your function to handle that event
-createFunction<MyEventType>("My handler", "my.event", ({ event }) => {
-  // Handle your event
-});
+inngest.createFunction(
+  { name: "Post-signup email"} ,
+  { event: "user.signup" },
+  async ({ event }) => {
+    // Handle your event
+  }
+);
 `,
+  },
   featureOverflow: [
     {
       title: "Amazing local DX",
@@ -63,7 +80,7 @@ createFunction<MyEventType>("My handler", "my.event", ({ event }) => {
     {
       title: "Delays",
       description:
-        "Use TypeScript to build, test, and deploy serverless functions driven by  events or a schedule to any platform in sections, with zero infrastructure.",
+        "Use TypeScript to build, test, and deploy serverless functions driven by events or a schedule to any platform in sections, with zero infrastructure.",
       icon: "Retry",
     },
     {
@@ -77,26 +94,30 @@ createFunction<MyEventType>("My handler", "my.event", ({ event }) => {
     text: "It's sensational - This is the best way to test a background job",
     author: "Garrett Tolbert, Vercel",
   },
-  learning: [
-    {
-      title: "Quick Start Tutorial",
-      description:
-        "A step-by-step guide to learn how to build with Inngest in less than 5 minutes.",
-      type: "Tutorial",
-      href: "/docs/quick-start",
-    },
-    {
-      title: "Using TypeScript with Inngest",
-      description:
-        "Learn how our SDK gives you typesafety from sending events to running functions.",
-      type: "Docs",
-      href: "/docs/typescript",
-    },
-    {
-      title: "Running Background Jobs",
-      description: "How to background jobs without the queues and workers.",
-      type: "Guide",
-      href: "/docs/guides/background-jobs",
-    },
-  ],
+  learnMore: {
+    description:
+      "Dive into our resources and learn how Inngest is the best solution for serverless queues for TypeScript.",
+    resources: [
+      {
+        title: "Quick Start Tutorial",
+        description:
+          "A step-by-step guide to learn how to build with Inngest in less than 5 minutes.",
+        type: "Tutorial",
+        href: "/docs/quick-start",
+      },
+      {
+        title: "Using TypeScript with Inngest",
+        description:
+          "Learn how our SDK gives you typesafety from sending events to running functions.",
+        type: "Docs",
+        href: "/docs/typescript",
+      },
+      {
+        title: "Running Background Jobs",
+        description: "How to background jobs without the queues and workers.",
+        type: "Guide",
+        href: "/docs/guides/background-jobs",
+      },
+    ],
+  },
 };

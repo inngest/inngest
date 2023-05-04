@@ -104,7 +104,7 @@ export const Header = forwardRef<HTMLDivElement>(function Header(
             Log in
           </Button>
           <Button
-            href={process.env.NEXT_PUBLIC_SIGNUP_URL}
+            href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=docs-header`}
             size="sm"
             arrow="right"
           >
