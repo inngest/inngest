@@ -15,7 +15,7 @@ export const prepareWeeklyDigest = inngest.createFunction(
   { cron: "TZ=Europe/Paris 0 12 * * 5" },
   async ({ step }) => {
     // Load all the users from your database:
-    const users = step.run("Load users", async() => await db.load("SELECT * FROM users"));
+    const users = await step.run("Load users", async() => await db.load("SELECT * FROM users"));
 
     // 💡 Since we want to sent a weekly digest to each one of these users
     // it may take a long time to iterate through each user and send an email.
@@ -38,7 +38,7 @@ export const prepareWeeklyDigest = inngest.createFunction(
     });
 
     // 2️⃣ Now, we'll send all events in a single batch:
-    await inngest.send(events);
+    await step.sendEvent(events);
 
     // This function can now quickly finish and the rest of the logic will
     // be handled in the function below ⬇️
