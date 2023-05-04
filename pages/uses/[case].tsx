@@ -29,6 +29,7 @@ const Icons: { [key: string]: React.FC<IconProps> } = {
 
 type IconType = keyof typeof Icons;
 export type UseCase = {
+  slug?: string;
   title: string;
   lede: string;
   keyFeatures: {
@@ -56,7 +57,7 @@ export type UseCase = {
 
 export const getStaticProps: GetStaticProps = async (ctx) => {
   const { data } = require(`../../data/uses/${ctx.params.case}.ts`);
-  const stringData = JSON.stringify(data);
+  const stringData = JSON.stringify({ ...data, slug: ctx.params.case });
   return {
     props: {
       stringData,
@@ -90,7 +91,17 @@ export default function useCase({ stringData }) {
       <Header />
 
       <Container className="my-48">
-        <PageHeader title={data.title} lede={data.lede} />
+        <PageHeader
+          title={data.title}
+          lede={data.lede}
+          ctas={[
+            {
+              href: `/sign-up?ref=use-case-${data.slug}`,
+              text: `Sign Up`,
+              arrow: "right",
+            },
+          ]}
+        />
       </Container>
 
       <Container>
@@ -209,7 +220,7 @@ export default function useCase({ stringData }) {
           ))}
         </div>
       </Container>
-      <Footer />
+      <Footer ctaRef={`use-case-${data.slug}`} />
     </PageContainer>
   );
 }

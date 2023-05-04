@@ -7,7 +7,7 @@ import footerLinks from "./footerLinks";
 import StatusWidget from "../StatusWidget";
 import { Button } from "../Button";
 
-export default function Footer() {
+export default function Footer({ ctaRef }: { ctaRef?: string }) {
   return (
     <footer className="mt-20  bg-slate-1000">
       <div className="bg-indigo-600 backdrop-blur text-white">
@@ -26,7 +26,7 @@ export default function Footer() {
             className="mt-4"
             arrow="right"
             variant="tertiary"
-            href="/sign-up?ref=callout"
+            href={`/sign-up?ref=${ctaRef ? `${ctaRef}-callout` : "callout"}`}
           >
             Get started for free
           </Button>
