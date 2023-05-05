@@ -9,6 +9,15 @@ Inngest provides a `serve()` handler which adds an API endpoint to your router. 
 serve our API at `/api/inngest`**, as this makes automated deploys much easier.  If you need to
 change the API URL skip to [configuring the API Path](#configuring-the-api-path).
 
+```typescript
+// All serve handlers have the same arguments:
+serve(
+  inngest,    // a client created with new Inngest()
+  [fnA, fnB], // an array of Inngest functions to serve, created with inngest.createFunction()
+  {/* Optional extra configuration */}
+)
+```
+
 We provide framework-specific bindings to make this easy for common platforms:
 
 - [AWS Lambda](#framework-aws-lambda)
@@ -16,6 +25,7 @@ We provide framework-specific bindings to make this easy for common platforms:
 - [DigitalOcean functions](#framework-digital-ocean-functions)
 - [Express](#framework-express)
 - [Fresh (Deno)](#framework-fresh-deno)
+- [Google Cloud Functions](#framework-google-cloud-functions)
 - [Next.js](#framework-next-js)
 - [Redwood](#framework-redwood)
 - [Remix](#framework-remix)
@@ -52,13 +62,10 @@ You can import the Inngest API server when using <a href="https://developers.clo
 
 ```typescript
 import { serve } from "inngest/cloudflare";
-import { inngest } from "src/inngest/client";
-import fnA from "src/inngest/fnA"; // Your own function
+import { inngest } from "../../inngest/client";
+import fnA from "../../inngest/fnA"; // Your own function
 
-export const onRequest = serve(
-  inngest,
-  [fnA] // A list of functions to expose.  This can be empty to start.
-);
+export const onRequest = serve(inngest, [fnA]);
 ```
 
 
@@ -70,12 +77,12 @@ the function URL and path when configuring your handler:
 
 ```typescript
 import { serve } from "inngest/digitalocean";
-import { inngest } from "src/inngest/client";
-import fnA from "src/inngest/fnA"; // Your own function
+import { inngest } from "./src/inngest/client";
+import fnA from "./src/inngest/fnA"; // Your own function
 
 const main = serve(
   inngest,
-  [fnA], // A list of functions to expose.  This can be empty to start.
+  [fnA],
   {
     // Your digitalocean hostname.  This is required otherwise your functions won't work.
     serveHost: "https://faas-sfo3-your-url.doserverless.co",
@@ -96,8 +103,8 @@ like render, fly, AWS, K8S, etc:
 
 ```typescript
 import { serve } from "inngest/express";
-import { inngest } from "src/inngest/client";
-import fnA from "src/inngest/fnA"; // Your own function
+import { inngest } from "./src/inngest/client";
+import fnA from "./src/inngest/fnA"; // Your own function
 
 // Important:  ensure you add JSON middleware to process incoming JSON POST payloads.
 app.use(express.json());
@@ -118,17 +125,26 @@ framework</a> via the `esm.sh` CDN.  Add the serve handler to `./api/inngest.ts`
 
 ```typescript
 import { serve } from "https://esm.sh/inngest/deno/fresh";
-import { inngest } from "./client.ts";
+import fnA from "./src/inngest/fnA"; // Your own function
+import { inngest } from "./src/inngest/client.ts";
 
-const fn = inngest.createFunction(
-  { name: "Signup flow" },
-  { event: "user/signup" },
-  async () => {}
-);
-
-// Serve the Inngest API.
-export const handler = serve(inngest, [fn]);
+export const handler = serve(inngest, [fnA]);
 ```
+
+## Framework: Google Cloud Functions
+
+Google's [Functions Framework](https://github.com/GoogleCloudPlatform/functions-framework-nodejs) has an Express-compatible API which enables you to use the Express serve handler to deploy your functions to Google's Cloud Functions or Cloud Run. This is an example of a function
+
+```typescript
+import * as ff from "@google-cloud/functions-framework";
+import { serve } from "inngest/express";
+import fnA from "./src/inngest/fnA"; // Your own function
+import { inngest } from "./src/inngest/client";
+
+ff.http('inngest', serve(inngest, [fnA]));
+```
+
+You can run this locally with `npx @google-cloud/functions-framework --target=inngest` which will serve your Inngest functions on port `8080`.
 
 ## Framework: Next.js
 
@@ -137,13 +153,10 @@ Add the following within `./pages/api/inngest.ts`:
 
 ```typescript
 import { serve } from "inngest/next";
-import fnA from "src/inngest/fnA"; // Your own function
-import { inngest } from "./client";
+import fnA from "../../inngest/fnA"; // Your own function
+import { inngest } from "../../inngest/client";
 
-export default serve(
-  inngest,
-  [fnA] // A list of functions to expose.  This can be empty to start.
-);
+export default serve(inngest, [fnA]);
 ```
 
 ### Next.js 13+ <VersionBadge version="v1.8.0+" />
@@ -183,10 +196,7 @@ import { inngest } from "~~/inngest/client";
 import fnA from "~~/inngest/fnA"; // Your own function
 
 export default defineEventHandler(
-  serve(
-    inngest,
-    [fnA] // A list of functions to expose.  This can be empty to start.
-  )
+  serve(inngest, [fnA])
 );
 ```
 
@@ -202,7 +212,7 @@ import fnA from "src/inngest/fnA"; // Your own function
 
 export const handler = serve(
   inngest,
-  [fnA], // A list of functions to expose.  This can be empty to start.
+  [fnA],
   { servePath: "/api/inngest" }
 );
 ```
@@ -216,12 +226,10 @@ You can add Inngest to Remix easily.  Add the following to `./app/routes/api/inn
 
 ```typescript
 import { serve } from "inngest/remix";
-import { inngest } from "./client";
+import { inngest } from "~/inngest/client";
+import fnA from "~/inngest/fnA";
 
-const handler = serve(
-  inngest,
-  [] // A list of functions to expose.  This can be empty to start.
-);
+const handler = serve(inngest, [fnA]);
 
 export { handler as loader, handler as action };
 ```
@@ -233,7 +241,7 @@ If you can't serve the API at `/api/inngest`, you can configure the path via the
 ```typescript
 serve(
   inngest, // An Inngest client
-  [], // Functions to expose
+  [], // Functions to serve
   {
     // Overwrite the default serve path.
     servePath: "/api/v1/inngest",
