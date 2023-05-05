@@ -37,14 +37,14 @@ export default function Header() {
           <div
             className={classNames(
               menuState ? `bg-slate-900` : ``,
-              `lg:bg-transparent flex items-center py-5 lg:py-0 w-full lg:w-auto lg:px-0 justify-between`
+              `md:bg-transparent flex items-center py-5 md:py-0 w-full md:w-auto md:px-0 justify-between`
             )}
           >
             <a href="/" className="mr-4">
               <Logo className="text-white w-20 relative top-[2px]" />
             </a>
             <button
-              className="text-slate-400 xl:m lg:hidden"
+              className="text-slate-400 md:hidden"
               onClick={() => toggleMenu()}
             >
               {menuState ? <CloseMenu /> : <BurgerMenu />}
@@ -53,19 +53,19 @@ export default function Header() {
           <nav
             className={classNames(
               menuState ? `block` : `hidden`,
-              `overflow-y-scroll lg:overflow-visible w-full fixed bottom-0 lg:bottom-auto -z-10 lg:z-0 pt-[76px] lg:pt-0 h-screen lg:h-auto max-h-screen top-[0] left-0  right-0  bg-slate-900 lg:bg-transparent lg:static lg:flex`
+              `overflow-y-scroll md:overflow-visible w-full fixed bottom-0 md:bottom-auto -z-10 md:z-0 pt-[76px] md:pt-0 h-screen md:h-auto max-h-screen top-[0] left-0  right-0  bg-slate-900 md:bg-transparent md:static md:flex`
             )}
           >
-            <div className="flex flex-col lg:flex-row items-start lg:items-center w-full">
-              <ul className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-0">
-                <li className="relative flex items-center group text-white font-medium lg:px-5 lg:py-8 text-sm">
-                  <span className="hidden lg:block group-hover:lg:opacity-40 transition-opacity cursor-pointer">
+            <div className="flex flex-col md:flex-row items-start md:items-center w-full">
+              <ul className="flex flex-col md:flex-row md:items-center gap-4 md:gap-0">
+                <li className="relative flex items-center group text-white font-medium md:px-5 md:py-8 text-sm">
+                  <span className="hidden md:block group-hover:md:opacity-40 transition-opacity cursor-pointer">
                     Product
                   </span>
                   <HeaderDropdown navLinks={productLinks} />
                 </li>
-                <li className="relative flex flex-col lg:flex-row lg:items-center group text-white font-medium lg:px-5 lg:py-8 text-sm">
-                  <span className="hidden lg:block lg:group-hover:opacity-40 transition-opacity cursor-pointer">
+                <li className="relative flex flex-col md:flex-row md:items-center group text-white font-medium md:px-5 md:py-8 text-sm">
+                  <span className="hidden md:block md:group-hover:opacity-40 transition-opacity cursor-pointer">
                     Learn
                   </span>
                   <HeaderDropdown navLinks={learnLinks} />
@@ -73,7 +73,7 @@ export default function Header() {
                 <li>
                   <a
                     href="/pricing?ref=nav"
-                    className="flex mt-4 lg:mt-0 items-center text-white font-medium px-7 md:px-10 lg:px-5 py-2 text-sm  hover:opacity-60"
+                    className="flex mt-4 md:mt-0 items-center text-white font-medium px-7 md:px-10 md:px-5 py-2 text-sm  hover:opacity-60"
                   >
                     Pricing
                   </a>
@@ -81,7 +81,7 @@ export default function Header() {
                 <li>
                   <a
                     href="/blog?ref=nav"
-                    className="flex items-center text-white font-medium px-7 md:px-10 lg:px-5 py-2 text-sm  hover:opacity-60"
+                    className="flex items-center text-white font-medium px-7 md:px-10 md:px-5 py-2 text-sm  hover:opacity-60"
                   >
                     Blog
                   </a>
@@ -90,7 +90,7 @@ export default function Header() {
                   <a
                     href="https://roadmap.inngest.com/roadmap?ref=nav"
                     target="_blank"
-                    className="flex items-center text-white font-medium px-7 md:px-10 lg:px-5 py-2 text-sm  hover:opacity-60"
+                    className="md:hidden xl:flex items-center text-white font-medium px-7 md:px-10 md:px-5 py-2 text-sm  hover:opacity-60"
                   >
                     Roadmap
                   </a>
@@ -99,13 +99,13 @@ export default function Header() {
                   <a
                     href="https://roadmap.inngest.com/changelog?ref=nav"
                     target="_blank"
-                    className="flex items-center text-white font-medium px-7 md:px-10 lg:px-5 py-2 text-sm  hover:opacity-60"
+                    className="md:hidden xl:flex items-center text-white font-medium px-7 md:px-10 md:px-5 py-2 text-sm  hover:opacity-60"
                   >
                     Changelog
                   </a>
                 </li>
               </ul>
-              <ul className="flex flex-shrink-0 lg:items-center mt-6 lg:mt-0 md:px-3 lg:hidden xl:flex">
+              <ul className="flex flex-shrink-0 md:items-center mt-6 md:mt-0 md:px-3 md:hidden xl:flex">
                 <li>
                   <a
                     href="https://github.com/inngest/inngest"
@@ -132,7 +132,7 @@ export default function Header() {
                 </li>
               </ul>
             </div>
-            <div className="px-8 md:px-10 py-8 lg:py-0 lg:px-0 flex gap-6 items-center lg:w-1/3 lg:justify-end">
+            <div className="px-8 flex-shrink-0 py-8 md:py-0 md:px-0 flex gap-6 items-center md:w-1/3 md:justify-end">
               <a
                 href="https://app.inngest.com/login?ref=nav"
                 className="text-white font-medium text-sm  hover:opacity-60 duration-150 transition-all"
