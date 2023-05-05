@@ -55,8 +55,7 @@ inngest.createFunction(
   async ({ event }) => {
     // Handle your event
   }
-);
-`,
+);`,
   },
   featureOverflow: [
     {
@@ -78,16 +77,16 @@ inngest.createFunction(
       icon: "Server",
     },
     {
-      title: "Delays",
+      title: "Scheduled work for later",
       description:
-        "Use TypeScript to build, test, and deploy serverless functions driven by events or a schedule to any platform in sections, with zero infrastructure.",
-      icon: "Retry",
+        "Create jobs that sleep or pause for hours, days or weeks to create durable workflows faster than ever before.",
+      icon: "Scheduled",
     },
     {
-      title: "Open Source",
+      title: "TypeScript support",
       description:
-        "Learn how Inngest works, or self-host if you prefer to manage it yourself.",
-      icon: "Unlock",
+        "Define your event payload as TypeScript types to have end-to-end type safety for all your jobs.",
+      icon: "SDK",
     },
   ],
   quote: {

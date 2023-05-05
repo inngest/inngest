@@ -17,6 +17,8 @@ import {
   IconUnlock,
   IconWritingFns,
   IconProps,
+  IconSDK,
+  IconScheduled,
 } from "../../shared/Icons/duotone";
 
 const Icons: { [key: string]: React.FC<IconProps> } = {
@@ -25,6 +27,8 @@ const Icons: { [key: string]: React.FC<IconProps> } = {
   Tools: IconTools,
   Unlock: IconUnlock,
   WritingFns: IconWritingFns,
+  SDK: IconSDK,
+  Scheduled: IconScheduled,
 };
 
 type IconType = keyof typeof Icons;
