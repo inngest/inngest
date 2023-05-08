@@ -12,7 +12,7 @@ export default function EventDriven() {
       <Container className="mt-20 mb-12">
         <SectionHeader
           title="Fits into your workflow"
-          lede="Add Inngest to your stack in a few lines for code, then deploy to your
+          lede="Add Inngest to your stack in a few lines of code, then deploy to your
           existing provider. You don't have to change anything to get started."
         />
       </Container>
