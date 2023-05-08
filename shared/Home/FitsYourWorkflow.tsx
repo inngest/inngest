@@ -27,7 +27,7 @@ export default function EventDriven() {
               Use the Inngest SDK to define functions that are triggered by
               events from your app or anywhere on the internet.  We call your
               functions by HTTP at the right time, resuming your function with
-              the right state &mdash; using normal Typescript.
+              the right state &mdash; using normal TypeScript.
             </p>
             <div className="bg-slate-800/50 mt-4  backdrop-blur-md border border-slate-700/30 inline-flex rounded text-sm text-slate-200 shadow-lg">
               <pre className=" pl-4 pr-4 py-2">
