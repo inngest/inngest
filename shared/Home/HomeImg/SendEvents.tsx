@@ -51,9 +51,8 @@ export default function SendEvents() {
             findAccountByCustomerId(event.user.stripe_customer_id)
           );
 
-          // Use account returned from the previous step, automatically
-          // stored in function state.  This calls two steps in parallel
-          // both retrying independently.
+          // Use the account stored in functions tate from the previous step.
+          // This calls two steps in parallel both retrying independently.
           await Promise.all([
             sendFailedPaymentEmail(account.email),
             downgradeAccount(account.id),
