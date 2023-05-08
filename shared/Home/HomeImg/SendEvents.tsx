@@ -5,7 +5,7 @@ import classNames from "src/utils/classNames";
 import { stripIndent } from "src/utils/string";
 
 export default function SendEvents() {
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState(1);
 
   const tabs = [
     {
@@ -45,14 +45,26 @@ export default function SendEvents() {
         { name: "Handle failed payments" },
         { name: "stripe/charge.failed" },
         async ({ event, step }) => {
+          // step.run creates a reliable step which retries automatically,
+          // storing the returned data in function state.
           const account = await step.run("Get account", () =>
             findAccountByCustomerId(event.user.stripe_customer_id)
           );
 
+          // Use the stored function state as input into parallel steps which
+          // both retry independently.
           await Promise.all([
             sendFailedPaymentEmail(account.email),
             downgradeAccount(account.id),
           ]);
+
+          // The function will be woken up in 3 days with full state
+          // injected, on any platform - even serverless functions.
+          await step.sleep("3 days");
+
+          await step.run("Send reminder", () => {
+            sendReminder(account.email);
+          });
         }
       );`),
     },
