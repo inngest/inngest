@@ -76,7 +76,7 @@ export default function SendEvents() {
   };
 
   return (
-    <div className="-mt-10 md:-mt-28 xl:absolute bottom-10 right-20 flex flex-col md:flex-row gap-2 md:items-end md:justify-end">
+    <div className="-mt-10 min-[1100px]:-mt-28 lg:absolute bottom-10 right-20 flex flex-col min-[1100px]:flex-row gap-2 lg:items-end md:justify-end">
       <div className="w-full md:w-[400px] xl:w-[360px] xl:mr-10 bg-slate-800/50 backdrop-blur-md border border-slate-700/30 rounded-lg overflow-hidden shadow-lg">
         <div className="flex bg-slate-800/50 items-stretch justify-start gap-2 px-2">
           {tabs.map((tab, i) => (

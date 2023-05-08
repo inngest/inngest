@@ -3,7 +3,7 @@ export default function HeroImg() {
     <svg
       width="586"
       height="965"
-      className="absolute right-0 top-0 opacity-20 lg:opacity-40 xl:opacity-100 xl:right-20"
+      className="absolute right-0 top-0 opacity-20 lg:opacity-40 xl:opacity-60 xl:right-10 min-[1350px]:opacity-100 2xl:opacity-100 2xl:right-20"
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>

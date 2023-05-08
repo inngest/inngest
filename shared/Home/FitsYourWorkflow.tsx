@@ -9,7 +9,7 @@ export default function EventDriven() {
 
   return (
     <>
-      <Container className="mt-20 mb-12">
+      <Container className="mt-20 mb-12 lg:mr-[564px]">
         <SectionHeader
           title="Fits into your workflow"
           lede="Add Inngest to your stack in a few lines of code, then deploy to your
@@ -17,19 +17,19 @@ export default function EventDriven() {
         />
       </Container>
 
-      <div className="bg-gradient-to-r from-slate-1000/0  to-slate-900 pb-32 relative z-10">
-        <Container className="md:px-20 xl:h-[440px]">
-          <div className="py-16">
+      <div className="bg-gradient-to-r from-slate-1000/0 to-slate-900 pb-32 relative z-10">
+        <Container className="md:px-20 lg:h-[504px] xl:h-[484px]">
+          <div className="py-16 lg:mr-[564px] xl:max-w-lg">
             <h3 className="text-lg xl:text-2xl text-slate-50 mb-3">
               Reliable background functions in one line
             </h3>
-            <p className="text-slate-400 text-sm max-w-lg leading-5 lg:leading-7 lg:text-base">
+            <p className="text-slate-400 text-sm leading-5 lg:leading-7 lg:text-base">
               Use the Inngest SDK to define functions that are triggered by
-              events sent from your app (or anywhere on the internet).  We call your
-              functions by HTTP at the right time, resuming your function with
-              the right state &mdash; using normal TypeScript.
+              events sent from your app (or anywhere on the internet). We call
+              your functions by HTTP at the right time, resuming your function
+              with the right state &mdash; using normal TypeScript.
             </p>
-            <div className="bg-slate-800/50 mt-4  backdrop-blur-md border border-slate-700/30 inline-flex rounded text-sm text-slate-200 shadow-lg">
+            <div className="bg-slate-800/50 mt-4 backdrop-blur-md border border-slate-700/30 inline-flex rounded text-sm text-slate-200 shadow-lg">
               <pre className=" pl-4 pr-4 py-2">
                 <code className="bg-transparent text-slate-300">
                   <span className="text-cyan-400">npm install</span> inngest
@@ -43,6 +43,7 @@ export default function EventDriven() {
               </div>
             </div>
           </div>
+
           <SendEvents />
         </Container>
       </div>

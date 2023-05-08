@@ -10,50 +10,64 @@ export default function Hero() {
         <HeroImg />
         <div className="max-w-[800px] relative pr-10 lg:px-auto m-x-auto py-10 rounded-lg">
           <h1 className="text-4xl leading-[48px] sm:text-5xl sm:leading-[58px] lg:text-6xl font-semibold lg:leading-[68px] tracking-[-2px] text-slate-50 mb-5 font-extrabold">
-            Reliable functions on any platform, in minutes
+            Reliable functions on <br className="hidden md:inline" />
+            any platform, in minutes
           </h1>
           <p className="text-sm md:text-base text-slate-300 max-w-xl leading-6 md:leading-7">
-            Use TypeScript to write and test durable functions driven by events or a schedule.{" "}
-            Deploy to any platform using your current flow in minutes, zero infrastructure needed.
+            Use TypeScript to write and test durable functions driven by events
+            or a schedule. Deploy to any platform using your current flow in
+            minutes, zero infrastructure needed.
           </p>
 
-          <ul className="text-sm md:text-base text-slate-300 max-w-xl leading-5 md:leading-6 py-8 grid grid-cols-2 gap-x-4 gap-y-3">
+          <ul className="text-sm md:text-base text-slate-300 max-w-xl leading-5 md:leading-6 my-8 grid sm:grid-cols-2 gap-x-4 gap-y-3">
             <li
               className="pl-8"
               style={{
-                background: "url(/assets/check-white.svg) no-repeat 0 1px"
+                background: "url(/assets/check-white.svg) no-repeat 0 1px",
               }}
-            >Serverless queues</li>
+            >
+              Serverless queues
+            </li>
             <li
               className="pl-8"
               style={{
-                background: "url(/assets/check-white.svg) no-repeat 0 1px"
+                background: "url(/assets/check-white.svg) no-repeat 0 1px",
               }}
-            >Background jobs</li>
+            >
+              Background jobs
+            </li>
             <li
               className="pl-8"
               style={{
-                background: "url(/assets/check-white.svg) no-repeat 0 1px"
+                background: "url(/assets/check-white.svg) no-repeat 0 1px",
               }}
-            >Scheduled functions</li>
+            >
+              Scheduled functions
+            </li>
             <li
               className="pl-8"
               style={{
-                background: "url(/assets/check-white.svg) no-repeat 0 1px"
+                background: "url(/assets/check-white.svg) no-repeat 0 1px",
               }}
-            >Durable functions with memory</li>
+            >
+              Durable functions with memory
+            </li>
             <li
               className="pl-8"
               style={{
-                background: "url(/assets/check-white.svg) no-repeat 0 1px"
+                background: "url(/assets/check-white.svg) no-repeat 0 1px",
               }}
-            >Complex user-defined workflows</li>
+            >
+              Complex user-defined workflows
+            </li>
             <li
               className="pl-8"
               style={{
-                background: "url(/assets/check-white.svg) no-repeat 0 1px"
+                background: "url(/assets/check-white.svg) no-repeat 0 1px",
               }}
-            >AI & LLM chains</li>
+            >
+              AI & LLM chains
+            </li>
           </ul>
           <div className="flex flex-col items-start lg:flex-row gap-4 mt-6 lg:mt-12 lg:items-center">
             <a
