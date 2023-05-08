@@ -34,7 +34,7 @@ export default function SendEvents() {
         name: "stripe/charge.failed",
         data: { ... }
       }`),
-      fnName: "Create Function",
+      fnName: "Payment failed handler",
       fnVersion: 27,
       fnID: "01GGG522ZATDGVQBCND4ZEAS6Z",
       code: stripIndent(`import { downgradeAccount, findAccountByCustomerId } from "../accounts";
