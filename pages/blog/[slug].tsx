@@ -112,7 +112,7 @@ export default function BlogLayout(props) {
           <article>
             <main className="m-auto max-w-3xl pt-16">
               {scope.image && (
-                <figure className="flex flex-col items-end">
+                <figure className="mx-auto flex flex-col items-end max-w-[768px]">
                   <Image
                     className="rounded-lg shadow-lg"
                     src={scope.image}

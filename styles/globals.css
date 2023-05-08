@@ -7,20 +7,6 @@
 @tailwind components;
 @tailwind utilities;
 
-
-/* Crutch until we can remove old page templates */
-
-
-.v2:not(.docs) body {
-  background-color: "#080D19";
-  background-image: linear-gradient(
-    to bottom,
-    #121139 0%,
-    #080D19 100vh
-  );
-}
-
-
 .gradient {
   display: none;
 }
@@ -96,8 +82,15 @@
 
   font-size: 16px; /* Tailwind base */
   font-family: var(--text-font);
-  color: var(--font-color-primary);
-  background: var(--bg-color);
+
+  /* Default to dark theme */
+  color: #fff;
+  background-color: #080D19;
+  background-image: linear-gradient(
+    to bottom,
+    #121139 0%,
+    #080D19 100vh
+  );
 }
 
 /* Legacy base styles */
@@ -105,8 +98,16 @@
   font-size: 20px;
 }
 
+/* Crutch until we can remove old page templates */
+.v1:not(.docs) body  {
+  color: var(--font-color-primary);
+  background: var(--color-almost-white);
+}
+
 
 html.docs {
+  color: var(--font-color-primary);
+  background: var(--color-almost-white);
   scroll-behavior: smooth;
 }
 

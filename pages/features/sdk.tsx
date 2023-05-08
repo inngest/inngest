@@ -574,7 +574,7 @@ export const Hero = ({
   onToggle: (string) => void;
 }) => {
   return (
-    <div>
+    <div style={{ background: "var(--color-almost-white)" }}>
       {/* Content layout */}
       <div className="mx-auto my-12 px-10 lg:px-16 max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8">
         <header className="lg:my-24 mt-8">
