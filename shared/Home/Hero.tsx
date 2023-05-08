@@ -13,8 +13,8 @@ export default function Hero() {
             Reliable functions on any platform, in minutes
           </h1>
           <p className="text-sm md:text-base text-slate-300 max-w-xl leading-6 md:leading-7">
-            Use TypeScript to write and test <strong>durable functions driven by events</strong> or a schedule.{" "}
-            <strong>Deploy to any platform using your current flow</strong> in minutes, <strong>zero infrastructure or learning needed</strong>.
+            Use TypeScript to write and test durable functions driven by events or a schedule.{" "}
+            Deploy to any platform using your current flow in minutes, zero infrastructure needed.
           </p>
 
           <ul className="text-sm md:text-base text-slate-300 max-w-xl leading-5 md:leading-6 py-8 grid grid-cols-2 gap-x-4 gap-y-3">
