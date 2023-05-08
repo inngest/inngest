@@ -93,7 +93,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		"kind": item.Kind,
 	}).Counter(counterQueueItemsEnqueued).Inc(1)
 
-	_, err := q.EnqueueItem(ctx, QueueItem{
+	qi := QueueItem{
 		ID:          id,
 		AtMS:        at.UnixMilli(),
 		WorkspaceID: item.WorkspaceID,
@@ -102,7 +102,12 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		// Only use the queue name if provided by queueKindMapping.
 		// Otherwise, this defaults to WorkflowID.
 		QueueName: queueName,
-	}, at)
+	}
+
+	// Use the queue item's score, ensuring we process older function runs first
+	// (eg. before at)
+	next := time.UnixMilli(qi.Score())
+	_, err := q.EnqueueItem(ctx, qi, next)
 	if err != nil {
 		return err
 	}
