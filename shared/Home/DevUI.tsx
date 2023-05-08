@@ -26,9 +26,9 @@ export default function DevUI() {
             lede={
               <>
                 <p>
-                  Our open-source dev server runs on your machine providing you
-                  instant feedback and debugging tools so you can build
-                  serverless functions with events like never before possible.
+                  Our open-source dev server runs on your machine for local testing.
+                  Get instant feedback and debugging tools so you can build
+                  serverless functions with events like never before.
                 </p>
                 <div className="flex flex-col md:flex-row items-center justify-start pb-20 pt-8 gap-8">
                   <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700/30 flex rounded text-sm text-slate-200 shadow-lg">
