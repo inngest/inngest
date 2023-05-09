@@ -43,7 +43,7 @@ export default function SendEvents() {
 
       export default inngest.createFunction(
         { name: "Handle failed payments" },
-        { name: "stripe/charge.failed" },
+        { event: "stripe/charge.failed" },
         async ({ event, step }) => {
           // step.run creates a reliable step which retries automatically,
           // storing the returned data in function state.
