@@ -9,7 +9,7 @@ export default function EventDriven() {
 
   return (
     <>
-      <Container className="mt-20 mb-12 lg:mr-[564px]">
+      <Container className="mt-20 mb-12 lg:pr-[648px] relative z-20">
         <SectionHeader
           title="Fits into your workflow"
           lede="Add Inngest to your stack in a few lines of code, then deploy to your
@@ -17,7 +17,7 @@ export default function EventDriven() {
         />
       </Container>
 
-      <div className="bg-gradient-to-r from-slate-1000/0 to-slate-900 pb-32 relative z-10">
+      <div className="bg-gradient-to-r from-slate-1000/0 to-slate-900 pb-32 relative z-40">
         <Container className="md:px-20 lg:h-[504px] xl:h-[484px]">
           <div className="py-16 lg:mr-[564px] xl:max-w-lg">
             <h3 className="text-lg xl:text-2xl text-slate-50 mb-3">
@@ -29,13 +29,13 @@ export default function EventDriven() {
               your functions by HTTP at the right time, resuming your function
               with the right state &mdash; using normal TypeScript.
             </p>
-            <div className="bg-slate-800/50 mt-4 backdrop-blur-md border border-slate-700/30 inline-flex rounded text-sm text-slate-200 shadow-lg">
+            <div className="relative z-40 bg-slate-800/50 mt-4 backdrop-blur-md border border-slate-700/30 inline-flex rounded text-sm text-slate-200 shadow-lg">
               <pre className=" pl-4 pr-4 py-2">
                 <code className="bg-transparent text-slate-300">
                   <span className="text-cyan-400">npm install</span> inngest
                 </code>
               </pre>
-              <div className="bg-slate-900/50 rounded-r flex items-center justify-center pl-2 pr-2.5">
+              <div className="bg-slate-900/50 rounded-r flex items-center justify-center pl-2 pr-2.5 whitespace-nowrap">
                 <CopyBtn
                   btnAction={handleCopyClick}
                   copy="npm install inngest"
@@ -48,7 +48,7 @@ export default function EventDriven() {
         </Container>
       </div>
 
-      <Container className="flex flex-col lg:flex-row  gap-6 lg:gap-8 xl:gap-16 -mt-24 ">
+      <Container className="flex flex-col lg:flex-row  gap-6 lg:gap-8 xl:gap-16 -mt-24 relative z-50">
         <div className="lg:w-1/2 relative md:mr-40 lg:mr-0">
           <div className="lg:absolute inset-0 rounded-lg bg-blue-500 opacity-20 rotate-2 -z-0 scale-x-[110%] mx-5"></div>
           <div
