@@ -75,6 +75,14 @@ const footerLinks = [
     name: "Company",
     links: [
       {
+        label: "Roadmap",
+        url: "https://roadmap.inngest.com/roadmap?ref=footer",
+      },
+      {
+        label: "Changelog",
+        url: "https://roadmap.inngest.com/changelog?ref=footer",
+      },
+      {
         label: "About",
         url: "/about?ref=footer",
       },
