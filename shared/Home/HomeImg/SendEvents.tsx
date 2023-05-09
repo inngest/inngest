@@ -51,7 +51,7 @@ export default function SendEvents() {
             findAccountByCustomerId(event.user.stripe_customer_id)
           );
 
-          // Use the account stored in functions tate from the previous step.
+          // Use the account stored in function state from the previous step.
           // This calls two steps in parallel both retrying independently.
           await Promise.all([
             sendFailedPaymentEmail(account.email),
