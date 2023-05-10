@@ -15,7 +15,7 @@ export default function Hero() {
           </h1>
           <p className="text-sm md:text-base text-slate-300 max-w-xl leading-6 md:leading-7">
             Use TypeScript to write and test durable functions driven by events
-            or a schedule. Deploy to any platform using your current flow in
+            or a schedule. Deploy anywhere using your current flow in
             minutes, zero infrastructure needed.
           </p>
 
