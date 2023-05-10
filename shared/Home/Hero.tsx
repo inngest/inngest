@@ -58,7 +58,7 @@ export default function Hero() {
                 background: "url(/assets/check-white.svg) no-repeat 0 1px",
               }}
             >
-              Complex user-defined workflows
+              Webhooks
             </li>
             <li
               className="pl-8"
