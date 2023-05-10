@@ -202,6 +202,10 @@ export const navigation = [
     links: [
       { title: "Overview", href: `${baseDir}` },
       { title: "Quick Start Tutorial", href: `${baseDir}/quick-start` },
+      {
+        title: "Working With Environments",
+        href: `${baseDir}/platform/environments`,
+      },
     ],
   },
   {

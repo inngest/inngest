@@ -1,0 +1,78 @@
+# Working with Environments
+
+Inngest accounts all have multiple environments that help support your entire software development lifecycle. Inngest has different types of environments:
+
+-   **Production Environment** for all of your production applications, functions and event data.
+-   [**Branch Environments**](#branch-environments) are sandbox environments that enables developers on your team to test your changes specific to current Git feature branch. These are designed to work with platforms that support branch-based deployment previews like Vercel or Netlify.
+-   [**Local Environment**](/docs/local-development) leverages the Inngest Dev Server (`npx inngest-cli@latest dev`) to test and debug functions on your own machine.
+{/* TODO - Add this after Branch Environments when added to the dashboard UI (see section below) **Custom Environments** enable bespoke developer workflows for teams that have other environments like QA, a shared staging, or a canary environment. */}
+
+The key things that you need to know about environments:
+
+-   Data is isolated within each environment. Event types or functions may share the same name, but their data and logs are fully separated.
+-   Each environment uses Event Keys and Signing Keys to securely send data or register functions within a given environment.
+-   You can register multiple applications with each environment. {/*Learn more about using Inngest with multiple applications here.*/}
+-   You are billed for your usage across all environments, _except of course your local environment_.
+
+## Branch Environments
+
+Most developer workflows are centered around branching, whether feature branches or a variant of GitFlow. Inngest's Branch Environments are designed to give you and your team an isolated sandbox for every non-production branch that you deploy. For example,
+
+![Branch Environments mapping to your hosting platform's deployment previews](/assets/docs/environments/branch-environments-with-your-platform.png)
+
+Branch deployments:
+
+-   Are created on-demand when you send events or register your functions for a given environment
+-   Share Event Keys and Signing Keys to streamline your developer workflow (see: Configuring Branch Environments)
+
+It can be helpful to visualize the typical Inngest developer workflow using Branch environments and your platform's deploy previews:
+
+![The software development lifecycle from local development to Branch Environments to Production](/assets/docs/environments/branch-environments-sdlc.png)
+
+## Configuring Branch Environments
+
+As Branch Environments are created on-demand, all of your Branch Environments share the same Event Keys and Signing Key. This enables you to use the same environment variables in each of your application's deployment preview environments and set the environment dynamically using the `env` option with the `Inngest` client:
+
+```tsx
+const inngest = new Inngest({
+    name: "My app",
+    env: process.env.BRANCH,
+});
+// Alternatively, you can set the INNGEST_ENV environment variable in your app
+
+// Pass the client to the serve handler to complete the setup
+serve(inngest, [myFirstFunction, mySecondFunction]);
+```
+
+### Automatically Supported Platforms
+
+The Inngest SDK tries to automatically detect your application's branch and use it to set the `env` option when deploying to certain supported platforms. Here are the platforms that are automatically supported and what environment variable is _automatically_ used:
+
+-   **Vercel** - `VERCEL_GIT_COMMIT_REF` - This works perfectly with our Vercel integration.
+
+You can always override this using `INNGEST_ENV` or by manually passing `env` to the `Inngest` client.
+
+### Other Platforms
+
+Some platforms only pass an environment variable at build time. This means you'll have to explicitly set `env` to the platform's specific environment variable. For example, here's how you would set it on Netlify:
+
+```tsx
+const inngest = new Inngest({
+    name: "My app",
+    env: process.env.BRANCH,
+});
+```
+
+-   **Netlify** - `BRANCH` ([docs](https://docs.netlify.com/configure-builds/environment-variables/#git-metadata))
+-   **Cloudflare Pages** - `CF_PAGES_BRANCH` ([docs](https://developers.cloudflare.com/pages/platform/build-configuration/#environment-variables))
+-   **Railway** - `RAILWAY_GIT_BRANCH` ([docs](https://docs.railway.app/develop/variables#railway-provided-variables))
+-   **Render** - `RENDER_GIT_BRANCH` ([docs](https://render.com/docs/environment-variables#all-services))
+
+{/* ## Custom Environments */}
+{/* Section TBD - see above */}
+
+## Viewing and Switching Environments
+
+In the Inngest dashboard you can quickly switch between environments in the environment switcher dropdown in the top navigation. You can click “[View All Environments](https://app.inngest.com/env)” for a high level view of all of your environments.
+
+![The environment switcher dropdown menu in the Inngest dashboard](/assets/docs/environments/branch-dropdown.png)

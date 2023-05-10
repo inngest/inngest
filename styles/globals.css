@@ -107,7 +107,7 @@
 
 html.docs {
   color: var(--font-color-primary);
-  background: var(--color-almost-white);
+  background: var(--bg-color);
   scroll-behavior: smooth;
 }
 
