@@ -32,7 +32,7 @@ export const data: UseCase = {
     ],
     description:
       "Functions trigger as events are received. Inngest calls all matching functions via HTTP.",
-    code: `// Define your event payload with our standard name & date fields
+    code: `// Define your event payload with our standard name & data fields
 type Events = {
   "user.signup" : {
     name: "user.signup",
