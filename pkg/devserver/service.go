@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/inngest/inngest/inngest/client"
 	"github.com/inngest/inngest/inngest/clistate"
 	"github.com/inngest/inngest/pkg/api"
@@ -104,6 +105,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 		d.opts.Config,
 		api.Mount{At: "/", Router: devAPI},
 		api.Mount{At: "/v0", Router: core.Router},
+		api.Mount{At: "/debug", Handler: middleware.Profiler()},
 	)
 
 	// Fetch workspace information in the background, retrying if this

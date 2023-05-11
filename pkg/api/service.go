@@ -25,8 +25,9 @@ import (
 // XXX (tonyhb): refactor this to remove extra mounts.
 
 type Mount struct {
-	At     string
-	Router chi.Router
+	At      string
+	Router  chi.Router
+	Handler http.Handler
 }
 
 func NewService(c config.Config, mounts ...Mount) service.Service {
@@ -62,6 +63,10 @@ func (a *apiServer) Pre(ctx context.Context) error {
 	a.api = api.(*API)
 
 	for _, m := range a.mounts {
+		if m.Handler != nil {
+			api.Mount(m.At, m.Handler)
+			continue
+		}
 		api.Mount(m.At, m.Router)
 	}
 
