@@ -31,7 +31,7 @@ func TestRedirect(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	res, status, err := DefaultExecutor.do(context.Background(), ts.URL, input)
+	res, status, _, err := DefaultExecutor.do(context.Background(), ts.URL, input)
 	require.NoError(t, err)
 	require.Equal(t, 200, status)
 	require.Equal(t, []byte("ok"), res)
