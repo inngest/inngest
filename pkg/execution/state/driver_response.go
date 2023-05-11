@@ -97,6 +97,9 @@ type DriverResponse struct {
 	// Step represents the step that this response is for.
 	Step inngest.Step `json:"step"`
 
+	// Duration is how long the step took to run, from the driver itsef.
+	Duration time.Duration `json:"dur"`
+
 	// Generator indicates that this response is a partial repsonse from a
 	// SDK-based step (generator) function.  These functions are invoked
 	// multiple times with function state, and return a 206 Partial Content
@@ -123,6 +126,9 @@ type DriverResponse struct {
 
 	// Output is the output from an action, as a JSON-marshalled value.
 	Output any `json:"output"`
+
+	// OutputSize is the size of the response payload, verbatim, in bytes.
+	OutputSize int `json:"size"`
 
 	// Err represents the error from the action, if the action errored.
 	// If the action terminated successfully this must be nil.
