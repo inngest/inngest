@@ -121,7 +121,7 @@ For specific information on how the DevServer works and how it compares to produ
 - [**Join our online community for support, to give us feedback, or chat with us**](https://www.inngest.com/discord).
 - [Post a question or idea to our GitHub discussion board](https://github.com/orgs/inngest/discussions)
 - [Read the documentation](https://www.inngest.com/docs?ref=github-inngest-readme)
-- [Explore our public roadmap](https://github.com/orgs/inngest/projects/1/)
+- [Explore our public roadmap](http://roadmap.inngest.com/)
 - [Follow us on Twitter](https://twitter.com/inngest)
 - [Join our mailing list](https://www.inngest.com/mailing-list) for release notes and project updates
 
