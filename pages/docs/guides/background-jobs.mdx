@@ -1,7 +1,7 @@
 # Background jobs
 This guide will walk you through creating background jobs with retries in a few minutes.  Background tasks in Inngest are easy because:
 
-- You don’t need to create queues, workers, or subscriptions
+- You don't need to create queues, workers, or subscriptions
 - You can run background jobs on serverless functions without setting up infrastructure
 - You can enqueue jobs to run in the future, similar to a task queue, without any config.
 
@@ -12,8 +12,8 @@ There are two parts to background jobs:
 1. Creating the function that runs in the background
 2. Triggering the function
 
-Let's get started on a background job that sends an email to new signups.  This code creates
-a new Inngest function [as outlined in the function documentation](/docs/functions):
+Let's get started on a background job that sends an email to new signups. This code creates
+a new Inngest function [as outlined in the function reference](/docs/reference/functions/create):
 
 ```typescript
 import { Inngest } from "inngest";
@@ -68,19 +68,16 @@ await inngest.send({
 ```
 
 When you send an event to Inngest, we automatically find any functions that are triggered by the event name and automatically run those functions in the background.  The entire JSON object you pass in to
-`inngest.send` will be available to your functions.
+[`inngest.send()`](/docs/reference/events/send) will be available to your functions.
 
 <aside>
 👉 You can create many functions which listen to the same event, and all of them will run in the background
 </aside>
 
-{/*
 ## Further reading
 
-Now that you’ve created a background function you might want to learn how to:
+Now that you've created a background function you might want to learn how to:
 
-- Run Inngest locally to test functions
-- Enqueue jobs in the future
-- Test functions in Inngest
-- Cancel future jobs
-*/}
+- [Run Inngest locally to test functions](/docs/local-development)
+- [Enqueue jobs in the future](/docs/guides/enqueueing-future-jobs)
+- [Cancel running functions](/docs/functions/cancellation)

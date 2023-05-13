@@ -181,7 +181,7 @@ function CodeGroupHeader({
           {Children.map<ReactNode, any>(children, (child, childIndex) => (
             <Tab
               className={clsx(
-                "border-b py-3 transition focus:[&:not(:focus-visible)]:outline-none",
+                "border-b py-3 transition focus:outline-none",
                 childIndex === selectedIndex
                   ? "border-indigo-500 text-indigo-400"
                   : "border-transparent text-slate-400 hover:text-slate-300"

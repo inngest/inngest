@@ -23,10 +23,10 @@ The goal is to enable your team to trigger a script anytime they click a button 
 
 ## Sending an event from Retool
 
-To send data from Retool, we'll need to set up a “[Resource](https://docs.retool.com/docs/resources)” first. On your Resources tab in Retool, click “Create New” then select “Resource.” Then select “Rest API.” Now jump over to the Inngest Cloud dashboard and create a new Source using the “Add Source” button and selecting “API” ([direct link](/test/sources/new?ref=retool-guide#API)). Copy your brand new key and in the Retool dashboard, prefix your key with the Inngest Source API URL and path: `https://inn.gs/e/`
+To send data from Retool, we'll need to set up a “[Resource](https://docs.retool.com/docs/resources)” first. On your Resources tab in Retool, click “Create New” then select “Resource.” Then select “Rest API.” Now jump over to the Inngest Cloud dashboard and [create a new Event Key in the Inngest dashboard](/docs/events/creating-an-event-key). Copy your brand new key and in the Retool dashboard, prefix your key with the Inngest Event API URL and path: `https://inn.gs/e/`
 
 ```shell
-https://inn.gs/e/<YOUR-COPIED-SOURCE-API-KEY>
+https://inn.gs/e/<INNGEST-EVENT-KEY>
 ```
 
 Your new resource will look like this. When it does, click “Create resource.”
@@ -49,6 +49,7 @@ At the end, your resource query will look like this. Let's save it then click �
 
 In the Inngest Cloud dashboard's “Events” tab, you should see a brand new `retool/backfill.requested` event. Click on the event and you should be able to select the payload that we just sent.
 
+{/* TODO - Update screenshots!! */}
 ![Inngest Cloud dashboard view event payload](/assets/guides/trigger-your-code-from-retool/inngest-view-event-payload.gif)
 
 Now that we've verified the data is sent over to Inngest, you can attach the resource query as an event handler to the submit button. Select the “Default” interaction type and click “+ Add” to select our resource query `sendBackfillRequested`. For fun, you can add an `isFetching` to show loading.
@@ -68,9 +69,10 @@ mkdir -p inngest
 Now we'll create a file in this directory for our function - `runBackfillForUser.js`. This will be our Inngest function which will import our existing backfill code, use the `user_id` from the event payload to run that code, and return a http status code in our response to tell Inngest [if it should be retried or not](/docs/functions/retries?ref=retool-guide).
 
 
-```js
-// filename: ./inngest/runBackfillForUser.js
-import { createFunction } from "inngest";
+<CodeGroup>
+
+```ts {{ title: "runBackfillForUser.ts" }}
+import { inngest } from "./client";
 import { runBackfillForUser }  from "../lib/backfill-scripts";
 
 export default createFunction(
@@ -86,16 +88,21 @@ export default createFunction(
 );
 ```
 
-That's our function - we now just need to serve our function.
+```ts  {{ title: "client.ts" }}
+import { Inngest } from "inngest";
+
+export const inngest = new Inngest({ name: "My App" })
+```
+
+</CodeGroup>
+
+That's our function - now, we just need to serve our function.
 
 ### Serving our function
 
-There are different ways that you can have Inngest execute your functions:
+You need to serve your function to enable Inngest to remotely and securely invoke your function via HTTP.
 
-1. You can serve the functions securely via HTTP with our framework-specific handlers
-2. You can deploy them to a serverless function runtime with the Inngest CLI (_Coming soon!_)
-
-For this guide, we'll focus on **the former** with an existing [Express.js](https://expressjs.com/) application. Inngest's default `serve` handler can be imported and passed to Express.js' `app.use` or `router.use`. You can get your Inngest signing key by visiting the Secrets tab in the Inngest dasboard ([direct link](https://app.inngest.com/secrets)).
+For this guide, we'll explain how to do this with an existing [Express.js](https://expressjs.com/) application. Inngest's default [`serve()`](/docs/reference/serve) handler can be imported and passed to Express.js' `app.use` or `router.use`. You can get your Inngest signing key from [the Inngest dashboard](https://app.inngest.com/env/production/manage/signing-key).
 
 ```js
 import { serve } from "inngest/express"
@@ -117,7 +124,7 @@ By serving your functions via HTTP, you don't need to deploy your code to Innges
   👉 You can read how to do this in <a href="/docs/deploy#registering-live-functions-with-inngest">our deployment docs here</a>.
 </aside>
 
-After registering your endpoint, your new funciton should appear in the Functions tab of the Inngest Cloud dashboard:
+After registering your endpoint, your new function should appear in the Functions tab of the Inngest Cloud dashboard:
 
 ![Inngest Cloud dashboard view deployed function](/assets/guides/trigger-your-code-from-retool/inngest-deployed-function.png)
 

@@ -44,7 +44,7 @@ To send events from within of the context of a function, use [`step.sendEvent()`
             Any relevant user identifying data or attributes associated with the event. This data is encrypted at rest.
           </Property>
           <Property name="id" type="string">
-            A unique id used to idempotently ingest a given event payload once.
+            A unique id used to idempotently ingest a given event payload once (i.e. deduplication).
           </Property>
           <Property name="ts" type="number">
             A timestamp integer representing the time (in milliseconds) at which the event occurred. Defaults to the time the Inngest receives the event.
@@ -88,7 +88,7 @@ To send events from within of the context of a function, use [`step.sendEvent()`
 
 You can send events from any system or programming language with our simple API and an Inngest Event Key. The API accepts a single event payload or an array of event payloads.
 
-<CodeGroup title="Send Event(s)" tag="POST" label="inn.gs/e/:eventKey">
+<CodeGroup tag="POST" label="inn.gs/e/:eventKey">
 
 ```bash {{ title: 'cURL' }}
 curl https://inn.gs/e/$INNGEST_EVENT_KEY \

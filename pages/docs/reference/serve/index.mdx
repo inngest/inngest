@@ -1,8 +1,9 @@
 # Serve
 
-The `serve()` handler is used to serve your application's [functions](/docs/reference/functions/create) via HTTP. This handler enables Inngest to remotely and securely read your functions' configuration and invoke your function code. This enables you to host your function code on any platform.
+The `serve()` API handler is used to serve your application's [functions](/docs/reference/functions/create) via HTTP. This handler enables Inngest to remotely and securely read your functions' configuration and invoke your function code. This enables you to host your function code on any platform.
 
 ```ts
+import { serve } from "inngest/next"; // or your preferred framework
 import { inngest } from './client';
 import { sendSignupEmail, summarizeText, importProductImages } from './functions';
 
@@ -12,6 +13,8 @@ serve(inngest, [
   importProductImages,
 ])
 ```
+
+`serve` handlers are imported from convenient framework-specific packages like `"inngest/next"`, `"inngest/express"`, or `"inngest/lambda"`. [Click here for a full list of officially supported frameworks](/docs/sdk/serve). For any framework that is not support, you can [create a custom handler](#custom-frameworks).
 
 ---
 
@@ -58,3 +61,17 @@ serve(inngest, [
 <Callout>
   We always recommend setting the `INNGEST_SIGNING_KEY` over using the `signingKey` option. As with any secret, it's not a good practice to hard-code the signing key in your codebase.
 </Callout>
+
+## How the `serve` API handler works
+
+The API works by exposing a single endpoint at `/api/inngest` which handles different actions utilizing HTTP request methods:
+
+- `GET`: Return function metadata and render a debug page in in **development only**. See [`landingPage`](#landingPage).
+- `POST`: Invoke functions with the request body as incoming function state.
+- `PUT`: Trigger the SDK to register all functions with Inngest using the signing key.
+
+## Custom frameworks
+
+If the framework that your application uses is not included in our list of [first-party supported frameworks](/docs/sdk/serve), you can create a custom `serve` handler.
+
+To create your own handler, check out the [example handler](https://github.com/inngest/inngest-js/blob/main/src/examples/handler.ts) in our SDK's open source repo to understand how it works.

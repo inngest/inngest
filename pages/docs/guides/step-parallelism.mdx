@@ -9,10 +9,10 @@
 
 ## Running steps in parallel
 
-You can run steps in parallel via `Promise.all`:
+You can run steps in parallel via `Promise.all()`:
 
-- Create each step via `step.run` without awaiting, which returns an unresolved promise.
-- Await all steps via `Promise.all`. This triggers all steps to run in parallel via separate executions.
+- Create each step via [`step.run()`](/docs/reference/functions/step-run) without awaiting, which returns an unresolved promise.
+- Await all steps via `Promise.all()`. This triggers all steps to run in parallel via separate executions.
 
 A common use case is to split work into chunks:
 
@@ -49,11 +49,11 @@ export const fn = inngest.createFunction(
 );
 ```
 
-When each step is finished, Inngest will aggregate each step’s state and re-invoke the function with all state available.
+When each step is finished, Inngest will aggregate each step's state and re-invoke the function with all state available.
 
 ## Chunking jobs
 
-A common use case is to chunk work.  For example, when using OpenAI’s APIs you might need to chunk a user’s input and run the API on many chunks, then aggregate all data:
+A common use case is to chunk work. For example, when using OpenAI's APIs you might need to chunk a user's input and run the API on many chunks, then aggregate all data:
 
 ```tsx
 import { Inngest } from "inngest";
@@ -77,7 +77,7 @@ export const fn = inngest.createFunction(
 );
 ```
 
-This allows you to run many independent steps, wait until they’re all finished, then fetch the results from all steps within a few lines.  Doing this in a traditional system would require creating many jobs, polling the status of all jobs, and manually combining state.
+This allows you to run many independent steps, wait until they're all finished, then fetch the results from all steps within a few lines of code. Doing this in a traditional system would require creating many jobs, polling the status of all jobs, and manually combining state.
 
 ## Limitations
 
@@ -89,7 +89,7 @@ Another technique similar to parallelism is fan-out ([read the guide here](/docs
 
 - Both patterns run jobs in parallel
 - You can access the output of steps ran in parallel within your function, whereas with fan-out you cannot
-- Parallelism has a limit of 1,000 steps, though you can create as many functions as you’d like using fan-out
+- Parallelism has a limit of 1,000 steps, though you can create as many functions as you'd like using fan-out
 - You can replay events via fan-out, eg. to test functions locally
 - You can retry individual functions easily if they permanently fail, whereas if a step permanently fails (after retrying) the function itself will fail and terminate.
 - Fan-out splits functionality into different functions, using step functions keeps all related logic in a single, easy to read function

@@ -200,7 +200,7 @@ export function Property({
   children: React.ReactElement;
 }) {
   return (
-    <li className="m-0 px-0 py-4 first:pt-0 last:pb-0">
+    <li id={name} className="m-0 px-0 py-4 first:pt-0 last:pb-0 scroll-mt-24">
       <dl className="m-0 flex flex-wrap items-center gap-x-3 gap-y-2">
         <dt className="sr-only">Name</dt>
         <dd>

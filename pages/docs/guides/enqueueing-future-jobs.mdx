@@ -1,6 +1,6 @@
 # Enqueueing future jobs
 
-You can enqueue jobs in the future within Inngest easily.  Inngest offers two ways to run jobs in the future:  delaying jobs for a specific amount of time (eg. run in 1 day), or running code at a specific date and time.  There are some benefits to enqueuing jobs using Inngest:
+You can easily enqueue jobs in the future with Inngest. Inngest offers two ways to run jobs in the future: delaying jobs for a specific amount of time (eg. run in 1 day), or running code at a specific date and time. There are some benefits to enqueuing jobs using Inngest:
 
 - It works across any provider or platform
 - Delaying jobs is durable, and works across server restarts, serverless functions, and redeploys
@@ -15,7 +15,7 @@ You can enqueue jobs in the future within Inngest easily.  Inngest offers two wa
 
 ## Delaying jobs
 
-You can delay jobs using the `step.sleep` utility:
+You can delay jobs using the [`step.sleep()`](/docs/reference/functions/step-sleep) utility:
 
 ```tsx
 import { Inngest } from "inngest";
@@ -34,12 +34,12 @@ export const fn = inngest.createFunction(
 );
 ```
 
-For more information on `step.sleep` read the tool documentation](/docs/functions/multi-step#sleep)
+For more information on `step.sleep()` read [the reference guide](/docs/reference/functions/step-sleep)
 
 
 ## Running at specific times
 
-You can run jobs at a specific time using the `step.sleepUntil` utility:
+You can run jobs at a specific time using the [`step.sleepUntil()`](/docs/reference/functions/step-sleep-until) utility:
 
 ```tsx
 import { Inngest } from "inngest";
@@ -63,9 +63,11 @@ export const fn = inngest.createFunction(
 );
 ```
 
-For more information on `step.sleepUntil` [read the tool documentation](/docs/functions/multi-step#sleep-until).
+For more information on `step.sleepUntil()` [read the reference guide](/docs/reference/functions/step-sleep-until).
 
 ## How it works
+
+{/* TODO - Revisit this section after we write a How Inngest Works explainer */}
 
 In both methods, **the function controls when it runs**.  You control the flow of your code by calling `sleep` or `sleepUntil` within your function directly,
 instead of using the queue to manage your code's timing.  This keeps your logic together and makes your code easier to modify.

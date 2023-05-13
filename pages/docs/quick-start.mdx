@@ -105,9 +105,9 @@ export const inngest = new Inngest({ name: "My App" });
 export default serve(inngest, []);
 ```
 
-Here, we're creating a new Inngest client which we'll use to send and receive events. With this, we create an API endpoint called a "Serve Handler" with a list of available functions.
+Here, we're creating a new [Inngest client](/docs/reference/client/create) which we'll use to send and receive events. With this, we create an API endpoint called a "Serve Handler" with a list of available functions.
 
-You can import `serve()` for other frameworks, though the code is the same — only the import changes.
+You can import [`serve()`](/docs/reference/serve) for other frameworks, though the code is the same — only the import changes.
 
 This sets up the API endpoint for hosting and calling functions!  We'll update the array passed in to `serve` with functions as we write them.
 
@@ -128,7 +128,7 @@ const helloWorld = inngest.createFunction(
 );
 ```
 
-We also add this new function to our serve handler.
+We also add this new function to the `serve` handler.
 
 ```ts
 export default serve(inngest, [helloWorld]);
@@ -138,8 +138,8 @@ This creates a new function which will be called in the background any time Inng
 
 {/*  TODO/DOCS: Link these to relevant docs on each when completed (Concepts, guides, references etc.) */}
 - Functions are called by events (or on a schedule), in the background
-- Functions can sleep
-- Functions will retry automatically if they error.
+- Functions can [sleep](/docs/reference/functions/step-sleep)
+- Functions will [retry automatically if they error](/docs/functions/retries).
 
 Instead of calling your function directly as an API with a JSON body, you send a JSON event to Inngest.  Inngest calls all functions listening to this event, and automatically passes the event payload JSON as an function argument.
 
@@ -204,7 +204,7 @@ export default async function handler(req, res) {
 ```
 
 <Callout>
-Sending events requires an ["**event key**"](/docs/events) to send data to Inngest in production. For local development, we only need a placeholder key. Create an `.env.local` file in your project and add the following environment variable:
+Sending events requires an ["**event key**"](/docs/events/creating-an-event-key) to send data to Inngest in production. For local development, we only need a placeholder key. Create an `.env.local` file in your project and add the following environment variable:
 
 ```shell
 INNGEST_EVENT_KEY="local"

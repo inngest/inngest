@@ -7,7 +7,7 @@ The first thing you'll need to do is to add and serve the Inngest API in your pr
 
 Inngest provides a `serve()` handler which adds an API endpoint to your router.  **You should always
 serve our API at `/api/inngest`**, as this makes automated deploys much easier.  If you need to
-change the API URL skip to [configuring the API Path](#configuring-the-api-path).
+change the API URL skip to [configuring the API Path](/docs/reference/serve#serve-client-functions-options).
 
 ```typescript
 // All serve handlers have the same arguments:
@@ -46,7 +46,7 @@ the reference for more information](/docs/sdk/reference/serve#reference).
 
 We recommend using [Lambda function URLs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html) to trigger your functions, as these require no other configuration or cost.
 
-Alternatively, you can use an API Gateway to route requests to your Lambda. The handler supports [API Gateway V1](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html) and [API Gateway V2](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html). If you are running API Gateway behind a proxy or have some other configuration, you may have to specify the `serveHost` and `servePath` options when calling `serve()` to ensure Inngest knows the URL where you are serving your functions. See [Configuring the API path](#configuring-the-api-path) for more details.
+Alternatively, you can use an API Gateway to route requests to your Lambda. The handler supports [API Gateway V1](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html) and [API Gateway V2](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-lambda.html). If you are running API Gateway behind a proxy or have some other configuration, you may have to specify the `serveHost` and `servePath` options when calling `serve()` to ensure Inngest knows the URL where you are serving your functions. See [Configuring the API path](/docs/reference/serve#serve-client-functions-options) for more details.
 
 ```typescript
 import { serve } from "inngest/lambda";
@@ -234,34 +234,10 @@ const handler = serve(inngest, [fnA]);
 export { handler as loader, handler as action };
 ```
 
-## Configuring the API path
+## Reference
 
-If you can't serve the API at `/api/inngest`, you can configure the path via the serve handler:
+For more information about the `serve` handler, read the [the reference guide](/docs/reference/serve), which includes:
 
-```typescript
-serve(
-  inngest, // An Inngest client
-  [], // Functions to serve
-  {
-    // Overwrite the default serve path.
-    servePath: "/api/v1/inngest",
-  }
-);
-```
-
-Note that when deploying to providers like Vercel, we always expect that your API is hosted at
-`/api/inngest` and automated deploys will fail.  [You can read more on deploying in our deploy docs.](/docs/deploy)
-
-## How the API works
-
-The API works by exposing a single endpoint at `/api/inngest` which handles three RESTful http methods:
-
-- `GET`:  Returns a getting started UI and metadata about your functions **in development only**
-- `POST`:  Runs a function, using the request's post data as incoming function state.
-- `PUT`:  Triggers a deploy, which makes the SDK push functions to Inngest using the signing key.
-
-## Custom frameworks
-
-While Inngest provides some first-party tooling for popular frameworks, they're all created using a standard interface that any framework can use.
-
-To create your own handler, check out the [example handler](https://github.com/inngest/inngest-js/blob/main/src/examples/handler.ts) in our TS SDK to understand how it works.
+* [Configuration options](/docs/reference/serve#serve-client-functions-options)
+* [How the serve handler works](/docs/reference/serve#how-the-serve-api-handler-works)
+* [Custom framework handlers](/docs/reference/serve#custom-frameworks)

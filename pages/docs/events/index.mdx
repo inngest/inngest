@@ -18,7 +18,7 @@ const inngest = new Inngest({ name: "Your app name" });
 const inngest = new Inngest({ name: "Your app name", eventKey: "xyz..." });
 ```
 
-Then, sending an event is simple, just call the the `send()` method with your event payload ([Read about the payload format](/docs/reference/events/send)):
+Then, sending an event is simple, just call the the `send()` method with your event payload ([Read about the payload format](/docs/reference/events/send#inngest-send-event-payload-event-payload-promise)):
 
 ```typescript
 // This sends an event to Inngest.
@@ -50,13 +50,13 @@ Sending this event, named `storefront/cart.checkout.completed`, to Inngest will 
 
 <Callout>
 
-💡 One event can trigger multiple functions, enabling you to consume a single event in multiple ways. This is different than traditional message queues where only one worker can consume a single message.
+💡 One event can trigger multiple functions, enabling you to consume a single event in multiple ways. This is different than traditional message queues where only one worker can consume a single message. Learn about [the fan-out approach here](/docs/guides/fan-out-jobs).
 
 </Callout>
 
 ## Sending multiple events at once
 
-You can also send multiple events in a single `send` call. This enables you to send a batch of events very easily. You can send up to `512kb` in a single call which means you can send anywhere between 10 and 1000 typically sized payloads at once.
+You can also send multiple events in a single `send` call. This enables you to send a batch of events very easily. You can send up to `512kb` in a single call which means you can send anywhere between 10 and 1000 typically sized payloads at once. This is the default and can be increased for your account.
 
 ```typescript
 await inngest.send([
@@ -110,4 +110,4 @@ For example, for two events like `storefront/item.imported` and `storefront/item
 
 ## Reference
 
-For a full reference of how you can send events, including event versioning, read [the reference](/docs/reference/events/send).
+For a full reference of how you can send events, read [the reference](/docs/reference/events/send).
