@@ -1,0 +1,81 @@
+# Create the Inngest Client
+
+The `Inngest` client object is used to configure your application, enabling you to create functions and send events.
+
+```ts
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({
+  name: "My application",
+});
+```
+
+---
+
+## Configuration
+
+<Properties>
+  <Property name="name" type="string" required>
+    The unique name of your application
+  </Property>
+  <Property name="eventKey" type="string">
+    An Inngest [Event Key](/docs/events/creating-an-event-key). Alternatively, set the `INNGEST_EVENT_KEY` environment variable.
+  </Property>
+  <Property name="env" type="string">
+    The environment name. Required only when using [Branch Environments](/docs/platform/environments)
+  </Property>
+  <Property name="fetch" type="Fetch API compatible interface">
+    Override the default [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) implementation. Defaults to the runtime's native Fetch API.
+  </Property>
+  <Property name="inngestBaseUrl" type="string">
+    Override the default (`https://inn.gs/`) base URL for sending events.
+  </Property>
+</Properties>
+
+<Callout>
+We recommend setting the `INNGEST_EVENT_KEY` as an environment variable over using the `eventKey` option. As with any secret, it's not a good practice to hard-code the event key in your codebase.
+</Callout>
+
+## Defining Event Payload Types
+
+You can leverage TypeScript to define your event payload types. When you pass types to the Inngest client, events are fully typed when using them with `inngest.send()` and `inngest.createFunction()`. This can more easily alert you to issues with your code during compile time.
+
+<CodeGroup title="Defining Types" forceTabs={true}>
+```ts
+type Events = {
+  "app/account.created": {
+    name: "app/account.created",
+    data: {
+      userId: string;
+    }
+  },
+  "app/subscription.started": {
+    name: "app/subscription.started",
+    data: {
+      userId: string;
+      planId: string;
+    }
+  }
+}
+
+export const inngest = new Inngest<Events>({ name: "My App" });
+```
+</CodeGroup>
+
+## Best Practices
+
+### Share your client across your codebase
+
+Instantiating the `Inngest` client in a single file and sharing it across your codebase is ideal as you only need a single place to configure your client and define types which can be leveraged anywhere you send events or create functions.
+
+```ts  {{ filename: './inngest/client.ts' }}
+import { Inngest } from "inngest";
+
+export const inngest = new Inngest({ name: "My App" });
+```
+
+```ts  {{ filename: './inngest/myFunction.ts' }}
+import { inngest } from "./client";
+
+export default inngest.createFunction(...);
+```

@@ -1,0 +1,71 @@
+# Wait for additional events `step.waitForEvent()`
+
+Use `step.waitForEvent()` to wait for a particular event to be received before continuing. It returns a `Promise` that is resolved with the received event or `null` if the event is not received within the timeout.
+
+```ts
+export default inngest.createFunction(
+  { name: "Send onboarding nudge email" },
+  { event: "app/account.created" },
+  async ({ event, step }) => {
+    const onboardingCompleted = await step.waitForEvent("app/onboarding.completed", {
+      timeout: "3d",
+      match: "data.userId"
+    });
+    // Do something else
+  }
+);
+```
+
+---
+
+## `step.waitForEvent(eventName, options): Promise<null | EventPayload>`
+
+<Row>
+  <Col>
+    <Properties>
+      <Property name="eventName" type="string" required>
+        The name of a given event to wait for.
+      </Property>
+      <Property name="options" type="object" required>
+        Options for configuring how to wait for the event.
+        <Properties nested={true}>
+          <Property name="timeout" type="string" required>
+            The amount of time to wait to receive the event. A time string compatible with the [ms](https://npm.im/ms) package, e.g. `"30m"`, `"3 hours"`, or `"2.5d"`
+          </Property>
+          <Property name="match" type="string">
+            The property to match the event trigger and the wait event, using dot-notation, e.g. `data.userId`. Cannot be combined with `if`.
+          </Property>
+          <Property name="if" type="string">
+            A filtering statement using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original `event` trigger and the `async` event, e.g. `event.data.userId === async.data.userId && async.data.billing_plan === 'pro'`. Cannot be combined with `match`.
+          </Property>
+        </Properties>
+      </Property>
+    </Properties>
+  </Col>
+  <Col>
+  ```ts
+  // Wait 7 days for an approval and match invoice IDs
+  const approval = await step.waitForEvent(
+    "app/invoice.approved",
+    {
+      timeout: "7d",
+      match: "data.invoiceId"
+    }
+  );
+
+  // Wait 30 days for a user to start a subscription
+  // on the pro plan
+  const subscription = await step.waitForEvent(
+    "app/subscription.created",
+    {
+      timeout: "30d",
+      if: "event.data.userId === async.data.userId && async.data.billing_plan === 'pro'"
+    }
+  );
+  ```
+  </Col>
+</Row>
+
+<Callout>
+  `step.waitForEvent()` must be called using `await` or some other Promise handler to ensure your function sleeps correctly.
+</Callout>

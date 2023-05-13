@@ -1,0 +1,60 @@
+# Serve
+
+The `serve()` handler is used to serve your application's [functions](/docs/reference/functions/create) via HTTP. This handler enables Inngest to remotely and securely read your functions' configuration and invoke your function code. This enables you to host your function code on any platform.
+
+```ts
+import { inngest } from './client';
+import { sendSignupEmail, summarizeText, importProductImages } from './functions';
+
+serve(inngest, [
+  sendSignupEmail,
+  summarizeText,
+  importProductImages,
+])
+```
+
+---
+
+## `serve(client, functions[], options)`
+
+<Properties>
+  <Property name="client" type="Inngest client" required>
+    An Inngest client ([reference](/docs/reference/client/create))
+  </Property>
+  <Property name="functions" type="InngestFunctions[]" required>
+    An array of Inngest functions defined using `inngest.createFunction()` ([reference](/docs/reference/functions/create))
+  </Property>
+  <Property name="options" type="object">
+    Options for configuring how to wait for the event.
+    <Properties nested={true}>
+      <Property name="signingKey" type="string" required>
+        The Inngest Signing Key for your [selected environment](/docs/platform/environments). We recommend setting the `INNGEST_SIGNING_KEY` environment variable instead of passing the `signingKey` option. You can find this in [the Inngest dashboard](https://app.inngest.com/env/production/manage/signing-key).
+      </Property>
+      <Property name="serveHost" type="string">
+        The domain host of your application, _including_ protocol, e.g. `https://myapp.com`. The SDK attempts to infer this via HTTP headers at runtime, but this may be required when using platforms like AWS Lambda or when using a reverse proxy.
+      </Property>
+      <Property name="servePath" type="string">
+        The path where your `serve` handler is hosted. The SDK attempts to infer this via HTTP headers at runtime. We recommend `/api/inngest`.
+      </Property>
+      <Property name="streaming" type={`"allow" | "force" | false`}>
+        Enables streaming responses back to Inngest which can enable maximum serverless function timeouts. See [reference](/docs/streaming) for more information on the configuration.
+      </Property>
+      <Property name="logLevel" type={`"fatal" | "error" | "warn" | "info" | "debug" | "silent"`}>
+        The minimum level to log from the Inngest serve endpoint. Defaults to `"info"`.
+      </Property>
+      <Property name="inngestRegisterUrl" type="string">
+        The URL used to register functions with Inngest. This can be useful in testing environments when using the Inngest Dev Server. Defaults to: `"https://api.inngest.com/fn/register"`
+      </Property>
+      <Property name="fetch" type="Fetch API compatible interface">
+        Override the default [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) implementation. Defaults to the runtime's native Fetch API.
+      </Property>
+      <Property name="landingPage" type="boolean">
+        Force a landing page to be rendered by the `serve` handler to help debug the setup of your application. This is disabled by default in production (`NODE_ENV !== "production"`).
+      </Property>
+    </Properties>
+  </Property>
+</Properties>
+
+<Callout>
+  We always recommend setting the `INNGEST_SIGNING_KEY` over using the `signingKey` option. As with any secret, it's not a good practice to hard-code the signing key in your codebase.
+</Callout>

@@ -9,6 +9,7 @@ import { useIsInsideMobileNavigation } from "./MobileNavigation";
 import { useSectionStore } from "./SectionProvider";
 import { Tag } from "./Tag";
 import { remToPx } from "../../utils/remToPx";
+import { IconDocs, IconGuide } from "../Icons/duotone";
 
 function useInitialValue(value, condition = true) {
   let initialValue = useRef(value).current;
@@ -202,17 +203,12 @@ export const navigation = [
     links: [
       { title: "Overview", href: `${baseDir}` },
       { title: "Quick Start Tutorial", href: `${baseDir}/quick-start` },
-      {
-        title: "Working With Environments",
-        href: `${baseDir}/platform/environments`,
-      },
     ],
   },
   {
-    title: "Using the SDK",
+    title: "Getting Started",
     links: [
       { title: "SDK Overview", href: `${baseDir}/sdk/overview` },
-      { title: "Migrating to v1", href: `${baseDir}/sdk/v1-migration` },
       { title: "Serving the API & Frameworks", href: `${baseDir}/sdk/serve` },
       { title: "Writing Functions", href: `${baseDir}/functions` },
       { title: "Sending Events", href: `${baseDir}/events` },
@@ -224,40 +220,10 @@ export const navigation = [
         title: "Local Development",
         href: `${baseDir}/local-development`,
       },
-      { title: "Using TypeScript", href: `${baseDir}/typescript` },
-      {
-        title: "Handling Errors & Retries",
-        href: `${baseDir}/functions/retries`,
-      },
-      { title: "Concurrency", href: `${baseDir}/functions/concurrency` },
-      { title: "Cancellation", href: `${baseDir}/functions/cancellation` },
-      { title: "Streaming", href: `${baseDir}/streaming` },
     ],
   },
   {
-    title: "Events",
-    links: [
-      {
-        title: "Event Format",
-        href: `${baseDir}/events/event-format-and-structure`,
-      },
-      {
-        title: "Creating an Event Key",
-        href: `${baseDir}/events/creating-an-event-key`,
-      },
-    ],
-  },
-  {
-    title: "Deploying",
-    links: [
-      { title: "How to Deploy", href: `${baseDir}/deploy` },
-      { title: "Vercel", href: `${baseDir}/deploy/vercel` },
-      { title: "Netlify", href: `${baseDir}/deploy/netlify` },
-      { title: "Cloudflare Pages", href: `${baseDir}/deploy/cloudflare` },
-    ],
-  },
-  {
-    title: "Guides",
+    title: "Use Cases",
     links: [
       {
         title: "Background jobs",
@@ -279,10 +245,6 @@ export const navigation = [
         title: "Fan-out jobs",
         href: `${baseDir}/guides/fan-out-jobs`,
       },
-      // {
-      //   title: "Overview",
-      //   href: `${baseDir}/guides`,
-      // },
       {
         title: "Trigger code from Retool",
         href: `${baseDir}/guides/trigger-your-code-from-retool`,
@@ -294,8 +256,117 @@ export const navigation = [
     ],
   },
   {
-    title: "SDK Reference",
-    links: [{ title: "Serve", href: `${baseDir}/sdk/reference/serve` }],
+    title: "Platform",
+    links: [
+      {
+        title: "Working With Environments",
+        href: `${baseDir}/platform/environments`,
+      },
+      {
+        title: "Creating an Event Key",
+        href: `${baseDir}/events/creating-an-event-key`,
+      },
+      { title: "How to Deploy", href: `${baseDir}/deploy` },
+      { title: "Deploy: Vercel", href: `${baseDir}/deploy/vercel` },
+      { title: "Deploy: Netlify", href: `${baseDir}/deploy/netlify` },
+      {
+        title: "Deploy: Cloudflare Pages",
+        href: `${baseDir}/deploy/cloudflare`,
+      },
+    ],
+  },
+];
+
+const referenceNavigation = [
+  {
+    title: "Inngest Client",
+    links: [
+      {
+        title: "Create the client",
+        href: `${baseDir}/reference/client/create`,
+      },
+    ],
+  },
+  {
+    title: "Functions",
+    links: [
+      {
+        title: "Create function",
+        href: `${baseDir}/reference/functions/create`,
+      },
+      {
+        title: "Define steps (step.run)",
+        href: `${baseDir}/reference/functions/step-run`,
+      },
+      {
+        title: "Sleep",
+        href: `${baseDir}/reference/functions/step-sleep`,
+      },
+      {
+        title: "Sleep until a time",
+        href: `${baseDir}/reference/functions/step-sleep-until`,
+      },
+      {
+        title: "Wait for additional events",
+        href: `${baseDir}/reference/functions/step-wait-for-event`,
+      },
+      {
+        title: "Sending events from functions",
+        href: `${baseDir}/reference/functions/step-send-event`,
+      },
+      {
+        title: "Error handling",
+        href: `${baseDir}/functions/retries`,
+        // href: `${baseDir}/reference/functions/error-handling`,
+      },
+      {
+        title: "Cancel running functions",
+        href: `${baseDir}/functions/cancellation`,
+        // href: `${baseDir}/reference/functions/cancel-running-functions`,
+      },
+      {
+        title: "Concurrency",
+        href: `${baseDir}/functions/concurrency`,
+        // href: `${baseDir}/reference/functions/concurrency`,
+      },
+      // {
+      //   title: "Logging",
+      //   href: `${baseDir}/reference/functions/logging`,
+      // },
+    ],
+  },
+  {
+    title: "Events",
+    links: [
+      {
+        title: "Send",
+        href: `${baseDir}/reference/events/send`,
+      },
+    ],
+  },
+  {
+    title: "Serve",
+    links: [
+      // {
+      //   title: "Framework handlers",
+      //   href: `${baseDir}/sdk/serve`,
+      // },
+      {
+        title: "Configuration",
+        href: `${baseDir}/reference/serve`,
+      },
+      { title: "Streaming", href: `${baseDir}/streaming` },
+    ],
+  },
+  {
+    title: "Using the SDK",
+    links: [
+      {
+        title: "Using TypeScript",
+        href: `${baseDir}/typescript`,
+      },
+      { title: "Migrating to v1", href: `${baseDir}/sdk/v1-migration` },
+    ],
   },
 ];
 
@@ -314,6 +385,12 @@ export function Navigation(props) {
   return (
     <nav {...props}>
       <ul role="list">
+        <li className="mt-6 mb-4 flex gap-2 items-center text-base font-semibold text-slate-900 dark:text-white">
+          <span className="p-0.5 bg-indigo-500 rounded-sm">
+            <IconGuide />
+          </span>
+          Guides
+        </li>
         {/* <li>
           <Button
             href="/ai-personalized-documentation?ref=docs"
@@ -329,6 +406,19 @@ export function Navigation(props) {
           </TopLevelNavItem>
         ))}
         {navigation.map((group, groupIndex) => (
+          <NavigationGroup
+            key={group.title}
+            group={group}
+            className={groupIndex === 0 && "lg:mt-0"}
+          />
+        ))}
+        <li className="mt-6 mb-4 flex gap-2 items-center text-base font-semibold text-slate-900 dark:text-white">
+          <span className="p-0.5 bg-blue-500 rounded-sm">
+            <IconDocs />
+          </span>
+          Reference
+        </li>
+        {referenceNavigation.map((group, groupIndex) => (
           <NavigationGroup
             key={group.title}
             group={group}

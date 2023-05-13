@@ -67,7 +67,7 @@ const learnLinks = {
   featured: [
     {
       title: "Docs",
-      desc: "Everything you need to know about our event-driven platform",
+      desc: "SDK and platform guides and references",
       url: "/docs?ref=nav",
       icon: IconDocs,
       iconBg: "bg-blue-500",

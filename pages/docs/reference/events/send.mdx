@@ -1,0 +1,139 @@
+# Send Events
+
+Send events to Inngest. Functions with matching event triggers will be invoked.
+
+```ts
+import { inngest } from "./client";
+
+await inngest.send({
+  name: "app/account.created",
+  data: {
+    accountId: "645e9f6794e10937e9bdc201",
+    billingPlan: "pro",
+  },
+  user: {
+    userId: "645ea000129f1c40109ca7ad",
+    email: "taylor@example.com",
+  }
+})
+```
+
+To send events from within of the context of a function, use [`step.sendEvent()`](/docs/reference/functions/step-send-event).
+
+---
+
+
+## `inngest.send(eventPayload | eventPayload[]): Promise`
+{/* TODO - Show the event ids in the return value when we add to the SDK */}
+{/*## `inngest.send(eventPayload | eventPayload[]): Promise<string[]>`*/}
+
+<Row>
+  <Col>
+    <Properties>
+      <Property name="eventPayload" type="object | object[]" required>
+        An event payload object or an array of event payload objects.
+
+        <Properties nested={true}>
+          <Property name="name" type="string" required>
+            The event name. We recommend using lowercase dot notation for names, prepending `prefixes/` with a slash for organization.
+          </Property>
+          <Property name="data" type="object" required>
+            Any data to associate with the event. Will be serialized as JSON.
+          </Property>
+          <Property name="user" type="object">
+            Any relevant user identifying data or attributes associated with the event. This data is encrypted at rest.
+          </Property>
+          <Property name="id" type="string">
+            A unique id used to idempotently ingest a given event payload once.
+          </Property>
+          <Property name="ts" type="number">
+            A timestamp integer representing the time (in milliseconds) at which the event occurred. Defaults to the time the Inngest receives the event.
+          </Property>
+          <Property name="v" type="string">
+            A version identifier for a particular event payload. e.g. `"2023-04-14.1"`
+          </Property>
+        </Properties>
+      </Property>
+    </Properties>
+  </Col>
+  <Col>
+  ```ts
+  // Send a single event
+  await inngest.send({
+    name: "app/user.activated",
+    data: { userId: "01H08SEAXBJFJNGTTZ5TAWB0BD" }
+  })
+
+  // Send an o array of events
+  await inngest.send([
+    {
+      name: "app/invoice.created",
+      data: { invoiceId: "645e9e024befa68763f5b500" }
+    },
+    {
+      name: "app/invoice.created",
+      data: { invoiceId: "645e9e08f29fb563c972b1f7" }
+    },
+  ])
+  ```
+  </Col>
+</Row>
+
+<Callout>
+  🔐 **Security** - All data sent in the `user` object is fully encrypted at rest. Each unique user gets their own encryption key and when you delete the user from our system, which helps comply with GDPR and CCPA.
+</Callout>
+
+
+## Send Events via HTTP API
+
+You can send events from any system or programming language with our simple API and an Inngest Event Key. The API accepts a single event payload or an array of event payloads.
+
+<CodeGroup title="Send Event(s)" tag="POST" label="inn.gs/e/:eventKey">
+
+```bash {{ title: 'cURL' }}
+curl https://inn.gs/e/$INNGEST_EVENT_KEY \
+  --data '{
+    "name": "user.signup",
+    "data": {
+      "userId": "645ea8289ad09eac29230442"
+    }
+  }'
+```
+
+```php
+$url = "https://inn.gs/e/{$eventKey}";
+$content = json_encode([
+    "name" => "user.signup",
+    "data" => [
+      "userId" => "645ea8289ad09eac29230442",
+    ],
+]);
+
+$curl = curl_init($url);
+curl_setopt($curl, CURLOPT_HEADER, false);
+curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($curl, CURLOPT_HTTPHEADER, ["Content-type: application/json"]);
+curl_setopt($curl, CURLOPT_POST, true);
+curl_setopt($curl, CURLOPT_POSTFIELDS, $content);
+
+$json_response = curl_exec($curl);
+$status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+if ($status != 200) {
+    return [
+        'status' => $status,
+        'message' => "Error: call to URL $url failed with status $status, response $json_response, curl_error " . curl_error($curl) . ", curl_errno " . curl_errno($curl),
+    ];
+}
+
+curl_close($curl);
+$response = json_decode($json_response, true);
+```
+
+</CodeGroup>
+
+```json {{ title: 'Response' }}
+{
+  "ids": ["01H08W4TMBNKMEWFD0TYC532GG"],
+  "status": 200
+}
+```

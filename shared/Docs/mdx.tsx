@@ -92,7 +92,7 @@ export function Note({ children }) {
 
 export function Callout({ children }) {
   return (
-    <div className="border border-transparent dark:border-indigo-600/20 text-indigo-600 dark:text-indigo-200 bg-indigo-600/10 rounded-lg p-6  [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+    <div className="my-6 border border-transparent dark:border-indigo-600/20 text-indigo-600 dark:text-indigo-200 bg-indigo-600/10 rounded-lg p-6 mt- [&>:first-child]:mt-0 [&>:last-child]:mb-0">
       {children}
     </div>
   );
@@ -136,7 +136,7 @@ export function ButtonDeploy({ label, type, href }) {
 
 export function Row({ children }) {
   return (
-    <div className="grid grid-cols-1 items-start gap-x-16 gap-y-10 xl:max-w-none xl:grid-cols-2">
+    <div className="grid grid-cols-1 items-start gap-x-16 gap-y-10 xl:max-w-none xl:grid-cols-2 my-6 [&>:first-child]:mt-0 [&>:last-child]:mb-0">
       {children}
     </div>
   );
@@ -155,12 +155,32 @@ export function Col({ children, sticky = false }) {
   );
 }
 
-export function Properties({ children }) {
+export function Properties({
+  nested = false,
+  children,
+}: {
+  nested?: boolean;
+  children: React.ReactElement;
+}) {
   return (
-    <div className="my-6">
+    <div
+      className={clsx(
+        "my-6",
+        nested &&
+          "-mt-3 pt-2 pb-3 border border-slate-900/5 dark:border-white/5 rounded-md"
+      )}
+    >
+      {nested && (
+        <div className="px-3 pb-2 mb-3 border-b border-slate-900/5 text-xs font-semibold">
+          Properties
+        </div>
+      )}
       <ul
         role="list"
-        className="m-0 max-w-[calc(theme(maxWidth.lg)-theme(spacing.8))] list-none divide-y divide-slate-900/5 p-0 dark:divide-white/5"
+        className={clsx(
+          "m-0 max-w-[calc(theme(maxWidth.3xl)-theme(spacing.8))] list-none divide-y divide-slate-900/5 p-0 dark:divide-white/5",
+          nested && "px-3"
+        )}
       >
         {children}
       </ul>
@@ -168,7 +188,17 @@ export function Properties({ children }) {
   );
 }
 
-export function Property({ name, type, children }) {
+export function Property({
+  name,
+  type,
+  required = false,
+  children,
+}: {
+  name: string;
+  type: string;
+  required?: boolean;
+  children: React.ReactElement;
+}) {
   return (
     <li className="m-0 px-0 py-4 first:pt-0 last:pb-0">
       <dl className="m-0 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -177,11 +207,22 @@ export function Property({ name, type, children }) {
           <code>{name}</code>
         </dd>
         <dt className="sr-only">Type</dt>
-        <dd className="font-mono text-xs text-slate-400 dark:text-slate-500">
+        <dd className="font-mono font-medium text-xs text-slate-500 dark:text-slate-400">
           {type}
         </dd>
+        <dt className="sr-only">Required</dt>
+        <dd
+          className={clsx(
+            "font-mono font-medium text-xs",
+            required
+              ? "text-amber-600 dark:text-amber-400"
+              : "text-slate-500 dark:text-slate-400"
+          )}
+        >
+          {required ? "required" : "optional"}
+        </dd>
         <dt className="sr-only">Description</dt>
-        <dd className="w-full flex-none [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+        <dd className="w-full text-sm flex-none [&>:first-child]:mt-0 [&>:last-child]:mb-0">
           {children}
         </dd>
       </dl>

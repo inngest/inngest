@@ -1,0 +1,61 @@
+# Sending events from functions `step.sendEvent()`
+
+Use to send event(s) reliability within your function. Use this instead of [`inngest.send()`](/docs/reference/events/send) to ensure reliable event delivery from within functions. This is especially useful when [creating functions that fan-out](/docs/guides/fan-out-jobs).
+
+```ts
+export default inngest.createFunction(
+  { name: "User onboarding" },
+  { event: "app/user.signup" },
+  async ({ event, step }) => {
+    // Do something
+    await step.sendEvent({
+      name: "app/user.activated",
+      data: { userId: event.data.userId }
+    });
+    // Do something else
+  }
+);
+```
+
+To send events from outside of the context of a function, use [`inngest.send()`](/docs/reference/events/send).
+
+---
+
+## `step.sendEvent(eventPayload | eventPayload[]): Promise`
+
+<Row>
+  <Col>
+    <Properties>
+      <Property name="eventPayload" type="object | object[]" required>
+        An event payload object or an array of event payload objects.
+
+        [See the documentation for `inngest.send()`](/docs/reference/events/send) for the event payload format.
+      </Property>
+    </Properties>
+  </Col>
+  <Col>
+  ```ts
+  // Send a single event
+  await step.sendEvent({
+    name: "app/user.activated",
+    data: { userId: "01H08SEAXBJFJNGTTZ5TAWB0BD" }
+  })
+
+  // Send an array of events
+  await step.sendEvent([
+    {
+      name: "app/invoice.created",
+      data: { invoiceId: "645e9e024befa68763f5b500" }
+    },
+    {
+      name: "app/invoice.created",
+      data: { invoiceId: "645e9e08f29fb563c972b1f7" }
+    },
+  ])
+  ```
+  </Col>
+</Row>
+
+<Callout>
+  `step.sendEvent()` must be called using `await` or some other Promise handler to ensure your function sleeps correctly.
+</Callout>

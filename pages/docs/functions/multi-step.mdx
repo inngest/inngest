@@ -117,83 +117,21 @@ That's it! We've now written a multi-step function that will send a welcome emai
 
 Most importantly, we had to write no config to do this. We can use all the power of JavaScript to write our functions and all the power of Inngest's tools to coordinate between events and steps.
 
-## Step tools
+## Step Reference
 
-Inngest provides a number of tools to help you write multi-step functions. These tools are available in the `step` argument of your function.
+For an in-depth reference of each step tool that you can use read [our create function reference](/docs/reference/functions/create#step) or jump directly to a step reference guide:
 
-- [`run`](#run) - Run synchronous or asynchronous code as a retryable step in your function
-- [`waitForEvent`](#wait-for-event) - Wait for an event to be fired, and return the event data
-- [`sleep`](#sleep) - Sleep for a given amount of time
-- [`sleepUntil`](#sleep-until) - Sleep until a given time
-
-### `run()`
-
-Use `step.run()` to run synchronous or asynchronous code as a retryable step in your function.
-
-It takes a name for the block (for you, so you can easily see which steps ran) and a function to run when the block is triggered, then returns a Promise that resolves to the return value of the given function.
-
-For example, I could fetch a random user from the database in a lottery draw:
-
-```ts
-const user = await step.run("Get random user", () => getRandomUser());
-```
-
-### `waitForEvent()`
-
-Use `step.waitForEvent()` to wait for a particular event to be received before continuing. It returns a Promise that is resolved with the received event.
-
-```ts
-const postCreated = await step.waitForEvent("app/post.created", {
-  timeout: "30 minutes",
-  match: "data.post_id",
-});
-```
-
-A `timeout` must be provided as the maximum time to wait for the event. If this timeout is reached, the tool will resolve with `null` instead of the event data.
-
-To match a particular event, you can use the `match` option. This is as key which is used to compare the function's initial event payload and the event payload that you're waiting for. The above example will make sure that the initial event's `data.post_id` value exactly matches the `app/post.created`'s `data.post_id` - Any `app/post.created` that does not match will be ignored by this wait.
-
-### `sleep()`
-
-Use `step.sleep()` to wait for a specified amount of time before continuing.
-
-```ts
-await step.sleep("30 minutes");
-await step.sleep(1000 * 60 * 30);
-```
-
-`time` can be specified using a `number` of milliseconds or an `ms`-compatible
-time string like `"1 hour"`, `"30 mins"`, or `"2.5d"`. See the [ms](https://npm.im/ms) package for more information.
-
-To wait until a particular date, use `step.sleepUntil()` instead.
-
-### `sleepUntil()`
-
-Use `step.sleepUntil()` to wait until a particular date before continuing by
-passing a `Date`.
-
-<aside>
-⚠️ Don't use this for sleeping based on now. For example, to sleep until tomorrow, use `step.sleep("1 day")` instead.
-</aside>
-
-Any dates passed to `sleepUntil()` must be static for every call to your function. This is best achieved by calculating dates within `step.run()` instead of in the main function body.
-
-```ts
-const userBirthday = await step.run("Get user birthday", async () => {
-  const user = await getUser(1);
-  return user.birthday;
-});
-
-await step.sleepUntil(userBirthday);
-```
-
-**To wait a particular amount of time from now, always use `step.sleep()` instead.**
+- [`step.run()`](/docs/reference/functions/step-run) - Run synchronous or asynchronous code as a retryable step in your function
+- [`step.sleep()`](/docs/reference/functions/step-sleep) - Sleep for a given amount of time
+- [`step.sleepUntil()`](/docs/reference/functions/step-sleep-until) - Sleep until a given time
+- [`step.waitForEvent()`](/docs/reference/functions/step-wait-for-event) - Pause a function's execution until another event is received
+- [`step.sendEvent()`](/docs/reference/functions/step-send-event) - Send event(s) reliability within your function. Use this instead of `inngest.send()` to ensure reliable event delivery from within functions.
 
 ## Gotchas
 
 ### My function is running twice
 
-Inngest will communicate with your function multiple times throughout a single run and will use your use of tools to smartly memoise state.
+Inngest will communicate with your function multiple times throughout a single run and will use your use of tools to intelligently memoize state.
 
 For this reason, placing business logic outside of a `step.run()` call is a bad idea, as this will be run every time Inngest communicates with your function.
 

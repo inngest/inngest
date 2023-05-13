@@ -1,0 +1,45 @@
+# Sleep `step.sleep()`
+
+Use `step.sleep()` to pause the execution of your function for a specific amount of time.
+
+```ts
+export default inngest.createFunction(
+  { name: "Send delayed email" },
+  { event: "app/user.signup" },
+  async ({ event, step }) => {
+    await step.sleep("2d");
+    // Do something else
+  }
+);
+```
+
+To sleep until a particular date time, use [`step.sleepUntil()`](/docs/reference/functions/step-sleep-until) instead.
+
+---
+
+## `step.sleep(duration): Promise`
+
+<Row>
+  <Col>
+    <Properties>
+      <Property name="duration" type="number | string" required>
+        The duration of time to sleep:
+
+        * Number of milliseconds
+        * Time string compatible with the [ms](https://npm.im/ms) package, e.g. `"30m"`, `"3 hours"`, or `"2.5d"`
+      </Property>
+    </Properties>
+  </Col>
+  <Col>
+  ```ts
+  // Sleep for 30 minutes
+  await step.sleep("30m");
+  await step.sleep("30 minutes");
+  await step.sleep(30 * 60 * 1000);
+  ```
+  </Col>
+</Row>
+
+<Callout>
+  `step.sleep()` must be called using `await` or some other Promise handler to ensure your function sleeps correctly.
+</Callout>

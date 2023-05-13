@@ -1,0 +1,79 @@
+# Define Steps `step.run()`
+
+Use `step.run()` to run synchronous or asynchronous code as a retryable step in your function. `step.run()` returns a [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise) that resolves with the return value of your handler function.
+
+```ts
+export default inngest.createFunction(
+  { name: "Import product images" },
+  { event: "shop/product.imported" },
+  async ({ event, step }) => {
+    const uploadedImageURLs = await step.run("Copy images to S3", async () => {
+      return copyAllImagesToS3(event.data.imageURLs);
+    })
+  }
+);
+```
+
+---
+
+## `step.run(name, handler): Promise`
+
+<Row>
+  <Col>
+    <Properties>
+      <Property name="name" type="string" required>
+        The name of the step. This will be what appears in your function's logs.
+      </Property>
+      <Property name="handler" type="function" required>
+        The function that code that you want to run and automatically retry for this step. Functions can be:
+        * A synchronous function
+        * An `async` function
+        * Any function that returns a [`Promise`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)
+
+        Throwing errors within the handler function will trigger the step to be retried ([reference](/docs/functions/retries)).
+      </Property>
+    </Properties>
+  </Col>
+  <Col>
+  ```ts
+  // Steps can have async handlers
+  const result = await step.run("Get API data", async () => {
+    // Steps should return data used in other steps
+    return fetch("...").json();
+  });
+
+  // Steps can have synchronous handlers
+  const data = await step.run("Transform", () => {
+    return transformData(result);
+  });
+
+  // Returning data is optional
+  await step.run("Insert data", async () => {
+    db.insert(data);
+  });
+  ```
+  </Col>
+</Row>
+
+## How to call `step.run()`
+
+As `step.run()` returns a [Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise), you will need to handle it like any other Promise in JavaScript. Here are some ways you can use `step.run()` in your code:
+
+```ts
+// Use the "await" keyword to wait for the promise to fulfil
+await step.run("Create user", () => {/* ... */})
+const user = await step.run("Create user", () => {/* ... */})
+
+// Use `then` (or similar)
+step.run("Create user", () => {/* ... */})
+  .then((user) => {
+    // do something else
+  })
+
+// Use with a Promise helper function to run in parallel
+Promise.all([
+  step.run("Create subscription", () => {/* ... */}),
+  step.run("Add to CRM", () => {/* ... */}),
+  step.run("Send welcome email", () => {/* ... */}),
+])
+```

@@ -9,10 +9,8 @@ const legacyDocsUrls = [
   ["/docs/what-is-inngest", "/docs"],
   ["/docs/reference/functions/retries", "/docs/functions/retries"],
   ["/docs/creating-an-event-key", "/docs/events/creating-an-event-key"],
-  [
-    "/docs/event-format-and-structure",
-    "/docs/events/event-format-and-structure",
-  ],
+  ["/docs/event-format-and-structure", "/docs/reference/events/send"],
+  ["/docs/events/event-format-and-structure", "/docs/reference/events/send"],
   ["/docs/writing-and-running-fuctions", "/docs/functions"], //typo
   ["/docs/cli/steps/", "/docs/functions/multi-step"],
   ["/docs/events/sources/sdks", "/docs/events"],
@@ -23,6 +21,7 @@ const legacyDocsUrls = [
   ["/docs/frameworks/express", "/docs/sdk/serve#framework-express"],
   ["/docs/frameworks/nextjs", "/docs/sdk/serve#framework-next-js"],
   ["/docs/frameworks/redwoodjs", "/docs/sdk/serve#framework-redwood"],
+  ["/docs/sdk/reference/serve", "/docs/reference/serve"],
 ];
 
 async function redirects() {

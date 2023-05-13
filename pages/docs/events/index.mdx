@@ -1,6 +1,6 @@
 # Events
 
-Firstly, make sure you have the [`inngest`](https://www.npmjs.com/package/inngest) package installed via NPM or yarn:
+To start, make sure you have the [`inngest`](https://www.npmjs.com/package/inngest) package installed via NPM or yarn:
 
 ```bash
 npm install inngest  # or yarn add inngest
@@ -18,7 +18,7 @@ const inngest = new Inngest({ name: "Your app name" });
 const inngest = new Inngest({ name: "Your app name", eventKey: "xyz..." });
 ```
 
-Then, sending an event is simple, just call the the `send()` method with your event payload ([Read about the payload format](/docs/events/event-format-and-structure)):
+Then, sending an event is simple, just call the the `send()` method with your event payload ([Read about the payload format](/docs/reference/events/send)):
 
 ```typescript
 // This sends an event to Inngest.
@@ -108,6 +108,6 @@ For example, for two events like `storefront/item.imported` and `storefront/item
 
 </Callout>
 
-## Advanced usage
+## Reference
 
-There's more you can do with events, such as [user identification](/docs/events/event-format-and-structure#optional-fields), event versioning, and filtering for each key.
+For a full reference of how you can send events, including event versioning, read [the reference](/docs/reference/events/send).

@@ -145,26 +145,35 @@ function CodePanel({ tag, label, code, children }: CodePanelProps) {
 
 type CodeGroupHeaderProps = {
   title?: string;
+  filename?: string;
+  hasTabs?: boolean;
   children: React.ReactNode;
   selectedIndex?: number;
 };
 
 function CodeGroupHeader({
   title,
+  filename,
   children,
+  hasTabs,
   selectedIndex,
 }: CodeGroupHeaderProps) {
-  let hasTabs = Children.count(children) > 1;
+  const heading = title || filename;
 
-  if (!title && !hasTabs) {
+  if (!heading && !hasTabs) {
     return null;
   }
 
   return (
-    <div className="gap-x-4bg-slate-800 flex min-h-[calc(theme(spacing.12)+1px)] flex-wrap items-start px-4 dark:bg-transparent">
-      {title && (
-        <h3 className="mr-auto pt-3 text-xs font-semibold text-white">
-          {title}
+    <div className="px-6 gap-x-4 bg-slate-800 flex min-h-[calc(theme(spacing.10)+1px)] flex-wrap items-center dark:bg-transparent">
+      {heading && (
+        <h3
+          className={clsx(
+            "mr-auto text-xs font-semibold text-white",
+            !!filename && "font-mono"
+          )}
+        >
+          {filename ? <code>{heading}</code> : heading}
         </h3>
       )}
       {hasTabs && (
@@ -187,9 +196,7 @@ function CodeGroupHeader({
   );
 }
 
-function CodeGroupPanels({ children, ...props }) {
-  let hasTabs = Children.count(children) > 1;
-
+function CodeGroupPanels({ hasTabs, children, ...props }) {
   if (hasTabs) {
     return (
       <Tab.Panels>
@@ -278,15 +285,23 @@ const CodeGroupContext = createContext(false);
 
 type CodeGroupProps = {
   title?: string;
+  filename?: string;
+  forceTabs?: boolean;
   children: React.ReactNode;
 };
 
-export function CodeGroup({ children, title, ...props }: CodeGroupProps) {
+export function CodeGroup({
+  children,
+  title,
+  filename,
+  forceTabs,
+  ...props
+}: CodeGroupProps) {
   let languages = Children.map<string, any>(children, (child) =>
     getPanelTitle(child.props)
   );
   let tabGroupProps = useTabGroupProps(languages);
-  let hasTabs = Children.count(children) > 1;
+  let hasTabs = forceTabs || Children.count(children) > 1;
   let Container: typeof Tab["Group"] | "div" = hasTabs ? Tab.Group : "div";
   let containerProps = hasTabs ? tabGroupProps : {};
   let headerProps = hasTabs
@@ -299,10 +314,17 @@ export function CodeGroup({ children, title, ...props }: CodeGroupProps) {
         {...containerProps}
         className="not-prose my-6 overflow-hidden rounded-lg bg-slate-900 shadow-md"
       >
-        <CodeGroupHeader title={title} {...headerProps}>
+        <CodeGroupHeader
+          title={title}
+          filename={filename}
+          hasTabs={hasTabs}
+          {...headerProps}
+        >
           {children}
         </CodeGroupHeader>
-        <CodeGroupPanels {...props}>{children}</CodeGroupPanels>
+        <CodeGroupPanels hasTabs={hasTabs} {...props}>
+          {children}
+        </CodeGroupPanels>
       </Container>
     </CodeGroupContext.Provider>
   );

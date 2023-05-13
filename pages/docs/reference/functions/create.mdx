@@ -1,0 +1,106 @@
+# Create Function
+
+Define your functions using the `createFunction` method on the [Inngest client](/docs/reference/client/create).
+
+```ts
+import { inngest } from "./client";
+
+export default inngest.createFunction(
+  { name: "Import product images" },
+  { event: "shop/product.imported" },
+  async ({ event, step, runId }) => {
+    // Your function code
+  }
+);
+```
+
+---
+
+## `inngest.createFunction(configuration, trigger, handler): InngestFunction`
+
+The `createFunction` method accepts a series of arguments to define your function.
+
+### Configuration
+
+<Properties>
+  <Property name="name" type="string" required>
+    A unique name for your function. This will be used to create a unique slug identifier.
+  </Property>
+  <Property name="concurrency" type="number">
+    Limit the number of concurrently running functions ([reference](/docs/functions/concurrency))
+  </Property>
+  <Property name="retries" type="number">
+    Configure the number of times the function will be retried from `0` to `20`. Default: `3`
+  </Property>
+  <Property name="onFailure" type="function">
+    A function that will be called only when this Inngest function permanently fails after all retries have been attempted.
+    {/* TODO - Link to improved error handling docs */}
+  </Property>
+  <Property name="cancelOn" type="object">
+    Define an event that can be used to cancel a running or sleeping function ([reference](/docs/functions/cancellation))
+    <Properties nested={true}>
+      <Property name="event" type="string" required>
+        The event name which will be used to cancel
+      </Property>
+      <Property name="match" type="string">
+        The property to match the event trigger and the cancelling event, using dot-notation, e.g. `data.userId`
+      </Property>
+      <Property name="timeout" type="string">
+        The amount of time to wait to receive the cancelling event. A time string compatible with the [ms](https://npm.im/ms) package, e.g. `"30m"`, `"3 hours"`, or `"2.5d"`
+      </Property>
+    </Properties>
+  </Property>
+</Properties>
+
+{/* TODO - Document fns arg */}
+
+### Trigger
+
+One of the following function triggers is **Required**.
+
+<Properties>
+  <Property name="event" type="string">
+    The name of the event that will trigger this event to run
+  </Property>
+  <Property name="cron" type="string">
+    A [unix-cron](https://crontab.guru/) compatible schedule string. <br/>Optional timezone prefix, e.g. `TZ=Europe/Paris 0 12 * * 5`.
+  </Property>
+</Properties>
+
+### Handler
+
+The handler is your code that runs whenever the trigger occurs. Every function handler receives a single object argument which can be deconstructed. The key arguments are `event` and `step`. Note, that scheduled functions that use a `cron` trigger will not receive an `event` argument.
+
+```ts
+function handler({ event, step, runId }) {/* ... */}
+```
+
+#### `event`
+
+The event payload `object` that triggered the given function run. The event payload object will match what you send with [`inngest.send()`](/docs/reference/events/send). Below is an example event payload object:
+
+```ts
+{
+  name: "app/account.created",
+  data: {
+    userId: "1234567890"
+  },
+  v: "2023-05-12.1",
+  ts: 1683898268584
+}
+```
+
+### `step`
+
+The `step` object has methods that enable you to define
+
+- [`step.run()`](/docs/reference/functions/step-run) - Run synchronous or asynchronous code as a retryable step in your function
+- [`step.sleep()`](/docs/reference/functions/step-sleep) - Sleep for a given amount of time
+- [`step.sleepUntil()`](/docs/reference/functions/step-sleep-until) - Sleep until a given time
+- [`step.waitForEvent()`](/docs/reference/functions/step-wait-for-event) - Pause a function's execution until another event is received
+- [`step.sendEvent()`](/docs/reference/functions/step-send-event) - Send event(s) reliability within your function. Use this instead of `inngest.send()` to ensure reliable event delivery from within functions.
+
+### `runId`
+
+The unique ID for the given function run. This can be useful for logging and looking up specific function runs in the Inngest dashboard.
+

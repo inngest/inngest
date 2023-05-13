@@ -1,0 +1,51 @@
+# Sleep until a time `step.sleepUntil()`
+
+Use `step.sleepUntil()` to pause the execution of your function until a specific date time.
+
+```ts
+export default inngest.createFunction(
+  { name: "Send scheduled reminder" },
+  { event: "app/reminder.scheduled" },
+  async ({ event, step }) => {
+    const d = new Date(event.data.remind_at)
+    await step.sleepUntil(d);
+    // Do something else
+  }
+);
+```
+
+To sleep until a particular amount of time from now, use [`step.sleep()`](/docs/reference/functions/step-sleep) instead.
+
+---
+
+## `step.sleep(datetime): Promise`
+
+<Row>
+  <Col>
+    <Properties>
+      <Property name="datetime" type="Date | string" required>
+        The datetime at which to continue execution of your function. This can be:
+
+        * A [`Date`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object
+        * Any date time string in [the format accepted by the `Date` object](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date#date_time_string_format), i.e. `YYYY-MM-DDTHH:mm:ss.sssZ` or simplified forms like `YYYY-MM-DD` or `YYYY-MM-DDHH:mm:ss`
+      </Property>
+    </Properties>
+  </Col>
+  <Col>
+  ```ts
+  // Sleep until the new year
+  await step.sleepUntil("2024-01-01");
+
+  // Sleep until September ends
+  await step.sleepUntil("2023-09-30T11:59:59");
+
+  // Sleep until the end of the this week
+  const d = dayjs().endOf('week').toDate();
+  await step.sleepUntil(d)
+  ```
+  </Col>
+</Row>
+
+<Callout>
+  `step.sleepUntil()` must be called using `await` or some other Promise handler to ensure your function sleeps correctly.
+</Callout>
