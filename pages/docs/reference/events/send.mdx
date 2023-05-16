@@ -41,7 +41,12 @@ To send events from within of the context of a function, use [`step.sendEvent()`
             Any data to associate with the event. Will be serialized as JSON.
           </Property>
           <Property name="user" type="object">
-            Any relevant user identifying data or attributes associated with the event. This data is encrypted at rest.
+            Any relevant user identifying data or attributes associated with the event. **This data is encrypted at rest.**
+            <Properties nested>
+              <Property name="external_id" type="string">
+                An external identifier for the user. Most commonly, their user id in your system.
+              </Property>
+            </Properties>
           </Property>
           <Property name="id" type="string">
             A unique id used to idempotently ingest a given event payload once (i.e. deduplication).
@@ -79,9 +84,11 @@ To send events from within of the context of a function, use [`step.sendEvent()`
   </Col>
 </Row>
 
-<Callout>
-  🔐 **Security** - All data sent in the `user` object is fully encrypted at rest. Each unique user gets their own encryption key and when you delete the user from our system, which helps comply with GDPR and CCPA.
-</Callout>
+## User data encryption 🔐
+
+All data sent in the `user` object is fully encrypted at rest. Each unique user gets their own encryption key and when you delete the user from our system, which helps comply with GDPR and CCPA.
+
+An API is planned to allow you to do this programmatically which will use the `user.external_id` (see above) to perform the delete operation.
 
 
 ## Send Events via HTTP API
