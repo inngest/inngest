@@ -13,8 +13,10 @@ Inngest allows you to build functions which coordinate between events using a fe
 ```typescript
 import { inngest } from "./client";
 
-// This is the data received whenever the `cart/product.added` event is received.
-type Added = {
+/*
+This is the data received whenever the `cart/product.added` event is received:
+
+type CartProductAdded = {
   name: "cart/product.added"
   data: {
     cart_id: string;
@@ -25,9 +27,20 @@ type Added = {
     email: string;
   };
 };
+*/
 
-export default inngest.createFunction<Added>(
-  { name: "Product added to cart" },
+export default inngest.createFunction(
+  {
+    name: "Product added to cart",
+    // Automatically cancel this instance of the function whenever a user adds another
+    // product to their cart.  Another instance of this function will run and schedule
+    // another wait from 24 hours after the new product was added to their cart.
+    cancelOn: {
+      event: "cart/product.added",
+      timeout: "24h",
+      match: "data.cart_id",
+    },
+  },
   { event: "cart/product.added" },
   ({ event, step }) => {
     // This function runs as soon as a product is added to the cart.
@@ -50,19 +63,7 @@ export default inngest.createFunction<Added>(
       sendCartReminderEmail({ email: event.user.email, cart: event.data.cart_id });
     });
 
-    // We could wait another 6 days to send a reminder after a week of adding to the
-    // cart also.
-  },
-  {
-    // Automatically cancel this instance of the function whenever a user adds another
-    // product to their cart.  Another instance of this function will run and schedule
-    // another wait from 24 hours after the new product was added to their cart.
-    cancellation: {
-      event: "cart/product.added",
-      timeout: "24h",
-      match: "data.cart_id",
-    }
-  }
+    // Idea: We could also wait another 6 days to send a 1 week cart reminder
 });
 ```
 
@@ -80,7 +81,7 @@ This has the following benefits:
 
 **Cancellations: running the function once**
 
-We only want to run this function once for each cart_id.  A user might add 3 products, but they should only receive a single reminder email.  In this case, we set a `cancellation` option when defining the function which cancels any running or paused functions.  Any time another product is added to the same cart ID, older runs of this function are cancelled.  For example:
+We only want to run this function once for each `cart_id`.  A user might add 3 products, but they should only receive a single reminder email.  In this case, we set a `cancelOn` option when defining the function which cancels any running or paused functions.  Any time another product is added to the same cart ID, older runs of this function are cancelled.  For example:
 
 - A user adds a product to the cart.  This function runs with an ID of #1
 - A user adds another product.  Function #1 is cancelled automatically, and another copy of this function runs with an ID of #2
@@ -96,11 +97,10 @@ It's possible to handle these flows within standard applications by:
 
 These are both possible within Inngest and using traditional queueing systems, although these approaches typically have more code and distributed state to maintain, increasing the chances of bugs and breaking changes.
 
-{/*
-Additional resources
 
-- TODO: Link to SDK `step.waitForEvent` docs
-- TODO: Link to SDK `step.run` docs
-- TODO: Link to SDK `step.sleep` docs for alternative approaches
-- TODO: Link to auto-cancellation
-*/}
+## Additional resources
+
+- [Reference: `step.waitForEvent()`](/docs/reference/functions/step-wait-for-event)
+- [Reference: `step.run()`](/docs/reference/functions/step-run)
+- [Reference: `step.sleep()`](/docs/reference/functions/step-sleep)
+- [Reference: `cancelOn`](/docs/functions/cancellation)
