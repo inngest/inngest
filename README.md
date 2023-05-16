@@ -1,9 +1,9 @@
 # Inngest
 
-![Latest release](https://img.shields.io/github/v/release/inngest/inngest?include_prereleases&sort=semver)
-![Test Status](https://img.shields.io/github/actions/workflow/status/inngest/inngest/go.yaml?branch=main&label=tests)
-![Discord](https://img.shields.io/discord/842170679536517141?label=discord)
-![Twitter Follow](https://img.shields.io/twitter/follow/inngest?style=social)
+[![Latest release](https://img.shields.io/github/v/release/inngest/inngest?include_prereleases&sort=semver)](https://github.com/inngest/inngest/releases)
+[![Test Status](https://img.shields.io/github/actions/workflow/status/inngest/inngest/go.yaml?branch=main&label=tests)](https://github.com/inngest/inngest/actions?query=branch%3Amain)
+[![Discord](https://img.shields.io/discord/842170679536517141?label=discord)](https://www.inngest.com/discord)
+[![Twitter Follow](https://img.shields.io/twitter/follow/inngest?style=social)](https://twitter.com/inngest)
 
 Run reliable serverless functions in the background. Inngest allows you to schedule, enqueue, and run serverless functions in the background reliably with retries on any platform, with zero infrastructure, fully locally testable. Learn more: https://www.inngest.com.
 
