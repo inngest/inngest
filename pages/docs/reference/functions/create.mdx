@@ -24,7 +24,10 @@ The `createFunction` method accepts a series of arguments to define your functio
 
 <Properties>
   <Property name="name" type="string" required>
-    A unique name for your function. This will be used to create a unique slug identifier.
+    A unique name for your function. This will be used to create a unique slug `id` by default.
+  </Property>
+  <Property name="id" type="string">
+    A unique identifier for your function to override the default (a slug of your function name).
   </Property>
   <Property name="concurrency" type="number">
     Limit the number of concurrently running functions ([reference](/docs/functions/concurrency))

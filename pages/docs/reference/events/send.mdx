@@ -12,7 +12,7 @@ await inngest.send({
     billingPlan: "pro",
   },
   user: {
-    userId: "645ea000129f1c40109ca7ad",
+    external_id: "645ea000129f1c40109ca7ad",
     email: "taylor@example.com",
   }
 })
@@ -65,11 +65,11 @@ To send events from within of the context of a function, use [`step.sendEvent()`
   ```ts
   // Send a single event
   await inngest.send({
-    name: "app/user.activated",
-    data: { userId: "01H08SEAXBJFJNGTTZ5TAWB0BD" }
+    name: "app/post.created",
+    data: { postId: "01H08SEAXBJFJNGTTZ5TAWB0BD" }
   })
 
-  // Send an o array of events
+  // Send an array of events
   await inngest.send([
     {
       name: "app/invoice.created",
@@ -80,6 +80,27 @@ To send events from within of the context of a function, use [`step.sendEvent()`
       data: { invoiceId: "645e9e08f29fb563c972b1f7" }
     },
   ])
+
+  // Send user data that will be encrypted at rest
+  await inngest.send({
+    name: "app/account.created",
+    data: { billingPlan: "pro" },
+    user: {
+      external_id: "6463da8211cdbbcb191dd7da",
+      email: "test@example.com"
+    }
+  })
+
+  // Specify the idempotency id, version, and timestamp
+  await inngest.send({
+    // Use an id specific to the event type & payload
+    id: "cart-checkout-completed-ed12c8bde",
+    name: "storefront/cart.checkout.completed",
+    data: { cartId: "ed12c8bde" },
+    user: { external_id: "6463da8211cdbbcb191dd7da" },
+    ts: 1684274328198,
+    v: "2024-05-15.1"
+  });
   ```
   </Col>
 </Row>
