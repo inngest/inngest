@@ -4,16 +4,18 @@ import NavLink from "./NavLink";
 
 export default function HeaderDropdown({ navLinks }) {
   return (
-    <div className="overflow-hidden px-2 md:px-5 md:overflow-auto md:bg-slate-950 md:rounded-lg md:absolute top-[70px] -left-4 md:hidden group-hover:md:block">
+    <div className="px-2 md:px-5 pb-4 md:overflow-auto md:bg-slate-950 md:rounded-lg md:absolute top-[70px] -left-4 md:hidden group-hover:md:block shadow-2xl">
       <div className="flex flex-col md:w-[520px]">
-        <div className="flex w-full flex-col">
-          <h3 className="text-base md:text-2xs md:uppercase text-slate-200 font-semibold mb-1 px-5 pt-3">
-            {navLinks.featuredTitle}
-          </h3>
-          {navLinks.featured.map((link) => (
-            <FeaturedLink key={link.title} link={link} />
-          ))}
-        </div>
+        {!!navLinks.featured.length && (
+          <div className="flex w-full flex-col">
+            <h3 className="text-base md:text-2xs md:uppercase text-slate-200 font-semibold mb-1 px-5 pt-3">
+              {navLinks.featuredTitle}
+            </h3>
+            {navLinks.featured.map((link) => (
+              <FeaturedLink key={link.title} link={link} />
+            ))}
+          </div>
+        )}
         <div className="flex flex-col w-full">
           <h3 className="text-2xs uppercase text-slate-400 md:text-slate-200 font-semibold mb-2 mt-3 px-5">
             {navLinks.linksTitle}

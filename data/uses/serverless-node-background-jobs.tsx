@@ -28,15 +28,17 @@ export const data: UseCase = {
   ],
   codeSection: {
     title: "Define background jobs in just a few lines of code",
-    steps: [
-      "Create your function",
-      "Declare the event that triggers your function",
-      "Define your function steps",
-      "Trigger your function with an event",
-    ],
-    description:
-      "Sending events to Inngest automatically triggers background jobs which subscribe to that event.",
-    code: `import { inngest } from "./client";
+    examples: [
+      {
+        steps: [
+          "Create your function",
+          "Declare the event that triggers your function",
+          "Define your function steps",
+          "Trigger your function with an event",
+        ],
+        description:
+          "Sending events to Inngest automatically triggers background jobs which subscribe to that event.",
+        code: `import { inngest } from "./client";
 
 // Instead of sending a welcome email or adding a user to your CRM
 // within your signup API endpoint, you can offload to the background:
@@ -65,6 +67,8 @@ await inngest.send({
     email: "user@example.com",
   }
 })`,
+      },
+    ],
   },
   featureOverflow: [
     {

@@ -25,14 +25,16 @@ export const data: UseCase = {
   ],
   codeSection: {
     title: "Queue work in just a few lines of code",
-    steps: [
-      "Define your event payload type",
-      "Send events with type",
-      "Define your functions with that event trigger",
-    ],
-    description:
-      "Functions trigger as events are received. Inngest calls all matching functions via HTTP.",
-    code: `// Define your event payload with our standard name & data fields
+    examples: [
+      {
+        steps: [
+          "Define your event payload type",
+          "Send events with type",
+          "Define your functions with that event trigger",
+        ],
+        description:
+          "Functions trigger as events are received. Inngest calls all matching functions via HTTP.",
+        code: `// Define your event payload with our standard name & data fields
 type Events = {
   "user.signup" : {
     name: "user.signup",
@@ -56,6 +58,8 @@ inngest.createFunction(
     // Handle your event
   }
 );`,
+      },
+    ],
   },
   featureOverflow: [
     {

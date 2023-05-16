@@ -16,49 +16,60 @@ import {
 const productLinks = {
   featuredTitle: "Product",
   featured: [
-    {
-      title: "TypeScript & JavaScript SDK",
-      desc: "Event-driven and and scheduled serverless functions",
-      url: "/features/sdk?ref=nav",
-      icon: IconSDK,
-      iconBg: "bg-indigo-500",
-    },
-    {
-      title: "Step Functions",
-      desc: "Build complex conditional workflows",
-      url: "/features/step-functions?ref=nav",
-      icon: IconSteps,
-      iconBg: "bg-violet-500",
-    },
+    // {
+    //   title: "TypeScript & JavaScript SDK",
+    //   desc: "Event-driven and and scheduled serverless functions",
+    //   url: "/features/sdk?ref=nav",
+    //   icon: IconSDK,
+    //   iconBg: "bg-indigo-500",
+    // },
+    // {
+    //   title: "Step Functions",
+    //   desc: "Build complex conditional workflows",
+    //   url: "/features/step-functions?ref=nav",
+    //   icon: IconSteps,
+    //   iconBg: "bg-violet-500",
+    // },
   ],
   linksTitle: "Use Cases",
   linksTheme: "indigo",
   links: [
     {
-      title: "Serverless queues",
+      title: "Serverless Queues",
       url: "/uses/serverless-queues?ref=nav",
-      icon: IconJourney,
+      icon: IconSteps,
+    },
+    // {
+    //   title: "Durable Functions",
+    //   url: "/uses/durable-functions?ref=nav",
+    //   icon: IconScheduled,
+    // },
+    {
+      title: "Background Jobs",
+      url: "/uses/serverless-node-background-jobs?ref=nav",
+      icon: IconBackgroundTasks,
+    },
+    {
+      title: "AI + LLMs",
+      url: "/uses/zero-infra-llm-ai?ref=nav",
+      icon: IconSDK,
     },
     {
       title: "Scheduled & cron jobs",
       url: "/uses/serverless-cron-jobs?ref=nav",
       icon: IconScheduled,
     },
-    {
-      title: "Background tasks",
-      url: "/uses/serverless-node-background-jobs?ref=nav",
-      icon: IconBackgroundTasks,
-    },
-    {
-      title: "Internal tools",
-      url: "/uses/internal-tools?ref=nav",
-      icon: IconTools,
-    },
-    {
-      title: "User journey automation",
-      url: "/uses/user-journey-automation?ref=nav",
-      icon: IconJourney,
-    },
+    // {
+    //   title: "Complex Workflows",
+    //   url: "/uses/complex-workflows?ref=nav",
+    //   icon: IconJourney,
+    // },
+    //
+    // {
+    //   title: "User journey automation",
+    //   url: "/uses/user-journey-automation?ref=nav",
+    //   icon: IconJourney,
+    // },
   ],
 };
 

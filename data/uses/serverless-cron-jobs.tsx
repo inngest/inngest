@@ -23,13 +23,11 @@ export const data: UseCase = {
   ],
   codeSection: {
     title: "Schedule work in a few lines of code",
-    steps: [
-      "Define a function using a cron schedule",
-      "Or define a function triggered by an event and use step.sleepUntil to delay work until a given timestamp",
-    ],
-    description:
-      "Use both depending on if your schedule work is periodic or dynamic.",
-    code: `import { inngest } from "./client";
+    examples: [
+      {
+        steps: ["Define a function using a cron schedule"],
+        description: "Use when your code needs to run periodically.",
+        code: `import { inngest } from "./client";
 
 // Define a function to run on a cron-schedule:
 inngest.createFunction(
@@ -38,9 +36,17 @@ inngest.createFunction(
   async () => {
     // This function will run every Monday at 9am New York time
   },
-);
+);`,
+      },
+      {
+        steps: [
+          "Run at a specific timestamp defined in an event",
+        ],
+        description:
+          "Use when you needs to schedule something dynamically, like a reminder time set by a user.",
+        code: `import { inngest } from "./client";
 
-// Or define a function which sleeps until a given timestamp:
+// Define a function which sleeps until a given timestamp:
 inngest.createFunction(
   { name: "Post Slack reminder" },
   { event: "slack.reminder.scheduled" },
@@ -50,8 +56,9 @@ inngest.createFunction(
       // This will run after the given reminder timestamp
     })
   },
-);
-`,
+);`,
+      },
+    ],
   },
   featureOverflow: [
     {

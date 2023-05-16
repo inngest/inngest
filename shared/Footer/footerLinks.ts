@@ -14,16 +14,16 @@ const footerLinks = [
   {
     name: "Product",
     links: [
-      {
-        label: "Function SDK",
-        url: "/features/sdk?ref=footer",
-        icon: IconSDK,
-      },
-      {
-        label: "Step Functions",
-        url: "/features/step-functions?ref=footer",
-        icon: IconSteps,
-      },
+      // {
+      //   label: "Function SDK",
+      //   url: "/features/sdk?ref=footer",
+      //   icon: IconSDK,
+      // },
+      // {
+      //   label: "Step Functions",
+      //   url: "/features/step-functions?ref=footer",
+      //   icon: IconSteps,
+      // },
       {
         label: "Documentation",
         url: "/docs?ref=footer",
@@ -34,11 +34,11 @@ const footerLinks = [
         url: "/patterns?ref=footer",
         icon: IconPatterns,
       },
-      {
-        label: "Self Hosting",
-        url: "/docs/self-hosting?ref=footer",
-        icon: IconDeploying,
-      },
+      // {
+      //   label: "Self Hosting",
+      //   url: "/docs/self-hosting?ref=footer",
+      //   icon: IconDeploying,
+      // },
     ],
   },
   {
@@ -55,15 +55,16 @@ const footerLinks = [
         icon: IconScheduled,
       },
       {
+        label: "AI + LLMs",
+        url: "/uses/zero-infra-llm-ai?ref=footer",
+        icon: IconSDK,
+      },
+      {
         label: "Node.js background jobs",
         url: "/uses/serverless-node-background-jobs?ref=footer",
         icon: IconBackgroundTasks,
       },
-      {
-        label: "Internal tools",
-        url: "/uses/internal-tools?ref=footer",
-        icon: IconTools,
-      },
+
       {
         label: "User Journey Automation",
         url: "/uses/user-journey-automation?ref=footer",
