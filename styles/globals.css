@@ -705,6 +705,26 @@ ul.check li {
   opacity: .5;
 }
 
+/** Blog code shift **/
+.blog-content pre.shiki {
+  margin-right: 0;
+}
+@media (max-width: 1024px) {
+  .blog-content pre.shiki {
+    /**
+     * Tailwind applies annoying uncentered right padding on
+     * smaller screens
+     */
+    max-width: 100% !important;
+  }
+}
+@media (min-width: 1024px) {
+  .blog-content pre.shiki {
+    width: calc(100% + 100px);
+    margin-left: -50px;
+  }
+}
+
 
 /** SDK Code snippet */
 .transform-iso,
