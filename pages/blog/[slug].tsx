@@ -20,6 +20,7 @@ import CTACallout from "src/shared/CTACallout";
 const components = {
   DiscordCTA,
   Button,
+  CTACallout,
 };
 
 type Props = {
