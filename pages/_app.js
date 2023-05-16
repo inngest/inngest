@@ -71,8 +71,9 @@ function MyApp({ Component, pageProps }) {
     pageProps?.meta?.title ||
     "Reliable serverless background functions on any platform";
   const metaTitle = `Inngest - ${title}`;
-  const disableMetadata =
-    pageProps?.meta?.disabled === true || router.asPath.match(/^\/docs/);
+  const disableMetadata = Boolean(
+    pageProps?.meta?.disabled === true || router.asPath.match(/^\/docs/)
+  );
   // Warn during local dev
   if (
     !disableMetadata &&
@@ -110,16 +111,13 @@ function MyApp({ Component, pageProps }) {
           <>
             <title>{metaTitle}</title>
             {pageProps?.meta?.description && (
-              <>
-                <meta
-                  name="description"
-                  content={pageProps.meta.description}
-                ></meta>
-                <meta
-                  property="og:description"
-                  content={pageProps.meta.description}
-                />
-              </>
+              <meta name="description" content={pageProps.meta.description} />
+            )}
+            {pageProps?.meta?.description && (
+              <meta
+                property="og:description"
+                content={pageProps.meta.description}
+              />
             )}
             <meta property="og:image" content={ogImage} />
             <meta property="og:title" content={metaTitle} />

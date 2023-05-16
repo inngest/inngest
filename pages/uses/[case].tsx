@@ -79,11 +79,17 @@ export type UseCase = {
 };
 
 export const getStaticProps: GetStaticProps = async (ctx) => {
-  const { data } = require(`../../data/uses/${ctx.params.case}.tsx`);
+  const {
+    data,
+  }: { data: UseCase } = require(`../../data/uses/${ctx.params.case}.tsx`);
   const stringData = JSON.stringify({ ...data, slug: ctx.params.case });
   return {
     props: {
       stringData,
+      meta: {
+        title: data.title,
+        description: data.lede,
+      },
       designVersion: "2",
     },
   };
