@@ -8,20 +8,29 @@ import { getOpenGraphImageURL } from "../utils/social";
 import { useAnonId } from "../shared/legacy/trackingHooks";
 import "../styles/globals.css";
 import * as fullstory from "@fullstory/browser";
+import { GitBranch } from "react-feather";
 
 import { Layout as DocsLayout } from "../shared/Docs/Layout";
 
 import PageBanner from "../shared/legacy/PageBanner";
 
-const DISABLE_BANNER = true;
+const DISABLE_BANNER = false;
 
 function DefaultLayout({ children }) {
   const router = useRouter();
   return (
     <>
       {!DISABLE_BANNER && router.pathname !== "/sign-up" && (
-        <PageBanner href="/ai-personalized-documentation?ref=page-banner">
-          ✨ Try Our AI-Personalized Documentation for Inngest
+        <PageBanner href="/blog/branch-environments?ref=page-banner">
+          <GitBranch
+            size="1em"
+            className="inline -mt-0.5 mr-1.5 text-fuchsia-100"
+          />
+          <span className="sm:hidden">Announcing Branch Environments</span>
+          <span className="hidden sm:inline">
+            Announcing Branch Environments - A test environment for every
+            feature branch
+          </span>
         </PageBanner>
       )}
       <div className="bg-slate-1000 gradient h-screen w-full absolute top-0 right-0 -z-10 "></div>
