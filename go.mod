@@ -8,7 +8,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.4
 	github.com/VividCortex/ewma v1.2.0
 	github.com/alecthomas/chroma v0.10.0
-	github.com/alicebob/miniredis/v2 v2.21.0
+	github.com/alicebob/miniredis/v2 v2.30.3-0.20230429171801-33a1bb4d32a1
 	github.com/aws/aws-sdk-go v1.43.31
 	github.com/cespare/xxhash/v2 v2.1.2
 	github.com/charmbracelet/bubbles v0.10.3
@@ -187,7 +187,7 @@ require (
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	github.com/yuin/goldmark v1.4.13 // indirect
 	github.com/yuin/goldmark-emoji v1.0.1 // indirect
-	github.com/yuin/gopher-lua v0.0.0-20210529063254-f4c35e4016d9 // indirect
+	github.com/yuin/gopher-lua v1.1.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zclconf/go-cty v1.8.3 // indirect
 	go.opencensus.io v0.23.0 // indirect
