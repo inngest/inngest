@@ -5,7 +5,6 @@ image: /assets/blog/branch-environments/featured-image.png
 date: 2023-05-17
 author: Dan Farrelly
 disableCTA: true
-hide: true
 ---
 
 The modern developer workflow is centered around branching. Git is used to create branches, CI platforms run automated tests on each branch, and platforms like Vercel and Netlify have brought CD to branches with their deploy preview features. However, while deploy previews can help with front-end development, it can result in an awkward workflow when testing changes end-to-end using shared backing APIs, databases, caches, queues, and more.
@@ -24,7 +23,7 @@ With the platforms mentioned above, you can now set this up for your Webapp, API
 
 The Inngest platform enables you to run reliable code in the background without having to configure queues. Inngest will now create an environment for every branch that you deploy, allowing you to test your entire application in a fully isolated sandbox.
 
-![Full-stack environments for your branch workflow](/assets/blog/branch-environments/full-stack-envs.png)
+![Inngest environments for your branch workflow](/assets/blog/branch-environments/branch-environments-sdlc.svg)
 
 ## How It Works
 
@@ -32,7 +31,7 @@ With Inngest, you send events via our SDK, and Inngest invokes your functions re
 
 Our Vercel integration now creates a new Inngest *Branch Environment* whenever Vercel creates a deployment for a given Git branch. The Vercel integration sends your branch name and deployment preview's URL to Inngest, which is used to create the new environment and correctly route events and invoke functions in that environment.
 
-![Inngest Branch Environments aligning with Vercel Preview Environments](/assets/blog/inngest-announcement-april-2023/vercel-branch-envs.png)
+![Inngest Branch Environments aligning with Vercel Preview Environments](/assets/blog/inngest-announcement-april-2023/vercel-branch-envs.svg)
 
 ### How You Can Use It Today
 
