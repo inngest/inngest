@@ -93,7 +93,7 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 		rc,
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(100),
-		redis_state.WithPollTick(500*time.Millisecond),
+		redis_state.WithPollTick(250*time.Millisecond),
 		redis_state.WithQueueKeyGenerator(&redis_state.DefaultQueueKeyGenerator{
 			Prefix: "{queue}",
 		}),
