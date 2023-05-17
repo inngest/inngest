@@ -33,7 +33,9 @@ func New() queue.Queue {
 	}()
 	return redis_state.NewQueue(
 		rc,
-		redis_state.WithPollTick(500*time.Millisecond),
+		// This is lower for testing.  The devserver command specifies its own
+		// tick poll.
+		redis_state.WithPollTick(50*time.Millisecond),
 		redis_state.WithNumWorkers(100),
 		redis_state.WithQueueKeyGenerator(redis_state.DefaultQueueKeyGenerator{
 			Prefix: "{root}",
