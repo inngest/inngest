@@ -33,6 +33,7 @@ func New() queue.Queue {
 	}()
 	return redis_state.NewQueue(
 		rc,
+		redis_state.WithPollTick(500*time.Millisecond),
 		redis_state.WithNumWorkers(100),
 		redis_state.WithQueueKeyGenerator(redis_state.DefaultQueueKeyGenerator{
 			Prefix: "{root}",

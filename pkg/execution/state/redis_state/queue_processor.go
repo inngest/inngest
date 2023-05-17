@@ -125,7 +125,9 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 
 	tick := time.NewTicker(q.pollTick)
 
-	q.logger.Debug().Msg("starting queue worker")
+	q.logger.Debug().
+		Str("poll", q.pollTick.String()).
+		Msg("starting queue worker")
 
 LOOP:
 	for {
