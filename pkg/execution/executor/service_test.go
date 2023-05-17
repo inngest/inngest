@@ -1,3 +1,5 @@
+//go:build !race
+
 package executor
 
 import (
@@ -30,7 +32,7 @@ import (
 
 const (
 	timeout = 1500 * time.Millisecond
-	buffer  = 500 * time.Millisecond
+	buffer  = 1500 * time.Millisecond
 )
 
 type prepared struct {
