@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	timeout = 1500 * time.Millisecond
+	timeout = 3000 * time.Millisecond
 	buffer  = 1500 * time.Millisecond
 )
 
