@@ -33,7 +33,7 @@ It can be helpful to visualize the typical Inngest developer workflow using Bran
 
 As Branch Environments are created on-demand, all of your Branch Environments share the same Event Keys and Signing Key. This enables you to use the same environment variables in each of your application's deployment preview environments and set the environment dynamically using the `env` option with the `Inngest` client:
 
-```tsx
+```ts
 const inngest = new Inngest({
     name: "My app",
     env: process.env.BRANCH,
@@ -56,7 +56,7 @@ You can always override this using `INNGEST_ENV` or by manually passing `env` to
 
 Some platforms only pass an environment variable at build time. This means you'll have to explicitly set `env` to the platform's specific environment variable. For example, here's how you would set it on Netlify:
 
-```tsx
+```ts
 const inngest = new Inngest({
     name: "My app",
     env: process.env.BRANCH,
@@ -67,6 +67,12 @@ const inngest = new Inngest({
 -   **Cloudflare Pages** - `CF_PAGES_BRANCH` ([docs](https://developers.cloudflare.com/pages/platform/build-configuration/#environment-variables))
 -   **Railway** - `RAILWAY_GIT_BRANCH` ([docs](https://docs.railway.app/develop/variables#railway-provided-variables))
 -   **Render** - `RENDER_GIT_BRANCH` ([docs](https://render.com/docs/environment-variables#all-services))
+
+### Sending Events to Branch Environments
+
+As all branch environments share Event Keys, all you need to do to send events to your branch environment is set the `env` option with the SDK. This will configure the SDK's `send()` method to automatically routes events to the correct environment.
+
+If you are sending events without an Inngest SDK, you'll need pass the `x-inngest-env` header along with your request. For more information about this and sending events from any environment with **the Event API**, [read the `send()` reference](/docs/reference/events/send#send-events-via-http-event-api).
 
 {/* ## Custom Environments */}
 {/* Section TBD - see above */}

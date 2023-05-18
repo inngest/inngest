@@ -112,9 +112,11 @@ All data sent in the `user` object is fully encrypted at rest. Each unique user 
 An API is planned to allow you to do this programmatically which will use the `user.external_id` (see above) to perform the delete operation.
 
 
-## Send Events via HTTP API
+## Send Events via HTTP (Event API)
 
 You can send events from any system or programming language with our simple API and an Inngest Event Key. The API accepts a single event payload or an array of event payloads.
+
+To send an event to a specific [branch environment](/docs/platform/environments#branch-environments), set the `x-inngest-env` header to the name of your branch environment, e.g. `x-inngest-env: feature/my-branch`.
 
 <CodeGroup tag="POST" label="inn.gs/e/:eventKey">
 
