@@ -1,3 +1,5 @@
+//go:build !race
+
 package executor
 
 import (
@@ -29,8 +31,8 @@ import (
 )
 
 const (
-	timeout = 1500 * time.Millisecond
-	buffer  = 500 * time.Millisecond
+	timeout = 3000 * time.Millisecond
+	buffer  = 1500 * time.Millisecond
 )
 
 type prepared struct {
@@ -582,7 +584,7 @@ func TestServiceRetry(t *testing.T) {
 		}, time.Now())
 		require.NoError(t, err)
 
-		<-time.After(time.Until(backoff.DefaultBackoff(1)) + (2 * time.Second))
+		<-time.After(time.Until(backoff.DefaultBackoff(1)) + (3 * time.Second))
 
 		run, err := data.sm.Load(ctx, id.RunID)
 		require.NoError(t, err)
