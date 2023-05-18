@@ -23,13 +23,13 @@ export type MDXFileMetadata = {
  */
 export async function loadMarkdownFilesMetadata<T>(
   dir: string
-): Promise<T & MDXFileMetadata[]> {
+): Promise<(T & MDXFileMetadata)[]> {
   const fs = require("node:fs");
   const path = require("node:path");
   const matter = require("gray-matter");
   const readingTime = require("reading-time");
 
-  const baseDir = path.join("./pages/", dir);
+  const baseDir = path.join(process.cwd(), "./pages/", dir);
 
   // Iterate all files in the directory, then parse the markdown.
   const mdxFilenames = fs.readdirSync(baseDir);
@@ -54,7 +54,11 @@ export async function loadMarkdownFilesMetadata<T>(
     // We need to stringify it since it wil be serialized at build-time.
     return data;
   });
-  return filesMetadata;
+
+  const sortedMetadata = filesMetadata.sort((a, b) => {
+    return a.date > b.date ? -1 : 1;
+  });
+  return sortedMetadata;
 }
 
 export type MDXContent<T> = {

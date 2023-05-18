@@ -2,6 +2,7 @@ import styled from "@emotion/styled";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import Image from "next/image";
+import { Rss } from "react-feather";
 
 import IconCalendar from "src/shared/Icons/Calendar";
 import ArrowRight from "src/shared/Icons/ArrowRight";
@@ -12,12 +13,16 @@ import ThemeToggleButton from "../shared/legacy/ThemeToggleButton";
 import Container from "../shared/layout/Container";
 import Tags from "../shared/Blog/Tags";
 import SectionHeader from "src/shared/SectionHeader";
+import {
+  loadMarkdownFilesMetadata,
+  type MDXFileMetadata,
+} from "../utils/markdown";
 
 export default function BlogLayout(props) {
   const router = useRouter();
   const { showHidden } = router.query;
 
-  const content = props.content.map(JSON.parse);
+  const content: BlogPost[] = props.content.map(JSON.parse);
   const visiblePosts = showHidden
     ? content
     : content
@@ -51,11 +56,17 @@ export default function BlogLayout(props) {
               Blog
             </h2>
             <p className="text-slate-200 text-sm">{description}</p>
+            <a
+              href="/api/rss.xml"
+              className="py-1 rounded-md transition-all text-slate-300 hover:text-white border border-transparent hover:border-slate-200/30"
+            >
+              <Rss className="h-4" />
+            </a>
           </div>
           <div className="pt-16">
             {focus && (
               <a
-                className="relative flex flex-col-reverse lg:flex-row xl:w-4/5 bg-indigo-600 rounded-lg mb-32 group   shadow-lg"
+                className="relative flex flex-col-reverse lg:flex-row xl:max-w-[1160px] bg-indigo-600 rounded-lg mb-32 group shadow-lg"
                 href={focus.redirect ?? `/blog/${focus.slug}`}
               >
                 <div className="absolute top-0 bottom-0 -left-[40px] -right-[40px] rounded-lg bg-indigo-500 opacity-20 rotate-1 -z-0 mx-5"></div>
@@ -79,9 +90,17 @@ export default function BlogLayout(props) {
                   </span>
                 </div>
                 {focus.image && (
-                  <div className="lg:w-3/5 flex rounded-t-lg lg:rounded-t-none lg:rounded-r-lg relative group-hover:scale-105 group-hover:rounded-lg transition-all">
+                  <div className="lg:w-3/5 flex rounded-t-lg lg:rounded-t-none lg:rounded-r-lg relative group-hover:scale-105 group-hover:rounded-lg overflow-hidden transition-all">
                     <Image
-                      className="rounded-t-lg lg:rounded-t-none lg:rounded-r-lg group-hover:rounded-lg"
+                      className="z-10 w-full m-auto rounded-t-lg lg:rounded-t-none lg:rounded-r-lg group-hover:rounded-lg"
+                      src={focus.image}
+                      alt={`Featured image for ${focus.heading} blog post`}
+                      width={900}
+                      height={900 / 2}
+                      quality={95}
+                    />
+                    <Image
+                      className="absolute h-[110%] w-[calc(100% + theme('spacing.4'))] max-w-none z-0 -top-2 -bottom-2 -left-2 -right-2 w-full m-auto blur-sm opacity-90 rounded-t-lg lg:rounded-t-none lg:rounded-r-lg"
                       src={focus.image}
                       alt={`Featured image for ${focus.heading} blog post`}
                       width={900}
@@ -134,34 +153,21 @@ export default function BlogLayout(props) {
   );
 }
 
+export type BlogPost = {
+  heading: string;
+  subtitle: string;
+  author?: string;
+  image: string;
+  date: string;
+  humanDate: string;
+  tags?: string[];
+  hide?: boolean;
+} & MDXFileMetadata;
+
 // This function also gets called at build time to generate specific content.
 export async function getStaticProps() {
-  // These are required here as this function is not included in frontend
-  // browser builds.
-  const fs = require("fs");
-
-  // Iterate all files in the blog posts directory, then parse the markdown.
-  const content = fs.readdirSync("./pages/blog/_posts/").map((fname) => {
-    const matter = require("gray-matter");
-    const readingTime = require("reading-time");
-
-    const source = fs.readFileSync("./pages/blog/_posts/" + fname);
-
-    const { data, content } = matter(source);
-    data.reading = readingTime(content);
-    data.humanDate = data.date.toLocaleDateString();
-    data.slug = fname.replace(/.mdx?/, "");
-
-    data.tags =
-      typeof data.tags === "string"
-        ? data.tags.split(",").map((t) => t.trim())
-        : data.tags;
-
-    // Disregard content, as the snippet for the blog list should be in
-    // the frontmatter.  Only reply with the frontmatter as a JSON string,
-    // as it has dates which cannot be serialized.
-    return JSON.stringify(data);
-  });
+  const posts = await loadMarkdownFilesMetadata<BlogPost>("blog/_posts");
+  const content = posts.map((p) => JSON.stringify(p));
 
   return {
     props: {
