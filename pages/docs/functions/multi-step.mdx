@@ -137,7 +137,7 @@ For this reason, placing business logic outside of a `step.run()` call is a bad 
 
 ### I want to run asynchronous code
 
-Easy! To run some asynchronous code, perform a call to `step.run()`, providing an `async` function, like so:
+`step.run()` accepts an `async` function, like so:
 
 ```ts
 await step.run("Do something", async () => {
@@ -145,9 +145,7 @@ await step.run("Do something", async () => {
 });
 ```
 
-Ideally, each call to `step.run()` is a single retryable action, so it's usually a good idea provide a synchronous function and return a promise.
-
-For example, the below code is problematic.
+Each call to `step.run()` is a single retryable step - a lightweight transaction.  Therefore, each step should have a single side effect.  For example, the below code is problematic:
 
 ```ts
 await step.run("Create alert", async () => {
