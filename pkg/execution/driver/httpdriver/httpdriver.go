@@ -127,7 +127,7 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 		return nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
 	}
 
-	input, err := driver.MarshalV1(ctx, s, step, idx)
+	input, err := driver.MarshalV1(ctx, s, step, idx, "local")
 	if err != nil {
 		return nil, err
 	}
