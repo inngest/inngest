@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.13.3] - 2023-05-19
+
+### Changed
+- Fixed local development concurrency when functions had no IDs specified
+
+## [v0.13.0] - 2023-05-03
+
+### Added
+- Moved to the same queue and state store as the cloud, implementing:
+  - Concurrency
+  - State management
+  - Partitioned queues
+- Also added improved support for history, functions local testing, etc
+
 ## [v0.7.0] - 2022-11-10
 
 ### Added
