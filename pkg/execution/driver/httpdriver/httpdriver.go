@@ -179,6 +179,8 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 				body = string(byt)
 			}
 		}
+	} else {
+		body = nil
 	}
 
 	// Add an error to driver.Response if the status code isn't 2XX.
