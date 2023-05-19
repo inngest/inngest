@@ -1,0 +1,26 @@
+# Providers' Usage Limits
+
+As your functions' code runs on the hosting provider of your choice, you will be subject to provider or billing plan
+limits separate from [Inngest's own limits](/docs/usage-limits/inngest).
+
+Here are the the known usage limits for each provider we support based on their documentation.
+
+|                                         | Payload size  | Concurrency         | Timeout                    |
+|-----------------------------------------|:--------------|---------------------|----------------------------|
+| [AWS Lambda][aws-quota]                 | 6MB - 20MB    | 1000                | 15m                        |
+| [Google Cloud Functions][gcp-quota]     | 512KB - 32MB  | 3000 (1st gen only) | 10m - 60m                  |
+| [Cloudflare Workers][cf-workers-limits] | 100MB - 500MB | 100 - 500           | [N/A][cf-workers-duration] |
+| [Vercel][vercel-limits]                 | 4MB - 4.5MB   | 1000                | 10s - 900s, N/A (Edge Fn)  |
+| [Netlify][netlify-limits]               | 256KB - 6MB   | ???                 | 10s - 15m                  |
+| [DigitalOcean][digitalocean-limits]     | 1MB           | 120                 | 15m                        |
+
+For more details tailored to your plan, please check each provider's website.
+
+
+[aws-quota]: https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html
+[gcp-quota]: https://cloud.google.com/functions/quotas
+[cf-workers-limits]: https://developers.cloudflare.com/workers/platform/limits/
+[cf-workers-duration]: https://developers.cloudflare.com/workers/platform/limits/#worker-limits
+[vercel-limits]: https://vercel.com/docs/concepts/limits/overview
+[netlify-limits]: https://docs.netlify.com/functions/overview/#default-deployment-options
+[digitalocean-limits]: https://docs.digitalocean.com/products/functions/details/limits/

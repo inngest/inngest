@@ -465,6 +465,7 @@ export default function Pricing() {
                   Sleeps and other pauses do not count towards your concurrency
                   limit as your function isn't running while waiting.
                 </p>
+                <p>See more details at <a href="/docs/usage-limits/inngest">Usage Limits</a> page.</p>
               </FAQRow>
               <FAQRow question={`Can I get a demo of the product?`}>
                 <p>
@@ -502,6 +503,7 @@ export default function Pricing() {
                   that, you can break it up into multiple steps (see: What is a
                   function step?).
                 </p>
+                <p>See more details at <a href="/docs/usage-limits/inngest">Usage Limits</a> page.</p>
               </FAQRow>
               <FAQRow
                 question={`Can multiple functions be triggered by the same event?`}

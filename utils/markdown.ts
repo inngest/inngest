@@ -1,6 +1,5 @@
 import { serialize } from "next-mdx-remote/serialize";
 import rehypeSlug from "rehype-slug";
-import rehypeRaw from "rehype-raw";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 
 import { rehypeParseCodeBlocks } from "src/mdx/rehype.mjs";

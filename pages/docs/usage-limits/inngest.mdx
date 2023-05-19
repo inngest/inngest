@@ -1,0 +1,64 @@
+import { Tag } from "src/shared/Docs/Tag";
+
+# Usage Limits
+
+We have put some limits on the service to make sure we provide you a good default to start with, while also keeping it a good experience for all other users using Inngest.
+
+Some of these limits are customizable, so if you need more than what the current limits provide, please [contact us][contact] and we can update the limits for you.
+
+## Functions
+
+The following applies to `step` usage.
+
+**Timeout**
+
+Each step has a timeout depending on the hosting provider of your choice ([see more info][provider-docs]),
+but Inngest supports up to `15 minutes` at the maximum.
+
+**Concurrency** <Tag>Customizable</Tag>
+
+Our hobby plan has a concurrency limit of `1`, and paid plans have a default concurrency limit of `100`.
+
+**Payload Size** <Tag>Customizable</Tag>
+
+The limit for data returned by a step is `4MB`.
+
+**# of Steps per Function**
+
+The maximum number of steps allowed per function is `1000`.
+
+<Callout>
+  ⚠️
+  This limit is easily reached if you're using `step` on each item in a loop.
+  Instead we recommend one or both of the following:
+  - Process the loop within a `step` and return that data
+  - Utilize the [fan out][fanout-guide] feature to process each item in a separate function
+</Callout>
+
+## Events
+
+**Name length**
+
+The maximum length allowed for an event name is `256` characters.
+
+**Request Body Size** <Tag>Customizable</Tag>
+
+The limit for each event request is `512KB`.
+
+**# of Events per request** <Tag>Customizable</Tag>
+
+Maximum number of events you can send in one request is `5000`.
+If you're doing fan out, you'll need to be aware of this limitation when you run `step.sendEvent(events)`.
+
+```typescript
+// this `events` list will need to be <= 5000
+const events = [{name: "<event-name>", data: {}}, ...];
+
+await step.sendEvent(events);
+// or
+await inngest.send(events);;
+```
+
+[provider-docs]: /docs/usage-limits/providers
+[fanout-guide]: /docs/guides/fan-out-jobs
+[contact]: /contact

@@ -274,7 +274,7 @@ export const navigation = [
         href: `${baseDir}/deploy/cloudflare`,
       },
     ],
-  },
+  }
 ];
 
 const referenceNavigation = [
@@ -372,6 +372,19 @@ const referenceNavigation = [
       { title: "Migrating to v1", href: `${baseDir}/sdk/v1-migration` },
     ],
   },
+  {
+    title: "Usage Limits",
+    links: [
+      {
+        title: "Inngest Cloud",
+        href: `${baseDir}/usage-limits/inngest`
+      },
+      {
+        title: "Serverless Providers",
+        href: `${baseDir}/usage-limits/providers`
+      }
+    ]
+  }
 ];
 
 export const headerLinks = [
