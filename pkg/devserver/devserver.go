@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/enums"
@@ -13,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/function"
 	"github.com/inngest/inngest/pkg/function/env"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/rueian/rueidis"
@@ -102,7 +104,11 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 			// partition.
 			funcs, _ := loader.Functions(ctx)
 			for _, f := range funcs {
-				if f.ID == p.WorkflowID.String() {
+				id := f.ID
+				if _, err := uuid.Parse(f.ID); err != nil {
+					id = function.DeterministicUUID(f).String()
+				}
+				if id == p.WorkflowID.String() {
 					return p.Queue(), f.Concurrency
 				}
 			}
