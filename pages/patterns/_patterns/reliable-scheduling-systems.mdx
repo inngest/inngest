@@ -19,7 +19,7 @@ Inngest supports scheduled functions and event-triggered functions. Combining th
 ```typescript
 import { inngest } from "./client";
 
-const inngest = new Inngest("Scheduling Backend");
+const inngest = new Inngest({ name: "Scheduling Backend" });
 
 // A scheduled function uses the current time to find notifications to send
 const slackCron = inngest.createFunction(

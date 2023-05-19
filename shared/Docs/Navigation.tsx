@@ -315,9 +315,13 @@ const referenceNavigation = [
         href: `${baseDir}/reference/functions/step-send-event`,
       },
       {
-        title: "Error handling",
+        title: "Error handling & retries",
         href: `${baseDir}/functions/retries`,
         // href: `${baseDir}/reference/functions/error-handling`,
+      },
+      {
+        title: "Handling failures",
+        href: `${baseDir}/reference/functions/handling-failures`,
       },
       {
         title: "Cancel running functions",

@@ -2,7 +2,8 @@ import Link, { LinkProps } from "next/link";
 import clsx from "clsx";
 
 import { Heading } from "./Heading";
-import React from "react";
+import React, { useState } from "react";
+import { ChevronDown, ChevronUp } from "react-feather";
 
 // export const a: React.FunctionComponent<LinkProps> = (props) => (
 //   <Link {...props} />
@@ -90,9 +91,25 @@ export function Note({ children }) {
   );
 }
 
-export function Callout({ children }) {
+export function Callout({
+  variant = "default",
+  children,
+}: {
+  variant: "default" | "info" | "warning";
+  children: React.ReactNode;
+}) {
   return (
-    <div className="my-6 border border-transparent dark:border-indigo-600/20 text-indigo-600 dark:text-indigo-200 bg-indigo-600/10 rounded-lg p-6 mt- [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+    <div
+      className={clsx(
+        "my-6 border border-transparent rounded-lg p-6 mt- [&>:first-child]:mt-0 [&>:last-child]:mb-0",
+        variant === "default" &&
+          "dark:border-indigo-600/20 text-indigo-600 dark:text-indigo-200 bg-indigo-600/10",
+        variant === "info" &&
+          "dark:border-sky-600/20 text-sky-600 dark:text-sky-100 bg-sky-300/10",
+        variant === "warning" &&
+          "dark:border-amber-700/20 text-amber-900 dark:text-amber-50 bg-amber-300/10"
+      )}
+    >
       {children}
     </div>
   );
@@ -157,29 +174,55 @@ export function Col({ children, sticky = false }) {
 
 export function Properties({
   nested = false,
+  collapse = false,
   children,
 }: {
   nested?: boolean;
+  collapse?: boolean;
   children: React.ReactElement;
 }) {
+  const [isCollapsed, setCollapsed] = useState<boolean>(collapse);
   return (
     <div
       className={clsx(
         "my-6",
         nested &&
-          "-mt-3 pt-2 pb-3 border border-slate-900/5 dark:border-white/5 rounded-md"
+          "-mt-3 pt-2 pb-3 border border-slate-900/5 dark:border-white/5 rounded-md",
+        collapse && isCollapsed && "pb-0"
       )}
     >
       {nested && (
-        <div className="px-3 pb-2 mb-3 border-b border-slate-900/5 text-xs font-semibold">
-          Properties
+        <div
+          className={clsx(
+            "px-3 pb-2 mb-3 border-b border-slate-900/5 text-xs font-semibold",
+            collapse && isCollapsed && "mb-0 border-b-0"
+          )}
+        >
+          {collapse ? (
+            <button
+              className="flex gap-1 items-center hover:text-indigo-800	"
+              onClick={() => {
+                setCollapsed(!isCollapsed);
+              }}
+            >
+              Show nested properties{" "}
+              {isCollapsed ? (
+                <ChevronDown className="h-3" />
+              ) : (
+                <ChevronUp className="h-3" />
+              )}
+            </button>
+          ) : (
+            "Properties"
+          )}
         </div>
       )}
       <ul
         role="list"
         className={clsx(
           "m-0 max-w-[calc(theme(maxWidth.3xl)-theme(spacing.8))] list-none divide-y divide-slate-900/5 p-0 dark:divide-white/5",
-          nested && "px-3"
+          nested && "px-3",
+          collapse && isCollapsed && "hidden"
         )}
       >
         {children}
@@ -192,11 +235,15 @@ export function Property({
   name,
   type,
   required = false,
+  attribute = false,
   children,
 }: {
   name: string;
   type: string;
+  /** Is the property a required argument? */
   required?: boolean;
+  /** Is the property an attribute part of an object? (required/optional will be hidden) */
+  attribute?: boolean;
   children: React.ReactElement;
 }) {
   return (
@@ -210,17 +257,21 @@ export function Property({
         <dd className="font-mono font-medium text-xs text-slate-500 dark:text-slate-400">
           {type}
         </dd>
-        <dt className="sr-only">Required</dt>
-        <dd
-          className={clsx(
-            "font-mono font-medium text-xs",
-            required
-              ? "text-amber-600 dark:text-amber-400"
-              : "text-slate-500 dark:text-slate-400"
-          )}
-        >
-          {required ? "required" : "optional"}
-        </dd>
+        {!attribute && (
+          <>
+            <dt className="sr-only">Required</dt>
+            <dd
+              className={clsx(
+                "font-mono font-medium text-xs",
+                required
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-slate-500 dark:text-slate-400"
+              )}
+            >
+              {required ? "required" : "optional"}
+            </dd>
+          </>
+        )}
         <dt className="sr-only">Description</dt>
         <dd className="w-full text-sm flex-none [&>:first-child]:mt-0 [&>:last-child]:mb-0">
           {children}

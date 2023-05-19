@@ -1,0 +1,224 @@
+# Handling Failures
+
+Define any failure handlers for your function with the [`onFailure`](/docs/reference/functions/create#configuration) option. This function will be automatically called when your function fails after it's maximum number of retries. Alternatively, you can use the [`"inngest/function.failed"`](#the-inngest-function-failed-event) system event to handle failures across all functions.
+
+```ts
+import { inngest } from "./client";
+
+export default inngest.createFunction(
+  {
+    name: "Import product images",
+    onFailure: async ({ error, event, step }) => {
+      // This is the failure handler which can be used to
+      // send an alert, notification, or whatever you need to do
+    }
+  },
+  { event: "shop/product.imported" },
+  async ({ event, step, runId }) => {
+    // This is the main function handler's code
+  }
+);
+```
+
+The failure handler is very useful for:
+
+* Sending alerts to your team
+* Sending metrics to a third party monitoring tool (e.g. Datadog)
+* Send a notification to your team or user that the job has failed
+* Perform a rollback of the transaction (i.e. undo work partially completed by the main handler)
+
+_Failures_ should not be confused with _Errors_ which will be retried. Read the [error handling & retries documentation](/docs/functions/retries) for more context.
+
+---
+
+## How `onFailure` works
+
+The `onFailure` handler is a helper that actually creates a separate Inngest function used specifically for handling failures for your main function handler.
+
+The separate Inngest function utilizes an [`"inngest/function.failed"`](#the-inngest-function-failed-event) system event that gets sent to your account any time a function fails. The function created with `onFailure` will appear as a separate function in your dashboard with the name format: `"<Your function name> (failure)"`.
+
+## `onFailure({ error, event, step, runId })`
+
+The `onFailure` handler function has the same arguments as [the main function handler](/docs/reference/functions/create#handler) when creating a function, but also received an `error` argument.
+
+### `error`
+
+The JavaScript [`Error`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/Error) object as thrown from the last retry in your main function handler.
+
+<Callout variant="warning">
+The Inngest SDK attempts to serialize and deserialize the `Error` object to the best of its ability and any custom error classes (e.g. `Prisma.PrismaClientKnownRequestError` or `MyCustomErrorType`) that may be thrown will be deserialized as the default `Error` object. This means you _cannot_ use `instance` of within `onFailure` to infer the type of error.
+</Callout>
+
+### `event`
+
+The [`"inngest/function.failed"`](#the-inngest-function-failed-event) system event payload object. This object is similar to any event payload, but it contains data specific to the failed function's final retry attempt. [See the complete reference for this event payload below](#the-inngest-function-failed-event).
+
+### `step`
+
+[See the `step` reference in the create function documentation](/docs/reference/functions/create#step).
+
+### `runId`
+
+This will be the function run ID for the error handling function, _not the function that failed_. To get the failed function's run ID, use `event.data.run_id`. [Learn more about `runId` here](/docs/reference/functions/create#run-id).
+
+
+## The `"inngest/function.failed"` event
+
+Inngest sends an `"inngest/function.failed"` event to your [environment](/docs/platform/environments) whenever any function fails after exhausting all of it's retry attempts. You can use this event as an `event` trigger within your own function or use the `onFailure` helper option as documented above.
+
+<Properties>
+  <Property name="name" type={`string: "inngest/function.failed"`} attribute>
+    The `inngest/` event prefix is reserved for system events in each environment.
+  </Property>
+  <Property name="data" type="object" attribute>
+    The event payload data.
+    <Properties nested>
+      <Property name="error" type="object" attribute>
+        Data about the error payload as returned from the failed function.
+        <Properties nested collapse>
+          <Property name="body" type="string" attribute>
+            The raw JSON-encoded response from the Inngest SDK.
+          </Property>
+          <Property name="status" type="integer" attribute>
+            The HTTP status code of the response from the Inngest SDK.
+          </Property>
+        </Properties>
+      </Property>
+      <Property name="event" type="string" attribute>
+        The failed function's original event payload.
+      </Property>
+      <Property name="function_id" type="string" attribute>
+        The failed function's [`id`](/docs/reference/functions/create#configuration)
+      </Property>
+      <Property name="run_id" type="string" attribute>
+        The failed function's function run ID.
+      </Property>
+    </Properties>
+  </Property>
+  <Property name="ts" type="number" attribute>
+    The timestamp integer in milliseconds at which the failure occurred.
+  </Property>
+</Properties>
+
+
+<details>
+  <summary><strong>Example "inngest/function.failed" event payload</strong></summary>
+
+  ```json
+  {
+    "name": "inngest/function.failed",
+    "data": {
+      "error": {
+        "body": "{\"name\":\"Error\",\"message\":\"Something failed\",\"stack\":\"Error: Something failed\\n    at /Users/danfarrelly/dev/inngest-google-cloud-functions/index.js:39:15\\n    at /Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/components/InngestStepTools.js:219:20\\n    at fn (/Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/components/InngestStepTools.js:97:113)\\n    at Promise.then.data (/Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/components/InngestFunction.js:289:32)\\n    at new Promise (<anonymous>)\\n    at InngestFunction.runFn (/Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/components/InngestFunction.js:288:34)\\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\\n    at async InngestCommHandler.runStep (/Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/components/InngestCommHandler.js:484:25)\\n    at async InngestCommHandler.handleAction (/Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/components/InngestCommHandler.js:349:33)\\n    at async ServerTiming.wrap (/Users/danfarrelly/dev/inngest-google-cloud-functions/node_modules/inngest/helpers/ServerTiming.js:69:21)\",\"__serialized\":true}",
+        "status": 500
+      },
+      "event": {
+        "data": { "billingPlan": "pro" },
+        "id": "01H0TPSHZTVFF6SFVTR6E25MTC",
+        "name": "user.signup",
+        "ts": 1684523501562,
+        "user": { "external_id": "6463da8211cdbbcb191dd7da" }
+      },
+      "function_id": "my-gcp-cloud-functions-app-hello-inngest",
+      "run_id": "01H0TPSJ576QY54R6JJ8MEX6JH"
+    },
+    "id": "01H0TPW7KB4KCR739TG2J3FTHT",
+    "ts": 1684523589227
+  }
+  ```
+</details>
+
+## Examples
+
+### Send a Slack notification when a function fails
+
+In this example, the function attempts to sync all products from a Shopify store, and if it fails, it sends a message to the team's _#eng-alerts_ Slack channel using the Slack Web Api's `chat.postMessage` ([docs](https://api.slack.com/methods/chat.postMessage)) API.
+
+```ts
+import { inngest } from "./client";
+import { client } from "@slack/web-api";
+
+export default inngest.createFunction(
+  {
+    name: "Sync Shopify products",
+    // Your handler should be an async function:
+    onFailure: async ({ error, event }) => {
+
+      const originalEvent = event.data.event;
+
+      // Post a message to the Engineering team's alerts channel in Slack:
+      const result = await client.chat.postMessage({
+        token: process.env.SLACK_TOKEN,
+        channel: "C12345",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `Sync Shopify function failed for Store ${originalEvent.storeId}: ${error.toString()}`
+            }
+          }
+        ]
+      });
+
+      return result;
+    }
+  },
+  { event: "shop/product_sync.requested" },
+  async ({ event, step, runId }) => {
+    // This is the main function handler's code
+    const products = await step.run("Fetch products", async () => {
+      const storeId = event.data.storeId;
+      // The function might fail here or...
+    })
+    await step.run("Save products", async () => {
+      // The function might fail here after the maximum number of retries
+    })
+  }
+);
+```
+
+### Track all function failures in Datadog
+
+You can use the `"inngest/function.failed"` event to handle all failed functions in a single place. This can enable you to send metrics, alerts, or events to external systems like Datadog for all of your Inngest functions. Here's an example using [Datadog's Events API](https://docs.datadoghq.com/api/latest/events/) to send all failures the Datadog event stream.
+
+```ts
+import { inngest } from "./client";
+import { client, v1 } from "@datadog/datadog-api-client";
+
+const configuration = client.createConfiguration();
+const apiInstance = new v1.EventsApi(configuration);
+
+export default inngest.createFunction(
+  { name: "Send failed function events to Datadog" },
+  { event: "inngest/function.failed" },
+  async ({ event, step }) => {
+
+    // This is a normal Inngest function, so we can use steps as we normally do:
+    await step.run("Send event to Datadog", async () => {
+
+      // Parse the event from the event's error.body object as it's serialized JSON:
+      const error = JSON.parse(event.data.error.body)
+
+      // Create the Datadog event body using information about the failed function:
+      const params: v1.EventsApiCreateEventRequest = {
+        body: {
+          title: "Inngest Function Failed",
+          alert_type: "error",
+          text: `The ${event.data.function_id} function failed with the error: ${error.message}`,
+          tags: [
+            // Add a tag with the Inngest function id:
+            `inngest_function_id:${event.data.function_id}`
+          ],
+        },
+      };
+
+      // Send to Datadog:
+      const data = await apiInstance.createEvent(params)
+
+      // Return the data to Inngest for viewing in function logs:
+      return { message: "Event sent successfully", data };
+    });
+  }
+);
+```
