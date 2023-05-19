@@ -156,7 +156,7 @@ await step.run("Create alert", async () => {
 
 If `createAlert()` succeeds but `sendAlertLinkToSlack()` fails, the code will be retried and an alert will be created every time the step is retried.
 
-Instead, we should split out asynchronous actions in to multiple steps so they're retried independently.
+Instead, we should split out asynchronous actions into multiple steps so they're retried independently.
 
 ```ts
 const alertId = await step.run("Create alert", () => createAlert());
