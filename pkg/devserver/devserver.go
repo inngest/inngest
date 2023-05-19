@@ -108,7 +108,7 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 				if _, err := uuid.Parse(f.ID); err != nil {
 					id = function.DeterministicUUID(f).String()
 				}
-				if id == p.WorkflowID.String() {
+				if id == p.WorkflowID.String() && f.Concurrency > 0 {
 					return p.Queue(), f.Concurrency
 				}
 			}
