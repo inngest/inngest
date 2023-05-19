@@ -111,6 +111,10 @@ You can import [`serve()`](/docs/reference/serve) for other frameworks, though t
 
 This sets up the API endpoint for hosting and calling functions!  We'll update the array passed in to `serve` with functions as we write them.
 
+<Callout>
+👉 Note: If you're using the Next.js App Router, exporting the Inngest client from an API route file will cause a build error. Instead, instantiate the Inngest client in a separate file and import it into your route file. For more information about using Inngest with the Next.js App Router, refer to [these docs](https://www.inngest.com/docs/sdk/serve#next-js-13).
+</Callout>
+
 ## 3. Write your first function
 
 ### Defining the function
