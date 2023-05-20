@@ -125,8 +125,8 @@ framework</a> via the `esm.sh` CDN.  Add the serve handler to `./api/inngest.ts`
 
 ```typescript
 import { serve } from "https://esm.sh/inngest/deno/fresh";
-import fnA from "./src/inngest/fnA"; // Your own function
 import { inngest } from "./src/inngest/client.ts";
+import fnA from "./src/inngest/fnA"; // Your own function
 
 export const handler = serve(inngest, [fnA]);
 ```
@@ -138,8 +138,8 @@ Google's [Functions Framework](https://github.com/GoogleCloudPlatform/functions-
 ```typescript
 import * as ff from "@google-cloud/functions-framework";
 import { serve } from "inngest/express";
-import fnA from "./src/inngest/fnA"; // Your own function
 import { inngest } from "./src/inngest/client";
+import fnA from "./src/inngest/fnA"; // Your own function
 
 ff.http('inngest', serve(inngest, [fnA]));
 ```
@@ -153,8 +153,8 @@ Add the following within `./pages/api/inngest.ts`:
 
 ```typescript
 import { serve } from "inngest/next";
-import fnA from "../../inngest/fnA"; // Your own function
 import { inngest } from "../../inngest/client";
+import fnA from "../../inngest/fnA"; // Your own function
 
 export default serve(inngest, [fnA]);
 ```
@@ -164,7 +164,11 @@ export default serve(inngest, [fnA]);
 Version 13+ of Next.js uses [Route Handlers](https://beta.nextjs.org/docs/routing/route-handlers), requiring a separate export for each HTTP method the API supports. Inngest requires `GET`, `POST`, and `PUT` methods (see [How the API works](#how-the-api-works) below), which you can export via destructuring instead of `export default`:
 
 ```typescript
-export const { GET, POST, PUT } = serve(inngest, [...fns]);
+import { serve } from "inngest/next";
+import { inngest } from "../../inngest/client";
+import fnA from "../../inngest/fnA"; // Your own functions
+
+export const { GET, POST, PUT } = serve(inngest, [fnA]);
 ```
 
 ### Streaming <VersionBadge version="v1.8.0+" />
