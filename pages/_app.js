@@ -63,6 +63,8 @@ function MyApp({ Component, pageProps }) {
     }
     if (isDocs) {
       htmlEl.classList.add(`docs`);
+    } else {
+      htmlEl.classList.remove(`docs`);
     }
   });
   useEffect(() => {

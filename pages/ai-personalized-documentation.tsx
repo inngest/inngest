@@ -139,7 +139,7 @@ export default function InngestGPT() {
                 <textarea
                   disabled={loading}
                   placeholder="Create a function that..."
-                  className="  backdrop-blur-md border border-slate-700/30 rounded-md text-slate-700 font-medium w-full h-52 focus:outline-none"
+                  className="border-0 backdrop-blur-md border border-slate-700/30 rounded-md text-slate-700 font-medium w-full h-52 focus:outline-none"
                   onChange={(e) => setMessage(e.target.value)}
                 />
               </div>

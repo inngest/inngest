@@ -4,7 +4,7 @@ import NavLink from "./NavLink";
 
 export default function HeaderDropdown({ navLinks }) {
   return (
-    <div className="px-2 md:px-5 pb-4 md:overflow-auto md:bg-slate-950 md:rounded-lg md:absolute top-[70px] -left-4 md:hidden group-hover:md:block shadow-2xl">
+    <div className="px-2 md:px-0 md:overflow-auto md:bg-slate-950 md:rounded-lg md:absolute top-[70px] -left-4 md:hidden group-hover:md:block md:shadow-2xl">
       <div className="flex flex-col md:w-[520px]">
         {!!navLinks.featured.length && (
           <div className="flex w-full flex-col">
