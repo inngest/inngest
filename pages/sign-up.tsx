@@ -118,7 +118,7 @@ const SignUp = () => {
             </a>
           </div>
           <form
-            className="flex flex-col gap-4 border-b border-t border-slate-300 pb-6 pt-4 text-center"
+            className="flex flex-col gap-4 border-b border-t border-slate-300 text-black pb-6 pt-4 text-center"
             action=""
             onSubmit={handleSubmit}
           >
