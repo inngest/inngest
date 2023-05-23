@@ -64,7 +64,7 @@ We wanted to implement an optional global filter for our app that would persist 
 
 Our first idea was to add an `env` search parameter to the URL, like this: `https://app.inngest.com/functions?env=staging`. During testing, we learned that since layouts are not re-rendered based on search parameters, it would lead to stale data in our UI. We either needed to remove this data from our layouts _or_ find another solution.
 
-To solve this issue, we converted the search parameter into an route parameter: `https://app.inngest.com/env/staging/functions`. Layout components can receive [dynamic route parameters](https://nextjs.org/docs/app/api-reference/file-conventions/layout#params-optional), which resolved our problems. Since the App Router primarily uses paths for routing, we found that it works best when putting parameters like this into the URL path.
+To solve this issue, we converted the search parameter into a route parameter: `https://app.inngest.com/env/staging/functions`. Layout components can receive [dynamic route parameters](https://nextjs.org/docs/app/api-reference/file-conventions/layout#params-optional), which resolved our problems. Since the App Router primarily uses paths for routing, we found that it works best when putting parameters like this into the URL path.
 
 Alternatively, you might be able to use middleware and parallel routes with search params depending on your use case: [check out this thread from Dan Abramov](https://twitter.com/dan_abramov/status/1655269078741786629?s=20).
 
