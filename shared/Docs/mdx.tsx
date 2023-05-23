@@ -18,7 +18,13 @@ export const a: React.FunctionComponent<
 );
 
 export { Button } from "../Button";
-export { CodeGroup, Code as code, Pre as pre } from "./Code";
+export {
+  CodeGroup,
+  Code as code,
+  Pre as pre,
+  GuideSelector,
+  GuideSection,
+} from "./Code";
 
 export const h2: React.FC<any> = function H2(props) {
   return <Heading level={2} {...props} />;

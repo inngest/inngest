@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useRouter } from "next/router";
 import { Tab } from "@headlessui/react";
 import clsx from "clsx";
 import create from "zustand";
@@ -348,4 +349,82 @@ export function Pre({ children, ...props }) {
   }
 
   return <CodeGroup {...props}>{children}</CodeGroup>;
+}
+
+type GuideOption = {
+  key: string;
+  title: string;
+};
+
+const GuideSelectorContext = createContext<{
+  selected: string;
+  options: GuideOption[];
+}>(null);
+
+export function GuideSelector({
+  children,
+  options = [],
+}: {
+  children: React.ReactNode;
+  options: GuideOption[];
+}) {
+  const router = useRouter();
+  const searchParamKey = "guide";
+  const [selected, setSelected] = useState<string>(options[0].key);
+
+  useEffect(() => {
+    const urlSelected = Array.isArray(router.query[searchParamKey])
+      ? router.query[searchParamKey][0]
+      : router.query[searchParamKey];
+    const isValidOption = options.find((o) => o.key === urlSelected);
+    if (isValidOption && Boolean(urlSelected) && urlSelected !== selected) {
+      setSelected(urlSelected);
+    }
+  }, [router, selected]);
+
+  const onChange = (newSelectedIndex) => {
+    const newSelectedKey = options[newSelectedIndex].key;
+    setSelected(newSelectedKey);
+    const url = new URL(router.asPath, window.location.origin);
+    url.searchParams.set(searchParamKey, newSelectedKey);
+    // Replace the URL state and do use shallow to avoid refresh
+    router.replace(url.toString(), null, { shallow: true, scroll: false });
+  };
+
+  return (
+    <GuideSelectorContext.Provider value={{ selected, options }}>
+      <Tab.Group onChange={onChange}>
+        <Tab.List className="-mb-px flex gap-4 text-sm font-medium">
+          {options.map((option, idx) => (
+            <Tab
+              key={idx}
+              className={clsx(
+                "border-b py-3 transition focus:outline-none",
+                option.key === selected
+                  ? "border-indigo-500 text-indigo-700"
+                  : "border-transparent text-slate-800 hover:text-indigo-600"
+              )}
+            >
+              {option.title}
+            </Tab>
+          ))}
+        </Tab.List>
+      </Tab.Group>
+      {children}
+    </GuideSelectorContext.Provider>
+  );
+}
+
+export function GuideSection({
+  children,
+  show,
+}: {
+  children: React.ReactNode;
+  show: string;
+}) {
+  let context = useContext(GuideSelectorContext);
+  if (show === context.selected) {
+    return <>{children}</>;
+  }
+  return null;
 }
