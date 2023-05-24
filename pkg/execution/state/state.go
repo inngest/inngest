@@ -137,7 +137,7 @@ type State interface {
 	// an Inngest event.
 	Event() map[string]interface{}
 
-	// EventBatch is the list of events that are used to trigger the workflow,
+	// Events is the list of events that are used to trigger the workflow,
 	// which is typically a list of Inngest event.
 	Events() []map[string]interface{}
 
