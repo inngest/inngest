@@ -47,6 +47,10 @@ type memstate struct {
 	// an Inngest event.
 	event map[string]interface{}
 
+	// Events is the root data that triggers the workflow, which is typically
+	// a list of Inngest events.
+	events []map[string]interface{}
+
 	stack []string
 
 	// Actions stores a map of all output from each individual action
@@ -82,6 +86,10 @@ func (s memstate) Stack() []string {
 
 func (s memstate) Event() map[string]interface{} {
 	return s.event
+}
+
+func (s memstate) Events() []map[string]interface{} {
+	return s.events
 }
 
 func (s memstate) Actions() map[string]any {
