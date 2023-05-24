@@ -15,7 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
-	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/rueian/rueidis"
 )
@@ -90,10 +90,10 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 			// partition.
 			funcs, _ := loader.Functions(ctx)
 			for _, f := range funcs {
-				if _, err := uuid.Parse(f.ID); err != nil {
-					id = function.DeterministicUUID(f).String()
+				if f.ID == uuid.Nil {
+					f.ID = inngest.DeterministicUUID(f)
 				}
-				if id == p.WorkflowID.String() && f.Concurrency > 0 {
+				if f.ID == p.WorkflowID && f.ConcurrencyLimit() > 0 {
 					return p.Queue(), f.ConcurrencyLimit()
 				}
 			}
