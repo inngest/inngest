@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -22,7 +23,7 @@ import (
 var (
 	DefaultExecutor = executor{
 		client: &http.Client{
-			Timeout:       15 * time.Minute,
+			Timeout:       consts.MaxFunctionTimeout,
 			CheckRedirect: CheckRedirect,
 		},
 	}
@@ -216,8 +217,9 @@ func (e executor) do(ctx context.Context, url string, input []byte) ([]byte, int
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("error executing request: %w", err)
 	}
+	defer resp.Body.Close()
 	dur := time.Since(pre)
-	byt, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
+	byt, err := io.ReadAll(io.LimitReader(resp.Body, consts.MaxBodySize))
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("error reading response body: %w", err)
 	}
