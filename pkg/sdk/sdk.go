@@ -2,8 +2,12 @@ package sdk
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -39,16 +43,47 @@ type RegisterRequest struct {
 	AppName string `json:"appName"`
 	// Functions represents all functions hosted within this deploy.
 	Functions []SDKFunction `json:"functions"`
-
 	// Headers are fetched from the incoming HTTP request.  They are present
 	// on all calls to Inngest from the SDK, and are separate from the RegisterRequest
 	// JSON payload to have a single source of truth.
 	Headers Headers `json:"headers"`
+
+	// checksum is a memoized field.
+	checksum string
 }
 
 type Headers struct {
 	Env      string `json:"env"`
 	Platform string `json:"platform"`
+}
+
+func (f *RegisterRequest) Checksum() (string, error) {
+	if f.checksum != "" {
+		return f.checksum, nil
+	}
+	byt, err := json.Marshal(f)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(byt)
+	f.checksum = hex.EncodeToString(sum[:])
+	return f.checksum, nil
+}
+
+func (f RegisterRequest) SDKLanguage() string {
+	parts := strings.Split(f.SDK, ":")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return ""
+}
+
+func (f RegisterRequest) SDKVersion() string {
+	parts := strings.Split(f.SDK, ":")
+	if len(parts) > 1 {
+		return parts[1]
+	}
+	return ""
 }
 
 // Parse parses the incoming
