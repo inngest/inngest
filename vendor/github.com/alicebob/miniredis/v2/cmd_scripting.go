@@ -23,7 +23,7 @@ func commandsScripting(m *Miniredis) {
 }
 
 var (
-	parsed = sync.Map{}
+	parsedScripts = sync.Map{}
 )
 
 // Execute lua. Needs to run m.Lock()ed, from within withTx().
@@ -110,14 +110,14 @@ func (m *Miniredis) runLuaScript(c *server.Peer, sha, script string, args []stri
 	return true
 }
 
-// doScriptCached pre-compiiles the given script into a Lua prototype,
+// doScript pre-compiiles the given script into a Lua prototype,
 // then executes the pre-compiled function against the given lua state.
 //
 // This is thread-safe.
 func doScript(l *lua.LState, script string) error {
 	proto, err := compile(script)
 	if err != nil {
-		return err
+		return fmt.Errorf(errLuaParseError(err))
 	}
 
 	lfunc := l.NewFunctionFromProto(proto)
@@ -131,10 +131,10 @@ func doScript(l *lua.LState, script string) error {
 }
 
 func compile(script string) (*lua.FunctionProto, error) {
-	if val, ok := parsed.Load(script); ok {
+	if val, ok := parsedScripts.Load(script); ok {
 		return val.(*lua.FunctionProto), nil
 	}
-	chunk, err := parse.Parse(strings.NewReader(script), "script")
+	chunk, err := parse.Parse(strings.NewReader(script), "<string>")
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func compile(script string) (*lua.FunctionProto, error) {
 	if err != nil {
 		return nil, err
 	}
-	parsed.Store(script, proto)
+	parsedScripts.Store(script, proto)
 	return proto, nil
 }
 
@@ -176,13 +176,6 @@ func (m *Miniredis) cmdEval(c *server.Peer, cmd string, args []string) {
 }
 
 func (m *Miniredis) cmdEvalsha(c *server.Peer, cmd string, args []string) {
-
-	/*
-		buf := make([]byte, 1<<16)
-		runtime.Stack(buf, true)
-		fmt.Printf("%s\n\n", buf)
-	*/
-
 	if len(args) < 2 {
 		setDirty(c)
 		c.WriteError(errWrongNumber(cmd))

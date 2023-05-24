@@ -129,7 +129,7 @@ github.com/agnivade/levenshtein
 # github.com/alicebob/gopher-json v0.0.0-20200520072559-a9ecdc9d1d3a
 ## explicit
 github.com/alicebob/gopher-json
-# github.com/alicebob/miniredis/v2 v2.30.3-0.20230429171801-33a1bb4d32a1
+# github.com/alicebob/miniredis/v2 v2.30.3-0.20230520070231-a946a99f2c60
 ## explicit; go 1.14
 github.com/alicebob/miniredis/v2
 github.com/alicebob/miniredis/v2/geohash
@@ -583,22 +583,6 @@ github.com/xhit/go-str2duration/v2
 # github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673
 ## explicit
 github.com/xrash/smetrics
-# github.com/yuin/goldmark v1.4.13
-## explicit; go 1.18
-github.com/yuin/goldmark
-github.com/yuin/goldmark/ast
-github.com/yuin/goldmark/extension
-github.com/yuin/goldmark/extension/ast
-github.com/yuin/goldmark/parser
-github.com/yuin/goldmark/renderer
-github.com/yuin/goldmark/renderer/html
-github.com/yuin/goldmark/text
-github.com/yuin/goldmark/util
-# github.com/yuin/goldmark-emoji v1.0.1
-## explicit; go 1.15
-github.com/yuin/goldmark-emoji
-github.com/yuin/goldmark-emoji/ast
-github.com/yuin/goldmark-emoji/definition
 # github.com/yuin/gopher-lua v1.1.0
 ## explicit; go 1.17
 github.com/yuin/gopher-lua

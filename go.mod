@@ -6,9 +6,7 @@ require (
 	cuelang.org/go v0.4.2
 	github.com/99designs/gqlgen v0.17.27
 	github.com/VividCortex/ewma v1.2.0
-	github.com/alecthomas/chroma v0.10.0
-	github.com/alicebob/miniredis/v2 v2.21.0
-	github.com/alicebob/miniredis/v2 v2.30.3-0.20230429171801-33a1bb4d32a1
+	github.com/alicebob/miniredis/v2 v2.30.3-0.20230520070231-a946a99f2c60
 	github.com/aws/aws-sdk-go v1.43.31
 	github.com/cespare/xxhash/v2 v2.1.2
 	github.com/charmbracelet/lipgloss v0.5.0
@@ -123,8 +121,6 @@ require (
 	github.com/twmb/murmur3 v1.1.6 // indirect
 	github.com/urfave/cli/v2 v2.25.1 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
-	github.com/yuin/goldmark v1.4.13 // indirect
-	github.com/yuin/goldmark-emoji v1.0.1 // indirect
 	github.com/yuin/gopher-lua v1.1.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zclconf/go-cty v1.8.3 // indirect
