@@ -139,7 +139,7 @@ type State interface {
 
 	// Events is the list of events that are used to trigger the workflow,
 	// which is typically a list of Inngest event.
-	Events() []map[string]interface{}
+	Events() map[string]interface{}
 
 	// Actions returns a map of all output from each individual action.
 	Actions() map[string]any
@@ -294,9 +294,9 @@ type Input struct {
 	// original event data.
 	EventData map[string]any
 
-	// EventDataList is the input data for initializing the workflow run,
+	// EventBatchData is the input data for initializing the workflow run,
 	// which is a list of EventData
-	EventDataList []map[string]any
+	EventBatchData map[string]any
 
 	// Debugger represents whether this function was started via the debugger.
 	Debugger bool

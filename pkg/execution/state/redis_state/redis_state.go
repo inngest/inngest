@@ -250,6 +250,11 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		return nil, err
 	}
 
+	events, err := json.Marshal(input.EventBatchData)
+	if err != nil {
+		return nil, err
+	}
+
 	metadata := runMetadata{
 		Identifier: input.Identifier,
 		Pending:    1,
@@ -287,6 +292,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		stepsByt,
 		history,
 		history.CreatedAt.UnixMilli(),
+		events,
 	})
 	if err != nil {
 		return nil, err
@@ -301,6 +307,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			m.kf.RunMetadata(ctx, input.Identifier.RunID),
 			m.kf.Actions(ctx, input.Identifier),
 			m.kf.History(ctx, input.Identifier.RunID),
+			m.kf.Batch(ctx, input.Identifier),
 		},
 		args,
 	).AsInt64()
@@ -320,6 +327,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			input.Identifier,
 			metadata.Metadata(),
 			input.EventData,
+			input.EventBatchData,
 			input.Steps,
 			map[string]error{},
 			make([]string, 0),
@@ -463,6 +471,9 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		return nil, fmt.Errorf("failed to unmarshal event; %w", err)
 	}
 
+	// TODO: populate this data from Redis properly
+	events := map[string]any{}
+
 	// Load the actions.  This is a map of step IDs to JSON-encoded results.
 	cmd = m.r.B().Hgetall().Key(m.kf.Actions(ctx, id)).Build()
 	rmap, err := m.r.Do(ctx, cmd).AsStrMap()
@@ -499,7 +510,7 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 
-	return state.NewStateInstance(*fn, id, meta, event, actions, errors, stack), nil
+	return state.NewStateInstance(*fn, id, meta, event, events, actions, errors, stack), nil
 }
 
 func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {

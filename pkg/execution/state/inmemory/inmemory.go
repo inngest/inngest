@@ -120,7 +120,7 @@ func (m *mem) New(ctx context.Context, input state.Input) (state.State, error) {
 		workflow:   input.Workflow,
 		identifier: input.Identifier,
 		event:      input.EventData,
-		events:     input.EventDataList,
+		events:     input.EventBatchData,
 		actions:    input.Steps,
 		errors:     map[string]error{},
 	}

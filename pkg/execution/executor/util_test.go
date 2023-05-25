@@ -13,12 +13,17 @@ import (
 func TestParseWait(t *testing.T) {
 	ctx := context.Background()
 
+	event := map[string]any{
+		"data": time.Now().Format(time.RFC3339),
+	}
+
 	state := state.NewStateInstance(
 		inngest.Function{},
 		state.Identifier{},
 		state.Metadata{},
+		event,
 		map[string]any{
-			"data": time.Now().Format(time.RFC3339),
+			"events": []map[string]any{event},
 		},
 		map[string]any{
 			"step-1": map[string]any{
