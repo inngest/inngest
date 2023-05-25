@@ -158,7 +158,9 @@ func run(t *testing.T, test *Test) {
 		Addr:    fmt.Sprintf(":%d", port),
 		Handler: mux,
 	}
-	go srv.ListenAndServe()
+	go func() {
+		_ = srv.ListenAndServe()
+	}()
 	defer srv.Close()
 
 	localURL, err := url.Parse(fmt.Sprintf("%s:%d", proxyURL, port))
