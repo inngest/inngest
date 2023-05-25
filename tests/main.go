@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 )
 
 const (
@@ -58,7 +59,7 @@ func init() {
 
 	proxyURL = os.Getenv(ENV_PROXY_URL)
 	if proxyURL == "" {
-		proxyURL = "http://127.0.0.1:42018"
+		proxyURL = "http://127.0.0.1"
 	}
 }
 
@@ -76,12 +77,25 @@ func parseEnvURL(env string) url.URL {
 func run(t *testing.T, test *Test) {
 	t.Helper()
 
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Println("")
+	header := fmt.Sprintf("Running test: %s", t.Name())
+	fmt.Println(header)
+	for i := 0; i < len(header); i++ {
+		fmt.Printf("=")
+	}
+	fmt.Println("")
+	fmt.Println("")
+
 	test.requests = make(chan http.Request)
 	test.responses = make(chan http.Response)
 
 	// Ensure that the desired function exists within the SDK.
 	rr, err := introspect(test)
 	require.NoError(t, err, "Introspection error")
+
+	rand.Seed(uint64(time.Now().UnixNano()))
 
 	// Start a new test server which will intercept all requests between the executor and the SDK.
 	//
@@ -139,14 +153,15 @@ func run(t *testing.T, test *Test) {
 		_, err = w.Write(byt)
 		require.NoError(t, err)
 	}))
+	port := rand.Int63n(10000) + 40000
 	srv := &http.Server{
-		Addr:    ":42018",
+		Addr:    fmt.Sprintf(":%d", port),
 		Handler: mux,
 	}
 	go srv.ListenAndServe()
 	defer srv.Close()
 
-	localURL, err := url.Parse(proxyURL)
+	localURL, err := url.Parse(fmt.Sprintf("%s:%d", proxyURL, port))
 	require.NoError(t, err)
 
 	// Register all functions with the SDK.
@@ -167,7 +182,7 @@ func run(t *testing.T, test *Test) {
 
 	fmt.Println(" ==> Waiting for extraneous requests")
 	<-time.After(test.Timeout + buffer)
-	fmt.Printf("\n\n")
+	fmt.Printf("\n")
 }
 
 // introspect asserts that the SDK is live and the expected function exists when calling
