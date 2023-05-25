@@ -162,7 +162,9 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 	}
 }
 
-func (t *Test) ExpectParallelSteps(stepFunc func() []state.GeneratorOpcode, timeout time.Duration) func() {
+// ExpectParallelStepRuns is used to assert that step.run is called with the given number of steps
+// in parallel.  This can be used for a single stpe or for multiple steps.
+func (t *Test) ExpectParallelStepRuns(stepFunc func() []state.GeneratorOpcode, timeout time.Duration) func() {
 	return func() {
 		c := time.After(timeout)
 

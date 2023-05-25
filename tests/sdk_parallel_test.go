@@ -97,7 +97,7 @@ func TestSDKParallelism(t *testing.T) {
 		}),
 
 		// Expect simultaneous responses.
-		test.ExpectParallelSteps(func() []state.GeneratorOpcode {
+		test.ExpectParallelStepRuns(func() []state.GeneratorOpcode {
 			return []state.GeneratorOpcode{
 				{
 					Op:   enums.OpcodeStep,
@@ -114,7 +114,7 @@ func TestSDKParallelism(t *testing.T) {
 			}
 		}, time.Second),
 
-		test.ExpectParallelSteps(func() []state.GeneratorOpcode {
+		test.ExpectParallelStepRuns(func() []state.GeneratorOpcode {
 			return []state.GeneratorOpcode{
 				{},
 				{

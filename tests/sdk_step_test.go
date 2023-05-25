@@ -85,6 +85,11 @@ func TestSDKSteps(t *testing.T) {
 
 		test.SendTrigger(),
 
+		// NOTE: This test is verbose, explicitly checking each request <> response
+		// individually to assert the entire chain is correct.
+		//
+		// Other tests use higher-level helpers such as ExpectParallelStepRuns.
+
 		// Expect to run the first step immediately, no plan included.  The SDK
 		// optimizes single steps to run immediately.
 		test.ExpectRequest("Initial request plan", "step", time.Second),
