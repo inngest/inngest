@@ -27,7 +27,7 @@ type GeneratorOpcode struct {
 	// Opts indicate options for the operation, eg. matching expressions
 	// when setting up async event listeners via `waitForEvent`, or retry
 	// policies for steps.
-	Opts any `json:"opts"`
+	Opts any `json:"opts,omitempty"`
 	// Data is the resulting data from the operation, eg. the step
 	// output.
 	Data json.RawMessage `json:"data"`

@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/function"
@@ -156,6 +158,96 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 
 		case <-time.After(timeout):
 			require.Failf(t.test, "Expected executor request but timed out", name)
+		}
+	}
+}
+
+func (t *Test) ExpectParallelSteps(stepFunc func() []state.GeneratorOpcode, timeout time.Duration) func() {
+	return func() {
+		c := time.After(timeout)
+
+		steps := stepFunc()
+
+		for i := 0; i < len(steps); i++ {
+
+			// Expect a request
+			select {
+			case <-t.requests:
+				// TODO: expect a request for this opcode
+				// Right now, let this pass through.
+			case <-c:
+				require.Fail(t.test, "Expected steps but timed out")
+			}
+
+			// And expect a response.
+			select {
+			case r := <-t.responses:
+				t.lastResponse = time.Now()
+				byt, err := io.ReadAll(r.Body)
+				require.NoError(t.test, err)
+
+				op := []state.GeneratorOpcode{}
+				err = json.Unmarshal(byt, &op)
+				require.NoError(t.test, err)
+
+				if len(op) == 0 {
+					// Equal to opcode none.
+					op = append(op, state.GeneratorOpcode{})
+				}
+
+				found := false
+				for _, s := range steps {
+					if reflect.DeepEqual(s, op[0]) {
+						if s.Op == enums.OpcodeNone {
+							// Do nothing.
+							found = true
+							break
+						}
+
+						// Update stack
+						t.AddRequestStack(driver.FunctionStack{
+							Stack:   []string{s.ID},
+							Current: t.requestCtx.Stack.Current + 1,
+						})()
+
+						// wtf plz refactor
+						var data interface{}
+						switch op[0].Data[0] {
+						case '"':
+							data = ""
+							err = json.Unmarshal(op[0].Data, &data)
+							require.NoError(t.test, err)
+						case '[':
+							data = []map[string]any{}
+							err = json.Unmarshal(op[0].Data, &data)
+							require.NoError(t.test, err)
+						case '{':
+							data = map[string]any{}
+							err = json.Unmarshal(op[0].Data, &data)
+							require.NoError(t.test, err)
+						}
+
+						t.AddRequestSteps(map[string]any{
+							s.ID: data,
+						})()
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					had, _ := json.Marshal(steps)
+					require.Fail(
+						t.test,
+						"Found unexpected step output waiting for steps",
+						"Got %s\nHad %#v",
+						string(byt),
+						string(had),
+					)
+				}
+			case <-c:
+				require.Fail(t.test, "Expected steps but timed out")
+			}
 		}
 	}
 }

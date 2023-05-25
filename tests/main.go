@@ -232,7 +232,7 @@ func register(serverURL url.URL, rr sdk.RegisterRequest) error {
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", signingKey))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("error registering: %w", err)
 	}
 	if resp.StatusCode != 200 {
 		byt, _ := httputil.DumpResponse(resp, true)

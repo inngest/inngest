@@ -2,10 +2,14 @@ package driver
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 
 	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/function/env"
 )
@@ -67,4 +71,26 @@ func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex
 	}
 
 	return jcs.Transform(j)
+}
+
+type UnhashedOp struct {
+	Name   string         `json:"name"`
+	Op     enums.Opcode   `json:"op"`
+	Opts   map[string]any `json:"opts"`
+	Pos    uint           `json:"pos"`
+	Parent *string        `json:"parent"`
+}
+
+func (u UnhashedOp) Hash() (string, error) {
+	j, err := json.Marshal(u)
+	if err != nil {
+		return "", err
+	}
+	byt, err := jcs.Transform(j)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println(string(byt))
+	sum := sha1.Sum(byt)
+	return hex.EncodeToString(sum[:]), nil
 }
