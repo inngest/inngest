@@ -471,8 +471,16 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		return nil, fmt.Errorf("failed to unmarshal event; %w", err)
 	}
 
-	// TODO: populate this data from Redis properly
-	events := map[string]any{}
+	// Load the batch
+	cmd = m.r.B().Get().Key(m.kf.Batch(ctx, id)).Build()
+	byt, err = m.r.Do(ctx, cmd).AsBytes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get batch; %w", err)
+	}
+	batch := map[string]any{}
+	if err := json.Unmarshal(byt, &batch); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
+	}
 
 	// Load the actions.  This is a map of step IDs to JSON-encoded results.
 	cmd = m.r.B().Hgetall().Key(m.kf.Actions(ctx, id)).Build()
@@ -510,7 +518,7 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 
-	return state.NewStateInstance(*fn, id, meta, event, events, actions, errors, stack), nil
+	return state.NewStateInstance(*fn, id, meta, event, batch, actions, errors, stack), nil
 }
 
 func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {
