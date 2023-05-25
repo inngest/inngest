@@ -2,15 +2,17 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"regexp"
 	"testing"
 	"time"
 
@@ -26,12 +28,14 @@ const (
 	ENV_EVENT_URL   = "EVENT_URL" // eg http://127.0.0.1:8288 or https://inn.gs
 	ENV_SIGNING_KEY = "INNGEST_SIGNING_KEY"
 	ENV_EVENT_KEY   = "INNGEST_EVENT_KEY"
+	ENV_PROXY_URL   = "PROXY_URL"
 )
 
 var (
 	sdkURL               url.URL
 	apiURL               url.URL
 	eventURL             url.URL
+	proxyURL             string
 	signingKey, eventKey string
 
 	buffer = 5 * time.Second
@@ -50,6 +54,11 @@ func init() {
 	eventKey = os.Getenv(ENV_EVENT_KEY)
 	if eventKey == "" {
 		eventKey = "eventkey"
+	}
+
+	proxyURL = os.Getenv(ENV_PROXY_URL)
+	if proxyURL == "" {
+		proxyURL = "http://127.0.0.1:42018"
 	}
 }
 
@@ -82,7 +91,8 @@ func run(t *testing.T, test *Test) {
 	// - State injected via the executor.
 	//
 	// We can also randomly inject faults by disregarding the SDK's response and throwing a 500.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		byt, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		fmt.Printf(" ==> Received executor request:\n\t%s\n", string(byt))
@@ -129,8 +139,14 @@ func run(t *testing.T, test *Test) {
 		_, err = w.Write(byt)
 		require.NoError(t, err)
 	}))
+	srv := &http.Server{
+		Addr:    ":42018",
+		Handler: mux,
+	}
+	go srv.ListenAndServe()
 	defer srv.Close()
-	localURL, err := url.Parse(srv.URL)
+
+	localURL, err := url.Parse(proxyURL)
 	require.NoError(t, err)
 
 	// Register all functions with the SDK.
@@ -229,12 +245,17 @@ func register(serverURL url.URL, rr sdk.RegisterRequest) error {
 		return err
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", signingKey))
+	key := regexp.MustCompile(`^signkey-[\w]+-`).ReplaceAllString(signingKey, "")
+	byt, _ = hex.DecodeString(key)
+	sum := sha256.Sum256(byt)
+	keyHash := hex.EncodeToString(sum[:])
+
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer signkey-test-%s", keyHash))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("error registering: %w", err)
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode > 299 {
 		byt, _ := httputil.DumpResponse(resp, true)
 		return fmt.Errorf("Error when registering functions: %s", string(byt))
 	}

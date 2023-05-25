@@ -150,6 +150,11 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			err = json.Unmarshal(byt, er)
 			require.NoError(t.test, err)
 
+			if t.requestEvent.Timestamp == 0 {
+				// Update any timestamp.
+				t.requestEvent.Timestamp = er.Event.Timestamp
+			}
+
 			require.EqualValues(t.test, t.requestEvent, er.Event, "Request event is incorrect", name)
 			// Unset the run ID so that our unique run ID doesn't cause issues.
 			t.requestCtx.RunID = er.Ctx.RunID
