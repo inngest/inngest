@@ -155,7 +155,7 @@ LOOP:
 			}
 			q.seqLeaseLock.RUnlock()
 
-			if err := q.scan(ctx, f); err != nil {
+			if err := q.scan(ctx); err != nil {
 				// On scan errors, halt the worker entirely.
 				if errors.Unwrap(err) != context.Canceled {
 					q.logger.Error().Err(err).Msg("error scanning partition pointers")
@@ -315,7 +315,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 	}
 }
 
-func (q *queue) scan(ctx context.Context, f osqueue.RunFunc) error {
+func (q *queue) scan(ctx context.Context) error {
 	if q.capacity() == 0 {
 		return nil
 	}
@@ -333,7 +333,7 @@ func (q *queue) scan(ctx context.Context, f osqueue.RunFunc) error {
 			q.scope.Counter("scan_no_capacity_total").Inc(1)
 			return nil
 		}
-		if err := q.processPartition(ctx, p, f); err != nil {
+		if err := q.processPartition(ctx, p); err != nil {
 			if errors.Unwrap(err) != context.Canceled {
 				q.logger.Error().Err(err).Msg("error processing partition")
 			}
@@ -344,7 +344,7 @@ func (q *queue) scan(ctx context.Context, f osqueue.RunFunc) error {
 	return nil
 }
 
-func (q *queue) processPartition(ctx context.Context, p *QueuePartition, f osqueue.RunFunc) error {
+func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
 	q.scope.Counter(counterPartitionProcess).Inc(1)
 	ctx, span := q.tracer.Start(ctx, "processPartition")
 	defer span.End()
