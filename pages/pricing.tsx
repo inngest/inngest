@@ -34,14 +34,6 @@ type Feature = {
 
 const FEATURES: Feature[] = [
   {
-    name: "Functions",
-    plans: {
-      Hobby: "50",
-      Team: "100",
-      Enterprise: "Unlimited",
-    },
-  },
-  {
     name: "Events",
     plans: {
       Hobby: "Unlimited",
@@ -135,10 +127,6 @@ const PLANS: Plan[] = [
     },
     features: [
       {
-        quantity: "50",
-        text: "Functions",
-      },
-      {
         quantity: "Unlimited",
         text: "Events",
       },
@@ -179,10 +167,6 @@ const PLANS: Plan[] = [
     },
     features: [
       {
-        quantity: "100",
-        text: "Functions",
-      },
-      {
         quantity: "Unlimited",
         text: "Events",
       },
@@ -220,10 +204,6 @@ const PLANS: Plan[] = [
       text: "Get in touch",
     },
     features: [
-      {
-        quantity: "Unlimited",
-        text: "Functions",
-      },
       {
         quantity: "Unlimited",
         text: "Events",
