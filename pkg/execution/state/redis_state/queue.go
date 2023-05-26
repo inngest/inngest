@@ -425,6 +425,12 @@ func (q QueueItem) Queue() string {
 	return *q.QueueName
 }
 
+// IsLeased checks if the QueueItem is currently already leased or not
+// based on the time passed in.
+func (q QueueItem) IsLeased(time time.Time) bool {
+	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
+}
+
 // QueuePartition represents an individual queue for a workflow.  It stores the
 // time of the earliest job within the workflow.
 type QueuePartition struct {
@@ -612,7 +618,7 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 		if err := json.Unmarshal([]byte(str), qi); err != nil {
 			return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
 		}
-		if qi.LeaseID != nil && now.Before(ulid.Time(qi.LeaseID.Time())) {
+		if qi.IsLeased(now) {
 			// Leased item, don't return.
 			continue
 		}
@@ -1282,10 +1288,10 @@ func (q *queue) Scavenge(ctx context.Context) (int, error) {
 // ConfigLease allows a worker to lease config keys for sequential or scavenger processing.
 // Leasing this key works similar to leasing partitions or queue items:
 //
-// - If the key isn't leased, a new lease is accepted.
-// - If the lease is expired, a new lease is accepted.
-// - If the key is leased, you must pass in the existing lease ID to renew the lease.  Mismatches do not
-//   grant a lease.
+//   - If the key isn't leased, a new lease is accepted.
+//   - If the lease is expired, a new lease is accepted.
+//   - If the key is leased, you must pass in the existing lease ID to renew the lease.  Mismatches do not
+//     grant a lease.
 //
 // This returns the new lease ID on success.
 //
