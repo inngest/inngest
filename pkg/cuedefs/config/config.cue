@@ -232,6 +232,6 @@ package config
 
 #HTTPDriver: {
 	name:        "http"
-	timeout?:    int | *900 // 15 minutes
+	timeout?:    int | *7200 // 2 hours
 	signingKey?: string
 }

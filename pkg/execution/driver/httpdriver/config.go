@@ -1,9 +1,6 @@
 package httpdriver
 
 import (
-	"net/http"
-	"time"
-
 	"github.com/inngest/inngest/pkg/execution/driver"
 
 	"github.com/inngest/inngest/pkg/config/registration"
@@ -27,10 +24,5 @@ func (Config) RuntimeName() string { return "http" }
 func (Config) DriverName() string { return "http" }
 
 func (c Config) NewDriver() (driver.Driver, error) {
-	return executor{
-		client: &http.Client{
-			Timeout: time.Duration(c.Timeout) * time.Second,
-		},
-		signingKey: []byte(c.SigningKey),
-	}, nil
+	return DefaultExecutor, nil
 }

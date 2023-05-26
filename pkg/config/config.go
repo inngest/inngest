@@ -22,7 +22,6 @@ config.#Config & {
 		drivers: {
 			http: config.#HTTPDriver & {
 				signingKey: "dev-signing-key"
-				timeout:    900
 			}
 			docker: config.#DockerDriver & {
 				network: "host"
