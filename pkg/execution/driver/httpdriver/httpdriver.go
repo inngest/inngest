@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -21,10 +22,27 @@ import (
 )
 
 var (
+	dialer = &net.Dialer{
+		KeepAlive: 15 * time.Second,
+	}
+
 	DefaultExecutor = executor{
 		client: &http.Client{
 			Timeout:       consts.MaxFunctionTimeout,
 			CheckRedirect: CheckRedirect,
+			Transport: &http.Transport{
+				Proxy:                 http.ProxyFromEnvironment,
+				DialContext:           dialer.DialContext,
+				ForceAttemptHTTP2:     true,
+				MaxIdleConns:          0,
+				IdleConnTimeout:       0,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+				// New, ensuring that services can take their time before
+				// responding with headers as they process long running
+				// kjobs.
+				ResponseHeaderTimeout: consts.MaxFunctionTimeout,
+			},
 		},
 	}
 
@@ -32,6 +50,7 @@ var (
 )
 
 func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
+
 	if len(via) > 10 {
 		return fmt.Errorf("stopped after 10 redirects")
 	}
