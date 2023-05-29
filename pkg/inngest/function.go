@@ -100,6 +100,15 @@ func (f Function) GetSlug() string {
 	return strings.ToLower(slug.Make(f.Name))
 }
 
+func (f Function) IsScheduled() bool {
+	for _, t := range f.Triggers {
+		if t.CronTrigger != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // Validate returns an error if the function definition is invalid.
 func (f Function) Validate(ctx context.Context) error {
 	var err error
