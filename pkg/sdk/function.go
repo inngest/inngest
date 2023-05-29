@@ -48,7 +48,6 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 		Triggers:    s.Triggers,
 		Idempotency: s.Idempotency,
 		RateLimit:   s.RateLimit,
-		Retries:     s.Retries,
 		Cancel:      s.Cancel,
 	}
 
@@ -68,9 +67,9 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 			atts := step.Retries.Attempts
 			funcStep.Retries = &atts
 		}
-		if step.Retries == nil && f.Retries != nil {
-			// Fall back to function defaults if not provided.
-			funcStep.Retries = f.Retries
+		if step.Retries == nil && s.Retries != nil {
+			// Use the function's defaults provided as syntactic sugar when registering functions
+			funcStep.Retries = s.Retries
 		}
 		f.Steps = append(f.Steps, funcStep)
 	}

@@ -66,10 +66,6 @@ type Function struct {
 	// RateLimit allows specifying custom rate limiting for the function.
 	RateLimit *RateLimit `json:"rateLimit,omitempty"`
 
-	// Retries allows specifying the number of retries to attempt across all steps in the
-	// function.
-	Retries *int `json:"retries,omitempty"`
-
 	// Cancel specifies cancellation signals for the function
 	Cancel []Cancel `json:"cancel,omitempty"`
 
