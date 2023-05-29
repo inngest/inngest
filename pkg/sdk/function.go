@@ -3,6 +3,7 @@ package sdk
 import (
 	"fmt"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
@@ -47,13 +48,20 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 		Slug:        s.Slug,
 		Concurrency: s.Concurrency,
 		Triggers:    s.Triggers,
-		Idempotency: s.Idempotency,
 		RateLimit:   s.RateLimit,
 		Cancel:      s.Cancel,
 	}
 	// Ensure we set the slug here if s.ID is nil.  This defaults to using
 	// the slugged version of the function name.
 	f.Slug = f.GetSlug()
+
+	if s.Idempotency != nil {
+		f.RateLimit = &inngest.RateLimit{
+			Count:  1,
+			Period: consts.FunctionIdempotencyPeriod.String(),
+			Key:    s.Idempotency,
+		}
+	}
 
 	for _, step := range s.Steps {
 		url, ok := step.Runtime["url"].(string)

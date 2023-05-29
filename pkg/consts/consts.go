@@ -10,4 +10,6 @@ const (
 
 	// MaxBodySize is the maximum payload size read on any HTTP response.
 	MaxBodySize = 1024 * 1024 * 4
+
+	FunctionIdempotencyPeriod = 24 * time.Hour
 )

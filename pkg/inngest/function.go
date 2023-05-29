@@ -57,15 +57,6 @@ type Function struct {
 	// Trigger represnets the trigger for the function.
 	Triggers []Trigger `json:"triggers"`
 
-	// Idempotency allows the specification of an idempotency key by templating event
-	// data, eg:
-	//
-	//  `event.data.order_id`.
-	//
-	// When specified, a function will run at most once per 24 hours for the given unique
-	// key.
-	Idempotency *string `json:"idempotency,omitempty"`
-
 	// RateLimit allows specifying custom rate limiting for the function.
 	RateLimit *RateLimit `json:"rateLimit,omitempty"`
 
