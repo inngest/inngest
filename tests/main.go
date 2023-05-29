@@ -171,6 +171,9 @@ func introspect(test *Test) (*sdk.RegisterRequest, error) {
 		return nil, fmt.Errorf("invalid introspect response: unable to decode introspect response: %w", err)
 	}
 
+	// Ensure we always have a slug.
+	test.Function.Slug = test.Function.GetSlug()
+
 	expected, err := json.MarshalIndent(test.Function, "", "  ")
 	if err != nil {
 		return nil, err

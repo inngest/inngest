@@ -47,6 +47,9 @@ type Function struct {
 	// Name is the descriptive name for the function
 	Name string `json:"name"`
 
+	// Slug is the human-friendly ID for the function
+	Slug string `json:"slug"`
+
 	// Concurrency allows limiting the concurrency of running functions, optionally constrained
 	// by an individual concurrency key.
 	Concurrency *Concurrency `json:"concurrency,omitempty"`
@@ -98,8 +101,11 @@ type Cancel struct {
 	If      *string `json:"if,omitempty"`
 }
 
-// Slug returns the function slug
-func (f Function) Slug() string {
+// GetSlug returns the function slug, defaulting to creating a slug of the function name.
+func (f Function) GetSlug() string {
+	if f.Slug != "" {
+		return f.Slug
+	}
 	return strings.ToLower(slug.Make(f.Name))
 }
 

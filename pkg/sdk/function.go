@@ -9,8 +9,9 @@ import (
 // SDKFunction represents a function as specified via the SDK's registration request.
 type SDKFunction struct {
 	Name string `json:"name"`
+
 	// ID is the function slug.
-	ID string `json:"id"`
+	Slug string `json:"slug"`
 
 	// Triggers represent the triggers which start this function.
 	Triggers []inngest.Trigger `json:"triggers"`
@@ -42,14 +43,17 @@ type SDKFunction struct {
 
 func (s SDKFunction) Function() (*inngest.Function, error) {
 	f := inngest.Function{
-		Name: s.Name,
-		// Slug:        s.ID,
+		Name:        s.Name,
+		Slug:        s.Slug,
 		Concurrency: s.Concurrency,
 		Triggers:    s.Triggers,
 		Idempotency: s.Idempotency,
 		RateLimit:   s.RateLimit,
 		Cancel:      s.Cancel,
 	}
+	// Ensure we set the slug here if s.ID is nil.  This defaults to using
+	// the slugged version of the function name.
+	f.Slug = f.GetSlug()
 
 	for _, step := range s.Steps {
 		url, ok := step.Runtime["url"].(string)
