@@ -12,14 +12,17 @@ type SDKFunction struct {
 	Name string `json:"name"`
 
 	// ID is the function slug.
-	Slug string `json:"slug"`
+	Slug string `json:"id"`
 
 	// Triggers represent the triggers which start this function.
 	Triggers []inngest.Trigger `json:"triggers"`
 
 	// Concurrency allows limiting the concurrency of running functions, optionally constrained
 	// by an individual concurrency key.
-	Concurrency *inngest.Concurrency `json:"concurrency,omitempty"`
+	//
+	// This may be an int OR a struct, for backwards compatibility.
+	Concurrency any `json:"concurrency,omitempty"`
+
 	// Idempotency allows the specification of an idempotency key by templating event
 	// data, eg:
 	//
@@ -44,20 +47,36 @@ type SDKFunction struct {
 
 func (s SDKFunction) Function() (*inngest.Function, error) {
 	f := inngest.Function{
-		Name:        s.Name,
-		Slug:        s.Slug,
-		Concurrency: s.Concurrency,
-		Triggers:    s.Triggers,
-		RateLimit:   s.RateLimit,
-		Cancel:      s.Cancel,
+		Name:      s.Name,
+		Slug:      s.Slug,
+		Triggers:  s.Triggers,
+		RateLimit: s.RateLimit,
+		Cancel:    s.Cancel,
 	}
 	// Ensure we set the slug here if s.ID is nil.  This defaults to using
 	// the slugged version of the function name.
 	f.Slug = f.GetSlug()
 
+	switch v := s.Concurrency.(type) {
+	case float64:
+		// JSON is always unmarshalled as a float.
+		c := int(v)
+		f.Concurrency = &inngest.Concurrency{
+			Limit: c,
+		}
+	case map[string]any:
+		// Handle maps.
+		limit, ok := v["limit"].(float64)
+		if ok {
+			f.Concurrency = &inngest.Concurrency{
+				Limit: int(limit),
+			}
+		}
+	}
+
 	if s.Idempotency != nil {
 		f.RateLimit = &inngest.RateLimit{
-			Count:  1,
+			Limit:  1,
 			Period: consts.FunctionIdempotencyPeriod.String(),
 			Key:    s.Idempotency,
 		}

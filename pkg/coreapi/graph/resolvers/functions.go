@@ -38,7 +38,7 @@ func (r *queryResolver) Functions(ctx context.Context) ([]*models.Function, erro
 			Name:        fn.Name,
 			Concurrency: fn.ConcurrencyLimit(),
 			Triggers:    triggers,
-			URL:         "",
+			URL:         fn.Steps[0].URI,
 		})
 	}
 

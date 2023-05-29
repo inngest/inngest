@@ -81,8 +81,8 @@ func (s WorkflowStep) RetryCount() int {
 }
 
 type RateLimit struct {
-	// Count is how often the function can be called within the specified period
-	Count uint `json:"count"`
+	// Limit is how often the function can be called within the specified period
+	Limit uint `json:"count"`
 	// Period represents the time period for throttling the function
 	Period string `json:"period"`
 	// Key is an optional string to constrain throttling using event data.  For
