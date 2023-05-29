@@ -17,11 +17,11 @@ type Step struct {
 
 	// Retries optionally overrides retries for this step, allowing steps to have differing retry
 	// counts to the core function.
-	Retries *int `json:"retries"`
+	Retries *int `json:"retries,omitempty"`
 
 	// ConcurrencyKey allows steps to share concurrency slots across multiple functions, eg. for
 	// rate limiting across multiple functions.
-	ConcurrencyKey *string `json:"concurrencyKey"`
+	ConcurrencyKey *string `json:"concurrencyKey,omitempty"`
 }
 
 // RetryCount returns the number of retries for this step.

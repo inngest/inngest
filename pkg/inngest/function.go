@@ -90,7 +90,7 @@ func (f Function) ConcurrencyLimit() int {
 
 type Concurrency struct {
 	Limit int     `json:"limit"`
-	Key   *string `json:"key"`
+	Key   *string `json:"key,omitempty"`
 }
 
 // Cancel represents a cancellation signal for a function.  When specified, this
@@ -98,8 +98,8 @@ type Concurrency struct {
 // events and expressions.
 type Cancel struct {
 	Event   string  `json:"event"`
-	Timeout *string `json:"timeout"`
-	If      *string `json:"if"`
+	Timeout *string `json:"timeout,omitempty"`
+	If      *string `json:"if,omitempty"`
 }
 
 // Slug returns the function slug
