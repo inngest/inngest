@@ -89,7 +89,7 @@ type RateLimit struct {
 	// example, if you want to throttle incoming notifications based off of a user's
 	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
 	// that we throttle functions for each user independently.
-	Key *string `json:"key"`
+	Key *string `json:"key,omitempty"`
 }
 
 type Edge struct {
