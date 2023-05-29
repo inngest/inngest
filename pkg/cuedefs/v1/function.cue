@@ -77,7 +77,7 @@ package v1
 	// Runtime represents how the function is executed.  Each runtime specifies data
 	// necessary for executing the image, eg. if this is an externally hosted serverless
 	// function via an API this will include the URL to use in order to invoke the function.
-	runtime?: #Runtime | *#RuntimeDocker
+	runtime?: #Runtime
 
 	// after specifies that this step should run after each of the following steps.
 	//

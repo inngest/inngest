@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/function"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -35,23 +33,12 @@ func (r *queryResolver) Functions(ctx context.Context) ([]*models.Function, erro
 			triggers = append(triggers, t)
 		}
 
-		avs, _, err := fn.Actions(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load function configuration")
-		}
-
-		av := avs[0]
-		rt, ok := av.Runtime.Runtime.(inngest.RuntimeHTTP)
-		if !ok {
-			return nil, fmt.Errorf("failed to parse function runtime data")
-		}
-
 		functions = append(functions, &models.Function{
-			ID:          fn.ID,
+			ID:          fn.Name,
 			Name:        fn.Name,
-			Concurrency: fn.Concurrency,
+			Concurrency: fn.ConcurrencyLimit(),
 			Triggers:    triggers,
-			URL:         rt.URL,
+			URL:         "",
 		})
 	}
 
@@ -85,7 +72,7 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 	}
 
 	startedAt := ulid.Time(runID.Time())
-	name := state.Workflow().Name
+	name := state.Function().Name
 
 	pending := state.Metadata().Pending
 	if pending < 0 {
@@ -124,7 +111,7 @@ func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionR
 
 		startedAt := ulid.Time(m.Identifier.RunID.Time())
 
-		name := s.Workflow().Name
+		name := s.Function().Name
 		pending := int(m.Pending)
 
 		// Don't let pending be negative for clients
@@ -146,31 +133,4 @@ func (r *queryResolver) FunctionRuns(ctx context.Context, query models.FunctionR
 	})
 
 	return runs, nil
-}
-
-// Deploy a function creating a new function version
-func (r *mutationResolver) DeployFunction(ctx context.Context, input models.DeployFunctionInput) (*function.FunctionVersion, error) {
-	// Parse function CUE or JSON string - This also validates the function
-	f, err := function.Unmarshal(ctx, []byte(input.Config), "")
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO - Move default environment to config
-	env := "prod"
-	if input.Env != nil {
-		env = input.Env.String()
-	}
-	fv, err := r.APIReadWriter.CreateFunctionVersion(ctx, *f, *input.Live, env)
-	if err != nil {
-		return nil, err
-	}
-
-	config, err := function.MarshalCUE(fv.Function)
-	if err != nil {
-		return nil, err
-	}
-
-	fv.Config = string(config)
-	return &fv, nil
 }

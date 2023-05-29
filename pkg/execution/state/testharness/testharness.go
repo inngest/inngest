@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,14 +23,14 @@ import (
 
 var (
 	// n100 is a workflow created during init() which has 100 steps and edges.
-	n100 = inngest.Workflow{
+	n100 = inngest.Function{
 		Name: "Test workflow",
-		ID:   "100-steps-87bd12",
+		ID:   uuid.NewSHA1(uuid.NameSpaceOID, []byte("Test workflow")),
 	}
 
-	w = inngest.Workflow{
+	w = inngest.Function{
+		ID:   uuid.NewSHA1(uuid.NameSpaceOID, []byte("Test workflow")),
 		Name: "Test workflow",
-		ID:   "shuffling-sphinx-87bd12",
 		Triggers: []inngest.Trigger{
 			{
 				EventTrigger: &inngest.EventTrigger{
@@ -40,16 +40,14 @@ var (
 		},
 		Steps: []inngest.Step{
 			{
-				ID:       "step-a",
-				ClientID: 1,
-				Name:     "first step",
-				DSN:      "test-step",
+				ID:   "step-a",
+				Name: "first step",
+				URI:  "http://www.example.com/api/inngest",
 			},
 			{
-				ID:       "step-b",
-				ClientID: 2,
-				Name:     "second step",
-				DSN:      "test-step",
+				ID:   "step-b",
+				Name: "second step",
+				URI:  "http://www.example.com/api/inngest",
 			},
 		},
 		Edges: []inngest.Edge{
@@ -79,14 +77,29 @@ var (
 	}
 )
 
+func FunctionLoader() state.FunctionLoader {
+	return loader{}
+}
+
+type loader struct{}
+
+func (loader) LoadFunction(ctx context.Context, identifier state.Identifier) (*inngest.Function, error) {
+	if identifier.WorkflowID == w.ID {
+		return &w, nil
+	}
+	if identifier.WorkflowID == n100.ID {
+		return &n100, nil
+	}
+	return nil, fmt.Errorf("workflow not found: %s", identifier.WorkflowID)
+}
+
 func init() {
 	// Copy the workflow and make 1000 scheduled steps.
 	for i := 1; i <= 100; i++ {
 		n100.Steps = append(n100.Steps, inngest.Step{
-			ID:       fmt.Sprintf("step-%d", i),
-			ClientID: uint(i),
-			Name:     fmt.Sprintf("Step %d", i),
-			DSN:      "test-step",
+			ID:   fmt.Sprintf("step-%d", i),
+			Name: fmt.Sprintf("Step %d", i),
+			URI:  "http://www.example.com/api/inngest",
 		})
 		n100.Edges = append(n100.Edges, inngest.Edge{
 			Incoming: inngest.TriggerName,
@@ -143,17 +156,16 @@ func CheckState(t *testing.T, gen Generator) {
 
 func checkNew(t *testing.T, m state.Manager) {
 	ctx := context.Background()
-	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	id := state.Identifier{
-		WorkflowID: w.UUID,
-		RunID:      runID,
-		Key:        runID.String(),
+		WorkflowID:      w.ID,
+		WorkflowVersion: w.FunctionVersion,
+		RunID:           runID,
+		Key:             runID.String(),
 	}
 
 	init := state.Input{
 		Identifier: id,
-		Workflow:   w,
 		EventData:  input.Map(),
 		Context: map[string]any{
 			"some": "data",
@@ -164,7 +176,7 @@ func checkNew(t *testing.T, m state.Manager) {
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
 
-	found := s.Workflow()
+	found := s.Function()
 	require.EqualValues(t, w, found, "Returned workflow does not match input")
 	require.EqualValues(t, input.Map(), s.Event(), "Returned event does not match input")
 	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
@@ -174,7 +186,7 @@ func checkNew(t *testing.T, m state.Manager) {
 	loaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 
-	found = loaded.Workflow()
+	found = loaded.Function()
 	require.EqualValues(t, w, found, "Loaded workflow does not match input")
 	require.EqualValues(t, input.Map(), loaded.Event(), "Loaded event does not match input")
 
@@ -186,17 +198,15 @@ func checkNew(t *testing.T, m state.Manager) {
 // predetermined step data.
 func checkNew_stepdata(t *testing.T, m state.Manager) {
 	ctx := context.Background()
-	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	id := state.Identifier{
-		WorkflowID: w.UUID,
+		WorkflowID: w.ID,
 		RunID:      runID,
 		Key:        runID.String(),
 	}
 
 	init := state.Input{
 		Identifier: id,
-		Workflow:   w,
 		EventData:  input.Map(),
 		Steps: map[string]any{
 			"step-a": map[string]any{
@@ -208,14 +218,14 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 	s, err := m.New(ctx, init)
 	require.NoError(t, err)
 
-	found := s.Workflow()
+	found := s.Function()
 	require.EqualValues(t, w, found, "Returned workflow does not match input")
 	require.EqualValues(t, input.Map(), s.Event(), "Returned event does not match input")
 
 	loaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 
-	found = loaded.Workflow()
+	found = loaded.Function()
 	require.EqualValues(t, w, found, "Loaded workflow does not match input")
 	require.EqualValues(t, input.Map(), loaded.Event(), "Loaded event does not match input")
 
@@ -279,7 +289,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 
 	// Ensure basics haven't changed.
 	require.EqualValues(t, s.Identifier(), next.Identifier())
-	require.EqualValues(t, s.Workflow(), next.Workflow())
+	require.EqualValues(t, s.Function(), next.Function())
 	require.EqualValues(t, s.Event(), next.Event())
 
 	// Assert that the next state has actions set. for the first step.
@@ -320,7 +330,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	require.NotNil(t, next)
 
 	require.EqualValues(t, s.Identifier(), next.Identifier())
-	require.EqualValues(t, s.Workflow(), next.Workflow())
+	require.EqualValues(t, s.Function(), next.Function())
 	require.EqualValues(t, s.Event(), next.Event())
 	// Assert that the next state has actions set. for the first step.
 	require.Equal(t, 0, len(s.Actions()))
@@ -349,7 +359,7 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	reloaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
 	require.EqualValues(t, next.Identifier(), reloaded.Identifier())
-	require.EqualValues(t, next.Workflow(), reloaded.Workflow())
+	require.EqualValues(t, next.Function(), reloaded.Function())
 	require.EqualValues(t, next.Event(), reloaded.Event())
 	require.EqualValues(t, next.Actions(), reloaded.Actions())
 	require.EqualValues(t, next.Errors(), reloaded.Errors())
@@ -1450,10 +1460,9 @@ func checkIdempotency(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 
 	// Create 100 new functions concurrently.
-	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	id := state.Identifier{
-		WorkflowID: w.UUID,
+		WorkflowID: w.ID,
 		RunID:      runID,
 		Key:        runID.String(),
 	}
@@ -1476,7 +1485,6 @@ func checkIdempotency(t *testing.T, m state.Manager) {
 
 			init := state.Input{
 				Identifier: copiedID,
-				Workflow:   w,
 				EventData:  data,
 			}
 
@@ -1499,17 +1507,15 @@ func checkIdempotency(t *testing.T, m state.Manager) {
 
 func checkSetStatus(t *testing.T, m state.Manager) {
 	ctx := context.Background()
-	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	id := state.Identifier{
-		WorkflowID: w.UUID,
+		WorkflowID: w.ID,
 		RunID:      runID,
 		Key:        runID.String(),
 	}
 
 	init := state.Input{
 		Identifier: id,
-		Workflow:   w,
 		EventData:  input.Map(),
 	}
 
@@ -1534,17 +1540,15 @@ func checkSetStatus(t *testing.T, m state.Manager) {
 
 func checkCancel(t *testing.T, m state.Manager) {
 	ctx := context.Background()
-	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	id := state.Identifier{
-		WorkflowID: w.UUID,
+		WorkflowID: w.ID,
 		RunID:      runID,
 		Key:        runID.String(),
 	}
 
 	init := state.Input{
 		Identifier: id,
-		Workflow:   w,
 		EventData:  input.Map(),
 	}
 
@@ -1569,16 +1573,14 @@ func checkCancel(t *testing.T, m state.Manager) {
 
 func checkCancel_cancelled(t *testing.T, m state.Manager) {
 	ctx := context.Background()
-	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	id := state.Identifier{
-		WorkflowID: w.UUID,
+		WorkflowID: w.ID,
 		RunID:      runID,
 		Key:        runID.String(),
 	}
 	init := state.Input{
 		Identifier: id,
-		Workflow:   w,
 		EventData:  input.Map(),
 	}
 
@@ -1601,16 +1603,14 @@ func checkCancel_cancelled(t *testing.T, m state.Manager) {
 
 func checkCancel_completed(t *testing.T, m state.Manager) {
 	ctx := context.Background()
-	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	id := state.Identifier{
-		WorkflowID: w.UUID,
+		WorkflowID: w.ID,
 		RunID:      runID,
 		Key:        runID.String(),
 	}
 	init := state.Input{
 		Identifier: id,
-		Workflow:   w,
 		EventData:  input.Map(),
 	}
 
@@ -1909,17 +1909,15 @@ func checkFinalizedDeletesPauses(t *testing.T, m state.Manager) {
 
 func setup(t *testing.T, m state.Manager) state.State {
 	ctx := context.Background()
-	w.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(w.ID))
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	id := state.Identifier{
-		WorkflowID: w.UUID,
+		WorkflowID: w.ID,
 		RunID:      runID,
 		Key:        runID.String(),
 	}
 
 	init := state.Input{
 		Identifier: id,
-		Workflow:   w,
 		EventData:  input.Map(),
 	}
 

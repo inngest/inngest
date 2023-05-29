@@ -7,7 +7,6 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/testharness"
@@ -21,6 +20,7 @@ func TestStateHarness(t *testing.T) {
 	sm, err := New(
 		context.Background(),
 		WithKeyPrefix("{test}:"),
+		WithFunctionLoader(testharness.FunctionLoader()),
 		WithConnectOpts(rueidis.ClientOption{
 			InitAddress:  []string{r.Addr()},
 			DisableCache: true,
@@ -30,7 +30,6 @@ func TestStateHarness(t *testing.T) {
 
 	create := func() (state.Manager, func()) {
 		return sm, func() {
-			// fmt.Println(r.Dump())
 			r.FlushAll()
 		}
 	}
@@ -54,7 +53,6 @@ func BenchmarkNew(b *testing.B) {
 	}
 	init := state.Input{
 		Identifier: id,
-		Workflow:   inngest.Workflow{},
 		EventData: event.Event{
 			Name: "test-event",
 			Data: map[string]any{

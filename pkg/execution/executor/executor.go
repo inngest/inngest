@@ -6,13 +6,12 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/rs/zerolog"
 )
@@ -135,16 +134,16 @@ func WithStateManager(sm state.Manager) ExecutorOpt {
 	}
 }
 
-func WithLogger(l *zerolog.Logger) ExecutorOpt {
+func WithFunctionLoader(l state.FunctionLoader) ExecutorOpt {
 	return func(e Executor) error {
-		e.(*executor).log = l
+		e.(*executor).fl = l
 		return nil
 	}
 }
 
-func WithConfig(c config.Execution) ExecutorOpt {
+func WithLogger(l *zerolog.Logger) ExecutorOpt {
 	return func(e Executor) error {
-		e.(*executor).config = c
+		e.(*executor).log = l
 		return nil
 	}
 }
@@ -184,11 +183,11 @@ func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
 
 // executor represents a built-in executor for running workflows.
 type executor struct {
-	log    *zerolog.Logger
-	config config.Execution
+	log *zerolog.Logger
 
 	sm             state.Manager
 	al             coredata.ExecutionActionLoader
+	fl             state.FunctionLoader
 	runtimeDrivers map[string]driver.Driver
 	failureHandler FailureHandler
 
@@ -226,15 +225,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 			Str("run_id", id.RunID.String()).
 			Interface("edge", edge).
 			Str("step", edge.Incoming).
-			Str("fn_name", s.Workflow().Name).
-			Str("fn_id", s.Workflow().ID).
+			Str("fn_name", s.Function().Name).
+			Str("fn_id", s.Function().ID.String()).
 			Int("attempt", attempt).
 			Logger()
 		log = &l
 		log.Debug().Msg("executing step")
 	}
-
-	w := s.Workflow()
 
 	// This could have been retried due to a state load error after
 	// the particular step's code has ran; we need to load state after
@@ -252,18 +249,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 			Scheduled: false,
 			Output:    resp,
 			Err:       nil,
-			// TODO: This data isn't necessarily available in the state
-			// store.  Should we mandate that this is saved?
-			//
-			// We're only short-circuiting execution here, which means
-			// everything has been recorded and all logs should be up
-			// to date;  this *shouldn't* be an issue (but... we need
-			// to check).
-			ActionVersion: nil,
 		}, 0, nil
 	}
 
-	resp, idx, err := e.run(ctx, w, id, edge, s, attempt, stackIndex)
+	resp, idx, err := e.run(ctx, id, edge, s, attempt, stackIndex)
 	if log != nil {
 		var (
 			l   *zerolog.Event
@@ -284,7 +273,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 		}
 		l.Str("run_id", id.RunID.String()).Str("step", edge.Incoming).Msg(msg)
 
-		if e.config.LogOutput && resp != nil {
+		if resp != nil {
 			// Log the output separately, highlighting it with
 			// a different caller.  This lets users scan for
 			// output easily, and if we build a TUI to filter on
@@ -312,19 +301,29 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 }
 
 // run executes the step with the given step ID.
-func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identifier, edge inngest.Edge, s state.State, attempt int, stackIndex int) (*state.DriverResponse, int, error) {
+func (e *executor) run(ctx context.Context, id state.Identifier, edge inngest.Edge, s state.State, attempt int, stackIndex int) (*state.DriverResponse, int, error) {
 	var (
 		response *state.DriverResponse
 		err      error
 	)
 
+	if e.fl == nil {
+		return nil, 0, fmt.Errorf("no function loader specified running step")
+	}
+
 	if edge.Incoming == inngest.TriggerName {
 		return nil, 0, nil
 	}
 
+	f, err := e.fl.LoadFunction(ctx, id)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error loading function for run: %w", err)
+	}
+
 	var step *inngest.Step
-	for _, s := range w.Steps {
+	for _, s := range f.Steps {
 		if s.ID == edge.Incoming {
+			// TODO
 			step = &s
 			break
 		}
@@ -333,7 +332,7 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 		// This isn't fixable.
 		return nil, 0, newFinalError(fmt.Errorf("unknown vertex: %s", edge.Incoming))
 	}
-	response, idx, err := e.executeAction(ctx, id, step, s, edge, attempt, stackIndex)
+	response, idx, err := e.executeStep(ctx, id, step, s, edge, attempt, stackIndex)
 	if err != nil {
 		return response, idx, err
 	}
@@ -360,47 +359,33 @@ func (e *executor) run(ctx context.Context, w inngest.Workflow, id state.Identif
 	return response, idx, err
 }
 
-func (e *executor) executeAction(ctx context.Context, id state.Identifier, action *inngest.Step, s state.State, edge inngest.Edge, attempt, stackIndex int) (*state.DriverResponse, int, error) {
+func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *inngest.Step, s state.State, edge inngest.Edge, attempt, stackIndex int) (*state.DriverResponse, int, error) {
 	var l *zerolog.Logger
 	if e.log != nil {
 		log := e.log.With().
 			Str("run_id", id.RunID.String()).
-			Str("step", action.ID).
 			Logger()
 		l = &log
 	}
 
-	definition, err := e.al.Action(ctx, action.DSN, action.Version)
-	if err != nil {
-		return nil, 0, fmt.Errorf("error loading step: %w", err)
-	}
-	if definition == nil {
-		return nil, 0, fmt.Errorf("no action returned: %s", action.DSN)
-	}
-
-	d, ok := e.runtimeDrivers[definition.Runtime.RuntimeType()]
+	d, ok := e.runtimeDrivers[step.Driver()]
 	if !ok {
-		return nil, 0, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, definition.Runtime.RuntimeType())
+		return nil, 0, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, step.Driver())
 	}
 
 	if l != nil {
-		l.Info().
-			Interface("version", definition.Version).
-			Interface("scopes", definition.Scopes).
-			Str("dsn", definition.DSN).
-			Str("action_name", action.Name).
-			Msg("executing action")
+		l.Info().Str("uri", step.URI).Msg("executing action")
 	}
 
-	if err := e.sm.Started(ctx, id, action.ID, attempt); err != nil {
+	if err := e.sm.Started(ctx, id, step.ID, attempt); err != nil {
 		return nil, 0, fmt.Errorf("error saving started state: %w", err)
 	}
 
-	response, err := d.Execute(ctx, s, *definition, edge, *action, stackIndex)
+	response, err := d.Execute(ctx, s, edge, *step, stackIndex)
 	if response == nil {
 		// Add an error response here.
 		response = &state.DriverResponse{
-			Step: *action,
+			Step: *step,
 			Err:  err,
 		}
 	}
@@ -411,13 +396,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 
 	// Ensure that the step is always set.  This removes the need for drivers to always
 	// set this.
-	response.Step = *action
-
-	if response.ActionVersion == nil {
-		// Set the ActionVersion automatically from the executor, where
-		// provided from the definition.
-		response.ActionVersion = definition.Version
-	}
+	response.Step = *step
 
 	// NOTE: We must ensure that the Step ID is overwritten for Generator steps.  Generator
 	// steps are executed many times until they stop yielding;  each execution returns a
@@ -459,7 +438,7 @@ func (e *executor) executeAction(ctx context.Context, id state.Identifier, actio
 		return response, 0, nil
 	}
 
-	if response.Err != nil && !queue.ShouldRetry(err, attempt, action.RetryCount()) {
+	if response.Err != nil && !queue.ShouldRetry(err, attempt, step.RetryCount()) {
 		// We need to detect whether this error is 'final' here, depending on whether
 		// we've hit the retry count or this error is deemed non-retryable.
 		//

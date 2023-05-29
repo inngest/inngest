@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"

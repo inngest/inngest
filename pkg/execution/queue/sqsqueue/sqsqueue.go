@@ -12,15 +12,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
-	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 )
-
-func init() {
-	registration.RegisterQueue(func() any { return &Config{} })
-}
 
 type Config struct {
 	Region   string

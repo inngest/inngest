@@ -5,9 +5,8 @@ import (
 	"encoding/json"
 
 	"github.com/gowebpki/jcs"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/function/env"
+	"github.com/inngest/inngest/pkg/inngest"
 )
 
 type Driver interface {
@@ -17,18 +16,10 @@ type Driver interface {
 	Execute(
 		ctx context.Context,
 		s state.State,
-		av inngest.ActionVersion,
 		edge inngest.Edge,
 		step inngest.Step,
 		stackIndex int,
 	) (*state.DriverResponse, error)
-}
-
-// EnvManager is a driver which reads and utilizes environment variables when
-// executing actions.  For example, the Docker driver utilizes an EnvReader to
-// read specific env variables for each exectuion.
-type EnvManager interface {
-	SetEnvReader(r env.EnvReader)
 }
 
 type FunctionStack struct {
@@ -44,7 +35,7 @@ func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex
 		"ctx": map[string]interface{}{
 			// fn_id is used within entrypoints to SDK-based functions in
 			// order to specify the ID of the function to run via RPC.
-			"fn_id": s.Workflow().ID,
+			"fn_id": s.Function().ID,
 			// env is the name of the environment that the function is running in.
 			// though this is self-discoverable most of the time, for static envs
 			// the SDK has no knowledge of the name as it only has a signing key.

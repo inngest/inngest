@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -112,9 +112,8 @@ type Metadata struct {
 // It is assumed that, once initialized, state does not error when returning
 // data for the given identifier.
 type State interface {
-	// Workflow returns the concrete workflow that is being executed
-	// for the given run.
-	Workflow() inngest.Workflow
+	// Function returns the inngest function for the given run.
+	Function() inngest.Function
 
 	// Metadata returns the run metadata, including the started at time
 	// as well as the pending count.
@@ -156,7 +155,8 @@ type State interface {
 
 // Manager represents a state manager which can both load and mutate state.
 type Manager interface {
-	Loader
+	FunctionLoader
+	StateLoader
 	Mutater
 	PauseManager
 }
@@ -181,15 +181,11 @@ type FunctionNotifier interface {
 
 type FunctionCallback func(context.Context, Identifier, enums.RunStatus)
 
-// Loader allows loading of previously stored state based off of a given Identifier.
-type Loader interface {
+// StateLoader allows loading of previously stored state based off of a given Identifier.
+type StateLoader interface {
 	// Metadata returns run metadata for the given identifier.  It may be cheaper
 	// than a full load in cases where only the metadata is necessary.
 	Metadata(ctx context.Context, runID ulid.ULID) (*Metadata, error)
-
-	// Workflow returns the workflow definition for the given run.  It's cheaper
-	// than a full state load.
-	Workflow(ctx context.Context, runID ulid.ULID) (*inngest.Workflow, error)
 
 	// Load returns run state for the given identifier.
 	Load(ctx context.Context, runID ulid.ULID) (State, error)
@@ -204,6 +200,11 @@ type Loader interface {
 	// StackIndex returns the index for the given step ID within the function stack of
 	// a given run.
 	StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error)
+}
+
+// FunctionLoader loads function definitions based off of an identifier.
+type FunctionLoader interface {
+	LoadFunction(ctx context.Context, identifier Identifier) (*inngest.Function, error)
 }
 
 // Mutater mutates state for a given identifier, storing the state and returning
@@ -282,7 +283,6 @@ type HistoryDeleter interface {
 // Identifier and Input;  the rest of the data is stored within the state store as
 // metadata.
 type Input struct {
-	Workflow inngest.Workflow
 	// Identifier represents the identifier
 	Identifier Identifier
 

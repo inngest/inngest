@@ -33,6 +33,7 @@ func commandsSortedSet(m *Miniredis) {
 	m.srv.Register("ZREVRANGEBYSCORE", m.makeCmdZrangebyscore(true))
 	m.srv.Register("ZREVRANK", m.makeCmdZrank(true))
 	m.srv.Register("ZSCORE", m.cmdZscore)
+	m.srv.Register("ZMSCORE", m.cmdZMscore)
 	m.srv.Register("ZUNION", m.cmdZunion)
 	m.srv.Register("ZUNIONSTORE", m.cmdZunionstore)
 	m.srv.Register("ZSCAN", m.cmdZscan)
@@ -1041,6 +1042,49 @@ func (m *Miniredis) cmdZscore(c *server.Peer, cmd string, args []string) {
 		}
 
 		c.WriteFloat(db.ssetScore(key, member))
+	})
+}
+
+// ZMSCORE
+func (m *Miniredis) cmdZMscore(c *server.Peer, cmd string, args []string) {
+	if len(args) < 2 {
+		setDirty(c)
+		c.WriteError(errWrongNumber(cmd))
+		return
+	}
+	if !m.handleAuth(c) {
+		return
+	}
+	if m.checkPubsub(c, cmd) {
+		return
+	}
+
+	key, members := args[0], args[1:]
+
+	withTx(m, c, func(c *server.Peer, ctx *connCtx) {
+		db := m.db(ctx.selectedDB)
+
+		if !db.exists(key) {
+			c.WriteLen(len(members))
+			for range members {
+				c.WriteNull()
+			}
+			return
+		}
+
+		if db.t(key) != "zset" {
+			c.WriteError(ErrWrongType.Error())
+			return
+		}
+
+		c.WriteLen(len(members))
+		for _, member := range members {
+			if !db.ssetExists(key, member) {
+				c.WriteNull()
+				continue
+			}
+			c.WriteFloat(db.ssetScore(key, member))
+		}
 	})
 }
 

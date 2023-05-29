@@ -7,6 +7,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
+	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -14,8 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
-	"github.com/inngest/inngest/pkg/function"
-	"github.com/inngest/inngest/pkg/function/env"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/rueian/rueidis"
 )
@@ -26,15 +26,12 @@ type StartOpts struct {
 	RootDir      string        `json:"dir"`
 	URLs         []string      `json:"urls"`
 	Autodiscover bool          `json:"autodiscover"`
-	Docker       bool          `json:"docker"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
 // development.
 //
 // It runs all available services from `inngest serve`, plus:
-//
-// - Builds locally defined docker-based functions using Buildx
 // - Adds development-specific APIs for communicating with the SDK.
 func New(ctx context.Context, opts StartOpts) error {
 	// The dev server _always_ logs output for development.
@@ -49,18 +46,6 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) error {
-	funcs, err := loader.Functions(ctx)
-	if err != nil {
-		return err
-	}
-
-	// create a new env reader which will load .env files from functions directly, each
-	// time the executor runs.
-	envreader, err := env.NewReader(funcs)
-	if err != nil {
-		return err
-	}
-
 	rc, err := createInmemoryRedis(ctx)
 	if err != nil {
 		return err
@@ -70,6 +55,7 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 	t := runner.NewTracker()
 	sm, err = redis_state.New(
 		ctx,
+		redis_state.WithFunctionLoader(loader),
 		redis_state.WithRedisClient(rc),
 		redis_state.WithKeyGenerator(redis_state.DefaultKeyFunc{
 			Prefix: "{state}",
@@ -104,12 +90,11 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 			// partition.
 			funcs, _ := loader.Functions(ctx)
 			for _, f := range funcs {
-				id := f.ID
-				if _, err := uuid.Parse(f.ID); err != nil {
-					id = function.DeterministicUUID(f).String()
+				if f.ID == uuid.Nil {
+					f.ID = inngest.DeterministicUUID(f)
 				}
-				if id == p.WorkflowID.String() && f.Concurrency > 0 {
-					return p.Queue(), f.Concurrency
+				if f.ID == p.WorkflowID && f.ConcurrencyLimit() > 0 {
+					return p.Queue(), f.ConcurrencyLimit()
 				}
 			}
 			return p.Queue(), 10_000
@@ -135,9 +120,11 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 	exec := executor.NewService(
 		opts.Config,
 		executor.WithExecutionLoader(loader),
-		executor.WithEnvReader(envreader),
 		executor.WithState(sm),
 		executor.WithQueue(queue),
+		executor.WithExecutorOpts(
+			executor.WithFunctionLoader(loader),
+		),
 	)
 
 	// Add notifications to the state manager so that we can store new function runs

@@ -41,9 +41,7 @@ package config
 			// For each runtime, specify a driver which has its own name.
 			[runtime=_]: #Driver & {name: string}
 		} | *{
-
-			docker: #DockerDriver
-			http:   #HTTPDriver
+			http: #HTTPDriver
 		}
 
 		// logOutput logs output from steps within logs.  This may
@@ -62,12 +60,12 @@ package config
 	}
 
 	queue: {
-		service: #QueueService | *{backend: "inmemory"}
+		service: #QueueService | *{backend: "redis"}
 		// This struct is retained for any shared settings
 	}
 
 	state: {
-		service: #StateService | *{backend: "inmemory"}
+		service: #StateService | *{backend: "redis"}
 		// This struct is retained for any shared settings
 	}
 
@@ -206,22 +204,7 @@ package config
 }
 
 // Drivers handle execution of each step within a function.
-#Driver: #DockerDriver | #MockDriver | #HTTPDriver
-
-// DockerDriver runs docker containers _synchronously_ on the given host.
-// If no host is specified, we default to the $DOCKER_HOST environment variable,
-// which uses the local machine if not set.
-#DockerDriver: {
-	name:  "docker"
-	host?: string
-
-	// network represents the network name to bind to.  Within `inngest run`
-	// and `inngest dev` this is automatically set to "host", ensuring containers
-	// run with access to localhost.
-	//
-	// This is not set by default when self-hosting via `inngest serve`.
-	network?: string | "host"
-}
+#Driver: #MockDriver | #HTTPDriver
 
 // MockDriver is used in testing to mock and stub function executions.  You
 // almost certainly do not need to include this in your config.

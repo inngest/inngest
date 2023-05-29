@@ -14,11 +14,11 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 )
 
 var (
@@ -65,8 +65,8 @@ func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
 	return nil
 }
 
-func Execute(ctx context.Context, s state.State, action inngest.ActionVersion, edge inngest.Edge, step inngest.Step, idx int) (*state.DriverResponse, error) {
-	return DefaultExecutor.Execute(ctx, s, action, edge, step, idx)
+func Execute(ctx context.Context, s state.State, edge inngest.Edge, step inngest.Step, idx int) (*state.DriverResponse, error) {
+	return DefaultExecutor.Execute(ctx, s, edge, step, idx)
 }
 
 type executor struct {
@@ -141,9 +141,10 @@ func ParseGenerator(ctx context.Context, byt []byte) ([]*state.GeneratorOpcode, 
 	}, nil
 }
 
-func (e executor) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, edge inngest.Edge, step inngest.Step, idx int) (*state.DriverResponse, error) {
-	rt, ok := action.Runtime.Runtime.(inngest.RuntimeHTTP)
-	if !ok {
+func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge, step inngest.Step, idx int) (*state.DriverResponse, error) {
+
+	uri, err := url.Parse(step.URI)
+	if err != nil || (uri.Scheme != "http" && uri.Scheme != "https") {
 		return nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
 	}
 
@@ -153,16 +154,16 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 	}
 
 	// If we have a generator step name, ensure we add the step ID parameter
-	parsed, _ := url.Parse(rt.URL)
-	values, _ := url.ParseQuery(parsed.RawQuery)
+	values, _ := url.ParseQuery(uri.RawQuery)
 	if edge.IncomingGeneratorStep != "" {
 		values.Set("stepId", edge.IncomingGeneratorStep)
-		parsed.RawQuery = values.Encode()
+		uri.RawQuery = values.Encode()
 	} else {
 		values.Set("stepId", edge.Incoming)
+		uri.RawQuery = values.Encode()
 	}
 
-	byt, status, duration, err := e.do(ctx, parsed.String(), input)
+	byt, status, duration, err := e.do(ctx, uri.String(), input)
 	if err != nil {
 		return nil, err
 	}
@@ -170,9 +171,9 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 	if status == 206 {
 		// This is a generator-based function returning opcodes.
 		resp := &state.DriverResponse{
-			ActionVersion: action.Version,
-			Duration:      duration,
-			OutputSize:    len(byt),
+			Step:       step,
+			Duration:   duration,
+			OutputSize: len(byt),
 		}
 		resp.Generator, err = ParseGenerator(ctx, byt)
 		if err != nil {
@@ -210,14 +211,14 @@ func (e executor) Execute(ctx context.Context, s state.State, action inngest.Act
 	}
 
 	return &state.DriverResponse{
+		Step: step,
 		Output: map[string]interface{}{
 			"status": status,
 			"body":   body,
 		},
-		Err:           err,
-		ActionVersion: action.Version,
-		Duration:      duration,
-		OutputSize:    len(byt),
+		Err:        err,
+		Duration:   duration,
+		OutputSize: len(byt),
 	}, nil
 }
 

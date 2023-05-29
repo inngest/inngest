@@ -6,7 +6,7 @@ import (
 
 	"cuelang.org/go/cue"
 	cueerrors "cuelang.org/go/cue/errors"
-	"github.com/inngest/inngest/inngest"
+	"github.com/inngest/inngest/pkg/inngest"
 )
 
 const (

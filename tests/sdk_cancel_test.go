@@ -4,11 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 )
 
@@ -26,6 +25,7 @@ func TestSDKCancelNotReceived(t *testing.T) {
 		"After the sleep": "425e4dc05acdef771b3b59a9ebbaae6377bebfc3",
 	}
 
+	retries := 10
 	fnID := "test-suite-cancel-test"
 	abstract := Test{
 		Name: "Cancel test",
@@ -37,28 +37,24 @@ func TestSDKCancelNotReceived(t *testing.T) {
 			- step.sleep
 			- step.run
 		`,
-		Function: function.Function{
-			ID:   fnID,
+		Function: inngest.Function{
 			Name: "Cancel test",
-			Triggers: []function.Trigger{
+			Triggers: []inngest.Trigger{
 				{
-					EventTrigger: &function.EventTrigger{
+					EventTrigger: &inngest.EventTrigger{
 						Event: "tests/cancel.test",
 					},
 				},
 			},
-			Steps: map[string]function.Step{
-				"step": {
-					ID:   "step",
-					Name: "step",
-					Runtime: &inngest.RuntimeWrapper{
-						Runtime: &inngest.RuntimeHTTP{
-							URL: stepURL(fnID, "step"),
-						},
-					},
+			Steps: []inngest.Step{
+				{
+					Name:    "step",
+					ID:      "step",
+					URI:     stepURL(fnID, "step"),
+					Retries: &retries,
 				},
 			},
-			Cancel: []function.Cancel{
+			Cancel: []inngest.Cancel{
 				{
 					Event:   "cancel/please",
 					Timeout: strptr("1h"),
@@ -78,7 +74,7 @@ func TestSDKCancelNotReceived(t *testing.T) {
 			test.SetRequestEvent(evt),
 			// And the executor should start its requests with this context.
 			test.SetRequestContext(SDKCtx{
-				FnID:   fnID,
+				FnID:   inngest.DeterministicUUID(abstract.Function).String(),
 				StepID: "step",
 				Stack: driver.FunctionStack{
 					Current: 0,
@@ -151,6 +147,7 @@ func TestSDKCancelReceived(t *testing.T) {
 		User: map[string]interface{}{},
 	}
 
+	retries := 10
 	fnID := "test-suite-cancel-test"
 	abstract := Test{
 		Name: "Cancel test",
@@ -162,28 +159,24 @@ func TestSDKCancelReceived(t *testing.T) {
 			- step.sleep
 			- step.run
 		`,
-		Function: function.Function{
-			ID:   fnID,
+		Function: inngest.Function{
 			Name: "Cancel test",
-			Triggers: []function.Trigger{
+			Triggers: []inngest.Trigger{
 				{
-					EventTrigger: &function.EventTrigger{
+					EventTrigger: &inngest.EventTrigger{
 						Event: "tests/cancel.test",
 					},
 				},
 			},
-			Steps: map[string]function.Step{
-				"step": {
-					ID:   "step",
-					Name: "step",
-					Runtime: &inngest.RuntimeWrapper{
-						Runtime: &inngest.RuntimeHTTP{
-							URL: stepURL(fnID, "step"),
-						},
-					},
+			Steps: []inngest.Step{
+				{
+					ID:      "step",
+					Name:    "step",
+					URI:     stepURL(fnID, "step"),
+					Retries: &retries,
 				},
 			},
-			Cancel: []function.Cancel{
+			Cancel: []inngest.Cancel{
 				{
 					Event:   "cancel/please",
 					Timeout: strptr("1h"),
@@ -205,7 +198,7 @@ func TestSDKCancelReceived(t *testing.T) {
 			test.SetRequestSteps(map[string]any{}),
 			// And the executor should start its requests with this context.
 			test.SetRequestContext(SDKCtx{
-				FnID:   fnID,
+				FnID:   inngest.DeterministicUUID(abstract.Function).String(),
 				StepID: "step",
 				Stack: driver.FunctionStack{
 					Current: 0,

@@ -13,11 +13,11 @@ import (
 
 	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/enums"
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/execution/state/inmemory"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 	"github.com/rueian/rueidis"
 )
@@ -29,11 +29,14 @@ var (
 	// scripts stores all embedded lua scripts on initialization
 	scripts = map[string]*rueidis.Lua{}
 	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
+
+	ErrNoFunctionLoader = fmt.Errorf("No function loader specified within redis state store")
 )
 
 func init() {
 	// register the redis driver
-	registration.RegisterState(func() any { return &Config{} })
+	registration.RegisterState(func() any { return registration.StateConfig(&Config{}) })
+	registration.RegisterQueue(func() any { return registration.QueueConfig(&queueConfig{}) })
 
 	// read the lua scripts
 	entries, err := embedded.ReadDir("lua")
@@ -81,6 +84,13 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 	}
 }
 
+type queueConfig struct{}
+
+func (c queueConfig) QueueName() string             { return "redis" }
+func (c queueConfig) Queue() (osqueue.Queue, error) { return nil, nil }
+func (c queueConfig) Consumer() osqueue.Consumer    { return nil }
+func (c queueConfig) Producer() osqueue.Producer    { return nil }
+
 // Config registers the configuration for the in-memory state store,
 // and provides a factory for the state manager based off of the config.
 type Config struct {
@@ -119,11 +129,6 @@ func (c Config) Manager(ctx context.Context) (state.Manager, error) {
 }
 
 func (c Config) ConnectOpts() (rueidis.ClientOption, error) {
-	// TODO
-	// if c.DSN != nil {
-	// 	return redis.ParseURL(*c.DSN)
-	// }
-
 	opts := rueidis.ClientOption{
 		InitAddress: []string{fmt.Sprintf("%s:%d", c.Host, c.Port)},
 		ShuffleInit: true,
@@ -131,9 +136,6 @@ func (c Config) ConnectOpts() (rueidis.ClientOption, error) {
 		Username:    c.Username,
 		Password:    c.Password,
 	}
-	// if c.PoolSize != nil {
-	// 	opts.PoolSize = *c.PoolSize
-	// }
 	return opts, nil
 }
 
@@ -210,8 +212,20 @@ func WithFunctionCallbacks(f ...state.FunctionCallback) Opt {
 	}
 }
 
+// WithFunctionLoader adds a function loader to the state interface.
+//
+// As of v0.13.0, function configuration is stored outside of the state store,
+// either in a cache or a datastore.  Because this is read-heavy, this should
+// be cached where possible.
+func WithFunctionLoader(fl state.FunctionLoader) Opt {
+	return func(m *mgr) {
+		m.fl = fl
+	}
+}
+
 type mgr struct {
 	kf KeyGenerator
+	fl state.FunctionLoader
 	r  rueidis.Client
 
 	callbacks []state.FunctionCallback
@@ -224,6 +238,11 @@ func (m *mgr) OnFunctionStatus(f state.FunctionCallback) {
 }
 
 func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
+	f, err := m.LoadFunction(ctx, input.Identifier)
+	if err != nil {
+		return nil, err
+	}
+
 	// We marshal this ahead of creating a redis transaction as it's necessary
 	// every time and reduces the duration that the lock is held.
 	event, err := json.Marshal(input.EventData)
@@ -231,11 +250,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		return nil, err
 	}
 
-	// Set the workflow.
-	workflow, err := json.Marshal(input.Workflow)
-	if err != nil {
-		return nil, err
-	}
 	metadata := runMetadata{
 		Identifier: input.Identifier,
 		Pending:    1,
@@ -269,7 +283,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 
 	args, err := StrSlice([]any{
 		event,
-		workflow,
 		metadataByt,
 		stepsByt,
 		history,
@@ -285,7 +298,6 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		[]string{
 			m.kf.Idempotency(ctx, input.Identifier),
 			m.kf.Event(ctx, input.Identifier),
-			m.kf.Workflow(ctx, input.Workflow.UUID, input.Workflow.Version),
 			m.kf.RunMetadata(ctx, input.Identifier.RunID),
 			m.kf.Actions(ctx, input.Identifier),
 			m.kf.History(ctx, input.Identifier.RunID),
@@ -303,8 +315,8 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 
 	go m.runCallbacks(ctx, input.Identifier, enums.RunStatusRunning)
 
-	return inmemory.NewStateInstance(
-			input.Workflow,
+	return state.NewStateInstance(
+			*f,
 			input.Identifier,
 			metadata.Metadata(),
 			input.EventData,
@@ -419,45 +431,26 @@ func (m mgr) Metadata(ctx context.Context, runID ulid.ULID) (*state.Metadata, er
 	return &meta, nil
 }
 
-func (m mgr) Workflow(ctx context.Context, runID ulid.ULID) (*inngest.Workflow, error) {
-	metadata, err := m.metadata(ctx, runID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load metadata: %w", err)
+func (m mgr) LoadFunction(ctx context.Context, id state.Identifier) (*inngest.Function, error) {
+	if m.fl == nil {
+		return nil, ErrNoFunctionLoader
 	}
-	return m.workflow(ctx, metadata)
-}
-
-func (m mgr) workflow(ctx context.Context, md *runMetadata) (*inngest.Workflow, error) {
-	// Load the workflow.
-	cmd := m.r.B().Get().Key(m.kf.Workflow(ctx, md.Identifier.WorkflowID, md.Identifier.WorkflowVersion)).Build()
-	byt, err := m.r.Do(ctx, cmd).AsBytes()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load workflow; %w", err)
-	}
-	w := &inngest.Workflow{}
-	if err := json.Unmarshal(byt, w); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal workflow; %w", err)
-	}
-	// We must ensure that the workflow UUID and Version are marshalled in JSON.
-	// In the dev server these are blank, so we force-add them here.
-	w.UUID = md.Identifier.WorkflowID
-	w.Version = md.Identifier.WorkflowVersion
-	return w, nil
+	return m.fl.LoadFunction(ctx, id)
 }
 
 func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	// XXX: Use a pipeliner to improve speed.
-
 	metadata, err := m.metadata(ctx, runID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load metadata; %w", err)
 	}
-	w, err := m.workflow(ctx, metadata)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load workflow; %w", err)
-	}
 
 	id := metadata.Identifier
+
+	fn, err := m.fl.LoadFunction(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 
 	// Load the event.
 	cmd := m.r.B().Get().Key(m.kf.Event(ctx, id)).Build()
@@ -506,7 +499,7 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 
-	return inmemory.NewStateInstance(*w, id, meta, event, actions, errors, stack), nil
+	return state.NewStateInstance(*fn, id, meta, event, actions, errors, stack), nil
 }
 
 func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {

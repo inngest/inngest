@@ -23,9 +23,7 @@ models:
   Environment:
     model: github.com/inngest/inngest/pkg/coreapi/graph/models.Environment
   Runtime:
-    model: github.com/inngest/inngest/inngest.RuntimeWrapper
-  ActionVersion:
-    model: github.com/inngest/inngest/inngest/client.ActionVersion
+    model: github.com/inngest/inngest/pkg/inngest.RuntimeWrapper
   FunctionVersion:
     model: github.com/inngest/inngest/pkg/function.FunctionVersion
   Event:

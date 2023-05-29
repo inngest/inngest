@@ -10,7 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
-	inngest "github.com/inngest/inngest/inngest"
+	inngest "github.com/inngest/inngest/pkg/inngest"
 	v2 "github.com/oklog/ulid/v2"
 )
 
@@ -158,18 +158,18 @@ func (mr *MockStateMockRecorder) RunID() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunID", reflect.TypeOf((*MockState)(nil).RunID))
 }
 
-// Workflow mocks base method.
-func (m *MockState) Workflow() inngest.Workflow {
+// Function mocks base method.
+func (m *MockState) Function() inngest.Function {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Workflow")
-	ret0, _ := ret[0].(inngest.Workflow)
+	ret := m.ctrl.Call(m, "Function")
+	ret0, _ := ret[0].(inngest.Function)
 	return ret0
 }
 
-// Workflow indicates an expected call of Workflow.
-func (mr *MockStateMockRecorder) Workflow() *gomock.Call {
+// Function indicates an expected call of Function.
+func (mr *MockStateMockRecorder) Function() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Workflow", reflect.TypeOf((*MockState)(nil).Workflow))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Function", reflect.TypeOf((*MockState)(nil).Function))
 }
 
 // WorkflowID mocks base method.

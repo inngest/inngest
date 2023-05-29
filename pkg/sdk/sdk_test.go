@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,20 +18,19 @@ func TestRegisterRequestValidate(t *testing.T) {
 		{
 			name: "No functions",
 			r: RegisterRequest{
-				Functions: []function.Function{},
+				Functions: []SDKFunction{},
 			},
 			err: ErrNoFunctions,
 		},
 		{
 			name: "no steps",
 			r: RegisterRequest{
-				Functions: []function.Function{
+				Functions: []SDKFunction{
 					{
-						ID:   "lol",
 						Name: "lol",
-						Triggers: []function.Trigger{
+						Triggers: []inngest.Trigger{
 							{
-								EventTrigger: &function.EventTrigger{
+								EventTrigger: &inngest.EventTrigger{
 									Event: "my/event",
 								},
 							},
@@ -45,18 +43,17 @@ func TestRegisterRequestValidate(t *testing.T) {
 		{
 			name: "no driver",
 			r: RegisterRequest{
-				Functions: []function.Function{
+				Functions: []SDKFunction{
 					{
-						ID:   "lol",
 						Name: "lol",
-						Triggers: []function.Trigger{
+						Triggers: []inngest.Trigger{
 							{
-								EventTrigger: &function.EventTrigger{
+								EventTrigger: &inngest.EventTrigger{
 									Event: "my/event",
 								},
 							},
 						},
-						Steps: map[string]function.Step{
+						Steps: map[string]SDKStep{
 							"step-id": {
 								ID:   "step-id",
 								Name: "This is my first step.  It's a goodun, but it uses docker",
@@ -65,28 +62,27 @@ func TestRegisterRequestValidate(t *testing.T) {
 					},
 				},
 			},
-			err: fmt.Errorf("Step 'step-id' has an invalid driver. Only HTTP drivers may be used with SDK functions."),
+			err: fmt.Errorf("No SDK URL"),
 		},
 		{
 			name: "docker driver",
 			r: RegisterRequest{
-				Functions: []function.Function{
+				Functions: []SDKFunction{
 					{
-						ID:   "lol",
 						Name: "lol",
-						Triggers: []function.Trigger{
+						Triggers: []inngest.Trigger{
 							{
-								EventTrigger: &function.EventTrigger{
+								EventTrigger: &inngest.EventTrigger{
 									Event: "my/event",
 								},
 							},
 						},
-						Steps: map[string]function.Step{
+						Steps: map[string]SDKStep{
 							"step-id": {
 								ID:   "step-id",
-								Name: "This is my first step.  It's a goodun, but it uses docker",
-								Runtime: &inngest.RuntimeWrapper{
-									Runtime: inngest.RuntimeDocker{},
+								Name: "This is my first step.  It's a goodun, but it's not http",
+								Runtime: map[string]any{
+									"url": "docker://some/image:foo",
 								},
 							},
 						},
@@ -98,25 +94,22 @@ func TestRegisterRequestValidate(t *testing.T) {
 		{
 			name: "valid",
 			r: RegisterRequest{
-				Functions: []function.Function{
+				Functions: []SDKFunction{
 					{
-						ID:   "lol",
 						Name: "lol",
-						Triggers: []function.Trigger{
+						Triggers: []inngest.Trigger{
 							{
-								EventTrigger: &function.EventTrigger{
+								EventTrigger: &inngest.EventTrigger{
 									Event: "my/event",
 								},
 							},
 						},
-						Steps: map[string]function.Step{
+						Steps: map[string]SDKStep{
 							"step-id": {
 								ID:   "step-id",
 								Name: "This is my first step.  It's a goodun, but it uses docker",
-								Runtime: &inngest.RuntimeWrapper{
-									Runtime: inngest.RuntimeHTTP{
-										URL: "https://www.example.net/lol/what",
-									},
+								Runtime: map[string]any{
+									"url": "https://www.example.net/lol/what",
 								},
 							},
 						},
@@ -128,7 +121,7 @@ func TestRegisterRequestValidate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := test.r.Validate(context.Background())
+			_, actual := test.r.Parse(context.Background())
 			if test.err == nil {
 				require.Nil(t, actual)
 			} else {

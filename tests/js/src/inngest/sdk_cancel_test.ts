@@ -3,6 +3,7 @@ import { inngest } from "@/inngest/client";
 export const testCancel = inngest.createFunction(
   {
     name: "Cancel test",
+    retries: 10,
     cancelOn: [
       {
         event: "cancel/please",

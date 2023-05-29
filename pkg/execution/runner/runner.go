@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
@@ -18,7 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/expressions"
-	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
@@ -334,6 +333,7 @@ func (s *svc) functions(ctx context.Context, evt event.Event) error {
 	var errs error
 	wg := &sync.WaitGroup{}
 	for _, fn := range fns {
+
 		// We want to initialize each function concurrently;  some of these
 		// may have expressions that take ~tens of milliseconds to run, and
 		// each function should have as little latency as possible.
@@ -369,7 +369,7 @@ func (s *svc) functions(ctx context.Context, evt event.Event) error {
 				if err != nil {
 					logger.From(ctx).Error().
 						Err(err).
-						Str("function", copied.ID).
+						Str("function", copied.Name).
 						Msg("error initializing fn")
 					errs = multierror.Append(errs, err)
 				}
@@ -533,8 +533,11 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 	return nil
 }
 
-func (s *svc) initialize(ctx context.Context, fn function.Function, evt event.Event) error {
-	logger.From(ctx).Info().Str("function", fn.ID).Msg("initializing fn")
+func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Event) error {
+	logger.From(ctx).Info().
+		Str("function_id", fn.ID.String()).
+		Str("function", fn.Name).
+		Msg("initializing fn")
 	_, err := Initialize(ctx, fn, evt, s.state, s.queue)
 	return err
 }
@@ -545,30 +548,24 @@ func (s *svc) initialize(ctx context.Context, fn function.Function, evt event.Ev
 //
 // This is a separate, exported function so that it can be used from this service
 // and also from eg. the run command.
-func Initialize(ctx context.Context, fn function.Function, evt event.Event, s state.Manager, q queue.Producer) (*state.Identifier, error) {
-	// XXX: This could/should be memoized.
-	flow, err := fn.Workflow(ctx)
-	if err != nil {
-		return nil, err
-	}
-
+func Initialize(ctx context.Context, fn inngest.Function, evt event.Event, s state.Manager, q queue.Producer) (*state.Identifier, error) {
 	zero := uuid.UUID{}
-	if bytes.Equal(flow.UUID[:], zero[:]) {
+	if bytes.Equal(fn.ID[:], zero[:]) {
 		// Locally, we want to ensure that each function has its own deterministic
 		// UUID for managing state.
 		//
 		// Using a remote API, this UUID may be a surrogate primary key.
-		flow.UUID = function.DeterministicUUID(fn)
+		fn.ID = inngest.DeterministicUUID(fn)
 	}
 
 	id := state.Identifier{
-		WorkflowID: flow.UUID,
-		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
-		Key:        evt.ID,
+		WorkflowID:      fn.ID,
+		WorkflowVersion: fn.FunctionVersion,
+		RunID:           ulid.MustNew(ulid.Now(), rand.Reader),
+		Key:             evt.ID,
 	}
 
 	if _, err := s.New(ctx, state.Input{
-		Workflow:   *flow,
 		Identifier: id,
 		EventData:  evt.Map(),
 	}); err != nil {
@@ -586,7 +583,7 @@ func Initialize(ctx context.Context, fn function.Function, evt event.Event, s st
 			}
 			expires = time.Now().Add(dur)
 		}
-		err = s.SavePause(ctx, state.Pause{
+		err := s.SavePause(ctx, state.Pause{
 			ID:         pauseID,
 			Identifier: id,
 			Expires:    state.Time(expires),
@@ -600,7 +597,7 @@ func Initialize(ctx context.Context, fn function.Function, evt event.Event, s st
 	}
 
 	// Enqueue running this from the source.
-	err = q.Enqueue(ctx, queue.Item{
+	err := q.Enqueue(ctx, queue.Item{
 		Kind:       queue.KindEdge,
 		Identifier: id,
 		Payload:    queue.PayloadEdge{Edge: inngest.SourceEdge},

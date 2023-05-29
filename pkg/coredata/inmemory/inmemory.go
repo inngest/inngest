@@ -6,14 +6,11 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
-	"time"
 
-	"github.com/inngest/inngest/inngest"
-	"github.com/inngest/inngest/inngest/client"
-	"github.com/inngest/inngest/internal/cuedefs"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/coredata"
-	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"golang.org/x/sync/errgroup"
 )
@@ -64,16 +61,7 @@ func (f *FSLoader) ReadDir(ctx context.Context) error {
 		Debug().
 		Str("dir", f.root).
 		Msg("scanning directory for functions")
-
-	fns, err := function.LoadRecursive(ctx, f.root)
-	if err != nil {
-		return err
-	}
-	for _, fn := range fns {
-		f.functions = append(f.functions, *fn)
-	}
-
-	return f.MemoryExecutionLoader.SetFunctions(ctx, fns)
+	return f.MemoryExecutionLoader.SetFunctions(ctx, nil)
 }
 
 // NewFSLoader returns an ExecutionLoader which reads functions from the given
@@ -109,30 +97,14 @@ type MemoryExecutionLoader struct {
 	*memactionloader
 
 	// functions stores all functions which were found within the given filesystem.
-	functions []function.Function
-
-	// actions stores all actions parsed and read from functions within the filesystem.
-	actions []inngest.ActionVersion
+	functions []inngest.Function
 
 	l sync.RWMutex
 }
 
-func (m *MemoryExecutionLoader) AddFunction(ctx context.Context, fn *function.Function) error {
+func (m *MemoryExecutionLoader) AddFunction(ctx context.Context, fn *inngest.Function) error {
 	m.l.Lock()
 	defer m.l.Unlock()
-
-	actions, _, _ := fn.Actions(ctx)
-
-	// Ensure that this action has a version.  In the case of development servers,
-	// actions aren't versioned: so we auto-fill a v1.1.
-	for n, a := range actions {
-		if a.Version == nil {
-			actions[n].Version = &inngest.VersionInfo{
-				Major: 1,
-				Minor: 1,
-			}
-		}
-	}
 
 	// Is this function and its actions already present?  If so, remove them.
 	for n, f := range m.functions {
@@ -142,21 +114,11 @@ func (m *MemoryExecutionLoader) AddFunction(ctx context.Context, fn *function.Fu
 		}
 	}
 	m.functions = append(m.functions, *fn)
-	m.actions = []inngest.ActionVersion{}
-
-	// Add all functions for each event again.
-	for _, fn := range m.functions {
-		actions, _, _ := fn.Actions(ctx)
-		m.actions = append(m.actions, actions...)
-	}
 
 	// recreate the in-memory action loader.
 	m.memactionloader = &memactionloader{
 		Actions: make(map[string][]inngest.ActionVersion),
 		lock:    &sync.RWMutex{},
-	}
-	for _, a := range m.actions {
-		m.memactionloader.Add(a)
 	}
 
 	logger.From(ctx).
@@ -167,12 +129,20 @@ func (m *MemoryExecutionLoader) AddFunction(ctx context.Context, fn *function.Fu
 	return nil
 }
 
-func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*function.Function) error {
+func (m *MemoryExecutionLoader) LoadFunction(ctx context.Context, id state.Identifier) (*inngest.Function, error) {
+	for _, fn := range m.functions {
+		if fn.ID == id.WorkflowID {
+			return &fn, nil
+		}
+	}
+	return nil, fmt.Errorf("Function ID '%s' not found for run ID '%s'", id.WorkflowID, id.RunID)
+}
+
+func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*inngest.Function) error {
 	m.l.Lock()
 	defer m.l.Unlock()
 
-	m.functions = []function.Function{}
-	m.actions = []inngest.ActionVersion{}
+	m.functions = []inngest.Function{}
 
 	// Validate all functions.
 	eg := &errgroup.Group{}
@@ -187,8 +157,6 @@ func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*function.
 	}
 
 	for _, fn := range f {
-		actions, _, _ := fn.Actions(ctx)
-		m.actions = append(m.actions, actions...)
 		m.functions = append(m.functions, *fn)
 	}
 
@@ -196,9 +164,6 @@ func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*function.
 	m.memactionloader = &memactionloader{
 		Actions: make(map[string][]inngest.ActionVersion),
 		lock:    &sync.RWMutex{},
-	}
-	for _, a := range m.actions {
-		m.memactionloader.Add(a)
 	}
 
 	logger.From(ctx).
@@ -209,15 +174,15 @@ func (m *MemoryExecutionLoader) SetFunctions(ctx context.Context, f []*function.
 	return nil
 }
 
-func (m *MemoryExecutionLoader) Functions(ctx context.Context) ([]function.Function, error) {
+func (m *MemoryExecutionLoader) Functions(ctx context.Context) ([]inngest.Function, error) {
 	return m.functions[:], nil
 }
 
-func (m *MemoryExecutionLoader) FunctionsScheduled(ctx context.Context) ([]function.Function, error) {
+func (m *MemoryExecutionLoader) FunctionsScheduled(ctx context.Context) ([]inngest.Function, error) {
 	m.l.RLock()
 	defer m.l.RUnlock()
 
-	fns := []function.Function{}
+	fns := []inngest.Function{}
 	for _, fn := range m.functions {
 		for _, t := range fn.Triggers {
 			if t.CronTrigger != nil {
@@ -229,11 +194,11 @@ func (m *MemoryExecutionLoader) FunctionsScheduled(ctx context.Context) ([]funct
 	return fns, nil
 }
 
-func (m *MemoryExecutionLoader) FunctionsByTrigger(ctx context.Context, eventName string) ([]function.Function, error) {
+func (m *MemoryExecutionLoader) FunctionsByTrigger(ctx context.Context, eventName string) ([]inngest.Function, error) {
 	m.l.RLock()
 	defer m.l.RUnlock()
 
-	fns := []function.Function{}
+	fns := []inngest.Function{}
 	for _, fn := range m.functions {
 		for _, t := range fn.Triggers {
 			if t.EventTrigger != nil && t.Event == eventName {
@@ -329,19 +294,6 @@ func NewInMemoryAPIFunctionWriter() *MemoryAPIFunctionWriter {
 	return loader
 }
 
-func (m *MemoryAPIFunctionWriter) CreateFunctionVersion(ctx context.Context, f function.Function, live bool, env string) (function.FunctionVersion, error) {
-	now := time.Now()
-	fv := function.FunctionVersion{
-		FunctionID: f.ID,
-		Version:    uint(1),
-		Function:   f,
-		ValidFrom:  &now,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-	}
-	return fv, nil
-}
-
 type MemoryAPIReadWriter struct {
 	*MemoryAPIFunctionWriter
 	*MemoryAPIActionLoader
@@ -362,58 +314,4 @@ func NewInMemoryAPIActionLoader() *MemoryAPIActionLoader {
 	return &MemoryAPIActionLoader{
 		memactionloader: NewInMemoryActionLoader(),
 	}
-}
-
-func (m *MemoryAPIActionLoader) ActionVersion(ctx context.Context, dsn string, vc *inngest.VersionConstraint) (client.ActionVersion, error) {
-	av, err := m.Action(ctx, dsn, vc)
-	if err != nil {
-		return client.ActionVersion{}, err
-	}
-	clientActionVersion := client.ActionVersion{
-		ActionVersion: *av,
-		Name:          av.Name,
-		DSN:           av.DSN,
-		Config:        "",
-	}
-	return clientActionVersion, nil
-}
-func (m *MemoryAPIActionLoader) CreateActionVersion(ctx context.Context, av inngest.ActionVersion) (client.ActionVersion, error) {
-	config, err := cuedefs.FormatAction(av)
-	if err != nil {
-		return client.ActionVersion{}, err
-	}
-	// Stub out with existing method
-	m.Add(av)
-	newActionVersion := client.ActionVersion{
-		ActionVersion: av,
-		Name:          av.Name,
-		DSN:           av.DSN,
-		Config:        config,
-	}
-	return newActionVersion, nil
-}
-func (m *MemoryAPIActionLoader) UpdateActionVersion(ctx context.Context, dsn string, version inngest.VersionInfo, enabled bool) (client.ActionVersion, error) {
-	// NOTE - use constraint so we can re-use m.Action for now
-	vc := &inngest.VersionConstraint{
-		Major: &version.Major,
-		Minor: &version.Minor,
-	}
-	existing, err := m.Action(ctx, dsn, vc)
-	if err != nil {
-		return client.ActionVersion{}, err
-	}
-
-	updatedActionVersion := client.ActionVersion{
-		ActionVersion: *existing,
-		Name:          existing.Name,
-		DSN:           existing.DSN,
-		Config:        "",
-	}
-	if enabled {
-		now := time.Now()
-		updatedActionVersion.ValidFrom = &now
-	}
-	// TODO - Add imageSha256 to be sent to function and set
-
-	return updatedActionVersion, nil
 }

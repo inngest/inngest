@@ -15,36 +15,22 @@ type FunctionRunEvent interface {
 
 type ActionVersionQuery struct {
 	Dsn          string `json:"dsn"`
-	VersionMajor *int   `json:"versionMajor"`
-	VersionMinor *int   `json:"versionMinor"`
-}
-
-type Config struct {
-	Execution *ExecutionConfig `json:"execution"`
-}
-
-type CreateActionVersionInput struct {
-	Config string `json:"config"`
-}
-
-type DeployFunctionInput struct {
-	Env    *Environment `json:"env"`
-	Config string       `json:"config"`
-	Live   *bool        `json:"live"`
+	VersionMajor *int   `json:"versionMajor,omitempty"`
+	VersionMinor *int   `json:"versionMinor,omitempty"`
 }
 
 type Event struct {
 	ID           string         `json:"id"`
-	Workspace    *Workspace     `json:"workspace"`
-	Name         *string        `json:"name"`
-	CreatedAt    *time.Time     `json:"createdAt"`
-	Payload      *string        `json:"payload"`
-	Schema       *string        `json:"schema"`
-	Status       *EventStatus   `json:"status"`
-	PendingRuns  *int           `json:"pendingRuns"`
-	TotalRuns    *int           `json:"totalRuns"`
-	Raw          *string        `json:"raw"`
-	FunctionRuns []*FunctionRun `json:"functionRuns"`
+	Workspace    *Workspace     `json:"workspace,omitempty"`
+	Name         *string        `json:"name,omitempty"`
+	CreatedAt    *time.Time     `json:"createdAt,omitempty"`
+	Payload      *string        `json:"payload,omitempty"`
+	Schema       *string        `json:"schema,omitempty"`
+	Status       *EventStatus   `json:"status,omitempty"`
+	PendingRuns  *int           `json:"pendingRuns,omitempty"`
+	TotalRuns    *int           `json:"totalRuns,omitempty"`
+	Raw          *string        `json:"raw,omitempty"`
+	FunctionRuns []*FunctionRun `json:"functionRuns,omitempty"`
 }
 
 type EventQuery struct {
@@ -54,50 +40,37 @@ type EventQuery struct {
 
 type EventsQuery struct {
 	WorkspaceID string  `json:"workspaceId"`
-	LastEventID *string `json:"lastEventId"`
-}
-
-type ExecutionConfig struct {
-	Drivers *ExecutionDriversConfig `json:"drivers"`
-}
-
-type ExecutionDockerDriverConfig struct {
-	Registry  *string `json:"registry"`
-	Namespace *string `json:"namespace"`
-}
-
-type ExecutionDriversConfig struct {
-	Docker *ExecutionDockerDriverConfig `json:"docker"`
+	LastEventID *string `json:"lastEventId,omitempty"`
 }
 
 type Function struct {
 	Name        string             `json:"name"`
 	ID          string             `json:"id"`
 	Concurrency int                `json:"concurrency"`
-	Triggers    []*FunctionTrigger `json:"triggers"`
+	Triggers    []*FunctionTrigger `json:"triggers,omitempty"`
 	URL         string             `json:"url"`
 }
 
 type FunctionEvent struct {
-	Workspace   *Workspace         `json:"workspace"`
-	FunctionRun *FunctionRun       `json:"functionRun"`
-	Type        *FunctionEventType `json:"type"`
-	Output      *string            `json:"output"`
-	CreatedAt   *time.Time         `json:"createdAt"`
+	Workspace   *Workspace         `json:"workspace,omitempty"`
+	FunctionRun *FunctionRun       `json:"functionRun,omitempty"`
+	Type        *FunctionEventType `json:"type,omitempty"`
+	Output      *string            `json:"output,omitempty"`
+	CreatedAt   *time.Time         `json:"createdAt,omitempty"`
 }
 
 func (FunctionEvent) IsFunctionRunEvent() {}
 
 type FunctionRun struct {
 	ID           string             `json:"id"`
-	Name         *string            `json:"name"`
-	Workspace    *Workspace         `json:"workspace"`
-	Status       *FunctionRunStatus `json:"status"`
-	WaitingFor   *StepEventWait     `json:"waitingFor"`
-	PendingSteps *int               `json:"pendingSteps"`
-	StartedAt    *time.Time         `json:"startedAt"`
-	Timeline     []FunctionRunEvent `json:"timeline"`
-	Event        *Event             `json:"event"`
+	Name         *string            `json:"name,omitempty"`
+	Workspace    *Workspace         `json:"workspace,omitempty"`
+	Status       *FunctionRunStatus `json:"status,omitempty"`
+	WaitingFor   *StepEventWait     `json:"waitingFor,omitempty"`
+	PendingSteps *int               `json:"pendingSteps,omitempty"`
+	StartedAt    *time.Time         `json:"startedAt,omitempty"`
+	Timeline     []FunctionRunEvent `json:"timeline,omitempty"`
+	Event        *Event             `json:"event,omitempty"`
 }
 
 type FunctionRunQuery struct {
@@ -115,29 +88,22 @@ type FunctionTrigger struct {
 }
 
 type StepEvent struct {
-	Workspace   *Workspace     `json:"workspace"`
-	FunctionRun *FunctionRun   `json:"functionRun"`
-	StepID      *string        `json:"stepID"`
-	Name        *string        `json:"name"`
-	Type        *StepEventType `json:"type"`
-	Output      *string        `json:"output"`
-	CreatedAt   *time.Time     `json:"createdAt"`
-	WaitingFor  *StepEventWait `json:"waitingFor"`
+	Workspace   *Workspace     `json:"workspace,omitempty"`
+	FunctionRun *FunctionRun   `json:"functionRun,omitempty"`
+	StepID      *string        `json:"stepID,omitempty"`
+	Name        *string        `json:"name,omitempty"`
+	Type        *StepEventType `json:"type,omitempty"`
+	Output      *string        `json:"output,omitempty"`
+	CreatedAt   *time.Time     `json:"createdAt,omitempty"`
+	WaitingFor  *StepEventWait `json:"waitingFor,omitempty"`
 }
 
 func (StepEvent) IsFunctionRunEvent() {}
 
 type StepEventWait struct {
-	EventName  *string   `json:"eventName"`
-	Expression *string   `json:"expression"`
+	EventName  *string   `json:"eventName,omitempty"`
+	Expression *string   `json:"expression,omitempty"`
 	ExpiryTime time.Time `json:"expiryTime"`
-}
-
-type UpdateActionVersionInput struct {
-	Dsn          string `json:"dsn"`
-	VersionMajor int    `json:"versionMajor"`
-	VersionMinor int    `json:"versionMinor"`
-	Enabled      *bool  `json:"enabled"`
 }
 
 type Workspace struct {

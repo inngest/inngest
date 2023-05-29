@@ -70,6 +70,7 @@ func (a *apiServer) Pre(ctx context.Context) error {
 		api.Mount(m.At, m.Router)
 	}
 
+	// TODO
 	a.publisher, err = pubsub.NewPublisher(ctx, a.config.EventStream.Service)
 	if err != nil {
 		return err

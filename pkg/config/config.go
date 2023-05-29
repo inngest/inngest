@@ -23,9 +23,6 @@ config.#Config & {
 			http: config.#HTTPDriver & {
 				signingKey: "dev-signing-key"
 			}
-			docker: config.#DockerDriver & {
-				network: "host"
-			}
 		}
 	}
 }

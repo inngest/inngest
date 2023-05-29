@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 )
 
 func init() {
@@ -19,7 +19,7 @@ const RuntimeName = "mock"
 type Mock struct {
 	// DynamicResponses allows users to specify a function which allows
 	// steps to return different data on each execution invocation.
-	DynamicResponses func(context.Context, state.State, inngest.ActionVersion, inngest.Edge, inngest.Step, int) map[string]state.DriverResponse
+	DynamicResponses func(context.Context, state.State, inngest.Edge, inngest.Step, int) map[string]state.DriverResponse
 
 	// Responses stores the responses that a driver should return.
 	Responses map[string]state.DriverResponse
@@ -31,7 +31,7 @@ type Mock struct {
 	RuntimeName string
 
 	// Executed stores which actions were "executed"
-	Executed map[string]inngest.ActionVersion
+	Executed map[string]inngest.Step
 
 	lock sync.RWMutex
 }
@@ -45,18 +45,18 @@ func (m *Mock) RuntimeType() string {
 	return m.RuntimeName
 }
 
-func (m *Mock) Execute(ctx context.Context, s state.State, action inngest.ActionVersion, edge inngest.Edge, step inngest.Step, idx int) (*state.DriverResponse, error) {
+func (m *Mock) Execute(ctx context.Context, s state.State, edge inngest.Edge, step inngest.Step, idx int) (*state.DriverResponse, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	if m.Executed == nil {
-		m.Executed = map[string]inngest.ActionVersion{}
+		m.Executed = map[string]inngest.Step{}
 	}
-	m.Executed[step.ID] = action
+	m.Executed[step.ID] = step
 
 	resp := m.Responses
 	if m.DynamicResponses != nil {
-		resp = m.DynamicResponses(ctx, s, action, edge, step, idx)
+		resp = m.DynamicResponses(ctx, s, edge, step, idx)
 	}
 	response := resp[step.ID]
 	err := m.Errors[step.ID]
@@ -77,7 +77,7 @@ type Config struct {
 	Responses map[string]state.DriverResponse
 	// DynamicResponses allows users to specify a function which allows
 	// steps to return different data on each execution invocation.
-	DynamicResponses func(context.Context, state.State, inngest.ActionVersion, inngest.Edge, inngest.Step, int) map[string]state.DriverResponse
+	DynamicResponses func(context.Context, state.State, inngest.Edge, inngest.Step, int) map[string]state.DriverResponse
 	// driver stores the driver once, as a singleton per config instance.
 	driver driver.Driver
 	Driver string

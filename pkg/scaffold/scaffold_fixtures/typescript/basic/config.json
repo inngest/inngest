@@ -1,6 +1,0 @@
-{
-	"name": "ts basic",
-	"description": "desc",
-	"targets": ["inngest", "aws"],
-	"postSetup": "## Markdown"
-}

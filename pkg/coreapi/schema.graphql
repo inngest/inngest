@@ -1,39 +1,12 @@
 scalar Time
+
 """
 The environment for the function to be run: `"prod"` or `"test"`
 """
 scalar Environment
 
-type Config {
-  execution: ExecutionConfig
-}
-
-type ExecutionConfig {
-  drivers: ExecutionDriversConfig
-}
-
-type ExecutionDriversConfig {
-  docker: ExecutionDockerDriverConfig
-}
-
-type ExecutionDockerDriverConfig {
-  registry: String
-  namespace: String
-}
-
 type Workspace {
   id: ID!
-}
-
-type ActionVersion {
-  dsn: String!
-  name: String!
-  versionMajor: Int!
-  versionMinor: Int!
-  createdAt: Time!
-  validFrom: Time
-  validTo: Time
-  config: String!
 }
 
 type FunctionVersion {

@@ -36,8 +36,10 @@ local partitionName        = ARGV[7]
 -- Check the concurrency limits for the account and custom key;  partition keys are checked when
 -- leasing the partition and do not need to be checked again (only one worker can run a partition at
 -- once, and the capacity is kept in memory after leasing a partition)
-if check_concurrency(currentTime, partitionConcurrencyKey, partitionConcurrency) <= 0 then
-	return 3
+if partitionConcurrency > 0 then
+	if check_concurrency(currentTime, partitionConcurrencyKey, partitionConcurrency) <= 0 then
+		return 3
+	end
 end
 if accountConcurrency > 0 then
 	if check_concurrency(currentTime, accountConcurrencyKey, accountConcurrency) <= 0 then

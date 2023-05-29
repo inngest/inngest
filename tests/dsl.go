@@ -10,7 +10,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/function"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ type Test struct {
 	//
 	// While tests can only check one function at a time, the SDK may register many functions
 	// at once.
-	Function function.Function
+	Function inngest.Function
 	// The event to send when testing this function.
 	EventTrigger inngestgo.Event
 	// Timeout is how long the tests take to run.

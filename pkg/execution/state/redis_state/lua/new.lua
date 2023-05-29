@@ -8,24 +8,20 @@ Output:
 
 local idempotencyKey = KEYS[1]
 local eventKey = KEYS[2]
-local workflowKey = KEYS[3]
-local metadataKey = KEYS[4]
-local stepKey = KEYS[5]
-local logKey = KEYS[6]
+local metadataKey = KEYS[3]
+local stepKey = KEYS[4]
+local logKey = KEYS[5]
 
 local event = ARGV[1]
-local workflow = ARGV[2]
-local metadata = ARGV[3]
-local steps = ARGV[4]
-local log = ARGV[5]
-local logScore = tonumber(ARGV[6])
+local metadata = ARGV[2]
+local steps = ARGV[3]
+local log = ARGV[4]
+local logScore = tonumber(ARGV[5])
 
 if redis.call("SETNX", idempotencyKey, "") == 0 then
   -- If this key exists, everything must've been initialised, so we can exit early
   return 1
 end
-
-redis.call("SETNX", workflowKey, workflow)
 
 local metadataJson = cjson.decode(metadata)
 for k, v in pairs(metadataJson) do

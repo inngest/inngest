@@ -966,13 +966,19 @@ func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration t
 		return nil, 0, fmt.Errorf("error leasing partition: %w", err)
 	}
 	switch result {
-	case 0:
-		return nil, 0, ErrPartitionConcurrencyLimit
 	case -1:
-		return nil, 0, ErrPartitionNotFound
+		return nil, 0, ErrPartitionConcurrencyLimit
 	case -2:
+		return nil, 0, ErrPartitionNotFound
+	case -3:
 		return nil, 0, ErrPartitionAlreadyLeased
 	default:
+		// If there's no concurrency limit for this partition, return a default
+		// amount so that processing the partition has reasonable limits.
+		if concurrency == 0 {
+			return &leaseID, QueuePeekDefault, nil
+		}
+
 		// result is the available concurrency within this partition
 		return &leaseID, result, nil
 	}

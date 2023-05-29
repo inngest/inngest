@@ -1,7 +1,4 @@
 type Query {
-  config: Config
-  actionVersion(query: ActionVersionQuery!): ActionVersion
-
   # Get an individual event
   event(query: EventQuery!): Event
 

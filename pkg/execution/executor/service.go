@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/inngest"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
@@ -18,7 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/function/env"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
@@ -29,13 +28,6 @@ import (
 
 type Opt func(s *svc)
 
-// WithEnvReader sets the EnvReader within the service.
-func WithEnvReader(r env.EnvReader) func(s *svc) {
-	return func(s *svc) {
-		s.envreader = r
-	}
-}
-
 func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
@@ -45,6 +37,12 @@ func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
 func WithState(sm state.Manager) func(s *svc) {
 	return func(s *svc) {
 		s.state = sm
+	}
+}
+
+func WithExecutorOpts(opts ...ExecutorOpt) func(s *svc) {
+	return func(s *svc) {
+		s.opts = opts
 	}
 }
 
@@ -72,10 +70,10 @@ type svc struct {
 	queue queue.Queue
 	// exec runs the specific actions.
 	exec Executor
-	// envreader allows reading .env variables for each function.
-	envreader env.EnvReader
 
 	wg sync.WaitGroup
+
+	opts []ExecutorOpt
 }
 
 func (s *svc) Name() string {
@@ -91,15 +89,6 @@ func (s *svc) Pre(ctx context.Context) error {
 			return err
 		}
 		s.data = l
-		// Allow .env readers when using the FS loader only.
-		fns, err := l.Functions(ctx)
-		if err != nil {
-			return err
-		}
-		s.envreader, err = env.NewReader(fns)
-		if err != nil {
-			return err
-		}
 	}
 
 	if s.state == nil {
@@ -116,32 +105,11 @@ func (s *svc) Pre(ctx context.Context) error {
 			return err
 		}
 	}
-
-	// Create drivers based off of the available config.  If we have no docker steps,
-	// don't initialize the docker driver.  This makes it easy for users to get started
-	// using the SDK with HTTP drivers only.
-	hasDocker, err := s.hasDockerStep(ctx)
-	if err != nil {
-		return err
-	}
-
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range s.config.Execution.Drivers {
-		// If we don't have any loaded functions, don't load the Docker driver;
-		// we probably don't actually need it and will be using HTTP fns instead.
-		if driverConfig.RuntimeName() == "docker" && !hasDocker {
-			continue
-		}
-
 		d, err := driverConfig.NewDriver()
 		if err != nil {
 			return err
-		}
-
-		if d, ok := d.(driver.EnvManager); ok {
-			// If this driver reads environment variables, set the
-			// env reader appropriately.
-			d.SetEnvReader(s.envreader)
 		}
 
 		drivers = append(drivers, d)
@@ -152,16 +120,18 @@ func (s *svc) Pre(ctx context.Context) error {
 		return fmt.Errorf("failed to create failure handler: %w", err)
 	}
 
-	s.exec, err = NewExecutor(
+	opts := []ExecutorOpt{
 		WithActionLoader(s.data),
 		WithStateManager(s.state),
 		WithRuntimeDrivers(
 			drivers...,
 		),
 		WithLogger(logger.From(ctx)),
-		WithConfig(s.config.Execution),
 		WithFailureHandler(failureHandler),
-	)
+	}
+	opts = append(opts, s.opts...)
+
+	s.exec, err = NewExecutor(opts...)
 	if err != nil {
 		return err
 	}
@@ -184,7 +154,7 @@ func (s *svc) getFailureHandler(ctx context.Context) (func(context.Context, stat
 			Name:      event.FnFailedName,
 			Timestamp: now.UnixMilli(),
 			Data: map[string]interface{}{
-				"function_id": s.Workflow().ID,
+				"function_id": s.Function().ID,
 				"run_id":      id.RunID.String(),
 				"error":       r.UserError(),
 				"event":       s.Event(),
@@ -335,10 +305,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	l.Trace().Int("len", len(children)).Msg("evaluated children")
 
 	for _, next := range children {
-		var retries *int
-		if next.Step != nil && next.Step.Retries != nil && next.Step.Retries.Attempts != nil {
-			retries = next.Step.Retries.Attempts
-		}
+		retries := next.Step.RetryCount()
 
 		// We want to wait for another event to come in to traverse this edge within the DAG.
 		//
@@ -394,7 +361,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 					PauseID:   pauseID,
 					OnTimeout: am.OnTimeout,
 				},
-				MaxAttempts: retries,
+				MaxAttempts: &retries,
 			}, expires); err != nil {
 				return fmt.Errorf("unable to enqueue pause timeout: %w", err)
 			}
@@ -419,7 +386,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 			Payload: queue.PayloadEdge{
 				Edge: next.Edge,
 			},
-			MaxAttempts: retries,
+			MaxAttempts: &retries,
 		}, at); err != nil {
 			return fmt.Errorf("unable to enqueue next step: %w", err)
 		}
@@ -637,20 +604,4 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	}
 
 	return nil
-}
-
-func (s *svc) hasDockerStep(ctx context.Context) (bool, error) {
-	fns, err := s.data.Functions(ctx)
-	if err != nil {
-		return false, err
-	}
-	for _, fn := range fns {
-		actions, _, _ := fn.Actions(ctx)
-		for _, a := range actions {
-			if a.Runtime.RuntimeType() == inngest.RuntimeTypeDocker {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
 }
