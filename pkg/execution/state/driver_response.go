@@ -134,6 +134,13 @@ type DriverResponse struct {
 	// If the action terminated successfully this must be nil.
 	Err error `json:"err"`
 
+	// RetryAt is an optional retry at field, specifying when we should retry
+	// the step if the step errored.
+	RetryAt *time.Time `json:"retryAt,omitempty"`
+
+	// Noretry, if true, indicates that we should never retry this step.
+	NoRetry bool `json:"noRetry,omitempty"`
+
 	// final indicates whether the error has been marked as final.  This occurs
 	// when the response errors and the executor detects that this is the final
 	// retry of the step.
@@ -148,6 +155,11 @@ func (r *DriverResponse) SetFinal() {
 	r.final = true
 }
 
+// NextRetryAt fulfils the queue.RetryAtSpecifier interface
+func (r DriverResponse) NextRetryAt() *time.Time {
+	return r.RetryAt
+}
+
 // Retryable returns whether the response indicates that the action is
 // retryable.
 //
@@ -160,6 +172,11 @@ func (r *DriverResponse) SetFinal() {
 // set to true this response is also not retryable.
 func (r DriverResponse) Retryable() bool {
 	if r.Err == nil || r.final {
+		return false
+	}
+
+	if r.NoRetry {
+		// If there's a no retry flag set this is never retryable.
 		return false
 	}
 

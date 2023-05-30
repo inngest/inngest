@@ -12,9 +12,11 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -47,10 +49,11 @@ var (
 	}
 
 	ErrEmptyResponse = fmt.Errorf("no response data")
+
+	ErrNoRetryAfter = fmt.Errorf("no retry after present")
 )
 
 func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
-
 	if len(via) > 10 {
 		return fmt.Errorf("stopped after 10 redirects")
 	}
@@ -163,32 +166,34 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 		uri.RawQuery = values.Encode()
 	}
 
-	byt, status, duration, err := e.do(ctx, uri.String(), input)
+	resp, err := e.do(ctx, uri.String(), input)
 	if err != nil {
 		return nil, err
 	}
 
-	if status == 206 {
+	if resp.statusCode == 206 {
 		// This is a generator-based function returning opcodes.
-		resp := &state.DriverResponse{
+		dr := &state.DriverResponse{
 			Step:       step,
-			Duration:   duration,
-			OutputSize: len(byt),
+			Duration:   resp.duration,
+			OutputSize: len(resp.body),
+			NoRetry:    resp.noRetry,
+			RetryAt:    resp.retryAt,
 		}
-		resp.Generator, err = ParseGenerator(ctx, byt)
+		dr.Generator, err = ParseGenerator(ctx, resp.body)
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		return dr, nil
 	}
 
 	var body interface{}
-	body = json.RawMessage(byt)
-	if len(byt) > 0 {
+	body = json.RawMessage(resp.body)
+	if len(resp.body) > 0 {
 		// Is the response valid JSON?  If so, ensure that we don't re-marshal the
 		// JSON string.
 		respjson := map[string]interface{}{}
-		if err := json.Unmarshal(byt, &respjson); err == nil {
+		if err := json.Unmarshal(resp.body, &respjson); err == nil {
 			body = respjson
 		} else {
 			// This isn't a map, so check the first character for json encoding.  If this isn't
@@ -196,8 +201,8 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 			//
 			// This is a stop-gap safety check to see if SDKs respond with text that's not JSON,
 			// in the case of an internal issue or a host processing error we can't control.
-			if byt[0] != '[' && byt[0] != '"' {
-				body = string(byt)
+			if resp.body[0] != '[' && resp.body[0] != '"' {
+				body = string(resp.body)
 			}
 		}
 	} else {
@@ -206,26 +211,40 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 
 	// Add an error to driver.Response if the status code isn't 2XX.
 	err = nil
-	if status < 200 || status > 299 {
-		err = fmt.Errorf("invalid status code: %d", status)
+	if resp.statusCode < 200 || resp.statusCode > 299 {
+		err = fmt.Errorf("invalid status code: %d", resp.statusCode)
 	}
 
 	return &state.DriverResponse{
 		Step: step,
 		Output: map[string]interface{}{
-			"status": status,
+			"status": resp.statusCode,
 			"body":   body,
 		},
 		Err:        err,
-		Duration:   duration,
-		OutputSize: len(byt),
+		Duration:   resp.duration,
+		OutputSize: len(resp.body),
+		NoRetry:    resp.noRetry,
+		RetryAt:    resp.retryAt,
 	}, nil
 }
 
-func (e executor) do(ctx context.Context, url string, input []byte) ([]byte, int, time.Duration, error) {
+type response struct {
+	body       []byte
+	statusCode int
+	duration   time.Duration
+	// retryAt is the time to retry this step at, on failure, if specified in the
+	// Retry-After headers, or X-Retry-After.
+	//
+	// This adheres to the HTTP spec; we support both seconds and times in this header.
+	retryAt *time.Time
+	noRetry bool
+}
+
+func (e executor) do(ctx context.Context, url string, input []byte) (*response, error) {
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(input))
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 
@@ -235,13 +254,20 @@ func (e executor) do(ctx context.Context, url string, input []byte) ([]byte, int
 	pre := time.Now()
 	resp, err := e.client.Do(req)
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("error executing request: %w", err)
+		return nil, fmt.Errorf("error executing request: %w", err)
 	}
 	defer resp.Body.Close()
 	dur := time.Since(pre)
 	byt, err := io.ReadAll(io.LimitReader(resp.Body, consts.MaxBodySize))
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("error reading response body: %w", err)
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var retryAt *time.Time
+	if after := resp.Header.Get("retry-after"); after != "" {
+		if at, err := ParseRetry(after); err == nil {
+			retryAt = &at
+		}
 	}
 
 	// If the responding status code is 201 Created, the response has been
@@ -253,16 +279,74 @@ func (e executor) do(ctx context.Context, url string, input []byte) ([]byte, int
 	// send a 201 status code and namespace in this way, so failing to parse
 	// here is an error.
 	if resp.StatusCode != 201 {
-		return byt, resp.StatusCode, dur, nil
+		return &response{
+			body:       byt,
+			statusCode: resp.StatusCode,
+			duration:   dur,
+			retryAt:    retryAt,
+			noRetry:    resp.Header.Get("x-no-retry") == "true",
+		}, nil
 	}
-
+	// Handle streaming responses.
 	var body struct {
-		StatusCode int    `json:"status"`
-		Body       string `json:"body"`
+		StatusCode int             `json:"status"`
+		Body       json.RawMessage `json:"body"`
+		RetryAt    *string         `json:"retryAt"`
+		NoRetry    bool            `json:"noRetry"`
 	}
 	if err := json.Unmarshal(byt, &body); err != nil {
-		return nil, 0, dur, fmt.Errorf("error reading response body to check for status code: %w", err)
+		return nil, fmt.Errorf("error reading response body to check for status code: %w", err)
 	}
-	return []byte(body.Body), body.StatusCode, dur, nil
+	if body.RetryAt != nil {
+		if at, err := ParseRetry(*body.RetryAt); err == nil {
+			retryAt = &at
+		}
+	}
+	return &response{
+		body:       body.Body,
+		statusCode: body.StatusCode,
+		duration:   dur,
+		retryAt:    retryAt,
+		noRetry:    body.NoRetry,
+	}, nil
 
+}
+
+// ParseRetry attempts to parse the retry-after header value.  It first checks to see
+// if we have a reasonably sized second value (<= weeks), then parses the value as unix
+// seconds.
+//
+// It falls back to parsing value in multiple formats: RFC3339, RFC1123, etc.
+//
+// This clips time within the minimums and maximums specified within consts.
+func ParseRetry(retry string) (time.Time, error) {
+	at, err := parseRetry(retry)
+	if err != nil {
+		return at, err
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+
+	dur := time.Until(at)
+	if dur > consts.MaxRetryDuration {
+		return now.Add(consts.MaxRetryDuration), nil
+	}
+	if dur < consts.MinRetryDuration {
+		return now.Add(consts.MinRetryDuration), nil
+	}
+	return at, nil
+}
+
+func parseRetry(retry string) (time.Time, error) {
+	if retry == "" {
+		return time.Time{}, ErrNoRetryAfter
+	}
+	if len(retry) <= 7 {
+		// Assume this is an int;  no dates can be <= 7 characters.
+		secs, _ := strconv.Atoi(retry)
+		if secs > 0 {
+			return time.Now().UTC().Truncate(time.Second).Add(time.Second * time.Duration(secs)), nil
+		}
+	}
+	return dateutil.ParseString(retry)
 }
