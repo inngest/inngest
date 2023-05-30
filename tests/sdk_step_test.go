@@ -46,6 +46,7 @@ func TestSDKSteps(t *testing.T) {
 		`,
 		Function: inngest.Function{
 			Name: "SDK Step Test",
+			Slug: fnID,
 			Triggers: []inngest.Trigger{
 				{
 					EventTrigger: &inngest.EventTrigger{

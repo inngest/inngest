@@ -34,6 +34,7 @@ func TestSDKFunctions(t *testing.T) {
 		`,
 		Function: inngest.Function{
 			Name: "SDK Function Test",
+			Slug: fnID,
 			Triggers: []inngest.Trigger{
 				{
 					EventTrigger: &inngest.EventTrigger{

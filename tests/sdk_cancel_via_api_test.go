@@ -38,6 +38,7 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 		`,
 		Function: inngest.Function{
 			Name: "Cancel test",
+			Slug: fnID,
 			Triggers: []inngest.Trigger{
 				{
 					EventTrigger: &inngest.EventTrigger{
