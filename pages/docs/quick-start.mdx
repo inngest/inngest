@@ -119,7 +119,7 @@ pnpm add inngest
   import { serve } from "inngest/next";
 
   // Create a client to send and receive events
-  const inngest = new Inngest({ name: "My App" });
+  export const inngest = new Inngest({ name: "My App" });
 
   // Create an API that serves zero functions
   export default serve(inngest, [/* your functions will be passed here later! */]);
@@ -178,7 +178,9 @@ Let's write your first reliable serverless function! <GuideSection show="nextpag
   We also add this new function to the `serve` handler.
 
   ```ts
-  export default serve(inngest, [helloWorld]);
+  export default serve(inngest, [
+    helloWorld, // <-- This is where you'll always add your new functions
+  ]);
   ```
 </GuideSection>
 
