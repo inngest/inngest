@@ -78,6 +78,22 @@ Promise.all([
 ])
 ```
 
+## Return values & serialization
+
+All data returned from `step.run` is serialized as JSON. This is done to enable the SDK to return a valid serialized response to the Inngest service. You will be able to customize this and utilize formats like `superjson` with the addition of middleware in the Inngest SDK's 2.0 release.
+
+```ts
+const output = await step.run("Create user", () => {
+  return { id: new ObjectId(), createdAt: new Date()  }
+})
+/*
+{
+  "id": "647731d1759aa55be43b975d",
+  "createdAt": "2023-05-31T11:39:18.097Z"
+}
+*/
+```
+
 ## Usage limits
 
 See [usage limits][usage-limits] for more details.
