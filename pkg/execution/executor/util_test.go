@@ -22,9 +22,7 @@ func TestParseWait(t *testing.T) {
 		state.Identifier{},
 		state.Metadata{},
 		event,
-		map[string]any{
-			"events": []map[string]any{event},
-		},
+		[]map[string]any{event},
 		map[string]any{
 			"step-1": map[string]any{
 				"wait": time.Now().Format(time.RFC3339),

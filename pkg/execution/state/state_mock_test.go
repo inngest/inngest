@@ -103,14 +103,12 @@ func (m *MockState) Event() map[string]interface{} {
 }
 
 // Events mocks base method
-func (m *MockState) Events() map[string]interface{} {
+func (m *MockState) Events() []map[string]interface{} {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Event")
 	ret0, _ := ret[0].(map[string]interface{})
 
-	return map[string]any{
-		"events": []map[string]any{ret0},
-	}
+	return []map[string]any{ret0}
 }
 
 // Event indicates an expected call of Event.

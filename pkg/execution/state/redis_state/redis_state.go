@@ -477,7 +477,7 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get batch; %w", err)
 	}
-	batch := map[string]any{}
+	batch := []map[string]any{}
 	if err := json.Unmarshal(byt, &batch); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
 	}
