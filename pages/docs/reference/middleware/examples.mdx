@@ -1,0 +1,153 @@
+# Example middleware <VersionBadge version="v2.0.0+" />
+
+<Callout>
+Middleware is still pre-release. You can use it by installing v2.0.0 using the `next` tag.
+
+<CodeGroup forceTabs>
+```sh {{ title: "npm" }}
+npm install inngest@next
+```
+```sh {{ title: "pnpm " }}
+pnpm install inngest@next
+```
+```sh {{ title: "Yarn" }}
+yarn add inngest@next
+```
+</CodeGroup>
+</Callout>
+
+The following examples show how you might use middleware in some real-world scenarios.
+
+## Sentry error reporting and tracing
+
+This example uses [Sentry](https://sentry.io/?ref=inngest) to:
+
+- Capture exceptions for reporting
+- Add tracing to each function run
+- Include useful context for each exception and trace like function ID and event names
+
+```ts
+import * as Sentry from "@sentry/node";
+
+const sentryMiddleware = new InngestMiddleware({
+  name: "Sentry Middleware",
+  init({ client }) {
+    // Initialize Sentry as soon as possible, creating a hub
+    Sentry.init({ dsn: "..." });
+
+    // Set up some tags that will be applied to all events
+    Sentry.setTag("inngest.client.name", client.name);
+
+    return {
+      onFunctionRun({ ctx, fn }) {
+        // Add specific context for the given function run
+        Sentry.setTags({
+          "inngest.function.id": fn.id(client.name),
+          "inngest.function.name": fn.name,
+          "inngest.event": ctx.event.name,
+          "inngest.run.id": ctx.runId,
+        });
+
+        // Start a transaction for this run
+        const transaction = Sentry.startTransaction({
+          name: "Inngest Function Run",
+          op: "run",
+          data: ctx.event,
+        });
+
+        let memoSpan: Sentry.Span;
+        let execSpan: Sentry.Span;
+
+        return {
+          transformInput() {
+            return {
+              ctx: {
+                // Add the Sentry client to the input arg so our
+                // functions can use it directly too
+                sentry: Sentry.getCurrentHub(),
+              },
+            };
+          },
+          beforeMemoization() {
+            // Track different spans for memoization and execution
+            memoSpan = transaction.startChild({ op: "memoization" });
+          },
+          afterMemoization() {
+            memoSpan.finish();
+          },
+          beforeExecution() {
+            execSpan = transaction.startChild({ op: "execution" });
+          },
+          afterExecution() {
+            execSpan.finish();
+          },
+          transformOutput({ result, step }) {
+            // Capture step output and log errors
+            if (step) {
+              Sentry.setTags({
+                "inngest.step.name": step.name,
+                "inngest.step.op": step.op,
+              });
+
+              if (result.error) {
+                Sentry.captureException(result.error);
+              }
+            }
+          },
+          async beforeResponse() {
+            // Finish the transaction and flush data to Sentry before the
+            // request closes
+            transaction.finish();
+            await Sentry.flush();
+          },
+        };
+      },
+    };
+  },
+});
+```
+
+## Prisma in function context
+
+The following is an example of adding a [Prisma](https://www.prisma.io/?ref=inngest) client to all Inngest functions, allowing them immediate access without needing to create the client themselves.
+
+While this example uses Prisma, it serves as a good example of using the [onFunctionRun -> input](/docs/reference/middleware/lifecycle#on-function-run-lifecycle) hook to mutate function input to perform crucial setup for your functions and keep them to just business logic.
+
+<Callout>
+💡 Types are inferred from middleware outputs, so your Inngest functions will see an appropriately-typed `prisma` property in their input.
+</Callout>
+
+```ts
+import { PrismaClient } from "@prisma/client";
+
+const prismaMiddleware = new InngestMiddleware({
+  name: "Prisma Middleware",
+  init() {
+    const prisma = new PrismaClient();
+
+    return {
+      onFunctionRun(ctx) {
+        return {
+          transformInput(ctx) {
+            return {
+              // Anything passed via `ctx` will be merged with the function's arguments
+              ctx: {
+                prisma,
+              },
+            };
+          },
+        };
+      },
+    };
+  },
+});
+
+// When defining a function...
+inngest.createFunction(
+  { name: "Example" },
+  { event: "app/user.loggedin" },
+  async ({ prisma }) => {
+    await prisma.auditTrail.create(/* ... */);
+  }
+);
+```

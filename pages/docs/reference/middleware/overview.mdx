@@ -1,0 +1,68 @@
+# Advanced: Middleware <VersionBadge version="v2.0.0+" />
+
+<Callout>
+Middleware is still pre-release. You can use it by installing v2.0.0 using the `next` tag.
+
+<CodeGroup forceTabs>
+```sh {{ title: "npm" }}
+npm install inngest@next
+```
+```sh {{ title: "pnpm " }}
+pnpm install inngest@next
+```
+```sh {{ title: "Yarn" }}
+yarn add inngest@next
+```
+</CodeGroup>
+</Callout>
+
+Middleware allows you to specify functions to run at various points in an Inngest client's lifecycle, such as during a function's execution or when sending an event. Use the `InngestMiddleware` class to define new middleware.
+
+```ts
+import { Inngest, InngestMiddleware } from "inngest";
+
+const myMiddleware = new InngestMiddleware({
+  name: "My Middleware",
+  init() {
+    return {
+      onFunctionRun({ fn }) {
+        // This will be logged whenever a function is executed
+        console.log(`Function ${fn.name} is running!`);
+
+        // This is where you can optionally specify hooks for this particular run
+        return {
+          afterExecution() {
+            console.log(`Function ${fn.name} has finished running!`);
+          },
+        };
+      },
+    };
+  },
+});
+
+const inngest = new Inngest({
+  name: "My App",
+  middleware: [myMiddleware],
+});
+```
+
+This can be used for a wide range of uses, for example:
+
+- Utilizing error-monitoring libraries (e.g. [Sentry](https://sentry.io/))
+- Adding logging support
+- Transforming input and output data (e.g. [superjson](https://github.com/blitz-js/superjson))
+- Setting up DB connections before starting a function's execution
+- Using Inngest's `step` building blocks to build reusable patterns
+
+## Next steps
+
+Check out some of the samples below for a quick look at how to use middleware:
+
+- [Example: Adding Sentry error reporting and tracing](/docs/reference/middleware/examples#adding-sentry-error-reporting-and-tracing)
+- [Example: Adding Prisma to function context](/docs/reference/middleware/examples#adding-prisma-to-function-context)
+
+Or see the next pages to walk through the details:
+
+- [Creating middleware](/docs/reference/middleware/create) - basic middleware, lifecycles, and hooks
+- [Lifecycle](/docs/reference/middleware/lifecycle) - middleware ordering and see all available hooks
+- [TypeScript](/docs/reference/middleware/typescript) - how to affect input and output types and values

@@ -16,13 +16,19 @@ const inngest = new Inngest({
 
 <Properties>
   <Property name="name" type="string" required>
-    The unique name of your application
+    The unique name of your application.
   </Property>
   <Property name="eventKey" type="string">
     An Inngest [Event Key](/docs/events/creating-an-event-key). Alternatively, set the `INNGEST_EVENT_KEY` environment variable.
   </Property>
+  <Property name="schemas" type="EventSchemas" version="v2.0.0+">
+    Event payload types. See [Defining Event Payload Types](#defining-event-payload-types).
+  </Property>
+  <Property name="middleware" type="array" version="v2.0.0+">
+    A stack of [middleware](/docs/reference/middleware/overview) to add to the client.
+  </Property>
   <Property name="env" type="string">
-    The environment name. Required only when using [Branch Environments](/docs/platform/environments)
+    The environment name. Required only when using [Branch Environments](/docs/platform/environments).
   </Property>
   <Property name="fetch" type="Fetch API compatible interface">
     Override the default [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) implementation. Defaults to the runtime's native Fetch API.
@@ -40,25 +46,135 @@ We recommend setting the `INNGEST_EVENT_KEY` as an environment variable over usi
 
 You can leverage TypeScript to define your event payload types. When you pass types to the Inngest client, events are fully typed when using them with `inngest.send()` and `inngest.createFunction()`. This can more easily alert you to issues with your code during compile time.
 
-<CodeGroup title="Defining Types" forceTabs={true}>
-```ts
+<Callout>
+Click the toggles on the top left of the code block to see the different methods available!
+</Callout>
+
+<CodeGroup forceTabs={true}>
+```ts {{ title: "v1" }}
 type Events = {
   "app/account.created": {
-    name: "app/account.created",
+    name: "app/account.created";
     data: {
       userId: string;
-    }
-  },
+    };
+  };
   "app/subscription.started": {
-    name: "app/subscription.started",
+    name: "app/subscription.started";
     data: {
       userId: string;
       planId: string;
-    }
-  }
-}
+    };
+  };
+};
 
 export const inngest = new Inngest<Events>({ name: "My App" });
+```
+```ts {{ title: "Union (v2)" }}
+import { EventSchemas, Inngest } from "inngest";
+
+type AppAccountCreated = {
+  name: "app/account.created";
+  data: {
+    userId: string;
+  };
+};
+
+type AppSubscriptionStarted = {
+  name: "app/subscription.started";
+  data: {
+    userId: string;
+    planId: string;
+  };
+};
+
+type Events = AppAccountCreated | AppSubscriptionStarted;
+
+export const inngest = new Inngest({
+  name: "My App",
+  schemas: new EventSchemas().fromUnion<Events>(),
+});
+```
+```ts {{ title: "Record (v2)"}}
+import { EventSchemas, Inngest } from "inngest";
+
+type Events = {
+  "app/account.created": {
+    data: {
+      userId: string;
+    };
+  };
+  "app/subscription.started": {
+    data: {
+      userId: string;
+      planId: string;
+    };
+  };
+};
+
+export const inngest = new Inngest({
+  name: "My App",
+  schemas: new EventSchemas().fromRecord<Events>(),
+});
+```
+```ts {{ title: "Zod (v2)" }}
+import { EventSchemas, Inngest } from "inngest";
+import { z } from "zod";
+
+const events = {
+  "app/account.created": {
+    data: z.object({
+      userId: z.string(),
+    }),
+  },
+  "app/subscription.started": {
+    data: z.object({
+      userId: z.string(),
+      planId: z.string(),
+    }),
+  },
+};
+
+export const inngest = new Inngest({
+  name: "My App",
+  schemas: new EventSchemas().fromZod(events),
+});
+```
+```ts {{ title: "Stacking (v2)" }}
+import { EventSchemas, Inngest } from "inngest";
+import { z } from "zod";
+
+type Events = {
+  "app/user.created": {
+    data: { id: string };
+  };
+};
+
+const zodEventSchemas = {
+  "app/account.created": {
+    data: z.object({
+      userId: z.string(),
+    }),
+  },
+};
+
+type AppPostCreated = {
+  name: "app/post.created";
+  data: { id: string };
+};
+
+type AppPostDeleted = {
+  name: "app/post.deleted";
+  data: { id: string };
+};
+
+export const inngest = new Inngest({
+  name: "My App",
+  schemas: new EventSchemas()
+    .fromRecord<Events>()
+    .fromUnion<AppPostCreated | AppPostDeleted>()
+    .fromZod(zodEventSchemas),
+});
 ```
 </CodeGroup>
 

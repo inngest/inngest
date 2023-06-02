@@ -127,8 +127,8 @@ The Inngest SDK lets you strictly type all of your code against your real produc
 - Encourage discoverability of your events via autocomplete
 - Give you instant feedback as to whether your code will run as intended
 
-```typescript
-// file: inngest/client.ts
+<CodeGroup forceTabs filename="inngest/client.ts">
+```typescript {{ title: "v1" }}
 import { Inngest } from "inngest";
 
 type AppUserCreated = {
@@ -147,6 +147,28 @@ type Events = {
 
 export const inngest = new Inngest<Events>({ name: "My App" });
 ```
+```typescript {{ title: "v2" }}
+import { EventSchemas, Inngest } from "inngest";
+
+type AppUserCreated = {
+  data: {
+    email: string;
+  };
+  user: {
+    id: string;
+  };
+};
+
+type Events = {
+  "app/user.created": AppUserCreated;
+};
+
+export const inngest = new Inngest({
+  name: "My App",
+  schemas: new EventSchemas().fromRecord<Events>(),
+});
+```
+</CodeGroup>
 
 You can then import this `inngest` client into where you're creating functions or sending events:
 

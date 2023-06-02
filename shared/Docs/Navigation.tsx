@@ -363,13 +363,38 @@ const referenceNavigation = [
     ],
   },
   {
+    title: "Middleware",
+    links: [
+      {
+        title: "Overview",
+        href: `${baseDir}/reference/middleware/overview`,
+      },
+      {
+        title: "Creating middleware",
+        href: `${baseDir}/reference/middleware/create`,
+      },
+      {
+        title: "Lifecycle",
+        href: `${baseDir}/reference/middleware/lifecycle`,
+      },
+      {
+        title: "Examples",
+        href: `${baseDir}/reference/middleware/examples`,
+      },
+      {
+        title: "TypeScript",
+        href: `${baseDir}/reference/middleware/typescript`,
+      },
+    ],
+  },
+  {
     title: "Using the SDK",
     links: [
       {
         title: "Using TypeScript",
         href: `${baseDir}/typescript`,
       },
-      { title: "Migrating to v1", href: `${baseDir}/sdk/v1-migration` },
+      { title: "Migrating", href: `${baseDir}/sdk/migration` },
     ],
   },
   {

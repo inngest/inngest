@@ -1,0 +1,455 @@
+export const description = "Migrate to v2 of the Inngest TS SDK."
+
+# Migrating from Inngest SDK v1 to v2
+
+This guide walks through migrating to the Inngest TS SDK v2 from v1.
+
+<Callout>
+`v2.0` is still in pre-release mode. You can install it using the `next` tag.
+
+<CodeGroup forceTabs>
+```sh {{ title: "npm" }}
+npm install inngest@next
+```
+```sh {{ title: "pnpm " }}
+pnpm install inngest@next
+```
+```sh {{ title: "Yarn" }}
+yarn add inngest@next
+```
+</CodeGroup>
+</Callout>
+
+## Breaking changes in v2
+
+Listed below are all breaking changes made in v2, potentially requiring code changes for you to upgrade.
+
+- <VersionBadge version="New" /> [Better event schemas](#better-event-schemas) - create and maintain your event types with a variety of native tools and third-party libraries
+- [Clearer event sending](#clearer-event-sending) - we removed some alternate methods of sending events to settle on a common standard
+- [Removed `tools` parameter](#removed-tools-parameter) - use `step` instead of `tools` for step functions
+- [Removed ability to `serve()` without a client](#removed-ability-to-serve-without-a-client) - everything is specified with a client, so it makes sense for this to be the same
+- [Renamed `throttle` to `rateLimit`](#renamed-throttle-to-ratelimit) - the concept didn't quite match the naming
+
+## New features in v2
+
+Aside from some of the breaking features above, this version also adds some new features that aren't breaking changes.
+
+- [Middleware](/docs/reference/middleware/overview) - specify functions to run at various points in an Inngest client's lifecycle
+- **Logging** - use a default console logger or specify your own to log during your workflows
+
+## Better event schemas
+
+Typing events is now done using a new `EventSchemas` class to create a guided, consistent, and extensible experience for declaring an event's data. This helps us achieve a few goals:
+
+- Reduced duplication (no more `name`!)
+- Allow many different methods of defining payloads to suit your codebase
+- Easy to add support for third-party libraries like Zod and TypeBox
+- Much clearer messaging when an event type doesn't satisfy what's required
+- Allows the library to infer more data itself, which allows us to add even more powerful type inference
+
+```ts
+// ❌ Invalid in v2
+type Events = {
+  "app/user.created": {
+    name: "app/user.created";
+    data: { id: string };
+  };
+  "app/user.deleted": {
+    name: "app/user.deleted";
+    data: { id: string };
+  };
+};
+
+new Inngest<Events>();
+```
+
+Instead, in v2, we use a new `EventSchemas` class and its methods to show current event typing support clearly. All we have to do is create a `new EventSchemas()` instance and pass it into our `new Inngest()` instance.
+
+```ts
+// ✅ Valid in v2 - `fromRecord()`
+type Events = {
+  "app/user.created": {
+    data: { id: string };
+  };
+  "app/user.deleted": {
+    data: { id: string };
+  };
+};
+
+new Inngest({
+  schemas: new EventSchemas().fromRecord<Events>(),
+});
+```
+
+Notice we've reduced the duplication of `name` slightly too; a common annoyance we've been seeing for a while!
+
+We use `fromRecord()` above to match the current event typing quite closely, but we now have some more options to define events without having to shim, like `fromUnion()`:
+
+```ts
+// ✅ Valid in v2 - `fromUnion()`
+type AppUserCreated = {
+  name: "app/user.created";
+  data: { id: string };
+};
+
+type AppUserDeleted = {
+  name: "app/user.deleted";
+  data: { id: string };
+};
+
+new EventSchemas().fromUnion<AppUserCreated | AppUserDeleted>();
+```
+
+This approach also gives us scope to add explicit support for third-party libraries, like Zod:
+
+```ts
+// ✅ Valid in v2 - `fromZod()`
+const userDataSchema = z.object({
+  id: z.string(),
+});
+
+new EventSchemas().fromZod({
+  "app/user.created": { data: userDataSchema },
+  "app/user.deleted": { data: userDataSchema },
+});
+```
+
+Stacking multiple event sources was technically supported in v1, but was a bit shaky. In v2, providing multiple event sources and optionally overriding previous ones is built in:
+
+```ts
+// ✅ Valid in v2 - stacking
+new EventSchemas()
+  .fromRecord<Events>()
+  .fromUnion<Custom1 | Custom2>()
+  .fromZod(zodEventSchemas);
+```
+
+Finally, we've added the ability to pull these built types out of Inngest for creating reusable logic without having to create an Inngest function. Inngest will append relevant fields and context to the events you input, so this is a great type to use for quickly understanding the resulting shape of data.
+
+```ts
+import { Inngest, type GetEvents } from "inngest";
+
+const inngest = new Inngest({ name: "My App" });
+type Events = GetEvents<typeof inngest>;
+```
+
+For more information, see [Defining Event Payload Types](/docs/reference/client/create#defining-event-payload-types).
+
+## Clearer event sending
+
+v1 had two different methods of sending events that shared the same function. This "overload" resulted in autocomplete typing for TypeScript users appear more complex than it needed to be.
+
+In addition, using a particular signature meant that you're locked in to sending a particular named event, meaning sending two different events in a batch required refactoring your call.
+
+For these reasons, we've removed a couple of the event-sending signatures and settled on a single standard.
+
+```ts
+// ❌ Invalid in v2
+inngest.send("app/user.created", { data: { userId: "123" } });
+inngest.send("app/user.created", [
+  { data: { userId: "123" } },
+  { data: { userId: "456" } },
+]);
+
+// ✅ Valid in v1 and v2
+inngest.send({ name: "app/user.created", data: { userId: "123" } });
+inngest.send([
+  { name: "app/user.created", data: { userId: "123" } },
+  { name: "app/user.created", data: { userId: "456" } },
+]);
+```
+
+## Removed `tools` parameter
+
+The `tools` parameter in a function was marked as deprecated in v1 and is now being fully removed in v2.
+
+You can swap out `tools` with `step` in every case.
+
+```ts
+inngest.createFunction(
+  { name: "Example" },
+  { event: "app/user.created" },
+  async ({ tools, step }) => {
+    // ❌ Invalid in v2
+    await tools.run("Foo", () => {});
+
+    // ✅ Valid in v1 and v2
+    await step.run("Foo", () => {});
+  }
+);
+```
+
+## Removed ability to `serve()` without a client
+
+In v1, serving Inngest functions could be done without a client via `serve("My App Name", ...)`. This limits our ability to do some clever TypeScript inference in places as we don't have access to the client that the functions have been created with.
+
+We're shifting to ensure the client is the place where everything is defined and created, so we're removing the ability to `serve()` with a string name.
+
+```ts
+// ❌ Invalid in v2
+serve("My App", [...fns]);
+
+// ✅ Valid in v1 and v2
+import { inngest } from "./client";
+serve(inngest, [...fns]);
+```
+
+As is the case already in v1, the app's name will be the name of the client passed to serve. To preserve the ability to explicitly name a serve handler, you can now pass a `name` option when serving to use the passed string instead of the client's name.
+
+```ts
+serve(inngest, [...fns], {
+  name: "My Custom App Name",
+});
+```
+
+## Renamed `throttle` to `rateLimit`
+
+Specifying a rate limit for a function in v1 meant specifying a `throttle` option when creating the function. The term "throttle" was confusing here, as the definition of throttling can change depending on the context, but usually implies that "throttled" events are still eventually used to trigger an event, which was not the case.
+
+To be clearer about the functionality of this option, we're renaming it to `rateLimit` instead.
+
+```ts
+inngest.createFunction(
+  {
+    name: "Example",
+    throttle: { count: 5 }, // ❌ Invalid in v2
+    rateLimit: { limit: 5 }, // ✅ Valid in v2
+  },
+  { event: "app/user.created" },
+  async ({ tools, step }) => {
+    // ...
+  }
+);
+```
+
+---
+
+## Migrating from Inngest SDK v0 to v1
+
+This guide walks through migrating to the Inngest TS SDK v1 from previous versions.
+
+## What's new in v1
+
+- **Step functions and tools are now async** - create your flow however you'd express yourself with JavaScript Promises.
+- **`inngest.createFunction` for everything** - all functions are now step functions; just use step tools within any function.
+- **Unified client instantiation and handling of schemas via `new Inngest()`** - removed legacy helpers that required manual types.
+- **A foundation for continuous improvement:**
+  - Better type inference and schemas
+  - Better error handling
+  - Clearer patterns and tooling
+  - Advanced function configuration
+
+## Replacing function creation helpers
+
+Creating any Inngest function now uses `inngest.createFunction()` to create a consistent experience.
+
+- All helpers have been removed
+- `inngest.createScheduledFunction()` has been removed
+- `inngest.createStepFunction()` has been removed
+
+```ts
+// ❌ Removed in v1
+import {
+  createFunction,
+  createScheduledFunction,
+  createStepFunction,
+} from "inngest";
+
+// ❌ Removed in v1
+inngest.createScheduledFunction(...);
+inngest.createStepFunction(...);
+```
+
+The following is how we would always create functions without the v0 helpers.
+
+```ts
+// ✅ Valid in v1
+import { Inngest } from "inngest";
+
+// We recommend exporting this from ./src/inngest/client.ts, giving you a
+// singleton across your entire app.
+export const inngest = new Inngest({ name: "My App" });
+
+const singleStepFn = inngest.createFunction(
+  { name: "Single step" },
+  { event: "example/single.step" },
+  async ({ event, step }) => "..."
+);
+
+const scheduledFn = inngest.createFunction(
+  { name: "Scheduled" },
+  { cron: "0 9 * * MON" },
+  async ({ event, step }) => "..."
+);
+
+const stepFn = inngest.createFunction(
+  { name: "Step function" },
+  { event: "example/step.function" },
+  async ({ event, step }) => "..."
+);
+```
+
+This helps ensure that important pieces such as type inference of events has a central place to reside.
+
+As such, each of the following examples requries an Inngest Client (`new Inngest()`) is used to create the function.
+
+```ts
+import { Inngest } from "inngest";
+
+// We recommend exporting your client from a separate file so that it can be
+// reused across the codebase.
+export const inngest = new Inngest({ name: "My App" });
+```
+
+See the specific examples below of how to transition from a helper to the new signatures.
+
+<details>
+<summary>`createFunction()`</summary>
+```ts
+// ❌ Removed in v1
+const singleStepFn = createFunction(
+  "Single step",
+  "example/single.step",
+  async ({ event }) => "..."
+);
+```
+```ts
+// ✅ Valid in v1
+const inngest = new Inngest({ name: "My App" });
+
+const singleStepFn = inngest.createFunction(
+  { name: "Single step" },
+  { event: "example/single.step" },
+  async ({ event, step }) => "..."
+);
+```
+</details>
+
+<details>
+<summary>`createScheduledFunction()` or `inngest.createScheduledFunction()`</summary>
+```ts
+// ❌ Removed in v1
+const scheduledFn = createScheduledFunction( // or inngest.createScheduledFunction
+  "Scheduled",
+  "0 9 * * MON",
+  async ({ event }) => "..."
+);
+```
+```ts
+// ✅ Valid in v1
+const inngest = new Inngest({ name: "My App" });
+
+const scheduledFn = inngest.createFunction(
+  { name: "Scheduled" },
+  { cron: "0 9 * * MON" },
+  async ({ event, step }) => "..."
+);
+```
+</details>
+
+<details>
+<summary>`createStepFunction` or `inngest.createStepFunction`</summary>
+```ts
+// ❌ Removed in v1
+const stepFn = createStepFunction(
+  "Step function",
+  "example/step.function",
+  ({ event, tools }) => "..."
+);
+```
+```ts
+// ✅ Valid in v1
+const inngest = new Inngest({ name: "My App" });
+
+const stepFn = inngest.createFunction(
+  { name: "Step function" },
+  { event: "example/step.function" },
+  async ({ event, step }) => "..."
+);
+```
+</details>
+
+## Updating to async step functions
+
+The signature of a step function is changing.
+
+- **`tools` is now `step`** - We renamed this to be easier to reason about billing and make the code more readable.
+- **Always `async`** - Every Inngest function is now an async function with access to async `step` tooling.
+- **Steps now return promises** - To align with the async patterns that developers are used to and to enable more flexibility, make sure to `await` steps.
+
+Step functions in v0 were synchronous, meaning steps had to run sequentially, one after the other.
+
+v1 brings the full power of asynchronous JavaScript to those functions, meaning you can use any and all async tooling at your disposal; `Promise.all()`, `Promise.race()`, loops, etc.
+
+```ts
+await Promise.all([
+  step.run("Send email", () => sendEmail(user.email, "Welcome!")),
+  step.run("Send alert to staff", () => sendAlert("New user created!")),
+]);
+```
+
+Here we look at an example of a step function in v0 and compare it with the new v1.
+
+```ts
+// ⚠️ v0 step function
+import { createStepFunction } from "inngest";
+import { getUser } from "./db";
+import { sendAlert, sendEmail } from "./email";
+
+export default createStepFunction(
+  "Example",
+  "app/user.created",
+  ({ event, tools }) => {
+    const user = tools.run("Get user email", () => getUser(event.userId));
+
+    tools.run("Send email", () => sendEmail(user.email, "Welcome!"));
+    tools.run("Send alert to staff", () => sendAlert("New user created!"));
+  }
+);
+
+```
+```ts
+// ✅ v1 step function
+import { inngest } from "./client";
+import { getUser } from "./db";
+import { sendAlert, sendEmail } from "./email";
+
+export default inngest.createFunction(
+  { name: "Example" },
+  { event: "app/user.created" },
+  async ({ event, step }) => {
+    // The step must now be awaited!
+    const user = await step.run("Get user email", () => getUser(event.userId));
+
+    await step.run("Send email", () => sendEmail(user.email, "Welcome!"));
+    await step.run("Send alert to staff", () => sendAlert("New user created!"));
+  }
+);
+```
+
+These two examples have the exact same functionality. As above, there are a few key changes that were required.
+
+- Using `createFunction()` on the client to create the step function
+- Awaiting step tooling to ensure they run in order
+- Using `step` instead of `tools`
+
+<Callout>
+When translating code to v1, be aware that not awaiting a step tool will mean it happens in the background, in parallel to the tools that follow. Just like a regular JavaScript async function, `await` halts progress, which is sometimes just what you want!
+</Callout>
+
+Async step functions with v1 of the Inngest TS SDK unlocks a huge `Array<Possibility>`. To explore these further, check out the [multi-step functions](/docs/functions/multi-step) docs.
+
+## Advanced: Updating custom framework serve handlers
+
+If you're using a custom serve handler and are creating your own `InngestCommHandler` instance, a `stepId` must be provided when returning arguments for the `run` command.
+
+This can be accessed via the query string using the exported `queryKeys.StepId` enum.
+
+```ts
+run: async () => {
+  if (req.method === "POST") {
+    return {
+      fnId: url.searchParams.get(queryKeys.FnId) as string,
+      // 🆕 stepId is now required
+      stepId: url.searchParams.get(queryKeys.StepId) as string,
+```

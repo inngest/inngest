@@ -36,23 +36,26 @@ export const data: UseCase = {
           "Functions trigger as events are received. Inngest calls all matching functions via HTTP.",
         code: `// Define your event payload with our standard name & data fields
 type Events = {
-  "user.signup" : {
-    name: "user.signup",
+  "user.signup": {
     data: {
-      userId: string
-    }
-  }
-}
-const inngest = new Inngest<Events>({ name: "My App" });
+      userId: string;
+    };
+  };
+};
+const inngest = new Inngest({
+  name: "My App",
+  schemas: new EventSchemas().fromRecord<Events>(),
+});
 
 // Send events to Inngest
 await inngest.send({
-  name: "user.signup", data: { userId: "12345" }
+  name: "user.signup",
+  data: { userId: "12345" },
 });
 
 // Define your function to handle that event
 inngest.createFunction(
-  { name: "Post-signup email"} ,
+  { name: "Post-signup email" },
   { event: "user.signup" },
   async ({ event }) => {
     // Handle your event

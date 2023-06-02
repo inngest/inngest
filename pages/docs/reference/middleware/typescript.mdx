@@ -1,0 +1,67 @@
+# TypeScript with Middleware <VersionBadge version="v2.0.0+" />
+
+<Callout>
+Middleware is still pre-release. You can use it by installing v2.0.0 using the `next` tag.
+
+<CodeGroup forceTabs>
+```sh {{ title: "npm" }}
+npm install inngest@next
+```
+```sh {{ title: "pnpm " }}
+pnpm install inngest@next
+```
+```sh {{ title: "Yarn" }}
+yarn add inngest@next
+```
+</CodeGroup>
+</Callout>
+
+Some lifecycle hooks can be used to mutate both values and types at key points in a particular lifecycle. The SDK leverages TypeScript's inference powers to make writing middleware easy for both the developer and the user.
+
+## Mutating input
+
+We can alter the input arguments for a function run (event data, `step` tooling, etc.), using `onFunctionRun`'s `transformInput()` hook. (See [Middleware - Lifecycle - Hook reference](/docs/reference/middleware/lifecycle#hook-reference) for a list of all available hooks.)
+
+```ts {{ title: "inngest/middleware/inputAlteration.ts" }}
+new InngestMiddleware({
+  name: "Input Alteration",
+  init() {
+    return {
+      onFunctionRun() {
+        return {
+          transformInput() {
+            return {
+              ctx: {
+                /**
+                 * This is a new property that will appear in my function.
+                 */
+                foo: "bar",
+              },
+            };
+          },
+        };
+      },
+    };
+  },
+});
+```
+
+```ts {{ title: "inngest/fns/myFunction.ts" }}
+inngest.createFunction(
+  { name: "Example function" },
+  { event: "app/user.created" },
+  async ({ event, foo }) => {
+    //             ^? (parameter) foo: string
+  }
+);
+```
+
+As you can see above, all of our functions now have access to the `foo` variable within our function's input, including typing from the SDK inferring the alterations.
+
+We can use this pattern to add additional typed tooling to function runs.
+
+## Ordering middleware and types
+
+Middleware runs in the order specified when registering it (see [Middleware - Lifecycle - Registering and order](/docs/reference/middleware/lifecycle#registering-and-order)), which affects typing too.
+
+When inferring a mutated input or output, the SDK will apply changes from each middleware in sequence, just as it will at runtime. This means that for two middlewares that add a `foo` value to input arguments, the last one to run will be what it seen both in types and at runtime.
