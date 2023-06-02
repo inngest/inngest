@@ -307,7 +307,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			m.kf.RunMetadata(ctx, input.Identifier.RunID),
 			m.kf.Actions(ctx, input.Identifier),
 			m.kf.History(ctx, input.Identifier.RunID),
-			m.kf.Batch(ctx, input.Identifier),
+			m.kf.Events(ctx, input.Identifier),
 		},
 		args,
 	).AsInt64()
@@ -471,14 +471,14 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		return nil, fmt.Errorf("failed to unmarshal event; %w", err)
 	}
 
-	// Load the batch
-	cmd = m.r.B().Get().Key(m.kf.Batch(ctx, id)).Build()
+	// Load the batch of events
+	cmd = m.r.B().Get().Key(m.kf.Events(ctx, id)).Build()
 	byt, err = m.r.Do(ctx, cmd).AsBytes()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get batch; %w", err)
 	}
-	batch := []map[string]any{}
-	if err := json.Unmarshal(byt, &batch); err != nil {
+	events := []map[string]any{}
+	if err := json.Unmarshal(byt, &events); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
 	}
 
@@ -518,7 +518,7 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 
-	return state.NewStateInstance(*fn, id, meta, event, batch, actions, errors, stack), nil
+	return state.NewStateInstance(*fn, id, meta, event, events, actions, errors, stack), nil
 }
 
 func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {
