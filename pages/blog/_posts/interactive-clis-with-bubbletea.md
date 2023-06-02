@@ -47,7 +47,7 @@ Because of its architecture, existing components, and ease of styling, Bubbletea
 
 ### Building a TUI-based event browser
 
-Skip ahead: [you can view all of our code in our CLI here](https://github.com/inngest/inngest/blob/main/cmd/commands/init.go). If you’re interested in the conclusions and want to gloss over the step-by-step guide, click here.
+Skip ahead: [you can view all of our code in our CLI here](https://github.com/inngest/inngest/blob/v0.5.0/cmd/commands/init.go). If you’re interested in the conclusions and want to gloss over the step-by-step guide, click here.
 
 First, we need to launch the CLI, often using arguments, flags, etc. In the Go world, that means that you might well be using Steve Francia’s fantastic Cobra library - [https://github.com/spf13/cobra](https://github.com/spf13/cobra).
 
