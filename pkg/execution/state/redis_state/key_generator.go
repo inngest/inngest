@@ -94,7 +94,7 @@ func (d DefaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
 }
 
 func (d DefaultKeyFunc) Events(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:events:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
+	return fmt.Sprintf("%s:bulk-events:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
 }
 
 func (d DefaultKeyFunc) Batch(ctx context.Context, batchID ulid.ULID) string {
