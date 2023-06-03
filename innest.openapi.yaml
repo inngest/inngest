@@ -1,0 +1,393 @@
+openapi: '3.1'
+info:
+  version: 0.0.0
+  title: Inngest API
+  license:
+    name: MIT
+  contact:
+    email: hello@inngest.com
+    url: 'https://www.inngest.com/'
+    name: Inngest
+  description: ''
+servers:
+  - url: 'https://inn.gs'
+    description: Inngest Production Server
+  - url: 'http://127.0.0.1:8288'
+    description: Local Server
+paths:
+  /dev:
+    get:
+      operationId: get_dev
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+        default:
+          description: Unexpected Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /fn/register:
+    post:
+      operationId: register_function
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required:
+                  - ok
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+        default:
+          description: Unexpected Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  /health:
+    get:
+      operationId: get_health
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+        default:
+          description: Unexpected Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+  '/e/{key}':
+    post:
+      operationId: send_event
+      parameters:
+        - name: key
+          in: path
+          description: Inngest Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventAPIResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+        default:
+          description: Unexpected Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIResponse'
+    parameters:
+      - schema:
+          type: string
+        name: key
+        in: path
+        required: true
+components:
+  schemas:
+    Handler:
+      type: object
+      properties:
+        functionIDs:
+          type: array
+          items:
+            type: string
+        sdk:
+          $ref: '#/components/schemas/RegisterRequest'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - functionIDs
+        - sdk
+        - createdAt
+        - updatedAt
+    StartOpts:
+      type: object
+      properties:
+        dir:
+          type: string
+        urls:
+          type: array
+          items:
+            type: string
+        autodiscover:
+          type: boolean
+      required:
+        - dir
+        - urls
+        - autodiscover
+    InfoResponse:
+      type: object
+      properties:
+        version:
+          type: string
+        authed:
+          type: boolean
+        startOpts:
+          $ref: '#/components/schemas/StartOpts'
+        functions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Function'
+        handlers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Handler'
+      required:
+        - version
+        - authed
+        - startOpts
+        - functions
+        - handlers
+    APIResponse:
+      title: API Response
+      type: object
+      properties:
+        status:
+          type: integer
+        message:
+          type: string
+        error:
+          type: string
+      required:
+        - status
+        - message
+    Event:
+      title: Event
+      type: object
+      properties:
+        name:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+        user:
+          type: object
+          additionalProperties: true
+        ts:
+          type: integer
+        v:
+          type: string
+      required:
+        - name
+    EventAPIResponse:
+      title: EventAPIResponse
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        error:
+          type: string
+      required:
+        - ids
+        - status
+    Headers:
+      title: Headers
+      type: object
+      properties:
+        env:
+          type: string
+        platform:
+          type: string
+      required:
+        - env
+        - platform
+    CronTrigger:
+      title: CronTrigger
+      type: object
+      properties:
+        cron:
+          type: string
+      required:
+        - cron
+    EventTrigger:
+      title: EventTrigger
+      type: object
+      properties:
+        event:
+          type: string
+        expression:
+          type: string
+      required:
+        - event
+    RateLimit:
+      title: RateLimit
+      type: object
+      properties:
+        limit:
+          type: integer
+        period:
+          type: string
+        key:
+          type: string
+      required:
+        - limit
+        - period
+    Cancel:
+      title: Cancel
+      type: object
+      properties:
+        event:
+          type: string
+        timeout:
+          type: string
+        if:
+          type: string
+      required:
+        - event
+    Step:
+      title: Step
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        runtime:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: integer
+              - type: string
+              - type: object
+                additionalProperties: true
+        retries:
+          type: object
+          additionalProperties: true
+      required:
+        - id
+        - name
+        - runtime
+    Function:
+      title: Function
+      type: object
+      properties:
+        name:
+          type: string
+        id:
+          type: string
+        triggers:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/CronTrigger'
+              - $ref: '#/components/schemas/EventTrigger'
+        concurrency: # TODO: what would be the appropriate type here?
+          oneOf:
+            - type: integer
+            - type: string
+            - type: object
+              additionalProperties: true
+        idempotency:
+          type: string
+        rateLimit:
+            $ref: '#/components/schemas/RateLimit'
+        retries:
+          type: integer
+        cancel:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cancel'
+        steps:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/Step'
+      required:
+        - name
+        - id
+        - triggers
+        - steps
+    RegisterRequest:
+      title: RegisterRequest
+      type: object
+      properties:
+        v:
+          type: string
+        url:
+          type: string
+          format: uri
+        deployType:
+          type: string
+        sdk:
+          type: string
+        framework:
+          type: string
+        appName:
+          type: string
+        functions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Function'
+        headers:
+          $ref: '#/components/schemas/Headers'
+      required:
+        - v
+        - url
+        - deployType
+        - sdk
+        - framework
+        - appName
+        - functions
+        - headers
