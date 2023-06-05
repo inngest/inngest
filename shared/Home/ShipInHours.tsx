@@ -17,7 +17,7 @@ export default function ShipInHours() {
             pre="Built for every developer"
             title={
               <span className="gap-2 items-end text-slate-200 font-medium text-2xl lg:text-4xl xl:text-5xl mb-4 tracking-tighter text-center">
-                Ship in hours, not months
+                Ship in hours, not weeks
               </span>
             }
           />
