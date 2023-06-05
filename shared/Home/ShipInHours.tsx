@@ -9,7 +9,7 @@ import Github from "../Icons/Github";
 
 export default function ShipInHours() {
   return (
-    <div className="overflow-hidden pb-60 -mb-60">
+    <div className="overflow-x-hidden pb-60 -mb-60">
       <div>
         <Container className="mt-6 mb-30 relative z-30">
           <SectionHeader

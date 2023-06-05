@@ -58,6 +58,7 @@ export default function DevUI() {
                 src="/assets/DevUI.png"
                 className={`
                   rounded-sm shadow-none m-auto w-screen relative z-10 scale-80 origin-center
+                  pointer-events-none
                   max-w-[1300px]
                   xl:-ml-[200px] xl:-mt-[340px] xl:mb-[0]
                   -ml-[50px] -mt-[150px] mb-[100px]
