@@ -1,8 +1,8 @@
 import React from "react";
 import Header from "../shared/Header";
 import Hero from "../shared/Home/Hero";
-import FitsYourWorkflow from "../shared/Home/FitsYourWorkflow";
-import DevUI from "../shared/Home/DevUI";
+import ShipInHours from "../shared/Home/ShipInHours";
+import LocalDev from "../shared/Home/LocalDev";
 import OutTheBox from "../shared/Home/OutTheBox";
 import FullyManaged from "../shared/Home/FullyManaged";
 import Roadmap from "../shared/Home/Roadmap";
@@ -33,12 +33,12 @@ export default function Home() {
 
       <Hero />
 
-      <FitsYourWorkflow />
+      <ShipInHours />
 
-      <DevUI />
+      <LocalDev />
 
       <CustomerQuote
-        className="mt-20 md:mt-4 mb-20"
+        className="mt-20 md:mt-4 mb-40"
         logo="/assets/customers/ocoya.svg"
         text="At Ocoya, we were struggling with the complexities of managing our
               social media and e-commerce workflows. Thanks to Inngest, we were
