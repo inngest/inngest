@@ -40,7 +40,7 @@ export default function ShipInHours() {
                 <p>Write and deploy workflows as functions — everything else is done for you.</p>
               </div>
               <div className="flex items-center flex-1">
-              <img src="/assets/payment-flow.svg" alt="With Inngest"  className="lg:max-w-[650px] max-w-full lg:-mb-[50px] pointer-events-none" />
+              <img src="/assets/payment-flow.png" alt="With Inngest"  className="lg:max-w-[650px] max-w-full lg:-mb-[50px] pointer-events-none" />
               </div>
             </div>
             <div className="flex flex-col pt-20 lg:pt-0">

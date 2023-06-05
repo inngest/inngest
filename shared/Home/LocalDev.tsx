@@ -61,7 +61,7 @@ export default function DevUI() {
                   pointer-events-none
                   max-w-[1300px]
                   xl:-ml-[200px] xl:-mt-[340px] xl:mb-[0]
-                  -ml-[50px] -mt-[150px] mb-[100px]
+                  -ml-[35px] -mt-[80px] mb-[50px]
                 `}
               />
             </div>
