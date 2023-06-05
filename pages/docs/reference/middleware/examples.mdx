@@ -151,3 +151,67 @@ inngest.createFunction(
   }
 );
 ```
+
+## Logging
+
+The following shows you how you can create a logger middleware and customize it to your needs.
+
+It is based on the [built-in logger middleware](/docs/guides/logging) in the SDK, and hope it gives you an idea of what you can do if the built-in logger doesn't meet your needs.
+
+```ts
+new InngestMiddleware({
+  name: "Inngest: Logger",
+  init({ client }) {
+    return {
+      onFunctionRun(arg) {
+        const { ctx } = arg;
+        const metadata = {
+          runID: ctx.runId,
+          eventName: ctx.event.name,
+          functionName: arg.fn.name,
+        };
+
+        let providedLogger: Logger = client["logger"];
+        // create a child logger if the provided logger has child logger implementation
+        try {
+          if ("child" in providedLogger) {
+            type ChildLoggerFn = (
+              metadata: Record<string, unknown>
+            ) => Logger;
+            providedLogger = (providedLogger.child as ChildLoggerFn)(metadata)
+          }
+        } catch (err) {
+          console.error('failed to create "childLogger" with error: ', err);
+          // no-op
+        }
+        const logger = new ProxyLogger(providedLogger);
+
+        return {
+          transformInput() {
+            return {
+              ctx: {
+                /**
+                 * The passed in logger from the user.
+                 * Defaults to a console logger if not provided.
+                 */
+                logger,
+              },
+            };
+          },
+          beforeExecution() {
+            logger.enable();
+          },
+          transformOutput({ result: { error } }) {
+            if (error) {
+              logger.error(error);
+            }
+          },
+          async beforeResponse() {
+            await logger.flush();
+          },
+        };
+      },
+    };
+  },
+})
+```

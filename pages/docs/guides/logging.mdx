@@ -1,0 +1,129 @@
+import { Tag } from "src/shared/Docs/Tag";
+
+# Logging in Inngest <VersionBadge version="v2.0.0+" />
+
+Log handling could have some caveats when working with serverless runtimes.
+
+One of the main problems is due to how serverless providers terminates after a function exits.
+There might not be enough time for a logger to finish flushing, which results in logs being lost.
+
+Another (opposite) problem is due to how Inngest handles memorization and code execution via HTTP calls to the SDK.
+A log statement outside of `step` function could end up running multiple times, resulting in duplicated deliveries.
+
+```ts {{ title: "example-fn.ts" }}
+// with v1 SDK
+async ({ event, step }) => {
+  logger.info("something") // this can be ran three times
+
+  step.run("fn", () => {
+    logger.info("something else") // this will always be ran once
+  })
+
+  step.run(...)
+}
+```
+
+We provide a thin wrapper over existing logging tools, and export it to Inngest functions in order to mitigate these
+problems, so you as the user don't need to deal with it and things should work as you expect.
+
+## Usage
+
+A `logger` object is available within all Inngest functions. You can use it with the logger of your choice,
+or if absent, `logger` will default to use `console`.
+
+```ts
+const fn = inngest.createFunction(
+  { name: "My awesome function" },
+  { event: "func/awesome" },
+  async ({ event, step, logger }) => {
+    logger.info("starting function", { metadataKey: "metadataValue" })
+
+    const val = step.run("do something", () => {
+      if (somethingBadHappens) logger.warn("something bad happened")
+    })
+
+    return { success: true, event }
+  }
+)
+```
+
+The exported logger provides the following interfaces.
+
+```ts
+export interface Logger {
+  info(...args: any[]): void;
+  warn(...args: any[]): void;
+  error(...args: any[]): void;
+  debug(...args: any[]): void;
+}
+```
+
+These are very typical interfaces and are also on the [RFC5424 guidelines](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1), so most loggers you choose should work without issues.
+
+
+## Using your preferred logger
+
+Running `console.log` is good for local development, but you probably want something more when running workloads in Production.
+
+The following is an example using [winston][winston] as the logger to be passed into Inngest functions.
+
+```ts {{ title: "inngest/client.ts" }}
+import { Inngest } from "inngest";
+import winston from "winston";
+
+/// Assuming we're deploying to Vercel.
+/// Other providers likely have their own pre-defined environment variables you can use.
+const env = process.env.VERCEL_ENV || "development";
+const ddTransportOps = {
+  host: "http-intake.logs.datadoghq.com",
+  path: `/api/v2/logs?dd-api-key=${process.env.DD_API_KEY}&ddsource=nextjs&service=inngest&ddtags=env:${env}`,
+  ssl: true
+}
+
+const logger = winston.createLogger({
+  level: "info",
+  exitOnError: false,
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.Http(ddTransportOps)
+  ]
+});
+
+// Pass `logger` to the Inngest client, and this winston logger will be accessible within functions
+export const inngest = new Inngest({
+  name: "My awesome app",
+  logger: logger,
+  ...
+});
+```
+
+## How it works
+
+There is a built-in [logging middleware](/docs/reference/middleware/examples#logging) that provides a good default to work
+with.
+
+### child logger
+
+If the logger library supports a child logger `.child()` implementation, the built-in middleware will utilize it to add
+function runtime metadata for you.
+
+- function name
+- event name
+- run ID
+
+## Loggers supported
+
+The following is a list of loggers we're aware of that works, but is not an exhaustive list.
+
+- [Winston][winston] <Tag>child logger support</Tag>
+- [Pino](https://github.com/pinojs/pino) <Tag>child logger support</Tag>
+- [Bunyan](https://github.com/trentm/node-bunyan) <Tag>child logger support</Tag>
+- [Roarr](https://github.com/gajus/roarr) <Tag>child logger support</Tag>
+- [LogLevel](https://github.com/pimterry/loglevel)
+- [Log4js](https://github.com/log4js-node/log4js-node)
+- [npmlog](https://github.com/npm/npmlog) (don't have `.debug()` but has a way to add custom levels)
+- [Tracer](https://github.com/baryon/tracer)
+- [Signale](https://github.com/klaudiosinani/signale)
+
+[winston]: https://github.com/winstonjs/winston

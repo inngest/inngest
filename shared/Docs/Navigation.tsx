@@ -246,6 +246,10 @@ export const navigation = [
         href: `${baseDir}/guides/fan-out-jobs`,
       },
       {
+        title: "Logging",
+        href: `${baseDir}/guides/logging`,
+      },
+      {
         title: "Trigger code from Retool",
         href: `${baseDir}/guides/trigger-your-code-from-retool`,
       },

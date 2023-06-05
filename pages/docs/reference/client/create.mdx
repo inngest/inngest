@@ -24,6 +24,9 @@ const inngest = new Inngest({
   <Property name="schemas" type="EventSchemas" version="v2.0.0+">
     Event payload types. See [Defining Event Payload Types](#defining-event-payload-types).
   </Property>
+  <Property name="logger" type="Logger" version="v2.0.0+">
+    A logger object that provides the following interfaces (`.info()`, `.warn()`, `.error()`, `.debug()`). Defaults to using `console` if not provided. See [logging guide](/docs/guides/logging) for more details.
+  </Property>
   <Property name="middleware" type="array" version="v2.0.0+">
     A stack of [middleware](/docs/reference/middleware/overview) to add to the client.
   </Property>
