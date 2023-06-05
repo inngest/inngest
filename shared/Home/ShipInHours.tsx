@@ -69,7 +69,7 @@ export default function ShipInHours() {
             </div>
             <div>
               <h3 className="font-semibold text-xl mb-4">Simple and powerful primitives</h3>
-              <p className="text-slate-200">Write long-running workflows without learning distributed systems with a single line of the SDK, on any platform – even serverless functions.</p>
+              <p className="text-slate-200">Write long-running workflows with multiple steps and sleeps as a single function.  Deploy to any platform – even serverless functions.</p>
             </div>
             <div>
               <h3 className="font-semibold text-xl mb-4">Any framework, any platform</h3>
