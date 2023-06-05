@@ -24,7 +24,8 @@ export default function ShipInHours() {
 
           <div className="flex justify-center">
             <p className="text-center max-w-md lg:max-w-xl mt-4 text-slate-200">
-            Build background jobs, scheduled jobs, and workflows by adding our SDK to your existing codebase and redeploying to your current platform.  Think in code without worrying about infra, queues, and config.
+            Using Inngest, you can build background jobs, scheduled jobs, and workflows set up in minutes.  Drop our SDK into your code to get production-grade systems out of the box.
+            {/*Build background jobs, scheduled jobs, and workflows by adding our SDK to your existing codebase and redeploying to your current platform.  Think in code without worrying about infra, queues, and config.*/}
             </p>
           </div>
 
