@@ -69,7 +69,7 @@ export default function DevUI() {
         </Container>
       </div>
 
-      <div className="w-screen max-w-screen relative md:-mt-20 lg:-mt-32 xl:-mt-[400px] xl:mb-[400px] z-20 opacity-50">
+      <div className="w-screen max-w-screen relative md:-mt-20 lg:-mt-32 xl:-mt-[400px] xl:mb-[400px] z-20 opacity-50 pointer-events-none">
         <div className=" blur-3xl w-[200px] md:w-[400px] lg:w-[500px] h-[200px] md:h-[400px] lg:h-[500px] bg-sky-500/20 absolute rounded-full left-1/2 -translate-x-[20%] translate-y-[40%] "></div>
         <div className=" blur-3xl w-[200px] md:w-[450px] lg:w-[550px] h-[200px] md:h-[450px] lg:h-[550px] bg-indigo-500/30 absolute rounded-full left-1/2 -translate-x-[100%] translate-y-[40%] "></div>
         <div className=" blur-3xl w-[200px] md:w-[300px] lg:w-[400px] h-[200px] md:h-[300px] lg:h-[400px] bg-purple-500/30 absolute rounded-full left-1/2 translate-x-[50%] translate-y-[40%] "></div>
