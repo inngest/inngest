@@ -46,7 +46,7 @@ export default function ShipInHours() {
             <div className="flex flex-col pt-20 lg:pt-0">
               <div className="text-center max-w-[400px] m-auto lg:pb-20 pb-8">
                 <p className="font-semibold text-xl mb-4">Without Inngest</p>
-                <p>Provision queues, handlers, and glue code for each job in a workflow, with everything handled manually.</p>
+                <p>Provision queues, handlers, and glue code for each background job, with state over many jobs.</p>
               </div>
               <div className="flex items-center justify-center flex-1">
                 <img src="/assets/without-inngest.svg" alt="Without Inngest" className="lg:max-w-[540px] max-w-full pointer-events-none"/>
