@@ -29,7 +29,7 @@ export default function ShipInHours() {
           </div>
 
           <div className={`
-            my-20 grid grid-cols-3 lg:gap-20 py-20 pl-20
+            my-20 grid xl:grid-cols-3 grid-cols-1 lg:gap-20 py-20 xl:pl-20 px-6
             bg-slate-900/70 backdrop-blur-sm rounded-xl
           `}>
             <div className="flex flex-col justify-stretch items-center h-full">
@@ -38,7 +38,7 @@ export default function ShipInHours() {
                 <p>Write and deploy workflows as functions — everything else is done for you.</p>
               </div>
               <div className="flex items-center flex-1">
-              <img src="/assets/with-inngest.svg" alt="With Inngest"  className="max-w-[210px]" />
+              <img src="/assets/with-inngest.svg" alt="With Inngest"  className="lg:max-w-[210px] max-w-full" />
               </div>
             </div>
             <div className="col-span-2 flex flex-col items-center justify-center">
@@ -46,10 +46,21 @@ export default function ShipInHours() {
                 <p className="font-semibold text-xl mb-4">Without Inngest</p>
                 <p>Provision queues, handlers, and glue code for each job in a workflow, with everything handled manually.</p>
               </div>
-              <img src="/assets/without-inngest.svg" alt="With Inngest" className="max-w-[540px]"/>
+              <img src="/assets/without-inngest.svg" alt="With Inngest" className="lg:max-w-[540px] max-w-full"/>
             </div>
             {/* BEFORE/AFTER, or WHAT WE DO, or, HOW IT WORKS, etc. */}
           </div>
+
+      <div className="w-screen max-w-screen relative md:-mt-20 lg:-mt-32 xl:-mt-[600px] xl:mb-[600px] z-20 opacity-50 pointer-events-none">
+        <div className=" blur-3xl w-[200px] md:w-[400px] lg:w-[500px] h-[200px] md:h-[400px] lg:h-[500px] bg-sky-500/20 absolute rounded-full left-1/2 -translate-x-[20%] translate-y-[40%] "></div>
+        <div className=" blur-3xl w-[200px] md:w-[450px] lg:w-[550px] h-[200px] md:h-[450px] lg:h-[550px] bg-indigo-500/30 absolute rounded-full left-1/2 -translate-x-[100%] translate-y-[40%] "></div>
+        <div className=" blur-3xl w-[200px] md:w-[300px] lg:w-[400px] h-[200px] md:h-[300px] lg:h-[400px] bg-purple-500/30 absolute rounded-full left-1/2 translate-x-[50%] translate-y-[40%] "></div>
+        <div className=" blur-3xl w-[200px] md:w-[400px] lg:w-[500px] h-[200px] md:h-[400px] lg:h-[500px] bg-indigo-500/10 absolute rounded-full bottom-0 left-1/2 -translate-x-[20%] -translate-y-[62%] "></div>
+        <div className=" blur-3xl w-[200px] md:w-[400px] lg:w-[550px] h-[200px] md:h-[400px] lg:h-[550px] bg-purple-500/10 absolute rounded-full bottom-0 left-1/2 -translate-x-[100%] translate-y-[50%] "></div>
+        <div className=" blur-3xl w-[200px] md:w-[200px] lg:w-[400px] h-[200px] md:h-[200px] lg:h-[400px] bg-blue-500/10 absolute rounded-full bottom-0 left-1/2 translate-x-[50%] translate-y-[6%] "></div>
+        <div className="overflow-x-hidden overflow-y-hidden w-screen">
+        </div>
+      </div>
 
           <div className="grid xl:grid-cols-3 xl:gap-20 gap-y-20 mb-20 lg:grid-cols-1 mt-20 xl:px-32">
             <div>
