@@ -181,6 +181,28 @@ export const inngest = new Inngest({
 ```
 </CodeGroup>
 
+### Reusing event types <VersionBadge version="v2.0.0+" />
+
+You can use the `GetEvents<>` generic to access the final event types from an Inngest client.
+
+<Callout>
+It's recommended to use this instead of directly reusing your event types, as Inngest will add extra properties and internal events such as `ts` and `inngest/function.failed`.
+</Callout>
+
+```ts
+import { EventSchemas, Inngest, type GetEvents } from "inngest";
+
+export const inngest = new Inngest({
+  name: "Example App",
+  schemas: new EventSchemas().fromRecord<{
+    "app/user.created": { data: { userId: string } };
+  }>(),
+});
+
+type Events = GetEvents<typeof inngest>;
+type AppUserCreated = Events["app/user.created"];
+```
+
 ## Best Practices
 
 ### Share your client across your codebase
