@@ -29,12 +29,11 @@ Learn how to get started:
 Adding sleeps, retries, and reliable steps to a function:
 
 <CodeGroup forceTabs>
-```ts {{ title: "v1" }}
-import { Inngest } from "inngest";
+```ts {{ title: "v2" }}
+import { EventSchemas, Inngest } from "inngest";
 
 type Events = {
   "user/new.signup": {
-    name: "user/new.signup";
     data: {
       email: string;
       name: string;
@@ -42,7 +41,10 @@ type Events = {
   };
 };
 
-const inngest = new Inngest<Events>({ name: "Next.js Shop" });
+const inngest = new Inngest({
+  name: "Next.js Shop",
+  schemas: new EventSchemas().fromRecord<Events>(),
+});
 
 export default inngest.createFunction(
   { name: "Signup flow" },
@@ -69,11 +71,12 @@ export default inngest.createFunction(
   }
 );
 ```
-```ts {{ title: "v2" }}
-import { EventSchemas, Inngest } from "inngest";
+```ts {{ title: "v1" }}
+import { Inngest } from "inngest";
 
 type Events = {
   "user/new.signup": {
+    name: "user/new.signup";
     data: {
       email: string;
       name: string;
@@ -81,10 +84,7 @@ type Events = {
   };
 };
 
-const inngest = new Inngest({
-  name: "Next.js Shop",
-  schemas: new EventSchemas().fromRecord<Events>(),
-});
+const inngest = new Inngest<Events>({ name: "Next.js Shop" });
 
 export default inngest.createFunction(
   { name: "Signup flow" },

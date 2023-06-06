@@ -23,22 +23,6 @@ We can use these when creating a new Inngest client via `new Inngest()`.
 This comes with powerful inference; we autocomplete your event names when selecting what to react to, without you having to dig for the name and data.
 
 <CodeGroup forceTabs filename="inngest/client.ts">
-```ts {{ title: "v1" }}
-import { Inngest } from "inngest";
-
-type UserSignup = {
-  name: "user/new.signup";
-  data: {
-    email: string;
-    name: string;
-  };
-};
-type Events = {
-  "user/new.signup": UserSignup;
-};
-
-export const inngest = new Inngest<Events>({ name: "My App" });
-```
 ```ts {{ title: "v2" }}
 import { EventSchemas, Inngest } from "inngest";
 
@@ -56,6 +40,22 @@ export const inngest = new Inngest({
   name: "My App",
   schemas: new EventSchemas().fromRecord<Events>(),
 });
+```
+```ts {{ title: "v1" }}
+import { Inngest } from "inngest";
+
+type UserSignup = {
+  name: "user/new.signup";
+  data: {
+    email: string;
+    name: string;
+  };
+};
+type Events = {
+  "user/new.signup": UserSignup;
+};
+
+export const inngest = new Inngest<Events>({ name: "My App" });
 ```
 </CodeGroup>
 
@@ -106,30 +106,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 When writing step functions, you can use `waitForEvent` to to, pause the current function until another event is received or the timeout expires - whichever happens first. When you declare your types using the `Inngest` constructor, `waitForEvent` leverages any types that you have:
 
 <CodeGroup forceTabs filename="inngest/client.ts">
-```ts {{ title: "v1" }}
-import { Inngest } from "inngest";
-
-type UserSignup = {
-  name: "user/new.signup";
-  data: {
-    email: string;
-    user_id: string;
-    name: string;
-  };
-};
-type UserAccountSetupCompleted = {
-  name: "user/account.setup.completed";
-  data: {
-    user_id: string;
-  };
-};
-type Events = {
-  "user/new.signup": UserSignup;
-  "user/account.setup.completed": UserAccountSetupCompleted;
-};
-
-export const inngest = new Inngest<Events>({ name: "My App" });
-```
 ```ts {{ title: "v2" }}
 import { EventSchemas, Inngest } from "inngest";
 
@@ -154,6 +130,30 @@ export const inngest = new Inngest({
   name: "My App",
   schemas: new EventSchemas().fromRecord<Events>(),
 });
+```
+```ts {{ title: "v1" }}
+import { Inngest } from "inngest";
+
+type UserSignup = {
+  name: "user/new.signup";
+  data: {
+    email: string;
+    user_id: string;
+    name: string;
+  };
+};
+type UserAccountSetupCompleted = {
+  name: "user/account.setup.completed";
+  data: {
+    user_id: string;
+  };
+};
+type Events = {
+  "user/new.signup": UserSignup;
+  "user/account.setup.completed": UserAccountSetupCompleted;
+};
+
+export const inngest = new Inngest<Events>({ name: "My App" });
 ```
 </CodeGroup>
 

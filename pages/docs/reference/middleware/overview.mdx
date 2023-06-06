@@ -1,21 +1,5 @@
 # Advanced: Middleware <VersionBadge version="v2.0.0+" />
 
-<Callout>
-Middleware is still pre-release. You can use it by installing v2.0.0 using the `next` tag.
-
-<CodeGroup forceTabs>
-```sh {{ title: "npm" }}
-npm install inngest@next
-```
-```sh {{ title: "pnpm " }}
-pnpm install inngest@next
-```
-```sh {{ title: "Yarn" }}
-yarn add inngest@next
-```
-</CodeGroup>
-</Callout>
-
 Middleware allows you to specify functions to run at various points in an Inngest client's lifecycle, such as during a function's execution or when sending an event. Use the `InngestMiddleware` class to define new middleware.
 
 ```ts

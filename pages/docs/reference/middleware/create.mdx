@@ -1,21 +1,5 @@
 # Creating middleware <VersionBadge version="v2.0.0+" />
 
-<Callout>
-Middleware is still in pre-release mode. You can use it by installing v2.0.0 using the `next` tag.
-
-<CodeGroup forceTabs>
-```sh {{ title: "npm" }}
-npm install inngest@next
-```
-```sh {{ title: "pnpm " }}
-pnpm install inngest@next
-```
-```sh {{ title: "Yarn" }}
-yarn add inngest@next
-```
-</CodeGroup>
-</Callout>
-
 Creating middleware means defining the lifecycles and subsequent hooks in those lifecycles to run code in. Lifecycles are actions such as a function run or sending events, and individual hooks within those are where we run code, usually with a _before_ and _after_ step.
 
 Middleware is created using the `InngestMiddleware` class.

@@ -54,25 +54,6 @@ Click the toggles on the top left of the code block to see the different methods
 </Callout>
 
 <CodeGroup forceTabs={true}>
-```ts {{ title: "v1" }}
-type Events = {
-  "app/account.created": {
-    name: "app/account.created";
-    data: {
-      userId: string;
-    };
-  };
-  "app/subscription.started": {
-    name: "app/subscription.started";
-    data: {
-      userId: string;
-      planId: string;
-    };
-  };
-};
-
-export const inngest = new Inngest<Events>({ name: "My App" });
-```
 ```ts {{ title: "Union (v2)" }}
 import { EventSchemas, Inngest } from "inngest";
 
@@ -178,6 +159,25 @@ export const inngest = new Inngest({
     .fromUnion<AppPostCreated | AppPostDeleted>()
     .fromZod(zodEventSchemas),
 });
+```
+```ts {{ title: "v1" }}
+type Events = {
+  "app/account.created": {
+    name: "app/account.created";
+    data: {
+      userId: string;
+    };
+  };
+  "app/subscription.started": {
+    name: "app/subscription.started";
+    data: {
+      userId: string;
+      planId: string;
+    };
+  };
+};
+
+export const inngest = new Inngest<Events>({ name: "My App" });
 ```
 </CodeGroup>
 
