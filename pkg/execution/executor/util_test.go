@@ -21,7 +21,6 @@ func TestParseWait(t *testing.T) {
 		inngest.Function{},
 		state.Identifier{},
 		state.Metadata{},
-		event,
 		[]map[string]any{event},
 		map[string]any{
 			"step-1": map[string]any{

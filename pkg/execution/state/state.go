@@ -101,6 +101,10 @@ type Metadata struct {
 	//   enqueued to be considered finalized.
 	Pending int `json:"pending"`
 
+	// Version is the used for making sure workloads runs are backward compatible
+	// and work without issues during breaking changes to backend logic
+	Version int `json:"version"`
+
 	// Context allows storing any other contextual data in metadata.
 	Context map[string]any `json:"ctx,omitempty"`
 }

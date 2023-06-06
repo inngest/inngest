@@ -7,18 +7,16 @@ Output:
 ]]
 
 local idempotencyKey = KEYS[1]
-local eventKey = KEYS[2]
+local eventsKey = KEYS[2]
 local metadataKey = KEYS[3]
 local stepKey = KEYS[4]
 local logKey = KEYS[5]
-local eventListKey = KEYS[6]
 
-local event = ARGV[1]
+local events = ARGV[1]
 local metadata = ARGV[2]
 local steps = ARGV[3]
 local log = ARGV[4]
 local logScore = tonumber(ARGV[5])
-local eventList = ARGV[6]
 
 if redis.call("SETNX", idempotencyKey, "") == 0 then
   -- If this key exists, everything must've been initialised, so we can exit early
@@ -41,8 +39,7 @@ if steps ~= nil and steps ~= "" then
   end
 end
 
-redis.call("SETNX", eventKey, event)
-redis.call("SETNX", eventListKey, eventList)
+redis.call("SETNX", eventsKey, events)
 redis.call("ZADD", logKey, logScore, log)
 
 return 0
