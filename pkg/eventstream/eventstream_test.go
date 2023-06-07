@@ -32,7 +32,7 @@ func TestParseStream_Single(t *testing.T) {
 	byt, err := json.Marshal(actual)
 	require.NoError(t, err)
 	r := bytes.NewReader(byt)
-	stream := make(chan json.RawMessage)
+	stream := make(chan StreamItem)
 
 	eg := errgroup.Group{}
 	eg.Go(func() error {
@@ -40,9 +40,9 @@ func TestParseStream_Single(t *testing.T) {
 	})
 
 	n := 0
-	for byt := range stream {
+	for item := range stream {
 		evt := event.Event{}
-		err := json.Unmarshal(byt, &evt)
+		err := json.Unmarshal(item.Item, &evt)
 		require.NoError(t, err)
 		require.EqualValues(t, actual, evt)
 		n++
@@ -78,7 +78,7 @@ func TestParseStream_Multiple(t *testing.T) {
 	require.NoError(t, err)
 
 	r := bytes.NewReader(byt)
-	stream := make(chan json.RawMessage)
+	stream := make(chan StreamItem)
 
 	eg := errgroup.Group{}
 	eg.Go(func() error {
@@ -86,9 +86,9 @@ func TestParseStream_Multiple(t *testing.T) {
 	})
 
 	n := 0
-	for byt := range stream {
+	for item := range stream {
 		evt := event.Event{}
-		err := json.Unmarshal(byt, &evt)
+		err := json.Unmarshal(item.Item, &evt)
 		require.NoError(t, err)
 		require.EqualValues(t, evts[n], evt)
 		n++
@@ -119,7 +119,7 @@ func TestParseStream_MaxSize(t *testing.T) {
 	require.NoError(t, err)
 
 	r := bytes.NewReader(byt)
-	stream := make(chan json.RawMessage)
+	stream := make(chan StreamItem)
 
 	eg := errgroup.Group{}
 	eg.Go(func() error {
