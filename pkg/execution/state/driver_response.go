@@ -12,6 +12,8 @@ import (
 	"github.com/xhit/go-str2duration/v2"
 )
 
+const DefaultErrorMessage = "Unknown error running SDK"
+
 type Retryable interface {
 	Retryable() bool
 }
@@ -255,41 +257,69 @@ func (r DriverResponse) Unwrap() error {
 //	}
 //
 // However, no types are defined, and we use any error we can get our hands on!
+//
+// NOTE: There are several required fields:  "name", "message".
 func (r DriverResponse) UserError() map[string]any {
+
 	if r.Output == nil && r.Err != nil {
 		return map[string]any{
-			"error": r.Err,
+			"error":   r.Err,
+			"name":    "Error",
+			"message": r.Err.Error(),
 		}
 	}
 
-	mapped, ok := r.Output.(map[string]any)
-	if ok && mapped["body"] != nil {
-		// Attempt to fetch the JS/SDK error from the body.
-		if bodyAsMap, ok := mapped["body"].(map[string]any); ok {
-			return bodyAsMap
+	if mapped, ok := r.Output.(map[string]any); ok {
+		if processed, err := processErrorFields(mapped); err == nil {
+			// Ensure that all fields are added.
+			if _, ok := processed["name"]; !ok {
+				processed["name"] = "Error"
+			}
+			if _, ok := processed["message"]; !ok {
+				processed["message"] = DefaultErrorMessage
+			}
+			return processed
 		}
+	}
+	return map[string]any{
+		"error":   DefaultErrorMessage,
+		"name":    "Error",
+		"message": DefaultErrorMessage,
+	}
+}
 
-		// The body might be a byte array. If it is, try and unmarshal it into a map[string]any.
-		if bodyAsBytes, ok := mapped["body"].(json.RawMessage); ok {
-			// We expect the body to be stringified JSON, so make sure to unescape it for JSON decoding.
-			if s, err := strconv.Unquote(string(bodyAsBytes)); err == nil {
-				var bodyAsMap map[string]any
-				if err := json.Unmarshal([]byte(s), &bodyAsMap); err == nil {
-					return bodyAsMap
-				}
+// processErrorFields looks for an error field then a body field to handle
+// error messages from step responses.
+func processErrorFields(input map[string]any) (map[string]any, error) {
+	fields := []string{"error", "body"}
+	for _, f := range fields {
+		// Attempt to fetch the JS/SDK error from the body.
+		switch v := input[f].(type) {
+		case map[string]any:
+			return v, nil
+		case json.RawMessage:
+			if mapped, err := processErrorString(string(v)); err == nil {
+				return mapped, nil
+			}
+		case []byte:
+			if mapped, err := processErrorString(string(v)); err == nil {
+				return mapped, nil
+			}
+		case string:
+			if mapped, err := processErrorString(v); err == nil {
+				return mapped, nil
 			}
 		}
-
-		return mapped
 	}
-	if ok {
-		return mapped
-	}
+	return input, nil
+}
 
-	// TODO: Add error logging properly to help with debugging
-	// unknow errors
-
-	return map[string]any{
-		"error": "Unknown error running SDK",
+// processErrorString attempts to unquote a quoted string.
+func processErrorString(s string) (map[string]any, error) {
+	if unquote, err := strconv.Unquote(s); err == nil {
+		s = unquote
 	}
+	mapped := map[string]any{}
+	err := json.Unmarshal([]byte(s), &mapped)
+	return mapped, err
 }
