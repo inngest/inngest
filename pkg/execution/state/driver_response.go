@@ -3,6 +3,7 @@ package state
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/inngest/inngest/pkg/dateutil"
@@ -267,6 +268,18 @@ func (r DriverResponse) UserError() map[string]any {
 		if bodyAsMap, ok := mapped["body"].(map[string]any); ok {
 			return bodyAsMap
 		}
+
+		// The body might be a byte array. If it is, try and unmarshal it into a map[string]any.
+		if bodyAsBytes, ok := mapped["body"].(json.RawMessage); ok {
+			// We expect the body to be stringified JSON, so make sure to unescape it for JSON decoding.
+			if s, err := strconv.Unquote(string(bodyAsBytes)); err == nil {
+				var bodyAsMap map[string]any
+				if err := json.Unmarshal([]byte(s), &bodyAsMap); err == nil {
+					return bodyAsMap
+				}
+			}
+		}
+
 		return mapped
 	}
 	if ok {
