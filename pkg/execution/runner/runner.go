@@ -15,6 +15,7 @@ import (
 	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -68,6 +69,12 @@ func WithQueue(q queue.Queue) func(s *svc) {
 	}
 }
 
+func WithRateLimiter(rl ratelimit.RateLimiter) func(s *svc) {
+	return func(s *svc) {
+		s.rl = rl
+	}
+}
+
 // WithTracker is used in the dev server to track runs.
 func WithTracker(t *Tracker) func(s *svc) {
 	// XXX: Replace with sqlite
@@ -96,6 +103,8 @@ type svc struct {
 	state state.Manager
 	// queue allows the scheduling of new functions.
 	queue queue.Queue
+	// rl rate-limits functions.
+	rl ratelimit.RateLimiter
 	// cronmanager allows the creation of new scheduled functions.
 	cronmanager *cron.Cron
 	em          *event.Manager
@@ -534,6 +543,22 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 }
 
 func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Event) error {
+	// Attempt to rate-limit the incoming function.
+	if s.rl != nil && fn.RateLimit != nil {
+		key, err := ratelimit.RateLimitKey(ctx, fn.ID, *fn.RateLimit, evt.Map())
+		if err != nil {
+			return err
+		}
+		limited, err := s.rl.RateLimit(ctx, key, *fn.RateLimit)
+		if err != nil {
+			return err
+		}
+		if limited {
+			// Do nothing.
+			return nil
+		}
+	}
+
 	logger.From(ctx).Info().
 		Str("function_id", fn.ID.String()).
 		Str("function", fn.Name).

@@ -35,9 +35,10 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.10.1
 	github.com/stretchr/testify v1.8.2
+	github.com/throttled/throttled/v2 v2.11.0
 	github.com/uber-go/tally/v4 v4.1.4
 	github.com/vektah/gqlparser/v2 v2.5.1
-	github.com/xhit/go-str2duration/v2 v2.0.0
+	github.com/xhit/go-str2duration/v2 v2.1.0
 	go.opentelemetry.io/otel/trace v1.14.0
 	gocloud.dev v0.25.0
 	gocloud.dev/pubsub/natspubsub v0.25.0

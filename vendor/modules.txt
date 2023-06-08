@@ -552,6 +552,10 @@ github.com/stretchr/testify/require
 # github.com/subosito/gotenv v1.2.0
 ## explicit
 github.com/subosito/gotenv
+# github.com/throttled/throttled/v2 v2.11.0
+## explicit; go 1.13
+github.com/throttled/throttled/v2
+github.com/throttled/throttled/v2/store/storetest
 # github.com/tklauser/go-sysconf v0.3.10
 ## explicit; go 1.13
 github.com/tklauser/go-sysconf
@@ -577,7 +581,7 @@ github.com/vektah/gqlparser/v2/lexer
 github.com/vektah/gqlparser/v2/parser
 github.com/vektah/gqlparser/v2/validator
 github.com/vektah/gqlparser/v2/validator/rules
-# github.com/xhit/go-str2duration/v2 v2.0.0
+# github.com/xhit/go-str2duration/v2 v2.1.0
 ## explicit; go 1.13
 github.com/xhit/go-str2duration/v2
 # github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673
