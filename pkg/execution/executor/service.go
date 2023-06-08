@@ -154,7 +154,7 @@ func (s *svc) getFailureHandler(ctx context.Context) (func(context.Context, stat
 			Name:      event.FnFailedName,
 			Timestamp: now.UnixMilli(),
 			Data: map[string]interface{}{
-				"function_id": s.Function().ID,
+				"function_id": s.Function().Slug,
 				"run_id":      id.RunID.String(),
 				"error":       r.UserError(),
 				"event":       s.Event(),
