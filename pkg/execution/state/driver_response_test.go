@@ -228,25 +228,30 @@ func TestDriverResponseUserError(t *testing.T) {
 			name: "with no Output and Err",
 			r:    DriverResponse{Output: nil, Err: fmt.Errorf("something went wrong")},
 			expected: map[string]any{
-				"error": fmt.Errorf("something went wrong"),
+				"error":   fmt.Errorf("something went wrong"),
+				"name":    "Error",
+				"message": "something went wrong",
 			},
 		},
 		{
 			name: "with no Output and no Err",
 			r:    DriverResponse{Output: nil},
 			expected: map[string]any{
-				"error": "Unknown error running SDK",
+				"error":   "Unknown error running SDK",
+				"name":    "Error",
+				"message": DefaultErrorMessage,
 			},
 		},
 		{
-			name: "with Output and body",
-			r: DriverResponse{Output: map[string]any{
-				"body": map[string]any{
-					"error": "this is an error",
+			name: "with encoded response",
+			r: DriverResponse{
+				Output: map[string]any{
+					"error": `{"name":"Error","message":"test"}`,
 				},
-			}},
+			},
 			expected: map[string]any{
-				"error": "this is an error",
+				"name":    "Error",
+				"message": "test",
 			},
 		},
 		{
@@ -255,22 +260,65 @@ func TestDriverResponseUserError(t *testing.T) {
 				"data": "error response",
 			}},
 			expected: map[string]any{
-				"data": "error response",
+				// Auto-fill required fields
+				"name":    "Error",
+				"message": DefaultErrorMessage,
+				"data":    "error response",
 			},
 		},
+		// encoded JS errors
+		{
+			name: "with body as error string",
+			r: DriverResponse{Output: map[string]any{
+				"body": "{\"name\":\"Error\",\"message\":\"lolk\",\"stack\":\"stack\",\"__serialized\":true}",
+			}},
+			expected: map[string]any{
+				"name":         "Error",
+				"message":      "lolk",
+				"stack":        "stack",
+				"__serialized": true,
+			},
+		},
+		{
+			name: "with body as error json.RawMessage",
+			r: DriverResponse{Output: map[string]any{
+				"body": json.RawMessage("{\"name\":\"Error\",\"message\":\"lolk\",\"stack\":\"stack\",\"__serialized\":true}"),
+			}},
+			expected: map[string]any{
+				"name":         "Error",
+				"message":      "lolk",
+				"stack":        "stack",
+				"__serialized": true,
+			},
+		},
+		{
+			name: "with body as error bytes",
+			r: DriverResponse{Output: map[string]any{
+				"body": []byte("{\"name\":\"Error\",\"message\":\"lolk\",\"stack\":\"stack\",\"__serialized\":true}"),
+			}},
+			expected: map[string]any{
+				"name":         "Error",
+				"message":      "lolk",
+				"stack":        "stack",
+				"__serialized": true,
+			},
+		},
+
 		// This should not happen though
 		{
 			name: "non map Output",
 			r:    DriverResponse{Output: "YOLO"},
 			expected: map[string]any{
-				"error": "Unknown error running SDK",
+				"error":   "Unknown error running SDK",
+				"name":    "Error",
+				"message": DefaultErrorMessage,
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.expected, test.r.UserError())
+			require.Equal(t, test.expected, test.r.UserError(), test.name)
 		})
 	}
 }
