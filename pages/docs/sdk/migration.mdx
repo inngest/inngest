@@ -1,8 +1,8 @@
-export const description = "Migrate to v2 of the Inngest TS SDK."
+export const description = "How to migrate your code to v2 of the Inngest TS SDK."
 
-# Migrating from Inngest SDK v1 to v2
+# Upgrading from Inngest SDK v1 to v2
 
-This guide walks through migrating to the Inngest TS SDK v2 from v1.
+This guide walks through migrating your code from v1 to v2 of the Inngest TS SDK.
 
 ## Breaking changes in v2
 
@@ -50,6 +50,9 @@ new Inngest<Events>();
 Instead, in v2, we use a new `EventSchemas` class and its methods to show current event typing support clearly. All we have to do is create a `new EventSchemas()` instance and pass it into our `new Inngest()` instance.
 
 ```ts
+import { Inngest, EventSchemas } from "inngest";
+//                ⬆️ New "EventSchemas" class
+
 // ✅ Valid in v2 - `fromRecord()`
 type Events = {
   "app/user.created": {
