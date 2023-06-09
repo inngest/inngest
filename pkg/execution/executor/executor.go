@@ -37,7 +37,6 @@ var (
 // we fail to wait for the executor, workflows may finish prematurely as future
 // actions may not be scheduled.
 //
-//
 // # Running functions
 //
 // The executor schedules function execution over drivers.  A driver is a runtime-specific
@@ -373,8 +372,9 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *i
 	if response == nil {
 		// Add an error response here.
 		response = &state.DriverResponse{
-			Step: *step,
-			Err:  err,
+			Step:    *step,
+			Err:     err,
+			Headers: response.Headers,
 		}
 	}
 	if err != nil && response.Err == nil {

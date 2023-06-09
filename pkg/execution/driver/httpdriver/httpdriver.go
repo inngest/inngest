@@ -173,6 +173,7 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 			Step:       step,
 			Duration:   res.Duration,
 			OutputSize: len(res.Body),
+			Headers:    res.Headers,
 		}
 		resp.Generator, err = ParseGenerator(ctx, res.Body)
 		if err != nil {
