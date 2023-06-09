@@ -16,13 +16,13 @@ import {
 const productLinks = {
   featuredTitle: "Product",
   featured: [
-    // {
-    //   title: "TypeScript & JavaScript SDK",
-    //   desc: "Event-driven and and scheduled serverless functions",
-    //   url: "/features/sdk?ref=nav",
-    //   icon: IconSDK,
-    //   iconBg: "bg-indigo-500",
-    // },
+    {
+      title: "How Inngest Works",
+      desc: "Learn about the Inngest serverless queue & workflow engine",
+      url: "/product/how-inngest-works?ref=nav",
+      icon: IconSteps,
+      iconBg: "bg-indigo-500",
+    },
     // {
     //   title: "Step Functions",
     //   desc: "Build complex conditional workflows",
