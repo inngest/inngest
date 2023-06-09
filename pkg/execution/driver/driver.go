@@ -30,9 +30,9 @@ type FunctionStack struct {
 // MarshalV1 marshals state as an input to driver runtimes.
 func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex int, env string) ([]byte, error) {
 	data := map[string]interface{}{
-		"event":  s.Event(),
-		"events": s.Events(),
-		"steps":  s.Actions(),
+		"event": s.Event(),
+		// "events": s.Events(), disabling this for now so we don't send unnecessary data to customer infra
+		"steps": s.Actions(),
 		"ctx": map[string]interface{}{
 			// fn_id is used within entrypoints to SDK-based functions in
 			// order to specify the ID of the function to run via RPC.
