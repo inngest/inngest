@@ -143,6 +143,9 @@ type DriverResponse struct {
 	//
 	// When final is true, Retryable() always returns false.
 	final bool
+
+	// Headers from the function invocation response.
+	Headers map[string][]string `json:"headers"`
 }
 
 // SetFinal indicates that this error is final, regardless of the status code

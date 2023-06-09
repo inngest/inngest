@@ -162,19 +162,19 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 		uri.RawQuery = values.Encode()
 	}
 
-	byt, status, duration, err := e.do(ctx, uri.String(), input)
+	res, err := e.do(ctx, uri.String(), input)
 	if err != nil {
 		return nil, err
 	}
 
-	if status == 206 {
+	if res.Status == 206 {
 		// This is a generator-based function returning opcodes.
 		resp := &state.DriverResponse{
 			Step:       step,
-			Duration:   duration,
-			OutputSize: len(byt),
+			Duration:   res.Duration,
+			OutputSize: len(res.Body),
 		}
-		resp.Generator, err = ParseGenerator(ctx, byt)
+		resp.Generator, err = ParseGenerator(ctx, res.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -182,12 +182,12 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 	}
 
 	var body interface{}
-	body = json.RawMessage(byt)
-	if len(byt) > 0 {
+	body = json.RawMessage(res.Body)
+	if len(res.Body) > 0 {
 		// Is the response valid JSON?  If so, ensure that we don't re-marshal the
 		// JSON string.
 		respjson := map[string]interface{}{}
-		if err := json.Unmarshal(byt, &respjson); err == nil {
+		if err := json.Unmarshal(res.Body, &respjson); err == nil {
 			body = respjson
 		} else {
 			// This isn't a map, so check the first character for json encoding.  If this isn't
@@ -195,8 +195,8 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 			//
 			// This is a stop-gap safety check to see if SDKs respond with text that's not JSON,
 			// in the case of an internal issue or a host processing error we can't control.
-			if byt[0] != '[' && byt[0] != '"' {
-				body = string(byt)
+			if res.Body[0] != '[' && res.Body[0] != '"' {
+				body = string(res.Body)
 			}
 		}
 	} else {
@@ -205,26 +205,35 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 
 	// Add an error to driver.Response if the status code isn't 2XX.
 	err = nil
-	if status < 200 || status > 299 {
-		err = fmt.Errorf("invalid status code: %d", status)
+	if res.Status < 200 || res.Status > 299 {
+		err = fmt.Errorf("invalid status code: %d", res.Status)
 	}
 
 	return &state.DriverResponse{
 		Step: step,
 		Output: map[string]interface{}{
-			"status": status,
+			"status": res.Status,
 			"body":   body,
 		},
 		Err:        err,
-		Duration:   duration,
-		OutputSize: len(byt),
+		Duration:   res.Duration,
+		OutputSize: len(res.Body),
+		Headers:    res.Headers,
 	}, nil
 }
 
-func (e executor) do(ctx context.Context, url string, input []byte) ([]byte, int, time.Duration, error) {
+type doOutput struct {
+	Body     []byte
+	Duration time.Duration
+	Headers  map[string][]string
+	Status   int
+}
+
+func (e executor) do(ctx context.Context, url string, input []byte) (doOutput, error) {
+	out := doOutput{}
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(input))
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("error creating request: %w", err)
+		return out, fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 
@@ -234,13 +243,15 @@ func (e executor) do(ctx context.Context, url string, input []byte) ([]byte, int
 	pre := time.Now()
 	resp, err := e.client.Do(req)
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("error executing request: %w", err)
+		return out, fmt.Errorf("error executing request: %w", err)
 	}
 	defer resp.Body.Close()
-	dur := time.Since(pre)
+	out.Duration = time.Since(pre)
+	out.Headers = resp.Header
+
 	byt, err := io.ReadAll(io.LimitReader(resp.Body, consts.MaxBodySize))
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("error reading response body: %w", err)
+		return out, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	// If the responding status code is 201 Created, the response has been
@@ -252,7 +263,9 @@ func (e executor) do(ctx context.Context, url string, input []byte) ([]byte, int
 	// send a 201 status code and namespace in this way, so failing to parse
 	// here is an error.
 	if resp.StatusCode != 201 {
-		return byt, resp.StatusCode, dur, nil
+		out.Body = byt
+		out.Status = resp.StatusCode
+		return out, nil
 	}
 
 	var body struct {
@@ -260,8 +273,11 @@ func (e executor) do(ctx context.Context, url string, input []byte) ([]byte, int
 		Body       string `json:"body"`
 	}
 	if err := json.Unmarshal(byt, &body); err != nil {
-		return nil, 0, dur, fmt.Errorf("error reading response body to check for status code: %w", err)
+		return out, fmt.Errorf("error reading response body to check for status code: %w", err)
 	}
-	return []byte(body.Body), body.StatusCode, dur, nil
+
+	out.Body = []byte(body.Body)
+	out.Status = body.StatusCode
+	return out, nil
 
 }
