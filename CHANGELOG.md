@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.14.0] - 2023-06-09
+
+### Added
+- Added rate limiting to OSS dev server
+- Updated function definitions for V2 function config
+
 ## [v0.13.3] - 2023-05-19
 
 ### Changed
