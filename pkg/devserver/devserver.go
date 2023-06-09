@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -101,6 +102,8 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 		}),
 	)
 
+	rl := ratelimit.New(ctx, rc, "{ratelimit}:")
+
 	runner := runner.NewService(
 		opts.Config,
 		runner.WithExecutionLoader(loader),
@@ -108,6 +111,7 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 		runner.WithStateManager(sm),
 		runner.WithQueue(queue),
 		runner.WithTracker(t),
+		runner.WithRateLimiter(rl),
 	)
 
 	// The devserver embeds the event API.
