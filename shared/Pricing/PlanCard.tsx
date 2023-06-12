@@ -48,6 +48,13 @@ export default function PlanCard({ variant = "light", content }) {
         <p
           className={`text-4xl mt-4 -mr-4 font-bold tracking-tight text-indigo-500 ${theme[variant].price}`}
         >
+          {Boolean(content.cost.startsAt) && (
+            <span
+              className={`text-sm font-medium -ml-8 mr-0.5 ${theme[variant].secondary}`}
+            >
+              Starting at{" "}
+            </span>
+          )}
           {content.cost.basePrice}
           <span
             className={`text-sm font-medium ml-0.5 ${theme[variant].secondary}`}
