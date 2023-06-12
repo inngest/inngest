@@ -1,4 +1,5 @@
 import { Button } from "../Button";
+import InformationCircle from "src/shared/Icons/InformationCircle";
 
 export default function ComparisonTable({ plans, features }) {
   return (
@@ -27,10 +28,13 @@ export default function ComparisonTable({ plans, features }) {
             <th></th>
             {plans.map((plan, i) => (
               <th className="text-left px-6 py-8" key={i}>
+                <span className="block text-xs text-slate-400 font-medium mb-1">
+                  Starting at
+                </span>
                 <span className="block text-4xl mb-2">
-                  {plan.cost}
+                  {plan.cost.basePrice}
                   <span className="text-sm text-slate-400 ml-1 font-medium">
-                    {plan.costTime}
+                    /{plan.cost.period}
                   </span>
                 </span>
                 <span className="block mb-8 text-sm font-medium mt-2 text-slate-200">
@@ -46,15 +50,26 @@ export default function ComparisonTable({ plans, features }) {
         <tbody>
           {features.map((feature, i) => (
             <tr key={i} className="h-14 border-t border-slate-900">
-              <td className="font-medium">{feature.name}</td>
+              <td className="h-14 flex items-center font-medium">
+                {feature.name}
+                {Boolean(feature.infoUrl) && (
+                  <a
+                    href={feature.infoUrl}
+                    className="ml-2 transition-all text-slate-500 hover:text-white"
+                  >
+                    <InformationCircle size="1em" />
+                  </a>
+                )}
+              </td>
               {plans.map((plan, j) =>
-                typeof feature.plans[plan.name] === "string" ? (
+                typeof feature.plans?.[plan.name] === "string" ? (
                   <td key={j} className="px-6 text-sm font-medium">
                     {feature.plans[plan.name]}
                   </td>
                 ) : (
                   <td className="px-6" key={j}>
-                    {feature.plans[plan.name] === true ? (
+                    {feature.all === true ||
+                    feature.plans?.[plan.name] === true ? (
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 20 20"

@@ -42,6 +42,16 @@ async function redirects() {
       destination: "/docs/events/webhooks",
       permanent: true,
     },
+    {
+      source: "/features/sdk",
+      destination: "/docs/sdk/overview",
+      permanent: true,
+    },
+    {
+      source: "/features/step-functions",
+      destination: "/docs/functions/multi-step",
+      permanent: true,
+    },
     ...legacyDocsUrls.map(([source, destination]) => ({
       source,
       destination,

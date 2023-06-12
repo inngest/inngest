@@ -4,11 +4,20 @@ import ComparisonTable from "src/shared/Pricing/ComparisionTable";
 import { FAQRow } from "src/shared/Pricing/FAQ";
 import PlanCard from "src/shared/Pricing/PlanCard";
 import Footer from "../shared/Footer";
+import { Button } from "src/shared/Button";
+import CodeWindow from "src/shared/CodeWindow";
+import InformationCircle from "src/shared/Icons/InformationCircle";
 
 type Plan = {
   name: string;
-  cost: string;
-  costTime?: string;
+  cost: {
+    startsAt?: boolean;
+    basePrice: string;
+    included: string;
+    additionalPrice: string;
+    additionalRate?: string;
+    period: string;
+  };
   description: React.ReactFragment | string;
   popular?: boolean;
   cta: {
@@ -19,148 +28,28 @@ type Plan = {
     quantity?: string;
     text: string;
   }[];
-  resources: {
-    ram: string;
-    maxRuntime: string;
-  };
 };
 
 type Feature = {
   name: string;
-  plans: {
+  all?: boolean; // All plans offer this
+  plans?: {
     [key: string]: string | boolean;
   };
+  infoUrl?: string;
 };
-
-const FEATURES: Feature[] = [
-  {
-    name: "Events",
-    plans: {
-      Hobby: "Unlimited",
-      Team: "Unlimited",
-      Enterprise: "Unlimited",
-    },
-  },
-  {
-    name: "Function steps/month",
-    plans: {
-      Hobby: "50K",
-      Team: "100K - 1M",
-      Enterprise: "Unlimited",
-    },
-  },
-  {
-    name: "Seats",
-    plans: {
-      Hobby: "1",
-      Team: "20",
-      Enterprise: "20+",
-    },
-  },
-  {
-    name: "Concurrent Functions",
-    plans: {
-      Hobby: "1",
-      Team: "100",
-      Enterprise: "Custom",
-    },
-  },
-  {
-    name: "Automatic Retries",
-    plans: {
-      Hobby: true,
-      Team: true,
-      Enterprise: true,
-    },
-  },
-  {
-    name: "Step Functions",
-    plans: {
-      Hobby: true,
-      Team: true,
-      Enterprise: true,
-    },
-  },
-  {
-    name: "Scheduled Functions",
-    plans: {
-      Hobby: true,
-      Team: true,
-      Enterprise: true,
-    },
-  },
-  {
-    name: "Local Dev Server",
-    plans: {
-      Hobby: true,
-      Team: true,
-      Enterprise: true,
-    },
-  },
-  {
-    name: "Event Coordination",
-    plans: {
-      Hobby: true,
-      Team: true,
-      Enterprise: true,
-    },
-  },
-  {
-    name: "Versioning",
-    plans: {
-      Hobby: true,
-      Team: true,
-      Enterprise: true,
-    },
-  },
-];
 
 const PLANS: Plan[] = [
   {
-    name: "Hobby",
-    cost: "$0",
-    costTime: "/month",
-    description: "Bring your project to life",
-    cta: {
-      href: "/sign-up?ref=pricing-hobby",
-      text: "Start building",
-    },
-    features: [
-      {
-        quantity: "Unlimited",
-        text: "Events",
-      },
-      {
-        quantity: "50k",
-        text: "Function steps/month",
-      },
-      {
-        quantity: "1",
-        text: "Concurrent Function",
-      },
-      {
-        quantity: "1",
-        text: "Seat",
-      },
-      {
-        quantity: "1 day",
-        text: "History",
-      },
-      {
-        text: "Discord support",
-      },
-    ],
-    resources: {
-      ram: "1GB",
-      maxRuntime: "6 hours",
-    },
-  },
-  {
     name: "Team",
-    cost: "From $20*",
-    costTime: "/month",
-    description: "From Startup to scale-up",
-    popular: true,
+    cost: {
+      basePrice: "$20",
+      included: "100k",
+      additionalPrice: "$1",
+      additionalRate: "10k",
+      period: "month",
+    },
+    description: "Bring your product to life",
     cta: {
       href: "/sign-up?ref=pricing-team",
       text: "Start building",
@@ -171,36 +60,71 @@ const PLANS: Plan[] = [
         text: "Events",
       },
       {
-        quantity: "100k - 10m",
-        text: "Function steps/month",
+        quantity: "Unlimited",
+        text: "Seats",
       },
       {
         quantity: "100",
         text: "Concurrent Functions",
       },
       {
-        quantity: "20",
-        text: "Seats",
-      },
-      {
         quantity: "7 days",
         text: "History",
       },
       {
-        text: "Email support",
+        text: "Discord Support",
       },
     ],
-    resources: {
-      ram: "1GB",
-      maxRuntime: "6 hours",
+  },
+  {
+    name: "Startup",
+    cost: {
+      basePrice: "$149",
+      included: "5M",
+      additionalPrice: "$10",
+      additionalRate: "1M",
+      period: "month",
     },
+    description: "Scale with us",
+    popular: true,
+    cta: {
+      href: "/sign-up?ref=pricing-startup",
+      text: "Start building",
+    },
+    features: [
+      {
+        quantity: "Unlimited",
+        text: "Events",
+      },
+      {
+        quantity: "Unlimited",
+        text: "Seats",
+      },
+      {
+        quantity: "500",
+        text: "Concurrent Functions",
+      },
+      {
+        quantity: "14 days",
+        text: "History",
+      },
+      {
+        text: "Discord + Email Support",
+      },
+    ],
   },
   {
     name: "Enterprise",
-    cost: "Flexible",
+    cost: {
+      startsAt: true,
+      basePrice: "$1250",
+      included: "Custom",
+      additionalPrice: "custom",
+      period: "month",
+    },
     description: "Powerful access for any scale",
     cta: {
-      href: "/contact?ref=pricing-advanced",
+      href: "/contact?ref=pricing-enterprise",
       text: "Get in touch",
     },
     features: [
@@ -209,31 +133,216 @@ const PLANS: Plan[] = [
         text: "Events",
       },
       {
-        quantity: "10m+",
-        text: "Function steps/month",
+        quantity: "Unlimited",
+        text: "Seats",
       },
       {
         quantity: "Custom",
         text: "Concurrent Functions",
       },
       {
-        quantity: "20+",
-        text: "Seats",
-      },
-      {
         quantity: "90 Days",
         text: "History",
       },
       {
-        text: "Email support",
+        text: "Discord + Email Support + SLAs",
+      },
+      {
+        quantity: "HIPAA BAA Available",
+        text: "Compliance",
       },
     ],
-    resources: {
-      ram: "up to 16GB",
-      maxRuntime: "6+ hours",
+  },
+];
+
+function getPlan(planName: string): Plan {
+  return PLANS.find((p) => p.name === planName);
+}
+
+function getPlanFeatureQuantity(planName: string, feature: string): string {
+  return (
+    getPlan(planName)?.features.find((f) => f.text === feature)?.quantity || ""
+  );
+}
+
+const FEATURES: Feature[] = [
+  {
+    name: "Function Steps/Month",
+    plans: {
+      Team: `${getPlan("Team").cost.included} + ${
+        getPlan("Team").cost.additionalPrice
+      } per additional ${getPlan("Team").cost.additionalRate}`,
+      Startup: `${getPlan("Startup").cost.included} + ${
+        getPlan("Startup").cost.additionalPrice
+      } per additional ${getPlan("Startup").cost.additionalRate}`,
+      Enterprise: getPlan("Enterprise").cost.included,
+    },
+  },
+  {
+    name: "Events",
+    plans: {
+      Team: getPlanFeatureQuantity("Team", "Events"),
+      Startup: getPlanFeatureQuantity("Startup", "Events"),
+      Enterprise: getPlanFeatureQuantity("Enterprise", "Events"),
+    },
+  },
+  {
+    name: "Seats",
+    plans: {
+      Team: "Unlimited",
+      Startup: "Unlimited",
+      Enterprise: "Unlimited",
+    },
+  },
+  {
+    name: "Concurrent Functions",
+    plans: {
+      Team: getPlanFeatureQuantity("Team", "Concurrent Functions"),
+      Startup: getPlanFeatureQuantity("Startup", "Concurrent Functions"),
+      Enterprise: getPlanFeatureQuantity("Enterprise", "Concurrent Functions"),
+    },
+  },
+  {
+    name: "History (Log Retention)",
+    plans: {
+      Team: getPlanFeatureQuantity("Team", "History"),
+      Startup: getPlanFeatureQuantity("Startup", "History"),
+      Enterprise: getPlanFeatureQuantity("Enterprise", "History"),
+    },
+  },
+  {
+    name: "Automatic Retries",
+    all: true,
+    infoUrl: "/docs/functions/retries?ref=pricing",
+  },
+  {
+    name: "Step Functions",
+    all: true,
+    infoUrl: "/docs/reference/functions/step-run?ref=pricing",
+  },
+  {
+    name: "Scheduled Functions",
+    all: true,
+    infoUrl: "/docs/guides/scheduled-functions?ref=pricing",
+  },
+  {
+    name: "Max Sleep Duration",
+    plans: {
+      Team: "60 days",
+      Startup: "6 months",
+      Enterprise: "1 year",
+    },
+    infoUrl: "/docs/guides/enqueueing-future-jobs?ref=pricing",
+  },
+  {
+    name: "Concurrency Controls",
+    all: true,
+    infoUrl: "/docs/functions/concurrency?ref=pricing",
+  },
+  {
+    name: "Custom Failure Handlers",
+    all: true,
+    infoUrl: "/docs/reference/functions/handling-failures?ref=pricing",
+  },
+  {
+    name: "Parallel Steps",
+    all: true,
+    infoUrl: "/docs/guides/step-parallelism?ref=pricing",
+  },
+  {
+    name: "Fan-Out",
+    all: true,
+    infoUrl: "/docs/guides/fan-out-jobs?ref=pricing",
+  },
+  {
+    name: "Local Dev Server",
+    all: true,
+    infoUrl: "/docs/local-development?ref=pricing",
+  },
+  {
+    name: "Vercel Integration",
+    all: true,
+    infoUrl: "/docs/deploy/vercel?ref=pricing",
+  },
+  {
+    name: "Discord Support",
+    plans: {
+      Team: true,
+      Startup: true,
+      Enterprise: true,
+    },
+  },
+  {
+    name: "Email Support",
+    plans: {
+      Team: false,
+      Startup: true,
+      Enterprise: true,
+    },
+  },
+  {
+    name: "Support SLA",
+    plans: {
+      Team: false,
+      Startup: false,
+      Enterprise: true,
+    },
+  },
+  {
+    name: "Onboarding Support",
+    plans: {
+      Team: false,
+      Startup: false,
+      Enterprise: true,
+    },
+  },
+  {
+    name: "HIPPA BAA Available",
+    plans: {
+      Team: false,
+      Startup: false,
+      Enterprise: true,
     },
   },
 ];
+
+const stepExamples = {
+  singleStep: `
+  export default inngest.createFunction(
+    { name: "Send Welcome Email" },
+    { event: "app/user.signup" },
+    async ({ event, step }) => {
+      await emailAPI.send({
+        template: "welcome",
+        to: event.user.email,
+      });
+    }
+  );
+  `,
+  multiStep: `
+  export default inngest.createFunction(
+    { name: "New Signup Drip Campaign" },
+    { event: "app/user.signup" },
+    async ({ event, step }) => {
+      await step.run("Send welcome email", async () => {
+        await emailAPI.send({
+          template: "welcome",
+          to: event.user.email,
+        });
+      });
+
+      await step.sleep("3 days");
+
+      await step.run("Send new user tips email", async () => {
+        await emailAPI.send({
+          template: "new-user-tips",
+          to: event.user.email,
+        });
+      });
+    }
+  );
+  `,
+};
 
 export async function getStaticProps() {
   return {
@@ -260,32 +369,127 @@ export default function Pricing() {
         }}
       >
         <Container>
-          <h1 className="text-3xl lg:text-5xl text-white mt-20 mb-28 font-semibold tracking-tight">
+          <h1 className="text-3xl lg:text-5xl text-white mt-20 mb-16 font-semibold tracking-tight">
             Simple pricing.
             <br />
             Powerful functionality.
           </h1>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-8 lg:gap-8 text-center mb-8">
-            <div className="md:col-span-2 rounded-lg flex flex-col gap-y-8 md:gap-y-0 md:flex-row items-stretch">
-              <PlanCard content={PLANS[0]} />
-              <PlanCard content={PLANS[1]} />
+          <div className="flex items-center justify-center my-12">
+            <div className="w-4xl min-w-[80%] sm:min-w-0 max-w-3xl relative">
+              <div className="lg:absolute inset-0 rounded-lg bg-blue-500 opacity-20 rotate-2 -z-0 scale-x-[110%] mx-5"></div>
+              <div
+                style={{
+                  backgroundImage: "url(/assets/footer/footer-grid.svg)",
+                  backgroundSize: "cover",
+                  backgroundPosition: "right -60px top -160px",
+                  backgroundRepeat: "no-repeat",
+                }}
+                className="flex flex-col justify-between bg-blue-500/90 rounded-xl relative w-full h-full"
+              >
+                <div className="py-4 px-4 flex flex-col sm:flex-row gap-6 items-center text-left">
+                  <div>
+                    <h3 className="text-white text-xl lg:text-2xl font-medium tracking-tight mb-2">
+                      Free Tier
+                    </h3>
+                    <p className="flex items-center text-sky-100 text-sm">
+                      50k Function Steps{" "}
+                      <a
+                        href="#what-is-a-function-step"
+                        className="mx-1 transition-all text-slate-200 hover:text-white"
+                      >
+                        <InformationCircle size="1.2em" />
+                      </a>{" "}
+                      &mdash; 25 Concurrent Functions &mdash; 3 Days History
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 items-center">
+                    <Button
+                      href="/sign-up?ref=free"
+                      variant="tertiary"
+                      arrow="right"
+                      className="whitespace-nowrap"
+                    >
+                      Create an account
+                    </Button>
+                    <p className="text-slate-200 text-xs">
+                      <em>No credit-card required</em>
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex items-stretch">
-              <PlanCard content={PLANS[2]} variant="dark" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-y-8 lg:gap-0 text-center mb-8">
+            {/* <div className="md:col-span-2 rounded-lg flex flex-col gap-y-8 md:gap-y-0 md:flex-row items-stretch"> */}
+            <PlanCard content={PLANS[0]} variant="light" />
+            <PlanCard content={PLANS[1]} variant="focus" />
+            <PlanCard content={PLANS[2]} variant="light" />
+            {/* </div> */}
+          </div>
+
+          <div>
+            {/* Step Comparison */}
+            <h2
+              id="what-is-a-function-step" // Used in PlanCard
+              className="scroll-mt-32 mt-20 mb-4 text-white text-4xl font-semibold tracking-tight"
+            >
+              What is a Function Step?
+            </h2>
+
+            <p className="my-8 text-lg font-medium">
+              A Function Step is a callable unit of an Inngest function. Code
+              that is retried counts as an additional billed step.
+            </p>
+
+            <div className="max-w-5xl mt-12 flex flex-col lg:flex-row gap-8 items-start">
+              <div>
+                <h3 className="text-lg font-semibold">
+                  Simple, single-step function
+                </h3>
+                <p className="my-4">
+                  This function does one thing. When a{" "}
+                  <code className="bg-slate-800 text-slate-200 text-sm">
+                    app/user.signup
+                  </code>{" "}
+                  event is triggered, the function sends a welcome email. This
+                  is billed as 1 step.
+                </p>
+                <CodeWindow
+                  className="mt-4 w-full"
+                  snippet={stepExamples.singleStep}
+                  lineHighlights={[[4, 9]]}
+                />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Multi-step function</h3>
+                <p className="my-4">
+                  This function combines functionality typically spread across
+                  multiple jobs and crons. When a{" "}
+                  <code className="bg-slate-800 text-slate-200 text-sm">
+                    app/user.signup
+                  </code>{" "}
+                  event is triggered, the function sends a welcome email, it
+                  waits 3 days, then sends another email. This is billed as 3
+                  steps.
+                </p>
+                <div className="flex">
+                  <CodeWindow
+                    className="mt-4 w-full"
+                    snippet={stepExamples.multiStep}
+                    lineHighlights={[
+                      [5, 10],
+                      [12, 12],
+                      [14, 19],
+                    ]}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          <p className="text-slate-200 text-sm text-center">
-            *Team plan starts at $20/month for 100,000 function steps (
-            <a href="#faq">?</a>).
-            <br />
-            Additional function steps are available to purchase for $10 per
-            100,000.
-          </p>
-
           <ComparisonTable plans={PLANS} features={FEATURES} />
 
-          <div className="xl:grid xl:grid-cols-4 mt-20 pt-12 border-t border-slate-900">
+          <div className="xl:grid xl:grid-cols-4 mt-12 pt-12 border-t border-slate-900">
             <div>
               <h2
                 id="faq"
@@ -341,7 +545,7 @@ export default function Pricing() {
                 </p>
               </FAQRow>
 
-              <FAQRow question={`What's a "function step"?`}>
+              {/* <FAQRow question={`What's a "function step"?`}>
                 <p>
                   Inngest functions can be broken down into separate parts, or
                   “steps” which run independently. Steps are defined using our
@@ -416,7 +620,7 @@ export default function Pricing() {
                   function steps. The last step is never called due to the
                   failure, so it is not billed.
                 </p>
-              </FAQRow>
+              </FAQRow> */}
 
               <FAQRow question={`How are my functions run?`}>
                 <p>
@@ -445,17 +649,20 @@ export default function Pricing() {
                   Sleeps and other pauses do not count towards your concurrency
                   limit as your function isn't running while waiting.
                 </p>
-                <p>See more details at <a href="/docs/usage-limits/inngest">Usage Limits</a> page.</p>
+                <p>
+                  See more details at{" "}
+                  <a href="/docs/usage-limits/inngest">Usage Limits</a> page.
+                </p>
               </FAQRow>
               <FAQRow question={`Can I get a demo of the product?`}>
                 <p>
                   Yes! We would be happy to demo Inngest for you and understand
-                  the needs of your team. Email us at{" "}
+                  the needs of your team.{" "}
                   <a
                     className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
-                    href="mailto:hello@inngest.com"
+                    href="/contact?ref=pricing-faq-demo"
                   >
-                    hello@inngest.com
+                    Contact us here
                   </a>{" "}
                   to set up a call.
                 </p>
@@ -466,7 +673,7 @@ export default function Pricing() {
                   to expand to Go, Python and others in the future.{" "}
                   <a
                     className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
-                    href="mailto:hello@inngest.com"
+                    href="/contact?ref=pricing-faq-languages"
                   >
                     Let us know
                   </a>{" "}
@@ -483,7 +690,10 @@ export default function Pricing() {
                   that, you can break it up into multiple steps (see: What is a
                   function step?).
                 </p>
-                <p>See more details at <a href="/docs/usage-limits/inngest">Usage Limits</a> page.</p>
+                <p>
+                  See more details at{" "}
+                  <a href="/docs/usage-limits/inngest">Usage Limits</a> page.
+                </p>
               </FAQRow>
               <FAQRow
                 question={`Can multiple functions be triggered by the same event?`}
@@ -511,12 +721,12 @@ export default function Pricing() {
               </FAQRow>
               <FAQRow question={`Can I select a region for my data?`}>
                 <p>
-                  Not yet, but it’s in our roadmap. If you have a specific
+                  Not yet, but it's in our roadmap. If you have a specific
                   roadmap in mind or would like to be one of the first people to
                   have access,{" "}
                   <a
                     className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
-                    href="mailto:hello@inngest.com"
+                    href="/contact?ref=pricing-faq-regions"
                   >
                     shoot us a message
                   </a>
@@ -525,10 +735,11 @@ export default function Pricing() {
               </FAQRow>
               <FAQRow question={`Can I self host inngest?`}>
                 <p>
-                  If you're interested in self-hosting Inngest,{" "}
+                  Not yet, but we plan to offer this in the future. If you're
+                  interested in self-hosting Inngest,{" "}
                   <a
                     className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
-                    href="mailto:hello@inngest.com"
+                    href="/contact?ref=pricing-faq-self-hosting"
                   >
                     reach out with your needs
                   </a>

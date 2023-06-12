@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 
-import CodeWindow, { removeLeadingSpaces } from "src/shared/legacy/CodeWindow";
+import CodeWindow, { removeLeadingSpaces } from "src/shared/CodeWindow";
 
 const defaultCode = `
   import { inngest } from "./client"

@@ -1,10 +1,19 @@
 import classNames from "src/utils/classNames";
 import { Button } from "../Button";
+import InformationCircle from "src/shared/Icons/InformationCircle";
 
 export default function PlanCard({ variant = "light", content }) {
   const theme = {
     light: {
-      cardBG: "bg-slate-100 last:bg-white",
+      cardBG: "bg-slate-100",
+      price: "text-indigo-500",
+      row: "odd:bg-slate-400/10",
+      primary: "text-slate-800",
+      secondary: "text-slate-600",
+      description: "text-slate-600",
+    },
+    focus: {
+      cardBG: "bg-white",
       price: "text-indigo-500",
       row: "odd:bg-slate-400/10",
       primary: "text-slate-800",
@@ -28,7 +37,7 @@ export default function PlanCard({ variant = "light", content }) {
       <div className="pt-8">
         {content.popular && (
           <div className="-mt-11 mb-3.5 block">
-            <div className=" bg-indigo-500 inline-block shadow-lg rounded-full text-white text-sm font-semibold tracking-tight leading-none py-2 px-4">
+            <div className="bg-indigo-500 inline-block shadow-lg rounded-full text-white text-sm font-semibold tracking-tight leading-none py-2 px-4">
               Most Popular
             </div>
           </div>
@@ -37,20 +46,43 @@ export default function PlanCard({ variant = "light", content }) {
           {content.name}
         </h2>
         <p
-          className={`text-3xl mt-2 -mr-4 font-bold tracking-tight text-indigo-500 ${theme[variant].price}`}
+          className={`text-4xl mt-4 -mr-4 font-bold tracking-tight text-indigo-500 ${theme[variant].price}`}
         >
-          {content.cost}
+          {content.cost.basePrice}
           <span
             className={`text-sm font-medium ml-0.5 ${theme[variant].secondary}`}
           >
-            /mo
+            /{content.cost.period}
           </span>
         </p>
         <p
+          className={`text-base mt-4 font-medium flex items-center justify-center ${theme[variant].description}`}
+        >
+          {content.cost.included} Function Steps{" "}
+          <a
+            href="#what-is-a-function-step"
+            className="ml-1.5 transition-all text-slate-500 hover:text-slate-700"
+          >
+            <InformationCircle size="1.2em" />
+          </a>
+        </p>
+        <div className="flex justify-center mt-4">
+          <div className={`text-sm font-medium ${theme[variant].secondary}`}>
+            {content.cost.additionalPrice === "custom" ? (
+              <>&nbsp;</>
+            ) : (
+              <>
+                + <strong>{content.cost.additionalPrice}</strong> per additional{" "}
+                <strong>{content.cost.additionalRate}</strong>
+              </>
+            )}
+          </div>
+        </div>
+        {/* <p
           className={`text-sm mt-2 font-medium  ${theme[variant].description}`}
         >
           {content.description}
-        </p>
+        </p> */}
         <ul className="flex flex-col mt-6">
           {content.features.map((feature, i) => (
             <li

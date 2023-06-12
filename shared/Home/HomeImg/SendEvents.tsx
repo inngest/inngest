@@ -85,7 +85,7 @@ export default function SendEvents() {
               className={classNames(
                 activeTab === i
                   ? `border-indigo-400 text-white`
-                  : ` border-transparent text-slate-400`,
+                  : `border-transparent text-slate-400`,
                 `font-medium text-center text-xs py-2.5 px-2 border-b-[2px]`
               )}
             >
