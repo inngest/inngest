@@ -76,11 +76,11 @@ Inngest sends an `"inngest/function.failed"` event to your [environment](/docs/p
       <Property name="error" type="object" attribute>
         Data about the error payload as returned from the failed function.
         <Properties nested collapse>
-          <Property name="body" type="string" attribute>
-            The raw JSON-encoded response from the Inngest SDK.
+          <Property name="message" type="string" attribute>
+            The error message when an error is caught 
           </Property>
-          <Property name="status" type="integer" attribute>
-            The HTTP status code of the response from the Inngest SDK.
+          <Property name="name" type="string" attribute>
+            The name of the error, defaulting to "Error" if unspecified
           </Property>
         </Properties>
       </Property>
