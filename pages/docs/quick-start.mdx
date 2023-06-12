@@ -86,9 +86,17 @@ Inngest runs your functions securely via an API endpoint at `/api/inngest`.  The
 
 Let's start a new Next.js project by running `create-next-app` in your terminal:
 
+<GuideSection show="nextpages">
 ```shell
-npx create-next-app@latest --ts --eslint inngest-guide
+npx create-next-app@latest --ts --eslint --tailwind --no-src-dir --no-app --import-alias='@/*' inngest-guide
 ```
+</GuideSection>
+
+<GuideSection show="nextappdir">
+```shell
+npx create-next-app@latest --ts --eslint --tailwind --src-dir --app --import-alias='@/*' inngest-guide
+```
+</GuideSection>
 
 You can answer the questions however you'd like.  This creates a new `inngest-guide` directory containing your project.  Open this directory in your terminal and code editor, then we can start adding Inngest!
 </details>
