@@ -121,21 +121,22 @@ func BenchmarkNew(b *testing.B) {
 	id := state.Identifier{
 		WorkflowID: uuid.New(),
 	}
+	evt := event.Event{
+		Name: "test-event",
+		Data: map[string]any{
+			"title": "They don't think it be like it is, but it do",
+			"data": map[string]any{
+				"float": 3.14132,
+			},
+		},
+		User: map[string]any{
+			"external_id": "1",
+		},
+		Version: "1985-01-01",
+	}.Map()
 	init := state.Input{
-		Identifier: id,
-		EventData: event.Event{
-			Name: "test-event",
-			Data: map[string]any{
-				"title": "They don't think it be like it is, but it do",
-				"data": map[string]any{
-					"float": 3.14132,
-				},
-			},
-			User: map[string]any{
-				"external_id": "1",
-			},
-			Version: "1985-01-01",
-		}.Map(),
+		Identifier:     id,
+		EventBatchData: []map[string]any{evt},
 	}
 
 	ctx := context.Background()

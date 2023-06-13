@@ -294,10 +294,6 @@ type Input struct {
 	// Identifier represents the identifier
 	Identifier Identifier
 
-	// EventData is the input data for initializing the workflow run, eg. the
-	// original event data.
-	EventData map[string]any
-
 	// EventBatchData is the input data for initializing the workflow run,
 	// which is a list of EventData
 	EventBatchData []map[string]any
