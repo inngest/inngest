@@ -31,6 +31,14 @@ type KeyGenerator interface {
 	// given workflow run.
 	Event(context.Context, state.Identifier) string
 
+	// Events returns the key used to store the specific batch for the
+	// given workflow run.
+	Events(context.Context, state.Identifier) string
+
+	// Batch returns the key used to store the specific batch of
+	// events, that is used to trigger a function run
+	Batch(context.Context, ulid.ULID) string
+
 	// Actions returns the key used to store the action response map used
 	// for given workflow run - ie. the results for individual steps.
 	Actions(context.Context, state.Identifier) string
@@ -83,6 +91,14 @@ func (d DefaultKeyFunc) Workflow(ctx context.Context, id uuid.UUID, version int)
 
 func (d DefaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("%s:events:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
+}
+
+func (d DefaultKeyFunc) Events(ctx context.Context, id state.Identifier) string {
+	return fmt.Sprintf("%s:bulk-events:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
+}
+
+func (d DefaultKeyFunc) Batch(ctx context.Context, batchID ulid.ULID) string {
+	return fmt.Sprintf("%s:batches:%s", d.Prefix, batchID)
 }
 
 func (d DefaultKeyFunc) Actions(ctx context.Context, id state.Identifier) string {

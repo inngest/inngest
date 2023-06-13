@@ -112,6 +112,45 @@ func TestQueueItemScore(t *testing.T) {
 	}
 }
 
+func TestQueueItemIsLeased(t *testing.T) {
+	now := time.Now()
+	tests := []struct {
+		name     string
+		time     time.Time
+		expected bool
+	}{
+		{
+			name:     "returns true for leased item",
+			time:     now.Add(1 * time.Minute), // 1m later
+			expected: true,
+		},
+		{
+			name:     "returns false for item with expired lease",
+			time:     now.Add(-1 * time.Minute), // 1m ago
+			expected: false,
+		},
+		{
+			name:     "returns false for empty lease ID",
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			qi := &QueueItem{}
+			if !test.time.IsZero() {
+				leaseID, err := ulid.New(ulid.Timestamp(test.time), rand.Reader)
+				if err != nil {
+					t.Fatalf("failed to create new LeaseID: %v\n", err)
+				}
+				qi.LeaseID = &leaseID
+			}
+
+			require.Equal(t, test.expected, qi.IsLeased(now))
+		})
+	}
+}
+
 func TestQueueEnqueueItem(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{

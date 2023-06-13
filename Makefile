@@ -9,7 +9,7 @@ test:
 	go test $(shell go list ./... | grep -v tests) -race -count=1
 	golangci-lint run
 
-PHONY: lint
+.PHONY: lint
 lint:
 	golangci-lint run --verbose
 

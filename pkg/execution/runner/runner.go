@@ -591,8 +591,8 @@ func Initialize(ctx context.Context, fn inngest.Function, evt event.Event, s sta
 	}
 
 	if _, err := s.New(ctx, state.Input{
-		Identifier: id,
-		EventData:  evt.Map(),
+		Identifier:     id,
+		EventBatchData: []map[string]any{evt.Map()},
 	}); err != nil {
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}

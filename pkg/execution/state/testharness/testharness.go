@@ -164,9 +164,12 @@ func checkNew(t *testing.T, m state.Manager) {
 		Key:             runID.String(),
 	}
 
+	evt := input.Map()
+	batch := []map[string]any{input.Map()}
+
 	init := state.Input{
-		Identifier: id,
-		EventData:  input.Map(),
+		Identifier:     id,
+		EventBatchData: batch,
 		Context: map[string]any{
 			"some": "data",
 			"true": true,
@@ -178,7 +181,8 @@ func checkNew(t *testing.T, m state.Manager) {
 
 	found := s.Function()
 	require.EqualValues(t, w, found, "Returned workflow does not match input")
-	require.EqualValues(t, input.Map(), s.Event(), "Returned event does not match input")
+	require.EqualValues(t, evt, s.Event(), "Returned event does not match input")
+	require.EqualValues(t, batch, s.Events(), "Returned events does not match input")
 	require.EqualValues(t, enums.RunStatusRunning, s.Metadata().Status, "Status is not Running")
 	require.EqualValues(t, init.Context, s.Metadata().Context, "Metadata context not saved")
 	require.EqualValues(t, id, s.Metadata().Identifier, "Metadata didn't save Identifier")
@@ -205,9 +209,12 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 		Key:        runID.String(),
 	}
 
+	evt := input.Map()
+	batch := []map[string]any{evt}
+
 	init := state.Input{
-		Identifier: id,
-		EventData:  input.Map(),
+		Identifier:     id,
+		EventBatchData: batch,
 		Steps: map[string]any{
 			"step-a": map[string]any{
 				"result": "predetermined",
@@ -220,7 +227,8 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 
 	found := s.Function()
 	require.EqualValues(t, w, found, "Returned workflow does not match input")
-	require.EqualValues(t, input.Map(), s.Event(), "Returned event does not match input")
+	require.EqualValues(t, evt, s.Event(), "Returned event does not match input")
+	require.EqualValues(t, batch, s.Events(), "Returned events does not match input")
 
 	loaded, err := m.Load(ctx, s.RunID())
 	require.NoError(t, err)
@@ -1467,6 +1475,7 @@ func checkIdempotency(t *testing.T, m state.Manager) {
 		Key:        runID.String(),
 	}
 	data := input.Map()
+	batch := []map[string]any{data}
 
 	var errCount int32
 	var okCount int32
@@ -1484,8 +1493,8 @@ func checkIdempotency(t *testing.T, m state.Manager) {
 			copiedID.RunID = ulid.MustNew(ulid.Now(), rand.Reader)
 
 			init := state.Input{
-				Identifier: copiedID,
-				EventData:  data,
+				Identifier:     copiedID,
+				EventBatchData: batch,
 			}
 
 			_, err := m.New(ctx, init)
@@ -1515,8 +1524,8 @@ func checkSetStatus(t *testing.T, m state.Manager) {
 	}
 
 	init := state.Input{
-		Identifier: id,
-		EventData:  input.Map(),
+		Identifier:     id,
+		EventBatchData: []map[string]any{input.Map()},
 	}
 
 	s, err := m.New(ctx, init)
@@ -1548,8 +1557,8 @@ func checkCancel(t *testing.T, m state.Manager) {
 	}
 
 	init := state.Input{
-		Identifier: id,
-		EventData:  input.Map(),
+		Identifier:     id,
+		EventBatchData: []map[string]any{input.Map()},
 	}
 
 	s, err := m.New(ctx, init)
@@ -1580,8 +1589,8 @@ func checkCancel_cancelled(t *testing.T, m state.Manager) {
 		Key:        runID.String(),
 	}
 	init := state.Input{
-		Identifier: id,
-		EventData:  input.Map(),
+		Identifier:     id,
+		EventBatchData: []map[string]any{input.Map()},
 	}
 
 	s, err := m.New(ctx, init)
@@ -1610,8 +1619,8 @@ func checkCancel_completed(t *testing.T, m state.Manager) {
 		Key:        runID.String(),
 	}
 	init := state.Input{
-		Identifier: id,
-		EventData:  input.Map(),
+		Identifier:     id,
+		EventBatchData: []map[string]any{input.Map()},
 	}
 
 	s, err := m.New(ctx, init)
@@ -1917,8 +1926,8 @@ func setup(t *testing.T, m state.Manager) state.State {
 	}
 
 	init := state.Input{
-		Identifier: id,
-		EventData:  input.Map(),
+		Identifier:     id,
+		EventBatchData: []map[string]any{input.Map()},
 	}
 
 	s, err := m.New(ctx, init)

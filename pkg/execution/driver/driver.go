@@ -31,6 +31,7 @@ type FunctionStack struct {
 func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex int, env string) ([]byte, error) {
 	data := map[string]interface{}{
 		"event": s.Event(),
+		// "events": s.Events(), disabling this for now so we don't send unnecessary data to customer infra
 		"steps": s.Actions(),
 		"ctx": map[string]interface{}{
 			// fn_id is used within entrypoints to SDK-based functions in

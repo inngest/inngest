@@ -175,10 +175,7 @@ func (f Function) Validate(ctx context.Context) error {
 // If no edges for a step exists, an automatic step from the tirgger is added.
 func (f Function) AllEdges(ctx context.Context) ([]Edge, error) {
 	// This has no defined actions, which means its an implicit
-	// single action invocation.  We assume that a Dockerfile
-	// exists in the project root, and that we can build the
-	// image which contains all of the code necessary to run
-	// the function.
+	// single action invocation.
 	if len(f.Steps) == 0 {
 		return nil, fmt.Errorf("This function has no steps")
 	}

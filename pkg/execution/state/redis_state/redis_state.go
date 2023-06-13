@@ -31,6 +31,10 @@ var (
 	include = regexp.MustCompile(`-- \$include\(([\w.]+)\)`)
 
 	ErrNoFunctionLoader = fmt.Errorf("No function loader specified within redis state store")
+
+	// A number to version backend logic in order to prevent non-backward compatible
+	// changes to break
+	currentVersion = 1
 )
 
 func init() {
@@ -245,7 +249,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 
 	// We marshal this ahead of creating a redis transaction as it's necessary
 	// every time and reduces the duration that the lock is held.
-	event, err := json.Marshal(input.EventData)
+	events, err := json.Marshal(input.EventBatchData)
 	if err != nil {
 		return nil, err
 	}
@@ -254,6 +258,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		Identifier: input.Identifier,
 		Pending:    1,
 		Debugger:   input.Debugger,
+		Version:    currentVersion,
 		Context:    input.Context,
 	}
 	if input.OriginalRunID != nil {
@@ -282,7 +287,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	history.CreatedAt = time.UnixMilli(int64(input.Identifier.RunID.Time()))
 
 	args, err := StrSlice([]any{
-		event,
+		events,
 		metadataByt,
 		stepsByt,
 		history,
@@ -297,7 +302,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		m.r,
 		[]string{
 			m.kf.Idempotency(ctx, input.Identifier),
-			m.kf.Event(ctx, input.Identifier),
+			m.kf.Events(ctx, input.Identifier),
 			m.kf.RunMetadata(ctx, input.Identifier.RunID),
 			m.kf.Actions(ctx, input.Identifier),
 			m.kf.History(ctx, input.Identifier.RunID),
@@ -319,7 +324,7 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 			*f,
 			input.Identifier,
 			metadata.Metadata(),
-			input.EventData,
+			input.EventBatchData,
 			input.Steps,
 			map[string]error{},
 			make([]string, 0),
@@ -452,19 +457,34 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		return nil, err
 	}
 
-	// Load the event.
-	cmd := m.r.B().Get().Key(m.kf.Event(ctx, id)).Build()
-	byt, err := m.r.Do(ctx, cmd).AsBytes()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get event; %w", err)
-	}
-	event := map[string]any{}
-	if err := json.Unmarshal(byt, &event); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal event; %w", err)
+	// Load events.
+	events := []map[string]any{}
+	switch metadata.Version {
+	case 0: // pre-batch days
+		cmd := m.r.B().Get().Key(m.kf.Event(ctx, id)).Build()
+		byt, err := m.r.Do(ctx, cmd).AsBytes()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get event; %w", err)
+		}
+		event := map[string]any{}
+		if err := json.Unmarshal(byt, &event); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal event; %w", err)
+		}
+		events = []map[string]any{event}
+	default: // current default is 1
+		// Load the batch of events
+		cmd := m.r.B().Get().Key(m.kf.Events(ctx, id)).Build()
+		byt, err := m.r.Do(ctx, cmd).AsBytes()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get batch; %w", err)
+		}
+		if err := json.Unmarshal(byt, &events); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal batch; %w", err)
+		}
 	}
 
 	// Load the actions.  This is a map of step IDs to JSON-encoded results.
-	cmd = m.r.B().Hgetall().Key(m.kf.Actions(ctx, id)).Build()
+	cmd := m.r.B().Hgetall().Key(m.kf.Actions(ctx, id)).Build()
 	rmap, err := m.r.Do(ctx, cmd).AsStrMap()
 	if err != nil {
 		return nil, fmt.Errorf("failed loading actions; %w", err)
@@ -499,7 +519,7 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 		return nil, fmt.Errorf("error fetching stack: %w", err)
 	}
 
-	return state.NewStateInstance(*fn, id, meta, event, actions, errors, stack), nil
+	return state.NewStateInstance(*fn, id, meta, events, actions, errors, stack), nil
 }
 
 func (m mgr) StackIndex(ctx context.Context, runID ulid.ULID, stepID string) (int, error) {
@@ -1099,6 +1119,15 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 		return nil, fmt.Errorf("invalid pending stored in run metadata")
 	}
 
+	if val, ok := data["version"]; ok && val != "" {
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return nil, fmt.Errorf("invalid metadata version detected: %#v", val)
+		}
+
+		m.Version = v
+	}
+
 	// The below fields are optional
 	if val, ok := data["debugger"]; ok {
 		if val == "true" {
@@ -1140,6 +1169,7 @@ type runMetadata struct {
 	Debugger      bool           `json:"debugger"`
 	RunType       string         `json:"runType,omitempty"`
 	OriginalRunID string         `json:"originalRunID,omitempty"`
+	Version       int            `json:"version"`
 	Context       map[string]any `json:"ctx,omitempty"`
 }
 
@@ -1151,6 +1181,7 @@ func (r runMetadata) Map() map[string]any {
 		"debugger":      r.Debugger,
 		"runType":       r.RunType,
 		"originalRunID": r.OriginalRunID,
+		"version":       r.Version,
 		"ctx":           r.Context,
 	}
 }
@@ -1161,6 +1192,7 @@ func (r runMetadata) Metadata() state.Metadata {
 		Pending:    r.Pending,
 		Debugger:   r.Debugger,
 		Status:     r.Status,
+		Version:    r.Version,
 		Context:    r.Context,
 	}
 

@@ -101,6 +101,10 @@ type Metadata struct {
 	//   enqueued to be considered finalized.
 	Pending int `json:"pending"`
 
+	// Version is the used for making sure workloads runs are backward compatible
+	// and work without issues during breaking changes to backend logic
+	Version int `json:"version"`
+
 	// Context allows storing any other contextual data in metadata.
 	Context map[string]any `json:"ctx,omitempty"`
 }
@@ -135,7 +139,11 @@ type State interface {
 
 	// Event is the root data that triggers the workflow, which is typically
 	// an Inngest event.
-	Event() map[string]interface{}
+	Event() map[string]any
+
+	// Events is the list of events that are used to trigger the workflow,
+	// which is typically a list of Inngest event.
+	Events() []map[string]any
 
 	// Actions returns a map of all output from each individual action.
 	Actions() map[string]any
@@ -286,9 +294,9 @@ type Input struct {
 	// Identifier represents the identifier
 	Identifier Identifier
 
-	// EventData is the input data for initializing the workflow run, eg. the
-	// original event data.
-	EventData map[string]any
+	// EventBatchData is the input data for initializing the workflow run,
+	// which is a list of EventData
+	EventBatchData []map[string]any
 
 	// Debugger represents whether this function was started via the debugger.
 	Debugger bool

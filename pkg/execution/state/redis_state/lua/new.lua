@@ -7,12 +7,12 @@ Output:
 ]]
 
 local idempotencyKey = KEYS[1]
-local eventKey = KEYS[2]
+local eventsKey = KEYS[2]
 local metadataKey = KEYS[3]
 local stepKey = KEYS[4]
 local logKey = KEYS[5]
 
-local event = ARGV[1]
+local events = ARGV[1]
 local metadata = ARGV[2]
 local steps = ARGV[3]
 local log = ARGV[4]
@@ -26,7 +26,7 @@ end
 local metadataJson = cjson.decode(metadata)
 for k, v in pairs(metadataJson) do
   if k == "ctx" or k == "id" then
-	  v = cjson.encode(v)
+    v = cjson.encode(v)
   end
   redis.call("HSET", metadataKey, k, tostring(v))
 end
@@ -39,7 +39,7 @@ if steps ~= nil and steps ~= "" then
   end
 end
 
-redis.call("SETNX", eventKey, event)
+redis.call("SETNX", eventsKey, events)
 redis.call("ZADD", logKey, logScore, log)
 
 return 0
