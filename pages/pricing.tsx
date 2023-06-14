@@ -437,8 +437,7 @@ export default function Pricing() {
             </h2>
 
             <p className="my-8 text-lg font-medium">
-              A Function Step is a callable unit of an Inngest function. Code
-              that is retried counts as an additional billed step.
+              A Function Step is a callable unit of an Inngest function.
             </p>
 
             <div className="max-w-5xl mt-12 flex flex-col lg:flex-row gap-8 items-start">
