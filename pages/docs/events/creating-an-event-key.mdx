@@ -1,4 +1,4 @@
-# Creating an event key
+# Creating an Event Key
 
 “Event Keys” are unique keys that allow applications to send (aka publish) events to Inngest. When using Event Keys with the [Inngest SDK](/docs/events), you can configure the `Inngest` client in 2 ways:
 
@@ -18,9 +18,13 @@ await inngest.send({ ... })
 
 \* Our [Vercel integration](/docs/deploy/vercel) automatically sets the `INNGEST_EVENT_KEY` as an environment variable for you
 
-<aside>
-  🙋 Event keys should be unique to a given <strong>environment</strong> (e.g. production, branch environments) and a specific <strong>application</strong> (your API, your mobile app, etc.). You can easily create and manage your event keys from the Inngest Cloud dashboard.
-</aside>
+<Callout>
+  🙋 Event Keys should be unique to a given <strong>environment</strong> (e.g. production, branch environments) and a specific <strong>application</strong> (your API, your mobile app, etc.). Keeping keys separated by application makes it easier to manage keys and rotate them when necessary.
+</Callout>
+
+<Callout>
+  🔐 **Securing Event Keys** - As Event Keys are used to send data to your Inngest environment, you should take precautions to secure your keys. Avoid storing them in source code and store the keys as secrets in your chosen platform when possible.
+</Callout>
 
 ## Creating a new Event Key
 
@@ -33,13 +37,12 @@ From the Inngest Cloud dashboard, Event Keys are listed in the "Manage" tab:
 
 ![A newly created Event Key in the Inngest Cloud dashboard](/assets/docs/creating-an-event-key/new-event-key-2023.png)
 
-🎉 You can now use this event key with the Inngest SDK to send events directly from any codebase. You can also:
+🎉 You can now use this event key with the Inngest SDK to send events directly from any codebase. You can also:
 
 - Rename your event key at any time using the “Name” field so you and your team can identify it later
 - Delete the event key when your key is no longer needed
 - Filter events by name or IP addresses for increased control and security
 
-## Best practices
-
-1. We recommend creating a unique key per source and per environment (e.g. production)
-2. For client-side sources where the event key may be visible in the browser, we recommend filtering events by name (e.g. `website/page.viewed` or pattern `website/*`) to discourage spam events from being sent to your Inngest Cloud account.
+<Callout variant="warning">
+  <span className="text-yellow-300">⚠️</span> While it is _possible_ to use Event Keys to send events from the browser, this practice presents risks as anyone inspecting your client side code will be able to read your key and send events to your Inngest environment. If you'd like to send events from the client, we recommend creating an API endpoint or edge function to proxy the sending of events.
+</Callout>
