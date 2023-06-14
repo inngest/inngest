@@ -77,7 +77,7 @@ func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
 type WaitForEventOpts struct {
 	Timeout string  `json:"timeout"`
 	If      *string `json:"if"`
-	// Event is taken from GeneratorOpcode.ID
+	// Event is taken from GeneratorOpcode.Name
 	Event string `json:"-"`
 }
 
