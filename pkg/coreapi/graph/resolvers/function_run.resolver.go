@@ -3,7 +3,6 @@ package resolvers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
@@ -150,9 +149,6 @@ func (r *functionRunResolver) WaitingFor(ctx context.Context, obj *models.Functi
 			wait = nil
 			continue
 		}
-
-		fmt.Printf("%#v\n", h)
-
 		step, ok := h.Data.(state.HistoryStep)
 		if ok {
 			data, _ := step.Data.(map[string]any)
