@@ -36,12 +36,14 @@ const CodeWindow = ({
   className = "",
   style = {},
   header,
+  showLineNumbers = false,
   lineHighlights = [],
 }: {
   snippet: string;
   className?: string;
   style?: object;
   header?: React.ReactNode;
+  showLineNumbers?: boolean;
   lineHighlights?: [number, number][];
 }) => {
   return (
@@ -69,7 +71,15 @@ const CodeWindow = ({
         )}
         <SyntaxHighlighter
           language="javascript"
-          showLineNumbers={false}
+          showLineNumbers={showLineNumbers}
+          lineNumberContainerStyle={{
+            borderRight: "1px solid pink",
+            background: "pink",
+          }}
+          lineNumberStyle={{
+            minWidth: "3em",
+            color: "rgba(42, 60, 85, 1)",
+          }}
           style={theme}
           customStyle={{
             padding: "0.25rem",

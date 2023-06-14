@@ -16,7 +16,7 @@ radial-gradient(at 21% 4%, hsla(209,94%,39%,0.69) 0px, transparent 50%),
 radial-gradient(at 97% 96%, hsla(279,100%,76%,0.53) 0px, transparent 50%),
 radial-gradient(at 43% 61%, hsla(279,100%,76%,0.53) 0px, transparent 50%),
 radial-gradient(at 73% 24%, hsla(279,100%,76%,0.7) 0px, transparent 50%),
-radial-gradient(at 5% 94%, hsla(210,75%,64%,0.81) 0px, transparent 50%)
+radial-gradient(at 5% 94%, hsla(210,75%,64%,0.81) 0px, transparent 50%).
 `;
 
 export default function CustomerQuote({

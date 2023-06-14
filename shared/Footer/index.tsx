@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import Logo from "src/shared/Icons/Logo";
 import Discord from "../Icons/Discord";
 import Github from "../Icons/Github";
@@ -5,33 +7,47 @@ import Twitter from "../Icons/Twitter";
 import Container from "../layout/Container";
 import footerLinks from "./footerLinks";
 import StatusWidget from "../StatusWidget";
-import { Button } from "../Button";
+
+const MeshGradient = `
+radial-gradient(at 35% 95%, hsla(258,82%,61%,1) 0px, transparent 50%),
+radial-gradient(at 65% 9%, hsla(261,49%,53%,1) 0px, transparent 50%),
+radial-gradient(at 77% 89%, hsla(246,66%,61%,1) 0px, transparent 50%),
+url(/assets/textures/wave-large.svg)
+`;
 
 export default function Footer({ ctaRef }: { ctaRef?: string }) {
   return (
     <footer className="mt-20  bg-slate-1000">
-      <div className="bg-indigo-600 backdrop-blur text-white">
-        {/* <div className="bg-slate-950/40 backdrop-blur text-white"> */}
-        <Container className="py-20 lg:py-32">
-          <h4 className=" text-2xl lg:text-4xl tracking-tight mb-4 font-medium">
+      <Container>
+        <div
+          className="py-12 lg:py-16 text-center rounded-lg"
+          style={{
+            backgroundColor: `hsla(222,79%,61%,1)`,
+            backgroundImage: MeshGradient,
+            backgroundSize: "100%",
+            backgroundPosition: "100%",
+          }}
+        >
+          <h4 className="text-2xl lg:text-3xl tracking-tight mb-4 font-semibold drop-shadow">
             Ready to start building?
           </h4>
-          <p className="text-sm lg:text-base max-w-xl text-indigo-100">
-            Ship reliable serverless functions in record time.
+          <p className="mt-4 mb-6 text-sm lg:text-base text-indigo-100 drop-shadow">
+            Ship background functions & workflows like never before
           </p>
-          <code className="text-sm text-white block mt-8 mr-4">
-            <span className="text-indigo-300">$</span> npx inngest-cli dev
-          </code>
-          <Button
-            className="mt-4"
-            arrow="right"
-            variant="tertiary"
-            href={`/sign-up?ref=${ctaRef ? `${ctaRef}-callout` : "callout"}`}
-          >
-            Get started for free
-          </Button>
-        </Container>
-      </div>
+          <div className="flex flex-col gap-5 items-center">
+            <code className="mt-8 py-2 px-4 rounded-lg bg-white/10 text-base text-white backdrop-blur-md font-bold">
+              <span className="">$</span> npx inngest-cli dev
+            </code>
+            <Link
+              href={`/sign-up?ref=${ctaRef ? `${ctaRef}-callout` : "callout"}`}
+              className="py-3 px-5 bg-slate-800 text-white rounded-lg transition-all hover:bg-slate-900"
+            >
+              Get Started For Free
+            </Link>
+          </div>
+        </div>
+      </Container>
+
       <Container className="pb-12 pt-16 lg:pt-24">
         <div className="w-full rounded-lg relative ">
           <div className=" mb-12 flex gap-6 items-center">

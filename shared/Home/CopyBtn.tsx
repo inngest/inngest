@@ -31,7 +31,7 @@ export default function CopyBtn({ btnAction, copy }) {
           clipRule="evenodd"
         />
       </svg>
-      <div className="absolute opacity-0 group-hover:opacity-100 transition-all duration-150 bg-slate-900 text-slate-300 font-semibold text-xs px-3 py-1.5 rounded bottom-[30px] -left-[20px]">
+      <div className="absolute opacity-0 group-hover:opacity-100 transition-all duration-150 bg-slate-900/80 text-slate-300 font-semibold text-xs px-3 py-1.5 rounded bottom-[30px] -left-[20px]">
         {clickedState ? "Copied" : "Copy"}
       </div>
     </button>
