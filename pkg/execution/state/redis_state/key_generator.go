@@ -35,10 +35,6 @@ type KeyGenerator interface {
 	// given workflow run.
 	Events(context.Context, state.Identifier) string
 
-	// Batch returns the key used to store the specific batch of
-	// events, that is used to trigger a function run
-	Batch(context.Context, ulid.ULID) string
-
 	// Actions returns the key used to store the action response map used
 	// for given workflow run - ie. the results for individual steps.
 	Actions(context.Context, state.Identifier) string
@@ -95,10 +91,6 @@ func (d DefaultKeyFunc) Event(ctx context.Context, id state.Identifier) string {
 
 func (d DefaultKeyFunc) Events(ctx context.Context, id state.Identifier) string {
 	return fmt.Sprintf("%s:bulk-events:%s:%s", d.Prefix, id.WorkflowID, id.RunID)
-}
-
-func (d DefaultKeyFunc) Batch(ctx context.Context, batchID ulid.ULID) string {
-	return fmt.Sprintf("%s:batches:%s", d.Prefix, batchID)
 }
 
 func (d DefaultKeyFunc) Actions(ctx context.Context, id state.Identifier) string {
@@ -168,6 +160,14 @@ type QueueKeyGenerator interface {
 	// have in-progress work.  This allows us to scan and scavenge jobs in concurrency queues where
 	// leases have expired (in the case of failed workers)
 	ConcurrencyIndex() string
+
+	// BatchPointer returns the key used as the pointer reference to the
+	// actual batch
+	BatchPointer(context.Context, uuid.UUID) string
+
+	// Batch returns the key used to store the specific batch of
+	// events, that is used to trigger a function run
+	Batch(context.Context, ulid.ULID) string
 }
 
 type DefaultQueueKeyGenerator struct {
@@ -216,4 +216,12 @@ func (d DefaultQueueKeyGenerator) Concurrency(prefix, key string) string {
 
 func (d DefaultQueueKeyGenerator) ConcurrencyIndex() string {
 	return fmt.Sprintf("%s:concurrency:sorted", d.Prefix)
+}
+
+func (d DefaultQueueKeyGenerator) BatchPointer(ctx context.Context, workflowID uuid.UUID) string {
+	return fmt.Sprintf("%s:workflows:%s:batch", d.Prefix, workflowID)
+}
+
+func (d DefaultQueueKeyGenerator) Batch(ctx context.Context, batchID ulid.ULID) string {
+	return fmt.Sprintf("%s:batches:%s", d.Prefix, batchID)
 }

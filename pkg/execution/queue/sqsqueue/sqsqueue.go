@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -134,6 +135,11 @@ func (i impl) Enqueue(ctx context.Context, item queue.Item, at time.Time) error 
 	})
 
 	return err
+}
+
+func (i impl) BatchPointerKey(ctx context.Context, id uuid.UUID) string {
+	// NOTE: Batching is not supported on SQS yet
+	return ""
 }
 
 // Run subscribes to the topic, processing each queue item.
