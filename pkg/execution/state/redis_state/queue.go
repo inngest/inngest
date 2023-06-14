@@ -1364,11 +1364,6 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 	}
 }
 
-// BatchPointerKey returns the key for the pointer
-func (q queue) BatchPointerKey(ctx context.Context, workspaceID uuid.UUID) string {
-	return q.kg.BatchPointer(ctx, workspaceID)
-}
-
 func hashID(ctx context.Context, id string) string {
 	ui := xxhash.Sum64String(id)
 	return strconv.FormatUint(ui, 36)

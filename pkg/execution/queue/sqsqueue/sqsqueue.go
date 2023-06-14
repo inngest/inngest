@@ -137,11 +137,6 @@ func (i impl) Enqueue(ctx context.Context, item queue.Item, at time.Time) error 
 	return err
 }
 
-func (i impl) BatchPointerKey(ctx context.Context, id uuid.UUID) string {
-	// NOTE: Batching is not supported on SQS yet
-	return ""
-}
-
 // Run subscribes to the topic, processing each queue item.
 func (i impl) Run(ctx context.Context, f queue.RunFunc) error {
 	// We can use our pubsub broker logic here, as SQS is a supported backend.

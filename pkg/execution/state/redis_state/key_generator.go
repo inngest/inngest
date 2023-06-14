@@ -168,6 +168,10 @@ type QueueKeyGenerator interface {
 	// Batch returns the key used to store the specific batch of
 	// events, that is used to trigger a function run
 	Batch(context.Context, ulid.ULID) string
+
+	// BatchMetadata returns the key used to store the metadata related
+	// to a batch
+	BatchMetadata(context.Context, ulid.ULID) string
 }
 
 type DefaultQueueKeyGenerator struct {
@@ -224,4 +228,8 @@ func (d DefaultQueueKeyGenerator) BatchPointer(ctx context.Context, workflowID u
 
 func (d DefaultQueueKeyGenerator) Batch(ctx context.Context, batchID ulid.ULID) string {
 	return fmt.Sprintf("%s:batches:%s", d.Prefix, batchID)
+}
+
+func (d DefaultQueueKeyGenerator) BatchMetadata(ctx context.Context, batchID ulid.ULID) string {
+	return fmt.Sprintf("%s:metadata", d.Batch(ctx, batchID))
 }

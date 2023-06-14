@@ -17,9 +17,6 @@ type RunFunc func(context.Context, Item) error
 type Producer interface {
 	// Enqueue allows an item to be enqueued ton run at the given time.
 	Enqueue(context.Context, Item, time.Time) error
-
-	// BatchPointerKey returns the key of the batch pointer
-	BatchPointerKey(context.Context, uuid.UUID) string
 }
 
 type Consumer interface {
