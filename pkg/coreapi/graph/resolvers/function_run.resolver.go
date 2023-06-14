@@ -3,6 +3,7 @@ package resolvers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
@@ -52,11 +53,14 @@ func (r *functionRunResolver) Timeline(ctx context.Context, obj *models.Function
 			switch h.Type {
 			case enums.HistoryTypeStepWaiting:
 				if step, ok := h.Data.(state.HistoryStep); ok {
-					data, _ := step.Data.(state.HistoryStepWaitingData)
+					data, _ := step.Data.(map[string]any)
+					byt, _ := json.Marshal(data)
+					var stepData state.HistoryStepWaitingData
+					_ = json.Unmarshal(byt, &stepData)
 					event.WaitingFor = &models.StepEventWait{
-						ExpiryTime: data.ExpiryTime,
-						EventName:  data.EventName,
-						Expression: data.Expression,
+						ExpiryTime: stepData.ExpiryTime,
+						EventName:  stepData.EventName,
+						Expression: stepData.Expression,
 					}
 					event.Output = nil
 				}
@@ -146,9 +150,15 @@ func (r *functionRunResolver) WaitingFor(ctx context.Context, obj *models.Functi
 			wait = nil
 			continue
 		}
+
+		fmt.Printf("%#v\n", h)
+
 		step, ok := h.Data.(state.HistoryStep)
 		if ok {
-			stepData, _ := step.Data.(state.HistoryStepWaitingData)
+			data, _ := step.Data.(map[string]any)
+			byt, _ := json.Marshal(data)
+			var stepData state.HistoryStepWaitingData
+			_ = json.Unmarshal(byt, &stepData)
 			wait = &models.StepEventWait{
 				ExpiryTime: stepData.ExpiryTime,
 				EventName:  stepData.EventName,

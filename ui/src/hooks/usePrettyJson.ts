@@ -17,6 +17,9 @@ export const usePrettyJson = (
       return JSON.stringify(data, null, 2);
     } catch (e) {
       console.warn("Unable to parse content as JSON: ", json);
+      if (typeof json === "string") {
+        return json
+      }
       return "";
     }
   }, [json]);
