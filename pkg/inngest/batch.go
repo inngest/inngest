@@ -44,5 +44,6 @@ type EventBatchConfig struct {
 }
 
 func (c EventBatchConfig) IsEnabled() bool {
-	return c.MaxSize != 0 && c.Timeout != ""
+	// batch of 1 should not be considered a batch
+	return c.MaxSize > 1 && c.Timeout != ""
 }

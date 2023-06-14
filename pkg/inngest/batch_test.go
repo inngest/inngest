@@ -75,6 +75,11 @@ func TestEventBatchIsEnabled(t *testing.T) {
 			config:   &EventBatchConfig{},
 			expected: false,
 		},
+		{
+			name:     "should return false for batch of 1",
+			config:   &EventBatchConfig{MaxSize: 1, Timeout: "2s"},
+			expected: false,
+		},
 	}
 
 	for _, test := range tests {
