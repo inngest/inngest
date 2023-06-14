@@ -3,8 +3,6 @@ package queue
 import (
 	"context"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type Queue interface {
