@@ -181,6 +181,19 @@ func WithDenyQueueNames(queues ...string) func(q *queue) {
 	}
 }
 
+// WithAllowQueueNames specifies that the worker can only select jobs from queue partitions
+// within the given list of names.  This means that the worker will never work on jobs in
+// other queues.
+func WithAllowQueueNames(queues ...string) func(q *queue) {
+	return func(q *queue) {
+		q.allowQueues = queues
+		q.allowQueueMap = make(map[string]*struct{})
+		for _, i := range queues {
+			q.allowQueueMap[i] = &struct{}{}
+		}
+	}
+}
+
 // WithKindToQueueMapping maps queue.Item.Kind strings to queue names.  For example,
 // when pushing a queue.Item with a kind of PayloadEdge, this job can be mapped to
 // a specific queue name here.
@@ -322,6 +335,11 @@ type queue struct {
 	// this partition, meaning that no jobs from this queue will run on this worker.
 	denyQueues   []string
 	denyQueueMap map[string]*struct{}
+
+	// allowQueues provides an allowlist, ensuring that the queue only peeks the specified
+	// partitions.  jobs from other partitions will never be scanned or processed.
+	allowQueues   []string
+	allowQueueMap map[string]*struct{}
 
 	// seqLeaseID stores the lease ID if this queue is the sequential processor.
 	// all runners attempt to claim this lease automatically.
@@ -1010,9 +1028,9 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 		limit = PartitionPeekMax
 	}
 
-	// TODO: If this is an allowlist, only peek the given partitions.
-	//       This requires ZMSCORE support within miniredis for testing;  we need
-	//       to add this prior to implementation.
+	// TODO: If this is an allowlist, only peek the given partitions.  Use ZMSCORE
+	// to fetch the scores for all allowed partitions, then filter where score <= until.
+	// Call an HMGET to get the partitions.
 
 	unix := until.Unix()
 
@@ -1050,6 +1068,12 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 		item := &QueuePartition{}
 		if err = json.Unmarshal([]byte(i), item); err != nil {
 			return nil, fmt.Errorf("error reading partition item: %w", err)
+		}
+
+		// If we have an allowlist, only accept this partition if its in the allowlist.
+		if len(q.allowQueues) > 0 && q.allowQueueMap[item.Queue()] == nil {
+			ignored++
+			continue
 		}
 
 		// Ignore any denied queues if they're explicitly in the denylist.  Because
