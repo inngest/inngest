@@ -23,9 +23,9 @@ export async function getStaticProps() {
     props: {
       designVersion: "2",
       meta: {
-        title: "Reliable serverless background functions on any platform",
+        title: "Effortless serverless queues, background jobs, and workflows",
         description:
-          "Inngest is an open source platform that enables developers to build amazing products by ensuring serverless functions are reliable, schedulable and event-driven.",
+          "Easily develop serverless workflows in your current codebase, without any new infrastructure. Using Inngest, your entire team can ship reliable products.",
       },
     },
   };

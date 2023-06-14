@@ -3,6 +3,9 @@ import { ChevronRightIcon } from "@heroicons/react/20/solid";
 
 import Container from "../layout/Container";
 
+/**
+ * NOTE - When you update hero copy also update index.tsx's getStaticProps title/description for social & SEO
+ */
 export default function Hero() {
   return (
     <Container
