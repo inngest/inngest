@@ -42,12 +42,12 @@ const highlights = [
     description: `Add our SDK to your existing project to start building in minutes. Inngest works with all of your favorite frameworks, without any infrastructure.`,
   },
   {
-    title: "Declarative Jobs & Workflows",
+    title: "Declarative jobs & workflows",
     description: `Write your background jobs in just a few lines of code. Skip all boilerplate, and never define queues or state again.`,
   },
   {
     title: "Simple primitives, infinite possibilities",
-    description: `Learn our SDK in minutes, not hours, to build even the most complex workflows faster than ever before.`,
+    description: `Learn our SDK in minutes, not weeks, to build even the most complex workflows faster than ever before.`,
   },
 ];
 
