@@ -1,26 +1,21 @@
 package inngest
 
-import "fmt"
+import "encoding/json"
 
-func NewEventBatchConfig(data map[string]any) (*EventBatchConfig, error) {
-	if data == nil {
+func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
+	if conf == nil {
 		return nil, nil
 	}
 
+	data, err := json.Marshal(conf)
+	if err != nil {
+		return nil, err
+	}
+
 	config := &EventBatchConfig{}
-
-	size, ok := data["maxSize"].(int)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type for MaxSize: %v", size)
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, err
 	}
-	config.MaxSize = size
-
-	timeout, ok := data["timeout"].(string)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type for Timeout: %v", timeout)
-	}
-	config.Timeout = timeout
-
 	// TODO: validate timeout expression
 
 	return config, nil
