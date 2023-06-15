@@ -13,10 +13,10 @@ export default function LocalDev({ className }: { className?: string }) {
     <Container className={`mt-44 relative z-30 ${className}`}>
       <div>
         <Heading
-          title="End-to-End Local Development"
-          lede="The open source Inngest Dev Server runs on your machine for a complete
-          local development experience. Get instant feedback on running jobs and
-          errors like never before."
+          title="End-to-end local development, in&nbsp;one&nbsp;command"
+          lede="The open source Inngest dev server runs on your machine for a complete
+          local development experience, with production parity. Get instant feedback on
+          your work and deploy to prod with full confidence."
           className="mx-auto max-w-3xl text-center"
         />
 
@@ -54,7 +54,7 @@ export default function LocalDev({ className }: { className?: string }) {
       />
 
       <CustomerQuote
-        quote="It's sensational - This is the best way to test a background job. I’ve never had a UI like this that I can follow and see my workflow."
+        quote="It's sensational - this is the best way to test a background job! I’ve never had a UI like this that I can use to follow and see my workflows."
         name="Garrett Tolbert - Vercel"
         avatar="/assets/customers/vercel-garrett-tolbert.jpg"
         className="max-w-lg md:absolute md:-bottom-20 md:left-[20%]"

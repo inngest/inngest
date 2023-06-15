@@ -7,10 +7,12 @@ import Container from "../layout/Container";
 export default function Logos({
   heading,
   logos,
+  footer,
   variant = "dark",
 }: {
   heading: string | React.ReactNode;
   logos: { src: string; name: string; href?: string }[];
+  footer?: React.ReactNode;
   variant?: "dark" | "light";
 }) {
   const hasLinks = !!logos.find((l) => !!l.href);
@@ -68,6 +70,9 @@ export default function Logos({
           );
         })}
       </div>
+
+      {footer}
+
     </Container>
   );
 }

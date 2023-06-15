@@ -5,21 +5,21 @@ import Heading from "./Heading";
 
 const highlights = [
   {
-    title: "Ship Reliable Code",
+    title: "Ship reliable code",
     description:
-      "All functions are retried automatically. Configure concurrency, rate limiting and backoffs with ease.",
+      "All functions are retried automatically. Manage concurrency, rate limiting and backoffs in code within your function.",
     img: "/assets/homepage/platform/reliable-code.svg",
   },
   {
-    title: "Powerful Scheduling",
+    title: "Powerful scheduling",
     description:
-      "Enqueue future work, sleep for months, and dynamically cancel jobs without managing job state and plumbing multiple jobs together.",
+      "Enqueue future work, sleep for months, and dynamically cancel jobs without managing job state or hacking APIs together.",
     img: "/assets/homepage/platform/powerful-scheduling.svg",
   },
   {
-    title: "Replay Functions With The Click of a Button",
+    title: "Replay functions at any time",
     description:
-      "Forget the dead letter queue. Replay functions that have failed or replay functions in your local environment to debug issues easier than ever before.",
+      "Forget the dead letter queue. Replay functions that have failed, or replay functions in your local environment to debug issues easier than ever before.",
     img: "/assets/homepage/platform/replay-functions.svg",
   },
 ];
@@ -28,7 +28,7 @@ export default function PlatformFeatures() {
   return (
     <Container className="my-44 tracking-tight">
       <Heading
-        title="We’ve Built the Hard Stuff for You"
+        title="We’ve built the hard stuff for you"
         lede="Inngest gives you everything you need with sensible defaults."
         className="mx-auto max-w-3xl text-center"
       />

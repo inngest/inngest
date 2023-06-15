@@ -113,7 +113,7 @@ export default function Home() {
         <Logos
           heading={
             <>
-              Your code runs your existing platform, or{" "}
+              Your code runs on your existing platform, or{" "}
               <Link
                 href="/docs/deploy?ref=homepage-platforms"
                 className="text-slate-700 underline hover:text-slate-900"
@@ -151,6 +151,17 @@ export default function Home() {
             },
           ]}
           variant="light"
+          footer={(
+            <div className="flex items-center justify-center mt-8">
+              <Link
+                href="/product/how-inngest-works?ref=homepage-run-anywhere"
+                className="rounded-md px-3 py-1.5 text-sm font-medium bg-white transition-all text-slate-600 hover:text-slate-800 border border-slate-200 hover:bg-slate-50 whitespace-nowrap drop-shadow"
+              >
+                Learn How Inngest Works
+              </Link>
+            </div>
+          )}
+
         />
 
         <CustomerQuote

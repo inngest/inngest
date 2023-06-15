@@ -10,22 +10,22 @@ inngest.createFunction(
   { name: "Handle payments" },
   { event: "api/invoice.created" },
   async ({ event, step }) => {
+
     // Wait until the next billing date
     await step.sleepUntil(event.data.invoiceDate);
 
-    // Automatically retry this code on error
+    // Steps automatically retry on error, and only run
+    // once on success - automatically, with no work.
     const charge = await step.run("Charge", async () => {
       return await stripe.charges.create({
         amount: event.data.amount,
       });
     });
 
-    // Insert into the database atomically
     await step.run("Update db", async () => {
       await db.payments.upsert(charge)
     });
 
-    // Finally, send a receipt email to the user
     await step.run("Send receipt", async () => {
       await resend.emails.send({
         to: event.user.email,
@@ -38,12 +38,12 @@ inngest.createFunction(
 
 const highlights = [
   {
-    title: "Drop into any codebase",
-    description: `Add our SDK and use the Inngest Dev Server to get building in minutes. Inngest works with all of your favorite frameworks.`,
+    title: "Any codebase, zero infrastructure",
+    description: `Add our SDK to your existing project to start building in minutes. Inngest works with all of your favorite frameworks, without any infrastructure.`,
   },
   {
     title: "Declarative Jobs & Workflows",
-    description: `Write your background jobs in just a few lines of code. Skip all of the boilerplate worker code.`,
+    description: `Write your background jobs in just a few lines of code. Skip all boilerplate, and never define queues or state again.`,
   },
   {
     title: "Simple primitives, infinite possibilities",
@@ -56,7 +56,7 @@ export default function SDKOverview() {
     <Container className="my-36 max-w-[1200px] flex flex-col lg:flex-row justify-center items-start gap-24 tracking-tight">
       <div className="mx-4 sm:mx-auto max-w-lg">
         <Heading
-          title="From Proof-of-Concept to Production in Record Time"
+          title="Ship in hours, not weeks"
           lede="Build everything from simple tasks to long-lived workflows using our
           SDK. With Inngest, there is zero infrastructure to set up - just write
           code."

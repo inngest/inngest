@@ -8,19 +8,19 @@ const highlights = [
   {
     title: "Serverless, Servers or Edge",
     description:
-      "Inngest functions can run anywhere that you deploy your code. Mix and match for your needs, from GPU optimized VMs to instantly scaling serverless platforms.",
+      "Inngest functions run anywhere that you deploy your code. Mix and match for your needs, from GPU optimized VMs to instantly scaling serverless platforms.",
     img: "/assets/homepage/paths-graphic.svg",
   },
   {
-    title: "Logging & Observability Built-in",
+    title: "Logging & observability built-in",
     description:
       "Debug issues quickly without having to leave the Inngest dashboard.",
     img: "/assets/homepage/observability-graphic.svg",
   },
   {
-    title: "We Call You",
+    title: "We call you",
     description:
-      "Inngest invokes your code via HTTP exactly when it needs to and manages the state of your function along.",
+      "Inngest invokes your code via HTTP at exactly the right time, injecting function state on each call.  Ship complex workflows by writing code.",
     img: "/assets/homepage/we-call-you-graphic.svg",
   },
 ];
@@ -31,11 +31,11 @@ export default function RunAnywhere() {
       <Heading
         title={
           <>
-            Run Anywhere, Zero Infrastructure,
-            <br className="hidden lg:block" /> or Config Required
+            Run anywhere, zero infrastructure
+            <br className="hidden lg:block" /> or config required
           </>
         }
-        lede="Inngest invokes your background functions and workflows wherever you currently host your code. Deliver products faster and skip the hassle of managing infrastructure."
+        lede="Inngest calls your code wherever it's hosted. Deploy to your existing setup, and deliver products faster without managing infrastructure."
         variant="light"
         className="mx-auto max-w-3xl text-center"
       />
@@ -59,15 +59,6 @@ export default function RunAnywhere() {
             />
           </div>
         ))}
-      </div>
-
-      <div className="flex items-center justify-center">
-        <Link
-          href="/product/how-inngest-works?ref=homepage-run-anywhere"
-          className="rounded-md px-3 py-1.5 text-sm font-medium bg-white transition-all text-slate-600 hover:text-slate-800 border border-slate-200 hover:bg-slate-50 whitespace-nowrap drop-shadow"
-        >
-          Learn How Inngest Works
-        </Link>
       </div>
     </Container>
   );

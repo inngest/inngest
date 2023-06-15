@@ -5,9 +5,9 @@ import { ChevronRightIcon } from "@heroicons/react/20/solid";
 const features = [
   {
     status: "New",
-    title: "Branch Environments on Every Platform",
+    title: "Branch environments on every platform",
     description:
-      "Test your entire application end-to-end with an Inngest environment for every development branch that you deploy. Works out of the box with our Vercel integration.",
+      "Test your entire application end-to-end with an Inngest environment for every development branch that you deploy, without any extra work.",
     href: "/blog/branch-environments?ref=homepage-feature-callouts",
     icon: (
       <svg
@@ -30,7 +30,7 @@ const features = [
     status: "Coming Soon",
     title: "Replay",
     description:
-      "Never deal with the hassle of configuring and monitoring dead-letter-queues. We store incoming events so you can replay permanently failed functions at any time.",
+      "Never deal with the hassle of dead-letter-queues. Replay permanently failed functions at any time with the click of a button.",
     href: null,
     icon: (
       <svg
@@ -79,7 +79,7 @@ export default function FeatureCallouts() {
               href={href ? href : process.env.NEXT_PUBLIC_DISCORD_URL}
               className="group mt-6 flex flex-row items-center text-sm text-indigo-100 transition-all hover:text-indigo-50 whitespace-nowrap"
             >
-              {href ? "Learn More" : "Join Our Community For First Access"}{" "}
+              {href ? "Learn more" : "Join our community for first access"}{" "}
               <ChevronRightIcon className="h-4 transition-all group-hover:translate-x-1" />
             </Link>
           </div>
