@@ -1,6 +1,8 @@
 package inngest
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
 	if conf == nil {

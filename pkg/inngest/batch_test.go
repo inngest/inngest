@@ -35,7 +35,7 @@ func TestNewEventBatchConfig(t *testing.T) {
 			data: map[string]any{
 				"maxSize": "yolo",
 			},
-			expectedError: errors.New("unexpected type for MaxSize:"),
+			expectedError: errors.New("json: cannot unmarshal string into Go struct field EventBatchConfig.maxSize of type int"),
 		},
 		{
 			name: "should return error with invalid timeout type",
@@ -43,7 +43,7 @@ func TestNewEventBatchConfig(t *testing.T) {
 				"maxSize": 10,
 				"timeout": 10,
 			},
-			expectedError: errors.New("unexpected type for Timeout:"),
+			expectedError: errors.New("json: cannot unmarshal number into Go struct field EventBatchConfig.timeout of type string"),
 		},
 	}
 
