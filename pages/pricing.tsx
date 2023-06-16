@@ -440,8 +440,8 @@ export default function Pricing() {
               A Function Step is a callable unit of an Inngest function.
             </p>
 
-            <div className="max-w-5xl mt-12 flex flex-col lg:flex-row gap-8 items-start">
-              <div>
+            <div className="max-w-5xl w-full mt-12 flex flex-col lg:flex-row gap-8 items-start">
+              <div className="w-full lg:max-w-md">
                 <h3 className="text-lg font-semibold">
                   Simple, single-step function
                 </h3>
@@ -459,7 +459,7 @@ export default function Pricing() {
                   lineHighlights={[[4, 9]]}
                 />
               </div>
-              <div>
+              <div className="max-w-[100%]">
                 <h3 className="text-lg font-semibold">Multi-step function</h3>
                 <p className="my-4">
                   This function combines functionality typically spread across
@@ -471,7 +471,7 @@ export default function Pricing() {
                   waits 3 days, then sends another email. This is billed as 3
                   steps.
                 </p>
-                <div className="flex">
+                <div>
                   <CodeWindow
                     className="mt-4 w-full"
                     snippet={stepExamples.multiStep}
