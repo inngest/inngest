@@ -30,7 +30,7 @@ const features = [
     status: "Coming Soon",
     title: "Replay",
     description:
-      "Never deal with the hassle of dead-letter-queues. Replay permanently failed functions at any time with the click of a button.",
+      "Never deal with the hassle of dead-letter-queues. Replay one or millions of failed functions at any time with the click of a button.",
     href: null,
     icon: (
       <svg
