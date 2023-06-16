@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"regexp"
@@ -11,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/enums"
