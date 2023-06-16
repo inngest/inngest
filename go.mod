@@ -14,7 +14,6 @@ require (
 	github.com/dustinkirkland/golang-petname v0.0.0-20191129215211-8e5a1ed0cff0
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-chi/cors v1.2.1
-	github.com/goccy/go-json v0.10.0
 	github.com/golang/mock v1.6.0
 	github.com/google/cel-go v0.11.4
 	github.com/google/uuid v1.3.0
