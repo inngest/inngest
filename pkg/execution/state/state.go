@@ -36,9 +36,10 @@ var (
 
 // Identifier represents the unique identifier for a workflow run.
 type Identifier struct {
-	WorkflowID      uuid.UUID `json:"wID"`
-	WorkflowVersion int       `json:"wv"`
-	RunID           ulid.ULID `json:"runID"`
+	WorkflowID      uuid.UUID  `json:"wID"`
+	WorkflowVersion int        `json:"wv"`
+	RunID           ulid.ULID  `json:"runID"`
+	BatchID         *ulid.ULID `json:"batchID"`
 	// Key represents a unique idempotency key used to deduplicate this
 	// workflow run amongst other runs for the same workflow.
 	Key string `json:"key"`
