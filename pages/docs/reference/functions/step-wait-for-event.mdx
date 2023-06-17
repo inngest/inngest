@@ -38,7 +38,7 @@ To add a simple time based delay to your code, use [`step.sleep()`](/docs/refere
             The property to match the event trigger and the wait event, using dot-notation, e.g. `data.userId`. Cannot be combined with `if`.
           </Property>
           <Property name="if" type="string">
-            A filtering statement using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original `event` trigger and the `async` event, e.g. `event.data.userId === async.data.userId && async.data.billing_plan === 'pro'`. Cannot be combined with `match`.
+            A filtering statement using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original `event` trigger and the `async` event, e.g. `event.data.userId == async.data.userId && async.data.billing_plan == 'pro'`. Cannot be combined with `match`.
           </Property>
         </Properties>
       </Property>
@@ -61,7 +61,7 @@ To add a simple time based delay to your code, use [`step.sleep()`](/docs/refere
     "app/subscription.created",
     {
       timeout: "30d",
-      if: "event.data.userId === async.data.userId && async.data.billing_plan === 'pro'"
+      if: "event.data.userId == async.data.userId && async.data.billing_plan == 'pro'"
     }
   );
   ```
