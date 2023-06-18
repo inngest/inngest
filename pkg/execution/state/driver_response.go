@@ -260,10 +260,9 @@ func (r DriverResponse) Unwrap() error {
 //
 // NOTE: There are several required fields:  "name", "message".
 func (r DriverResponse) UserError() map[string]any {
-
 	if r.Output == nil && r.Err != nil {
 		return map[string]any{
-			"error":   r.Err,
+			"error":   r.Err.Error(),
 			"name":    "Error",
 			"message": r.Err.Error(),
 		}
@@ -281,6 +280,7 @@ func (r DriverResponse) UserError() map[string]any {
 			return processed
 		}
 	}
+
 	return map[string]any{
 		"error":   DefaultErrorMessage,
 		"name":    "Error",
@@ -314,8 +314,13 @@ func processErrorFields(input map[string]any) (map[string]any, error) {
 	return input, nil
 }
 
-// processErrorString attempts to unquote a quoted string.
+// processErrorString attempts to unquote and unmarshal a JSON-encoded string
 func processErrorString(s string) (map[string]any, error) {
+	// Bound inner error fields to 32kb
+	if len(s) > 32*1024 {
+		return nil, fmt.Errorf("error field too large")
+	}
+
 	if unquote, err := strconv.Unquote(s); err == nil {
 		s = unquote
 	}
