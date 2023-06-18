@@ -88,3 +88,42 @@ func TestEventBatchIsEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestEventBatchConfigIsValid(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   *EventBatchConfig
+		expected error
+	}{
+		{
+			name: "should return no error if valid",
+			config: &EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "10s",
+			},
+		},
+		{
+			name: "should return error if MaxSize is less than 2",
+			config: &EventBatchConfig{
+				MaxSize: 1,
+			},
+			expected: errors.New("batch size cannot be smaller than 2"),
+		},
+		{
+			name: "should return error if timeout is invalid duration string",
+			config: &EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "10ss", // simulating typos
+			},
+			expected: errors.New("invalid timeout string"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.config.IsValid(); err != nil {
+				require.ErrorContains(t, err, test.expected.Error())
+			}
+		})
+	}
+}

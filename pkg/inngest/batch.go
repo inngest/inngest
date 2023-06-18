@@ -2,6 +2,8 @@ package inngest
 
 import (
 	"encoding/json"
+	"fmt"
+	"time"
 )
 
 func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
@@ -18,7 +20,6 @@ func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, err
 	}
-	// TODO: validate timeout expression
 
 	return config, nil
 }
@@ -43,4 +44,16 @@ type EventBatchConfig struct {
 func (c EventBatchConfig) IsEnabled() bool {
 	// batch of 1 should not be considered a batch
 	return c.MaxSize > 1 && c.Timeout != ""
+}
+
+func (c EventBatchConfig) IsValid() error {
+	if c.MaxSize < 2 {
+		return fmt.Errorf("batch size cannot be smaller than 2: %d", c.MaxSize)
+	}
+
+	if _, err := time.ParseDuration(c.Timeout); err != nil {
+		return fmt.Errorf("invalid timeout string: %v", err)
+	}
+
+	return nil
 }
