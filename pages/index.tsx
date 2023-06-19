@@ -37,12 +37,11 @@ export default function Home() {
       <Header />
       <div
         style={{
-          backgroundImage: `radial-gradient(63.13% 57.7% at 50% 33.33%, #0F003C 0%, rgba(5, 9, 17, 0) 100%)`,
+          backgroundImage: `radial-gradient(63.13% 40.7% at 50% 33.33%, #0F003C 0%, rgba(5, 9, 17, 0) 100%)`,
         }}
       >
         <Hero />
       </div>
-
       <Logos
         heading="Trusted by teams all over the world"
         logos={[

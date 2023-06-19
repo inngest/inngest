@@ -1,6 +1,4 @@
 import { useState } from "react";
-import SyntaxHighlighter from "react-syntax-highlighter";
-import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 import classNames from "src/utils/classNames";
 import { stripIndent } from "src/utils/string";
 import {
@@ -10,7 +8,8 @@ import {
   IconTools,
 } from "../Icons/duotone";
 import Container from "../layout/Container";
-import SectionHeader from "../SectionHeader";
+import CodeWindow from "../CodeWindow";
+import Heading from "./Heading";
 
 export default function GetThingsShipped() {
   const tabs = [
@@ -183,7 +182,6 @@ export default function GetThingsShipped() {
                   template: "welcome",
                 })
               );
-
               const profileComplete = await step.waitForEvent(
                 "app/user.profile.completed",
                 {
@@ -191,7 +189,6 @@ export default function GetThingsShipped() {
                   match: "data.userId",
                 }
               );
-
               if (!profileComplete) {
                 await step.run("Send reminder email", () =>
                   sendEmail({
@@ -257,15 +254,16 @@ export default function GetThingsShipped() {
   return (
     <>
       <Container className="mt-40">
-        <SectionHeader
+        <Heading
           title="Get things shipped"
           lede="We built all the features that you need to build powerful applications
         without having to re-invent the wheel."
+          className="mx-auto max-w-3xl text-center"
         />
       </Container>
 
-      <Container className="flex flex-col xl:flex-row items-start mt-10 lg:mt-20 mb-80">
-        <ul className="flex xl:flex-col flex-wrap justify-start gap-1 xl:gap-2 xl:w-[290px] pb-8 xl:pb-0 xl:pt-4">
+      <Container className="flex flex-col xl:flex-row items-start mt-10 lg:mt-20 mb-96">
+        <ul className="flex xl:flex-col max-lg:self-center flex-wrap justify-start gap-1 xl:gap-2 xl:w-[290px] pb-8 xl:pb-0 xl:pt-10">
           {tabs.map((tab, i) => (
             <li key={i}>
               <button
@@ -283,8 +281,8 @@ export default function GetThingsShipped() {
           ))}
         </ul>
 
-        <div className="w-full rounded-lg bg-indigo-600 pb-4 md:pb-0 flex relative">
-          <div className="hidden md:block absolute top-0 bottom-0 -left-10 -right-10 rounded-lg bg-indigo-500 opacity-20 rotate-1 -z-0 mx-5"></div>
+        <div className="w-full rounded-lg pb-4 md:pb-0 flex relative">
+          <div className="hidden md:block absolute top-0 bottom-0 -left-10 -right-10 rounded-lg opacity-20 rotate-1 -z-0 mx-5"></div>
           {tabs.map((tab, i) =>
             activeTab === i ? (
               <div
@@ -292,44 +290,37 @@ export default function GetThingsShipped() {
                 key={i}
               >
                 <div className="py-10 pr-8 flex flex-col gap-4">
-                  <h2 className="text-white text-xl font-semibold flex items-center gap-1">
-                    {tab.icon && <tab.icon size={28} />} {tab.title}
+                  <h2 className="text-white text-[1.375rem] font-semibold flex items-center gap-1">
+                    {tab.title}
                   </h2>
                   {tab.content.map((content, j) => (
                     <div key={j} className="flex flex-col gap-0.5">
                       <h4 className="text-lg text-white font-medium">
                         {content.title}
                       </h4>
-                      <p className="text-indigo-50 text-sm leading-6 ">
+                      <p className="text-indigo-200 text-sm leading-6 ">
                         {content.description}
                       </p>
                     </div>
                   ))}
                 </div>
-                <div className="max-w-full overflow-x-scroll md:w-1/2 md:absolute right-10 top-10 bg-slate-950/80 backdrop-blur-md border border-slate-800/60 rounded-lg overflow-hidden shadow-lg">
-                  <h6 className="text-slate-300 w-full bg-slate-950/50 text-center text-xs py-1.5 border-b border-slate-800/50">
-                    {tab.code.title}
-                  </h6>
-                  {/* <pre className="px-4 py-3 overflow-x-scroll max-w-full">
-                    <code className="text-xs text-slate-300">
-                      {tab.code.content}
-                    </code>
-                  </pre> */}
-
-                  <SyntaxHighlighter
-                    language="javascript"
-                    showLineNumbers={false}
-                    style={syntaxThemeDark}
-                    codeTagProps={{ className: "code-window" }}
-                    // className="hello"
-                    customStyle={{
-                      backgroundColor: "transparent",
-                      fontSize: "0.7rem",
-                      padding: "1.5rem",
+                <div className="max-w-full overflow-x-scroll md:w-1/2 md:absolute right-10 top-10">
+                  <CodeWindow
+                    snippet={tab.code.content.trim()}
+                    header={
+                      <div className="flex py-2 px-5">
+                        <div className="py-1 px-4 rounded-full text-sm font-medium text-white bg-slate-950">
+                          {tab.code.title}
+                        </div>
+                      </div>
+                    }
+                    className="grow w-full md:max-w-xl text-xs lg:text-[13px]"
+                    style={{
+                      background: `radial-gradient(114.31% 100% at 50% 0%, #131E38 0%, #0A1223 100%),
+                        linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%)`,
                     }}
-                  >
-                    {tab.code.content.trim()}
-                  </SyntaxHighlighter>
+                    showLineNumbers={true}
+                  />
                 </div>
               </div>
             ) : null

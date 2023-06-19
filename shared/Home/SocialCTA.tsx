@@ -1,7 +1,7 @@
 import Discord from "../Icons/Discord";
 import Github from "../Icons/Github";
 import Container from "../layout/Container";
-import ArrowRight from "../Icons/ArrowRight";
+import { ChevronRightIcon } from "@heroicons/react/20/solid";
 
 export default function SocialCTA() {
   return (
@@ -23,16 +23,16 @@ export default function SocialCTA() {
           </p>
           <a
             href="https://discord.gg/EuesV2ZSnX"
-            className="group lg:mx-6  mt-3 lg:mt-6 inline-flex rounded-full text-sm font-medium px-6 py-2 bg-slate-800 hover:bg-slate-700 transition-all text-white"
+            className="group lg:mx-6  mt-3 lg:mt-6 inline-flex rounded-md text-sm font-medium px-6 py-2 bg-slate-800 hover:bg-slate-700 transition-all text-white"
           >
-            Join the community
-            <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " />
+            Join the Community
+            <ChevronRightIcon className="h-5 group-hover:translate-x-1 relative top-px transition-transform duration-150" />
           </a>
         </div>
         <div className="w-full lg:w-1/2">
           <a
             href="https://github.com/inngest/inngest"
-            className="bg-slate-800 rounded flex items-center justify-center  text-white h-[140px] lg:h-[200px]  hover:opacity-80 transition-all duration-150"
+            className="bg-slate-800 rounded flex items-center justify-center text-white h-[140px] lg:h-[200px]  hover:opacity-80 transition-all duration-150"
           >
             <Github size="4em" />
           </a>
@@ -44,10 +44,10 @@ export default function SocialCTA() {
           </p>
           <a
             href="https://github.com/inngest/inngest"
-            className="group lg:mx-6  mt-3 lg:mt-6 inline-flex rounded-full text-sm font-medium px-6 py-2 bg-slate-800 hover:bg-slate-700 transition-all text-white"
+            className="group lg:mx-6  mt-3 lg:mt-6 inline-flex rounded-md text-sm font-medium px-6 py-2 bg-slate-800 hover:bg-slate-700 transition-all text-white"
           >
             View Project
-            <ArrowRight className="group-hover:translate-x-1.5 relative top-px transition-transform duration-150 " />
+            <ChevronRightIcon className="h-5 group-hover:translate-x-1 relative top-px transition-transform duration-150" />
           </a>
         </div>
       </Container>

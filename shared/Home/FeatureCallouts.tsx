@@ -79,7 +79,7 @@ export default function FeatureCallouts() {
               href={href ? href : process.env.NEXT_PUBLIC_DISCORD_URL}
               className="group mt-6 flex flex-row items-center text-sm text-indigo-100 transition-all hover:text-indigo-50 whitespace-nowrap"
             >
-              {href ? "Learn more" : "Join our community for first access"}{" "}
+              {href ? "Learn More" : "Join Our Community for First Access"}{" "}
               <ChevronRightIcon className="h-4 transition-all group-hover:translate-x-1" />
             </Link>
           </div>
