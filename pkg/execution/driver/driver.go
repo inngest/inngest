@@ -30,8 +30,8 @@ type FunctionStack struct {
 // MarshalV1 marshals state as an input to driver runtimes.
 func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex int, env string) ([]byte, error) {
 	req := &SDKRequest{
-		Events:  s.Events(),
 		Event:   s.Event(),
+		Events:  s.Events(),
 		Actions: s.Actions(),
 		Context: &SDKRequestContext{
 			FunctionID: s.Function().ID,
@@ -46,7 +46,7 @@ func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex
 	}
 	// NOTE: Should this also be based on SDK versions?
 	if req.IsBatchSizeTooLarge() && req.BatchID != nil {
-		req.Events = nil
+		req.Events = []map[string]any{}
 		req.BatchID = s.Identifier().BatchID
 	}
 
