@@ -13,11 +13,16 @@ type SDKRequest struct {
 	Events  []map[string]any   `json:"events,omitempty"`
 	Actions map[string]any     `json:"steps"`
 	Context *SDKRequestContext `json:"ctx"`
-	BatchID *ulid.ULID         `json:"batch_id,omitempty"`
+
+	// UseAPI tells the SDK to retrieve `Events` and `Actions` data
+	// from the API instead of expecting it to be in the request body.
+	// This is a way to get around serverless provider's request body
+	// size limits.
+	UseAPI bool `json:"use_api"`
 }
 
-func (req *SDKRequest) IsBatchSizeTooLarge() bool {
-	byt, err := json.Marshal(req.Events)
+func (req *SDKRequest) IsBodySizeTooLarge() bool {
+	byt, err := json.Marshal(req)
 	if err != nil {
 		// log error
 		return false

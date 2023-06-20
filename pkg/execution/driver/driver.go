@@ -46,9 +46,9 @@ func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex
 		},
 	}
 	// NOTE: Should this also be based on SDK versions?
-	if req.IsBatchSizeTooLarge() && req.BatchID != nil {
+	if req.IsBodySizeTooLarge() {
 		req.Events = []map[string]any{}
-		req.BatchID = s.Identifier().BatchID
+		req.UseAPI = true
 	}
 
 	j, err := json.Marshal(req)

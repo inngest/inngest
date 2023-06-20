@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSDKRequestIsBatchSizeTooLarge(t *testing.T) {
+func TestSDKRequestIsBodySizeTooLarge(t *testing.T) {
 	tests := []struct {
 		name     string
 		req      *SDKRequest
@@ -38,7 +38,7 @@ func TestSDKRequestIsBatchSizeTooLarge(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.expected, test.req.IsBatchSizeTooLarge())
+			require.Equal(t, test.expected, test.req.IsBodySizeTooLarge())
 		})
 	}
 }
