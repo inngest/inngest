@@ -196,6 +196,8 @@ Let's write your first reliable serverless function! <GuideSection show="nextpag
   Create the following function in your new `inngest` directory at `src/inngest/functions.ts`:
 
   ```ts {{ filename: "src/inngest/functions.ts" }}
+  import { inngest } from "./client";
+
   export const helloWorld = inngest.createFunction(
     { name: "Hello World" },
     { event: "test/hello.world" },
@@ -235,7 +237,11 @@ Now, let's run your function!
 
 Ensure your Next.js app is up and running via `npm run dev` inside project root, then head to `http://localhost:8288`.  You should see the following UI, which allows you to send events directly to Inngest:
 
-{/*  TODO: ADD IMAGE */}
+<img
+  src="/assets/docs/quick-start/dev-server-startup-screen.png"
+  width="720" height={720/1800*1218} quality="95"
+  className="max-w-2xl"
+/>
 
 To send the event, click on “Send event” in the top right corner then add the following event data:
 
@@ -293,10 +299,10 @@ To send an event from your code, you can use the `Inngest` client's `send()` met
 <GuideSection show="nextappdir">
   ```ts
   import { NextResponse } from 'next/server';
-  import { inngest } from "../../../inngest"; // Import our client
+  import { inngest } from "../../../inngest/client"; // Import our client
 
   // Create a simple async Next.js API route handler
-  export async function GET(request: Request) {
+  export async function GET() {
     // Send your event payload to Inngest
     await inngest.send({
       name: "test/hello.world",
