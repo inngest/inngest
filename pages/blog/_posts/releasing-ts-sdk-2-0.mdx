@@ -95,7 +95,7 @@ const fn = inngest.createFunction(
   async ({ event, step, logger }) => {
     logger.info("starting function", { metadataKey: "metadataValue" })
 
-    const val = step.run("do something", () => {
+    await step.run("do something", () => {
       if (somethingBadHappens) logger.warn("something bad happened")
     })
 
