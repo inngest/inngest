@@ -15,11 +15,11 @@ A log statement outside of `step` function could end up running multiple times, 
 async ({ event, step }) => {
   logger.info("something") // this can be ran three times
 
-  step.run("fn", () => {
+  await step.run("fn", () => {
     logger.info("something else") // this will always be ran once
   })
 
-  step.run(...)
+  await step.run(...)
 }
 ```
 
@@ -38,7 +38,7 @@ const fn = inngest.createFunction(
   async ({ event, step, logger }) => {
     logger.info("starting function", { metadataKey: "metadataValue" })
 
-    const val = step.run("do something", () => {
+    const val = await step.run("do something", () => {
       if (somethingBadHappens) logger.warn("something bad happened")
     })
 
