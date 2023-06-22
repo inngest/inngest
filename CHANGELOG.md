@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.14.5] - 2023-06-22
+
+### Fixed
+- Fixed open-source rate limit keys
+- Fixed expression concatenation with undefined event data 
+
 ## [v0.14.0] - 2023-06-09
 
 ### Added
