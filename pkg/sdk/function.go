@@ -23,6 +23,9 @@ type SDKFunction struct {
 	// This may be an int OR a struct, for backwards compatibility.
 	Concurrency any `json:"concurrency,omitempty"`
 
+	// EventBatch determines how a function will process a list of incoming events
+	EventBatch map[string]any `json:"batchEvents,omitempty"`
+
 	// Idempotency allows the specification of an idempotency key by templating event
 	// data, eg:
 	//
@@ -73,6 +76,12 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 			}
 		}
 	}
+
+	eventbatch, err := inngest.NewEventBatchConfig(s.EventBatch)
+	if err != nil {
+		return nil, err
+	}
+	f.EventBatch = eventbatch
 
 	if s.Idempotency != nil {
 		f.RateLimit = &inngest.RateLimit{

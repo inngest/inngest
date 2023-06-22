@@ -29,31 +29,29 @@ type FunctionStack struct {
 
 // MarshalV1 marshals state as an input to driver runtimes.
 func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex int, env string) ([]byte, error) {
-	data := map[string]interface{}{
-		"event": s.Event(),
-		// "events": s.Events(), disabling this for now so we don't send unnecessary data to customer infra
-		"steps": s.Actions(),
-		"ctx": map[string]interface{}{
-			// fn_id is used within entrypoints to SDK-based functions in
-			// order to specify the ID of the function to run via RPC.
-			"fn_id": s.Function().ID,
-			// env is the name of the environment that the function is running in.
-			// though this is self-discoverable most of the time, for static envs
-			// the SDK has no knowledge of the name as it only has a signing key.
-			"env": env,
-			// step_id is used within entrypoints to SDK-based functions in
-			// order to specify the step of the function to run via RPC.
-			"step_id": step.ID,
-			// XXX: Pass in opentracing context within ctx.
-			"run_id": s.RunID(),
-			"stack": FunctionStack{
+	req := &SDKRequest{
+		// Events:  s.Events(),
+		Events:  []map[string]any{},
+		Event:   s.Event(),
+		Actions: s.Actions(),
+		Context: &SDKRequestContext{
+			FunctionID: s.Function().ID,
+			Env:        env,
+			StepID:     step.ID,
+			RunID:      s.RunID(),
+			Stack: &FunctionStack{
 				Stack:   s.Stack(),
 				Current: stackIndex,
 			},
 		},
 	}
+	// NOTE: Should this also be based on SDK versions?
+	if req.IsBodySizeTooLarge() {
+		req.Events = []map[string]any{}
+		req.UseAPI = true
+	}
 
-	j, err := json.Marshal(data)
+	j, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}

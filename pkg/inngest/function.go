@@ -57,6 +57,9 @@ type Function struct {
 	// Trigger represnets the trigger for the function.
 	Triggers []Trigger `json:"triggers"`
 
+	// EventBatch determines how the function will process a list of incoming events
+	EventBatch *EventBatchConfig `json:"batchEvents,omitempty"`
+
 	// RateLimit allows specifying custom rate limiting for the function.
 	RateLimit *RateLimit `json:"rateLimit,omitempty"`
 
@@ -118,9 +121,16 @@ func (f Function) Validate(ctx context.Context) error {
 	if len(f.Triggers) == 0 {
 		err = multierror.Append(err, fmt.Errorf("At least one trigger is required"))
 	}
+
 	for _, t := range f.Triggers {
 		if terr := t.Validate(ctx); terr != nil {
 			err = multierror.Append(err, terr)
+		}
+	}
+
+	if f.EventBatch != nil {
+		if berr := f.EventBatch.IsValid(); berr != nil {
+			err = multierror.Append(err, berr)
 		}
 	}
 
