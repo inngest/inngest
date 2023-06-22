@@ -171,7 +171,7 @@ type QueueKeyGenerator interface {
 
 	// BatchMetadata returns the key used to store the metadata related
 	// to a batch
-	BatchStatus(context.Context, ulid.ULID) string
+	BatchMetadata(context.Context, ulid.ULID) string
 }
 
 type DefaultQueueKeyGenerator struct {
@@ -230,6 +230,6 @@ func (d DefaultQueueKeyGenerator) Batch(ctx context.Context, batchID ulid.ULID) 
 	return fmt.Sprintf("%s:batches:%s", d.Prefix, batchID)
 }
 
-func (d DefaultQueueKeyGenerator) BatchStatus(ctx context.Context, batchID ulid.ULID) string {
-	return fmt.Sprintf("%s:status", d.Batch(ctx, batchID))
+func (d DefaultQueueKeyGenerator) BatchMetadata(ctx context.Context, batchID ulid.ULID) string {
+	return fmt.Sprintf("%s:metadata", d.Batch(ctx, batchID))
 }
