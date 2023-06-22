@@ -20,7 +20,7 @@ func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
 
 	config := &EventBatchConfig{}
 	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode batch config: %v", err)
 	}
 
 	if config.MaxSize > consts.MaxBatchSize {
@@ -29,7 +29,7 @@ func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
 
 	dur, err := time.ParseDuration(config.Timeout)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse time duration: %v", err)
 	}
 	if dur > consts.MaxBatchTimeout {
 		config.Timeout = "60s"
