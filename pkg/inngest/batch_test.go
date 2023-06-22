@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,6 +24,17 @@ func TestNewEventBatchConfig(t *testing.T) {
 			expected: &EventBatchConfig{
 				MaxSize: 10,
 				Timeout: "2s",
+			},
+		},
+		{
+			name: "should return allowed max values if config is over allowed values",
+			data: map[string]any{
+				"maxSize": 1000,
+				"timeout": "10m",
+			},
+			expected: &EventBatchConfig{
+				MaxSize: consts.MaxBatchSize,
+				Timeout: "60s",
 			},
 		},
 		{

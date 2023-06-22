@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/inngest/inngest/pkg/consts"
 )
 
 func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
@@ -19,6 +21,18 @@ func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
 	config := &EventBatchConfig{}
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, err
+	}
+
+	if config.MaxSize > consts.MaxBatchSize {
+		config.MaxSize = consts.MaxBatchSize
+	}
+
+	dur, err := time.ParseDuration(config.Timeout)
+	if err != nil {
+		return nil, err
+	}
+	if dur > consts.MaxBatchTimeout {
+		config.Timeout = "60s"
 	}
 
 	return config, nil

@@ -12,4 +12,7 @@ const (
 	MaxBodySize = 1024 * 1024 * 4 // 4MB
 
 	FunctionIdempotencyPeriod = 24 * time.Hour
+
+	MaxBatchSize    = 100
+	MaxBatchTimeout = 60 * time.Second
 )
