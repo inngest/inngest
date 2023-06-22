@@ -15,7 +15,8 @@ import (
 )
 
 var (
-	ErrRateLimitExceeded = fmt.Errorf("rate limit exceeded")
+	ErrRateLimitExceeded             = fmt.Errorf("rate limit exceeded")
+	ErrEvaluatingRateLimitExpression = fmt.Errorf("rate limit expression evaluation failed")
 )
 
 type RateLimiter interface {
@@ -34,7 +35,7 @@ func RateLimitKey(ctx context.Context, id uuid.UUID, c inngest.RateLimit, evt ma
 	}
 	res, _, err := eval.Evaluate(ctx, expressions.NewData(evt))
 	if err != nil {
-		return "", fmt.Errorf("error evaluating rate limit expression: %w", err)
+		return "", ErrEvaluatingRateLimitExpression
 	}
 	// Take a checksum of this data.  It doesn't matter if this is a map or a string;
 	// as long as we're consistent here.
