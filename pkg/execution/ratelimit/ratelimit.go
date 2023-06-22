@@ -40,11 +40,14 @@ func RateLimitKey(ctx context.Context, id uuid.UUID, c inngest.RateLimit, evt ma
 
 	// Take a checksum of this data.  It doesn't matter if this is a map or a string;
 	// as long as we're consistent here.
+	return hash(res, id), nil
+}
+
+func hash(res any, id uuid.UUID) string {
+	fmt.Println(res)
 	ui := xxhash.Sum64String(fmt.Sprintf("%v", res))
 	sum := strconv.FormatUint(ui, 36)
-
-	// Use this function and checksum as the rate limit key.
-	return fmt.Sprintf("%s-%s", id, sum), nil
+	return fmt.Sprintf("%s-%s", id, sum)
 }
 
 // RateLimit checks the given key against the specified rate limit, returning true if limited.
