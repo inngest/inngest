@@ -117,6 +117,15 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 // which is used in place of unknown.
 func handleUnknownCall(i interpreter.InterpretableCall, args *argColl) (interpreter.Interpretable, error) {
 	switch i.Function() {
+	case operators.Add:
+		// Find the non-unknown type and return that
+		for _, arg := range args.arguments {
+			if types.IsUnknown(arg) {
+				continue
+			}
+			return staticCall{result: arg, InterpretableCall: i}, nil
+		}
+		return staticCall{result: types.False, InterpretableCall: i}, nil
 	case operators.Equals:
 		// Comparing an unknown to null is true, else return false.
 		result := types.False

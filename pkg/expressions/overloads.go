@@ -49,7 +49,8 @@ func celDeclarations() []*exprpb.Decl {
 		if _, ok := d.DeclKind.(*exprpb.Decl_Function); ok {
 			// This is a function that we will overload directly in the cel env to
 			// provide easier type handling.
-			if d.Name == operators.Equals ||
+			if d.Name == operators.Add ||
+				d.Name == operators.Equals ||
 				d.Name == operators.NotEquals ||
 				d.Name == operators.LessEquals ||
 				d.Name == operators.Less ||
@@ -70,6 +71,10 @@ func celDeclarations() []*exprpb.Decl {
 		//
 		// We do not need to re-implement the functionality for these overloads - they
 		// are already implemented within functions/standard using traits.
+		decls.NewFunction(
+			operators.Add,
+			decls.NewOverload("add_any",
+				[]*expr.Type{decls.Any, decls.Any}, decls.Any)),
 		decls.NewFunction(
 			operators.Equals,
 			decls.NewOverload("equals_any",

@@ -74,6 +74,35 @@ func TestEvaluateExpression(t *testing.T) {
 			"",
 		},
 		{
+			"5 + 4",
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{
+						"name": "Tester McTestyFace",
+					},
+				},
+			},
+			int64(9),
+			nil,
+			false,
+			"",
+		},
+		{
+			// missing attr
+			"event.data.name + '-' + event.data.foo",
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{
+						"name": "Tester McTestyFace",
+					},
+				},
+			},
+			"Tester McTestyFace-",
+			nil,
+			false,
+			"",
+		},
+		{
 			"uppercase(event.data.name) + ' is my name'",
 			map[string]interface{}{
 				"event": event.Event{

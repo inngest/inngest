@@ -33,17 +33,21 @@ func RateLimitKey(ctx context.Context, id uuid.UUID, c inngest.RateLimit, evt ma
 	if err != nil {
 		return "", fmt.Errorf("unable to parse rate limit expression: %w", err)
 	}
-	res, _, err := eval.Evaluate(ctx, expressions.NewData(evt))
+	res, _, err := eval.Evaluate(ctx, expressions.NewData(map[string]any{"event": evt}))
 	if err != nil {
 		return "", ErrEvaluatingRateLimitExpression
 	}
+
 	// Take a checksum of this data.  It doesn't matter if this is a map or a string;
 	// as long as we're consistent here.
+	return hash(res, id), nil
+}
+
+func hash(res any, id uuid.UUID) string {
+	fmt.Println(res)
 	ui := xxhash.Sum64String(fmt.Sprintf("%v", res))
 	sum := strconv.FormatUint(ui, 36)
-
-	// Use this function and checksum as the rate limit key.
-	return fmt.Sprintf("%s-%s", id, sum), nil
+	return fmt.Sprintf("%s-%s", id, sum)
 }
 
 // RateLimit checks the given key against the specified rate limit, returning true if limited.
