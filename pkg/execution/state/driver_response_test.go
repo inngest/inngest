@@ -228,7 +228,7 @@ func TestDriverResponseUserError(t *testing.T) {
 			name: "with no Output and Err",
 			r:    DriverResponse{Output: nil, Err: fmt.Errorf("something went wrong")},
 			expected: map[string]any{
-				"error":   fmt.Errorf("something went wrong"),
+				"error":   "something went wrong",
 				"name":    "Error",
 				"message": "something went wrong",
 			},
