@@ -14,11 +14,12 @@ type Plan = {
     startsAt?: boolean;
     basePrice: string;
     included: string;
-    additionalPrice: string;
+    additionalPrice?: string;
     additionalRate?: string;
     period: string;
   };
   description: React.ReactFragment | string;
+  showInTable?: boolean;
   popular?: boolean;
   cta: {
     href: string;
@@ -40,6 +41,41 @@ type Feature = {
 };
 
 const PLANS: Plan[] = [
+  {
+    showInTable: false,
+    name: "Free",
+    cost: {
+      basePrice: "$0",
+      included: "50k",
+      period: "month",
+    },
+    description: "Build your side project",
+    cta: {
+      href: "/sign-up?ref=pricing-free",
+      text: "Create an Account",
+    },
+    features: [
+      {
+        quantity: "Unlimited",
+        text: "Events",
+      },
+      {
+        quantity: "Unlimited",
+        text: "Seats",
+      },
+      {
+        quantity: "25",
+        text: "Concurrent Functions",
+      },
+      {
+        quantity: "3 days",
+        text: "History",
+      },
+      {
+        text: "Discord Support",
+      },
+    ],
+  },
   {
     name: "Team",
     cost: {
@@ -392,14 +428,17 @@ export default function Pricing() {
                       Free Tier
                     </h3>
                     <p className="flex items-center text-sky-100 text-sm">
-                      50k Function Steps{" "}
+                      {getPlan("Free").cost.included} Function Steps{" "}
                       <a
                         href="#what-is-a-function-step"
                         className="mx-1 transition-all text-slate-200 hover:text-white"
                       >
                         <InformationCircle size="1.2em" />
                       </a>{" "}
-                      &mdash; 25 Concurrent Functions &mdash; 3 Days History
+                      &mdash;{" "}
+                      {getPlanFeatureQuantity("Free", "Concurrent Functions")}{" "}
+                      Concurrent Functions &mdash;{" "}
+                      {getPlanFeatureQuantity("Free", "History")} History
                     </p>
                   </div>
                   <div className="flex flex-col gap-2 items-center">
@@ -420,11 +459,9 @@ export default function Pricing() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-y-8 lg:gap-0 text-center mb-8">
-            {/* <div className="md:col-span-2 rounded-lg flex flex-col gap-y-8 md:gap-y-0 md:flex-row items-stretch"> */}
-            <PlanCard content={PLANS[0]} variant="light" />
-            <PlanCard content={PLANS[1]} variant="focus" />
-            <PlanCard content={PLANS[2]} variant="light" />
-            {/* </div> */}
+            {PLANS.filter((p) => p.showInTable !== false).map((p) => (
+              <PlanCard content={p} variant={p.popular ? "focus" : "light"} />
+            ))}
           </div>
 
           <div>
@@ -508,7 +545,7 @@ export default function Pricing() {
                     href="/docs/functions"
                   >
                     Inngest SDK
-                  </a>
+                  </a>{" "}
                   using{" "}
                   <code className="bg-slate-800 text-slate-200">
                     createFunction
@@ -639,8 +676,9 @@ export default function Pricing() {
                   As Inngest runs your function any time an event is received,
                   you may have any number of events received within a short
                   period of time (e.g. 10ms). Inngest can run all of these
-                  functions concurrently (in parallel). Our Hobby plan only
-                  allows one function to run at a time. Our paid plans offer
+                  functions concurrently (in parallel). Our Free Tier allows for
+                  up to {getPlanFeatureQuantity("Free", "Concurrent Functions")}{" "}
+                  concurrent functions at a time. Our paid plans offer
                   substantial concurrency to enable you to parallelize workloads
                   and keep your system efficient and performant.
                 </p>
@@ -672,19 +710,18 @@ export default function Pricing() {
                   to expand to Go, Python and others in the future.{" "}
                   <a
                     className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
-                    href="/contact?ref=pricing-faq-languages"
+                    href="https://roadmap.inngest.com/roadmap"
                   >
-                    Let us know
-                  </a>{" "}
-                  if you're interested in an SDK that we don't currently have.
-                  up a call.
+                    Share your feedback or up vote an specific language SDK here
+                  </a>
+                  .
                 </p>
               </FAQRow>
               <FAQRow question={`How long can my functions run for?`}>
                 <p>
-                  Inngest functions are invoked via http, so each function step
+                  Inngest functions are invoked via https, so each function step
                   can run as long as your platform or server supports, for
-                  example, Vercel’s Pro plan runs functions for up to 60 seconds
+                  example, Vercel's Pro plan runs functions for up to 60 seconds
                   which means that if your function needs to run longer than
                   that, you can break it up into multiple steps (see: What is a
                   function step?).

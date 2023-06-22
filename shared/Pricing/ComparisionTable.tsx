@@ -2,6 +2,7 @@ import { Button } from "../Button";
 import InformationCircle from "src/shared/Icons/InformationCircle";
 
 export default function ComparisonTable({ plans, features }) {
+  const visiblePlans = plans.filter((p) => p.showInTable !== false);
   return (
     <div className="hidden lg:block">
       <h2 className="text-white mt-32 mb-8 text-4xl font-semibold">
@@ -11,7 +12,7 @@ export default function ComparisonTable({ plans, features }) {
         <thead>
           <tr className="border-b border-slate-900">
             <th className="px-6 py-4"></th>
-            {plans.map((plan, i) => (
+            {visiblePlans.map((plan, i) => (
               <th className="text-left px-6 py-4" key={i}>
                 <h2 className="text-lg flex items-center">
                   {plan.name}{" "}
@@ -26,7 +27,7 @@ export default function ComparisonTable({ plans, features }) {
           </tr>
           <tr>
             <th></th>
-            {plans.map((plan, i) => (
+            {visiblePlans.map((plan, i) => (
               <th className="text-left px-6 py-8" key={i}>
                 <span className="block text-xs text-slate-400 font-medium mb-1">
                   Starting at
@@ -61,7 +62,7 @@ export default function ComparisonTable({ plans, features }) {
                   </a>
                 )}
               </td>
-              {plans.map((plan, j) =>
+              {visiblePlans.map((plan, j) =>
                 typeof feature.plans?.[plan.name] === "string" ? (
                   <td key={j} className="px-6 text-sm font-medium">
                     {feature.plans[plan.name]}

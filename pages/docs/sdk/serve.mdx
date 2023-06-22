@@ -177,7 +177,7 @@ export const { GET, POST, PUT } = serve(inngest, [fnA]);
 
 ### Streaming <VersionBadge version="v1.8.0+" />
 
-Next.js Edge Functions hosted on [Vercel](/docs/deploy/vercel) can also stream responses back to Inngest, giving you a much higher request timeout of 15 minutes (up from 10 seconds on the Hobby plan!).
+Next.js Edge Functions hosted on [Vercel](/docs/deploy/vercel) can also stream responses back to Inngest, giving you a much higher request timeout of 15 minutes (up from 10 seconds on the Vercel Hobby plan!).
 
 To enable this, set your runtime to `"edge"` (see [Quickstart for Using Edge Functions | Vercel Docs](https://vercel.com/docs/concepts/functions/edge-functions/quickstart)) and add the `streaming: "allow"` option to your serve handler:
 
