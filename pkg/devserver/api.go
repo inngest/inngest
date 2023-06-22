@@ -193,14 +193,6 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 
 	a.devserver.handlers = append(a.devserver.handlers, *h)
 	_, _ = w.Write([]byte(`{"ok":true}`))
-
-	logger.From(ctx).Info().
-		Int("len", len(req.Functions)).
-		Str("app", req.AppName).
-		Str("url", req.URL).
-		Str("sdk", req.SDK).
-		Str("framework", req.Framework).
-		Msg("registered functions")
 }
 
 func (a devapi) err(ctx context.Context, w http.ResponseWriter, status int, err error) {

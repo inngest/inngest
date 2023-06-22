@@ -44,7 +44,6 @@ func RateLimitKey(ctx context.Context, id uuid.UUID, c inngest.RateLimit, evt ma
 }
 
 func hash(res any, id uuid.UUID) string {
-	fmt.Println(res)
 	ui := xxhash.Sum64String(fmt.Sprintf("%v", res))
 	sum := strconv.FormatUint(ui, 36)
 	return fmt.Sprintf("%s-%s", id, sum)

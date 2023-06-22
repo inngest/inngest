@@ -208,11 +208,6 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 		return err
 	}
 
-	logger.From(ctx).
-		Info().
-		Int("len", len(fns)).
-		Msg("initializing scheduled functions")
-
 	for _, f := range fns {
 		fn := f
 		// Set up a cron schedule for the current function.
