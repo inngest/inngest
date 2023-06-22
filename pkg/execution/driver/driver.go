@@ -45,11 +45,12 @@ func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex
 			},
 		},
 	}
-	// NOTE: Should this also be based on SDK versions?
-	if req.IsBodySizeTooLarge() {
-		req.Events = []map[string]any{}
-		req.UseAPI = true
-	}
+
+	// if req.IsBodySizeTooLarge() {
+	// 	req.Events = []map[string]any{}
+	// 	req.Actions = map[string]any{}
+	// 	req.UseAPI = true
+	// }
 
 	j, err := json.Marshal(req)
 	if err != nil {
