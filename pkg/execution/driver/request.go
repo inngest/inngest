@@ -20,6 +20,10 @@ type SDKRequest struct {
 	UseAPI bool `json:"use_api"`
 }
 
+// TODO:
+// This can be improved with a static map reference of size limits
+// for each serverless providers so we don't always enforced it at
+// the lowest common denominator, since those limits rarely changes.
 func (req *SDKRequest) IsBodySizeTooLarge() bool {
 	byt, err := json.Marshal(req)
 	if err != nil {
