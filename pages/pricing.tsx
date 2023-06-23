@@ -688,7 +688,7 @@ export default function Pricing() {
                 </p>
                 <p>
                   See more details at{" "}
-                  <a href="/docs/usage-limits/inngest">Usage Limits</a> page.
+                  <a className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all" href="/docs/usage-limits/inngest">Usage Limits</a> page.
                 </p>
               </FAQRow>
               <FAQRow question={`Can I get a demo of the product?`}>
@@ -728,7 +728,7 @@ export default function Pricing() {
                 </p>
                 <p>
                   See more details at{" "}
-                  <a href="/docs/usage-limits/inngest">Usage Limits</a> page.
+                  <a className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all" href="/docs/usage-limits/inngest">Usage Limits</a> page.
                 </p>
               </FAQRow>
               <FAQRow
