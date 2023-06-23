@@ -3,7 +3,7 @@ import Document, { Html, Head, Main, NextScript } from "next/document";
 export default class MyDocument extends Document {
   render() {
     return (
-      <Html>
+      <Html className="scroll-smooth">
         <Head>
           <link rel="icon" href={`/${process.env.NEXT_PUBLIC_FAVICON}`} />
           <link rel="preconnect" href="https://rsms.me/" />
