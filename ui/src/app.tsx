@@ -15,7 +15,6 @@ import Sidebar from "./components/Sidebar/Sidebar";
 import SidebarLink from "./components/Sidebar/SidebarLink";
 import TimelineScrollContainer from "./components/Timeline/TimelineScrollContainer";
 import { IconBook, IconFeed, IconFunction } from "./icons";
-import "./index.css";
 import {
   useGetEventsStreamQuery,
   useGetFunctionsStreamQuery,

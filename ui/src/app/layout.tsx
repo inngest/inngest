@@ -1,7 +1,7 @@
 import StoreProvider from '@/app/StoreProvider';
 import type { Metadata } from 'next';
 
-import '../index.css';
+import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Inngest Development Server',
