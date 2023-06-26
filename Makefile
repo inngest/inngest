@@ -23,8 +23,8 @@ snapshot:
 
 .PHONY: build-ui
 build-ui:
-	cd ui && yarn
-	cd ui && yarn build
+	cd ui && pnpm install
+	cd ui && pnpm build
 	cp -r ./ui/dist/* ./pkg/devserver/static/
 
 .PHONY: build

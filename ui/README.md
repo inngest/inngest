@@ -11,7 +11,7 @@ go run ./cmd/main.go dev -u http://localhost:3000/api/inngest
 Then run the UI in dev mode. This will run a Vite dev server and GraphQL codegen concurrently:
 
 ```sh
-yarn dev
+pnpm dev
 ```
 
 Head over to [http://localhost:5173/](http://localhost:5173/) to view the app!
@@ -20,4 +20,4 @@ Head over to [http://localhost:5173/](http://localhost:5173/) to view the app!
 
 Edit or add your queries within `coreapi.ts` and the GraphQL Codegen should automatically create a hook to use in `store/generated.ts`.
 
-To force running the codegen run `yarn dev:codegen`.
+To force running the codegen run `pnpm dev:codegen`.
