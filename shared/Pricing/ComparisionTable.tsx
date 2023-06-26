@@ -62,15 +62,27 @@ export default function ComparisonTable({ plans, features }) {
                   </a>
                 )}
               </td>
-              {visiblePlans.map((plan, j) =>
-                typeof feature.plans?.[plan.name] === "string" ? (
+              {visiblePlans.map((plan, j) => {
+                const value =
+                  typeof feature.plans?.[plan.name] === "string"
+                    ? feature.plans?.[plan.name]
+                    : typeof feature.all === "string"
+                    ? feature.all
+                    : null;
+                const bool =
+                  typeof feature.plans?.[plan.name] === "boolean"
+                    ? feature.plans?.[plan.name]
+                    : typeof feature.all === "boolean"
+                    ? feature.all
+                    : null;
+
+                return value ? (
                   <td key={j} className="px-6 text-sm font-medium">
-                    {feature.plans[plan.name]}
+                    {value}
                   </td>
                 ) : (
                   <td className="px-6" key={j}>
-                    {feature.all === true ||
-                    feature.plans?.[plan.name] === true ? (
+                    {bool ? (
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 20 20"
@@ -87,8 +99,8 @@ export default function ComparisonTable({ plans, features }) {
                       <span className="text-slate-800">-</span>
                     )}
                   </td>
-                )
-              )}
+                );
+              })}
             </tr>
           ))}
         </tbody>

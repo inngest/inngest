@@ -19,7 +19,7 @@ type Plan = {
     period: string;
   };
   description: React.ReactFragment | string;
-  showInTable?: boolean;
+  hideFromCards?: boolean;
   popular?: boolean;
   cta: {
     href: string;
@@ -33,17 +33,24 @@ type Plan = {
 
 type Feature = {
   name: string;
-  all?: boolean; // All plans offer this
+  all?: boolean | string; // All plans offer this
   plans?: {
     [key: string]: string | boolean;
   };
   infoUrl?: string;
 };
 
+const PLAN_NAMES = {
+  free: "Free Tier",
+  team: "Team",
+  startup: "Startup",
+  enterprise: "Enterprise",
+};
+
 const PLANS: Plan[] = [
   {
-    showInTable: false,
-    name: "Free",
+    hideFromCards: true,
+    name: PLAN_NAMES.free,
     cost: {
       basePrice: "$0",
       included: "50k",
@@ -77,7 +84,7 @@ const PLANS: Plan[] = [
     ],
   },
   {
-    name: "Team",
+    name: PLAN_NAMES.team,
     cost: {
       basePrice: "$20",
       included: "100k",
@@ -113,7 +120,7 @@ const PLANS: Plan[] = [
     ],
   },
   {
-    name: "Startup",
+    name: PLAN_NAMES.startup,
     cost: {
       basePrice: "$149",
       included: "5M",
@@ -150,7 +157,7 @@ const PLANS: Plan[] = [
     ],
   },
   {
-    name: "Enterprise",
+    name: PLAN_NAMES.enterprise,
     cost: {
       startsAt: true,
       basePrice: "$1250",
@@ -205,45 +212,58 @@ const FEATURES: Feature[] = [
   {
     name: "Function Steps/Month",
     plans: {
-      Team: `${getPlan("Team").cost.included} + ${
-        getPlan("Team").cost.additionalPrice
-      } per additional ${getPlan("Team").cost.additionalRate}`,
-      Startup: `${getPlan("Startup").cost.included} + ${
-        getPlan("Startup").cost.additionalPrice
-      } per additional ${getPlan("Startup").cost.additionalRate}`,
-      Enterprise: getPlan("Enterprise").cost.included,
+      [PLAN_NAMES.free]: `${getPlan(PLAN_NAMES.free).cost.included}`,
+      [PLAN_NAMES.team]: `${getPlan(PLAN_NAMES.team).cost.included} + ${
+        getPlan(PLAN_NAMES.team).cost.additionalPrice
+      } per additional ${getPlan(PLAN_NAMES.team).cost.additionalRate}`,
+      [PLAN_NAMES.startup]: `${getPlan(PLAN_NAMES.startup).cost.included} + ${
+        getPlan(PLAN_NAMES.startup).cost.additionalPrice
+      } per additional ${getPlan(PLAN_NAMES.startup).cost.additionalRate}`,
+      [PLAN_NAMES.enterprise]: getPlan(PLAN_NAMES.enterprise).cost.included,
     },
   },
   {
     name: "Events",
-    plans: {
-      Team: getPlanFeatureQuantity("Team", "Events"),
-      Startup: getPlanFeatureQuantity("Startup", "Events"),
-      Enterprise: getPlanFeatureQuantity("Enterprise", "Events"),
-    },
+    all: "Unlimited",
   },
   {
     name: "Seats",
-    plans: {
-      Team: "Unlimited",
-      Startup: "Unlimited",
-      Enterprise: "Unlimited",
-    },
+    all: "Unlimited",
   },
   {
     name: "Concurrent Functions",
     plans: {
-      Team: getPlanFeatureQuantity("Team", "Concurrent Functions"),
-      Startup: getPlanFeatureQuantity("Startup", "Concurrent Functions"),
-      Enterprise: getPlanFeatureQuantity("Enterprise", "Concurrent Functions"),
+      [PLAN_NAMES.free]: getPlanFeatureQuantity(
+        PLAN_NAMES.free,
+        "Concurrent Functions"
+      ),
+      [PLAN_NAMES.team]: getPlanFeatureQuantity(
+        PLAN_NAMES.team,
+        "Concurrent Functions"
+      ),
+      [PLAN_NAMES.startup]: getPlanFeatureQuantity(
+        PLAN_NAMES.startup,
+        "Concurrent Functions"
+      ),
+      [PLAN_NAMES.enterprise]: getPlanFeatureQuantity(
+        PLAN_NAMES.enterprise,
+        "Concurrent Functions"
+      ),
     },
   },
   {
     name: "History (Log Retention)",
     plans: {
-      Team: getPlanFeatureQuantity("Team", "History"),
-      Startup: getPlanFeatureQuantity("Startup", "History"),
-      Enterprise: getPlanFeatureQuantity("Enterprise", "History"),
+      [PLAN_NAMES.free]: getPlanFeatureQuantity(PLAN_NAMES.free, "History"),
+      [PLAN_NAMES.team]: getPlanFeatureQuantity(PLAN_NAMES.team, "History"),
+      [PLAN_NAMES.startup]: getPlanFeatureQuantity(
+        PLAN_NAMES.startup,
+        "History"
+      ),
+      [PLAN_NAMES.enterprise]: getPlanFeatureQuantity(
+        PLAN_NAMES.enterprise,
+        "History"
+      ),
     },
   },
   {
@@ -264,9 +284,10 @@ const FEATURES: Feature[] = [
   {
     name: "Max Sleep Duration",
     plans: {
-      Team: "60 days",
-      Startup: "6 months",
-      Enterprise: "1 year",
+      [PLAN_NAMES.free]: "7 days",
+      [PLAN_NAMES.team]: "60 days",
+      [PLAN_NAMES.startup]: "6 months",
+      [PLAN_NAMES.enterprise]: "1 year",
     },
     infoUrl: "/docs/guides/enqueueing-future-jobs?ref=pricing",
   },
@@ -303,41 +324,41 @@ const FEATURES: Feature[] = [
   {
     name: "Discord Support",
     plans: {
-      Team: true,
-      Startup: true,
-      Enterprise: true,
+      [PLAN_NAMES.team]: true,
+      [PLAN_NAMES.startup]: true,
+      [PLAN_NAMES.enterprise]: true,
     },
   },
   {
     name: "Email Support",
     plans: {
-      Team: false,
-      Startup: true,
-      Enterprise: true,
+      [PLAN_NAMES.team]: false,
+      [PLAN_NAMES.startup]: true,
+      [PLAN_NAMES.enterprise]: true,
     },
   },
   {
     name: "Support SLA",
     plans: {
-      Team: false,
-      Startup: false,
-      Enterprise: true,
+      [PLAN_NAMES.team]: false,
+      [PLAN_NAMES.startup]: false,
+      [PLAN_NAMES.enterprise]: true,
     },
   },
   {
     name: "Onboarding Support",
     plans: {
-      Team: false,
-      Startup: false,
-      Enterprise: true,
+      [PLAN_NAMES.team]: false,
+      [PLAN_NAMES.startup]: false,
+      [PLAN_NAMES.enterprise]: true,
     },
   },
   {
     name: "HIPPA BAA Available",
     plans: {
-      Team: false,
-      Startup: false,
-      Enterprise: true,
+      [PLAN_NAMES.team]: false,
+      [PLAN_NAMES.startup]: false,
+      [PLAN_NAMES.enterprise]: true,
     },
   },
 ];
@@ -425,10 +446,10 @@ export default function Pricing() {
                 <div className="py-4 px-4 flex flex-col sm:flex-row gap-6 items-center text-left">
                   <div>
                     <h3 className="text-white text-xl lg:text-2xl font-medium tracking-tight mb-2">
-                      Free Tier
+                      {PLAN_NAMES.free}
                     </h3>
                     <p className="flex items-center text-sky-100 text-sm">
-                      {getPlan("Free").cost.included} Function Steps{" "}
+                      {getPlan(PLAN_NAMES.free).cost.included} Function Steps{" "}
                       <a
                         href="#what-is-a-function-step"
                         className="mx-1 transition-all text-slate-200 hover:text-white"
@@ -436,9 +457,13 @@ export default function Pricing() {
                         <InformationCircle size="1.2em" />
                       </a>{" "}
                       &mdash;{" "}
-                      {getPlanFeatureQuantity("Free", "Concurrent Functions")}{" "}
+                      {getPlanFeatureQuantity(
+                        PLAN_NAMES.free,
+                        "Concurrent Functions"
+                      )}{" "}
                       Concurrent Functions &mdash;{" "}
-                      {getPlanFeatureQuantity("Free", "History")} History
+                      {getPlanFeatureQuantity(PLAN_NAMES.free, "History")}{" "}
+                      History
                     </p>
                   </div>
                   <div className="flex flex-col gap-2 items-center">
@@ -459,7 +484,7 @@ export default function Pricing() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-y-8 lg:gap-0 text-center mb-8">
-            {PLANS.filter((p) => p.showInTable !== false).map((p) => (
+            {PLANS.filter((p) => p.hideFromCards !== true).map((p) => (
               <PlanCard content={p} variant={p.popular ? "focus" : "light"} />
             ))}
           </div>
@@ -688,7 +713,13 @@ export default function Pricing() {
                 </p>
                 <p>
                   See more details at{" "}
-                  <a className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all" href="/docs/usage-limits/inngest">Usage Limits</a> page.
+                  <a
+                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
+                    href="/docs/usage-limits/inngest"
+                  >
+                    Usage Limits
+                  </a>{" "}
+                  page.
                 </p>
               </FAQRow>
               <FAQRow question={`Can I get a demo of the product?`}>
@@ -728,7 +759,13 @@ export default function Pricing() {
                 </p>
                 <p>
                   See more details at{" "}
-                  <a className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all" href="/docs/usage-limits/inngest">Usage Limits</a> page.
+                  <a
+                    className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
+                    href="/docs/usage-limits/inngest"
+                  >
+                    Usage Limits
+                  </a>{" "}
+                  page.
                 </p>
               </FAQRow>
               <FAQRow
