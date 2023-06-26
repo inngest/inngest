@@ -3,7 +3,7 @@ import FuncCard from "../components/Function/FuncCard";
 import { BlankSlate } from "../components/Blank";
 import { useAppDispatch } from "../store/hooks";
 import { showDocs } from "../store/global";
-import noResultsImg from "../../assets/images/no-results.png";
+import noResultsImg from "../../public/images/no-results.png";
 import { FunctionStatus } from "../utils/statusStyles";
 
 export const FunctionList = () => {

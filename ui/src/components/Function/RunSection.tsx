@@ -1,6 +1,6 @@
 import ms from "ms";
 import { useEffect, useMemo, useState } from "react";
-import noFnsImg from "../../../assets/images/no-fn-selected.png";
+import noFnsImg from "../../../public/images/no-fn-selected.png";
 import { usePrettyJson } from "../../hooks/usePrettyJson";
 import {
   EventStatus,

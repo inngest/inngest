@@ -1,6 +1,6 @@
-import noEventsImg from "../assets/images/no-events.png";
-import noFnSelectedImg from "../assets/images/no-fn-selected.png";
-import noResultsImg from "../assets/images/no-results.png";
+import noEventsImg from "../public/images/no-events.png";
+import noFnSelectedImg from "../public/images/no-fn-selected.png";
+import noResultsImg from "../public/images/no-results.png";
 import ActionBar from "./components/ActionBar";
 import BG from "./components/BG";
 import { BlankSlate } from "./components/Blank";
