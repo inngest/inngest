@@ -1,35 +1,34 @@
-import ActionBar from "./components/ActionBar";
-import BG from "./components/BG";
-import { BlankSlate } from "./components/Blank";
-import Button from "./components/Button";
-import ContentFrame from "./components/Content/ContentFrame";
-import { FunctionList } from "./views/FunctionList";
-import { Docs } from "./components/Docs";
-import { EventSection } from "./components/Event/Section";
-import { SendEventModal } from "./components/Event/SendEventModal";
-import { EventStream } from "./components/Event/Stream";
-import { FunctionRunSection } from "./components/Function/RunSection";
-import { FuncStream } from "./components/Function/Stream";
-import Header from "./components/Header";
-import Sidebar from "./components/Sidebar/Sidebar";
-import SidebarLink from "./components/Sidebar/SidebarLink";
-import TimelineScrollContainer from "./components/Timeline/TimelineScrollContainer";
-import { IconBook, IconFeed, IconFunction } from "./icons";
-import {
-  useGetEventsStreamQuery,
-  useGetFunctionsStreamQuery,
-} from "./store/generated";
+"use client";
+
+import ActionBar from '@/components/ActionBar';
+import BG from '@/components/BG';
+import { BlankSlate } from '@/components/Blank';
+import Button from '@/components/Button';
+import ContentFrame from '@/components/Content/ContentFrame';
+import { Docs } from '@/components/Docs';
+import { EventSection } from '@/components/Event/Section';
+import { SendEventModal } from '@/components/Event/SendEventModal';
+import { EventStream } from '@/components/Event/Stream';
+import { FunctionRunSection } from '@/components/Function/RunSection';
+import { FuncStream } from '@/components/Function/Stream';
+import Header from '@/components/Header';
+import Sidebar from '@/components/Sidebar/Sidebar';
+import SidebarLink from '@/components/Sidebar/SidebarLink';
+import TimelineScrollContainer from '@/components/Timeline/TimelineScrollContainer';
+import { IconBook, IconFeed, IconFunction } from '@/icons';
+import { useGetEventsStreamQuery, useGetFunctionsStreamQuery } from '@/store/generated';
 import {
   setSidebarTab,
   showDocs,
-  showFunctions,
   showEventSendModal,
   showFeed,
-} from "./store/global";
-import { useAppDispatch, useAppSelector } from "./store/hooks";
-import classNames from "./utils/classnames";
+  showFunctions,
+} from '@/store/global';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import classNames from '@/utils/classnames';
+import { FunctionList } from '@/views/FunctionList';
 
-export function App() {
+export default function Page() {
   const sidebarTab = useAppSelector((state) => state.global.sidebarTab);
   const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
   const selectedRun = useAppSelector((state) => state.global.selectedRun);
