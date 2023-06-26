@@ -8,7 +8,8 @@
     "dev:codegen": "nodemon -w ../pkg/coreapi -e graphql -x 'pnpm codegen'",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "codegen": "graphql-codegen --config codegen.ts"
+    "codegen": "graphql-codegen --config codegen.ts",
+    "preinstall": "npx only-allow pnpm"
   },
   "dependencies": {
     "@formkit/auto-animate": "^1.0.0-beta.5",
