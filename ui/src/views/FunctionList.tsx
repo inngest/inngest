@@ -3,7 +3,6 @@ import FuncCard from "../components/Function/FuncCard";
 import { BlankSlate } from "../components/Blank";
 import { useAppDispatch } from "../store/hooks";
 import { showDocs } from "../store/global";
-import noResultsImg from "../../public/images/no-results.png";
 import { FunctionStatus } from "../utils/statusStyles";
 
 export const FunctionList = () => {
@@ -46,7 +45,7 @@ export const FunctionList = () => {
           <BlankSlate
             title="Inngest has not detected any functions"
             subtitle="Read our documentation to learn how to serve your functions"
-            imageUrl={noResultsImg}
+            imageUrl="/images/no-results.png"
             button={{
               text: "Serving Functions",
               onClick: () => dispatch(showDocs("/sdk/serve")),

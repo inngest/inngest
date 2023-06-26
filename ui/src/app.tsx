@@ -1,6 +1,3 @@
-import noEventsImg from "../public/images/no-events.png";
-import noFnSelectedImg from "../public/images/no-fn-selected.png";
-import noResultsImg from "../public/images/no-results.png";
 import ActionBar from "./components/ActionBar";
 import BG from "./components/BG";
 import { BlankSlate } from "./components/Blank";
@@ -156,13 +153,13 @@ export function App() {
               <BlankSlate
                 title="No event selected"
                 subtitle="Select an event from the stream on the left to view its details and which functions it's triggered."
-                imageUrl={noFnSelectedImg}
+                imageUrl="/images/no-fn-selected.png"
               />
             ) : (
               <BlankSlate
                 title="Inngest hasn't received any events"
                 subtitle="Read our documentation to learn how to send events to Inngest."
-                imageUrl={noEventsImg}
+                imageUrl="/images/no-events.png"
                 button={{
                   text: "Sending Events",
                   onClick: () => dispatch(showDocs("/events")),
@@ -173,13 +170,13 @@ export function App() {
             <BlankSlate
               title="No run selected"
               subtitle="Select a function run from the stream on the left to view its details, trigger, and execution timeline."
-              imageUrl={noFnSelectedImg}
+              imageUrl="/images/no-fn-selected.png"
             />
           ) : (
             <BlankSlate
               title="No functions have been run yet"
               subtitle="We haven't run any functions in response to events or crons yet. Read our documentation to learn how to write and call a function."
-              imageUrl={noResultsImg}
+              imageUrl="/images/no-results.png"
               button={{
                 text: "Writing Functions",
                 onClick: () => dispatch(showDocs("/functions")),
