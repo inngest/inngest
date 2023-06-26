@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { api, Event } from './generated';
+import { api, type Event } from './generated';
 
 const devUrl = new URL(window.location.href);
 devUrl.pathname = "";
