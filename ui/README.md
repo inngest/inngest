@@ -8,13 +8,11 @@ Start the CLI using the `dev` command, for example:
 go run ./cmd/main.go dev -u http://localhost:3000/api/inngest
 ```
 
-Then run the UI in dev mode. This will run a Vite dev server and GraphQL codegen concurrently:
+Then run the UI in dev mode. This will run Next.js and GraphQL codegen concurrently:
 
 ```sh
 pnpm dev
 ```
-
-Head over to [http://localhost:5173/](http://localhost:5173/) to view the app!
 
 ## GraphQL Codegen
 
