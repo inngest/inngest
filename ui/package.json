@@ -4,9 +4,10 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "pnpm install && concurrently --prefix-colors \"green.inverse,magenta.inverse,blue.inverse\" pnpm:dev:*",
-    "dev:vite": "vite",
+    "dev:next": "next dev",
     "dev:codegen": "nodemon -w ../pkg/coreapi -e graphql -x 'pnpm codegen'",
-    "build": "tsc && vite build",
+    "build": "next build",
+    "start": "next start",
     "codegen": "graphql-codegen --config codegen.ts",
     "preinstall": "npx only-allow pnpm"
   },
