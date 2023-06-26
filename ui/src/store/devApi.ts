@@ -23,7 +23,7 @@ export const devApi = createApi({
          * users run multiple copies of inngest - one for dev, one for tests - as mock
          * environments.
          */
-        if (import.meta.env.DEV) {
+        if (process.env.NODE_ENV === 'development') {
           const localDevUrl = new URL(url, devUrl);
           url = localDevUrl.href;
         }
