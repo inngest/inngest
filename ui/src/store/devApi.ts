@@ -1,13 +1,15 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { api, type Event } from './generated';
 
+const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL ? new URL('/', process.env.NEXT_PUBLIC_API_BASE_URL) : '/';
+
 export interface EventPayload {
   name: string;
 }
 
 export const devApi = createApi({
   reducerPath: "devApi",
-  baseQuery: fetchBaseQuery({ baseUrl: '/' }),
+  baseQuery: fetchBaseQuery({ baseUrl: baseURL.toString() }),
   endpoints: (builder) => ({
     sendEvent: builder.mutation<void, { id: string, name: string; ts: number, data?: object, user?: object }>({
       query: (event) => ({
