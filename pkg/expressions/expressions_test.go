@@ -88,6 +88,22 @@ func TestEvaluateExpression(t *testing.T) {
 			"",
 		},
 		{
+			// concat str + number
+			"event.data.name + '-' + event.data.number",
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{
+						"name":   "hi",
+						"number": 9.1,
+					},
+				},
+			},
+			"hi-9.1",
+			nil,
+			false,
+			"",
+		},
+		{
 			// missing attr
 			"event.data.name + '-' + event.data.foo",
 			map[string]interface{}{
@@ -179,6 +195,68 @@ func TestEvaluateExpression(t *testing.T) {
 				},
 			},
 			true,
+			nil,
+			false,
+			"",
+		},
+		// map equality
+		{
+			"event.data == event.data",
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]any{
+						"nope": nil,
+						"inner": map[string]any{
+							"eval": "ok",
+						},
+					},
+				},
+			},
+			true,
+			nil,
+			false,
+			"",
+		},
+		{
+			"event.data.a == event.data.b",
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]any{
+						"nope": nil,
+						"a": map[string]any{
+							"eval": "ok",
+							"num":  1.161,
+						},
+						"b": map[string]any{
+							"eval": "ok",
+							"num":  1.161,
+						},
+					},
+				},
+			},
+			true,
+			nil,
+			false,
+			"",
+		},
+		{
+			"event.data.a == event.data.b",
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]any{
+						"nope": nil,
+						"a": map[string]any{
+							"eval": "ok",
+							"num":  9,
+						},
+						"b": map[string]any{
+							"eval": "ok",
+							"num":  1.161,
+						},
+					},
+				},
+			},
+			false,
 			nil,
 			false,
 			"",
@@ -348,7 +426,6 @@ func TestEvaluateExpression(t *testing.T) {
 			"",
 		},
 		// basics
-
 		{
 			expr: `steps.first.foo == 'test' && steps.second.bar != true && steps.second.baz != true`,
 			data: map[string]interface{}{
