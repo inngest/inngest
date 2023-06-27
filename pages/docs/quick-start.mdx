@@ -280,10 +280,11 @@ To send an event from your code, you can use the `Inngest` client's `send()` met
 
 <GuideSection show="nextpages">
   ```ts
+  import { NextApiRequest, NextApiResponse } from "next";
   import { inngest } from "./inngest";
 
   // Create a simple async Next.js API route handler
-  export default async function handler(req, res) {
+  export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Send your event payload to Inngest
     await inngest.send({
       name: "test/hello.world",
