@@ -89,16 +89,17 @@ func TestEvaluateExpression(t *testing.T) {
 		},
 		{
 			// concat str + number
-			"event.data.name + '-' + event.data.number",
+			"event.data.name + '-' + event.data.number + '-' + event.data.bool + '-' + event.data.missing",
 			map[string]interface{}{
 				"event": event.Event{
 					Data: map[string]interface{}{
 						"name":   "hi",
 						"number": 9.1,
+						"bool":   true,
 					},
 				},
 			},
-			"hi-9.1",
+			"hi-9.1-true-",
 			nil,
 			false,
 			"",
