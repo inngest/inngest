@@ -147,6 +147,7 @@ export function ButtonDeploy({ label, type, href }) {
   return (
     <a
       href={href}
+      target="_blank"
       className="block text-slate-800 dark:text-slate-200 cursor-pointer bg-slate-200 hover:bg-indigo-300/60 dark:bg-slate-800/40 rounded-lg py-8 px-6 group/deploy dark:hover:bg-indigo-800/40 no-underline transition-all"
     >
       {logoType}
