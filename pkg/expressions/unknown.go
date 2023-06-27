@@ -46,6 +46,9 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 		}
 
 		// For each function that we wnat to be heterogeneous, check the types here.
+		//
+		// Only run this in the case in which we have known types;  unknowns are handled
+		// below.
 		if argTypes.TypeLen() == 2 && !argTypes.Exists(types.UnknownType) {
 			// Check if the original function is a success.
 			val := call.Eval(act)
@@ -59,8 +62,6 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 				//
 				// This allows concatenation of distinct types, eg string + number.
 				//
-				// Check if we have non-unknown types, and only run this if there's no unknown.
-				// Unknowns are handled below.
 				str := types.String(fmt.Sprintf("%v%v", args[0].Eval(act).Value(), args[1].Eval(act).Value()))
 				return staticCall{result: str, InterpretableCall: call}, nil
 			}
