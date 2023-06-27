@@ -89,17 +89,21 @@ func TestEvaluateExpression(t *testing.T) {
 		},
 		{
 			// concat str + number
-			"event.data.name + '-' + event.data.number + '-' + event.data.bool + '-' + event.data.missing",
+			"event.data.name + '-' + event.data.number + '-' + event.data.bool + '-' + event.data.list + '-' + event.data.obj + '-' + event.data.missing",
 			map[string]interface{}{
 				"event": event.Event{
 					Data: map[string]interface{}{
 						"name":   "hi",
 						"number": 9.1,
 						"bool":   true,
+						"list":   []any{3, "ok?", true},
+						"obj": map[string]any{
+							"name": "inngest",
+						},
 					},
 				},
 			},
-			"hi-9.1-true-",
+			"hi-9.1-true-[3 ok? true]-map[name:inngest]-",
 			nil,
 			false,
 			"",
