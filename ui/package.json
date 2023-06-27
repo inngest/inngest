@@ -1,7 +1,6 @@
 {
   "name": "ui",
-  "private": true,
-  "version": "0.0.0",
+  "main": "n/a",
   "scripts": {
     "dev": "pnpm install && concurrently --prefix-colors \"green.inverse,magenta.inverse,blue.inverse\" pnpm:dev:*",
     "dev:next": "next dev",
@@ -12,41 +11,42 @@
     "preinstall": "npx only-allow pnpm"
   },
   "dependencies": {
-    "@formkit/auto-animate": "^1.0.0-beta.5",
-    "@monaco-editor/react": "^4.4.6",
-    "@reduxjs/toolkit": "^1.9.0",
-    "@rtk-query/graphql-request-base-query": "^2.2.0",
-    "graphql": "^16.6.0",
-    "graphql-request": "4",
-    "monaco-editor": "^0.34.1",
-    "ms": "^2.1.3",
+    "@formkit/auto-animate": "1.0.0-beta.5",
+    "@monaco-editor/react": "4.4.6",
+    "@reduxjs/toolkit": "1.9.0",
+    "@rtk-query/graphql-request-base-query": "2.2.0",
+    "graphql": "16.6.0",
+    "graphql-request": "4.0.0",
+    "monaco-editor": "0.34.1",
+    "ms": "2.1.3",
     "next": "13.4.5",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-redux": "^8.0.5",
-    "react-refractor": "^2.1.7",
-    "react-timeago": "^7.1.0",
-    "refractor": "^4.8.0",
-    "ulid": "^2.3.0"
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-redux": "8.0.5",
+    "react-refractor": "2.1.7",
+    "react-timeago": "7.1.0",
+    "refractor": "4.8.0",
+    "ulid": "2.3.0"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "2.13.11",
-    "@graphql-codegen/typescript-operations": "^2.5.7",
-    "@graphql-codegen/typescript-rtk-query": "^2.3.7",
-    "@types/ms": "^0.7.31",
-    "@types/react": "^18.0.27",
-    "@types/react-dom": "^18.0.10",
-    "@types/react-timeago": "^4.1.3",
-    "autoprefixer": "^10.4.13",
-    "concurrently": "^7.5.0",
-    "nodemon": "^2.0.20",
-    "postcss": "^8.4.18",
-    "tailwindcss": "^3.2.1",
+    "@graphql-codegen/typescript-operations": "2.5.7",
+    "@graphql-codegen/typescript-rtk-query": "2.3.7",
+    "@types/ms": "0.7.31",
+    "@types/react": "18.0.27",
+    "@types/react-dom": "18.0.10",
+    "@types/react-timeago": "4.1.3",
+    "autoprefixer": "10.4.13",
+    "concurrently": "7.5.0",
+    "nodemon": "2.0.20",
+    "postcss": "8.4.18",
+    "tailwindcss": "3.2.1",
     "typescript": "5.1.3"
   },
   "engines": {
     "node": "18.x",
     "pnpm": "8.6.2"
   },
-  "packageManager": "pnpm@8.6.2"
+  "packageManager": "pnpm@8.6.2",
+  "private": true
 }
