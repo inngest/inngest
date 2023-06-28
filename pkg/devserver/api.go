@@ -23,7 +23,7 @@ import (
 //go:embed static/index.html
 var uiHtml []byte
 
-//go:embed static/assets
+//go:embed all:static
 var static embed.FS
 
 var (
@@ -70,10 +70,10 @@ func (a *devapi) addRoutes() {
 	a.Get("/", a.UI)
 
 	// Go embeds files relative to the current source, which embeds
-	// all assets under ./static/assets.  We remove the ./static
+	// all under ./static.  We remove the ./static
 	// directory by using fs.Sub: https://pkg.go.dev/io/fs#Sub.
-	assetsFS, _ := fs.Sub(static, "static")
-	a.Get("/assets/*", http.FileServer(http.FS(assetsFS)).ServeHTTP)
+	staticFS, _ := fs.Sub(static, "static")
+	a.Get("/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
 	a.Get("/dev", a.Info)
 	a.Post("/fn/register", a.Register)
 }

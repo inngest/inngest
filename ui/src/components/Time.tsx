@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import TimeAgo, { Formatter, ReactTimeagoProps } from "react-timeago";
+import TimeAgo, { type Formatter, type ReactTimeagoProps } from "react-timeago";
 
 interface TimeProps extends ReactTimeagoProps {
   date: string | number;

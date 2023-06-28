@@ -1,15 +1,21 @@
-node_modules
-dist
-dist-ssr
-*.local
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+dist/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Code editors and IDEs
+.idea/
+*.iml
+.vscode/
+
+# OS generated files
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db

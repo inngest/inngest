@@ -1,6 +1,5 @@
 import ms from "ms";
 import { useEffect, useMemo, useState } from "react";
-import noFnsImg from "../../../assets/images/no-fn-selected.png";
 import { usePrettyJson } from "../../hooks/usePrettyJson";
 import {
   EventStatus,
@@ -57,7 +56,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
     return (
       <ContentCard date={0} id="">
         <BlankSlate
-          imageUrl={noFnsImg}
+          imageUrl="/images/no-fn-selected.png"
           title="No function run selected"
           subtitle="Select a function run on the left to see a timeline of its execution."
         />
