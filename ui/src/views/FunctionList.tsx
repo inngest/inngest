@@ -12,7 +12,7 @@ export const FunctionList = () => {
   const functions = data?.functions || [];
 
   return (
-    <div className="px-5 py-4 h-full flex flex-col overflow-y-scroll">
+    <div className="px-10 py-6 h-full flex flex-col overflow-y-scroll">
       <header className="mb-8">
         <h1 className="text-lg mb-2 text-slate-50">Functions</h1>
         <p>This is a list of all detected functions</p>
