@@ -3,6 +3,12 @@ export { IconFeed } from "./Feed";
 export { IconFunction } from "./Function";
 export { IconBook } from "./Book";
 export { InngestLogo } from "./InngestLogo";
+export { IconChevron } from "./Chevron";
+export { IconPlus } from "./Plus";
+export { IconSpinner } from "./Spinner";
+export { IconCheckCircle } from "./CheckCircle";
+export { IconExclamationTriangle } from "./ExclamationTriangle";
+export { IconTrash } from "./Trash";
 
 // Status Icons
 export { IconStatusDefault } from "./StatusDefault";
