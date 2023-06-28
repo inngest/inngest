@@ -12,8 +12,8 @@ import { EventStream } from '@/components/Event/Stream';
 import { FunctionRunSection } from '@/components/Function/RunSection';
 import { FuncStream } from '@/components/Function/Stream';
 import Header from '@/components/Header';
-import Sidebar from '@/components/Sidebar/Sidebar';
-import SidebarLink from '@/components/Sidebar/SidebarLink';
+import Navbar from '@/components/Navbar/Navbar';
+import NavbarLink from '@/components/Navbar/NavbarLink';
 import TimelineScrollContainer from '@/components/Timeline/TimelineScrollContainer';
 import { IconBook, IconFeed, IconFunction } from '@/icons';
 import { useGetEventsStreamQuery, useGetFunctionsStreamQuery } from '@/store/generated';
@@ -83,26 +83,30 @@ export default function Page() {
     >
       <BG />
       {/* <EventDetail /> */}
-      <Header />
+      <Header>
+        <Navbar>
+          <NavbarLink
+            icon={<IconFeed />}
+            active={contentView === "feed"}
+            badge={20}
+            onClick={() => dispatch(showFeed())}
+            tabName="Stream"
+          />
+          <NavbarLink
+            icon={<IconFunction />}
+            active={contentView === "functions"}
+            onClick={() => dispatch(showFunctions())}
+            tabName="Functions"
+          />
+          <NavbarLink
+            icon={<IconBook />}
+            active={contentView === "docs"}
+            onClick={() => dispatch(showDocs())}
+            tabName="Docs"
+          />
+        </Navbar>
+      </Header>
       <SendEventModal />
-      <Sidebar>
-        <SidebarLink
-          icon={<IconFeed />}
-          active={contentView === "feed"}
-          badge={20}
-          onClick={() => dispatch(showFeed())}
-        />
-        <SidebarLink
-          icon={<IconFunction />}
-          active={contentView === "functions"}
-          onClick={() => dispatch(showFunctions())}
-        />
-        <SidebarLink
-          icon={<IconBook />}
-          active={contentView === "docs"}
-          onClick={() => dispatch(showDocs())}
-        />
-      </Sidebar>
       {contentView === "feed" ? (
         <>
           <ActionBar
