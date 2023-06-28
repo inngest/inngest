@@ -22,11 +22,13 @@ import {
   showDocs,
   showEventSendModal,
   showFeed,
+  showApps,
   showFunctions,
 } from '@/store/global';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import classNames from '@/utils/classnames';
 import { FunctionList } from '@/views/FunctionList';
+import AppList from '@/views/AppList';
 
 export default function Page() {
   const sidebarTab = useAppSelector((state) => state.global.sidebarTab);
@@ -91,6 +93,12 @@ export default function Page() {
             badge={20}
             onClick={() => dispatch(showFeed())}
             tabName="Stream"
+          />
+          <NavbarLink
+            icon={<IconFunction />}
+            active={contentView === "apps"}
+            onClick={() => dispatch(showApps())}
+            tabName="Apps"
           />
           <NavbarLink
             icon={<IconFunction />}
@@ -188,6 +196,8 @@ export default function Page() {
         </>
       ) : contentView === "functions" ? (
         <FunctionList />
+      ) : contentView === "apps" ? (
+        <AppList />
       ) : (
         <Docs />
       )}

@@ -8,6 +8,9 @@ dependencies:
   '@formkit/auto-animate':
     specifier: ^1.0.0-beta.5
     version: 1.0.0-beta.5
+  '@headlessui/react':
+    specifier: 1.7.15
+    version: 1.7.15(react-dom@18.2.0)(react@18.2.0)
   '@monaco-editor/react':
     specifier: ^4.4.6
     version: 4.4.6(monaco-editor@0.34.1)(react-dom@18.2.0)(react@18.2.0)
@@ -1332,6 +1335,18 @@ packages:
     dependencies:
       graphql: 16.6.0
     dev: true
+
+  /@headlessui/react@1.7.15(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-OTO0XtoRQ6JPB1cKNFYBZv2Q0JMqMGNhYP1CjPvcJvjz8YGokz8oAj89HIYZGN0gZzn/4kk9iUpmMF4Q21Gsqw==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      react: ^16 || ^17 || ^18
+      react-dom: ^16 || ^17 || ^18
+    dependencies:
+      client-only: 0.0.1
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+    dev: false
 
   /@iarna/toml@2.2.5:
     resolution: {integrity: sha512-trnsAYxU3xnS1gPHPyU961coFyLkh4gAD/0zQ5mymY4yOZ+CYvsPqUbOFSw0aDM4y0tV7tiFxL/1XfXPNC6IPg==}
