@@ -8,6 +8,7 @@ export { IconPlus } from "./Plus";
 export { IconSpinner } from "./Spinner";
 export { IconCheckCircle } from "./CheckCircle";
 export { IconExclamationTriangle } from "./ExclamationTriangle";
+export { IconArrowTopRightOnSquare} from "./ArrowTopRightOnSquare";
 export { IconTrash } from "./Trash";
 
 // Status Icons
