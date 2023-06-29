@@ -67,5 +67,5 @@ module.exports = {
       full: "9999px",
     },
   },
-  plugins: [],
+  plugins: [require('@headlessui/tailwindcss')],
 };
