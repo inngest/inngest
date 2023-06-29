@@ -92,8 +92,9 @@ export default function AppCard({ app }: AppCardProps) {
 
         <Disclosure
           as="div"
-          className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800"
+          className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative"
         >
+          <span className="absolute top-[2.7rem] left-[1.844rem] h-[calc(100%-2.7rem)] w-px bg-slate-800" aria-hidden="true" />
           <Disclosure.Button className="flex items-center text-white justify-between p-4 pr-6 w-full">
             <div className="flex items-center gap-3 text-base">
               {app.status === "connected" ? (
@@ -115,7 +116,7 @@ export default function AppCard({ app }: AppCardProps) {
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Disclosure.Panel className="text-gray-500 pl-10 pr-6 pb-4 ">
+            <Disclosure.Panel className="text-gray-500 pl-14 pr-6 pb-4 ">
               {app.status !== "connected" && (
                 <p className="pb-4 text-slate-400">
                   The Inngest Dev Server can’t find your application. Ensure
@@ -148,8 +149,9 @@ export default function AppCard({ app }: AppCardProps) {
 
         <Disclosure
           as="div"
-          className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800"
+          className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative"
         >
+          <span className="absolute top-0 left-[1.844rem] h-[1.05rem] w-px bg-slate-800" aria-hidden="true" />
           <Disclosure.Button className="flex items-center text-white justify-between p-4 pr-6 w-full">
             <div className="flex items-center gap-3 text-base">
               {app.status === "connected" && app.functionCount > 0 ? (
@@ -188,7 +190,7 @@ export default function AppCard({ app }: AppCardProps) {
               leaveFrom="opacity-100"
               leaveTo="opacity-0"
             >
-              <Disclosure.Panel className="text-gray-500 pl-10 pr-6 pb-4 ">
+              <Disclosure.Panel className="text-gray-500 pl-14 pr-6 pb-4 ">
                 <p className="pb-4 text-slate-400">
                   There are currently no functions registered at this url.
                   Ensure you have created a function and are exporting it
