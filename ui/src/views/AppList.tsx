@@ -4,6 +4,17 @@ import Button from "@/components/Button";
 
 const mockApps = [
   {
+    name: "",
+    id: "tempId",
+    createdAt: "",
+    url: "localhost:3001",
+    functionCount: 0,
+    sdkVersion: "",
+    status: "not connected",
+    automaticallyAdded: false,
+    connecting: true,
+  },
+  {
     name: "SDK Example Redwoodjs Vercel",
     id: "id1",
     createdAt: "",
@@ -14,13 +25,13 @@ const mockApps = [
     automaticallyAdded: false,
   },
   {
-    name: "Growth",
-    id: "id2",
+    name: "SDK Example",
+    id: "id3",
     createdAt: "",
-    url: "localhost:3001",
+    url: "localhost:4000",
     functionCount: 0,
-    sdkVersion: "2.0.40",
-    status: "not connected",
+    sdkVersion: "2.0.41",
+    status: "connected",
     automaticallyAdded: true,
   },
 ];

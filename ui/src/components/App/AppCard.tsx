@@ -6,7 +6,7 @@ import {
   IconChevron,
   IconCheckCircle,
   IconExclamationTriangle,
-  IconTrash,
+  IconSpinner,
   IconArrowTopRightOnSquare,
   IconAppStatusDefault,
 } from "@/icons";
@@ -20,6 +20,7 @@ type AppCardProps = {
     sdkVersion: string;
     status: string;
     automaticallyAdded: boolean;
+    connecting?: boolean;
   };
 };
 
@@ -47,13 +48,15 @@ const AppHeader = ({ status, functionCount, sdkVersion }) => {
         `text-white rounded-t-md px-6 py-2.5 capitalize flex gap-2 items-center justify-between`
       )}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 leading-7">
         {headerIcon}
         {headerLabel}
       </div>
-      <span className="text-xs leading-3 border rounded-md border-white/20 box-border py-1.5 px-2 text-slate-300">
-        SDK {sdkVersion}
-      </span>
+      {sdkVersion && (
+        <span className="text-xs leading-3 border rounded-md border-white/20 box-border py-1.5 px-2 text-slate-300">
+          SDK {sdkVersion}
+        </span>
+      )}
     </header>
   );
 };
@@ -67,14 +70,21 @@ export default function AppCard({ app }: AppCardProps) {
         sdkVersion={app.sdkVersion}
       />
       <div className="border border-slate-700/30 rounded-b-md divide-y divide-slate-700/30 bg-slate-800/30">
-        <div className="flex items-center justify-between px-6 py-4 ">
-          <p className=" text-lg text-white">{app.name}</p>
-          {!app.automaticallyAdded && (
-            <span className="text-xs leading-3 border rounded-md border-slate-800 box-border py-1.5 px-2 text-slate-300">
-              Auto Detected
-            </span>
-          )}
-        </div>
+        {app.connecting ? (
+          <div className="p-4 pr-6 flex items-center gap-2">
+            <IconSpinner className="fill-sky-400 text-slate-800" />
+            <p className="text-slate-400 text-lg font-light">Connecting...</p>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between px-6 py-4 ">
+            <p className=" text-lg text-white">{app.name}</p>
+            {app.automaticallyAdded && (
+              <span className="text-xs leading-3 border rounded-md border-slate-800 box-border py-1.5 px-2 text-slate-300">
+                Auto Detected
+              </span>
+            )}
+          </div>
+        )}
 
         <Disclosure
           as="div"
@@ -159,32 +169,39 @@ export default function AppCard({ app }: AppCardProps) {
               )}
             </div>
           </Disclosure.Button>
-          <Transition
-            enter="transition-opacity duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="transition-opacity duration-300"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <Disclosure.Panel className="text-gray-500 pl-10 pr-6 pb-4 ">
-              {app.status !== "connected" && (
+          {(app.status !== "connected" || app.functionCount < 1) && (
+            <Transition
+              enter="transition-opacity duration-300"
+              enterFrom="opacity-0"
+              enterTo="opacity-100"
+              leave="transition-opacity duration-300"
+              leaveFrom="opacity-100"
+              leaveTo="opacity-0"
+            >
+              <Disclosure.Panel className="text-gray-500 pl-10 pr-6 pb-4 ">
                 <p className="pb-4 text-slate-400">
                   There are currently no functions registered at this url.
                   Ensure you have created a function and are exporting it
                   correctly from your serve command.
                 </p>
-              )}
-              <div className="flex items-center justify-between p-4 mb-4 bg-slate-950 rounded-md">
-                <code className="text-slate-300">serve(client, [list_of_fns]);</code>
-              </div>
-              <a className="text-indigo-400 flex items-center gap-2">
-                Creating Functions
-                <IconArrowTopRightOnSquare />
-              </a>
-            </Disclosure.Panel>
-          </Transition>
+                <div className="flex items-center justify-between p-4 mb-4 bg-slate-950 rounded-md">
+                  <code className="text-slate-300">
+                    serve(client, [list_of_fns]);
+                  </code>
+                </div>
+                <a className="text-indigo-400 flex items-center gap-2">
+                  Creating Functions
+                  <IconArrowTopRightOnSquare />
+                </a>
+              </Disclosure.Panel>
+            </Transition>
+          )}
         </Disclosure>
+        {!app.automaticallyAdded && (
+          <div className="text-white p-4 pr-6">
+            <button className="text-rose-400">Delete App</button>
+          </div>
+        )}
       </div>
     </div>
   );
