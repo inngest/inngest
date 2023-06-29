@@ -107,7 +107,8 @@ export default function AppCard({ app }: AppCardProps) {
                 <p className="pb-4 text-slate-400">
                   The Inngest Dev Server can’t find your application. Ensure
                   your full URL is correct, including the correct port. Inngest
-                  automatically scans <span className="text-white">multiple ports</span> by default.
+                  automatically scans{" "}
+                  <span className="text-white">multiple ports</span> by default.
                 </p>
               )}
               <div className="flex items-center justify-between pb-4">
@@ -121,20 +122,70 @@ export default function AppCard({ app }: AppCardProps) {
                   readOnly={app.automaticallyAdded}
                 />
               </div>
-              <a className="text-indigo-400 flex items-center gap-2">Connecting to the Dev Server<IconArrowTopRightOnSquare /></a>
+              <a className="text-indigo-400 flex items-center gap-2">
+                Connecting to the Dev Server
+                <IconArrowTopRightOnSquare />
+              </a>
             </Disclosure.Panel>
           </Transition>
         </Disclosure>
-        <div className="flex items-center text-white justify-between p-4 pr-6">
-          <div className="flex items-center gap-3 text-base">
-            {<IconStatusCompleted />}
-            {app.functionCount} Functions registered
-          </div>
-          <button className="text-indigo-400 flex items-center gap-2">
-            View Functions
-            <IconChevron className="-rotate-90" />
-          </button>
-        </div>
+
+        <Disclosure
+          as="div"
+          className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800"
+        >
+          <Disclosure.Button className="flex items-center text-white justify-between p-4 pr-6 w-full">
+            <div className="flex items-center gap-3 text-base">
+              {app.status === "connected" && app.functionCount > 0 ? (
+                <>
+                  {<IconStatusCompleted />}
+                  {app.functionCount} Functions registered
+                </>
+              ) : app.status !== "connected" ? (
+                <>{<IconStatusFailed />}No Functions Found</>
+              ) : (
+                <>{<IconStatusFailed />}No Functions Found</>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              {app.status === "connected" && app.functionCount > 0 ? (
+                <>
+                  <button className="text-indigo-400 flex items-center gap-2">
+                    View Functions
+                    <IconChevron className="-rotate-90" />
+                  </button>
+                </>
+              ) : (
+                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
+              )}
+            </div>
+          </Disclosure.Button>
+          <Transition
+            enter="transition-opacity duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="transition-opacity duration-300"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <Disclosure.Panel className="text-gray-500 pl-10 pr-6 pb-4 ">
+              {app.status !== "connected" && (
+                <p className="pb-4 text-slate-400">
+                  There are currently no functions registered at this url.
+                  Ensure you have created a function and are exporting it
+                  correctly from your serve command.
+                </p>
+              )}
+              <div className="flex items-center justify-between p-4 mb-4 bg-slate-950 rounded-md">
+                <code className="text-slate-300">serve(client, [list_of_fns]);</code>
+              </div>
+              <a className="text-indigo-400 flex items-center gap-2">
+                Creating Functions
+                <IconArrowTopRightOnSquare />
+              </a>
+            </Disclosure.Panel>
+          </Transition>
+        </Disclosure>
       </div>
     </div>
   );
