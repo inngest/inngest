@@ -1,4 +1,6 @@
 import { Disclosure, Transition } from "@headlessui/react";
+import { useAppDispatch } from "@/store/hooks";
+import { showFunctions, showDocs } from "@/store/global";
 import classNames from "@/utils/classnames";
 import {
   IconAppStatusCompleted,
@@ -62,6 +64,7 @@ const AppHeader = ({ status, functionCount, sdkVersion }) => {
 };
 
 export default function AppCard({ app }: AppCardProps) {
+  const dispatch = useAppDispatch();
   return (
     <div>
       <AppHeader
@@ -131,7 +134,10 @@ export default function AppCard({ app }: AppCardProps) {
                   readOnly={app.automaticallyAdded}
                 />
               </div>
-              <a className="text-indigo-400 flex items-center gap-2">
+              <a
+                className="text-indigo-400 flex items-center gap-2 cursor-pointer"
+                onClick={() => dispatch(showDocs("/sdk/serve"))}
+              >
                 Connecting to the Dev Server
                 <IconArrowTopRightOnSquare />
               </a>
@@ -159,7 +165,10 @@ export default function AppCard({ app }: AppCardProps) {
             <div className="flex items-center gap-4">
               {app.status === "connected" && app.functionCount > 0 ? (
                 <>
-                  <button className="text-indigo-400 flex items-center gap-2">
+                  <button
+                    className="text-indigo-400 flex items-center gap-2"
+                    onClick={() => dispatch(showFunctions())}
+                  >
                     View Functions
                     <IconChevron className="-rotate-90" />
                   </button>
@@ -189,7 +198,10 @@ export default function AppCard({ app }: AppCardProps) {
                     serve(client, [list_of_fns]);
                   </code>
                 </div>
-                <a className="text-indigo-400 flex items-center gap-2">
+                <a
+                  className="text-indigo-400 flex items-center gap-2 cursor-pointer"
+                  onClick={() => dispatch(showDocs("/functions"))}
+                >
                   Creating Functions
                   <IconArrowTopRightOnSquare />
                 </a>
