@@ -2,6 +2,7 @@ import { Disclosure, Transition } from "@headlessui/react";
 import { useAppDispatch } from "@/store/hooks";
 import { showFunctions, showDocs } from "@/store/global";
 import classNames from "@/utils/classnames";
+import CodeLine from "@/components/CodeLine";
 import {
   IconAppStatusCompleted,
   IconAppStatusFailed,
@@ -193,11 +194,10 @@ export default function AppCard({ app }: AppCardProps) {
                   Ensure you have created a function and are exporting it
                   correctly from your serve command.
                 </p>
-                <div className="flex items-center justify-between p-4 mb-4 bg-slate-950 rounded-md">
-                  <code className="text-slate-300">
-                    serve(client, [list_of_fns]);
-                  </code>
-                </div>
+                <CodeLine
+                  code="serve(client, [list_of_fns]);"
+                  className="p-4 mb-4"
+                />
                 <a
                   className="text-indigo-400 flex items-center gap-2 cursor-pointer"
                   onClick={() => dispatch(showDocs("/functions"))}
