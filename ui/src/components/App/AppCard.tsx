@@ -23,7 +23,7 @@ type AppCardProps = {
   };
 };
 
-const AppHeader = ({ status, functionCount, automaticallyAdded }) => {
+const AppHeader = ({ status, functionCount, sdkVersion }) => {
   let headerColor, headerLabel, headerIcon;
 
   if (status !== "connected") {
@@ -51,11 +51,9 @@ const AppHeader = ({ status, functionCount, automaticallyAdded }) => {
         {headerIcon}
         {headerLabel}
       </div>
-      {!automaticallyAdded && (
-        <button onClick={() => {}}>
-          <IconTrash />
-        </button>
-      )}
+      <span className="text-xs leading-3 border rounded-md border-white/20 box-border py-1.5 px-2 text-slate-300">
+        SDK {sdkVersion}
+      </span>
     </header>
   );
 };
@@ -66,7 +64,7 @@ export default function AppCard({ app }: AppCardProps) {
       <AppHeader
         status={app.status}
         functionCount={app.functionCount}
-        automaticallyAdded={app.automaticallyAdded}
+        sdkVersion={app.sdkVersion}
       />
       <div className="border border-slate-700/30 rounded-b-md divide-y divide-slate-700/30 bg-slate-800/30">
         <div className="flex items-center justify-between px-6 py-4 ">
