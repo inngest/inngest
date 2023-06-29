@@ -1,13 +1,14 @@
 import { Disclosure, Transition } from "@headlessui/react";
 import classNames from "@/utils/classnames";
 import {
-  IconStatusCompleted,
-  IconStatusFailed,
+  IconAppStatusCompleted,
+  IconAppStatusFailed,
   IconChevron,
   IconCheckCircle,
   IconExclamationTriangle,
   IconTrash,
   IconArrowTopRightOnSquare,
+  IconAppStatusDefault,
 } from "@/icons";
 
 type AppCardProps = {
@@ -84,9 +85,9 @@ export default function AppCard({ app }: AppCardProps) {
           <Disclosure.Button className="flex items-center text-white justify-between p-4 pr-6 w-full">
             <div className="flex items-center gap-3 text-base">
               {app.status === "connected" ? (
-                <>{<IconStatusCompleted />}Connected to server</>
+                <>{<IconAppStatusCompleted />}Connected to server</>
               ) : (
-                <>{<IconStatusFailed />}No connection to server</>
+                <>{<IconAppStatusFailed />}No connection to server</>
               )}
             </div>
             <div className="flex items-center gap-4">
@@ -138,13 +139,13 @@ export default function AppCard({ app }: AppCardProps) {
             <div className="flex items-center gap-3 text-base">
               {app.status === "connected" && app.functionCount > 0 ? (
                 <>
-                  {<IconStatusCompleted />}
+                  {<IconAppStatusCompleted />}
                   {app.functionCount} Functions registered
                 </>
               ) : app.status !== "connected" ? (
-                <>{<IconStatusFailed />}No Functions Found</>
+                <>{<IconAppStatusDefault />}No Functions Found</>
               ) : (
-                <>{<IconStatusFailed />}No Functions Found</>
+                <>{<IconAppStatusFailed />}No Functions Found</>
               )}
             </div>
             <div className="flex items-center gap-4">

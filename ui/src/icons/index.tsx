@@ -10,6 +10,9 @@ export { IconCheckCircle } from "./CheckCircle";
 export { IconExclamationTriangle } from "./ExclamationTriangle";
 export { IconArrowTopRightOnSquare} from "./ArrowTopRightOnSquare";
 export { IconTrash } from "./Trash";
+export { IconAppStatusCompleted } from "./AppStatusCompleted";
+export { IconAppStatusFailed } from "./AppStatusFailed";
+export { IconAppStatusDefault } from "./AppStatusDefault";
 
 // Status Icons
 export { IconStatusDefault } from "./StatusDefault";
