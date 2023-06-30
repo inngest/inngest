@@ -94,7 +94,14 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 
 	defer a.devserver.handlerLock.Unlock()
 
-	funcs, _ := a.devserver.loader.Functions(r.Context())
+	all, _ := a.devserver.data.GetFunctions(r.Context())
+	funcs := make([]inngest.Function, len(all))
+	for n, i := range all {
+		f := inngest.Function{}
+		_ = json.Unmarshal([]byte(i.Config), &f)
+		funcs[n] = f
+	}
+
 	ir := InfoResponse{
 		Version:   version.Print(),
 		StartOpts: a.devserver.opts,

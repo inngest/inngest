@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/inngest/inngest/pkg/coredata"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -107,24 +106,11 @@ func NewExecutor(opts ...ExecutorOpt) (Executor, error) {
 		return nil, ErrNoStateManager
 	}
 
-	if m.al == nil {
-		return nil, ErrNoActionLoader
-	}
-
 	return m, nil
 }
 
 // ExecutorOpt modifies the built in executor on creation.
 type ExecutorOpt func(m Executor) error
-
-// WithActionLoader sets the action loader to use when retrieving function definitions
-// in a workflow.
-func WithActionLoader(al coredata.ExecutionActionLoader) ExecutorOpt {
-	return func(e Executor) error {
-		e.(*executor).al = al
-		return nil
-	}
-}
 
 // WithStateManager sets which state manager to use when creating an executor.
 func WithStateManager(sm state.Manager) ExecutorOpt {
@@ -186,7 +172,6 @@ type executor struct {
 	log *zerolog.Logger
 
 	sm             state.Manager
-	al             coredata.ExecutionActionLoader
 	fl             state.FunctionLoader
 	runtimeDrivers map[string]driver.Driver
 	failureHandler FailureHandler

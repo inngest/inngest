@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/inngest/inngest/pkg/config"
-	"github.com/inngest/inngest/pkg/coredata"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
@@ -22,12 +21,6 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 	return svc
 }
 
-func WithAPIReadWriter(rw coredata.APIReadWriter) func(s *svc) {
-	return func(s *svc) {
-		s.data = rw
-	}
-}
-
 func WithRunner(r runner.Runner) Opt {
 	return func(s *svc) {
 		s.runner = r
@@ -37,8 +30,6 @@ func WithRunner(r runner.Runner) Opt {
 type svc struct {
 	config config.Config
 	api    *CoreAPI
-	// data provides the ability to write and load data
-	data coredata.APIReadWriter
 	// runner is the execution runner
 	runner runner.Runner
 }
@@ -48,17 +39,11 @@ func (s *svc) Name() string {
 }
 
 func (s *svc) Pre(ctx context.Context) (err error) {
-	s.data, err = s.config.DataStore.Service.Concrete.ReadWriter(ctx)
-	if err != nil {
-		return err
-	}
-
 	// TODO - Configure API with correct ports, etc., set up routes
 	s.api, err = NewCoreApi(Options{
-		Config:        s.config,
-		Logger:        logger.From(ctx),
-		APIReadWriter: s.data,
-		Runner:        s.runner,
+		Config: s.config,
+		Logger: logger.From(ctx),
+		Runner: s.runner,
 	})
 
 	if err != nil {

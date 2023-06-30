@@ -4,15 +4,13 @@ package resolvers
 
 import (
 	"github.com/inngest/inngest/pkg/coreapi/generated"
-	"github.com/inngest/inngest/pkg/coredata"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/runner"
 )
 
 type Resolver struct {
-	Data          cqrs.Manager
-	APIReadWriter coredata.APIReadWriter
-	Runner        runner.Runner
+	Data   cqrs.Manager
+	Runner runner.Runner
 }
 
 // Mutation returns generated.MutationResolver implementation. Only necessary when mutations exist.

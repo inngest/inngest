@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/ddb/sqlc"
+	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/jinzhu/copier"
 )
 
@@ -21,6 +23,16 @@ type wrapper struct {
 	q  *sqlc.Queries
 	db *sql.DB
 	tx *sql.Tx
+}
+
+// LoadFunction implements the state.FunctionLoader interface.
+func (w wrapper) LoadFunction(ctx context.Context, identifier state.Identifier) (*inngest.Function, error) {
+	// XXX: This doesn't store versions, as the dev server is currently ignorant to version.s
+	fn, err := w.GetFunctionByID(ctx, identifier.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	return fn.InngestFunction()
 }
 
 func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
@@ -92,6 +104,13 @@ func (w wrapper) GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*cqrs.
 		return w.q.GetAppFunctions(ctx, appID)
 	}
 	return copyInto(ctx, f, []*cqrs.Function{})
+}
+
+func (w wrapper) GetFunctionByID(ctx context.Context, id uuid.UUID) (*cqrs.Function, error) {
+	f := func(ctx context.Context) (*sqlc.Function, error) {
+		return w.q.GetFunctionByID(ctx, id)
+	}
+	return copyInto(ctx, f, &cqrs.Function{})
 }
 
 func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {

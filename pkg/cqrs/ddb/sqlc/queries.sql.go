@@ -160,6 +160,24 @@ func (q *Queries) GetApps(ctx context.Context) ([]*App, error) {
 	return items, nil
 }
 
+const getFunctionByID = `-- name: GetFunctionByID :one
+SELECT id, app_id, name, slug, config, created_at FROM functions WHERE id = ?
+`
+
+func (q *Queries) GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error) {
+	row := q.db.QueryRowContext(ctx, getFunctionByID, id)
+	var i Function
+	err := row.Scan(
+		&i.ID,
+		&i.AppID,
+		&i.Name,
+		&i.Slug,
+		&i.Config,
+		&i.CreatedAt,
+	)
+	return &i, err
+}
+
 const getFunctions = `-- name: GetFunctions :many
 SELECT id, app_id, name, slug, config, created_at FROM functions
 `

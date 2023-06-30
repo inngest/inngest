@@ -14,7 +14,6 @@ import (
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/coreapi"
-	"github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -28,11 +27,10 @@ const (
 	SDKPollInterval = 5 * time.Second
 )
 
-func newService(opts StartOpts, loader *inmemory.ReadWriter, runner runner.Runner, data cqrs.Manager) *devserver {
+func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager) *devserver {
 	return &devserver{
 		data:        data,
 		runner:      runner,
-		loader:      loader,
 		opts:        opts,
 		urls:        opts.URLs,
 		urlLock:     &sync.Mutex{},
@@ -62,9 +60,6 @@ type devserver struct {
 	urls    []string
 	urlLock *sync.Mutex
 
-	// loader stores all registered functions in the dev server.
-	loader *inmemory.ReadWriter
-
 	// handlers are updated by the API (d.apiservice) when registering functions.
 	handlers    []SDKHandler
 	handlerLock *sync.Mutex
@@ -79,15 +74,13 @@ func (d *devserver) Pre(ctx context.Context) error {
 	// registering functions.
 	devAPI := newDevAPI(d)
 
-	datarw := d.loader
 	core, err := coreapi.NewCoreApi(coreapi.Options{
-		Data:          d.data,
-		Config:        d.opts.Config,
-		Logger:        logger.From(ctx),
-		APIReadWriter: datarw,
-		Runner:        d.runner,
-		Tracker:       d.tracker,
-		State:         d.state,
+		Data:    d.data,
+		Config:  d.opts.Config,
+		Logger:  logger.From(ctx),
+		Runner:  d.runner,
+		Tracker: d.tracker,
+		State:   d.state,
 	})
 	if err != nil {
 		return err

@@ -3,7 +3,6 @@ package registration
 import (
 	"context"
 
-	"github.com/inngest/inngest/pkg/coredata"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -56,12 +55,6 @@ func RegisterState(f func() any) {
 	registeredStates[driver.StateName()] = f
 }
 
-// RegisterState registers a state manager for use within self hosted services
-func RegisterDataStore(f func() any) {
-	driver := f().(DataStoreConfig)
-	registeredDataStores[driver.DataStoreName()] = f
-}
-
 // DriverConfig is an interface used to determine driver config structs.
 type DriverConfig interface {
 	NewDriver() (driver.Driver, error)
@@ -83,9 +76,4 @@ type QueueConfig interface {
 type StateConfig interface {
 	StateName() string
 	Manager(context.Context) (state.Manager, error)
-}
-
-type DataStoreConfig interface {
-	DataStoreName() string
-	ReadWriter(context.Context) (coredata.ReadWriter, error)
 }

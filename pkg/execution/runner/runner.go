@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"
-	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
@@ -118,13 +117,6 @@ func (s svc) Name() string {
 
 func (s *svc) Pre(ctx context.Context) error {
 	var err error
-
-	if s.data == nil {
-		s.data, err = inmemorydatastore.NewFSLoader(ctx, ".")
-		if err != nil {
-			return err
-		}
-	}
 
 	logger.From(ctx).Info().Str("backend", s.config.Queue.Service.Backend).Msg("starting event stream")
 	s.pubsub, err = pubsub.NewPublishSubscriber(ctx, s.config.EventStream.Service)

@@ -1,15 +1,11 @@
 package models
 
 import (
-	"encoding/json"
-
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/inngest"
 )
 
 func MakeFunction(f *cqrs.Function) (*Function, error) {
-	fn := inngest.Function{}
-	err := json.Unmarshal([]byte(f.Config), &fn)
+	fn, err := f.InngestFunction()
 	if err != nil {
 		return nil, err
 	}

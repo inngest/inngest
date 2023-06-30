@@ -14,7 +14,6 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/apiutil"
 	"github.com/inngest/inngest/pkg/coreapi/generated"
 	"github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
-	"github.com/inngest/inngest/pkg/coredata"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -27,12 +26,11 @@ import (
 type Options struct {
 	Data cqrs.Manager
 
-	Config        config.Config
-	Logger        *zerolog.Logger
-	APIReadWriter coredata.APIReadWriter
-	Runner        runner.Runner
-	Tracker       *runner.Tracker
-	State         state.Manager
+	Config  config.Config
+	Logger  *zerolog.Logger
+	Runner  runner.Runner
+	Tracker *runner.Tracker
+	State   state.Manager
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
@@ -57,9 +55,8 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	a.Use(cors.Handler)
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
-		Data:          o.Data,
-		APIReadWriter: o.APIReadWriter,
-		Runner:        o.Runner,
+		Data:   o.Data,
+		Runner: o.Runner,
 	}}))
 
 	// TODO - Add option for enabling GraphQL Playground

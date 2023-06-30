@@ -27,3 +27,6 @@ SELECT * FROM functions;
 
 -- name: GetAppFunctions :many
 SELECT * FROM functions WHERE app_id = ?;
+
+-- name: GetFunctionByID :one
+SELECT * FROM functions WHERE id = ?;
