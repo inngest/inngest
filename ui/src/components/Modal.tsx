@@ -1,5 +1,5 @@
-import { Fragment } from "react";
-import { Dialog, Transition } from "@headlessui/react";
+import { Fragment } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
 
 type ModalProps = {
   children?: React.ReactNode;
