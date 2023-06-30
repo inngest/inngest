@@ -29,12 +29,6 @@ var uiHtml []byte
 //go:embed all:static
 var static embed.FS
 
-var (
-	// signingKeyErrorLoggedCount ensures that we log the signing key message once
-	// every N times, instead of spamming the console every time we poll for functions.
-	signingKeyErrorCount = 0
-)
-
 func init() {
 	// Fix invalid mime type errors when loading JS from our assets on windows.
 	_ = mime.AddExtensionType(".js", "application/javascript")
@@ -130,7 +124,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 
 	if err := a.register(ctx, *req); err != nil {
 		logger.From(ctx).Warn().Msgf("Error registering functions:\n%s", err)
-		publicerr.WriteHTTP(w, err)
+		_ = publicerr.WriteHTTP(w, err)
 		return
 	}
 

@@ -55,7 +55,7 @@ func (w wrapper) Commit(ctx context.Context) error {
 }
 
 func (w wrapper) Rollback(ctx context.Context) error {
-	return w.Rollback(ctx)
+	return w.tx.Rollback()
 }
 
 //
