@@ -144,6 +144,7 @@ func run(t *testing.T, test *Test) {
 	}
 
 	test.test = t
+	test.proxyURL = srv.URL
 	for _, f := range test.chain {
 		f()
 	}
@@ -201,19 +202,24 @@ func introspect(test *Test) (*sdk.RegisterRequest, error) {
 	return data, nil
 }
 
+func replaceURL(nodeURL, proxyURL string) string {
+	// Take the URL and replace the host with our server's URL.
+	node, err := url.Parse(nodeURL)
+	if err != nil {
+		return ""
+	}
+	proxy, _ := url.Parse(proxyURL)
+	proxy.Path = "/"
+	proxy.RawQuery = node.RawQuery
+	return proxy.String()
+}
+
 func register(serverURL url.URL, rr sdk.RegisterRequest) error {
 	// Register functions using _this_ host and the introspection request
 	for n, fn := range rr.Functions {
 		for key, step := range fn.Steps {
-			rturl, _ := step.Runtime["url"].(string)
-			// Take the URL and replace the host with our server's URL.
-			parsed, err := url.Parse(rturl)
-			if err != nil {
-				return err
-			}
-			serverURL.Path = "/"
-			serverURL.RawQuery = parsed.RawQuery
-			step.Runtime["url"] = serverURL.String()
+			nodeURL, _ := step.Runtime["url"].(string)
+			step.Runtime["url"] = replaceURL(nodeURL, serverURL.String())
 			fn.Steps[key] = step
 		}
 		rr.Functions[n] = fn

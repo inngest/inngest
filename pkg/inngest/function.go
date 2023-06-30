@@ -238,7 +238,8 @@ func (f Function) AllEdges(ctx context.Context) ([]Edge, error) {
 // DeterministicUUID returns a deterministic V3 UUID based off of the SHA1
 // hash of the function's name.
 func DeterministicUUID(f Function) uuid.UUID {
-	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(f.Name))
+	str := f.Name + f.Steps[0].URI
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(str))
 }
 
 func RandomID() (string, error) {

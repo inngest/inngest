@@ -55,6 +55,8 @@ type Test struct {
 	lastResponse time.Time
 
 	lastEventID *string
+
+	proxyURL string
 }
 
 func (t *Test) SetAssertions(items ...func()) {
@@ -94,6 +96,12 @@ func (t *Test) SetRequestEvent(event inngestgo.Event) func() {
 
 func (t *Test) SetRequestContext(ctx SDKCtx) func() {
 	return func() {
+		// Ensure we set the ID here, which is deterministic but we use random ports within
+		// the test server, breaking determinism.
+		t.Function.Steps[0].URI = replaceURL(t.Function.Steps[0].URI, t.proxyURL)
+		t.Function.ID = inngest.DeterministicUUID(t.Function)
+		ctx.FnID = t.Function.ID.String()
+
 		t.requestCtx = ctx
 		if t.requestCtx.Stack.Stack == nil {
 			// Normalize to a non-nil slice
@@ -148,11 +156,11 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			err = json.Unmarshal(byt, er)
 			require.NoError(t.test, err)
 
-			require.EqualValues(t.test, t.requestEvent, er.Event, "Request event is incorrect", name)
+			require.EqualValues(t.test, t.requestEvent, er.Event, "Request event is incorrect")
 			// Unset the run ID so that our unique run ID doesn't cause issues.
 			t.requestCtx.RunID = er.Ctx.RunID
-			require.EqualValues(t.test, t.requestCtx, er.Ctx, "Request ctx is incorrect", name)
-			require.EqualValues(t.test, t.requestSteps, er.Steps, "Request steps are incorrect", name)
+			require.EqualValues(t.test, t.requestCtx, er.Ctx, "Request ctx is incorrect")
+			require.EqualValues(t.test, t.requestSteps, er.Steps, "Request steps are incorrect")
 
 		case <-time.After(timeout):
 			require.Failf(t.test, "Expected executor request but timed out", name)
