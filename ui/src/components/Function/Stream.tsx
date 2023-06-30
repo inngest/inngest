@@ -1,19 +1,9 @@
-import {
-  FunctionRunStatus,
-  useGetFunctionsStreamQuery,
-} from "../../store/generated";
-import { selectEvent, selectRun } from "../../store/global";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import TimelineFeedContent from "../Timeline/TimelineFeedContent";
-import TimelineRow from "../Timeline/TimelineRow";
+import { FunctionRunStatus, useGetFunctionsStreamQuery } from '../../store/generated';
+import TimelineFeedContent from '../Timeline/TimelineFeedContent';
+import TimelineRow from '../Timeline/TimelineRow';
 
 export const FuncStream = () => {
-  const functions = useGetFunctionsStreamQuery(
-    undefined,
-    { pollingInterval: 1500 }
-  );
-  const selectedRun = useAppSelector((state) => state.global.selectedRun);
-  const dispatch = useAppDispatch();
+  const functions = useGetFunctionsStreamQuery(undefined, { pollingInterval: 1500 });
 
   return (
     <>
@@ -27,14 +17,11 @@ export const FuncStream = () => {
         >
           <TimelineFeedContent
             date={run.startedAt}
-            active={selectedRun === run.id}
             status={run.status || FunctionRunStatus.Completed}
             badge={run.pendingSteps || 0}
-            name={run.name || "Unknown"}
-            onClick={() => {
-              dispatch(selectRun(run.id));
-              dispatch(selectEvent(run.event?.id || null));
-            }}
+            name={run.name || 'Unknown'}
+            active={false}
+            href=""
           />
         </TimelineRow>
       ))}

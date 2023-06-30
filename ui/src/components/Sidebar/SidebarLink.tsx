@@ -1,36 +1,30 @@
-import classNames from "../../utils/classnames";
+'use client';
+
+import Link, { type LinkProps } from 'next/link';
+
+import classNames from '@/utils/classnames';
+import { usePathname } from 'next/navigation';
 
 interface SidebarLinkProps {
+  href: string;
   icon: React.ReactNode;
-  active?: boolean;
   badge?: number;
-  onClick?: () => void;
 }
 
-export default function SidebarLink({
-  icon,
-  active = false,
-  badge = 0,
-  onClick,
-}: SidebarLinkProps) {
+export default function SidebarLink({ href, icon, badge = 0 }: SidebarLinkProps) {
+  const pathname = usePathname();
+
   return (
-    <button
-      onClick={
-        onClick
-          ? (e) => {
-              e.preventDefault();
-              onClick();
-            }
-          : undefined
-      }
+    <Link
+      href={href}
       className={classNames(
-        active
+        pathname.startsWith(`/${href.split('/')[1]}`)
           ? `border-indigo-400`
           : `border-transparent opacity-40 hover:opacity-100`,
         `border-l-2 flex items-center justify-center w-full py-3 transition-all duration-150`
       )}
     >
       {icon}
-    </button>
+    </Link>
   );
 }

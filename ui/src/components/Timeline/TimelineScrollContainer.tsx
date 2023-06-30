@@ -1,15 +1,8 @@
-import { useAutoAnimate } from "@formkit/auto-animate/react";
+'use client';
 
-export default function TimelineContainer({ children }) {
-  const [animationRef] = useAutoAnimate<HTMLUListElement>({
-    duration: 150,
-  });
-
+export function TimelineScrollContainer({ children }) {
   return (
-    <ul
-      ref={animationRef}
-      className="bg-slate-950/50 border-r border-slate-800/40 overflow-y-scroll relative py-4 pr-2.5 shrink-0 col-start-2 row-span-2"
-    >
+    <ul className="bg-slate-950/50 border-r border-slate-800/40 overflow-y-scroll relative py-4 pr-2.5 w-96 h-full">
       {children}
     </ul>
   );

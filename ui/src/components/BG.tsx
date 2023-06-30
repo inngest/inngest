@@ -1,6 +1,6 @@
 export default function BG() {
   return (
-    <div className="fixed inset-0 w-full h-full flex items-center justify-center overflow-hidden pointer-events-none -z-10 ">
+    <div className="fixed inset-0 w-full h-full flex items-center justify-center overflow-hidden pointer-events-none -z-10">
       <svg width="1104" height="870" className="opacity-10 scale-[2]">
         <defs>
           <radialGradient
@@ -188,5 +188,5 @@ export default function BG() {
         </g>
       </svg>
     </div>
-  )
+  );
 }

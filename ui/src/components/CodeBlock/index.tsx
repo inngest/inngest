@@ -1,7 +1,7 @@
-import { useState } from "react";
-import classNames from "../../utils/classnames";
-import CopyButton from "./CopyButton";
-import { SyntaxHighlight } from "./SyntaxHighlight";
+import { useState } from 'react';
+import classNames from '../../utils/classnames';
+import CopyButton from './CopyButton';
+import { SyntaxHighlight } from './SyntaxHighlight';
 
 interface CodeBlockProps {
   tabs: {
@@ -12,11 +12,7 @@ interface CodeBlockProps {
   modal?: (...args: any[]) => any;
 }
 
-export default function CodeBlock({
-  tabs,
-  modal,
-  expanded = false,
-}: CodeBlockProps) {
+export default function CodeBlock({ tabs, modal, expanded = false }: CodeBlockProps) {
   const [activeTab, setActiveTab] = useState(0);
 
   const handleTabClick = (index) => {
@@ -66,12 +62,13 @@ export default function CodeBlock({
       >
         {tabs.map((tab, i) => (
           <code
+            key={tab.label}
             className={classNames(
               i === activeTab ? ` ` : `opacity-0 pointer-events-none`,
               `col-start-1 row-start-1 transition-all duration-150`
             )}
           >
-            <SyntaxHighlight code={tabs[i].content} className="p-4 text-2xs" />
+            <SyntaxHighlight code={tab.content} className="p-4 text-2xs" />
           </code>
         ))}
       </div>

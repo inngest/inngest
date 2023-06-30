@@ -11,5 +11,5 @@ export function InngestLogo() {
         <circle fill="#6366F1" cx="18.105" cy="11.211" r="1.745" />
       </g>
     </svg>
-  )
+  );
 }

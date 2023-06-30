@@ -1,25 +1,25 @@
-import { useState } from "react";
-import classNames from "../../utils/classnames";
+import { useState } from 'react';
+import classNames from '../../utils/classnames';
 
-import TimelineFuncProgress from "../Timeline/TimelineFuncProgress";
-import TimelineRow from "../Timeline/TimelineRow";
-import TimelineStaticContent from "../Timeline/TimelineStaticContent";
+import TimelineFuncProgress from '../Timeline/TimelineFuncProgress';
+import TimelineRow from '../Timeline/TimelineRow';
+import TimelineStaticContent from '../Timeline/TimelineStaticContent';
 
-import eventFuncs from "../../../mock/eventFuncs";
-import { funcTabs } from "../../../mock/funcTabs";
-import { eventTabs } from "../../../mock/tabs";
-import { IconFeed } from "../../icons";
-import { EventStatus, FunctionRunStatus } from "../../store/generated";
-import Button from "../Button";
-import CodeBlock from "../CodeBlock";
-import ContentCard from "../Content/ContentCard";
-import FuncCard from "../Function/FuncCard";
-import HistoricalList from "./HistoricalList";
+import eventFuncs from '../../../mock/eventFuncs';
+import { funcTabs } from '../../../mock/funcTabs';
+import { eventTabs } from '../../../mock/tabs';
+import { IconFeed } from '../../icons';
+import { EventStatus, FunctionRunStatus } from '../../store/generated';
+import Button from '../Button';
+import CodeBlock from '../CodeBlock';
+import ContentCard from '../Content/ContentCard';
+import FuncCard from '../Function/FuncCard';
+import HistoricalList from './HistoricalList';
 
 export default function EventDetail() {
   const [codeBlockModalActive, setCodeBlockModalActive] = useState({
     visible: false,
-    content: "",
+    content: '',
   });
 
   const [activeTab, setActiveTab] = useState(0);
@@ -28,7 +28,7 @@ export default function EventDetail() {
     if (codeBlockModalActive.visible) {
       setCodeBlockModalActive({
         visible: false,
-        content: "",
+        content: '',
       });
     } else {
       setCodeBlockModalActive({
@@ -38,7 +38,7 @@ export default function EventDetail() {
     }
   };
 
-  const tabs = ["Event History", "Analytics"];
+  const tabs = ['Event History', 'Analytics'];
 
   return (
     // fake overlay
@@ -47,9 +47,7 @@ export default function EventDetail() {
         <header className="col-span-3 flex flex-col justify-between border-b border-slate-800/50 ">
           <div className=" h-full pt-4 px-4">
             <span className="mb-1 block">Event Overview</span>
-            <h1 className="text-2xl text-slate-50 leading-none">
-              accounts/profile
-            </h1>
+            <h1 className="text-2xl text-slate-50 leading-none">accounts/profile</h1>
           </div>
           <div className="flex -mb-px">
             {tabs.map((tab, i) => (
@@ -81,18 +79,14 @@ export default function EventDetail() {
                 <TimelineRow status={EventStatus.Completed} iconOffset={0}>
                   <TimelineStaticContent
                     label="Event Received"
-                    date={"2022-04-28T14:34:21"}
+                    date={'2022-04-28T14:34:21'}
                     actionBtn={<Button label="Replay" />}
                   />
                 </TimelineRow>
 
                 {eventFuncs.map((eventFunc, i) => {
                   return (
-                    <TimelineRow
-                      key={i}
-                      status={eventFunc.status}
-                      iconOffset={36}
-                    >
+                    <TimelineRow key={i} status={eventFunc.status} iconOffset={36}>
                       <FuncCard
                         title={eventFunc.name}
                         date={eventFunc.datetime}
@@ -111,11 +105,7 @@ export default function EventDetail() {
                   );
                 })}
 
-                <TimelineRow
-                  status={EventStatus.Failed}
-                  iconOffset={0}
-                  bottomLine={false}
-                >
+                <TimelineRow status={EventStatus.Failed} iconOffset={0} bottomLine={false}>
                   <TimelineStaticContent label="Function 3 Errored with Error 404" />
                 </TimelineRow>
               </div>
@@ -125,7 +115,7 @@ export default function EventDetail() {
             </div>
             <ContentCard
               title="Process uploaded images"
-              date={"2022-04-28T14:34:21"}
+              date={'2022-04-28T14:34:21'}
               button={<Button label="Open Function" icon={<IconFeed />} />}
               id="01GGG522ZATDGVQBCND4ZEAS6Z"
             >
@@ -139,7 +129,7 @@ export default function EventDetail() {
                 <TimelineRow status={EventStatus.Completed} iconOffset={0}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    date={"2022-04-28T14:34:21"}
+                    date={'2022-04-28T14:34:21'}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   >
                     <CodeBlock modal={setModal} tabs={funcTabs} />
@@ -149,28 +139,28 @@ export default function EventDetail() {
                 <TimelineRow status={EventStatus.Completed}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    date={"2022-04-28T14:34:21"}
+                    date={'2022-04-28T14:34:21'}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   />
                 </TimelineRow>
                 <TimelineRow status={EventStatus.Failed}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    date={"2022-04-28T14:34:21"}
+                    date={'2022-04-28T14:34:21'}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   />
                 </TimelineRow>
                 <TimelineRow status={EventStatus.Failed}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    date={"2022-04-28T14:34:21"}
+                    date={'2022-04-28T14:34:21'}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   />
                 </TimelineRow>
                 <TimelineRow status={EventStatus.Failed} bottomLine={false}>
                   <TimelineFuncProgress
                     label="Function Started"
-                    date={"2022-04-28T14:34:21"}
+                    date={'2022-04-28T14:34:21'}
                     id="01GGG522ZATDGVQBCND4ZEAS6Z"
                   />
                 </TimelineRow>

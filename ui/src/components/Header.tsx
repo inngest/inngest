@@ -1,8 +1,8 @@
-import { InngestLogo } from "../icons";
+import { InngestLogo } from '../icons';
 
 export default function Header() {
   return (
-    <header className="flex w-full justify-between bg-slate-950 pr-5 pl-3 py-3 border-b border-slate-800/30 col-span-3">
+    <header className="flex w-full justify-between bg-slate-950 pr-5 pl-3 py-3 border-b border-slate-800/30 col-span-3 h-[50px]">
       <div className="flex items-center">
         <h1 className="text-slate-300 text-sm flex items-center ">
           <InngestLogo />

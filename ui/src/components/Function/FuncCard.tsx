@@ -1,7 +1,8 @@
-import { EventStatus, FunctionRunStatus } from "../../store/generated";
-import classNames from "../../utils/classnames";
-import statusStyles, { FunctionStatus } from "../../utils/statusStyles";
-import { Time } from "../Time";
+import Link from 'next/link';
+import { EventStatus, FunctionRunStatus } from '../../store/generated';
+import classNames from '../../utils/classnames';
+import statusStyles, { FunctionStatus } from '../../utils/statusStyles';
+import { Time } from '../Time';
 
 interface FuncCardProps {
   title: string;
@@ -11,7 +12,7 @@ interface FuncCardProps {
   status: FunctionRunStatus | EventStatus | FunctionStatus;
   active?: boolean;
   contextualBar?: React.ReactNode;
-  onClick?: () => void;
+  href?: string;
 }
 
 export default function FuncCard({
@@ -22,27 +23,20 @@ export default function FuncCard({
   status,
   active = false,
   contextualBar,
-  onClick,
+  href,
 }: FuncCardProps) {
   const itemStatus = statusStyles(status);
 
   return (
-    <a
+    <Link
+      href={href ?? ''}
       className={classNames(
         active
           ? `outline outline-2 outline-indigo-400 outline-offset-3 bg-slate-900 border-slate-700/50`
           : null,
         `px-5 py-3.5 bg-slate-800/50 w-full rounded-lg block`,
-        onClick ? "hover:bg-slate-800/80 cursor-pointer" : null
+        href ? 'hover:bg-slate-800/80 cursor-pointer' : null
       )}
-      onClick={
-        onClick
-          ? (e) => {
-              e.preventDefault();
-              onClick();
-            }
-          : undefined
-      }
     >
       <div>
         <div className="flex items-start justify-between">
@@ -74,6 +68,6 @@ export default function FuncCard({
           {contextualBar}
         </div>
       )}
-    </a>
+    </Link>
   );
 }

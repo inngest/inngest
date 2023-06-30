@@ -20,5 +20,5 @@ export function IconFeed() {
         />
       </g>
     </svg>
-  )
+  );
 }

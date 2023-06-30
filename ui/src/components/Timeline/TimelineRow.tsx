@@ -1,6 +1,6 @@
-import { EventStatus, FunctionRunStatus } from "../../store/generated";
-import classNames from "../../utils/classnames";
-import statusStyles from "../../utils/statusStyles";
+import { EventStatus, FunctionRunStatus } from '../../store/generated';
+import classNames from '../../utils/classnames';
+import statusStyles from '../../utils/statusStyles';
 
 interface TimelineRowProps {
   status: EventStatus | FunctionRunStatus | null;

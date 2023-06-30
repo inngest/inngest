@@ -1,4 +1,4 @@
-import { gql } from "graphql-request";
+import { gql } from 'graphql-request';
 
 export const EVENTS_STREAM = gql`
   query GetEventsStream {
