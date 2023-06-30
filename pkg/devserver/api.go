@@ -2,6 +2,7 @@ package devserver
 
 import (
 	"context"
+	"database/sql"
 	"embed"
 	_ "embed"
 	"encoding/json"
@@ -9,14 +10,16 @@ import (
 	"io/fs"
 	"mime"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/tel"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
 )
 
@@ -105,6 +108,8 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 
 // Register regsters functions served via SDKs
 func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
 	a.devserver.handlerLock.Lock()
 	defer a.devserver.handlerLock.Unlock()
 
@@ -116,72 +121,10 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var key string
-	bearer := r.Header.Get("Authorization")
-	if len(bearer) > 7 && strings.ToUpper(bearer[0:6]) == "BEARER" {
-		key = bearer[7:]
-	}
-	if key == "" {
-		// In development, we log a warning here.
-		if signingKeyErrorCount%20 == 0 {
-			logger.From(ctx).Warn().Msg("You're missing the INNGEST_SIGNING_KEY parameter when serving your functions.  This will not work in production.")
-		}
-		signingKeyErrorCount++
-	}
-
-	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
-	// signing key and warn if the user has an invalid key.
-	funcs, err := req.Parse(ctx)
-	if err != nil {
-		logger.From(ctx).Warn().Msgf("At least one function is invalid:\n%s", err)
-		a.err(ctx, w, 400, fmt.Errorf("At least one function is invalid:\n%w", err))
+	if err := a.register(ctx, *req); err != nil {
+		logger.From(ctx).Warn().Msgf("Error registering functions:\n%s", err)
+		publicerr.WriteHTTP(w, err)
 		return
-	}
-
-	// Find and update this SDK handler, if it exists.
-	var h *SDKHandler
-	for n, item := range a.devserver.handlers {
-		if item.SDK.URL != req.URL {
-			continue
-		}
-
-		// Check if the checksum exists and is the same.  If so, we can ignore
-		// this request.
-		/*
-			TODO: FIX THIS
-			if item.SDK.Hash != nil && req.Hash != nil && *item.SDK.Hash == *req.Hash {
-				_, _ = w.Write([]byte(`{"ok":true, "skipped": true}`))
-				return
-			}
-		*/
-
-		// Remove this item from the handlers list.
-		h = &item
-		a.devserver.handlers = append(a.devserver.handlers[:n], a.devserver.handlers[n+1:]...)
-		break
-	}
-
-	if h == nil {
-		h = &SDKHandler{
-			SDK:       *req,
-			CreatedAt: time.Now(),
-		}
-	}
-	// Reset function IDs;  we'll add these as we iterate through the requests.
-	h.Functions = []string{}
-	h.UpdatedAt = time.Now()
-
-	// For each function, add it to our loader.
-	for _, fn := range funcs {
-		// Create a new UUID for the function.
-		fn.ID = inngest.DeterministicUUID(*fn)
-
-		h.Functions = append(h.Functions, fn.Name)
-		if err := a.devserver.loader.AddFunction(ctx, fn); err != nil {
-			logger.From(ctx).Warn().Msgf("Error adding your function:\n%s", err)
-			a.err(ctx, w, 400, err)
-			return
-		}
 	}
 
 	// Re-initialize our cron manager.
@@ -191,8 +134,83 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.devserver.handlers = append(a.devserver.handlers, *h)
 	_, _ = w.Write([]byte(`{"ok":true}`))
+}
+
+func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error) {
+	sum, err := r.Checksum()
+	if err != nil {
+		return publicerr.Wrap(err, 400, "Invalid request")
+	}
+
+	if _, err := a.devserver.data.GetAppByChecksum(ctx, sum); err == nil {
+		// Already registered.
+		return nil
+	}
+
+	// We need a UUID to register functions with.
+	appParams := cqrs.InsertAppParams{
+		ID:          uuid.New(),
+		Name:        r.AppName,
+		SdkLanguage: r.SDKLanguage(),
+		SdkVersion:  r.SDKVersion(),
+		Framework: sql.NullString{
+			String: r.Framework,
+			Valid:  r.Framework != "",
+		},
+		Url:      r.URL,
+		Checksum: sum,
+	}
+
+	tx, err := a.devserver.data.WithTx(ctx)
+	if err != nil {
+		return publicerr.Wrap(err, 500, "Error starting registration tx")
+	}
+
+	defer func() {
+		// We want to save an app at the end, after handling each error.
+		if err != nil {
+			appParams.Error = sql.NullString{
+				String: err.Error(),
+				Valid:  true,
+			}
+		}
+		_, _ = a.devserver.data.InsertApp(ctx, appParams)
+		err = tx.Commit(ctx)
+	}()
+
+	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
+	// signing key and warn if the user has an invalid key.
+	funcs, err := r.Parse(ctx)
+	if err != nil {
+		return publicerr.Wrap(err, 400, "At least one function is invalid")
+	}
+
+	// For each function,
+	for _, fn := range funcs {
+		config, err := json.Marshal(fn)
+		if err != nil {
+			return publicerr.Wrap(err, 500, "Error marshalling function")
+		}
+
+		// Create a new UUID for the function.
+		fn.ID = inngest.DeterministicUUID(*fn)
+		_, err = tx.InsertFunction(ctx, cqrs.InsertFunctionParams{
+			ID:        fn.ID,
+			Name:      fn.Name,
+			Slug:      fn.Slug,
+			AppID:     appParams.ID,
+			Config:    string(config),
+			CreatedAt: time.Now(),
+		})
+		if err != nil {
+			err = fmt.Errorf("Function %s is invalid: %w", fn.Slug, err)
+			return publicerr.Wrap(err, 500, "Error saving function")
+		}
+	}
+
+	// Create a new app.
+	return nil
 }
 
 func (a devapi) err(ctx context.Context, w http.ResponseWriter, status int, err error) {

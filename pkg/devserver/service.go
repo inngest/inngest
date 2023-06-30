@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -27,8 +28,9 @@ const (
 	SDKPollInterval = 5 * time.Second
 )
 
-func newService(opts StartOpts, loader *inmemory.ReadWriter, runner runner.Runner) *devserver {
+func newService(opts StartOpts, loader *inmemory.ReadWriter, runner runner.Runner, data cqrs.Manager) *devserver {
 	return &devserver{
+		data:        data,
 		runner:      runner,
 		loader:      loader,
 		opts:        opts,
@@ -46,6 +48,8 @@ func newService(opts StartOpts, loader *inmemory.ReadWriter, runner runner.Runne
 // SDKs, as they can test and use a single URL.
 type devserver struct {
 	opts StartOpts
+
+	data cqrs.Manager
 
 	// runner stores the runner
 	runner  runner.Runner
@@ -77,6 +81,7 @@ func (d *devserver) Pre(ctx context.Context) error {
 
 	datarw := d.loader
 	core, err := coreapi.NewCoreApi(coreapi.Options{
+		Data:          d.data,
 		Config:        d.opts.Config,
 		Logger:        logger.From(ctx),
 		APIReadWriter: datarw,

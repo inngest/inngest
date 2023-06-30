@@ -9,6 +9,11 @@ test:
 	go test $(shell go list ./... | grep -v tests) -race -count=1
 	golangci-lint run
 
+.PHONY: vendor
+vendor:
+	go install github.com/goware/modvendor@latest
+	go mod tidy && go mod vendor && modvendor -copy="**/*.a" -v
+
 .PHONY: lint
 lint:
 	golangci-lint run --verbose
@@ -16,6 +21,11 @@ lint:
 .PHONY: e2e
 e2e:
 	./tests.sh
+
+queries:
+	go install github.com/kyleconroy/sqlc/cmd/sqlc@latest
+	sqlc generate
+	# sed -i 's#interface{}#uuid.UUID#' ./pkg/cqrs/ddb/queries/*.go
 
 .PHONY: snapshot
 snapshot:

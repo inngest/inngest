@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/cqrs/ddb"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/executor"
@@ -47,6 +48,11 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) error {
+	db, err := ddb.New()
+	if err != nil {
+		return err
+	}
+
 	rc, err := createInmemoryRedis(ctx)
 	if err != nil {
 		return err
@@ -115,7 +121,7 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 	)
 
 	// The devserver embeds the event API.
-	ds := newService(opts, loader, runner)
+	ds := newService(opts, loader, runner, ddb.NewCQRS(db))
 	// embed the tracker
 	ds.tracker = t
 	ds.state = sm

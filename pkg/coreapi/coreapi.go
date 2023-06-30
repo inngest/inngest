@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/generated"
 	"github.com/inngest/inngest/pkg/coreapi/graph/resolvers"
 	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -24,6 +25,8 @@ import (
 )
 
 type Options struct {
+	Data cqrs.Manager
+
 	Config        config.Config
 	Logger        *zerolog.Logger
 	APIReadWriter coredata.APIReadWriter
@@ -36,6 +39,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	logger := o.Logger.With().Str("caller", "coreapi").Logger()
 
 	a := &CoreAPI{
+		data:    o.Data,
 		config:  o.Config,
 		log:     &logger,
 		Router:  chi.NewMux(),
@@ -53,6 +57,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	a.Use(cors.Handler)
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
+		Data:          o.Data,
 		APIReadWriter: o.APIReadWriter,
 		Runner:        o.Runner,
 	}}))
@@ -70,6 +75,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 
 type CoreAPI struct {
 	chi.Router
+	data    cqrs.Manager
 	config  config.Config
 	log     *zerolog.Logger
 	server  *http.Server

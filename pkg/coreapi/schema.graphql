@@ -60,9 +60,24 @@ enum EventStatus {
   NO_FUNCTIONS
 }
 
-type Function {
+type App {
+  id: ID!
   name: String!
+  sdkLanguage: String!
+  sdkVersion: String!
+  framework: String
+  url: String
+  checksum: String
+  error: String
+
+  functions: [Function!]!
+}
+
+type Function {
   id: String!
+  name: String!
+  slug: String!
+  config: String!
   concurrency: Int!
   triggers: [FunctionTrigger!]
   url: String!

@@ -11,38 +11,18 @@ import (
 )
 
 func (r *queryResolver) Functions(ctx context.Context) ([]*models.Function, error) {
-	fns, err := r.APIReadWriter.Functions(ctx)
+	all, err := r.Data.GetFunctions(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	var functions []*models.Function
-	for _, fn := range fns {
-		var triggers []*models.FunctionTrigger
-
-		for _, trigger := range fn.Triggers {
-			t := &models.FunctionTrigger{}
-			if trigger.EventTrigger != nil {
-				t.Type = models.FunctionTriggerTypesEvent
-				t.Value = trigger.Event
-			}
-			if trigger.CronTrigger != nil {
-				t.Type = models.FunctionTriggerTypesCron
-				t.Value = trigger.Cron
-			}
-			triggers = append(triggers, t)
+	res := make([]*models.Function, len(all))
+	for n, i := range all {
+		res[n], err = models.MakeFunction(i)
+		if err != nil {
+			return nil, err
 		}
-
-		functions = append(functions, &models.Function{
-			ID:          fn.Name,
-			Name:        fn.Name,
-			Concurrency: fn.ConcurrencyLimit(),
-			Triggers:    triggers,
-			URL:         fn.Steps[0].URI,
-		})
 	}
-
-	return functions, nil
+	return res, nil
 }
 
 func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error) {

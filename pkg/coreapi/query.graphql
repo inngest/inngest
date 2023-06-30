@@ -1,4 +1,6 @@
 type Query {
+  apps: [App!]!
+
   # Get an individual event
   event(query: EventQuery!): Event
 
