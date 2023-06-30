@@ -1,8 +1,8 @@
-import { Disclosure, Transition } from "@headlessui/react";
-import { useAppDispatch } from "@/store/hooks";
-import { showFunctions, showDocs } from "@/store/global";
-import classNames from "@/utils/classnames";
-import CodeLine from "@/components/CodeLine";
+import { Disclosure, Transition } from '@headlessui/react';
+import { useAppDispatch } from '@/store/hooks';
+import { showFunctions, showDocs } from '@/store/global';
+import classNames from '@/utils/classnames';
+import CodeLine from '@/components/CodeLine';
 import {
   IconAppStatusCompleted,
   IconAppStatusFailed,
@@ -12,7 +12,7 @@ import {
   IconSpinner,
   IconArrowTopRightOnSquare,
   IconAppStatusDefault,
-} from "@/icons";
+} from '@/icons';
 
 type AppCardProps = {
   app: {
@@ -30,17 +30,17 @@ type AppCardProps = {
 const AppHeader = ({ status, functionCount, sdkVersion }) => {
   let headerColor, headerLabel, headerIcon;
 
-  if (status !== "connected") {
-    headerColor = "bg-rose-600/50";
-    headerLabel = "No Connection";
+  if (status !== 'connected') {
+    headerColor = 'bg-rose-600/50';
+    headerLabel = 'No Connection';
     headerIcon = <IconExclamationTriangle />;
   } else if (functionCount < 1) {
-    headerColor = "bg-orange-400/70";
-    headerLabel = "No Functions Found";
+    headerColor = 'bg-orange-400/70';
+    headerLabel = 'No Functions Found';
     headerIcon = <IconExclamationTriangle />;
   } else {
-    headerColor = "bg-teal-400/50";
-    headerLabel = "Connected";
+    headerColor = 'bg-teal-400/50';
+    headerLabel = 'Connected';
     headerIcon = <IconCheckCircle />;
   }
 
@@ -94,10 +94,13 @@ export default function AppCard({ app }: AppCardProps) {
           as="div"
           className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative"
         >
-          <span className="absolute top-[2.7rem] left-[1.844rem] h-[calc(100%-2.7rem)] w-px bg-slate-800" aria-hidden="true" />
+          <span
+            className="absolute top-[2.7rem] left-[1.844rem] h-[calc(100%-2.7rem)] w-px bg-slate-800"
+            aria-hidden="true"
+          />
           <Disclosure.Button className="flex items-center text-white justify-between p-4 pr-6 w-full">
             <div className="flex items-center gap-3 text-base">
-              {app.status === "connected" ? (
+              {app.status === 'connected' ? (
                 <>{<IconAppStatusCompleted />}Connected to server</>
               ) : (
                 <>{<IconAppStatusFailed />}No connection to server</>
@@ -117,28 +120,30 @@ export default function AppCard({ app }: AppCardProps) {
             leaveTo="opacity-0"
           >
             <Disclosure.Panel className="text-gray-500 pl-14 pr-6 pb-4 ">
-              {app.status !== "connected" && (
+              {app.status !== 'connected' && (
                 <p className="pb-4 text-slate-400">
                   The Inngest Dev Server can’t find your application. Ensure
                   your full URL is correct, including the correct port. Inngest
-                  automatically scans{" "}
+                  automatically scans{' '}
                   <span className="text-white">multiple ports</span> by default.
                 </p>
               )}
               <div className="flex items-center justify-between pb-4">
                 <div>
                   <p className="text-sm font-semibold text-white">App URL</p>
-                  <p className="text-slate-400">The URL of your application</p>
+                  <p className="text-slate-500 text-sm">
+                    The URL of your application
+                  </p>
                 </div>
                 <input
-                  className="min-w-[50%] bg-slate-800 rounded-md text-slate-300 py-2 px-4"
+                  className="min-w-[50%] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline"
                   value={app.url}
                   readOnly={app.automaticallyAdded}
                 />
               </div>
               <a
                 className="text-indigo-400 flex items-center gap-2 cursor-pointer"
-                onClick={() => dispatch(showDocs("/sdk/serve"))}
+                onClick={() => dispatch(showDocs('/sdk/serve'))}
               >
                 Connecting to the Dev Server
                 <IconArrowTopRightOnSquare />
@@ -151,22 +156,25 @@ export default function AppCard({ app }: AppCardProps) {
           as="div"
           className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative"
         >
-          <span className="absolute top-0 left-[1.844rem] h-[1.05rem] w-px bg-slate-800" aria-hidden="true" />
+          <span
+            className="absolute top-0 left-[1.844rem] h-[1.05rem] w-px bg-slate-800"
+            aria-hidden="true"
+          />
           <Disclosure.Button className="flex items-center text-white justify-between p-4 pr-6 w-full">
             <div className="flex items-center gap-3 text-base">
-              {app.status === "connected" && app.functionCount > 0 ? (
+              {app.status === 'connected' && app.functionCount > 0 ? (
                 <>
                   {<IconAppStatusCompleted />}
                   {app.functionCount} Functions registered
                 </>
-              ) : app.status !== "connected" ? (
+              ) : app.status !== 'connected' ? (
                 <>{<IconAppStatusDefault />}No Functions Found</>
               ) : (
                 <>{<IconAppStatusFailed />}No Functions Found</>
               )}
             </div>
             <div className="flex items-center gap-4">
-              {app.status === "connected" && app.functionCount > 0 ? (
+              {app.status === 'connected' && app.functionCount > 0 ? (
                 <>
                   <button
                     className="text-indigo-400 flex items-center gap-2"
@@ -181,7 +189,7 @@ export default function AppCard({ app }: AppCardProps) {
               )}
             </div>
           </Disclosure.Button>
-          {(app.status !== "connected" || app.functionCount < 1) && (
+          {(app.status !== 'connected' || app.functionCount < 1) && (
             <Transition
               enter="transition-opacity duration-300"
               enterFrom="opacity-0"
@@ -202,7 +210,7 @@ export default function AppCard({ app }: AppCardProps) {
                 />
                 <a
                   className="text-indigo-400 flex items-center gap-2 cursor-pointer"
-                  onClick={() => dispatch(showDocs("/functions"))}
+                  onClick={() => dispatch(showDocs('/functions'))}
                 >
                   Creating Functions
                   <IconArrowTopRightOnSquare />

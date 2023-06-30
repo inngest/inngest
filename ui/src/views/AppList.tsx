@@ -1,51 +1,69 @@
-import AppCard from "@/components/App/AppCard";
-import { IconFunction, IconPlus, IconSpinner } from "@/icons";
-import Button from "@/components/Button";
+import { useState } from 'react';
+
+import AppCard from '@/components/App/AppCard';
+import { IconFunction, IconPlus, IconSpinner } from '@/icons';
+import Button from '@/components/Button';
+import AddAppModal from '@/components/App/AddAppModal';
 
 const mockApps = [
   {
-    name: "",
-    id: "tempId",
-    createdAt: "",
-    url: "localhost:3001",
+    name: '',
+    id: 'tempId',
+    createdAt: '',
+    url: 'localhost:3001',
     functionCount: 0,
-    sdkVersion: "",
-    status: "not connected",
+    sdkVersion: '',
+    status: 'not connected',
     automaticallyAdded: false,
     connecting: true,
   },
   {
-    name: "SDK Example Redwoodjs Vercel",
-    id: "id1",
-    createdAt: "",
-    url: "localhost:3000",
+    name: 'SDK Example Redwoodjs Vercel',
+    id: 'id1',
+    createdAt: '',
+    url: 'localhost:3000',
     functionCount: 24,
-    sdkVersion: "2.0.41",
-    status: "connected",
+    sdkVersion: '2.0.41',
+    status: 'connected',
     automaticallyAdded: false,
   },
   {
-    name: "SDK Example",
-    id: "id3",
-    createdAt: "",
-    url: "localhost:4000",
+    name: 'SDK Example',
+    id: 'id3',
+    createdAt: '',
+    url: 'localhost:4000',
     functionCount: 0,
-    sdkVersion: "2.0.41",
-    status: "connected",
+    sdkVersion: '2.0.41',
+    status: 'connected',
     automaticallyAdded: true,
   },
 ];
 
 export default function AppList() {
+  const [isAddAppModalVisible, setAddAppModalVisible] = useState(false);
   return (
     <div className="px-10 py-6 h-full flex flex-col overflow-y-scroll">
       <header className="mb-8">
         <h1 className="text-lg text-slate-50">Connected Apps</h1>
-        <p className="my-4">This is a list of all apps. We auto-detect apps that you have defined in specific ports. </p>
+        <p className="my-4">
+          This is a list of all apps. We auto-detect apps that you have defined
+          in specific ports.{' '}
+        </p>
         <div className="flex items-center gap-5">
-          <Button label="Add App" icon={<IconPlus />} btnAction={() => {}} />
+          <Button
+            label="Add App"
+            icon={<IconPlus />}
+            btnAction={() => setAddAppModalVisible(true)}
+          />
+          {isAddAppModalVisible && (
+            <AddAppModal
+              isOpen={isAddAppModalVisible}
+              onClose={() => setAddAppModalVisible(false)}
+            />
+          )}
           <p className="text-sky-400 flex items-center gap-2">
-            <IconSpinner className="fill-sky-400 text-slate-800" /> Auto-detecting Apps
+            <IconSpinner className="fill-sky-400 text-slate-800" />{' '}
+            Auto-detecting Apps
           </p>
         </div>
       </header>
