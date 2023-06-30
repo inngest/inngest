@@ -189,13 +189,13 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 
 	// For each function,
 	for _, fn := range funcs {
+		// Create a new UUID for the function.
+		fn.ID = inngest.DeterministicUUID(*fn)
+
 		config, err := json.Marshal(fn)
 		if err != nil {
 			return publicerr.Wrap(err, 500, "Error marshalling function")
 		}
-
-		// Create a new UUID for the function.
-		fn.ID = inngest.DeterministicUUID(*fn)
 		_, err = tx.InsertFunction(ctx, cqrs.InsertFunctionParams{
 			ID:        fn.ID,
 			Name:      fn.Name,
