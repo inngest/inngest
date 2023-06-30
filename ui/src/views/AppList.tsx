@@ -1,9 +1,6 @@
-import { useState } from 'react';
-
 import AppCard from '@/components/App/AppCard';
 import { IconFunction, IconPlus, IconSpinner } from '@/icons';
-import Button from '@/components/Button';
-import AddAppModal from '@/components/App/AddAppModal';
+import AddAppButton from '@/components/App/AddAppButton';
 
 const mockApps = [
   {
@@ -40,29 +37,18 @@ const mockApps = [
 ];
 
 export default function AppList() {
-  const [isAddAppModalVisible, setAddAppModalVisible] = useState(false);
   return (
     <div className="px-10 py-6 h-full flex flex-col overflow-y-scroll">
       <header className="mb-8">
         <h1 className="text-lg text-slate-50">Connected Apps</h1>
         <p className="my-4">
           This is a list of all apps. We auto-detect apps that you have defined
-          in specific ports.{' '}
+          in specific ports.
         </p>
         <div className="flex items-center gap-5">
-          <Button
-            label="Add App"
-            icon={<IconPlus />}
-            btnAction={() => setAddAppModalVisible(true)}
-          />
-          {isAddAppModalVisible && (
-            <AddAppModal
-              isOpen={isAddAppModalVisible}
-              onClose={() => setAddAppModalVisible(false)}
-            />
-          )}
+          <AddAppButton />
           <p className="text-sky-400 flex items-center gap-2">
-            <IconSpinner className="fill-sky-400 text-slate-800" />{' '}
+            <IconSpinner className="fill-sky-400 text-slate-800" />
             Auto-detecting Apps
           </p>
         </div>
