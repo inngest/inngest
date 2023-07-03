@@ -1,8 +1,8 @@
-import { Disclosure, Transition } from '@headlessui/react';
 import { useAppDispatch } from '@/store/hooks';
 import { showFunctions, showDocs } from '@/store/global';
 import CodeLine from '@/components/CodeLine';
 import AppCardHeader from '@/components/App/AppCardHeader';
+import AppCardStep from './AppCardStep';
 import {
   IconAppStatusCompleted,
   IconAppStatusFailed,
@@ -50,37 +50,24 @@ export default function AppCard({ app }: AppCardProps) {
             )}
           </div>
         )}
-
-        <Disclosure
-          as="div"
-          className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative"
-        >
-          <span
-            className="absolute top-[2.7rem] left-[1.844rem] h-[calc(100%-2.7rem)] w-px bg-slate-800"
-            aria-hidden="true"
-          />
-          <Disclosure.Button className="flex items-center text-white justify-between p-4 pr-6 w-full">
-            <div className="flex items-center gap-3 text-base">
-              {app.status === 'connected' ? (
-                <>{<IconAppStatusCompleted />}Connected to server</>
-              ) : (
-                <>{<IconAppStatusFailed />}No connection to server</>
-              )}
-            </div>
-            <div className="flex items-center gap-4">
-              <p className="text-slate-300 ui-open:hidden">{app.url}</p>
-              <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
-            </div>
-          </Disclosure.Button>
-          <Transition
-            enter="transition-opacity duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="transition-opacity duration-300"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <Disclosure.Panel className="text-gray-500 pl-14 pr-6 pb-4 ">
+        <AppCardStep
+          lineContent={
+            <>
+              <div className="flex items-center gap-3 text-base">
+                {app.status === 'connected' ? (
+                  <>{<IconAppStatusCompleted />}Connected to server</>
+                ) : (
+                  <>{<IconAppStatusFailed />}No connection to server</>
+                )}
+              </div>
+              <div className="flex items-center gap-4">
+                <p className="text-slate-300 ui-open:hidden">{app.url}</p>
+                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
+              </div>
+            </>
+          }
+          expandedContent={
+            <>
               {app.status !== 'connected' && (
                 <p className="pb-4 text-slate-400">
                   The Inngest Dev Server can’t find your application. Ensure
@@ -103,83 +90,74 @@ export default function AppCard({ app }: AppCardProps) {
                 />
               </div>
               <a
-                className="text-indigo-400 flex items-center gap-2 cursor-pointer"
+                className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
                 onClick={() => dispatch(showDocs('/sdk/serve'))}
               >
                 Connecting to the Dev Server
                 <IconArrowTopRightOnSquare />
               </a>
-            </Disclosure.Panel>
-          </Transition>
-        </Disclosure>
-
-        <Disclosure
-          as="div"
-          className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative"
-        >
-          <span
-            className="absolute top-0 left-[1.844rem] h-[1.05rem] w-px bg-slate-800"
-            aria-hidden="true"
-          />
-          <Disclosure.Button className="flex items-center text-white justify-between p-4 pr-6 w-full">
-            <div className="flex items-center gap-3 text-base">
-              {app.status === 'connected' && app.functionCount > 0 ? (
+            </>
+          }
+        />
+        <AppCardStep
+          isEvenStep
+          isExpandable={app.status !== 'connected' || app.functionCount < 1}
+          lineContent={
+            <>
+              <div className="flex items-center gap-3 text-base">
+                {app.status === 'connected' && app.functionCount > 0 ? (
+                  <>
+                    {<IconAppStatusCompleted />}
+                    {app.functionCount} Functions registered
+                  </>
+                ) : app.status !== 'connected' ? (
+                  <>{<IconAppStatusDefault />}No Functions Found</>
+                ) : (
+                  <>{<IconAppStatusFailed />}No Functions Found</>
+                )}
+              </div>
+              <div className="flex items-center gap-4">
+                {app.status === 'connected' && app.functionCount > 0 ? (
+                  <>
+                    <button
+                      className="text-indigo-400 flex items-center gap-2"
+                      onClick={() => dispatch(showFunctions())}
+                    >
+                      View Functions
+                      <IconChevron className="-rotate-90" />
+                    </button>
+                  </>
+                ) : (
+                  <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
+                )}
+              </div>
+            </>
+          }
+          expandedContent={
+            <>
+              {(app.status !== 'connected' || app.functionCount < 1) && (
                 <>
-                  {<IconAppStatusCompleted />}
-                  {app.functionCount} Functions registered
-                </>
-              ) : app.status !== 'connected' ? (
-                <>{<IconAppStatusDefault />}No Functions Found</>
-              ) : (
-                <>{<IconAppStatusFailed />}No Functions Found</>
-              )}
-            </div>
-            <div className="flex items-center gap-4">
-              {app.status === 'connected' && app.functionCount > 0 ? (
-                <>
-                  <button
-                    className="text-indigo-400 flex items-center gap-2"
-                    onClick={() => dispatch(showFunctions())}
+                  <p className="pb-4 text-slate-400">
+                    There are currently no functions registered at this url.
+                    Ensure you have created a function and are exporting it
+                    correctly from your serve command.
+                  </p>
+                  <CodeLine
+                    code="serve(client, [list_of_fns]);"
+                    className="p-4 mb-4"
+                  />
+                  <a
+                    className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
+                    onClick={() => dispatch(showDocs('/functions'))}
                   >
-                    View Functions
-                    <IconChevron className="-rotate-90" />
-                  </button>
+                    Creating Functions
+                    <IconArrowTopRightOnSquare />
+                  </a>
                 </>
-              ) : (
-                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
               )}
-            </div>
-          </Disclosure.Button>
-          {(app.status !== 'connected' || app.functionCount < 1) && (
-            <Transition
-              enter="transition-opacity duration-300"
-              enterFrom="opacity-0"
-              enterTo="opacity-100"
-              leave="transition-opacity duration-300"
-              leaveFrom="opacity-100"
-              leaveTo="opacity-0"
-            >
-              <Disclosure.Panel className="text-gray-500 pl-14 pr-6 pb-4 ">
-                <p className="pb-4 text-slate-400">
-                  There are currently no functions registered at this url.
-                  Ensure you have created a function and are exporting it
-                  correctly from your serve command.
-                </p>
-                <CodeLine
-                  code="serve(client, [list_of_fns]);"
-                  className="p-4 mb-4"
-                />
-                <a
-                  className="text-indigo-400 flex items-center gap-2 cursor-pointer"
-                  onClick={() => dispatch(showDocs('/functions'))}
-                >
-                  Creating Functions
-                  <IconArrowTopRightOnSquare />
-                </a>
-              </Disclosure.Panel>
-            </Transition>
-          )}
-        </Disclosure>
+            </>
+          }
+        />
         {!app.automaticallyAdded && (
           <div className="text-white p-4 pr-6">
             <button className="text-rose-400">Delete App</button>
