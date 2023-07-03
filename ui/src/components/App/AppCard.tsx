@@ -83,6 +83,7 @@ export default function AppCard({ app }: AppCardProps) {
                     The URL of your application
                   </p>
                 </div>
+                {/* To do: add ability to edit the URL */}
                 <input
                   className="min-w-[50%] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline"
                   value={app.url}
@@ -160,6 +161,7 @@ export default function AppCard({ app }: AppCardProps) {
         />
         {!app.automaticallyAdded && (
           <div className="text-white p-4 pr-6">
+            {/* To do: add ability to delete app */}
             <button className="text-rose-400">Delete App</button>
           </div>
         )}

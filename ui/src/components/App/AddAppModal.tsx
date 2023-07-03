@@ -22,6 +22,7 @@ export default function AddAppModal({ isOpen, onClose }) {
       </div>
       <div className="flex items-center justify-between p-6 border-t border-slate-800">
         <Button label="Cancel" kind="secondary" btnAction={onClose} />
+        {/* To do: Trigger connect action and display error */}
         <Button label="Connect App" btnAction={() => {}} />
       </div>
     </Modal>

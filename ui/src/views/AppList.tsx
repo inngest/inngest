@@ -58,6 +58,7 @@ export default function AppList() {
         <p className="text-white">{mockApps.length} Apps Connected</p>
       </div>
       <div className="grid md:grid-cols-2 grid-cols-1 gap-6 min-h-max">
+        {/* To do: fetch real apps */}
         {mockApps.map((app, id) => {
           return <AppCard key={app?.id} app={app} />;
         })}
