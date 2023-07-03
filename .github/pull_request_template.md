@@ -14,3 +14,5 @@ Include screenshots if you modify the UI.
 ## Checklist
 - [ ] I've linked any associated issues to this PR.
 - [ ] I've tested my own changes.
+
+*[Check our Pull Request Guidelines](https://github.com/inngest/inngest/blob/main/docs/PULL_REQUEST_GUIDELINES.md_)*
