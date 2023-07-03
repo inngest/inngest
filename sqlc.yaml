@@ -1,0 +1,18 @@
+version: 2
+overrides:
+  go:
+    overrides:
+      - column: "apps.id"
+        go_type: "github.com/google/uuid"
+sql:
+  - engine: "sqlite"
+    schema: "pkg/cqrs/ddb/sqlc/schema.sql"
+    queries: "pkg/cqrs/ddb/sqlc/queries.sql"
+    gen:
+      go:
+        emit_result_struct_pointers: true
+        package: "sqlc"
+        out: "pkg/cqrs/ddb/sqlc"
+        overrides:
+          - column: "apps.id"
+            go_type: "github.com/google/uuid"

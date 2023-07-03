@@ -1,0 +1,80 @@
+package resolvers
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/devserver/discovery"
+)
+
+func (a queryResolver) Apps(ctx context.Context) ([]*cqrs.App, error) {
+	return a.Data.GetApps(ctx)
+}
+
+func (a appResolver) ID(ctx context.Context, obj *cqrs.App) (string, error) {
+	if obj == nil {
+		return "", fmt.Errorf("no app defined")
+	}
+	return obj.ID.String(), nil
+}
+
+func (a appResolver) Framework(ctx context.Context, obj *cqrs.App) (*string, error) {
+	if obj == nil {
+		return nil, fmt.Errorf("no app defined")
+	}
+	if obj.Framework.Valid {
+		return &obj.Framework.String, nil
+	}
+	return nil, nil
+}
+
+func (a appResolver) Error(ctx context.Context, obj *cqrs.App) (*string, error) {
+	if obj == nil {
+		return nil, fmt.Errorf("no app defined")
+	}
+	if obj.Error.Valid {
+		return &obj.Error.String, nil
+	}
+	return nil, nil
+}
+
+func (a appResolver) Functions(ctx context.Context, obj *cqrs.App) ([]*models.Function, error) {
+	if obj == nil {
+		return nil, fmt.Errorf("no app defined")
+	}
+	funcs, err := a.Data.GetAppFunctions(ctx, obj.ID)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]*models.Function, len(funcs))
+	for n, f := range funcs {
+		res[n], err = models.MakeFunction(f)
+		if err != nil {
+			return nil, err
+		}
+
+	}
+	return res, nil
+}
+
+func (a appResolver) Connected(ctx context.Context, obj *cqrs.App) (bool, error) {
+	urls := discovery.URLs()
+	err := urls[obj.Url]
+	return err == nil, nil
+}
+
+func (a appResolver) Autodiscovered(ctx context.Context, obj *cqrs.App) (bool, error) {
+	urls := discovery.URLs()
+	_, ok := urls[obj.Url]
+	return ok, nil
+}
+
+func (a appResolver) FunctionCount(ctx context.Context, obj *cqrs.App) (int, error) {
+	funcs, err := a.Data.GetAppFunctions(ctx, obj.ID)
+	if err != nil {
+		return 0, err
+	}
+	return len(funcs), nil
+}

@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
-	"github.com/inngest/inngest/pkg/coredata/inmemory"
+	"github.com/inngest/inngest/pkg/cqrs/ddb"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/executor"
@@ -39,14 +39,19 @@ func New(ctx context.Context, opts StartOpts) error {
 	if !opts.Config.Execution.LogOutput {
 		opts.Config.Execution.LogOutput = true
 	}
-	loader, err := inmemory.New(ctx)
+	return start(ctx, opts)
+}
+
+func start(ctx context.Context, opts StartOpts) error {
+	db, err := ddb.New()
 	if err != nil {
 		return err
 	}
-	return start(ctx, opts, loader)
-}
 
-func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) error {
+	dbcqrs := ddb.NewCQRS(db)
+	loader := dbcqrs.(state.FunctionLoader)
+	execLoader := ddb.NewExecutionLoader(dbcqrs)
+
 	rc, err := createInmemoryRedis(ctx)
 	if err != nil {
 		return err
@@ -89,10 +94,14 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 		redis_state.WithPartitionConcurrencyKeyGenerator(func(ctx context.Context, p redis_state.QueuePartition) (string, int) {
 			// Ensure that we return the correct concurrency values per
 			// partition.
-			funcs, _ := loader.Functions(ctx)
-			for _, f := range funcs {
+			funcs, err := dbcqrs.GetFunctions(ctx)
+			if err != nil {
+				return p.Queue(), 10_000
+			}
+			for _, fn := range funcs {
+				f, _ := fn.InngestFunction()
 				if f.ID == uuid.Nil {
-					f.ID = inngest.DeterministicUUID(f)
+					f.ID = inngest.DeterministicUUID(*f)
 				}
 				if f.ID == p.WorkflowID && f.ConcurrencyLimit() > 0 {
 					return p.Queue(), f.ConcurrencyLimit()
@@ -106,7 +115,7 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 
 	runner := runner.NewService(
 		opts.Config,
-		runner.WithExecutionLoader(loader),
+		runner.WithExecutionLoader(execLoader),
 		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
 		runner.WithQueue(queue),
@@ -115,7 +124,7 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 	)
 
 	// The devserver embeds the event API.
-	ds := newService(opts, loader, runner)
+	ds := newService(opts, runner, dbcqrs)
 	// embed the tracker
 	ds.tracker = t
 	ds.state = sm
@@ -123,7 +132,7 @@ func start(ctx context.Context, opts StartOpts, loader *inmemory.ReadWriter) err
 	// Create an executor.
 	exec := executor.NewService(
 		opts.Config,
-		executor.WithExecutionLoader(loader),
+		executor.WithExecutionLoader(execLoader),
 		executor.WithState(sm),
 		executor.WithQueue(queue),
 		executor.WithExecutorOpts(

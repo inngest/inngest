@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/coredata"
-	inmemorydatastore "github.com/inngest/inngest/pkg/coredata/inmemory"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/driver"
@@ -83,14 +82,6 @@ func (s *svc) Name() string {
 func (s *svc) Pre(ctx context.Context) error {
 	var err error
 
-	if s.data == nil {
-		l, err := inmemorydatastore.NewFSLoader(ctx, ".")
-		if err != nil {
-			return err
-		}
-		s.data = l
-	}
-
 	if s.state == nil {
 		s.state, err = s.config.State.Service.Concrete.Manager(ctx)
 		if err != nil {
@@ -121,7 +112,6 @@ func (s *svc) Pre(ctx context.Context) error {
 	}
 
 	opts := []ExecutorOpt{
-		WithActionLoader(s.data),
 		WithStateManager(s.state),
 		WithRuntimeDrivers(
 			drivers...,

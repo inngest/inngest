@@ -13,10 +13,10 @@ import (
 // PCGSource is an implementation of a 64-bit permuted congruential
 // generator as defined in
 //
-// 	PCG: A Family of Simple Fast Space-Efficient Statistically Good
-// 	Algorithms for Random Number Generation
-// 	Melissa E. O’Neill, Harvey Mudd College
-// 	http://www.pcg-random.org/pdf/toms-oneill-pcg-family-v1.02.pdf
+//	PCG: A Family of Simple Fast Space-Efficient Statistically Good
+//	Algorithms for Random Number Generation
+//	Melissa E. O’Neill, Harvey Mudd College
+//	http://www.pcg-random.org/pdf/toms-oneill-pcg-family-v1.02.pdf
 //
 // The generator here is the congruential generator PCG XSL RR 128/64 (LCG)
 // as found in the software available at http://www.pcg-random.org/.

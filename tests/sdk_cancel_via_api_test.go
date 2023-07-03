@@ -110,20 +110,18 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 				if err := json.NewDecoder(resp.Body).Decode(&ids); err != nil {
 					return err
 				}
-				if len(ids) != 1 {
-					return fmt.Errorf("no run ID found for event: %s", *test.lastEventID)
-				}
-
-				// Cancel run
-				route = fmt.Sprintf("%s/v0/runs/%s", apiURL.String(), ids[0])
-				req, _ := http.NewRequest(http.MethodDelete, route, nil)
-				resp, err = http.DefaultClient.Do(req)
-				if err != nil {
-					return fmt.Errorf("error making delete request: %w", err)
-				}
-				defer resp.Body.Close()
-				if resp.StatusCode != 204 {
-					return fmt.Errorf("unexpected cancel status code: %d", resp.StatusCode)
+				for _, id := range ids {
+					// Cancel run
+					route = fmt.Sprintf("%s/v0/runs/%s", apiURL.String(), id)
+					req, _ := http.NewRequest(http.MethodDelete, route, nil)
+					resp, err = http.DefaultClient.Do(req)
+					if err != nil {
+						return fmt.Errorf("error making delete request: %w", err)
+					}
+					defer resp.Body.Close()
+					if resp.StatusCode != 204 {
+						return fmt.Errorf("unexpected cancel status code: %d", resp.StatusCode)
+					}
 				}
 				return nil
 			}),

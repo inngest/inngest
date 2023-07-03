@@ -50,6 +50,8 @@ func hash(res any, id uuid.UUID) string {
 }
 
 // RateLimit checks the given key against the specified rate limit, returning true if limited.
+//
+// This allows bursts of up to 1/10th the given rate limit, by default.
 func rateLimit(ctx context.Context, store throttled.GCRAStoreCtx, key string, c inngest.RateLimit) (bool, error) {
 	dur, err := str2duration.ParseDuration(c.Period)
 	if err != nil {
@@ -57,7 +59,8 @@ func rateLimit(ctx context.Context, store throttled.GCRAStoreCtx, key string, c 
 	}
 
 	quota := throttled.RateQuota{
-		MaxRate: throttled.PerDuration(int(c.Limit), dur),
+		MaxRate:  throttled.PerDuration(int(c.Limit), dur),
+		MaxBurst: int(c.Limit) / 10,
 	}
 
 	limiter, err := throttled.NewGCRARateLimiterCtx(store, quota)

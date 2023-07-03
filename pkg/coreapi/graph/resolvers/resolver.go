@@ -4,13 +4,13 @@ package resolvers
 
 import (
 	"github.com/inngest/inngest/pkg/coreapi/generated"
-	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/runner"
 )
 
 type Resolver struct {
-	APIReadWriter coredata.APIReadWriter
-	Runner        runner.Runner
+	Data   cqrs.Manager
+	Runner runner.Runner
 }
 
 // Mutation returns generated.MutationResolver implementation. Only necessary when mutations exist.
@@ -23,7 +23,10 @@ func (r *Resolver) Event() generated.EventResolver { return &eventResolver{r} }
 
 func (r *Resolver) FunctionRun() generated.FunctionRunResolver { return &functionRunResolver{r} }
 
+func (r *Resolver) App() generated.AppResolver { return &appResolver{r} }
+
 // type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type eventResolver struct{ *Resolver }
+type appResolver struct{ *Resolver }
 type functionRunResolver struct{ *Resolver }

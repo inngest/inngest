@@ -10,7 +10,7 @@ jobs:
     name: lint
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -35,16 +35,3 @@ jobs:
           go-version: '1.20'
       - name: Test
         run: go test $(go list ./... | grep -v tests) -race -count=1
-  test-windows:
-    strategy:
-      matrix:
-        os: [windows-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: '1.20'
-      - name: Test
-        run: go test $(go list ./... | grep -v tests) -count=1

@@ -16,12 +16,16 @@ resolver:
 struct_tag: json
 
 models:
+  NullString:
+    model: github.com/inngest/inngest/pkg/coreapi.NullString
   Int:
     model:
       - github.com/99designs/gqlgen/graphql.Int
       - github.com/99designs/gqlgen/graphql.Uint
   Environment:
     model: github.com/inngest/inngest/pkg/coreapi/graph/models.Environment
+  App:
+    model: github.com/inngest/inngest/pkg/cqrs.App
   Runtime:
     model: github.com/inngest/inngest/pkg/inngest.RuntimeWrapper
   FunctionVersion:

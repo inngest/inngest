@@ -44,8 +44,10 @@ type EventsQuery struct {
 }
 
 type Function struct {
-	Name        string             `json:"name"`
 	ID          string             `json:"id"`
+	Name        string             `json:"name"`
+	Slug        string             `json:"slug"`
+	Config      string             `json:"config"`
 	Concurrency int                `json:"concurrency"`
 	Triggers    []*FunctionTrigger `json:"triggers,omitempty"`
 	URL         string             `json:"url"`

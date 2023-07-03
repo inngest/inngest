@@ -275,7 +275,7 @@ func defaultSubscriberCallOptions() *SubscriberCallOptions {
 	}
 }
 
-// internalSubscriberClient is an interface that defines the methods availaible from Cloud Pub/Sub API.
+// internalSubscriberClient is an interface that defines the methods available from Cloud Pub/Sub API.
 type internalSubscriberClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
@@ -332,7 +332,8 @@ func (c *SubscriberClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *SubscriberClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
@@ -587,7 +588,8 @@ func NewSubscriberClient(ctx context.Context, opts ...option.ClientOption) (*Sub
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *subscriberGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -979,7 +981,9 @@ func (c *subscriberGRPCClient) Seek(ctx context.Context, req *pubsubpb.SeekReque
 }
 
 func (c *subscriberGRPCClient) GetIamPolicy(ctx context.Context, req *iampb.GetIamPolicyRequest, opts ...gax.CallOption) (*iampb.Policy, error) {
-	ctx = insertMetadata(ctx, c.xGoogMetadata)
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource", url.QueryEscape(req.GetResource())))
+
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).GetIamPolicy[0:len((*c.CallOptions).GetIamPolicy):len((*c.CallOptions).GetIamPolicy)], opts...)
 	var resp *iampb.Policy
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -994,7 +998,9 @@ func (c *subscriberGRPCClient) GetIamPolicy(ctx context.Context, req *iampb.GetI
 }
 
 func (c *subscriberGRPCClient) SetIamPolicy(ctx context.Context, req *iampb.SetIamPolicyRequest, opts ...gax.CallOption) (*iampb.Policy, error) {
-	ctx = insertMetadata(ctx, c.xGoogMetadata)
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource", url.QueryEscape(req.GetResource())))
+
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).SetIamPolicy[0:len((*c.CallOptions).SetIamPolicy):len((*c.CallOptions).SetIamPolicy)], opts...)
 	var resp *iampb.Policy
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -1009,7 +1015,9 @@ func (c *subscriberGRPCClient) SetIamPolicy(ctx context.Context, req *iampb.SetI
 }
 
 func (c *subscriberGRPCClient) TestIamPermissions(ctx context.Context, req *iampb.TestIamPermissionsRequest, opts ...gax.CallOption) (*iampb.TestIamPermissionsResponse, error) {
-	ctx = insertMetadata(ctx, c.xGoogMetadata)
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource", url.QueryEscape(req.GetResource())))
+
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).TestIamPermissions[0:len((*c.CallOptions).TestIamPermissions):len((*c.CallOptions).TestIamPermissions)], opts...)
 	var resp *iampb.TestIamPermissionsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
