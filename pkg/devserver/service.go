@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/devserver/discovery"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -27,13 +28,18 @@ const (
 	SDKPollInterval = 5 * time.Second
 )
 
+var (
+	timeout = 2 * time.Second
+	hc      = http.Client{
+		Timeout: timeout,
+	}
+)
+
 func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager) *devserver {
 	return &devserver{
 		data:        data,
 		runner:      runner,
 		opts:        opts,
-		urls:        opts.URLs,
-		urlLock:     &sync.Mutex{},
 		handlerLock: &sync.Mutex{},
 	}
 }
@@ -55,10 +61,6 @@ type devserver struct {
 	state   state.Manager
 
 	apiservice service.Service
-
-	// urls are the URLs that host SDKs
-	urls    []string
-	urlLock *sync.Mutex
 
 	// handlers are updated by the API (d.apiservice) when registering functions.
 	handlers    []SDKHandler
@@ -153,9 +155,7 @@ func (d *devserver) autodiscover(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		d.urlLock.Lock()
-		d.urls = Autodiscover(ctx)
-		d.urlLock.Unlock()
+		_ = discovery.Autodiscover(ctx)
 		<-time.After(5 * time.Second)
 	}
 }
@@ -168,30 +168,33 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 			return
 		}
 
-		d.urlLock.Lock()
-		for _, u := range d.urls {
+		for u := range discovery.URLs() {
 			// Make a new PUT request to the URL, indicating that the
 			// SDK should push functions to the dev server.
 			req, _ := http.NewRequest(http.MethodPut, u, nil)
 			resp, err := hc.Do(req)
 			if err != nil {
 				logger.From(ctx).Error().Err(err).Str("url", u).Msg("unable to connect to the SDK")
+				discovery.SetURLError(u, fmt.Errorf("Unable to connect to the SDK"))
 				continue
 			}
 			if resp.StatusCode == 200 {
+				discovery.SetURLError(u, nil)
 				continue
 			}
+
 			// Log an error that we were unable to connect to the SDK.
 			body, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
+			discovery.SetURLError(u, fmt.Errorf("Unable to connect to the SDK: %s", body))
+
 			logger.From(ctx).Error().
 				Int("status", resp.StatusCode).
 				Str("url", u).
 				Str("response", string(body)).
 				Msg("unable to connect to the SDK")
-		}
-		d.urlLock.Unlock()
 
+		}
 		<-time.After(SDKPollInterval)
 	}
 }

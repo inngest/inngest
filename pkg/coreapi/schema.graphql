@@ -69,8 +69,12 @@ type App {
   url: String
   checksum: String
   error: String
-
   functions: [Function!]!
+
+  # These fields are UI convenience fields
+  connected: Boolean!
+  functionCount: Int!
+  autodiscovered: Boolean!
 }
 
 type Function {

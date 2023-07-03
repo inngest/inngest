@@ -50,15 +50,18 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	App struct {
-		Checksum    func(childComplexity int) int
-		Error       func(childComplexity int) int
-		Framework   func(childComplexity int) int
-		Functions   func(childComplexity int) int
-		ID          func(childComplexity int) int
-		Name        func(childComplexity int) int
-		SdkLanguage func(childComplexity int) int
-		SdkVersion  func(childComplexity int) int
-		Url         func(childComplexity int) int
+		Autodiscovered func(childComplexity int) int
+		Checksum       func(childComplexity int) int
+		Connected      func(childComplexity int) int
+		Error          func(childComplexity int) int
+		Framework      func(childComplexity int) int
+		FunctionCount  func(childComplexity int) int
+		Functions      func(childComplexity int) int
+		ID             func(childComplexity int) int
+		Name           func(childComplexity int) int
+		SdkLanguage    func(childComplexity int) int
+		SdkVersion     func(childComplexity int) int
+		Url            func(childComplexity int) int
 	}
 
 	Event struct {
@@ -158,6 +161,9 @@ type AppResolver interface {
 
 	Error(ctx context.Context, obj *cqrs.App) (*string, error)
 	Functions(ctx context.Context, obj *cqrs.App) ([]*models.Function, error)
+	Connected(ctx context.Context, obj *cqrs.App) (bool, error)
+	FunctionCount(ctx context.Context, obj *cqrs.App) (int, error)
+	Autodiscovered(ctx context.Context, obj *cqrs.App) (bool, error)
 }
 type EventResolver interface {
 	Status(ctx context.Context, obj *models.Event) (*models.EventStatus, error)
@@ -196,12 +202,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	_ = ec
 	switch typeName + "." + field {
 
+	case "App.autodiscovered":
+		if e.complexity.App.Autodiscovered == nil {
+			break
+		}
+
+		return e.complexity.App.Autodiscovered(childComplexity), true
+
 	case "App.checksum":
 		if e.complexity.App.Checksum == nil {
 			break
 		}
 
 		return e.complexity.App.Checksum(childComplexity), true
+
+	case "App.connected":
+		if e.complexity.App.Connected == nil {
+			break
+		}
+
+		return e.complexity.App.Connected(childComplexity), true
 
 	case "App.error":
 		if e.complexity.App.Error == nil {
@@ -216,6 +236,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.App.Framework(childComplexity), true
+
+	case "App.functionCount":
+		if e.complexity.App.FunctionCount == nil {
+			break
+		}
+
+		return e.complexity.App.FunctionCount(childComplexity), true
 
 	case "App.functions":
 		if e.complexity.App.Functions == nil {
@@ -865,8 +892,12 @@ type App {
   url: String
   checksum: String
   error: String
-
   functions: [Function!]!
+
+  # These fields are UI convenience fields
+  connected: Boolean!
+  functionCount: Int!
+  autodiscovered: Boolean!
 }
 
 type Function {
@@ -1466,6 +1497,138 @@ func (ec *executionContext) fieldContext_App_functions(ctx context.Context, fiel
 				return ec.fieldContext_Function_url(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Function", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _App_connected(ctx context.Context, field graphql.CollectedField, obj *cqrs.App) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_App_connected(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.App().Connected(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_App_connected(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "App",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _App_functionCount(ctx context.Context, field graphql.CollectedField, obj *cqrs.App) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_App_functionCount(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.App().FunctionCount(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_App_functionCount(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "App",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _App_autodiscovered(ctx context.Context, field graphql.CollectedField, obj *cqrs.App) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_App_autodiscovered(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.App().Autodiscovered(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_App_autodiscovered(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "App",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -3344,6 +3507,12 @@ func (ec *executionContext) fieldContext_Query_apps(ctx context.Context, field g
 				return ec.fieldContext_App_error(ctx, field)
 			case "functions":
 				return ec.fieldContext_App_functions(ctx, field)
+			case "connected":
+				return ec.fieldContext_App_connected(ctx, field)
+			case "functionCount":
+				return ec.fieldContext_App_functionCount(ctx, field)
+			case "autodiscovered":
+				return ec.fieldContext_App_autodiscovered(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type App", field.Name)
 		},
@@ -6466,6 +6635,66 @@ func (ec *executionContext) _App(ctx context.Context, sel ast.SelectionSet, obj 
 					}
 				}()
 				res = ec._App_functions(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "connected":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._App_connected(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "functionCount":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._App_functionCount(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
+		case "autodiscovered":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._App_autodiscovered(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}

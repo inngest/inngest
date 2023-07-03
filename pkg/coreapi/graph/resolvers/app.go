@@ -6,6 +6,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/devserver/discovery"
 )
 
 func (a queryResolver) Apps(ctx context.Context) ([]*cqrs.App, error) {
@@ -56,4 +57,24 @@ func (a appResolver) Functions(ctx context.Context, obj *cqrs.App) ([]*models.Fu
 
 	}
 	return res, nil
+}
+
+func (a appResolver) Connected(ctx context.Context, obj *cqrs.App) (bool, error) {
+	urls := discovery.URLs()
+	err := urls[obj.Url]
+	return err == nil, nil
+}
+
+func (a appResolver) Autodiscovered(ctx context.Context, obj *cqrs.App) (bool, error) {
+	urls := discovery.URLs()
+	_, ok := urls[obj.Url]
+	return ok, nil
+}
+
+func (a appResolver) FunctionCount(ctx context.Context, obj *cqrs.App) (int, error) {
+	funcs, err := a.Data.GetAppFunctions(ctx, obj.ID)
+	if err != nil {
+		return 0, err
+	}
+	return len(funcs), nil
 }

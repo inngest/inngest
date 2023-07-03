@@ -1,4 +1,4 @@
-package devserver
+package discovery
 
 import (
 	"context"
@@ -46,6 +46,10 @@ var (
 	hc = http.Client{
 		Timeout: timeout,
 	}
+
+	// urls lists all auto-discovered URLs to the error connecting
+	urls    = map[string]error{}
+	urlLock sync.Mutex
 )
 
 func init() {
@@ -59,8 +63,9 @@ func init() {
 // Autodiscover attempts to automatically discover SDK endpoints running on
 // the local machine, using a combination of the default supported ports
 // and default API endpoints above.
-func Autodiscover(ctx context.Context) []string {
-	results := []string{}
+func Autodiscover(ctx context.Context) map[string]error {
+	urlLock.Lock()
+
 	ports := openPorts(ctx)
 	for _, port := range ports {
 		for _, path := range Paths {
@@ -68,11 +73,35 @@ func Autodiscover(ctx context.Context) []string {
 			// so we do these sequentially.
 			url := fmt.Sprintf("http://127.0.0.1:%d%s", port, path)
 			if err := checkURL(ctx, url); err == nil {
-				results = append(results, url)
+				if _, ok := urls[url]; !ok {
+					// only add if the URL doesn't exist;  this ensures
+					// we don't overwrite eror5rs.
+					urls[url] = nil
+				}
 			}
 		}
 	}
-	return results
+
+	urlLock.Unlock()
+
+	return URLs()
+}
+
+// URLs returns a list of auto-discovered URLs
+func URLs() map[string]error {
+	urlLock.Lock()
+	defer urlLock.Unlock()
+	copied := map[string]error{}
+	for k, v := range urls {
+		copied[k] = v
+	}
+	return copied
+}
+
+func SetURLError(url string, err error) {
+	urlLock.Lock()
+	defer urlLock.Unlock()
+	urls[url] = err
 }
 
 // checkURL attempts to discover whether there's an SDK hosted at the given url
