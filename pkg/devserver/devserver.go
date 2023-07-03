@@ -50,7 +50,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	dbcqrs := ddb.NewCQRS(db)
 	loader := dbcqrs.(state.FunctionLoader)
-	execLoader := ddb.NewExecutionLoader(dbcqrs)
 
 	rc, err := createInmemoryRedis(ctx)
 	if err != nil {
@@ -115,7 +114,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	runner := runner.NewService(
 		opts.Config,
-		runner.WithExecutionLoader(execLoader),
+		runner.WithExecutionLoader(dbcqrs),
 		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
 		runner.WithQueue(queue),
@@ -132,7 +131,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create an executor.
 	exec := executor.NewService(
 		opts.Config,
-		executor.WithExecutionLoader(execLoader),
+		executor.WithExecutionLoader(dbcqrs),
 		executor.WithState(sm),
 		executor.WithQueue(queue),
 		executor.WithExecutorOpts(

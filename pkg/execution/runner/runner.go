@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/config"
-	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
@@ -44,7 +44,7 @@ type Runner interface {
 	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
-func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
+func WithExecutionLoader(l cqrs.ExecutionLoader) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
 	}
@@ -97,7 +97,7 @@ type svc struct {
 	pubsub pubsub.PublishSubscriber
 	// data provides the required loading capabilities to trigger functions
 	// from events.
-	data coredata.ExecutionLoader
+	data cqrs.ExecutionLoader
 	// state allows the creation of new function runs.
 	state state.Manager
 	// queue allows the scheduling of new functions.
