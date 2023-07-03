@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
-	"github.com/inngest/inngest/pkg/coredata"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/driver"
@@ -27,7 +27,7 @@ import (
 
 type Opt func(s *svc)
 
-func WithExecutionLoader(l coredata.ExecutionLoader) func(s *svc) {
+func WithExecutionLoader(l cqrs.ExecutionLoader) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
 	}
@@ -62,7 +62,7 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 type svc struct {
 	config config.Config
 	// data provides the ability to load action versions when running steps.
-	data coredata.ExecutionLoader
+	data cqrs.ExecutionLoader
 	// state allows us to record step results
 	state state.Manager
 	// queue allows us to enqueue next steps.
