@@ -15,9 +15,9 @@ export default function Header(props: Props) {
         </h1>
         {props.children}
       </nav>
-      <div className="my-1">
+      {/* <div className="my-1">
         <AddAppButton />
-      </div>
+      </div> */}
     </header>
   );
 }
