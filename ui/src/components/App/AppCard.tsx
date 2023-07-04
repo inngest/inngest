@@ -1,5 +1,6 @@
 import { useAppDispatch } from '@/store/hooks';
 import { showFunctions, showDocs } from '@/store/global';
+import { type App } from '@/store/generated';
 import CodeLine from '@/components/CodeLine';
 import AppCardHeader from '@/components/App/AppCardHeader';
 import AppCardStep from './AppCardStep';
@@ -12,30 +13,20 @@ import {
   IconAppStatusDefault,
 } from '@/icons';
 
-type AppCardProps = {
-  app: {
-    id: string;
-    name: string;
-    url: string;
-    functionCount: number;
-    sdkVersion: string;
-    status: string;
-    automaticallyAdded: boolean;
-    connecting?: boolean;
-  };
-};
+type AppWithoutFunctions= Omit<App, 'functions'>;
 
-export default function AppCard({ app }: AppCardProps) {
+export default function AppCard({ app }: {app: AppWithoutFunctions} ) {
   const dispatch = useAppDispatch();
   return (
     <div>
       <AppCardHeader
-        status={app.status}
+        connected={app.connected}
         functionCount={app.functionCount}
         sdkVersion={app.sdkVersion}
       />
       <div className="border border-slate-700/30 rounded-b-md divide-y divide-slate-700/30 bg-slate-800/30">
-        {app.connecting ? (
+        {/* To do: add ability to edit url inside card triggers this loading state */}
+        {false ? (
           <div className="p-4 pr-6 flex items-center gap-2">
             <IconSpinner className="fill-sky-400 text-slate-800" />
             <p className="text-slate-400 text-lg font-light">Connecting...</p>
@@ -43,7 +34,7 @@ export default function AppCard({ app }: AppCardProps) {
         ) : (
           <div className="flex items-center justify-between px-6 py-4 ">
             <p className=" text-lg text-white">{app.name}</p>
-            {app.automaticallyAdded && (
+            {app.autodiscovered && (
               <span className="text-xs leading-3 border rounded-md border-slate-800 box-border py-1.5 px-2 text-slate-300">
                 Auto Detected
               </span>
@@ -54,7 +45,7 @@ export default function AppCard({ app }: AppCardProps) {
           lineContent={
             <>
               <div className="flex items-center gap-3 text-base">
-                {app.status === 'connected' ? (
+                {app.connected ? (
                   <>{<IconAppStatusCompleted />}Connected to server</>
                 ) : (
                   <>{<IconAppStatusFailed />}No connection to server</>
@@ -68,7 +59,7 @@ export default function AppCard({ app }: AppCardProps) {
           }
           expandedContent={
             <>
-              {app.status !== 'connected' && (
+              {!app.connected && (
                 <p className="pb-4 text-slate-400">
                   The Inngest Dev Server can’t find your application. Ensure
                   your full URL is correct, including the correct port. Inngest
@@ -87,7 +78,7 @@ export default function AppCard({ app }: AppCardProps) {
                 <input
                   className="min-w-[50%] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline"
                   value={app.url}
-                  readOnly={app.automaticallyAdded}
+                  readOnly={app.autodiscovered}
                 />
               </div>
               <a
@@ -102,23 +93,23 @@ export default function AppCard({ app }: AppCardProps) {
         />
         <AppCardStep
           isEvenStep
-          isExpandable={app.status !== 'connected' || app.functionCount < 1}
+          isExpandable={!app.connected || app.functionCount < 1}
           lineContent={
             <>
               <div className="flex items-center gap-3 text-base">
-                {app.status === 'connected' && app.functionCount > 0 ? (
+                {app.connected && app.functionCount > 0 ? (
                   <>
                     {<IconAppStatusCompleted />}
                     {app.functionCount} Functions registered
                   </>
-                ) : app.status !== 'connected' ? (
+                ) : !app.connected ? (
                   <>{<IconAppStatusDefault />}No Functions Found</>
                 ) : (
                   <>{<IconAppStatusFailed />}No Functions Found</>
                 )}
               </div>
               <div className="flex items-center gap-4">
-                {app.status === 'connected' && app.functionCount > 0 ? (
+                {app.connected && app.functionCount > 0 ? (
                   <>
                     <button
                       className="text-indigo-400 flex items-center gap-2"
@@ -136,7 +127,7 @@ export default function AppCard({ app }: AppCardProps) {
           }
           expandedContent={
             <>
-              {(app.status !== 'connected' || app.functionCount < 1) && (
+              {(!app.connected || app.functionCount < 1) && (
                 <>
                   <p className="pb-4 text-slate-400">
                     There are currently no functions registered at this url.
@@ -159,7 +150,7 @@ export default function AppCard({ app }: AppCardProps) {
             </>
           }
         />
-        {!app.automaticallyAdded && (
+        {!app.autodiscovered && (
           <div className="text-white p-4 pr-6">
             {/* To do: add ability to delete app */}
             <button className="text-rose-400">Delete App</button>

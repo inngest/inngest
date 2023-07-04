@@ -4,17 +4,17 @@ import { IconCheckCircle, IconExclamationTriangle } from '@/icons';
 type AppCardHeaderProps = {
   functionCount: number;
   sdkVersion: string;
-  status: string;
+  connected: boolean;
 };
 
 export default function AppCardHeader({
-  status,
+  connected,
   functionCount,
   sdkVersion,
 }: AppCardHeaderProps) {
   let headerColor, headerLabel, headerIcon;
 
-  if (status !== 'connected') {
+  if (!connected) {
     headerColor = 'bg-rose-600/50';
     headerLabel = 'No Connection';
     headerIcon = <IconExclamationTriangle />;
