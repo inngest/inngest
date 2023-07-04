@@ -105,3 +105,21 @@ export const FUNCTIONS = gql`
     }
   }
 `;
+
+export const APPS = gql`
+  query GetApps {
+    apps {
+      id
+      name
+      sdkLanguage
+      sdkVersion
+      framework
+      url
+      error
+      connected
+      functionCount
+      autodiscovered
+    }
+  }
+`;
+
