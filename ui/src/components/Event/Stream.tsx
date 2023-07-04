@@ -1,16 +1,13 @@
-import { EventStatus, useGetEventsStreamQuery } from "../../store/generated";
-import { selectEvent } from "../../store/global";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import TimelineFeedContent from "../Timeline/TimelineFeedContent";
-import TimelineRow from "../Timeline/TimelineRow";
+'use client';
+
+import { usePathname } from 'next/navigation';
+import { EventStatus, useGetEventsStreamQuery } from '../../store/generated';
+import TimelineFeedContent from '../Timeline/TimelineFeedContent';
+import TimelineRow from '../Timeline/TimelineRow';
 
 export const EventStream = () => {
-  const events = useGetEventsStreamQuery(
-    undefined,
-    { pollingInterval: 1500 }
-  );
-  const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
-  const dispatch = useAppDispatch();
+  const events = useGetEventsStreamQuery(undefined, { pollingInterval: 1500 });
+  const pathname = usePathname();
 
   return (
     <>
@@ -24,11 +21,11 @@ export const EventStream = () => {
         >
           <TimelineFeedContent
             date={event.createdAt}
-            active={selectedEvent === event.id}
             status={event.status || EventStatus.Completed}
             badge={event.totalRuns || 0}
-            name={event.name || "Unknown"}
-            onClick={() => dispatch(selectEvent(event.id))}
+            name={event.name || 'Unknown'}
+            active={pathname.includes(event.id)}
+            href={`/feed/events/${event.id}`}
           />
         </TimelineRow>
       ))}

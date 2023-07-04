@@ -1,5 +1,5 @@
-import { useState } from "react";
-import classNames from "../../utils/classnames";
+import { useState } from 'react';
+import classNames from '../../utils/classnames';
 
 export default function CopyButton({ btnAction }) {
   const [clickedState, setClickedState] = useState(false);
@@ -22,7 +22,7 @@ export default function CopyButton({ btnAction }) {
         `flex gap-1.5 items-center  border text-xs  rounded-sm px-2.5 py-1 text-slate-100 transition-all duration-150`
       )}
     >
-      {clickedState ? "Copied!" : "Copy"}
+      {clickedState ? 'Copied!' : 'Copy'}
     </button>
   );
 }

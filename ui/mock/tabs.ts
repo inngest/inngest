@@ -64,13 +64,13 @@ const payloadContent = `{
   },
   ts: 1667221378334, // This will be in every event
   v: '2022-10-31.1', // optional
- }`
+ }`;
 
 const schemaContent = `{
   label: String,
   id: ObjectId,
   count: Integer,
- }`
+ }`;
 
 export const eventTabs = [
   {
@@ -81,4 +81,4 @@ export const eventTabs = [
     label: 'Schema',
     content: schemaContent,
   },
-]
+];

@@ -16,37 +16,10 @@ export type Scalars = {
   Time: any;
 };
 
-export type ActionVersion = {
-  __typename?: 'ActionVersion';
-  config: Scalars['String'];
-  createdAt: Scalars['Time'];
-  dsn: Scalars['String'];
-  name: Scalars['String'];
-  validFrom?: Maybe<Scalars['Time']>;
-  validTo?: Maybe<Scalars['Time']>;
-  versionMajor: Scalars['Int'];
-  versionMinor: Scalars['Int'];
-};
-
 export type ActionVersionQuery = {
   dsn: Scalars['String'];
   versionMajor?: InputMaybe<Scalars['Int']>;
   versionMinor?: InputMaybe<Scalars['Int']>;
-};
-
-export type Config = {
-  __typename?: 'Config';
-  execution?: Maybe<ExecutionConfig>;
-};
-
-export type CreateActionVersionInput = {
-  config: Scalars['String'];
-};
-
-export type DeployFunctionInput = {
-  config: Scalars['String'];
-  env?: InputMaybe<Scalars['Environment']>;
-  live?: InputMaybe<Scalars['Boolean']>;
 };
 
 export type Event = {
@@ -81,22 +54,6 @@ export enum EventStatus {
 export type EventsQuery = {
   lastEventId?: InputMaybe<Scalars['ID']>;
   workspaceId?: Scalars['ID'];
-};
-
-export type ExecutionConfig = {
-  __typename?: 'ExecutionConfig';
-  drivers?: Maybe<ExecutionDriversConfig>;
-};
-
-export type ExecutionDockerDriverConfig = {
-  __typename?: 'ExecutionDockerDriverConfig';
-  namespace?: Maybe<Scalars['String']>;
-  registry?: Maybe<Scalars['String']>;
-};
-
-export type ExecutionDriversConfig = {
-  __typename?: 'ExecutionDriversConfig';
-  docker?: Maybe<ExecutionDockerDriverConfig>;
 };
 
 export type Function = {
@@ -177,42 +134,13 @@ export type FunctionVersion = {
   version: Scalars['Int'];
 };
 
-export type Mutation = {
-  __typename?: 'Mutation';
-  createActionVersion?: Maybe<ActionVersion>;
-  deployFunction?: Maybe<FunctionVersion>;
-  updateActionVersion?: Maybe<ActionVersion>;
-};
-
-
-export type MutationCreateActionVersionArgs = {
-  input: CreateActionVersionInput;
-};
-
-
-export type MutationDeployFunctionArgs = {
-  input: DeployFunctionInput;
-};
-
-
-export type MutationUpdateActionVersionArgs = {
-  input: UpdateActionVersionInput;
-};
-
 export type Query = {
   __typename?: 'Query';
-  actionVersion?: Maybe<ActionVersion>;
-  config?: Maybe<Config>;
   event?: Maybe<Event>;
   events?: Maybe<Array<Event>>;
   functionRun?: Maybe<FunctionRun>;
   functionRuns?: Maybe<Array<FunctionRun>>;
   functions?: Maybe<Array<Function>>;
-};
-
-
-export type QueryActionVersionArgs = {
-  query: ActionVersionQuery;
 };
 
 
@@ -261,13 +189,6 @@ export type StepEventWait = {
   eventName?: Maybe<Scalars['String']>;
   expiryTime: Scalars['Time'];
   expression?: Maybe<Scalars['String']>;
-};
-
-export type UpdateActionVersionInput = {
-  dsn: Scalars['String'];
-  enabled?: InputMaybe<Scalars['Boolean']>;
-  versionMajor: Scalars['Int'];
-  versionMinor: Scalars['Int'];
 };
 
 export type Workspace = {
