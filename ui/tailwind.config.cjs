@@ -11,11 +11,11 @@ module.exports = {
       },
       gridTemplateColumns: {
         // Sidebar | Timeline Scroll | Content Frame
-        "app-sm": "50px 260px 1fr",
-        app: "50px 340px 1fr",
-        "app-desktop": "50px 420px 1fr",
+        "app-sm": "260px 1fr",
+        app: "340px 1fr",
+        "app-desktop": "420px 1fr",
         "event-overlay": "340px 1fr",
-        docs: "50px 1fr",
+        docs: "1fr",
       },
       gridTemplateRows: {
         // Header | Action Bar | Content Frame
@@ -67,5 +67,5 @@ module.exports = {
       full: "9999px",
     },
   },
-  plugins: [],
+  plugins: [require('@headlessui/tailwindcss')],
 };

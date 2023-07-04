@@ -2,7 +2,7 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import { createSlice } from "@reduxjs/toolkit";
 
 const initialState: {
-  contentView: "feed" | "functions" | "docs";
+  contentView: "feed" | "functions" | "docs" | "apps";
   docsPath: string | null;
   sidebarTab: "events" | "functions";
   selectedEvent: string | null;
@@ -38,6 +38,9 @@ const globalState = createSlice({
     showFeed(state) {
       state.contentView = "feed";
     },
+    showApps(state) {
+      state.contentView = "apps";
+    },
     showFunctions(state) {
       state.contentView = "functions";
     },
@@ -68,6 +71,7 @@ export const {
   showDocs,
   showFunctions,
   showFeed,
+  showApps,
   showEventSendModal,
 } = globalState.actions;
 export default globalState.reducer;

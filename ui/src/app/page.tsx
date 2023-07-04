@@ -12,8 +12,8 @@ import { EventStream } from '@/components/Event/Stream';
 import { FunctionRunSection } from '@/components/Function/RunSection';
 import { FuncStream } from '@/components/Function/Stream';
 import Header from '@/components/Header';
-import Sidebar from '@/components/Sidebar/Sidebar';
-import SidebarLink from '@/components/Sidebar/SidebarLink';
+import Navbar from '@/components/Navbar/Navbar';
+import NavbarLink from '@/components/Navbar/NavbarLink';
 import TimelineScrollContainer from '@/components/Timeline/TimelineScrollContainer';
 import { IconBook, IconFeed, IconFunction } from '@/icons';
 import { useGetEventsStreamQuery, useGetFunctionsStreamQuery } from '@/store/generated';
@@ -22,11 +22,13 @@ import {
   showDocs,
   showEventSendModal,
   showFeed,
+  showApps,
   showFunctions,
 } from '@/store/global';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import classNames from '@/utils/classnames';
 import { FunctionList } from '@/views/FunctionList';
+import AppList from '@/views/AppList';
 
 export default function Page() {
   const sidebarTab = useAppSelector((state) => state.global.sidebarTab);
@@ -83,26 +85,36 @@ export default function Page() {
     >
       <BG />
       {/* <EventDetail /> */}
-      <Header />
+      <Header>
+        <Navbar>
+          <NavbarLink
+            icon={<IconFeed />}
+            active={contentView === "feed"}
+            badge={20}
+            onClick={() => dispatch(showFeed())}
+            tabName="Stream"
+          />
+          {/* <NavbarLink
+            icon={<IconFunction />}
+            active={contentView === "apps"}
+            onClick={() => dispatch(showApps())}
+            tabName="Apps"
+          /> */}
+          <NavbarLink
+            icon={<IconFunction />}
+            active={contentView === "functions"}
+            onClick={() => dispatch(showFunctions())}
+            tabName="Functions"
+          />
+          <NavbarLink
+            icon={<IconBook />}
+            active={contentView === "docs"}
+            onClick={() => dispatch(showDocs())}
+            tabName="Docs"
+          />
+        </Navbar>
+      </Header>
       <SendEventModal />
-      <Sidebar>
-        <SidebarLink
-          icon={<IconFeed />}
-          active={contentView === "feed"}
-          badge={20}
-          onClick={() => dispatch(showFeed())}
-        />
-        <SidebarLink
-          icon={<IconFunction />}
-          active={contentView === "functions"}
-          onClick={() => dispatch(showFunctions())}
-        />
-        <SidebarLink
-          icon={<IconBook />}
-          active={contentView === "docs"}
-          onClick={() => dispatch(showDocs())}
-        />
-      </Sidebar>
       {contentView === "feed" ? (
         <>
           <ActionBar
@@ -184,6 +196,8 @@ export default function Page() {
         </>
       ) : contentView === "functions" ? (
         <FunctionList />
+      ) : contentView === "apps" ? (
+        <AppList />
       ) : (
         <Docs />
       )}

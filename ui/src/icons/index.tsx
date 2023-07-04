@@ -3,6 +3,16 @@ export { IconFeed } from "./Feed";
 export { IconFunction } from "./Function";
 export { IconBook } from "./Book";
 export { InngestLogo } from "./InngestLogo";
+export { IconChevron } from "./Chevron";
+export { IconPlus } from "./Plus";
+export { IconSpinner } from "./Spinner";
+export { IconCheckCircle } from "./CheckCircle";
+export { IconExclamationTriangle } from "./ExclamationTriangle";
+export { IconArrowTopRightOnSquare} from "./ArrowTopRightOnSquare";
+export { IconCopy } from "./Copy";
+export { IconAppStatusCompleted } from "./AppStatusCompleted";
+export { IconAppStatusFailed } from "./AppStatusFailed";
+export { IconAppStatusDefault } from "./AppStatusDefault";
 
 // Status Icons
 export { IconStatusDefault } from "./StatusDefault";
