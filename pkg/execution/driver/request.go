@@ -13,7 +13,6 @@ type SDKRequest struct {
 	Events  []map[string]any   `json:"events,omitempty"`
 	Actions map[string]any     `json:"steps"`
 	Context *SDKRequestContext `json:"ctx"`
-
 	// UseAPI tells the SDK to retrieve `Events` and `Actions` data
 	// from the API instead of expecting it to be in the request body.
 	// This is a way to get around serverless provider's request body
@@ -24,7 +23,6 @@ type SDKRequest struct {
 func (req *SDKRequest) IsBodySizeTooLarge() bool {
 	byt, err := json.Marshal(req)
 	if err != nil {
-		// log error
 		return false
 	}
 	return len(byt) >= consts.MaxBodySize
@@ -35,6 +33,9 @@ type SDKRequestContext struct {
 	// order to specify the ID of the function to run via RPC.
 	FunctionID uuid.UUID `json:"fn_id"`
 
+	// RunID  is the ID of the current
+	RunID ulid.ULID `json:"run_id"`
+
 	// Env is the name of the environment that the function is running in.
 	// though this is self-discoverable most of the time, for static envs
 	// the SDK has no knowledge of the name as it only has a signing key.
@@ -44,8 +45,16 @@ type SDKRequestContext struct {
 	// order to specify the step of the function to run via RPC.
 	StepID string `json:"step_id"`
 
-	// XXX: Pass in opentracing context within ctx.
-	RunID ulid.ULID `json:"run_id"`
+	// Attempt is the zero-index attempt number.
+	Attempt int `json:"attempt"`
 
+	// Stack represents the function stack at the time of the step invocation.
 	Stack *FunctionStack `json:"stack"`
+
+	// XXX: Pass in opentracing context within ctx.
+}
+
+type FunctionStack struct {
+	Stack   []string `json:"stack"`
+	Current int      `json:"current"`
 }

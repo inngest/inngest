@@ -19,16 +19,19 @@ type Driver interface {
 		edge inngest.Edge,
 		step inngest.Step,
 		stackIndex int,
+		attempt int,
 	) (*state.DriverResponse, error)
 }
 
-type FunctionStack struct {
-	Stack   []string `json:"stack"`
-	Current int      `json:"current"`
-}
-
 // MarshalV1 marshals state as an input to driver runtimes.
-func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex int, env string) ([]byte, error) {
+func MarshalV1(
+	ctx context.Context,
+	s state.State,
+	step inngest.Step,
+	stackIndex int,
+	env string,
+	attempt int,
+) ([]byte, error) {
 	req := &SDKRequest{
 		// Events:  s.Events(),
 		Events:  []map[string]any{},
@@ -43,6 +46,7 @@ func MarshalV1(ctx context.Context, s state.State, step inngest.Step, stackIndex
 				Stack:   s.Stack(),
 				Current: stackIndex,
 			},
+			Attempt: attempt,
 		},
 	}
 
