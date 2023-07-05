@@ -369,7 +369,7 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *i
 		return nil, 0, fmt.Errorf("error saving started state: %w", err)
 	}
 
-	response, err := d.Execute(ctx, s, edge, *step, stackIndex)
+	response, err := d.Execute(ctx, s, edge, *step, stackIndex, attempt)
 	if response == nil {
 		// Add an error response here.
 		response = &state.DriverResponse{
