@@ -94,12 +94,12 @@ export default function Page() {
             onClick={() => dispatch(showFeed())}
             tabName="Stream"
           />
-          {/* <NavbarLink
+          <NavbarLink
             icon={<IconFunction />}
             active={contentView === "apps"}
             onClick={() => dispatch(showApps())}
             tabName="Apps"
-          /> */}
+          />
           <NavbarLink
             icon={<IconFunction />}
             active={contentView === "functions"}
