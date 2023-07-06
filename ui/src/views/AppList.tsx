@@ -7,6 +7,9 @@ export default function AppList() {
   const { data } = useGetAppsQuery();
   const apps = data?.apps || [];
 
+  const connectedApps = apps.filter(app => app.connected === true);
+  const numberOfConnectedApps = connectedApps.length;
+
   return (
     <div className="px-10 py-6 h-full flex flex-col overflow-y-scroll">
       <header className="mb-8">
@@ -25,7 +28,7 @@ export default function AppList() {
       </header>
       <div className="flex items-center gap-2 py-6">
         <IconFunction />
-        <p className="text-white">{apps.length} Apps Connected</p>
+        <p className="text-white">{numberOfConnectedApps} Apps Connected</p>
       </div>
       <div className="grid md:grid-cols-2 grid-cols-1 gap-6 min-h-max">
         {/* To do: fetch real apps */}
