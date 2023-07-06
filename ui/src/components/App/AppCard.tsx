@@ -106,7 +106,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                   <input
                     id="editAppUrl"
                     className={classNames(
-                      'min-w-[50%] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline',
+                      'min-w-[50%] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline readOnly:outline-transparent',
                       isUrlInvalid && ' outline-rose-500',
                       isAppConnecting && 'pr-6'
                     )}
