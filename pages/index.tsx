@@ -94,7 +94,7 @@ export default function Home() {
         />
       </div>
 
-      <LocalDev className="-mb-60" />
+      <LocalDev className="-mb-80 md:-mb-60" />
 
       <div className="bg-white pt-60 pb-48">
         <RunAnywhere />

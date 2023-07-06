@@ -58,7 +58,7 @@ export default function CustomerQuote({
       >
         <div
           className={clsx(
-            "text-lg font-medium",
+            "text-sm mb-2 md:text-base lg:text-lg font-medium",
             variant === "dark" ? "text-white drop-shadow" : "text-slate-900"
           )}
         >

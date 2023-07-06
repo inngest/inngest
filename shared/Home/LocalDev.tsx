@@ -13,9 +13,9 @@ export default function LocalDev({ className }: { className?: string }) {
     <div
       style={{
         backgroundImage: "url(/assets/pricing/table-bg.png)",
-        backgroundPosition: "center -20%",
+        backgroundPosition: "center -50%",
         backgroundRepeat: "no-repeat",
-        backgroundSize: "1800px 1200px",
+        backgroundSize: "2000px 1200px",
       }}
     >
       <Container className={`mt-44 relative z-30 ${className}`}>
@@ -66,7 +66,7 @@ export default function LocalDev({ className }: { className?: string }) {
           quote="It's sensational - this is the best way to test a background job! I’ve never had a UI like this that I can use to follow and see my workflows."
           name="Garrett Tolbert - Vercel"
           avatar="/assets/customers/vercel-garrett-tolbert.jpg"
-          className="max-w-lg md:absolute md:-bottom-20 md:left-[20%]"
+          className="max-w-lg m-auto -mt-20 md:m-auto md:absolute md:-bottom-20 md:left-[20%]"
         />
       </Container>
     </div>
