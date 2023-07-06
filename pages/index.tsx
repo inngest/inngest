@@ -94,19 +94,9 @@ export default function Home() {
         />
       </div>
 
-      <LocalDev className="-mb-96" />
+      <LocalDev className="-mb-80 md:-mb-60" />
 
-      <div className="bg-white pt-96 pb-48">
-        <div
-          style={{
-            backgroundImage: "url(/assets/pricing/table-bg.png)",
-            backgroundPosition: "center -30px",
-            backgroundRepeat: "no-repeat",
-            backgroundSize: "1800px 1200px",
-          }}
-          className="w-full h-100"
-        ></div>
-
+      <div className="bg-white pt-60 pb-48">
         <RunAnywhere />
 
         <Logos
@@ -150,7 +140,7 @@ export default function Home() {
             },
           ]}
           variant="light"
-          footer={(
+          footer={
             <div className="flex items-center justify-center mt-8">
               <Link
                 href="/product/how-inngest-works?ref=homepage-run-anywhere"
@@ -159,8 +149,7 @@ export default function Home() {
                 Learn How Inngest Works
               </Link>
             </div>
-          )}
-
+          }
         />
 
         <CustomerQuote
