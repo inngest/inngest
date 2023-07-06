@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Modal from '@/components/Modal';
 import Button from '@/components/Button';
 import { IconExclamationTriangle } from '@/icons';
 import classNames from '@/utils/classnames';
+import useInputUrlValidation from '@/hooks/useInputURLValidation';
 
 export default function AddAppModal({ isOpen, onClose }) {
-  const [input, setInput] = useState('');
+  const [inputUrl, setInputUrl, isUrlInvalid] = useInputUrlValidation();
   const [isDisabled, setDisabled] = useState(true);
-  const [isInvalid, setInvalid] = useState(false);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setInput(e.target.value);
+    setInputUrl(e.target.value);
     if (e.target.value.length > 0) {
       setDisabled(false);
     } else {
@@ -22,24 +22,6 @@ export default function AddAppModal({ isOpen, onClose }) {
     // To do: call Add App.
   }
 
-  useEffect(() => {
-    let debounce = setTimeout(() => {
-      if (input.length > 0) {
-        try {
-          new URL(input);
-          setInvalid(false);
-        } catch (err) {
-          setInvalid(true);
-        }
-      } else {
-        setInvalid(false);
-      }
-    }, 500);
-    return () => {
-      clearTimeout(debounce);
-    };
-  }, [input]);
-
   return (
     <Modal
       title="Add Inngest App"
@@ -49,7 +31,7 @@ export default function AddAppModal({ isOpen, onClose }) {
     >
       <form>
         <div className="bg-[#050911]/50 p-6">
-          <label htmlFor="addApp" className="text-sm font-semibold text-white">
+          <label htmlFor="addAppUrlModal" className="text-sm font-semibold text-white">
             App URL
             <span className="text-slate-500 text-sm pb-4 block">
               The URL of your application
@@ -57,22 +39,21 @@ export default function AddAppModal({ isOpen, onClose }) {
           </label>
           <div className="relative">
             <input
-              id="addApp"
+              id="addAppUrlModal"
               className={classNames(
                 'min-w-[420px] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline',
-                isInvalid && 'pr-8 outline-rose-500'
+                isUrlInvalid && 'pr-8 outline-rose-500'
               )}
               placeholder="https://example.com/api/inngest"
-              value={input}
+              value={inputUrl}
               onChange={handleChange}
             />
-            {isInvalid && (
+            {isUrlInvalid && (
               <IconExclamationTriangle className="absolute top-2/4 right-2 -translate-y-2/4 text-rose-500" />
             )}
           </div>
         </div>
-
-        {isInvalid && (
+        {isUrlInvalid && (
           <p className="bg-rose-600/50 text-white flex items-center gap-2 text-sm px-6 py-2">
             <IconExclamationTriangle />
             Please enter a valid URL
@@ -81,7 +62,7 @@ export default function AddAppModal({ isOpen, onClose }) {
         <div className="flex items-center justify-between p-6 border-t border-slate-800">
           <Button label="Cancel" kind="secondary" btnAction={onClose} />
           <Button
-            disabled={isDisabled || isInvalid}
+            disabled={isDisabled || isUrlInvalid}
             label="Connect App"
             btnAction={handleSubmit}
           />
