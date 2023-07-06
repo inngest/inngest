@@ -3,25 +3,9 @@ import { IconFunction, IconSpinner } from '@/icons';
 import AddAppButton from '@/components/App/AddAppButton';
 import { useGetAppsQuery } from '@/store/generated';
 
-const cenas = [{
-  autodiscovered: false,
-  connected: false,
-  functionCount: 0,
-  id: '1cena',
-  name: 'fake cenas',
-  sdkLanguage: 'a',
-  sdkVersion: '2.12.0',
-  url: 'http://localhost:2020'
-  }]
-
-
 export default function AppList() {
   const { data } = useGetAppsQuery();
-  const apps = cenas;
-
-// export default function AppList() {
-//   const { data } = useGetAppsQuery();
-//   const apps = data?.apps || [];
+  const apps = data?.apps || [];
 
   return (
     <div className="px-10 py-6 h-full flex flex-col overflow-y-scroll">

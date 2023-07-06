@@ -1,9 +1,13 @@
+import { useState } from 'react';
 import { useAppDispatch } from '@/store/hooks';
 import { showFunctions, showDocs } from '@/store/global';
 import { type App } from '@/store/generated';
+// import { useDeleteAppMutation } from '@/store/devApi';
 import CodeLine from '@/components/CodeLine';
 import AppCardHeader from '@/components/App/AppCardHeader';
 import AppCardStep from './AppCardStep';
+import classNames from '@/utils/classnames';
+import useInputUrlValidation from '@/hooks/useInputURLValidation';
 import {
   IconAppStatusCompleted,
   IconAppStatusFailed,
@@ -13,10 +17,29 @@ import {
   IconAppStatusDefault,
 } from '@/icons';
 
-type AppWithoutFunctions= Omit<App, 'functions'>;
+type AppWithoutFunctions = Omit<App, 'functions'>;
 
-export default function AppCard({ app }: {app: AppWithoutFunctions} ) {
+export default function AppCard({ app }: { app: AppWithoutFunctions }) {
+  const [isAppConnecting, setAppConnecting] = useState(false);
+  const [inputUrl, setInputUrl, isUrlInvalid] = useInputUrlValidation({
+    callback: () => {
+      // To do: edit app, show the isAppConnecting state in the meanwhile, remove it once done
+    },
+    initialInputValue: app.url ?? undefined,
+  });
+  // const [_deleteApp, deleteAppState] = useDeleteAppMutation();
   const dispatch = useAppDispatch();
+
+  function handleDelete() {
+    // _deleteApp({
+    //   id: app.id,
+    // });
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setInputUrl(e.target.value);
+  }
+
   return (
     <div>
       <AppCardHeader
@@ -25,8 +48,7 @@ export default function AppCard({ app }: {app: AppWithoutFunctions} ) {
         sdkVersion={app.sdkVersion}
       />
       <div className="border border-slate-700/30 rounded-b-md divide-y divide-slate-700/30 bg-slate-800/30">
-        {/* To do: add ability to edit url inside card triggers this loading state */}
-        {false ? (
+        {isAppConnecting ? (
           <div className="p-4 pr-6 flex items-center gap-2">
             <IconSpinner className="fill-sky-400 text-slate-800" />
             <p className="text-slate-400 text-lg font-light">Connecting...</p>
@@ -67,20 +89,37 @@ export default function AppCard({ app }: {app: AppWithoutFunctions} ) {
                   <span className="text-white">multiple ports</span> by default.
                 </p>
               )}
-              <div className="flex items-center justify-between pb-4">
-                <div>
-                  <p className="text-sm font-semibold text-white">App URL</p>
-                  <p className="text-slate-500 text-sm">
+              {isUrlInvalid && (
+                <p className="pb-4 text-slate-400">Please enter a valid URL</p>
+              )}
+              <form className="flex items-center justify-between pb-4">
+                <label
+                  htmlFor="editAppUrl"
+                  className="text-sm font-semibold text-white"
+                >
+                  App URL
+                  <span className="text-slate-500 text-sm block">
                     The URL of your application
-                  </p>
+                  </span>
+                </label>
+                <div className="relative">
+                  <input
+                    id="editAppUrl"
+                    className={classNames(
+                      'min-w-[50%] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline',
+                      isUrlInvalid && ' outline-rose-500',
+                      isAppConnecting && 'pr-6'
+                    )}
+                    value={inputUrl}
+                    placeholder="https://example.com/api/inngest"
+                    onChange={handleChange}
+                    readOnly={app.autodiscovered}
+                  />
+                  {isAppConnecting && (
+                    <IconSpinner className="absolute top-1/3 right-2 fill-sky-400 text-slate-800" />
+                  )}
                 </div>
-                {/* To do: add ability to edit the URL */}
-                <input
-                  className="min-w-[50%] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline"
-                  value={app.url}
-                  readOnly={app.autodiscovered}
-                />
-              </div>
+              </form>
               <a
                 className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
                 onClick={() => dispatch(showDocs('/sdk/serve'))}
@@ -152,8 +191,9 @@ export default function AppCard({ app }: {app: AppWithoutFunctions} ) {
         />
         {!app.autodiscovered && (
           <div className="text-white p-4 pr-6">
-            {/* To do: add ability to delete app */}
-            <button className="text-rose-400">Delete App</button>
+            <button className="text-rose-400" onClick={handleDelete}>
+              Delete App
+            </button>
           </div>
         )}
       </div>
