@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -927,12 +928,14 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 
 // PausesByEvent returns all pauses for a given event within a workspace.
 func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
-	cmd := m.r.B().Hscan().Key(m.kf.PauseEvent(ctx, workspaceID, event)).Cursor(0).Build()
-	scan, err := m.r.Do(ctx, cmd).AsScanEntry()
+	key := m.kf.PauseEvent(ctx, workspaceID, event)
+	cmd := m.r.B().Hkeys().Key(key).Build()
+	keys, err := m.r.Do(ctx, cmd).AsStrSlice()
 	if err != nil {
 		return nil, err
 	}
-	return &iter{i: -1, vals: scan}, nil
+
+	return &keyIter{i: 0, keys: keys, r: m.r, key: key}, nil
 }
 
 func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) {
@@ -1062,38 +1065,81 @@ func (m mgr) runCallbacks(ctx context.Context, id state.Identifier, status enums
 	}
 }
 
-type iter struct {
+type keyIter struct {
+	l sync.Mutex
+
 	i    int
-	vals rueidis.ScanEntry
+	keys []string
+
+	// buffer stores items returned from HMGet temporarily.
+	buffer []string
+
+	// val stores the next val
+	val *state.Pause
+
+	r   rueidis.Client
+	key string
+	err error
 }
 
-func (i *iter) Next(ctx context.Context) bool {
-	if len(i.vals.Elements) == 0 || i.i >= (len(i.vals.Elements)-1) {
+func (i *keyIter) Err() error {
+	return i.err
+}
+
+func (i *keyIter) Next(ctx context.Context) bool {
+	i.l.Lock()
+	defer i.l.Unlock()
+
+	if len(i.buffer) > 0 {
+		i.getNext(ctx)
+		return i.err == nil
+	}
+
+	if len(i.keys) == 0 || i.i == len(i.keys) {
 		return false
 	}
-	// Skip the ID
-	i.i++
-	// Get the value.
-	i.i++
-	return true
+
+	amt := 100
+	if 100 > len(i.keys) {
+		// Fetch all remaining keys.
+		amt = len(i.keys)
+	}
+
+	// Take a buffer from the keys
+	buffer := i.keys[:amt]
+
+	cmd := i.r.B().Hmget().Key(i.key).Field(buffer...).Build()
+	vals, err := i.r.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		i.err = err
+		return false
+	}
+	// Remove the fetched keys from remaining list
+	i.keys = i.keys[amt:]
+	// Update our buffer.
+	i.buffer = vals
+
+	// get the next item into Val
+	i.getNext(ctx)
+
+	return i.err == nil
 }
 
-func (i *iter) Val(ctx context.Context) *state.Pause {
-	if i.i == -1 || i.i >= len(i.vals.Elements) {
-		return nil
-	}
+// Buffer by running an MGET to get the values of the pauses.
+func (i *keyIter) Val(ctx context.Context) *state.Pause {
+	return i.val
+}
 
-	val := i.vals.Elements[i.i]
-	if val == "" {
-		return nil
+func (i *keyIter) getNext(ctx context.Context) {
+	if len(i.buffer) == 0 {
+		return
 	}
+	str := i.buffer[0]
+	i.buffer = i.buffer[1:]
 
 	pause := &state.Pause{}
-	err := json.Unmarshal([]byte(val), pause)
-	if err != nil {
-		return nil
-	}
-	return pause
+	i.err = json.Unmarshal([]byte(str), pause)
+	i.val = pause
 }
 
 func NewRunMetadata(data map[string]string) (*runMetadata, error) {
