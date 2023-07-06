@@ -63,6 +63,7 @@ var (
 	}
 
 	startedAtKey = startedAtCtxKey{}
+	latencyKey   = latencyCtxKey{}
 )
 
 func init() {
@@ -74,8 +75,17 @@ func init() {
 // available via context.
 type startedAtCtxKey struct{}
 
+// latencyCtxKey is a context key which records when the queue item starts,
+// available via context.
+type latencyCtxKey struct{}
+
 func GetItemStart(ctx context.Context) (time.Time, bool) {
 	t, ok := ctx.Value(startedAtKey).(time.Time)
+	return t, ok
+}
+
+func GetItemLatency(ctx context.Context) (time.Duration, bool) {
+	t, ok := ctx.Value(latencyKey).(time.Duration)
 	return t, ok
 }
 
@@ -616,11 +626,14 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 				Msg("delaying job in memory")
 		}
 
-		jobCtx = context.WithValue(jobCtx, startedAtKey, time.Now())
-
+		n := time.Now()
 		// Track the latency on average globally.  Do this in a goroutine so that it doesn't
 		// at all delay the job during concurrenty locking contention.
-		latency := time.Since(time.UnixMilli(qi.AtMS))
+		latency := n.Sub(time.UnixMilli(qi.AtMS))
+		// store started at and latency in ctx
+		jobCtx = context.WithValue(jobCtx, startedAtKey, n)
+		jobCtx = context.WithValue(jobCtx, latencyKey, latency)
+
 		go func() {
 			// Update the ewma
 			latencySem.Lock()
@@ -630,11 +643,6 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 
 			// Set the metrics historgram and gauge, which reports the ewma value.
 			scope.Histogram(histogramItemLatency, latencyBuckets).RecordDuration(latency)
-
-			q.logger.Debug().
-				Str("job_id", qi.ID).
-				Int64("latency_ms", latency.Milliseconds()).
-				Msg("processing job")
 		}()
 
 		go scope.Counter(counterQueueItemsStarted).Inc(1)
