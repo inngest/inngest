@@ -228,13 +228,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 		if log != nil {
 			log.Warn().Msg("step already executed")
 		}
-		// TODO: Index ???
+
+		// Get the index from the previous save.
+		idx, _ := e.sm.StackIndex(ctx, id.RunID, edge.Incoming)
+
 		// This has already successfully been executed.
 		return &state.DriverResponse{
 			Scheduled: false,
 			Output:    resp,
 			Err:       nil,
-		}, 0, nil
+		}, idx, nil
 	}
 
 	resp, idx, err := e.run(ctx, id, edge, s, attempt, stackIndex)
@@ -366,7 +369,7 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *i
 		return nil, 0, fmt.Errorf("error saving started state: %w", err)
 	}
 
-	response, err := d.Execute(ctx, s, edge, *step, stackIndex)
+	response, err := d.Execute(ctx, s, edge, *step, stackIndex, attempt)
 	if response == nil {
 		// Add an error response here.
 		response = &state.DriverResponse{

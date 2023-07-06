@@ -65,8 +65,8 @@ func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
 	return nil
 }
 
-func Execute(ctx context.Context, s state.State, edge inngest.Edge, step inngest.Step, idx int) (*state.DriverResponse, error) {
-	return DefaultExecutor.Execute(ctx, s, edge, step, idx)
+func Execute(ctx context.Context, s state.State, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+	return DefaultExecutor.Execute(ctx, s, edge, step, idx, attempt)
 }
 
 type executor struct {
@@ -141,14 +141,13 @@ func ParseGenerator(ctx context.Context, byt []byte) ([]*state.GeneratorOpcode, 
 	}, nil
 }
 
-func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge, step inngest.Step, idx int) (*state.DriverResponse, error) {
-
+func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
 	uri, err := url.Parse(step.URI)
 	if err != nil || (uri.Scheme != "http" && uri.Scheme != "https") {
 		return nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
 	}
 
-	input, err := driver.MarshalV1(ctx, s, step, idx, "local")
+	input, err := driver.MarshalV1(ctx, s, step, idx, "local", attempt)
 	if err != nil {
 		return nil, err
 	}
