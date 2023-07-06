@@ -123,3 +123,10 @@ export const APPS = gql`
   }
 `;
 
+export const ADD_APP = gql`
+  mutation CreateApp($input: CreateAppInput!) {
+    createApp(input: $input) {
+      url
+    }
+  } 
+`;

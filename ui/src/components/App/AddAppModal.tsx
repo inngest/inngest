@@ -4,9 +4,11 @@ import Button from '@/components/Button';
 import { IconExclamationTriangle } from '@/icons';
 import classNames from '@/utils/classnames';
 import useInputUrlValidation from '@/hooks/useInputURLValidation';
+import { useCreateAppMutation } from '@/store/generated';
 
 export default function AddAppModal({ isOpen, onClose }) {
   const [inputUrl, setInputUrl, isUrlInvalid] = useInputUrlValidation();
+  const [createAppMutation] = useCreateAppMutation();
   const [isDisabled, setDisabled] = useState(true);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -18,8 +20,24 @@ export default function AddAppModal({ isOpen, onClose }) {
     }
   }
 
-  function handleSubmit() {
-    // To do: call Add App.
+  async function createApp() {
+    try {
+      const response = await createAppMutation({
+        input: {
+          url: inputUrl,
+        },
+      });
+      console.log('Created app URL:', response);
+      onClose();
+    } catch (error) {
+      console.error('Error creating app:', error);
+    }
+    // To do: add optimistic render in the list and toast for error
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    createApp();
   }
 
   return (
@@ -31,7 +49,10 @@ export default function AddAppModal({ isOpen, onClose }) {
     >
       <form>
         <div className="bg-[#050911]/50 p-6">
-          <label htmlFor="addAppUrlModal" className="text-sm font-semibold text-white">
+          <label
+            htmlFor="addAppUrlModal"
+            className="text-sm font-semibold text-white"
+          >
             App URL
             <span className="text-slate-500 text-sm pb-4 block">
               The URL of your application

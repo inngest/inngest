@@ -5,7 +5,7 @@ interface ButtonProps {
   label?: React.ReactNode;
   icon?: React.ReactNode;
   disabled?: boolean;
-  btnAction?: () => void;
+  btnAction?: (e?: React.MouseEvent) => void;
 }
 
 export default function Button({

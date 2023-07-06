@@ -38,6 +38,10 @@ export type App = {
   url?: Maybe<Scalars['String']>;
 };
 
+export type CreateAppInput = {
+  url: Scalars['String'];
+};
+
 export type Event = {
   __typename?: 'Event';
   createdAt?: Maybe<Scalars['Time']>;
@@ -152,6 +156,22 @@ export type FunctionVersion = {
   version: Scalars['Int'];
 };
 
+export type Mutation = {
+  __typename?: 'Mutation';
+  createApp: App;
+  updateApp: App;
+};
+
+
+export type MutationCreateAppArgs = {
+  input: CreateAppInput;
+};
+
+
+export type MutationUpdateAppArgs = {
+  input: UpdateAppInput;
+};
+
 export type Query = {
   __typename?: 'Query';
   apps: Array<App>;
@@ -210,6 +230,11 @@ export type StepEventWait = {
   expression?: Maybe<Scalars['String']>;
 };
 
+export type UpdateAppInput = {
+  id: Scalars['String'];
+  url: Scalars['String'];
+};
+
 export type Workspace = {
   __typename?: 'Workspace';
   id: Scalars['ID'];
@@ -248,6 +273,13 @@ export type GetAppsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework?: string | null, url?: string | null, error?: string | null, connected: boolean, functionCount: number, autodiscovered: boolean }> };
+
+export type CreateAppMutationVariables = Exact<{
+  input: CreateAppInput;
+}>;
+
+
+export type CreateAppMutation = { __typename?: 'Mutation', createApp: { __typename?: 'App', url?: string | null } };
 
 
 export const GetEventsStreamDocument = `
@@ -367,6 +399,13 @@ export const GetAppsDocument = `
   }
 }
     `;
+export const CreateAppDocument = `
+    mutation CreateApp($input: CreateAppInput!) {
+  createApp(input: $input) {
+    url
+  }
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -388,9 +427,12 @@ const injectedRtkApi = api.injectEndpoints({
     GetApps: build.query<GetAppsQuery, GetAppsQueryVariables | void>({
       query: (variables) => ({ document: GetAppsDocument, variables })
     }),
+    CreateApp: build.mutation<CreateAppMutation, CreateAppMutationVariables>({
+      query: (variables) => ({ document: CreateAppDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery } = injectedRtkApi;
+export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation } = injectedRtkApi;
 

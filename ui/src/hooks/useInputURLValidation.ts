@@ -34,7 +34,6 @@ function useInputUrlValidation({
     };
   }, [inputUrl, callback]);
 
-  debugger;
   return [inputUrl, setInputUrl, isUrlInvalid] as const;
 }
 

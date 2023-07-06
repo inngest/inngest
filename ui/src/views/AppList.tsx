@@ -28,10 +28,9 @@ export default function AppList() {
       </header>
       <div className="flex items-center gap-2 py-6">
         <IconFunction />
-        <p className="text-white">{numberOfConnectedApps} Apps Connected</p>
+        <p className="text-white">{numberOfConnectedApps} App${numberOfConnectedApps === 1 ? "" : "s"} Connected</p>
       </div>
       <div className="grid md:grid-cols-2 grid-cols-1 gap-6 min-h-max">
-        {/* To do: fetch real apps */}
         {apps.map((app) => {
           return <AppCard key={app?.id} app={app} />;
         })}
