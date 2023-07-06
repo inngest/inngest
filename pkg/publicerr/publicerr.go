@@ -40,6 +40,25 @@ func WrapDefaults(err error) error {
 	}
 }
 
+// WrapWithData wraps a root cause error with an HTTP status and a public message.  The status
+// is first to conform to Wrapf and Errorf formats.
+func WrapWithData(err error, status int, msg string, data map[string]any) error {
+	return Error{
+		Message: msg,
+		Status:  status,
+		Err:     err,
+	}
+}
+
+func WithData(err error, data map[string]any) error {
+	d, ok := err.(Error)
+	if !ok {
+		d = WrapDefaults(err).(Error)
+	}
+	d.Data = data
+	return d
+}
+
 // Errorf is much like fmt.Errorf but holds an HTTP status and returns an Error type
 // wrapping fmt.Errorf's builtin error.  This is used to create new error structs
 // easily if the message is intended for the public.
@@ -64,6 +83,8 @@ func Errorf(status int, message string, opts ...interface{}) error {
 type Error struct {
 	// Message represents the message to display
 	Message string `json:"error"`
+	// Data is a KV map of extra error data.
+	Data map[string]any `json:"data"`
 	// Status represents the HTTP status code to use when responding via HTTP
 	Status int `json:"status"`
 	// Err is the original err which represents the cause of the issue.  This is

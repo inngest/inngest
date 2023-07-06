@@ -2,10 +2,9 @@ package devserver
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver/discovery"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -26,13 +26,6 @@ import (
 
 const (
 	SDKPollInterval = 5 * time.Second
-)
-
-var (
-	timeout = 2 * time.Second
-	hc      = http.Client{
-		Timeout: timeout,
-	}
 )
 
 func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager) *devserver {
@@ -168,32 +161,43 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 			return
 		}
 
+		urls := map[string]struct{}{}
+		if apps, err := d.data.GetApps(ctx); err == nil {
+			for _, app := range apps {
+				// We've seen this URL.
+				urls[app.Url] = struct{}{}
+
+				// Make a new PUT request to each app, indicating that the
+				// SDK should push functions to the dev server.
+				err := deploy.Ping(ctx, app.Url)
+				discovery.SetURLError(app.Url, err)
+				if err != nil {
+					_, _ = d.data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
+						ID: app.ID,
+						Error: sql.NullString{
+							String: err.Error(),
+							Valid:  true,
+						},
+					})
+				} else {
+					_, _ = d.data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
+						ID: app.ID,
+						Error: sql.NullString{
+							String: "",
+							Valid:  false,
+						},
+					})
+				}
+			}
+		}
+
+		// Attempt to add new apps for each discovered URL that's _not_ already
+		// an app.
 		for u := range discovery.URLs() {
-			// Make a new PUT request to the URL, indicating that the
-			// SDK should push functions to the dev server.
-			req, _ := http.NewRequest(http.MethodPut, u, nil)
-			resp, err := hc.Do(req)
-			if err != nil {
-				logger.From(ctx).Error().Err(err).Str("url", u).Msg("unable to connect to the SDK")
-				discovery.SetURLError(u, fmt.Errorf("Unable to connect to the SDK"))
+			if _, ok := urls[u]; ok {
 				continue
 			}
-			if resp.StatusCode == 200 {
-				discovery.SetURLError(u, nil)
-				continue
-			}
-
-			// Log an error that we were unable to connect to the SDK.
-			body, _ := io.ReadAll(resp.Body)
-			_ = resp.Body.Close()
-			discovery.SetURLError(u, fmt.Errorf("Unable to connect to the SDK: %s", body))
-
-			logger.From(ctx).Error().
-				Int("status", resp.StatusCode).
-				Str("url", u).
-				Str("response", string(body)).
-				Msg("unable to connect to the SDK")
-
+			_ = deploy.Ping(ctx, u)
 		}
 		<-time.After(SDKPollInterval)
 	}
