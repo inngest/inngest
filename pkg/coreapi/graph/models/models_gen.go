@@ -19,6 +19,10 @@ type ActionVersionQuery struct {
 	VersionMinor *int   `json:"versionMinor,omitempty"`
 }
 
+type CreateAppInput struct {
+	URL string `json:"url"`
+}
+
 type Event struct {
 	ID           string         `json:"id"`
 	Workspace    *Workspace     `json:"workspace,omitempty"`
@@ -106,6 +110,11 @@ type StepEventWait struct {
 	EventName  *string   `json:"eventName,omitempty"`
 	Expression *string   `json:"expression,omitempty"`
 	ExpiryTime time.Time `json:"expiryTime"`
+}
+
+type UpdateAppInput struct {
+	ID  string `json:"id"`
+	URL string `json:"url"`
 }
 
 type Workspace struct {

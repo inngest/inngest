@@ -3,6 +3,9 @@ INSERT INTO apps
 	(id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url) VALUES
 	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *;
 
+-- name: GetApp :one
+SELECT * FROM apps WHERE id = ?;
+
 -- name: GetApps :many
 SELECT * FROM apps WHERE deleted_at IS NULL;
 
@@ -15,6 +18,14 @@ SELECT * FROM apps;
 -- name: DeleteApp :exec
 UPDATE apps SET deleted_at = NOW() WHERE id = ?;
 
+-- name: HardDeleteApp :exec
+DELETE FROM apps WHERE id = ?;
+
+-- name: UpdateAppURL :one
+UPDATE apps SET url = ? WHERE id = ? RETURNING *;
+
+-- name: UpdateAppError :one
+UPDATE apps SET error = ? WHERE id = ? RETURNING *;
 
 -- note - this is very basic right now.
 -- name: InsertFunction :one

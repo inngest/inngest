@@ -90,6 +90,60 @@ func (w wrapper) InsertApp(ctx context.Context, arg cqrs.InsertAppParams) (*cqrs
 	)
 }
 
+func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorParams) (*cqrs.App, error) {
+	// https://duckdb.org/docs/sql/indexes.html
+	//
+	// NOTE: You cannot update in DuckDB without deleting first right now.  Instead,
+	// we run a series of transactions to get, delete, then re-insert the app.  This
+	// will be fixed in a near version of DuckDB.
+	app, err := w.q.GetApp(ctx, arg.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := w.q.HardDeleteApp(ctx, arg.ID); err != nil {
+		return nil, err
+	}
+
+	app.Error = arg.Error
+	params := sqlc.InsertAppParams{}
+	_ = copier.CopyWithOption(&params, app, copier.Option{DeepCopy: true})
+
+	// Recreate the app.
+	app, err = w.q.InsertApp(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	out := &cqrs.App{}
+	err = copier.CopyWithOption(out, app, copier.Option{DeepCopy: true})
+	return out, err
+}
+
+func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) (*cqrs.App, error) {
+	// https://duckdb.org/docs/sql/indexes.html
+	//
+	// NOTE: You cannot update in DuckDB without deleting first right now.  Instead,
+	// we run a series of transactions to get, delete, then re-insert the app.  This
+	// will be fixed in a near version of DuckDB.
+	app, err := w.q.GetApp(ctx, arg.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := w.q.HardDeleteApp(ctx, arg.ID); err != nil {
+		return nil, err
+	}
+	app.Url = arg.Url
+	params := sqlc.InsertAppParams{}
+	_ = copier.CopyWithOption(&params, app, copier.Option{DeepCopy: true})
+	// Recreate the app.
+	app, err = w.q.InsertApp(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	out := &cqrs.App{}
+	err = copier.CopyWithOption(out, app, copier.Option{DeepCopy: true})
+	return out, err
+}
+
 // DeleteApp creates a new app.
 func (w wrapper) DeleteApp(ctx context.Context, id uuid.UUID) error {
 	return w.q.DeleteApp(ctx, id)
