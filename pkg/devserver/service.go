@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -27,13 +26,6 @@ import (
 
 const (
 	SDKPollInterval = 5 * time.Second
-)
-
-var (
-	timeout = 2 * time.Second
-	hc      = http.Client{
-		Timeout: timeout,
-	}
 )
 
 func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager) *devserver {
