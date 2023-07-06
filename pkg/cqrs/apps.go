@@ -40,6 +40,11 @@ type AppReader interface {
 type AppWriter interface {
 	// InsertApp creates a new app.
 	InsertApp(ctx context.Context, arg InsertAppParams) (*App, error)
+	// UpdateAppError sets an app error.  A nil string
+	// clears the app error.
+	UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error)
+	// UpdateAppURL
+	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 	// DeleteApp creates a new app.
 	DeleteApp(ctx context.Context, id uuid.UUID) error
 }
@@ -55,4 +60,14 @@ type InsertAppParams struct {
 	Error       sql.NullString
 	Checksum    string
 	Url         string
+}
+
+type UpdateAppErrorParams struct {
+	ID    uuid.UUID
+	Error sql.NullString
+}
+
+type UpdateAppURLParams struct {
+	ID  uuid.UUID
+	Url string
 }

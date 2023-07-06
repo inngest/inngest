@@ -62,6 +62,30 @@ func (q *Queries) GetAllApps(ctx context.Context) ([]*App, error) {
 	return items, nil
 }
 
+const getApp = `-- name: GetApp :one
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE id = ?
+`
+
+func (q *Queries) GetApp(ctx context.Context, id uuid.UUID) (*App, error) {
+	row := q.db.QueryRowContext(ctx, getApp, id)
+	var i App
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SdkLanguage,
+		&i.SdkVersion,
+		&i.Framework,
+		&i.Metadata,
+		&i.Status,
+		&i.Error,
+		&i.Checksum,
+		&i.CreatedAt,
+		&i.DeletedAt,
+		&i.Url,
+	)
+	return &i, err
+}
+
 const getAppByChecksum = `-- name: GetAppByChecksum :one
 SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url FROM apps WHERE checksum = ?
 `
@@ -212,6 +236,15 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 	return items, nil
 }
 
+const hardDeleteApp = `-- name: HardDeleteApp :exec
+DELETE FROM apps WHERE id = ?
+`
+
+func (q *Queries) HardDeleteApp(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, hardDeleteApp, id)
+	return err
+}
+
 const insertApp = `-- name: InsertApp :one
 INSERT INTO apps
 	(id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url) VALUES
@@ -295,6 +328,64 @@ func (q *Queries) InsertFunction(ctx context.Context, arg InsertFunctionParams) 
 		&i.Slug,
 		&i.Config,
 		&i.CreatedAt,
+	)
+	return &i, err
+}
+
+const updateAppError = `-- name: UpdateAppError :one
+UPDATE apps SET error = ? WHERE id = ? RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url
+`
+
+type UpdateAppErrorParams struct {
+	Error sql.NullString
+	ID    uuid.UUID
+}
+
+func (q *Queries) UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error) {
+	row := q.db.QueryRowContext(ctx, updateAppError, arg.Error, arg.ID)
+	var i App
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SdkLanguage,
+		&i.SdkVersion,
+		&i.Framework,
+		&i.Metadata,
+		&i.Status,
+		&i.Error,
+		&i.Checksum,
+		&i.CreatedAt,
+		&i.DeletedAt,
+		&i.Url,
+	)
+	return &i, err
+}
+
+const updateAppURL = `-- name: UpdateAppURL :one
+UPDATE apps SET url = ? WHERE id = ? RETURNING id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, deleted_at, url
+`
+
+type UpdateAppURLParams struct {
+	Url string
+	ID  uuid.UUID
+}
+
+func (q *Queries) UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error) {
+	row := q.db.QueryRowContext(ctx, updateAppURL, arg.Url, arg.ID)
+	var i App
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.SdkLanguage,
+		&i.SdkVersion,
+		&i.Framework,
+		&i.Metadata,
+		&i.Status,
+		&i.Error,
+		&i.Checksum,
+		&i.CreatedAt,
+		&i.DeletedAt,
+		&i.Url,
 	)
 	return &i, err
 }

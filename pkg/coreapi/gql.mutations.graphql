@@ -1,0 +1,13 @@
+type Mutation {
+  createApp(input: CreateAppInput!): App!
+  updateApp(input: UpdateAppInput!): App!
+}
+
+input CreateAppInput {
+  url: String!
+}
+
+input UpdateAppInput {
+  id: String!
+  url: String!
+}
