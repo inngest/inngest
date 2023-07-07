@@ -33,6 +33,8 @@ type AppReader interface {
 	GetApps(ctx context.Context) ([]*App, error)
 	// GetAppByChecksum returns an app by checksum.
 	GetAppByChecksum(ctx context.Context, checksum string) (*App, error)
+	// GetAppByURL returns an app by URL
+	GetAppByURL(ctx context.Context, url string) (*App, error)
 	// GetAllApps returns all apps.
 	GetAllApps(ctx context.Context) ([]*App, error)
 }
@@ -45,7 +47,7 @@ type AppWriter interface {
 	UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error)
 	// UpdateAppURL
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
-	// DeleteApp creates a new app.
+	// DeleteApp deletes an app.
 	DeleteApp(ctx context.Context, id uuid.UUID) error
 }
 

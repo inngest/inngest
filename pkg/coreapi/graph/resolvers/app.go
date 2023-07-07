@@ -60,9 +60,7 @@ func (a appResolver) Functions(ctx context.Context, obj *cqrs.App) ([]*models.Fu
 }
 
 func (a appResolver) Connected(ctx context.Context, obj *cqrs.App) (bool, error) {
-	urls := discovery.URLs()
-	err := urls[obj.Url]
-	return err == nil, nil
+	return !obj.Error.Valid, nil
 }
 
 func (a appResolver) Autodiscovered(ctx context.Context, obj *cqrs.App) (bool, error) {

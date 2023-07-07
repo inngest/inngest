@@ -48,7 +48,7 @@ var (
 	}
 
 	// urls lists all auto-discovered URLs to the error connecting
-	urls    = map[string]error{}
+	urls    = map[string]struct{}{}
 	urlLock sync.Mutex
 )
 
@@ -63,7 +63,7 @@ func init() {
 // Autodiscover attempts to automatically discover SDK endpoints running on
 // the local machine, using a combination of the default supported ports
 // and default API endpoints above.
-func Autodiscover(ctx context.Context) map[string]error {
+func Autodiscover(ctx context.Context) map[string]struct{} {
 	urlLock.Lock()
 
 	ports := openPorts(ctx)
@@ -76,7 +76,7 @@ func Autodiscover(ctx context.Context) map[string]error {
 				if _, ok := urls[url]; !ok {
 					// only add if the URL doesn't exist;  this ensures
 					// we don't overwrite eror5rs.
-					urls[url] = nil
+					urls[url] = struct{}{}
 				}
 			}
 		}
@@ -88,20 +88,14 @@ func Autodiscover(ctx context.Context) map[string]error {
 }
 
 // URLs returns a list of auto-discovered URLs
-func URLs() map[string]error {
+func URLs() map[string]struct{} {
 	urlLock.Lock()
 	defer urlLock.Unlock()
-	copied := map[string]error{}
+	copied := map[string]struct{}{}
 	for k, v := range urls {
 		copied[k] = v
 	}
 	return copied
-}
-
-func SetURLError(url string, err error) {
-	urlLock.Lock()
-	defer urlLock.Unlock()
-	urls[url] = err
 }
 
 // checkURL attempts to discover whether there's an SDK hosted at the given url
