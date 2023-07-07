@@ -1,5 +1,6 @@
 "use client";
 
+import { Toaster } from 'sonner';
 import ActionBar from '@/components/ActionBar';
 import BG from '@/components/BG';
 import { BlankSlate } from '@/components/Blank';
@@ -213,6 +214,7 @@ export default function Page() {
       ) : (
         <Docs />
       )}
+      <Toaster theme="dark" toastOptions={{ style: { background: "#334155" }}}/>
     </div>
   );
 }

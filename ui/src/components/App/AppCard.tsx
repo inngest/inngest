@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { useAppDispatch } from '@/store/hooks';
 import { showFunctions, showDocs } from '@/store/global';
 import { type App } from '@/store/generated';
@@ -47,12 +48,13 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
           id: app.id,
         },
       });
+      toast.success('The URL was successfully updated.');
       console.log('Edited app URL:', response);
     } catch (error) {
+      toast.error('The URL could not be updated.');
       console.error('Error editing app:', error);
     }
     setIsLoading(false);
-    // To do: add optimistic render in the list and toast for error
   }
 
   async function deleteApp() {
@@ -60,11 +62,13 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
       const response = await _deleteApp({
         id: app.id,
       });
+      toast.success(`${app.name || 'The app'} was successfully deleted.`);
       console.log('Deleted app:', response);
     } catch (error) {
+      toast.error(`${app.name || 'The app'} could not be deleted: ${error}`);
       console.error('Error deleting app:', error);
     }
-    // To do: add optimistic render in the list and toast for error
+    // To do: add optimistic render in the list
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {

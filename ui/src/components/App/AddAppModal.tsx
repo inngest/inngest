@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import Modal from '@/components/Modal';
 import Button from '@/components/Button';
 import { IconExclamationTriangleSolid } from '@/icons';
@@ -38,12 +39,14 @@ export default function AddAppModal({ isOpen, onClose }) {
           url: inputUrl,
         },
       });
-      console.log('Created app URL:', response);
-      onClose();
+      toast.success('The app was successfully added.');
+      console.log('Created app:', response);
     } catch (error) {
+      toast.error('The app could not be created: ${error}.');
       console.error('Error creating app:', error);
     }
-    // To do: add optimistic render in the list and toast for error
+    onClose();
+    // To do: add optimistic render in the list
   }
 
   function handleSubmit(e) {

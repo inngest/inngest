@@ -28,6 +28,7 @@
     "react-refractor": "2.1.7",
     "react-timeago": "7.1.0",
     "refractor": "4.8.0",
+    "sonner": "0.5.0",
     "ulid": "2.3.0"
   },
   "devDependencies": {
