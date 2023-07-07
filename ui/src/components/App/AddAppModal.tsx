@@ -74,14 +74,14 @@ export default function AddAppModal({ isOpen, onClose }) {
               id="addAppUrlModal"
               className={classNames(
                 'min-w-[420px] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline',
-                isUrlInvalid && inputUrl.length > 0 && 'pr-8 outline-rose-500'
+                isUrlInvalid && inputUrl.length > 0 && 'pr-8 outline-rose-400'
               )}
               placeholder="https://example.com/api/inngest"
               value={inputUrl}
               onChange={handleChange}
             />
             {isUrlInvalid && inputUrl.length > 0 && (
-              <IconExclamationTriangle className="absolute top-2/4 right-2 -translate-y-2/4 text-rose-500" />
+              <IconExclamationTriangle className="absolute top-2/4 right-2 -translate-y-2/4 text-rose-400" />
             )}
           </div>
         </div>

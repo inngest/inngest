@@ -23,8 +23,9 @@ type AppWithoutFunctions = Omit<App, 'functions'>;
 export default function AppCard({ app }: { app: AppWithoutFunctions }) {
   const [inputUrl, setInputUrl] = useState(app.url || '');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const dispatch = useAppDispatch();
-  const [_updateApp, { isLoading }] = useUpdateAppMutation();
+  const [_updateApp, updateAppState] = useUpdateAppMutation();
   // const [_deleteApp, deleteAppState] = useDeleteAppMutation();
 
   const debouncedRequest = useDebounce(() => {
@@ -33,6 +34,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
       updateApp();
     } else {
       setUrlInvalid(true);
+      setIsLoading(false);
     }
   });
 
@@ -48,6 +50,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
     } catch (error) {
       console.error('Error editing app:', error);
     }
+    setIsLoading(false);
     // To do: add optimistic render in the list and toast for error
   }
 
@@ -65,6 +68,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setInputUrl(e.target.value);
+    setIsLoading(true);
     debouncedRequest();
   }
 
@@ -80,7 +84,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
         sdkVersion={app.sdkVersion}
       />
       <div className="border border-slate-700/30 rounded-b-md divide-y divide-slate-700/30 bg-slate-800/30">
-        {isLoading ? (
+        {isLoading || !app.name ? (
           <div className="p-4 pr-6 flex items-center gap-2">
             <IconSpinner className="fill-sky-400 text-slate-800" />
             <p className="text-slate-400 text-lg font-light">Connecting...</p>
@@ -114,15 +118,20 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
           expandedContent={
             <>
               {!app.connected && (
-                <p className="pb-4 text-slate-400">
-                  The Inngest Dev Server can’t find your application. Ensure
-                  your full URL is correct, including the correct port. Inngest
-                  automatically scans{' '}
-                  <span className="text-white">multiple ports</span> by default.
-                </p>
-              )}
-              {isUrlInvalid && (
-                <p className="pb-4 text-slate-400">Please enter a valid URL</p>
+                <>
+                  <p className="pb-4 text-slate-400">
+                    The Inngest Dev Server can’t find your application. Ensure
+                    your full URL is correct, including the correct port.
+                    Inngest automatically scans{' '}
+                    <span className="text-white">multiple ports</span> by
+                    default.
+                  </p>
+                  {app.error && (
+                    <p className="pb-4 text-rose-400 font-medium	">
+                      Error: {app.error}
+                    </p>
+                  )}
+                </>
               )}
               <form className="flex items-center justify-between pb-4">
                 <label
@@ -134,12 +143,12 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                     The URL of your application
                   </span>
                 </label>
-                <div className="relative">
+                <div className="relative flex-1 pl-10">
                   <input
                     id="editAppUrl"
                     className={classNames(
-                      'min-w-[50%] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline readOnly:outline-transparent',
-                      isUrlInvalid && ' outline-rose-500',
+                      'w-full bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline read-only:outline-transparent',
+                      isUrlInvalid && ' outline-rose-400',
                       isLoading && 'pr-6'
                     )}
                     value={inputUrl}
@@ -149,6 +158,11 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                   />
                   {isLoading && (
                     <IconSpinner className="absolute top-1/3 right-2 fill-sky-400 text-slate-800" />
+                  )}
+                  {isUrlInvalid && (
+                    <p className="absolute text-rose-400 top-10 left-14">
+                      Please enter a valid URL
+                    </p>
                   )}
                 </div>
               </form>
