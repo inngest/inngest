@@ -159,12 +159,18 @@ export type FunctionVersion = {
 export type Mutation = {
   __typename?: 'Mutation';
   createApp: App;
+  deleteApp: Scalars['String'];
   updateApp: App;
 };
 
 
 export type MutationCreateAppArgs = {
   input: CreateAppInput;
+};
+
+
+export type MutationDeleteAppArgs = {
+  id: Scalars['String'];
 };
 
 
@@ -287,6 +293,13 @@ export type UpdateAppMutationVariables = Exact<{
 
 
 export type UpdateAppMutation = { __typename?: 'Mutation', updateApp: { __typename?: 'App', url?: string | null, id: string } };
+
+export type DeleteAppMutationVariables = Exact<{
+  id: Scalars['String'];
+}>;
+
+
+export type DeleteAppMutation = { __typename?: 'Mutation', deleteApp: string };
 
 
 export const GetEventsStreamDocument = `
@@ -421,6 +434,11 @@ export const UpdateAppDocument = `
   }
 }
     `;
+export const DeleteAppDocument = `
+    mutation DeleteApp($id: String!) {
+  deleteApp(id: $id)
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -448,9 +466,12 @@ const injectedRtkApi = api.injectEndpoints({
     UpdateApp: build.mutation<UpdateAppMutation, UpdateAppMutationVariables>({
       query: (variables) => ({ document: UpdateAppDocument, variables })
     }),
+    DeleteApp: build.mutation<DeleteAppMutation, DeleteAppMutationVariables>({
+      query: (variables) => ({ document: DeleteAppDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation } = injectedRtkApi;
+export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation } = injectedRtkApi;
 

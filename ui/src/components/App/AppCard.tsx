@@ -7,7 +7,7 @@ import AppCardHeader from '@/components/App/AppCardHeader';
 import Badge from '@/components/Badge';
 import AppCardStep from './AppCardStep';
 import classNames from '@/utils/classnames';
-import { useUpdateAppMutation } from '@/store/generated';
+import { useUpdateAppMutation, useDeleteAppMutation } from '@/store/generated';
 import useDebounce from '@/hooks/useDebounce';
 import isValidUrl from '@/utils/urlValidation';
 import {
@@ -27,7 +27,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
   const [isLoading, setIsLoading] = useState(false);
   const dispatch = useAppDispatch();
   const [_updateApp, updateAppState] = useUpdateAppMutation();
-  // const [_deleteApp, deleteAppState] = useDeleteAppMutation();
+  const [_deleteApp, deleteAppState] = useDeleteAppMutation();
 
   const debouncedRequest = useDebounce(() => {
     if (isValidUrl(inputUrl)) {
@@ -56,15 +56,15 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
   }
 
   async function deleteApp() {
-    // try {
-    //   const response = await _deleteApp({
-    //       id: app.id
-    //   });
-    //   console.log('Edited app URL:', response);
-    // } catch (error) {
-    //   console.error('Error editing app:', error);
-    // }
-    // // To do: add optimistic render in the list and toast for error
+    try {
+      const response = await _deleteApp({
+          id: app.id
+      });
+      console.log('Deleted app:', response);
+    } catch (error) {
+      console.error('Error deleting app:', error);
+    }
+    // To do: add optimistic render in the list and toast for error
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
