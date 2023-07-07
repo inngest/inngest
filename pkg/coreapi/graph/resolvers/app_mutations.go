@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -16,6 +17,10 @@ func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateApp
 	params := cqrs.InsertAppParams{
 		ID:  uuid.New(),
 		Url: input.URL,
+		Error: sql.NullString{
+			Valid:  true,
+			String: deploy.DeployErrUnreachable.Error(),
+		},
 	}
 	app, _ := r.Data.InsertApp(ctx, params)
 
