@@ -391,6 +391,11 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 	for iter.Next(ctx) {
 		pause := iter.Val(ctx)
 
+		if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evt.ID {
+			// Skip the orignial event.
+			continue
+		}
+
 		// NOTE: Some pauses may be nil or expired, as the iterator may take
 		// time to process.  We handle that here and assume that the event
 		// did not occur in time.
@@ -596,12 +601,13 @@ func Initialize(ctx context.Context, fn inngest.Function, evt event.Event, s sta
 			expires = time.Now().Add(dur)
 		}
 		err := s.SavePause(ctx, state.Pause{
-			ID:         pauseID,
-			Identifier: id,
-			Expires:    state.Time(expires),
-			Event:      &c.Event,
-			Expression: c.If,
-			Cancel:     true,
+			ID:                pauseID,
+			Identifier:        id,
+			Expires:           state.Time(expires),
+			Event:             &c.Event,
+			Expression:        c.If,
+			Cancel:            true,
+			TriggeringEventID: &evt.ID,
 		})
 		if err != nil {
 			return &id, fmt.Errorf("error saving pause: %w", err)

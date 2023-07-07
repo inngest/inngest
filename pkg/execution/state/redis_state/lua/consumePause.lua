@@ -25,6 +25,10 @@ local logTime      = ARGV[5]
 local pause = redis.call("GET", pauseKey)
 if pause == false or pause == nil then
 	-- Pause no longer exists.
+	if pauseEventKey ~= "" then
+		-- Clean up regardless
+		redis.call("HDEL", pauseEventKey, pauseID)
+	end
 	return 1
 end
 

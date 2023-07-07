@@ -41,6 +41,9 @@ type PauseGetter interface {
 	// PausesByEvent returns all pauses for a given event, in a given workspace.
 	PausesByEvent(ctx context.Context, workspaceID uuid.UUID, eventName string) (PauseIterator, error)
 
+	// EventHasPauses returns whether the event has pauses stored.
+	EventHasPauses(ctx context.Context, workspaceID uuid.UUID, eventName string) (bool, error)
+
 	// PauseByStep returns a specific pause for a given workflow run, from a given step.
 	//
 	// This is required when continuing a step function from an async step, ie. one that
@@ -143,6 +146,9 @@ type Pause struct {
 	// GroupID stores the group ID for this step and history, allowing us to correlate
 	// event receives with other history items.
 	GroupID string `json:"groupID"`
+	// TriggeringEventID is the event that triggered the original run.  This allows us
+	// to exclude the original event ID when considering triggers.
+	TriggeringEventID *string `json:"tID,omitempty"`
 }
 
 func (p Pause) Edge() inngest.Edge {

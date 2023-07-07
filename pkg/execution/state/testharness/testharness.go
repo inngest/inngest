@@ -1004,6 +1004,10 @@ func checkPausesByEvent_empty(t *testing.T, m state.Manager) {
 	require.NotNil(t, iter)
 	require.False(t, iter.Next(ctx))
 	require.Nil(t, iter.Val(ctx))
+
+	exists, err := m.EventHasPauses(ctx, uuid.UUID{}, "lol/nothing.my.friend")
+	require.NoError(t, err)
+	require.False(t, exists)
 }
 
 func checkPausesByEvent_single(t *testing.T, m state.Manager) {
@@ -1053,6 +1057,14 @@ func checkPausesByEvent_single(t *testing.T, m state.Manager) {
 	}
 	err = m.SavePause(ctx, unusedB)
 	require.NoError(t, err)
+
+	exists, err := m.EventHasPauses(ctx, wsA, evtA)
+	require.NoError(t, err)
+	require.True(t, exists)
+
+	exists, err = m.EventHasPauses(ctx, wsB, evtA)
+	require.NoError(t, err)
+	require.True(t, exists)
 
 	iter, err := m.PausesByEvent(ctx, wsA, evtA)
 	require.NoError(t, err)
