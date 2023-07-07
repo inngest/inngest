@@ -130,3 +130,20 @@ export const ADD_APP = gql`
     }
   } 
 `;
+
+export const UPDATE_APP = gql`
+  mutation UpdateApp($input: UpdateAppInput!) {
+    updateApp(input: $input) {
+      url
+      id
+    }
+  } 
+`;
+
+// export const DELETE_APP = gql`
+//   mutation DeleteApp($id: ID!) {
+//     deleteApp(id: $id) {
+//       id
+//     }
+//   } 
+// `;

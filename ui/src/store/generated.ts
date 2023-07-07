@@ -281,6 +281,13 @@ export type CreateAppMutationVariables = Exact<{
 
 export type CreateAppMutation = { __typename?: 'Mutation', createApp: { __typename?: 'App', url?: string | null } };
 
+export type UpdateAppMutationVariables = Exact<{
+  input: UpdateAppInput;
+}>;
+
+
+export type UpdateAppMutation = { __typename?: 'Mutation', updateApp: { __typename?: 'App', url?: string | null, id: string } };
+
 
 export const GetEventsStreamDocument = `
     query GetEventsStream {
@@ -406,6 +413,14 @@ export const CreateAppDocument = `
   }
 }
     `;
+export const UpdateAppDocument = `
+    mutation UpdateApp($input: UpdateAppInput!) {
+  updateApp(input: $input) {
+    url
+    id
+  }
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -430,9 +445,12 @@ const injectedRtkApi = api.injectEndpoints({
     CreateApp: build.mutation<CreateAppMutation, CreateAppMutationVariables>({
       query: (variables) => ({ document: CreateAppDocument, variables })
     }),
+    UpdateApp: build.mutation<UpdateAppMutation, UpdateAppMutationVariables>({
+      query: (variables) => ({ document: UpdateAppDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation } = injectedRtkApi;
+export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation } = injectedRtkApi;
 

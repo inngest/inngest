@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useAppDispatch } from '@/store/hooks';
 import { showFunctions, showDocs } from '@/store/global';
 import { type App } from '@/store/generated';
-// import { useDeleteAppMutation } from '@/store/devApi';
 import CodeLine from '@/components/CodeLine';
 import AppCardHeader from '@/components/App/AppCardHeader';
 import AppCardStep from './AppCardStep';
 import classNames from '@/utils/classnames';
-import useInputUrlValidation from '@/hooks/useInputURLValidation';
+import { useUpdateAppMutation } from '@/store/generated';
+import useDebounce from '@/hooks/useDebounce';
+import isValidUrl from '@/utils/urlValidation';
 import {
   IconAppStatusCompleted,
   IconAppStatusFailed,
@@ -20,24 +21,55 @@ import {
 type AppWithoutFunctions = Omit<App, 'functions'>;
 
 export default function AppCard({ app }: { app: AppWithoutFunctions }) {
-  const [isAppConnecting, setAppConnecting] = useState(false);
-  const [inputUrl, setInputUrl, isUrlInvalid] = useInputUrlValidation({
-    callback: () => {
-      // To do: edit app, show the isAppConnecting state in the meanwhile, remove it once done
-    },
-    initialInputValue: app.url ?? undefined,
-  });
-  // const [_deleteApp, deleteAppState] = useDeleteAppMutation();
+  const [inputUrl, setInputUrl] = useState(app.url || '');
+  const [isUrlInvalid, setUrlInvalid] = useState(false);
   const dispatch = useAppDispatch();
+  const [_updateApp, { isLoading }] = useUpdateAppMutation();
+  // const [_deleteApp, deleteAppState] = useDeleteAppMutation();
 
-  function handleDelete() {
-    // _deleteApp({
-    //   id: app.id,
-    // });
+  const debouncedRequest = useDebounce(() => {
+    if (isValidUrl(inputUrl)) {
+      setUrlInvalid(false);
+      updateApp();
+    } else {
+      setUrlInvalid(true);
+    }
+  });
+
+  async function updateApp() {
+    try {
+      const response = await _updateApp({
+        input: {
+          url: inputUrl,
+          id: app.id,
+        },
+      });
+      console.log('Edited app URL:', response);
+    } catch (error) {
+      console.error('Error editing app:', error);
+    }
+    // To do: add optimistic render in the list and toast for error
+  }
+
+  async function deleteApp() {
+    // try {
+    //   const response = await _deleteApp({
+    //       id: app.id
+    //   });
+    //   console.log('Edited app URL:', response);
+    // } catch (error) {
+    //   console.error('Error editing app:', error);
+    // }
+    // // To do: add optimistic render in the list and toast for error
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setInputUrl(e.target.value);
+    debouncedRequest();
+  }
+
+  function handleDelete() {
+    deleteApp();
   }
 
   return (
@@ -48,7 +80,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
         sdkVersion={app.sdkVersion}
       />
       <div className="border border-slate-700/30 rounded-b-md divide-y divide-slate-700/30 bg-slate-800/30">
-        {isAppConnecting ? (
+        {isLoading ? (
           <div className="p-4 pr-6 flex items-center gap-2">
             <IconSpinner className="fill-sky-400 text-slate-800" />
             <p className="text-slate-400 text-lg font-light">Connecting...</p>
@@ -108,14 +140,14 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                     className={classNames(
                       'min-w-[50%] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline readOnly:outline-transparent',
                       isUrlInvalid && ' outline-rose-500',
-                      isAppConnecting && 'pr-6'
+                      isLoading && 'pr-6'
                     )}
                     value={inputUrl}
                     placeholder="https://example.com/api/inngest"
                     onChange={handleChange}
                     readOnly={app.autodiscovered}
                   />
-                  {isAppConnecting && (
+                  {isLoading && (
                     <IconSpinner className="absolute top-1/3 right-2 fill-sky-400 text-slate-800" />
                   )}
                 </div>
