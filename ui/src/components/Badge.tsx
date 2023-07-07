@@ -5,7 +5,7 @@ const kindStyles = {
   error: 'bg-rose-600/40 border-none text-slate-300',
 };
 
-export function Badge({
+export default function Badge({
   children,
   className = '',
   kind = 'outlined',

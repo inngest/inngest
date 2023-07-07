@@ -4,6 +4,7 @@ import { showFunctions, showDocs } from '@/store/global';
 import { type App } from '@/store/generated';
 import CodeLine from '@/components/CodeLine';
 import AppCardHeader from '@/components/App/AppCardHeader';
+import Badge from '@/components/Badge';
 import AppCardStep from './AppCardStep';
 import classNames from '@/utils/classnames';
 import { useUpdateAppMutation } from '@/store/generated';
@@ -93,9 +94,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
           <div className="flex items-center justify-between px-6 py-4 ">
             <p className=" text-lg text-white">{app.name}</p>
             {app.autodiscovered && (
-              <span className="text-xs leading-3 border rounded-md border-slate-800 box-border py-1.5 px-2 text-slate-300">
-                Auto Detected
-              </span>
+              <Badge>Auto Detected</Badge>
             )}
           </div>
         )}

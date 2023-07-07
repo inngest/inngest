@@ -1,5 +1,5 @@
 import classNames from '@/utils/classnames';
-import { Badge } from '@/components/Badge';
+import Badge from '@/components/Badge';
 
 interface NavbarLinkProps {
   icon: React.ReactNode;

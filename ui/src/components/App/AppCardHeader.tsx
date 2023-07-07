@@ -1,5 +1,6 @@
 import classNames from '@/utils/classnames';
 import { IconCheckCircle, IconExclamationTriangle } from '@/icons';
+import Badge from '@/components/Badge';
 
 type AppCardHeaderProps = {
   functionCount: number;
@@ -39,11 +40,7 @@ export default function AppCardHeader({
         {headerIcon}
         {headerLabel}
       </div>
-      {sdkVersion && (
-        <span className="text-xs leading-3 border rounded-md border-white/20 box-border py-1.5 px-2 text-slate-300">
-          SDK {sdkVersion}
-        </span>
-      )}
+      {sdkVersion && <Badge>SDK {sdkVersion}</Badge>}
     </header>
   );
 }
