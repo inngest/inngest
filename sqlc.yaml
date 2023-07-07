@@ -3,7 +3,7 @@ overrides:
   go:
     overrides:
       - column: "apps.id"
-        go_type: "github.com/google/uuid"
+        go_type: "github.com/google/uuid.UUID"
 sql:
   - engine: "sqlite"
     schema: "pkg/cqrs/ddb/sqlc/schema.sql"
@@ -15,4 +15,4 @@ sql:
         out: "pkg/cqrs/ddb/sqlc"
         overrides:
           - column: "apps.id"
-            go_type: "github.com/google/uuid"
+            go_type: "github.com/google/uuid.UUID"

@@ -170,7 +170,6 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 				// Make a new PUT request to each app, indicating that the
 				// SDK should push functions to the dev server.
 				err := deploy.Ping(ctx, app.Url)
-				discovery.SetURLError(app.Url, err)
 				if err != nil {
 					_, _ = d.data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
 						ID: app.ID,
