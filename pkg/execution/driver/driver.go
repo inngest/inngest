@@ -33,8 +33,7 @@ func MarshalV1(
 	attempt int,
 ) ([]byte, error) {
 	req := &SDKRequest{
-		// Events:  s.Events(),
-		Events:  []map[string]any{},
+		Events:  s.Events(),
 		Event:   s.Event(),
 		Actions: s.Actions(),
 		Context: &SDKRequestContext{
@@ -50,11 +49,12 @@ func MarshalV1(
 		},
 	}
 
-	// if req.IsBodySizeTooLarge() {
-	// 	req.Events = []map[string]any{}
-	// 	req.Actions = map[string]any{}
-	// 	req.UseAPI = true
-	// }
+	// empty the attrs that consume the most
+	if req.IsBodySizeTooLarge() {
+		req.Events = []map[string]any{}
+		req.Actions = map[string]any{}
+		req.UseAPI = true
+	}
 
 	j, err := json.Marshal(req)
 	if err != nil {
