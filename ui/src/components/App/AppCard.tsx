@@ -58,7 +58,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
   async function deleteApp() {
     try {
       const response = await _deleteApp({
-          id: app.id
+        id: app.id,
       });
       console.log('Deleted app:', response);
     } catch (error) {
@@ -85,17 +85,24 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
         sdkVersion={app.sdkVersion}
       />
       <div className="border border-slate-700/30 rounded-b-md divide-y divide-slate-700/30 bg-slate-800/30">
-        {isLoading || !app.name ? (
+        {!app.name ? (
           <div className="p-4 pr-6 flex items-center gap-2">
             <IconSpinner className="fill-sky-400 text-slate-800" />
-            <p className="text-slate-400 text-lg font-light">Connecting...</p>
+            <p className="text-slate-400 text-lg font-normal">Connecting...</p>
           </div>
         ) : (
           <div className="flex items-center justify-between px-6 py-4 ">
-            <p className=" text-lg text-white">{app.name}</p>
-            {app.autodiscovered && (
-              <Badge>Auto Detected</Badge>
+            {!app.connected ? (
+              <div className="flex items-center gap-2">
+                <IconSpinner className="fill-sky-400 text-slate-800" />
+                <p className="text-slate-400 text-lg font-normal">
+                  Connecting to {app.name}...
+                </p>
+              </div>
+            ) : (
+              <p className=" text-lg text-white">{app.name}</p>
             )}
+            {app.autodiscovered && <Badge>Auto Detected</Badge>}
           </div>
         )}
         <AppCardStep
