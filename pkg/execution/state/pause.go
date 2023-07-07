@@ -146,6 +146,9 @@ type Pause struct {
 	// GroupID stores the group ID for this step and history, allowing us to correlate
 	// event receives with other history items.
 	GroupID string `json:"groupID"`
+	// TriggeringEventID is the event that triggered the original run.  This allows us
+	// to exclude the original event ID when considering triggers.
+	TriggeringEventID *string `json:"tID,omitempty"`
 }
 
 func (p Pause) Edge() inngest.Edge {
