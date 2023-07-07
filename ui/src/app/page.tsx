@@ -81,6 +81,7 @@ export default function Page() {
         appsConnectedCount: result.data?.apps?.filter(app => app.connected === true)?.length || 0,
         hasConnectedError: result?.data?.apps?.some(app => app.connected === false),
       }),
+      pollingInterval: 1500,
     }
   );
 
