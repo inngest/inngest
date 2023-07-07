@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Modal from '@/components/Modal';
 import Button from '@/components/Button';
-import { IconExclamationTriangle } from '@/icons';
+import { IconExclamationTriangleSolid } from '@/icons';
 import classNames from '@/utils/classnames';
 import { useCreateAppMutation } from '@/store/generated';
 import useDebounce from '@/hooks/useDebounce';
@@ -81,13 +81,13 @@ export default function AddAppModal({ isOpen, onClose }) {
               onChange={handleChange}
             />
             {isUrlInvalid && inputUrl.length > 0 && (
-              <IconExclamationTriangle className="absolute top-2/4 right-2 -translate-y-2/4 text-rose-400" />
+              <IconExclamationTriangleSolid className="absolute top-2/4 right-2 -translate-y-2/4 text-rose-400" />
             )}
           </div>
         </div>
         {isUrlInvalid && inputUrl.length > 0 && (
           <p className="bg-rose-600/50 text-white flex items-center gap-2 text-sm px-6 py-2">
-            <IconExclamationTriangle />
+            <IconExclamationTriangleSolid />
             Please enter a valid URL
           </p>
         )}

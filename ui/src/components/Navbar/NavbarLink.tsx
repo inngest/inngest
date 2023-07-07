@@ -1,9 +1,11 @@
-import classNames from "../../utils/classnames";
+import classNames from '@/utils/classnames';
+import { Badge } from '@/components/Badge';
 
 interface NavbarLinkProps {
   icon: React.ReactNode;
   active?: boolean;
   badge?: number;
+  hasError?: boolean;
   onClick?: () => void;
   tabName: string;
 }
@@ -11,9 +13,10 @@ interface NavbarLinkProps {
 export default function NavebarLink({
   icon,
   active = false,
-  badge = 0,
+  badge,
   onClick,
   tabName,
+  hasError,
 }: NavbarLinkProps) {
   return (
     <button
@@ -34,6 +37,7 @@ export default function NavebarLink({
     >
       {icon}
       {tabName}
+      {typeof badge === 'number' && <Badge kind={hasError ? 'error' : 'outlined'}>{badge.toString()}</Badge>}
     </button>
   );
 }
