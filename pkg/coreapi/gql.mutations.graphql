@@ -1,6 +1,7 @@
 type Mutation {
   createApp(input: CreateAppInput!): App!
   updateApp(input: UpdateAppInput!): App!
+  deleteApp(id: String!): String! # returns the ID of the deleted app
 }
 
 input CreateAppInput {

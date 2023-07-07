@@ -74,6 +74,13 @@ func (w wrapper) GetAppByChecksum(ctx context.Context, checksum string) (*cqrs.A
 	return copyInto(ctx, f, &cqrs.App{})
 }
 
+func (w wrapper) GetAppByURL(ctx context.Context, url string) (*cqrs.App, error) {
+	f := func(ctx context.Context) (*sqlc.App, error) {
+		return w.q.GetAppByURL(ctx, url)
+	}
+	return copyInto(ctx, f, &cqrs.App{})
+}
+
 // GetAllApps returns all apps.
 func (w wrapper) GetAllApps(ctx context.Context) ([]*cqrs.App, error) {
 	return copyInto(ctx, w.q.GetAllApps, []*cqrs.App{})
@@ -144,9 +151,9 @@ func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) 
 	return out, err
 }
 
-// DeleteApp creates a new app.
+// DeleteApp deletes an app
 func (w wrapper) DeleteApp(ctx context.Context, id uuid.UUID) error {
-	return w.q.DeleteApp(ctx, id)
+	return w.q.HardDeleteApp(ctx, id)
 }
 
 //

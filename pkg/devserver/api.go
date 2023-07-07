@@ -149,6 +149,16 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		return nil
 	}
 
+	// Attempt to get the existing app by URL, and delete it if possible.
+	// We're going to recreate it below.
+	//
+	// We need to do this as we always create an app when entering the URL
+	// via the UI.  This is a dev-server specific quirk.
+	app, err := a.devserver.data.GetAppByURL(ctx, r.URL)
+	if err == nil && app != nil {
+		_ = a.devserver.data.DeleteApp(ctx, app.ID)
+	}
+
 	// We need a UUID to register functions with.
 	appParams := cqrs.InsertAppParams{
 		ID:          uuid.New(),
