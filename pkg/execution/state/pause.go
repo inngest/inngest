@@ -41,6 +41,9 @@ type PauseGetter interface {
 	// PausesByEvent returns all pauses for a given event, in a given workspace.
 	PausesByEvent(ctx context.Context, workspaceID uuid.UUID, eventName string) (PauseIterator, error)
 
+	// EventHasPauses returns whether the event has pauses stored.
+	EventHasPauses(ctx context.Context, workspaceID uuid.UUID, eventName string) (bool, error)
+
 	// PauseByStep returns a specific pause for a given workflow run, from a given step.
 	//
 	// This is required when continuing a step function from an async step, ie. one that

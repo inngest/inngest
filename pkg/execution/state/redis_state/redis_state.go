@@ -938,6 +938,12 @@ func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event str
 	return &keyIter{i: 0, keys: keys, r: m.r, key: key}, nil
 }
 
+func (m mgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {
+	key := m.kf.PauseEvent(ctx, workspaceID, event)
+	cmd := m.r.B().Exists().Key(key).Build()
+	return m.r.Do(ctx, cmd).AsBool()
+}
+
 func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) {
 	cmd := m.r.B().Get().Key(m.kf.PauseID(ctx, id)).Build()
 	str, err := m.r.Do(ctx, cmd).ToString()
