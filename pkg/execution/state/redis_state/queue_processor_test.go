@@ -415,7 +415,7 @@ func TestQueueRunExtended(t *testing.T) {
 	// The default wait
 	wait := atomic.LoadInt32(&delayMax) + atomic.LoadInt32(&jobCompleteMax) + 100
 	// Increasing, because of the race detector
-	wait = wait * 2
+	wait = wait * 3
 
 	// We enqueue jobs up to delayMax, and they can take up to jobCompleteMax, so add
 	// 100ms of buffer.
@@ -423,6 +423,7 @@ func TestQueueRunExtended(t *testing.T) {
 
 	a := atomic.LoadInt64(&added)
 	h := atomic.LoadInt64(&handled)
+
 	fmt.Printf("Added %d items\n", a)
 	fmt.Printf("Handled %d items\n", h)
 
