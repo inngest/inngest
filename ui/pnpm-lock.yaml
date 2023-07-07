@@ -88,6 +88,9 @@ devDependencies:
   concurrently:
     specifier: 7.5.0
     version: 7.5.0
+  lodash.debounce:
+    specifier: 4.0.8
+    version: 4.0.8
   nodemon:
     specifier: 2.0.20
     version: 2.0.20
@@ -3082,6 +3085,10 @@ packages:
     engines: {node: '>=8'}
     dependencies:
       p-locate: 4.1.0
+    dev: true
+
+  /lodash.debounce@4.0.8:
+    resolution: {integrity: sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==}
     dev: true
 
   /lodash@4.17.21:
