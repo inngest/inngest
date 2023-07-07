@@ -77,6 +77,12 @@ If you are sending events without an Inngest SDK, you'll need pass the `x-innges
 {/* ## Custom Environments */}
 {/* Section TBD - see above */}
 
+### Archiving Branch Environments
+
+By default, branch environments are archived 3 days after their latest deploy. Each time you deploy, the auto archive date is extended by 3 days. Archiving a branch environment doesn't delete anything; it only prevents the environment's functions from triggering.
+
+If you'd like to disable auto archive on a branch environment, click the toggle in the [environments page](https://app.inngest.com/env). There's also a button that lets you manually archive/unarchive branch environments at any time.
+
 ## Viewing and Switching Environments
 
 In the Inngest dashboard you can quickly switch between environments in the environment switcher dropdown in the top navigation. You can click “[View All Environments](https://app.inngest.com/env)” for a high level view of all of your environments.
