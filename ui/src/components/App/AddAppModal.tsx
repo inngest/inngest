@@ -3,16 +3,27 @@ import Modal from '@/components/Modal';
 import Button from '@/components/Button';
 import { IconExclamationTriangle } from '@/icons';
 import classNames from '@/utils/classnames';
-import useInputUrlValidation from '@/hooks/useInputURLValidation';
 import { useCreateAppMutation } from '@/store/generated';
+import useDebounce from '@/hooks/useDebounce';
+import isValidUrl from '@/utils/urlValidation';
 
 export default function AddAppModal({ isOpen, onClose }) {
-  const [inputUrl, setInputUrl, isUrlInvalid] = useInputUrlValidation();
-  const [createAppMutation] = useCreateAppMutation();
+  const [inputUrl, setInputUrl] = useState('');
+  const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isDisabled, setDisabled] = useState(true);
+  const [_createApp, createAppState] = useCreateAppMutation();
+
+  const debouncedRequest = useDebounce(() => {
+    if (isValidUrl(inputUrl)) {
+      setUrlInvalid(false);
+    } else {
+      setUrlInvalid(true);
+    }
+  });
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setInputUrl(e.target.value);
+    debouncedRequest();
     if (e.target.value.length > 0) {
       setDisabled(false);
     } else {
@@ -22,7 +33,7 @@ export default function AddAppModal({ isOpen, onClose }) {
 
   async function createApp() {
     try {
-      const response = await createAppMutation({
+      const response = await _createApp({
         input: {
           url: inputUrl,
         },
@@ -63,18 +74,18 @@ export default function AddAppModal({ isOpen, onClose }) {
               id="addAppUrlModal"
               className={classNames(
                 'min-w-[420px] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline',
-                isUrlInvalid && 'pr-8 outline-rose-500'
+                isUrlInvalid && inputUrl.length > 0 && 'pr-8 outline-rose-500'
               )}
               placeholder="https://example.com/api/inngest"
               value={inputUrl}
               onChange={handleChange}
             />
-            {isUrlInvalid && (
+            {isUrlInvalid && inputUrl.length > 0 && (
               <IconExclamationTriangle className="absolute top-2/4 right-2 -translate-y-2/4 text-rose-500" />
             )}
           </div>
         </div>
-        {isUrlInvalid && (
+        {isUrlInvalid && inputUrl.length > 0 && (
           <p className="bg-rose-600/50 text-white flex items-center gap-2 text-sm px-6 py-2">
             <IconExclamationTriangle />
             Please enter a valid URL
