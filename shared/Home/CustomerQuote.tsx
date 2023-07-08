@@ -23,10 +23,11 @@ url(/assets/textures/wave.svg)
 
 export default function CustomerQuote({
   quote,
+  name,
   avatar,
+  logo,
   className,
   variant = "dark",
-  name,
   cta,
 }: {
   quote: string;
@@ -34,6 +35,7 @@ export default function CustomerQuote({
   className?: string;
   variant?: "dark" | "light";
   avatar?: string;
+  logo?: string;
   cta?: { href: string; text: string };
 }) {
   return (
@@ -66,10 +68,8 @@ export default function CustomerQuote({
         </div>
         <div
           className={clsx(
-            "flex flex-row gap-4 items-center text-base font-medium",
-            avatar && variant === "dark"
-              ? "text-indigo-50 drop-shadow"
-              : "text-slate-800"
+            "flex flex-row gap-4 w-full items-center text-base font-medium",
+            variant === "dark" ? "text-indigo-50 drop-shadow" : "text-slate-800"
           )}
         >
           {avatar && (
@@ -81,7 +81,15 @@ export default function CustomerQuote({
               className="rounded-full"
             />
           )}
-          {name}
+          <span className="grow">{name}</span>
+          {logo && (
+            <Image
+              src={logo}
+              alt={`${name}'s company logo`}
+              height={36}
+              width={110}
+            />
+          )}
         </div>
         {cta && (
           <Link

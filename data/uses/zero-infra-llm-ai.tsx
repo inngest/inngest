@@ -101,10 +101,11 @@ inngest.createFunction(
     //   icon: "SDK",
     // },
   ],
-  // quote: {
-  //   text: "It's sensational - This is the best way to test a background job",
-  //   author: "Garrett Tolbert, Vercel",
-  // },
+  quote: {
+    text: `The nice thing about writing step functions for Inngest vs regular "async worker queues" is that we can express logic, e.g. "if X than wait for event Y", with a layer of caching/retries on top.`,
+    author: "Alex Kotliarskyi - Co-founder at Secta AI Labs",
+    logo: "/assets/customers/secta-labs-logo.svg",
+  },
   learnMore: {
     description:
       "Dive into our resources and learn how Inngest is the best solution for building reliable LLM + AI products in production.",

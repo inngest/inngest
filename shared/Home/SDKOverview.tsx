@@ -57,9 +57,21 @@ export default function SDKOverview() {
       <div className="mx-4 sm:mx-auto max-w-lg">
         <Heading
           title="Ship in hours, not weeks"
-          lede="Build everything from simple tasks to long-lived workflows using our
-          SDK. With Inngest, there is zero infrastructure to set up - just write
-          code."
+          lede={
+            <>
+              Build everything from simple tasks to long-lived workflows using
+              our SDK. With Inngest, there is zero infrastructure to set up -
+              just write code.
+              <br />
+              <br />
+              <span className="text-sm">
+                <em>
+                  * On average, teams ship their first Inngest function to
+                  production in 4 hrs and 44 minutes.
+                </em>
+              </span>
+            </>
+          }
         />
 
         <div className="mt-8 flex flex-col gap-5 max-w-[468px]">

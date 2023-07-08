@@ -11,7 +11,7 @@ export default function Hero() {
     <Container
       className="mt-24 md:mt-36 tracking-tight lg:bg-[url(/assets/homepage/use-case-line-graphic.svg)]"
       style={{
-        backgroundSize: "1512px 198px",
+        backgroundSize: "1980px 198px",
         backgroundPosition: "50% 258px",
         backgroundRepeat: "no-repeat",
       }}

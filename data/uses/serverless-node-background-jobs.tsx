@@ -111,6 +111,7 @@ await inngest.send({
   quote: {
     text: "It's sensational - This is the best way to test a background job",
     author: "Garrett Tolbert, Vercel",
+    avatar: "/assets/customers/vercel-garrett-tolbert.jpg",
   },
   learnMore: {
     description:

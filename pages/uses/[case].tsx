@@ -9,6 +9,7 @@ import SectionHeader from "src/shared/SectionHeader";
 import Learning from "src/shared/Cards/Learning";
 import PageContainer from "src/shared/layout/PageContainer";
 import Image from "next/image";
+import CustomerQuote from "src/shared/Home/CustomerQuote";
 
 import {
   IconRetry,
@@ -66,6 +67,8 @@ export type UseCase = {
   quote?: {
     text: string;
     author: string;
+    avatar?: string;
+    logo?: string;
   };
   learnMore: {
     description: string;
@@ -178,7 +181,7 @@ export default function useCase({ stringData }) {
               {example.steps.map((step, idx) => (
                 <p className="flex items-start gap-3">
                   <span className="bg-slate-800 rounded flex items-center justify-center w-6 h-6 text-xs font-bold shrink-0">
-                    {example?.steps?.length === 1 ? "→" : idx + 1 }
+                    {example?.steps?.length === 1 ? "→" : idx + 1}
                   </span>{" "}
                   {step}
                 </p>
@@ -207,6 +210,18 @@ export default function useCase({ stringData }) {
         ))}
       </Container>
 
+      {!!data.quote && (
+        <Container className="flex flex-col items-center gap-4 my-48">
+          <CustomerQuote
+            quote={data.quote.text}
+            name={data.quote.author}
+            avatar={data.quote.avatar}
+            logo={data.quote.logo}
+            className="mx-auto mb-24 max-w-2xl"
+          />
+        </Container>
+      )}
+
       <Container className="my-40">
         <SectionHeader
           title={data.featureOverflowTitle || "Everything you need to build"}
@@ -227,15 +242,6 @@ export default function useCase({ stringData }) {
           ))}
         </div>
       </Container>
-
-      {!!data.quote && (
-        <Container className="flex flex-col items-center gap-4 my-48">
-          <h3 className="text-white text-center text-xl max-w-xl">
-            "{data.quote.text}"
-          </h3>
-          <p className="text-indigo-200">{data.quote.author}</p>
-        </Container>
-      )}
 
       <Container>
         <SectionHeader title="Learn more" lede={data.learnMore.description} />
