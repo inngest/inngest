@@ -16,7 +16,7 @@ import {
   IconAppStatusFailed,
   IconChevron,
   IconSpinner,
-  IconArrowTopRightOnSquare,
+  IconBook,
   IconAppStatusDefault,
 } from '@/icons';
 
@@ -181,7 +181,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                 onClick={() => dispatch(showDocs('/sdk/serve'))}
               >
                 Connecting to the Dev Server
-                <IconArrowTopRightOnSquare />
+                <IconBook />
               </a>
             </>
           }
@@ -238,7 +238,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                     onClick={() => dispatch(showDocs('/functions'))}
                   >
                     Creating Functions
-                    <IconArrowTopRightOnSquare />
+                    <IconBook />
                   </a>
                 </>
               )}
