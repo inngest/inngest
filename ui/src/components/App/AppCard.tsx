@@ -112,15 +112,18 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
         <AppCardStep
           lineContent={
             <>
-              <div className="flex items-center gap-3 text-base">
+              <div className="">
+                <div className='flex items-center gap-3 text-base'>
                 {app.connected ? (
                   <>{<IconAppStatusCompleted />}Connected to server</>
                 ) : (
                   <>{<IconAppStatusFailed />}No connection to server</>
                 )}
+                </div>
+                <p className="text-slate-300 ui-open:hidden xl:hidden pl-10">{app.url}</p>
               </div>
               <div className="flex items-center gap-4">
-                <p className="text-slate-300 ui-open:hidden">{app.url}</p>
+                <p className="text-slate-300 xl:flex xl:ui-open:hidden hidden">{app.url}</p>
                 <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
               </div>
             </>
@@ -143,7 +146,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                   )}
                 </>
               )}
-              <form className="flex items-center justify-between pb-4">
+              <form className="block xl:flex xl:items-center xl:justify-between pb-4">
                 <label
                   htmlFor="editAppUrl"
                   className="text-sm font-semibold text-white"
@@ -153,7 +156,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                     The URL of your application
                   </span>
                 </label>
-                <div className="relative flex-1 pl-10">
+                <div className="relative flex-1 pt-2 xl:pl-10 xl:pt-0">
                   <input
                     id="editAppUrl"
                     className={classNames(
