@@ -14,6 +14,7 @@ export { IconCopy } from "./Copy";
 export { IconAppStatusCompleted } from "./AppStatusCompleted";
 export { IconAppStatusFailed } from "./AppStatusFailed";
 export { IconAppStatusDefault } from "./AppStatusDefault";
+export { InngestSmallLogo} from "./InngestSmallLogo";
 
 // Status Icons
 export { IconStatusDefault } from "./StatusDefault";
