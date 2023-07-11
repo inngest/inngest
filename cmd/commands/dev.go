@@ -48,18 +48,13 @@ func doDev(cmd *cobra.Command, args []string) {
 
 	urls, _ := cmd.Flags().GetStringSlice("sdk-url")
 
-	// Run auto-discovery if no URLs are provided, unless we've
-	// explicitly disabled it.
-	discover := true
+	// Run auto-discovery unless we've explicitly disabled it.
 	noDiscovery, _ := cmd.Flags().GetBool("no-discovery")
-	if len(urls) > 0 || noDiscovery {
-		discover = false
-	}
 
 	opts := devserver.StartOpts{
 		Config:       *conf,
 		URLs:         urls,
-		Autodiscover: discover,
+		Autodiscover: !noDiscovery,
 	}
 
 	err = devserver.New(ctx, opts)
