@@ -47,7 +47,7 @@ We created Inngest to bring the benefits of event-driven systems to all develope
 👉 [Read the full quick start guide here](https://www.inngest.com/docs/quick-start?ref=github-inngest-readme)
 
 1. [NPM install our SDK for your typescript project](https://github.com/inngest/inngest-js): `npm install inngest`
-2. Run the Inngest dev server: `npx inngest@latest dev` (This repo's CLI)
+2. Run the Inngest dev server: `npx inngest-cli@latest dev` (This repo's CLI)
 3. [Integrate Inngest with your framework in one line](https://www.inngest.com/docs/sdk/serve?ref=github-inngest-readme) via the `serve()` handler
 4. [Write and run functions in your existing framework or project](https://www.inngest.com/docs/functions?ref=github-inngest-readme)
 
