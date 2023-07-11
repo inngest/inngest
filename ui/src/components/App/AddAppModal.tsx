@@ -54,6 +54,13 @@ export default function AddAppModal({ isOpen, onClose }) {
     createApp();
   }
 
+  function handleKeyDown (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
   return (
     <Modal
       title="Add Inngest App"
@@ -61,7 +68,7 @@ export default function AddAppModal({ isOpen, onClose }) {
       isOpen={isOpen}
       onClose={onClose}
     >
-      <form>
+      <form onSubmit={handleSubmit}>
         <div className="bg-[#050911]/50 p-6">
           <label
             htmlFor="addAppUrlModal"
@@ -79,9 +86,10 @@ export default function AddAppModal({ isOpen, onClose }) {
                 'min-w-[420px] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline',
                 isUrlInvalid && inputUrl.length > 0 && 'pr-8 outline-rose-400'
               )}
-              placeholder="https://example.com/api/inngest"
+              placeholder="http://localhost:3000/api/inngest"
               value={inputUrl}
               onChange={handleChange}
+              onKeyDown={handleKeyDown}
             />
             {isUrlInvalid && inputUrl.length > 0 && (
               <IconExclamationTriangleSolid className="absolute top-2/4 right-2 -translate-y-2/4 text-rose-400" />
@@ -99,7 +107,7 @@ export default function AddAppModal({ isOpen, onClose }) {
           <Button
             disabled={isDisabled || isUrlInvalid}
             label="Connect App"
-            btnAction={handleSubmit}
+            type="submit"
           />
         </div>
       </form>

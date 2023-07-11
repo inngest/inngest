@@ -165,7 +165,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                       isLoading && 'pr-6'
                     )}
                     value={inputUrl}
-                    placeholder="https://example.com/api/inngest"
+                    placeholder="http://localhost:3000/api/inngest"
                     onChange={handleChange}
                     readOnly={app.autodiscovered}
                   />
