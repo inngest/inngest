@@ -13,6 +13,11 @@ import (
 )
 
 func (r *mutationResolver) CreateApp(ctx context.Context, input models.CreateAppInput) (*cqrs.App, error) {
+	// If we already have the app, return it.
+	if app, err := r.Data.GetAppByURL(ctx, input.URL); err == nil && app != nil {
+		return app, nil
+	}
+
 	// Create a new app which holds the error message.
 	params := cqrs.InsertAppParams{
 		ID:  uuid.New(),

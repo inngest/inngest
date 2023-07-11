@@ -30,10 +30,11 @@ const (
 
 func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager) *devserver {
 	return &devserver{
-		data:        data,
-		runner:      runner,
-		opts:        opts,
-		handlerLock: &sync.Mutex{},
+		data:         data,
+		runner:       runner,
+		opts:         opts,
+		handlerLock:  &sync.Mutex{},
+		autodiscover: true,
 	}
 }
 
@@ -45,6 +46,8 @@ func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager) *devser
 // SDKs, as they can test and use a single URL.
 type devserver struct {
 	opts StartOpts
+
+	autodiscover bool
 
 	data cqrs.Manager
 
@@ -94,10 +97,8 @@ func (d *devserver) Pre(ctx context.Context) error {
 		api.Mount{At: "/debug", Handler: middleware.Profiler()},
 	)
 
-	if d.opts.Autodiscover {
-		// Autodiscover the URLs that are hosting Inngest SDKs on the local machine.
-		go d.autodiscover(ctx)
-	}
+	// Autodiscover the URLs that are hosting Inngest SDKs on the local machine.
+	go d.runDiscovery(ctx)
 
 	return d.apiservice.Pre(ctx)
 }
@@ -138,17 +139,20 @@ func (d *devserver) Stop(ctx context.Context) error {
 	return d.apiservice.Stop(ctx)
 }
 
-// Autodiscover attempts to run autodiscovery while the dev server is running.
+// runDiscovery attempts to run autodiscovery while the dev server is running.
 //
 // This lets the dev server start and wait for the SDK server to come up at
 // any point.
-func (d *devserver) autodiscover(ctx context.Context) {
+func (d *devserver) runDiscovery(ctx context.Context) {
 	logger.From(ctx).Info().Msg("autodiscovering locally hosted SDKs")
 	for {
 		if ctx.Err() != nil {
 			return
 		}
-		_ = discovery.Autodiscover(ctx)
+
+		if d.autodiscover {
+			_ = discovery.Autodiscover(ctx)
+		}
 		<-time.After(5 * time.Second)
 	}
 }
