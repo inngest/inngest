@@ -45,11 +45,19 @@ export default function Home() {
       <Logos
         heading="Trusted by teams all over the world"
         logos={[
-          { src: "/assets/customers/ocoya.svg", name: "Ocoya" },
-          { src: "/assets/customers/snaplet-dark.svg", name: "Snaplet" },
+          {
+            src: "/assets/customers/tripadvisor.svg",
+            name: "TripAdvisor",
+            featured: true,
+          },
+          { src: "/assets/customers/ocoya.svg", name: "Ocoya", featured: true },
+          {
+            src: "/assets/customers/snaplet-dark.svg",
+            name: "Snaplet",
+          },
+          { src: "/assets/customers/finta-logo.png?v=1", name: "Finta.io" },
           { src: "/assets/customers/tono-logo.png", name: "Tono Health" },
           // { src: "/assets/customers/semgrep-logo.svg", name: "Semgrep" },
-          { src: "/assets/customers/finta-logo.png?v=1", name: "Finta.io" },
           { src: "/assets/customers/yoke-logo.svg", name: "Yoko" },
         ]}
       />

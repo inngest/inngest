@@ -11,7 +11,7 @@ export default function Logos({
   variant = "dark",
 }: {
   heading: string | React.ReactNode;
-  logos: { src: string; name: string; href?: string }[];
+  logos: { src: string; name: string; href?: string; featured?: boolean }[];
   footer?: React.ReactNode;
   variant?: "dark" | "light";
 }) {
@@ -29,11 +29,11 @@ export default function Logos({
       </h2>
       <div
         className={clsx(
-          "mt-10 flex flex-wrap lg:flex-row gap-y-8 items-center justify-center",
+          "mt-16 mb-20 lg:mb-40 xl:mb-60 grid grid-cols-2 lg:grid-cols-4 gap-y-16 items-center justify-center px-20 max-w-[1200px] m-auto",
           hasLinks ? "gap-x-4" : "gap-x-16"
         )}
       >
-        {logos.map(({ src, name, href }, idx) => {
+        {logos.map(({ src, name, href, featured }, idx) => {
           if (href) {
             return (
               <Link
@@ -43,7 +43,8 @@ export default function Logos({
                   variant === "dark" &&
                     "border-slate-900 hover:border-slate-700",
                   variant === "light" &&
-                    "border-slate-200 hover:border-slate-300"
+                    "border-slate-200 hover:border-slate-300",
+                  featured && "col-span-2"
                 )}
               >
                 <Image
@@ -63,16 +64,18 @@ export default function Logos({
               src={src}
               alt={name}
               title={name}
-              width={120}
-              height={30}
-              className="text-white max-h-[36px] transition-all grayscale hover:grayscale-0"
+              width={featured ? 240 : 120}
+              height={featured ? 120 : 30}
+              className={clsx(
+                "text-white m-auto max-h-[36px] transition-all grayscale hover:grayscale-0",
+                featured && "col-span-2 max-h-[60px]"
+              )}
             />
           );
         })}
       </div>
 
       {footer}
-
     </Container>
   );
 }
