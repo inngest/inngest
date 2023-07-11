@@ -105,3 +105,43 @@ export const FUNCTIONS = gql`
     }
   }
 `;
+
+export const APPS = gql`
+  query GetApps {
+    apps {
+      id
+      name
+      sdkLanguage
+      sdkVersion
+      framework
+      url
+      error
+      connected
+      functionCount
+      autodiscovered
+    }
+  }
+`;
+
+export const ADD_APP = gql`
+  mutation CreateApp($input: CreateAppInput!) {
+    createApp(input: $input) {
+      url
+    }
+  } 
+`;
+
+export const UPDATE_APP = gql`
+  mutation UpdateApp($input: UpdateAppInput!) {
+    updateApp(input: $input) {
+      url
+      id
+    }
+  } 
+`;
+
+export const DELETE_APP = gql`
+  mutation DeleteApp($id: String!) {
+    deleteApp(id: $id)
+  } 
+`;

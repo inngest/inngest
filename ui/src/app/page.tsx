@@ -1,5 +1,6 @@
 "use client";
 
+import { Toaster } from 'sonner';
 import ActionBar from '@/components/ActionBar';
 import BG from '@/components/BG';
 import { BlankSlate } from '@/components/Blank';
@@ -16,7 +17,7 @@ import Navbar from '@/components/Navbar/Navbar';
 import NavbarLink from '@/components/Navbar/NavbarLink';
 import TimelineScrollContainer from '@/components/Timeline/TimelineScrollContainer';
 import { IconBook, IconFeed, IconFunction } from '@/icons';
-import { useGetEventsStreamQuery, useGetFunctionsStreamQuery } from '@/store/generated';
+import { useGetEventsStreamQuery, useGetFunctionsStreamQuery, useGetAppsQuery } from '@/store/generated';
 import {
   setSidebarTab,
   showDocs,
@@ -74,6 +75,17 @@ export default function Page() {
     }
   );
 
+  const { appsConnectedCount, hasConnectedError } = useGetAppsQuery(
+    undefined,
+    {
+      selectFromResult: (result) => ({
+        appsConnectedCount: result.data?.apps?.filter(app => app.connected === true)?.length || 0,
+        hasConnectedError: result?.data?.apps?.some(app => app.connected === false),
+      }),
+      pollingInterval: 1500,
+    }
+  );
+
   return (
     <div
       className={classNames(
@@ -90,16 +102,17 @@ export default function Page() {
           <NavbarLink
             icon={<IconFeed />}
             active={contentView === "feed"}
-            badge={20}
             onClick={() => dispatch(showFeed())}
             tabName="Stream"
           />
-          {/* <NavbarLink
+          <NavbarLink
             icon={<IconFunction />}
             active={contentView === "apps"}
             onClick={() => dispatch(showApps())}
+            badge={appsConnectedCount}
+            hasError={hasConnectedError}
             tabName="Apps"
-          /> */}
+          />
           <NavbarLink
             icon={<IconFunction />}
             active={contentView === "functions"}
@@ -201,6 +214,7 @@ export default function Page() {
       ) : (
         <Docs />
       )}
+      <Toaster theme="dark" toastOptions={{ style: { background: "#334155" }}}/>
     </div>
   );
 }

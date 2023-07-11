@@ -38,10 +38,10 @@ export default function AppCardStep({
       </Disclosure.Button>
       {expandedContent && isExpandable && (
         <Transition
-          enter="transition-opacity duration-300"
+          enter="transition-opacity duration-200"
           enterFrom="opacity-0"
           enterTo="opacity-100"
-          leave="transition-opacity duration-300"
+          leave="transition-opacity duration-200"
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >

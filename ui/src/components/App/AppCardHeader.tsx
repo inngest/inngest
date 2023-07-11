@@ -1,20 +1,21 @@
 import classNames from '@/utils/classnames';
 import { IconCheckCircle, IconExclamationTriangle } from '@/icons';
+import Badge from '@/components/Badge';
 
 type AppCardHeaderProps = {
   functionCount: number;
   sdkVersion: string;
-  status: string;
+  connected: boolean;
 };
 
 export default function AppCardHeader({
-  status,
+  connected,
   functionCount,
   sdkVersion,
 }: AppCardHeaderProps) {
   let headerColor, headerLabel, headerIcon;
 
-  if (status !== 'connected') {
+  if (!connected) {
     headerColor = 'bg-rose-600/50';
     headerLabel = 'No Connection';
     headerIcon = <IconExclamationTriangle />;
@@ -39,11 +40,7 @@ export default function AppCardHeader({
         {headerIcon}
         {headerLabel}
       </div>
-      {sdkVersion && (
-        <span className="text-xs leading-3 border rounded-md border-white/20 box-border py-1.5 px-2 text-slate-300">
-          SDK {sdkVersion}
-        </span>
-      )}
+      {sdkVersion && <Badge>SDK {sdkVersion}</Badge>}
     </header>
   );
 }

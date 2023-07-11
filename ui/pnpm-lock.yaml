@@ -29,6 +29,9 @@ dependencies:
   graphql-request:
     specifier: 4.0.0
     version: 4.0.0(graphql@16.6.0)
+  lodash.debounce:
+    specifier: 4.0.8
+    version: 4.0.8
   monaco-editor:
     specifier: 0.34.1
     version: 0.34.1
@@ -56,6 +59,9 @@ dependencies:
   refractor:
     specifier: 4.8.0
     version: 4.8.0
+  sonner:
+    specifier: 0.5.0
+    version: 0.5.0(react-dom@18.2.0)(react@18.2.0)
   ulid:
     specifier: 2.3.0
     version: 2.3.0
@@ -3084,6 +3090,10 @@ packages:
       p-locate: 4.1.0
     dev: true
 
+  /lodash.debounce@4.0.8:
+    resolution: {integrity: sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==}
+    dev: false
+
   /lodash@4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
     dev: true
@@ -3952,6 +3962,16 @@ packages:
       dot-case: 3.0.4
       tslib: 2.5.3
     dev: true
+
+  /sonner@0.5.0(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-V5L4918wScYxpe3x1H92MV0vSkUqRREu8dwFf7dDTQmRMQ58r1vzSKCsULZ5HCTqxNkfCdhQXHf7rRMaj/MukQ==}
+    peerDependencies:
+      react: ^18.0.0
+      react-dom: ^18.0.0
+    dependencies:
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+    dev: false
 
   /source-map-js@1.0.2:
     resolution: {integrity: sha512-R0XvVJ9WusLiqTCEiGCmICCMplcCkIwwR11mOSD9CR5u+IXYdiseeEuXCVAjS54zqwkLcPNnmU4OeJ6tUrWhDw==}

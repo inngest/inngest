@@ -16,37 +16,30 @@ export type Scalars = {
   Time: any;
 };
 
-export type ActionVersion = {
-  __typename?: 'ActionVersion';
-  config: Scalars['String'];
-  createdAt: Scalars['Time'];
-  dsn: Scalars['String'];
-  name: Scalars['String'];
-  validFrom?: Maybe<Scalars['Time']>;
-  validTo?: Maybe<Scalars['Time']>;
-  versionMajor: Scalars['Int'];
-  versionMinor: Scalars['Int'];
-};
-
 export type ActionVersionQuery = {
   dsn: Scalars['String'];
   versionMajor?: InputMaybe<Scalars['Int']>;
   versionMinor?: InputMaybe<Scalars['Int']>;
 };
 
-export type Config = {
-  __typename?: 'Config';
-  execution?: Maybe<ExecutionConfig>;
+export type App = {
+  __typename?: 'App';
+  autodiscovered: Scalars['Boolean'];
+  checksum?: Maybe<Scalars['String']>;
+  connected: Scalars['Boolean'];
+  error?: Maybe<Scalars['String']>;
+  framework?: Maybe<Scalars['String']>;
+  functionCount: Scalars['Int'];
+  functions: Array<Function>;
+  id: Scalars['ID'];
+  name: Scalars['String'];
+  sdkLanguage: Scalars['String'];
+  sdkVersion: Scalars['String'];
+  url?: Maybe<Scalars['String']>;
 };
 
-export type CreateActionVersionInput = {
-  config: Scalars['String'];
-};
-
-export type DeployFunctionInput = {
-  config: Scalars['String'];
-  env?: InputMaybe<Scalars['Environment']>;
-  live?: InputMaybe<Scalars['Boolean']>;
+export type CreateAppInput = {
+  url: Scalars['String'];
 };
 
 export type Event = {
@@ -83,27 +76,13 @@ export type EventsQuery = {
   workspaceId?: Scalars['ID'];
 };
 
-export type ExecutionConfig = {
-  __typename?: 'ExecutionConfig';
-  drivers?: Maybe<ExecutionDriversConfig>;
-};
-
-export type ExecutionDockerDriverConfig = {
-  __typename?: 'ExecutionDockerDriverConfig';
-  namespace?: Maybe<Scalars['String']>;
-  registry?: Maybe<Scalars['String']>;
-};
-
-export type ExecutionDriversConfig = {
-  __typename?: 'ExecutionDriversConfig';
-  docker?: Maybe<ExecutionDockerDriverConfig>;
-};
-
 export type Function = {
   __typename?: 'Function';
   concurrency: Scalars['Int'];
+  config: Scalars['String'];
   id: Scalars['String'];
   name: Scalars['String'];
+  slug: Scalars['String'];
   triggers?: Maybe<Array<FunctionTrigger>>;
   url: Scalars['String'];
 };
@@ -179,40 +158,34 @@ export type FunctionVersion = {
 
 export type Mutation = {
   __typename?: 'Mutation';
-  createActionVersion?: Maybe<ActionVersion>;
-  deployFunction?: Maybe<FunctionVersion>;
-  updateActionVersion?: Maybe<ActionVersion>;
+  createApp: App;
+  deleteApp: Scalars['String'];
+  updateApp: App;
 };
 
 
-export type MutationCreateActionVersionArgs = {
-  input: CreateActionVersionInput;
+export type MutationCreateAppArgs = {
+  input: CreateAppInput;
 };
 
 
-export type MutationDeployFunctionArgs = {
-  input: DeployFunctionInput;
+export type MutationDeleteAppArgs = {
+  id: Scalars['String'];
 };
 
 
-export type MutationUpdateActionVersionArgs = {
-  input: UpdateActionVersionInput;
+export type MutationUpdateAppArgs = {
+  input: UpdateAppInput;
 };
 
 export type Query = {
   __typename?: 'Query';
-  actionVersion?: Maybe<ActionVersion>;
-  config?: Maybe<Config>;
+  apps: Array<App>;
   event?: Maybe<Event>;
   events?: Maybe<Array<Event>>;
   functionRun?: Maybe<FunctionRun>;
   functionRuns?: Maybe<Array<FunctionRun>>;
   functions?: Maybe<Array<Function>>;
-};
-
-
-export type QueryActionVersionArgs = {
-  query: ActionVersionQuery;
 };
 
 
@@ -263,11 +236,9 @@ export type StepEventWait = {
   expression?: Maybe<Scalars['String']>;
 };
 
-export type UpdateActionVersionInput = {
-  dsn: Scalars['String'];
-  enabled?: InputMaybe<Scalars['Boolean']>;
-  versionMajor: Scalars['Int'];
-  versionMinor: Scalars['Int'];
+export type UpdateAppInput = {
+  id: Scalars['String'];
+  url: Scalars['String'];
 };
 
 export type Workspace = {
@@ -303,6 +274,32 @@ export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type GetFunctionsQuery = { __typename?: 'Query', functions?: Array<{ __typename?: 'Function', id: string, name: string, url: string, triggers?: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> | null };
+
+export type GetAppsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework?: string | null, url?: string | null, error?: string | null, connected: boolean, functionCount: number, autodiscovered: boolean }> };
+
+export type CreateAppMutationVariables = Exact<{
+  input: CreateAppInput;
+}>;
+
+
+export type CreateAppMutation = { __typename?: 'Mutation', createApp: { __typename?: 'App', url?: string | null } };
+
+export type UpdateAppMutationVariables = Exact<{
+  input: UpdateAppInput;
+}>;
+
+
+export type UpdateAppMutation = { __typename?: 'Mutation', updateApp: { __typename?: 'App', url?: string | null, id: string } };
+
+export type DeleteAppMutationVariables = Exact<{
+  id: Scalars['String'];
+}>;
+
+
+export type DeleteAppMutation = { __typename?: 'Mutation', deleteApp: string };
 
 
 export const GetEventsStreamDocument = `
@@ -406,6 +403,42 @@ export const GetFunctionsDocument = `
   }
 }
     `;
+export const GetAppsDocument = `
+    query GetApps {
+  apps {
+    id
+    name
+    sdkLanguage
+    sdkVersion
+    framework
+    url
+    error
+    connected
+    functionCount
+    autodiscovered
+  }
+}
+    `;
+export const CreateAppDocument = `
+    mutation CreateApp($input: CreateAppInput!) {
+  createApp(input: $input) {
+    url
+  }
+}
+    `;
+export const UpdateAppDocument = `
+    mutation UpdateApp($input: UpdateAppInput!) {
+  updateApp(input: $input) {
+    url
+    id
+  }
+}
+    `;
+export const DeleteAppDocument = `
+    mutation DeleteApp($id: String!) {
+  deleteApp(id: $id)
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -424,9 +457,21 @@ const injectedRtkApi = api.injectEndpoints({
     GetFunctions: build.query<GetFunctionsQuery, GetFunctionsQueryVariables | void>({
       query: (variables) => ({ document: GetFunctionsDocument, variables })
     }),
+    GetApps: build.query<GetAppsQuery, GetAppsQueryVariables | void>({
+      query: (variables) => ({ document: GetAppsDocument, variables })
+    }),
+    CreateApp: build.mutation<CreateAppMutation, CreateAppMutationVariables>({
+      query: (variables) => ({ document: CreateAppDocument, variables })
+    }),
+    UpdateApp: build.mutation<UpdateAppMutation, UpdateAppMutationVariables>({
+      query: (variables) => ({ document: UpdateAppDocument, variables })
+    }),
+    DeleteApp: build.mutation<DeleteAppMutation, DeleteAppMutationVariables>({
+      query: (variables) => ({ document: DeleteAppDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery } = injectedRtkApi;
+export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation } = injectedRtkApi;
 

@@ -1,42 +1,22 @@
+import { useMemo } from 'react';
 import AppCard from '@/components/App/AppCard';
-import { IconFunction, IconPlus, IconSpinner } from '@/icons';
+import { IconFunction, IconSpinner } from '@/icons';
 import AddAppButton from '@/components/App/AddAppButton';
-
-const mockApps = [
-  {
-    name: '',
-    id: 'tempId',
-    createdAt: '',
-    url: 'localhost:3001',
-    functionCount: 0,
-    sdkVersion: '',
-    status: 'not connected',
-    automaticallyAdded: false,
-    connecting: true,
-  },
-  {
-    name: 'SDK Example Redwoodjs Vercel',
-    id: 'id1',
-    createdAt: '',
-    url: 'localhost:3000',
-    functionCount: 24,
-    sdkVersion: '2.0.41',
-    status: 'connected',
-    automaticallyAdded: false,
-  },
-  {
-    name: 'SDK Example',
-    id: 'id3',
-    createdAt: '',
-    url: 'localhost:4000',
-    functionCount: 0,
-    sdkVersion: '2.0.41',
-    status: 'connected',
-    automaticallyAdded: true,
-  },
-];
+import { useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {
+  const { data } = useGetAppsQuery(undefined, { pollingInterval: 1500 });
+  const apps = data?.apps || [];
+
+  const connectedApps = apps.filter((app) => app.connected === true);
+  const numberOfConnectedApps = connectedApps.length;
+
+  const memoizedAppCards = useMemo(() => {
+    return apps.map((app) => {
+      return <AppCard key={app?.id} app={app} />;
+    });
+  }, [apps]);
+
   return (
     <div className="px-10 py-6 h-full flex flex-col overflow-y-scroll">
       <header className="mb-8">
@@ -55,13 +35,13 @@ export default function AppList() {
       </header>
       <div className="flex items-center gap-2 py-6">
         <IconFunction />
-        <p className="text-white">{mockApps.length} Apps Connected</p>
+        <p className="text-white">
+          {numberOfConnectedApps} App{numberOfConnectedApps === 1 ? '' : 's'}{' '}
+          Connected
+        </p>
       </div>
       <div className="grid md:grid-cols-2 grid-cols-1 gap-6 min-h-max">
-        {/* To do: fetch real apps */}
-        {mockApps.map((app, id) => {
-          return <AppCard key={app?.id} app={app} />;
-        })}
+        {memoizedAppCards}
       </div>
     </div>
   );

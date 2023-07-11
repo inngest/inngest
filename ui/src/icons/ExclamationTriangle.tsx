@@ -1,21 +1,20 @@
-export function IconExclamationTriangle() {
+export function IconExclamationTriangle({ className }: { className?: string }) {
   return (
     <svg
-      width="18"
-      height="19"
-      viewBox="0 0 18 19"
+      className={className}
+      width="20"
+      height="20"
+      viewBox="0 -1 24 24"
+      strokeWidth="1.5"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      stroke="currentColor"
     >
-      <g>
-        <path
-          d="M8.99971 7.25005V10.0625M2.02227 12.5943C1.37323 13.7193 2.18516 15.125 3.48396 15.125H14.5155C15.8143 15.125 16.6262 13.7193 15.9771 12.5943L10.4614 3.03364C9.812 1.90802 8.18742 1.90802 7.53802 3.03364L2.02227 12.5943ZM8.99971 12.3125H9.00533V12.3182H8.99971V12.3125Z"
-          stroke="white"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </g>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+      />
     </svg>
   );
 }
