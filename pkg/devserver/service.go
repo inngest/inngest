@@ -30,11 +30,10 @@ const (
 
 func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager) *devserver {
 	return &devserver{
-		data:         data,
-		runner:       runner,
-		opts:         opts,
-		handlerLock:  &sync.Mutex{},
-		autodiscover: true,
+		data:        data,
+		runner:      runner,
+		opts:        opts,
+		handlerLock: &sync.Mutex{},
 	}
 }
 
@@ -46,8 +45,6 @@ func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager) *devser
 // SDKs, as they can test and use a single URL.
 type devserver struct {
 	opts StartOpts
-
-	autodiscover bool
 
 	data cqrs.Manager
 
@@ -150,7 +147,7 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 			return
 		}
 
-		if d.autodiscover {
+		if d.opts.Autodiscover {
 			_ = discovery.Autodiscover(ctx)
 		}
 		<-time.After(5 * time.Second)
