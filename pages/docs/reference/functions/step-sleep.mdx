@@ -2,6 +2,8 @@
 
 Use `step.sleep()` to pause the execution of your function for a specific amount of time.
 
+Functions that are sleeping do not count towards [concurrency](/docs/functions/concurrency) limits.
+
 ```ts
 export default inngest.createFunction(
   { name: "Send delayed email" },
