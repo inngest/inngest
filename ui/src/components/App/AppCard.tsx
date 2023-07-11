@@ -115,9 +115,9 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
               <div className="">
                 <div className='flex items-center gap-3 text-base'>
                 {app.connected ? (
-                  <>{<IconAppStatusCompleted />}Connected to server</>
+                  <>{<IconAppStatusCompleted />}Connected to App</>
                 ) : (
-                  <>{<IconAppStatusFailed />}No connection to server</>
+                  <>{<IconAppStatusFailed />}No Connection to App</>
                 )}
                 </div>
                 <p className="text-slate-300 ui-open:hidden xl:hidden pl-10">{app.url}</p>
@@ -203,7 +203,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                 ) : !app.connected ? (
                   <>{<IconAppStatusDefault />}No Functions Found</>
                 ) : (
-                  <>{<IconAppStatusFailed />}No Functions Found</>
+                  <>{<IconAppStatusFailed className="text-orange-400/70"/>}No Functions Found</>
                 )}
               </div>
               <div className="flex items-center gap-4">
