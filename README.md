@@ -1,13 +1,41 @@
-# Inngest
+# [Inngest](https://www.inngest.com)
 
 [![Latest release](https://img.shields.io/github/v/release/inngest/inngest?include_prereleases&sort=semver)](https://github.com/inngest/inngest/releases)
 [![Test Status](https://img.shields.io/github/actions/workflow/status/inngest/inngest/go.yaml?branch=main&label=tests)](https://github.com/inngest/inngest/actions?query=branch%3Amain)
 [![Discord](https://img.shields.io/discord/842170679536517141?label=discord)](https://www.inngest.com/discord)
 [![Twitter Follow](https://img.shields.io/twitter/follow/inngest?style=social)](https://twitter.com/inngest)
 
-Run reliable serverless functions in the background. Inngest allows you to schedule, enqueue, and run serverless functions in the background reliably with retries on any platform, with zero infrastructure, fully locally testable. Learn more: https://www.inngest.com.
+[Inngest](https://www.inngest.com) is the developer platform for easily building reliable workflows with zero infrastructure.
 
-<br />
+<div align="center">
+
+  <a href="https://www.inngest.com/uses/serverless-node-background-jobs?ref=org-readme">
+    Background Jobs
+  </a>&nbsp;&nbsp;|&nbsp;&nbsp;
+
+  <a href="https://www.inngest.com/uses/serverless-queues?ref=org-readme">
+    Serverless Queues
+  </a>&nbsp;&nbsp;|&nbsp;&nbsp;
+
+  <a href="https://www.inngest.com/docs/functions/multi-step?ref=org-readme">
+    Workflows
+  </a>&nbsp;&nbsp;|&nbsp;&nbsp;
+
+  <a href="https://www.inngest.com/uses/zero-infra-llm-ai?ref=org-readme">
+    AI & LLM Chains
+  </a>&nbsp;&nbsp;|&nbsp;&nbsp;
+
+  <a href="https://www.inngest.com/uses/serverless-cron-jobs?ref=org-readme">
+    Scheduled Jobs
+  </a>
+</div>
+<br/>
+
+- Write background jobs and workflows in your existing codebase using the [**Inngest SDK**](https://github.com/inngest/inngest-js)
+- Run the open source [**Inngest Dev Server**](#the-inngest-dev-server) on your machine for a complete local development experience, with production parity.
+- The **Inngest Platform** invokes your code wherever you host it, via HTTPS. Deploy to your existing setup, and deliver products faster without managing infrastructure.
+
+---
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
@@ -16,29 +44,30 @@ Run reliable serverless functions in the background. Inngest allows you to sched
 
 <br />
 
-The local development UI:
+#### The Inngest Dev Server
 
-![DevUI](https://user-images.githubusercontent.com/306177/204876780-d97eec85-53e2-4fca-81ce-cae45d56c319.png)
+```
+npx inngest-cli@latest dev
+```
+
+![Inngest Dev Server screenshot](https://www.inngest.com/assets/homepage/dev-server-screenshot.jpg)
 
 <br />
 
 ## Overview
 
-Inngest makes it simple for you to write delayed or background jobs by triggering functions from events — decoupling your code within your application.
+Inngest makes it easy to develop serverless workflows in your existing codebase, without any new infrastructure. Inngest Functions are triggered via events &mdash; decoupling your code within your application.
 
-- You send events from your application via our SDK (or with a Webhook)
-- Inngest runs your serverless functions that are configured to be triggered by those events, either immediately, or delayed.
+1. You define your Inngest functions using the [Inngest SDK](https://github.com/inngest/inngest-js) and serve them through a [simple API endpoint](https://www.inngest.com/docs/sdk/serve?ref=github-inngest-readme).
+2. Inngest automatically invokes your functions via HTTPS whenever you send events from your application.
 
 Inngest abstracts the complex parts of building a robust, reliable, and scalable architecture away from you, so you can focus on writing amazing code and building applications for your users.
 
-We created Inngest to bring the benefits of event-driven systems to all developers, without having to write any code themselves. We believe that:
+- **Run your code anywhere** - We call you via HTTPS so you can deploy your code to serverless, servers or the edge.
+- **Zero-infrastructure required** - No queues or workers to configure or manage &mdash; just write code and Inngest does the rest.
+- **Build complex workflows with simple primitives** - [Our SDK](https://github.com/inngest/inngest-js) provides easy to learn `step` tools like [`run`](https://www.inngest.com/docs/reference/functions/step-run?ref=github-inngest-readme), [`sleep`](https://www.inngest.com/docs/reference/functions/step-sleep?ref=github-inngest-readme), [`sleepUntil`](https://www.inngest.com/docs/reference/functions/step-sleep-until?ref=github-inngest-readme), and [`waitForEvent`](https://www.inngest.com/docs/reference/functions/step-wait-for-event?ref=github-inngest-readme) that you can combine using code and patterns that you're used to create complex and robust workflows.
 
-- Event-driven systems should be _easy_ to build and adopt
-- Event-driven systems are better than regular, procedural systems and queues
-- Developer experience matters
-- Serverless scheduling enables scalable, reliable systems that are both cheaper and better for compliance
-
-[Read more about our vision and why this project exists](https://www.inngest.com/blog/open-source-event-driven-queue)
+[Read more about our vision and why this Inngest exists](https://www.inngest.com/blog/inngest-add-super-powers-to-serverless-functions)
 
 <br />
 
@@ -110,7 +139,7 @@ Inngest’s architecture is made up of 6 core components:
 
 And, in this CLI:
 
-- The **DevServer** combines all the components and basic drivers for each into a single system which loads all functions on disk, handles incoming events via the API and executes functions, all returning a readable output to the developer. (_Note - the DevServer does not run a Core API as functions are loaded directly from disk_)
+- The **DevServer** combines all the components and basic drivers for each into a single system which reads all functions from your application running on your machine, handles incoming events via the API and executes functions, all returning a readable output to the developer.
 
 For specific information on how the DevServer works and how it compares to production [read this doc](/docs/DEVSERVER_ARCHITECTURE.md).
 
