@@ -1,4 +1,4 @@
-# [Inngest](https://www.inngest.com)
+# [![Inngest](https://github.com/inngest/.github/raw/main/profile/github-readme-banner.png)](https://www.inngest.com)
 
 [![Latest release](https://img.shields.io/github/v/release/inngest/inngest?include_prereleases&sort=semver)](https://github.com/inngest/inngest/releases)
 [![Test Status](https://img.shields.io/github/actions/workflow/status/inngest/inngest/go.yaml?branch=main&label=tests)](https://github.com/inngest/inngest/actions?query=branch%3Amain)
