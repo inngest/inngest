@@ -71,7 +71,11 @@ export default function Home() {
         <SDKOverview />
 
         <Logos
-          heading="Use your existing framework (or no framework!)"
+          heading={
+            <>
+              Use your existing framework (<em>or no framework!</em>)
+            </>
+          }
           logos={[
             {
               src: "/assets/brand-logos/next-js-white.svg",

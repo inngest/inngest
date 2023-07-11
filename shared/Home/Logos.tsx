@@ -16,6 +16,7 @@ export default function Logos({
   variant?: "dark" | "light";
 }) {
   const hasLinks = !!logos.find((l) => !!l.href);
+  const nonFeaturedCount = logos.filter((l) => !l.featured).length;
   return (
     <Container className="my-36 mx-auto max-w-4xl">
       <h2
@@ -29,8 +30,10 @@ export default function Logos({
       </h2>
       <div
         className={clsx(
-          "mt-16 mb-20 lg:mb-40 xl:mb-60 grid grid-cols-2 lg:grid-cols-4 gap-y-16 items-center justify-center px-20 max-w-[1200px] m-auto",
-          hasLinks ? "gap-x-4" : "gap-x-16"
+          "mt-16 mb-20 lg:mb-40 xl:mb-60 grid grid-cols-2 items-center justify-center px-20 max-w-[1200px] m-auto",
+          nonFeaturedCount === 4 && "px-20 lg:grid-cols-4",
+          nonFeaturedCount === 5 && "px-6 lg:grid-cols-5",
+          hasLinks ? "gap-x-4 gap-y-8" : "gap-x-16 gap-y-16"
         )}
       >
         {logos.map(({ src, name, href, featured }, idx) => {
@@ -39,12 +42,16 @@ export default function Logos({
               <Link
                 href={href}
                 className={clsx(
-                  "group flex items-center justify-center h-16 w-40 px-6 py-6 rounded-lg border transition-all",
+                  "group flex items-center justify-center h-16 w-40 max-w-[90%] px-6 py-6 m-auto rounded-lg border transition-all",
                   variant === "dark" &&
                     "border-slate-900 hover:border-slate-700",
                   variant === "light" &&
                     "border-slate-200 hover:border-slate-300",
-                  featured && "col-span-2"
+                  featured && "col-span-2",
+                  !featured &&
+                    nonFeaturedCount % 2 == 1 &&
+                    idx === logos.length - 1 &&
+                    "col-span-2 lg:col-span-1" // center the last item if there is an odd number
                 )}
               >
                 <Image
