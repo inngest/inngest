@@ -5,22 +5,6 @@ before:
     - make build-ui
 
 builds:
-  - env:
-      - CGO_ENABLED=1
-    main: ./cmd/
-    binary: inngest
-    ldflags:
-      - -s -w
-      - -X github.com/inngest/inngest/pkg/inngest/version.Version={{.Version}}
-      - -X github.com/inngest/inngest/pkg/inngest/version.Hash={{.ShortCommit}}
-    goos:
-      - linux
-      - windows
-      - darwin
-    goarch:
-      - amd64
-      - arm64
-builds:
   -
     builder: prebuilt
     goos: [linux, darwin]
