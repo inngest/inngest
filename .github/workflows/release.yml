@@ -51,7 +51,7 @@ jobs:
           v: false
           x: false
           race: false
-          ldflags: -s -w -X github.com/inngest/inngest/pkg/inngest/version.Version=${{ steps.sha.outputs.sha }} -X github.com/inngest/inngest/pkg/inngest/version.Hash=${{ steps.tag.outputs.tag }}
+          ldflags: -s -w -X github.com/inngest/inngest/pkg/inngest/version.Version=${{ steps.tag.outputs.tag }} -X github.com/inngest/inngest/pkg/inngest/version.Hash=${{ steps.sha.outputs.sha }}
           buildmode: default
           trimpath: true
 
