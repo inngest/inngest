@@ -6,7 +6,7 @@ on:
       - "v*"
 
 jobs:
-  build:
+  goreleaser:
     runs-on: ubuntu-latest
     steps:
       - name: Login to Docker Hub
