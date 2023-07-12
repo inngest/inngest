@@ -1,3 +1,4 @@
+import type { GetStaticPropsResult } from "next";
 import Link from "next/link";
 import React from "react";
 import Header from "../shared/Header";
@@ -6,19 +7,19 @@ import Logos from "src/shared/Home/Logos";
 import SDKOverview from "src/shared/Home/SDKOverview";
 
 import LocalDev from "../shared/Home/LocalDev";
-import OutTheBox from "../shared/Home/OutTheBox";
-import FullyManaged from "../shared/Home/FullyManaged";
 import SocialCTA from "../shared/Home/SocialCTA";
 import Footer from "../shared/Footer";
 import CustomerQuote from "src/shared/Home/CustomerQuote";
 
-import Patterns from "src/shared/Home/Patterns";
 import GetThingsShipped from "src/shared/Home/GetThingsShipped";
 import RunAnywhere from "src/shared/Home/RunAnywhere";
 import PlatformFeatures from "src/shared/Home/PlatformFeatures";
 import FeatureCallouts from "src/shared/Home/FeatureCallouts";
+import type { PageProps } from "src/shared/types";
 
-export async function getStaticProps() {
+export async function getStaticProps(): Promise<
+  GetStaticPropsResult<PageProps>
+> {
   return {
     props: {
       designVersion: "2",
@@ -26,6 +27,7 @@ export async function getStaticProps() {
         title: "Effortless serverless queues, background jobs, and workflows",
         description:
           "Easily develop serverless workflows in your current codebase, without any new infrastructure. Using Inngest, your entire team can ship reliable products.",
+        image: "/assets/homepage/open-graph.png",
       },
     },
   };

@@ -23,7 +23,7 @@ Router.events.on("hashChangeStart", onRouteChange);
 Router.events.on("routeChangeComplete", onRouteChange);
 Router.events.on("routeChangeError", onRouteChange);
 
-type Props = {
+export type Props = {
   children: React.ReactNode;
   sections: [];
   /* The title automatically pulled from the h1 tag in each mdx file */

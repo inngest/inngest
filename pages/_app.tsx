@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import Head from "next/head";
+import type { AppProps } from "next/app";
 import { useRouter } from "next/router";
 import Script from "next/script";
 
@@ -9,27 +10,31 @@ import { useAnonId } from "../shared/legacy/trackingHooks";
 import "../styles/globals.css";
 import * as fullstory from "@fullstory/browser";
 
-import { Layout as DocsLayout } from "../shared/Docs/Layout";
+import {
+  Layout as DocsLayout,
+  type Props as DocsLayoutProps,
+} from "../shared/Docs/Layout";
 
 import PageBanner from "../shared/legacy/PageBanner";
+import type { PageProps } from "@/shared/types";
 
 const FireIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     fill="none"
     viewBox="0 0 24 24"
-    stroke-width="1.5"
+    strokeWidth="1.5"
     stroke="currentColor"
     className="w-4 h-4 inline -mt-0.5 mr-1.5 text-fuchsia-100"
   >
     <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"
     />
     <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z"
     />
   </svg>
@@ -56,7 +61,9 @@ function DefaultLayout({ children }) {
   );
 }
 
-function MyApp({ Component, pageProps }) {
+type DefaultProps = PageProps & DocsLayoutProps;
+
+function MyApp({ Component, pageProps }: AppProps<DefaultProps>) {
   const router = useRouter();
   const { anonId, existing } = useAnonId();
 
@@ -173,8 +180,8 @@ function MyApp({ Component, pageProps }) {
         strategy="afterInteractive"
         src="/inngest-sdk.js"
         onLoad={() => {
-          Inngest.init(process.env.NEXT_PUBLIC_INNGEST_KEY);
-          Inngest.identify({ anonymous_id: anonId });
+          window.Inngest.init(process.env.NEXT_PUBLIC_INNGEST_KEY);
+          window.Inngest.identify({ anonymous_id: anonId });
           // The hook should tell us if the anon id is an existing one, or it's just been set
           const firstTouch = !existing;
           let ref = null;
@@ -183,7 +190,7 @@ function MyApp({ Component, pageProps }) {
             ref = urlParams.get("ref");
           } catch (e) {}
           // See tracking for next/link based transitions in tracking.ts
-          Inngest.event({
+          window.Inngest.event({
             name: "website/page.viewed",
             data: {
               first_touch: firstTouch,
@@ -196,7 +203,7 @@ function MyApp({ Component, pageProps }) {
               // Prevent the double tracking of page views b/c routeChangeComplete
               // is unpredictable.
               if (p.name === "website/page.viewed") return;
-              Inngest.event(p);
+              window.Inngest.event(p);
             });
           }
         }}
