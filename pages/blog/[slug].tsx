@@ -17,10 +17,12 @@ import Container from "src/shared/layout/Container";
 import { Button } from "src/shared/Button";
 import IconCalendar from "src/shared/Icons/Calendar";
 import CTACallout from "src/shared/CTACallout";
+import Blockquote from "src/shared/Blog/Blockquote";
 const components = {
   DiscordCTA,
   Button,
   CTACallout,
+  Blockquote,
 };
 
 type Props = {
@@ -161,11 +163,10 @@ export default function BlogLayout(props) {
                         className="text-indigo-400 font-medium hover:text-white transition-all no-underline hover:underline"
                         href="https://www.inngest.com?ref=blog-post"
                       >
-                        Inngest's
+                        Inngest
                       </a>{" "}
-                      platform lets you build serverless background tasks and
-                      scheduled jobs using events - zero infrastructure
-                      required.
+                      is the developer platform for creating, testing, and
+                      running reliable background jobs and workflows.
                     </>
                   }
                   cta={{

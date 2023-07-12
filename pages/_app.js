@@ -8,28 +8,45 @@ import { getOpenGraphImageURL } from "../utils/social";
 import { useAnonId } from "../shared/legacy/trackingHooks";
 import "../styles/globals.css";
 import * as fullstory from "@fullstory/browser";
-import { GitBranch } from "react-feather";
 
 import { Layout as DocsLayout } from "../shared/Docs/Layout";
 
 import PageBanner from "../shared/legacy/PageBanner";
 
-const DISABLE_BANNER = false;
+const FireIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke-width="1.5"
+    stroke="currentColor"
+    className="w-4 h-4 inline -mt-0.5 mr-1.5 text-fuchsia-100"
+  >
+    <path
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z"
+    />
+    <path
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z"
+    />
+  </svg>
+);
+
+const DISABLE_BANNER = true;
 
 function DefaultLayout({ children }) {
   const router = useRouter();
   return (
     <>
       {!DISABLE_BANNER && router.pathname !== "/sign-up" && (
-        <PageBanner href="/blog/branch-environments?ref=page-banner">
-          <GitBranch
-            size="1em"
-            className="inline -mt-0.5 mr-1.5 text-fuchsia-100"
-          />
-          <span className="sm:hidden">Announcing Branch Environments</span>
+        <PageBanner href="/blog/announcing-inngest-seed-financing?ref=page-banner">
+          <FireIcon />
+          <span className="sm:hidden">Inngest Raises $3M Seed</span>
           <span className="hidden sm:inline">
-            Announcing Branch Environments - A test environment for every
-            feature branch
+            Inngest Raises $3M Seed from GGV Capital & Guillermo Rauch
           </span>
         </PageBanner>
       )}

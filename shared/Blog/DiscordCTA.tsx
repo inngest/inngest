@@ -8,7 +8,7 @@ const DiscordCTA: React.FC<{ size?: "default" | "small" }> = ({
   size = "default",
 }) => {
   return (
-    <div className="max-w-[65ch] border-t-[2px] border-slate-800 pt-16 m-auto text-indigo-500">
+    <div className="max-w-[70ch] border-t-[2px] border-slate-800 pt-16 m-auto text-indigo-500">
       <DiscordLogo size={32} />
       <h2 className="text-white text-xl font-medium mt-6">
         Help shape the future of Inngest

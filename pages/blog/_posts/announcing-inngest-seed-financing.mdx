@@ -1,0 +1,47 @@
+---
+hide: true # Remove this to go live!
+heading: Inngest Raises $3M Seed led by GGV Capital
+subtitle: New round led by Glenn Solomon of GGV, including Guillermo Rauch and Tom Preston-Werner
+image: /assets/blog/seed-financing/featured-image.png?v1
+date: 2023-07-12
+author: Dan Farrelly, Tony Holdstock-Brown
+---
+import Blockquote from "src/shared/Blog/Blockquote";
+
+**Today, we're thrilled to announce that Inngest has raised $3M in new funding led by Glenn Solomon of [GGV Capital](https://www.ggvc.com/), Guillermo Rauch of Vercel, and Github founder, Tom Preston-Werner, with continued participation from [Afore Capital](https://www.afore.vc/) and Comma Capital, plus other strategic partners.**
+
+---
+
+Shipping reliable background jobs and workflows are a time consuming and frustrating experience for any software team. They're notoriously painful to develop and test locally. Deploying new jobs to production also requires tedious configuration of cloud infrastructure which often requires a handoff to another team or individual. Often weeks of developer time is spent on basic workflows, before anything complex like idempotency is handled.
+
+Inngest is solving this problem for every software team, no matter team size or experience.
+
+<Blockquote
+  text="Inngest is the missing piece of the trend we've been seeing of developer-led, framework-defined infrastructure. You start with a great dev experience, a framework like Next, and then the complexity of the cloud goes away. Inngest fits like a glove in our vision of a frontend cloud."
+  attribution={{ name: "Guillermo Rauch", title: "CEO of Vercel" }}
+  avatar="/assets/about/guillermo-rauch-avatar.jpg"
+/>
+
+## Ship in hours, not weeks
+
+Using Inngest, developers can write, test, and deploy complex workflows to production in hours, not weeks — all without touching infrastructure or queues.  We combine several components to make this faster than ever:
+
+- The **Inngest Dev Server** is a complete local development experience which starts with a single command.  It runs on your own machine providing instant visual feedback and debugging tools so you can develop and iterate on your work.
+- The **Inngest SDK** enables you to skip all the boilerplate and write your background jobs and workflows in just a few lines of code. It has simple primitives that you can learn in minutes, but powerful enough to build the most complex of workflows. Our SDK can be added to any codebase and works along side the most popular frameworks like Next.js, Express.js, RedwoodJS, and Remix, among many others.
+- The **Inngest Platform** replaces all of your legacy queues, event streams, workers and subscribers with a fully managed platform. All code is automatically retried when errors are encountered. You can manage job concurrency, rate limiting and backoffs in your code using the SDK — we handle everything for you. Scheduling, sleep and job cancellation is all included to build durable, long-running workflows.
+
+Inngest enables companies like [Ocoya](/customers/ocoya?ref=blog-seed-announcement) to launch new product lines in weeks, all while dramatically simplifying their architecture & infrastructure.
+
+## Serverless, Servers, or Edge
+
+Instead of polling for messages or events, Inngest invokes your code via HTTPS. This enables you to deploy your jobs along side your API on any infrastructure that you choose. Your CI/CD process remains the same as before and Inngest. You can securely and easily start leveraging Inngest without having to deploy your code to another platform.
+
+This approach enables Inngest to support serverless platforms like Vercel, classic long-running servers, and even edge server platforms that often support streaming responses and have fast startup times.
+
+## What's next
+
+We're only getting started and we're leveraging this new capital to help bring Inngest to more developers. We've started by growing our world class team and [our roadmap is full with new functionality](https://roadmap.inngest.com/roadmap) that will enable you to build better products, faster. We're planning on building on our foundation to include support for real-time event forwarding, subscriptions, batch processing, bulk job replay, and new language SDKs.
+
+Our goal is to enable all developers to build complex systems faster and easier than ever.
+
+We invite you to give Inngest a try with [our quick start guide](/docs/quick-start?ref=blog-seed-announcement) and [join our community](/discord?ref=blog-seed-announcement) for questions and sharing feedback with the team!

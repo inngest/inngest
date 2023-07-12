@@ -17,33 +17,37 @@ url(/assets/textures/wave-large.svg)
 
 export default function Footer({ ctaRef }: { ctaRef?: string }) {
   return (
-    <footer className="mt-20  bg-slate-1000">
+    <footer className="mt-80 border-t border-slate-800 bg-slate-1000">
       <Container>
-        <div
-          className="py-12 lg:py-16 text-center rounded-lg"
-          style={{
-            backgroundColor: `hsla(222,79%,61%,1)`,
-            backgroundImage: MeshGradient,
-            backgroundSize: "cover",
-            backgroundPosition: "100%",
-          }}
-        >
-          <h4 className="text-2xl lg:text-3xl tracking-tight mb-4 font-semibold drop-shadow">
-            Ready to start building?
-          </h4>
-          <p className="mt-4 mb-6 text-sm lg:text-base text-indigo-100 drop-shadow">
-            Ship background functions & workflows like never before
-          </p>
-          <div className="flex flex-col gap-5 items-center">
-            <code className="mt-8 py-2 px-4 rounded-lg bg-white/10 text-base text-white backdrop-blur-md font-bold">
-              <span className="">$</span> npx inngest-cli dev
-            </code>
-            <Link
-              href={`/sign-up?ref=${ctaRef ? `${ctaRef}-callout` : "callout"}`}
-              className="py-3 px-5 bg-slate-800 text-white rounded-lg transition-all hover:bg-slate-900"
-            >
-              Get Started For Free
-            </Link>
+        <div className="p-2.5 rounded-[14px] bg-slate-800/50 -mt-60">
+          <div
+            className="py-12 lg:py-16 text-center rounded-lg shadow"
+            style={{
+              backgroundColor: `hsla(222,79%,61%,1)`,
+              backgroundImage: MeshGradient,
+              backgroundSize: "cover",
+              backgroundPosition: "100%",
+            }}
+          >
+            <h4 className="text-2xl lg:text-3xl tracking-tight mb-4 font-semibold drop-shadow">
+              Ready to start building?
+            </h4>
+            <p className="mt-4 mb-6 text-sm lg:text-base text-indigo-100 drop-shadow">
+              Ship background functions & workflows like never before
+            </p>
+            <div className="flex flex-col gap-5 items-center">
+              <code className="mt-8 py-2.5 px-5 rounded-[6px] bg-white/10 text-sm text-white backdrop-blur-md font-medium">
+                <span className="">$</span> npx inngest-cli dev
+              </code>
+              <Link
+                href={`/sign-up?ref=${
+                  ctaRef ? `${ctaRef}-callout` : "callout"
+                }`}
+                className="py-3 px-5 bg-slate-800 text-white rounded-[6px] text-sm transition-all hover:bg-slate-900"
+              >
+                Get Started For Free
+              </Link>
+            </div>
           </div>
         </div>
       </Container>
