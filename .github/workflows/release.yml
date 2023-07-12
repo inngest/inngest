@@ -62,6 +62,9 @@ jobs:
           path: ./build/*
           retention-days: 1
 
+      - name: Clean UI
+        run: git checkout -- .
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:

@@ -5,5 +5,4 @@ testfns/
 build/*
 
 main
-pkg/devserver/index.html
 pkg/devserver/static/
