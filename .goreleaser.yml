@@ -3,8 +3,10 @@ builds:
     builder: prebuilt
     goos: [linux, darwin]
     goarch: [amd64, arm64]
+    goamd64: [v1]
     prebuilt:
       path: ./build/inngest-{{ .Os }}-{{ .Arch }}
+    binary: inngest
 
 
 dockers:
