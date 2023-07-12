@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Container from "../layout/Container";
+import clsx from "clsx";
 
 import Heading from "./Heading";
 
@@ -8,19 +9,19 @@ const highlights = [
     title: "Ship reliable code",
     description:
       "All functions are retried automatically. Manage concurrency, rate limiting and backoffs in code within your function.",
-    img: "/assets/homepage/platform/reliable-code.svg",
+    img: "/assets/homepage/platform/ship-code.png",
   },
   {
     title: "Powerful scheduling",
     description:
       "Enqueue future work, sleep for months, and dynamically cancel jobs without managing job state or hacking APIs together.",
-    img: "/assets/homepage/platform/powerful-scheduling.svg",
+    img: "/assets/homepage/platform/powerful-scheduling.png",
   },
   {
     title: "Replay functions at any time",
     description:
       "Forget the dead letter queue. Replay functions that have failed, or replay functions in your local environment to debug issues easier than ever before.",
-    img: "/assets/homepage/platform/replay-functions.svg",
+    img: "/assets/homepage/platform/replay-functions.png",
   },
 ];
 
@@ -33,23 +34,28 @@ export default function PlatformFeatures() {
         className="mx-auto max-w-3xl text-center"
       />
 
-      <div className="my-24 mx-auto max-w-6xl flex flex-col gap-12">
+      <div className="my-24 mx-auto max-w-6xl flex flex-col gap-8">
         {highlights.map(({ title, description, img }, idx) => (
           <div
             key={idx}
-            className="grid md:grid-cols-3 gap-16 justify-between items-center rounded-lg"
+            className={clsx(
+              `flex flex-col items-stretch bg-slate-950 border rounded-xl p-2.5 border-slate-900`,
+              idx % 2 === 0 ? `lg:flex-row-reverse` : `lg:flex-row`
+            )}
           >
-            <div className={`${idx % 2 === 0 ? "" : "md:col-start-3 order-2"}`}>
+            <div className=" px-6 lg:px-10 py-6 lg:py-12 flex flex-col justify-center">
               <h3 className="text-xl text-indigo-50 font-semibold">{title}</h3>
-              <p className="my-1.5 text-indigo-200">{description}</p>
+              <p className="my-1.5 text-sm lg:text-base text-indigo-200">
+                {description}
+              </p>
             </div>
-            <img
-              src={img}
-              className={`w-full max-h-72 px-12 pointer-events-none md:col-span-2 ${
-                idx % 2 === 0 ? "" : "md:col-start-0 md:order-1"
-              }`}
-              alt={`Graphic for ${title}`}
-            />
+            <div className="bg-slate-1000 w-full rounded flex items-center justify-center">
+              <img
+                src={img}
+                alt={`Graphic for ${title}`}
+                className="w-full max-w-[600px] m-auto"
+              />
+            </div>
           </div>
         ))}
       </div>

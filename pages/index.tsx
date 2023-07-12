@@ -33,15 +33,18 @@ export async function getStaticProps() {
 
 export default function Home() {
   return (
-    <div className="home font-sans bg-[#050911]">
+    <div
+      className="home font-sans bg-slate-1000"
+      style={{
+        backgroundImage: `radial-gradient(circle at center -20%, #231649 0%, rgba(5, 9, 17, 0) 1500px)`,
+        backgroundSize: "100% 1500px",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
       <Header />
-      <div
-        style={{
-          backgroundImage: `radial-gradient(63.13% 40.7% at 50% 33.33%, #0F003C 0%, rgba(5, 9, 17, 0) 100%)`,
-        }}
-      >
-        <Hero />
-      </div>
+
+      <Hero />
+
       <Logos
         heading="Trusted by teams all over the world"
         logos={[
@@ -62,12 +65,8 @@ export default function Home() {
         ]}
       />
 
-      <div
-        style={{
-          background: `url(/assets/textures/diagonal-cross.svg) no-repeat 0 160%`,
-          backgroundSize: "cover",
-        }}
-      >
+      <div className="relative">
+        <div className="absolute top-80 left-0 right-0 -skew-y-6 bottom-0 bg-gradient-to-b from-slate-900/80 border-t border-slate-800/70 to-slate-1000/0"></div>
         <SDKOverview />
 
         <Logos
@@ -108,7 +107,7 @@ export default function Home() {
 
       <LocalDev className="-mb-80 md:-mb-60" />
 
-      <div className="bg-white pt-60 pb-48">
+      <div className="bg-white pt-60 pb-20 md:pb-40">
         <RunAnywhere />
 
         <Logos
@@ -153,10 +152,10 @@ export default function Home() {
           ]}
           variant="light"
           footer={
-            <div className="flex items-center justify-center mt-8">
+            <div className="flex items-center justify-center mt-20">
               <Link
                 href="/product/how-inngest-works?ref=homepage-run-anywhere"
-                className="rounded-md px-3 py-1.5 text-sm font-medium bg-white transition-all text-slate-600 hover:text-slate-800 border border-slate-200 hover:bg-slate-50 whitespace-nowrap drop-shadow"
+                className="rounded-md px-6 py-3 text-sm font-medium bg-slate-900 transition-all text-white hover:bg-slate-800 whitespace-nowrap drop-shadow"
               >
                 Learn How Inngest Works
               </Link>
@@ -168,7 +167,7 @@ export default function Home() {
           quote="We switched from our PostgreSQL backed queue to Inngest in less than a day. Their approach is idiomatic with a great developer experience. Inngest allowed us to stop worrying about scalability and stability."
           name="Peter Pistorius - CEO @ Snaplet"
           avatar="/assets/customers/snaplet-peter-pistorius.png"
-          className="mx-auto mb-24 max-w-2xl"
+          className="px-6 mx-auto mb-28 lg:mb-20 max-w-2xl"
           variant="light"
         />
       </div>

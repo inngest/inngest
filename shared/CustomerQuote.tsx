@@ -27,7 +27,7 @@ export default function CustomerQuote({
 }: CustomerQuoteProps) {
   return (
     <aside
-      className={`${className} max-w-[1200px] mx-auto px-4 flex flex-col md:flex-row items-center`}
+      className={`${className} max-w-[1200px] mx-auto px-6 md:px-4 flex flex-col md:flex-row items-center`}
     >
       <div className="relative max-w-[80%]">
         <div className="absolute z-0 w-full h-full rounded-[14px] backdrop-blur bg-white/5"></div>

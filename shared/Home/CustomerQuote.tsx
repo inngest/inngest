@@ -39,16 +39,14 @@ export default function CustomerQuote({
   cta?: { href: string; text: string };
 }) {
   return (
-    <aside className={clsx("py-5 relative", className)}>
+    <aside
+      className={clsx(
+        "p-2.5 relative bg-slate-100/10 rounded-[16px] backdrop-blur",
+        className
+      )}
+    >
       <div
-        className={clsx(
-          "absolute top-0 z-0 w-full h-full rounded-[14px] backdrop-blur bg-white/5",
-          variant === "dark" && "bg-white/5",
-          variant === "light" && "bg-slate-100/50"
-        )}
-      ></div>
-      <div
-        className="relative z-10 mx-5 py-5 px-8 flex flex-col items-start gap-2 rounded-lg border border-white/10"
+        className="relative z-10 py-5 px-8 flex flex-col items-start gap-2 rounded-lg shadow"
         style={{
           backgroundColor:
             variant === "dark"

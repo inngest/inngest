@@ -18,7 +18,7 @@ export default function Logos({
   const hasLinks = !!logos.find((l) => !!l.href);
   const nonFeaturedCount = logos.filter((l) => !l.featured).length;
   return (
-    <Container className="my-36 mx-auto max-w-4xl">
+    <Container className="my-20 lg:my-36 mx-auto max-w-4xl">
       <h2
         className={clsx(
           "text-lg tracking-tight text-center",

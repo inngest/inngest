@@ -27,7 +27,7 @@ const highlights = [
 
 export default function RunAnywhere() {
   return (
-    <Container className="mt-64 mb-24 tracking-tight">
+    <Container className="mt-40 lg:mt-64 mb-24 tracking-tight">
       <Heading
         title={
           <>
@@ -40,7 +40,7 @@ export default function RunAnywhere() {
         className="mx-auto max-w-3xl text-center"
       />
 
-      <div className="my-24 mx-auto max-w-6xl grid md:grid-cols-3 gap-7">
+      <div className="mt-8 mb-24 lg:my-24 mx-auto max-w-6xl grid md:grid-cols-3 gap-7">
         {highlights.map(({ title, description, img }, idx) => (
           <div
             key={idx}
