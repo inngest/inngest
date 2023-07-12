@@ -32,6 +32,19 @@ The `createFunction` method accepts a series of arguments to define your functio
   <Property name="concurrency" type="number">
     Limit the number of concurrently running functions ([reference](/docs/functions/concurrency))
   </Property>
+  <Property name="batchEvents" type="object">
+    Configure how the function should consume batches of events ([reference](/docs/guides/batching))
+
+    <Properties nested={true}>
+      <Property name="maxSize" type="number" required>
+        The maximum number of events a batch can have. Current limit is `100`.
+      </Property>
+      <Property name="timeout" type="string" required>
+        How long to wait before invoking the function with the batch even if it's not full.
+        Current permitted values are from `1s` to `60s`.
+      </Property>
+    </Properties>
+  </Property>
   <Property name="retries" type="number">
     Configure the number of times the function will be retried from `0` to `20`. Default: `3`
   </Property>
@@ -74,7 +87,7 @@ One of the following function triggers is **Required**.
 The handler is your code that runs whenever the trigger occurs. Every function handler receives a single object argument which can be deconstructed. The key arguments are `event` and `step`. Note, that scheduled functions that use a `cron` trigger will not receive an `event` argument.
 
 ```ts
-function handler({ event, step, runId }) {/* ... */}
+function handler({ event, events, step, runId, logger }) {/* ... */}
 ```
 
 #### `event`
@@ -92,7 +105,12 @@ The event payload `object` that triggered the given function run. The event payl
 }
 ```
 
-### `step`
+#### `events` <VersionBadge version="v2.2.0+" />
+
+`events` is an array of `event` payload objects that's accessible when the `batchEvents` is set on the function configuration.
+If batching is not configured, the array contains a single event payload matching the `event` argument.
+
+#### `step`
 
 The `step` object has methods that enable you to define
 
@@ -102,7 +120,21 @@ The `step` object has methods that enable you to define
 - [`step.waitForEvent()`](/docs/reference/functions/step-wait-for-event) - Pause a function's execution until another event is received
 - [`step.sendEvent()`](/docs/reference/functions/step-send-event) - Send event(s) reliability within your function. Use this instead of `inngest.send()` to ensure reliable event delivery from within functions.
 
-### `runId`
+#### `runId`
 
 The unique ID for the given function run. This can be useful for logging and looking up specific function runs in the Inngest dashboard.
 
+#### `logger` <VersionBadge version="v2.0.0+" />
+
+The `logger` object exposes the following interfaces.
+
+```ts
+export interface Logger {
+  info(...args: any[]): void;
+  warn(...args: any[]): void;
+  error(...args: any[]): void;
+  debug(...args: any[]): void;
+}
+```
+
+It is a proxy object that is either backed by `console` or the logger you provided ([reference](/docs/guides/logging)).

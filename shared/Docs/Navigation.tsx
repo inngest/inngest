@@ -254,6 +254,10 @@ export const navigation = [
         href: `${baseDir}/guides/logging`,
       },
       {
+        title: "Batching events",
+        href: `${baseDir}/guides/batching`,
+      },
+      {
         title: "Trigger code from Retool",
         href: `${baseDir}/guides/trigger-your-code-from-retool`,
       },

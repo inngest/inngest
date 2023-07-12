@@ -1,0 +1,90 @@
+# Batching events <VersionBadge version="v2.2.0+" />
+
+When you have a high load system, it's common to handle a batch of events together rather
+than handling each event individually.
+It's cost efficient both in terms of computation, and less network roundtrips.
+
+Another common use case for batch handling events is to account for interactions with external system
+limitations.
+For example, if your event handler calls an API with a rigid rate limit, then batching events could reduce
+the number of requests to that API.
+
+## Usage
+
+Now if you're convinced this is a feature you need, here's how you can enable batching event
+consumption with Inngest.
+
+```ts {{ title: "record-api-calls.ts"}}
+const fn = inngest.createFunction(
+  { name: "Record API calls", batchEvents: { maxSize: 100, timeout: "5s" } },
+  { event: "log/api.call" },
+  // NOTE: Use the `events` argument, which is an array of event payloads
+  async ({ events, step }) => {
+    const attrs = events.map(evt => {
+      return {
+        user_id: evt.data.user_id,
+        endpoint: evt.data.endpoint,
+        timestamp: toDateTime(evt.ts)
+      }
+    })
+
+    const result = await step.run("record data to DB", async () => {
+      return db.bulkWrite(attrs)
+    })
+
+    return { success: true, recorded: result.length }
+  }
+)
+```
+
+Imagine we have a job that we use for counting calls made to our API, and we want to track that to
+know how many users are utilizing it.
+
+Ignoring the fact there are definitely better databases for recording this kind of data, if we
+established a transaction for every single event here, this will put a tremendous amount of stress on
+a database, and in certain cases could cause issues like [this](https://blog.sentry.io/transaction-id-wraparound-in-postgres/).
+
+By simply batching the database writes to every 100 events, it will reduce the database load ~100x.
+
+### Configurations
+
+To enable batching, simply set the `batchEvents` object in your function configuration
+([reference](/docs/reference/functions/create#inngest-create-function-configuration-trigger-handler-inngest-function)).
+It accepts two attributes:
+
+* `maxSize`
+* `timeout`
+
+#### maxSize
+
+The number of events in a "full" batch. This is the maximum amount of events your function will receive in a single
+batch when it gets invoked.
+
+#### timeout
+
+The duration Inngest will wait before invoking your function even if the batch is not full.
+Typical high load systems will have their timeouts set to a couple of seconds, usually not more than 10s.
+
+### How it works
+
+A function that has batching enabled will be invoked if one of the two conditions are met:
+
+* The batch is full
+* Timer is up
+
+#### `events` argument
+
+With `batchEvents` set, the SDK will send an `events` array argument to the handler. It contains
+the full list of events within a batch, which you can now operate on all of them within a single function.
+
+## Caveats
+
+With batching, certain event level configurations will be invalidated. When invoking a function, it's pretty
+hard to tell if a condition that was valid for an event will still be true when there're now a full list of them.
+
+Here are some features on the event level configuration that won't work with batching:
+
+* rate limit
+* [cancellation](/docs/functions/cancellation).
+
+When using batching, we recommend to keep the above in mind, and try to keep it simple if you can.
