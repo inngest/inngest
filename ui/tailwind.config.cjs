@@ -38,6 +38,11 @@ module.exports = {
             transform: "rotate(360deg)",
           },
         },
+        shimmer: {
+          '100%': {
+            transform: 'translateX(100%)',
+          },
+        },
       },
       animation: {
         "pulse-spin": "pulse-spin 1s ease-out infinite",
