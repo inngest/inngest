@@ -33,33 +33,44 @@ export default function CustomerQuote({
   quote: string;
   name: string;
   className?: string;
-  variant?: "dark" | "light";
+  variant?: "dark" | "light" | "transparent";
   avatar?: string;
   logo?: string;
   cta?: { href: string; text: string };
 }) {
+  const hasLightFontColor = variant === "dark" || variant === "transparent";
   return (
     <aside
       className={clsx(
-        "p-2.5 relative bg-slate-100/10 rounded-[16px] backdrop-blur",
+        "relative rounded-[16px] backdrop-blur",
+        variant !== "transparent" && "p-2.5 bg-slate-100/10",
         className
       )}
     >
       <div
-        className="relative z-10 py-5 px-8 flex flex-col items-start gap-2 rounded-lg shadow"
+        className={clsx(
+          "relative z-10 flex flex-col items-start gap-2 rounded-lg shadow",
+          variant !== "transparent" && "py-5 px-8"
+        )}
         style={{
           backgroundColor:
             variant === "dark"
               ? `hsla(235,79%,63%,1)`
-              : "hsla(235,79%,63%,0.2)",
+              : variant === "light"
+              ? "hsla(235,79%,63%,0.2)"
+              : "transparent",
           backgroundImage:
-            variant === "dark" ? MeshGradient : MeshGradientLight,
+            variant === "dark"
+              ? MeshGradient
+              : variant === "light"
+              ? MeshGradientLight
+              : "none",
         }}
       >
         <div
           className={clsx(
             "text-sm mb-2 md:text-base lg:text-lg font-medium",
-            variant === "dark" ? "text-white drop-shadow" : "text-slate-900"
+            hasLightFontColor ? "text-white drop-shadow" : "text-slate-900"
           )}
         >
           &ldquo;{quote}&rdquo;
@@ -67,7 +78,7 @@ export default function CustomerQuote({
         <div
           className={clsx(
             "flex flex-row gap-4 w-full items-center text-base font-medium",
-            variant === "dark" ? "text-indigo-50 drop-shadow" : "text-slate-800"
+            hasLightFontColor ? "text-indigo-50 drop-shadow" : "text-slate-800"
           )}
         >
           {avatar && (
