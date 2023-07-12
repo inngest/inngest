@@ -54,7 +54,7 @@ func up(db *sql.DB) error {
 		return err
 	}
 
-	m, err := migrate.NewWithInstance("iofs", source, "postgres", driver)
+	m, err := migrate.NewWithInstance("iofs", source, "duckdb", driver)
 	if err != nil {
 		return err
 	}

@@ -20,6 +20,14 @@ builds:
     goarch:
       - amd64
       - arm64
+builds:
+  -
+    builder: prebuilt
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    prebuilt:
+      path: ./build/inngest-{{ .Os }}-{{ .Arch }}
+
 
 dockers:
   - id: inngest-amd64
