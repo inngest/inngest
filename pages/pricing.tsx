@@ -24,6 +24,7 @@ type Plan = {
   cta: {
     href: string;
     text: string;
+    shortText?: string;
   };
   features: {
     quantity?: string;
@@ -41,7 +42,7 @@ type Feature = {
 };
 
 const PLAN_NAMES = {
-  free: "Free Tier",
+  free: "Free tier",
   team: "Team",
   startup: "Startup",
   enterprise: "Enterprise",
@@ -59,7 +60,7 @@ const PLANS: Plan[] = [
     description: "Build your side project",
     cta: {
       href: "/sign-up?ref=pricing-free",
-      text: "Create an Account",
+      text: "Create an account",
     },
     features: [
       {
@@ -72,14 +73,14 @@ const PLANS: Plan[] = [
       },
       {
         quantity: "25",
-        text: "Concurrent Functions",
+        text: "Concurrent functions",
       },
       {
         quantity: "3 days",
         text: "History",
       },
       {
-        text: "Discord Support",
+        text: "Discord support",
       },
     ],
   },
@@ -108,15 +109,19 @@ const PLANS: Plan[] = [
       },
       {
         quantity: "100",
-        text: "Concurrent Functions",
+        text: "Concurrent functions",
       },
       {
         quantity: "7 days",
         text: "History",
       },
       {
-        text: "Discord Support",
+        text: "Discord support",
       },
+      { text: "-" },
+      { text: "-" },
+      { text: "-" },
+      { text: "-" },
     ],
   },
   {
@@ -145,15 +150,19 @@ const PLANS: Plan[] = [
       },
       {
         quantity: "500",
-        text: "Concurrent Functions",
+        text: "Concurrent functions",
       },
       {
         quantity: "14 days",
         text: "History",
       },
       {
-        text: "Discord + Email Support",
+        text: "Email, Discord support",
       },
+      { text: "-" },
+      { text: "-" },
+      { text: "-" },
+      { text: "-" },
     ],
   },
   {
@@ -168,7 +177,8 @@ const PLANS: Plan[] = [
     description: "Powerful access for any scale",
     cta: {
       href: "/contact?ref=pricing-enterprise",
-      text: "Get in touch",
+      text: "Speak with solutions engineering",
+      shortText: "Book a demo",
     },
     features: [
       {
@@ -181,17 +191,26 @@ const PLANS: Plan[] = [
       },
       {
         quantity: "Custom",
-        text: "Concurrent Functions",
+        text: "Concurrent functions",
       },
       {
-        quantity: "90 Days",
+        quantity: "90 days",
         text: "History",
       },
       {
-        text: "Discord + Email Support + SLAs",
+        text: "Dedicated Slack channel, Email, Discord support",
       },
       {
-        quantity: "HIPAA BAA Available",
+        text: "Exportable metrics",
+      },
+      {
+        text: "Customer success",
+      },
+      {
+        text: "SLAs",
+      },
+      {
+        quantity: "SOC2 report & BAA available",
         text: "Compliance",
       },
     ],
@@ -210,7 +229,7 @@ function getPlanFeatureQuantity(planName: string, feature: string): string {
 
 const FEATURES: Feature[] = [
   {
-    name: "Function Steps/Month",
+    name: "Steps/month",
     plans: {
       [PLAN_NAMES.free]: `${getPlan(PLAN_NAMES.free).cost.included}`,
       [PLAN_NAMES.team]: `${getPlan(PLAN_NAMES.team).cost.included} + ${
@@ -231,28 +250,28 @@ const FEATURES: Feature[] = [
     all: "Unlimited",
   },
   {
-    name: "Concurrent Functions",
+    name: "Concurrent functions",
     plans: {
       [PLAN_NAMES.free]: getPlanFeatureQuantity(
         PLAN_NAMES.free,
-        "Concurrent Functions"
+        "Concurrent functions"
       ),
       [PLAN_NAMES.team]: getPlanFeatureQuantity(
         PLAN_NAMES.team,
-        "Concurrent Functions"
+        "Concurrent functions"
       ),
       [PLAN_NAMES.startup]: getPlanFeatureQuantity(
         PLAN_NAMES.startup,
-        "Concurrent Functions"
+        "Concurrent functions"
       ),
       [PLAN_NAMES.enterprise]: getPlanFeatureQuantity(
         PLAN_NAMES.enterprise,
-        "Concurrent Functions"
+        "Concurrent functions"
       ),
     },
   },
   {
-    name: "History (Log Retention)",
+    name: "History (log retention)",
     plans: {
       [PLAN_NAMES.free]: getPlanFeatureQuantity(PLAN_NAMES.free, "History"),
       [PLAN_NAMES.team]: getPlanFeatureQuantity(PLAN_NAMES.team, "History"),
@@ -267,22 +286,7 @@ const FEATURES: Feature[] = [
     },
   },
   {
-    name: "Automatic Retries",
-    all: true,
-    infoUrl: "/docs/functions/retries?ref=pricing",
-  },
-  {
-    name: "Step Functions",
-    all: true,
-    infoUrl: "/docs/reference/functions/step-run?ref=pricing",
-  },
-  {
-    name: "Scheduled Functions",
-    all: true,
-    infoUrl: "/docs/guides/scheduled-functions?ref=pricing",
-  },
-  {
-    name: "Max Sleep Duration",
+    name: "Max sleep duration",
     plans: {
       [PLAN_NAMES.free]: "7 days",
       [PLAN_NAMES.team]: "60 days",
@@ -292,37 +296,52 @@ const FEATURES: Feature[] = [
     infoUrl: "/docs/guides/enqueueing-future-jobs?ref=pricing",
   },
   {
-    name: "Concurrency Controls",
+    name: "Automatic retries",
+    all: true,
+    infoUrl: "/docs/functions/retries?ref=pricing",
+  },
+  {
+    name: "Step functions",
+    all: true,
+    infoUrl: "/docs/reference/functions/step-run?ref=pricing",
+  },
+  {
+    name: "Scheduled functions",
+    all: true,
+    infoUrl: "/docs/guides/scheduled-functions?ref=pricing",
+  },
+  {
+    name: "Concurrency controls",
     all: true,
     infoUrl: "/docs/functions/concurrency?ref=pricing",
   },
   {
-    name: "Custom Failure Handlers",
+    name: "Custom failure handlers",
     all: true,
     infoUrl: "/docs/reference/functions/handling-failures?ref=pricing",
   },
   {
-    name: "Parallel Steps",
+    name: "Parallel steps",
     all: true,
     infoUrl: "/docs/guides/step-parallelism?ref=pricing",
   },
   {
-    name: "Fan-Out",
+    name: "Fan-out",
     all: true,
     infoUrl: "/docs/guides/fan-out-jobs?ref=pricing",
   },
   {
-    name: "Local Dev Server",
+    name: "Local dev server",
     all: true,
     infoUrl: "/docs/local-development?ref=pricing",
   },
   {
-    name: "Vercel Integration",
+    name: "Vercel integration",
     all: true,
     infoUrl: "/docs/deploy/vercel?ref=pricing",
   },
   {
-    name: "Discord Support",
+    name: "Discord support",
     plans: {
       [PLAN_NAMES.team]: true,
       [PLAN_NAMES.startup]: true,
@@ -330,7 +349,7 @@ const FEATURES: Feature[] = [
     },
   },
   {
-    name: "Email Support",
+    name: "Email support",
     plans: {
       [PLAN_NAMES.team]: false,
       [PLAN_NAMES.startup]: true,
@@ -338,7 +357,7 @@ const FEATURES: Feature[] = [
     },
   },
   {
-    name: "Support SLA",
+    name: "Dedicated Slack channel support",
     plans: {
       [PLAN_NAMES.team]: false,
       [PLAN_NAMES.startup]: false,
@@ -346,7 +365,7 @@ const FEATURES: Feature[] = [
     },
   },
   {
-    name: "Onboarding Support",
+    name: "Exportable metrics",
     plans: {
       [PLAN_NAMES.team]: false,
       [PLAN_NAMES.startup]: false,
@@ -354,7 +373,47 @@ const FEATURES: Feature[] = [
     },
   },
   {
-    name: "HIPPA BAA Available",
+    name: "SLAs",
+    plans: {
+      [PLAN_NAMES.team]: false,
+      [PLAN_NAMES.startup]: false,
+      [PLAN_NAMES.enterprise]: true,
+    },
+  },
+  {
+    name: "Solutions engineering",
+    plans: {
+      [PLAN_NAMES.team]: false,
+      [PLAN_NAMES.startup]: false,
+      [PLAN_NAMES.enterprise]: true,
+    },
+  },
+  {
+    name: "Dedicated customer success",
+    plans: {
+      [PLAN_NAMES.team]: false,
+      [PLAN_NAMES.startup]: false,
+      [PLAN_NAMES.enterprise]: true,
+    },
+  },
+  {
+    name: "Exportable metrics",
+    plans: {
+      [PLAN_NAMES.team]: false,
+      [PLAN_NAMES.startup]: false,
+      [PLAN_NAMES.enterprise]: true,
+    },
+  },
+  {
+    name: "HIPAA BAA available",
+    plans: {
+      [PLAN_NAMES.team]: false,
+      [PLAN_NAMES.startup]: false,
+      [PLAN_NAMES.enterprise]: true,
+    },
+  },
+  {
+    name: "SOC2 report",
     plans: {
       [PLAN_NAMES.team]: false,
       [PLAN_NAMES.startup]: false,
@@ -449,7 +508,7 @@ export default function Pricing() {
                       {PLAN_NAMES.free}
                     </h3>
                     <p className="flex items-center text-sky-100 text-sm">
-                      {getPlan(PLAN_NAMES.free).cost.included} Function Steps{" "}
+                      {getPlan(PLAN_NAMES.free).cost.included} steps{" "}
                       <a
                         href="#what-is-a-function-step"
                         className="mx-1 transition-all text-slate-200 hover:text-white"
@@ -459,11 +518,11 @@ export default function Pricing() {
                       &mdash;{" "}
                       {getPlanFeatureQuantity(
                         PLAN_NAMES.free,
-                        "Concurrent Functions"
+                        "Concurrent functions"
                       )}{" "}
-                      Concurrent Functions &mdash;{" "}
+                      concurrent functions &mdash;{" "}
                       {getPlanFeatureQuantity(PLAN_NAMES.free, "History")}{" "}
-                      History
+                      history
                     </p>
                   </div>
                   <div className="flex flex-col gap-2 items-center">
@@ -489,24 +548,30 @@ export default function Pricing() {
             ))}
           </div>
 
-          <div>
+          <div className="">
             {/* Step Comparison */}
             <h2
               id="what-is-a-function-step" // Used in PlanCard
               className="scroll-mt-32 mt-20 mb-4 text-white text-4xl font-semibold tracking-tight"
             >
-              What is a Function Step?
+              What is a step?
             </h2>
 
-            <p className="my-8 text-lg font-medium">
-              A Function Step is a callable unit of an Inngest function.
+            <p className="mt-8 text-lg font-medium max-w-4xl mb-16">
+              <a
+                href="/docs/functions/multi-step"
+                className="text-white underline"
+              >
+                Steps
+              </a>{" "}
+              are building blocks for logic in functions. They are individually
+              retried, and only run once on success. They allow you to easily
+              write complex logic in a single function.
             </p>
 
-            <div className="max-w-5xl w-full mt-12 flex flex-col lg:flex-row gap-8 items-start">
+            <div className="w-full mt-12 flex flex-col lg:flex-row gap-8 items-start">
               <div className="w-full lg:max-w-md">
-                <h3 className="text-lg font-semibold">
-                  Simple, single-step function
-                </h3>
+                <h3 className="text-lg font-semibold">Single-step function</h3>
                 <p className="my-4">
                   This function does one thing. When a{" "}
                   <code className="bg-slate-800 text-slate-200 text-sm">
@@ -524,14 +589,13 @@ export default function Pricing() {
               <div className="max-w-[100%]">
                 <h3 className="text-lg font-semibold">Multi-step function</h3>
                 <p className="my-4">
-                  This function combines functionality typically spread across
-                  multiple jobs and crons. When a{" "}
+                  In this example, when a{" "}
                   <code className="bg-slate-800 text-slate-200 text-sm">
                     app/user.signup
                   </code>{" "}
-                  event is triggered, the function sends a welcome email, it
-                  waits 3 days, then sends another email. This is billed as 3
-                  steps.
+                  event is triggered the function sends a welcome email, waits 3
+                  days, then sends another email - without any extra queues,
+                  state, or functions. This is billed as 3 steps.
                 </p>
                 <div>
                   <CodeWindow
@@ -701,7 +765,7 @@ export default function Pricing() {
                   As Inngest runs your function any time an event is received,
                   you may have any number of events received within a short
                   period of time (e.g. 10ms). Inngest can run all of these
-                  functions concurrently (in parallel). Our Free Tier allows for
+                  functions concurrently (in parallel). Our free tier allows for
                   up to {getPlanFeatureQuantity("Free", "Concurrent Functions")}{" "}
                   concurrent functions at a time. Our paid plans offer
                   substantial concurrency to enable you to parallelize workloads
@@ -717,7 +781,7 @@ export default function Pricing() {
                     className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
                     href="/docs/usage-limits/inngest"
                   >
-                    Usage Limits
+                    usage limits
                   </a>{" "}
                   page.
                 </p>
@@ -758,14 +822,14 @@ export default function Pricing() {
                   function step?).
                 </p>
                 <p>
-                  See more details at{" "}
+                  See more details on our{" "}
                   <a
                     className="text-indigo-400 hover:text-white hover:underline hover:decoration-white transition-all"
                     href="/docs/usage-limits/inngest"
                   >
-                    Usage Limits
+                    usage limits
                   </a>{" "}
-                  page.
+                  documentation.
                 </p>
               </FAQRow>
               <FAQRow

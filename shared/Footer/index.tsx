@@ -45,7 +45,7 @@ export default function Footer({ ctaRef }: { ctaRef?: string }) {
                 }`}
                 className="py-3 px-5 bg-slate-800 text-white rounded-[6px] text-sm transition-all hover:bg-slate-900"
               >
-                Get Started For Free
+                Get started for free
               </Link>
             </div>
           </div>

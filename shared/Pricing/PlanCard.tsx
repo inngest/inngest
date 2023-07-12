@@ -38,13 +38,14 @@ export default function PlanCard({ variant = "light", content }) {
         {content.popular && (
           <div className="-mt-11 mb-3.5 block">
             <div className="bg-indigo-500 inline-block shadow-lg rounded-full text-white text-sm font-semibold tracking-tight leading-none py-2 px-4">
-              Most Popular
+              Most popular
             </div>
           </div>
         )}
         <h2 className={`text-lg font-semibold ${theme[variant].primary}`}>
           {content.name}
         </h2>
+
         <p
           className={`text-4xl mt-4 -mr-4 font-bold tracking-tight text-indigo-500 ${theme[variant].price}`}
         >
@@ -62,10 +63,17 @@ export default function PlanCard({ variant = "light", content }) {
             /{content.cost.period}
           </span>
         </p>
+
+        <div className="px-12 py-2 mt-4 mb-4">
+          <Button href={content.cta.href} arrow="right" full variant="primary">
+            {content.cta.text}
+          </Button>
+        </div>
+
         <p
           className={`text-base mt-4 font-medium flex items-center justify-center ${theme[variant].description}`}
         >
-          {content.cost.included} Function Steps{" "}
+          {content.cost.included} steps{" "}
           <a
             href="#what-is-a-function-step"
             className="ml-1.5 transition-all text-slate-500 hover:text-slate-700"
@@ -114,11 +122,6 @@ export default function PlanCard({ variant = "light", content }) {
             </li>
           ))}
         </ul>
-      </div>
-      <div className="px-12 py-2 mt-4 mb-4">
-        <Button href={content.cta.href} arrow="right" full>
-          {content.cta.text}
-        </Button>
       </div>
     </div>
   );
