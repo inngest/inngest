@@ -165,8 +165,8 @@ export default function BlogLayout(props) {
                       >
                         Inngest
                       </a>{" "}
-                      is the developer platform for creating, testing, and
-                      running reliable background jobs and workflows.
+                      is the developer platform for easily building reliable
+                      workflows and background jobs with zero infrastructure.
                     </>
                   }
                   cta={{
