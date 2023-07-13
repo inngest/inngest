@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/coreapi"
@@ -139,6 +140,7 @@ func (d *devserver) Stop(ctx context.Context) error {
 // runDiscovery attempts to run autodiscovery while the dev server is running.
 //
 // This lets the dev server start and wait for the SDK server to come up at
+
 // any point.
 func (d *devserver) runDiscovery(ctx context.Context) {
 	logger.From(ctx).Info().Msg("autodiscovering locally hosted SDKs")
@@ -157,6 +159,22 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 // pollSDKs hits each SDK's register endpoint, asking them to communicate with
 // the dev server to re-register their functions.
 func (d *devserver) pollSDKs(ctx context.Context) {
+	// Initially, add every app started with the `-u` flag
+	for _, url := range d.opts.URLs {
+		// Create a new app which holds the error message.
+		params := cqrs.InsertAppParams{
+			ID:  uuid.New(),
+			Url: url,
+			Error: sql.NullString{
+				Valid:  true,
+				String: deploy.DeployErrUnreachable.Error(),
+			},
+		}
+		_, _ = d.data.InsertApp(ctx, params)
+	}
+
+	// Then poll for every added app (including apps added via the `-u` flag and via the
+	// UI), plus run autodiscovery.
 	for {
 		if ctx.Err() != nil {
 			return
@@ -225,5 +243,6 @@ func localIPs() []*net.IPNet {
 			}
 		}
 	}
+
 	return ips
 }
