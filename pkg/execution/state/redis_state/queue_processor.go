@@ -187,6 +187,11 @@ LOOP:
 // attempting to claim a lease on sequential processing.  Only one worker is allowed to
 // work on partitions sequentially;  this reduces contention.
 func (q *queue) claimSequentialLease(ctx context.Context) {
+	// Workers with an allowlist can never claim sequential queues.
+	if len(q.allowQueues) > 0 {
+		return
+	}
+
 	// Attempt to claim the lease immediately.
 	leaseID, err := q.ConfigLease(ctx, q.kg.Sequential(), ConfigLeaseDuration, q.sequentialLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
