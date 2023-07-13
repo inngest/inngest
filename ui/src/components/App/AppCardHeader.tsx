@@ -1,17 +1,14 @@
 import classNames from '@/utils/classnames';
 import { IconCheckCircle, IconExclamationTriangle } from '@/icons';
-import Badge from '@/components/Badge';
 
 type AppCardHeaderProps = {
   functionCount: number;
-  sdkVersion: string;
   connected: boolean;
 };
 
 export default function AppCardHeader({
   connected,
   functionCount,
-  sdkVersion,
 }: AppCardHeaderProps) {
   let headerColor, headerLabel, headerIcon;
 
@@ -40,7 +37,6 @@ export default function AppCardHeader({
         {headerIcon}
         {headerLabel}
       </div>
-      {sdkVersion && <Badge>SDK {sdkVersion}</Badge>}
     </header>
   );
 }
