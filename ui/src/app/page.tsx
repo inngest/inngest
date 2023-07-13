@@ -75,11 +75,12 @@ export default function Page() {
     }
   );
 
-  const { appsConnectedCount, hasConnectedError } = useGetAppsQuery(
+  const { appsConnectedCount, appsDisconnectedCount, hasConnectedError } = useGetAppsQuery(
     undefined,
     {
       selectFromResult: (result) => ({
         appsConnectedCount: result.data?.apps?.filter(app => app.connected === true)?.length || 0,
+        appsDisconnectedCount: result.data?.apps?.filter(app => app.connected === false)?.length || 0,
         hasConnectedError: result?.data?.apps?.some(app => app.connected === false),
       }),
       pollingInterval: 1500,
@@ -109,7 +110,7 @@ export default function Page() {
             icon={<IconFunction />}
             active={contentView === "apps"}
             onClick={() => dispatch(showApps())}
-            badge={appsConnectedCount}
+            badge={hasConnectedError ? appsDisconnectedCount : appsConnectedCount}
             hasError={hasConnectedError}
             tabName="Apps"
           />
