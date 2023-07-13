@@ -945,6 +945,19 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 // PausesByEvent returns all pauses for a given event within a workspace.
 func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
 	key := m.kf.PauseEvent(ctx, workspaceID, event)
+	// If there are > 1000 keys in the hmap, use scanning
+
+	cntCmd := m.pauseR.B().Hlen().Key(key).Build()
+	cnt, err := m.pauseR.Do(ctx, cntCmd).AsInt64()
+	if err != nil || cnt > 1000 {
+		cmd := m.pauseR.B().Hscan().Key(m.kf.PauseEvent(ctx, workspaceID, event)).Cursor(0).Build()
+		scan, err := m.pauseR.Do(ctx, cmd).AsScanEntry()
+		if err != nil {
+			return nil, err
+		}
+		return &scanIter{i: -1, vals: scan}, nil
+	}
+
 	cmd := m.pauseR.B().Hkeys().Key(key).Cache()
 	// Cache this for a second
 	keys, err := m.pauseR.DoCache(ctx, cmd, time.Second).AsStrSlice()
@@ -1163,6 +1176,40 @@ func (i *keyIter) getNext(ctx context.Context) {
 	pause := &state.Pause{}
 	i.err = json.Unmarshal([]byte(str), pause)
 	i.val = pause
+}
+
+type scanIter struct {
+	i    int
+	vals rueidis.ScanEntry
+}
+
+func (i *scanIter) Next(ctx context.Context) bool {
+	if len(i.vals.Elements) == 0 || i.i >= (len(i.vals.Elements)-1) {
+		return false
+	}
+	// Skip the ID
+	i.i++
+	// Get the value.
+	i.i++
+	return true
+}
+
+func (i *scanIter) Val(ctx context.Context) *state.Pause {
+	if i.i == -1 || i.i >= len(i.vals.Elements) {
+		return nil
+	}
+
+	val := i.vals.Elements[i.i]
+	if val == "" {
+		return nil
+	}
+
+	pause := &state.Pause{}
+	err := json.Unmarshal([]byte(val), pause)
+	if err != nil {
+		return nil
+	}
+	return pause
 }
 
 func NewRunMetadata(data map[string]string) (*runMetadata, error) {
