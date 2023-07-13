@@ -19,7 +19,7 @@ export function IconAppStatusFailed({ className }: { className?: string }) {
           fill="currentColor"
         />
       </g>
-      <text x="12" y="20" fill="#FFFFFF" fontSize="16" fontWeight="bold">
+      <text x="12.5" y="20" fill="#FFFFFF" fontSize="15" fontWeight="bold">
       !
     </text>
     </svg>
