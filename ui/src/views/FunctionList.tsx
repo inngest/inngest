@@ -52,7 +52,7 @@ export const FunctionList = () => {
   return (
     <main className="flex min-h-0 flex-col overflow-y-auto">
       <table className="border-b border-slate-700/30 bg-slate-800/30 table-fixed w-full">
-        <thead className="sticky top-0 z-10 shadow bg-slate-950">
+        <thead className="sticky top-0 shadow bg-slate-950">
           <tr>
             <HeaderCell>Function Name</HeaderCell>
             <HeaderCell>Triggers</HeaderCell>
