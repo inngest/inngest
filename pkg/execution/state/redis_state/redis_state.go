@@ -169,6 +169,11 @@ func New(ctx context.Context, opts ...Opt) (state.Manager, error) {
 		return m, err
 	}
 
+	if m.pauseR == nil {
+		// Use the standard redis client for pauses
+		m.pauseR = m.r
+	}
+
 	return m, nil
 }
 
@@ -198,6 +203,13 @@ func WithKeyPrefix(prefix string) Opt {
 func WithRedisClient(r rueidis.Client) Opt {
 	return func(m *mgr) {
 		m.r = r
+	}
+}
+
+// WithPauseRedisClient uses an already connected redis client for managing pauses.
+func WithPauseRedisClient(r rueidis.Client) Opt {
+	return func(m *mgr) {
+		m.pauseR = r
 	}
 }
 
@@ -231,7 +243,11 @@ func WithFunctionLoader(fl state.FunctionLoader) Opt {
 type mgr struct {
 	kf KeyGenerator
 	fl state.FunctionLoader
-	r  rueidis.Client
+
+	// this is the standard redis client for the state store.
+	r rueidis.Client
+	// this is the redis client for managing pauses.
+	pauseR rueidis.Client
 
 	callbacks []state.FunctionCallback
 }
@@ -805,7 +821,7 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 
 	status, err := scripts["savePause"].Exec(
 		ctx,
-		m.r,
+		m.pauseR,
 		keys,
 		args,
 	).AsInt64()
@@ -832,7 +848,7 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 
 	status, err := scripts["leasePause"].Exec(
 		ctx,
-		m.r,
+		m.pauseR,
 		[]string{m.kf.PauseID(ctx, id), m.kf.PauseLease(ctx, id)},
 		args,
 	).AsInt64()
@@ -909,7 +925,7 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 
 	status, err := scripts["consumePause"].Exec(
 		ctx,
-		m.r,
+		m.pauseR,
 		keys,
 		args,
 	).AsInt64()
@@ -929,24 +945,25 @@ func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 // PausesByEvent returns all pauses for a given event within a workspace.
 func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
 	key := m.kf.PauseEvent(ctx, workspaceID, event)
-	cmd := m.r.B().Hkeys().Key(key).Build()
-	keys, err := m.r.Do(ctx, cmd).AsStrSlice()
+	cmd := m.pauseR.B().Hkeys().Key(key).Cache()
+	// Cache this for a second
+	keys, err := m.pauseR.DoCache(ctx, cmd, time.Second).AsStrSlice()
 	if err != nil {
 		return nil, err
 	}
 
-	return &keyIter{i: 0, keys: keys, r: m.r, key: key}, nil
+	return &keyIter{i: 0, keys: keys, r: m.pauseR, key: key}, nil
 }
 
 func (m mgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID, event string) (bool, error) {
 	key := m.kf.PauseEvent(ctx, workspaceID, event)
-	cmd := m.r.B().Exists().Key(key).Build()
-	return m.r.Do(ctx, cmd).AsBool()
+	cmd := m.pauseR.B().Exists().Key(key).Build()
+	return m.pauseR.Do(ctx, cmd).AsBool()
 }
 
 func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) {
-	cmd := m.r.B().Get().Key(m.kf.PauseID(ctx, id)).Build()
-	str, err := m.r.Do(ctx, cmd).ToString()
+	cmd := m.pauseR.B().Get().Key(m.kf.PauseID(ctx, id)).Build()
+	str, err := m.pauseR.Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
 	}
@@ -964,8 +981,8 @@ func (m mgr) PauseByID(ctx context.Context, id uuid.UUID) (*state.Pause, error) 
 // has deferred results which must be continued by resuming the specific pause set
 // up for the given step ID.
 func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID string) (*state.Pause, error) {
-	cmd := m.r.B().Get().Key(m.kf.PauseStep(ctx, i, actionID)).Build()
-	str, err := m.r.Do(ctx, cmd).ToString()
+	cmd := m.pauseR.B().Get().Key(m.kf.PauseStep(ctx, i, actionID)).Build()
+	str, err := m.pauseR.Do(ctx, cmd).ToString()
 
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
@@ -979,8 +996,8 @@ func (m mgr) PauseByStep(ctx context.Context, i state.Identifier, actionID strin
 		return nil, err
 	}
 
-	cmd = m.r.B().Get().Key(m.kf.PauseID(ctx, id)).Build()
-	byt, err := m.r.Do(ctx, cmd).AsBytes()
+	cmd = m.pauseR.B().Get().Key(m.kf.PauseID(ctx, id)).Build()
+	byt, err := m.pauseR.Do(ctx, cmd).AsBytes()
 
 	if err == rueidis.Nil {
 		return nil, state.ErrPauseNotFound
