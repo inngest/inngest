@@ -86,7 +86,6 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
       <AppCardHeader
         connected={app.connected}
         functionCount={app.functionCount}
-        sdkVersion={app.sdkVersion}
       />
       <div className="border border-slate-700/30 rounded-b-md divide-y divide-slate-700/30 bg-slate-800/30">
         {!app.name ? (
@@ -113,17 +112,21 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
           lineContent={
             <>
               <div className="">
-                <div className='flex items-center gap-3 text-base'>
-                {app.connected ? (
-                  <>{<IconAppStatusCompleted />}Connected to App</>
-                ) : (
-                  <>{<IconAppStatusFailed />}No Connection to App</>
-                )}
+                <div className="flex items-center gap-3 text-base">
+                  {app.connected ? (
+                    <>{<IconAppStatusCompleted />}Connected to App</>
+                  ) : (
+                    <>{<IconAppStatusFailed />}No Connection to App</>
+                  )}
                 </div>
-                <p className="text-slate-300 ui-open:hidden xl:hidden pl-10">{app.url}</p>
+                <p className="text-slate-300 ui-open:hidden xl:hidden pl-10">
+                  {app.url}
+                </p>
               </div>
               <div className="flex items-center gap-4">
-                <p className="text-slate-300 xl:flex xl:ui-open:hidden hidden">{app.url}</p>
+                <p className="text-slate-300 xl:flex xl:ui-open:hidden hidden">
+                  {app.url}
+                </p>
                 <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
               </div>
             </>
@@ -152,7 +155,7 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                   className="text-sm font-semibold text-white"
                 >
                   App URL
-                  <span className="text-slate-500 text-sm block">
+                  <span className="text-slate-400 text-sm block font-normal">
                     The URL of your application
                   </span>
                 </label>
@@ -179,6 +182,27 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                   )}
                 </div>
               </form>
+              <div className="grid grid-cols-3 mb-4 border-y border-slate-700/30">
+                <div className="py-4">
+                  <p className="text-sm font-semibold text-white">
+                    {app.framework}
+                  </p>
+                  <p className="text-sm text-slate-400">Framework</p>
+                </div>
+                <div className="py-4">
+                  <p className="text-sm font-semibold text-white">
+                    {app.sdkLanguage}
+                  </p>
+                  <p className="text-sm text-slate-400">Language</p>
+                </div>
+                <div className="py-4">
+                  <p className="text-sm font-semibold text-white">
+                    {app.sdkVersion}
+                  </p>
+                  <p className="text-sm text-slate-400">SDK Version</p>
+                </div>
+              </div>
+
               <a
                 className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
                 onClick={() => dispatch(showDocs('/sdk/serve'))}
@@ -203,7 +227,10 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                 ) : !app.connected ? (
                   <>{<IconAppStatusDefault />}No Functions Found</>
                 ) : (
-                  <>{<IconAppStatusFailed className="text-orange-400/70"/>}No Functions Found</>
+                  <>
+                    {<IconAppStatusFailed className="text-orange-400/70" />}No
+                    Functions Found
+                  </>
                 )}
               </div>
               <div className="flex items-center gap-4">
