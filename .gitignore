@@ -2,6 +2,7 @@ cmd/cmd
 target/
 dist/
 testfns/
+build/*
 
 main
-pkg/devserver/index.html
+pkg/devserver/static/

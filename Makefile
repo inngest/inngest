@@ -2,6 +2,9 @@
 dev:
 	goreleaser build --single-target --snapshot --rm-dist
 
+xgo:
+	xgo -pkg cmd -ldflags="-s -w" -out build/inngest -targets "linux/arm64,linux/amd64,darwin/arm64,darwin/amd64" .
+
 .PHONY: test
 test:
 	sh -c 'cd ./pkg/cuedefs && cue vet ./tests/... -c'

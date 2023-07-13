@@ -1,25 +1,13 @@
-before:
-  hooks:
-    - go mod tidy
-    - go generate ./...
-    - make build-ui
-
 builds:
-  - env:
-      - CGO_ENABLED=1
-    main: ./cmd/
+  -
+    builder: prebuilt
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    goamd64: [v1]
+    prebuilt:
+      path: ./build/inngest-{{ .Os }}-{{ .Arch }}
     binary: inngest
-    ldflags:
-      - -s -w
-      - -X github.com/inngest/inngest/pkg/inngest/version.Version={{.Version}}
-      - -X github.com/inngest/inngest/pkg/inngest/version.Hash={{.ShortCommit}}
-    goos:
-      - linux
-      - windows
-      - darwin
-    goarch:
-      - amd64
-      - arm64
+
 
 dockers:
   - id: inngest-amd64
@@ -33,6 +21,7 @@ dockers:
     - "inngest/inngest:{{ .Tag }}-amd64"
     build_flag_templates:
     - "--pull"
+    - "--build-arg=BIN=./build/inngest-linux-amd64"
     - "--label=org.opencontainers.image.created={{.Date}}"
     - "--label=org.opencontainers.image.title={{.ProjectName}}"
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
@@ -49,6 +38,7 @@ dockers:
     - "inngest/inngest:{{ .Tag }}-arm64v8"
     build_flag_templates:
     - "--pull"
+    - "--build-arg=BIN=./build/inngest-linux-arm64"
     - "--label=org.opencontainers.image.created={{.Date}}"
     - "--label=org.opencontainers.image.title={{.ProjectName}}"
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
@@ -65,9 +55,7 @@ docker_manifests:
       - inngest/inngest:{{ .Tag }}-arm64v8
 
 archives:
-  - replacements:
-      amd64: x86_64
-    format_overrides:
+  - format_overrides:
       - goos: windows
         format: zip
     files:

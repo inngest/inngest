@@ -9,7 +9,7 @@ import { URL } from "url";
  */
 const archMap: Partial<Record<typeof process.arch, string>> = {
   arm64: "arm64",
-  x64: "x86_64",
+  x64: "amd64",
 };
 
 /**
