@@ -27,6 +27,7 @@ type StartOpts struct {
 	RootDir      string        `json:"dir"`
 	URLs         []string      `json:"urls"`
 	Autodiscover bool          `json:"autodiscover"`
+	Poll         bool          `json:"poll"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)

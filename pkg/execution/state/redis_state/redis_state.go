@@ -471,7 +471,7 @@ func (m mgr) Load(ctx context.Context, runID ulid.ULID) (state.State, error) {
 
 	fn, err := m.fl.LoadFunction(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to load function from state function loader: %s: %w", id.WorkflowID, err)
 	}
 
 	// Load events.

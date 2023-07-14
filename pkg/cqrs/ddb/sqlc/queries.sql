@@ -30,6 +30,10 @@ UPDATE apps SET url = ? WHERE id = ? RETURNING *;
 -- name: UpdateAppError :one
 UPDATE apps SET error = ? WHERE id = ? RETURNING *;
 
+--
+-- Functions
+--
+
 -- note - this is very basic right now.
 -- name: InsertFunction :one
 INSERT INTO functions
@@ -44,3 +48,12 @@ SELECT * FROM functions WHERE app_id = ?;
 
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;
+
+-- name: UpdateFunctionConfig :one
+UPDATE functions SET config = ? WHERE id = ? RETURNING *;
+
+-- name: DeleteFunctionsByAppID :exec
+DELETE FROM functions WHERE app_id = ?;
+
+-- name: DeleteFunctionsByIDs :exec
+DELETE FROM functions WHERE id IN (sqlc.slice('ids'));

@@ -22,6 +22,7 @@ func NewCmdDev() *cobra.Command {
 	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
 	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
 	cmd.Flags().Bool("no-discovery", false, "Disable autodiscovery")
+	cmd.Flags().Bool("no-poll", false, "Disable polling of apps for updates")
 
 	return cmd
 }
@@ -50,11 +51,13 @@ func doDev(cmd *cobra.Command, args []string) {
 
 	// Run auto-discovery unless we've explicitly disabled it.
 	noDiscovery, _ := cmd.Flags().GetBool("no-discovery")
+	noPoll, _ := cmd.Flags().GetBool("no-poll")
 
 	opts := devserver.StartOpts{
 		Config:       *conf,
 		URLs:         urls,
 		Autodiscover: !noDiscovery,
+		Poll:         !noPoll,
 	}
 
 	err = devserver.New(ctx, opts)

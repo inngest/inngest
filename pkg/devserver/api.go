@@ -161,7 +161,8 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 
 	// We need a UUID to register functions with.
 	appParams := cqrs.InsertAppParams{
-		ID:          uuid.New(),
+		// Use a deterministic ID for the app in dev.
+		ID:          uuid.NewSHA1(uuid.NameSpaceOID, []byte(r.URL)),
 		Name:        r.AppName,
 		SdkLanguage: r.SDKLanguage(),
 		SdkVersion:  r.SDKVersion(),
@@ -188,7 +189,16 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		}
 		_, _ = a.devserver.data.InsertApp(ctx, appParams)
 		err = tx.Commit(ctx)
+		if err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error registering functions")
+		}
 	}()
+
+	// Get a list of all functions
+	existing, _ := tx.GetAppFunctions(ctx, appParams.ID)
+	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
+	// this set.
+	seen := map[uuid.UUID]struct{}{}
 
 	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
 	// signing key and warn if the user has an invalid key.
@@ -202,10 +212,26 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		// Create a new UUID for the function.
 		fn.ID = inngest.DeterministicUUID(*fn)
 
+		// Mark as seen.
+		seen[fn.ID] = struct{}{}
+
 		config, err := json.Marshal(fn)
 		if err != nil {
 			return publicerr.Wrap(err, 500, "Error marshalling function")
 		}
+
+		if _, err := tx.GetFunctionByID(ctx, fn.ID); err == nil {
+			// Update the function config.
+			_, err = tx.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
+				ID:     fn.ID,
+				Config: string(config),
+			})
+			if err != nil {
+				return publicerr.Wrap(err, 500, "Error updating function config")
+			}
+			continue
+		}
+
 		_, err = tx.InsertFunction(ctx, cqrs.InsertFunctionParams{
 			ID:        fn.ID,
 			Name:      fn.Name,
@@ -220,7 +246,20 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		}
 	}
 
-	// Create a new app.
+	// Remove all unseen functions.
+	deletes := []uuid.UUID{}
+	for _, fn := range existing {
+		if _, ok := seen[fn.ID]; !ok {
+			deletes = append(deletes, fn.ID)
+		}
+	}
+	if len(deletes) == 0 {
+		return nil
+	}
+
+	if err = tx.DeleteFunctionsByIDs(ctx, deletes); err != nil {
+		return publicerr.Wrap(err, 500, "Error deleting removed function")
+	}
 	return nil
 }
 

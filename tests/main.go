@@ -82,6 +82,12 @@ func run(t *testing.T, test *Test) {
 	//
 	// We can also randomly inject faults by disregarding the SDK's response and throwing a 500.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Ignore ping requests
+		if r.Method == http.MethodPut {
+			r.Body.Close()
+			return
+		}
+
 		byt, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		fmt.Printf(" ==> Received executor request:\n\t%s\n", string(byt))
@@ -224,6 +230,8 @@ func register(serverURL url.URL, rr sdk.RegisterRequest) error {
 		}
 		rr.Functions[n] = fn
 	}
+
+	rr.URL = serverURL.String()
 
 	byt, err := json.Marshal(rr)
 	if err != nil {
