@@ -1,5 +1,25 @@
 # Changelog
 
+## [v0.15.3] - 2023-07-14
+
+### Added
+- Added the ability to prevent polling of SDKs for updates.  Any function updates must
+  be triggered by re-adding your app via the UI.
+
+### Fixed
+- Ensures new functions appear within apps automatically
+
+## [v0.15.0] - 2023-07-12
+
+### Added
+- Added apps to the dev server.  You can now submit multiple app endpoints via the UI,
+  and see apps and their statuses/errors from a tab.
+
+### Fixed
+- Fixed open-source rate limit keys
+- Fixed expression concatenation with undefined event data 
+
+
 ## [v0.14.5] - 2023-06-22
 
 ### Fixed
