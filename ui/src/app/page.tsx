@@ -29,7 +29,7 @@ import {
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import classNames from '@/utils/classnames';
 import FunctionList from '@/app/(dashboard)/functions/page';
-import AppList from '@/views/AppList';
+import AppList from '@/app/(dashboard)/apps/page';
 
 export default function Page() {
   const sidebarTab = useAppSelector((state) => state.global.sidebarTab);
