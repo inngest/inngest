@@ -119,6 +119,10 @@ export const APPS = gql`
       connected
       functionCount
       autodiscovered
+      functions {
+        name
+        id
+      }
     }
   }
 `;
