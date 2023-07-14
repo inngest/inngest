@@ -6,7 +6,7 @@ import BG from '@/components/BG';
 import { BlankSlate } from '@/components/Blank';
 import Button from '@/components/Button';
 import ContentFrame from '@/components/Content/ContentFrame';
-import { Docs } from '@/components/Docs';
+import Docs from '@/app/(dashboard)/docs/page';
 import { EventSection } from '@/components/Event/Section';
 import { SendEventModal } from '@/components/Event/SendEventModal';
 import { EventStream } from '@/components/Event/Stream';
