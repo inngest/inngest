@@ -72,7 +72,7 @@ export default function FunctionList() {
             <HeaderCell colSpan={1} />
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-800/30">
+        <tbody className="divide-y divide-slate-800/30 text-slate-400">
           {isFetching ? (
             <TableSkeleton />
           ) : functions?.length === 0 ? (
@@ -137,7 +137,7 @@ export default function FunctionList() {
                     </td>
                     {/* App URL */}
                     <td
-                      className={classNames(cellStyles, 'whitespace-nowrap')}
+                      className={classNames(cellStyles, 'whitespace-nowrap text-sm')}
                       colSpan={3}
                     >
                       {cleanUrl.toString()}
