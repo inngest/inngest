@@ -20,9 +20,7 @@ import {
   IconAppStatusDefault,
 } from '@/icons';
 
-type AppWithoutFunctions = Omit<App, 'functions'>;
-
-export default function AppCard({ app }: { app: AppWithoutFunctions }) {
+export default function AppCard({ app }: { app: App }) {
   const [inputUrl, setInputUrl] = useState(app.url || '');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -215,17 +213,20 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
         />
         <AppCardStep
           isEvenStep
-          isExpandable={!app.connected || app.functionCount < 1}
           lineContent={
             <>
               <div className="flex items-center gap-3 text-base">
                 {app.connected && app.functionCount > 0 ? (
                   <>
                     {<IconAppStatusCompleted />}
-                    {app.functionCount} Functions registered
+                    {app.functionCount} Function{app.functionCount === 1 ? '' : 's'} Registered
                   </>
-                ) : !app.connected ? (
-                  <>{<IconAppStatusDefault />}No Functions Found</>
+                ) : !app.connected && app.functionCount > 0 ? (
+                  <>
+                    {<IconAppStatusDefault />}
+                    
+                    {app.functionCount} Function{app.functionCount === 1 ? '' : 's'} Registered
+                  </>
                 ) : (
                   <>
                     {<IconAppStatusFailed className="text-orange-400/70" />}No
@@ -234,25 +235,22 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                 )}
               </div>
               <div className="flex items-center gap-4">
-                {app.connected && app.functionCount > 0 ? (
-                  <>
-                    <button
-                      className="text-indigo-400 flex items-center gap-2"
-                      onClick={() => dispatch(showFunctions())}
-                    >
-                      View Functions
-                      <IconChevron className="-rotate-90" />
-                    </button>
-                  </>
-                ) : (
-                  <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
+                {app.functionCount > 0 && (
+                  <button
+                    className="text-indigo-400 flex items-center gap-2"
+                    onClick={() => dispatch(showFunctions())}
+                  >
+                    View Functions
+                    <IconChevron className="-rotate-90" />
+                  </button>
                 )}
+                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
               </div>
             </>
           }
           expandedContent={
             <>
-              {(!app.connected || app.functionCount < 1) && (
+              {app.functionCount < 1 && (
                 <>
                   <p className="pb-4 text-slate-400">
                     There are currently no functions registered at this url.
@@ -271,6 +269,19 @@ export default function AppCard({ app }: { app: AppWithoutFunctions }) {
                     <IconBook />
                   </a>
                 </>
+              )}
+              {app.functionCount > 0 && (
+                <ul className="columns-2">
+                  {[...app.functions]
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((func) => {
+                      return (
+                        <li key={func.id} className="py-1 text-slate-400">
+                          {func.name}
+                        </li>
+                      );
+                    })}
+                </ul>
               )}
             </>
           }

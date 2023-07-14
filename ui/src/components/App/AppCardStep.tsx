@@ -31,7 +31,7 @@ export default function AppCardStep({
         aria-hidden="true"
       />
       <Disclosure.Button
-        as={isExpandable ? 'button' : 'div'}
+        as={'div'}
         className="flex items-center text-white justify-between p-4 pr-6 w-full"
       >
         {lineContent}

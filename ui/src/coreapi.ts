@@ -122,6 +122,10 @@ export const APPS = gql`
       functions {
         name
         id
+        concurrency
+        config
+        slug
+        url
       }
     }
   }
