@@ -40,6 +40,7 @@ type FunctionReader interface {
 
 type FunctionWriter interface {
 	InsertFunction(ctx context.Context, params InsertFunctionParams) (*Function, error)
+	UpdateFunction(ctx context.Context, params UpdateFunctionParams) (*Function, error)
 }
 
 type InsertFunctionParams struct {
@@ -49,4 +50,14 @@ type InsertFunctionParams struct {
 	Slug      string
 	Config    string
 	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type UpdateFunctionParams struct {
+	ID        uuid.UUID
+	AppID     uuid.UUID
+	Name      string
+	Slug      string
+	Config    string
+	UpdatedAt time.Time
 }

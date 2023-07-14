@@ -20,4 +20,5 @@ CREATE TABLE functions (
     slug VARCHAR NOT NULL,
     config VARCHAR NOT NULL,
     created_at TIMESTAMP NOT NULL
+    updated_at TIMESTAMP NOT NULL
 );

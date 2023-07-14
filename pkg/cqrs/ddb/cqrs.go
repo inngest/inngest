@@ -188,6 +188,16 @@ func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionP
 	)
 }
 
+func (w wrapper) UpdateFunction(ctx context.Context, params cqrs.UpdateFunctionParams) (*cqrs.Function, error) {
+	return copyWriter(
+		ctx,
+		w.q.UpdateFunction,
+		params,
+		sqlc.UpdateFunctionParams{},
+		&cqrs.Function{},
+	)
+}
+
 func copyWriter[
 	PARAMS_IN any,
 	INTERNAL_PARAMS any,

@@ -157,6 +157,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	app, err := a.devserver.data.GetAppByURL(ctx, r.URL)
 	if err == nil && app != nil {
 		_ = a.devserver.data.DeleteApp(ctx, app.ID)
+		// TODO - Remove all dangling functions w/ old app id
 	}
 
 	// We need a UUID to register functions with.
@@ -206,17 +207,39 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		if err != nil {
 			return publicerr.Wrap(err, 500, "Error marshalling function")
 		}
-		_, err = tx.InsertFunction(ctx, cqrs.InsertFunctionParams{
-			ID:        fn.ID,
-			Name:      fn.Name,
-			Slug:      fn.Slug,
-			AppID:     appParams.ID,
-			Config:    string(config),
-			CreatedAt: time.Now(),
-		})
-		if err != nil {
-			err = fmt.Errorf("Function %s is invalid: %w", fn.Slug, err)
+
+		existing, err := tx.GetFunctionByID(ctx, fn.ID)
+		if err != nil && err != sql.ErrNoRows {
+			err = fmt.Errorf("Function %s query failed: %w", fn.Slug, err)
 			return publicerr.Wrap(err, 500, "Error saving function")
+		}
+		if existing == nil {
+			_, err = tx.InsertFunction(ctx, cqrs.InsertFunctionParams{
+				ID:        fn.ID,
+				Name:      fn.Name,
+				Slug:      fn.Slug,
+				AppID:     appParams.ID,
+				Config:    string(config),
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			})
+			if err != nil {
+				err = fmt.Errorf("Function %s is invalid: %w", fn.Slug, err)
+				return publicerr.Wrap(err, 500, "Error saving function")
+			}
+		} else {
+			_, err = tx.UpdateFunction(ctx, cqrs.UpdateFunctionParams{
+				ID:        fn.ID,
+				Name:      fn.Name,
+				Slug:      fn.Slug,
+				AppID:     appParams.ID,
+				Config:    string(config),
+				UpdatedAt: time.Now(),
+			})
+			if err != nil {
+				err = fmt.Errorf("Function %s is invalid: %w", fn.Slug, err)
+				return publicerr.Wrap(err, 500, "Error updating function")
+			}
 		}
 	}
 

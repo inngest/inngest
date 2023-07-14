@@ -36,6 +36,14 @@ INSERT INTO functions
 	(id, app_id, name, slug, config, created_at) VALUES
 	(?, ?, ?, ?, ?, ?) RETURNING *;
 
+-- name: UpdateFunction :one
+UPDATE functions
+	SET app_id = ?, name = ?, slug = ?, config = ?, updated_at = ?
+	WHERE id = ? RETURNING *;
+
+-- name: GetFunction :one
+SELECT * FROM functions WHERE id = ?;
+
 -- name: GetFunctions :many
 SELECT * FROM functions;
 
