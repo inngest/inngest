@@ -192,6 +192,26 @@ func (w wrapper) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) er
 	return w.q.DeleteFunctionsByAppID(ctx, appID)
 }
 
+func (w wrapper) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error {
+	copied := make([]any, len(ids))
+	for n, i := range ids {
+		copied[n] = i
+	}
+	return w.q.DeleteFunctionsByIDs(ctx, copied)
+}
+
+func (w wrapper) UpdateFunctionConfig(ctx context.Context, arg cqrs.UpdateFunctionConfigParams) (*cqrs.Function, error) {
+	return copyWriter(
+		ctx,
+		w.q.UpdateFunctionConfig,
+		arg,
+		sqlc.UpdateFunctionConfigParams{},
+		&cqrs.Function{},
+	)
+}
+
+// copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
+// automatically.
 func copyWriter[
 	PARAMS_IN any,
 	INTERNAL_PARAMS any,

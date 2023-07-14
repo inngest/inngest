@@ -15,7 +15,8 @@ CREATE TABLE apps (
 
 -- note - this is very basic right now.  it does not conform to the cloud.
 CREATE TABLE functions (
-    id UUID PRIMARY KEY,
+    -- id UUID PRIMARY KEY, -- ADD this when https://github.com/duckdb/duckdb/issues/1631 is fixed.
+    id UUID,
     app_id UUID,
     name VARCHAR NOT NULL,
     slug VARCHAR NOT NULL,

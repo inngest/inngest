@@ -8,6 +8,7 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,6 +29,25 @@ DELETE FROM functions WHERE app_id = ?
 
 func (q *Queries) DeleteFunctionsByAppID(ctx context.Context, appID interface{}) error {
 	_, err := q.db.ExecContext(ctx, deleteFunctionsByAppID, appID)
+	return err
+}
+
+const deleteFunctionsByIDs = `-- name: DeleteFunctionsByIDs :exec
+DELETE FROM functions WHERE id IN (/*SLICE:ids*/?)
+`
+
+func (q *Queries) DeleteFunctionsByIDs(ctx context.Context, ids []interface{}) error {
+	query := deleteFunctionsByIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	_, err := q.db.ExecContext(ctx, query, queryParams...)
 	return err
 }
 
@@ -422,6 +442,29 @@ func (q *Queries) UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*Ap
 		&i.CreatedAt,
 		&i.DeletedAt,
 		&i.Url,
+	)
+	return &i, err
+}
+
+const updateFunctionConfig = `-- name: UpdateFunctionConfig :one
+UPDATE functions SET config = ? WHERE id = ? RETURNING id, app_id, name, slug, config, created_at
+`
+
+type UpdateFunctionConfigParams struct {
+	Config string
+	ID     interface{}
+}
+
+func (q *Queries) UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error) {
+	row := q.db.QueryRowContext(ctx, updateFunctionConfig, arg.Config, arg.ID)
+	var i Function
+	err := row.Scan(
+		&i.ID,
+		&i.AppID,
+		&i.Name,
+		&i.Slug,
+		&i.Config,
+		&i.CreatedAt,
 	)
 	return &i, err
 }

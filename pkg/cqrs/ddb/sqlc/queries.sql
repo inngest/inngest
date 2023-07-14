@@ -49,5 +49,11 @@ SELECT * FROM functions WHERE app_id = ?;
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;
 
+-- name: UpdateFunctionConfig :one
+UPDATE functions SET config = ? WHERE id = ? RETURNING *;
+
 -- name: DeleteFunctionsByAppID :exec
 DELETE FROM functions WHERE app_id = ?;
+
+-- name: DeleteFunctionsByIDs :exec
+DELETE FROM functions WHERE id IN (sqlc.slice('ids'));

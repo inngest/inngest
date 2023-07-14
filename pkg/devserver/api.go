@@ -174,13 +174,6 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		Checksum: sum,
 	}
 
-	// Initially, we must delete all functions because we're straight up replacing them.
-	// This allows us to clean functions that are removed. Functions have a deterministic ID
-	// and so logs etc. are all still persisted.
-	if err := a.devserver.data.DeleteFunctionsByAppID(ctx, appParams.ID); err != nil {
-		return publicerr.Wrap(err, 500, "Error clearing existing functions")
-	}
-
 	tx, err := a.devserver.data.WithTx(ctx)
 	if err != nil {
 		return publicerr.Wrap(err, 500, "Error starting registration tx")
@@ -201,6 +194,12 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		}
 	}()
 
+	// Get a list of all functions
+	existing, _ := tx.GetAppFunctions(ctx, appParams.ID)
+	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
+	// this set.
+	seen := map[uuid.UUID]struct{}{}
+
 	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
 	// signing key and warn if the user has an invalid key.
 	funcs, err := r.Parse(ctx)
@@ -213,9 +212,24 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		// Create a new UUID for the function.
 		fn.ID = inngest.DeterministicUUID(*fn)
 
+		// Mark as seen.
+		seen[fn.ID] = struct{}{}
+
 		config, err := json.Marshal(fn)
 		if err != nil {
 			return publicerr.Wrap(err, 500, "Error marshalling function")
+		}
+
+		if _, err := tx.GetFunctionByID(ctx, fn.ID); err == nil {
+			// Update the function config.
+			_, err = tx.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
+				ID:     fn.ID,
+				Config: string(config),
+			})
+			if err != nil {
+				return publicerr.Wrap(err, 500, "Error updating function config")
+			}
+			continue
 		}
 
 		_, err = tx.InsertFunction(ctx, cqrs.InsertFunctionParams{
@@ -232,8 +246,21 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		}
 	}
 
-	// Create a new app.
-	return err
+	// Remove all unseen functions.
+	deletes := []uuid.UUID{}
+	for _, fn := range existing {
+		if _, ok := seen[fn.ID]; !ok {
+			deletes = append(deletes, fn.ID)
+		}
+	}
+	if len(deletes) == 0 {
+		return nil
+	}
+
+	if err = tx.DeleteFunctionsByIDs(ctx, deletes); err != nil {
+		return publicerr.Wrap(err, 500, "Error deleting removed function")
+	}
+	return nil
 }
 
 func (a devapi) err(ctx context.Context, w http.ResponseWriter, status int, err error) {

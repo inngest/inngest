@@ -40,7 +40,11 @@ type FunctionReader interface {
 
 type FunctionWriter interface {
 	InsertFunction(ctx context.Context, params InsertFunctionParams) (*Function, error)
+	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
+	// DeleteFunctionsByAppID deletes all functions for a specific app.
 	DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error
+	// DeleteFunctionsByIDs deletes all functions with the given IDs
+	DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error
 }
 
 type InsertFunctionParams struct {
@@ -50,4 +54,9 @@ type InsertFunctionParams struct {
 	Slug      string
 	Config    string
 	CreatedAt time.Time
+}
+
+type UpdateFunctionConfigParams struct {
+	Config string
+	ID     uuid.UUID
 }
