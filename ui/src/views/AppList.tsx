@@ -33,12 +33,19 @@ export default function AppList() {
           </p>
         </div>
       </header>
-      <div className="flex items-center gap-2 py-6">
-        <IconFunction />
-        <p className="text-white">
-          {numberOfConnectedApps} App{numberOfConnectedApps === 1 ? '' : 's'}{' '}
-          Connected
-        </p>
+      <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-baseline gap-2 py-4">
+          <p className="text-lg font-semibold text-white">
+            {apps.length}
+          </p>
+          <p className="text-sm text-slate-400">Total Apps</p>
+        </div>
+        <div className="flex items-baseline gap-2 py-4">
+          <p className="text-lg font-semibold text-white">
+            {numberOfConnectedApps}
+          </p>
+          <p className="text-sm text-slate-400">App{numberOfConnectedApps === 1 ? '' : 's'}{' '}Connected</p>
+        </div>
       </div>
       <div className="grid md:grid-cols-2 grid-cols-1 gap-6 min-h-max">
         {memoizedAppCards}
