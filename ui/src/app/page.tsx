@@ -28,7 +28,7 @@ import {
 } from '@/store/global';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import classNames from '@/utils/classnames';
-import { FunctionList } from '@/views/FunctionList';
+import FunctionList from '@/app/(dashboard)/functions/page';
 import AppList from '@/views/AppList';
 
 export default function Page() {

@@ -1,3 +1,5 @@
+"use client";
+
 import { useGetFunctionsQuery } from '@/store/generated';
 import { BlankSlate } from '@/components/Blank';
 import { useAppDispatch } from '@/store/hooks';
@@ -51,7 +53,7 @@ const TableSkeleton = () => {
   );
 };
 
-export const FunctionList = () => {
+export default function FunctionList() {
   const dispatch = useAppDispatch();
 
   const { data, isFetching } = useGetFunctionsQuery(undefined, {
