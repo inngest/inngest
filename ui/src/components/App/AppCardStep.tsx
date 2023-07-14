@@ -19,7 +19,7 @@ export default function AppCardStep({
   return (
     <Disclosure
       as="div"
-      className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative"
+      className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative cursor-pointer"
     >
       <span
         className={classNames(
@@ -31,7 +31,7 @@ export default function AppCardStep({
         aria-hidden="true"
       />
       <Disclosure.Button
-        as={isExpandable ? 'button' : 'div'}
+        as={'div'}
         className="flex items-center text-white justify-between p-4 pr-6 w-full"
       >
         {lineContent}

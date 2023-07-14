@@ -278,7 +278,7 @@ export type GetFunctionsQuery = { __typename?: 'Query', functions?: Array<{ __ty
 export type GetAppsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework?: string | null, url?: string | null, error?: string | null, connected: boolean, functionCount: number, autodiscovered: boolean }> };
+export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework?: string | null, url?: string | null, error?: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
 
 export type CreateAppMutationVariables = Exact<{
   input: CreateAppInput;
@@ -416,6 +416,14 @@ export const GetAppsDocument = `
     connected
     functionCount
     autodiscovered
+    functions {
+      name
+      id
+      concurrency
+      config
+      slug
+      url
+    }
   }
 }
     `;

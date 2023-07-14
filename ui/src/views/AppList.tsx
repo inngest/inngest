@@ -33,11 +33,10 @@ export default function AppList() {
           </p>
         </div>
       </header>
-      <div className="flex items-center gap-2 py-6">
+      <div className="flex items-center gap-3 mb-4">
         <IconFunction />
-        <p className="text-white">
-          {numberOfConnectedApps} App{numberOfConnectedApps === 1 ? '' : 's'}{' '}
-          Connected
+        <p className="text-slate-200">
+          {numberOfConnectedApps} / {apps.length} Apps Connected
         </p>
       </div>
       <div className="grid md:grid-cols-2 grid-cols-1 gap-6 min-h-max">
