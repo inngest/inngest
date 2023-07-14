@@ -242,6 +242,24 @@ const handler = serve(inngest, [fnA]);
 export { handler as loader, handler as action };
 ```
 
+### Streaming <VersionBadge version="v2.3.0+" />
+
+Remix Edge Functions hosted on [Vercel](/docs/deploy/vercel) can also stream responses back to Inngest, giving you a much higher request timeout of 15 minutes (up from 10 seconds on the Vercel Hobby plan!).
+
+To enable this, set your runtime to `"edge"` (see [Quickstart for Using Edge Functions | Vercel Docs](https://vercel.com/docs/concepts/functions/edge-functions/quickstart)) and add the `streaming: "allow"` option to your serve handler:
+
+```typescript
+export const config = {
+  runtime: "edge",
+};
+
+const handler = serve(inngest, [...fns], {
+  streaming: "allow",
+});
+```
+
+For more information, check out the [Streaming](/docs/streaming) page.
+
 ## Reference
 
 For more information about the `serve` handler, read the [the reference guide](/docs/reference/serve), which includes:
