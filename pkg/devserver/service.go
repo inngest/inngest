@@ -103,7 +103,9 @@ func (d *devserver) Pre(ctx context.Context) error {
 
 func (d *devserver) Run(ctx context.Context) error {
 	// Start polling the SDKs as the APIs are going live.
-	go d.pollSDKs(ctx)
+	if d.opts.Poll {
+		go d.pollSDKs(ctx)
+	}
 
 	// Add a nice output to the terminal.
 	if isatty.IsTerminal(os.Stdout.Fd()) {
@@ -152,6 +154,7 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 		if d.opts.Autodiscover {
 			_ = discovery.Autodiscover(ctx)
 		}
+
 		<-time.After(5 * time.Second)
 	}
 }
@@ -211,11 +214,13 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 
 		// Attempt to add new apps for each discovered URL that's _not_ already
 		// an app.
-		for u := range discovery.URLs() {
-			if _, ok := urls[u]; ok {
-				continue
+		if d.opts.Autodiscover {
+			for u := range discovery.URLs() {
+				if _, ok := urls[u]; ok {
+					continue
+				}
+				_ = deploy.Ping(ctx, u)
 			}
-			_ = deploy.Ping(ctx, u)
 		}
 		<-time.After(SDKPollInterval)
 	}

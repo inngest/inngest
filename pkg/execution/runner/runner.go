@@ -415,7 +415,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 				// state for the function to retrieve expression data.
 				s, err := s.state.Load(ctx, pause.Identifier.RunID)
 				if err != nil {
-					return err
+					return fmt.Errorf("error loading function state for pause: %w", err)
 				}
 				// Get expression data from the executor for the given run ID.
 				data = state.EdgeExpressionData(ctx, s, pause.Outgoing)
@@ -426,7 +426,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			// Compile and run the expression.
 			ok, _, err := expressions.EvaluateBoolean(ctx, *pause.Expression, data)
 			if err != nil {
-				return err
+				return fmt.Errorf("error evaluating pause expression: %w", err)
 			}
 			if !ok {
 				logger.From(ctx).Trace().
@@ -455,13 +455,13 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 					// We can safely ignore these errors.
 					continue
 				default:
-					return err
+					return fmt.Errorf("error cancelling function via event: %w", err)
 				}
 			}
 
 			// Consume the pause and continue
 			if err := s.state.ConsumePause(ctx, pause.ID, evtMap); err != nil {
-				return err
+				return fmt.Errorf("error consuming cancel pause: %w", err)
 			}
 
 			continue
@@ -490,7 +490,7 @@ func (s *svc) pauses(ctx context.Context, evt event.Event) error {
 			continue
 		}
 		if err != nil {
-			return err
+			return fmt.Errorf("error leasing pause: %w", err)
 		}
 
 		logger.From(ctx).Debug().
