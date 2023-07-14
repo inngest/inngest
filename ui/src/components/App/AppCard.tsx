@@ -216,21 +216,21 @@ export default function AppCard({ app }: { app: App }) {
           lineContent={
             <>
               <div className="flex items-center gap-3 text-base">
-                {app.connected && app.functionCount > 0 ? (
+                {app.functionCount > 0 && (
                   <>
-                    {<IconAppStatusCompleted />}
-                    {app.functionCount} Function{app.functionCount === 1 ? '' : 's'} Registered
+                    {app.connected && <IconAppStatusCompleted />}
+                    {!app.connected && <IconAppStatusDefault />}
+                    {app.functionCount} Function
+                    {app.functionCount === 1 ? '' : 's'} Registered
                   </>
-                ) : !app.connected && app.functionCount > 0 ? (
+                )}
+                {app.functionCount < 1 && (
                   <>
-                    {<IconAppStatusDefault />}
-                    
-                    {app.functionCount} Function{app.functionCount === 1 ? '' : 's'} Registered
-                  </>
-                ) : (
-                  <>
-                    {<IconAppStatusFailed className="text-orange-400/70" />}No
-                    Functions Found
+                    {app.connected && (
+                      <IconAppStatusFailed className="text-orange-400/70" />
+                    )}
+                    {!app.connected && <IconAppStatusDefault />}
+                    No Functions Found
                   </>
                 )}
               </div>
