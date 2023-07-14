@@ -40,6 +40,7 @@ type FunctionReader interface {
 
 type FunctionWriter interface {
 	InsertFunction(ctx context.Context, params InsertFunctionParams) (*Function, error)
+	DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error
 }
 
 type InsertFunctionParams struct {

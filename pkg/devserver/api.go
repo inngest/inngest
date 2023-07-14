@@ -161,7 +161,8 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 
 	// We need a UUID to register functions with.
 	appParams := cqrs.InsertAppParams{
-		ID:          uuid.New(),
+		// Use a deterministic ID for the app in dev.
+		ID:          uuid.NewSHA1(uuid.NameSpaceOID, []byte(r.URL)),
 		Name:        r.AppName,
 		SdkLanguage: r.SDKLanguage(),
 		SdkVersion:  r.SDKVersion(),
@@ -171,6 +172,13 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		},
 		Url:      r.URL,
 		Checksum: sum,
+	}
+
+	// Initially, we must delete all functions because we're straight up replacing them.
+	// This allows us to clean functions that are removed. Functions have a deterministic ID
+	// and so logs etc. are all still persisted.
+	if err := a.devserver.data.DeleteFunctionsByAppID(ctx, appParams.ID); err != nil {
+		return publicerr.Wrap(err, 500, "Error clearing existing functions")
 	}
 
 	tx, err := a.devserver.data.WithTx(ctx)
@@ -188,6 +196,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		}
 		_, _ = a.devserver.data.InsertApp(ctx, appParams)
 		err = tx.Commit(ctx)
+		if err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error registering functions")
+		}
 	}()
 
 	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
@@ -206,6 +217,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		if err != nil {
 			return publicerr.Wrap(err, 500, "Error marshalling function")
 		}
+
 		_, err = tx.InsertFunction(ctx, cqrs.InsertFunctionParams{
 			ID:        fn.ID,
 			Name:      fn.Name,
@@ -221,7 +233,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	}
 
 	// Create a new app.
-	return nil
+	return err
 }
 
 func (a devapi) err(ctx context.Context, w http.ResponseWriter, status int, err error) {

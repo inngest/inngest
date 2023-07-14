@@ -188,6 +188,10 @@ func (w wrapper) InsertFunction(ctx context.Context, params cqrs.InsertFunctionP
 	)
 }
 
+func (w wrapper) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error {
+	return w.q.DeleteFunctionsByAppID(ctx, appID)
+}
+
 func copyWriter[
 	PARAMS_IN any,
 	INTERNAL_PARAMS any,
