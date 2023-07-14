@@ -19,7 +19,7 @@ export default function AppCardStep({
   return (
     <Disclosure
       as="div"
-      className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative"
+      className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative cursor-pointer"
     >
       <span
         className={classNames(
