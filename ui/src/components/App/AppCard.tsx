@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import { useAppDispatch } from '@/store/hooks';
-import { showFunctions, showDocs } from '@/store/global';
+import { showDocs } from '@/store/global';
 import { type App } from '@/store/generated';
 import CodeLine from '@/components/CodeLine';
 import AppCardHeader from '@/components/App/AppCardHeader';
@@ -236,13 +237,13 @@ export default function AppCard({ app }: { app: App }) {
               </div>
               <div className="flex items-center gap-4">
                 {app.functionCount > 0 && (
-                  <button
+                  <Link
                     className="text-indigo-400 flex items-center gap-2"
-                    onClick={() => dispatch(showFunctions())}
+                    href="/functions"
                   >
                     View Functions
                     <IconChevron className="-rotate-90" />
-                  </button>
+                  </Link>
                 )}
                 <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
               </div>
