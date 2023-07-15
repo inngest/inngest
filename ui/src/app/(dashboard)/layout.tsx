@@ -39,12 +39,12 @@ export default function DashboardLayout({
           <NavbarLink icon={<IconFeed />} href="stream" tabName="Stream" />
           <NavbarLink
             icon={<IconFunction />}
-            href="functions"
+            href="apps"
             badge={appsCount}
             hasError={hasConnectedError}
-            tabName="Functions"
+            tabName="Apps"
           />
-          <NavbarLink icon={<IconFunction />} href="apps" tabName="Apps" />
+          <NavbarLink icon={<IconFunction />} href="functions" tabName="Functions" />
           <NavbarLink icon={<IconBook />} href="docs" tabName="Docs" />
         </Navbar>
       </Header>
