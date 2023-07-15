@@ -51,16 +51,6 @@ const globalState = createSlice({
         state.docsPath = action.payload || null;
       }
     },
-    showEventSendModal: (
-      state,
-      action: PayloadAction<{ show: boolean; data?: string | null }>
-    ) => {
-      state.showingSendEventModal = action.payload.show;
-
-      if (typeof action.payload.data !== "undefined") {
-        state.sendEventModalData = action.payload.data;
-      }
-    },
   },
 });
 
@@ -72,6 +62,5 @@ export const {
   showFunctions,
   showFeed,
   showApps,
-  showEventSendModal,
 } = globalState.actions;
 export default globalState.reducer;

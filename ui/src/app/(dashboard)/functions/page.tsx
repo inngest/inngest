@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
 import { useGetFunctionsQuery } from '@/store/generated';
 import { BlankSlate } from '@/components/Blank';
 import { useAppDispatch } from '@/store/hooks';
-import { showDocs, showEventSendModal } from '@/store/global';
+import { showDocs } from '@/store/global';
 import { IconEvent, IconClock } from '@/icons';
 import Skeleton from '@/components/Skeleton';
 import Tag from '@/components/Tag';
 import classNames from '@/utils/classnames';
-import Button from '@/components/Button';
+import SendEventButton from '@/components/Event/SendEventButton';
 
 const cellStyles = 'pl-6 pr-2 py-3';
 
@@ -137,7 +137,10 @@ export default function FunctionList() {
                     </td>
                     {/* App URL */}
                     <td
-                      className={classNames(cellStyles, 'whitespace-nowrap text-sm')}
+                      className={classNames(
+                        cellStyles,
+                        'whitespace-nowrap text-sm'
+                      )}
                       colSpan={3}
                     >
                       {cleanUrl.toString()}
@@ -148,21 +151,14 @@ export default function FunctionList() {
                         className={classNames(cellStyles, 'whitespace-nowrap')}
                         colSpan={1}
                       >
-                        <Button
+                        <SendEventButton
                           kind="secondary"
                           label="Trigger"
-                          btnAction={() => {
-                            dispatch(
-                              showEventSendModal({
-                                show: true,
-                                data: JSON.stringify({
-                                  name: getFirstEventValue(),
-                                  data: {},
-                                  user: {},
-                                }),
-                              })
-                            );
-                          }}
+                          data={JSON.stringify({
+                            name: getFirstEventValue(),
+                            data: {},
+                            user: {},
+                          })}
                         />
                       </td>
                     )}
@@ -175,4 +171,4 @@ export default function FunctionList() {
       </table>
     </main>
   );
-};
+}
