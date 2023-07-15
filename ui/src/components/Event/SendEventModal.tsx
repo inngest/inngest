@@ -124,7 +124,7 @@ export default function SendEventModal({data, isOpen, onClose}) {
   }, [monaco]);
 
   return portal(
-    <Modal isOpen={isOpen} onClose={onClose}>
+    <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-7xl">
       <div className="relative w-[60rem] h-[30rem] bg-slate-800/30 border border-slate-700/30 flex flex-col">
         <div className="mt-4 mx-4 bg-slate-800/40 shadow border-b border-slate-700/20 flex justify-between rounded-t">
           <div className="flex -mb-px">
@@ -134,7 +134,7 @@ export default function SendEventModal({data, isOpen, onClose}) {
           </div>
           <div className="flex gap-2 items-center mr-2">
             <div className="py-2 flex flex-row items-center space-x-2">
-              <div className="text-4xs text-center">Cmd+Enter</div>
+              <div className="text-4xs text-center text-white">Cmd+Enter</div>
               <button
                 onClick={() => sendEvent()}
                 className="bg-slate-700/50 hover:bg-slate-700/80 border-slate-700/50 flex gap-1.5 items-center border text-xs rounded-sm px-2.5 py-1 text-slate-100 transition-all duration-150"
