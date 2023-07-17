@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { useAppDispatch } from '@/store/hooks';
-import { showDocs } from '@/store/global';
+import useDocsNavigation from '@/hooks/useDocsNavigation';
 import { type App } from '@/store/generated';
 import CodeLine from '@/components/CodeLine';
 import AppCardHeader from '@/components/App/AppCardHeader';
@@ -25,7 +24,7 @@ export default function AppCard({ app }: { app: App }) {
   const [inputUrl, setInputUrl] = useState(app.url || '');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const dispatch = useAppDispatch();
+  const navigateToDocs = useDocsNavigation();
   const [_updateApp, updateAppState] = useUpdateAppMutation();
   const [_deleteApp, deleteAppState] = useDeleteAppMutation();
 
@@ -204,7 +203,7 @@ export default function AppCard({ app }: { app: App }) {
 
               <a
                 className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
-                onClick={() => dispatch(showDocs('/sdk/serve'))}
+                onClick={() => navigateToDocs('/sdk/serve')}
               >
                 Connecting to the Dev Server
                 <IconBook />
@@ -264,7 +263,7 @@ export default function AppCard({ app }: { app: App }) {
                   />
                   <a
                     className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
-                    onClick={() => dispatch(showDocs('/functions'))}
+                    onClick={() => navigateToDocs('/functions')}
                   >
                     Creating Functions
                     <IconBook />

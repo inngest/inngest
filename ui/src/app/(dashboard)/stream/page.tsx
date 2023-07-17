@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import useDocsNavigation from '@/hooks/useDocsNavigation';
 import TimelineScrollContainer from '@/components/Timeline/TimelineScrollContainer';
 import ContentFrame from '@/components/Content/ContentFrame';
 import { EventSection } from '@/components/Event/Section';
@@ -8,12 +9,11 @@ import { FunctionRunSection } from '@/components/Function/RunSection';
 import { EventStream } from '@/components/Event/Stream';
 import { FuncStream } from '@/components/Function/Stream';
 import { BlankSlate } from '@/components/Blank';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useAppSelector } from '@/store/hooks';
 import {
   useGetEventsStreamQuery,
   useGetFunctionsStreamQuery,
 } from '@/store/generated';
-import { showDocs } from '@/store/global';
 import SendEventButton from '@/components/Event/SendEventButton';
 import ActionBar from '@/components/ActionBar';
 import classNames from '@/utils/classnames';
@@ -22,7 +22,7 @@ export default function Stream() {
   const [secondaryTab, setSecondaryTab] = useState('events');
   const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
   const selectedRun = useAppSelector((state) => state.global.selectedRun);
-  const dispatch = useAppDispatch();
+  const navigateToDocs = useDocsNavigation();
 
   const { hasEvents, isLoading: eventsLoading } = useGetEventsStreamQuery(
     undefined,
@@ -50,14 +50,18 @@ export default function Stream() {
     onClick: () => void;
   }[] = [
     {
-      key: "events",
-      title: "Event Stream",
-      onClick: () =>{setSecondaryTab("events")},
+      key: 'events',
+      title: 'Event Stream',
+      onClick: () => {
+        setSecondaryTab('events');
+      },
     },
     {
-      key: "functions",
-      title: "Function Log",
-      onClick: () => {setSecondaryTab("functions")},
+      key: 'functions',
+      title: 'Function Log',
+      onClick: () => {
+        setSecondaryTab('functions');
+      },
     },
   ];
 
@@ -111,7 +115,7 @@ export default function Stream() {
             imageUrl="/images/no-events.png"
             button={{
               text: 'Sending Events',
-              onClick: () => dispatch(showDocs('/events')),
+              onClick: () => navigateToDocs('/events'),
             }}
           />
         )
@@ -128,7 +132,7 @@ export default function Stream() {
           imageUrl="/images/no-results.png"
           button={{
             text: 'Writing Functions',
-            onClick: () => dispatch(showDocs('/functions')),
+            onClick: () => navigateToDocs('/functions'),
           }}
         />
       )}

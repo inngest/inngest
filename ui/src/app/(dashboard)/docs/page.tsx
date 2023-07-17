@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useAppSelector } from "../../../store/hooks";
+import { useAppSelector } from '@/store/hooks';
 
 export default function Docs() {
   /**
@@ -13,8 +13,8 @@ export default function Docs() {
 
   return (
     <iframe
-      src={`https://inngest.com/docs${path || ""}`}
+      src={`https://inngest.com/docs${path || ''}`}
       className="w-full h-full"
     />
   );
-};
+}

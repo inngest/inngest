@@ -2,8 +2,7 @@
 
 import { useGetFunctionsQuery } from '@/store/generated';
 import { BlankSlate } from '@/components/Blank';
-import { useAppDispatch } from '@/store/hooks';
-import { showDocs } from '@/store/global';
+import useDocsNavigation from '@/hooks/useDocsNavigation';
 import { IconEvent, IconClock } from '@/icons';
 import Skeleton from '@/components/Skeleton';
 import Tag from '@/components/Tag';
@@ -54,7 +53,7 @@ const TableSkeleton = () => {
 };
 
 export default function FunctionList() {
-  const dispatch = useAppDispatch();
+  const navigateToDocs = useDocsNavigation();
 
   const { data, isFetching } = useGetFunctionsQuery(undefined, {
     refetchOnMountOrArgChange: true,
@@ -84,7 +83,7 @@ export default function FunctionList() {
                   imageUrl="/images/no-results.png"
                   button={{
                     text: 'Serving Functions',
-                    onClick: () => dispatch(showDocs('/sdk/serve')),
+                    onClick: () => navigateToDocs('/sdk/serve'),
                   }}
                 />
               </td>
