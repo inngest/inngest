@@ -24,9 +24,6 @@ jobs:
       - name: Set sha
         id: sha
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      - name: Set tag
-        id: tag
-        run: echo "tag=$(git describe --tags `git rev-list --tags --max-count=1`)" >> $GITHUB_OUTPUT
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v2
@@ -36,7 +33,7 @@ jobs:
 
       - name: Build app
         run: |
-          go build -o /builds/inngest-windows-amd64 -ldflags="-s -w -X github.com/inngest/inngest/pkg/inngest/version.Version=${{ steps.tag.outputs.tag }} -X github.com/inngest/inngest/pkg/inngest/version.Hash=${{ steps.sha.outputs.sha }}" ./cmd/main.go
+          go build -o /builds/inngest-windows-amd64 -ldflags="-s -w -X github.com/inngest/inngest/pkg/inngest/version.Version=${{ github.ref_name }} -X github.com/inngest/inngest/pkg/inngest/version.Hash=${{ steps.sha.outputs.sha }}" ./cmd/main.go
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
