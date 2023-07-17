@@ -18,9 +18,7 @@ jobs:
         with:
           go-version: '1.20'
       - name: Set up MinGW
-        uses: egor-tensin/setup-mingw@v2
-        with:
-          platform: x64
+        uses: msys2/setup-msys2@v2
       - name: Install pnpm
         uses: pnpm/action-setup@v2
         with:
@@ -37,6 +35,10 @@ jobs:
 
       - name: Build app
         run: |
+          CC=x86_64-w64-mingw32-gcc \
+          CXX=x86_64-w64-mingw32-g++ \
+          CC_FOR_TARGET=x86_64-w64-mingw32-gcc \
+          CXX_FOR_TARGET=x86_64-w64-mingw32-g++ \
           go build -o /builds/inngest-windows-amd64 -ldflags="-s -w -X github.com/inngest/inngest/pkg/inngest/version.Version=${{ github.ref_name }} -X github.com/inngest/inngest/pkg/inngest/version.Hash=${{ steps.sha.outputs.sha }}" ./cmd/main.go
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
