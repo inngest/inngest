@@ -614,12 +614,17 @@ func Initialize(ctx context.Context, fn inngest.Function, evt event.Event, s sta
 		}
 	}
 
+	at := time.Now()
+	if time.UnixMilli(evt.Timestamp).After(at) {
+		at = time.UnixMilli(evt.Timestamp)
+	}
+
 	// Enqueue running this from the source.
 	err := q.Enqueue(ctx, queue.Item{
 		Kind:       queue.KindEdge,
 		Identifier: id,
 		Payload:    queue.PayloadEdge{Edge: inngest.SourceEdge},
-	}, time.Now())
+	}, at)
 	if err != nil {
 		return &id, fmt.Errorf("error enqueuing function: %w", err)
 	}
