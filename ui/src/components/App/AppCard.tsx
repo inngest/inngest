@@ -253,7 +253,7 @@ export default function AppCard({ app }: { app: App }) {
               {app.functionCount < 1 && (
                 <>
                   <p className="pb-4 text-slate-400">
-                    There are currently no functions registered at this url.
+                    There are currently no functions registered at this URL.
                     Ensure you have created a function and are exporting it
                     correctly from your serve command.
                   </p>
