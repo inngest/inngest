@@ -200,14 +200,15 @@ export default function AppCard({ app }: { app: App }) {
                   <p className="text-sm text-slate-400">SDK Version</p>
                 </div>
               </div>
-
-              <a
-                className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
-                onClick={() => dispatch(showDocs('/sdk/serve'))}
-              >
-                Connecting to the Dev Server
-                <IconBook />
-              </a>
+              {!app.connected &&
+                <a
+                  className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
+                  onClick={() => dispatch(showDocs('/sdk/serve'))}
+                >
+                  Connecting to the Dev Server
+                  <IconBook />
+                </a>
+              }
             </>
           }
         />
