@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -17,7 +18,20 @@ var (
 	defaultTimeout = 30 * time.Second
 
 	ErrPreTimeout = fmt.Errorf("service did not pre-up within the given timeout")
+
+	wgctxVal = wgctx{}
 )
+
+type wgctx struct{}
+
+// GetWaitgroup returns a waitgroup from the top-level service context
+func GetWaitgroup(ctx context.Context) *sync.WaitGroup {
+	wg, _ := ctx.Value(wgctxVal).(*sync.WaitGroup)
+	if wg == nil {
+		wg = &sync.WaitGroup{}
+	}
+	return wg
+}
 
 // Service represents a basic interface for a long-running service.  By invoking
 // the Start function with a service, we automatically call Pre to initialize
@@ -129,6 +143,11 @@ func Start(ctx context.Context, s Service) (err error) {
 		}
 	}()
 
+	// Create a new parent waitgroup which can be used to prevent stopping
+	// until the WG reaches 0.  This can be used for ephemeral goroutines.
+	wg := &sync.WaitGroup{}
+	runCtx = context.WithValue(runCtx, wgctxVal, wg)
+
 	runErr := make(chan error)
 	l.Info().Msg("service starting")
 	go func() {
@@ -159,11 +178,15 @@ func Start(ctx context.Context, s Service) (err error) {
 	stopCh := make(chan error)
 	go func() {
 		l.Info().Msg("service cleaning up")
-		// Create a new context that's not cabcekked,
+		// Create a new context that's not cancelled.
 		if err := s.Stop(context.Background()); err != nil && err != context.Canceled {
 			stopCh <- err
 			return
 		}
+
+		// Wait for everything in the run waitgroup
+		wg.Wait()
+
 		stopCh <- nil
 	}()
 	select {
