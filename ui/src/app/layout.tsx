@@ -1,5 +1,6 @@
 import StoreProvider from '@/app/StoreProvider';
 import type { Metadata } from 'next';
+import { Toaster } from 'sonner';
 
 import './globals.css';
 
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <div id="app"/>
         <div id="modals"/>
         <StoreProvider>{children}</StoreProvider>
+        <Toaster theme="dark" toastOptions={{ style: { background: "#334155" }}}/>
       </body>
     </html>
   );

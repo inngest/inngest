@@ -3,13 +3,12 @@ package devserver
 import (
 	"context"
 	"database/sql"
-	"embed"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"mime"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -22,17 +21,6 @@ import (
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
 )
-
-//go:embed static/index.html
-var uiHtml []byte
-
-//go:embed all:static
-var static embed.FS
-
-func init() {
-	// Fix invalid mime type errors when loading JS from our assets on windows.
-	_ = mime.AddExtensionType(".js", "application/javascript")
-}
 
 type devapi struct {
 	chi.Router
@@ -64,22 +52,38 @@ func (a *devapi) addRoutes() {
 		return http.HandlerFunc(fn)
 	})
 
-	a.Get("/", a.UI)
+	a.Get("/dev", a.Info)
+	a.Post("/fn/register", a.Register)
 
 	// Go embeds files relative to the current source, which embeds
 	// all under ./static.  We remove the ./static
 	// directory by using fs.Sub: https://pkg.go.dev/io/fs#Sub.
 	staticFS, _ := fs.Sub(static, "static")
-	a.Get("/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	a.Get("/dev", a.Info)
-	a.Post("/fn/register", a.Register)
+	a.Get("/images/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+	a.Get("/assets/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+	a.Get("/_next/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+	a.Get("/{file}.txt", http.FileServer(http.FS(staticFS)).ServeHTTP)
+	a.Get("/{file}.svg", http.FileServer(http.FS(staticFS)).ServeHTTP)
+	a.Get("/{file}.jpg", http.FileServer(http.FS(staticFS)).ServeHTTP)
+	a.Get("/{file}.png", http.FileServer(http.FS(staticFS)).ServeHTTP)
+
+	a.Get("/*", a.UI)
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
+	// If there's a trailing slash, redirect to non-trailing slashes.
+	if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
+		r.URL.Path = strings.TrimSuffix(r.URL.Path, "/")
+		http.Redirect(w, r, r.URL.String(), 303)
+		return
+	}
+
 	m := tel.NewMetadata(r.Context())
 	tel.SendEvent(r.Context(), "cli/dev_ui.loaded", m)
 	tel.SendMetadata(r.Context(), m)
-	_, _ = w.Write(uiHtml)
+
+	byt := parsedRoutes.serve(r.Context(), r.URL.Path)
+	_, _ = w.Write(byt)
 }
 
 // Info returns information about the dev server and its registered functions.

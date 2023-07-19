@@ -1,6 +1,8 @@
-import { useAppSelector } from "../store/hooks";
+'use client';
 
-export const Docs = () => {
+import { useAppSelector } from '@/store/hooks';
+
+export default function Docs() {
   /**
    * When link seleted.
    * Make URL with https://www.inngest.com as base, and URL as path
@@ -11,8 +13,8 @@ export const Docs = () => {
 
   return (
     <iframe
-      src={`https://inngest.com/docs${path || ""}`}
+      src={`https://inngest.com/docs${path || ''}`}
       className="w-full h-full"
     />
   );
-};
+}

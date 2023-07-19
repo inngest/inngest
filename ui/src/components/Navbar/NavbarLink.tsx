@@ -1,35 +1,32 @@
+import type { Route } from 'next';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import classNames from '@/utils/classnames';
 import Badge from '@/components/Badge';
 
 interface NavbarLinkProps {
   icon: React.ReactNode;
-  active?: boolean;
+  href: Route;
   badge?: number;
   hasError?: boolean;
-  onClick?: () => void;
   tabName: string;
 }
 
-export default function NavebarLink({
+export default function NavbarLink({
   icon,
-  active = false,
+  href,
   badge,
-  onClick,
   tabName,
   hasError,
 }: NavbarLinkProps) {
+  const pathname = usePathname();
+  const isActive = pathname === '/' + href;
+
   return (
-    <button
-      onClick={
-        onClick
-          ? (e) => {
-              e.preventDefault();
-              onClick();
-            }
-          : undefined
-      }
+    <Link
+      href={href}
       className={classNames(
-        active
+        isActive
           ? `border-indigo-400 text-white`
           : `border-transparent text-slate-400 hover:text-white`,
         `border-t-2 flex items-center justify-center w-full p-3 transition-all duration-150 gap-2`
@@ -37,7 +34,9 @@ export default function NavebarLink({
     >
       {icon}
       {tabName}
-      {typeof badge === 'number' && <Badge kind={hasError ? 'error' : 'outlined'}>{badge.toString()}</Badge>}
-    </button>
+      {typeof badge === 'number' && (
+        <Badge kind={hasError ? 'error' : 'outlined'}>{badge.toString()}</Badge>
+      )}
+    </Link>
   );
 }

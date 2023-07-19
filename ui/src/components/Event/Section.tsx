@@ -7,7 +7,7 @@ import {
   FunctionRunStatus,
   useGetEventQuery,
 } from "../../store/generated";
-import { selectEvent, selectRun, showEventSendModal } from "../../store/global";
+import { selectEvent, selectRun } from "../../store/global";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import Button from "../Button";
 import CodeBlock from "../CodeBlock";
@@ -15,6 +15,7 @@ import ContentCard from "../Content/ContentCard";
 import FuncCard from "../Function/FuncCard";
 import TimelineRow from "../Timeline/TimelineRow";
 import TimelineStaticContent from "../Timeline/TimelineStaticContent";
+import SendEventButton from '@/components/Event/SendEventButton';
 
 interface EventSectionProps {
   eventId: string;
@@ -88,14 +89,10 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
                     })
                   }}
                 />
-                <Button
-                  label="Edit and replay"
+                <SendEventButton
+                  label="Edit and Replay"
                   kind="secondary"
-                  btnAction={() => {
-                    dispatch(
-                      showEventSendModal({ show: true, data: event.raw })
-                    );
-                  }}
+                  data={event.raw}
                 />
               </>
             }

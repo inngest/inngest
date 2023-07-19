@@ -18,6 +18,12 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: "1.20"
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8.6.2
+      - name: Build UI
+        run: make build-ui
       - name: Build dev serve
         run: |
           go build -o ./inngest-bin ./cmd/main.go

@@ -3,23 +3,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ulid } from 'ulid';
 import { usePortal } from "../../hooks/usePortal";
 import { useSendEventMutation } from "../../store/devApi";
-import { selectEvent, showEventSendModal } from "../../store/global";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { selectEvent } from "../../store/global";
+import { useAppDispatch } from "../../store/hooks";
 import { genericiseEvent } from "../../utils/events";
-import CodeBlockModal from "../CodeBlock/CodeBlockModal";
+import Modal from '@/components/Modal';
 
-export const SendEventModal = () => {
+export default function SendEventModal({data, isOpen, onClose}) {
   const [_sendEvent, sendEventState] = useSendEventMutation();
   const portal = usePortal();
-  const eventDataStr = useAppSelector(
-    (state) => state.global.sendEventModalData
-  );
-  const visible = useAppSelector((state) => state.global.showingSendEventModal);
+  const eventDataStr = data;
   const dispatch = useAppDispatch();
-
-  const onClose = () => {
-    dispatch(showEventSendModal({ show: false }));
-  };
 
   const snippedData = useMemo(
     () => genericiseEvent(eventDataStr),
@@ -29,7 +22,7 @@ export const SendEventModal = () => {
   const [input, setInput] = useState(snippedData);
   useEffect(() => {
     setInput(genericiseEvent(snippedData));
-  }, [eventDataStr, visible]);
+  }, [eventDataStr, isOpen]);
 
   const pushToast = (message: string) => {
     alert(message);
@@ -130,14 +123,10 @@ export const SendEventModal = () => {
     });
   }, [monaco]);
 
-  if (!visible) {
-    return null;
-  }
-
   return portal(
-    <CodeBlockModal closeModal={onClose}>
+    <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-7xl">
       <div className="relative w-[60rem] h-[30rem] bg-slate-800/30 border border-slate-700/30 flex flex-col">
-        <div className="mt-4 mx-4 bg-slate-800/40 flex shadow border-b border-slate-700/20 flex justify-between rounded-t">
+        <div className="mt-4 mx-4 bg-slate-800/40 shadow border-b border-slate-700/20 flex justify-between rounded-t">
           <div className="flex -mb-px">
             <button className="border-indigo-400 text-white text-xs px-5 py-2.5 border-b block transition-all duration-150">
               Payload
@@ -145,7 +134,7 @@ export const SendEventModal = () => {
           </div>
           <div className="flex gap-2 items-center mr-2">
             <div className="py-2 flex flex-row items-center space-x-2">
-              <div className="text-4xs text-center">Cmd+Enter</div>
+              <div className="text-4xs text-center text-white">Cmd+Enter</div>
               <button
                 onClick={() => sendEvent()}
                 className="bg-slate-700/50 hover:bg-slate-700/80 border-slate-700/50 flex gap-1.5 items-center border text-xs rounded-sm px-2.5 py-1 text-slate-100 transition-all duration-150"
@@ -193,6 +182,6 @@ export const SendEventModal = () => {
           />
         ) : null}
       </div>
-    </CodeBlockModal>
+    </Modal>
   );
 };

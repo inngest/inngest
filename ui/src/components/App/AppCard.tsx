@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { useAppDispatch } from '@/store/hooks';
-import { showFunctions, showDocs } from '@/store/global';
+import Link from 'next/link';
+import useDocsNavigation from '@/hooks/useDocsNavigation';
 import { type App } from '@/store/generated';
 import CodeLine from '@/components/CodeLine';
 import AppCardHeader from '@/components/App/AppCardHeader';
@@ -24,7 +24,7 @@ export default function AppCard({ app }: { app: App }) {
   const [inputUrl, setInputUrl] = useState(app.url || '');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const dispatch = useAppDispatch();
+  const navigateToDocs = useDocsNavigation();
   const [_updateApp, updateAppState] = useUpdateAppMutation();
   const [_deleteApp, deleteAppState] = useDeleteAppMutation();
 
@@ -203,7 +203,7 @@ export default function AppCard({ app }: { app: App }) {
 
               <a
                 className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
-                onClick={() => dispatch(showDocs('/sdk/serve'))}
+                onClick={() => navigateToDocs('/sdk/serve')}
               >
                 Connecting to the Dev Server
                 <IconBook />
@@ -236,13 +236,13 @@ export default function AppCard({ app }: { app: App }) {
               </div>
               <div className="flex items-center gap-4">
                 {app.functionCount > 0 && (
-                  <button
+                  <Link
                     className="text-indigo-400 flex items-center gap-2"
-                    onClick={() => dispatch(showFunctions())}
+                    href="/functions"
                   >
                     View Functions
                     <IconChevron className="-rotate-90" />
-                  </button>
+                  </Link>
                 )}
                 <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
               </div>
@@ -263,7 +263,7 @@ export default function AppCard({ app }: { app: App }) {
                   />
                   <a
                     className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
-                    onClick={() => dispatch(showDocs('/functions'))}
+                    onClick={() => navigateToDocs('/functions')}
                   >
                     Creating Functions
                     <IconBook />
