@@ -17,16 +17,16 @@ var parsedRoutes *routes
 func init() {
 	// Fix invalid mime type errors when loading JS from our assets on windows.
 	_ = mime.AddExtensionType(".js", "application/javascript")
+	parsedRoutes = &routes{}
 
 	// Fetch the routes from the manifest.
 	byt, err := static.ReadFile("static/routes-manifest.json")
 	if err != nil {
-		panic(err.Error())
+		return
 	}
 
-	parsedRoutes = &routes{}
 	if err := json.Unmarshal(byt, parsedRoutes); err != nil {
-		panic(err.Error())
+		return
 	}
 	parsedRoutes.files = static
 }
