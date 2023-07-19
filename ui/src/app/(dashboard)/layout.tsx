@@ -5,7 +5,7 @@ import Header from '@/components/Header';
 import Navbar from '@/components/Navbar/Navbar';
 import NavbarLink from '@/components/Navbar/NavbarLink';
 import classNames from '@/utils/classnames';
-import { IconBook, IconFeed, IconFunction } from '@/icons';
+import { IconBook, IconFeed, IconFunction, IconWindow } from '@/icons';
 import { useGetAppsQuery } from '@/store/generated';
 
 export default function DashboardLayout({
@@ -27,10 +27,10 @@ export default function DashboardLayout({
   return (
     <div
       className={classNames(
-        "w-screen h-screen text-slate-400 text-sm grid overflow-hidden relative",
-        pathname === "/stream"
-          ? "grid-cols-app-sm xl:grid-cols-app 2xl:grid-cols-app-desktop grid-rows-app"
-          : "grid-cols-docs grid-rows-docs"
+        'w-screen h-screen text-slate-400 text-sm grid overflow-hidden relative',
+        pathname === '/stream'
+          ? 'grid-cols-app-sm xl:grid-cols-app 2xl:grid-cols-app-desktop grid-rows-app'
+          : 'grid-cols-docs grid-rows-docs'
       )}
     >
       <BG />
@@ -38,13 +38,17 @@ export default function DashboardLayout({
         <Navbar>
           <NavbarLink icon={<IconFeed />} href="stream" tabName="Stream" />
           <NavbarLink
-            icon={<IconFunction />}
+            icon={<IconWindow className="h-[1.125rem] w-[1.125rem]" />}
             href="apps"
             badge={appsCount}
             hasError={hasConnectedError}
             tabName="Apps"
           />
-          <NavbarLink icon={<IconFunction />} href="functions" tabName="Functions" />
+          <NavbarLink
+            icon={<IconFunction />}
+            href="functions"
+            tabName="Functions"
+          />
           <NavbarLink icon={<IconBook />} href="docs" tabName="Docs" />
         </Navbar>
       </Header>

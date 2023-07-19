@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
 import { useMemo } from 'react';
 import AppCard from '@/components/App/AppCard';
-import { IconFunction, IconSpinner } from '@/icons';
+import { IconWindow, IconSpinner } from '@/icons';
 import AddAppButton from '@/components/App/AddAppButton';
 import { useGetAppsQuery } from '@/store/generated';
 
@@ -36,7 +36,7 @@ export default function AppList() {
         </div>
       </header>
       <div className="flex items-center gap-3 mb-4">
-        <IconFunction />
+        <IconWindow className="h-5 w-5" />
         <p className="text-slate-200">
           {numberOfConnectedApps} / {apps.length} Apps Connected
         </p>
