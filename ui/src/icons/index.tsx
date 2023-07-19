@@ -17,6 +17,7 @@ export { IconAppStatusDefault } from './AppStatusDefault';
 export { InngestSmallLogo } from './InngestSmallLogo';
 export { IconEvent } from './Event';
 export { IconClock } from './Clock';
+export { IconWindow } from './Window';
 
 // Status Icons
 export { IconStatusDefault } from './StatusDefault';

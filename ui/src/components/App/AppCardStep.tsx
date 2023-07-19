@@ -19,7 +19,7 @@ export default function AppCardStep({
   return (
     <Disclosure
       as="div"
-      className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative cursor-pointer"
+      className="ui-open:ring-inset ui-open:ring-1 ui-open:ring-slate-800 relative"
     >
       <span
         className={classNames(
@@ -32,7 +32,7 @@ export default function AppCardStep({
       />
       <Disclosure.Button
         as={'div'}
-        className="flex items-center text-white justify-between p-4 pr-6 w-full"
+        className="flex items-center text-white justify-between p-4 pr-6 w-full cursor-pointer"
       >
         {lineContent}
       </Disclosure.Button>

@@ -1,5 +1,6 @@
 import Editor, { useMonaco } from "@monaco-editor/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from 'sonner';
 import { ulid } from 'ulid';
 import { usePortal } from "../../hooks/usePortal";
 import { useSendEventMutation } from "../../store/devApi";
@@ -66,6 +67,7 @@ export default function SendEventModal({data, isOpen, onClose}) {
     _sendEvent(data)
       .unwrap()
       .then(() => {
+        toast.success('The event was successfully added.')
         onClose();
         dispatch(selectEvent(data.id));
       });

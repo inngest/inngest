@@ -200,7 +200,7 @@ export default function AppCard({ app }: { app: App }) {
                   <p className="text-sm text-slate-400">SDK Version</p>
                 </div>
               </div>
-
+            {!app.connected &&
               <a
                 className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
                 onClick={() => navigateToDocs('/sdk/serve')}
@@ -208,6 +208,7 @@ export default function AppCard({ app }: { app: App }) {
                 Connecting to the Dev Server
                 <IconBook />
               </a>
+             }
             </>
           }
         />
@@ -253,7 +254,7 @@ export default function AppCard({ app }: { app: App }) {
               {app.functionCount < 1 && (
                 <>
                   <p className="pb-4 text-slate-400">
-                    There are currently no functions registered at this url.
+                    There are currently no functions registered at this URL.
                     Ensure you have created a function and are exporting it
                     correctly from your serve command.
                   </p>

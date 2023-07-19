@@ -29,7 +29,7 @@ export default function NavbarLink({
         isActive
           ? `border-indigo-400 text-white`
           : `border-transparent text-slate-400 hover:text-white`,
-        `border-t-2 flex items-center justify-center w-full p-3 transition-all duration-150 gap-2`
+        `border-t-2 flex items-center justify-center w-full px-3 leading-[2.75rem] transition-all duration-150 gap-2`
       )}
     >
       {icon}
