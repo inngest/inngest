@@ -502,9 +502,6 @@ func (q QueuePartition) MarshalBinary() ([]byte, error) {
 //
 // The queue score must be added in milliseconds to process sub-second items in order.
 func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error) {
-	ctx, span := q.tracer.Start(ctx, "EnqueueItem")
-	defer span.End()
-
 	if len(i.ID) == 0 {
 		i.ID = ulid.MustNew(ulid.Now(), rnd).String()
 	}
@@ -590,9 +587,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 // If limit is -1, this will return the first unleased item - representing the next available item in the
 // queue.
 func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, limit int64) ([]*QueueItem, error) {
-	ctx, span := q.tracer.Start(ctx, "Peek")
-	defer span.End()
-
 	// Check whether limit is -1, peeking next available time
 	isPeekNext := limit == -1
 
@@ -659,9 +653,6 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 // Obtaining a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
 func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, duration time.Duration) (*ulid.ULID, error) {
-	ctx, span := q.tracer.Start(ctx, "Lease")
-	defer span.End()
-
 	var (
 		ak, pk, ck string // account, partition, custom concurrency key
 		ac, pc, cc int    // account, partiiton, custom concurrency max
@@ -735,9 +726,6 @@ func (q *queue) Lease(ctx context.Context, p QueuePartition, item QueueItem, dur
 // Renewing a lease updates the vesting time for the queue item until now() +
 // lease duration. This returns the newly acquired lease ID on success.
 func (q *queue) ExtendLease(ctx context.Context, p QueuePartition, i QueueItem, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
-	ctx, span := q.tracer.Start(ctx, "ExtendLease")
-	defer span.End()
-
 	var (
 		ak, pk, ck string // account, partition, custom concurrency key
 	)
@@ -858,9 +846,6 @@ func (q *queue) Dequeue(ctx context.Context, p QueuePartition, i QueueItem) erro
 
 // Requeue requeues an item in the future.
 func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error {
-	ctx, span := q.tracer.Start(ctx, "Requeue")
-	defer span.End()
-
 	priority := PriorityMin
 	if q.pf != nil {
 		priority = q.pf(ctx, i)
@@ -941,9 +926,6 @@ func (q *queue) Requeue(ctx context.Context, p QueuePartition, i QueueItem, at t
 // that the worker always wants to lease the given queue.  Filtering must be done when peeking
 // when running a worker.
 func (q *queue) PartitionLease(ctx context.Context, p QueuePartition, duration time.Duration) (*ulid.ULID, int64, error) {
-	ctx, span := q.tracer.Start(ctx, "PartitionLease")
-	defer span.End()
-
 	var (
 		concurrencyKey string
 		concurrency    = defaultPartitionConcurrency
@@ -1126,9 +1108,6 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 // concurrency limit;  we don't want to scan the partition next time, so we force the partition
 // to be at a specific time instead of taking the earliest available queue item time
 func (q *queue) PartitionRequeue(ctx context.Context, queueName string, at time.Time, forceAt bool) error {
-	ctx, span := q.tracer.Start(ctx, "PartitionRequeue")
-	defer span.End()
-
 	keys := []string{
 		q.kg.PartitionItem(),
 		q.kg.PartitionIndex(),
