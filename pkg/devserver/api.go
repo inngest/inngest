@@ -139,6 +139,8 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error) {
+	r.URL = cqrs.NormalizeAppURL(r.URL)
+
 	sum, err := r.Checksum()
 	if err != nil {
 		return publicerr.Wrap(err, 400, "Invalid request")
