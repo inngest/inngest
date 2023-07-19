@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -70,6 +71,13 @@ func (a *devapi) addRoutes() {
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
+	// If there's a trailing slash, redirect to non-trailing slashes.
+	if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
+		r.URL.Path = strings.TrimSuffix(r.URL.Path, "/")
+		http.Redirect(w, r, r.URL.String(), 303)
+		return
+	}
+
 	m := tel.NewMetadata(r.Context())
 	tel.SendEvent(r.Context(), "cli/dev_ui.loaded", m)
 	tel.SendMetadata(r.Context(), m)
