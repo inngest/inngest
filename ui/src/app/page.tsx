@@ -30,6 +30,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import classNames from '@/utils/classnames';
 import { FunctionList } from '@/views/FunctionList';
 import AppList from '@/views/AppList';
+import { IconWindow } from '@/icons';
 
 export default function Page() {
   const sidebarTab = useAppSelector((state) => state.global.sidebarTab);
@@ -106,7 +107,7 @@ export default function Page() {
             tabName="Stream"
           />
           <NavbarLink
-            icon={<IconFunction />}
+            icon={<IconWindow className="h-[1.125rem] w-[1.125rem]" />}
             active={contentView === "apps"}
             onClick={() => dispatch(showApps())}
             badge={appsCount}
