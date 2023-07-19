@@ -143,6 +143,8 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error) {
+	r.URL = cqrs.NormalizeAppURL(r.URL)
+
 	sum, err := r.Checksum()
 	if err != nil {
 		return publicerr.Wrap(err, 400, "Invalid request")
@@ -207,7 +209,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 	// XXX (tonyhb): If we're authenticated, we can match the signing key against the workspace's
 	// signing key and warn if the user has an invalid key.
 	funcs, err := r.Parse(ctx)
-	if err != nil {
+	if err != nil && err != sdk.ErrNoFunctions {
 		return publicerr.Wrap(err, 400, "At least one function is invalid")
 	}
 

@@ -1,7 +1,7 @@
 builds:
   -
     builder: prebuilt
-    goos: [linux, darwin]
+    goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
     goamd64: [v1]
     prebuilt:
@@ -21,7 +21,7 @@ dockers:
     - "inngest/inngest:{{ .Tag }}-amd64"
     build_flag_templates:
     - "--pull"
-    - "--build-arg=BIN=./build/inngest-linux-amd64"
+    - "--build-arg=BIN=inngest-linux-amd64"
     - "--label=org.opencontainers.image.created={{.Date}}"
     - "--label=org.opencontainers.image.title={{.ProjectName}}"
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
@@ -38,7 +38,7 @@ dockers:
     - "inngest/inngest:{{ .Tag }}-arm64v8"
     build_flag_templates:
     - "--pull"
-    - "--build-arg=BIN=./build/inngest-linux-arm64"
+    - "--build-arg=BIN=inngest-linux-arm64"
     - "--label=org.opencontainers.image.created={{.Date}}"
     - "--label=org.opencontainers.image.title={{.ProjectName}}"
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"

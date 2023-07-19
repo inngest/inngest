@@ -39,8 +39,11 @@ type Identifier struct {
 	WorkflowID      uuid.UUID `json:"wID"`
 	WorkflowVersion int       `json:"wv"`
 	RunID           ulid.ULID `json:"runID"`
-	// Key represents a unique idempotency key used to deduplicate this
-	// workflow run amongst other runs for the same workflow.
+	// Key represents a unique user-defined key to be used as part of the
+	// idempotency key.  This is appended to the workflow ID and workflow
+	// version to create a full idempotency key (via the IdempotencyKey() method).
+	//
+	// If this is not present the RunID is used as this value.
 	Key string `json:"key"`
 }
 

@@ -1,5 +1,5 @@
-ARG BIN=./build/inngest-linux-amd64
-FROM --platform=$BUILDPLATFORM alpine:3.16 AS inngest
-RUN apk add --no-cache ca-certificates tzdata && update-ca-certificates
-COPY ${BIN} /bin/inngest
+FROM --platform=$BUILDPLATFORM debian:stable-slim AS inngest
+ARG BIN=inngest-linux-amd64
+RUN apt-get update && apt-get install -y ca-certificates tzdata && update-ca-certificates
+COPY $BIN /bin/inngest
 CMD ["inngest"]
