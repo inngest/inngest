@@ -1,4 +1,5 @@
 'use client';
+import { Toaster } from 'sonner';
 import { usePathname } from 'next/navigation';
 import BG from '@/components/BG';
 import Header from '@/components/Header';
@@ -53,6 +54,7 @@ export default function DashboardLayout({
         </Navbar>
       </Header>
       {children}
+      <Toaster theme="dark" toastOptions={{ style: { background: "#334155" }}}/>
     </div>
   );
 }
