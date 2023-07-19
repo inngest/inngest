@@ -5,13 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/apiutil"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/eventstream"
+	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 )
@@ -57,6 +61,7 @@ func NewAPI(o Options) (chi.Router, error) {
 
 	api.Get("/health", api.HealthCheck)
 	api.Post("/e/{key}", api.ReceiveEvent)
+	api.Post("/invoke/{slug}", api.Invoke)
 
 	return api, nil
 }
@@ -134,12 +139,17 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	// Process those incoming events
 	eg.Go(func() error {
-		// TODO: Iterate through event stream and process event.
 		for byt := range byteStream {
 			evt := event.Event{}
 			if err := json.Unmarshal(byt, &evt); err != nil {
 				return err
 			}
+
+			if strings.HasPrefix(strings.ToLower(evt.Name), "inngest/") {
+				err := fmt.Errorf("event name is reserved for internal use: %s", evt.Name)
+				return err
+			}
+
 			id, err := a.handler(r.Context(), &evt)
 			if err != nil {
 				a.log.Error().Str("event", evt.Name).Err(err).Msg("error handling event")
@@ -168,4 +178,37 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		IDs:    ids,
 		Status: 200,
 	})
+}
+
+// Invoke creates an event to invoke a specific function.
+func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
+	// XXX: In OSS self hosting, check signing keys here.
+
+	// Get the function slug from the route parameter.   This is the function
+	// we'll invoke.  Any request is passed as the event data to the function.
+	slug := chi.URLParam(r, "slug")
+
+	data := map[string]any{}
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Unable to read post data request"))
+		return
+	}
+
+	data[consts.InvokeSlugKey] = slug
+
+	now := time.Now().UnixMilli()
+	evt := event.Event{
+		Name:      consts.InvokeEventName,
+		Data:      data,
+		Timestamp: now,
+	}
+
+	evtID, err := a.handler(r.Context(), &evt)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to create invocation event: %s", err))
+		return
+	}
+
+	// TODO: If await is true as a query parameter, await the data from the function.
+	_, _ = w.Write([]byte(evtID))
 }
