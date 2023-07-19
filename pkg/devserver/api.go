@@ -64,15 +64,20 @@ func (a *devapi) addRoutes() {
 		return http.HandlerFunc(fn)
 	})
 
-	a.Get("/", a.UI)
+	a.Get("/dev", a.Info)
+	a.Post("/fn/register", a.Register)
 
 	// Go embeds files relative to the current source, which embeds
 	// all under ./static.  We remove the ./static
 	// directory by using fs.Sub: https://pkg.go.dev/io/fs#Sub.
 	staticFS, _ := fs.Sub(static, "static")
-	a.Get("/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	a.Get("/dev", a.Info)
-	a.Post("/fn/register", a.Register)
+	a.Get("/images/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+	a.Get("/assets/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+	a.Get("/_next/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+
+	// Route everything else to the UI so that refreshes work from
+	// static servers.
+	a.Get("/*", a.UI)
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
