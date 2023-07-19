@@ -1,12 +1,13 @@
+'use client';
+
 import { useGetFunctionsQuery } from '@/store/generated';
 import { BlankSlate } from '@/components/Blank';
-import { useAppDispatch } from '@/store/hooks';
-import { showDocs, showEventSendModal } from '@/store/global';
+import useDocsNavigation from '@/hooks/useDocsNavigation';
 import { IconEvent, IconClock } from '@/icons';
 import Skeleton from '@/components/Skeleton';
 import Tag from '@/components/Tag';
 import classNames from '@/utils/classnames';
-import Button from '@/components/Button';
+import SendEventButton from '@/components/Event/SendEventButton';
 
 const cellStyles = 'pl-6 pr-2 py-3';
 
@@ -51,8 +52,8 @@ const TableSkeleton = () => {
   );
 };
 
-export const FunctionList = () => {
-  const dispatch = useAppDispatch();
+export default function FunctionList() {
+  const navigateToDocs = useDocsNavigation();
 
   const { data, isFetching } = useGetFunctionsQuery(undefined, {
     refetchOnMountOrArgChange: true,
@@ -70,7 +71,7 @@ export const FunctionList = () => {
             <HeaderCell colSpan={1} />
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-800/30">
+        <tbody className="divide-y divide-slate-800/30 text-slate-400">
           {isFetching ? (
             <TableSkeleton />
           ) : functions?.length === 0 ? (
@@ -82,7 +83,7 @@ export const FunctionList = () => {
                   imageUrl="/images/no-results.png"
                   button={{
                     text: 'Serving Functions',
-                    onClick: () => dispatch(showDocs('/sdk/serve')),
+                    onClick: () => navigateToDocs('/sdk/serve'),
                   }}
                 />
               </td>
@@ -135,7 +136,10 @@ export const FunctionList = () => {
                     </td>
                     {/* App URL */}
                     <td
-                      className={classNames(cellStyles, 'whitespace-nowrap')}
+                      className={classNames(
+                        cellStyles,
+                        'whitespace-nowrap text-sm'
+                      )}
                       colSpan={3}
                     >
                       {cleanUrl.toString()}
@@ -146,21 +150,14 @@ export const FunctionList = () => {
                         className={classNames(cellStyles, 'whitespace-nowrap')}
                         colSpan={1}
                       >
-                        <Button
+                        <SendEventButton
                           kind="secondary"
                           label="Trigger"
-                          btnAction={() => {
-                            dispatch(
-                              showEventSendModal({
-                                show: true,
-                                data: JSON.stringify({
-                                  name: getFirstEventValue(),
-                                  data: {},
-                                  user: {},
-                                }),
-                              })
-                            );
-                          }}
+                          data={JSON.stringify({
+                            name: getFirstEventValue(),
+                            data: {},
+                            user: {},
+                          })}
                         />
                       </td>
                     )}
@@ -173,4 +170,4 @@ export const FunctionList = () => {
       </table>
     </main>
   );
-};
+}

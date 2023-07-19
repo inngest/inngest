@@ -39,6 +39,7 @@ build-ui:
 	cd ui && pnpm install
 	cd ui && pnpm build
 	cp -r ./ui/dist/* ./pkg/devserver/static/
+	cp -r ./ui/.next/routes-manifest.json ./pkg/devserver/static/
 
 .PHONY: build
 build:

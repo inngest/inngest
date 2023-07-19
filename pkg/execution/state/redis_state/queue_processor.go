@@ -362,8 +362,6 @@ func (q *queue) scan(ctx context.Context) error {
 
 func (q *queue) processPartition(ctx context.Context, p *QueuePartition) error {
 	q.scope.Counter(counterPartitionProcess).Inc(1)
-	ctx, span := q.tracer.Start(ctx, "processPartition")
-	defer span.End()
 
 	// Attempt to lease items.  This checks partition-level concurrency limits
 	//

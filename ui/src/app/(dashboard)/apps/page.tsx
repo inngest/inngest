@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo } from 'react';
 import AppCard from '@/components/App/AppCard';
 import { IconFunction, IconSpinner } from '@/icons';
