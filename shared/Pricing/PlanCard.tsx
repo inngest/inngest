@@ -42,55 +42,66 @@ export default function PlanCard({ variant = "light", content }) {
             </div>
           </div>
         )}
-        <h2 className={`text-lg font-semibold ${theme[variant].primary}`}>
-          {content.name}
-        </h2>
+        {/* Prevent weird button wrap on enterprise from mis-aligning rows */}
+        <div className="sm:min-h-[272px] min-[933px]:min-h-[252px] min-[1272px]:min-h-0">
+          <h2 className={`text-lg font-semibold ${theme[variant].primary}`}>
+            {content.name}
+          </h2>
 
-        <p
-          className={`text-4xl mt-4 -mr-4 font-bold tracking-tight text-indigo-500 ${theme[variant].price}`}
-        >
-          {Boolean(content.cost.startsAt) && (
+          <p
+            className={`text-4xl mt-4 font-bold tracking-tight text-indigo-500 ${
+              theme[variant].price
+            } ${!!content.cost.period && "pl-4"}`}
+          >
+            {/* {Boolean(content.cost.startsAt) && (
+              <span
+                className={`text-sm font-medium -ml-8 mr-0.5 ${theme[variant].secondary}`}
+              >
+                Starting at{" "}
+              </span>
+            )} */}
+            {content.cost.basePrice}
             <span
-              className={`text-sm font-medium -ml-8 mr-0.5 ${theme[variant].secondary}`}
+              className={`text-sm font-medium ml-0.5 ${theme[variant].secondary}`}
             >
-              Starting at{" "}
+              {!!content.cost.period ? `/${content.cost.period}` : ""}
             </span>
-          )}
-          {content.cost.basePrice}
-          <span
-            className={`text-sm font-medium ml-0.5 ${theme[variant].secondary}`}
-          >
-            /{content.cost.period}
-          </span>
-        </p>
+          </p>
 
-        <div className="px-12 py-2 mt-4 mb-4">
-          <Button href={content.cta.href} arrow="right" full variant="primary">
-            {content.cta.text}
-          </Button>
-        </div>
+          <div className="px-12 py-2 mt-4 mb-4">
+            {/*  */}
+            <Button
+              href={content.cta.href}
+              arrow="right"
+              full
+              variant="primary"
+            >
+              {content.cta.text}
+            </Button>
+          </div>
 
-        <p
-          className={`text-base mt-4 font-medium flex items-center justify-center ${theme[variant].description}`}
-        >
-          {content.cost.included} steps{" "}
-          <a
-            href="#what-is-a-function-step"
-            className="ml-1.5 transition-all text-slate-500 hover:text-slate-700"
+          <p
+            className={`text-base mt-4 font-medium flex items-center justify-center ${theme[variant].description}`}
           >
-            <InformationCircle size="1.2em" />
-          </a>
-        </p>
-        <div className="flex justify-center mt-4">
-          <div className={`text-sm font-medium ${theme[variant].secondary}`}>
-            {content.cost.additionalPrice === "custom" ? (
-              <>&nbsp;</>
-            ) : (
-              <>
-                + <strong>{content.cost.additionalPrice}</strong> per additional{" "}
-                <strong>{content.cost.additionalRate}</strong>
-              </>
-            )}
+            {content.cost.included} steps{" "}
+            <a
+              href="#what-is-a-function-step"
+              className="ml-1.5 transition-all text-slate-500 hover:text-slate-700"
+            >
+              <InformationCircle size="1.2em" />
+            </a>
+          </p>
+          <div className="flex justify-center mt-4">
+            <div className={`text-sm font-medium ${theme[variant].secondary}`}>
+              {content.cost.additionalPrice === "custom" ? (
+                <>&nbsp;</>
+              ) : (
+                <>
+                  + <strong>{content.cost.additionalPrice}</strong> per
+                  additional <strong>{content.cost.additionalRate}</strong>
+                </>
+              )}
+            </div>
           </div>
         </div>
         {/* <p

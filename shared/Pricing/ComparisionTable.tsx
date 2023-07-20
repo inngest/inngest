@@ -30,13 +30,15 @@ export default function ComparisonTable({ plans, features }) {
             {visiblePlans.map((plan, i) => (
               <th className="text-left px-6 py-8" key={i}>
                 <span className="block text-xs text-slate-400 font-medium mb-1">
-                  Starting at
+                  {plan.cost.startsAt ? `Starting at` : <>&nbsp;</>}
                 </span>
                 <span className="block text-4xl mb-2">
                   {plan.cost.basePrice}
-                  <span className="text-sm text-slate-400 ml-1 font-medium">
-                    /{plan.cost.period}
-                  </span>
+                  {!!plan.cost.period && (
+                    <span className="text-sm text-slate-400 ml-1 font-medium">
+                      /{plan.cost.period}
+                    </span>
+                  )}
                 </span>
                 <span className="block mb-8 text-sm font-medium mt-2 text-slate-200">
                   {plan.description}

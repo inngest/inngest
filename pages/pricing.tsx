@@ -16,7 +16,7 @@ type Plan = {
     included: string;
     additionalPrice?: string;
     additionalRate?: string;
-    period: string;
+    period?: string;
   };
   description: React.ReactFragment | string;
   hideFromCards?: boolean;
@@ -87,6 +87,7 @@ const PLANS: Plan[] = [
   {
     name: PLAN_NAMES.team,
     cost: {
+      startsAt: true,
       basePrice: "$20",
       included: "100k",
       additionalPrice: "$1",
@@ -127,6 +128,7 @@ const PLANS: Plan[] = [
   {
     name: PLAN_NAMES.startup,
     cost: {
+      startsAt: true,
       basePrice: "$149",
       included: "5M",
       additionalPrice: "$10",
@@ -168,11 +170,11 @@ const PLANS: Plan[] = [
   {
     name: PLAN_NAMES.enterprise,
     cost: {
-      startsAt: true,
-      basePrice: "$1250",
+      // startsAt: true,
+      basePrice: "Custom",
       included: "Custom",
-      additionalPrice: "custom",
-      period: "month",
+      // additionalPrice: "custom",
+      // period: "month",
     },
     description: "Powerful access for any scale",
     cta: {
