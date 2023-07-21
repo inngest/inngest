@@ -7,6 +7,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/spf13/cobra"
 )
 
@@ -59,6 +60,13 @@ func doDev(cmd *cobra.Command, args []string) {
 		Autodiscover: !noDiscovery,
 		Poll:         !noPoll,
 	}
+
+	close, err := telemetry.TracerSetup("devserver", telemetry.TracerTypeIO)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer close()
 
 	err = devserver.New(ctx, opts)
 	if err != nil {
