@@ -113,7 +113,7 @@ export default function PlanCard({ variant = "light", content }) {
           {content.features.map((feature, i) => (
             <li
               key={i}
-              className={`flex flex-col py-2.5 ${theme[variant].row}`}
+              className={`flex flex-col py-2.5 min-h-[64px] ${theme[variant].row}`}
             >
               {feature.quantity && (
                 <span className={`font-semibold ${theme[variant].primary}`}>

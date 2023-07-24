@@ -38,6 +38,7 @@ type Feature = {
   plans?: {
     [key: string]: string | boolean;
   };
+  heading?: boolean;
   infoUrl?: string;
 };
 
@@ -117,8 +118,10 @@ const PLANS: Plan[] = [
         text: "History",
       },
       {
-        text: "Discord support",
+        quantity: "Discord Community",
+        text: "Support",
       },
+      { text: "-" },
       { text: "-" },
       { text: "-" },
       { text: "-" },
@@ -159,8 +162,10 @@ const PLANS: Plan[] = [
         text: "History",
       },
       {
-        text: "Email, Discord support",
+        quantity: "Email, Discord",
+        text: "Support",
       },
+      { text: "-" },
       { text: "-" },
       { text: "-" },
       { text: "-" },
@@ -200,19 +205,25 @@ const PLANS: Plan[] = [
         text: "History",
       },
       {
-        text: "Dedicated Slack channel, Email, Discord support",
+        quantity: "SLAs, Dedicated Slack channel, Email",
+        text: "Support",
       },
       {
-        text: "Exportable metrics",
+        quantity: "Single sign-on",
+        text: "Account security",
       },
       {
-        text: "Customer success",
+        text: "Dedicated customer success",
       },
       {
-        text: "SLAs",
+        quantity: "Datadog, Salesforce (+Add on)",
+        text: "Integrations",
       },
       {
-        quantity: "SOC2 report & BAA available",
+        text: "Data warehouse exports (+Add on)",
+      },
+      {
+        quantity: "SOC2 report & HIPAA/BAA",
         text: "Compliance",
       },
     ],
@@ -298,6 +309,10 @@ const FEATURES: Feature[] = [
     infoUrl: "/docs/guides/enqueueing-future-jobs?ref=pricing",
   },
   {
+    name: "Features",
+    heading: true,
+  },
+  {
     name: "Automatic retries",
     all: true,
     infoUrl: "/docs/functions/retries?ref=pricing",
@@ -338,9 +353,46 @@ const FEATURES: Feature[] = [
     infoUrl: "/docs/local-development?ref=pricing",
   },
   {
+    name: "Branch environments",
+    all: true,
+    infoUrl: "/docs/platform/environments?ref=pricing#branch-environments",
+  },
+  {
     name: "Vercel integration",
     all: true,
     infoUrl: "/docs/deploy/vercel?ref=pricing",
+  },
+  {
+    name: "Data warehouse exports",
+    plans: {
+      [PLAN_NAMES.team]: false,
+      [PLAN_NAMES.startup]: false,
+      [PLAN_NAMES.enterprise]: "+ Add on",
+    },
+  },
+  {
+    name: "Integrations",
+    heading: true,
+  },
+  {
+    name: "Datadog",
+    plans: {
+      [PLAN_NAMES.team]: false,
+      [PLAN_NAMES.startup]: false,
+      [PLAN_NAMES.enterprise]: true,
+    },
+  },
+  {
+    name: "Salesforce",
+    plans: {
+      [PLAN_NAMES.team]: false,
+      [PLAN_NAMES.startup]: false,
+      [PLAN_NAMES.enterprise]: "+ Add on",
+    },
+  },
+  {
+    name: "Support",
+    heading: true,
   },
   {
     name: "Discord support",
@@ -367,23 +419,7 @@ const FEATURES: Feature[] = [
     },
   },
   {
-    name: "Exportable metrics",
-    plans: {
-      [PLAN_NAMES.team]: false,
-      [PLAN_NAMES.startup]: false,
-      [PLAN_NAMES.enterprise]: true,
-    },
-  },
-  {
     name: "SLAs",
-    plans: {
-      [PLAN_NAMES.team]: false,
-      [PLAN_NAMES.startup]: false,
-      [PLAN_NAMES.enterprise]: true,
-    },
-  },
-  {
-    name: "Solutions engineering",
     plans: {
       [PLAN_NAMES.team]: false,
       [PLAN_NAMES.startup]: false,
@@ -399,19 +435,23 @@ const FEATURES: Feature[] = [
     },
   },
   {
-    name: "Exportable metrics",
+    name: "Solutions engineering",
     plans: {
       [PLAN_NAMES.team]: false,
       [PLAN_NAMES.startup]: false,
-      [PLAN_NAMES.enterprise]: true,
+      [PLAN_NAMES.enterprise]: "+ Add on",
     },
   },
   {
-    name: "HIPAA BAA available",
+    name: "Security & Privacy",
+    heading: true,
+  },
+  {
+    name: "HIPAA BAA",
     plans: {
       [PLAN_NAMES.team]: false,
       [PLAN_NAMES.startup]: false,
-      [PLAN_NAMES.enterprise]: true,
+      [PLAN_NAMES.enterprise]: "Available",
     },
   },
   {
@@ -611,6 +651,20 @@ export default function Pricing() {
                   />
                 </div>
               </div>
+            </div>
+            <div className="w-full mt-12">
+              <h3 className="text-2xl font-semibold">
+                How can I estimate steps?
+              </h3>
+              <p className="my-4 max-w-3xl">
+                You can use the volume of messages that you currently process in
+                your queues to approximate your step usage. Additionally, add
+                the number of cron jobs that you run if you aim to use Inngest
+                for scheduling. <br />
+                <br />
+                <a href="/contact?ref=estimate-steps">Get in touch</a> if you
+                want help estimating advanced use cases.
+              </p>
             </div>
           </div>
 
