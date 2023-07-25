@@ -1,9 +1,11 @@
 'use client';
 
+import { useMemo } from 'react';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import Table from '@/components/Table';
 import SourceBadge from './SourceBadge';
 import TriggerTag from './TriggerTag';
+import FunctionList from './FunctionList';
 import { triggerStream } from 'mock/triggerStream';
 import { fullDate } from '@/utils/date';
 
@@ -25,25 +27,38 @@ type Trigger = {
 };
 
 const columnHelper = createColumnHelper<Trigger>();
-const columns = [
-  columnHelper.accessor('startedAt', {
-    header: () => <span>Started At</span>,
-    cell: (info) => fullDate(new Date(info.getValue())),
-  }),
-  columnHelper.accessor((row) => row.source.name, {
-    id: 'source',
-    cell: (props) => <SourceBadge row={props.row} />,
-    header: () => <span>Source</span>,
-  }),
-  columnHelper.accessor('type', {
-    header: () => <span>Trigger</span>,
-    cell: (props) => <TriggerTag row={props.row} />,
-  }),
-];
 
 export default function Stream() {
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('startedAt', {
+        header: () => <span>Started At</span>,
+        cell: (props) => fullDate(new Date(props.getValue())),
+      }),
+      columnHelper.accessor((row) => row.source.name, {
+        id: 'source',
+        cell: (props) => <SourceBadge row={props.row} />,
+        header: () => <span>Source</span>,
+      }),
+      columnHelper.accessor('type', {
+        header: () => <span>Trigger</span>,
+        cell: (props) => (
+          <TriggerTag
+            name={props.row.original.name}
+            type={props.row.original.type}
+          />
+        ),
+      }),
+      columnHelper.accessor('functions', {
+        header: () => <span>Function</span>,
+        cell: (props) => <FunctionList row={props.row} />,
+      }),
+    ],
+    []
+  );
+
   return (
-    <div>
+    <div className='min-h-0 overflow-y-auto'>
       <Table
         options={{
           data: triggerStream,

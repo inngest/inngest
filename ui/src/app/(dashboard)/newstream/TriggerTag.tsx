@@ -1,8 +1,7 @@
 import Tag from '@/components/Tag';
 import { IconEvent, IconClock } from '@/icons';
 
-export default function TriggerTag({ row }) {
-  const { type, name } = row?.original;
+export default function TriggerTag({ name, type }) {
   return (
     <Tag>
       <div className="flex items-center gap-2">
