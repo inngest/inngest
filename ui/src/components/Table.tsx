@@ -29,7 +29,7 @@ export default function Table({ options }) {
       </thead>
       <tbody className="divide-y divide-slate-800/30">
         {table.getRowModel().rows.map((row) => (
-          <tr key={row.id}>
+          <tr key={row.id} {...options.getRowProps(row)}>
             {row.getVisibleCells().map((cell) => (
               <td className={cellStyles} key={cell.id}>
                 {flexRender(cell.column.columnDef.cell, cell.getContext())}

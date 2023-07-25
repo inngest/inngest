@@ -57,13 +57,22 @@ export default function Stream() {
     []
   );
 
+  const getRowProps = (row) => {
+    if (row.original.functions.length > 1) {
+      return {
+        style: { verticalAlign: 'baseline' },
+      };
+    }
+  };
+
   return (
-    <div className='min-h-0 overflow-y-auto'>
+    <div className="min-h-0 overflow-y-auto">
       <Table
         options={{
           data: triggerStream,
           columns,
           getCoreRowModel: getCoreRowModel(),
+          getRowProps,
         }}
       />
     </div>
