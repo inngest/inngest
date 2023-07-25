@@ -14,7 +14,7 @@ type Plan = {
     startsAt?: boolean;
     basePrice: string;
     included: string;
-    additionalPrice?: string;
+    additionalPrice: string | null;
     additionalRate?: string;
     period?: string;
   };
@@ -57,6 +57,7 @@ const PLANS: Plan[] = [
       basePrice: "$0",
       included: "50k",
       period: "month",
+      additionalPrice: null,
     },
     description: "Build your side project",
     cta: {
@@ -178,7 +179,7 @@ const PLANS: Plan[] = [
       // startsAt: true,
       basePrice: "Custom",
       included: "Custom",
-      // additionalPrice: "custom",
+      additionalPrice: null,
       // period: "month",
     },
     description: "Powerful access for any scale",

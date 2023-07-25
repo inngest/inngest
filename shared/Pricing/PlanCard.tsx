@@ -93,13 +93,13 @@ export default function PlanCard({ variant = "light", content }) {
           </p>
           <div className="flex justify-center mt-4">
             <div className={`text-sm font-medium ${theme[variant].secondary}`}>
-              {content.cost.additionalPrice === "custom" ? (
-                <>&nbsp;</>
-              ) : (
+              {content.cost.additionalPrice ? (
                 <>
                   + <strong>{content.cost.additionalPrice}</strong> per
                   additional <strong>{content.cost.additionalRate}</strong>
                 </>
+              ) : (
+                <>&nbsp;</>
               )}
             </div>
           </div>
