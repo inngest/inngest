@@ -188,20 +188,21 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 	// we'll invoke.  Any request is passed as the event data to the function.
 	slug := chi.URLParam(r, "slug")
 
-	data := map[string]any{}
-	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+	evt := event.Event{}
+	if err := json.NewDecoder(r.Body).Decode(&evt); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Unable to read post data request"))
 		return
 	}
 
-	data[consts.InvokeSlugKey] = slug
-
-	now := time.Now().UnixMilli()
-	evt := event.Event{
-		Name:      consts.InvokeEventName,
-		Data:      data,
-		Timestamp: now,
+	if evt.Timestamp == 0 {
+		evt.Timestamp = time.Now().UnixMilli()
 	}
+	if evt.Data == nil {
+		evt.Data = map[string]interface{}{}
+	}
+	// Override the name and add the invoke key.
+	evt.Name = consts.InvokeEventName
+	evt.Data[consts.InvokeSlugKey] = slug
 
 	evtID, err := a.handler(r.Context(), &evt)
 	if err != nil {
