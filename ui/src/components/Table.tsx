@@ -1,4 +1,5 @@
 import { useReactTable, flexRender } from '@tanstack/react-table';
+import classNames from '@/utils/classnames';
 
 const cellStyles = 'pl-6 pr-2 py-3';
 
@@ -7,11 +8,14 @@ export default function Table({ options }) {
 
   return (
     <table className="w-full bg-slate-950 border-b border-slate-700/30">
-      <thead className="bg-slate-900 text-left">
+      <thead className="bg-slate-900 text-left sticky top-0">
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id}>
             {headerGroup.headers.map((header) => (
-              <th className={cellStyles} key={header.id}>
+              <th
+                className={classNames(cellStyles, 'text-slate-500 font-medium')}
+                key={header.id}
+              >
                 {header.isPlaceholder
                   ? null
                   : flexRender(
