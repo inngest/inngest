@@ -1,11 +1,11 @@
 import { IconWindow, IconClock, IconReplay, IconWebhook } from '@/icons';
 import Badge from '@/components/Badge';
 
-export default function SourceStatus({ row }) {
+export default function SourceBadge({ row }) {
   const { type, name } = row?.original?.source;
   const { test } = row?.original;
 
-  let icon, styles;
+  let icon, styles, sourceName;
   switch (type) {
     case 'replay':
       icon = <IconReplay className="h-4" />;
@@ -22,7 +22,8 @@ export default function SourceStatus({ row }) {
     case 'scheduled':
     case 'manual':
       icon = <IconClock className="h-4" />;
-      styles = 'text-orange-400 bg-orange-400/10';
+      styles = 'text-orange-400 bg-orange-400/10 capitalize';
+      sourceName = type;
       break;
     default:
       icon = null;
@@ -34,7 +35,7 @@ export default function SourceStatus({ row }) {
       <Badge kind="solid" className={styles}>
         <span className="flex items-center gap-1">
           {icon}
-          {name}
+          {name ?? sourceName}
         </span>
       </Badge>
       {test && (
