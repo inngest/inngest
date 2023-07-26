@@ -34,12 +34,7 @@ type tracer struct {
 func TracerSetup(svc string, ttype TracerType) (func(), error) {
 	ctx := context.Background()
 
-	var (
-		tracer *tracer
-		err    error
-	)
-
-	tracer, err = NewTracerProvider(ctx, svc, ttype)
+	tracer, err := NewTracerProvider(ctx, svc, ttype)
 	if err != nil {
 		return nil, err
 	}

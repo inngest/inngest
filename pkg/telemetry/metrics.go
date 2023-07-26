@@ -29,12 +29,7 @@ const (
 func MeterSetup(svc string) (func(), error) {
 	ctx := context.Background()
 
-	var (
-		meter *meter
-		err   error
-	)
-
-	meter, err = NewOTLPMeterProvider(ctx, svc)
+	meter, err := NewOTLPMeterProvider(ctx, svc)
 	if err != nil {
 		return nil, err
 	}
