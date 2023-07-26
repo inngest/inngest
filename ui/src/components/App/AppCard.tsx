@@ -17,7 +17,7 @@ import {
   IconChevron,
   IconSpinner,
   IconBook,
-  IconAppStatusDefault,
+  IconCircleStatusMinus,
 } from '@/icons';
 
 export default function AppCard({ app }: { app: App }) {
@@ -220,7 +220,7 @@ export default function AppCard({ app }: { app: App }) {
                 {app.functionCount > 0 && (
                   <>
                     {app.connected && <IconCircleStatusCheck withOutline />}
-                    {!app.connected && <IconAppStatusDefault />}
+                    {!app.connected && <IconCircleStatusMinus withOutline />}
                     {app.functionCount} Function
                     {app.functionCount === 1 ? '' : 's'} Registered
                   </>
@@ -230,7 +230,7 @@ export default function AppCard({ app }: { app: App }) {
                     {app.connected && (
                       <IconCircleStatusExclamation withOutline className="text-orange-400/70" />
                     )}
-                    {!app.connected && <IconAppStatusDefault />}
+                    {!app.connected && <IconCircleStatusMinus withOutline />}
                     No Functions Found
                   </>
                 )}
