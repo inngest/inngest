@@ -11,7 +11,6 @@ export { IconExclamationTriangle } from './ExclamationTriangle';
 export { IconExclamationTriangleSolid } from './ExclamationTriangleSolid';
 export { IconArrowTopRightOnSquare } from './ArrowTopRightOnSquare';
 export { IconCopy } from './Copy';
-export { IconAppStatusCompleted } from './AppStatusCompleted';
 export { IconAppStatusFailed } from './AppStatusFailed';
 export { IconAppStatusDefault } from './AppStatusDefault';
 export { InngestSmallLogo } from './InngestSmallLogo';
@@ -20,6 +19,9 @@ export { IconClock } from './Clock';
 export { IconWindow } from './Window';
 export { IconReplay } from './Replay';
 export { IconWebhook } from './Webhook';
+
+// Circle Status Icons
+export { IconCircleStatusCheck } from './CircleStatusCheck';
 
 // Status Icons
 export { IconStatusDefault } from './StatusDefault';

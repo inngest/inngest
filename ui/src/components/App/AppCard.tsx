@@ -12,7 +12,7 @@ import { useUpdateAppMutation, useDeleteAppMutation } from '@/store/generated';
 import useDebounce from '@/hooks/useDebounce';
 import isValidUrl from '@/utils/urlValidation';
 import {
-  IconAppStatusCompleted,
+  IconCircleStatusCheck,
   IconAppStatusFailed,
   IconChevron,
   IconSpinner,
@@ -112,7 +112,7 @@ export default function AppCard({ app }: { app: App }) {
               <div className="">
                 <div className="flex items-center gap-3 text-base">
                   {app.connected ? (
-                    <>{<IconAppStatusCompleted />}Connected to App</>
+                    <>{<IconCircleStatusCheck withOutline />}Connected to App</>
                   ) : (
                     <>{<IconAppStatusFailed />}No Connection to App</>
                   )}
@@ -219,7 +219,7 @@ export default function AppCard({ app }: { app: App }) {
               <div className="flex items-center gap-3 text-base">
                 {app.functionCount > 0 && (
                   <>
-                    {app.connected && <IconAppStatusCompleted />}
+                    {app.connected && <IconCircleStatusCheck withOutline />}
                     {!app.connected && <IconAppStatusDefault />}
                     {app.functionCount} Function
                     {app.functionCount === 1 ? '' : 's'} Registered
