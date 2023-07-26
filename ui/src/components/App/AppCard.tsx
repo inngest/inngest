@@ -13,7 +13,7 @@ import useDebounce from '@/hooks/useDebounce';
 import isValidUrl from '@/utils/urlValidation';
 import {
   IconCircleStatusCheck,
-  IconAppStatusFailed,
+  IconCircleStatusExclamation,
   IconChevron,
   IconSpinner,
   IconBook,
@@ -114,7 +114,7 @@ export default function AppCard({ app }: { app: App }) {
                   {app.connected ? (
                     <>{<IconCircleStatusCheck withOutline />}Connected to App</>
                   ) : (
-                    <>{<IconAppStatusFailed />}No Connection to App</>
+                    <>{<IconCircleStatusExclamation withOutline />}No Connection to App</>
                   )}
                 </div>
                 <p className="text-slate-300 ui-open:hidden xl:hidden pl-10">
@@ -228,7 +228,7 @@ export default function AppCard({ app }: { app: App }) {
                 {app.functionCount < 1 && (
                   <>
                     {app.connected && (
-                      <IconAppStatusFailed className="text-orange-400/70" />
+                      <IconCircleStatusExclamation withOutline className="text-orange-400/70" />
                     )}
                     {!app.connected && <IconAppStatusDefault />}
                     No Functions Found
