@@ -22,6 +22,8 @@ export { IconWebhook } from './Webhook';
 export { IconCircleStatusCheck } from './CircleStatusCheck';
 export { IconCircleStatusExclamation } from './CircleStatusExclamation';
 export { IconCircleStatusMinus } from './CircleStatusMinus';
+export { IconCircleStatusCross } from './CircleStatusCross';
+export { IconCircleStatusArrowPath } from './CircleStatusArrowPath';
 
 // Status Icons
 export { IconStatusDefault } from './StatusDefault';
