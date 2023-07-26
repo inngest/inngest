@@ -1,4 +1,31 @@
-import statusStyles from '@/utils/statusStyles';
+import {
+  IconCircleStatusCheck,
+  IconCircleStatusArrowPath,
+  IconCircleStatusCross,
+  IconCircleStatusMinus,
+} from '@/icons';
+import { FunctionRunStatus } from '@/store/generated';
+
+export function statusStyles(status: FunctionRunStatus | null) {
+  switch (status) {
+    case FunctionRunStatus.Running:
+      return {
+        icon: IconCircleStatusArrowPath,
+      };
+    case FunctionRunStatus.Completed:
+      return {
+        icon: IconCircleStatusCheck,
+      };
+    case FunctionRunStatus.Failed:
+      return {
+        icon: IconCircleStatusCross,
+      };
+    default:
+      return {
+        icon: IconCircleStatusMinus,
+      };
+  }
+}
 
 export default function FunctionList({ row }) {
   const { functions } = row?.original;
