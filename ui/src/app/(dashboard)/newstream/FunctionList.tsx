@@ -40,7 +40,7 @@ export default function FunctionList({ row }) {
             const itemStatus = statusStyles(func.status);
             return (
               <div key={func.id} className="flex items-center gap-2">
-                <itemStatus.icon />
+                <itemStatus.icon className="h-6 w-6"/>
                 <span>{func.name}</span>
               </div>
             );

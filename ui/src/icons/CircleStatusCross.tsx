@@ -1,6 +1,8 @@
 export function IconCircleStatusCross({
+  className,
   withOutline,
 }: {
+  className?: string;
   withOutline?: boolean;
 }) {
   return (
@@ -11,6 +13,7 @@ export function IconCircleStatusCross({
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       color="#F43F5E"
+      className={className}
     >
       {withOutline && (
         <path
