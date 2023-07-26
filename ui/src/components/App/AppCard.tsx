@@ -12,12 +12,12 @@ import { useUpdateAppMutation, useDeleteAppMutation } from '@/store/generated';
 import useDebounce from '@/hooks/useDebounce';
 import isValidUrl from '@/utils/urlValidation';
 import {
-  IconCircleStatusCheck,
-  IconCircleStatusExclamation,
+  IconStatusCircleCheck,
+  IconStatusCircleExclamation,
   IconChevron,
   IconSpinner,
   IconBook,
-  IconCircleStatusMinus,
+  IconStatusCircleMinus,
 } from '@/icons';
 
 export default function AppCard({ app }: { app: App }) {
@@ -112,9 +112,9 @@ export default function AppCard({ app }: { app: App }) {
               <div className="">
                 <div className="flex items-center gap-3 text-base">
                   {app.connected ? (
-                    <>{<IconCircleStatusCheck withOutline />}Connected to App</>
+                    <>{<IconStatusCircleCheck withOutline />}Connected to App</>
                   ) : (
-                    <>{<IconCircleStatusExclamation withOutline />}No Connection to App</>
+                    <>{<IconStatusCircleExclamation withOutline />}No Connection to App</>
                   )}
                 </div>
                 <p className="text-slate-300 ui-open:hidden xl:hidden pl-10">
@@ -219,8 +219,8 @@ export default function AppCard({ app }: { app: App }) {
               <div className="flex items-center gap-3 text-base">
                 {app.functionCount > 0 && (
                   <>
-                    {app.connected && <IconCircleStatusCheck withOutline />}
-                    {!app.connected && <IconCircleStatusMinus withOutline />}
+                    {app.connected && <IconStatusCircleCheck withOutline />}
+                    {!app.connected && <IconStatusCircleMinus withOutline />}
                     {app.functionCount} Function
                     {app.functionCount === 1 ? '' : 's'} Registered
                   </>
@@ -228,9 +228,9 @@ export default function AppCard({ app }: { app: App }) {
                 {app.functionCount < 1 && (
                   <>
                     {app.connected && (
-                      <IconCircleStatusExclamation withOutline className="text-orange-400/70" />
+                      <IconStatusCircleExclamation withOutline className="text-orange-400/70" />
                     )}
-                    {!app.connected && <IconCircleStatusMinus withOutline />}
+                    {!app.connected && <IconStatusCircleMinus withOutline />}
                     No Functions Found
                   </>
                 )}

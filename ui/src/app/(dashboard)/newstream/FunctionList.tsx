@@ -1,8 +1,8 @@
 import {
-  IconCircleStatusCheck,
-  IconCircleStatusArrowPath,
-  IconCircleStatusCross,
-  IconCircleStatusMinus,
+  IconStatusCircleCheck,
+  IconStatusCircleArrowPath,
+  IconStatusCircleCross,
+  IconStatusCircleMinus,
 } from '@/icons';
 import { FunctionRunStatus } from '@/store/generated';
 
@@ -10,19 +10,19 @@ export function statusStyles(status: FunctionRunStatus | null) {
   switch (status) {
     case FunctionRunStatus.Running:
       return {
-        icon: IconCircleStatusArrowPath,
+        icon: IconStatusCircleArrowPath,
       };
     case FunctionRunStatus.Completed:
       return {
-        icon: IconCircleStatusCheck,
+        icon: IconStatusCircleCheck,
       };
     case FunctionRunStatus.Failed:
       return {
-        icon: IconCircleStatusCross,
+        icon: IconStatusCircleCross,
       };
     default:
       return {
-        icon: IconCircleStatusMinus,
+        icon: IconStatusCircleMinus,
       };
   }
 }

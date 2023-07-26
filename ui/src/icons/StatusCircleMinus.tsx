@@ -1,4 +1,4 @@
-export function IconCircleStatusMinus({
+export function IconStatusCircleMinus({
   className,
   withOutline,
 }: {

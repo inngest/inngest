@@ -1,4 +1,4 @@
-export function IconCircleStatusCheck({
+export function IconStatusCircleCheck({
   className,
   withOutline,
 }: {

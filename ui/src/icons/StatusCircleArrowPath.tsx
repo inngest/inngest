@@ -1,4 +1,4 @@
-export function IconCircleStatusArrowPath({
+export function IconStatusCircleArrowPath({
   className,
   withOutline,
 }: {

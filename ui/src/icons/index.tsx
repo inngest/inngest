@@ -19,11 +19,11 @@ export { IconReplay } from './Replay';
 export { IconWebhook } from './Webhook';
 
 // Circle Status Icons
-export { IconCircleStatusCheck } from './CircleStatusCheck';
-export { IconCircleStatusExclamation } from './CircleStatusExclamation';
-export { IconCircleStatusMinus } from './CircleStatusMinus';
-export { IconCircleStatusCross } from './CircleStatusCross';
-export { IconCircleStatusArrowPath } from './CircleStatusArrowPath';
+export { IconStatusCircleCheck } from './StatusCircleCheck';
+export { IconStatusCircleExclamation } from './StatusCircleExclamation';
+export { IconStatusCircleMinus } from './StatusCircleMinus';
+export { IconStatusCircleCross } from './StatusCircleCross';
+export { IconStatusCircleArrowPath } from './StatusCircleArrowPath';
 
 // Status Icons
 export { IconStatusDefault } from './StatusDefault';

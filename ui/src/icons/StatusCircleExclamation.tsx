@@ -1,4 +1,4 @@
-export function IconCircleStatusExclamation({
+export function IconStatusCircleExclamation({
   className,
   withOutline,
 }: {

@@ -1,4 +1,4 @@
-export function IconCircleStatusCross({
+export function IconStatusCircleCross({
   className,
   withOutline,
 }: {
