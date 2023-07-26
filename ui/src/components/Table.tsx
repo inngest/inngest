@@ -1,7 +1,7 @@
 import { useReactTable, flexRender } from '@tanstack/react-table';
 import classNames from '@/utils/classnames';
 
-const cellStyles = 'pl-6 pr-2 py-3';
+const cellStyles = 'pl-6 pr-2 py-3 whitespace-nowrap';
 
 export default function Table({ options }) {
   const table = useReactTable(options);
