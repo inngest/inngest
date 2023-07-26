@@ -18,12 +18,20 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+type TracerType int8
+
+const (
+	TracerTypeIO = iota
+	TracerTypeOTLP
+	TracerTypeJaeger
+)
+
 type tracer struct {
 	Provider *trace.TracerProvider
 	Shutdown func()
 }
 
-func TracerSetup(svc, ttype string) (func(), error) {
+func TracerSetup(svc string, ttype TracerType) (func(), error) {
 	ctx := context.Background()
 
 	var (
@@ -47,49 +55,59 @@ func TracerSetup(svc, ttype string) (func(), error) {
 	return func() { tracer.Shutdown() }, nil
 }
 
-func NewTracerProvider(ctx context.Context, svc, ttype string) (*tracer, error) {
+// NewTracerProvider creates a new tracer with a provider and exporter based
+// on the passed in `TraceType`.
+func NewTracerProvider(ctx context.Context, svc string, ttype TracerType) (*tracer, error) {
 	switch ttype {
-	case "otlp":
+	case TracerTypeOTLP:
 		return NewOLTPTraceProvider(ctx, svc)
-	case "jaeger":
-		exp, err := jaegerExporter()
-		if err != nil {
-			return nil, fmt.Errorf("error setting up Jaeger exporter: %w", err)
-		}
-		tp := trace.NewTracerProvider(
-			trace.WithBatcher(exp),
-			trace.WithResource(resource.NewWithAttributes(
-				semconv.SchemaURL,
-				semconv.ServiceNameKey.String(svc),
-				semconv.DeploymentEnvironmentKey.String(env()),
-			)),
-		)
-		return &tracer{
-			Provider: tp,
-			Shutdown: func() {
-				_ = tp.ForceFlush(ctx)
-			},
-		}, nil
+	case TracerTypeJaeger:
+		return NewJaegerTraceProvider(ctx, svc)
 	default:
-		exp, err := stdouttrace.New()
-		if err != nil {
-			return nil, fmt.Errorf("error settings up stdout trace exporter: %w", err)
-		}
-		tp := trace.NewTracerProvider(
-			trace.WithBatcher(exp),
-			trace.WithResource(resource.NewWithAttributes(
-				semconv.SchemaURL,
-				semconv.ServiceNameKey.String(svc),
-				semconv.DeploymentEnvironmentKey.String(env()),
-			)),
-		)
-		return &tracer{
-			Provider: tp,
-			Shutdown: func() {
-				_ = tp.Shutdown(ctx)
-			},
-		}, nil
+		return NewIOTraceProvider(ctx, svc)
 	}
+}
+
+func NewJaegerTraceProvider(ctx context.Context, svc string) (*tracer, error) {
+	exp, err := jaegerExporter()
+	if err != nil {
+		return nil, fmt.Errorf("error setting up Jaeger exporter: %w", err)
+	}
+	tp := trace.NewTracerProvider(
+		trace.WithBatcher(exp),
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(svc),
+			semconv.DeploymentEnvironmentKey.String(env()),
+		)),
+	)
+	return &tracer{
+		Provider: tp,
+		Shutdown: func() {
+			_ = tp.ForceFlush(ctx)
+		},
+	}, nil
+}
+
+func NewIOTraceProvider(ctx context.Context, svc string) (*tracer, error) {
+	exp, err := stdouttrace.New()
+	if err != nil {
+		return nil, fmt.Errorf("error settings up stdout trace exporter: %w", err)
+	}
+	tp := trace.NewTracerProvider(
+		trace.WithBatcher(exp),
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(svc),
+			semconv.DeploymentEnvironmentKey.String(env()),
+		)),
+	)
+	return &tracer{
+		Provider: tp,
+		Shutdown: func() {
+			_ = tp.Shutdown(ctx)
+		},
+	}, nil
 }
 
 func NewOLTPTraceProvider(ctx context.Context, svc string) (*tracer, error) {
@@ -133,14 +151,6 @@ func NewOLTPTraceProvider(ctx context.Context, svc string) (*tracer, error) {
 			_ = tp.Shutdown(ctx)
 		},
 	}, nil
-}
-
-func env() string {
-	val := os.Getenv("ENV")
-	if val == "" {
-		val = "development"
-	}
-	return val
 }
 
 func jaegerExporter() (trace.SpanExporter, error) {

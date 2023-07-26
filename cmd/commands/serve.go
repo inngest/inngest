@@ -86,7 +86,7 @@ func serve(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	close, err := telemetry.TracerSetup(svcName, "io")
+	close, err := telemetry.TracerSetup(svcName, telemetry.TracerTypeIO)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
