@@ -73,6 +73,12 @@ export default function Stream() {
           columns,
           getCoreRowModel: getCoreRowModel(),
           getRowProps,
+          enablePinning: true,
+          initialState: {
+            columnPinning: {
+              left: ['startedAt'],
+            },
+          },
         }}
       />
     </div>
