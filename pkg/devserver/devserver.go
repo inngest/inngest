@@ -182,6 +182,4 @@ func createInmemoryRedis(ctx context.Context) (rueidis.Client, error) {
 		}
 	}()
 	return rc, nil
-
-	// Before running the development service,
 }
