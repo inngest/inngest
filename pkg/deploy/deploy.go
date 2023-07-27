@@ -26,14 +26,24 @@ var (
 	DeployErrUnreachable         = fmt.Errorf("unreachable")
 	DeployErrUnsupportedProtocol = fmt.Errorf("unsupported_protocol")
 
-	client = http.Client{
+	Client = http.Client{
 		Timeout: 10 * time.Second,
 	}
 )
 
 func Ping(ctx context.Context, url string) error {
-	req, _ := http.NewRequest(http.MethodPut, url, nil)
-	resp, err := client.Do(req)
+	req, err := http.NewRequest(http.MethodPut, url, nil)
+	if err != nil {
+		return publicerr.WrapWithData(
+			err,
+			400,
+			"There was an error registering your app",
+			map[string]any{
+				"error_code": err.Error(),
+			},
+		)
+	}
+	resp, err := Client.Do(req)
 	if err != nil {
 		err = handlePingError(err)
 		return publicerr.WrapWithData(

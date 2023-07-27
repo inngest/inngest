@@ -9,8 +9,10 @@ import (
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/cqrs/ddb"
+	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/runner"
@@ -18,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/rueian/rueidis"
 )
 
@@ -40,6 +43,13 @@ func New(ctx context.Context, opts StartOpts) error {
 	if !opts.Config.Execution.LogOutput {
 		opts.Config.Execution.LogOutput = true
 	}
+
+	// Before running the development service, ensure that we change the http
+	// driver in development to use our AWS Gateway http client, attempting to
+	// automatically transform dev requests to lambda invocations.
+	httpdriver.DefaultExecutor.Client.Transport = awsgateway.NewTransformTripper(httpdriver.DefaultExecutor.Client.Transport)
+	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
+
 	return start(ctx, opts)
 }
 
@@ -49,6 +59,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
+	// Initialize the devserver
 	dbcqrs := ddb.NewCQRS(db)
 	loader := dbcqrs.(state.FunctionLoader)
 

@@ -144,6 +144,9 @@ github.com/antlr/antlr4/runtime/Go/antlr
 # github.com/apparentlymart/go-textseg/v13 v13.0.0
 ## explicit; go 1.16
 github.com/apparentlymart/go-textseg/v13/textseg
+# github.com/aws/aws-lambda-go v1.41.0
+## explicit; go 1.18
+github.com/aws/aws-lambda-go/events
 # github.com/aws/aws-sdk-go v1.43.31
 ## explicit; go 1.11
 github.com/aws/aws-sdk-go/aws
