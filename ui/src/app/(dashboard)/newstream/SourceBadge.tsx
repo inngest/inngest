@@ -1,7 +1,13 @@
+import type { Row } from '@tanstack/react-table';
 import { IconWindow, IconClock, IconReplay, IconWebhook } from '@/icons';
 import Badge from '@/components/Badge';
+import type { Trigger } from './page';
 
-export default function SourceBadge({ row }) {
+type SourceBadgeProps = {
+  row: Row<Trigger>;
+};
+
+export default function SourceBadge({ row }: SourceBadgeProps) {
   const { type, name } = row?.original?.source;
   const { test } = row?.original;
 

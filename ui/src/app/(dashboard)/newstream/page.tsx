@@ -1,7 +1,7 @@
 'use client';
 
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
-import { FunctionRunStatus } from '@/store/generated';
+import { FunctionRunStatus, FunctionTriggerTypes } from '@/store/generated';
 import Table from '@/components/Table';
 import SourceBadge from './SourceBadge';
 import TriggerTag from './TriggerTag';
@@ -9,11 +9,11 @@ import FunctionRunList from './FunctionRunList';
 import { triggerStream } from 'mock/triggerStream';
 import { fullDate } from '@/utils/date';
 
-type Trigger = {
+export type Trigger = {
   id: string;
   startedAt: string;
   name: string;
-  type: string;
+  type: FunctionTriggerTypes;
   source: {
     type: string;
     name: string;
@@ -32,7 +32,10 @@ const columns = [
   columnHelper.accessor('startedAt', {
     header: () => <span>Started At</span>,
     cell: (props) => (
-      <time dateTime={fullDate(new Date(props.getValue()))} suppressHydrationWarning={true}>
+      <time
+        dateTime={fullDate(new Date(props.getValue()))}
+        suppressHydrationWarning={true}
+      >
         {fullDate(new Date(props.getValue()))}
       </time>
     ),
