@@ -12,7 +12,6 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
-	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
@@ -26,21 +25,15 @@ const (
 	MeterTypePrometheus
 )
 
-func MeterSetup(svc string) (func(), error) {
+func MeterSetup(svc string, mtype MeterType) (func(), error) {
 	ctx := context.Background()
 
-	meter, err := NewOTLPMeterProvider(ctx, svc)
+	meter, err := NewMeterProvider(ctx, svc, mtype)
 	if err != nil {
 		return nil, err
 	}
 
 	otel.SetMeterProvider(meter.Provider)
-	otel.SetTextMapPropagator(
-		propagation.NewCompositeTextMapPropagator(
-			// propagation.TraceContext{},
-			propagation.Baggage{},
-		),
-	)
 
 	return func() { meter.Shutdown() }, nil
 }
@@ -126,9 +119,7 @@ func NewOTLPMeterProvider(ctx context.Context, svc string) (*meter, error) {
 		return nil, fmt.Errorf("failed to create new otlp metrics exporter: %w", err)
 	}
 
-	// reader := metricsdk.NewPeriodicReader(exporter metricsdk.Exporter, options ...metricsdk.PeriodicReaderOption)
 	reader := metric.NewPeriodicReader(exp)
-
 	mp := metric.NewMeterProvider(
 		metric.WithReader(reader),
 		metric.WithResource(resource.NewWithAttributes(
