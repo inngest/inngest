@@ -1,7 +1,14 @@
 import statusStyles from '@/utils/statusStyles';
 
-export default function FunctionList({ row }) {
-  const { functions } = row?.original;
+type FunctionListProps = {
+  functions: {
+    id: string;
+    name: string;
+    status: FunctionRunStatus;
+  }[]
+}
+
+export default function FunctionList({ functions }: FunctionListProps) {
 
   return (
     <>
