@@ -21,8 +21,8 @@ type Trigger = {
   test: boolean;
   functions: {
     id: string;
-    name: String;
-    status: String;
+    name: string;
+    status: FunctionRunStatus;
   }[];
 };
 
