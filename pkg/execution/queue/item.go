@@ -63,6 +63,10 @@ type Item struct {
 	// Payload stores item-specific data for use when processing the item.  For example,
 	// this may contain the function's edge for running a step.
 	Payload any `json:"payload,omitempty"`
+
+	// Metadata is used for storing additional metadata related to the queue item.
+	// e.g. tracing data
+	Metadata map[string]string
 }
 
 func (i Item) GetMaxAttempts() int {

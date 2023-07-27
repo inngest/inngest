@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/service"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"github.com/spf13/cobra"
 )
 
@@ -59,24 +60,40 @@ func serve(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	svc := []service.Service{}
+	var svcName string
+	services := make([]service.Service, 0)
 	for _, name := range args {
 		switch name {
 		case ServeEventAPI:
-			svc = append(svc, api.NewService(*conf))
+			svc := api.NewService(*conf)
+			svcName = svc.Name()
+			services = append(services, svc)
 		case ServeRunner:
-			svc = append(svc, runner.NewService(*conf))
+			svc := runner.NewService(*conf)
+			svcName = svc.Name()
+			services = append(services, svc)
 		case ServeExecutor:
-			svc = append(svc, executor.NewService(*conf))
+			svc := executor.NewService(*conf)
+			svcName = svc.Name()
+			services = append(services, svc)
 		case ServeCoreAPI:
-			svc = append(svc, coreapi.NewService(*conf))
+			svc := coreapi.NewService(*conf)
+			svcName = svc.Name()
+			services = append(services, svc)
 		default:
 			fmt.Println("Not implemented")
 			os.Exit(1)
 		}
 	}
 
-	if err := service.StartAll(ctx, svc...); err != nil {
+	close, err := telemetry.TracerSetup(svcName, telemetry.TracerTypeIO)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+	defer close()
+
+	if err := service.StartAll(ctx, services...); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
