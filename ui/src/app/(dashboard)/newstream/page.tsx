@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
+import SendEventButton from '@/components/Event/SendEventButton';
 import Table from '@/components/Table';
 import SourceBadge from './SourceBadge';
 import TriggerTag from './TriggerTag';
@@ -66,21 +67,33 @@ export default function Stream() {
   };
 
   return (
-    <div className="min-h-0 overflow-y-auto">
-      <Table
-        options={{
-          data: triggerStream,
-          columns,
-          getCoreRowModel: getCoreRowModel(),
-          getRowProps,
-          enablePinning: true,
-          initialState: {
-            columnPinning: {
-              left: ['startedAt'],
+    <div className="flex flex-col min-h-0 min-w-0">
+      <div className="flex justify-end px-5 py-2">
+        <SendEventButton
+          label="Test Event"
+          data={JSON.stringify({
+            name: '',
+            data: {},
+            user: {},
+          })}
+        />
+      </div>
+      <div className="min-h-0 overflow-y-auto">
+        <Table
+          options={{
+            data: triggerStream,
+            columns,
+            getCoreRowModel: getCoreRowModel(),
+            getRowProps,
+            enablePinning: true,
+            initialState: {
+              columnPinning: {
+                left: ['startedAt'],
+              },
             },
-          },
-        }}
-      />
+          }}
+        />
+      </div>
     </div>
   );
 }
