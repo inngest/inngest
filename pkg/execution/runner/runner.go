@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -310,13 +311,67 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	return errs
 }
 
+// FindInvokedFunction is a helper method which loads all available functions, checks
+// the incoming event and returns the function to be invoked via the RPC invoke event,
+// or nil if a function is not being invoked.
+func FindInvokedFunction(ctx context.Context, evt event.Event, fl cqrs.ExecutionLoader) (*inngest.Function, error) {
+	if evt.Name != consts.InvokeEventName {
+		return nil, nil
+	}
+
+	fns, err := fl.Functions(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	name := evt.Data[consts.InvokeSlugKey]
+	if name == "" {
+		return nil, err
+	}
+
+	for _, fn := range fns {
+		if fn.GetSlug() == name {
+			return &fn, nil
+		}
+	}
+
+	return nil, nil
+}
+
 // functions triggers all functions from the given event.
 func (s *svc) functions(ctx context.Context, evt event.Event) error {
+	// Don't use an errgroup here as we want all errors together, vs the first
+	// non-nil error.
+	var errs error
+	wg := &sync.WaitGroup{}
+
+	wg.Add(1)
+	go func() {
+		// Invoke functions by RPC-like calling
+		defer wg.Done()
+		// Find any invoke functions specified.
+		fn, err := FindInvokedFunction(ctx, evt, s.data)
+		if err != nil {
+			errs = multierror.Append(errs, err)
+		}
+		if fn != nil {
+			// Initialize this function for this event only once;  we don't
+			// want multiple matching triggers to run the function more than once.
+			err := s.initialize(ctx, *fn, evt)
+			if err != nil {
+				logger.From(ctx).Error().
+					Err(err).
+					Str("function", fn.Name).
+					Msg("error invoking fn")
+				errs = multierror.Append(errs, err)
+			}
+		}
+	}()
+
 	fns, err := s.data.FunctionsByTrigger(ctx, evt.Name)
 	if err != nil {
 		return fmt.Errorf("error loading functions by trigger: %w", err)
 	}
-
 	if len(fns) == 0 {
 		return nil
 	}
@@ -326,10 +381,7 @@ func (s *svc) functions(ctx context.Context, evt event.Event) error {
 	// Do this once instead of many times when evaluating expressions.
 	evtMap := evt.Map()
 
-	var errs error
-	wg := &sync.WaitGroup{}
 	for _, fn := range fns {
-
 		// We want to initialize each function concurrently;  some of these
 		// may have expressions that take ~tens of milliseconds to run, and
 		// each function should have as little latency as possible.

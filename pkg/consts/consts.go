@@ -15,4 +15,11 @@ const (
 
 	MaxBatchSize    = 100
 	MaxBatchTimeout = 60 * time.Second
+
+	// InvokeEventName is the event name used to invoke specific functions via an
+	// API.  Note that invoking functions still sends an event in the usual manner.
+	InvokeEventName = "inngest/function.invoked"
+	// InvokeSlugKey is the data key used to store the fn name when invoking a function
+	// via an RPC-like call, abstracting event-driven fanout.
+	InvokeSlugKey = "_inngest_fn"
 )
