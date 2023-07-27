@@ -7,6 +7,7 @@ require (
 	github.com/99designs/gqlgen v0.17.27
 	github.com/VividCortex/ewma v1.2.0
 	github.com/alicebob/miniredis/v2 v2.30.3-0.20230520070231-a946a99f2c60
+	github.com/aws/aws-lambda-go v1.41.0
 	github.com/aws/aws-sdk-go v1.43.31
 	github.com/cespare/xxhash/v2 v2.2.0
 	github.com/charmbracelet/lipgloss v0.5.0
