@@ -26,8 +26,8 @@ var (
 		KeepAlive: 15 * time.Second,
 	}
 
-	DefaultExecutor = executor{
-		client: &http.Client{
+	DefaultExecutor = &executor{
+		Client: &http.Client{
 			Timeout:       consts.MaxFunctionTimeout,
 			CheckRedirect: CheckRedirect,
 			Transport: &http.Transport{
@@ -50,10 +50,10 @@ var (
 )
 
 func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
-
 	if len(via) > 10 {
 		return fmt.Errorf("stopped after 10 redirects")
 	}
+
 	// If we're redirected we want to ensure that we retain the HTTP method.
 	req.Method = via[0].Method
 	req.Body, err = via[0].GetBody()
@@ -70,7 +70,7 @@ func Execute(ctx context.Context, s state.State, edge inngest.Edge, step inngest
 }
 
 type executor struct {
-	client     *http.Client
+	Client     *http.Client
 	signingKey []byte
 }
 
@@ -232,7 +232,7 @@ func (e executor) do(ctx context.Context, url string, input []byte) ([]byte, int
 		req.Header.Add("X-Inngest-Signature", Sign(ctx, e.signingKey, input))
 	}
 	pre := time.Now()
-	resp, err := e.client.Do(req)
+	resp, err := e.Client.Do(req)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("error executing request: %w", err)
 	}
