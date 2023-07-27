@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
+import { FunctionRunStatus } from '@/store/generated';
 import Table from '@/components/Table';
 import SourceBadge from './SourceBadge';
 import TriggerTag from './TriggerTag';
-import FunctionList from './FunctionList';
+import FunctionRunList from './FunctionRunList';
 import { triggerStream } from 'mock/triggerStream';
 import { fullDate } from '@/utils/date';
 
@@ -19,7 +19,7 @@ type Trigger = {
     name: string;
   };
   test: boolean;
-  functions: {
+  functionRuns: {
     id: string;
     name: string;
     status: FunctionRunStatus;
@@ -28,7 +28,7 @@ type Trigger = {
 
 const columnHelper = createColumnHelper<Trigger>();
 
-const columns =  [
+const columns = [
   columnHelper.accessor('startedAt', {
     header: () => <span>Started At</span>,
     cell: (props) => fullDate(new Date(props.getValue())),
@@ -47,16 +47,15 @@ const columns =  [
       />
     ),
   }),
-  columnHelper.accessor('functions', {
+  columnHelper.accessor('functionRuns', {
     header: () => <span>Function</span>,
-    cell: (props) => <FunctionList row={props.row} />,
+    cell: (props) => <FunctionRunList functionRuns={props.getValue()} />,
   }),
 ];
 
 export default function Stream() {
-
   const getRowProps = (row) => {
-    if (row.original.functions.length > 1) {
+    if (row.original.functionRuns.length > 1) {
       return {
         style: { verticalAlign: 'baseline' },
       };

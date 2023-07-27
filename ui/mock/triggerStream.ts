@@ -11,7 +11,7 @@ export const triggerStream = [
         name: 'Stripe',
       },
       test: true,
-      functions: [
+      functionRuns: [
         {
           id: 'function1',
           name: 'Email: Make Payment',
@@ -33,7 +33,7 @@ export const triggerStream = [
         type: 'app',
         name: 'Dashboard',
       },
-      functions: [],
+      functionRuns: [],
     },
     {
       id: 'id3',
@@ -43,7 +43,7 @@ export const triggerStream = [
       source: {
         type: 'manual',
       },
-      functions: [
+      functionRuns: [
         {
           id: 'function3',
           name: 'Email: Changed Timezone',
