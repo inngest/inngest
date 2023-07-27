@@ -31,7 +31,11 @@ const columnHelper = createColumnHelper<Trigger>();
 const columns = [
   columnHelper.accessor('startedAt', {
     header: () => <span>Started At</span>,
-    cell: (props) => fullDate(new Date(props.getValue())),
+    cell: (props) => (
+      <time dateTime={fullDate(new Date(props.getValue()))} suppressHydrationWarning={true}>
+        {fullDate(new Date(props.getValue()))}
+      </time>
+    ),
   }),
   columnHelper.accessor((row) => row.source.name, {
     id: 'source',
