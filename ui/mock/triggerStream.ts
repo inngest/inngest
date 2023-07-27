@@ -12,7 +12,6 @@ export const triggerStream = [
       },
       test: true,
       functionRuns: [
-
         {
           id: 'function1',
           name: 'Email: Make Payment',
