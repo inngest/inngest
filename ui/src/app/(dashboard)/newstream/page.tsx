@@ -28,34 +28,32 @@ type Trigger = {
 
 const columnHelper = createColumnHelper<Trigger>();
 
+const columns =  [
+  columnHelper.accessor('startedAt', {
+    header: () => <span>Started At</span>,
+    cell: (props) => fullDate(new Date(props.getValue())),
+  }),
+  columnHelper.accessor((row) => row.source.name, {
+    id: 'source',
+    cell: (props) => <SourceBadge row={props.row} />,
+    header: () => <span>Source</span>,
+  }),
+  columnHelper.accessor('type', {
+    header: () => <span>Trigger</span>,
+    cell: (props) => (
+      <TriggerTag
+        name={props.row.original.name}
+        type={props.row.original.type}
+      />
+    ),
+  }),
+  columnHelper.accessor('functions', {
+    header: () => <span>Function</span>,
+    cell: (props) => <FunctionList row={props.row} />,
+  }),
+];
+
 export default function Stream() {
-  const columns = useMemo(
-    () => [
-      columnHelper.accessor('startedAt', {
-        header: () => <span>Started At</span>,
-        cell: (props) => fullDate(new Date(props.getValue())),
-      }),
-      columnHelper.accessor((row) => row.source.name, {
-        id: 'source',
-        cell: (props) => <SourceBadge row={props.row} />,
-        header: () => <span>Source</span>,
-      }),
-      columnHelper.accessor('type', {
-        header: () => <span>Trigger</span>,
-        cell: (props) => (
-          <TriggerTag
-            name={props.row.original.name}
-            type={props.row.original.type}
-          />
-        ),
-      }),
-      columnHelper.accessor('functions', {
-        header: () => <span>Function</span>,
-        cell: (props) => <FunctionList row={props.row} />,
-      }),
-    ],
-    []
-  );
 
   const getRowProps = (row) => {
     if (row.original.functions.length > 1) {
