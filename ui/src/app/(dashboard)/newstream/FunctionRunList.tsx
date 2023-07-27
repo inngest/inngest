@@ -1,5 +1,17 @@
-import statusStyles from '@/utils/statusStyles';
 import { FunctionRunStatus } from '@/store/generated';
+import {
+  IconStatusCircleCheck,
+  IconStatusCircleArrowPath,
+  IconStatusCircleCross,
+  IconStatusCircleMinus,
+} from '@/icons';
+
+const functionRunStatusIcons = {
+  [FunctionRunStatus.Running]: IconStatusCircleArrowPath,
+  [FunctionRunStatus.Completed]: IconStatusCircleCheck,
+  [FunctionRunStatus.Failed]: IconStatusCircleCross,
+  [FunctionRunStatus.Cancelled]: IconStatusCircleMinus,
+} as const satisfies Record<FunctionRunStatus, React.ComponentType>;
 
 type FunctionRunListProps = {
   functionRuns: {
@@ -19,10 +31,10 @@ export default function FunctionRunList({
       ) : (
         <ul className="flex flex-col space-y-4">
           {functionRuns.map((functionRun) => {
-            const itemStatus = statusStyles(functionRun.status);
+            const FunctionRunStatusIcon = functionRunStatusIcons[functionRun.status];
             return (
               <div key={functionRun.id} className="flex items-center gap-2">
-                <itemStatus.icon />
+                <FunctionRunStatusIcon />
                 <span>{functionRun.name}</span>
               </div>
             );
