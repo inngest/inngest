@@ -652,12 +652,20 @@ func Initialize(ctx context.Context, fn inngest.Function, evt event.Event, s sta
 			}
 			expires = time.Now().Add(dur)
 		}
+
+		// Ensure that we only listen to cancellation events that occur
+		// after the initial event is received.
+		expr := "(async.ts == null || async.ts > event.ts)"
+		if c.If != nil {
+			expr = expr + " && " + *c.If
+		}
+
 		err := s.SavePause(ctx, state.Pause{
 			ID:                pauseID,
 			Identifier:        id,
 			Expires:           state.Time(expires),
 			Event:             &c.Event,
-			Expression:        c.If,
+			Expression:        &expr,
 			Cancel:            true,
 			TriggeringEventID: &evt.ID,
 		})
