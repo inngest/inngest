@@ -102,7 +102,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 		semconv.MessagingOperationPublish,
 		attribute.String("item.type", item.Kind),
 		attribute.Int("item.attempt", item.Attempt),
-		attribute.Int("item.attempts.max", *item.MaxAttempts),
+		attribute.Int("item.attempts.max", item.GetMaxAttempts()),
 	))
 	defer span.End()
 
