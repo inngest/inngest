@@ -144,6 +144,7 @@ func TestSDKCancelReceived(t *testing.T) {
 		Name: "tests/cancel.test",
 		Data: map[string]any{
 			"request_id": "123",
+			"whatever":   "this doesn't matter my friend",
 		},
 		User: map[string]interface{}{},
 	}
