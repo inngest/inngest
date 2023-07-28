@@ -37,7 +37,7 @@ func Ping(ctx context.Context, url string) error {
 		return publicerr.WrapWithData(
 			err,
 			400,
-			"There was an error registering your app",
+			fmt.Sprintf("There was an error registering your app: %s", err.Error()),
 			map[string]any{
 				"error_code": err.Error(),
 			},
