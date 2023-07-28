@@ -652,12 +652,32 @@ func Initialize(ctx context.Context, fn inngest.Function, evt event.Event, s sta
 			}
 			expires = time.Now().Add(dur)
 		}
-		err := s.SavePause(ctx, state.Pause{
+
+		// Ensure that we only listen to cancellation events that occur
+		// after the initial event is received.
+		expr := "(async.ts == null || async.ts > event.ts)"
+		if c.If != nil {
+			expr = expr + " && " + *c.If
+		}
+
+		// Filter the expression data such that it contains only the variables used
+		// in the expression.
+		eval, err := expressions.NewExpressionEvaluator(ctx, expr)
+		if err != nil {
+			return &id, err
+		}
+
+		// Take the data for expressions based off of state
+		ed := expressions.NewData(map[string]any{"event": evt.Map()})
+		data := eval.FilteredAttributes(ctx, ed).Map()
+
+		err = s.SavePause(ctx, state.Pause{
 			ID:                pauseID,
 			Identifier:        id,
 			Expires:           state.Time(expires),
 			Event:             &c.Event,
-			Expression:        c.If,
+			Expression:        &expr,
+			ExpressionData:    data,
 			Cancel:            true,
 			TriggeringEventID: &evt.ID,
 		})
