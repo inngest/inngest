@@ -66,7 +66,7 @@ type Item struct {
 
 	// Metadata is used for storing additional metadata related to the queue item.
 	// e.g. tracing data
-	Metadata map[string]string
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 func (i Item) GetMaxAttempts() int {
@@ -78,13 +78,14 @@ func (i Item) GetMaxAttempts() int {
 
 func (i *Item) UnmarshalJSON(b []byte) error {
 	type kind struct {
-		GroupID     string           `json:"groupID"`
-		WorkspaceID uuid.UUID        `json:"wsID"`
-		Kind        string           `json:"kind"`
-		Identifier  state.Identifier `json:"identifier"`
-		Attempt     int              `json:"atts"`
-		MaxAttempts *int             `json:"maxAtts,omitempty"`
-		Payload     json.RawMessage  `json:"payload"`
+		GroupID     string            `json:"groupID"`
+		WorkspaceID uuid.UUID         `json:"wsID"`
+		Kind        string            `json:"kind"`
+		Identifier  state.Identifier  `json:"identifier"`
+		Attempt     int               `json:"atts"`
+		MaxAttempts *int              `json:"maxAtts,omitempty"`
+		Payload     json.RawMessage   `json:"payload"`
+		Metadata    map[string]string `json:"metadata"`
 	}
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
@@ -98,6 +99,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.Identifier = temp.Identifier
 	i.Attempt = temp.Attempt
 	i.MaxAttempts = temp.MaxAttempts
+	i.Metadata = temp.Metadata
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.
 	if len(temp.Payload) > 0 {
