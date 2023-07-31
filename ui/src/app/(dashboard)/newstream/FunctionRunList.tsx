@@ -33,10 +33,10 @@ export default function FunctionRunList({
           {functionRuns.map((functionRun) => {
             const FunctionRunStatusIcon = functionRunStatusIcons[functionRun.status];
             return (
-              <div key={functionRun.id} className="flex items-center gap-2">
+              <li key={functionRun.id} data-key={functionRun.id} className="flex items-center gap-2">
                 <FunctionRunStatusIcon />
-                <span>{functionRun.name}</span>
-              </div>
+                {functionRun.name}
+              </li>
             );
           })}
         </ul>
