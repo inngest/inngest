@@ -698,6 +698,15 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 
 		if osqueue.ShouldRetry(err, qi.Data.Attempt, qi.Data.GetMaxAttempts()) {
 			at := backoff.DefaultBackoff(qi.Data.Attempt)
+			// If the error contains a NextRetryAt method, use that to indicate
+			// when we should retry.
+			if specifier, ok := err.(osqueue.RetryAtSpecifier); ok {
+				next := specifier.NextRetryAt()
+				if next != nil {
+					at = *next
+				}
+			}
+
 			qi.Data.Attempt += 1
 			qi.AtMS = at.UnixMilli()
 			q.logger.Warn().Err(err).

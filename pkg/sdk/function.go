@@ -108,9 +108,17 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 			funcStep.Retries = &atts
 		}
 		if step.Retries == nil && s.Retries != nil {
-			// Use the function's defaults provided as syntactic sugar when registering functions
+			// Use the function's defaults provided as syntactic sugar when registering functions,
+			// only if retries is nil
 			funcStep.Retries = s.Retries
 		}
+
+		// Always enforce bounds.
+		if funcStep.Retries != nil && *funcStep.Retries > consts.MaxRetries {
+			max := consts.MaxRetries
+			funcStep.Retries = &max
+		}
+
 		f.Steps = append(f.Steps, funcStep)
 	}
 

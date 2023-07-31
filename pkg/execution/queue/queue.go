@@ -48,6 +48,12 @@ type AlwaysRetryableError interface {
 	AlwaysRetryable()
 }
 
+// RetryAtSpecifier specifies the next retry time.  If this returns a nil pointer,
+// the default retry iwll be used for the current attempt.
+type RetryAtSpecifier interface {
+	NextRetryAt() *time.Time
+}
+
 // ShouldRetry returns whether we need to retry an error.
 func ShouldRetry(err error, attempt int, max int) bool {
 	if _, ok := err.(AlwaysRetryableError); ok {
