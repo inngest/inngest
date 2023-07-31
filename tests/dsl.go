@@ -80,7 +80,11 @@ func (t *Test) Func(f func() error) func() {
 
 func (t *Test) Send(evt inngestgo.Event) func() {
 	return func() {
-		client := inngestgo.NewClient(eventKey, inngestgo.WithEndpoint(eventURL.String()))
+		url := eventURL.String()
+		client := inngestgo.NewClient(inngestgo.ClientOpts{
+			EventKey: &eventKey,
+			EventURL: &url,
+		})
 		id, err := client.Send(context.Background(), evt)
 		require.NoError(t.test, err)
 		t.lastEventID = &id
@@ -157,11 +161,14 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			require.NoError(t.test, err)
 
 			require.NotZero(t.test, er.Event.Timestamp)
-			// Zero out the TS
+			// Zero out the TS and ID
 			ts := er.Event.Timestamp
+			evtID := er.Event.ID
 			er.Event.Timestamp = 0
+			er.Event.ID = nil
 			require.EqualValues(t.test, t.requestEvent, er.Event, "Request event is incorrect")
 			er.Event.Timestamp = ts
+			er.Event.ID = evtID
 
 			// Unset the run ID so that our unique run ID doesn't cause issues.
 			t.requestCtx.RunID = er.Ctx.RunID
@@ -175,13 +182,24 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 }
 
 func (t *Test) ExpectResponse(status int, body []byte) func() {
+	return t.ExpectResponseFunc(status, func(b []byte) error {
+		require.Equal(t.test, string(body), string(b))
+		return nil
+	})
+}
+
+func (t *Test) ExpectResponseFunc(status int, f func(b []byte) error) func() {
 	return func() {
 		select {
 		case r := <-t.responses:
 			t.lastResponse = time.Now()
-			byt, err := io.ReadAll(r.Body)
+
+			rdr := r.Body
+
+			byt, err := io.ReadAll(rdr)
 			require.NoError(t.test, err)
-			require.Equal(t.test, string(body), string(byt))
+
+			err = f(byt)
 		case <-time.After(time.Second):
 			require.Fail(t.test, "Expected SDK generator response but timed out")
 		}
@@ -189,20 +207,13 @@ func (t *Test) ExpectResponse(status int, body []byte) func() {
 }
 
 func (t *Test) ExpectJSONResponse(status int, expected any) func() {
-	return func() {
-		select {
-		case r := <-t.responses:
-			t.lastResponse = time.Now()
-			byt, err := io.ReadAll(r.Body)
-			require.NoError(t.test, err)
-			var actual any
-			err = json.Unmarshal(byt, &actual)
-			require.NoError(t.test, err)
-			require.EqualValues(t.test, expected, actual)
-		case <-time.After(time.Second):
-			require.Fail(t.test, "Expected SDK generator response but timed out")
-		}
-	}
+	return t.ExpectResponseFunc(status, func(byt []byte) error {
+		var actual any
+		err := json.Unmarshal(byt, &actual)
+		require.NoError(t.test, err)
+		require.EqualValues(t.test, expected, actual)
+		return nil
+	})
 }
 
 func (t *Test) ExpectGeneratorResponse(expected []state.GeneratorOpcode) func() {

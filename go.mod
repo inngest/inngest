@@ -23,7 +23,7 @@ require (
 	github.com/gowebpki/jcs v1.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/terraform v0.15.3
-	github.com/inngest/inngestgo v0.4.3-0.20230427225702-be10dcbf5ec7
+	github.com/inngest/inngestgo v0.4.3-0.20230731190123-1d1baf256abd
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/marcboeker/go-duckdb v1.4.1
@@ -158,7 +158,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.16.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	golang.org/x/crypto v0.11.0 // indirect
-	golang.org/x/exp v0.0.0-20230315142452-642cacee5cc0 // indirect
+	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/oauth2 v0.6.0 // indirect

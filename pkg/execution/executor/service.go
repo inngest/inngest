@@ -506,7 +506,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 					WorkspaceID: item.WorkspaceID,
 					Kind:        queue.KindSleep,
 					Identifier:  item.Identifier,
-					Attempt:     item.Attempt,
+					Attempt:     0,
 					MaxAttempts: item.MaxAttempts,
 					// TODO: Save to state store after processing.
 					Payload: edge,
@@ -528,6 +528,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 				item.JobID = &jobID
 				item.Payload = edge
 				item.Kind = queue.KindEdge
+				item.Attempt = 0
 				return s.queue.Enqueue(ctx, item, time.Now())
 			case enums.OpcodeStep:
 				// Re-enqueue the exact same edge to run now.
@@ -539,6 +540,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 				edge.Edge.Outgoing = gen.ID
 				item.Payload = edge
 				item.Kind = queue.KindEdge
+				item.Attempt = 0
 				return s.queue.Enqueue(ctx, item, time.Now())
 			default:
 				return fmt.Errorf("unknown opcode: %s", gen.Op.String())
