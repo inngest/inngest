@@ -293,29 +293,48 @@ func (e executor) do(ctx context.Context, url string, input []byte) (*response, 
 			noRetry:    resp.Header.Get("x-inngest-no-retry") == "true",
 		}, nil
 	}
-	// Handle streaming responses.
-	var body struct {
-		StatusCode int             `json:"status"`
-		Body       json.RawMessage `json:"body"`
-		RetryAt    *string         `json:"retryAt"`
-		NoRetry    bool            `json:"noRetry"`
+
+	stream, err := ParseStream(byt)
+	if err != nil {
+		return nil, err
 	}
-	if err := json.Unmarshal(byt, &body); err != nil {
-		return nil, fmt.Errorf("error reading response body to check for status code: %w", err)
-	}
-	if body.RetryAt != nil {
-		if at, err := ParseRetry(*body.RetryAt); err == nil {
+	if stream.RetryAt != nil {
+		if at, err := ParseRetry(*stream.RetryAt); err == nil {
 			retryAt = &at
 		}
 	}
+
 	return &response{
-		body:       body.Body,
-		statusCode: body.StatusCode,
+		body:       stream.Body,
+		statusCode: stream.StatusCode,
 		duration:   dur,
 		retryAt:    retryAt,
-		noRetry:    body.NoRetry,
+		noRetry:    stream.NoRetry,
 	}, nil
 
+}
+
+func ParseStream(resp []byte) (*StreamResponse, error) {
+	body := &StreamResponse{}
+	if err := json.Unmarshal(resp, &body); err != nil {
+		return nil, fmt.Errorf("error reading response body to check for status code: %w", err)
+	}
+	// Check to see if the body is double-encoded.
+	if len(body.Body) > 0 && body.Body[0] == '"' && body.Body[len(body.Body)-1] == '"' {
+		var str string
+		if err := json.Unmarshal(body.Body, &str); err == nil {
+			body.Body = []byte(str)
+		}
+	}
+	return body, nil
+}
+
+type StreamResponse struct {
+	StatusCode int               `json:"status"`
+	Body       json.RawMessage   `json:"body"`
+	RetryAt    *string           `json:"retryAt"`
+	NoRetry    bool              `json:"noRetry"`
+	Headers    map[string]string `json:"headers"`
 }
 
 // ParseRetry attempts to parse the retry-after header value.  It first checks to see

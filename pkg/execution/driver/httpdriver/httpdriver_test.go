@@ -2,6 +2,7 @@ package httpdriver
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,8 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/stretchr/testify/require"
 )
 
@@ -97,5 +100,76 @@ func TestParseRetry(t *testing.T) {
 		actual, err := ParseRetry(now.Add(time.Second).Format(time.RFC1123))
 		require.NoError(t, err)
 		require.Equal(t, now.Add(consts.MinRetryDuration), actual)
+	})
+}
+
+func TestParseStream(t *testing.T) {
+	t.Run("It parses stream responses", func(t *testing.T) {
+		byt := []byte(`{"status":200,"body":"hi"}`)
+		resp, err := ParseStream(byt)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.Equal(t, StreamResponse{
+			StatusCode: 200,
+			Body:       []byte("hi"),
+		}, *resp)
+	})
+
+	t.Run("It parses generators as a stream", func(t *testing.T) {
+		gen := []state.GeneratorOpcode{
+			{
+				Op:   enums.OpcodeStep,
+				ID:   "step-id",
+				Name: "step name",
+				Data: []byte(`"oh hello there"`),
+			},
+		}
+		raw, err := json.Marshal(gen)
+		require.NoError(t, err)
+		r := StreamResponse{
+			StatusCode: 206,
+			Body:       raw,
+		}
+		byt, err := json.Marshal(r)
+		require.NoError(t, err)
+
+		actual, err := ParseStream(byt)
+		require.NoError(t, err)
+		require.NotNil(t, actual)
+		require.Equal(t, r, *actual)
+	})
+
+	t.Run("It handles double encoding from old SDK releases", func(t *testing.T) {
+		gen := []state.GeneratorOpcode{
+			{
+				Op:   enums.OpcodeStep,
+				ID:   "step-id",
+				Name: "step name",
+				Data: []byte(`"oh hello there"`),
+			},
+		}
+
+		first, err := json.Marshal(gen)
+		require.NoError(t, err)
+
+		// Encode once again
+		second, err := json.Marshal(string(first))
+		require.NoError(t, err)
+
+		r := StreamResponse{
+			StatusCode: 206,
+			Body:       second,
+		}
+
+		byt, err := json.Marshal(r)
+		require.NoError(t, err)
+
+		// We should actually get the first encoding.
+		r.Body = first
+
+		actual, err := ParseStream(byt)
+		require.NoError(t, err)
+		require.NotNil(t, actual)
+		require.Equal(t, r, *actual)
 	})
 }
