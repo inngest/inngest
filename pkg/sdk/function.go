@@ -70,10 +70,14 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 	case map[string]any:
 		// Handle maps.
 		limit, ok := v["limit"].(float64)
+		key, _ := v["key"].(string)
 		if ok {
 			f.Concurrency = &inngest.Concurrency{
 				Limit: int(limit),
 			}
+		}
+		if key != "" {
+			f.Concurrency.Key = &key
 		}
 	}
 
