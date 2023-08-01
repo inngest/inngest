@@ -135,7 +135,7 @@ type DriverResponse struct {
 
 	// Err represents the error from the action, if the action errored.
 	// If the action terminated successfully this must be nil.
-	Err error `json:"err"`
+	Err *string `json:"err"`
 
 	// RetryAt is an optional retry at field, specifying when we should retry
 	// the step if the step errored.
@@ -246,18 +246,6 @@ func (r *DriverResponse) Final() bool {
 	return false
 }
 
-// Error allows Response to fulfil the Error interface.
-func (r DriverResponse) Error() string {
-	if r.Err == nil {
-		return ""
-	}
-	return r.Err.Error()
-}
-
-func (r DriverResponse) Unwrap() error {
-	return r.Err
-}
-
 // UserError returns the error that the user reported for this response. Can be
 // used to safely fetch the error from the response.
 //
@@ -279,9 +267,9 @@ func (r DriverResponse) Unwrap() error {
 func (r DriverResponse) UserError() map[string]any {
 	if r.Output == nil && r.Err != nil {
 		return map[string]any{
-			"error":   r.Err.Error(),
+			"error":   r.Err,
 			"name":    "Error",
-			"message": r.Err.Error(),
+			"message": r.Err,
 		}
 	}
 
