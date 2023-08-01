@@ -1,11 +1,11 @@
 'use client';
-import { useState } from 'react';
+
+import { useRouter } from 'next/navigation';
 import {
   createColumnHelper,
   getCoreRowModel,
   type Row,
 } from '@tanstack/react-table';
-import StreamDetails from './@slideOver/StreamDetails';
 import SendEventButton from '@/components/Event/SendEventButton';
 import { FunctionRunStatus, FunctionTriggerTypes } from '@/store/generated';
 import { selectEvent, selectRun } from '@/store/global';
@@ -16,7 +16,6 @@ import TriggerTag from './TriggerTag';
 import FunctionRunList from './FunctionRunList';
 import { triggerStream } from 'mock/triggerStream';
 import { fullDate } from '@/utils/date';
-import SlideOver from '@/components/SlideOver';
 
 export type Trigger = {
   id: string;
@@ -71,7 +70,7 @@ const columns = [
 
 export default function Stream() {
   const dispatch = useAppDispatch();
-  const [isSlideOverVisible, setSlideOverVisible] = useState(false);
+  const router = useRouter();
 
   function handleOpenSlideOver({
     triggerID,
@@ -82,18 +81,12 @@ export default function Stream() {
   }) {
     if (e.target instanceof HTMLElement) {
       const runID = e.target.dataset.key;
-      setSlideOverVisible(true);
+      router.push(`/newstream/trigger/${triggerID}`);
       dispatch(selectEvent(triggerID));
       if (runID) {
         dispatch(selectRun(runID));
       }
     }
-  }
-
-  function handleCloseSlideOver() {
-    setSlideOverVisible(false);
-    dispatch(selectEvent(''));
-    dispatch(selectRun(''));
   }
 
   const getRowProps = (row: Row<Trigger>) => ({
@@ -108,9 +101,6 @@ export default function Stream() {
 
   return (
     <div className="flex flex-col min-h-0 min-w-0">
-      <SlideOver isOpen={isSlideOverVisible} onClose={handleCloseSlideOver}>
-        <StreamDetails />
-      </SlideOver>
       <div className="flex justify-end px-5 py-2">
         <SendEventButton
           label="Test Event"

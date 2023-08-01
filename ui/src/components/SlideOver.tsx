@@ -1,20 +1,30 @@
-'use client'
+'use client';
 
-import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
+import { useState, Fragment } from 'react';
 
 type SlideOverProps = {
   children?: React.ReactNode;
-  isOpen?: boolean;
   onClose: () => void;
 };
 
-export default function SlideOver({ children, isOpen = true, onClose = () => {} }: SlideOverProps) {
+export default function SlideOver({ children, onClose }: SlideOverProps) {
+  const [isOpen, setOpen] = useState(true);
+
+  function handleClose() {
+    setOpen(false);
+    // Allows the leave transition to happen before unmounting
+    setTimeout(() => {
+      onClose();
+    }, 500);
+  }
+
   return (
-    <Transition.Root show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-10" onClose={onClose}>
+    <Transition.Root show={isOpen} appear={true} as={Fragment}>
+      <Dialog as="div" className="relative z-10" onClose={handleClose}>
         <Transition.Child
-          as="div"
+          as={Fragment}
+          appear={true}
           enter="ease-in-out duration-500"
           enterFrom="opacity-0"
           enterTo="opacity-100"
@@ -22,12 +32,8 @@ export default function SlideOver({ children, isOpen = true, onClose = () => {} 
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div
-            className="fixed inset-0 bg-[#04060C]/90 transition-opacity z-10"
-            aria-hidden="true"
-          />
+          <div className="fixed inset-0 bg-[#04060C]/90 transition-opacity z-10" />
         </Transition.Child>
-
         <div className="fixed inset-0 overflow-hidden z-10">
           <div className="absolute inset-0 overflow-hidden">
             <div className="pointer-events-none fixed inset-y-0 right-0 flex w-3/4">
