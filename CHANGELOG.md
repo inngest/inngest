@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.16.0] - 2023-07-31
+
+### Added
+- Added support for custom step backoff stragies specified within function code
+- Added support for scheduling functions based off of a future `ts` unix-ms timestamp within events
+- Added support for testing AWS Lambda functions locally without an AWS Gateway
+
 ## [v0.15.3] - 2023-07-14
 
 ### Added
