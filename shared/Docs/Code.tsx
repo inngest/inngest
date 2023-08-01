@@ -402,7 +402,7 @@ export function GuideSelector({
                 "border-b py-3 transition focus:outline-none",
                 option.key === selected
                   ? "border-indigo-500 text-indigo-700"
-                  : "border-transparent text-slate-800 hover:text-indigo-600"
+                  : "border-transparent text-slate-600 hover:text-indigo-600"
               )}
             >
               {option.title}

@@ -291,11 +291,11 @@ To send an event from your code, you can use the `Inngest` client's `send()` met
     await inngest.send({
       name: "test/hello.world",
       data: {
-        email: "test@example.com",
+        email: "testFromNext@example.com",
       },
     });
 
-    res.status(200).json({ name: "Hello Inngest!" });
+    res.status(200).json({ name: "Hello Inngest from Next!" });
   }
   ```
 </GuideSection>
@@ -310,11 +310,11 @@ To send an event from your code, you can use the `Inngest` client's `send()` met
     await inngest.send({
       name: "test/hello.world",
       data: {
-        email: "test@example.com",
+        email: "testFromNext@example.com",
       },
     });
 
-    return NextResponse.json({ name: "Hello Inngest!" });
+    return NextResponse.json({ name: "Hello Inngest from Next!" });
   }
   ```
 </GuideSection>
