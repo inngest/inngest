@@ -158,6 +158,15 @@ func (r *DriverResponse) SetFinal() {
 	r.final = true
 }
 
+// SetError sets the Err field to the string of the error specified.
+func (r *DriverResponse) SetError(err error) {
+	if err == nil {
+		return
+	}
+	str := err.Error()
+	r.Err = &str
+}
+
 // NextRetryAt fulfils the queue.RetryAtSpecifier interface
 func (r DriverResponse) NextRetryAt() *time.Time {
 	return r.RetryAt
