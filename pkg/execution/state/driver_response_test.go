@@ -2,7 +2,6 @@ package state
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -27,7 +26,7 @@ func TestDriverResponseRetryable(t *testing.T) {
 			name: "no output, with error",
 			r: DriverResponse{
 				Output: map[string]interface{}{},
-				Err:    fmt.Errorf("some err"),
+				Err:    strptr("some err"),
 			},
 			expected: true,
 		},
@@ -44,7 +43,7 @@ func TestDriverResponseRetryable(t *testing.T) {
 				Output: map[string]interface{}{
 					"hi": "my g",
 				},
-				Err: fmt.Errorf("some err"),
+				Err: strptr("some err"),
 			},
 			expected: true,
 		},
@@ -64,7 +63,7 @@ func TestDriverResponseRetryable(t *testing.T) {
 					"hi":     "my g",
 					"status": 200,
 				},
-				Err: fmt.Errorf("some err"),
+				Err: strptr("some err"),
 			},
 			expected: false,
 		},
@@ -75,7 +74,7 @@ func TestDriverResponseRetryable(t *testing.T) {
 					"hi":     "my g",
 					"status": 401,
 				},
-				Err: fmt.Errorf("some err"),
+				Err: strptr("some err"),
 			},
 			expected: false,
 		},
@@ -86,7 +85,7 @@ func TestDriverResponseRetryable(t *testing.T) {
 					"hi":         "my g",
 					"statusCode": 401,
 				},
-				Err: fmt.Errorf("some err"),
+				Err: strptr("some err"),
 			},
 			expected: false,
 		},
@@ -97,7 +96,7 @@ func TestDriverResponseRetryable(t *testing.T) {
 					"hi":     "my g",
 					"status": 499,
 				},
-				Err: fmt.Errorf("some err"),
+				Err: strptr("some err"),
 			},
 			expected: false,
 		},
@@ -105,7 +104,7 @@ func TestDriverResponseRetryable(t *testing.T) {
 			name: "5xx json status",
 			r: DriverResponse{
 				Output: unmarshalledFalse,
-				Err:    fmt.Errorf("some err"),
+				Err:    strptr("some err"),
 			},
 			expected: false,
 		},
@@ -116,7 +115,7 @@ func TestDriverResponseRetryable(t *testing.T) {
 					"hi":     "my g",
 					"status": 500,
 				},
-				Err: fmt.Errorf("some err"),
+				Err: strptr("some err"),
 			},
 			expected: true,
 		},
@@ -127,7 +126,7 @@ func TestDriverResponseRetryable(t *testing.T) {
 					"hi":         "my g",
 					"statusCode": 500,
 				},
-				Err: fmt.Errorf("some err"),
+				Err: strptr("some err"),
 			},
 			expected: true,
 		},
@@ -135,7 +134,7 @@ func TestDriverResponseRetryable(t *testing.T) {
 			name: "5xx json status",
 			r: DriverResponse{
 				Output: unmarshalledTrue,
-				Err:    fmt.Errorf("some err"),
+				Err:    strptr("some err"),
 			},
 			expected: true,
 		},
@@ -153,7 +152,7 @@ func TestDriverResponseRetryable(t *testing.T) {
 					"hi":     "dont retry me plz",
 					"status": 500,
 				},
-				Err:   fmt.Errorf("some err"),
+				Err:   strptr("some err"),
 				final: true,
 			},
 			expected: false,
@@ -186,14 +185,14 @@ func TestDriverResponseFinal(t *testing.T) {
 		{
 			name: "error is not final",
 			r: DriverResponse{
-				Err: fmt.Errorf("some err"),
+				Err: strptr("some err"),
 			},
 			expected: false,
 		},
 		{
 			name: "error marked as final is final",
 			r: DriverResponse{
-				Err:   fmt.Errorf("some err"),
+				Err:   strptr("some err"),
 				final: true,
 			},
 			expected: true,
@@ -201,7 +200,7 @@ func TestDriverResponseFinal(t *testing.T) {
 		{
 			name: "non-retryable error is final",
 			r: DriverResponse{
-				Err: fmt.Errorf("final err plz"),
+				Err: strptr("final err plz"),
 				Output: map[string]interface{}{
 					"status": 401,
 				},
@@ -226,7 +225,7 @@ func TestDriverResponseUserError(t *testing.T) {
 	}{
 		{
 			name: "with no Output and Err",
-			r:    DriverResponse{Output: nil, Err: fmt.Errorf("something went wrong")},
+			r:    DriverResponse{Output: nil, Err: strptr("something went wrong")},
 			expected: map[string]any{
 				"error":   "something went wrong",
 				"name":    "Error",
@@ -318,7 +317,7 @@ func TestDriverResponseUserError(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.expected, test.r.UserError(), test.name)
+			require.EqualValues(t, test.expected, test.r.UserError(), test.name)
 		})
 	}
 }
@@ -351,4 +350,8 @@ func TestGeneratorSleepDuration(t *testing.T) {
 	duration, err = g.SleepDuration()
 	require.Nil(t, err)
 	require.WithinDuration(t, time.Now().Truncate(time.Second).Add(time.Minute), time.Now().Add(duration), time.Second)
+}
+
+func strptr(s string) *string {
+	return &s
 }

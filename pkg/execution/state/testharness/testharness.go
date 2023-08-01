@@ -384,7 +384,7 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 
 	r := state.DriverResponse{
 		Step: w.Steps[0],
-		Err:  fmt.Errorf("an absolutely terrible yet intermittent, non-final, retryable error"),
+		Err:  strptr("an absolutely terrible yet intermittent, non-final, retryable error"),
 	}
 	require.True(t, r.Retryable())
 	require.False(t, r.Final())
@@ -397,7 +397,8 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	require.NotNil(t, next)
 
 	require.Nil(t, next.Actions()[r.Step.ID])
-	require.Contains(t, next.Errors()[r.Step.ID].Error(), r.Err.Error())
+	require.NotNil(t, r.Err)
+	require.Contains(t, next.Errors()[r.Step.ID].Error(), *r.Err)
 
 	// Only the trigger, which was not yet complete.
 	require.Equal(t, 1, next.Metadata().Pending)
@@ -417,7 +418,8 @@ func checkSaveResponse_error(t *testing.T, m state.Manager) {
 	require.NotNil(t, next)
 
 	require.Nil(t, finalized.Actions()[r.Step.ID])
-	require.Contains(t, finalized.Errors()[r.Step.ID].Error(), r.Err.Error())
+	require.NotNil(t, r.Err)
+	require.Contains(t, finalized.Errors()[r.Step.ID].Error(), *r.Err)
 
 	// Next stores an outdated reference
 	require.Equal(t, 1, next.Metadata().Pending)
@@ -430,7 +432,7 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
 
-	stepErr := fmt.Errorf("an absolutely terrible yet intermittent, non-final, retryable error")
+	stepErr := strptr("an absolutely terrible yet intermittent, non-final, retryable error")
 	r := state.DriverResponse{
 		Step: w.Steps[0],
 		Err:  stepErr,
@@ -446,7 +448,8 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 	require.NotNil(t, next)
 
 	require.Nil(t, next.Actions()[r.Step.ID])
-	require.Contains(t, next.Errors()[r.Step.ID].Error(), r.Err.Error())
+	require.NotNil(t, r.Err)
+	require.Contains(t, next.Errors()[r.Step.ID].Error(), *r.Err)
 
 	// This is not final
 	require.Equal(t, 1, next.Metadata().Pending)
@@ -466,7 +469,8 @@ func checkSaveResponse_outputOverwritesError(t *testing.T, m state.Manager) {
 
 	require.Equal(t, r.Output, finalized.Actions()[r.Step.ID])
 	// The error is still stored.
-	require.Contains(t, next.Errors()[r.Step.ID].Error(), stepErr.Error())
+	require.NotNil(t, stepErr)
+	require.Contains(t, next.Errors()[r.Step.ID].Error(), *stepErr)
 	// Saving output should not finalize.
 	require.Equal(t, 1, finalized.Metadata().Pending)
 
@@ -548,7 +552,7 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 	t.Run("It doesn't amend the stack with temporary non-final errors", func(t *testing.T) {
 		r := state.DriverResponse{
 			Step: w.Steps[1],
-			Err:  fmt.Errorf("an absolutely terrible yet intermittent, non-final, retryable error"),
+			Err:  strptr("an absolutely terrible yet intermittent, non-final, retryable error"),
 		}
 		require.True(t, r.Retryable())
 		require.False(t, r.Final())
@@ -567,7 +571,7 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 	t.Run("It modifies the stack with a final error", func(t *testing.T) {
 		r := state.DriverResponse{
 			Step: w.Steps[1],
-			Err:  fmt.Errorf("a permanent error"),
+			Err:  strptr("a permanent error"),
 		}
 		r.SetFinal()
 		require.False(t, r.Retryable())
@@ -1751,7 +1755,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 
 		r := state.DriverResponse{
 			Step: w.Steps[0],
-			Err:  fmt.Errorf("lol"),
+			Err:  strptr("lol"),
 		}
 		_, err := m.SaveResponse(ctx, s.Identifier(), r, 2)
 		require.NoError(t, err)
@@ -1778,7 +1782,7 @@ func checkLogs(t *testing.T, m state.Manager) {
 
 		r := state.DriverResponse{
 			Step: w.Steps[0],
-			Err:  fmt.Errorf("lol"),
+			Err:  strptr("lol"),
 		}
 		r.SetFinal()
 
@@ -1949,4 +1953,8 @@ func setup(t *testing.T, m state.Manager) state.State {
 	<-time.After(time.Millisecond)
 
 	return s
+}
+
+func strptr(s string) *string {
+	return &s
 }

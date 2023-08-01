@@ -577,7 +577,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 	} else {
 		typ = enums.HistoryTypeStepErrored
 		data = output(map[string]any{
-			"error":  r.Err.Error(),
+			"error":  r.Err,
 			"output": r.Output,
 		})
 		result = data

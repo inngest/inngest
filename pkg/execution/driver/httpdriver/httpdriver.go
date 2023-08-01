@@ -215,13 +215,19 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 		err = fmt.Errorf("invalid status code: %d", resp.statusCode)
 	}
 
+	var errstr *string
+	if err != nil {
+		str := err.Error()
+		errstr = &str
+	}
+
 	return &state.DriverResponse{
 		Step: step,
 		Output: map[string]interface{}{
 			"status": resp.statusCode,
 			"body":   body,
 		},
-		Err:        err,
+		Err:        errstr,
 		Duration:   resp.duration,
 		OutputSize: len(resp.body),
 		NoRetry:    resp.noRetry,
@@ -284,7 +290,7 @@ func (e executor) do(ctx context.Context, url string, input []byte) (*response, 
 			statusCode: resp.StatusCode,
 			duration:   dur,
 			retryAt:    retryAt,
-			noRetry:    resp.Header.Get("x-no-retry") == "true",
+			noRetry:    resp.Header.Get("x-inngest-no-retry") == "true",
 		}, nil
 	}
 	// Handle streaming responses.

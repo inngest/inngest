@@ -334,7 +334,7 @@ func (e *executor) run(ctx context.Context, id state.Identifier, edge inngest.Ed
 		// This action errored.  We've stored this in our state manager already;
 		// return the response error only.  We can use the same variable for both
 		// the response and the error to indicate an error value.
-		return response, idx, response
+		return response, idx, fmt.Errorf("%s", *response.Err)
 	}
 	if response.Scheduled {
 		// This action is not yet complete, so we can't traverse
@@ -374,12 +374,12 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *i
 		// Add an error response here.
 		response = &state.DriverResponse{
 			Step: *step,
-			Err:  err,
 		}
 	}
 	if err != nil && response.Err == nil {
 		// Set the response error
-		response.Err = err
+		errstr := err.Error()
+		response.Err = &errstr
 	}
 
 	// Ensure that the step is always set.  This removes the need for drivers to always
@@ -400,7 +400,8 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *i
 		if response.Generator[0].Data != nil {
 			err = json.Unmarshal(response.Generator[0].Data, &response.Output)
 			if err != nil {
-				response.Err = fmt.Errorf("error unmarshalling generator step data as json: %w", err)
+				errstr := fmt.Sprintf("error unmarshalling generator step data as json: %s", err)
+				response.Err = &errstr
 			}
 		}
 
