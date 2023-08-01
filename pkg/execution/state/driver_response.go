@@ -276,9 +276,9 @@ func (r *DriverResponse) Final() bool {
 func (r DriverResponse) UserError() map[string]any {
 	if r.Output == nil && r.Err != nil {
 		return map[string]any{
-			"error":   r.Err,
+			"error":   *r.Err,
 			"name":    "Error",
-			"message": r.Err,
+			"message": *r.Err,
 		}
 	}
 

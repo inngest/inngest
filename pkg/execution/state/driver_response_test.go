@@ -317,7 +317,7 @@ func TestDriverResponseUserError(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.expected, test.r.UserError(), test.name)
+			require.EqualValues(t, test.expected, test.r.UserError(), test.name)
 		})
 	}
 }
