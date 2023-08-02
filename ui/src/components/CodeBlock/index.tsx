@@ -41,7 +41,7 @@ export default function CodeBlock({
                 i === activeTab
                   ? `border-indigo-400 text-white`
                   : `border-transparent text-slate-400`,
-                `text-xs px-5 py-2.5 border-b block transition-all duration-150`
+                `text-xs px-5 py-2.5 border-b block transition-all duration-150 outline-none`
               )}
               onClick={() => handleTabClick(i)}
               key={i}

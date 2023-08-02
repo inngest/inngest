@@ -1,8 +1,15 @@
 'use client';
 
-import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
+import { useRouter } from 'next/navigation';
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  type Row,
+} from '@tanstack/react-table';
 import SendEventButton from '@/components/Event/SendEventButton';
 import { FunctionRunStatus, FunctionTriggerTypes } from '@/store/generated';
+import { selectEvent, selectRun } from '@/store/global';
+import { useAppDispatch } from '@/store/hooks';
 import Table from '@/components/Table';
 import SourceBadge from './SourceBadge';
 import TriggerTag from './TriggerTag';
@@ -62,13 +69,35 @@ const columns = [
 ];
 
 export default function Stream() {
-  const getRowProps = (row) => {
-    if (row.original.functionRuns.length > 1) {
-      return {
-        style: { verticalAlign: 'baseline' },
-      };
+  const dispatch = useAppDispatch();
+  const router = useRouter();
+
+  function handleOpenSlideOver({
+    triggerID,
+    e,
+  }: {
+    triggerID: string;
+    e: React.MouseEvent<HTMLElement>;
+  }) {
+    if (e.target instanceof HTMLElement) {
+      const runID = e.target.dataset.key;
+      router.push(`/newstream/trigger/${triggerID}`);
+      dispatch(selectEvent(triggerID));
+      if (runID) {
+        dispatch(selectRun(runID));
+      }
     }
-  };
+  }
+
+  const getRowProps = (row: Row<Trigger>) => ({
+    style: {
+      verticalAlign:
+        row.original.functionRuns.length > 1 ? 'baseline' : 'initial',
+      cursor: 'pointer',
+    },
+    onClick: (e: React.MouseEvent<HTMLElement>) =>
+      handleOpenSlideOver({ triggerID: row.original.id, e }),
+  });
 
   return (
     <div className="flex flex-col min-h-0 min-w-0">
