@@ -6,7 +6,7 @@ import StreamDetails from '../../StreamDetails';
 import { selectEvent, selectRun } from '@/store/global';
 import { useAppDispatch } from '@/store/hooks';
 
-export default function Page() {
+export default function SlideOverStreamDetailsPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
 
