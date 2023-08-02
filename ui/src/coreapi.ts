@@ -1,4 +1,4 @@
-import { gql } from "graphql-request";
+import { gql } from 'graphql-request';
 
 export const EVENTS_STREAM = gql`
   query GetEventsStream {
@@ -136,7 +136,7 @@ export const ADD_APP = gql`
     createApp(input: $input) {
       url
     }
-  } 
+  }
 `;
 
 export const UPDATE_APP = gql`
@@ -145,11 +145,11 @@ export const UPDATE_APP = gql`
       url
       id
     }
-  } 
+  }
 `;
 
 export const DELETE_APP = gql`
   mutation DeleteApp($id: String!) {
     deleteApp(id: $id)
-  } 
+  }
 `;

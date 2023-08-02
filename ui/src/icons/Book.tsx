@@ -12,5 +12,5 @@ export function IconBook() {
         />
       </g>
     </svg>
-  )
+  );
 }

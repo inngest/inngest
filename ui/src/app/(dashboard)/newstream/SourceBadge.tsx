@@ -1,6 +1,7 @@
 import type { Row } from '@tanstack/react-table';
-import { IconWindow, IconClock, IconReplay, IconWebhook } from '@/icons';
+
 import Badge from '@/components/Badge';
+import { IconClock, IconReplay, IconWebhook, IconWindow } from '@/icons';
 import type { Trigger } from './page';
 
 type SourceBadgeProps = {

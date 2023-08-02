@@ -1,24 +1,22 @@
-import Editor, { useMonaco } from "@monaco-editor/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Editor, { useMonaco } from '@monaco-editor/react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
-import { usePortal } from "../../hooks/usePortal";
-import { useSendEventMutation } from "../../store/devApi";
-import { selectEvent } from "../../store/global";
-import { useAppDispatch } from "../../store/hooks";
-import { genericiseEvent } from "../../utils/events";
-import Modal from '@/components/Modal';
 
-export default function SendEventModal({data, isOpen, onClose}) {
+import Modal from '@/components/Modal';
+import { usePortal } from '../../hooks/usePortal';
+import { useSendEventMutation } from '../../store/devApi';
+import { selectEvent } from '../../store/global';
+import { useAppDispatch } from '../../store/hooks';
+import { genericiseEvent } from '../../utils/events';
+
+export default function SendEventModal({ data, isOpen, onClose }) {
   const [_sendEvent, sendEventState] = useSendEventMutation();
   const portal = usePortal();
   const eventDataStr = data;
   const dispatch = useAppDispatch();
 
-  const snippedData = useMemo(
-    () => genericiseEvent(eventDataStr),
-    [eventDataStr]
-  );
+  const snippedData = useMemo(() => genericiseEvent(eventDataStr), [eventDataStr]);
 
   const [input, setInput] = useState(snippedData);
   useEffect(() => {
@@ -33,41 +31,41 @@ export default function SendEventModal({data, isOpen, onClose}) {
     let data: any;
 
     try {
-      data = JSON.parse(input || "");
+      data = JSON.parse(input || '');
 
-      if (typeof data.id !== "string") {
+      if (typeof data.id !== 'string') {
         data.id = ulid();
       }
 
-      if (!data.ts || typeof data.ts !== "number") {
+      if (!data.ts || typeof data.ts !== 'number') {
         data.ts = Date.now();
       }
     } catch (err) {
-      return pushToast("Event payload could not be parsed as JSON.");
+      return pushToast('Event payload could not be parsed as JSON.');
     }
 
     if (!data.name) {
-      return pushToast("Event payload must contain a name.");
+      return pushToast('Event payload must contain a name.');
     }
 
-    if (typeof data.name !== "string") {
+    if (typeof data.name !== 'string') {
       return pushToast(
-        "Event payload name must be a string, ideally in the format 'scope/subject.verb'."
+        "Event payload name must be a string, ideally in the format 'scope/subject.verb'.",
       );
     }
 
-    if (data.data && typeof data.data !== "object") {
-      return pushToast("Event payload data must be an object if defined.");
+    if (data.data && typeof data.data !== 'object') {
+      return pushToast('Event payload data must be an object if defined.');
     }
 
-    if (data.user && typeof data.user !== "object") {
-      return pushToast("Event payload user must be an object if defined.");
+    if (data.user && typeof data.user !== 'object') {
+      return pushToast('Event payload user must be an object if defined.');
     }
 
     _sendEvent(data)
       .unwrap()
       .then(() => {
-        toast.success('The event was successfully added.')
+        toast.success('The event was successfully added.');
         onClose();
         dispatch(selectEvent(data.id));
       });
@@ -89,36 +87,36 @@ export default function SendEventModal({data, isOpen, onClose}) {
       validate: true,
       schemas: [
         {
-          uri: "https://inngest.com/event-schema.json",
-          fileMatch: ["*"],
+          uri: 'https://inngest.com/event-schema.json',
+          fileMatch: ['*'],
           schema: {
-            type: "object",
+            type: 'object',
             properties: {
               name: {
-                type: "string",
+                type: 'string',
                 description:
                   "A unique identifier for the event. The recommended format is scope/subject.verb, e.g. 'app/user.created' or 'stripe/payment.succeeded'.",
               },
               data: {
-                type: "object",
+                type: 'object',
                 additionalProperties: true,
-                description: "Any data pertinent to the event.",
+                description: 'Any data pertinent to the event.',
               },
               user: {
-                type: "object",
+                type: 'object',
                 additionalProperties: true,
                 description:
                   "Any user data associated with the event. All fields ending in '_id' will be used to attribute the event to a particular user.",
               },
               ts: {
-                type: "number",
+                type: 'number',
                 multipleOf: 1,
                 minimum: 0,
                 description:
-                  "An integer representing the milliseconds since the unix epoch at which this event occured. If omitted, the current time will be used.",
+                  'An integer representing the milliseconds since the unix epoch at which this event occured. If omitted, the current time will be used.',
               },
             },
-            required: ["name"],
+            required: ['name'],
           },
         },
       ],
@@ -141,7 +139,7 @@ export default function SendEventModal({data, isOpen, onClose}) {
                 onClick={() => sendEvent()}
                 className="bg-slate-700/50 hover:bg-slate-700/80 border-slate-700/50 flex gap-1.5 items-center border text-xs rounded-sm px-2.5 py-1 text-slate-100 transition-all duration-150"
               >
-                {sendEventState.isLoading ? "Spinner" : "Send event"}
+                {sendEventState.isLoading ? 'Spinner' : 'Send event'}
               </button>
             </div>
           </div>
@@ -149,16 +147,16 @@ export default function SendEventModal({data, isOpen, onClose}) {
         {monaco ? (
           <Editor
             defaultLanguage="json"
-            value={input ?? "{}"}
-            onChange={(value) => setInput(value || "")}
+            value={input ?? '{}'}
+            onChange={(value) => setInput(value || '')}
             className="overflow-x-hidden flex-1 mx-4 mb-4"
             theme="vs-dark"
             onMount={(editor) => {
               editor.addAction({
-                id: "sendInngestEvent",
-                label: "Send Inngest Event",
+                id: 'sendInngestEvent',
+                label: 'Send Inngest Event',
                 keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
-                contextMenuGroupId: "2_execution",
+                contextMenuGroupId: '2_execution',
                 run: () => {
                   sendEventRef.current();
                 },
@@ -171,19 +169,19 @@ export default function SendEventModal({data, isOpen, onClose}) {
               minimap: {
                 enabled: false,
               },
-              lineNumbers: "off",
-              extraEditorClassName: "",
-              theme: "vs-dark",
+              lineNumbers: 'off',
+              extraEditorClassName: '',
+              theme: 'vs-dark',
               contextmenu: false,
               inlayHints: {
-                enabled: "on",
+                enabled: 'on',
               },
               scrollBeyondLastLine: false,
-              wordWrap: "on",
+              wordWrap: 'on',
             }}
           />
         ) : null}
       </div>
-    </Modal>
+    </Modal>,
   );
-};
+}

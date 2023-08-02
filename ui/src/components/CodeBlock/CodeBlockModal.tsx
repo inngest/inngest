@@ -1,22 +1,19 @@
-import { useEffect } from "react";
+import { useEffect } from 'react';
 
 interface CodeBlockModalProps {
   children: React.ReactNode;
   closeModal: () => void;
 }
 
-export default function CodeBlockModal({
-  children,
-  closeModal,
-}: CodeBlockModalProps) {
+export default function CodeBlockModal({ children, closeModal }: CodeBlockModalProps) {
   useEffect(() => {
     const close = (e) => {
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         closeModal();
       }
     };
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
   }, []);
 
   return (

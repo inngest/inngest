@@ -1,5 +1,5 @@
-import classNames from "../../utils/classnames";
-import { Time } from "../Time";
+import classNames from '../../utils/classnames';
+import { Time } from '../Time';
 
 interface ContentCardProps {
   children: React.ReactNode;
@@ -17,20 +17,18 @@ export default function ContentCard({
   date,
   button,
   id,
-  idPrefix = "",
+  idPrefix = '',
   active = false,
 }: ContentCardProps) {
   return (
     <div
       className={classNames(
         active ? `bg-slate-950` : ``,
-        `flex-1 border rounded-lg border-slate-800/30 overflow-hidden flex flex-col shrink-0`
+        `flex-1 border rounded-lg border-slate-800/30 overflow-hidden flex flex-col shrink-0`,
       )}
     >
       <div
-        className={classNames(
-          title ? "shadow-slate-950 px-5 py-4 shadow-lg relative z-30" : ""
-        )}
+        className={classNames(title ? 'shadow-slate-950 px-5 py-4 shadow-lg relative z-30' : '')}
       >
         {title ? (
           <div className="mb-5">
@@ -43,7 +41,7 @@ export default function ContentCard({
 
         <div className="flex items-center justify-between">
           {button && button}
-          <span className="text-3xs leading-none">{[idPrefix, id].filter(Boolean).join(": ")}</span>
+          <span className="text-3xs leading-none">{[idPrefix, id].filter(Boolean).join(': ')}</span>
         </div>
       </div>
       <div className="overflow-y-scroll flex-1">{children}</div>

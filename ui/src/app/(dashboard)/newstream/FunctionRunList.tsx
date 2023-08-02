@@ -1,10 +1,10 @@
-import { FunctionRunStatus } from '@/store/generated';
 import {
-  IconStatusCircleCheck,
   IconStatusCircleArrowPath,
+  IconStatusCircleCheck,
   IconStatusCircleCross,
   IconStatusCircleMinus,
 } from '@/icons';
+import { FunctionRunStatus } from '@/store/generated';
 
 const functionRunStatusIcons = {
   [FunctionRunStatus.Running]: IconStatusCircleArrowPath,
@@ -21,9 +21,7 @@ type FunctionRunListProps = {
   }[];
 };
 
-export default function FunctionRunList({
-  functionRuns,
-}: FunctionRunListProps) {
+export default function FunctionRunList({ functionRuns }: FunctionRunListProps) {
   return (
     <>
       {functionRuns.length < 1 ? (
@@ -33,7 +31,11 @@ export default function FunctionRunList({
           {functionRuns.map((functionRun) => {
             const FunctionRunStatusIcon = functionRunStatusIcons[functionRun.status];
             return (
-              <li key={functionRun.id} data-key={functionRun.id} className="flex items-center gap-2">
+              <li
+                key={functionRun.id}
+                data-key={functionRun.id}
+                className="flex items-center gap-2"
+              >
                 <FunctionRunStatusIcon />
                 {functionRun.name}
               </li>

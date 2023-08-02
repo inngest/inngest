@@ -19,9 +19,7 @@ export default function Badge({
 
   return (
     <span className={classNames}>
-      {kind === 'error' && (
-        <IconExclamationTriangleSolid className="text-rose-400 w-3 h-3" />
-      )}
+      {kind === 'error' && <IconExclamationTriangleSolid className="text-rose-400 w-3 h-3" />}
       {children}
     </span>
   );

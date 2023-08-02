@@ -1,7 +1,7 @@
-import { EventStatus, FunctionRunStatus } from "../../store/generated";
-import classNames from "../../utils/classnames";
-import statusStyles from "../../utils/statusStyles";
-import { Time } from "../Time";
+import { EventStatus, FunctionRunStatus } from '../../store/generated';
+import classNames from '../../utils/classnames';
+import statusStyles from '../../utils/statusStyles';
+import { Time } from '../Time';
 
 interface TimelineFeedContent {
   date: string | number;
@@ -29,7 +29,7 @@ export default function TimelineFeedContent({
         active
           ? `outline outline-2 outline-indigo-400 outline-offset-3 bg-slate-900 border-slate-700/50`
           : `hover:bg-slate-800`,
-        `pr-1.5 pl-2.5 pb-1.5 pt-2.5 bg-transparent border border-transparent text-left rounded group flex flex-col flex-1 min-w-0`
+        `pr-1.5 pl-2.5 pb-1.5 pt-2.5 bg-transparent border border-transparent text-left rounded group flex flex-col flex-1 min-w-0`,
       )}
       onClick={
         onClick
@@ -48,7 +48,9 @@ export default function TimelineFeedContent({
           <span className={`${eventStatusStyles.text}`}>{name}</span>
         </h4>
         <span
-          className={`rounded-md ${eventStatusStyles.fnBG} ${badge > 0 ? "text-slate-100" : "text-slate-400"} text-3xs font-semibold leading-none flex items-center justify-center py-1.5 px-2`}
+          className={`rounded-md ${eventStatusStyles.fnBG} ${
+            badge > 0 ? 'text-slate-100' : 'text-slate-400'
+          } text-3xs font-semibold leading-none flex items-center justify-center py-1.5 px-2`}
         >
           {badge}
         </span>

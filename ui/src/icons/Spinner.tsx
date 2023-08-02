@@ -1,10 +1,11 @@
-import classNames from "@/utils/classnames";
+import classNames from '@/utils/classnames';
 
 export function IconSpinner({ className }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
-      width="14px" height="14px"
+      width="14px"
+      height="14px"
       className={classNames(className, `animate-spin`)}
       viewBox="0 0 100 101"
       fill="none"

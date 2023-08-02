@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
-import AppCard from '@/components/App/AppCard';
-import { IconWindow, IconSpinner } from '@/icons';
+
 import AddAppButton from '@/components/App/AddAppButton';
+import AppCard from '@/components/App/AppCard';
+import { IconSpinner, IconWindow } from '@/icons';
 import { useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {
@@ -24,8 +25,7 @@ export default function AppList() {
       <header className="mb-8">
         <h1 className="text-lg text-slate-50">Connected Apps</h1>
         <p className="my-4">
-          This is a list of all apps. We auto-detect apps that you have defined
-          in specific ports.
+          This is a list of all apps. We auto-detect apps that you have defined in specific ports.
         </p>
         <div className="flex items-center gap-5">
           <AddAppButton />
@@ -41,9 +41,7 @@ export default function AppList() {
           {numberOfConnectedApps} / {apps.length} Apps Connected
         </p>
       </div>
-      <div className="grid md:grid-cols-2 grid-cols-1 gap-6 min-h-max">
-        {memoizedAppCards}
-      </div>
+      <div className="grid md:grid-cols-2 grid-cols-1 gap-6 min-h-max">{memoizedAppCards}</div>
     </div>
   );
 }

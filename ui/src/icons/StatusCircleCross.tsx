@@ -21,14 +21,7 @@ export function IconStatusCircleCross({
           stroke="#1E293B"
         />
       )}
-      <rect
-        x="5.375"
-        y="5.375"
-        width="19.25"
-        height="19.25"
-        rx="9.625"
-        fill="white"
-      />
+      <rect x="5.375" y="5.375" width="19.25" height="19.25" rx="9.625" fill="white" />
       <path
         fillRule="evenodd"
         clipRule="evenodd"

@@ -1,5 +1,6 @@
 import { useRouter } from 'next/navigation';
 import { useDispatch } from 'react-redux';
+
 import { showDocs } from '@/store/global';
 
 const useDocsNavigation = () => {
@@ -8,7 +9,7 @@ const useDocsNavigation = () => {
 
   const navigateToDocs = (docsPath) => {
     dispatch(showDocs(docsPath));
-    router.push("/docs");
+    router.push('/docs');
   };
 
   return navigateToDocs;

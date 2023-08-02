@@ -1,5 +1,5 @@
 import Tag from '@/components/Tag';
-import { IconEvent, IconClock } from '@/icons';
+import { IconClock, IconEvent } from '@/icons';
 
 type TriggerTagProps = {
   name: string;

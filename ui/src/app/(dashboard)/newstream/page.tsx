@@ -1,21 +1,18 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import {
-  createColumnHelper,
-  getCoreRowModel,
-  type Row,
-} from '@tanstack/react-table';
+import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
+import { triggerStream } from 'mock/triggerStream';
+
 import SendEventButton from '@/components/Event/SendEventButton';
+import Table from '@/components/Table';
 import { FunctionRunStatus, FunctionTriggerTypes } from '@/store/generated';
 import { selectEvent, selectRun } from '@/store/global';
 import { useAppDispatch } from '@/store/hooks';
-import Table from '@/components/Table';
+import { fullDate } from '@/utils/date';
+import FunctionRunList from './FunctionRunList';
 import SourceBadge from './SourceBadge';
 import TriggerTag from './TriggerTag';
-import FunctionRunList from './FunctionRunList';
-import { triggerStream } from 'mock/triggerStream';
-import { fullDate } from '@/utils/date';
 
 export type Trigger = {
   id: string;
@@ -40,10 +37,7 @@ const columns = [
   columnHelper.accessor('startedAt', {
     header: () => <span>Started At</span>,
     cell: (props) => (
-      <time
-        dateTime={fullDate(new Date(props.getValue()))}
-        suppressHydrationWarning={true}
-      >
+      <time dateTime={fullDate(new Date(props.getValue()))} suppressHydrationWarning={true}>
         {fullDate(new Date(props.getValue()))}
       </time>
     ),
@@ -55,12 +49,7 @@ const columns = [
   }),
   columnHelper.accessor('type', {
     header: () => <span>Trigger</span>,
-    cell: (props) => (
-      <TriggerTag
-        name={props.row.original.name}
-        type={props.row.original.type}
-      />
-    ),
+    cell: (props) => <TriggerTag name={props.row.original.name} type={props.row.original.type} />,
   }),
   columnHelper.accessor('functionRuns', {
     header: () => <span>Function</span>,
@@ -91,8 +80,7 @@ export default function Stream() {
 
   const getRowProps = (row: Row<Trigger>) => ({
     style: {
-      verticalAlign:
-        row.original.functionRuns.length > 1 ? 'baseline' : 'initial',
+      verticalAlign: row.original.functionRuns.length > 1 ? 'baseline' : 'initial',
       cursor: 'pointer',
     },
     onClick: (e: React.MouseEvent<HTMLElement>) =>

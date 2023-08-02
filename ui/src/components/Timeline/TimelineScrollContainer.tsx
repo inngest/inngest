@@ -1,4 +1,4 @@
-import { useAutoAnimate } from "@formkit/auto-animate/react";
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 
 export default function TimelineContainer({ children }) {
   const [animationRef] = useAutoAnimate<HTMLUListElement>({

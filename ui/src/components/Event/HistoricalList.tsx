@@ -1,5 +1,5 @@
-import { EventStatus, useGetEventsStreamQuery } from "../../store/generated";
-import statusStyles from "../../utils/statusStyles";
+import { EventStatus, useGetEventsStreamQuery } from '../../store/generated';
+import statusStyles from '../../utils/statusStyles';
 
 interface ListItemProps {
   date: Date;
@@ -15,9 +15,7 @@ function ListItem({ date, id, badge, status }: ListItemProps) {
     <button className="px-4 py-4 bg-transparent border-t border-slate-800/50 text-left group flex flex-col min-w-0 w-full first-of-type:border-transparent hover:bg-slate-800/40">
       <div className="flex items-start justify-between w-full">
         <div className="text-sm font-normal whitespace-nowrap overflow-hidden text-ellipsis grow pr-2 leading-none">
-          <span className={`block text-xs ${eventStatusStyles.text}`}>
-            {date.toISOString()}
-          </span>
+          <span className={`block text-xs ${eventStatusStyles.text}`}>{date.toISOString()}</span>
           <span className={`block text-3xs text-slate-500 mt-2`}>{id}</span>
         </div>
         <span

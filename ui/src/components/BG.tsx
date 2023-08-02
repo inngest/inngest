@@ -188,5 +188,5 @@ export default function BG() {
         </g>
       </svg>
     </div>
-  )
+  );
 }

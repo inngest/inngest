@@ -1,15 +1,12 @@
-import classNames from '@/utils/classnames';
 import { IconCheckCircle, IconExclamationTriangle } from '@/icons';
+import classNames from '@/utils/classnames';
 
 type AppCardHeaderProps = {
   functionCount: number;
   connected: boolean;
 };
 
-export default function AppCardHeader({
-  connected,
-  functionCount,
-}: AppCardHeaderProps) {
+export default function AppCardHeader({ connected, functionCount }: AppCardHeaderProps) {
   let headerColor, headerLabel, headerIcon;
 
   if (!connected) {
@@ -30,7 +27,7 @@ export default function AppCardHeader({
     <header
       className={classNames(
         headerColor,
-        `text-white rounded-t-md px-6 py-2.5 capitalize flex gap-2 items-center justify-between`
+        `text-white rounded-t-md px-6 py-2.5 capitalize flex gap-2 items-center justify-between`,
       )}
     >
       <div className="flex items-center gap-2 leading-7">

@@ -1,4 +1,5 @@
 import { Disclosure, Transition } from '@headlessui/react';
+
 import classNames from '@/utils/classnames';
 
 type AppCardStepProps = {
@@ -24,9 +25,7 @@ export default function AppCardStep({
       <span
         className={classNames(
           `absolute w-px bg-slate-800`,
-          isEvenStep
-            ? verticalLineForEvenStepsclassNames
-            : verticalLineForOddStepsclassNames
+          isEvenStep ? verticalLineForEvenStepsclassNames : verticalLineForOddStepsclassNames,
         )}
         aria-hidden="true"
       />

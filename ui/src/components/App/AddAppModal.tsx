@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import Modal from '@/components/Modal';
+
 import Button from '@/components/Button';
-import { IconExclamationTriangleSolid } from '@/icons';
-import classNames from '@/utils/classnames';
-import { useCreateAppMutation } from '@/store/generated';
+import Modal from '@/components/Modal';
 import useDebounce from '@/hooks/useDebounce';
+import { IconExclamationTriangleSolid } from '@/icons';
+import { useCreateAppMutation } from '@/store/generated';
+import classNames from '@/utils/classnames';
 import isValidUrl from '@/utils/urlValidation';
 
 export default function AddAppModal({ isOpen, onClose }) {
@@ -54,12 +55,12 @@ export default function AddAppModal({ isOpen, onClose }) {
     createApp();
   }
 
-  function handleKeyDown (e) {
+  function handleKeyDown(e) {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleSubmit(e);
     }
-  };
+  }
 
   return (
     <Modal
@@ -70,21 +71,16 @@ export default function AddAppModal({ isOpen, onClose }) {
     >
       <form onSubmit={handleSubmit}>
         <div className="bg-[#050911]/50 p-6">
-          <label
-            htmlFor="addAppUrlModal"
-            className="text-sm font-semibold text-white"
-          >
+          <label htmlFor="addAppUrlModal" className="text-sm font-semibold text-white">
             App URL
-            <span className="text-slate-500 text-sm pb-4 block">
-              The URL of your application
-            </span>
+            <span className="text-slate-500 text-sm pb-4 block">The URL of your application</span>
           </label>
           <div className="relative">
             <input
               id="addAppUrlModal"
               className={classNames(
                 'min-w-[420px] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline',
-                isUrlInvalid && inputUrl.length > 0 && 'pr-8 outline-rose-400'
+                isUrlInvalid && inputUrl.length > 0 && 'pr-8 outline-rose-400',
               )}
               placeholder="http://localhost:3000/api/inngest"
               value={inputUrl}
@@ -104,11 +100,7 @@ export default function AddAppModal({ isOpen, onClose }) {
         )}
         <div className="flex items-center justify-between p-6 border-t border-slate-800">
           <Button label="Cancel" kind="secondary" btnAction={onClose} />
-          <Button
-            disabled={isDisabled || isUrlInvalid}
-            label="Connect App"
-            type="submit"
-          />
+          <Button disabled={isDisabled || isUrlInvalid} label="Connect App" type="submit" />
         </div>
       </form>
     </Modal>
