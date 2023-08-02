@@ -1,9 +1,9 @@
-type LayoutProps = {
+type StreamLayoutProps = {
   children: React.ReactNode;
   slideOver: React.ReactNode;
 };
 
-export default function Layout({ children, slideOver }: LayoutProps) {
+export default function StreamLayout({ children, slideOver }: StreamLayoutProps) {
   return (
     <>
       {children}
