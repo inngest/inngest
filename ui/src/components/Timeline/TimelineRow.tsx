@@ -1,6 +1,6 @@
-import { EventStatus, FunctionRunStatus } from "../../store/generated";
-import classNames from "../../utils/classnames";
-import statusStyles from "../../utils/statusStyles";
+import { EventStatus, FunctionRunStatus } from '../../store/generated';
+import classNames from '../../utils/classnames';
+import statusStyles from '../../utils/statusStyles';
 
 interface TimelineRowProps {
   status: EventStatus | FunctionRunStatus | null;
@@ -25,7 +25,7 @@ export default function TimelineRow({
         <div
           className={classNames(
             topLine ? `bg-slate-700/60` : ``,
-            `w-[2px] shrink-0 bg-transparent`
+            `w-[2px] shrink-0 bg-transparent`,
           )}
           style={{ flexBasis: `${iconOffset}px` }}
         ></div>
@@ -35,7 +35,7 @@ export default function TimelineRow({
         <div
           className={classNames(
             bottomLine ? `bg-slate-700/60` : ``,
-            `basis-[100%] w-[2px] bg-transparent`
+            `basis-[100%] w-[2px] bg-transparent`,
           )}
         ></div>
       </div>

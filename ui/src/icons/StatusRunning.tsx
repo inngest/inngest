@@ -7,5 +7,5 @@ export function IconStatusRunning() {
         fillRule="nonzero"
       />
     </svg>
-  )
+  );
 }

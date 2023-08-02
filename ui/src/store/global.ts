@@ -1,5 +1,5 @@
-import type { PayloadAction } from "@reduxjs/toolkit";
-import { createSlice } from "@reduxjs/toolkit";
+import type { PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 
 const initialState: {
   docsPath: string | null;
@@ -12,7 +12,7 @@ const initialState: {
 };
 
 const globalState = createSlice({
-  name: "global",
+  name: 'global',
   initialState,
   reducers: {
     selectEvent(state, action: PayloadAction<string | null>) {
@@ -22,16 +22,12 @@ const globalState = createSlice({
       state.selectedRun = action.payload;
     },
     showDocs(state, action: PayloadAction<`/${string}` | null | undefined>) {
-      if (typeof action.payload !== "undefined") {
+      if (typeof action.payload !== 'undefined') {
         state.docsPath = action.payload || null;
       }
     },
   },
 });
 
-export const {
-  selectEvent,
-  selectRun,
-  showDocs,
-} = globalState.actions;
+export const { selectEvent, selectRun, showDocs } = globalState.actions;
 export default globalState.reducer;

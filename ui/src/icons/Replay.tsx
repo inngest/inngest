@@ -1,12 +1,6 @@
 export function IconReplay({ className }: { className?: string }) {
   return (
-    <svg
-      width="16"
-      height="13"
-      viewBox="0 0 16 13"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
+    <svg width="16" height="13" viewBox="0 0 16 13" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path
         fillRule="evenodd"
         clipRule="evenodd"

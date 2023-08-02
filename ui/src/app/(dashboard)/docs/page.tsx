@@ -11,10 +11,5 @@ export default function Docs() {
    */
   const path = useAppSelector((state) => state.global.docsPath);
 
-  return (
-    <iframe
-      src={`https://inngest.com/docs${path || ''}`}
-      className="w-full h-full"
-    />
-  );
+  return <iframe src={`https://inngest.com/docs${path || ''}`} className="w-full h-full" />;
 }

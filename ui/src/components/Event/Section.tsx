@@ -1,21 +1,18 @@
-import { useMemo } from "react";
+import { useMemo } from 'react';
 import { ulid } from 'ulid';
-import { usePrettyJson } from "../../hooks/usePrettyJson";
-import { useSendEventMutation } from "../../store/devApi";
-import {
-  EventStatus,
-  FunctionRunStatus,
-  useGetEventQuery,
-} from "../../store/generated";
-import { selectEvent, selectRun } from "../../store/global";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import Button from "../Button";
-import CodeBlock from "../CodeBlock";
-import ContentCard from "../Content/ContentCard";
-import FuncCard from "../Function/FuncCard";
-import TimelineRow from "../Timeline/TimelineRow";
-import TimelineStaticContent from "../Timeline/TimelineStaticContent";
+
 import SendEventButton from '@/components/Event/SendEventButton';
+import { usePrettyJson } from '../../hooks/usePrettyJson';
+import { useSendEventMutation } from '../../store/devApi';
+import { EventStatus, FunctionRunStatus, useGetEventQuery } from '../../store/generated';
+import { selectEvent, selectRun } from '../../store/global';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import Button from '../Button';
+import CodeBlock from '../CodeBlock';
+import ContentCard from '../Content/ContentCard';
+import FuncCard from '../Function/FuncCard';
+import TimelineRow from '../Timeline/TimelineRow';
+import TimelineStaticContent from '../Timeline/TimelineStaticContent';
 
 interface EventSectionProps {
   eventId: string;
@@ -50,16 +47,16 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
 
   return (
     <ContentCard
-      title={event.name || "unknown"}
+      title={event.name || 'unknown'}
       date={event.createdAt}
       id={eventId}
-      idPrefix={"Event ID"}
+      idPrefix={'Event ID'}
       active
       // button={<Button label="Open Event" icon={<IconFeed />} />}
     >
       {eventPayload ? (
         <div className="px-4 pt-4">
-          <CodeBlock tabs={[{ label: "Payload", content: eventPayload }]}/>
+          <CodeBlock tabs={[{ label: 'Payload', content: eventPayload }]} />
         </div>
       ) : null}
       <div className="pr-4 pt-4">
@@ -78,22 +75,18 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
 
                     const eventId = ulid();
 
-                    sendEvent(
-                      {
-                        ...JSON.parse(event.raw),
-                        id: eventId,
-                        ts: Date.now(),
-                      },
-                    ).unwrap().then(() => {
-                      dispatch(selectEvent(eventId));
+                    sendEvent({
+                      ...JSON.parse(event.raw),
+                      id: eventId,
+                      ts: Date.now(),
                     })
+                      .unwrap()
+                      .then(() => {
+                        dispatch(selectEvent(eventId));
+                      });
                   }}
                 />
-                <SendEventButton
-                  label="Edit and Replay"
-                  kind="secondary"
-                  data={event.raw}
-                />
+                <SendEventButton label="Edit and Replay" kind="secondary" data={event.raw} />
               </>
             }
           />
@@ -112,11 +105,8 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
                 <div className="flex-1">
                   <div className="flex flex-row justify-between items-center space-x-4">
                     <div>
-                      Function waiting for{" "}
-                      <strong>{run.waitingFor.eventName}</strong> event
-                      {run.waitingFor.expression
-                        ? " matching the expression:"
-                        : ""}
+                      Function waiting for <strong>{run.waitingFor.eventName}</strong> event
+                      {run.waitingFor.expression ? ' matching the expression:' : ''}
                     </div>
                     {/* <div>Continue button</div> */}
                   </div>
@@ -131,11 +121,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
                   <div className="flex flex-row justify-between items-center">
                     <div>
                       Function paused for sleep until&nbsp;
-                      <strong>
-                        {new Date(
-                          run.waitingFor.expiryTime
-                        ).toLocaleTimeString()}
-                      </strong>
+                      <strong>{new Date(run.waitingFor.expiryTime).toLocaleTimeString()}</strong>
                     </div>
                     {/* <div>Continue button</div> */}
                   </div>
@@ -152,7 +138,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
               bottomLine={i < list.length - 1}
             >
               <FuncCard
-                title={run.name || "Unknown"}
+                title={run.name || 'Unknown'}
                 date={run.startedAt}
                 id={run.id}
                 status={status}

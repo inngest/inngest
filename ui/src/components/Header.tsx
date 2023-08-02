@@ -1,5 +1,5 @@
-import { InngestLogo, InngestSmallLogo } from '@/icons';
 import AddAppButton from '@/components/App/AddAppButton';
+import { InngestLogo, InngestSmallLogo } from '@/icons';
 
 type Props = {
   children?: React.ReactNode;
@@ -12,9 +12,7 @@ export default function Header(props: Props) {
         <h1 className="text-slate-300 text-sm flex items-end">
           <InngestSmallLogo className="block md:hidden" />
           <InngestLogo className="hidden md:block" />
-          <span className="ml-1.5 text-indigo-400 hidden md:block">
-            Dev Server
-          </span>
+          <span className="ml-1.5 text-indigo-400 hidden md:block">Dev Server</span>
         </h1>
         {props.children}
       </nav>

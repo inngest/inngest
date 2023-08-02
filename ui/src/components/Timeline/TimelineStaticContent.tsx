@@ -1,4 +1,4 @@
-import { Time } from "../Time";
+import { Time } from '../Time';
 
 interface TimelineStaticRowProps {
   label: string;
@@ -6,11 +6,7 @@ interface TimelineStaticRowProps {
   actionBtn?: React.ReactNode;
 }
 
-export default function TimelineStaticRow({
-  label,
-  date,
-  actionBtn,
-}: TimelineStaticRowProps) {
+export default function TimelineStaticRow({ label, date, actionBtn }: TimelineStaticRowProps) {
   return (
     <div className="flex items-start justify-between w-full pt-[2px]">
       <div>

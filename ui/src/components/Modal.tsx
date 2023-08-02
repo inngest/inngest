@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
+
 import classNames from '@/utils/classnames';
 
 type ModalProps = {
@@ -8,7 +9,7 @@ type ModalProps = {
   onClose: () => void;
   title?: string;
   description?: string;
-  maxWidth?: string; 
+  maxWidth?: string;
 };
 
 export default function Modal({
@@ -17,7 +18,7 @@ export default function Modal({
   onClose,
   title,
   description,
-  maxWidth = "max-w-lg"
+  maxWidth = 'max-w-lg',
 }: ModalProps) {
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -50,7 +51,12 @@ export default function Modal({
               leaveTo="opacity-0 scale-95"
             >
               {/* The actual dialog panel  */}
-              <Dialog.Panel className={classNames(maxWidth, "transform overflow-hidden rounded bg-slate-950 shadow-xl transition-all")}>
+              <Dialog.Panel
+                className={classNames(
+                  maxWidth,
+                  'transform overflow-hidden rounded bg-slate-950 shadow-xl transition-all',
+                )}
+              >
                 {(title || description) && (
                   <div className="border-b border-slate-800 p-6">
                     <Dialog.Title className="text-white text-xl font-semibold">

@@ -1,7 +1,7 @@
-import { EventStatus, FunctionRunStatus } from "../../store/generated";
-import classNames from "../../utils/classnames";
-import statusStyles, { FunctionStatus } from "../../utils/statusStyles";
-import { Time } from "../Time";
+import { EventStatus, FunctionRunStatus } from '../../store/generated';
+import classNames from '../../utils/classnames';
+import statusStyles, { FunctionStatus } from '../../utils/statusStyles';
+import { Time } from '../Time';
 
 interface FuncCardProps {
   title: string;
@@ -33,7 +33,7 @@ export default function FuncCard({
           ? `outline outline-2 outline-indigo-400 outline-offset-3 bg-slate-900 border-slate-700/50`
           : null,
         `px-5 py-3.5 bg-slate-800/50 w-full rounded-lg block`,
-        onClick ? "hover:bg-slate-800/80 cursor-pointer" : null
+        onClick ? 'hover:bg-slate-800/80 cursor-pointer' : null,
       )}
       onClick={
         onClick

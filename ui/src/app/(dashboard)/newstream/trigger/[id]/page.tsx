@@ -2,11 +2,11 @@
 
 import { useEffect } from 'react';
 import { useParams } from 'next/navigation';
+
 import { EventSection } from '@/components/Event/Section';
 import { FunctionRunSection } from '@/components/Function/RunSection';
 import { selectEvent } from '@/store/global';
-import { useAppSelector } from '@/store/hooks';
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
 export default function StreamDetails() {
   const selectedEvent = useAppSelector((state) => state.global.selectedEvent);

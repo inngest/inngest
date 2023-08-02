@@ -1,28 +1,22 @@
 'use client';
 
-import { useGetFunctionsQuery } from '@/store/generated';
 import { BlankSlate } from '@/components/Blank';
-import useDocsNavigation from '@/hooks/useDocsNavigation';
-import { IconEvent, IconClock } from '@/icons';
+import SendEventButton from '@/components/Event/SendEventButton';
 import Skeleton from '@/components/Skeleton';
 import Tag from '@/components/Tag';
+import useDocsNavigation from '@/hooks/useDocsNavigation';
+import { IconClock, IconEvent } from '@/icons';
+import { useGetFunctionsQuery } from '@/store/generated';
 import classNames from '@/utils/classnames';
-import SendEventButton from '@/components/Event/SendEventButton';
 
 const cellStyles = 'pl-6 pr-2 py-3';
 
-const HeaderCell = ({
-  children,
-  colSpan,
-}: {
-  children?: React.ReactNode;
-  colSpan: number;
-}) => {
+const HeaderCell = ({ children, colSpan }: { children?: React.ReactNode; colSpan: number }) => {
   return (
     <th
       className={classNames(
         'w-fit whitespace-nowrap text-left text-xs font-semibold text-white',
-        cellStyles
+        cellStyles,
       )}
       colSpan={colSpan}
     >
@@ -92,9 +86,7 @@ export default function FunctionList() {
             <>
               {functions.map((func) => {
                 const getFirstEventValue = () => {
-                  const eventTrigger = func?.triggers?.find(
-                    (trigger) => trigger.type === 'EVENT'
-                  );
+                  const eventTrigger = func?.triggers?.find((trigger) => trigger.type === 'EVENT');
                   return eventTrigger ? eventTrigger.value : null;
                 };
                 const cleanUrl = new URL(func.url || '');
@@ -107,27 +99,20 @@ export default function FunctionList() {
                         title={func.name}
                         className={classNames(
                           'pl-6 px-2 py-3 text-sm font-medium leading-7 text-ellipsis overflow-hidden',
-                          cellStyles
+                          cellStyles,
                         )}
                       >
                         {func.name}
                       </p>
                     </td>
                     {/* Triggers */}
-                    <td
-                      className={classNames(cellStyles, 'whitespace-nowrap')}
-                      colSpan={2}
-                    >
+                    <td className={classNames(cellStyles, 'whitespace-nowrap')} colSpan={2}>
                       {func.triggers?.map((trigger, index) => {
                         return (
                           <Tag key={index}>
                             <div className="flex items-center gap-2">
-                              {trigger.type === 'EVENT' && (
-                                <IconEvent className="h-2" />
-                              )}
-                              {trigger.type === 'CRON' && (
-                                <IconClock className="h-3" />
-                              )}
+                              {trigger.type === 'EVENT' && <IconEvent className="h-2" />}
+                              {trigger.type === 'CRON' && <IconClock className="h-3" />}
                               {trigger.value}
                             </div>
                           </Tag>
@@ -135,21 +120,12 @@ export default function FunctionList() {
                       })}
                     </td>
                     {/* App URL */}
-                    <td
-                      className={classNames(
-                        cellStyles,
-                        'whitespace-nowrap text-sm'
-                      )}
-                      colSpan={3}
-                    >
+                    <td className={classNames(cellStyles, 'whitespace-nowrap text-sm')} colSpan={3}>
                       {cleanUrl.toString()}
                     </td>
                     {/* Trigger Button */}
                     {getFirstEventValue() && (
-                      <td
-                        className={classNames(cellStyles, 'whitespace-nowrap')}
-                        colSpan={1}
-                      >
+                      <td className={classNames(cellStyles, 'whitespace-nowrap')} colSpan={1}>
                         <SendEventButton
                           kind="secondary"
                           label="Trigger"

@@ -1,4 +1,5 @@
-import { useReactTable, flexRender } from '@tanstack/react-table';
+import { flexRender, useReactTable } from '@tanstack/react-table';
+
 import classNames from '@/utils/classnames';
 
 const cellStyles = 'pl-6 pr-2 py-3 whitespace-nowrap';
@@ -16,16 +17,13 @@ export default function Table({ options }) {
                 className={classNames(
                   cellStyles,
                   'bg-slate-900 text-slate-500 font-medium',
-                  header.column.getIsPinned() && 'sticky left-0 z-[4]'
+                  header.column.getIsPinned() && 'sticky left-0 z-[4]',
                 )}
                 key={header.id}
               >
                 {header.isPlaceholder
                   ? null
-                  : flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )}
+                  : flexRender(header.column.columnDef.header, header.getContext())}
               </th>
             ))}
           </tr>
@@ -39,7 +37,7 @@ export default function Table({ options }) {
                 className={classNames(
                   cellStyles,
                   'bg-slate-950',
-                  cell.column.getIsPinned() && 'sticky left-0 z-[2]'
+                  cell.column.getIsPinned() && 'sticky left-0 z-[2]',
                 )}
                 key={cell.id}
               >

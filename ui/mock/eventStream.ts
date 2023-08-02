@@ -136,7 +136,7 @@ const eventStream = [
     name: 'accounts/profile.photo.uploaded',
     badge: 1,
   },
-]
+];
 
 const fnLog = [
   {
@@ -264,9 +264,7 @@ const fnLog = [
     name: 'accounts/profile.photo.uploaded',
     badge: 1,
   },
-]
-
-
+];
 
 export const feeds = [
   {
@@ -276,5 +274,5 @@ export const feeds = [
   {
     name: 'Function Log',
     content: fnLog,
-  }
-]
+  },
+];

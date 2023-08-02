@@ -7,5 +7,5 @@ export function IconStatusFailed() {
         fillRule="evenodd"
       />
     </svg>
-  )
+  );
 }

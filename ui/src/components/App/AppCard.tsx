@@ -1,24 +1,24 @@
 import { useState } from 'react';
-import { toast } from 'sonner';
 import Link from 'next/link';
-import useDocsNavigation from '@/hooks/useDocsNavigation';
-import { type App } from '@/store/generated';
-import CodeLine from '@/components/CodeLine';
+import { toast } from 'sonner';
+
 import AppCardHeader from '@/components/App/AppCardHeader';
 import Badge from '@/components/Badge';
-import AppCardStep from './AppCardStep';
-import classNames from '@/utils/classnames';
-import { useUpdateAppMutation, useDeleteAppMutation } from '@/store/generated';
+import CodeLine from '@/components/CodeLine';
 import useDebounce from '@/hooks/useDebounce';
-import isValidUrl from '@/utils/urlValidation';
+import useDocsNavigation from '@/hooks/useDocsNavigation';
 import {
-  IconStatusCircleCheck,
-  IconStatusCircleExclamation,
+  IconBook,
   IconChevron,
   IconSpinner,
-  IconBook,
+  IconStatusCircleCheck,
+  IconStatusCircleExclamation,
   IconStatusCircleMinus,
 } from '@/icons';
+import { useDeleteAppMutation, useUpdateAppMutation, type App } from '@/store/generated';
+import classNames from '@/utils/classnames';
+import isValidUrl from '@/utils/urlValidation';
+import AppCardStep from './AppCardStep';
 
 export default function AppCard({ app }: { app: App }) {
   const [inputUrl, setInputUrl] = useState(app.url || '');
@@ -81,10 +81,7 @@ export default function AppCard({ app }: { app: App }) {
 
   return (
     <div>
-      <AppCardHeader
-        connected={app.connected}
-        functionCount={app.functionCount}
-      />
+      <AppCardHeader connected={app.connected} functionCount={app.functionCount} />
       <div className="border border-slate-700/30 rounded-b-md divide-y divide-slate-700/30 bg-slate-800/30">
         {!app.name ? (
           <div className="p-4 pr-6 flex items-center gap-2">
@@ -96,9 +93,7 @@ export default function AppCard({ app }: { app: App }) {
             {!app.connected ? (
               <div className="flex items-center gap-2">
                 <IconSpinner className="fill-sky-400 text-slate-800" />
-                <p className="text-slate-400 text-lg font-normal">
-                  Connecting to {app.name}...
-                </p>
+                <p className="text-slate-400 text-lg font-normal">Connecting to {app.name}...</p>
               </div>
             ) : (
               <p className=" text-lg text-white">{app.name}</p>
@@ -117,14 +112,10 @@ export default function AppCard({ app }: { app: App }) {
                     <>{<IconStatusCircleExclamation withOutline />}No Connection to App</>
                   )}
                 </div>
-                <p className="text-slate-300 ui-open:hidden xl:hidden pl-10">
-                  {app.url}
-                </p>
+                <p className="text-slate-300 ui-open:hidden xl:hidden pl-10">{app.url}</p>
               </div>
               <div className="flex items-center gap-4">
-                <p className="text-slate-300 xl:flex xl:ui-open:hidden hidden">
-                  {app.url}
-                </p>
+                <p className="text-slate-300 xl:flex xl:ui-open:hidden hidden">{app.url}</p>
                 <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
               </div>
             </>
@@ -134,24 +125,17 @@ export default function AppCard({ app }: { app: App }) {
               {!app.connected && (
                 <>
                   <p className="pb-4 text-slate-400">
-                    The Inngest Dev Server can’t find your application. Ensure
-                    your full URL is correct, including the correct port.
-                    Inngest automatically scans{' '}
-                    <span className="text-white">multiple ports</span> by
-                    default.
+                    The Inngest Dev Server can’t find your application. Ensure your full URL is
+                    correct, including the correct port. Inngest automatically scans{' '}
+                    <span className="text-white">multiple ports</span> by default.
                   </p>
                   {app.error && (
-                    <p className="pb-4 text-rose-400 font-medium	">
-                      Error: {app.error}
-                    </p>
+                    <p className="pb-4 text-rose-400 font-medium	">Error: {app.error}</p>
                   )}
                 </>
               )}
               <form className="block xl:flex xl:items-center xl:justify-between pb-4">
-                <label
-                  htmlFor="editAppUrl"
-                  className="text-sm font-semibold text-white"
-                >
+                <label htmlFor="editAppUrl" className="text-sm font-semibold text-white">
                   App URL
                   <span className="text-slate-400 text-sm block font-normal">
                     The URL of your application
@@ -163,7 +147,7 @@ export default function AppCard({ app }: { app: App }) {
                     className={classNames(
                       'w-full bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline read-only:outline-transparent',
                       isUrlInvalid && ' outline-rose-400',
-                      isLoading && 'pr-6'
+                      isLoading && 'pr-6',
                     )}
                     value={inputUrl}
                     placeholder="http://localhost:3000/api/inngest"
@@ -182,33 +166,27 @@ export default function AppCard({ app }: { app: App }) {
               </form>
               <div className="grid grid-cols-3 mb-4 border-y border-slate-700/30">
                 <div className="py-4">
-                  <p className="text-sm font-semibold text-white">
-                    {app.framework}
-                  </p>
+                  <p className="text-sm font-semibold text-white">{app.framework}</p>
                   <p className="text-sm text-slate-400">Framework</p>
                 </div>
                 <div className="py-4">
-                  <p className="text-sm font-semibold text-white">
-                    {app.sdkLanguage}
-                  </p>
+                  <p className="text-sm font-semibold text-white">{app.sdkLanguage}</p>
                   <p className="text-sm text-slate-400">Language</p>
                 </div>
                 <div className="py-4">
-                  <p className="text-sm font-semibold text-white">
-                    {app.sdkVersion}
-                  </p>
+                  <p className="text-sm font-semibold text-white">{app.sdkVersion}</p>
                   <p className="text-sm text-slate-400">SDK Version</p>
                 </div>
               </div>
-            {!app.connected &&
-              <a
-                className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
-                onClick={() => navigateToDocs('/sdk/serve')}
-              >
-                Connecting to the Dev Server
-                <IconBook />
-              </a>
-             }
+              {!app.connected && (
+                <a
+                  className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
+                  onClick={() => navigateToDocs('/sdk/serve')}
+                >
+                  Connecting to the Dev Server
+                  <IconBook />
+                </a>
+              )}
             </>
           }
         />
@@ -237,10 +215,7 @@ export default function AppCard({ app }: { app: App }) {
               </div>
               <div className="flex items-center gap-4">
                 {app.functionCount > 0 && (
-                  <Link
-                    className="text-indigo-400 flex items-center gap-2"
-                    href="/functions"
-                  >
+                  <Link className="text-indigo-400 flex items-center gap-2" href="/functions">
                     View Functions
                     <IconChevron className="-rotate-90" />
                   </Link>
@@ -254,14 +229,10 @@ export default function AppCard({ app }: { app: App }) {
               {app.functionCount < 1 && (
                 <>
                   <p className="pb-4 text-slate-400">
-                    There are currently no functions registered at this URL.
-                    Ensure you have created a function and are exporting it
-                    correctly from your serve command.
+                    There are currently no functions registered at this URL. Ensure you have created
+                    a function and are exporting it correctly from your serve command.
                   </p>
-                  <CodeLine
-                    code="serve(client, [list_of_fns]);"
-                    className="p-4 mb-4"
-                  />
+                  <CodeLine code="serve(client, [list_of_fns]);" className="p-4 mb-4" />
                   <a
                     className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
                     onClick={() => navigateToDocs('/functions')}

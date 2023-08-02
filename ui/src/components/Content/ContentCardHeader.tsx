@@ -8,5 +8,5 @@ export default function ContentCardHeader() {
 
       <h1>accounts/profile.photo.uploaded</h1>
     </div>
-  )
+  );
 }

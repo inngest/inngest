@@ -25,7 +25,7 @@ export default function Button({
           ? 'bg-slate-700/50 border-slate-700/50 hover:bg-slate-700/80 disabled:hover:bg-slate-700/50'
           : kind === 'text'
           ? 'text-slate-400 border-transparent hover:text-white disabled:hover:text-slate-40'
-          : 'bg-slate-800/20 border-slate-700/50 hover:bg-slate-800/40 disabled:hover:bg-slate-800/20'
+          : 'bg-slate-800/20 border-slate-700/50 hover:bg-slate-800/40 disabled:hover:bg-slate-800/20',
       )}
       type={type}
       onClick={btnAction}

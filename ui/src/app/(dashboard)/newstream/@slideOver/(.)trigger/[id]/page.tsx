@@ -1,10 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+
 import SlideOver from '@/components/SlideOver';
-import StreamDetails from '../../StreamDetails';
 import { selectEvent, selectRun } from '@/store/global';
 import { useAppDispatch } from '@/store/hooks';
+import StreamDetails from '../../StreamDetails';
 
 export default function SlideOverStreamDetailsPage() {
   const router = useRouter();

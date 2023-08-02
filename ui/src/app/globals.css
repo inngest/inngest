@@ -14,7 +14,7 @@
 
 /* Handle */
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-800 rounded;
+  @apply rounded bg-slate-800;
 }
 
 /* Handle on hover */
@@ -23,5 +23,5 @@
 }
 
 #modals {
-  @apply text-slate-400 text-sm;
+  @apply text-sm text-slate-400;
 }

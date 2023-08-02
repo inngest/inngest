@@ -1,5 +1,5 @@
 export const genericiseEvent = (eventDataStr: string | null | undefined) => {
-  const data = JSON.parse(eventDataStr ?? "{}");
+  const data = JSON.parse(eventDataStr ?? '{}');
 
   return JSON.stringify(
     {
@@ -8,6 +8,6 @@ export const genericiseEvent = (eventDataStr: string | null | undefined) => {
       user: data.user,
     },
     null,
-    2
+    2,
   );
 };

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import TimeAgo, { type Formatter, type ReactTimeagoProps } from "react-timeago";
+import { useEffect, useMemo, useState } from 'react';
+import TimeAgo, { type Formatter, type ReactTimeagoProps } from 'react-timeago';
 
 interface TimeProps extends ReactTimeagoProps {
   date: string | number;
@@ -26,7 +26,5 @@ export const Time = ({ date }: TimeProps) => {
     };
   }, []);
 
-  return (
-    <TimeAgo date={date} formatter={formatter} title={tooltip} key={time} />
-  );
+  return <TimeAgo date={date} formatter={formatter} title={tooltip} key={time} />;
 };

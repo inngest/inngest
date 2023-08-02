@@ -1,21 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import useDocsNavigation from '@/hooks/useDocsNavigation';
-import TimelineScrollContainer from '@/components/Timeline/TimelineScrollContainer';
+
+import ActionBar from '@/components/ActionBar';
+import { BlankSlate } from '@/components/Blank';
 import ContentFrame from '@/components/Content/ContentFrame';
 import { EventSection } from '@/components/Event/Section';
-import { FunctionRunSection } from '@/components/Function/RunSection';
-import { EventStream } from '@/components/Event/Stream';
-import { FuncStream } from '@/components/Function/Stream';
-import { BlankSlate } from '@/components/Blank';
-import { useAppSelector } from '@/store/hooks';
-import {
-  useGetEventsStreamQuery,
-  useGetFunctionsStreamQuery,
-} from '@/store/generated';
 import SendEventButton from '@/components/Event/SendEventButton';
-import ActionBar from '@/components/ActionBar';
+import { EventStream } from '@/components/Event/Stream';
+import { FunctionRunSection } from '@/components/Function/RunSection';
+import { FuncStream } from '@/components/Function/Stream';
+import TimelineScrollContainer from '@/components/Timeline/TimelineScrollContainer';
+import useDocsNavigation from '@/hooks/useDocsNavigation';
+import { useGetEventsStreamQuery, useGetFunctionsStreamQuery } from '@/store/generated';
+import { useAppSelector } from '@/store/hooks';
 import classNames from '@/utils/classnames';
 
 export default function Stream() {
@@ -24,25 +22,19 @@ export default function Stream() {
   const selectedRun = useAppSelector((state) => state.global.selectedRun);
   const navigateToDocs = useDocsNavigation();
 
-  const { hasEvents, isLoading: eventsLoading } = useGetEventsStreamQuery(
-    undefined,
-    {
-      selectFromResult: (result) => ({
-        ...result,
-        hasEvents: Boolean(result.data?.events?.length || 0),
-      }),
-    }
-  );
+  const { hasEvents, isLoading: eventsLoading } = useGetEventsStreamQuery(undefined, {
+    selectFromResult: (result) => ({
+      ...result,
+      hasEvents: Boolean(result.data?.events?.length || 0),
+    }),
+  });
 
-  const { hasRuns, isLoading: runsLoading } = useGetFunctionsStreamQuery(
-    undefined,
-    {
-      selectFromResult: (result) => ({
-        ...result,
-        hasRuns: Boolean(result.data?.functionRuns?.length || 0),
-      }),
-    }
-  );
+  const { hasRuns, isLoading: runsLoading } = useGetFunctionsStreamQuery(undefined, {
+    selectFromResult: (result) => ({
+      ...result,
+      hasRuns: Boolean(result.data?.functionRuns?.length || 0),
+    }),
+  });
 
   const tabs: {
     key: typeof secondaryTab;
@@ -75,7 +67,7 @@ export default function Stream() {
               secondaryTab === tab.key
                 ? `border-indigo-400 text-white`
                 : `border-transparent text-slate-400`,
-              `text-xs px-5 py-2.5 border-b block transition-all duration-150`
+              `text-xs px-5 py-2.5 border-b block transition-all duration-150`,
             )}
             onClick={tab.onClick}
           >

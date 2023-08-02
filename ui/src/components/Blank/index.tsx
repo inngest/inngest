@@ -1,4 +1,4 @@
-import { IconBook, IconFeed } from "../../icons";
+import { IconBook, IconFeed } from '../../icons';
 
 interface BlankSlateProps {
   imageUrl?: string;
@@ -11,13 +11,7 @@ interface BlankSlateProps {
   button?: { text: string; onClick: () => void };
 }
 
-export const BlankSlate = ({
-  imageUrl,
-  title,
-  subtitle,
-  button,
-  link,
-}: BlankSlateProps) => {
+export const BlankSlate = ({ imageUrl, title, subtitle, button, link }: BlankSlateProps) => {
   return (
     <div className="w-full h-full flex items-center justify-center text-white">
       <div className="max-w-[24rem] flex flex-col items-center justify-center text-center space-y-3">
