@@ -103,6 +103,9 @@ devDependencies:
   postcss:
     specifier: 8.4.18
     version: 8.4.18
+  prettier:
+    specifier: 3.0.0
+    version: 3.0.0
   tailwindcss:
     specifier: 3.2.1
     version: 3.2.1(postcss@8.4.18)(ts-node@10.9.1)
@@ -3621,6 +3624,12 @@ packages:
       nanoid: 3.3.6
       picocolors: 1.0.0
       source-map-js: 1.0.2
+
+  /prettier@3.0.0:
+    resolution: {integrity: sha512-zBf5eHpwHOGPC47h0zrPyNn+eAEIdEzfywMoYn2XPi0P44Zp0tSq64rq0xAREh4auw2cJZHo9QUob+NqCQky4g==}
+    engines: {node: '>=14'}
+    hasBin: true
+    dev: true
 
   /prismjs@1.27.0:
     resolution: {integrity: sha512-t13BGPUlFDR7wRB5kQDG4jjl7XeuH6jbJGt11JHPL96qwsEHNX2+68tFXqc1/k+/jALsbSWJKUOT/hcYAZ5LkA==}
