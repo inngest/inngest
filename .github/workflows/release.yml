@@ -23,7 +23,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
       - name: Build app
         run: |
-          set CGO_CXXFLAGS="-std=c++17" go build -o /builds/inngest-windows-amd64 -ldflags="-s -w -X github.com/inngest/inngest/pkg/inngest/version.Version=${{ github.ref_name }} -X github.com/inngest/inngest/pkg/inngest/version.Hash=${{ steps.sha.outputs.sha }} -extldflags=-static" ./cmd/main.go
+          set CGO_CXXFLAGS="-std=c++17" && go build -o /builds/inngest-windows-amd64 -ldflags="-s -w -X github.com/inngest/inngest/pkg/inngest/version.Version=${{ github.ref_name }} -X github.com/inngest/inngest/pkg/inngest/version.Hash=${{ steps.sha.outputs.sha }} -extldflags=-static" ./cmd/main.go
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
