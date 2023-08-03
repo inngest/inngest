@@ -4,9 +4,11 @@ import { useRouter } from 'next/navigation';
 import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
 import { triggerStream } from 'mock/triggerStream';
 
+import { BlankSlate } from '@/components/Blank';
 import SendEventButton from '@/components/Event/SendEventButton';
 import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';
+import useDocsNavigation from '@/hooks/useDocsNavigation';
 import { FunctionRunStatus, FunctionTriggerTypes } from '@/store/generated';
 import { selectEvent, selectRun } from '@/store/global';
 import { useAppDispatch } from '@/store/hooks';
@@ -60,6 +62,7 @@ const columns = [
 export default function Stream() {
   const dispatch = useAppDispatch();
   const router = useRouter();
+  const navigateToDocs = useDocsNavigation();
 
   function handleOpenSlideOver({
     triggerID,
@@ -113,7 +116,17 @@ export default function Stream() {
             },
           }}
           customRowProps={customRowProps}
-          blankState={<p></p>}
+          blankState={
+            <BlankSlate
+              title="Inngest hasn't received any events"
+              subtitle="Read our documentation to learn how to send events to Inngest."
+              imageUrl="/images/no-events.png"
+              button={{
+                text: 'Sending Events',
+                onClick: () => navigateToDocs('/events'),
+              }}
+            />
+          }
         />
       </div>
     </div>

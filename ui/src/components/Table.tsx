@@ -7,7 +7,7 @@ const cellStyles = 'pl-6 pr-2 py-3 whitespace-nowrap';
 type TableProps = {
   options: TableOptions<any>;
   blankState: React.ReactNode;
-  customRowProps: (row: Row<any>) => void;
+  customRowProps?: (row: Row<any>) => void;
 };
 
 export default function Table({ options, blankState, customRowProps }: TableProps) {
