@@ -9,7 +9,7 @@ export default function SocialCTA() {
       <Container className="my-10 lg:mt-20 lg:mb-12 flex flex-col md:flex-row gap-8 lg:gap-12">
         <div className="w-full lg:w-1/2 ">
           <a
-            href="https://discord.gg/EuesV2ZSnX"
+            href="https://www.inngest.com/discord"
             className="bg-[#5765f2] rounded flex items-center justify-center  text-white h-[140px] lg:h-[200px] hover:opacity-80 transition-all duration-150"
           >
             <Discord size="4em" />
@@ -22,7 +22,7 @@ export default function SocialCTA() {
             a direct line to shaping the future of the SDK!
           </p>
           <a
-            href="https://discord.gg/EuesV2ZSnX"
+            href="https://www.inngest.com/discord"
             className="group lg:mx-6  mt-3 lg:mt-6 inline-flex rounded-md text-sm font-medium px-6 py-2 bg-slate-800 hover:bg-slate-700 transition-all text-white"
           >
             Join the Community

@@ -118,7 +118,7 @@ export default function Header() {
                 </li>
                 <li>
                   <a
-                    href="https://discord.gg/EuesV2ZSnX"
+                    href="https://www.inngest.com/discord"
                     className="flex flex-shrink-0 items-center text-white font-medium px-3.5 py-2 text-sm  hover:opacity-60"
                   >
                     <Discord />

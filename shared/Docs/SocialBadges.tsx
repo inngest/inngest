@@ -43,7 +43,7 @@ export default function SocialBadges() {
       <SocialLink href="https://github.com/inngest/inngest" icon={GitHubIcon}>
         Star our open source repo
       </SocialLink>
-      <SocialLink href="https://discord.gg/EuesV2ZSnX" icon={DiscordIcon}>
+      <SocialLink href="https://www.inngest.com/disord" icon={DiscordIcon}>
         Join our Discord community
       </SocialLink>
       <SocialLink href="https://twitter.com/inngest" icon={TwitterIcon}>
