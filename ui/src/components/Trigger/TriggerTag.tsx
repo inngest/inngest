@@ -2,17 +2,17 @@ import Tag from '@/components/Tag';
 import { IconClock, IconEvent } from '@/icons';
 
 type TriggerTagProps = {
-  name: string;
+  value: string;
   type: string;
 };
 
-export default function TriggerTag({ name, type }: TriggerTagProps) {
+export default function TriggerTag({ value, type }: TriggerTagProps) {
   return (
     <Tag>
       <div className="flex items-center gap-2">
         {type === 'EVENT' && <IconEvent className="h-2" />}
         {type === 'CRON' && <IconClock className="h-4" />}
-        {name}
+        {value}
       </div>
     </Tag>
   );

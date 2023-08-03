@@ -6,13 +6,13 @@ import { triggerStream } from 'mock/triggerStream';
 
 import SendEventButton from '@/components/Event/SendEventButton';
 import Table from '@/components/Table';
+import TriggerTag from '@/components/Trigger/TriggerTag';
 import { FunctionRunStatus, FunctionTriggerTypes } from '@/store/generated';
 import { selectEvent, selectRun } from '@/store/global';
 import { useAppDispatch } from '@/store/hooks';
 import { fullDate } from '@/utils/date';
 import FunctionRunList from './FunctionRunList';
 import SourceBadge from './SourceBadge';
-import TriggerTag from './TriggerTag';
 
 export type Trigger = {
   id: string;
@@ -49,7 +49,7 @@ const columns = [
   }),
   columnHelper.accessor('type', {
     header: () => <span>Trigger</span>,
-    cell: (props) => <TriggerTag name={props.row.original.name} type={props.row.original.type} />,
+    cell: (props) => <TriggerTag value={props.row.original.name} type={props.row.original.type} />,
   }),
   columnHelper.accessor('functionRuns', {
     header: () => <span>Function</span>,
