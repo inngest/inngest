@@ -78,7 +78,7 @@ export default function Stream() {
     }
   }
 
-  const getRowProps = (row: Row<Trigger>) => ({
+  const customRowProps = (row: Row<Trigger>) => ({
     style: {
       verticalAlign: row.original.functionRuns.length > 1 ? 'baseline' : 'initial',
       cursor: 'pointer',
@@ -105,7 +105,6 @@ export default function Stream() {
             data: triggerStream,
             columns,
             getCoreRowModel: getCoreRowModel(),
-            getRowProps,
             enablePinning: true,
             initialState: {
               columnPinning: {
@@ -113,6 +112,8 @@ export default function Stream() {
               },
             },
           }}
+          customRowProps={customRowProps}
+          blankState={<p></p>}
         />
       </div>
     </div>

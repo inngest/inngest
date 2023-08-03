@@ -1,4 +1,4 @@
-import { flexRender, useReactTable, type TableOptions } from '@tanstack/react-table';
+import { flexRender, useReactTable, type Row, type TableOptions } from '@tanstack/react-table';
 
 import classNames from '@/utils/classnames';
 
@@ -7,9 +7,10 @@ const cellStyles = 'pl-6 pr-2 py-3 whitespace-nowrap';
 type TableProps = {
   options: TableOptions<any>;
   blankState: React.ReactNode;
+  customRowProps: (row: Row<any>) => void;
 };
 
-export default function Table({ options, blankState }: TableProps) {
+export default function Table({ options, blankState, customRowProps }: TableProps) {
   const table = useReactTable(options);
 
   // Calculates total colSpan of the table, to assign the colSpan of the blank state.
@@ -54,7 +55,7 @@ export default function Table({ options, blankState }: TableProps) {
           </tr>
         )}
         {table.getRowModel().rows.map((row) => (
-          <tr key={row.id} {...(options.getRowProps ? options.getRowProps(row) : {})}>
+          <tr key={row.id} {...(customRowProps ? customRowProps(row) : {})}>
             {row.getVisibleCells().map((cell) => (
               <td
                 className={classNames(
