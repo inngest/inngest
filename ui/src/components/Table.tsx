@@ -1,11 +1,27 @@
-import { flexRender, useReactTable } from '@tanstack/react-table';
+import { flexRender, useReactTable, type TableOptions } from '@tanstack/react-table';
 
 import classNames from '@/utils/classnames';
 
 const cellStyles = 'pl-6 pr-2 py-3 whitespace-nowrap';
 
-export default function Table({ options }) {
+type TableProps = {
+  options: TableOptions<any>;
+  blankState: React.ReactNode;
+};
+
+export default function Table({ options, blankState }: TableProps) {
   const table = useReactTable(options);
+
+  // Calculates total colSpan of the table, to assign the colSpan of the blank state.
+  // Might need to be changed if we implement the column visibity feature.
+  let colSpanTotalSum = table.getHeaderGroups().reduce((sum, headerGroup) => {
+    return (
+      sum +
+      headerGroup.headers.reduce((subSum, header) => {
+        return subSum + header.colSpan;
+      }, 0)
+    );
+  }, 0);
 
   return (
     <table className="w-full border-b border-slate-700/30">
@@ -30,6 +46,13 @@ export default function Table({ options }) {
         ))}
       </thead>
       <tbody className="divide-y divide-slate-800/30">
+        {table.getRowModel().rows.length < 1 && (
+          <tr>
+            <td className={classNames(cellStyles, 'text-center')} colSpan={colSpanTotalSum}>
+              {blankState}
+            </td>
+          </tr>
+        )}
         {table.getRowModel().rows.map((row) => (
           <tr key={row.id} {...(options.getRowProps ? options.getRowProps(row) : {})}>
             {row.getVisibleCells().map((cell) => (
