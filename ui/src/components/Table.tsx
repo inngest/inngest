@@ -31,7 +31,7 @@ export default function Table({ options }) {
       </thead>
       <tbody className="divide-y divide-slate-800/30">
         {table.getRowModel().rows.map((row) => (
-          <tr key={row.id} {...options.getRowProps(row)}>
+          <tr key={row.id} {...(options.getRowProps ? options.getRowProps(row) : {})}>
             {row.getVisibleCells().map((cell) => (
               <td
                 className={classNames(

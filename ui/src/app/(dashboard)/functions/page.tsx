@@ -1,13 +1,69 @@
 'use client';
 
+import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
+
 import { BlankSlate } from '@/components/Blank';
 import SendEventButton from '@/components/Event/SendEventButton';
 import Skeleton from '@/components/Skeleton';
+import Table from '@/components/Table';
 import Tag from '@/components/Tag';
+import TriggerTags from '@/components/Trigger/TriggerTags';
 import useDocsNavigation from '@/hooks/useDocsNavigation';
 import { IconClock, IconEvent } from '@/icons';
-import { useGetFunctionsQuery } from '@/store/generated';
+import { FunctionTriggerTypes, useGetFunctionsQuery, type Function } from '@/store/generated';
 import classNames from '@/utils/classnames';
+
+const columnHelper = createColumnHelper<Function>();
+const columns = [
+  columnHelper.accessor('name', {
+    header: () => <span>Function Name</span>,
+    cell: (props) => <p className="text-sm font-medium leading-7">{props.getValue()}</p>,
+  }),
+  columnHelper.accessor('triggers', {
+    header: () => <span>Triggers</span>,
+    cell: (props) => {
+      const triggers = props.getValue();
+      if (!triggers || triggers.length === 0) {
+        return <></>;
+      }
+      return <TriggerTags triggers={triggers} />;
+    },
+  }),
+  columnHelper.accessor('url', {
+    header: () => <span>App URL</span>,
+    cell: (props) => {
+      const cleanUrl = new URL(props.getValue() || '');
+      cleanUrl.search = '';
+      return <p className="text-sm">{cleanUrl.toString()}</p>;
+    },
+  }),
+  columnHelper.display({
+    id: 'triggerCTA',
+    cell: (props) => {
+      const getFirstEventValue = () => {
+        const eventTrigger = props.row?.original?.triggers?.find(
+          (trigger) => trigger.type === FunctionTriggerTypes.Event,
+        );
+        return eventTrigger ? eventTrigger.value : null;
+      };
+      return (
+        <>
+          {getFirstEventValue() && (
+            <SendEventButton
+              kind="secondary"
+              label="Trigger"
+              data={JSON.stringify({
+                name: getFirstEventValue(),
+                data: {},
+                user: {},
+              })}
+            />
+          )}
+        </>
+      );
+    },
+  }),
+];
 
 const cellStyles = 'pl-6 pr-2 py-3';
 
@@ -56,6 +112,19 @@ export default function FunctionList() {
 
   return (
     <main className="flex min-h-0 flex-col overflow-y-auto">
+      <Table
+        options={{
+          data: functions,
+          columns,
+          getCoreRowModel: getCoreRowModel(),
+          enablePinning: true,
+          initialState: {
+            columnPinning: {
+              left: ['name'],
+            },
+          },
+        }}
+      />
       <table className="border-b border-slate-700/30 bg-slate-800/30 w-full table-fixed">
         <thead className="sticky top-0 shadow bg-slate-950">
           <tr>
