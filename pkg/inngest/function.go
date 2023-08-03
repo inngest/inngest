@@ -187,6 +187,13 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
+	// Validate rate limit expression
+	if f.RateLimit != nil && f.RateLimit.Key != nil {
+		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.RateLimit.Key); exprErr != nil {
+			err = multierror.Append(err, fmt.Errorf("Rate limit expression is invalid: %s", exprErr))
+		}
+	}
+
 	return err
 }
 
