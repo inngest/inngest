@@ -21,6 +21,14 @@ type EventAPIResponse struct {
 	Error  error    `json:"error,omitempty"`
 }
 
+// InvokeAPIResponse is the API response sent when responding to an invoke
+// request.
+type InvokeAPIResponse struct {
+	ID     string `json:"id"`
+	Status int    `json:"status"`
+	Error  error  `json:"error,omitempty"`
+}
+
 // CancelRun cancels a run for a given run ID, returning consistent errors for public APIs
 func CancelRun(ctx context.Context, sm state.Manager, runID ulid.ULID) error {
 	if sm == nil {

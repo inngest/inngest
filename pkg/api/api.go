@@ -215,5 +215,8 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: If await is true as a query parameter, await the data from the function.
-	_, _ = w.Write([]byte(evtID))
+	_ = json.NewEncoder(w).Encode(apiutil.InvokeAPIResponse{
+		ID:     evtID,
+		Status: 200,
+	})
 }
