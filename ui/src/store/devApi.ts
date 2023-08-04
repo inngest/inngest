@@ -16,10 +16,10 @@ export const devApi = createApi({
   endpoints: (builder) => ({
     sendEvent: builder.mutation<
       void,
-      { id: string; name: string; ts: number; data?: object; user?: object }
+      { id: string; name: string; ts: number; data?: object; user?: object; functionId?: string }
     >({
-      query: (event) => ({
-        url: '/e/dev_key',
+      query: ({ functionId, ...event }) => ({
+        url: functionId ? `/invoke/${functionId}` : '/e/dev_key',
         method: 'POST',
         body: event,
       }),
