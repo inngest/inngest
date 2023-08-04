@@ -96,6 +96,7 @@ export const FUNCTIONS = gql`
   query GetFunctions {
     functions {
       id
+      slug
       name
       triggers {
         type
