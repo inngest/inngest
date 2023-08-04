@@ -1,7 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
-import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
+import { useMemo, useState } from 'react';
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getSortedRowModel,
+  type SortingState,
+} from '@tanstack/react-table';
 
 import { BlankSlate } from '@/components/Blank';
 import SendEventButton from '@/components/Event/SendEventButton';
@@ -26,6 +31,7 @@ const columns = [
       }
       return <TriggerTags triggers={triggers} />;
     },
+    enableSorting: false,
   }),
   columnHelper.accessor('url', {
     header: () => <span>App URL</span>,
@@ -34,6 +40,7 @@ const columns = [
       cleanUrl.search = '';
       return <p className="text-sm">{cleanUrl.toString()}</p>;
     },
+    enableSorting: false,
   }),
   columnHelper.display({
     id: 'triggerCTA',
@@ -61,11 +68,18 @@ const columns = [
         </>
       );
     },
+    enableSorting: false,
   }),
 ];
 
 export default function FunctionList() {
   const navigateToDocs = useDocsNavigation();
+  const [sorting, setSorting] = useState<SortingState>([
+    {
+      id: 'name',
+      desc: false,
+    },
+  ]);
 
   const { data, isFetching } = useGetFunctionsQuery(undefined, {
     refetchOnMountOrArgChange: true,
@@ -98,6 +112,12 @@ export default function FunctionList() {
               left: ['name'],
             },
           },
+          state: {
+            sorting,
+          },
+          getSortedRowModel: getSortedRowModel(),
+          onSortingChange: setSorting,
+          enableSortingRemoval: false,
         }}
         blankState={
           <span className="p-10">

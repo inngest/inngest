@@ -1,5 +1,6 @@
 import { flexRender, useReactTable, type Row, type TableOptions } from '@tanstack/react-table';
 
+import { IconChevron } from '@/icons';
 import classNames from '@/utils/classnames';
 
 const cellStyles = 'pl-6 pr-2 py-3 whitespace-nowrap';
@@ -35,13 +36,22 @@ export default function Table({ options, blankState, customRowProps }: TableProp
                   cellStyles,
                   'bg-slate-900 text-slate-500 font-medium',
                   header.column.getIsPinned() && 'sticky left-0 z-[4]',
+                  header.column.getCanSort() && 'cursor-pointer',
                 )}
+                onClick={header.column.getToggleSortingHandler()}
                 key={header.id}
                 style={{ width: header.getSize() }}
               >
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(header.column.columnDef.header, header.getContext())}
+                <div className="flex items-center gap-2">
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())}
+                  {header.column.getIsSorted() && (
+                    <IconChevron
+                      className={header.column.getIsSorted() === 'asc' ? 'rotate-180' : undefined}
+                    />
+                  )}
+                </div>
               </th>
             ))}
           </tr>

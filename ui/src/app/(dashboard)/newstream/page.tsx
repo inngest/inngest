@@ -108,6 +108,7 @@ export default function Stream() {
             data: triggerStream,
             columns,
             getCoreRowModel: getCoreRowModel(),
+            enableSorting: false,
             enablePinning: true,
             initialState: {
               columnPinning: {
