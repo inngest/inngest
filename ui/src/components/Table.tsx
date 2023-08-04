@@ -37,6 +37,7 @@ export default function Table({ options, blankState, customRowProps }: TableProp
                   header.column.getIsPinned() && 'sticky left-0 z-[4]',
                 )}
                 key={header.id}
+                style={{ width: header.getSize() }}
               >
                 {header.isPlaceholder
                   ? null
@@ -47,7 +48,7 @@ export default function Table({ options, blankState, customRowProps }: TableProp
         ))}
       </thead>
       <tbody className="divide-y divide-slate-800/30">
-        {table.getRowModel().rows.length < 1 && (
+        {options.data.length < 1 && (
           <tr>
             <td className={classNames(cellStyles, 'text-center')} colSpan={colSpanTotalSum}>
               {blankState}
@@ -64,6 +65,7 @@ export default function Table({ options, blankState, customRowProps }: TableProp
                   cell.column.getIsPinned() && 'sticky left-0 z-[2]',
                 )}
                 key={cell.id}
+                style={{ width: cell.column.getSize() }}
               >
                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
               </td>

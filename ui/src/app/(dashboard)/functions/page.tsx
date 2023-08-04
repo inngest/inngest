@@ -37,6 +37,7 @@ const columns = [
   }),
   columnHelper.display({
     id: 'triggerCTA',
+    size: 55,
     cell: (props) => {
       const getFirstEventValue = () => {
         const eventTrigger = props.row?.original?.triggers?.find(
@@ -71,17 +72,17 @@ export default function FunctionList() {
   });
   const functions = data?.functions || [];
 
-  const tableData = useMemo(() => (isFetching ? Array(8).fill({}) : functions), [isFetching, data]);
+  const tableData = useMemo(() => (isFetching ? Array(8).fill({}) : functions), [isFetching]);
 
   const tableColumns = useMemo(
     () =>
       isFetching
         ? columns.map((column) => ({
             ...column,
-            cell: () => <Skeleton className="block h-5 w-32" />,
+            cell: () => <Skeleton className="block h-5 my-[0.3rem]" />,
           }))
         : columns,
-    [isFetching, columns],
+    [isFetching],
   );
 
   return (
