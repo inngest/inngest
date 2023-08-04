@@ -191,6 +191,10 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 	// Get the function slug from the route parameter.   This is the function
 	// we'll invoke.  Any request is passed as the event data to the function.
 	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		_ = publicerr.WriteHTTP(w, publicerr.Errorf(400, "Function slug is required"))
+		return
+	}
 
 	evt := event.Event{}
 	if err := json.NewDecoder(r.Body).Decode(&evt); err != nil {
