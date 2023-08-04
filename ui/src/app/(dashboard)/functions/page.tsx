@@ -2,11 +2,12 @@
 
 import { BlankSlate } from '@/components/Blank';
 import SendEventButton from '@/components/Event/SendEventButton';
+import TriggerCronButton from '@/components/Event/TriggerCronButton';
 import Skeleton from '@/components/Skeleton';
 import Tag from '@/components/Tag';
 import useDocsNavigation from '@/hooks/useDocsNavigation';
 import { IconClock, IconEvent } from '@/icons';
-import { useGetFunctionsQuery } from '@/store/generated';
+import { FunctionTriggerTypes, useGetFunctionsQuery } from '@/store/generated';
 import classNames from '@/utils/classnames';
 
 const cellStyles = 'pl-6 pr-2 py-3';
@@ -89,6 +90,11 @@ export default function FunctionList() {
                   const eventTrigger = func?.triggers?.find((trigger) => trigger.type === 'EVENT');
                   return eventTrigger ? eventTrigger.value : null;
                 };
+                const isCron = (): boolean => {
+                  return Boolean(
+                    func.triggers?.some((trigger) => trigger.type === FunctionTriggerTypes.Cron),
+                  );
+                };
                 const cleanUrl = new URL(func.url || '');
                 cleanUrl.search = '';
                 return (
@@ -123,7 +129,7 @@ export default function FunctionList() {
                     <td className={classNames(cellStyles, 'whitespace-nowrap text-sm')} colSpan={3}>
                       {cleanUrl.toString()}
                     </td>
-                    {/* Trigger Button */}
+                    {/* Trigger Button for events */}
                     {getFirstEventValue() && (
                       <td className={classNames(cellStyles, 'whitespace-nowrap')} colSpan={1}>
                         <SendEventButton
@@ -135,6 +141,12 @@ export default function FunctionList() {
                             user: {},
                           })}
                         />
+                      </td>
+                    )}
+                    {/* Trigger Button for cron */}
+                    {isCron() && (
+                      <td className={classNames(cellStyles, 'whitespace-nowrap')} colSpan={1}>
+                        <TriggerCronButton kind="secondary" functionId={func.slug} />
                       </td>
                     )}
                   </tr>
