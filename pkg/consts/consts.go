@@ -24,6 +24,9 @@ const (
 	// MinRetryDuration is the soonest a retry can be scheduled.
 	MinRetryDuration = time.Second * 1
 
+	// MaxCancellations represents the max automatic cancellation signals per function
+	MaxCancellations = 5
+
 	// FunctionIdempotencyPeriod determines how long a specific function remains idempotent
 	// when using idempotency keys.
 	FunctionIdempotencyPeriod = 24 * time.Hour
