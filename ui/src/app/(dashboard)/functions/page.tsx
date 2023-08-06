@@ -21,6 +21,7 @@ const columns = [
   columnHelper.accessor('name', {
     header: () => <span>Function Name</span>,
     cell: (props) => <p className="text-sm font-medium leading-7">{props.getValue()}</p>,
+    sortingFn: 'text',
   }),
   columnHelper.accessor('triggers', {
     header: () => <span>Triggers</span>,
@@ -86,7 +87,7 @@ export default function FunctionList() {
   });
   const functions = data?.functions || [];
 
-  const tableData = useMemo(() => (isFetching ? Array(8).fill({}) : functions), [isFetching]);
+  const tableData = useMemo(() => (isFetching ? Array(8).fill({}) : functions), [isFetching, functions]);
 
   const tableColumns = useMemo(
     () =>
@@ -96,7 +97,7 @@ export default function FunctionList() {
             cell: () => <Skeleton className="block h-5 my-[0.3rem]" />,
           }))
         : columns,
-    [isFetching],
+    [isFetching, functions],
   );
 
   return (
