@@ -14,6 +14,7 @@ import SendEventButton from '@/components/Event/SendEventButton';
 import Skeleton from '@/components/Skeleton';
 import Table from '@/components/Table';
 import TriggerTags from '@/components/Trigger/TriggerTags';
+import useDebounce from '@/hooks/useDebounce';
 import useDocsNavigation from '@/hooks/useDocsNavigation';
 import { IconMagnifyingGlass } from '@/icons';
 import { FunctionTriggerTypes, useGetFunctionsQuery, type Function } from '@/store/generated';
@@ -88,7 +89,11 @@ export default function FunctionList() {
       desc: false,
     },
   ]);
+  const [searchInput, setSearchInput] = useState('');
   const [globalFilter, setGlobalFilter] = useState('');
+  const debouncedSearch = useDebounce(() => {
+    setGlobalFilter(searchInput);
+  });
 
   const { data, isFetching } = useGetFunctionsQuery(undefined, {
     refetchOnMountOrArgChange: true,
@@ -115,9 +120,10 @@ export default function FunctionList() {
           type="text"
           className="text-slate-100 w-96 placeholder-slate-400 my-4 py-1 pl-4 bg-slate-950"
           placeholder="Search function..."
-          value={globalFilter ?? ''}
+          value={searchInput ?? ''}
           onChange={(event) => {
-            setGlobalFilter(event.target.value);
+            setSearchInput(event.target.value);
+            debouncedSearch();
           }}
         />
         <IconMagnifyingGlass className="absolute left-0 h-3 w-3 text--slate-400" />
