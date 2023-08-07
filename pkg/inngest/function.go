@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/xhit/go-str2duration/v2"
 )
@@ -185,6 +186,10 @@ func (f Function) Validate(ctx context.Context) error {
 				err = multierror.Append(err, fmt.Errorf("Cancellation expression is invalid: %s", exprErr))
 			}
 		}
+	}
+
+	if len(f.Cancel) > consts.MaxCancellations {
+		err = multierror.Append(err, fmt.Errorf("This function exceeds the max number of cancellation events: %d", consts.MaxCancellations))
 	}
 
 	// Validate rate limit expression

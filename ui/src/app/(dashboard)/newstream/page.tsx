@@ -4,15 +4,17 @@ import { useRouter } from 'next/navigation';
 import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
 import { triggerStream } from 'mock/triggerStream';
 
+import { BlankSlate } from '@/components/Blank';
 import SendEventButton from '@/components/Event/SendEventButton';
 import Table from '@/components/Table';
+import TriggerTag from '@/components/Trigger/TriggerTag';
+import useDocsNavigation from '@/hooks/useDocsNavigation';
 import { FunctionRunStatus, FunctionTriggerTypes } from '@/store/generated';
 import { selectEvent, selectRun } from '@/store/global';
 import { useAppDispatch } from '@/store/hooks';
 import { fullDate } from '@/utils/date';
 import FunctionRunList from './FunctionRunList';
 import SourceBadge from './SourceBadge';
-import TriggerTag from './TriggerTag';
 
 export type Trigger = {
   id: string;
@@ -49,7 +51,7 @@ const columns = [
   }),
   columnHelper.accessor('type', {
     header: () => <span>Trigger</span>,
-    cell: (props) => <TriggerTag name={props.row.original.name} type={props.row.original.type} />,
+    cell: (props) => <TriggerTag value={props.row.original.name} type={props.row.original.type} />,
   }),
   columnHelper.accessor('functionRuns', {
     header: () => <span>Function</span>,
@@ -60,6 +62,7 @@ const columns = [
 export default function Stream() {
   const dispatch = useAppDispatch();
   const router = useRouter();
+  const navigateToDocs = useDocsNavigation();
 
   function handleOpenSlideOver({
     triggerID,
@@ -78,7 +81,7 @@ export default function Stream() {
     }
   }
 
-  const getRowProps = (row: Row<Trigger>) => ({
+  const customRowProps = (row: Row<Trigger>) => ({
     style: {
       verticalAlign: row.original.functionRuns.length > 1 ? 'baseline' : 'initial',
       cursor: 'pointer',
@@ -105,7 +108,7 @@ export default function Stream() {
             data: triggerStream,
             columns,
             getCoreRowModel: getCoreRowModel(),
-            getRowProps,
+            enableSorting: false,
             enablePinning: true,
             initialState: {
               columnPinning: {
@@ -113,6 +116,18 @@ export default function Stream() {
               },
             },
           }}
+          customRowProps={customRowProps}
+          blankState={
+            <BlankSlate
+              title="Inngest hasn't received any events"
+              subtitle="Read our documentation to learn how to send events to Inngest."
+              imageUrl="/images/no-events.png"
+              button={{
+                text: 'Sending Events',
+                onClick: () => navigateToDocs('/events'),
+              }}
+            />
+          }
         />
       </div>
     </div>
