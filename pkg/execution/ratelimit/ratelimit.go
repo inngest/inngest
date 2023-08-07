@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
@@ -20,7 +21,7 @@ var (
 )
 
 type RateLimiter interface {
-	RateLimit(ctx context.Context, key string, c inngest.RateLimit) (bool, error)
+	RateLimit(ctx context.Context, key string, c inngest.RateLimit) (bool, time.Duration, error)
 }
 
 // RateLimitKey returns the rate limiting key given a function ID, rate limit config,
@@ -52,10 +53,13 @@ func hash(res any, id uuid.UUID) string {
 // RateLimit checks the given key against the specified rate limit, returning true if limited.
 //
 // This allows bursts of up to 1/10th the given rate limit, by default.
-func rateLimit(ctx context.Context, store throttled.GCRAStoreCtx, key string, c inngest.RateLimit) (bool, error) {
+//
+// Tihs returns the duration until the next request will be permitted, or -1 if the rate limit
+// has not been exceeded.
+func rateLimit(ctx context.Context, store throttled.GCRAStoreCtx, key string, c inngest.RateLimit) (bool, time.Duration, error) {
 	dur, err := str2duration.ParseDuration(c.Period)
 	if err != nil {
-		return true, err
+		return true, -1, err
 	}
 
 	quota := throttled.RateQuota{
@@ -68,6 +72,10 @@ func rateLimit(ctx context.Context, store throttled.GCRAStoreCtx, key string, c 
 		log.Fatal(err)
 	}
 
-	ok, _, err := limiter.RateLimitCtx(ctx, key, 1)
-	return ok, err
+	ok, res, err := limiter.RateLimitCtx(ctx, key, 1)
+	if err != nil {
+		return ok, -1, err
+	}
+
+	return ok, res.RetryAfter, err
 }

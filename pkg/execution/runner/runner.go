@@ -593,7 +593,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Eve
 		if err != nil {
 			return err
 		}
-		limited, err := s.rl.RateLimit(ctx, key, *fn.RateLimit)
+		limited, _, err := s.rl.RateLimit(ctx, key, *fn.RateLimit)
 		if err != nil {
 			return err
 		}
