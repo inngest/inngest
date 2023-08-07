@@ -9,7 +9,7 @@ Most third party webhooks will consider the request failed if it doesn't respond
 A common approach to build a reliable webhook that covers the requirements listed above will include:
 
 1. Create a queue to buffer webhook events
-2. Create an HTTP handler for a webhook endpoint that verifies [the webhook payload signature](https://stripe.com/docs/webhooks/signatures) and pushes webhook events to a particular queue
+2. Create an HTTP handler for a webhook endpoint that verifies [the webhook payload signature](https://stripe.com/docs/webhooks#verify-events) and pushes webhook events to a particular queue
 3. Create a worker that polls the queue for messages and processes them
 4. Configure your worker
 5. Define a [dead-letter queue](https://en.wikipedia.org/wiki/Dead_letter_queue) for events that fail to be processed and potentially, a redrive policy for retrying at a later time.

@@ -9,7 +9,8 @@
     "broken-link-checker": "npx ts-node ./scripts/brokenLinkChecker.ts",
     "prettier": "prettier --write --trailing-comma es5 \"pages/**/*.tsx\" \"pages/**/*.js\" \"shared/*.tsx\" \"shared/*.js\"",
     "storybook": "start-storybook -p 6006",
-    "build-storybook": "build-storybook"
+    "build-storybook": "build-storybook",
+    "preinstall": "npx only-allow pnpm"
   },
   "prettier": {
     "trailingComma": "es5",
@@ -96,7 +97,6 @@
     "shiki": "^0.12.1",
     "slugify": "^1.6.3",
     "tailwindcss": "^3.2.4",
-    "typescript": "^4.3.5",
     "unist-builder": "^3.0.0",
     "unist-util-visit": "^4.1.1",
     "urql": "^2.0.5",
@@ -112,6 +112,12 @@
     "@storybook/react": "^6.5.15",
     "@storybook/testing-library": "^0.0.13",
     "@types/lodash.shuffle": "^4.2.7",
-    "@types/marked": "^4.0.5"
-  }
+    "@types/marked": "^4.0.5",
+    "typescript": "5.1.3"
+  },
+  "engines": {
+    "node": "18.x",
+    "pnpm": "8.6.2"
+  },
+  "packageManager": "pnpm@8.6.2"
 }
