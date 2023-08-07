@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import {
   createColumnHelper,
   getCoreRowModel,
+  getFilteredRowModel,
   getSortedRowModel,
   type SortingState,
 } from '@tanstack/react-table';
@@ -14,6 +15,7 @@ import Skeleton from '@/components/Skeleton';
 import Table from '@/components/Table';
 import TriggerTags from '@/components/Trigger/TriggerTags';
 import useDocsNavigation from '@/hooks/useDocsNavigation';
+import { IconMagnifyingGlass } from '@/icons';
 import { FunctionTriggerTypes, useGetFunctionsQuery, type Function } from '@/store/generated';
 
 const columnHelper = createColumnHelper<Function>();
@@ -22,6 +24,8 @@ const columns = [
     header: () => <span>Function Name</span>,
     cell: (props) => <p className="text-sm font-medium leading-7">{props.getValue()}</p>,
     sortingFn: 'text',
+    filterFn: 'equalsString',
+    enableGlobalFilter: true,
   }),
   columnHelper.accessor('triggers', {
     header: () => <span>Triggers</span>,
@@ -33,6 +37,7 @@ const columns = [
       return <TriggerTags triggers={triggers} />;
     },
     enableSorting: false,
+    enableGlobalFilter: false,
   }),
   columnHelper.accessor('url', {
     header: () => <span>App URL</span>,
@@ -42,6 +47,7 @@ const columns = [
       return <p className="text-sm">{cleanUrl.toString()}</p>;
     },
     enableSorting: false,
+    enableGlobalFilter: false,
   }),
   columnHelper.display({
     id: 'triggerCTA',
@@ -70,6 +76,7 @@ const columns = [
       );
     },
     enableSorting: false,
+    enableGlobalFilter: false,
   }),
 ];
 
@@ -81,6 +88,7 @@ export default function FunctionList() {
       desc: false,
     },
   ]);
+  const [globalFilter, setGlobalFilter] = useState('');
 
   const { data, isFetching } = useGetFunctionsQuery(undefined, {
     refetchOnMountOrArgChange: true,
@@ -101,39 +109,57 @@ export default function FunctionList() {
   );
 
   return (
-    <main className="flex min-h-0 flex-col overflow-y-auto">
-      <Table
-        options={{
-          data: tableData,
-          columns: tableColumns,
-          getCoreRowModel: getCoreRowModel(),
-          enablePinning: true,
-          initialState: {
-            columnPinning: {
-              left: ['name'],
+    <div className="flex flex-col min-h-0 min-w-0">
+      <div className="relative flex items-center bg-slate-950 ml-6">
+        <input
+          type="text"
+          className="text-slate-100 w-96 placeholder-slate-400 my-4 py-1 pl-4 bg-slate-950"
+          placeholder="Search function..."
+          value={globalFilter ?? ''}
+          onChange={(event) => {
+            setGlobalFilter(event.target.value);
+          }}
+        />
+        <IconMagnifyingGlass className="absolute left-0 h-3 w-3 text--slate-400" />
+      </div>
+
+      <main className="min-h-0 overflow-y-auto">
+        <Table
+          options={{
+            data: tableData,
+            columns: tableColumns,
+            getCoreRowModel: getCoreRowModel(),
+            enablePinning: true,
+            initialState: {
+              columnPinning: {
+                left: ['name'],
+              },
             },
-          },
-          state: {
-            sorting,
-          },
-          getSortedRowModel: getSortedRowModel(),
-          onSortingChange: setSorting,
-          enableSortingRemoval: false,
-        }}
-        blankState={
-          <span className="p-10">
-            <BlankSlate
-              title="Inngest has not detected any functions"
-              subtitle="Read our documentation to learn how to serve your functions"
-              imageUrl="/images/no-results.png"
-              button={{
-                text: 'Serving Functions',
-                onClick: () => navigateToDocs('/sdk/serve'),
-              }}
-            />
-          </span>
-        }
-      />
-    </main>
+            state: {
+              sorting,
+              globalFilter,
+            },
+            getSortedRowModel: getSortedRowModel(),
+            onSortingChange: setSorting,
+            enableSortingRemoval: false,
+            getFilteredRowModel: getFilteredRowModel(),
+            onGlobalFilterChange: setGlobalFilter,
+          }}
+          blankState={
+            <span className="p-10">
+              <BlankSlate
+                title="Inngest has not detected any functions"
+                subtitle="Read our documentation to learn how to serve your functions"
+                imageUrl="/images/no-results.png"
+                button={{
+                  text: 'Serving Functions',
+                  onClick: () => navigateToDocs('/sdk/serve'),
+                }}
+              />
+            </span>
+          }
+        />
+      </main>
+    </div>
   );
 }
