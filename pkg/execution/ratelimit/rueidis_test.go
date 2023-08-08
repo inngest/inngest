@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
-	"github.com/rueian/rueidis"
+	"github.com/redis/rueidis"
 
 	"github.com/throttled/throttled/v2"
 	"github.com/throttled/throttled/v2/store/storetest"

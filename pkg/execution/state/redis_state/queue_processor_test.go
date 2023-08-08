@@ -15,8 +15,8 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"github.com/rs/zerolog"
-	"github.com/rueian/rueidis"
 	"github.com/stretchr/testify/require"
 )
 
