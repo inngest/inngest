@@ -11,6 +11,7 @@ import {
 
 import { BlankSlate } from '@/components/Blank';
 import SendEventButton from '@/components/Event/SendEventButton';
+import TriggerCronButton from '@/components/Event/TriggerCronButton';
 import Skeleton from '@/components/Skeleton';
 import Table from '@/components/Table';
 import TriggerTags from '@/components/Trigger/TriggerTags';
@@ -60,6 +61,13 @@ const columns = [
         );
         return eventTrigger ? eventTrigger.value : null;
       };
+      const isCron = (): boolean => {
+        return Boolean(
+          props.row?.original?.triggers?.some(
+            (trigger) => trigger.type === FunctionTriggerTypes.Cron,
+          ),
+        );
+      };
       return (
         <>
           {getFirstEventValue() && (
@@ -72,6 +80,9 @@ const columns = [
                 user: {},
               })}
             />
+          )}
+          {isCron() && (
+            <TriggerCronButton kind="secondary" functionId={props.row?.original?.slug} />
           )}
         </>
       );
@@ -100,7 +111,10 @@ export default function FunctionList() {
   });
   const functions = data?.functions || [];
 
-  const tableData = useMemo(() => (isFetching ? Array(8).fill({}) : functions), [isFetching, functions]);
+  const tableData = useMemo(
+    () => (isFetching ? Array(8).fill({}) : functions),
+    [isFetching, functions],
+  );
 
   const tableColumns = useMemo(
     () =>

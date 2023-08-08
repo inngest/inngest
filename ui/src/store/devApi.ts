@@ -16,14 +16,20 @@ export const devApi = createApi({
   endpoints: (builder) => ({
     sendEvent: builder.mutation<
       void,
-      { id: string; name: string; ts: number; data?: object; user?: object }
+      { id: string; name: string; ts: number; data?: object; user?: object; functionId?: string }
     >({
-      query: (event) => ({
-        url: '/e/dev_key',
+      query: ({ functionId, ...event }) => ({
+        url: functionId ? `/invoke/${functionId}` : '/e/dev_key',
         method: 'POST',
         body: event,
       }),
       onQueryStarted(event, { dispatch, queryFulfilled }) {
+        // Don't optimistically update if this is a function invocation, as the
+        // shape of the payload will be different when sending vs receiving.
+        if (event.functionId) {
+          return;
+        }
+
         // Optimistically add the event to the `GetEventQuery` cache so that it shows up in the UI
         // immediately.
         dispatch(
