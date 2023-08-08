@@ -24,6 +24,12 @@ export const devApi = createApi({
         body: event,
       }),
       onQueryStarted(event, { dispatch, queryFulfilled }) {
+        // Don't optimistically update if this is a function invocation, as the
+        // shape of the payload will be different when sending vs receiving.
+        if (event.functionId) {
+          return;
+        }
+
         // Optimistically add the event to the `GetEventQuery` cache so that it shows up in the UI
         // immediately.
         dispatch(
