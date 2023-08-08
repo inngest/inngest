@@ -20,7 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
-	"github.com/rueian/rueidis"
+	"github.com/redis/rueidis"
 )
 
 //go:embed lua/*

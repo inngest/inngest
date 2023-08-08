@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/rueian/rueidis"
+	"github.com/redis/rueidis"
 )
 
 const (

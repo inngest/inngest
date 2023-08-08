@@ -21,7 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
-	"github.com/rueian/rueidis"
+	"github.com/redis/rueidis"
 )
 
 // StartOpts configures the dev server

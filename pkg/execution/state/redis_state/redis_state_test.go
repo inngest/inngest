@@ -13,7 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/testharness"
 	"github.com/oklog/ulid/v2"
-	"github.com/rueian/rueidis"
+	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
 
