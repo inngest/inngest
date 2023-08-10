@@ -10,7 +10,7 @@ type TriggerTagProps = {
 export default function TriggerTag({ value, type }: TriggerTagProps) {
   return (
     <Tag>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 text-slate-400">
         {type === FunctionTriggerTypes.Event && <IconEvent className="h-2" />}
         {type === FunctionTriggerTypes.Cron && <IconClock className="h-4" />}
         {value}
