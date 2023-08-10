@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -113,8 +114,13 @@ func run(t *testing.T, test *Test) {
 		sdkResponse, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
 
+		rdr := sdkResponse.Body
+		if sdkResponse.Header.Get("content-encoding") == "gzip" {
+			rdr, _ = gzip.NewReader(sdkResponse.Body)
+		}
+
 		// Read the response.
-		byt, err = io.ReadAll(sdkResponse.Body)
+		byt, err = io.ReadAll(rdr)
 		require.NoError(t, err)
 		sdkResponse.Body.Close()
 		sdkResponse.Body = ioutil.NopCloser(bytes.NewReader(byt))
