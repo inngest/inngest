@@ -103,6 +103,9 @@ type Edge struct {
 	IncomingGeneratorStep string `json:"gen,omitempty"`
 	// Outgoing is the name of the generator step or step that last ran.
 	Outgoing string `json:"outgoing"`
+	// DisableImmediateExecution indicates that we should not immediately execute
+	// steps upon finding them.
+	DisableImmediateExecution bool `json:"disableImmediateExecution,omitempty"`
 	// Metadata specifies the type of edge to use.  This defaults
 	// to EdgeTypeEdge - a basic link that can conditionally run.
 	Metadata *EdgeMetadata `json:"metadata,omitempty"`
@@ -132,10 +135,10 @@ type AsyncEdgeMetadata struct {
 
 // VersionCoinstraint represents version constraints for an action.  We use semver without
 // patches:
-// - Major versions are backwards-incompatible (eg. requesting different secrets,
-//   incompatible APIs).
-// - Minor versions are backwards compatible improvements, fixes, or additions.  We
-//   automatically use the latest minor version within every step function.
+//   - Major versions are backwards-incompatible (eg. requesting different secrets,
+//     incompatible APIs).
+//   - Minor versions are backwards compatible improvements, fixes, or additions.  We
+//     automatically use the latest minor version within every step function.
 type VersionConstraint struct {
 	Major *uint `json:"major,omitempty"`
 	Minor *uint `json:"minor,omitempty"`

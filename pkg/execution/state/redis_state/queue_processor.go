@@ -147,7 +147,10 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 	// (eg. before at)
 	next := time.UnixMilli(qi.Score())
 	_, err := q.EnqueueItem(ctx, qi, next)
-	if err != nil {
+
+	// If the queue item already exists, we don't need to do anything
+	// TODO This should be optional based on the SDK version
+	if err != nil && err != ErrQueueItemExists {
 		return err
 	}
 
@@ -726,7 +729,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi QueueItem, f o
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		q.logger.Info().Interface("item", qi).Msg("dequeueing failed job")
+		q.logger.Info().Interface("item", qi).Err(err).Msg("dequeueing failed job")
 		if err := q.Dequeue(ctx, p, qi); err != nil {
 			return err
 		}

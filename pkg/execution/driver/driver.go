@@ -27,6 +27,7 @@ type Driver interface {
 func MarshalV1(
 	ctx context.Context,
 	s state.State,
+	edge inngest.Edge,
 	step inngest.Step,
 	stackIndex int,
 	env string,
@@ -45,7 +46,8 @@ func MarshalV1(
 				Stack:   s.Stack(),
 				Current: stackIndex,
 			},
-			Attempt: attempt,
+			Attempt:                   attempt,
+			DisableImmediateExecution: edge.DisableImmediateExecution,
 		},
 	}
 

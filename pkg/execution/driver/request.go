@@ -55,6 +55,10 @@ type SDKRequestContext struct {
 	// Stack represents the function stack at the time of the step invocation.
 	Stack *FunctionStack `json:"stack"`
 
+	// DisableImmediateExecution is used to tell the SDK whether it should
+	// disallow immediate execution of steps as they are found.
+	DisableImmediateExecution bool `json:"disable_immediate_execution"`
+
 	// XXX: Pass in opentracing context within ctx.
 }
 

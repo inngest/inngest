@@ -151,7 +151,7 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 		return nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
 	}
 
-	input, err := driver.MarshalV1(ctx, s, step, idx, "local", attempt)
+	input, err := driver.MarshalV1(ctx, s, edge, step, idx, "local", attempt)
 	if err != nil {
 		return nil, err
 	}
@@ -245,6 +245,8 @@ type response struct {
 	// This adheres to the HTTP spec; we support both seconds and times in this header.
 	retryAt *time.Time
 	noRetry bool
+	// e.g. inngest-js:v1.2.3-alpha.1
+	sdkVersion string
 }
 
 func (e executor) do(ctx context.Context, url string, input []byte) (*response, error) {
@@ -291,6 +293,7 @@ func (e executor) do(ctx context.Context, url string, input []byte) (*response, 
 			duration:   dur,
 			retryAt:    retryAt,
 			noRetry:    resp.Header.Get("x-inngest-no-retry") == "true",
+			sdkVersion: resp.Header.Get("x-inngest-sdk"),
 		}, nil
 	}
 
@@ -310,6 +313,7 @@ func (e executor) do(ctx context.Context, url string, input []byte) (*response, 
 		duration:   dur,
 		retryAt:    retryAt,
 		noRetry:    stream.NoRetry,
+		sdkVersion: stream.Headers["x-inngest-sdk"],
 	}, nil
 
 }
