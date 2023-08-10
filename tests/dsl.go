@@ -200,6 +200,7 @@ func (t *Test) ExpectResponseFunc(status int, f func(b []byte) error) func() {
 			require.NoError(t.test, err)
 
 			err = f(byt)
+			require.NoError(t.test, err)
 		case <-time.After(time.Second):
 			require.Fail(t.test, "Expected SDK generator response but timed out")
 		}
