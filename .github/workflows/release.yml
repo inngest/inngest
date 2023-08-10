@@ -69,7 +69,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v2
         with:
           distribution: goreleaser-pro
-          version: 'v0.19.2'
+          version: '~> 1.19'
           args: release --rm-dist --debug
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
