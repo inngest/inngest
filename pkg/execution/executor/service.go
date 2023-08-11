@@ -430,6 +430,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 			// Give each goroutine copies of the edge and item to manipulate.
 			edge := origEdge
 			item := origItem
+			item.SdkVersion = r.SdkVersion
 
 			switch gen.Op {
 			case enums.OpcodeNone:
@@ -482,6 +483,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 						PauseID:   pauseID,
 						OnTimeout: true,
 					},
+					SdkVersion: r.SdkVersion,
 				}, expires)
 			case enums.OpcodeSleep:
 				// Re-enqueue the exact same edge after a sleep.
@@ -509,7 +511,8 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 					Attempt:     0,
 					MaxAttempts: item.MaxAttempts,
 					// TODO: Save to state store after processing.
-					Payload: edge,
+					Payload:    edge,
+					SdkVersion: r.SdkVersion,
 				}, time.Now().Add(dur))
 			case enums.OpcodeStepPlanned:
 				if err := s.state.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {

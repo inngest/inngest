@@ -144,7 +144,7 @@ type DriverResponse struct {
 	// Noretry, if true, indicates that we should never retry this step.
 	NoRetry bool `json:"noRetry,omitempty"`
 
-	// SDKVersion is the version of the SDK that the step was run with.
+	// SdkVersion is the version of the SDK that the step was run with.
 	SdkVersion string `json:"sdkVersion"`
 
 	// final indicates whether the error has been marked as final.  This occurs

@@ -148,10 +148,10 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 	next := time.UnixMilli(qi.Score())
 	_, err := q.EnqueueItem(ctx, qi, next)
 
-	// If the queue item already exists, we don't need to do anything
-	// TODO This should be optional based on the SDK version
-	if err != nil && err != ErrQueueItemExists {
-		return err
+	if err != nil {
+		if err != ErrQueueItemExists || item.ShouldEnforceIdempotency() {
+			return err
+		}
 	}
 
 	return nil

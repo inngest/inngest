@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -63,10 +65,31 @@ type Item struct {
 	// Payload stores item-specific data for use when processing the item.  For example,
 	// this may contain the function's edge for running a step.
 	Payload any `json:"payload,omitempty"`
+	// SdkVersion is the version of the SDK that wants to queue this item.
+	//e.g. inngest-js:v1.2.3-alpha.1
+	SdkVersion string `json:"sdkVersion"`
 
 	// Metadata is used for storing additional metadata related to the queue item.
 	// e.g. tracing data
 	Metadata map[string]string `json:"metadata,omitempty"`
+}
+
+// ShouldEnforceIdempotency decides if the executor should throw an error upon
+// attempting to queue duplicate items, or if it should silently fail.
+//
+// Later versions of SDKs can attempt to enqueue duplicate items, but earlier
+// versions cannot.
+//
+// Falls back to false if the SDK version on the item is not parseable.
+func (i Item) ShouldEnforceIdempotency() bool {
+	sdkVersion, err := parseSdkVersion(i.SdkVersion)
+	if err != nil {
+		return false
+	}
+
+	jsSdkPreV3 := sdkVersion.Name == "inngest-js" && semver.Compare(sdkVersion.Version, "v3.0.0") == -1
+
+	return jsSdkPreV3
 }
 
 func (i Item) GetMaxAttempts() int {
@@ -156,4 +179,31 @@ type PayloadEdge struct {
 type PayloadPauseTimeout struct {
 	PauseID   uuid.UUID `json:"pauseID"`
 	OnTimeout bool      `json:"onTimeout"`
+}
+
+type SdkVersion struct {
+	// The name of the SDK that this version is for.
+	Name string `json:"name"`
+	// The semver version. Includes the "v" prefix and any prerelease tags.
+	// e.g. v1.2.3-alpha.1
+	Version string `json:"version"`
+}
+
+func parseSdkVersion(version string) (*SdkVersion, error) {
+	parts := strings.Split(version, ":")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid version string: %s", version)
+	}
+
+	sdkName := parts[0]
+	sdkVersion := parts[1]
+
+	if !semver.IsValid(sdkVersion) {
+		return nil, fmt.Errorf("invalid version number: %s", sdkVersion)
+	}
+
+	return &SdkVersion{
+		Name:    sdkName,
+		Version: sdkVersion,
+	}, nil
 }
