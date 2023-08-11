@@ -1,0 +1,7 @@
+# Settings used for ripgrep
+
+# ignore all vendors except inngest related ones
+/vendor/*
+!/vendor/github.com
+/vendor/github.com/*
+!/vendor/github.com/inngest

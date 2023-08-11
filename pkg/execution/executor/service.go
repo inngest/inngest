@@ -200,7 +200,6 @@ func (s *svc) Stop(ctx context.Context) error {
 	return nil
 }
 
-// TODO Add logic here based on SDK response.
 func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	l := logger.From(ctx).With().
 		Str("run_id", item.Identifier.RunID.String()).
@@ -409,10 +408,6 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 
 // scheduleGeneratorResponse handles a specific generator opcode.
 func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item, r *state.DriverResponse) error {
-	l := logger.From(ctx).With().
-		Str("run_id", origItem.Identifier.RunID.String()).
-		Logger()
-
 	if r.Generator == nil {
 		return fmt.Errorf("unable to handle non-generator response")
 	}
@@ -432,17 +427,8 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 	for _, val := range r.Generator {
 		gen := val
 		eg.Go(func() error {
-			// Disable immediate execution of steps if we have parallel
-			// actions. This is necessary to ensure that we don't execute
-			// steps more than once.
-			disableImmediateExecution := origEdge.Edge.DisableImmediateExecution
-			if !disableImmediateExecution && len(r.Generator) > 1 {
-				disableImmediateExecution = true
-			}
-
 			// Give each goroutine copies of the edge and item to manipulate.
 			edge := origEdge
-			edge.Edge.DisableImmediateExecution = disableImmediateExecution
 			item := origItem
 
 			switch gen.Op {
@@ -520,7 +506,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 					WorkspaceID: item.WorkspaceID,
 					Kind:        queue.KindSleep,
 					Identifier:  item.Identifier,
-					Attempt:     item.Attempt,
+					Attempt:     0,
 					MaxAttempts: item.MaxAttempts,
 					// TODO: Save to state store after processing.
 					Payload: edge,
@@ -530,21 +516,19 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 					return err
 				}
 
-				l.Info().Msg("incremented scheduled step count")
-
 				// Planned generator IDs are the same as the actual OpcodeStep IDs.
 				// We can't set edge.Edge.Outgoing here because the step hasn't yet ran.
 				//
 				// We do, though, want to store the incomin step ID name _without_ overriding
 				// the actual DAG step, though.
 				edge.Edge.IncomingGeneratorStep = gen.ID
-				// It is expected for the SDK to report the same planned steps across
-				// multiple invocations, therefore we must manage idempotency here.
+				// Ensure that if this step is planned multiple times by an erroneous SDK we only
+				// enqueue it once during the idempotency period.
 				jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
 				item.JobID = &jobID
 				item.Payload = edge
 				item.Kind = queue.KindEdge
-				l.Info().Str("JobID", *item.JobID).Msg("attempting to enqueue")
+				item.Attempt = 0
 				return s.queue.Enqueue(ctx, item, time.Now())
 			case enums.OpcodeStep:
 				// Re-enqueue the exact same edge to run now.
@@ -556,6 +540,7 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 				edge.Edge.Outgoing = gen.ID
 				item.Payload = edge
 				item.Kind = queue.KindEdge
+				item.Attempt = 0
 				return s.queue.Enqueue(ctx, item, time.Now())
 			default:
 				return fmt.Errorf("unknown opcode: %s", gen.Op.String())
@@ -598,8 +583,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		if err := s.queue.Enqueue(ctx, queue.Item{
 			Kind:       queue.KindEdge,
 			Identifier: item.Identifier,
-			// TODO Needs to contain new option
-			Payload: queue.PayloadEdge{Edge: pause.Edge()},
+			Payload:    queue.PayloadEdge{Edge: pause.Edge()},
 		}, time.Now()); err != nil {
 			return fmt.Errorf("error enqueueing timeout step: %w", err)
 		}
