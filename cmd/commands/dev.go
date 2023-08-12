@@ -61,7 +61,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		Poll:         !noPoll,
 	}
 
-	close, err := telemetry.TracerSetup("devserver", telemetry.TracerTypeIO)
+	close, err := telemetry.TracerSetup("devserver", telemetry.TracerTypeNoop)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
