@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs/ddb/sqlc"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/jinzhu/copier"
 )
 
@@ -76,7 +77,7 @@ func (w wrapper) GetAppByChecksum(ctx context.Context, checksum string) (*cqrs.A
 
 func (w wrapper) GetAppByURL(ctx context.Context, url string) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
-	url = cqrs.NormalizeAppURL(url)
+	url = util.NormalizeAppURL(url)
 
 	f := func(ctx context.Context) (*sqlc.App, error) {
 		return w.q.GetAppByURL(ctx, url)
@@ -92,7 +93,7 @@ func (w wrapper) GetAllApps(ctx context.Context) ([]*cqrs.App, error) {
 // InsertApp creates a new app.
 func (w wrapper) InsertApp(ctx context.Context, arg cqrs.InsertAppParams) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
-	arg.Url = cqrs.NormalizeAppURL(arg.Url)
+	arg.Url = util.NormalizeAppURL(arg.Url)
 
 	return copyWriter(
 		ctx,
@@ -133,7 +134,7 @@ func (w wrapper) UpdateAppError(ctx context.Context, arg cqrs.UpdateAppErrorPara
 
 func (w wrapper) UpdateAppURL(ctx context.Context, arg cqrs.UpdateAppURLParams) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
-	arg.Url = cqrs.NormalizeAppURL(arg.Url)
+	arg.Url = util.NormalizeAppURL(arg.Url)
 
 	// https://duckdb.org/docs/sql/indexes.html
 	//

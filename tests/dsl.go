@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -103,6 +104,9 @@ func (t *Test) SetRequestContext(ctx SDKCtx) func() {
 		// Ensure we set the ID here, which is deterministic but we use random ports within
 		// the test server, breaking determinism.
 		t.Function.Steps[0].URI = replaceURL(t.Function.Steps[0].URI, t.proxyURL)
+		for i := range t.Function.Steps {
+			t.Function.Steps[i].URI = util.NormalizeAppURL(t.Function.Steps[i].URI)
+		}
 		t.Function.ID = inngest.DeterministicUUID(t.Function)
 		ctx.FnID = t.Function.ID.String()
 
