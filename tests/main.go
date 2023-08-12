@@ -16,7 +16,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/sdk"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -187,6 +189,12 @@ func introspect(test *Test) (*sdk.RegisterRequest, error) {
 	// Ensure we always have a slug.
 	test.Function.Slug = test.Function.GetSlug()
 
+	// Normalize URLs so that 127 <> localhost always matches.
+	for i := range test.Function.Steps {
+		test.Function.Steps[i].URI = util.NormalizeAppURL(test.Function.Steps[i].URI)
+	}
+	test.Function.ID = inngest.DeterministicUUID(test.Function)
+
 	expected, err := json.MarshalIndent(test.Function, "", "  ")
 	if err != nil {
 		return nil, err
@@ -199,6 +207,12 @@ func introspect(test *Test) (*sdk.RegisterRequest, error) {
 
 	found := false
 	for _, f := range funcs {
+		f.ID = inngest.DeterministicUUID(test.Function)
+
+		for i := range f.Steps {
+			f.Steps[i].URI = util.NormalizeAppURL(f.Steps[i].URI)
+		}
+
 		actual, _ := json.MarshalIndent(f, "", "  ")
 		if bytes.Equal(expected, actual) {
 			found = true

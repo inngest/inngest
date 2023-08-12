@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 type devapi struct {
@@ -143,7 +144,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error) {
-	r.URL = cqrs.NormalizeAppURL(r.URL)
+	r.URL = util.NormalizeAppURL(r.URL)
 
 	sum, err := r.Checksum()
 	if err != nil {
