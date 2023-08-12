@@ -253,7 +253,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		//
 		// If the error is not of type response error, we assume the step is
 		// always retryable.
-		if queue.ShouldRetry(err, item.Attempt, item.GetMaxAttempts()) {
+		if resp.Retryable() && queue.ShouldRetry(nil, item.Attempt, item.GetMaxAttempts()) {
 			return err
 		}
 
