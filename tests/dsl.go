@@ -203,6 +203,8 @@ func (t *Test) ExpectResponseFunc(status int, f func(b []byte) error) func() {
 			byt, err := io.ReadAll(rdr)
 			require.NoError(t.test, err)
 
+			require.Equal(t.test, status, r.StatusCode)
+
 			err = f(byt)
 			require.NoError(t.test, err)
 		case <-time.After(time.Second):
