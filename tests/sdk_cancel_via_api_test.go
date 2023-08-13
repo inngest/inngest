@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -106,10 +107,14 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 					return err
 				}
 				defer resp.Body.Close()
+
+				byt, _ := io.ReadAll(resp.Body)
+
 				ids := []ulid.ULID{}
-				if err := json.NewDecoder(resp.Body).Decode(&ids); err != nil {
-					return err
+				if err := json.Unmarshal(byt, &ids); err != nil {
+					return fmt.Errorf("cannot get event runs: %w\n\n%s", err, byt)
 				}
+
 				for _, id := range ids {
 					// Cancel run
 					route = fmt.Sprintf("%s/v0/runs/%s", apiURL.String(), id)
