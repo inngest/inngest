@@ -177,10 +177,16 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 
-	if err := eg.Wait(); err != nil {
+	err := eg.Wait()
+
+	if max+1 > len(ids) {
+		max = len(ids) - 1
+	}
+
+	if err != nil {
 		w.WriteHeader(400)
 		_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
-			IDs:    ids[0:max],
+			IDs:    ids[0 : max+1],
 			Status: 400,
 			Error:  err,
 		})
@@ -189,7 +195,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(200)
 	_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
-		IDs:    ids[0:max],
+		IDs:    ids[0 : max+1],
 		Status: 200,
 	})
 }
