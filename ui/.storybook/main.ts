@@ -8,7 +8,6 @@ const config: StorybookConfig = {
     '@storybook/addon-interactions',
     '@storybook/addon-a11y',
     '@storybook/addon-actions',
-    'storybook-addon-pseudo-states',
     {
       name: '@storybook/addon-styling',
       options: {

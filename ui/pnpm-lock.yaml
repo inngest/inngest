@@ -145,9 +145,6 @@ devDependencies:
   storybook:
     specifier: 7.2.2
     version: 7.2.2
-  storybook-addon-pseudo-states:
-    specifier: 2.1.0
-    version: 2.1.0(@storybook/components@7.2.3)(@storybook/core-events@7.2.3)(@storybook/manager-api@7.2.3)(@storybook/preview-api@7.2.3)(@storybook/theming@7.2.3)(react-dom@18.2.0)(react@18.2.0)
   tailwindcss:
     specifier: 3.2.1
     version: 3.2.1(postcss@8.4.18)(ts-node@10.9.1)
@@ -11808,31 +11805,6 @@ packages:
 
   /store2@2.14.2:
     resolution: {integrity: sha512-siT1RiqlfQnGqgT/YzXVUNsom9S0H1OX+dpdGN1xkyYATo4I6sep5NmsRD/40s3IIOvlCq6akxkqG82urIZW1w==}
-    dev: true
-
-  /storybook-addon-pseudo-states@2.1.0(@storybook/components@7.2.3)(@storybook/core-events@7.2.3)(@storybook/manager-api@7.2.3)(@storybook/preview-api@7.2.3)(@storybook/theming@7.2.3)(react-dom@18.2.0)(react@18.2.0):
-    resolution: {integrity: sha512-AwbCL1OiZ16aIeXSP/IOovkMwXy7NTZqmjkz+UM2guSGjvogHNA95NhuVyWoqieE+QWUpGO48+MrBGMeeJcHOQ==}
-    peerDependencies:
-      '@storybook/components': ^7.0.0
-      '@storybook/core-events': ^7.0.0
-      '@storybook/manager-api': ^7.0.0
-      '@storybook/preview-api': ^7.0.0
-      '@storybook/theming': ^7.0.0
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
-      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0
-    peerDependenciesMeta:
-      react:
-        optional: true
-      react-dom:
-        optional: true
-    dependencies:
-      '@storybook/components': 7.2.3(@types/react-dom@18.0.10)(@types/react@18.0.27)(react-dom@18.2.0)(react@18.2.0)
-      '@storybook/core-events': 7.2.3
-      '@storybook/manager-api': 7.2.3(react-dom@18.2.0)(react@18.2.0)
-      '@storybook/preview-api': 7.2.3
-      '@storybook/theming': 7.2.3(react-dom@18.2.0)(react@18.2.0)
-      react: 18.2.0
-      react-dom: 18.2.0(react@18.2.0)
     dev: true
 
   /storybook@7.2.2:
