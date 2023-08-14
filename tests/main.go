@@ -4,15 +4,18 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
-	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"regexp"
 	"testing"
 	"time"
 
@@ -28,6 +31,7 @@ const (
 	ENV_EVENT_URL   = "EVENT_URL" // eg http://127.0.0.1:8288 or https://inn.gs
 	ENV_SIGNING_KEY = "INNGEST_SIGNING_KEY"
 	ENV_EVENT_KEY   = "INNGEST_EVENT_KEY"
+	ENV_PROXY_URL   = "PROXY_URL"
 )
 
 var (
@@ -35,6 +39,7 @@ var (
 	apiURL               url.URL
 	eventURL             url.URL
 	signingKey, eventKey string
+	proxyURL             string
 
 	buffer = 5 * time.Second
 )
@@ -53,6 +58,11 @@ func init() {
 	if eventKey == "" {
 		eventKey = "eventkey"
 	}
+
+	proxyURL = os.Getenv(ENV_PROXY_URL)
+	if proxyURL == "" {
+		proxyURL = "http://localhost"
+	}
 }
 
 func parseEnvURL(env string) url.URL {
@@ -69,12 +79,24 @@ func parseEnvURL(env string) url.URL {
 func run(t *testing.T, test *Test) {
 	t.Helper()
 
+	rand.Seed(time.Now().UnixNano())
+
+	fmt.Println("")
+	fmt.Println("")
+	header := fmt.Sprintf("Running test: %s", t.Name())
+	fmt.Println(header)
+	for i := 0; i < len(header); i++ {
+		fmt.Printf("=")
+	}
+	fmt.Println("")
+	fmt.Println("")
+
 	test.requests = make(chan http.Request)
 	test.responses = make(chan http.Response)
 
-	// Ensure that the desired function exists within the SDK.
-	rr, err := introspect(test)
-	require.NoError(t, err, "Introspection error")
+	// Create a new server on a random port that listens on 0.0.0.0.
+	// This means we cannot use httptest.NewServer
+	mux := http.NewServeMux()
 
 	// Start a new test server which will intercept all requests between the executor and the SDK.
 	//
@@ -84,7 +106,7 @@ func run(t *testing.T, test *Test) {
 	// - State injected via the executor.
 	//
 	// We can also randomly inject faults by disregarding the SDK's response and throwing a 500.
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Ignore ping requests
 		if r.Method == http.MethodPut {
 			r.Body.Close()
@@ -142,13 +164,49 @@ func run(t *testing.T, test *Test) {
 		_, err = w.Write(byt)
 		require.NoError(t, err)
 	}))
+	port := rand.Int63n(10000) + 40000
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: mux,
+	}
+	go func() {
+		_ = srv.ListenAndServe()
+	}()
 	defer srv.Close()
-	localURL, err := url.Parse(srv.URL)
+
+	var err error
+
+	test.localURL, err = url.Parse(fmt.Sprintf("%s:%d", proxyURL, port))
 	require.NoError(t, err)
 
+	// Ensure that the desired function exists within the SDK.
+	rr, err := introspect(test)
+	require.NoError(t, err, "Introspection error")
+
 	// Register all functions with the SDK.
-	err = register(*localURL, *rr)
+	err = register(*test.localURL, *rr)
 	require.NoError(t, err, "Function registration error")
+
+	defer func() {
+		// De-register the app.
+		fmt.Println("REMOVING APP")
+		url := apiURL
+		url.Path = "/fn/remove"
+
+		fv := url.Query()
+		fv.Add("url", test.localURL.String())
+
+		req, err := http.NewRequest(http.MethodDelete, url.String()+"?"+fv.Encode(), nil)
+		if err != nil {
+			fmt.Println("Error removing app after test", err)
+			return
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			fmt.Println("Error removing app after test", err)
+		}
+		resp.Body.Close()
+	}()
 
 	// Trigger the function by sending an event.
 	trigger := test.Function.Triggers[0]
@@ -158,7 +216,6 @@ func run(t *testing.T, test *Test) {
 	}
 
 	test.test = t
-	test.proxyURL = srv.URL
 	for _, f := range test.chain {
 		f()
 	}
@@ -265,12 +322,17 @@ func register(serverURL url.URL, rr sdk.RegisterRequest) error {
 		return err
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", signingKey))
+	key := regexp.MustCompile(`^signkey-[\w]+-`).ReplaceAllString(signingKey, "")
+	byt, _ = hex.DecodeString(key)
+	sum := sha256.Sum256(byt)
+	keyHash := hex.EncodeToString(sum[:])
+
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer signkey-test-%s", keyHash))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("error registering: %w", err)
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode > 299 {
 		byt, _ := httputil.DumpResponse(resp, true)
 		return fmt.Errorf("Error when registering functions: %s", string(byt))
 	}
@@ -285,5 +347,5 @@ func stepURL(fnID string, step string) string {
 	q.Add("fnId", fnID)
 	q.Add("stepId", step)
 	url.RawQuery = q.Encode()
-	return url.String()
+	return util.NormalizeAppURL(url.String())
 }
