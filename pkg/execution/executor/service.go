@@ -13,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -39,13 +38,19 @@ func WithState(sm state.Manager) func(s *svc) {
 	}
 }
 
+func WithServiceExecutor(exec Executor) func(s *svc) {
+	return func(s *svc) {
+		s.exec = exec
+	}
+}
+
 func WithExecutorOpts(opts ...ExecutorOpt) func(s *svc) {
 	return func(s *svc) {
 		s.opts = opts
 	}
 }
 
-func WithQueue(q queue.Queue) func(s *svc) {
+func WithServiceQueue(q queue.Queue) func(s *svc) {
 	return func(s *svc) {
 		s.queue = q
 	}
@@ -83,50 +88,24 @@ func (s *svc) Pre(ctx context.Context) error {
 	var err error
 
 	if s.state == nil {
-		s.state, err = s.config.State.Service.Concrete.Manager(ctx)
-		if err != nil {
-			return err
-		}
+		return fmt.Errorf("no state provided")
 	}
 
 	if s.queue == nil {
-		logger.From(ctx).Info().Str("backend", s.config.Queue.Service.Backend).Msg("starting queue")
-		s.queue, err = s.config.Queue.Service.Concrete.Queue()
-		if err != nil {
-			return err
-		}
-	}
-	var drivers = []driver.Driver{}
-	for _, driverConfig := range s.config.Execution.Drivers {
-		d, err := driverConfig.NewDriver()
-		if err != nil {
-			return err
-		}
-
-		drivers = append(drivers, d)
+		return fmt.Errorf("no queue provided")
 	}
 
 	failureHandler, err := s.getFailureHandler(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create failure handler: %w", err)
 	}
-
-	opts := []ExecutorOpt{
-		WithStateManager(s.state),
-		WithRuntimeDrivers(
-			drivers...,
-		),
-		WithLogger(logger.From(ctx)),
-		WithFailureHandler(failureHandler),
-	}
-	opts = append(opts, s.opts...)
-
-	s.exec, err = NewExecutor(opts...)
-	if err != nil {
-		return err
-	}
+	s.exec.SetFailureHandler(failureHandler)
 
 	return nil
+}
+
+func (s *svc) Executor() Executor {
+	return s.exec
 }
 
 func (s *svc) getFailureHandler(ctx context.Context) (func(context.Context, state.Identifier, state.State, state.DriverResponse) error, error) {

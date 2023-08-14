@@ -3,16 +3,24 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"sync"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/semaphore"
 )
 
 var (
@@ -20,6 +28,10 @@ var (
 	ErrNoStateManager    = fmt.Errorf("no state manager provided")
 	ErrNoActionLoader    = fmt.Errorf("no action loader provided")
 	ErrNoRuntimeDriver   = fmt.Errorf("runtime driver for action not found")
+
+	ErrFunctionEnded = fmt.Errorf("function already ended")
+
+	PauseHandleConcurrency = 100
 )
 
 // Executor manages executing actions.  It interfaces over a state store to save
@@ -80,6 +92,29 @@ type Executor interface {
 		// right order.
 		stackIndex int,
 	) (*state.DriverResponse, int, error)
+
+	// HandlePauses handles pauses loaded from an incoming event.  This delegates to Cancel and
+	// Resume where necessary, depending on pauses that have been loaded and matched.
+	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) error
+	// Cancel cancels an in-progress function, preventing any enqueued or future steps from running.
+	Cancel(ctx context.Context, id state.Identifier, r CancelRequest) error
+	// Resume resumes an in-progress function from the given waitForEvent pause.
+	Resume(ctx context.Context, p state.Pause, r ResumeRequest) error
+	// SetFailureHandler sets the failure handler, called when a function permanently fails.
+	SetFailureHandler(f FailureHandler)
+}
+
+// CancelRequest stores information about the incoming cancellation request within
+// history.
+type CancelRequest struct {
+	EventID    *ulid.ULID
+	Expression *string
+	UserID     *uuid.UUID
+}
+
+type ResumeRequest struct {
+	With    any
+	EventID *ulid.ULID
 }
 
 // FailureHandler is a function that handles failures in the executor.
@@ -115,6 +150,14 @@ type ExecutorOpt func(m Executor) error
 func WithStateManager(sm state.Manager) ExecutorOpt {
 	return func(e Executor) error {
 		e.(*executor).sm = sm
+		return nil
+	}
+}
+
+// WithQueue sets which state manager to use when creating an executor.
+func WithQueue(q queue.Queue) ExecutorOpt {
+	return func(e Executor) error {
+		e.(*executor).queue = q
 		return nil
 	}
 }
@@ -171,11 +214,16 @@ type executor struct {
 	log *zerolog.Logger
 
 	sm             state.Manager
+	queue          queue.Queue
 	fl             state.FunctionLoader
 	runtimeDrivers map[string]driver.Driver
 	failureHandler FailureHandler
 
 	steplimit uint
+}
+
+func (e *executor) SetFailureHandler(f FailureHandler) {
+	e.failureHandler = f
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -448,6 +496,205 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *i
 	}
 
 	return response, idx, err
+}
+
+// HandlePauses handles pauses loaded from an incoming event.
+//
+// TODO: Use InternalEvent which wraps event with internal ID here.
+func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) error {
+	if e.queue == nil || e.sm == nil {
+		return fmt.Errorf("No queue or state manager specified")
+	}
+
+	var (
+		goerr error
+		wg    sync.WaitGroup
+	)
+
+	evtID := evt.InternalID()
+
+	// Schedule up to PauseHandleConcurrency pauses at once.
+	sem := semaphore.NewWeighted(int64(PauseHandleConcurrency))
+
+	for iter.Next(ctx) {
+		if goerr != nil {
+			break
+		}
+
+		pause := iter.Val(ctx)
+
+		// Block until we have capacity
+		_ = sem.Acquire(ctx, 1)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// Always release one from the capacity
+			defer sem.Release(1)
+
+			if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evt.InternalID().String() {
+				// Don't allow the original function trigger to trigger the
+				// cancellation
+				return
+			}
+
+			// NOTE: Some pauses may be nil or expired, as the iterator may take
+			// time to process.  We handle that here and assume that the event
+			// did not occur in time.
+			if pause == nil || pause.Expires.Time().Before(time.Now()) {
+				// Consume this pause to remove it entirely
+				_ = e.sm.ConsumePause(context.Background(), pause.ID, nil)
+				return
+			}
+
+			// Ensure that we store the group ID for this pause, letting us properly track cancellation
+			// or continuation history
+			ctx = state.WithGroupID(ctx, pause.GroupID)
+
+			// Run an expression if this exists.
+			if pause.Expression != nil {
+				// Precompute the expression data once, as a value (not pointer)
+				data := expressions.NewData(map[string]interface{}{
+					"async": evt.Event().Map(),
+				})
+
+				if len(pause.ExpressionData) > 0 {
+					// If we have cached data for the expression (eg. the expression is evaluating workflow
+					// state which we don't have access to here), unmarshal the data and add it to our
+					// event data.
+					data.Add(pause.ExpressionData)
+				}
+
+				expr, err := expressions.NewExpressionEvaluator(ctx, *pause.Expression)
+				if err != nil {
+					return
+				}
+
+				val, _, err := expr.Evaluate(ctx, data)
+				if err != nil {
+					// XXX: Track error here.
+					return
+				}
+				result, _ := val.(bool)
+				if !result {
+					return
+				}
+			}
+
+			// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
+			if pause.Cancel {
+				err := e.Cancel(ctx, pause.Identifier, CancelRequest{
+					EventID:    &evtID,
+					Expression: pause.Expression,
+				})
+				if err != nil {
+					goerr = errors.Join(goerr, fmt.Errorf("error cancelling function: %w", err))
+					return
+				}
+				// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
+				err = e.sm.ConsumePause(ctx, pause.ID, nil)
+				if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
+					// Done.
+					return
+				}
+				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+				return
+			}
+
+			err := e.Resume(ctx, *pause, ResumeRequest{
+				With:    evt.Event().Map(),
+				EventID: &evtID,
+			})
+			if err != nil {
+				goerr = errors.Join(goerr, fmt.Errorf("error consuming pause after cancel: %w", err))
+			}
+		}()
+
+	}
+
+	wg.Wait()
+	return goerr
+}
+
+// Cancel cancels an in-progress function.
+func (e *executor) Cancel(ctx context.Context, id state.Identifier, r CancelRequest) error {
+	md, err := e.sm.Metadata(ctx, id.RunID)
+	if err != nil {
+		return err
+	}
+
+	switch md.Status {
+	case enums.RunStatusFailed, enums.RunStatusCompleted, enums.RunStatusOverflowed:
+		return ErrFunctionEnded
+	case enums.RunStatusCancelled:
+		return nil
+	}
+
+	// TODO: Load all pauses for the function and remove.
+
+	if err := e.sm.Cancel(ctx, md.Identifier); err != nil {
+		return fmt.Errorf("error cancelling function: %w", err)
+	}
+
+	// XXX: Write to history here.
+	return nil
+}
+
+// Resume resumes an in-progress function from the given waitForEvent pause.
+func (e *executor) Resume(ctx context.Context, pause state.Pause, r ResumeRequest) error {
+	if e.queue == nil || e.sm == nil {
+		return fmt.Errorf("No queue or state manager specified")
+	}
+
+	// Lease this pause so that only this thread can schedule the execution.
+	//
+	// If we don't do this, there's a chance that two concurrent runners
+	// attempt to enqueue the next step of the workflow.
+	err := e.sm.LeasePause(ctx, pause.ID)
+	if err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
+		// Ignore;  this is being handled by another runner.
+		return nil
+	}
+
+	if pause.OnTimeout {
+		// Delete this pause, as an event has occured which matches
+		// the timeout.  We can do this prior to leasing a pause as it's the
+		// only work that needs to happen
+		err := e.sm.ConsumePause(ctx, pause.ID, nil)
+		if err == nil || err == state.ErrPauseNotFound {
+			return nil
+		}
+		return err
+	}
+
+	// Schedule an execution from the pause's entrypoint.  We do this after
+	// consuming the pause to guarantee the event data is stored via the pause
+	// for the next run.  If the ConsumePause call comes after enqueue, the TCP
+	// conn may drop etc. and running the job may occur prior to saving state data.
+	if err := e.queue.Enqueue(
+		ctx,
+		queue.Item{
+			// Add a new group ID for the child;  this will be a new step.
+			GroupID:     uuid.New().String(),
+			WorkspaceID: pause.WorkspaceID,
+			Kind:        queue.KindEdge,
+			Identifier:  pause.Identifier,
+			Payload: queue.PayloadEdge{
+				Edge: inngest.Edge{
+					Outgoing: pause.Outgoing,
+					Incoming: pause.Incoming,
+				},
+			},
+		},
+		time.Now(),
+	); err != nil {
+		return fmt.Errorf("error enqueueing after pause: %w", err)
+	}
+
+	if err = e.sm.ConsumePause(ctx, pause.ID, r.With); err != nil {
+		return fmt.Errorf("error consuming pause via event: %w", err)
+	}
+	return nil
 }
 
 type execError struct {
