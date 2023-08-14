@@ -13,10 +13,10 @@ const meta = {
 
 export default meta;
 
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<typeof Header>;
 
 export const Default: Story = {
   args: {
-    children: <p className='text-white pr-4'>This is the header's middle component</p>,
+    children: <p className="text-white pr-4">This is the header's middle component</p>,
   },
 };
