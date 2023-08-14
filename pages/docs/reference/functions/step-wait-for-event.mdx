@@ -153,7 +153,7 @@ export default inngest.createFunction(
     const topicSelected = await step.waitForEvent("ai/post.topic.selected", {
       timeout: "5m",
       // "async" is the "ai/post.topic.selected" event here:
-      if: `async.data.completionId == ${generatedTopics.completionId}`
+      if: `async.data.completionId == "${generatedTopics.completionId}"`
     });
 
     // If the user selected a topic within 5 minutes, "topicSelected" will
