@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import Badge from '@/components/Badge';
 import classNames from '@/utils/classnames';
 
-interface NavbarLinkProps {
+export type NavbarLinkProps = {
   icon: React.ReactNode;
   href: Route;
   badge?: number;
