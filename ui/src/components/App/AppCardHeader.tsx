@@ -20,7 +20,7 @@ export default function AppCardHeader({ connected, functionCount }: AppCardHeade
   } else {
     headerColor = 'bg-teal-400/50';
     headerLabel = 'Connected';
-    headerIcon = <IconCheckCircle />;
+    headerIcon = <IconCheckCircle className="text-white icon-xl" />;
   }
 
   return (
