@@ -21,7 +21,7 @@ type Story = StoryObj<typeof SearchInput>;
 
 export const Default: Story = {};
 
-export const isInvalid: Story = {
+export const Empty: Story = {
   args: {
     value: '',
   },

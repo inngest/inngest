@@ -20,7 +20,7 @@ type Story = StoryObj<typeof Input>;
 
 export const Default: Story = {};
 
-export const WithPlaceholder: Story = {
+export const Empty: Story = {
     args: {
       placeholder: 'This is the placeholder',
       value: '',
