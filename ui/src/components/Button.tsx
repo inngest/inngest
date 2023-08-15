@@ -32,7 +32,7 @@ export default function Button({
       disabled={disabled}
     >
       {label && label}
-      {icon && icon}
+      {icon && <span className="icon-xs">{icon}</span>}
     </button>
   );
 }
