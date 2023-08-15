@@ -134,7 +134,7 @@ export default function FunctionList() {
         value={searchInput}
         onChange={setSearchInput}
         debouncedSearch={debouncedSearch}
-        className="ml-6 my-4"
+        className="py-4"
       />
       <main className="min-h-0 overflow-y-auto">
         <Table

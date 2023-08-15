@@ -17,11 +17,14 @@ export default function SearchInput({
 }: SearchInputProps) {
   return (
     <div
-      className={classNames('relative text-slate-400 flex items-center bg-slate-950', className)}
+      className={classNames(
+        'relative text-slate-400 flex items-center bg-slate-950 pl-6 ',
+        className,
+      )}
     >
       <input
         type="text"
-        className="text-slate-100 w-96 placeholder-slate-400 py-1 pl-4 bg-slate-950"
+        className="text-slate-100 w-96 placeholder-slate-400 py-1 pl-4 bg-transparent"
         placeholder={props?.placeholder ?? 'Search...'}
         value={value ?? ''}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -30,7 +33,7 @@ export default function SearchInput({
         }}
         {...props}
       />
-      <IconMagnifyingGlass className="absolute left-0 h-3 w-3 text--slate-400" />
+      <IconMagnifyingGlass className="absolute left-6 h-3 w-3 text--slate-400" />
     </div>
   );
 }

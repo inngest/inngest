@@ -14,8 +14,8 @@ export default function Input({ value, className, onChange, isInvalid, ...props 
       <input
         id="addAppUrlModal"
         className={classNames(
-          'min-w-[420px] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline',
-          isInvalid && value.length > 0 && 'pr-8 outline-rose-400',
+          'min-w-[420px] bg-slate-800 rounded-md text-slate-300 py-2 px-4',
+          isInvalid && value.length > 0 && 'pr-8 border-rose-400 border-2',
           className
         )}
         value={value}
