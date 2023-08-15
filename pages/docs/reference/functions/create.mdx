@@ -87,7 +87,7 @@ One of the following function triggers is **Required**.
 The handler is your code that runs whenever the trigger occurs. Every function handler receives a single object argument which can be deconstructed. The key arguments are `event` and `step`. Note, that scheduled functions that use a `cron` trigger will not receive an `event` argument.
 
 ```ts
-function handler({ event, events, step, runId, logger }) {/* ... */}
+function handler({ event, events, step, runId, logger, attempt }) {/* ... */}
 ```
 
 #### `event`
@@ -138,3 +138,7 @@ export interface Logger {
 ```
 
 It is a proxy object that is either backed by `console` or the logger you provided ([reference](/docs/guides/logging)).
+
+### `attempt` <VersionBadge version="v2.5.0+" />
+
+The current zero-indexed attempt number for this function execution. The first attempt will be 0, the second 1, and so on. The attempt number is incremented every time the function throws an error and is retried.
