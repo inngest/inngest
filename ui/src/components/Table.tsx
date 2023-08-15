@@ -48,7 +48,10 @@ export default function Table({ options, blankState, customRowProps }: TableProp
                     : flexRender(header.column.columnDef.header, header.getContext())}
                   {header.column.getIsSorted() && (
                     <IconChevron
-                      className={header.column.getIsSorted() === 'asc' ? 'rotate-180' : undefined}
+                      className={classNames(
+                        'icon-xs transition-all duration-500',
+                        header.column.getIsSorted() === 'asc' && '-rotate-180',
+                      )}
                     />
                   )}
                 </div>
