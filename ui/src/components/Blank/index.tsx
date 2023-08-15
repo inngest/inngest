@@ -1,4 +1,5 @@
 import { IconBook, IconFeed } from '../../icons';
+import Link from '@/components/Link/Link';
 
 interface BlankSlateProps {
   imageUrl?: string;
@@ -25,15 +26,12 @@ export const BlankSlate = ({ imageUrl, title, subtitle, button, link }: BlankSla
         {subtitle ? <div>{subtitle}</div> : null}
 
         {link ? (
-          <a
+          <Link
+            internalNavigation={false}
             href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-2 bg-slate-1000/80 border border-slate-700 rounded-sm px-3 py-2 flex flex-row items-center space-x-2 justify-center leading-none"
           >
             <div>{link.text}</div>
-            <IconFeed />
-          </a>
+          </Link>
         ) : button ? (
           <button
             onClick={button.onClick}

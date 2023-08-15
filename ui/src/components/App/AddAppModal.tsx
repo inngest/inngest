@@ -7,7 +7,6 @@ import Modal from '@/components/Modal';
 import useDebounce from '@/hooks/useDebounce';
 import { IconExclamationTriangleSolid } from '@/icons';
 import { useCreateAppMutation } from '@/store/generated';
-import classNames from '@/utils/classnames';
 import isValidUrl from '@/utils/urlValidation';
 
 export default function AddAppModal({ isOpen, onClose }) {

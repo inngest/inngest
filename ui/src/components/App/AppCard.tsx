@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import Link from 'next/link';
 import { toast } from 'sonner';
 
 import AppCardHeader from '@/components/App/AppCardHeader';
 import Badge from '@/components/Badge';
 import CodeLine from '@/components/CodeLine';
+import Link from '@/components/Link/Link';
 import useDebounce from '@/hooks/useDebounce';
 import useDocsNavigation from '@/hooks/useDocsNavigation';
 import {
-  IconBook,
   IconChevron,
   IconSpinner,
   IconStatusCircleCheck,
@@ -116,7 +115,7 @@ export default function AppCard({ app }: { app: App }) {
               </div>
               <div className="flex items-center gap-4">
                 <p className="text-slate-300 xl:flex xl:ui-open:hidden hidden">{app.url}</p>
-                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
+                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500 transition-transform duration-500" />
               </div>
             </>
           }
@@ -179,13 +178,13 @@ export default function AppCard({ app }: { app: App }) {
                 </div>
               </div>
               {!app.connected && (
-                <a
-                  className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
+                <Link
+                  internalNavigation
+                  className="w-fit"
                   onClick={() => navigateToDocs('/sdk/serve')}
                 >
                   Connecting to the Dev Server
-                  <IconBook />
-                </a>
+                </Link>
               )}
             </>
           }
@@ -215,12 +214,11 @@ export default function AppCard({ app }: { app: App }) {
               </div>
               <div className="flex items-center gap-4">
                 {app.functionCount > 0 && (
-                  <Link className="text-indigo-400 flex items-center gap-2" href="/functions">
+                  <Link internalNavigation href="/functions">
                     View Functions
-                    <IconChevron className="-rotate-90" />
                   </Link>
                 )}
-                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
+                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500 transition-transform duration-500" />
               </div>
             </>
           }
@@ -233,13 +231,13 @@ export default function AppCard({ app }: { app: App }) {
                     a function and are exporting it correctly from your serve command.
                   </p>
                   <CodeLine code="serve(client, [list_of_fns]);" className="p-4 mb-4" />
-                  <a
-                    className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
+                  <Link
+                    internalNavigation
+                    className="w-fit"
                     onClick={() => navigateToDocs('/functions')}
                   >
                     Creating Functions
-                    <IconBook />
-                  </a>
+                  </Link>
                 </>
               )}
               {app.functionCount > 0 && (
