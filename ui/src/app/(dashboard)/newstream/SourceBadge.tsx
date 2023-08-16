@@ -28,7 +28,7 @@ export default function SourceBadge({ row }: SourceBadgeProps) {
       break;
     case 'scheduled':
     case 'manual':
-      icon = <IconClock className="h-4" />;
+      icon = <IconClock />;
       styles = 'text-orange-400 bg-orange-400/10 capitalize';
       sourceName = type;
       break;
