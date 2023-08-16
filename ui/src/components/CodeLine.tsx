@@ -26,7 +26,7 @@ export default function CodeLine({ code, className }: CodeLineProps) {
       onClick={() => handleCopyClick(code)}
     >
       <code className="text-slate-300">{code}</code>
-      {clickedState ? <IconStatusCompleted /> : <IconCopy />}
+      {clickedState ? <IconStatusCompleted /> : <IconCopy className="text-slate-500 icon-2xl" />}
     </div>
   );
 }
