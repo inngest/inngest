@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
@@ -19,7 +18,6 @@ import (
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/oklog/ulid/v2"
-	"github.com/xhit/go-str2duration/v2"
 )
 
 type Opt func(s *svc)
@@ -257,125 +255,6 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		// Finalize this step early, as we don't need to re-invoke anything else or
 		// load children until generators complete.
 		return s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt)
-	}
-
-	run, err := s.state.Load(ctx, item.Identifier.RunID)
-	if err != nil {
-		return fmt.Errorf("unable to load run: %w", err)
-	}
-
-	children, err := state.DefaultEdgeEvaluator.AvailableChildren(ctx, run, edge.Incoming)
-	if err != nil {
-		return fmt.Errorf("unable to evaluate available children: %w", err)
-	}
-
-	l.Trace().Int("len", len(children)).Msg("evaluated children")
-
-	for _, next := range children {
-		retries := next.Step.RetryCount()
-		// We want to wait for another event to come in to traverse this edge within the DAG.
-		//
-		// Create a new "pause", which informs the state manager that we're pausing the traversal
-		// of this edge until later.
-		//
-		// The runner should load all pauses and automatically resume the traversal when a
-		// matching event is received.
-		if next.Metadata != nil && next.Metadata.AsyncEdgeMetadata != nil {
-			am := next.Metadata.AsyncEdgeMetadata
-			if am.Event == "" {
-				return fmt.Errorf("no async edge event specified")
-			}
-			dur, err := str2duration.ParseDuration(am.TTL)
-			if err != nil {
-				return fmt.Errorf("error parsing async edge ttl '%s': %w", am.TTL, err)
-			}
-
-			// This should also increase the waitgroup count, as we have an
-			// edge that is outstanding.
-			//
-			// XXX: Should this be a part of saving a pause?  Maybe we should
-			// always increase scheduled count atomically here.
-			if err := s.state.Scheduled(ctx, item.Identifier, next.Incoming, 0, nil); err != nil {
-				return fmt.Errorf("unable to schedule async edge: %w", err)
-			}
-
-			l.Debug().Interface("edge", next).Msg("saving pause")
-			pauseID := uuid.New()
-			expires := time.Now().Add(dur)
-			err = s.state.SavePause(ctx, state.Pause{
-				ID:         pauseID,
-				Identifier: run.Identifier(),
-				Outgoing:   next.Outgoing,
-				Incoming:   next.Incoming,
-				Expires:    state.Time(expires),
-				Event:      &am.Event,
-				Expression: am.Match,
-				OnTimeout:  am.OnTimeout,
-			})
-			if err != nil {
-				return fmt.Errorf("error saving edge pause: %w", err)
-			}
-
-			l.Debug().Interface("edge", next).Msg("scheduling pause timeout")
-			// Enqueue a timeout.  This will be handled within our queue;  if the
-			// pause still exists at this time and has not been comsumed we will
-			// continue traversing this edge if OnTimeout is true.
-			if err := s.queue.Enqueue(ctx, queue.Item{
-				Kind:       queue.KindPause,
-				Identifier: item.Identifier,
-				Payload: queue.PayloadPauseTimeout{
-					PauseID:   pauseID,
-					OnTimeout: am.OnTimeout,
-				},
-				MaxAttempts: &retries,
-			}, expires); err != nil {
-				return fmt.Errorf("unable to enqueue pause timeout: %w", err)
-			}
-			continue
-		}
-
-		at := time.Now()
-		if next.Metadata != nil && next.Metadata.Wait != nil {
-			dur, err := ParseWait(ctx, *next.Metadata.Wait, run, edge.Incoming)
-			if err != nil {
-				return fmt.Errorf("unable to parse wait: %w", err)
-			}
-			at = at.Add(dur)
-		}
-
-		l.Debug().Str("outgoing", next.Outgoing).Time("at", at).Msg("scheduling next step")
-
-		// Enqueue the next child in our queue.
-		if err := s.queue.Enqueue(ctx, queue.Item{
-			Kind:       queue.KindEdge,
-			Identifier: item.Identifier,
-			Payload: queue.PayloadEdge{
-				Edge: next.Edge,
-			},
-			MaxAttempts: &retries,
-		}, at); err != nil {
-			return fmt.Errorf("unable to enqueue next step: %w", err)
-		}
-
-		// Increase the waitgroup counter.
-		// Unfortunately, the backing queue and the state store may be different
-		// backing services.  Therefore, we can never guarantee that enqueueing an
-		// item increases the scheduled count.
-		//
-		// Hopefully, if the backing implementation is the same (eg. a database which
-		// hosts the queue and the state store), Enqueue increases the pending count
-		// and this is a no-op - things should be atomic where possible.
-		if err := s.state.Scheduled(ctx, item.Identifier, next.Incoming, 0, &at); err != nil {
-			return fmt.Errorf("unable to schedule next step: %w", err)
-		}
-	}
-
-	// Mark this step as finalized.
-	//
-	// This must happen after everything is enqueued, else the scheduled <> finalized count
-	// is out of order.
-	if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt); err != nil {
-		return fmt.Errorf("unable to finalize step: %w", err)
 	}
 
 	l.Debug().Interface("edge", edge).Msg("step complete")
