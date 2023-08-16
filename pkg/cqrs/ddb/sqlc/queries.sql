@@ -30,9 +30,11 @@ UPDATE apps SET url = ? WHERE id = ? RETURNING *;
 -- name: UpdateAppError :one
 UPDATE apps SET error = ? WHERE id = ? RETURNING *;
 
+
 --
 -- Functions
 --
+
 
 -- note - this is very basic right now.
 -- name: InsertFunction :one
@@ -57,3 +59,22 @@ DELETE FROM functions WHERE app_id = ?;
 
 -- name: DeleteFunctionsByIDs :exec
 DELETE FROM functions WHERE id IN (sqlc.slice('ids'));
+
+
+--
+-- Events
+--
+
+-- name: InsertEvent :one
+INSERT INTO events
+	(internal_id, event_id, event_data, event_user, event_v, event_ts) VALUES
+	(?, ?, ?, ?, ?, ?) RETURNING *;
+
+--
+-- History
+--
+
+-- name: InsertHistory :exec
+INSERT INTO history
+	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, step_name, step_id, url, cancel_request, sleep, wait_for_event, result) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

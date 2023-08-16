@@ -21,3 +21,34 @@ CREATE TABLE functions (
     config VARCHAR NOT NULL,
     created_at TIMESTAMP NOT NULL
 );
+
+CREATE TABLE events (
+	internal_id CHAR(26) PRIMARY KEY,
+	event_id VARCHAR NOT NULL,
+	event_data VARCHAR DEFAULT '{}' NOT NULL,
+	event_user VARCHAR DEFAULT '{}' NOT NULL,
+	event_v VARCHAR,
+	event_ts TIMESTAMP NOT NULL
+);
+
+CREATE TABLE history (
+	id UUID,
+	created_at TIMESTAMP NOT NULL,
+	run_started_at TIMESTAMP NOT NULL,
+	function_id UUID,
+	function_version INT NOT NULL,
+	run_id CHAR(26) NOT NULL, 
+	event_id CHAR(26) NOT NULL, 
+	batch_id CHAR(26), 
+	group_id CHAR(36),
+	idempotency_key VARCHAR NOT NULL,
+	type VARCHAR NOT NULL,
+	attempt INT NOT NULL,
+	step_name VARCHAR,
+	step_id VARCHAR,
+	url VARCHAR,
+	cancel_request VARCHAR,
+	sleep VARCHAR,
+	wait_for_event VARCHAR,
+	result VARCHAR
+);
