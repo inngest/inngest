@@ -42,7 +42,7 @@ func ParseWait(ctx context.Context, wait string, s state.State, outgoingID strin
 	return 0, fmt.Errorf("Unable to get duration from expression response: %v", out)
 }
 
-func sortOps(opcodes []state.GeneratorOpcode) {
+func sortOps(opcodes []*state.GeneratorOpcode) {
 	sort.SliceStable(opcodes, func(i, j int) bool {
 		// Ensure that we process waitForEvents first, as these are highest priority:
 		// it ensures that wait triggers are saved as soon as possible.

@@ -84,7 +84,7 @@ func TestParseWait(t *testing.T) {
 }
 
 func TestSortOps(t *testing.T) {
-	input := []state.GeneratorOpcode{
+	input := []*state.GeneratorOpcode{
 		{
 			Op: enums.OpcodeStep,
 		},
@@ -98,7 +98,7 @@ func TestSortOps(t *testing.T) {
 			Op: enums.OpcodeWaitForEvent,
 		},
 	}
-	expected := []state.GeneratorOpcode{
+	expected := []*state.GeneratorOpcode{
 		{
 			Op: enums.OpcodeWaitForEvent,
 		},
@@ -114,5 +114,5 @@ func TestSortOps(t *testing.T) {
 	}
 
 	sortOps(input)
-	require.Equal(t, expected, input)
+	require.EqualValues(t, expected, input)
 }

@@ -96,18 +96,18 @@ type Executor interface {
 	) (*state.DriverResponse, int, error)
 
 	// HandleGeneratorResponse handles all generator responses.
-	HandleGeneratorResponse(ctx context.Context, gen []state.GeneratorOpcode, item queue.Item) error
+	HandleGeneratorResponse(ctx context.Context, gen []*state.GeneratorOpcode, item queue.Item) error
 	// HandleGenerator handles an individual generator response returned from the SDK.
 	HandleGenerator(ctx context.Context, gen state.GeneratorOpcode, item queue.Item) error
 
 	// HandlePauses handles pauses loaded from an incoming event.  This delegates to Cancel and
 	// Resume where necessary, depending on pauses that have been loaded and matched.
 	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) error
-	// Cancel cancels an in-progress function, preventing any enqueued or future steps from running.
+	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
 	Cancel(ctx context.Context, id state.Identifier, r CancelRequest) error
-	// Resume resumes an in-progress function from the given waitForEvent pause.
+	// Resume resumes an in-progress function run from the given waitForEvent pause.
 	Resume(ctx context.Context, p state.Pause, r ResumeRequest) error
-	// SetFailureHandler sets the failure handler, called when a function permanently fails.
+	// SetFailureHandler sets the failure handler, called when a function run permanently fails.
 	SetFailureHandler(f FailureHandler)
 }
 
@@ -568,7 +568,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			// Run an expression if this exists.
 			if pause.Expression != nil {
 				// Precompute the expression data once, as a value (not pointer)
-				data := expressions.NewData(map[string]interface{}{
+				data := expressions.NewData(map[string]any{
 					"async": evt.Event().Map(),
 				})
 
@@ -711,13 +711,13 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r ResumeReques
 	return nil
 }
 
-func (e *executor) HandleGeneratorResponse(ctx context.Context, gen []state.GeneratorOpcode, item queue.Item) error {
+func (e *executor) HandleGeneratorResponse(ctx context.Context, gen []*state.GeneratorOpcode, item queue.Item) error {
 	// Ensure that we process waitForEvents first, as these are highest priority.
 	sortOps(gen)
 
 	eg := errgroup.Group{}
 	for _, op := range gen {
-		copied := op
+		copied := *op
 		eg.Go(func() error { return e.HandleGenerator(ctx, copied, item) })
 	}
 
