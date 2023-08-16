@@ -9,7 +9,11 @@ export default function AddAppButton() {
 
   return (
     <>
-      <Button label="Add App" icon={<IconPlus />} btnAction={() => setAddAppModalVisible(true)} />
+      <Button
+        label="Add App"
+        icon={<IconPlus />}
+        btnAction={() => setAddAppModalVisible(true)}
+      />
       {isAddAppModalVisible && (
         <AddAppModal isOpen={isAddAppModalVisible} onClose={() => setAddAppModalVisible(false)} />
       )}

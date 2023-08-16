@@ -1,4 +1,5 @@
 import classNames from '../utils/classnames';
+import React from 'react';
 
 interface ButtonProps {
   kind?: 'primary' | 'secondary' | 'text';
@@ -17,6 +18,10 @@ export default function Button({
   kind = 'primary',
   type,
 }: ButtonProps) {
+  
+  // Replace this with alternative once we revamp the button variations
+  const iconElement = icon ? React.cloneElement(icon as React.ReactElement, { className: 'icon-xs' }) : null;
+
   return (
     <button
       className={classNames(
@@ -32,7 +37,7 @@ export default function Button({
       disabled={disabled}
     >
       {label && label}
-      {icon && <span className="icon-xs">{icon}</span>}
+      {iconElement}
     </button>
   );
 }
