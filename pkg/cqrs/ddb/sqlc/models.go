@@ -45,6 +45,16 @@ type Function struct {
 	CreatedAt time.Time
 }
 
+type FunctionRun struct {
+	RunID           ulid.ULID
+	RunStartedAt    time.Time
+	FunctionID      uuid.UUID
+	FunctionVersion int64
+	EventID         ulid.ULID
+	BatchID         ulid.ULID
+	OriginalRunID   ulid.ULID
+}
+
 type History struct {
 	ID              ulid.ULID
 	CreatedAt       time.Time

@@ -17,6 +17,7 @@ type DBWriter interface {
 type Manager interface {
 	AppManager
 	FunctionManager
+	FunctionRunManager
 	ExecutionLoader
 	EventWriter
 

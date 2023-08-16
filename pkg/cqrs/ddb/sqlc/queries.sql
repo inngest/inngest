@@ -32,7 +32,7 @@ UPDATE apps SET error = ? WHERE id = ? RETURNING *;
 
 
 --
--- Functions
+-- functions
 --
 
 
@@ -60,6 +60,15 @@ DELETE FROM functions WHERE app_id = ?;
 -- name: DeleteFunctionsByIDs :exec
 DELETE FROM functions WHERE id IN (sqlc.slice('ids'));
 
+
+--
+-- function runs
+--
+
+-- name: InsertFunctionRun :exec
+INSERT INTO function_runs
+	(run_id, run_started_at, function_id, function_version, event_id, batch_id, original_run_id) VALUES
+	(?, ?, ?, ?, ?, ?, ?);
 
 --
 -- Events

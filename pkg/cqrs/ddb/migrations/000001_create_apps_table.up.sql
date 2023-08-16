@@ -34,6 +34,16 @@ CREATE TABLE events (
 	event_ts TIMESTAMP NOT NULL
 );
 
+CREATE TABLE function_runs (
+	run_id CHAR(26) NOT NULL, 
+	run_started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+	function_id UUID,
+	function_version INT NOT NULL,
+	event_id CHAR(26) NOT NULL, 
+	batch_id CHAR(26), 
+	original_run_id CHAR(26)
+);
+
 CREATE TABLE history (
 	id UUID,
 	created_at TIMESTAMP NOT NULL DEFAULT NOW(),

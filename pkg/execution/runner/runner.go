@@ -492,8 +492,17 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		Str("function_id", fn.ID.String()).
 		Str("function", fn.Name).
 		Msg("initializing fn")
-	_, err := Initialize(ctx, fn, evt, s.state, s.queue)
-	return err
+	id, err := Initialize(ctx, fn, evt, s.state, s.queue)
+	if err != nil {
+		return err
+	}
+
+	return s.cqrs.InsertFunctionRun(ctx, cqrs.FunctionRun{
+		RunID:        id.RunID,
+		RunStartedAt: ulid.Time(id.RunID.Time()),
+		FunctionID:   fn.ID,
+		EventID:      evt.InternalID(),
+	})
 }
 
 // Initialize creates a new funciton run identifier for the given workflow and

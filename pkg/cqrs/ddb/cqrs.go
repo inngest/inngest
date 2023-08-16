@@ -246,6 +246,18 @@ func (w wrapper) InsertEvent(ctx context.Context, e cqrs.Event) error {
 	return w.q.InsertEvent(ctx, evt)
 }
 
+//
+// Function runs
+//
+
+func (w wrapper) InsertFunctionRun(ctx context.Context, e cqrs.FunctionRun) error {
+	run := sqlc.InsertFunctionRunParams{}
+	if err := copier.CopyWithOption(&run, e, copier.Option{DeepCopy: true}); err != nil {
+		return err
+	}
+	return w.q.InsertFunctionRun(ctx, run)
+}
+
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[

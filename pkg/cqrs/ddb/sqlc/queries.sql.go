@@ -395,7 +395,7 @@ type InsertFunctionParams struct {
 	CreatedAt time.Time
 }
 
-// Functions
+// functions
 //
 // note - this is very basic right now.
 func (q *Queries) InsertFunction(ctx context.Context, arg InsertFunctionParams) (*Function, error) {
@@ -417,6 +417,37 @@ func (q *Queries) InsertFunction(ctx context.Context, arg InsertFunctionParams) 
 		&i.CreatedAt,
 	)
 	return &i, err
+}
+
+const insertFunctionRun = `-- name: InsertFunctionRun :exec
+
+INSERT INTO function_runs
+	(run_id, run_started_at, function_id, function_version, event_id, batch_id, original_run_id) VALUES
+	(?, ?, ?, ?, ?, ?, ?)
+`
+
+type InsertFunctionRunParams struct {
+	RunID           ulid.ULID
+	RunStartedAt    time.Time
+	FunctionID      uuid.UUID
+	FunctionVersion int64
+	EventID         ulid.ULID
+	BatchID         ulid.ULID
+	OriginalRunID   ulid.ULID
+}
+
+// function runs
+func (q *Queries) InsertFunctionRun(ctx context.Context, arg InsertFunctionRunParams) error {
+	_, err := q.db.ExecContext(ctx, insertFunctionRun,
+		arg.RunID,
+		arg.RunStartedAt,
+		arg.FunctionID,
+		arg.FunctionVersion,
+		arg.EventID,
+		arg.BatchID,
+		arg.OriginalRunID,
+	)
+	return err
 }
 
 const insertHistory = `-- name: InsertHistory :exec

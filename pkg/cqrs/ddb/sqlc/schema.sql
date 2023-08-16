@@ -22,6 +22,16 @@ CREATE TABLE functions (
     created_at TIMESTAMP NOT NULL
 );
 
+CREATE TABLE function_runs (
+	run_id CHAR(26) NOT NULL, 
+	run_started_at TIMESTAMP NOT NULL,
+	function_id UUID,
+	function_version INT NOT NULL,
+	event_id CHAR(26) NOT NULL, 
+	batch_id CHAR(26), 
+	original_run_id CHAR(26)
+);
+
 CREATE TABLE events (
 	internal_id CHAR(26) PRIMARY KEY,
 	event_id VARCHAR NOT NULL,
