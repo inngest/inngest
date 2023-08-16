@@ -84,14 +84,14 @@ export default function AppCard({ app }: { app: App }) {
       <div className="border border-slate-700/30 rounded-b-md divide-y divide-slate-700/30 bg-slate-800/30">
         {!app.name ? (
           <div className="p-4 pr-6 flex items-center gap-2">
-            <IconSpinner className="fill-sky-400 text-slate-800" />
+            <IconSpinner />
             <p className="text-slate-400 text-lg font-normal">Connecting...</p>
           </div>
         ) : (
           <div className="flex items-center justify-between px-6 py-4 ">
             {!app.connected ? (
               <div className="flex items-center gap-2">
-                <IconSpinner className="fill-sky-400 text-slate-800" />
+                <IconSpinner />
                 <p className="text-slate-400 text-lg font-normal">Connecting to {app.name}...</p>
               </div>
             ) : (
@@ -154,7 +154,7 @@ export default function AppCard({ app }: { app: App }) {
                     readOnly={app.autodiscovered}
                   />
                   {isLoading && (
-                    <IconSpinner className="absolute top-1/3 right-2 fill-sky-400 text-slate-800" />
+                    <IconSpinner className="absolute top-1/3 right-2" />
                   )}
                   {isUrlInvalid && (
                     <p className="absolute text-rose-400 top-10 left-14">

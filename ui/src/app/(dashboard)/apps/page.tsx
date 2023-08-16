@@ -30,7 +30,7 @@ export default function AppList() {
         <div className="flex items-center gap-5">
           <AddAppButton />
           <p className="text-sky-400 flex items-center gap-2">
-            <IconSpinner className="fill-sky-400 text-slate-800" />
+            <IconSpinner />
             Auto-detecting Apps
           </p>
         </div>
