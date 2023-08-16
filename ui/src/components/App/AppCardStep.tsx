@@ -15,8 +15,8 @@ export default function AppCardStep({
   expandedContent,
   isEvenStep = false,
 }: AppCardStepProps) {
-  const verticalLineForOddStepsclassNames = `top-[2.7rem] left-[1.844rem] h-[calc(100%-2.7rem)]`;
-  const verticalLineForEvenStepsclassNames = `top-0 left-[1.844rem] h-[1.05rem]`;
+  const verticalLineForOddStepsclassNames = `top-[2.52rem] left-[1.844rem] h-[calc(100%-2.52rem)]`;
+  const verticalLineForEvenStepsclassNames = `top-0 left-[1.844rem] h-[1.22rem]`;
   return (
     <Disclosure
       as="div"
