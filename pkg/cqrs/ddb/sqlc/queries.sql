@@ -79,6 +79,9 @@ INSERT INTO events
 	(internal_id, event_id, event_data, event_user, event_v, event_ts) VALUES
 	(?, ?, ?, ?, ?, ?);
 
+-- name: GetEventByInternalID :one
+SELECT * FROM events WHERE internal_id = ?;
+
 --
 -- History
 --

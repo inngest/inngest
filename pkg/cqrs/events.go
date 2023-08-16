@@ -44,6 +44,15 @@ func (e Event) Event() event.Event {
 	}
 }
 
+type EventManager interface {
+	EventWriter
+	EventReader
+}
+
 type EventWriter interface {
 	InsertEvent(ctx context.Context, e Event) error
+}
+
+type EventReader interface {
+	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*Event, error)
 }

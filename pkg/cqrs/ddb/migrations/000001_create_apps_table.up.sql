@@ -26,7 +26,7 @@ CREATE TABLE functions (
 
 -- XXX: This does not conform to the cloud.  It only includes basic fields.
 CREATE TABLE events (
-	internal_id CHAR(26) PRIMARY KEY,
+	internal_id BLOB, -- cannot use CHAR(26) for ulids, nor primary keys for null ter
 	event_id VARCHAR NOT NULL,
 	event_data VARCHAR DEFAULT '{}' NOT NULL,
 	event_user VARCHAR DEFAULT '{}' NOT NULL,
@@ -35,13 +35,13 @@ CREATE TABLE events (
 );
 
 CREATE TABLE function_runs (
-	run_id CHAR(26) NOT NULL, 
+	run_id BLOB NOT NULL, 
 	run_started_at TIMESTAMP NOT NULL DEFAULT NOW(),
 	function_id UUID,
 	function_version INT NOT NULL,
-	event_id CHAR(26) NOT NULL, 
-	batch_id CHAR(26), 
-	original_run_id CHAR(26)
+	event_id BLOB NOT NULL, 
+	batch_id BLOB, 
+	original_run_id BLOB
 );
 
 CREATE TABLE history (
@@ -50,10 +50,10 @@ CREATE TABLE history (
 	run_started_at TIMESTAMP NOT NULL DEFAULT NOW(),
 	function_id UUID,
 	function_version INT NOT NULL,
-	run_id CHAR(26) NOT NULL, 
-	event_id CHAR(26) NOT NULL, 
-	batch_id CHAR(26), 
-	group_id CHAR(36),
+	run_id BLOB NOT NULL, 
+	event_id BLOB NOT NULL, 
+	batch_id BLOB, 
+	group_id BLOB,
 	idempotency_key VARCHAR NOT NULL,
 	type VARCHAR NOT NULL,
 	attempt INT NOT NULL,

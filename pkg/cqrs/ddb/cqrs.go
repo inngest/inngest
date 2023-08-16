@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jinzhu/copier"
+	"github.com/oklog/ulid/v2"
 )
 
 func NewCQRS(db *sql.DB) cqrs.Manager {
@@ -244,6 +246,29 @@ func (w wrapper) InsertEvent(ctx context.Context, e cqrs.Event) error {
 	}
 
 	return w.q.InsertEvent(ctx, evt)
+}
+
+func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*cqrs.Event, error) {
+	obj, err := w.q.GetEventByInternalID(ctx, internalID)
+	if err != nil {
+		return nil, fmt.Errorf("error quering event in ddb: %w", err)
+	}
+	evt := convertEvent(obj)
+	return &evt, nil
+}
+
+func convertEvent(obj *sqlc.Event) cqrs.Event {
+	evt := &cqrs.Event{
+		ID:           obj.InternalID,
+		EventID:      obj.EventID,
+		EventVersion: obj.EventV.String,
+		EventTS:      obj.EventTs.UnixMilli(),
+		EventData:    map[string]any{},
+		EventUser:    map[string]any{},
+	}
+	_ = json.Unmarshal([]byte(obj.EventData), &evt.EventData)
+	_ = json.Unmarshal([]byte(obj.EventUser), &evt.EventUser)
+	return *evt
 }
 
 //

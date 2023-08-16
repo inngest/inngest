@@ -15,11 +15,12 @@ type DBWriter interface {
 }
 
 type Manager interface {
+	ExecutionLoader
+
 	AppManager
 	FunctionManager
 	FunctionRunManager
-	ExecutionLoader
-	EventWriter
+	EventManager
 
 	// Scoped allows creating a new manager using a transaction.
 	WithTx(ctx context.Context) (TxManager, error)

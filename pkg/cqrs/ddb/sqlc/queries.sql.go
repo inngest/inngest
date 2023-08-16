@@ -238,6 +238,24 @@ func (q *Queries) GetApps(ctx context.Context) ([]*App, error) {
 	return items, nil
 }
 
+const getEventByInternalID = `-- name: GetEventByInternalID :one
+SELECT internal_id, event_id, event_data, event_user, event_v, event_ts FROM events WHERE internal_id = ?
+`
+
+func (q *Queries) GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*Event, error) {
+	row := q.db.QueryRowContext(ctx, getEventByInternalID, internalID)
+	var i Event
+	err := row.Scan(
+		&i.InternalID,
+		&i.EventID,
+		&i.EventData,
+		&i.EventUser,
+		&i.EventV,
+		&i.EventTs,
+	)
+	return &i, err
+}
+
 const getFunctionByID = `-- name: GetFunctionByID :one
 SELECT id, app_id, name, slug, config, created_at FROM functions WHERE id = ?
 `
