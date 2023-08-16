@@ -149,7 +149,16 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 	_, err := q.EnqueueItem(ctx, qi, next)
 
 	if err != nil {
-		if err != ErrQueueItemExists || item.ShouldEnforceIdempotency() {
+		if err != ErrQueueItemExists {
+			return err
+		}
+
+		shouldEnforceIdempotency, checkErr := item.ShouldEnforceIdempotency()
+		if checkErr != nil {
+			return fmt.Errorf("error checking idempotency: %w", checkErr)
+		}
+
+		if shouldEnforceIdempotency {
 			return err
 		}
 	}

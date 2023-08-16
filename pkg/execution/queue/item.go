@@ -81,15 +81,15 @@ type Item struct {
 // versions cannot.
 //
 // Falls back to false if the SDK version on the item is not parseable.
-func (i Item) ShouldEnforceIdempotency() bool {
+func (i Item) ShouldEnforceIdempotency() (bool, error) {
 	sdkVersion, err := parseSdkVersion(i.SdkVersion)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("error parsing sdk version: %w", err)
 	}
 
 	jsSdkPreV3 := sdkVersion.Name == "inngest-js" && semver.Compare(sdkVersion.Version, "v3.0.0") == -1
 
-	return jsSdkPreV3
+	return jsSdkPreV3, nil
 }
 
 func (i Item) GetMaxAttempts() int {
