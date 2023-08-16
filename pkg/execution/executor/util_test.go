@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/stretchr/testify/require"
@@ -80,4 +81,38 @@ func TestParseWait(t *testing.T) {
 		})
 	}
 
+}
+
+func TestSortOps(t *testing.T) {
+	input := []state.GeneratorOpcode{
+		{
+			Op: enums.OpcodeStep,
+		},
+		{
+			Op: enums.OpcodeStep,
+		},
+		{
+			Op: enums.OpcodeSleep,
+		},
+		{
+			Op: enums.OpcodeWaitForEvent,
+		},
+	}
+	expected := []state.GeneratorOpcode{
+		{
+			Op: enums.OpcodeWaitForEvent,
+		},
+		{
+			Op: enums.OpcodeStep,
+		},
+		{
+			Op: enums.OpcodeStep,
+		},
+		{
+			Op: enums.OpcodeSleep,
+		},
+	}
+
+	sortOps(input)
+	require.Equal(t, expected, input)
 }

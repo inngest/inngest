@@ -15,11 +15,13 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -92,6 +94,11 @@ type Executor interface {
 		// right order.
 		stackIndex int,
 	) (*state.DriverResponse, int, error)
+
+	// HandleGeneratorResponse handles all generator responses.
+	HandleGeneratorResponse(ctx context.Context, gen []state.GeneratorOpcode, item queue.Item) error
+	// HandleGenerator handles an individual generator response returned from the SDK.
+	HandleGenerator(ctx context.Context, gen state.GeneratorOpcode, item queue.Item) error
 
 	// HandlePauses handles pauses loaded from an incoming event.  This delegates to Cancel and
 	// Resume where necessary, depending on pauses that have been loaded and matched.
@@ -190,6 +197,14 @@ func WithStepLimits(limit uint) ExecutorOpt {
 	}
 }
 
+// WithEvaluatorFactory allows customizing of the expression evaluator factory function.
+func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.Evaluator, error)) ExecutorOpt {
+	return func(e Executor) error {
+		e.(*executor).evalFactory = f
+		return nil
+	}
+}
+
 // WithRuntimeDrivers specifies the drivers available to use when executing steps
 // of a function.
 //
@@ -216,6 +231,7 @@ type executor struct {
 	sm             state.Manager
 	queue          queue.Queue
 	fl             state.FunctionLoader
+	evalFactory    func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	runtimeDrivers map[string]driver.Driver
 	failureHandler FailureHandler
 
@@ -499,8 +515,6 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *i
 }
 
 // HandlePauses handles pauses loaded from an incoming event.
-//
-// TODO: Use InternalEvent which wraps event with internal ID here.
 func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) error {
 	if e.queue == nil || e.sm == nil {
 		return fmt.Errorf("No queue or state manager specified")
@@ -695,6 +709,243 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r ResumeReques
 		return fmt.Errorf("error consuming pause via event: %w", err)
 	}
 	return nil
+}
+
+func (e *executor) HandleGeneratorResponse(ctx context.Context, gen []state.GeneratorOpcode, item queue.Item) error {
+	// Ensure that we process waitForEvents first, as these are highest priority.
+	sortOps(gen)
+
+	eg := errgroup.Group{}
+	for _, op := range gen {
+		copied := op
+		eg.Go(func() error { return e.HandleGenerator(ctx, copied, item) })
+	}
+
+	return eg.Wait()
+}
+
+func (e *executor) HandleGenerator(ctx context.Context, gen state.GeneratorOpcode, item queue.Item) error {
+	// Grab the edge that triggered this step execution.
+	edge, ok := item.Payload.(queue.PayloadEdge)
+	if !ok {
+		return fmt.Errorf("unknown queue item type handling generator: %T", item.Payload)
+	}
+
+	switch gen.Op {
+	case enums.OpcodeNone:
+		// OpcodeNone essentially terminates this "thread" or execution path.  We don't need to do
+		// anything - including scheduling future steps.
+		//
+		// This is necessary for parallelization:  we may fan out from 1 step -> 10 parallel steps,
+		// then need to coalesce back to a single thread after all 10 have finished.  We expect
+		// drivers/the SDK to return OpcodeNone for all but the last of parallel steps.
+		return nil
+	case enums.OpcodeStep:
+		return e.handleGeneratorStep(ctx, gen, item, edge)
+	case enums.OpcodeStepPlanned:
+		return e.handleGeneratorStepPlanned(ctx, gen, item, edge)
+	case enums.OpcodeSleep:
+		return e.handleGeneratorSleep(ctx, gen, item, edge)
+	case enums.OpcodeWaitForEvent:
+		return e.handleGeneratorWaitForEvent(ctx, gen, item, edge)
+	}
+
+	return fmt.Errorf("unknown opcode: %s", gen.Op)
+}
+
+func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
+	nextEdge := inngest.Edge{
+		Outgoing: gen.ID,             // Going from the current step
+		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
+	}
+
+	// Re-enqueue the exact same edge to run now.
+	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, nil); err != nil {
+		return err
+	}
+	// Update the group ID in context;  we've already saved this step's success and we're now
+	// running the step again, needing a new history group
+	groupID := uuid.New().String()
+	err := e.queue.Enqueue(ctx, queue.Item{
+		WorkspaceID: item.WorkspaceID,
+		GroupID:     groupID,
+		Kind:        queue.KindEdge,
+		Identifier:  item.Identifier,
+		Attempt:     0,
+		MaxAttempts: item.MaxAttempts,
+		Payload:     queue.PayloadEdge{Edge: nextEdge},
+	}, time.Now())
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+	return err
+}
+
+func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
+	nextEdge := inngest.Edge{
+		// Planned generator IDs are the same as the actual OpcodeStep IDs.
+		// We can't set edge.Edge.Outgoing here because the step hasn't yet ran.
+		//
+		// We do, though, want to store the incomin step ID name _without_ overriding
+		// the actual DAG step, though.
+		// Run the same action.
+		IncomingGeneratorStep: gen.ID,
+		Outgoing:              edge.Edge.Outgoing,
+		Incoming:              edge.Edge.Incoming,
+	}
+
+	// Re-enqueue the exact same edge to run now.
+	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
+		return err
+	}
+
+	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
+	// Update the group ID in context;  we're scheduling a new step, and we want
+	// to start a new history group for this item.
+	groupID := uuid.New().String()
+	err := e.queue.Enqueue(ctx, queue.Item{
+		JobID:       &jobID,
+		GroupID:     groupID, // Ensure we correlate future jobs with this group ID, eg. started/failed.
+		WorkspaceID: item.WorkspaceID,
+		Kind:        queue.KindEdge,
+		Identifier:  item.Identifier,
+		Attempt:     0,
+		MaxAttempts: item.MaxAttempts,
+		Payload: queue.PayloadEdge{
+			Edge: nextEdge,
+		},
+	}, time.Now())
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+	return err
+}
+
+// handleSleep handles the sleep opcode, ensuring that we enqueue the function to rerun
+// at the correct time.
+func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
+	dur, err := gen.SleepDuration()
+	if err != nil {
+		return err
+	}
+	at := time.Now().Add(dur)
+
+	nextEdge := inngest.Edge{
+		Outgoing: gen.ID,             // Leaving sleep
+		Incoming: edge.Edge.Incoming, // To re-call the SDK
+	}
+
+	// XXX: Remove this after we create queues for function runs.
+	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, &at); err != nil {
+		return err
+	}
+
+	// Create another group for the next item which will run.  We're enqueueing
+	// the function to run again after sleep, so need a new group.
+	groupID := uuid.New().String()
+	err = e.queue.Enqueue(ctx, queue.Item{
+		WorkspaceID: item.WorkspaceID,
+		// Sleeps re-enqueue the step so that we can mark the step as completed
+		// in the executor after the sleep is complete.  This will re-call the
+		// generator step, but we need the same group ID for correlation.
+		GroupID:     groupID,
+		Kind:        queue.KindSleep,
+		Identifier:  item.Identifier,
+		Attempt:     0,
+		MaxAttempts: item.MaxAttempts,
+		Payload:     queue.PayloadEdge{Edge: nextEdge},
+	}, time.Now().Add(dur))
+	if err == redis_state.ErrQueueItemExists {
+		// Safely ignore this error.
+		return nil
+	}
+	return err
+}
+
+func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
+	opts, err := gen.WaitForEventOpts()
+	if err != nil {
+		return fmt.Errorf("unable to parse wait for event opts: %w", err)
+	}
+	expires, err := opts.Expires()
+	if err != nil {
+		return fmt.Errorf("unable to parse wait for event expires: %w", err)
+	}
+
+	// Filter the expression data such that it contains only the variables used
+	// in the expression.
+	data := map[string]any{}
+	if opts.If != nil {
+		expr, err := e.newExpressionEvaluator(ctx, *opts.If)
+		if err != nil {
+			return execError{err, true}
+		}
+
+		run, err := e.sm.Load(ctx, item.Identifier.RunID)
+		if err != nil {
+			return execError{err: fmt.Errorf("unable to load run after execution: %w", err)}
+		}
+
+		// Take the data for expressions based off of state.
+		ed := expressions.NewData(state.EdgeExpressionData(ctx, run, ""))
+		data = expr.FilteredAttributes(ctx, ed).Map()
+	}
+
+	pauseID := uuid.New()
+	err = e.sm.SavePause(ctx, state.Pause{
+		ID:             pauseID,
+		WorkspaceID:    item.WorkspaceID,
+		Identifier:     item.Identifier,
+		GroupID:        item.GroupID,
+		Outgoing:       gen.ID,
+		Incoming:       edge.Edge.Incoming,
+		StepName:       gen.Name,
+		Expires:        state.Time(expires),
+		Event:          &opts.Event,
+		Expression:     opts.If,
+		ExpressionData: data,
+		DataKey:        gen.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	// This should also increase the waitgroup count, as we have an
+	// edge that is outstanding.
+	//
+	// TODO: Remove with function run specific queues
+	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.IncomingGeneratorStep, 0, nil); err != nil {
+		return fmt.Errorf("unable to schedule wait for event: %w", err)
+	}
+
+	// SDK-based event coordination is called both when an event is received
+	// OR on timeout, depending on which happens first.  Both routes consume
+	// the pause so this race will conclude by calling the function once, as only
+	// one thread can lease and consume a pause;  the other will find that the
+	// pause is no longer available and return.
+	err = e.queue.Enqueue(ctx, queue.Item{
+		WorkspaceID: item.WorkspaceID,
+		// Use the same group ID, allowing us to track the cancellation of
+		// the step correctly.
+		GroupID:    item.GroupID,
+		Kind:       queue.KindPause,
+		Identifier: item.Identifier,
+		Payload: queue.PayloadPauseTimeout{
+			PauseID:   pauseID,
+			OnTimeout: true,
+		},
+	}, expires)
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+	return err
+}
+
+func (e *executor) newExpressionEvaluator(ctx context.Context, expr string) (expressions.Evaluator, error) {
+	if e.evalFactory != nil {
+		return e.evalFactory(ctx, expr)
+	}
+	return expressions.NewExpressionEvaluator(ctx, expr)
 }
 
 type execError struct {

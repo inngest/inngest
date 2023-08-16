@@ -3,8 +3,10 @@ package executor
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/xhit/go-str2duration/v2"
@@ -38,4 +40,15 @@ func ParseWait(ctx context.Context, wait string, s state.State, outgoingID strin
 	}
 
 	return 0, fmt.Errorf("Unable to get duration from expression response: %v", out)
+}
+
+func sortOps(opcodes []state.GeneratorOpcode) {
+	sort.SliceStable(opcodes, func(i, j int) bool {
+		// Ensure that we process waitForEvents first, as these are highest priority:
+		// it ensures that wait triggers are saved as soon as possible.
+		if opcodes[i].Op == enums.OpcodeWaitForEvent {
+			return true
+		}
+		return opcodes[i].Op < opcodes[j].Op
+	})
 }
