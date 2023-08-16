@@ -46,6 +46,12 @@ type Runner interface {
 	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
+func WithCQRS(data cqrs.Manager) func(s *svc) {
+	return func(s *svc) {
+		s.cqrs = data
+	}
+}
+
 func WithExecutor(e executor.Executor) func(s *svc) {
 	return func(s *svc) {
 		s.executor = e
@@ -100,6 +106,7 @@ func NewService(c config.Config, opts ...Opt) Runner {
 
 type svc struct {
 	config config.Config
+	cqrs   cqrs.Manager
 	// pubsub allows us to subscribe to new events, and re-publish events
 	// if there are errors.
 	pubsub pubsub.PublishSubscriber
@@ -287,8 +294,15 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		return fmt.Errorf("error creating event: %w", err)
 	}
 
-	// TODO: Refactor to store in duckdb
 	tracked := event.NewOSSTrackedEvent(*evt)
+	// Write the event to our CQRS manager for long-term storage.
+	err = s.cqrs.InsertEvent(
+		ctx,
+		cqrs.ConvertFromEvent(tracked.InternalID(), tracked.Event()),
+	)
+	if err != nil {
+		return err
+	}
 
 	l := logger.From(ctx).With().
 		Str("event", evt.Name).

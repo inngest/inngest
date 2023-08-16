@@ -3,6 +3,8 @@ package ddb
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -203,11 +205,7 @@ func (w wrapper) DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) er
 }
 
 func (w wrapper) DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error {
-	copied := make([]any, len(ids))
-	for n, i := range ids {
-		copied[n] = i
-	}
-	return w.q.DeleteFunctionsByIDs(ctx, copied)
+	return w.q.DeleteFunctionsByIDs(ctx, ids)
 }
 
 func (w wrapper) UpdateFunctionConfig(ctx context.Context, arg cqrs.UpdateFunctionConfigParams) (*cqrs.Function, error) {
@@ -218,6 +216,34 @@ func (w wrapper) UpdateFunctionConfig(ctx context.Context, arg cqrs.UpdateFuncti
 		sqlc.UpdateFunctionConfigParams{},
 		&cqrs.Function{},
 	)
+}
+
+//
+// Events
+//
+
+func (w wrapper) InsertEvent(ctx context.Context, e cqrs.Event) error {
+	data, err := json.Marshal(e.EventData)
+	if err != nil {
+		return err
+	}
+	user, err := json.Marshal(e.EventUser)
+	if err != nil {
+		return err
+	}
+	evt := sqlc.InsertEventParams{
+		InternalID: e.ID,
+		EventID:    e.EventID,
+		EventData:  string(data),
+		EventUser:  string(user),
+		EventV: sql.NullString{
+			Valid:  e.EventVersion != "",
+			String: e.EventVersion,
+		},
+		EventTs: time.UnixMilli(e.EventTS),
+	}
+
+	return w.q.InsertEvent(ctx, evt)
 }
 
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/oklog/ulid"
+	ulid "github.com/oklog/ulid/v2"
 )
 
 const deleteApp = `-- name: DeleteApp :exec
@@ -349,11 +349,11 @@ func (q *Queries) InsertApp(ctx context.Context, arg InsertAppParams) (*App, err
 	return &i, err
 }
 
-const insertEvent = `-- name: InsertEvent :one
+const insertEvent = `-- name: InsertEvent :exec
 
 INSERT INTO events
 	(internal_id, event_id, event_data, event_user, event_v, event_ts) VALUES
-	(?, ?, ?, ?, ?, ?) RETURNING internal_id, event_id, event_data, event_user, event_v, event_ts
+	(?, ?, ?, ?, ?, ?)
 `
 
 type InsertEventParams struct {
@@ -366,8 +366,8 @@ type InsertEventParams struct {
 }
 
 // Events
-func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) (*Event, error) {
-	row := q.db.QueryRowContext(ctx, insertEvent,
+func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error {
+	_, err := q.db.ExecContext(ctx, insertEvent,
 		arg.InternalID,
 		arg.EventID,
 		arg.EventData,
@@ -375,16 +375,7 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) (*Even
 		arg.EventV,
 		arg.EventTs,
 	)
-	var i Event
-	err := row.Scan(
-		&i.InternalID,
-		&i.EventID,
-		&i.EventData,
-		&i.EventUser,
-		&i.EventV,
-		&i.EventTs,
-	)
-	return &i, err
+	return err
 }
 
 const insertFunction = `-- name: InsertFunction :one

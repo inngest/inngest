@@ -18,6 +18,7 @@ type Manager interface {
 	AppManager
 	FunctionManager
 	ExecutionLoader
+	EventWriter
 
 	// Scoped allows creating a new manager using a transaction.
 	WithTx(ctx context.Context) (TxManager, error)

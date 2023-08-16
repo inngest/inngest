@@ -65,10 +65,10 @@ DELETE FROM functions WHERE id IN (sqlc.slice('ids'));
 -- Events
 --
 
--- name: InsertEvent :one
+-- name: InsertEvent :exec
 INSERT INTO events
 	(internal_id, event_id, event_data, event_user, event_v, event_ts) VALUES
-	(?, ?, ?, ?, ?, ?) RETURNING *;
+	(?, ?, ?, ?, ?, ?);
 
 --
 -- History

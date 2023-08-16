@@ -158,6 +158,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	runner := runner.NewService(
 		opts.Config,
+		runner.WithCQRS(dbcqrs),
 		runner.WithExecutor(exec),
 		runner.WithExecutionLoader(dbcqrs),
 		runner.WithEventManager(event.NewManager()),

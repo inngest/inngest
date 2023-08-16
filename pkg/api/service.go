@@ -68,7 +68,6 @@ func (a *apiServer) Pre(ctx context.Context) error {
 		api.Mount(m.At, m.Router)
 	}
 
-	// TODO
 	a.publisher, err = pubsub.NewPublisher(ctx, a.config.EventStream.Service)
 	if err != nil {
 		return err
@@ -93,9 +92,11 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 
 	l.Debug().Str("event", e.Name).Msg("handling event")
 
+	internalID := ulid.MustNew(ulid.Now(), rand.Reader)
+
 	if e.ID == "" {
 		// Always ensure that the event has an ID, for idempotency.
-		e.ID = ulid.MustNew(ulid.Now(), rand.Reader).String()
+		e.ID = internalID.String()
 	}
 
 	byt, err := json.Marshal(e)
@@ -115,6 +116,7 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 			Timestamp: time.Now(),
 		},
 	)
+
 	return e.ID, err
 }
 
