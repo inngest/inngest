@@ -37,7 +37,6 @@ var (
 // we fail to wait for the executor, workflows may finish prematurely as future
 // actions may not be scheduled.
 //
-//
 // # Running functions
 //
 // The executor schedules function execution over drivers.  A driver is a runtime-specific
@@ -427,7 +426,7 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *i
 		return response, 0, nil
 	}
 
-	if response.Err != nil && !queue.ShouldRetry(err, attempt, step.RetryCount()) {
+	if response.Err != nil && (!response.Retryable() || !queue.ShouldRetry(nil, attempt, step.RetryCount())) {
 		// We need to detect whether this error is 'final' here, depending on whether
 		// we've hit the retry count or this error is deemed non-retryable.
 		//

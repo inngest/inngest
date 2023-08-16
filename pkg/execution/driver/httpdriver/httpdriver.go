@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
@@ -21,6 +22,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"golang.org/x/mod/semver"
 )
 
 var (
@@ -292,7 +294,7 @@ func (e executor) do(ctx context.Context, url string, input []byte) (*response, 
 			statusCode: resp.StatusCode,
 			duration:   dur,
 			retryAt:    retryAt,
-			noRetry:    resp.Header.Get("x-inngest-no-retry") == "true",
+			noRetry:    !shouldRetry(resp.StatusCode, resp),
 			sdkVersion: resp.Header.Get("x-inngest-sdk"),
 		}, nil
 	}
@@ -378,4 +380,56 @@ func parseRetry(retry string) (time.Time, error) {
 		}
 	}
 	return dateutil.ParseString(retry)
+}
+
+// shouldRetry determines if a request should be retried based on the response
+// status code and headers.
+//
+// This is a best-effort attempt to determine if a request should be retried; we
+// fall back to retrying if the request doesn't give us a firm answer.
+func shouldRetry(status int, resp *http.Response) bool {
+	noRetryHeader := resp.Header.Get("x-inngest-no-retry")
+	// Always obey the no-retry header if it's set.
+	if noRetryHeader != "" {
+		return noRetryHeader != "true"
+	}
+
+	// In the absence of a no-retry header, this is only a no-retry response if
+	// the status code is 4XX.
+	if status < 400 || status > 499 {
+		return true
+	}
+
+	// e.g. inngest-js:v1.2.3-beta.5
+	versionHeader := strings.Split(resp.Header.Get("x-inngest-sdk"), ":")
+	if len(versionHeader) != 2 {
+		// Unexpected version string; we can't determine if this is a
+		// no-retry, so we'll assume we should retry.
+		return true
+	}
+
+	sdkLang := versionHeader[0]
+	sdkVersion := versionHeader[1]
+
+	if !semver.IsValid(sdkVersion) {
+		// Unexpected version string; we can't determine if this is a
+		// no-retry, so we'll assume we should retry.
+		return true
+	}
+
+	// If we're here, we're assessing a 4XX response with no
+	// `x-inngest-no-retry` header. We'll determine if this is a no-retry based
+	// on the SDK version.
+	if sdkLang == "inngest-js" {
+		switch {
+		// 4XX should not be retried if <v2.4.1
+		case semver.Major(sdkVersion) == "v2" && semver.Compare(sdkVersion, "v2.4.1") == -1:
+			return false
+		// 4XX should not be retried if <v1.10.1
+		case semver.Major(sdkVersion) == "v1" && semver.Compare(sdkVersion, "v1.10.1") == -1:
+			return false
+		}
+	}
+
+	return true
 }
