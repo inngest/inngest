@@ -46,9 +46,12 @@ func MarshalV1(
 				Stack:   s.Stack(),
 				Current: stackIndex,
 			},
-			Attempt:                   attempt,
-			DisableImmediateExecution: edge.DisableImmediateExecution,
+			Attempt: attempt,
 		},
+	}
+
+	if edge.DisableImmediateExecution {
+		req.DisableImmediateExecution = true
 	}
 
 	// empty the attrs that consume the most

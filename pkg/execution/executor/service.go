@@ -429,6 +429,9 @@ func (s *svc) scheduleGeneratorResponse(ctx context.Context, origItem queue.Item
 		eg.Go(func() error {
 			// Give each goroutine copies of the edge and item to manipulate.
 			edge := origEdge
+			if len(r.Generator) > 1 {
+				edge.Edge.DisableImmediateExecution = true
+			}
 			item := origItem
 			item.SdkVersion = r.SdkVersion
 
