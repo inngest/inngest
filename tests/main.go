@@ -189,7 +189,6 @@ func run(t *testing.T, test *Test) {
 
 	defer func() {
 		// De-register the app.
-		fmt.Println("REMOVING APP")
 		url := apiURL
 		url.Path = "/fn/remove"
 
