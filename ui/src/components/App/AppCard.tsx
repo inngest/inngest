@@ -106,9 +106,9 @@ export default function AppCard({ app }: { app: App }) {
               <div className="">
                 <div className="flex items-center gap-3 text-base">
                   {app.connected ? (
-                    <>{<IconStatusCircleCheck withOutline />}Connected to App</>
+                    <>{<IconStatusCircleCheck />}Connected to App</>
                   ) : (
-                    <>{<IconStatusCircleExclamation withOutline />}No Connection to App</>
+                    <>{<IconStatusCircleExclamation />}No Connection to App</>
                   )}
                 </div>
                 <p className="text-slate-300 ui-open:hidden xl:hidden pl-10">{app.url}</p>
@@ -196,8 +196,8 @@ export default function AppCard({ app }: { app: App }) {
               <div className="flex items-center gap-3 text-base">
                 {app.functionCount > 0 && (
                   <>
-                    {app.connected && <IconStatusCircleCheck withOutline />}
-                    {!app.connected && <IconStatusCircleMinus withOutline />}
+                    {app.connected && <IconStatusCircleCheck />}
+                    {!app.connected && <IconStatusCircleMinus />}
                     {app.functionCount} Function
                     {app.functionCount === 1 ? '' : 's'} Registered
                   </>
@@ -205,9 +205,9 @@ export default function AppCard({ app }: { app: App }) {
                 {app.functionCount < 1 && (
                   <>
                     {app.connected && (
-                      <IconStatusCircleExclamation withOutline className="text-orange-400/70" />
+                      <IconStatusCircleExclamation className="text-orange-400/70" />
                     )}
-                    {!app.connected && <IconStatusCircleMinus withOutline />}
+                    {!app.connected && <IconStatusCircleMinus />}
                     No Functions Found
                   </>
                 )}
