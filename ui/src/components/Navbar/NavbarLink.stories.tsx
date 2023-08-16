@@ -32,7 +32,7 @@ export const Default: Story = {
 export const WithCounter: Story = {
   args: {
     badge: 0,
-    icon: <IconWindow className="h-[1.125rem] w-[1.125rem]" />,
+    icon: <IconWindow />,
     tabName: 'Apps',
     href: '/apps',
   },
@@ -42,7 +42,7 @@ export const WithError: Story = {
   args: {
     badge: 0,
     hasError: true,
-    icon: <IconWindow className="h-[1.125rem] w-[1.125rem]" />,
+    icon: <IconWindow />,
     tabName: 'Apps',
     href: '/apps',
   },
