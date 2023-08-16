@@ -181,6 +181,7 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 			OutputSize: len(resp.body),
 			NoRetry:    resp.noRetry,
 			RetryAt:    resp.retryAt,
+			SdkVersion: resp.sdkVersion,
 		}
 		dr.Generator, err = ParseGenerator(ctx, resp.body)
 		if err != nil {
@@ -234,6 +235,7 @@ func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge,
 		OutputSize: len(resp.body),
 		NoRetry:    resp.noRetry,
 		RetryAt:    resp.retryAt,
+		SdkVersion: resp.sdkVersion,
 	}, nil
 }
 
