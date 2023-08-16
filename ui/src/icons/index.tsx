@@ -26,11 +26,11 @@ export { IconStatusCircleMinus } from './StatusCircleMinus';
 export { IconStatusCircleCross } from './StatusCircleCross';
 export { IconStatusCircleArrowPath } from './StatusCircleArrowPath';
 
-// Status Icons
-export { IconStatusDefault } from './StatusDefault';
-export { IconStatusRunning } from './StatusRunning';
-export { IconStatusCompleted } from './StatusCompleted';
-export { IconStatusFailed } from './StatusFailed';
-export { IconStatusPaused } from './StatusPaused';
-export { IconStatusActionReq } from './StatusActionReq';
-export { IconStatusNoFn } from './StatusNoFn';
+// Deprecated - Status Icons
+export { DeprecatedIconStatusDefault } from './StatusDefault';
+export { DeprecatedIconStatusRunning } from './StatusRunning';
+export { DeprecatedIconStatusCompleted } from './StatusCompleted';
+export { DeprecatedIconStatusFailed } from './StatusFailed';
+export { DeprecatedIconStatusPaused } from './StatusPaused';
+export { DeprecatedIconStatusActionReq } from './StatusActionReq';
+export { DeprecatedIconStatusNoFn } from './StatusNoFn';
