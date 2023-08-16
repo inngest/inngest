@@ -8,7 +8,6 @@ export { IconPlus } from './Plus';
 export { IconSpinner } from './Spinner';
 export { IconCheckCircle } from './CheckCircle';
 export { IconExclamationTriangle } from './ExclamationTriangle';
-export { IconExclamationTriangleSolid } from './ExclamationTriangleSolid';
 export { IconArrowTopRightOnSquare } from './ArrowTopRightOnSquare';
 export { IconCopy } from './Copy';
 export { InngestSmallLogo } from './InngestSmallLogo';
