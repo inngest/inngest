@@ -35,6 +35,7 @@ func NewCmdServe() *cobra.Command {
 		Run:       serve,
 		Args:      cobra.OnlyValidArgs,
 		ValidArgs: serveArgs,
+		Hidden:    true,
 	}
 
 	cmd.Flags().StringVarP(&serveConf, "config", "c", "", "The config file location (defaults to ./inngest.(cue|json) or /etc/inngest.(cue|json)")

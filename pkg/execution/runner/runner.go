@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -45,6 +46,12 @@ type Runner interface {
 	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
+func WithExecutor(e executor.Executor) func(s *svc) {
+	return func(s *svc) {
+		s.executor = e
+	}
+}
+
 func WithExecutionLoader(l cqrs.ExecutionLoader) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
@@ -63,7 +70,7 @@ func WithStateManager(sm state.Manager) func(s *svc) {
 	}
 }
 
-func WithQueue(q queue.Queue) func(s *svc) {
+func WithRunnerQueue(q queue.Queue) func(s *svc) {
 	return func(s *svc) {
 		s.queue = q
 	}
@@ -96,6 +103,8 @@ type svc struct {
 	// pubsub allows us to subscribe to new events, and re-publish events
 	// if there are errors.
 	pubsub pubsub.PublishSubscriber
+	// executor handles execution of functions.
+	executor executor.Executor
 	// data provides the required loading capabilities to trigger functions
 	// from events.
 	data cqrs.ExecutionLoader
@@ -209,10 +218,10 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 				continue
 			}
 			_, err := s.cronmanager.AddFunc(t.Cron, func() {
-				err := s.initialize(context.Background(), fn, event.Event{
+				err := s.initialize(context.Background(), fn, event.NewOSSTrackedEvent(event.Event{
 					ID:   time.Now().UTC().Format(time.RFC3339),
 					Name: "inngest/scheduled.timer",
-				})
+				}))
 				if err != nil {
 					logger.From(ctx).Error().Err(err).Msg("error initializing scheduled function")
 				}
@@ -278,6 +287,9 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		return fmt.Errorf("error creating event: %w", err)
 	}
 
+	// TODO: Refactor to store in duckdb
+	tracked := event.NewOSSTrackedEvent(*evt)
+
 	l := logger.From(ctx).With().
 		Str("event", evt.Name).
 		Str("id", evt.ID).
@@ -293,7 +305,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := s.functions(ctx, *evt); err != nil {
+		if err := s.functions(ctx, tracked); err != nil {
 			l.Error().Err(err).Msg("error scheduling functions")
 			errs = multierror.Append(errs, err)
 		}
@@ -302,7 +314,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := s.pauses(ctx, *evt); err != nil {
+		if err := s.pauses(ctx, tracked); err != nil {
 			l.Error().Err(err).Msg("error consuming pauses")
 			errs = multierror.Append(errs, err)
 		}
@@ -314,7 +326,9 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 // FindInvokedFunction is a helper method which loads all available functions, checks
 // the incoming event and returns the function to be invoked via the RPC invoke event,
 // or nil if a function is not being invoked.
-func FindInvokedFunction(ctx context.Context, evt event.Event, fl cqrs.ExecutionLoader) (*inngest.Function, error) {
+func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqrs.ExecutionLoader) (*inngest.Function, error) {
+	evt := tracked.Event()
+
 	if evt.Name != consts.InvokeEventName {
 		return nil, nil
 	}
@@ -339,7 +353,9 @@ func FindInvokedFunction(ctx context.Context, evt event.Event, fl cqrs.Execution
 }
 
 // functions triggers all functions from the given event.
-func (s *svc) functions(ctx context.Context, evt event.Event) error {
+func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
+	evt := tracked.Event()
+
 	// Don't use an errgroup here as we want all errors together, vs the first
 	// non-nil error.
 	var errs error
@@ -350,14 +366,14 @@ func (s *svc) functions(ctx context.Context, evt event.Event) error {
 		// Invoke functions by RPC-like calling
 		defer wg.Done()
 		// Find any invoke functions specified.
-		fn, err := FindInvokedFunction(ctx, evt, s.data)
+		fn, err := FindInvokedFunction(ctx, tracked, s.data)
 		if err != nil {
 			errs = multierror.Append(errs, err)
 		}
 		if fn != nil {
 			// Initialize this function for this event only once;  we don't
 			// want multiple matching triggers to run the function more than once.
-			err := s.initialize(ctx, *fn, evt)
+			err := s.initialize(ctx, *fn, tracked)
 			if err != nil {
 				logger.From(ctx).Error().
 					Err(err).
@@ -413,7 +429,7 @@ func (s *svc) functions(ctx context.Context, evt event.Event) error {
 
 				// Initialize this function for this event only once;  we don't
 				// want multiple matching triggers to run the function more than once.
-				err := s.initialize(ctx, copied, evt)
+				err := s.initialize(ctx, copied, tracked)
 				if err != nil {
 					logger.From(ctx).Error().
 						Err(err).
@@ -431,165 +447,20 @@ func (s *svc) functions(ctx context.Context, evt event.Event) error {
 }
 
 // pauses searches for and triggers all pauses from this event.
-func (s *svc) pauses(ctx context.Context, evt event.Event) error {
+func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 	logger.From(ctx).Trace().Msg("querying for pauses")
-	// TODO: Add workspace ID handling to the open source runner.
-	iter, err := s.state.PausesByEvent(ctx, uuid.UUID{}, evt.Name)
+
+	iter, err := s.state.PausesByEvent(ctx, uuid.UUID{}, evt.Event().Name)
 	if err != nil {
 		return fmt.Errorf("error finding event pauses: %w", err)
 	}
-
-	evtMap := evt.Map()
-	for iter.Next(ctx) {
-		pause := iter.Val(ctx)
-
-		if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evt.ID {
-			// Skip the orignial event.
-			continue
-		}
-
-		// NOTE: Some pauses may be nil or expired, as the iterator may take
-		// time to process.  We handle that here and assume that the event
-		// did not occur in time.
-		if pause == nil || pause.Expires.Time().Before(time.Now()) {
-			continue
-		}
-
-		logger.From(ctx).Trace().
-			Str("pause_id", pause.ID.String()).
-			Msg("handling pause")
-
-		if pause.Expression != nil {
-			data := pause.ExpressionData
-
-			if len(data) == 0 {
-				// The pause had no expression data, so always load
-				// state for the function to retrieve expression data.
-				s, err := s.state.Load(ctx, pause.Identifier.RunID)
-				if err != nil {
-					return fmt.Errorf("error loading function state for pause: %w", err)
-				}
-				// Get expression data from the executor for the given run ID.
-				data = state.EdgeExpressionData(ctx, s, pause.Outgoing)
-			}
-
-			// Add the async event data to the expression
-			data["async"] = evtMap
-			// Compile and run the expression.
-			ok, _, err := expressions.EvaluateBoolean(ctx, *pause.Expression, data)
-			if err != nil {
-				return fmt.Errorf("error evaluating pause expression: %w", err)
-			}
-			if !ok {
-				logger.From(ctx).Trace().
-					Str("pause_id", pause.ID.String()).
-					Str("expression", *pause.Expression).
-					Msg("expression false")
-				continue
-			}
-		}
-
-		if pause.Cancel {
-			// This cancels the workflow, preventing future runs.
-			//
-			// XXX: When cancelling a workflow we should delete all other pauses
-			// for the same function run.  This should happen in the state store
-			// directly.
-
-			logger.From(ctx).Info().
-				Str("pause_id", pause.ID.String()).
-				Str("run_id", pause.Identifier.RunID.String()).
-				Msg("cancelling function via event")
-
-			if err := s.state.Cancel(ctx, pause.Identifier); err != nil {
-				switch err {
-				case state.ErrFunctionCancelled, state.ErrFunctionComplete, state.ErrFunctionFailed:
-					// We can safely ignore these errors.
-					continue
-				default:
-					return fmt.Errorf("error cancelling function via event: %w", err)
-				}
-			}
-
-			// Consume the pause and continue
-			if err := s.state.ConsumePause(ctx, pause.ID, evtMap); err != nil {
-				return fmt.Errorf("error consuming cancel pause: %w", err)
-			}
-
-			continue
-		}
-
-		if pause.OnTimeout {
-			// Delete this pause, as an event has occured which matches
-			// the timeout.
-			if err := s.state.ConsumePause(ctx, pause.ID, nil); err != nil {
-				return err
-			}
-		}
-
-		logger.From(ctx).Debug().
-			Str("pause_id", pause.ID.String()).
-			Str("run_id", pause.Identifier.RunID.String()).
-			Msg("leasing pause")
-
-		// Lease this pause so that only this thread can schedule the execution.
-		//
-		// If we don't do this, there's a chance that two concurrent runners
-		// attempt to enqueue the next step of the workflow.
-		err := s.state.LeasePause(ctx, pause.ID)
-		if err == state.ErrPauseLeased {
-			// Ignore;  this is being handled by another runner.
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("error leasing pause: %w", err)
-		}
-
-		logger.From(ctx).Debug().
-			Str("pause_id", pause.ID.String()).
-			Str("run_id", pause.Identifier.RunID.String()).
-			Msg("consuming pause")
-
-		if err := s.state.ConsumePause(ctx, pause.ID, evtMap); err != nil {
-			return err
-		}
-
-		logger.From(ctx).Info().
-			Str("pause_id", pause.ID.String()).
-			Str("run_id", pause.Identifier.RunID.String()).
-			Msg("resuming function")
-
-		// Schedule an execution from the pause's entrypoint.
-		if err := s.queue.Enqueue(
-			ctx,
-			queue.Item{
-				Kind:       queue.KindEdge,
-				Identifier: pause.Identifier,
-				Payload: queue.PayloadEdge{
-					Edge: inngest.Edge{
-						Outgoing: pause.Outgoing,
-						Incoming: pause.Incoming,
-					},
-				},
-			},
-			time.Now(),
-		); err != nil {
-			logger.From(ctx).Error().
-				Err(err).
-				Str("pause_id", pause.ID.String()).
-				Str("run_id", pause.Identifier.RunID.String()).
-				Msg("error resuming function")
-			return err
-		}
-	}
-
-	return nil
+	return s.executor.HandlePauses(ctx, iter, evt)
 }
 
-func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Event) error {
+func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.TrackedEvent) error {
 	// Attempt to rate-limit the incoming function.
 	if s.rl != nil && fn.RateLimit != nil {
-		key, err := ratelimit.RateLimitKey(ctx, fn.ID, *fn.RateLimit, evt.Map())
+		key, err := ratelimit.RateLimitKey(ctx, fn.ID, *fn.RateLimit, evt.Event().Map())
 		if err != nil {
 			return err
 		}
@@ -617,7 +488,9 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Eve
 //
 // This is a separate, exported function so that it can be used from this service
 // and also from eg. the run command.
-func Initialize(ctx context.Context, fn inngest.Function, evt event.Event, s state.Manager, q queue.Producer) (*state.Identifier, error) {
+func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedEvent, s state.Manager, q queue.Producer) (*state.Identifier, error) {
+	evt := tracked.Event()
+
 	zero := uuid.UUID{}
 	if bytes.Equal(fn.ID[:], zero[:]) {
 		// Locally, we want to ensure that each function has its own deterministic

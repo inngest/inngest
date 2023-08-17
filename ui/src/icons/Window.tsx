@@ -5,6 +5,8 @@ export function IconWindow({ className }: { className?: string }) {
       viewBox="0 0 20 20"
       fill="currentColor"
       className={className}
+      height="16"
+      width="16"
     >
       <path
         fillRule="evenodd"

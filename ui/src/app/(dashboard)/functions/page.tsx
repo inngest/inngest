@@ -12,12 +12,12 @@ import {
 import { BlankSlate } from '@/components/Blank';
 import SendEventButton from '@/components/Event/SendEventButton';
 import TriggerCronButton from '@/components/Event/TriggerCronButton';
+import SearchInput from '@/components/SearchInput/SearchInput';
 import Skeleton from '@/components/Skeleton';
 import Table from '@/components/Table';
 import TriggerTags from '@/components/Trigger/TriggerTags';
 import useDebounce from '@/hooks/useDebounce';
 import useDocsNavigation from '@/hooks/useDocsNavigation';
-import { IconMagnifyingGlass } from '@/icons';
 import { FunctionTriggerTypes, useGetFunctionsQuery, type Function } from '@/store/generated';
 
 const columnHelper = createColumnHelper<Function>();
@@ -129,20 +129,13 @@ export default function FunctionList() {
 
   return (
     <div className="flex flex-col min-h-0 min-w-0">
-      <div className="relative flex items-center bg-slate-950 ml-6">
-        <input
-          type="text"
-          className="text-slate-100 w-96 placeholder-slate-400 my-4 py-1 pl-4 bg-slate-950"
-          placeholder="Search function..."
-          value={searchInput ?? ''}
-          onChange={(event) => {
-            setSearchInput(event.target.value);
-            debouncedSearch();
-          }}
-        />
-        <IconMagnifyingGlass className="absolute left-0 h-3 w-3 text--slate-400" />
-      </div>
-
+      <SearchInput
+        placeholder="Search function..."
+        value={searchInput}
+        onChange={setSearchInput}
+        debouncedSearch={debouncedSearch}
+        className="py-4"
+      />
       <main className="min-h-0 overflow-y-auto">
         <Table
           options={{
@@ -166,17 +159,15 @@ export default function FunctionList() {
             onGlobalFilterChange: setGlobalFilter,
           }}
           blankState={
-            <span className="p-10">
-              <BlankSlate
-                title="Inngest has not detected any functions"
-                subtitle="Read our documentation to learn how to serve your functions"
-                imageUrl="/images/no-results.png"
-                button={{
-                  text: 'Serving Functions',
-                  onClick: () => navigateToDocs('/sdk/serve'),
-                }}
-              />
-            </span>
+            <BlankSlate
+              title="Inngest has not detected any functions"
+              subtitle="Read our documentation to learn how to serve your functions"
+              imageUrl="/images/no-results.png"
+              button={{
+                text: 'Serving Functions',
+                onClick: () => navigateToDocs('/sdk/serve'),
+              }}
+            />
           }
         />
       </main>

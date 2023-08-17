@@ -1,8 +1,10 @@
 package event
 
 import (
+	"crypto/rand"
 	"encoding/json"
-	"sync"
+
+	"github.com/oklog/ulid/v2"
 )
 
 const (
@@ -10,75 +12,9 @@ const (
 	FnFailedName      = "inngest/function.failed"
 )
 
-type Manager struct {
-	events map[string]Event
-	l      *sync.RWMutex
-}
-
-func NewManager() Manager {
-	return Manager{
-		events: make(map[string]Event),
-		l:      &sync.RWMutex{},
-	}
-}
-
-// Fetch an individual event by its ID.
-func (e Manager) EventById(id string) *Event {
-	e.l.RLock()
-	defer e.l.RUnlock()
-
-	evt, ok := e.events[id]
-	if !ok {
-		return nil
-	}
-
-	return &evt
-}
-
-// Fetch all events with a given name.
-func (e Manager) EventsByName(name string) []Event {
-	e.l.RLock()
-	defer e.l.RUnlock()
-
-	events := []Event{}
-
-	for _, evt := range e.events {
-		if evt.Name == name {
-			events = append(events, evt)
-		}
-	}
-
-	return events
-
-}
-
-// Fetch all events.
-func (e Manager) Events() []Event {
-	e.l.RLock()
-	defer e.l.RUnlock()
-
-	events := []Event{}
-
-	for _, evt := range e.events {
-		events = append(events, evt)
-	}
-
-	return events
-}
-
-// Parse and create a new event, adding it to the in-memory map as we go.
-func (e Manager) NewEvent(data string) (*Event, error) {
-	e.l.Lock()
-	defer e.l.Unlock()
-
-	evt, err := NewEvent(data)
-	if err != nil {
-		return nil, err
-	}
-
-	e.events[evt.ID] = *evt
-
-	return evt, err
+type TrackedEvent interface {
+	InternalID() ulid.ULID
+	Event() Event
 }
 
 func NewEvent(data string) (*Event, error) {
@@ -92,11 +28,11 @@ func NewEvent(data string) (*Event, error) {
 
 // Event represents an event sent to Inngest.
 type Event struct {
-	Name string                 `json:"name"`
-	Data map[string]interface{} `json:"data"`
+	Name string         `json:"name"`
+	Data map[string]any `json:"data"`
 
 	// User represents user-specific information for the event.
-	User map[string]interface{} `json:"user,omitempty"`
+	User map[string]any `json:"user,omitempty"`
 
 	// ID represents the unique ID for this particular event.  If supplied, we should attempt
 	// to only ingest this event once.
@@ -108,15 +44,15 @@ type Event struct {
 	Version   string `json:"v,omitempty"`
 }
 
-func (evt Event) Map() map[string]interface{} {
+func (evt Event) Map() map[string]any {
 	if evt.Data == nil {
-		evt.Data = make(map[string]interface{})
+		evt.Data = make(map[string]any)
 	}
 	if evt.User == nil {
-		evt.User = make(map[string]interface{})
+		evt.User = make(map[string]any)
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"name": evt.Name,
 		"data": evt.Data,
 		"user": evt.User,
@@ -132,4 +68,28 @@ func (evt Event) Map() map[string]interface{} {
 	}
 
 	return data
+}
+
+func NewOSSTrackedEvent(e Event) TrackedEvent {
+	id, err := ulid.Parse(e.ID)
+	if err != nil {
+		id = ulid.MustNew(ulid.Now(), rand.Reader)
+	}
+	return ossTrackedEvent{
+		id:    id,
+		event: e,
+	}
+}
+
+type ossTrackedEvent struct {
+	id    ulid.ULID
+	event Event
+}
+
+func (o ossTrackedEvent) Event() Event {
+	return o.event
+}
+
+func (o ossTrackedEvent) InternalID() ulid.ULID {
+	return o.id
 }

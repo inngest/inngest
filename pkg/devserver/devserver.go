@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
@@ -19,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
@@ -124,12 +126,43 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	rl := ratelimit.New(ctx, rc, "{ratelimit}:")
 
+	var drivers = []driver.Driver{}
+	for _, driverConfig := range opts.Config.Execution.Drivers {
+		d, err := driverConfig.NewDriver()
+		if err != nil {
+			return err
+		}
+		drivers = append(drivers, d)
+	}
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(sm),
+		executor.WithRuntimeDrivers(
+			drivers...,
+		),
+		executor.WithQueue(queue),
+		executor.WithLogger(logger.From(ctx)),
+		executor.WithFunctionLoader(loader),
+	)
+	if err != nil {
+		return err
+	}
+
+	// Create an executor.
+	executorSvc := executor.NewService(
+		opts.Config,
+		executor.WithExecutionLoader(dbcqrs),
+		executor.WithState(sm),
+		executor.WithServiceQueue(queue),
+		executor.WithServiceExecutor(exec),
+	)
+
 	runner := runner.NewService(
 		opts.Config,
+		runner.WithExecutor(exec),
 		runner.WithExecutionLoader(dbcqrs),
 		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
-		runner.WithQueue(queue),
+		runner.WithRunnerQueue(queue),
 		runner.WithTracker(t),
 		runner.WithRateLimiter(rl),
 	)
@@ -139,17 +172,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	// embed the tracker
 	ds.tracker = t
 	ds.state = sm
-
-	// Create an executor.
-	exec := executor.NewService(
-		opts.Config,
-		executor.WithExecutionLoader(dbcqrs),
-		executor.WithState(sm),
-		executor.WithQueue(queue),
-		executor.WithExecutorOpts(
-			executor.WithFunctionLoader(loader),
-		),
-	)
 
 	// Add notifications to the state manager so that we can store new function runs
 	// in the core API service.
@@ -163,7 +185,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		})
 	}
 
-	return service.StartAll(ctx, ds, runner, exec)
+	return service.StartAll(ctx, ds, runner, executorSvc)
 }
 
 func createInmemoryRedis(ctx context.Context) (rueidis.Client, error) {

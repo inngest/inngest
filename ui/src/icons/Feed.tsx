@@ -1,6 +1,6 @@
-export function IconFeed() {
+export function IconFeed({ className }: { className?: string }) {
   return (
-    <svg width="20" height="15">
+    <svg className={className} height="16" width="16" viewBox="0 0 20 15">
       <g fillRule="nonzero" fill="none">
         <path
           d="M10.002 3.847A3.799 3.799 0 1 1 10 11.444a3.799 3.799 0 0 1 .002-7.597Zm0 2a1.798 1.798 0 1 0 0 3.595 1.798 1.798 0 0 0 0-3.595Z"

@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import Link from 'next/link';
 import { toast } from 'sonner';
 
 import AppCardHeader from '@/components/App/AppCardHeader';
 import Badge from '@/components/Badge';
 import CodeLine from '@/components/CodeLine';
+import Link from '@/components/Link/Link';
 import useDebounce from '@/hooks/useDebounce';
 import useDocsNavigation from '@/hooks/useDocsNavigation';
 import {
-  IconBook,
   IconChevron,
   IconSpinner,
   IconStatusCircleCheck,
@@ -85,14 +84,14 @@ export default function AppCard({ app }: { app: App }) {
       <div className="border border-slate-700/30 rounded-b-md divide-y divide-slate-700/30 bg-slate-800/30">
         {!app.name ? (
           <div className="p-4 pr-6 flex items-center gap-2">
-            <IconSpinner className="fill-sky-400 text-slate-800" />
+            <IconSpinner />
             <p className="text-slate-400 text-lg font-normal">Connecting...</p>
           </div>
         ) : (
           <div className="flex items-center justify-between px-6 py-4 ">
             {!app.connected ? (
               <div className="flex items-center gap-2">
-                <IconSpinner className="fill-sky-400 text-slate-800" />
+                <IconSpinner />
                 <p className="text-slate-400 text-lg font-normal">Connecting to {app.name}...</p>
               </div>
             ) : (
@@ -107,16 +106,16 @@ export default function AppCard({ app }: { app: App }) {
               <div className="">
                 <div className="flex items-center gap-3 text-base">
                   {app.connected ? (
-                    <>{<IconStatusCircleCheck withOutline />}Connected to App</>
+                    <>{<IconStatusCircleCheck />}Connected to App</>
                   ) : (
-                    <>{<IconStatusCircleExclamation withOutline />}No Connection to App</>
+                    <>{<IconStatusCircleExclamation />}No Connection to App</>
                   )}
                 </div>
                 <p className="text-slate-300 ui-open:hidden xl:hidden pl-10">{app.url}</p>
               </div>
               <div className="flex items-center gap-4">
                 <p className="text-slate-300 xl:flex xl:ui-open:hidden hidden">{app.url}</p>
-                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
+                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500 transition-transform duration-500" />
               </div>
             </>
           }
@@ -155,7 +154,7 @@ export default function AppCard({ app }: { app: App }) {
                     readOnly={app.autodiscovered}
                   />
                   {isLoading && (
-                    <IconSpinner className="absolute top-1/3 right-2 fill-sky-400 text-slate-800" />
+                    <IconSpinner className="absolute top-1/3 right-2" />
                   )}
                   {isUrlInvalid && (
                     <p className="absolute text-rose-400 top-10 left-14">
@@ -179,13 +178,13 @@ export default function AppCard({ app }: { app: App }) {
                 </div>
               </div>
               {!app.connected && (
-                <a
-                  className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
+                <Link
+                  internalNavigation
+                  className="w-fit"
                   onClick={() => navigateToDocs('/sdk/serve')}
                 >
                   Connecting to the Dev Server
-                  <IconBook />
-                </a>
+                </Link>
               )}
             </>
           }
@@ -197,8 +196,8 @@ export default function AppCard({ app }: { app: App }) {
               <div className="flex items-center gap-3 text-base">
                 {app.functionCount > 0 && (
                   <>
-                    {app.connected && <IconStatusCircleCheck withOutline />}
-                    {!app.connected && <IconStatusCircleMinus withOutline />}
+                    {app.connected && <IconStatusCircleCheck />}
+                    {!app.connected && <IconStatusCircleMinus />}
                     {app.functionCount} Function
                     {app.functionCount === 1 ? '' : 's'} Registered
                   </>
@@ -206,21 +205,20 @@ export default function AppCard({ app }: { app: App }) {
                 {app.functionCount < 1 && (
                   <>
                     {app.connected && (
-                      <IconStatusCircleExclamation withOutline className="text-orange-400/70" />
+                      <IconStatusCircleExclamation className="text-orange-400/70" />
                     )}
-                    {!app.connected && <IconStatusCircleMinus withOutline />}
+                    {!app.connected && <IconStatusCircleMinus />}
                     No Functions Found
                   </>
                 )}
               </div>
               <div className="flex items-center gap-4">
                 {app.functionCount > 0 && (
-                  <Link className="text-indigo-400 flex items-center gap-2" href="/functions">
+                  <Link internalNavigation href="/functions">
                     View Functions
-                    <IconChevron className="-rotate-90" />
                   </Link>
                 )}
-                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500" />
+                <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500 transition-transform duration-500" />
               </div>
             </>
           }
@@ -233,13 +231,13 @@ export default function AppCard({ app }: { app: App }) {
                     a function and are exporting it correctly from your serve command.
                   </p>
                   <CodeLine code="serve(client, [list_of_fns]);" className="p-4 mb-4" />
-                  <a
-                    className="text-indigo-400 flex items-center gap-2 cursor-pointer w-fit"
+                  <Link
+                    internalNavigation
+                    className="w-fit"
                     onClick={() => navigateToDocs('/functions')}
                   >
                     Creating Functions
-                    <IconBook />
-                  </a>
+                  </Link>
                 </>
               )}
               {app.functionCount > 0 && (

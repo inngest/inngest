@@ -1,0 +1,22 @@
+import { IconGallery, IconItem, Meta } from '@storybook/blocks';
+
+import * as Icons from '@/icons';
+
+<Meta title="Iconography" />
+
+# Iconography
+
+<IconGallery style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(calc(33.33% - 10px), 1fr))', gap: '10px'}}>
+  {Object.keys(Icons).map(iconName => {
+    if (iconName.startsWith('Icon')) {
+      const IconComponent = Icons[iconName];
+      return (
+        <IconItem key={iconName} name={iconName.replace('Icon', '')}>
+          <IconComponent />
+        </IconItem>
+      );
+    }
+    return null;
+})}
+
+</IconGallery>

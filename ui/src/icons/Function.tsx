@@ -1,12 +1,12 @@
-export function IconFunction() {
+export function IconFunction({ className }: { className?: string }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 20 20"
-      width={16}
-      height={16}
       fill="currentColor"
-      aria-hidden="true"
+      className={className}
+      height="16"
+      width="16"
     >
       <path
         fillRule="evenodd"

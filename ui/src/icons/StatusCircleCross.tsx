@@ -1,10 +1,4 @@
-export function IconStatusCircleCross({
-  className,
-  withOutline,
-}: {
-  className?: string;
-  withOutline?: boolean;
-}) {
+export function IconStatusCircleCross({ className }: { className?: string }) {
   return (
     <svg
       width="28"
@@ -15,12 +9,6 @@ export function IconStatusCircleCross({
       color="#F43F5E"
       className={className}
     >
-      {withOutline && (
-        <path
-          d="M15 29C22.732 29 29 22.732 29 15C29 7.26801 22.732 1 15 1C7.26801 1 1 7.26801 1 15C1 22.732 7.26801 29 15 29Z"
-          stroke="#1E293B"
-        />
-      )}
       <rect x="5.375" y="5.375" width="19.25" height="19.25" rx="9.625" fill="white" />
       <path
         fillRule="evenodd"
