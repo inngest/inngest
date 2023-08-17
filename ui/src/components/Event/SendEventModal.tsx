@@ -143,7 +143,7 @@ export default function SendEventModal({ data, isOpen, onClose }) {
       isOpen={isOpen}
       onClose={onClose}
       title="Send Event"
-      description="Send an event manually by pasting a payload or creating a new one"
+      description="Send an event manually by filling or pasting a payload"
       className="max-w-5xl w-full"
     >
       <div className="m-6">
