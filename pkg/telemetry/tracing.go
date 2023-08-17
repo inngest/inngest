@@ -21,7 +21,8 @@ import (
 type TracerType int8
 
 const (
-	TracerTypeIO = iota
+	TracerTypeNoop = iota
+	TracerTypeIO
 	TracerTypeOTLP
 	TracerTypeJaeger
 )
@@ -58,8 +59,10 @@ func NewTracerProvider(ctx context.Context, svc string, ttype TracerType) (*trac
 		return NewOLTPTraceProvider(ctx, svc)
 	case TracerTypeJaeger:
 		return NewJaegerTraceProvider(ctx, svc)
-	default:
+	case TracerTypeIO:
 		return NewIOTraceProvider(ctx, svc)
+	default:
+		return newNoopTraceProvider(ctx, svc)
 	}
 }
 
@@ -91,6 +94,22 @@ func NewIOTraceProvider(ctx context.Context, svc string) (*tracer, error) {
 	}
 	tp := trace.NewTracerProvider(
 		trace.WithBatcher(exp),
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(svc),
+			semconv.DeploymentEnvironmentKey.String(env()),
+		)),
+	)
+	return &tracer{
+		Provider: tp,
+		Shutdown: func() {
+			_ = tp.Shutdown(ctx)
+		},
+	}, nil
+}
+
+func newNoopTraceProvider(ctx context.Context, svc string) (*tracer, error) {
+	tp := trace.NewTracerProvider(
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(svc),

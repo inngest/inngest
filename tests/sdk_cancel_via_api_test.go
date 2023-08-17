@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -101,19 +102,27 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 
 				// Get run ID from event
 				route := fmt.Sprintf("%s/v0/events/%s/runs", apiURL.String(), *test.lastEventID)
-				resp, err := http.Get(route)
+				req, _ := http.NewRequest(http.MethodGet, route, nil)
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", eventKey))
+				resp, err := http.DefaultClient.Do(req)
+
 				if err != nil {
 					return err
 				}
 				defer resp.Body.Close()
+
+				byt, _ := io.ReadAll(resp.Body)
+
 				ids := []ulid.ULID{}
-				if err := json.NewDecoder(resp.Body).Decode(&ids); err != nil {
-					return err
+				if err := json.Unmarshal(byt, &ids); err != nil {
+					return fmt.Errorf("cannot get event runs: %w\n\n%s", err, byt)
 				}
+
 				for _, id := range ids {
 					// Cancel run
 					route = fmt.Sprintf("%s/v0/runs/%s", apiURL.String(), id)
-					req, _ := http.NewRequest(http.MethodDelete, route, nil)
+					req, _ = http.NewRequest(http.MethodDelete, route, nil)
+					req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", eventKey))
 					resp, err = http.DefaultClient.Do(req)
 					if err != nil {
 						return fmt.Errorf("error making delete request: %w", err)

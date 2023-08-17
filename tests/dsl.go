@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -56,7 +60,7 @@ type Test struct {
 
 	lastEventID *string
 
-	proxyURL string
+	localURL *url.URL
 }
 
 func (t *Test) SetAssertions(items ...func()) {
@@ -80,7 +84,11 @@ func (t *Test) Func(f func() error) func() {
 
 func (t *Test) Send(evt inngestgo.Event) func() {
 	return func() {
-		client := inngestgo.NewClient(eventKey, inngestgo.WithEndpoint(eventURL.String()))
+		url := eventURL.String()
+		client := inngestgo.NewClient(inngestgo.ClientOpts{
+			EventKey: &eventKey,
+			EventURL: &url,
+		})
 		id, err := client.Send(context.Background(), evt)
 		require.NoError(t.test, err)
 		t.lastEventID = &id
@@ -98,7 +106,10 @@ func (t *Test) SetRequestContext(ctx SDKCtx) func() {
 	return func() {
 		// Ensure we set the ID here, which is deterministic but we use random ports within
 		// the test server, breaking determinism.
-		t.Function.Steps[0].URI = replaceURL(t.Function.Steps[0].URI, t.proxyURL)
+		t.Function.Steps[0].URI = replaceURL(t.Function.Steps[0].URI, t.localURL.String())
+		for i := range t.Function.Steps {
+			t.Function.Steps[i].URI = util.NormalizeAppURL(t.Function.Steps[i].URI)
+		}
 		t.Function.ID = inngest.DeterministicUUID(t.Function)
 		ctx.FnID = t.Function.ID.String()
 
@@ -157,11 +168,14 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			require.NoError(t.test, err)
 
 			require.NotZero(t.test, er.Event.Timestamp)
-			// Zero out the TS
+			// Zero out the TS and ID
 			ts := er.Event.Timestamp
+			evtID := er.Event.ID
 			er.Event.Timestamp = 0
+			er.Event.ID = nil
 			require.EqualValues(t.test, t.requestEvent, er.Event, "Request event is incorrect")
 			er.Event.Timestamp = ts
+			er.Event.ID = evtID
 
 			// Unset the run ID so that our unique run ID doesn't cause issues.
 			t.requestCtx.RunID = er.Ctx.RunID
@@ -175,13 +189,27 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 }
 
 func (t *Test) ExpectResponse(status int, body []byte) func() {
+	return t.ExpectResponseFunc(status, func(b []byte) error {
+		require.Equal(t.test, string(body), string(b))
+		return nil
+	})
+}
+
+func (t *Test) ExpectResponseFunc(status int, f func(b []byte) error) func() {
 	return func() {
 		select {
 		case r := <-t.responses:
 			t.lastResponse = time.Now()
-			byt, err := io.ReadAll(r.Body)
+
+			rdr := r.Body
+
+			byt, err := io.ReadAll(rdr)
 			require.NoError(t.test, err)
-			require.Equal(t.test, string(body), string(byt))
+
+			require.Equal(t.test, status, r.StatusCode)
+
+			err = f(byt)
+			require.NoError(t.test, err)
 		case <-time.After(time.Second):
 			require.Fail(t.test, "Expected SDK generator response but timed out")
 		}
@@ -189,20 +217,13 @@ func (t *Test) ExpectResponse(status int, body []byte) func() {
 }
 
 func (t *Test) ExpectJSONResponse(status int, expected any) func() {
-	return func() {
-		select {
-		case r := <-t.responses:
-			t.lastResponse = time.Now()
-			byt, err := io.ReadAll(r.Body)
-			require.NoError(t.test, err)
-			var actual any
-			err = json.Unmarshal(byt, &actual)
-			require.NoError(t.test, err)
-			require.EqualValues(t.test, expected, actual)
-		case <-time.After(time.Second):
-			require.Fail(t.test, "Expected SDK generator response but timed out")
-		}
-	}
+	return t.ExpectResponseFunc(status, func(byt []byte) error {
+		var actual any
+		err := json.Unmarshal(byt, &actual)
+		require.NoError(t.test, err)
+		require.EqualValues(t.test, expected, actual)
+		return nil
+	})
 }
 
 func (t *Test) ExpectGeneratorResponse(expected []state.GeneratorOpcode) func() {
@@ -219,6 +240,98 @@ func (t *Test) ExpectGeneratorResponse(expected []state.GeneratorOpcode) func() 
 			require.EqualValues(t.test, expected, actual)
 		case <-time.After(time.Second):
 			require.Fail(t.test, "Expected SDK generator response but timed out")
+		}
+	}
+}
+
+// ExpectParallelStepRuns is used to assert that step.run is called with the given number of steps
+// in parallel.  This can be used for a single stpe or for multiple steps.
+func (t *Test) ExpectParallelStepRuns(stepFunc func() []state.GeneratorOpcode, timeout time.Duration) func() {
+	return func() {
+		c := time.After(timeout)
+
+		steps := stepFunc()
+
+		for i := 0; i < len(steps); i++ {
+
+			// Expect a request
+			select {
+			case <-t.requests:
+				// TODO: expect a request for this opcode
+				// Right now, let this pass through.
+			case <-c:
+				require.Fail(t.test, "Expected steps but timed out")
+			}
+
+			// And expect a response.
+			select {
+			case r := <-t.responses:
+				t.lastResponse = time.Now()
+				byt, err := io.ReadAll(r.Body)
+				require.NoError(t.test, err)
+
+				op := []state.GeneratorOpcode{}
+				err = json.Unmarshal(byt, &op)
+				require.NoError(t.test, err)
+
+				if len(op) == 0 {
+					// Equal to opcode none.
+					op = append(op, state.GeneratorOpcode{})
+				}
+
+				found := false
+				for _, s := range steps {
+					if reflect.DeepEqual(s, op[0]) {
+						if s.Op == enums.OpcodeNone {
+							// Do nothing.
+							found = true
+							break
+						}
+
+						// Update stack
+						t.AddRequestStack(driver.FunctionStack{
+							Stack:   []string{s.ID},
+							Current: t.requestCtx.Stack.Current + 1,
+						})()
+
+						// wtf plz refactor
+						var data interface{}
+						switch op[0].Data[0] {
+						case '"':
+							data = ""
+							err = json.Unmarshal(op[0].Data, &data)
+							require.NoError(t.test, err)
+						case '[':
+							data = []map[string]any{}
+							err = json.Unmarshal(op[0].Data, &data)
+							require.NoError(t.test, err)
+						case '{':
+							data = map[string]any{}
+							err = json.Unmarshal(op[0].Data, &data)
+							require.NoError(t.test, err)
+						}
+
+						t.AddRequestSteps(map[string]any{
+							s.ID: data,
+						})()
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					had, _ := json.Marshal(steps)
+					require.Fail(
+						t.test,
+						"Found unexpected step output waiting for steps",
+						"Got %s\nHad %#v",
+						string(byt),
+						string(had),
+					)
+				}
+			case <-c:
+				require.Fail(t.test, "Expected steps but timed out")
+			}
 		}
 	}
 }

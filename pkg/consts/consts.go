@@ -33,6 +33,8 @@ const (
 
 	MaxBatchSize    = 100
 	MaxBatchTimeout = 60 * time.Second
+	// MaxEvents is the maximum number of events we can parse in a single batch.
+	MaxEvents = 5_000
 
 	// InvokeEventName is the event name used to invoke specific functions via an
 	// API.  Note that invoking functions still sends an event in the usual manner.
