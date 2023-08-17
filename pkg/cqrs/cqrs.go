@@ -21,6 +21,7 @@ type Manager interface {
 	FunctionManager
 	FunctionRunManager
 	EventManager
+	HistoryManager
 
 	// Scoped allows creating a new manager using a transaction.
 	WithTx(ctx context.Context) (TxManager, error)

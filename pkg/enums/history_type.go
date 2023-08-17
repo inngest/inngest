@@ -5,20 +5,21 @@ package enums
 type HistoryType int
 
 const (
-	// HistoryTypeNone represents the default HistoryType 0, which does nothing
+	// HistoryTypeNone represents the default HistoryType 0, which means nothing
 	HistoryTypeNone HistoryType = iota
 
+	HistoryTypeFunctionScheduled
 	HistoryTypeFunctionStarted
 	HistoryTypeFunctionCompleted
 	HistoryTypeFunctionFailed
 	HistoryTypeFunctionCancelled
-	HistoryTypeFunctionStatusUpdated
+	HistoryTypeFunctionStatusUpdated // TODO: Remove.  Statuses above capture everything.
 
 	HistoryTypeStepScheduled
 	HistoryTypeStepStarted
 	HistoryTypeStepCompleted
-	HistoryTypeStepErrored  // Errored
-	HistoryTypeStepFailed   // Permanently failed
-	HistoryTypeStepWaiting  // Waiting for an event
-	HistoryTypeStepSleeping // Sleeping for some time
+	HistoryTypeStepErrored
+	HistoryTypeStepFailed // Permanently failed
+	HistoryTypeStepWaiting
+	HistoryTypeStepSleeping
 )

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/ddb/sqlc"
+	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
@@ -281,6 +282,14 @@ func (w wrapper) InsertFunctionRun(ctx context.Context, e cqrs.FunctionRun) erro
 		return err
 	}
 	return w.q.InsertFunctionRun(ctx, run)
+}
+
+func (w wrapper) InsertHistory(ctx context.Context, h history.History) error {
+	params, err := convertHistoryToWriter(h)
+	if err != nil {
+		return err
+	}
+	return w.q.InsertHistory(ctx, *params)
 }
 
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types

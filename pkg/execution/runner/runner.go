@@ -14,7 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -52,7 +52,7 @@ func WithCQRS(data cqrs.Manager) func(s *svc) {
 	}
 }
 
-func WithExecutor(e executor.Executor) func(s *svc) {
+func WithExecutor(e execution.Executor) func(s *svc) {
 	return func(s *svc) {
 		s.executor = e
 	}
@@ -111,7 +111,7 @@ type svc struct {
 	// if there are errors.
 	pubsub pubsub.PublishSubscriber
 	// executor handles execution of functions.
-	executor executor.Executor
+	executor execution.Executor
 	// data provides the required loading capabilities to trigger functions
 	// from events.
 	data cqrs.ExecutionLoader

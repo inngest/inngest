@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -34,7 +35,7 @@ func WithState(sm state.Manager) func(s *svc) {
 	}
 }
 
-func WithServiceExecutor(exec Executor) func(s *svc) {
+func WithServiceExecutor(exec execution.Executor) func(s *svc) {
 	return func(s *svc) {
 		s.exec = exec
 	}
@@ -69,7 +70,7 @@ type svc struct {
 	// queue allows us to enqueue next steps.
 	queue queue.Queue
 	// exec runs the specific actions.
-	exec Executor
+	exec execution.Executor
 
 	wg sync.WaitGroup
 
@@ -100,7 +101,7 @@ func (s *svc) Pre(ctx context.Context) error {
 	return nil
 }
 
-func (s *svc) Executor() Executor {
+func (s *svc) Executor() execution.Executor {
 	return s.exec
 }
 
@@ -237,7 +238,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		}
 	}
 
-	resp, _, err := s.exec.Execute(ctx, item.Identifier, edge, item.Attempt, stackIdx)
+	resp, _, err := s.exec.Execute(ctx, item.Identifier, item, edge, stackIdx)
 
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.

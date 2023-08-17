@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -19,7 +20,6 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -36,103 +36,12 @@ var (
 	PauseHandleConcurrency = 100
 )
 
-// Executor manages executing actions.  It interfaces over a state store to save
-// action and workflow data once an action finishes or fails.  Once a function
-// finishes, its children become available to execute.  This is not handled
-// immediately;  instead, the executor returns the children which can be executed.
-// The owner of the executor is responsible for managing and calling the next
-// child functions.
-//
-// # Atomicity
-//
-// Functions in the executor should be considered atomic.  If the context has closed
-// because the process is terminating whilst we are executing, completing, or failing
-// an action we must wait for the executor to finish processing before quitting. If
-// we fail to wait for the executor, workflows may finish prematurely as future
-// actions may not be scheduled.
-//
-// # Running functions
-//
-// The executor schedules function execution over drivers.  A driver is a runtime-specific
-// implementation which runs functions, eg. a docker driver for running contianers,
-// or a webassembly driver for wasm runtimes.
-//
-// Runtimes can be asynchronous.  A docker container may take minutes to run, and
-// the connection to docker may be interrupted.  The executor provides functionality
-// for storing the outcome of an action via Resume and Fail at any point after an
-// action has started.
-type Executor interface {
-	// Execute runs the given function via the execution drivers.  If the
-	// from ID is "$trigger" this is treated as a new workflow invocation from the
-	// trigger, and all functions that are direct children of the trigger will be
-	// scheduled for execution.
-	//
-	// Attempt is the zero-index attempt number for this execution.  The executor
-	// needs knowledge of the attempt number to store the error for each attempt,
-	// and to figure out whether this is the final retry for determining whether
-	// the next error is "finalized".
-	//
-	// It is important for this function to be atomic;  if the function was scheduled
-	// and the context terminates, we must store the output or async data in workflow
-	// state then schedule the child functions else the workflow will terminate early.
-	//
-	// Execution will fail with no response and state.ErrFunctionCancelled if this function
-	// run has been cancelled by an external event or process.
-	//
-	// This returns the step's response, the current stack pointer index, and any error.
-	Execute(
-		ctx context.Context,
-		id state.Identifier,
-		// edge represents the edge to run.  This executes the step defined within
-		// Incoming, optionally using the StepPlanned field to execute a substep if
-		// the step is a generator.
-		edge inngest.Edge,
-		// attempt represents the attempt number for this step.
-		attempt int,
-		// stackIndex represents the stack pointer at the time this step was scheduled.
-		// This lets SDKs correctly evaluate parallelism by replaying generated steps in the
-		// right order.
-		stackIndex int,
-	) (*state.DriverResponse, int, error)
-
-	// HandleGeneratorResponse handles all generator responses.
-	HandleGeneratorResponse(ctx context.Context, gen []*state.GeneratorOpcode, item queue.Item) error
-	// HandleGenerator handles an individual generator response returned from the SDK.
-	HandleGenerator(ctx context.Context, gen state.GeneratorOpcode, item queue.Item) error
-
-	// HandlePauses handles pauses loaded from an incoming event.  This delegates to Cancel and
-	// Resume where necessary, depending on pauses that have been loaded and matched.
-	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) error
-	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
-	Cancel(ctx context.Context, id state.Identifier, r CancelRequest) error
-	// Resume resumes an in-progress function run from the given waitForEvent pause.
-	Resume(ctx context.Context, p state.Pause, r ResumeRequest) error
-	// SetFailureHandler sets the failure handler, called when a function run permanently fails.
-	SetFailureHandler(f FailureHandler)
-}
-
-// CancelRequest stores information about the incoming cancellation request within
-// history.
-type CancelRequest struct {
-	EventID    *ulid.ULID
-	Expression *string
-	UserID     *uuid.UUID
-}
-
-type ResumeRequest struct {
-	With    any
-	EventID *ulid.ULID
-}
-
-// FailureHandler is a function that handles failures in the executor.
-type FailureHandler func(context.Context, state.Identifier, state.State, state.DriverResponse) error
-
 // NewExecutor returns a new executor, responsible for running the specific step of a
 // function (using the available drivers) and storing the step's output or error.
 //
 // Note that this only executes a single step of the function;  it returns which children
 // can be directly executed next and saves a state.Pause for edges that have async conditions.
-func NewExecutor(opts ...ExecutorOpt) (Executor, error) {
+func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 	m := &executor{
 		runtimeDrivers: map[string]driver.Driver{},
 	}
@@ -151,11 +60,11 @@ func NewExecutor(opts ...ExecutorOpt) (Executor, error) {
 }
 
 // ExecutorOpt modifies the built in executor on creation.
-type ExecutorOpt func(m Executor) error
+type ExecutorOpt func(m execution.Executor) error
 
 // WithStateManager sets which state manager to use when creating an executor.
 func WithStateManager(sm state.Manager) ExecutorOpt {
-	return func(e Executor) error {
+	return func(e execution.Executor) error {
 		e.(*executor).sm = sm
 		return nil
 	}
@@ -163,35 +72,35 @@ func WithStateManager(sm state.Manager) ExecutorOpt {
 
 // WithQueue sets which state manager to use when creating an executor.
 func WithQueue(q queue.Queue) ExecutorOpt {
-	return func(e Executor) error {
+	return func(e execution.Executor) error {
 		e.(*executor).queue = q
 		return nil
 	}
 }
 
 func WithFunctionLoader(l state.FunctionLoader) ExecutorOpt {
-	return func(e Executor) error {
+	return func(e execution.Executor) error {
 		e.(*executor).fl = l
 		return nil
 	}
 }
 
 func WithLogger(l *zerolog.Logger) ExecutorOpt {
-	return func(e Executor) error {
+	return func(e execution.Executor) error {
 		e.(*executor).log = l
 		return nil
 	}
 }
 
-func WithFailureHandler(f FailureHandler) ExecutorOpt {
-	return func(e Executor) error {
+func WithFailureHandler(f execution.FailureHandler) ExecutorOpt {
+	return func(e execution.Executor) error {
 		e.(*executor).failureHandler = f
 		return nil
 	}
 }
 
 func WithStepLimits(limit uint) ExecutorOpt {
-	return func(e Executor) error {
+	return func(e execution.Executor) error {
 		e.(*executor).steplimit = limit
 		return nil
 	}
@@ -199,7 +108,7 @@ func WithStepLimits(limit uint) ExecutorOpt {
 
 // WithEvaluatorFactory allows customizing of the expression evaluator factory function.
 func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.Evaluator, error)) ExecutorOpt {
-	return func(e Executor) error {
+	return func(e execution.Executor) error {
 		e.(*executor).evalFactory = f
 		return nil
 	}
@@ -211,7 +120,7 @@ func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.
 // When invoking a step in a function, we find the registered driver with the step's
 // RuntimeType() and use that driver to execute the step.
 func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
-	return func(exec Executor) error {
+	return func(exec execution.Executor) error {
 		e := exec.(*executor)
 		for _, d := range drivers {
 			if _, ok := e.runtimeDrivers[d.RuntimeType()]; ok {
@@ -233,18 +142,24 @@ type executor struct {
 	fl             state.FunctionLoader
 	evalFactory    func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	runtimeDrivers map[string]driver.Driver
-	failureHandler FailureHandler
+	failureHandler execution.FailureHandler
+
+	lifecycles []execution.LifecycleListener
 
 	steplimit uint
 }
 
-func (e *executor) SetFailureHandler(f FailureHandler) {
+func (e *executor) SetFailureHandler(f execution.FailureHandler) {
 	e.failureHandler = f
+}
+
+func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
+	e.lifecycles = append(e.lifecycles, l)
 }
 
 // Execute loads a workflow and the current run state, then executes the
 // workflow via an executor.
-func (e *executor) Execute(ctx context.Context, id state.Identifier, edge inngest.Edge, attempt int, stackIndex int) (*state.DriverResponse, int, error) {
+func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, stackIndex int) (*state.DriverResponse, int, error) {
 	var log *zerolog.Logger
 
 	s, err := e.sm.Load(ctx, id.RunID)
@@ -275,7 +190,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 			Str("step", edge.Incoming).
 			Str("fn_name", s.Function().Name).
 			Str("fn_id", s.Function().ID.String()).
-			Int("attempt", attempt).
+			Int("attempt", item.Attempt).
 			Logger()
 		log = &l
 		log.Debug().Msg("executing step")
@@ -303,7 +218,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 		}, idx, nil
 	}
 
-	resp, idx, err := e.run(ctx, id, edge, s, attempt, stackIndex)
+	resp, idx, err := e.run(ctx, id, item, edge, s, stackIndex)
 	if log != nil {
 		var (
 			l   *zerolog.Event
@@ -362,7 +277,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 }
 
 // run executes the step with the given step ID.
-func (e *executor) run(ctx context.Context, id state.Identifier, edge inngest.Edge, s state.State, attempt int, stackIndex int) (*state.DriverResponse, int, error) {
+func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, s state.State, stackIndex int) (*state.DriverResponse, int, error) {
 	var (
 		response *state.DriverResponse
 		err      error
@@ -393,7 +308,7 @@ func (e *executor) run(ctx context.Context, id state.Identifier, edge inngest.Ed
 		// This isn't fixable.
 		return nil, 0, newFinalError(fmt.Errorf("unknown vertex: %s", edge.Incoming))
 	}
-	response, idx, err := e.executeStep(ctx, id, step, s, edge, attempt, stackIndex)
+	response, idx, err := e.executeStep(ctx, id, item, step, s, edge, stackIndex)
 	if err != nil {
 		return response, idx, err
 	}
@@ -420,7 +335,7 @@ func (e *executor) run(ctx context.Context, id state.Identifier, edge inngest.Ed
 	return response, idx, err
 }
 
-func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *inngest.Step, s state.State, edge inngest.Edge, attempt, stackIndex int) (*state.DriverResponse, int, error) {
+func (e *executor) executeStep(ctx context.Context, id state.Identifier, item queue.Item, step *inngest.Step, s state.State, edge inngest.Edge, stackIndex int) (*state.DriverResponse, int, error) {
 	var l *zerolog.Logger
 	if e.log != nil {
 		log := e.log.With().
@@ -438,11 +353,15 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *i
 		l.Info().Str("uri", step.URI).Msg("executing action")
 	}
 
-	if err := e.sm.Started(ctx, id, step.ID, attempt); err != nil {
+	for _, e := range e.lifecycles {
+		go e.OnStepStarted(ctx, id, item, edge, *step, s)
+	}
+
+	if err := e.sm.Started(ctx, id, step.ID, item.Attempt); err != nil {
 		return nil, 0, fmt.Errorf("error saving started state: %w", err)
 	}
 
-	response, err := d.Execute(ctx, s, edge, *step, stackIndex, attempt)
+	response, err := d.Execute(ctx, s, edge, *step, stackIndex, item.Attempt)
 	if response == nil {
 		// Add an error response here.
 		response = &state.DriverResponse{
@@ -500,7 +419,7 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *i
 		return response, 0, nil
 	}
 
-	if response.Err != nil && (!response.Retryable() || !queue.ShouldRetry(nil, attempt, step.RetryCount())) {
+	if response.Err != nil && (!response.Retryable() || !queue.ShouldRetry(nil, item.Attempt, step.RetryCount())) {
 		// We need to detect whether this error is 'final' here, depending on whether
 		// we've hit the retry count or this error is deemed non-retryable.
 		//
@@ -513,7 +432,7 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, step *i
 		logger.From(ctx).Trace().Msg("saving response to state")
 	}
 
-	idx, serr := e.sm.SaveResponse(ctx, id, *response, attempt)
+	idx, serr := e.sm.SaveResponse(ctx, id, *response, item.Attempt)
 	if serr != nil {
 		if l != nil {
 			logger.From(ctx).Error().Err(serr).Msg("unable to save state")
@@ -607,7 +526,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 
 			// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
 			if pause.Cancel {
-				err := e.Cancel(ctx, pause.Identifier, CancelRequest{
+				err := e.Cancel(ctx, pause.Identifier, execution.CancelRequest{
 					EventID:    &evtID,
 					Expression: pause.Expression,
 				})
@@ -625,7 +544,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 				return
 			}
 
-			err := e.Resume(ctx, *pause, ResumeRequest{
+			err := e.Resume(ctx, *pause, execution.ResumeRequest{
 				With:    evt.Event().Map(),
 				EventID: &evtID,
 			})
@@ -641,7 +560,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 }
 
 // Cancel cancels an in-progress function.
-func (e *executor) Cancel(ctx context.Context, id state.Identifier, r CancelRequest) error {
+func (e *executor) Cancel(ctx context.Context, id state.Identifier, r execution.CancelRequest) error {
 	md, err := e.sm.Metadata(ctx, id.RunID)
 	if err != nil {
 		return err
@@ -665,7 +584,7 @@ func (e *executor) Cancel(ctx context.Context, id state.Identifier, r CancelRequ
 }
 
 // Resume resumes an in-progress function from the given waitForEvent pause.
-func (e *executor) Resume(ctx context.Context, pause state.Pause, r ResumeRequest) error {
+func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.ResumeRequest) error {
 	if e.queue == nil || e.sm == nil {
 		return fmt.Errorf("No queue or state manager specified")
 	}

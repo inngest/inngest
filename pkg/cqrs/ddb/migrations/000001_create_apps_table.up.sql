@@ -53,7 +53,7 @@ CREATE TABLE history (
 	run_id BLOB NOT NULL, 
 	event_id BLOB NOT NULL, 
 	batch_id BLOB, 
-	group_id BLOB,
+	group_id VARCHAR,
 	idempotency_key VARCHAR NOT NULL,
 	type VARCHAR NOT NULL,
 	attempt INT NOT NULL,
