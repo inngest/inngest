@@ -9,7 +9,7 @@ type ModalProps = {
   onClose: () => void;
   title?: string;
   description?: string;
-  maxWidth?: string;
+  className?: string;
 };
 
 export default function Modal({
@@ -18,7 +18,7 @@ export default function Modal({
   onClose,
   title,
   description,
-  maxWidth = 'max-w-lg',
+  className = 'max-w-lg',
 }: ModalProps) {
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -53,7 +53,7 @@ export default function Modal({
               {/* The actual dialog panel  */}
               <Dialog.Panel
                 className={classNames(
-                  maxWidth,
+                  className,
                   'transform overflow-hidden rounded bg-slate-950 shadow-xl transition-all',
                 )}
               >

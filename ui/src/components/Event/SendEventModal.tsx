@@ -143,9 +143,9 @@ export default function SendEventModal({ data, isOpen, onClose }) {
       onClose={onClose}
       title="Send Event"
       description="Send an event manually by pasting a payload or creating a new one"
-      maxWidth="max-w-7xl"
+      className="max-w-5xl w-full"
     >
-      <div className="relative w-[60rem] h-[30rem]  flex flex-col">
+      <div className="relative w-full h-[30rem] flex flex-col">
         <div className="mt-4 mx-4 items-center bg-slate-800 shadow border-b border-slate-700/20 flex justify-between rounded-t">
           <p className=" text-slate-300/50 text-xs px-5">Payload</p>
           <div className="flex gap-2 items-center mr-2">
