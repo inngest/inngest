@@ -1,4 +1,4 @@
-export function IconStatusRunning() {
+export function DeprecatedIconStatusRunning() {
   return (
     <svg width="10" height="12" className="animate-pulse-spin">
       <path

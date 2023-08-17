@@ -35,7 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Navbar>
           <NavbarLink icon={<IconFeed />} href="stream" tabName="Stream" />
           <NavbarLink
-            icon={<IconWindow className="h-[1.125rem] w-[1.125rem]" />}
+            icon={<IconWindow />}
             href="apps"
             badge={appsCount}
             hasError={hasConnectedError}

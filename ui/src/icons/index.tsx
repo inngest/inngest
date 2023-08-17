@@ -8,7 +8,6 @@ export { IconPlus } from './Plus';
 export { IconSpinner } from './Spinner';
 export { IconCheckCircle } from './CheckCircle';
 export { IconExclamationTriangle } from './ExclamationTriangle';
-export { IconExclamationTriangleSolid } from './ExclamationTriangleSolid';
 export { IconArrowTopRightOnSquare } from './ArrowTopRightOnSquare';
 export { IconCopy } from './Copy';
 export { InngestSmallLogo } from './InngestSmallLogo';
@@ -18,6 +17,7 @@ export { IconWindow } from './Window';
 export { IconReplay } from './Replay';
 export { IconWebhook } from './Webhook';
 export { IconMagnifyingGlass } from './MagnifyingGlass';
+export { IconCheck } from './Check';
 
 // Circle Status Icons
 export { IconStatusCircleCheck } from './StatusCircleCheck';
@@ -26,11 +26,11 @@ export { IconStatusCircleMinus } from './StatusCircleMinus';
 export { IconStatusCircleCross } from './StatusCircleCross';
 export { IconStatusCircleArrowPath } from './StatusCircleArrowPath';
 
-// Status Icons
-export { IconStatusDefault } from './StatusDefault';
-export { IconStatusRunning } from './StatusRunning';
-export { IconStatusCompleted } from './StatusCompleted';
-export { IconStatusFailed } from './StatusFailed';
-export { IconStatusPaused } from './StatusPaused';
-export { IconStatusActionReq } from './StatusActionReq';
-export { IconStatusNoFn } from './StatusNoFn';
+// Deprecated - Status Icons
+export { DeprecatedIconStatusDefault } from './StatusDefault';
+export { DeprecatedIconStatusRunning } from './StatusRunning';
+export { DeprecatedIconStatusCompleted } from './StatusCompleted';
+export { DeprecatedIconStatusFailed } from './StatusFailed';
+export { DeprecatedIconStatusPaused } from './StatusPaused';
+export { DeprecatedIconStatusActionReq } from './StatusActionReq';
+export { DeprecatedIconStatusNoFn } from './StatusNoFn';

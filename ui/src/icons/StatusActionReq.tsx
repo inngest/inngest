@@ -1,4 +1,4 @@
-export function IconStatusActionReq() {
+export function DeprecatedIconStatusActionReq() {
   return (
     <svg width="3" height="11">
       <path

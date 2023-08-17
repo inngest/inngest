@@ -15,20 +15,20 @@ export default function SourceBadge({ row }: SourceBadgeProps) {
   let icon, styles, sourceName;
   switch (type) {
     case 'replay':
-      icon = <IconReplay className="h-4" />;
+      icon = <IconReplay />;
       styles = 'text-sky-400 bg-sky-400/10';
       break;
     case 'app':
-      icon = <IconWindow className="h-4" />;
+      icon = <IconWindow />;
       styles = 'text-teal-400 bg-teal-400/10';
       break;
     case 'webhook':
-      icon = <IconWebhook className="h-4" />;
+      icon = <IconWebhook />;
       styles = 'text-indigo-400 bg-indigo-400/10';
       break;
     case 'scheduled':
     case 'manual':
-      icon = <IconClock className="h-4" />;
+      icon = <IconClock />;
       styles = 'text-orange-400 bg-orange-400/10 capitalize';
       sourceName = type;
       break;

@@ -11,9 +11,8 @@ import * as Icons from '@/icons';
     if (iconName.startsWith('Icon')) {
       const IconComponent = Icons[iconName];
       return (
-        <IconItem style={{color: 'green'}} key={iconName} name={iconName.replace('Icon', '')}>
-
-          <IconComponent style={{color: 'yellow'}}/>
+        <IconItem key={iconName} name={iconName.replace('Icon', '')}>
+          <IconComponent />
         </IconItem>
       );
     }

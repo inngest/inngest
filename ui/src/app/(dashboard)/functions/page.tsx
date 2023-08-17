@@ -159,17 +159,15 @@ export default function FunctionList() {
             onGlobalFilterChange: setGlobalFilter,
           }}
           blankState={
-            <span className="p-10">
-              <BlankSlate
-                title="Inngest has not detected any functions"
-                subtitle="Read our documentation to learn how to serve your functions"
-                imageUrl="/images/no-results.png"
-                button={{
-                  text: 'Serving Functions',
-                  onClick: () => navigateToDocs('/sdk/serve'),
-                }}
-              />
-            </span>
+            <BlankSlate
+              title="Inngest has not detected any functions"
+              subtitle="Read our documentation to learn how to serve your functions"
+              imageUrl="/images/no-results.png"
+              button={{
+                text: 'Serving Functions',
+                onClick: () => navigateToDocs('/sdk/serve'),
+              }}
+            />
           }
         />
       </main>

@@ -7,6 +7,8 @@ export function IconMagnifyingGlass({ className }: { className?: string }) {
       strokeWidth="2.5"
       stroke="currentColor"
       className={className}
+      height="16"
+      width="16"
     >
       <path
         strokeLinecap="round"

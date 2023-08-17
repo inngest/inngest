@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { IconCopy, IconStatusCompleted } from '@/icons';
+import { IconCopy, IconCheck } from '@/icons';
 import classNames from '@/utils/classnames';
 
 type CodeLineProps = {
@@ -26,7 +26,7 @@ export default function CodeLine({ code, className }: CodeLineProps) {
       onClick={() => handleCopyClick(code)}
     >
       <code className="text-slate-300">{code}</code>
-      {clickedState ? <IconStatusCompleted /> : <IconCopy />}
+      {clickedState ? <IconCheck className="text-teal-500 icon-2xl" /> : <IconCopy className="text-slate-500 icon-2xl" />}
     </div>
   );
 }

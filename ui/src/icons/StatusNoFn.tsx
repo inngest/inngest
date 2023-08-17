@@ -1,4 +1,4 @@
-export function IconStatusNoFn() {
+export function DeprecatedIconStatusNoFn() {
   return (
     <svg width="7" height="11">
       <path

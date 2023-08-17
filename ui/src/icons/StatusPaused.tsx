@@ -1,4 +1,4 @@
-export function IconStatusPaused() {
+export function DeprecatedIconStatusPaused() {
   return (
     <svg width="7" height="10">
       <path

@@ -30,13 +30,13 @@ export default function AppList() {
         <div className="flex items-center gap-5">
           <AddAppButton />
           <p className="text-sky-400 flex items-center gap-2">
-            <IconSpinner className="fill-sky-400 text-slate-800" />
+            <IconSpinner />
             Auto-detecting Apps
           </p>
         </div>
       </header>
       <div className="flex items-center gap-3 mb-4">
-        <IconWindow className="h-5 w-5" />
+        <IconWindow className="icon-xl" />
         <p className="text-slate-200">
           {numberOfConnectedApps} / {apps.length} Apps Connected
         </p>

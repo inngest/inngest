@@ -5,7 +5,7 @@ import Button from '@/components/Button';
 import Input from '@/components/Form/Input';
 import Modal from '@/components/Modal';
 import useDebounce from '@/hooks/useDebounce';
-import { IconExclamationTriangleSolid } from '@/icons';
+import { IconExclamationTriangle } from '@/icons';
 import { useCreateAppMutation } from '@/store/generated';
 import isValidUrl from '@/utils/urlValidation';
 
@@ -86,7 +86,7 @@ export default function AddAppModal({ isOpen, onClose }) {
         </div>
         {isUrlInvalid && inputUrl.length > 0 && (
           <p className="bg-rose-600/50 text-white flex items-center gap-2 text-sm px-6 py-2">
-            <IconExclamationTriangleSolid />
+            <IconExclamationTriangle />
             Please enter a valid URL
           </p>
         )}
