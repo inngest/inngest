@@ -25,3 +25,7 @@
 #modals {
   @apply text-sm text-slate-400;
 }
+
+:focus-visible {
+  outline-color: white;
+}

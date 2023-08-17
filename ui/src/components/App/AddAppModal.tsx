@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import Button from '@/components/Button';
+import Input from '@/components/Form/Input';
 import Modal from '@/components/Modal';
 import useDebounce from '@/hooks/useDebounce';
 import { IconExclamationTriangleSolid } from '@/icons';
 import { useCreateAppMutation } from '@/store/generated';
-import classNames from '@/utils/classnames';
 import isValidUrl from '@/utils/urlValidation';
 
 export default function AddAppModal({ isOpen, onClose }) {
@@ -75,22 +75,14 @@ export default function AddAppModal({ isOpen, onClose }) {
             App URL
             <span className="text-slate-500 text-sm pb-4 block">The URL of your application</span>
           </label>
-          <div className="relative">
-            <input
-              id="addAppUrlModal"
-              className={classNames(
-                'min-w-[420px] bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline',
-                isUrlInvalid && inputUrl.length > 0 && 'pr-8 outline-rose-400',
-              )}
-              placeholder="http://localhost:3000/api/inngest"
-              value={inputUrl}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-            />
-            {isUrlInvalid && inputUrl.length > 0 && (
-              <IconExclamationTriangleSolid className="absolute top-2/4 right-2 -translate-y-2/4 text-rose-400" />
-            )}
-          </div>
+          <Input
+            id="addAppUrlModal"
+            value={inputUrl}
+            placeholder="http://localhost:3000/api/inngest"
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            isInvalid={isUrlInvalid}
+          />
         </div>
         {isUrlInvalid && inputUrl.length > 0 && (
           <p className="bg-rose-600/50 text-white flex items-center gap-2 text-sm px-6 py-2">
