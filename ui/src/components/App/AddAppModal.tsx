@@ -70,7 +70,7 @@ export default function AddAppModal({ isOpen, onClose }) {
       onClose={onClose}
     >
       <form onSubmit={handleSubmit}>
-        <div className="bg-[#050911]/50 p-6">
+        <div className="p-6">
           <label htmlFor="addAppUrlModal" className="text-sm font-semibold text-white">
             App URL
             <span className="text-slate-500 text-sm pb-4 block">The URL of your application</span>

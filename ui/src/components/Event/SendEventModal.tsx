@@ -146,9 +146,9 @@ export default function SendEventModal({ data, isOpen, onClose }) {
       description="Send an event manually by pasting a payload or creating a new one"
       className="max-w-5xl w-full"
     >
-      <div className="m-4">
-        <div className="relative w-full h-[30rem] flex flex-col rounded overflow-hidden">
-          <div className="mt-4 items-center bg-slate-800 shadow border-b border-slate-700/20 flex justify-between rounded-t">
+      <div className="m-6">
+        <div className="relative w-full h-[20rem] flex flex-col rounded overflow-hidden">
+          <div className="items-center bg-slate-800 shadow border-b border-slate-700/20 flex justify-between">
             <p className=" text-slate-300/50 text-xs px-5 py-4">Payload</p>
           </div>
           {monaco ? (
