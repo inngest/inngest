@@ -83,6 +83,20 @@ export default function SendEventModal({ data, isOpen, onClose }) {
       return;
     }
 
+    monaco.editor.defineTheme('inngest-theme', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': '#1e293b', // slate-800
+        'editor.lineHighlightBorder': '#cbd5e11a', // slate-300/10
+        'editorIndentGuide.background': '#cbd5e133', // slate-300/20
+        'editorIndentGuide.activeBackground': '#cbd5e14d', // slate-300/30
+        'editorLineNumber.foreground': '#cbd5e14d', // slate-300/30
+        'editorLineNumber.activeForeground': '#CBD5E1', // slate-300
+      },
+    });
+
     monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
       validate: true,
       schemas: [
@@ -124,14 +138,16 @@ export default function SendEventModal({ data, isOpen, onClose }) {
   }, [monaco]);
 
   return portal(
-    <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-7xl">
-      <div className="relative w-[60rem] h-[30rem] bg-slate-800/30 border border-slate-700/30 flex flex-col">
-        <div className="mt-4 mx-4 bg-slate-800/40 shadow border-b border-slate-700/20 flex justify-between rounded-t">
-          <div className="flex -mb-px">
-            <button className="border-indigo-400 text-white text-xs px-5 py-2.5 border-b block transition-all duration-150">
-              Payload
-            </button>
-          </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Send Event"
+      description="Send an event manually by pasting a payload or creating a new one"
+      maxWidth="max-w-7xl"
+    >
+      <div className="relative w-[60rem] h-[30rem]  flex flex-col">
+        <div className="mt-4 mx-4 items-center bg-slate-800 shadow border-b border-slate-700/20 flex justify-between rounded-t">
+          <p className=" text-slate-300/50 text-xs px-5">Payload</p>
           <div className="flex gap-2 items-center mr-2">
             <div className="py-2 flex flex-row items-center space-x-2">
               <div className="text-4xs text-center text-white">Cmd+Enter</div>
@@ -149,8 +165,8 @@ export default function SendEventModal({ data, isOpen, onClose }) {
             defaultLanguage="json"
             value={input ?? '{}'}
             onChange={(value) => setInput(value || '')}
-            className="overflow-x-hidden flex-1 mx-4 mb-4"
-            theme="vs-dark"
+            className="overflow-x-hidden flex-1 mx-4 mb-4 rounded-b"
+            theme="inngest-theme"
             onMount={(editor) => {
               editor.addAction({
                 id: 'sendInngestEvent',
@@ -169,15 +185,17 @@ export default function SendEventModal({ data, isOpen, onClose }) {
               minimap: {
                 enabled: false,
               },
-              lineNumbers: 'off',
+              lineNumbers: 'on',
               extraEditorClassName: '',
-              theme: 'vs-dark',
               contextmenu: false,
               inlayHints: {
                 enabled: 'on',
               },
               scrollBeyondLastLine: false,
               wordWrap: 'on',
+              fontFamily: 'Source Code Pro, monospace',
+              fontSize: 13,
+              lineHeight: 26,
             }}
           />
         ) : null}
