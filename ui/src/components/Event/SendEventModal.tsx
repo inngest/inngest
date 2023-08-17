@@ -145,60 +145,61 @@ export default function SendEventModal({ data, isOpen, onClose }) {
       description="Send an event manually by pasting a payload or creating a new one"
       className="max-w-5xl w-full"
     >
-      <div className="relative w-full h-[30rem] flex flex-col">
-        <div className="mt-4 mx-4 items-center bg-slate-800 shadow border-b border-slate-700/20 flex justify-between rounded-t">
-          <p className=" text-slate-300/50 text-xs px-5">Payload</p>
-          <div className="flex gap-2 items-center mr-2">
-            <div className="py-2 flex flex-row items-center space-x-2">
-              <div className="text-4xs text-center text-white">Cmd+Enter</div>
-              <button
-                onClick={() => sendEvent()}
-                className="bg-slate-700/50 hover:bg-slate-700/80 border-slate-700/50 flex gap-1.5 items-center border text-xs rounded-sm px-2.5 py-1 text-slate-100 transition-all duration-150"
-              >
-                {sendEventState.isLoading ? 'Spinner' : 'Send event'}
-              </button>
+      <div className="m-4">
+        <div className="relative w-full h-[30rem] flex flex-col rounded overflow-hidden">
+          <div className="mt-4 items-center bg-slate-800 shadow border-b border-slate-700/20 flex justify-between rounded-t">
+            <p className=" text-slate-300/50 text-xs px-5">Payload</p>
+            <div className="flex gap-2 items-center mr-2">
+              <div className="py-2 flex flex-row items-center space-x-2">
+                <div className="text-4xs text-center text-white">Cmd+Enter</div>
+                <button
+                  onClick={() => sendEvent()}
+                  className="bg-slate-700/50 hover:bg-slate-700/80 border-slate-700/50 flex gap-1.5 items-center border text-xs rounded-sm px-2.5 py-1 text-slate-100 transition-all duration-150"
+                >
+                  {sendEventState.isLoading ? 'Spinner' : 'Send event'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-        {monaco ? (
-          <Editor
-            defaultLanguage="json"
-            value={input ?? '{}'}
-            onChange={(value) => setInput(value || '')}
-            className="overflow-x-hidden flex-1 mx-4 mb-4 rounded-b"
-            theme="inngest-theme"
-            onMount={(editor) => {
-              editor.addAction({
-                id: 'sendInngestEvent',
-                label: 'Send Inngest Event',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
-                contextMenuGroupId: '2_execution',
-                run: () => {
-                  sendEventRef.current();
+          {monaco ? (
+            <Editor
+              defaultLanguage="json"
+              value={input ?? '{}'}
+              onChange={(value) => setInput(value || '')}
+              theme="inngest-theme"
+              onMount={(editor) => {
+                editor.addAction({
+                  id: 'sendInngestEvent',
+                  label: 'Send Inngest Event',
+                  keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+                  contextMenuGroupId: '2_execution',
+                  run: () => {
+                    sendEventRef.current();
+                  },
+                });
+              }}
+              options={{
+                fixedOverflowWidgets: false,
+                formatOnPaste: false,
+                formatOnType: false,
+                minimap: {
+                  enabled: false,
                 },
-              });
-            }}
-            options={{
-              fixedOverflowWidgets: true,
-              formatOnPaste: false,
-              formatOnType: false,
-              minimap: {
-                enabled: false,
-              },
-              lineNumbers: 'on',
-              extraEditorClassName: '',
-              contextmenu: false,
-              inlayHints: {
-                enabled: 'on',
-              },
-              scrollBeyondLastLine: false,
-              wordWrap: 'on',
-              fontFamily: 'Source Code Pro, monospace',
-              fontSize: 13,
-              lineHeight: 26,
-            }}
-          />
-        ) : null}
+                lineNumbers: 'on',
+                extraEditorClassName: '',
+                contextmenu: false,
+                inlayHints: {
+                  enabled: 'on',
+                },
+                scrollBeyondLastLine: false,
+                wordWrap: 'on',
+                fontFamily: 'Source Code Pro, monospace',
+                fontSize: 13,
+                lineHeight: 26,
+              }}
+            />
+          ) : null}
+        </div>
       </div>
     </Modal>,
   );
