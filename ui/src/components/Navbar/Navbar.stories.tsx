@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
 import Navbar from './Navbar';
-import NavbarLink from './NavbarLink';
+import NavbarLink, { type NavbarLinkProps } from './NavbarLink';
 import { Default, WithCounter } from './NavbarLink.stories';
 
 const meta = {
@@ -25,8 +25,8 @@ type Story = StoryObj<typeof Navbar>;
 export const NavbarWithLinks: Story = {
   render: (args) => (
     <Navbar {...args}>
-      <NavbarLink {...Default.args} />
-      <NavbarLink {...WithCounter.args} />
+      <NavbarLink {...(Default.args as NavbarLinkProps)} />
+      <NavbarLink {...(WithCounter.args as NavbarLinkProps)} />
     </Navbar>
   ),
 };

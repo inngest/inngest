@@ -11,6 +11,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 var (
@@ -117,7 +118,7 @@ func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error)
 			err = multierror.Append(err, ferr)
 		}
 
-		for _, step := range fn.Steps {
+		for n, step := range fn.Steps {
 			uri, ferr := url.Parse(step.URI)
 			if ferr != nil {
 				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid URI", step.ID))
@@ -126,6 +127,8 @@ func (f RegisterRequest) Parse(ctx context.Context) ([]*inngest.Function, error)
 				err = multierror.Append(err, fmt.Errorf("Step '%s' has an invalid driver. Only HTTP drivers may be used with SDK functions.", step.ID))
 				continue
 			}
+			step.URI = util.NormalizeAppURL(step.URI)
+			fn.Steps[n] = step
 		}
 	}
 

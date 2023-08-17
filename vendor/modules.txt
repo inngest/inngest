@@ -451,9 +451,11 @@ github.com/hashicorp/terraform/tfdiags
 # github.com/inconshreveable/mousetrap v1.0.0
 ## explicit
 github.com/inconshreveable/mousetrap
-# github.com/inngest/inngestgo v0.4.3-0.20230427225702-be10dcbf5ec7
-## explicit; go 1.18
+# github.com/inngest/inngestgo v0.4.3-0.20230731190123-1d1baf256abd
+## explicit; go 1.20
 github.com/inngest/inngestgo
+github.com/inngest/inngestgo/internal/sdkrequest
+github.com/inngest/inngestgo/step
 # github.com/jedib0t/go-pretty/v6 v6.3.0
 ## explicit; go 1.16
 github.com/jedib0t/go-pretty/v6/table
@@ -789,9 +791,14 @@ gocloud.dev/pubsub/natspubsub
 # golang.org/x/crypto v0.11.0
 ## explicit; go 1.17
 golang.org/x/crypto/ed25519
-# golang.org/x/exp v0.0.0-20230315142452-642cacee5cc0
-## explicit; go 1.18
+# golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
+## explicit; go 1.20
+golang.org/x/exp/constraints
 golang.org/x/exp/rand
+golang.org/x/exp/slices
+golang.org/x/exp/slog
+golang.org/x/exp/slog/internal
+golang.org/x/exp/slog/internal/buffer
 # golang.org/x/mod v0.10.0
 ## explicit; go 1.17
 golang.org/x/mod/internal/lazyregexp

@@ -6,7 +6,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   className?: string;
   isInvalid?: boolean;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}
+};
 
 export default function Input({ value, className, onChange, isInvalid, ...props }: InputProps) {
   return (

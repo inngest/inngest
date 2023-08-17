@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 type devapi struct {
@@ -54,6 +55,8 @@ func (a *devapi) addRoutes() {
 
 	a.Get("/dev", a.Info)
 	a.Post("/fn/register", a.Register)
+	// This allows tests to remove apps by URL
+	a.Delete("/fn/remove", a.RemoveApp)
 
 	// Go embeds files relative to the current source, which embeds
 	// all under ./static.  We remove the ./static
@@ -143,7 +146,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error) {
-	r.URL = cqrs.NormalizeAppURL(r.URL)
+	r.URL = util.NormalizeAppURL(r.URL)
 
 	sum, err := r.Checksum()
 	if err != nil {
@@ -267,6 +270,28 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 		return publicerr.Wrap(err, 500, "Error deleting removed function")
 	}
 	return nil
+}
+
+// RemoveApp allows users to de-register an app by its URL
+func (a devapi) RemoveApp(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	url := r.FormValue("url")
+
+	app, err := a.devserver.data.GetAppByURL(ctx, url)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "App not found: %s", url))
+		return
+	}
+
+	if err := a.devserver.data.DeleteFunctionsByAppID(ctx, app.ID); err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Error deleting functions"))
+		return
+	}
+
+	if err := a.devserver.data.DeleteApp(ctx, app.ID); err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Error deleting app"))
+		return
+	}
 }
 
 func (a devapi) err(ctx context.Context, w http.ResponseWriter, status int, err error) {

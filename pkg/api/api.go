@@ -119,29 +119,36 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create a new channel which receives a stream of events from the incoming HTTP request
-	byteStream := make(chan json.RawMessage)
+	stream := make(chan eventstream.StreamItem)
 	eg := errgroup.Group{}
 	eg.Go(func() error {
-		return eventstream.ParseStream(ctx, r.Body, byteStream, a.config.EventAPI.MaxSize)
+		return eventstream.ParseStream(ctx, r.Body, stream, a.config.EventAPI.MaxSize)
 	})
 
 	// Create a new channel which holds all event IDs as a slice.
 	var (
-		ids    = []string{}
-		idChan = make(chan string)
+		max    int
+		ids    = make([]string, consts.MaxEvents)
+		idChan = make(chan struct {
+			int
+			string
+		})
 	)
 	eg.Go(func() error {
 		for item := range idChan {
-			ids = append(ids, item)
+			if max < item.int {
+				max = item.int
+			}
+			ids[item.int] = item.string
 		}
 		return nil
 	})
 
 	// Process those incoming events
 	eg.Go(func() error {
-		for byt := range byteStream {
+		for s := range stream {
 			evt := event.Event{}
-			if err := json.Unmarshal(byt, &evt); err != nil {
+			if err := json.Unmarshal(s.Item, &evt); err != nil {
 				return err
 			}
 
@@ -159,7 +166,10 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				a.log.Error().Str("event", evt.Name).Err(err).Msg("error handling event")
 				return err
 			}
-			idChan <- id
+			idChan <- struct {
+				int
+				string
+			}{s.N, id}
 		}
 
 		// Close the idChan so that we stop appending to the ID slice.
@@ -167,10 +177,16 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 
-	if err := eg.Wait(); err != nil {
+	err := eg.Wait()
+
+	if max+1 > len(ids) {
+		max = len(ids) - 1
+	}
+
+	if err != nil {
 		w.WriteHeader(400)
 		_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
-			IDs:    ids,
+			IDs:    ids[0 : max+1],
 			Status: 400,
 			Error:  err,
 		})
@@ -179,7 +195,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(200)
 	_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
-		IDs:    ids,
+		IDs:    ids[0 : max+1],
 		Status: 200,
 	})
 }
