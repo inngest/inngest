@@ -3,6 +3,7 @@ import Editor, { useMonaco } from '@monaco-editor/react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
+import Button from '@/components/Button';
 import Modal from '@/components/Modal';
 import { usePortal } from '../../hooks/usePortal';
 import { useSendEventMutation } from '../../store/devApi';
@@ -148,18 +149,7 @@ export default function SendEventModal({ data, isOpen, onClose }) {
       <div className="m-4">
         <div className="relative w-full h-[30rem] flex flex-col rounded overflow-hidden">
           <div className="mt-4 items-center bg-slate-800 shadow border-b border-slate-700/20 flex justify-between rounded-t">
-            <p className=" text-slate-300/50 text-xs px-5">Payload</p>
-            <div className="flex gap-2 items-center mr-2">
-              <div className="py-2 flex flex-row items-center space-x-2">
-                <div className="text-4xs text-center text-white">Cmd+Enter</div>
-                <button
-                  onClick={() => sendEvent()}
-                  className="bg-slate-700/50 hover:bg-slate-700/80 border-slate-700/50 flex gap-1.5 items-center border text-xs rounded-sm px-2.5 py-1 text-slate-100 transition-all duration-150"
-                >
-                  {sendEventState.isLoading ? 'Spinner' : 'Send event'}
-                </button>
-              </div>
-            </div>
+            <p className=" text-slate-300/50 text-xs px-5 py-4">Payload</p>
           </div>
           {monaco ? (
             <Editor
@@ -200,6 +190,14 @@ export default function SendEventModal({ data, isOpen, onClose }) {
             />
           ) : null}
         </div>
+      </div>
+      <div className="flex items-center justify-between p-6 border-t border-slate-800">
+        <Button label="Cancel" kind="secondary" btnAction={onClose} />
+        <Button
+          disabled={sendEventState.isLoading}
+          label="Send Event"
+          btnAction={() => sendEvent()}
+        />
       </div>
     </Modal>,
   );
