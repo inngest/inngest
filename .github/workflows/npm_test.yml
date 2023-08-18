@@ -1,0 +1,54 @@
+name: Test npm CLI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'npm/**'
+  pull_request:
+    paths:
+      - 'npm/**'
+
+jobs:
+  install:
+    name: Test CLI installation
+    strategy:
+      matrix:
+        node:
+          - 16
+          - 18
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: npm
+    steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: 'Get previous version tag'
+        id: previoustag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        with:
+          prefix: v
+      - id: version
+        shell: bash
+        run: |
+            echo "${{ steps.previoustag.outputs.tag }}" | cut -c2- | tee version.txt
+            echo "::set-output name=version::$(cat version.txt)"
+      - run: npm ci
+        env:
+          SKIP_POSTINSTALL: 1
+      - run: npm version ${{ steps.version.outputs.version }}
+      - run: npm run build
+      - name: Trigger postinstall
+        run: npm install --foreground-scripts
+        env:
+          DEBUG: 'inngest:*'
+      - run: bin/inngest version
