@@ -202,9 +202,9 @@ export const tipsRouter = router({
     }),
 ```
 
-The mutation creates multiple resources in Sanity, which is a contentis content management system (CMS) that treats your content as data and stores it for later querying and retrieval. For Kent’s tips, we are creating two documents:
+The mutation creates multiple resources in Sanity, which is a headless content management system (CMS) that treats your content as data and stores it for later querying and retrieval. For Kent’s tips, we are creating two documents:
 
-* **Video Resource**represents an “immutable” reference to the original video media. Every video we upload is unique and points to a URL of the original video media.
+* **Video Resource** represents an “immutable” reference to the original video media. Every video we upload is unique and points to a URL of the original video media.
 * **Tip Resource** that has a reference to the Video Resource. The Tip Resource contains metadata around the tip itself, such as the title, description, and other similar information.
 
 Storing these two resources in our content management system means they are safe and secure and ready for the rest of the process to proceed.
@@ -510,7 +510,7 @@ It was surprising that it was able to do this, but it is consistent with it. We 
 
 Very cool.
 
-Once that’s complete we send use the Inngest Cloudflare client to send an event and pick the process back up on the Next.js side of the fence.
+Once that’s complete we use the Inngest Cloudflare client to send an event and pick the process back up on the Next.js side of the fence.
 
 ### Apply the LLM suggestions to the Tip Resource
 
