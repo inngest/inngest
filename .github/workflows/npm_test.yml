@@ -1,0 +1,43 @@
+name: Test npm CLI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'npm/**'
+  pull_request:
+    paths:
+      - 'npm/**'
+
+jobs:
+  install:
+    name: Test CLI installation
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: npm
+    steps:
+      - uses: actions/checkout@v3
+      - name: 'Get previous version tag'
+        id: previoustag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
+        with:
+          prefix: v
+      - id: version
+        shell: bash
+        run: |
+            run: echo "${{ steps.previoustag.outputs.tag }}" | cut -c2- | tee version.txt
+            run: echo "::set-output name=version::$(cat version.txt)"
+      - run: npm ci
+      - run: npm version ${{ steps.version.outputs.version }}
+      - run: npm pack
+      - run: npm install --global ./inngest-cli-${{ steps.version.outputs.version }}.tgz
+        env:
+          DEBUG: 'inngest:*'
+      - run: inngest-cli version
