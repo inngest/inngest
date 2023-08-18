@@ -34,8 +34,8 @@ jobs:
       - id: version
         shell: bash
         run: |
-            run: echo "${{ steps.previoustag.outputs.tag }}" | cut -c2- | tee version.txt
-            run: echo "::set-output name=version::$(cat version.txt)"
+            echo "${{ steps.previoustag.outputs.tag }}" | cut -c2- | tee version.txt
+            echo "::set-output name=version::$(cat version.txt)"
       - run: npm ci
       - run: npm version ${{ steps.version.outputs.version }}
       - run: npm pack
