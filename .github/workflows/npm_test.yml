@@ -37,7 +37,10 @@ jobs:
             echo "${{ steps.previoustag.outputs.tag }}" | cut -c2- | tee version.txt
             echo "::set-output name=version::$(cat version.txt)"
       - run: npm ci
+        env:
+          SKIP_POSTINSTALL: 1
       - run: npm version ${{ steps.version.outputs.version }}
+      - run: npm run build
       - run: npm pack
       - run: npm install --global ./inngest-cli-${{ steps.version.outputs.version }}.tgz
         env:

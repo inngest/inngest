@@ -185,7 +185,6 @@ function pipeBinaryToInstallLocation(
     }
 
     const targetPath = path.resolve("./bin");
-
     debug("targetPath:", targetPath);
 
     /**
@@ -211,7 +210,7 @@ function pipeBinaryToInstallLocation(
           .buffer()
           .then((buffer) => {
             const zip = new AdmZip(buffer);
-            zip.extractAllTo(targetPath);
+            zip.extractAllTo(targetPath, true);
             resolve();
           })
           .catch(reject);
