@@ -45,7 +45,7 @@ CREATE TABLE function_runs (
 );
 
 CREATE TABLE history (
-	id UUID,
+	id BLOB,
 	created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 	run_started_at TIMESTAMP NOT NULL DEFAULT NOW(),
 	function_id UUID,

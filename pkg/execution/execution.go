@@ -125,9 +125,9 @@ type LifecycleListener interface {
 		context.Context,
 		state.Identifier,
 		queue.Item,
+		inngest.Edge,
 		inngest.Step,
-		*state.DriverResponse,
-		error,
+		state.DriverResponse,
 	)
 
 	OnWaitForEvent(

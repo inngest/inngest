@@ -38,15 +38,21 @@ var (
 type Identifier struct {
 	RunID ulid.ULID `json:"runID"`
 
-	WorkflowID      uuid.UUID `json:"wID"`
-	WorkflowVersion int       `json:"wv"`
+	// WorkflowID tracks the internal ID of the function
+	WorkflowID uuid.UUID `json:"wID"`
+	// WorkflowVersion tracks the version of the function that was live
+	// at the time of the trigger.
+	WorkflowVersion int `json:"wv"`
 	// StaticVersion indicates whether the workflow is pinned to the
 	// given function definition over the life of the function.  If functions
 	// are deployed to their own URLs, this ensures that the endpoint we hit
 	// for the function (and therefore code) stays the same.  Note:  this is only
 	// important when we people use separate endpoints per function version.
 	StaticVersion bool `json:"s,omitempty"`
-
+	// EventID tracks the event ID that started the function.
+	EventID ulid.ULID `json:"evtID"`
+	// BatchID tracks the batch ID for the function, if the function uses batching.
+	BatchID *ulid.ULID `json:"bID,omitempty"`
 	// Key represents a unique user-defined key to be used as part of the
 	// idempotency key.  This is appended to the workflow ID and workflow
 	// version to create a full idempotency key (via the IdempotencyKey() method).

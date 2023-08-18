@@ -37,41 +37,41 @@ type History struct {
 	CompletedStepCount *int64
 	StepName           *string
 	URL                *string
-	CancelEvent        *CancelEventHistory
-	CancelUser         *CancelUserHistory
-	Sleep              *SleepHistory
-	WaitForEvent       *WaitForEventHistory
-	Result             *ResultHistory
+	CancelEvent        *CancelEvent
+	CancelUser         *CancelUser
+	Sleep              *Sleep
+	WaitForEvent       *WaitForEvent
+	Result             *Result
 }
 
-type CancelEventHistory struct {
+type CancelEvent struct {
 	EventID    ulid.ULID `json:"event_id"`
 	Expression *string   `json:"expression"`
 }
 
-type CancelUserHistory struct {
+type CancelUser struct {
 	UserID uuid.UUID `json:"user_id"`
 }
 
-type SleepHistory struct {
+type Sleep struct {
 	Datetime string `json:"datetime"`
 }
 
-type WaitForEventHistory struct {
+type WaitForEvent struct {
 	EventName  *string `json:"event_name"`
 	Expression *string `json:"expression"`
 	Timeout    int     `json:"timeout"`
 }
 
-type ResultHistory struct {
-	ErrorCode          *string             `json:"error_code"`
-	Framework          *string             `json:"framework"`
-	Output             any                 `json:"output"`
-	Platform           *string             `json:"platform"`
-	ResponseDurationMS int                 `json:"response_duration_ms"`
-	ResponseHeaders    map[string][]string `json:"response_headers"`
-	ResponseSizeBytes  int                 `json:"response_size_bytes"`
-	SDKLanguage        string              `json:"sdk_language"`
-	SDKVersion         string              `json:"sdk_version"`
-	Stack              []map[string]any    `json:"stack"`
+type Result struct {
+	ErrorCode   *string             `json:"error_code"`
+	Framework   *string             `json:"framework"`
+	Output      any                 `json:"output"`
+	Platform    *string             `json:"platform"`
+	DurationMS  int                 `json:"response_duration_ms"`
+	Headers     map[string][]string `json:"response_headers"`
+	SizeBytes   int                 `json:"response_size_bytes"`
+	SDKLanguage string              `json:"sdk_language"`
+	SDKVersion  string              `json:"sdk_version"`
+	Stack       []map[string]any    `json:"stack"`
 }

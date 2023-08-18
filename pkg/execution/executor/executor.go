@@ -99,6 +99,15 @@ func WithFailureHandler(f execution.FailureHandler) ExecutorOpt {
 	}
 }
 
+func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
+	return func(e execution.Executor) error {
+		for _, item := range l {
+			e.AddLifecycleListener(item)
+		}
+		return nil
+	}
+}
+
 func WithStepLimits(limit uint) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).steplimit = limit
@@ -219,6 +228,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	resp, idx, err := e.run(ctx, id, item, edge, s, stackIndex)
+
+	if resp.Final() && e.failureHandler != nil {
+		if err := e.failureHandler(ctx, id, s, *resp); err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error handling failure in executor fail handler")
+		}
+	}
+
 	if log != nil {
 		var (
 			l   *zerolog.Event
@@ -299,7 +315,6 @@ func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item
 	var step *inngest.Step
 	for _, s := range f.Steps {
 		if s.ID == edge.Incoming {
-			// TODO
 			step = &s
 			break
 		}
@@ -308,17 +323,21 @@ func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item
 		// This isn't fixable.
 		return nil, 0, newFinalError(fmt.Errorf("unknown vertex: %s", edge.Incoming))
 	}
+
+	for _, e := range e.lifecycles {
+		go e.OnStepStarted(ctx, id, item, edge, *step, s)
+	}
+
 	response, idx, err := e.executeStep(ctx, id, item, step, s, edge, stackIndex)
+
+	for _, e := range e.lifecycles {
+		go e.OnStepFinished(ctx, id, item, edge, *step, *response)
+	}
+
 	if err != nil {
 		return response, idx, err
 	}
 	if response.Err != nil {
-		if response.Final() && e.failureHandler != nil {
-			if err := e.failureHandler(ctx, id, s, *response); err != nil {
-				logger.From(ctx).Error().Err(err).Msg("error handling failure in executor fail handler")
-			}
-		}
-
 		// This action errored.  We've stored this in our state manager already;
 		// return the response error only.  We can use the same variable for both
 		// the response and the error to indicate an error value.
@@ -353,10 +372,6 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, item qu
 		l.Info().Str("uri", step.URI).Msg("executing action")
 	}
 
-	for _, e := range e.lifecycles {
-		go e.OnStepStarted(ctx, id, item, edge, *step, s)
-	}
-
 	if err := e.sm.Started(ctx, id, step.ID, item.Attempt); err != nil {
 		return nil, 0, fmt.Errorf("error saving started state: %w", err)
 	}
@@ -376,7 +391,21 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, item qu
 
 	// Ensure that the step is always set.  This removes the need for drivers to always
 	// set this.
-	response.Step = *step
+	if response.Step.ID == "" {
+		response.Step = *step
+	}
+
+	// This action may have executed _asynchronously_.  That is, it may have been
+	// scheduled for execution but the result is pending.  In this case we cannot
+	// traverse this node's children as we don't have the response yet.
+	//
+	// This happens when eg. a docker image takes a long time to run, and/or running
+	// the container (via a scheduler) isn't a blocking operation.
+	//
+	// XXX: We can add a state interface to indicate that the step is pending.
+	if response.Scheduled {
+		return response, 0, nil
+	}
 
 	// NOTE: We must ensure that the Step ID is overwritten for Generator steps.  Generator
 	// steps are executed many times until they stop yielding;  each execution returns a
@@ -405,18 +434,6 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, item qu
 	}
 	if len(response.Generator) > 1 {
 		return response, stackIndex, err
-	}
-
-	// This action may have executed _asynchronously_.  That is, it may have been
-	// scheduled for execution but the result is pending.  In this case we cannot
-	// traverse this node's children as we don't have the response yet.
-	//
-	// This happens when eg. a docker image takes a long time to run, and/or running
-	// the container (via a scheduler) isn't a blocking operation.
-	//
-	// XXX: We can add a state interface to indicate that the step is pending.
-	if response.Scheduled {
-		return response, 0, nil
 	}
 
 	if response.Err != nil && (!response.Retryable() || !queue.ShouldRetry(nil, item.Attempt, step.RetryCount())) {
