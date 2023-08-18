@@ -25,8 +25,9 @@ type History struct {
 	BatchID         *ulid.ULID
 	RunID           ulid.ULID
 	OriginalRunID   *ulid.ULID
-	StepID          string
-	HistoryGroupID  *uuid.UUID
+	StepID          *string
+	StepName        *string
+	GroupID         *uuid.UUID
 	IdempotencyKey  string
 	Status          *string
 
@@ -35,7 +36,6 @@ type History struct {
 
 	Attempt            int64
 	CompletedStepCount *int64
-	StepName           *string
 	URL                *string
 	CancelEvent        *CancelEvent
 	CancelUser         *CancelUser
@@ -54,7 +54,7 @@ type CancelUser struct {
 }
 
 type Sleep struct {
-	Datetime string `json:"datetime"`
+	Until time.Time `json:"until"`
 }
 
 type WaitForEvent struct {

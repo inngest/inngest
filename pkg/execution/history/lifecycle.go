@@ -56,7 +56,7 @@ func (l lifecycle) OnStepStarted(
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  id.IdempotencyKey(),
 		StepName:        &edge.Incoming,
-		StepID:          edge.Incoming, // TODO: Add step name to edge.
+		StepID:          &edge.Incoming, // TODO: Add step name to edge.
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
 		URL:             &step.URI,
@@ -87,7 +87,7 @@ func (l lifecycle) OnStepFinished(
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  id.IdempotencyKey(),
 		StepName:        &resp.Step.Name,
-		StepID:          edge.Incoming,
+		StepID:          &edge.Incoming,
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
 		URL:             &step.URI,
