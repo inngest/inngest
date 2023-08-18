@@ -41,8 +41,9 @@ jobs:
           SKIP_POSTINSTALL: 1
       - run: npm version ${{ steps.version.outputs.version }}
       - run: npm run build
-      - run: npm pack
-      - run: npm install --global ./inngest-cli-${{ steps.version.outputs.version }}.tgz
+      - name: Trigger postinstall
+        run: npm install
         env:
           DEBUG: 'inngest:*'
+      - run: npm link
       - run: inngest-cli version
