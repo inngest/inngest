@@ -14,6 +14,9 @@ jobs:
     name: Test CLI installation
     strategy:
       matrix:
+        node:
+          - 16
+          - 18
         os:
           - ubuntu-latest
           - macos-latest
@@ -23,6 +26,9 @@ jobs:
       run:
         working-directory: npm
     steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node }}
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
