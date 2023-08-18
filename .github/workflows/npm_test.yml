@@ -48,8 +48,9 @@ jobs:
       - run: npm version ${{ steps.version.outputs.version }}
       - run: npm run build
       - name: Trigger postinstall
-        run: npm install
+        run: npm install --foreground-scripts
         env:
           DEBUG: 'inngest:*'
-      - run: npm link
+      - run: npm pack
+      - run: npm install --global ./inngest-cli-${{ steps.version.outputs.version }}.tgz
       - run: inngest-cli version
