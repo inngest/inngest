@@ -4,7 +4,7 @@
   "description": "The event-driven queue for any language.",
   "license": "SEE LICENSE IN LICENSE.md",
   "scripts": {
-    "prepublishOnly": "mkdir bin && touch bin/inngest && cp ../README.md .",
+    "prepublishOnly": "touch bin/inngest && cp ../README.md .",
     "postinstall": "node postinstall.js",
     "build": "tsc"
   },

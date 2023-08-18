@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import AdmZip from "adm-zip";
 import Debug from "debug";
 import fetch, { Response } from "node-fetch";
