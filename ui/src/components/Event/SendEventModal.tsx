@@ -5,6 +5,7 @@ import { ulid } from 'ulid';
 
 import Button from '@/components/Button';
 import Modal from '@/components/Modal';
+import useModifierKey from '@/hooks/useModifierKey';
 import { usePortal } from '../../hooks/usePortal';
 import { useSendEventMutation } from '../../store/devApi';
 import { selectEvent } from '../../store/global';
@@ -197,6 +198,7 @@ export default function SendEventModal({ data, isOpen, onClose }) {
           disabled={sendEventState.isLoading}
           label="Send Event"
           btnAction={() => sendEvent()}
+          keys={[useModifierKey(), '↵']}
         />
       </div>
     </Modal>,
