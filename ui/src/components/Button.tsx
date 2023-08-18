@@ -1,5 +1,6 @@
-import classNames from '../utils/classnames';
 import React from 'react';
+
+import classNames from '../utils/classnames';
 
 interface ButtonProps {
   kind?: 'primary' | 'secondary' | 'text';
@@ -8,6 +9,7 @@ interface ButtonProps {
   disabled?: boolean;
   type?: 'submit' | 'button';
   btnAction?: (e?: React.MouseEvent) => void;
+  keys?: string[];
 }
 
 export default function Button({
@@ -17,10 +19,12 @@ export default function Button({
   btnAction,
   kind = 'primary',
   type,
+  keys,
 }: ButtonProps) {
-  
   // Replace this with alternative once we revamp the button variations
-  const iconElement = icon ? React.cloneElement(icon as React.ReactElement, { className: 'icon-xs' }) : null;
+  const iconElement = icon
+    ? React.cloneElement(icon as React.ReactElement, { className: 'icon-xs' })
+    : null;
 
   return (
     <button
@@ -36,8 +40,17 @@ export default function Button({
       onClick={btnAction}
       disabled={disabled}
     >
-      {label && label}
       {iconElement}
+      {label && label}
+      {keys && (
+        <kbd className="ml-auto flex items-center gap-1">
+          {keys.map((key, i) => (
+            <kbd className="ml-auto flex h-6 w-6 items-center justify-center rounded-sm bg-slate-700 font-sans text-xs text-slate-400">
+              {key}
+            </kbd>
+          ))}
+        </kbd>
+      )}
     </button>
   );
 }
