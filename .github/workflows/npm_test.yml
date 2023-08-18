@@ -51,6 +51,4 @@ jobs:
         run: npm install --foreground-scripts
         env:
           DEBUG: 'inngest:*'
-      - run: npm pack
-      - run: npm install --global ./inngest-cli-${{ steps.version.outputs.version }}.tgz
-      - run: inngest-cli version
+      - run: bin/inngest version
