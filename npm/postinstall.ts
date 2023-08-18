@@ -59,6 +59,9 @@ async function getBinaryUrl(): Promise<URL> {
    */
   if (platform.platform === "windows") {
     debug("Windows detected; pinning to v0.14.6");
+    console.log(
+      "Windows detected; pinning to last known working version 0.14.6"
+    );
     version = "0.14.6";
   }
 
