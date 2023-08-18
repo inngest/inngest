@@ -24,6 +24,8 @@ jobs:
         working-directory: npm
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: 'Get previous version tag'
         id: previoustag
         uses: "WyriHaximus/github-action-get-previous-tag@v1"
