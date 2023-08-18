@@ -30,6 +30,7 @@ type App struct {
 type Event struct {
 	InternalID ulid.ULID
 	EventID    string
+	EventName  string
 	EventData  string
 	EventUser  string
 	EventV     sql.NullString
@@ -50,6 +51,7 @@ type FunctionRun struct {
 	RunStartedAt    time.Time
 	FunctionID      uuid.UUID
 	FunctionVersion int64
+	TriggerType     string
 	EventID         ulid.ULID
 	BatchID         ulid.ULID
 	OriginalRunID   ulid.ULID

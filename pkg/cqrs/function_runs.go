@@ -13,6 +13,7 @@ type FunctionRun struct {
 	RunStartedAt    time.Time
 	FunctionID      uuid.UUID
 	FunctionVersion int64
+	TriggerType     string
 	EventID         ulid.ULID
 	BatchID         ulid.ULID
 	OriginalRunID   ulid.ULID
@@ -20,8 +21,13 @@ type FunctionRun struct {
 
 type FunctionRunManager interface {
 	FunctionRunWriter
+	FunctionRunReader
 }
 
 type FunctionRunWriter interface {
 	InsertFunctionRun(ctx context.Context, run FunctionRun) error
+}
+
+type FunctionRunReader interface {
+	GetFunctionRunsTimebound(ctx context.Context, t Timebound, limit int) ([]*FunctionRun, error)
 }

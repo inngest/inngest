@@ -67,8 +67,11 @@ DELETE FROM functions WHERE id IN (sqlc.slice('ids'));
 
 -- name: InsertFunctionRun :exec
 INSERT INTO function_runs
-	(run_id, run_started_at, function_id, function_version, event_id, batch_id, original_run_id) VALUES
-	(?, ?, ?, ?, ?, ?, ?);
+	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: GetFunctionRunsTimebound :many
+SELECT * FROM function_runs WHERE run_started_at >= @before AND run_started_at < @after LIMIT ?;
 
 --
 -- Events
@@ -76,11 +79,14 @@ INSERT INTO function_runs
 
 -- name: InsertEvent :exec
 INSERT INTO events
-	(internal_id, event_id, event_data, event_user, event_v, event_ts) VALUES
-	(?, ?, ?, ?, ?, ?);
+	(internal_id, event_id, event_name, event_data, event_user, event_v, event_ts) VALUES
+	(?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetEventByInternalID :one
 SELECT * FROM events WHERE internal_id = ?;
+
+-- name: GetEventsTimebound :many
+SELECT * FROM events WHERE event_ts > @after AND event_ts <= @before ORDER BY event_ts DESC LIMIT ?;
 
 --
 -- History

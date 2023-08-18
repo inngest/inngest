@@ -112,6 +112,20 @@ type StepEventWait struct {
 	ExpiryTime time.Time `json:"expiryTime"`
 }
 
+type StreamItem struct {
+	ID        string         `json:"id"`
+	Trigger   string         `json:"trigger"`
+	Type      StreamType     `json:"type"`
+	CreatedAt time.Time      `json:"createdAt"`
+	Runs      []*FunctionRun `json:"runs,omitempty"`
+}
+
+type StreamQuery struct {
+	After  *time.Time `json:"after,omitempty"`
+	Before *time.Time `json:"before,omitempty"`
+	Limit  int        `json:"limit"`
+}
+
 type UpdateAppInput struct {
 	ID  string `json:"id"`
 	URL string `json:"url"`
@@ -347,5 +361,46 @@ func (e *StepEventType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e StepEventType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type StreamType string
+
+const (
+	StreamTypeEvent StreamType = "EVENT"
+	StreamTypeCron  StreamType = "CRON"
+)
+
+var AllStreamType = []StreamType{
+	StreamTypeEvent,
+	StreamTypeCron,
+}
+
+func (e StreamType) IsValid() bool {
+	switch e {
+	case StreamTypeEvent, StreamTypeCron:
+		return true
+	}
+	return false
+}
+
+func (e StreamType) String() string {
+	return string(e)
+}
+
+func (e *StreamType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = StreamType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid StreamType", str)
+	}
+	return nil
+}
+
+func (e StreamType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }

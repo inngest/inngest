@@ -28,6 +28,7 @@ CREATE TABLE functions (
 CREATE TABLE events (
 	internal_id BLOB, -- cannot use CHAR(26) for ulids, nor primary keys for null ter
 	event_id VARCHAR NOT NULL,
+	event_name VARCHAR NOT NULL,
 	event_data VARCHAR DEFAULT '{}' NOT NULL,
 	event_user VARCHAR DEFAULT '{}' NOT NULL,
 	event_v VARCHAR,
@@ -39,6 +40,7 @@ CREATE TABLE function_runs (
 	run_started_at TIMESTAMP NOT NULL DEFAULT NOW(),
 	function_id UUID,
 	function_version INT NOT NULL,
+	trigger_type VARCHAR NOT NULL DEFAULT 'event', -- or 'cron' if this is a cron-based function.
 	event_id BLOB NOT NULL, 
 	batch_id BLOB, 
 	original_run_id BLOB

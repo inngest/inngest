@@ -58,7 +58,6 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 			Valid:  true,
 			String: *h.URL,
 		}
-
 	}
 
 	params.Sleep, err = marshalJSONAsNullString(h.Sleep)

@@ -55,4 +55,5 @@ type EventWriter interface {
 
 type EventReader interface {
 	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*Event, error)
+	GetEventsTimebound(ctx context.Context, t Timebound, limit int) ([]*Event, error)
 }

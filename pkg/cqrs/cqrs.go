@@ -3,6 +3,7 @@ package cqrs
 import (
 	"context"
 	"database/sql"
+	"time"
 )
 
 // DBWriter can be a *sql.DB or an *sql.TX, and is needed to allow
@@ -32,4 +33,11 @@ type TxManager interface {
 
 	Commit(context.Context) error
 	Rollback(context.Context) error
+}
+
+type Timebound struct {
+	// After is the lower bound to load data from, exclusive.
+	After *time.Time `json:"after,omitempty"`
+	// Before is the upper bound to load data from, inclusive
+	Before *time.Time `json:"before,omitempty"`
 }

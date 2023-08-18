@@ -497,11 +497,17 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		return err
 	}
 
+	triggerType := "event"
+	if evt.Event().Name == "inngest/scheduled.timer" {
+		triggerType = "cron"
+	}
+
 	return s.cqrs.InsertFunctionRun(ctx, cqrs.FunctionRun{
 		RunID:        id.RunID,
 		RunStartedAt: ulid.Time(id.RunID.Time()),
 		FunctionID:   fn.ID,
 		EventID:      evt.InternalID(),
+		TriggerType:  triggerType,
 	})
 }
 

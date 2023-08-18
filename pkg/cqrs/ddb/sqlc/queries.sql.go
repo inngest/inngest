@@ -239,7 +239,7 @@ func (q *Queries) GetApps(ctx context.Context) ([]*App, error) {
 }
 
 const getEventByInternalID = `-- name: GetEventByInternalID :one
-SELECT internal_id, event_id, event_data, event_user, event_v, event_ts FROM events WHERE internal_id = ?
+SELECT internal_id, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id = ?
 `
 
 func (q *Queries) GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*Event, error) {
@@ -248,12 +248,54 @@ func (q *Queries) GetEventByInternalID(ctx context.Context, internalID ulid.ULID
 	err := row.Scan(
 		&i.InternalID,
 		&i.EventID,
+		&i.EventName,
 		&i.EventData,
 		&i.EventUser,
 		&i.EventV,
 		&i.EventTs,
 	)
 	return &i, err
+}
+
+const getEventsTimebound = `-- name: GetEventsTimebound :many
+SELECT internal_id, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE event_ts > ? AND event_ts <= ? ORDER BY event_ts DESC LIMIT ?
+`
+
+type GetEventsTimeboundParams struct {
+	After  time.Time
+	Before time.Time
+	Limit  int64
+}
+
+func (q *Queries) GetEventsTimebound(ctx context.Context, arg GetEventsTimeboundParams) ([]*Event, error) {
+	rows, err := q.db.QueryContext(ctx, getEventsTimebound, arg.After, arg.Before, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Event
+	for rows.Next() {
+		var i Event
+		if err := rows.Scan(
+			&i.InternalID,
+			&i.EventID,
+			&i.EventName,
+			&i.EventData,
+			&i.EventUser,
+			&i.EventV,
+			&i.EventTs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getFunctionByID = `-- name: GetFunctionByID :one
@@ -272,6 +314,48 @@ func (q *Queries) GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function,
 		&i.CreatedAt,
 	)
 	return &i, err
+}
+
+const getFunctionRunsTimebound = `-- name: GetFunctionRunsTimebound :many
+SELECT run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id FROM function_runs WHERE run_started_at >= ? AND run_started_at < ? LIMIT ?
+`
+
+type GetFunctionRunsTimeboundParams struct {
+	Before time.Time
+	After  time.Time
+	Limit  int64
+}
+
+func (q *Queries) GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionRunsTimeboundParams) ([]*FunctionRun, error) {
+	rows, err := q.db.QueryContext(ctx, getFunctionRunsTimebound, arg.Before, arg.After, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*FunctionRun
+	for rows.Next() {
+		var i FunctionRun
+		if err := rows.Scan(
+			&i.RunID,
+			&i.RunStartedAt,
+			&i.FunctionID,
+			&i.FunctionVersion,
+			&i.TriggerType,
+			&i.EventID,
+			&i.BatchID,
+			&i.OriginalRunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getFunctions = `-- name: GetFunctions :many
@@ -370,13 +454,14 @@ func (q *Queries) InsertApp(ctx context.Context, arg InsertAppParams) (*App, err
 const insertEvent = `-- name: InsertEvent :exec
 
 INSERT INTO events
-	(internal_id, event_id, event_data, event_user, event_v, event_ts) VALUES
-	(?, ?, ?, ?, ?, ?)
+	(internal_id, event_id, event_name, event_data, event_user, event_v, event_ts) VALUES
+	(?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertEventParams struct {
 	InternalID ulid.ULID
 	EventID    string
+	EventName  string
 	EventData  string
 	EventUser  string
 	EventV     sql.NullString
@@ -388,6 +473,7 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error 
 	_, err := q.db.ExecContext(ctx, insertEvent,
 		arg.InternalID,
 		arg.EventID,
+		arg.EventName,
 		arg.EventData,
 		arg.EventUser,
 		arg.EventV,
@@ -440,8 +526,8 @@ func (q *Queries) InsertFunction(ctx context.Context, arg InsertFunctionParams) 
 const insertFunctionRun = `-- name: InsertFunctionRun :exec
 
 INSERT INTO function_runs
-	(run_id, run_started_at, function_id, function_version, event_id, batch_id, original_run_id) VALUES
-	(?, ?, ?, ?, ?, ?, ?)
+	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertFunctionRunParams struct {
@@ -449,6 +535,7 @@ type InsertFunctionRunParams struct {
 	RunStartedAt    time.Time
 	FunctionID      uuid.UUID
 	FunctionVersion int64
+	TriggerType     string
 	EventID         ulid.ULID
 	BatchID         ulid.ULID
 	OriginalRunID   ulid.ULID
@@ -461,6 +548,7 @@ func (q *Queries) InsertFunctionRun(ctx context.Context, arg InsertFunctionRunPa
 		arg.RunStartedAt,
 		arg.FunctionID,
 		arg.FunctionVersion,
+		arg.TriggerType,
 		arg.EventID,
 		arg.BatchID,
 		arg.OriginalRunID,

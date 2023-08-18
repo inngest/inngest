@@ -137,6 +137,7 @@ type ComplexityRoot struct {
 		FunctionRun  func(childComplexity int, query models.FunctionRunQuery) int
 		FunctionRuns func(childComplexity int, query models.FunctionRunsQuery) int
 		Functions    func(childComplexity int) int
+		Stream       func(childComplexity int, query models.StreamQuery) int
 	}
 
 	StepEvent struct {
@@ -154,6 +155,14 @@ type ComplexityRoot struct {
 		EventName  func(childComplexity int) int
 		ExpiryTime func(childComplexity int) int
 		Expression func(childComplexity int) int
+	}
+
+	StreamItem struct {
+		CreatedAt func(childComplexity int) int
+		ID        func(childComplexity int) int
+		Runs      func(childComplexity int) int
+		Trigger   func(childComplexity int) int
+		Type      func(childComplexity int) int
 	}
 
 	Workspace struct {
@@ -192,6 +201,7 @@ type MutationResolver interface {
 }
 type QueryResolver interface {
 	Apps(ctx context.Context) ([]*cqrs.App, error)
+	Stream(ctx context.Context, query models.StreamQuery) ([]*models.StreamItem, error)
 	Event(ctx context.Context, query models.EventQuery) (*models.Event, error)
 	Events(ctx context.Context, query models.EventsQuery) ([]*models.Event, error)
 	Functions(ctx context.Context) ([]*models.Function, error)
@@ -683,6 +693,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Functions(childComplexity), true
 
+	case "Query.stream":
+		if e.complexity.Query.Stream == nil {
+			break
+		}
+
+		args, err := ec.field_Query_stream_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Stream(childComplexity, args["query"].(models.StreamQuery)), true
+
 	case "StepEvent.createdAt":
 		if e.complexity.StepEvent.CreatedAt == nil {
 			break
@@ -760,6 +782,41 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.StepEventWait.Expression(childComplexity), true
 
+	case "StreamItem.createdAt":
+		if e.complexity.StreamItem.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.StreamItem.CreatedAt(childComplexity), true
+
+	case "StreamItem.id":
+		if e.complexity.StreamItem.ID == nil {
+			break
+		}
+
+		return e.complexity.StreamItem.ID(childComplexity), true
+
+	case "StreamItem.runs":
+		if e.complexity.StreamItem.Runs == nil {
+			break
+		}
+
+		return e.complexity.StreamItem.Runs(childComplexity), true
+
+	case "StreamItem.trigger":
+		if e.complexity.StreamItem.Trigger == nil {
+			break
+		}
+
+		return e.complexity.StreamItem.Trigger(childComplexity), true
+
+	case "StreamItem.type":
+		if e.complexity.StreamItem.Type == nil {
+			break
+		}
+
+		return e.complexity.StreamItem.Type(childComplexity), true
+
 	case "Workspace.id":
 		if e.complexity.Workspace.ID == nil {
 			break
@@ -781,6 +838,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputEventsQuery,
 		ec.unmarshalInputFunctionRunQuery,
 		ec.unmarshalInputFunctionRunsQuery,
+		ec.unmarshalInputStreamQuery,
 		ec.unmarshalInputUpdateAppInput,
 	)
 	first := true
@@ -860,6 +918,8 @@ input UpdateAppInput {
 	{Name: "../gql.query.graphql", Input: `type Query {
   apps: [App!]!
 
+  stream(query: StreamQuery!): [StreamItem!]!
+
   # Get an individual event
   event(query: EventQuery!): Event
 
@@ -900,6 +960,18 @@ input FunctionRunQuery {
 input FunctionRunsQuery {
   workspaceId: ID! = "local"
 }
+
+input StreamQuery {
+  # This allows you to query for items after a specific time.  If
+  # not provided this defaults to the most recent items in the stream,
+  # eg now.
+  after: Time
+  # Before allows you to receive items in a stream before a specific time.
+  # This is useful as you can add the last stream item's time as the before
+  # field, ensuring that only new items are received.
+  before: Time
+  limit: Int! = 20
+}
 `, BuiltIn: false},
 	{Name: "../gql.schema.graphql", Input: `scalar Time
 
@@ -910,6 +982,19 @@ scalar Environment
 
 type Workspace {
   id: ID!
+}
+
+type StreamItem {
+  id: ID!
+  trigger: String! # Event name or cron
+  type: StreamType!
+  createdAt: Time!
+  runs: [FunctionRun]
+}
+
+enum StreamType {
+  EVENT
+  CRON
 }
 
 type FunctionVersion {
@@ -1181,6 +1266,21 @@ func (ec *executionContext) field_Query_functionRuns_args(ctx context.Context, r
 	if tmp, ok := rawArgs["query"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("query"))
 		arg0, err = ec.unmarshalNFunctionRunsQuery2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRunsQuery(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["query"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_stream_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 models.StreamQuery
+	if tmp, ok := rawArgs["query"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("query"))
+		arg0, err = ec.unmarshalNStreamQuery2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStreamQuery(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -3862,6 +3962,73 @@ func (ec *executionContext) fieldContext_Query_apps(ctx context.Context, field g
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_stream(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_stream(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Stream(rctx, fc.Args["query"].(models.StreamQuery))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.StreamItem)
+	fc.Result = res
+	return ec.marshalNStreamItem2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStreamItemᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_stream(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_StreamItem_id(ctx, field)
+			case "trigger":
+				return ec.fieldContext_StreamItem_trigger(ctx, field)
+			case "type":
+				return ec.fieldContext_StreamItem_type(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_StreamItem_createdAt(ctx, field)
+			case "runs":
+				return ec.fieldContext_StreamItem_runs(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type StreamItem", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_stream_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_event(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_event(ctx, field)
 	if err != nil {
@@ -4825,6 +4992,243 @@ func (ec *executionContext) fieldContext_StepEventWait_expiryTime(ctx context.Co
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StreamItem_id(ctx context.Context, field graphql.CollectedField, obj *models.StreamItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StreamItem_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StreamItem_id(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StreamItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StreamItem_trigger(ctx context.Context, field graphql.CollectedField, obj *models.StreamItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StreamItem_trigger(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Trigger, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StreamItem_trigger(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StreamItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StreamItem_type(ctx context.Context, field graphql.CollectedField, obj *models.StreamItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StreamItem_type(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Type, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(models.StreamType)
+	fc.Result = res
+	return ec.marshalNStreamType2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStreamType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StreamItem_type(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StreamItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type StreamType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StreamItem_createdAt(ctx context.Context, field graphql.CollectedField, obj *models.StreamItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StreamItem_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StreamItem_createdAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StreamItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StreamItem_runs(ctx context.Context, field graphql.CollectedField, obj *models.StreamItem) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StreamItem_runs(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Runs, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*models.FunctionRun)
+	fc.Result = res
+	return ec.marshalOFunctionRun2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRun(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StreamItem_runs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StreamItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_FunctionRun_id(ctx, field)
+			case "name":
+				return ec.fieldContext_FunctionRun_name(ctx, field)
+			case "workspace":
+				return ec.fieldContext_FunctionRun_workspace(ctx, field)
+			case "status":
+				return ec.fieldContext_FunctionRun_status(ctx, field)
+			case "waitingFor":
+				return ec.fieldContext_FunctionRun_waitingFor(ctx, field)
+			case "pendingSteps":
+				return ec.fieldContext_FunctionRun_pendingSteps(ctx, field)
+			case "startedAt":
+				return ec.fieldContext_FunctionRun_startedAt(ctx, field)
+			case "timeline":
+				return ec.fieldContext_FunctionRun_timeline(ctx, field)
+			case "event":
+				return ec.fieldContext_FunctionRun_event(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FunctionRun", field.Name)
 		},
 	}
 	return fc, nil
@@ -6871,6 +7275,54 @@ func (ec *executionContext) unmarshalInputFunctionRunsQuery(ctx context.Context,
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputStreamQuery(ctx context.Context, obj interface{}) (models.StreamQuery, error) {
+	var it models.StreamQuery
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	if _, present := asMap["limit"]; !present {
+		asMap["limit"] = 20
+	}
+
+	fieldsInOrder := [...]string{"after", "before", "limit"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "after":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("after"))
+			it.After, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "before":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("before"))
+			it.Before, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "limit":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+			it.Limit, err = ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputUpdateAppInput(ctx context.Context, obj interface{}) (models.UpdateAppInput, error) {
 	var it models.UpdateAppInput
 	asMap := map[string]interface{}{}
@@ -7660,6 +8112,29 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
+		case "stream":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_stream(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
 		case "event":
 			field := field
 
@@ -7861,6 +8336,59 @@ func (ec *executionContext) _StepEventWait(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var streamItemImplementors = []string{"StreamItem"}
+
+func (ec *executionContext) _StreamItem(ctx context.Context, sel ast.SelectionSet, obj *models.StreamItem) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, streamItemImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StreamItem")
+		case "id":
+
+			out.Values[i] = ec._StreamItem_id(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "trigger":
+
+			out.Values[i] = ec._StreamItem_trigger(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "type":
+
+			out.Values[i] = ec._StreamItem_type(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "createdAt":
+
+			out.Values[i] = ec._StreamItem_createdAt(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "runs":
+
+			out.Values[i] = ec._StreamItem_runs(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8465,6 +8993,75 @@ func (ec *executionContext) marshalNInt2uint(ctx context.Context, sel ast.Select
 	return res
 }
 
+func (ec *executionContext) marshalNStreamItem2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStreamItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.StreamItem) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNStreamItem2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStreamItem(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNStreamItem2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStreamItem(ctx context.Context, sel ast.SelectionSet, v *models.StreamItem) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._StreamItem(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNStreamQuery2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStreamQuery(ctx context.Context, v interface{}) (models.StreamQuery, error) {
+	res, err := ec.unmarshalInputStreamQuery(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNStreamType2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStreamType(ctx context.Context, v interface{}) (models.StreamType, error) {
+	var res models.StreamType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNStreamType2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStreamType(ctx context.Context, sel ast.SelectionSet, v models.StreamType) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -8910,6 +9507,47 @@ func (ec *executionContext) marshalOFunctionEventType2ᚖgithubᚗcomᚋinngest�
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOFunctionRun2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRun(ctx context.Context, sel ast.SelectionSet, v []*models.FunctionRun) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOFunctionRun2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRun(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	return ret
 }
 
 func (ec *executionContext) marshalOFunctionRun2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRunᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.FunctionRun) graphql.Marshaler {

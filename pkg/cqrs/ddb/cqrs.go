@@ -237,6 +237,7 @@ func (w wrapper) InsertEvent(ctx context.Context, e cqrs.Event) error {
 	evt := sqlc.InsertEventParams{
 		InternalID: e.ID,
 		EventID:    e.EventID,
+		EventName:  e.EventName,
 		EventData:  string(data),
 		EventUser:  string(user),
 		EventV: sql.NullString{
@@ -245,7 +246,6 @@ func (w wrapper) InsertEvent(ctx context.Context, e cqrs.Event) error {
 		},
 		EventTs: time.UnixMilli(e.EventTS),
 	}
-
 	return w.q.InsertEvent(ctx, evt)
 }
 
@@ -257,11 +257,39 @@ func (w wrapper) GetEventByInternalID(ctx context.Context, internalID ulid.ULID)
 	evt := convertEvent(obj)
 	return &evt, nil
 }
+func (w wrapper) GetEventsTimebound(ctx context.Context, t cqrs.Timebound, limit int) ([]*cqrs.Event, error) {
+	after := time.Time{}                           // after the beginning of time, eg all
+	before := time.Now().Add(time.Hour * 24 * 365) // before 1 year in the future, eg all
+	if t.After != nil {
+		after = *t.After
+	}
+	if t.Before != nil {
+		before = *t.Before
+	}
+
+	evts, err := w.q.GetEventsTimebound(ctx, sqlc.GetEventsTimeboundParams{
+		After:  after,
+		Before: before,
+		Limit:  int64(limit),
+	})
+	if err != nil {
+		return []*cqrs.Event{}, err
+	}
+
+	var res = make([]*cqrs.Event, len(evts))
+	for n, i := range evts {
+		e := convertEvent(i)
+		fmt.Println("QUERY", e)
+		res[n] = &e
+	}
+	return res, nil
+}
 
 func convertEvent(obj *sqlc.Event) cqrs.Event {
 	evt := &cqrs.Event{
 		ID:           obj.InternalID,
 		EventID:      obj.EventID,
+		EventName:    obj.EventName,
 		EventVersion: obj.EventV.String,
 		EventTS:      obj.EventTs.UnixMilli(),
 		EventData:    map[string]any{},
@@ -283,6 +311,29 @@ func (w wrapper) InsertFunctionRun(ctx context.Context, e cqrs.FunctionRun) erro
 	}
 	return w.q.InsertFunctionRun(ctx, run)
 }
+
+func (w wrapper) GetFunctionRunsTimebound(ctx context.Context, t cqrs.Timebound, limit int) ([]*cqrs.FunctionRun, error) {
+	after := time.Time{}                           // after the beginning of time, eg all
+	before := time.Now().Add(time.Hour * 24 * 365) // before 1 year in the future, eg all
+	if t.After != nil {
+		after = *t.After
+	}
+	if t.Before != nil {
+		before = *t.Before
+	}
+
+	return copyInto(ctx, func(ctx context.Context) ([]*sqlc.FunctionRun, error) {
+		return w.q.GetFunctionRunsTimebound(ctx, sqlc.GetFunctionRunsTimeboundParams{
+			Before: before,
+			After:  after,
+			Limit:  int64(limit),
+		})
+	}, []*cqrs.FunctionRun{})
+}
+
+//
+// History
+//
 
 func (w wrapper) InsertHistory(ctx context.Context, h history.History) error {
 	params, err := convertHistoryToWriter(h)
