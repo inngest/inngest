@@ -152,7 +152,6 @@ func (s *svc) getFailureHandler(ctx context.Context) (func(context.Context, stat
 func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
 	return s.queue.Run(ctx, func(ctx context.Context, item queue.Item) error {
-		logger.From(ctx).Info().Interface("item", item).Msg("processing queue item")
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()
@@ -188,37 +187,6 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	}
 	edge := payload.Edge
 
-	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
-	// that child;  we don't need to handle the trigger individually.
-	//
-	// This cuts down on queue churn.
-	if edge.Incoming == inngest.TriggerName {
-		// Load the step for the function and immediately execute.
-		// XXX: Refactor this;  holdover from both generator and DAG based approach used to
-		// allow > 1 step from the trigger.
-		runstate, err := s.state.Load(ctx, item.Identifier.RunID)
-		if err != nil {
-			return fmt.Errorf("unable to load function run: %w", err)
-		}
-		children, err := state.DefaultEdgeEvaluator.AvailableChildren(ctx, runstate, edge.Incoming)
-		if err != nil {
-			return fmt.Errorf("unable to evaluate available next steps: %w", err)
-		}
-		if len(children) == 1 && (children[0].Edge.Metadata == nil || children[0].Edge.Metadata.Wait == nil) {
-			// Directly call the child instead of re-enqueueing a next step.
-			edge = children[0].Edge
-			// Update the payload
-			payload := item.Payload.(queue.PayloadEdge)
-			payload.Edge = edge
-			item.Payload = payload
-			// Add retries from the step to our queue item
-			retries := children[0].Step.RetryCount()
-			item.MaxAttempts = &retries
-		}
-	}
-
-	l.Info().Interface("payload", payload).Msg("processing step")
-
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
@@ -238,12 +206,11 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		}
 	}
 
-	resp, _, err := s.exec.Execute(ctx, item.Identifier, item, edge, stackIdx)
+	resp, err := s.exec.Execute(ctx, item.Identifier, item, edge, stackIdx)
 
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
 	if err == state.ErrFunctionCancelled {
-		_ = s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt)
 		return nil
 	}
 

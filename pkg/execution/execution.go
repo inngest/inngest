@@ -58,7 +58,7 @@ type Executor interface {
 	// Execution will fail with no response and state.ErrFunctionCancelled if this function
 	// run has been cancelled by an external event or process.
 	//
-	// This returns the step's response, the current stack pointer index, and any error.
+	// This returns the step's response and any error.
 	Execute(
 		ctx context.Context,
 		id state.Identifier,
@@ -73,7 +73,7 @@ type Executor interface {
 		// This lets SDKs correctly evaluate parallelism by replaying generated steps in the
 		// right order.
 		stackIndex int,
-	) (*state.DriverResponse, int, error)
+	) (*state.DriverResponse, error)
 
 	// HandleGeneratorResponse handles all generator responses.
 	HandleGeneratorResponse(ctx context.Context, gen []*state.GeneratorOpcode, item queue.Item) error
@@ -105,65 +105,4 @@ type CancelRequest struct {
 type ResumeRequest struct {
 	With    any
 	EventID *ulid.ULID
-}
-
-// LifecycleListener listens to lifecycle events on the executor.
-type LifecycleListener interface {
-	// Close closes the listener and flushes any pending writes.
-	Close() error
-
-	OnStepStarted(
-		context.Context,
-		state.Identifier,
-		queue.Item,
-		inngest.Edge,
-		inngest.Step,
-		state.State,
-	)
-
-	OnStepFinished(
-		context.Context,
-		state.Identifier,
-		queue.Item,
-		inngest.Edge,
-		inngest.Step,
-		state.DriverResponse,
-	)
-
-	OnWaitForEvent(
-		context.Context,
-		state.Identifier,
-		queue.Item,
-		state.GeneratorOpcode,
-	)
-}
-
-type NoopLifecyceListener struct{}
-
-func (NoopLifecyceListener) OnStepStarted(
-	ctx context.Context,
-	id state.Identifier,
-	item queue.Item,
-	edge inngest.Edge,
-	step inngest.Step,
-	state state.State,
-) {
-}
-
-func (NoopLifecyceListener) OnStepFinished(
-	context.Context,
-	state.Identifier,
-	queue.Item,
-	inngest.Step,
-	*state.DriverResponse,
-	error,
-) {
-}
-
-func (NoopLifecyceListener) OnWaitForEvent(
-	context.Context,
-	state.Identifier,
-	queue.Item,
-	state.GeneratorOpcode,
-) {
 }

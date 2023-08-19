@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -19,7 +18,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -167,42 +165,57 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 }
 
 // Execute loads a workflow and the current run state, then executes the
-// workflow via an executor.
-func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, stackIndex int) (*state.DriverResponse, int, error) {
-	var log *zerolog.Logger
+// function's step via the necessary driver.
+func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, stackIndex int) (*state.DriverResponse, error) {
+	if e.fl == nil {
+		return nil, fmt.Errorf("no function loader specified running step")
+	}
 
 	s, err := e.sm.Load(ctx, id.RunID)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	md := s.Metadata()
 
 	if md.Status == enums.RunStatusCancelled {
-		return nil, 0, state.ErrFunctionCancelled
+		return nil, state.ErrFunctionCancelled
 	}
 
 	if e.steplimit != 0 && len(s.Actions()) >= int(e.steplimit) {
 		// Update this function's state to overflowed, if running.
 		if md.Status == enums.RunStatusRunning {
+			// XXX: Update error to failed, set error message
 			if err := e.sm.SetStatus(ctx, id, enums.RunStatusOverflowed); err != nil {
-				return nil, 0, err
+				return nil, err
 			}
 		}
-		return nil, 0, state.ErrFunctionOverflowed
+		return nil, state.ErrFunctionOverflowed
 	}
 
-	if e.log != nil {
-		l := e.log.With().
-			Str("run_id", id.RunID.String()).
-			Interface("edge", edge).
-			Str("step", edge.Incoming).
-			Str("fn_name", s.Function().Name).
-			Str("fn_id", s.Function().ID.String()).
-			Int("attempt", item.Attempt).
-			Logger()
-		log = &l
-		log.Debug().Msg("executing step")
+	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
+	// that child;  we don't need to handle the trigger individually.
+	//
+	// This cuts down on queue churn.
+	if edge.Incoming == inngest.TriggerName {
+		f, err := e.fl.LoadFunction(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("error loading function for run: %w", err)
+		}
+		// We only support functions with a single step, as we've removed the DAG based approach.
+		// This means that we always execute the first step.
+		if len(f.Steps) > 1 {
+			return nil, fmt.Errorf("DAG-based steps are no longer supported")
+		}
+		edge.Outgoing = inngest.TriggerName
+		edge.Incoming = f.Steps[0].ID
+		// Update the payload
+		payload := item.Payload.(queue.PayloadEdge)
+		payload.Edge = edge
+		item.Payload = payload
+		// Add retries from the step to our queue item
+		retries := f.Steps[0].RetryCount()
+		item.MaxAttempts = &retries
 	}
 
 	// This could have been retried due to a state load error after
@@ -212,94 +225,44 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// To fix this particular consistency issue, always check to see
 	// if there's output stored for this action ID.
 	if resp, _ := s.ActionID(edge.Incoming); resp != nil {
-		if log != nil {
-			log.Warn().Msg("step already executed")
-		}
-
-		// Get the index from the previous save.
-		idx, _ := e.sm.StackIndex(ctx, id.RunID, edge.Incoming)
-
 		// This has already successfully been executed.
 		return &state.DriverResponse{
 			Scheduled: false,
 			Output:    resp,
 			Err:       nil,
-		}, idx, nil
+		}, nil
 	}
 
-	resp, idx, err := e.run(ctx, id, item, edge, s, stackIndex)
+	resp, err := e.run(ctx, id, item, edge, s, stackIndex)
 
-	if resp.Final() && e.failureHandler != nil {
-		if err := e.failureHandler(ctx, id, s, *resp); err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error handling failure in executor fail handler")
+	if resp == nil && err == nil {
+		// Sanity checking.  This can never happen
+		return nil, fmt.Errorf("unknown error occurred")
+	}
+
+	if resp != nil && resp.Err != nil && !resp.Retryable() {
+		// This step permanently failed.
+		if ferr := e.failureHandler(ctx, id, s, *resp); ferr != nil {
+			_ = ferr
 		}
 	}
 
-	if log != nil {
-		var (
-			l   *zerolog.Event
-			msg string
-		)
-		// We want a different log level depending on whether this step
-		// errored.
-		if err == nil {
-			l = log.Debug()
-			msg = "executed step"
-		} else {
-			retryable := true
-			if resp != nil {
-				retryable = resp.Retryable()
-			}
-			l = log.Warn().Err(err).Bool("retryable", retryable)
-			msg = "error executing step"
-		}
-		l.Str("run_id", id.RunID.String()).Str("step", edge.Incoming).Msg(msg)
-
-		if resp != nil {
-			// Log the output separately, highlighting it with
-			// a different caller.  This lets users scan for
-			// output easily, and if we build a TUI to filter on
-			// caller to show only step outputs, etc.
-			log.Info().
-				Str("caller", "output").
-				Interface("generator", resp.Generator).
-				Interface("output", resp.Output).
-				Str("run_id", id.RunID.String()).
-				Str("step", edge.Incoming).
-				Msg("step output")
-		}
-	}
-
-	if err != nil {
-		// This is likely a state.DriverResponse, which itself includes
-		// whether the action can be retried based off of the output.
-		//
-		// The runner is responsible for scheduling jobs and will check
-		// whether the action can be retried.
-		return resp, idx, err
-	}
-
-	return resp, idx, nil
+	// The runner is responsible for scheduling jobs and will check
+	// whether the action can be retried.
+	//
+	// Retries are a native aspect of the queue;  returning errors always
+	// retries steps if possible.
+	return resp, err
 }
 
 // run executes the step with the given step ID.
-func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, s state.State, stackIndex int) (*state.DriverResponse, int, error) {
-	var (
-		response *state.DriverResponse
-		err      error
-	)
-
-	if e.fl == nil {
-		return nil, 0, fmt.Errorf("no function loader specified running step")
-	}
-
-	if edge.Incoming == inngest.TriggerName {
-		return nil, 0, nil
-	}
-
+//
+// A nil response with an error indicates that an internal error occurred and the step
+// did not run.
+func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, s state.State, stackIndex int) (*state.DriverResponse, error) {
 	f, err := e.fl.LoadFunction(ctx, id)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error loading function for run: %w", err)
+		return nil, fmt.Errorf("error loading function for run: %w", err)
 	}
 
 	var step *inngest.Step
@@ -310,122 +273,67 @@ func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item
 		}
 	}
 	if step == nil {
-		// This isn't fixable.
-		return nil, 0, newFinalError(fmt.Errorf("unknown vertex: %s", edge.Incoming))
+		// Sanity check we've enqueued the right step.
+		return nil, newFinalError(fmt.Errorf("unknown vertex: %s", edge.Incoming))
 	}
 
 	for _, e := range e.lifecycles {
 		go e.OnStepStarted(ctx, id, item, edge, *step, s)
 	}
 
-	response, idx, err := e.executeStep(ctx, id, item, step, s, edge, stackIndex)
+	// Execute the actual step.
+	response, err := e.executeDriverForStep(ctx, id, item, step, s, edge, stackIndex)
 
 	for _, e := range e.lifecycles {
 		go e.OnStepFinished(ctx, id, item, edge, *step, *response)
 	}
 
-	if err != nil {
-		return response, idx, err
+	if response.Err != nil && err == nil {
+		// This step errored, so always return an error.
+		return response, fmt.Errorf("%s", *response.Err)
 	}
-	if response.Err != nil {
-		// This action errored.  We've stored this in our state manager already;
-		// return the response error only.  We can use the same variable for both
-		// the response and the error to indicate an error value.
-		return response, idx, fmt.Errorf("%s", *response.Err)
-	}
-	if response.Scheduled {
-		// This action is not yet complete, so we can't traverse
-		// its children.  We assume that the driver is responsible for
-		// retrying and coordinating async state here;  the executor's
-		// job is to execute the action only.
-		return response, idx, nil
-	}
-
-	return response, idx, err
+	return response, err
 }
 
-func (e *executor) executeStep(ctx context.Context, id state.Identifier, item queue.Item, step *inngest.Step, s state.State, edge inngest.Edge, stackIndex int) (*state.DriverResponse, int, error) {
-	var l *zerolog.Logger
-	if e.log != nil {
-		log := e.log.With().
-			Str("run_id", id.RunID.String()).
-			Logger()
-		l = &log
-	}
-
+// executeDriverForStep runs the enqueued step by invoking the driver.  It also inspects
+// and normalizes responses (eg. max retry attempts).
+func (e *executor) executeDriverForStep(ctx context.Context, id state.Identifier, item queue.Item, step *inngest.Step, s state.State, edge inngest.Edge, stackIndex int) (*state.DriverResponse, error) {
 	d, ok := e.runtimeDrivers[step.Driver()]
 	if !ok {
-		return nil, 0, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, step.Driver())
+		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, step.Driver())
 	}
 
-	if l != nil {
-		l.Info().Str("uri", step.URI).Msg("executing action")
-	}
-
+	// TODO: Remove.  This is unnecessary.
 	if err := e.sm.Started(ctx, id, step.ID, item.Attempt); err != nil {
-		return nil, 0, fmt.Errorf("error saving started state: %w", err)
+		return nil, fmt.Errorf("error saving started state: %w", err)
 	}
 
 	response, err := d.Execute(ctx, s, edge, *step, stackIndex, item.Attempt)
 	if response == nil {
-		// Add an error response here.
 		response = &state.DriverResponse{
 			Step: *step,
 		}
 	}
 	if err != nil && response.Err == nil {
-		// Set the response error
+		// Set the response error if it wasn't set, or if Execute had an internal error.
+		// This ensures that we only ever need to check resp.Err to handle errors.
 		errstr := err.Error()
 		response.Err = &errstr
 	}
-
 	// Ensure that the step is always set.  This removes the need for drivers to always
 	// set this.
 	if response.Step.ID == "" {
 		response.Step = *step
 	}
 
-	if len(response.Generator) > 0 {
-		// Already handled.
-		return response, 0, nil
+	// Max attempts is encoded at the queue level from step configuration.  If we're at max attempts,
+	// ensure the response's NoRetry flag is set, as we shouldn't retry any more.  This also ensures
+	// that we properly handle this response as a Failure (permanent) vs an Error (transient).
+	if response.Err != nil && !queue.ShouldRetry(nil, item.Attempt, step.RetryCount()) {
+		response.NoRetry = true
 	}
 
-	// This action may have executed _asynchronously_.  That is, it may have been
-	// scheduled for execution but the result is pending.  In this case we cannot
-	// traverse this node's children as we don't have the response yet.
-	//
-	// This happens when eg. a docker image takes a long time to run, and/or running
-	// the container (via a scheduler) isn't a blocking operation.
-	//
-	// XXX: We can add a state interface to indicate that the step is pending.
-	if response.Scheduled {
-		return response, 0, nil
-	}
-
-	if response.Err != nil && (!response.Retryable() || !queue.ShouldRetry(nil, item.Attempt, step.RetryCount())) {
-		// We need to detect whether this error is 'final' here, depending on whether
-		// we've hit the retry count or this error is deemed non-retryable.
-		//
-		// When this error is final, we need to store the error and update the step
-		// as finalized within the state store.
-		response.SetFinal()
-	}
-
-	idx, serr := e.sm.SaveResponse(ctx, id, *response, item.Attempt)
-	if serr != nil {
-		err = multierror.Append(err, serr)
-	}
-
-	if response.Err == nil {
-		// Mark this step as finalized.
-		// This must happen after everything is enqueued, else the scheduled <> finalized count
-		// is out of order.
-		if err := e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt); err != nil {
-			return response, stackIndex, fmt.Errorf("unable to finalize step: %w", err)
-		}
-	}
-
-	return response, idx, err
+	return response, err
 }
 
 // HandlePauses handles pauses loaded from an incoming event.
