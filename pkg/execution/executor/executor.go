@@ -275,7 +275,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		//
 		// This must happen after everything is enqueued, else the scheduled <> finalized count
 		// is out of order.
-		if err := e.sm.Finalized(ctx, id, edge.Incoming, attempt); err != nil {
+		if err := e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt); err != nil {
 			return resp, idx, fmt.Errorf("unable to finalize step: %w", err)
 		}
 	}
