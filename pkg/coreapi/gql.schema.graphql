@@ -9,6 +9,19 @@ type Workspace {
   id: ID!
 }
 
+type StreamItem {
+  id: ID!
+  trigger: String! # Event name or cron
+  type: StreamType!
+  createdAt: Time!
+  runs: [FunctionRun]
+}
+
+enum StreamType {
+  EVENT
+  CRON
+}
+
 type FunctionVersion {
   functionId: ID!
   version: Int!
@@ -149,12 +162,15 @@ type StepEventWait {
 
 type FunctionRun {
   id: ID!
-  name: String
+  name: String @deprecated
   workspace: Workspace
   status: FunctionRunStatus
   waitingFor: StepEventWait
-  pendingSteps: Int
+  pendingSteps: Int @deprecated
   startedAt: Time
   timeline: [FunctionRunEvent!]
   event: Event
+  functionID: String!
+
+  function: Function
 }

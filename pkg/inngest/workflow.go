@@ -96,8 +96,7 @@ type Edge struct {
 	// Incoming is the name of the step to run.  This is always the name of the
 	// concrete step, even if we're running a generator.
 	Incoming string `json:"incoming"`
-	// StepPlanned is the ID of the generator step planned via enums.OpcodeStepPlanned,
-	// if this edge represents running a yielded generator step within a DAG.
+	// StepPlanned is the ID of the generator step planned via enums.OpcodeStepPlanned.
 	//
 	// We cannot use "Incoming" here as the incoming name still needs to tbe the generator.
 	IncomingGeneratorStep string `json:"gen,omitempty"`

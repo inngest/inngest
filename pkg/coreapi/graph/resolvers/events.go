@@ -11,33 +11,27 @@ import (
 )
 
 func (r *queryResolver) Event(ctx context.Context, query models.EventQuery) (*models.Event, error) {
-	evts, err := r.Runner.Events(ctx, query.EventID)
+	id, _ := ulid.Parse(query.EventID)
+
+	evt, err := r.Data.GetEventByInternalID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(evts) == 0 {
-		return nil, nil
-	}
-
-	evt := evts[0]
-
-	createdAt := time.UnixMilli(evt.Timestamp)
-	if evt.Timestamp == 0 {
-		if id, err := ulid.Parse(evt.ID); err == nil {
-			createdAt = ulid.Time(id.Time())
-		}
-	}
-
-	payloadByt, err := json.Marshal(evt.Data)
+	payloadByt, err := json.Marshal(evt.EventData)
 	if err != nil {
 		return nil, err
 	}
 	payload := string(payloadByt)
 
+	createdAt := time.UnixMilli(evt.EventTS)
+	if evt.EventTS == 0 {
+		createdAt = ulid.Time(evt.ID.Time())
+	}
+
 	return &models.Event{
-		ID:        evt.ID,
-		Name:      &evt.Name,
+		ID:        evt.EventID,
+		Name:      &evt.EventName,
 		CreatedAt: &createdAt,
 		Payload:   &payload,
 	}, nil

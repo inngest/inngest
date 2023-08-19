@@ -40,3 +40,10 @@ func MakeFunction(f *cqrs.Function) (*Function, error) {
 		URL:         fn.Steps[0].URI,
 	}, nil
 }
+
+func MakeFunctionRun(f *cqrs.FunctionRun) *FunctionRun {
+	return &FunctionRun{
+		ID:         f.RunID.String(),
+		FunctionID: f.FunctionID.String(),
+	}
+}

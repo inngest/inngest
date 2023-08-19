@@ -16,3 +16,59 @@ sql:
         overrides:
           - column: "apps.id"
             go_type: "github.com/google/uuid.UUID"
+          - column: "functions.id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "functions.app_id"
+            go_type: "github.com/google/uuid.UUID"
+
+          - column: "events.internal_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+
+          - column: "history.id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "history.function_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "history.run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "history.batch_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "history.event_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+
+          - column: "function_runs.function_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "function_runs.run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "function_runs.batch_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "function_runs.event_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "function_runs.original_run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
