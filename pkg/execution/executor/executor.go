@@ -339,6 +339,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, edge innges
 		}
 	}
 
+	if resp.Final() {
+		// Mark this step as finalized.
+		//
+		// This must happen after everything is enqueued, else the scheduled <> finalized count
+		// is out of order.
+		if err := e.sm.Finalized(ctx, id, edge.Incoming, attempt); err != nil {
+			return resp, idx, fmt.Errorf("unable to finalize step: %w", err)
+		}
+	}
+
 	if err != nil {
 		// This is likely a state.DriverResponse, which itself includes
 		// whether the action can be retried based off of the output.
