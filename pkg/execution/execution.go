@@ -138,9 +138,9 @@ type LifecycleListener interface {
 	)
 }
 
-type noopLifecyceListener struct{}
+type NoopLifecyceListener struct{}
 
-func (noopLifecyceListener) OnStepStarted(
+func (NoopLifecyceListener) OnStepStarted(
 	ctx context.Context,
 	id state.Identifier,
 	item queue.Item,
@@ -150,7 +150,7 @@ func (noopLifecyceListener) OnStepStarted(
 ) {
 }
 
-func (noopLifecyceListener) OnStepFinished(
+func (NoopLifecyceListener) OnStepFinished(
 	context.Context,
 	state.Identifier,
 	queue.Item,
@@ -160,7 +160,7 @@ func (noopLifecyceListener) OnStepFinished(
 ) {
 }
 
-func (noopLifecyceListener) OnWaitForEvent(
+func (NoopLifecyceListener) OnWaitForEvent(
 	context.Context,
 	state.Identifier,
 	queue.Item,
