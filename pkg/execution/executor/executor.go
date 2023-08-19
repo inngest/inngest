@@ -270,16 +270,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
-	if resp.Final() {
-		// Mark this step as finalized.
-		//
-		// This must happen after everything is enqueued, else the scheduled <> finalized count
-		// is out of order.
-		if err := e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt); err != nil {
-			return resp, idx, fmt.Errorf("unable to finalize step: %w", err)
-		}
-	}
-
 	if err != nil {
 		// This is likely a state.DriverResponse, which itself includes
 		// whether the action can be retried based off of the output.
@@ -455,6 +445,15 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, item qu
 			logger.From(ctx).Error().Err(serr).Msg("unable to save state")
 		}
 		err = multierror.Append(err, serr)
+	}
+
+	if response.Err == nil && len(response.Generator) == 0 {
+		// Mark this step as finalized.
+		// This must happen after everything is enqueued, else the scheduled <> finalized count
+		// is out of order.
+		if err := e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt); err != nil {
+			return response, stackIndex, fmt.Errorf("unable to finalize step: %w", err)
+		}
 	}
 
 	return response, idx, err

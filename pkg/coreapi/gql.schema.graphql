@@ -166,7 +166,7 @@ type FunctionRun {
   workspace: Workspace
   status: FunctionRunStatus
   waitingFor: StepEventWait
-  pendingSteps: Int
+  pendingSteps: Int @deprecated
   startedAt: Time
   timeline: [FunctionRunEvent!]
   event: Event
