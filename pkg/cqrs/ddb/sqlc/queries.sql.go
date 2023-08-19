@@ -316,18 +316,64 @@ func (q *Queries) GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function,
 	return &i, err
 }
 
+const getFunctionRunsFromEvents = `-- name: GetFunctionRunsFromEvents :many
+SELECT run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id FROM function_runs WHERE event_id IN (/*SLICE:event_ids*/?)
+`
+
+func (q *Queries) GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid.ULID) ([]*FunctionRun, error) {
+	query := getFunctionRunsFromEvents
+	var queryParams []interface{}
+	if len(eventIds) > 0 {
+		for _, v := range eventIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:event_ids*/?", strings.Repeat(",?", len(eventIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:event_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*FunctionRun
+	for rows.Next() {
+		var i FunctionRun
+		if err := rows.Scan(
+			&i.RunID,
+			&i.RunStartedAt,
+			&i.FunctionID,
+			&i.FunctionVersion,
+			&i.TriggerType,
+			&i.EventID,
+			&i.BatchID,
+			&i.OriginalRunID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFunctionRunsTimebound = `-- name: GetFunctionRunsTimebound :many
-SELECT run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id FROM function_runs WHERE run_started_at >= ? AND run_started_at < ? LIMIT ?
+SELECT run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id FROM function_runs WHERE run_started_at > ? AND run_started_at <= ? LIMIT ?
 `
 
 type GetFunctionRunsTimeboundParams struct {
-	Before time.Time
 	After  time.Time
+	Before time.Time
 	Limit  int64
 }
 
 func (q *Queries) GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionRunsTimeboundParams) ([]*FunctionRun, error) {
-	rows, err := q.db.QueryContext(ctx, getFunctionRunsTimebound, arg.Before, arg.After, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, getFunctionRunsTimebound, arg.After, arg.Before, arg.Limit)
 	if err != nil {
 		return nil, err
 	}

@@ -75,7 +75,7 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 
 	// TODO: Cancellation
 
-	return d.q.InsertHistory(ctx, params)
+	return d.q.InsertHistory(context.Background(), params)
 }
 
 func (historyDriver) Close() error { return nil }

@@ -61,6 +61,7 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 
 	return &models.FunctionRun{
 		ID:           runID.String(),
+		FunctionID:   state.Function().ID.String(),
 		Name:         &name,
 		Status:       &status,
 		PendingSteps: &pending,

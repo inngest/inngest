@@ -279,7 +279,6 @@ func (w wrapper) GetEventsTimebound(ctx context.Context, t cqrs.Timebound, limit
 	var res = make([]*cqrs.Event, len(evts))
 	for n, i := range evts {
 		e := convertEvent(i)
-		fmt.Println("QUERY", e)
 		res[n] = &e
 	}
 	return res, nil
@@ -310,6 +309,12 @@ func (w wrapper) InsertFunctionRun(ctx context.Context, e cqrs.FunctionRun) erro
 		return err
 	}
 	return w.q.InsertFunctionRun(ctx, run)
+}
+
+func (w wrapper) GetFunctionRunsFromEvents(ctx context.Context, eventIDs []ulid.ULID) ([]*cqrs.FunctionRun, error) {
+	return copyInto(ctx, func(ctx context.Context) ([]*sqlc.FunctionRun, error) {
+		return w.q.GetFunctionRunsFromEvents(ctx, eventIDs)
+	}, []*cqrs.FunctionRun{})
 }
 
 func (w wrapper) GetFunctionRunsTimebound(ctx context.Context, t cqrs.Timebound, limit int) ([]*cqrs.FunctionRun, error) {

@@ -162,7 +162,7 @@ type StepEventWait {
 
 type FunctionRun {
   id: ID!
-  name: String
+  name: String @deprecated
   workspace: Workspace
   status: FunctionRunStatus
   waitingFor: StepEventWait
@@ -170,4 +170,7 @@ type FunctionRun {
   startedAt: Time
   timeline: [FunctionRunEvent!]
   event: Event
+  functionID: String!
+
+  function: Function
 }

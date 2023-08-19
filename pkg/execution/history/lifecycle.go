@@ -77,6 +77,7 @@ func (l lifecycle) OnStepFinished(
 	step inngest.Step,
 	resp state.DriverResponse,
 ) {
+
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		CreatedAt:       time.Now(),

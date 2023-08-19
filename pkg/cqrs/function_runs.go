@@ -29,5 +29,6 @@ type FunctionRunWriter interface {
 }
 
 type FunctionRunReader interface {
+	GetFunctionRunsFromEvents(ctx context.Context, eventIDs []ulid.ULID) ([]*FunctionRun, error)
 	GetFunctionRunsTimebound(ctx context.Context, t Timebound, limit int) ([]*FunctionRun, error)
 }

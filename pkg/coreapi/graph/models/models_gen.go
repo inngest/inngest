@@ -77,6 +77,8 @@ type FunctionRun struct {
 	StartedAt    *time.Time         `json:"startedAt,omitempty"`
 	Timeline     []FunctionRunEvent `json:"timeline,omitempty"`
 	Event        *Event             `json:"event,omitempty"`
+	FunctionID   string             `json:"functionID"`
+	Function     *Function          `json:"function,omitempty"`
 }
 
 type FunctionRunQuery struct {

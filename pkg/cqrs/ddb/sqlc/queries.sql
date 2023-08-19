@@ -71,7 +71,10 @@ INSERT INTO function_runs
 	(?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetFunctionRunsTimebound :many
-SELECT * FROM function_runs WHERE run_started_at >= @before AND run_started_at < @after LIMIT ?;
+SELECT * FROM function_runs WHERE run_started_at > @after AND run_started_at <= @before LIMIT ?;
+
+-- name: GetFunctionRunsFromEvents :many
+SELECT * FROM function_runs WHERE event_id IN (sqlc.slice('event_ids'));
 
 --
 -- Events
