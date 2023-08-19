@@ -385,6 +385,11 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, item qu
 		response.Step = *step
 	}
 
+	if len(response.Generator) > 0 {
+		// Already handled.
+		return response, 0, nil
+	}
+
 	// This action may have executed _asynchronously_.  That is, it may have been
 	// scheduled for execution but the result is pending.  In this case we cannot
 	// traverse this node's children as we don't have the response yet.
@@ -397,35 +402,6 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, item qu
 		return response, 0, nil
 	}
 
-	// NOTE: We must ensure that the Step ID is overwritten for Generator steps.  Generator
-	// steps are executed many times until they stop yielding;  each execution returns a
-	// new step ID and data that must be stored independently of the parent generator ID.
-	//
-	// By updating the step ID, we ensure that the data will be saved to the generator's ID.
-	//
-	// We only do this for individual generator steps, as these denote that a single step ran.
-	if len(response.Generator) == 1 {
-		response.Step.ID = response.Generator[0].ID
-		response.Step.Name = response.Generator[0].Name
-		// Unmarshal the generator data into the step.
-		if response.Generator[0].Data != nil {
-			err = json.Unmarshal(response.Generator[0].Data, &response.Output)
-			if err != nil {
-				errstr := fmt.Sprintf("error unmarshalling generator step data as json: %s", err)
-				response.Err = &errstr
-			}
-		}
-
-		// If this is a plan step or a noop, we _dont_ want to save the response.  That's because the
-		// step in question didn't actually run.
-		if response.Generator[0].Op != enums.OpcodeStep {
-			return response, stackIndex, err
-		}
-	}
-	if len(response.Generator) > 1 {
-		return response, stackIndex, err
-	}
-
 	if response.Err != nil && (!response.Retryable() || !queue.ShouldRetry(nil, item.Attempt, step.RetryCount())) {
 		// We need to detect whether this error is 'final' here, depending on whether
 		// we've hit the retry count or this error is deemed non-retryable.
@@ -435,19 +411,12 @@ func (e *executor) executeStep(ctx context.Context, id state.Identifier, item qu
 		response.SetFinal()
 	}
 
-	if l != nil {
-		logger.From(ctx).Trace().Msg("saving response to state")
-	}
-
 	idx, serr := e.sm.SaveResponse(ctx, id, *response, item.Attempt)
 	if serr != nil {
-		if l != nil {
-			logger.From(ctx).Error().Err(serr).Msg("unable to save state")
-		}
 		err = multierror.Append(err, serr)
 	}
 
-	if response.Err == nil && len(response.Generator) == 0 {
+	if response.Err == nil {
 		// Mark this step as finalized.
 		// This must happen after everything is enqueued, else the scheduled <> finalized count
 		// is out of order.
@@ -702,6 +671,23 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 	nextEdge := inngest.Edge{
 		Outgoing: gen.ID,             // Going from the current step
 		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
+	}
+
+	resp := state.DriverResponse{
+		Step: inngest.Step{
+			ID:   gen.ID,
+			Name: gen.Name,
+		},
+	}
+	if gen.Data != nil {
+		if err := json.Unmarshal(gen.Data, &resp.Output); err != nil {
+			resp.Output = gen.Data
+		}
+	}
+
+	// Save the response to the state store.
+	if _, err := e.sm.SaveResponse(ctx, item.Identifier, resp, item.Attempt); err != nil {
+		return err
 	}
 
 	// Re-enqueue the exact same edge to run now.
