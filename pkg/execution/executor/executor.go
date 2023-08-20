@@ -264,7 +264,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			_ = ferr
 		}
 		for _, e := range e.lifecycles {
-			go e.OnFunctionFailed(ctx, id, *resp)
+			go e.OnFunctionFinished(ctx, id, item, *resp)
 		}
 		return resp, err
 	}
@@ -289,6 +289,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	if serr := e.sm.SetStatus(ctx, id, enums.RunStatusCompleted); serr != nil {
 		return resp, fmt.Errorf("error marking function as complete: %w", serr)
+	}
+
+	for _, e := range e.lifecycles {
+		go e.OnFunctionFinished(ctx, id, item, *resp)
 	}
 
 	return resp, err
