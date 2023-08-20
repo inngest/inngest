@@ -118,6 +118,70 @@ type LifecycleListener interface {
 // allowing other implementations to override specific functions.
 type NoopLifecyceListener struct{}
 
+// OnFunctionScheduled is called when a new function is initialized from
+// an event or trigger.
+//
+// Note that this does not mean the function immediately starts.  A function
+// may start if and when there's capacity due to concurrency.
+func (NoopLifecyceListener) OnFunctionScheduled(
+	context.Context,
+	state.Identifier,
+	queue.Item,
+) {
+}
+
+// OnFunctionStarted is called when the function starts.  This may be
+// immediately after the function is scheduled, or in the case of increased
+// latency (eg. due to debouncing or concurrency limits) some time after the
+// function is scheduled.
+func (NoopLifecyceListener) OnFunctionStarted(
+	context.Context,
+	state.Identifier,
+	queue.Item,
+) {
+}
+
+// OnFunctionFinished is called when a function finishes.  This will
+// be called when a function completes successfully or permanently failed,
+// with the final driver response indicating the type of success.
+//
+// If failed, DriverResponse will contain a non nil Err string.
+func (NoopLifecyceListener) OnFunctionFinished(
+	context.Context,
+	state.Identifier,
+	queue.Item,
+	state.DriverResponse,
+) {
+}
+
+// OnFunctionCancelled is called when a function is cancelled.  This includes
+// the cancellation request, detailing either the event that cancelled the
+// function or the API request information.
+func (NoopLifecyceListener) OnFunctionCancelled(
+	context.Context,
+	state.Identifier,
+	CancelRequest,
+) {
+}
+
+// OnFunctionResumed is called when a function is resumed from waiting for
+// an event.
+func (NoopLifecyceListener) OnFunctionResumed(
+	context.Context,
+	state.Identifier,
+	ResumeRequest,
+) {
+}
+
+// OnStepScheduled is called when a new step is scheduled.  It contains the
+// queue item which embeds the next step information.
+func (NoopLifecyceListener) OnStepScheduled(
+	context.Context,
+	state.Identifier,
+	queue.Item,
+) {
+}
+
 func (NoopLifecyceListener) OnStepStarted(
 	ctx context.Context,
 	id state.Identifier,
@@ -146,9 +210,12 @@ func (NoopLifecyceListener) OnWaitForEvent(
 ) {
 }
 
-func (NoopLifecyceListener) OnFunctionFailed(
+// OnSleep is called when a sleep step is scheduled.  The
+// state.GeneratorOpcode contains the sleep details.
+func (NoopLifecyceListener) OnSleep(
 	context.Context,
 	state.Identifier,
-	state.DriverResponse,
+	queue.Item,
+	state.GeneratorOpcode,
 ) {
 }

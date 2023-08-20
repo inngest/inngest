@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -18,7 +20,9 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
+	"github.com/xhit/go-str2duration/v2"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -32,6 +36,14 @@ var (
 	ErrFunctionEnded = fmt.Errorf("function already ended")
 
 	PauseHandleConcurrency = 100
+)
+
+var (
+	// SourceEdgeRetries represents the number of times we'll retry running a source edge.
+	// Each edge gets their own set of retries in our execution engine, embedded directly
+	// in the job.  The retry count is taken from function config for every step _but_
+	// initialization.
+	sourceEdgeRetries = 20
 )
 
 // NewExecutor returns a new executor, responsible for running the specific step of a
@@ -162,6 +174,143 @@ func (e *executor) SetFailureHandler(f execution.FailureHandler) {
 
 func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 	e.lifecycles = append(e.lifecycles, l)
+}
+
+// Execute loads a workflow and the current run state, then executes the
+// function's step via the necessary driver.
+func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*state.Identifier, error) {
+	var key string
+	if req.IdempotencyKey != nil {
+		// Use the given idempotency key
+		key = *req.IdempotencyKey
+	}
+	if key == "" && len(req.Events) == 1 {
+		// If not provided, use the incoming event ID if there's not a batch.
+		key = req.Events[0].InternalID().String()
+	}
+	if key == "" && req.BatchID != nil {
+		// Finally, if there is a batch use the batch ID as the idempotency key.
+		key = req.BatchID.String()
+	}
+
+	id := state.Identifier{
+		WorkflowID:      req.Function.ID,
+		WorkflowVersion: req.Function.FunctionVersion,
+		StaticVersion:   req.StaticVersion,
+		RunID:           ulid.MustNew(ulid.Now(), rand.Reader),
+		BatchID:         req.BatchID,
+		EventID:         req.Events[0].InternalID(),
+		Key:             key,
+	}
+
+	mapped := make([]map[string]any, len(req.Events))
+	for n, item := range req.Events {
+		mapped[n] = item.Event().Map()
+	}
+
+	_, err := e.sm.New(ctx, state.Input{
+		Identifier:     id,
+		EventBatchData: mapped,
+		Context:        req.Context,
+	})
+	if err == state.ErrIdentifierExists {
+		// This function was already created.
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error creating run state: %w", err)
+	}
+
+	// Create cancellation pauses immediately, only if this is a non-batch event.
+	if req.BatchID == nil {
+		for _, c := range req.Function.Cancel {
+			pauseID := uuid.New()
+			expires := time.Now().Add(consts.CancelTimeout)
+			if c.Timeout != nil {
+				dur, err := str2duration.ParseDuration(*c.Timeout)
+				if err != nil {
+					return &id, fmt.Errorf("error parsing cancel duration: %w", err)
+				}
+				expires = time.Now().Add(dur)
+			}
+
+			// Ensure that we only listen to cancellation events that occur
+			// after the initial event is received.
+			expr := "(async.ts == null || async.ts > event.ts)"
+			if c.If != nil {
+				expr = expr + " && " + *c.If
+			}
+
+			// Evaluate the expression.  This lets us inspect the expression's attributes
+			// so that we can store only the attrs used in the expression in the pause,
+			// saving space, bandwidth, etc.
+			eval, err := expressions.NewExpressionEvaluator(ctx, expr)
+			if err != nil {
+				return &id, err
+			}
+			ed := expressions.NewData(map[string]any{"event": req.Events[0].Event().Map()})
+			data := eval.FilteredAttributes(ctx, ed).Map()
+
+			// The triggering event ID should be the first ID in the batch.
+			triggeringID := req.Events[0].InternalID().String()
+
+			pause := state.Pause{
+				WorkspaceID:       req.WorkspaceID,
+				Identifier:        id,
+				ID:                pauseID,
+				Expires:           state.Time(expires),
+				Event:             &c.Event,
+				Expression:        c.If,
+				ExpressionData:    data,
+				Cancel:            true,
+				TriggeringEventID: &triggeringID,
+			}
+			err = e.sm.SavePause(ctx, pause)
+			if err != nil {
+				return &id, fmt.Errorf("error saving pause: %w", err)
+			}
+		}
+	}
+
+	at := time.Now()
+	if req.BatchID == nil {
+		evtTs := time.UnixMilli(req.Events[0].Event().Timestamp)
+		if evtTs.After(at) {
+			// Schedule functions in the future if there's a future
+			// event `ts` field.
+			at = evtTs
+		}
+	}
+	if req.At != nil {
+		at = *req.At
+	}
+
+	// Prefix the workflow to the job ID so that no invocation can accidentally
+	// cause idempotency issues across users/functions.
+	//
+	// This enures that we only ever enqueue the start job for this function once.
+	queueKey := fmt.Sprintf("%s:%s", req.Function.ID, key)
+	err = e.queue.Enqueue(ctx, queue.Item{
+		JobID:       &queueKey,
+		GroupID:     uuid.New().String(),
+		WorkspaceID: req.WorkspaceID,
+		Kind:        queue.KindEdge,
+		Identifier:  id,
+		Attempt:     0,
+		MaxAttempts: &sourceEdgeRetries,
+		Payload: queue.PayloadEdge{
+			Edge: inngest.SourceEdge,
+		},
+	}, at)
+	if err == redis_state.ErrQueueItemExists {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
+	}
+
+	return &id, nil
 }
 
 // Execute loads a workflow and the current run state, then executes the

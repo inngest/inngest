@@ -20,12 +20,15 @@ func NewLifecycleListener(l *slog.Logger, d ...Driver) execution.LifecycleListen
 		l = slog.Default()
 	}
 	return lifecycle{
-		log:     l,
-		drivers: d,
+		NoopLifecyceListener: execution.NoopLifecyceListener{},
+		log:                  l,
+		drivers:              d,
 	}
 }
 
 type lifecycle struct {
+	execution.NoopLifecyceListener
+
 	log     *slog.Logger
 	drivers []Driver
 }
