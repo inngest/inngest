@@ -211,17 +211,18 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	if err != nil || resp.Err != nil {
 		// Accordingly, we check if the driver's response is retryable here;
 		// this will let us know whether we can re-enqueue.
-		//
+		if resp != nil && !resp.Retryable() {
+			return nil
+		}
+
 		// If the error is not of type response error, we assume the step is
 		// always retryable.
 		if resp == nil || err != nil {
 			return err
 		}
-		if resp.Retryable() {
-			return fmt.Errorf("%s", resp.Error())
-		}
-		// This is a non-retryable error.  Return nil to prevent retries.
-		return nil
+
+		// Always retry; non-retryable is covered above.
+		return fmt.Errorf("%s", resp.Error())
 	}
 
 	return nil
