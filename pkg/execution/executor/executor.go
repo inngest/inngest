@@ -291,7 +291,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	// This enures that we only ever enqueue the start job for this function once.
 	queueKey := fmt.Sprintf("%s:%s", req.Function.ID, key)
-	err = e.queue.Enqueue(ctx, queue.Item{
+	item := queue.Item{
 		JobID:       &queueKey,
 		GroupID:     uuid.New().String(),
 		WorkspaceID: req.WorkspaceID,
@@ -302,12 +302,17 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Payload: queue.PayloadEdge{
 			Edge: inngest.SourceEdge,
 		},
-	}, at)
+	}
+	err = e.queue.Enqueue(ctx, item, at)
 	if err == redis_state.ErrQueueItemExists {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
+	}
+
+	for _, e := range e.lifecycles {
+		go e.OnFunctionScheduled(ctx, id, item)
 	}
 
 	return &id, nil
@@ -365,6 +370,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// Add retries from the step to our queue item
 		retries := f.Steps[0].RetryCount()
 		item.MaxAttempts = &retries
+
+		// Only just starting:  run lifecycles on first attempt.
+		if item.Attempt == 0 {
+			for _, e := range e.lifecycles {
+				go e.OnFunctionStarted(ctx, id, item)
+			}
+		}
 	}
 
 	// This could have been retried due to a state load error after
@@ -867,6 +879,8 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 		return err
 	}
 
+	until := time.Now().Add(dur)
+
 	// Create another group for the next item which will run.  We're enqueueing
 	// the function to run again after sleep, so need a new group.
 	groupID := uuid.New().String()
@@ -881,11 +895,16 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 		Attempt:     0,
 		MaxAttempts: item.MaxAttempts,
 		Payload:     queue.PayloadEdge{Edge: nextEdge},
-	}, time.Now().Add(dur))
+	}, until)
 	if err == redis_state.ErrQueueItemExists {
 		// Safely ignore this error.
 		return nil
 	}
+
+	for _, e := range e.lifecycles {
+		go e.OnSleep(ctx, item.Identifier, item, gen, until)
+	}
+
 	return err
 }
 
@@ -965,6 +984,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
+
+	for _, e := range e.lifecycles {
+		go e.OnWaitForEvent(ctx, item.Identifier, item, gen)
+	}
+
 	return err
 }
 

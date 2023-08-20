@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"time"
 
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -52,14 +53,6 @@ type LifecycleListener interface {
 		CancelRequest,
 	)
 
-	// OnFunctionResumed is called when a function is resumed from waiting for
-	// an event.
-	OnFunctionResumed(
-		context.Context,
-		state.Identifier,
-		ResumeRequest,
-	)
-
 	// OnStepScheduled is called when a new step is scheduled.  It contains the
 	// queue item which embeds the next step information.
 	OnStepScheduled(
@@ -98,6 +91,14 @@ type LifecycleListener interface {
 		state.GeneratorOpcode,
 	)
 
+	// OnWaitForEventResumed is called when a function is resumed from waiting for
+	// an event.
+	OnWaitForEventResumed(
+		context.Context,
+		state.Identifier,
+		ResumeRequest,
+	)
+
 	// OnSleep is called when a sleep step is scheduled.  The
 	// state.GeneratorOpcode contains the sleep details.
 	OnSleep(
@@ -105,6 +106,7 @@ type LifecycleListener interface {
 		state.Identifier,
 		queue.Item,
 		state.GeneratorOpcode,
+		time.Time, // Sleeping until this time.
 	)
 
 	// Close closes the listener and flushes any pending writes.
@@ -164,15 +166,6 @@ func (NoopLifecyceListener) OnFunctionCancelled(
 ) {
 }
 
-// OnFunctionResumed is called when a function is resumed from waiting for
-// an event.
-func (NoopLifecyceListener) OnFunctionResumed(
-	context.Context,
-	state.Identifier,
-	ResumeRequest,
-) {
-}
-
 // OnStepScheduled is called when a new step is scheduled.  It contains the
 // queue item which embeds the next step information.
 func (NoopLifecyceListener) OnStepScheduled(
@@ -210,6 +203,15 @@ func (NoopLifecyceListener) OnWaitForEvent(
 ) {
 }
 
+// OnWaitForEventResumed is called when a function is resumed from waiting for
+// an event.
+func (NoopLifecyceListener) OnWaitForEventResumed(
+	context.Context,
+	state.Identifier,
+	ResumeRequest,
+) {
+}
+
 // OnSleep is called when a sleep step is scheduled.  The
 // state.GeneratorOpcode contains the sleep details.
 func (NoopLifecyceListener) OnSleep(
@@ -217,5 +219,6 @@ func (NoopLifecyceListener) OnSleep(
 	state.Identifier,
 	queue.Item,
 	state.GeneratorOpcode,
+	time.Time,
 ) {
 }

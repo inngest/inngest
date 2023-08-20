@@ -58,9 +58,9 @@ type Sleep struct {
 }
 
 type WaitForEvent struct {
-	EventName  *string `json:"event_name"`
-	Expression *string `json:"expression"`
-	Timeout    int     `json:"timeout"`
+	EventName  string    `json:"event_name"`
+	Expression *string   `json:"expression"`
+	Timeout    time.Time `json:"timeout"`
 }
 
 type Result struct {
