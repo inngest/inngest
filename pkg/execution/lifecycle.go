@@ -40,6 +40,12 @@ type LifecycleListener interface {
 		state.GeneratorOpcode,
 	)
 
+	OnFunctionFailed(
+		context.Context,
+		state.Identifier,
+		state.DriverResponse,
+	)
+
 	// OnStepFailed(
 	// 	context.Context,
 	// 	state.Identifier,
@@ -75,5 +81,12 @@ func (NoopLifecyceListener) OnWaitForEvent(
 	state.Identifier,
 	queue.Item,
 	state.GeneratorOpcode,
+) {
+}
+
+func (NoopLifecyceListener) OnFunctionFailed(
+	context.Context,
+	state.Identifier,
+	state.DriverResponse,
 ) {
 }

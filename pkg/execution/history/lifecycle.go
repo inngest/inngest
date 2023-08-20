@@ -114,6 +114,13 @@ func (l lifecycle) OnStepFinished(
 	}
 }
 
+func (l lifecycle) OnFunctionFailed(
+	ctx context.Context,
+	id state.Identifier,
+	resp state.DriverResponse,
+) {
+}
+
 func (l lifecycle) OnWaitForEvent(
 	context.Context,
 	state.Identifier,

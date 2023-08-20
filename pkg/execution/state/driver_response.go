@@ -60,6 +60,10 @@ func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
 		return 0, fmt.Errorf("unable to return sleep duration for opcode %s", g.Op.String())
 	}
 
+	if len(g.Name) == 0 {
+		return 0, nil
+	}
+
 	// Quick heuristic to check if this is likely a date layout
 	if len(g.Name) >= 10 {
 		if parsed, err := dateutil.Parse(g.Name); err == nil {
@@ -170,6 +174,13 @@ func (r *DriverResponse) SetError(err error) {
 // NextRetryAt fulfils the queue.RetryAtSpecifier interface
 func (r DriverResponse) NextRetryAt() *time.Time {
 	return r.RetryAt
+}
+
+func (r DriverResponse) Error() string {
+	if r.Err == nil {
+		return ""
+	}
+	return *r.Err
 }
 
 // Retryable returns whether the response indicates that the action is

@@ -234,24 +234,63 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	resp, err := e.run(ctx, id, item, edge, s, stackIndex)
-
-	if resp == nil && err == nil {
-		// Sanity checking.  This can never happen
-		return nil, fmt.Errorf("unknown error occurred")
+	if resp == nil && err != nil {
+		return nil, err
 	}
 
-	if resp != nil && resp.Err != nil && !resp.Retryable() {
-		// This step permanently failed.
+	// Check for temporary failures.  The outputs of transient errors are not
+	// stored in the state store;  they're tracked via executor lifecycle methods
+	// for logging.
+	if resp.Err != nil && resp.Retryable() {
+		// Retries are a native aspect of the queue;  returning errors always
+		// retries steps if possible.
+
+		// TODO: Remove this save error call;  it's unnecessary.
+		if _, serr := e.sm.SaveResponse(ctx, id, *resp, item.Attempt); serr != nil {
+			return resp, fmt.Errorf("error saving function output: %w", serr)
+		}
+
+		return resp, err
+	}
+
+	// Check if this step permanently failed.  If so, the function is a failure.
+	if resp.Err != nil && !resp.Retryable() {
+		_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt, enums.RunStatusFailed)
+		if serr := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); serr != nil {
+			return resp, fmt.Errorf("error marking function as complete: %w", serr)
+		}
 		if ferr := e.failureHandler(ctx, id, s, *resp); ferr != nil {
+			// XXX: log
 			_ = ferr
 		}
+		for _, e := range e.lifecycles {
+			go e.OnFunctionFailed(ctx, id, *resp)
+		}
+		return resp, err
 	}
 
-	// The runner is responsible for scheduling jobs and will check
-	// whether the action can be retried.
-	//
-	// Retries are a native aspect of the queue;  returning errors always
-	// retries steps if possible.
+	// This is a success, which means either a generator or a function result.
+	if len(resp.Generator) > 0 {
+		// Handle generator responses then return.
+		if serr := e.HandleGeneratorResponse(ctx, resp.Generator, item); serr != nil {
+			return resp, fmt.Errorf("error handling generator response: %w", serr)
+		}
+		_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
+		return resp, err
+	}
+
+	// This is the function result.  Save this in the state store (which will inevitably
+	// be GC'd), and end.
+	if _, serr := e.sm.SaveResponse(ctx, id, *resp, item.Attempt); serr != nil {
+		return resp, fmt.Errorf("error saving function output: %w", serr)
+	}
+
+	_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
+
+	if serr := e.sm.SetStatus(ctx, id, enums.RunStatusCompleted); serr != nil {
+		return resp, fmt.Errorf("error marking function as complete: %w", serr)
+	}
+
 	return resp, err
 }
 
@@ -302,12 +341,10 @@ func (e *executor) executeDriverForStep(ctx context.Context, id state.Identifier
 	if !ok {
 		return nil, fmt.Errorf("%w: '%s'", ErrNoRuntimeDriver, step.Driver())
 	}
-
 	// TODO: Remove.  This is unnecessary.
 	if err := e.sm.Started(ctx, id, step.ID, item.Attempt); err != nil {
 		return nil, fmt.Errorf("error saving started state: %w", err)
 	}
-
 	response, err := d.Execute(ctx, s, edge, *step, stackIndex, item.Attempt)
 	if response == nil {
 		response = &state.DriverResponse{
@@ -325,14 +362,12 @@ func (e *executor) executeDriverForStep(ctx context.Context, id state.Identifier
 	if response.Step.ID == "" {
 		response.Step = *step
 	}
-
 	// Max attempts is encoded at the queue level from step configuration.  If we're at max attempts,
 	// ensure the response's NoRetry flag is set, as we shouldn't retry any more.  This also ensures
 	// that we properly handle this response as a Failure (permanent) vs an Error (transient).
 	if response.Err != nil && !queue.ShouldRetry(nil, item.Attempt, step.RetryCount()) {
 		response.NoRetry = true
 	}
-
 	return response, err
 }
 

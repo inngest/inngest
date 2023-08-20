@@ -176,11 +176,6 @@ func (s *svc) Stop(ctx context.Context) error {
 }
 
 func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
-	l := logger.From(ctx).With().
-		Str("run_id", item.Identifier.RunID.String()).
-		Int("attempt", item.Attempt).
-		Logger()
-
 	payload, err := queue.GetEdge(item)
 	if err != nil {
 		return fmt.Errorf("unable to get edge from queue item: %w", err)
@@ -191,7 +186,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
 	var stackIdx int
-	if item.Kind == queue.KindSleep {
+	if item.Kind == queue.KindSleep && item.Attempt == 0 {
 		stackIdx, err = s.state.SaveResponse(ctx, item.Identifier, state.DriverResponse{
 			Step: inngest.Step{ID: edge.Outgoing}, // XXX: Save edge name here.
 		}, 0)
@@ -213,48 +208,22 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 	if err == state.ErrFunctionCancelled {
 		return nil
 	}
-
-	if err != nil {
-		// The executor usually returns a state.DriverResponse if the step's
-		// response was an error.  In this case, the executor itself handles
-		// whether the step has been retried the max amount of times, as the
-		// executor has the workflow & step config.
-		//
+	if err != nil || resp.Err != nil {
 		// Accordingly, we check if the driver's response is retryable here;
 		// this will let us know whether we can re-enqueue.
 		//
 		// If the error is not of type response error, we assume the step is
 		// always retryable.
-		if (resp == nil || resp.Retryable()) && queue.ShouldRetry(nil, item.Attempt, item.GetMaxAttempts()) {
+		if resp == nil || err != nil {
 			return err
 		}
-
-		// This is a non-retryable error.  Finalize this step.
-		l.Warn().Interface("edge", edge).Err(err).Msg("step permanently failed")
-		if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt); err != nil {
-			return fmt.Errorf("unable to finalize step: %w", err)
+		if resp.Retryable() {
+			return fmt.Errorf("%s", resp.Error())
 		}
+		// This is a non-retryable error.  Return nil to prevent retries.
 		return nil
 	}
 
-	// If this is a generator step, we need to re-invoke the current function.
-	if resp != nil && resp.Generator != nil {
-		// We're re-invoking the current step again.  Generator steps do not have
-		// their own "step output" until the end of the function;  instead, each
-		// sub-step within the generator yields a new output with its own step ID.
-		//
-		// We keep invoking Generator-based functions until they provide no more
-		// yields, signalling they're done.
-		err := s.exec.HandleGeneratorResponse(ctx, resp.Generator, item)
-		if err != nil {
-			return fmt.Errorf("unable to schedule generator response: %w", err)
-		}
-		// Finalize this step early, as we don't need to re-invoke anything else or
-		// load children until generators complete.
-		return s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt)
-	}
-
-	l.Debug().Interface("edge", edge).Msg("step complete")
 	return nil
 }
 
