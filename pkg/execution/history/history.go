@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -37,8 +38,7 @@ type History struct {
 	Attempt            int64
 	CompletedStepCount *int64
 	URL                *string
-	CancelEvent        *CancelEvent
-	CancelUser         *CancelUser
+	Cancel             *execution.CancelRequest
 	Sleep              *Sleep
 	WaitForEvent       *WaitForEvent
 	WaitResult         *WaitResult

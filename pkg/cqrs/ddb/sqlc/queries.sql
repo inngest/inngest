@@ -70,11 +70,19 @@ INSERT INTO function_runs
 	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id) VALUES
 	(?, ?, ?, ?, ?, ?, ?, ?);
 
+-- name: InsertFunctionFinish :exec
+INSERT INTO function_finishes
+	(run_id, status, output, completed_step_count, created_at) VALUES 
+	(?, ?, ?, ?, ?);
+
 -- name: GetFunctionRunsTimebound :many
 SELECT * FROM function_runs WHERE run_started_at > @after AND run_started_at <= @before LIMIT ?;
 
 -- name: GetFunctionRunsFromEvents :many
 SELECT * FROM function_runs WHERE event_id IN (sqlc.slice('event_ids'));
+
+-- name: GetFunctionRunFinishesByRunIDs :many
+SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));
 
 --
 -- Events
@@ -97,5 +105,8 @@ SELECT * FROM events WHERE event_ts > @after AND event_ts <= @before ORDER BY ev
 
 -- name: InsertHistory :exec
 INSERT INTO history
-	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, step_name, step_id, url, cancel_request, sleep, wait_for_event, result) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, result) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: GetFunctionRunHistory :many
+SELECT * FROM history WHERE run_id = ? ORDER BY created_at ASC;

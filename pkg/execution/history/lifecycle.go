@@ -147,15 +147,7 @@ func (l lifecycle) OnFunctionCancelled(
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
-	}
-	if req.EventID != nil {
-		h.CancelEvent = &CancelEvent{
-			EventID:    *req.EventID,
-			Expression: req.Expression,
-		}
-	}
-	if req.UserID != nil {
-		h.CancelUser = &CancelUser{UserID: *req.UserID}
+		Cancel:          &req,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(ctx, h); err != nil {

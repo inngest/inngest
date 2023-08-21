@@ -336,6 +336,12 @@ func (w wrapper) GetFunctionRunsTimebound(ctx context.Context, t cqrs.Timebound,
 	}, []*cqrs.FunctionRun{})
 }
 
+func (w wrapper) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIDs []ulid.ULID) ([]*cqrs.FunctionRunFinish, error) {
+	return copyInto(ctx, func(ctx context.Context) ([]*sqlc.FunctionFinish, error) {
+		return w.q.GetFunctionRunFinishesByRunIDs(ctx, runIDs)
+	}, []*cqrs.FunctionRunFinish{})
+}
+
 //
 // History
 //
@@ -346,6 +352,12 @@ func (w wrapper) InsertHistory(ctx context.Context, h history.History) error {
 		return err
 	}
 	return w.q.InsertHistory(ctx, *params)
+}
+
+func (w wrapper) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*history.History, error) {
+	_, err := w.q.GetFunctionRunHistory(ctx, runID)
+	// TODO: Convert history
+	return nil, err
 }
 
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
