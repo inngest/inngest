@@ -627,6 +627,7 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 		return 0, err
 	}
 
+	// TODO Edit script to only allow a single step with stepOutput = true
 	index, err := scripts["saveResponse"].Exec(
 		ctx,
 		m.r,
