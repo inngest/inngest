@@ -9,7 +9,6 @@ Email is a fact of life. We aren't going to escape it any time soon. Your web ap
 
 If you’d like to dive right into code, you can find the [full example using Next.js, Prisma, Next-Auth, Resend, and Inngest to send customer lifecycle emails here on GitHub](https://github.com/joelhooks/inngest-resend-example).
 
-
 ## Essential Considerations when sending emails
 
 When you're sending an email to your customers, there are many things to consider, but there are two that are very important:
@@ -52,16 +51,13 @@ And then there’s Resend.
 
 [Resend is a modern twist on sending emails ](https://resend.com/)and removes (almost) all of the friction from sending your customer’s email directly. 
 
-It’s dead simple.
-
+It’s simple!
 
 ## Transactional versus Marketing Emails
 
 Most email service providers consider transactional emails separately from “bulk” or marketing emails.
 
 Here are some examples of transactional emails:
-
-
 
 * Password reset emails
 * Account creation emails
@@ -77,8 +73,6 @@ These are very specifically related to business concerns and emails your custome
 Transactional emails are sent to a single customer at a specific time.
 
 Marketing or bulk emails are things like:
-
-
 
 * Newsletters
 * Limited-time offers
@@ -127,7 +121,48 @@ Next-Auth is being used, for example. Next-Auth is an excellent library that doe
 
 In the Next-Auth configuration, we can add custom logic to intercept that creation and essentially do any work we might choose to perform as “side effects” to the new user joining our app:
 
-{CODE} [https://github.com/joelhooks/inngest-resend-example/blob/be5ef88f163c4b0516a85d556fd6268857eb11f4/src/server/auth.ts#L36-L75](https://github.com/joelhooks/inngest-resend-example/blob/be5ef88f163c4b0516a85d556fd6268857eb11f4/src/server/auth.ts#L36-L75)
+```ts
+export const authOptions: NextAuthOptions = {
+  callbacks: {
+    session: ({ session, user }) => ({
+      ...session,
+      user: {
+        ...session.user,
+        id: user.id,
+      },
+    }),
+  },
+  events: {
+    /**
+     * 👋 Internally next-auth creates event hooks to handle any application
+     * side effects that need to happen when an event occurs
+     * in our case we want to send an event to inngest when a user is created
+     * so that we can track user signups and other user related events.
+     * @see https://next-auth.js.org/configuration/events#createuser
+     * @param param0
+     */
+    createUser: async ({ user }) => {
+      inngest.send({ name: "user/created", user, data: {} });
+    },
+  },
+  adapter: PrismaAdapter(prisma),
+  providers: [
+    GithubProvider({
+      clientId: env.GITHUB_CLIENT_ID,
+      clientSecret: env.GITHUB_CLIENT_SECRET,
+    }),
+    /**
+     * ...add more providers here.
+     *
+     * Most other providers require a bit more work than the Github provider. For example, the
+     * GitHub provider requires you to add the `refresh_token_expires_in` field to the Account
+     * model. Refer to the NextAuth.js docs for the provider you want to use. Example:
+     *
+     * @see https://next-auth.js.org/providers/github
+     */
+  ],
+};
+```
 
 One option here is to send the email in the callback!
 
@@ -152,8 +187,6 @@ The workflow that has been started with the simple `user/created` event is our *
 
 In this workflow, we will:
 
-
-
 * Welcome the new user to the application 👋
 * Wait for a brief time for them to perform a core activity ⌛
 * If they DON’T perform the activity, send them an encouraging note
@@ -161,12 +194,50 @@ In this workflow, we will:
 
 This is a simple example, but it demonstrates this pattern well and could be expanded into a much more complex/specific scenario based on your actual customer needs!
 
-
 ### Implementing the workflow with Inngest
 
 Inngest greatly simplifies implementing an asynchronous, durable, event-driven workflow in your serverless applications. If you’ve implemented something like this in the past, you’re well aware of the messy logic that can result in making workflows tough to maintain and reason about. With Inngest, our workflow looks like this:
 
-{CODE} [https://github.com/joelhooks/inngest-resend-example/blob/be5ef88f163c4b0516a85d556fd6268857eb11f4/src/inngest/functions/user-created.ts#L37-L74](https://github.com/joelhooks/inngest-resend-example/blob/be5ef88f163c4b0516a85d556fd6268857eb11f4/src/inngest/functions/user-created.ts#L37-L74)
+```ts
+export const userCreated = inngest.createFunction(
+  { name: "A User Was Created" },
+  { event: "user/created" },
+  async ({ event, step }) => {
+    const { email } = event.user;
+
+    await step.run("send-welcome-email", async () => {
+      return sendEmail({
+        to: email,
+        subject: "Welcome to our app!",
+        body: "<p>Thanks for signing up!</p>",
+      });
+    });
+
+    const completedAction = await step.waitForEvent("user/created.document", {
+      timeout: "1m",
+      if: "event.user.email == async.user.email",
+    });
+
+    if (!completedAction) {
+      await step.run("send-nudge-email", async () => {
+        return sendEmail({
+          to: email,
+          subject: "How can we help!",
+          body: "<p>What can we do better? We are always here to help you suceed.</p>",
+        });
+      });
+    } else {
+      await step.run("send-congrats-email", async () => {
+        return sendEmail({
+          to: email,
+          subject: "You did it!",
+          body: "<p>We are so glad figured it out! It's challenging to do anything in this rough and tumble world so congrats on that.</p>",
+        });
+      });
+    }
+  }
+);
+```
 
 😍
 
@@ -193,7 +264,26 @@ It’s not magic. It’s a lot of deep, hard-core, expertly crafted, highly scal
 
 [Resend makes sending emails a breeze](https://resend.com/):
 
-{code} [https://github.com/joelhooks/inngest-resend-example/blob/be5ef88f163c4b0516a85d556fd6268857eb11f4/src/inngest/functions/user-created.ts#L18-L35](https://github.com/joelhooks/inngest-resend-example/blob/be5ef88f163c4b0516a85d556fd6268857eb11f4/src/inngest/functions/user-created.ts#L18-L35)
+```ts
+function sendEmail({
+  to,
+  subject,
+  body,
+}: {
+  to: string;
+  subject: string;
+  body: string;
+}) {
+  const resend = new Resend(env.RESEND_API_KEY);
+  return resend.emails.send({
+    from: env.FROM_EMAIL,
+    ...(env.REPLY_TO_EMAIL && { replyTo: env.REPLY_TO_EMAIL }), // optional (defaults to from
+    to,
+    subject,
+    html: body,
+  });
+}
+```
 
 To the point where there’s not even much to talk about 😅
 
