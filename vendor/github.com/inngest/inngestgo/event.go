@@ -76,6 +76,34 @@ func (e Event) Validate() error {
 	return nil
 }
 
+func (e Event) Map() map[string]any {
+	if e.Data == nil {
+		e.Data = make(map[string]any)
+	}
+	if e.User == nil {
+		e.User = make(map[string]any)
+	}
+
+	data := map[string]any{
+		"name": e.Name,
+		"data": e.Data,
+		"user": e.User,
+		// We cast to float64 because marshalling and unmarshalling from
+		// JSON automatically uses float64 as its type;  JS has no notion
+		// of ints.
+		"ts": float64(e.Timestamp),
+	}
+
+	if e.Version != "" {
+		data["v"] = e.Version
+	}
+	if e.ID != nil {
+		data["id"] = *e.ID
+	}
+
+	return data
+}
+
 // GenericEvent represents a single event generated from your system to be sent to
 // Inngest.
 type GenericEvent[DATA any, USER any] struct {
