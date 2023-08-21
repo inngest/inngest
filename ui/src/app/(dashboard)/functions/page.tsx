@@ -17,7 +17,6 @@ import Skeleton from '@/components/Skeleton';
 import Table from '@/components/Table';
 import TriggerTags from '@/components/Trigger/TriggerTags';
 import useDebounce from '@/hooks/useDebounce';
-import useDocsNavigation from '@/hooks/useDocsNavigation';
 import { FunctionTriggerTypes, useGetFunctionsQuery, type Function } from '@/store/generated';
 
 const columnHelper = createColumnHelper<Function>();
@@ -93,7 +92,6 @@ const columns = [
 ];
 
 export default function FunctionList() {
-  const navigateToDocs = useDocsNavigation();
   const [sorting, setSorting] = useState<SortingState>([
     {
       id: 'name',
@@ -163,9 +161,9 @@ export default function FunctionList() {
               title="Inngest has not detected any functions"
               subtitle="Read our documentation to learn how to serve your functions"
               imageUrl="/images/no-results.png"
-              button={{
+              link={{
                 text: 'Serving Functions',
-                onClick: () => navigateToDocs('/sdk/serve'),
+                url: 'https://www.inngest.com/docs/sdk/serve',
               }}
             />
           }

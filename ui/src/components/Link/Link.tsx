@@ -7,8 +7,7 @@ interface LinkProps {
   internalNavigation?: boolean;
   children: React.ReactNode;
   className?: string;
-  href?: string;
-  onClick?: () => void;
+  href: string;
 }
 
 const defaultLinkStyles =
@@ -16,12 +15,11 @@ const defaultLinkStyles =
 
 export default function Link({
   href,
-  onClick,
   children,
   className,
   internalNavigation = false,
 }: LinkProps) {
-  if (href && internalNavigation) {
+  if (internalNavigation) {
     return (
       <NextLink href={href} className={classNames(className, defaultLinkStyles)}>
         {children}
@@ -31,12 +29,12 @@ export default function Link({
   }
   return (
     <a
-      onClick={onClick}
       className={classNames(className, defaultLinkStyles)}
-      target={!internalNavigation ? '_blank' : '_self'}
+      target="_blank"
+      href={href}
     >
       {children}
-      {internalNavigation ? <IconChevron className="-rotate-90" /> : <IconArrowTopRightOnSquare />}
+      {<IconArrowTopRightOnSquare />}
     </a>
   );
 }
