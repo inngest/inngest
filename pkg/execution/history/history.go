@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -37,10 +38,10 @@ type History struct {
 	Attempt            int64
 	CompletedStepCount *int64
 	URL                *string
-	CancelEvent        *CancelEvent
-	CancelUser         *CancelUser
+	Cancel             *execution.CancelRequest
 	Sleep              *Sleep
 	WaitForEvent       *WaitForEvent
+	WaitResult         *WaitResult
 	Result             *Result
 }
 
@@ -58,9 +59,14 @@ type Sleep struct {
 }
 
 type WaitForEvent struct {
-	EventName  *string `json:"event_name"`
-	Expression *string `json:"expression"`
-	Timeout    int     `json:"timeout"`
+	EventName  string    `json:"event_name"`
+	Expression *string   `json:"expression"`
+	Timeout    time.Time `json:"timeout"`
+}
+
+type WaitResult struct {
+	EventID *ulid.ULID `json:"event_id"`
+	Timeout bool       `json:"timeout"`
 }
 
 type Result struct {

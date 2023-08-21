@@ -152,7 +152,6 @@ func (s *svc) getFailureHandler(ctx context.Context) (func(context.Context, stat
 func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
 	return s.queue.Run(ctx, func(ctx context.Context, item queue.Item) error {
-		logger.From(ctx).Info().Interface("item", item).Msg("processing queue item")
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()
@@ -177,53 +176,17 @@ func (s *svc) Stop(ctx context.Context) error {
 }
 
 func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
-	l := logger.From(ctx).With().
-		Str("run_id", item.Identifier.RunID.String()).
-		Int("attempt", item.Attempt).
-		Logger()
-
 	payload, err := queue.GetEdge(item)
 	if err != nil {
 		return fmt.Errorf("unable to get edge from queue item: %w", err)
 	}
 	edge := payload.Edge
 
-	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
-	// that child;  we don't need to handle the trigger individually.
-	//
-	// This cuts down on queue churn.
-	if edge.Incoming == inngest.TriggerName {
-		// Load the step for the function and immediately execute.
-		// XXX: Refactor this;  holdover from both generator and DAG based approach used to
-		// allow > 1 step from the trigger.
-		runstate, err := s.state.Load(ctx, item.Identifier.RunID)
-		if err != nil {
-			return fmt.Errorf("unable to load function run: %w", err)
-		}
-		children, err := state.DefaultEdgeEvaluator.AvailableChildren(ctx, runstate, edge.Incoming)
-		if err != nil {
-			return fmt.Errorf("unable to evaluate available next steps: %w", err)
-		}
-		if len(children) == 1 && (children[0].Edge.Metadata == nil || children[0].Edge.Metadata.Wait == nil) {
-			// Directly call the child instead of re-enqueueing a next step.
-			edge = children[0].Edge
-			// Update the payload
-			payload := item.Payload.(queue.PayloadEdge)
-			payload.Edge = edge
-			item.Payload = payload
-			// Add retries from the step to our queue item
-			retries := children[0].Step.RetryCount()
-			item.MaxAttempts = &retries
-		}
-	}
-
-	l.Info().Interface("payload", payload).Msg("processing step")
-
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
 	var stackIdx int
-	if item.Kind == queue.KindSleep {
+	if item.Kind == queue.KindSleep && item.Attempt == 0 {
 		stackIdx, err = s.state.SaveResponse(ctx, item.Identifier, state.DriverResponse{
 			Step: inngest.Step{ID: edge.Outgoing}, // XXX: Save edge name here.
 		}, 0)
@@ -238,56 +201,30 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		}
 	}
 
-	resp, _, err := s.exec.Execute(ctx, item.Identifier, item, edge, stackIdx)
+	resp, err := s.exec.Execute(ctx, item.Identifier, item, edge, stackIdx)
 
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
 	if err == state.ErrFunctionCancelled {
-		_ = s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt)
 		return nil
 	}
-
-	if err != nil {
-		// The executor usually returns a state.DriverResponse if the step's
-		// response was an error.  In this case, the executor itself handles
-		// whether the step has been retried the max amount of times, as the
-		// executor has the workflow & step config.
-		//
+	if err != nil || resp.Err != nil {
 		// Accordingly, we check if the driver's response is retryable here;
 		// this will let us know whether we can re-enqueue.
-		//
+		if resp != nil && !resp.Retryable() {
+			return nil
+		}
+
 		// If the error is not of type response error, we assume the step is
 		// always retryable.
-		if (resp == nil || resp.Retryable()) && queue.ShouldRetry(nil, item.Attempt, item.GetMaxAttempts()) {
+		if resp == nil || err != nil {
 			return err
 		}
 
-		// This is a non-retryable error.  Finalize this step.
-		l.Warn().Interface("edge", edge).Err(err).Msg("step permanently failed")
-		if err := s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt); err != nil {
-			return fmt.Errorf("unable to finalize step: %w", err)
-		}
-		return nil
+		// Always retry; non-retryable is covered above.
+		return fmt.Errorf("%s", resp.Error())
 	}
 
-	// If this is a generator step, we need to re-invoke the current function.
-	if resp != nil && resp.Generator != nil {
-		// We're re-invoking the current step again.  Generator steps do not have
-		// their own "step output" until the end of the function;  instead, each
-		// sub-step within the generator yields a new output with its own step ID.
-		//
-		// We keep invoking Generator-based functions until they provide no more
-		// yields, signalling they're done.
-		err := s.exec.HandleGeneratorResponse(ctx, resp.Generator, item)
-		if err != nil {
-			return fmt.Errorf("unable to schedule generator response: %w", err)
-		}
-		// Finalize this step early, as we don't need to re-invoke anything else or
-		// load children until generators complete.
-		return s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt)
-	}
-
-	l.Debug().Interface("edge", edge).Msg("step complete")
 	return nil
 }
 
@@ -312,28 +249,5 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	if err := s.state.ConsumePause(ctx, pause.ID, nil); err != nil {
-		return fmt.Errorf("error consuming timeout pause: %w", err)
-	}
-
-	if pauseTimeout.OnTimeout {
-		l.Info().Interface("pause", pauseTimeout).Interface("edge", pause.Edge()).Msg("scheduling pause timeout step")
-		// Enqueue the next job to run.  We could handle this in the
-		// same thread, but its safer to enable retries by re-enqueueing.
-		if err := s.queue.Enqueue(ctx, queue.Item{
-			Kind:       queue.KindEdge,
-			Identifier: item.Identifier,
-			Payload:    queue.PayloadEdge{Edge: pause.Edge()},
-		}, time.Now()); err != nil {
-			return fmt.Errorf("error enqueueing timeout step: %w", err)
-		}
-	} else {
-		l.Info().Interface("pause", pauseTimeout).Interface("edge", pause.Edge()).Msg("ignoring pause timeout")
-		// Finalize this action without it running.
-		if err := s.state.Finalized(ctx, item.Identifier, pause.Edge().Incoming, 0); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return s.exec.Resume(ctx, *pause, execution.ResumeRequest{})
 }

@@ -3,7 +3,6 @@ package runner
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"fmt"
 	"sync"
 	"time"
@@ -25,7 +24,6 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	"github.com/oklog/ulid/v2"
 	"github.com/robfig/cron/v3"
-	"github.com/xhit/go-str2duration/v2"
 )
 
 const (
@@ -492,7 +490,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		Str("function_id", fn.ID.String()).
 		Str("function", fn.Name).
 		Msg("initializing fn")
-	id, err := Initialize(ctx, fn, evt, s.state, s.queue)
+	id, err := Initialize(ctx, fn, evt, s.executor)
 	if err != nil {
 		return err
 	}
@@ -517,9 +515,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 //
 // This is a separate, exported function so that it can be used from this service
 // and also from eg. the run command.
-func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedEvent, s state.Manager, q queue.Producer) (*state.Identifier, error) {
-	evt := tracked.Event()
-
+func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedEvent, e execution.Executor) (*state.Identifier, error) {
 	zero := uuid.UUID{}
 	if bytes.Equal(fn.ID[:], zero[:]) {
 		// Locally, we want to ensure that each function has its own deterministic
@@ -529,81 +525,10 @@ func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedE
 		fn.ID = inngest.DeterministicUUID(fn)
 	}
 
-	id := state.Identifier{
-		WorkflowID:      fn.ID,
-		WorkflowVersion: fn.FunctionVersion,
-		RunID:           ulid.MustNew(ulid.Now(), rand.Reader),
-		Key:             evt.ID,
-	}
-
-	if _, err := s.New(ctx, state.Input{
-		Identifier:     id,
-		EventBatchData: []map[string]any{evt.Map()},
-	}); err != nil {
-		return nil, fmt.Errorf("error creating run state: %w", err)
-	}
-
-	// Set any cancellation pauses immediately
-	for _, c := range fn.Cancel {
-		pauseID := uuid.New()
-		expires := time.Now().Add(CancelTimeout)
-		if c.Timeout != nil {
-			dur, err := str2duration.ParseDuration(*c.Timeout)
-			if err != nil {
-				return &id, fmt.Errorf("error parsing cancel duration: %w", err)
-			}
-			expires = time.Now().Add(dur)
-		}
-
-		// Ensure that we only listen to cancellation events that occur
-		// after the initial event is received.
-		expr := "(async.ts == null || async.ts > event.ts)"
-		if c.If != nil {
-			expr = expr + " && " + *c.If
-		}
-
-		// Filter the expression data such that it contains only the variables used
-		// in the expression.
-		eval, err := expressions.NewExpressionEvaluator(ctx, expr)
-		if err != nil {
-			return &id, err
-		}
-
-		// Take the data for expressions based off of state
-		ed := expressions.NewData(map[string]any{"event": evt.Map()})
-		data := eval.FilteredAttributes(ctx, ed).Map()
-
-		err = s.SavePause(ctx, state.Pause{
-			ID:                pauseID,
-			Identifier:        id,
-			Expires:           state.Time(expires),
-			Event:             &c.Event,
-			Expression:        &expr,
-			ExpressionData:    data,
-			Cancel:            true,
-			TriggeringEventID: &evt.ID,
-		})
-		if err != nil {
-			return &id, fmt.Errorf("error saving pause: %w", err)
-		}
-	}
-
-	at := time.Now()
-	if time.UnixMilli(evt.Timestamp).After(at) {
-		at = time.UnixMilli(evt.Timestamp)
-	}
-
-	// Enqueue running this from the source.
-	err := q.Enqueue(ctx, queue.Item{
-		Kind:       queue.KindEdge,
-		Identifier: id,
-		Payload:    queue.PayloadEdge{Edge: inngest.SourceEdge},
-	}, at)
-	if err != nil {
-		return &id, fmt.Errorf("error enqueuing function: %w", err)
-	}
-
-	return &id, nil
+	return e.Schedule(ctx, execution.ScheduleRequest{
+		Function: fn,
+		Events:   []event.TrackedEvent{tracked},
+	})
 }
 
 // NewTracker returns a crappy in-memory tracker used for registering function runs.

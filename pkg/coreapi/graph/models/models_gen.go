@@ -69,16 +69,18 @@ func (FunctionEvent) IsFunctionRunEvent() {}
 
 type FunctionRun struct {
 	ID           string             `json:"id"`
-	Name         *string            `json:"name,omitempty"`
+	FunctionID   string             `json:"functionID"`
+	Function     *Function          `json:"function,omitempty"`
 	Workspace    *Workspace         `json:"workspace,omitempty"`
+	Event        *Event             `json:"event,omitempty"`
 	Status       *FunctionRunStatus `json:"status,omitempty"`
 	WaitingFor   *StepEventWait     `json:"waitingFor,omitempty"`
 	PendingSteps *int               `json:"pendingSteps,omitempty"`
 	StartedAt    *time.Time         `json:"startedAt,omitempty"`
+	FinishedAt   *time.Time         `json:"finishedAt,omitempty"`
+	Output       *string            `json:"output,omitempty"`
 	Timeline     []FunctionRunEvent `json:"timeline,omitempty"`
-	Event        *Event             `json:"event,omitempty"`
-	FunctionID   string             `json:"functionID"`
-	Function     *Function          `json:"function,omitempty"`
+	Name         *string            `json:"name,omitempty"`
 }
 
 type FunctionRunQuery struct {
@@ -273,6 +275,51 @@ func (e *FunctionRunStatus) UnmarshalGQL(v interface{}) error {
 }
 
 func (e FunctionRunStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type FunctionStatus string
+
+const (
+	FunctionStatusRunning   FunctionStatus = "RUNNING"
+	FunctionStatusCompleted FunctionStatus = "COMPLETED"
+	FunctionStatusFailed    FunctionStatus = "FAILED"
+	FunctionStatusCancelled FunctionStatus = "CANCELLED"
+)
+
+var AllFunctionStatus = []FunctionStatus{
+	FunctionStatusRunning,
+	FunctionStatusCompleted,
+	FunctionStatusFailed,
+	FunctionStatusCancelled,
+}
+
+func (e FunctionStatus) IsValid() bool {
+	switch e {
+	case FunctionStatusRunning, FunctionStatusCompleted, FunctionStatusFailed, FunctionStatusCancelled:
+		return true
+	}
+	return false
+}
+
+func (e FunctionStatus) String() string {
+	return string(e)
+}
+
+func (e *FunctionStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FunctionStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FunctionStatus", str)
+	}
+	return nil
+}
+
+func (e FunctionStatus) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

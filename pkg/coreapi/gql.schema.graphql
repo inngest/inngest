@@ -73,6 +73,15 @@ enum EventStatus {
   NO_FUNCTIONS
 }
 
+
+enum FunctionStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  # todo: SLEEPING, WAITING FOR EVENT when this is available with queue changes.
+}
+
 type App {
   id: ID!
   name: String!
@@ -162,15 +171,20 @@ type StepEventWait {
 
 type FunctionRun {
   id: ID!
-  name: String @deprecated
+  functionID: String!
+
+  # related fields
+  function: Function
   workspace: Workspace
+  event: Event
+
   status: FunctionRunStatus
   waitingFor: StepEventWait
   pendingSteps: Int @deprecated
   startedAt: Time
-  timeline: [FunctionRunEvent!]
-  event: Event
-  functionID: String!
+  finishedAt: Time
+  output: String # JSON encoded output of the function, or JSON encoded error if this is a failure.
 
-  function: Function
+  timeline: [FunctionRunEvent!] @deprecated
+  name: String @deprecated # use the embedded function field instead.
 }

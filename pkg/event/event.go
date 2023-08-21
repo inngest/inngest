@@ -96,3 +96,7 @@ func (o ossTrackedEvent) Event() Event {
 func (o ossTrackedEvent) InternalID() ulid.ULID {
 	return o.id
 }
+
+func (o ossTrackedEvent) BatchID() *ulid.ULID {
+	return nil
+}

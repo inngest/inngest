@@ -316,6 +316,97 @@ func (q *Queries) GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function,
 	return &i, err
 }
 
+const getFunctionRunFinishesByRunIDs = `-- name: GetFunctionRunFinishesByRunIDs :many
+SELECT run_id, status, output, completed_step_count, created_at FROM function_finishes WHERE run_id IN (/*SLICE:run_ids*/?)
+`
+
+func (q *Queries) GetFunctionRunFinishesByRunIDs(ctx context.Context, runIds []ulid.ULID) ([]*FunctionFinish, error) {
+	query := getFunctionRunFinishesByRunIDs
+	var queryParams []interface{}
+	if len(runIds) > 0 {
+		for _, v := range runIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", strings.Repeat(",?", len(runIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*FunctionFinish
+	for rows.Next() {
+		var i FunctionFinish
+		if err := rows.Scan(
+			&i.RunID,
+			&i.Status,
+			&i.Output,
+			&i.CompletedStepCount,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFunctionRunHistory = `-- name: GetFunctionRunHistory :many
+SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, result FROM history WHERE run_id = ? ORDER BY created_at ASC
+`
+
+func (q *Queries) GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*History, error) {
+	rows, err := q.db.QueryContext(ctx, getFunctionRunHistory, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*History
+	for rows.Next() {
+		var i History
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.RunStartedAt,
+			&i.FunctionID,
+			&i.FunctionVersion,
+			&i.RunID,
+			&i.EventID,
+			&i.BatchID,
+			&i.GroupID,
+			&i.IdempotencyKey,
+			&i.Type,
+			&i.Attempt,
+			&i.StepName,
+			&i.StepID,
+			&i.Url,
+			&i.CancelRequest,
+			&i.Sleep,
+			&i.WaitForEvent,
+			&i.WaitResult,
+			&i.Result,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFunctionRunsFromEvents = `-- name: GetFunctionRunsFromEvents :many
 SELECT run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id FROM function_runs WHERE event_id IN (/*SLICE:event_ids*/?)
 `
@@ -569,6 +660,31 @@ func (q *Queries) InsertFunction(ctx context.Context, arg InsertFunctionParams) 
 	return &i, err
 }
 
+const insertFunctionFinish = `-- name: InsertFunctionFinish :exec
+INSERT INTO function_finishes
+	(run_id, status, output, completed_step_count, created_at) VALUES 
+	(?, ?, ?, ?, ?)
+`
+
+type InsertFunctionFinishParams struct {
+	RunID              ulid.ULID
+	Status             string
+	Output             string
+	CompletedStepCount int64
+	CreatedAt          time.Time
+}
+
+func (q *Queries) InsertFunctionFinish(ctx context.Context, arg InsertFunctionFinishParams) error {
+	_, err := q.db.ExecContext(ctx, insertFunctionFinish,
+		arg.RunID,
+		arg.Status,
+		arg.Output,
+		arg.CompletedStepCount,
+		arg.CreatedAt,
+	)
+	return err
+}
+
 const insertFunctionRun = `-- name: InsertFunctionRun :exec
 
 INSERT INTO function_runs
@@ -605,8 +721,8 @@ func (q *Queries) InsertFunctionRun(ctx context.Context, arg InsertFunctionRunPa
 const insertHistory = `-- name: InsertHistory :exec
 
 INSERT INTO history
-	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, step_name, step_id, url, cancel_request, sleep, wait_for_event, result) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, result) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertHistoryParams struct {
@@ -618,7 +734,7 @@ type InsertHistoryParams struct {
 	RunID           ulid.ULID
 	EventID         ulid.ULID
 	BatchID         ulid.ULID
-	GroupID         interface{}
+	GroupID         sql.NullString
 	IdempotencyKey  string
 	Type            string
 	Attempt         int64
@@ -628,6 +744,7 @@ type InsertHistoryParams struct {
 	CancelRequest   sql.NullString
 	Sleep           sql.NullString
 	WaitForEvent    sql.NullString
+	WaitResult      sql.NullString
 	Result          sql.NullString
 }
 
@@ -652,6 +769,7 @@ func (q *Queries) InsertHistory(ctx context.Context, arg InsertHistoryParams) er
 		arg.CancelRequest,
 		arg.Sleep,
 		arg.WaitForEvent,
+		arg.WaitResult,
 		arg.Result,
 	)
 	return err

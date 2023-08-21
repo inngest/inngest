@@ -46,6 +46,14 @@ CREATE TABLE function_runs (
 	original_run_id BLOB
 );
 
+CREATE TABLE function_finishes (
+	run_id BLOB, 
+	status VARCHAR NOT NULL,
+	output VARCHAR NOT NULL DEFAULT '{}',
+	completed_step_count INT NOT NULL DEFAULT 1,
+	created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE history (
 	id BLOB,
 	created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -65,5 +73,6 @@ CREATE TABLE history (
 	cancel_request VARCHAR,
 	sleep VARCHAR,
 	wait_for_event VARCHAR,
+	wait_result VARCHAR,
 	result VARCHAR
 );

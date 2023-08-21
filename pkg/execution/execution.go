@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
@@ -37,9 +38,14 @@ import (
 // for storing the outcome of an action via Resume and Fail at any point after an
 // action has started.
 type Executor interface {
-	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
-	// always add to a list of listeners vs replace listeners.
-	AddLifecycleListener(l LifecycleListener)
+	// Schedule is called to schedule a given function with the given event.  This
+	// creates a new function run by initializing blank function state and placing
+	// the run in the queue.
+	//
+	// Note that the executor does *not* handle rate limiting, debouncing, batching,
+	// expressions, etc.  Any Schedule request will immediately be scheduled for the
+	// given time. Filtering of events in any way must be handled prior scheduling.
+	Schedule(ctx context.Context, r ScheduleRequest) (*state.Identifier, error)
 
 	// Execute runs the given function via the execution drivers.  If the
 	// from ID is "$trigger" this is treated as a new workflow invocation from the
@@ -58,7 +64,7 @@ type Executor interface {
 	// Execution will fail with no response and state.ErrFunctionCancelled if this function
 	// run has been cancelled by an external event or process.
 	//
-	// This returns the step's response, the current stack pointer index, and any error.
+	// This returns the step's response and any error.
 	Execute(
 		ctx context.Context,
 		id state.Identifier,
@@ -73,7 +79,7 @@ type Executor interface {
 		// This lets SDKs correctly evaluate parallelism by replaying generated steps in the
 		// right order.
 		stackIndex int,
-	) (*state.DriverResponse, int, error)
+	) (*state.DriverResponse, error)
 
 	// HandleGeneratorResponse handles all generator responses.
 	HandleGeneratorResponse(ctx context.Context, gen []*state.GeneratorOpcode, item queue.Item) error
@@ -87,12 +93,41 @@ type Executor interface {
 	Cancel(ctx context.Context, id state.Identifier, r CancelRequest) error
 	// Resume resumes an in-progress function run from the given waitForEvent pause.
 	Resume(ctx context.Context, p state.Pause, r ResumeRequest) error
+
+	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
+	// always add to a list of listeners vs replace listeners.
+	AddLifecycleListener(l LifecycleListener)
+
 	// SetFailureHandler sets the failure handler, called when a function run permanently fails.
 	SetFailureHandler(f FailureHandler)
 }
 
 // FailureHandler is a function that handles failures in the executor.
 type FailureHandler func(context.Context, state.Identifier, state.State, state.DriverResponse) error
+
+// ScheduleRequest represents all data necessary to schedule a new function.
+type ScheduleRequest struct {
+	Function inngest.Function
+	// StaticVersion represents the ability to pin this function to a specific version,
+	// disabling live migrations.
+	StaticVersion bool `json:"s,omitempty"`
+	// At allows functions to be scheduled in the future.
+	At *time.Time
+	// AccountID is the account that the request belongs to.
+	AccountID uuid.UUID
+	// WorkspaceID is the workspace that this request belongs to.
+	WorkspaceID uuid.UUID
+	// OriginalRunID is the ID of the ID of the original run, if this a replay.
+	OriginalRunID *ulid.ULID
+	// Events represent one or more events that the function is being triggered with.
+	Events []event.TrackedEvent
+	// BatchID refers to the batch ID, if this function is started as a batch.
+	BatchID *ulid.ULID
+	// IdempotencyKey represents an optional idempotency key for the function.
+	IdempotencyKey *string
+	// Context represents additional context used when initialiizing function runs.
+	Context map[string]any
+}
 
 // CancelRequest stores information about the incoming cancellation request within
 // history.
@@ -105,65 +140,4 @@ type CancelRequest struct {
 type ResumeRequest struct {
 	With    any
 	EventID *ulid.ULID
-}
-
-// LifecycleListener listens to lifecycle events on the executor.
-type LifecycleListener interface {
-	// Close closes the listener and flushes any pending writes.
-	Close() error
-
-	OnStepStarted(
-		context.Context,
-		state.Identifier,
-		queue.Item,
-		inngest.Edge,
-		inngest.Step,
-		state.State,
-	)
-
-	OnStepFinished(
-		context.Context,
-		state.Identifier,
-		queue.Item,
-		inngest.Edge,
-		inngest.Step,
-		state.DriverResponse,
-	)
-
-	OnWaitForEvent(
-		context.Context,
-		state.Identifier,
-		queue.Item,
-		state.GeneratorOpcode,
-	)
-}
-
-type NoopLifecyceListener struct{}
-
-func (NoopLifecyceListener) OnStepStarted(
-	ctx context.Context,
-	id state.Identifier,
-	item queue.Item,
-	edge inngest.Edge,
-	step inngest.Step,
-	state state.State,
-) {
-}
-
-func (NoopLifecyceListener) OnStepFinished(
-	context.Context,
-	state.Identifier,
-	queue.Item,
-	inngest.Step,
-	*state.DriverResponse,
-	error,
-) {
-}
-
-func (NoopLifecyceListener) OnWaitForEvent(
-	context.Context,
-	state.Identifier,
-	queue.Item,
-	state.GeneratorOpcode,
-) {
 }

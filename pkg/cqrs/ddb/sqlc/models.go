@@ -46,6 +46,14 @@ type Function struct {
 	CreatedAt time.Time
 }
 
+type FunctionFinish struct {
+	RunID              ulid.ULID
+	Status             string
+	Output             string
+	CompletedStepCount int64
+	CreatedAt          time.Time
+}
+
 type FunctionRun struct {
 	RunID           ulid.ULID
 	RunStartedAt    time.Time
@@ -66,7 +74,7 @@ type History struct {
 	RunID           ulid.ULID
 	EventID         ulid.ULID
 	BatchID         ulid.ULID
-	GroupID         interface{}
+	GroupID         sql.NullString
 	IdempotencyKey  string
 	Type            string
 	Attempt         int64
@@ -76,5 +84,6 @@ type History struct {
 	CancelRequest   sql.NullString
 	Sleep           sql.NullString
 	WaitForEvent    sql.NullString
+	WaitResult      sql.NullString
 	Result          sql.NullString
 }

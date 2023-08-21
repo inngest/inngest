@@ -13,6 +13,16 @@ CREATE TABLE apps (
 	url VARCHAR NOT NULL
 );
 
+CREATE TABLE events (
+	internal_id CHAR(26) PRIMARY KEY,
+	event_id VARCHAR NOT NULL,
+	event_name VARCHAR NOT NULL,
+	event_data VARCHAR DEFAULT '{}' NOT NULL,
+	event_user VARCHAR DEFAULT '{}' NOT NULL,
+	event_v VARCHAR,
+	event_ts TIMESTAMP NOT NULL
+);
+
 CREATE TABLE functions (
 	id UUID PRIMARY KEY,
 	app_id UUID,
@@ -33,26 +43,24 @@ CREATE TABLE function_runs (
 	original_run_id CHAR(26)
 );
 
-CREATE TABLE events (
-	internal_id CHAR(26) PRIMARY KEY,
-	event_id VARCHAR NOT NULL,
-	event_name VARCHAR NOT NULL,
-	event_data VARCHAR DEFAULT '{}' NOT NULL,
-	event_user VARCHAR DEFAULT '{}' NOT NULL,
-	event_v VARCHAR,
-	event_ts TIMESTAMP NOT NULL
+CREATE TABLE function_finishes (
+	run_id BLOB, 
+	status VARCHAR NOT NULL,
+	output VARCHAR NOT NULL DEFAULT '{}',
+	completed_step_count INT NOT NULL DEFAULT 1,
+	created_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE history (
-	id UUID,
+	id BLOB,
 	created_at TIMESTAMP NOT NULL,
 	run_started_at TIMESTAMP NOT NULL,
 	function_id UUID,
 	function_version INT NOT NULL,
-	run_id CHAR(26) NOT NULL, 
-	event_id CHAR(26) NOT NULL, 
-	batch_id CHAR(26), 
-	group_id CHAR(36),
+	run_id BLOB NOT NULL, 
+	event_id BLOB NOT NULL, 
+	batch_id BLOB, 
+	group_id VARCHAR,
 	idempotency_key VARCHAR NOT NULL,
 	type VARCHAR NOT NULL,
 	attempt INT NOT NULL,
@@ -62,5 +70,6 @@ CREATE TABLE history (
 	cancel_request VARCHAR,
 	sleep VARCHAR,
 	wait_for_event VARCHAR,
+	wait_result VARCHAR,
 	result VARCHAR
 );

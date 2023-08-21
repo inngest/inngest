@@ -42,4 +42,13 @@ const (
 	// InvokeSlugKey is the data key used to store the fn name when invoking a function
 	// via an RPC-like call, abstracting event-driven fanout.
 	InvokeSlugKey = "_inngest_fn"
+
+	// CancelTimeout is the maximum time a cancellation can exist
+	CancelTimeout = time.Hour * 24 * 365
+
+	// SourceEdgeRetries represents the number of times we'll retry running a source edge.
+	// Each edge gets their own set of retries in our execution engine, embedded directly
+	// in the job.  The retry count is taken from function config for every step _but_
+	// initialization.
+	SourceEdgeRetries = 20
 )

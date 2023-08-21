@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/inngest/inngest/pkg/cqrs/ddb/sqlc"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/oklog/ulid/v2"
 )
@@ -32,14 +33,15 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 		IdempotencyKey:  h.IdempotencyKey,
 		Type:            h.Type,
 		Attempt:         h.Attempt,
-		// TODO: Status
-		// TODO: Completed step count
 	}
 	if h.BatchID != nil {
 		params.BatchID = *h.BatchID
 	}
 	if h.GroupID != nil {
-		params.GroupID = h.GroupID.String()
+		params.GroupID = sql.NullString{
+			String: h.GroupID.String(),
+			Valid:  true,
+		}
 	}
 	if h.StepName != nil {
 		params.StepName = sql.NullString{
@@ -72,24 +74,64 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 	if err != nil {
 		return err
 	}
+	params.CancelRequest, err = marshalJSONAsNullString(h.Cancel)
+	if err != nil {
+		return err
+	}
+	params.WaitResult, err = marshalJSONAsNullString(h.WaitResult)
+	if err != nil {
+		return err
+	}
 
-	// TODO: Cancellation
+	if err := d.q.InsertHistory(context.Background(), params); err != nil {
+		return err
+	}
 
-	return d.q.InsertHistory(context.Background(), params)
+	switch h.Type {
+	case enums.HistoryTypeFunctionCancelled.String(),
+		enums.HistoryTypeFunctionCompleted.String(),
+		enums.HistoryTypeFunctionFailed.String():
+		// Add a function ends row.
+		end := sqlc.InsertFunctionFinishParams{
+			RunID:     h.RunID,
+			Status:    h.Type,
+			CreatedAt: h.CreatedAt,
+		}
+		if h.Result != nil {
+			end.Output, _ = marshalJSONAsString(h.Result.Output)
+		}
+		return d.q.InsertFunctionFinish(context.Background(), end)
+	default:
+		return nil
+	}
 }
 
 func (historyDriver) Close() error { return nil }
 
-func marshalJSONAsNullString(input any) (sql.NullString, error) {
-	if input == nil {
-		return sql.NullString{}, nil
+func marshalJSONAsString(input any) (string, error) {
+	switch v := input.(type) {
+	case []byte:
+		return string(v), nil
+	case json.RawMessage:
+		return string(v), nil
+	case string:
+		return v, nil
 	}
+
 	byt, err := json.Marshal(input)
 	if err != nil {
-		return sql.NullString{}, err
+		return "", err
+	}
+	return string(byt), nil
+}
+
+func marshalJSONAsNullString(input any) (sql.NullString, error) {
+	str, err := marshalJSONAsString(input)
+	if err != nil || str == "" {
+		return sql.NullString{}, nil
 	}
 	return sql.NullString{
 		Valid:  true,
-		String: string(byt),
+		String: str,
 	}, nil
 }

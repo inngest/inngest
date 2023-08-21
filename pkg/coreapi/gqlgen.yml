@@ -30,6 +30,8 @@ models:
     model: github.com/inngest/inngest/pkg/inngest.RuntimeWrapper
   FunctionVersion:
     model: github.com/inngest/inngest/pkg/function.FunctionVersion
+  FunctionRunFinish:
+    model: github.com/inngest/inngest/pkg/cqrs.FunctionRunFinish
   Event:
     fields:
       functionRuns:
@@ -55,4 +57,8 @@ models:
       status:
         resolver: true
       function:
+        resolver: true
+      output:
+        resolver: true
+      finishedAt:
         resolver: true

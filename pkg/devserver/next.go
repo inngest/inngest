@@ -69,11 +69,11 @@ type route struct {
 
 func (r *route) match(ctx context.Context, path string) ([]byte, error) {
 	if r.compiledRegex == nil {
-		r.compiledRegex = regexp.MustCompile(r.Regex)
-		r.compiledNamedRegex = regexp.MustCompile(r.NamedRegex)
+		r.compiledRegex, _ = regexp.Compile(r.Regex)
+		r.compiledNamedRegex, _ = regexp.Compile(r.NamedRegex)
 	}
 
-	if r.compiledRegex.MatchString(path) {
+	if r.compiledRegex != nil && r.compiledRegex.MatchString(path) {
 		file := "static" + r.Page + ".html"
 		if r.Page == "/" {
 			file = "static/index.html"
