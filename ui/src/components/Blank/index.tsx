@@ -26,7 +26,7 @@ export const BlankSlate = ({ imageUrl, title, subtitle, button, link }: BlankSla
         {subtitle ? <div>{subtitle}</div> : null}
 
         {link ? (
-          <Link internalNavigation={false} href={link.url}>
+          <Link href={link.url}>
             <div>{link.text}</div>
           </Link>
         ) : button ? (
