@@ -7,6 +7,7 @@ import { testCancel } from "@/inngest/sdk_cancel_test";
 import { testRetry } from "@/inngest/sdk_retry_test";
 import { testNonRetriableError } from "@/inngest/non_retryable";
 import { testParallelism } from "@/inngest/sdk_parallel_test";
+import { testWaitForEvent } from "@/inngest/sdk_wait_for_event_test";
 
 export default serve(inngest, [
   testSdkFunctions,
@@ -15,4 +16,5 @@ export default serve(inngest, [
   testRetry,
   testNonRetriableError,
   testParallelism,
+  testWaitForEvent,
 ]);

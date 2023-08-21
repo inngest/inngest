@@ -696,6 +696,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	}
 
 	if pause.OnTimeout && r.EventID != nil {
+		fmt.Println("NO MAN")
 		// Delete this pause, as an event has occured which matches
 		// the timeout.  We can do this prior to leasing a pause as it's the
 		// only work that needs to happen
@@ -703,20 +704,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		if err == nil || err == state.ErrPauseNotFound {
 			return nil
 		}
-		return err
-	}
-	if !pause.OnTimeout && r.EventID == nil {
-		// If this isn't a timeout and we don't have an event, we cannot consume
-		// this pause.  This is because no event occured during the timeframe the
-		// pause existed.
-		err := e.sm.ConsumePause(ctx, pause.ID, nil)
-		if err == nil || err == state.ErrPauseNotFound {
-			return nil
-		}
-		// Finalize this action without it running.
-		// if err := e.sm.Finalized(ctx, pause.Identifier, pause.Edge().Incoming, 0); err != nil {
-		// 	return err
-		// }
 		return err
 	}
 

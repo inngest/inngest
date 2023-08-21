@@ -9,7 +9,6 @@ export const testParallelism = inngest.createFunction(
       step.run("a", () => "a"),
       step.run("b", () => "b"),
       step.run("c", () => "c"),
-      step.sleep("1s"),
     ]);
 
     const d = await step.run("d", () => "d");
