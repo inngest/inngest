@@ -6,7 +6,6 @@ import Badge from '@/components/Badge';
 import CodeLine from '@/components/CodeLine';
 import Link from '@/components/Link/Link';
 import useDebounce from '@/hooks/useDebounce';
-import useDocsNavigation from '@/hooks/useDocsNavigation';
 import {
   IconChevron,
   IconSpinner,
@@ -23,7 +22,6 @@ export default function AppCard({ app }: { app: App }) {
   const [inputUrl, setInputUrl] = useState(app.url || '');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const navigateToDocs = useDocsNavigation();
   const [_updateApp, updateAppState] = useUpdateAppMutation();
   const [_deleteApp, deleteAppState] = useDeleteAppMutation();
 
@@ -153,9 +151,7 @@ export default function AppCard({ app }: { app: App }) {
                     onChange={handleChange}
                     readOnly={app.autodiscovered}
                   />
-                  {isLoading && (
-                    <IconSpinner className="absolute top-1/3 right-2" />
-                  )}
+                  {isLoading && <IconSpinner className="absolute top-1/3 right-2" />}
                   {isUrlInvalid && (
                     <p className="absolute text-rose-400 top-10 left-14">
                       Please enter a valid URL
@@ -178,11 +174,7 @@ export default function AppCard({ app }: { app: App }) {
                 </div>
               </div>
               {!app.connected && (
-                <Link
-                  internalNavigation
-                  className="w-fit"
-                  onClick={() => navigateToDocs('/sdk/serve')}
-                >
+                <Link className="w-fit" href="https://www.inngest.com/docs/sdk/serve">
                   Connecting to the Dev Server
                 </Link>
               )}
@@ -231,11 +223,7 @@ export default function AppCard({ app }: { app: App }) {
                     a function and are exporting it correctly from your serve command.
                   </p>
                   <CodeLine code="serve(client, [list_of_fns]);" className="p-4 mb-4" />
-                  <Link
-                    internalNavigation
-                    className="w-fit"
-                    onClick={() => navigateToDocs('/functions')}
-                  >
+                  <Link className="w-fit" href="https://www.inngest.com/docs/functions">
                     Creating Functions
                   </Link>
                 </>

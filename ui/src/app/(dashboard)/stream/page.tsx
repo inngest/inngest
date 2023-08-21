@@ -11,7 +11,6 @@ import { EventStream } from '@/components/Event/Stream';
 import { FunctionRunSection } from '@/components/Function/RunSection';
 import { FuncStream } from '@/components/Function/Stream';
 import TimelineScrollContainer from '@/components/Timeline/TimelineScrollContainer';
-import useDocsNavigation from '@/hooks/useDocsNavigation';
 import { useGetEventsStreamQuery, useGetFunctionsStreamQuery } from '@/store/generated';
 import { useAppSelector } from '@/store/hooks';
 import classNames from '@/utils/classnames';
@@ -20,7 +19,6 @@ export default function Stream() {
   const [secondaryTab, setSecondaryTab] = useState('events');
   const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
   const selectedRun = useAppSelector((state) => state.global.selectedRun);
-  const navigateToDocs = useDocsNavigation();
 
   const { hasEvents, isLoading: eventsLoading } = useGetEventsStreamQuery(undefined, {
     selectFromResult: (result) => ({
@@ -105,9 +103,9 @@ export default function Stream() {
             title="Inngest hasn't received any events"
             subtitle="Read our documentation to learn how to send events to Inngest."
             imageUrl="/images/no-events.png"
-            button={{
+            link={{
               text: 'Sending Events',
-              onClick: () => navigateToDocs('/events'),
+              url: 'https://www.inngest.com/docs/events',
             }}
           />
         )
@@ -122,9 +120,9 @@ export default function Stream() {
           title="No functions have been run yet"
           subtitle="We haven't run any functions in response to events or crons yet. Read our documentation to learn how to write and call a function."
           imageUrl="/images/no-results.png"
-          button={{
+          link={{
             text: 'Writing Functions',
-            onClick: () => navigateToDocs('/functions'),
+            url: 'https://www.inngest.com/docs/functions',
           }}
         />
       )}
