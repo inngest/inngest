@@ -288,13 +288,10 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		if err != nil {
 			return fmt.Errorf("unable to schedule generator response: %w", err)
 		}
-		// Finalize this step early, as we don't need to re-invoke anything else or
-		// load children until generators complete.
-		return s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt)
 	}
 
 	l.Debug().Interface("edge", edge).Msg("step complete")
-	return nil
+	return s.state.Finalized(ctx, item.Identifier, edge.Incoming, item.Attempt)
 }
 
 func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
