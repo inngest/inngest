@@ -14,7 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -46,7 +46,13 @@ type Runner interface {
 	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
-func WithExecutor(e executor.Executor) func(s *svc) {
+func WithCQRS(data cqrs.Manager) func(s *svc) {
+	return func(s *svc) {
+		s.cqrs = data
+	}
+}
+
+func WithExecutor(e execution.Executor) func(s *svc) {
 	return func(s *svc) {
 		s.executor = e
 	}
@@ -100,11 +106,12 @@ func NewService(c config.Config, opts ...Opt) Runner {
 
 type svc struct {
 	config config.Config
+	cqrs   cqrs.Manager
 	// pubsub allows us to subscribe to new events, and re-publish events
 	// if there are errors.
 	pubsub pubsub.PublishSubscriber
 	// executor handles execution of functions.
-	executor executor.Executor
+	executor execution.Executor
 	// data provides the required loading capabilities to trigger functions
 	// from events.
 	data cqrs.ExecutionLoader
@@ -287,8 +294,15 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		return fmt.Errorf("error creating event: %w", err)
 	}
 
-	// TODO: Refactor to store in duckdb
 	tracked := event.NewOSSTrackedEvent(*evt)
+	// Write the event to our CQRS manager for long-term storage.
+	err = s.cqrs.InsertEvent(
+		ctx,
+		cqrs.ConvertFromEvent(tracked.InternalID(), tracked.Event()),
+	)
+	if err != nil {
+		return err
+	}
 
 	l := logger.From(ctx).With().
 		Str("event", evt.Name).
@@ -478,8 +492,23 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		Str("function_id", fn.ID.String()).
 		Str("function", fn.Name).
 		Msg("initializing fn")
-	_, err := Initialize(ctx, fn, evt, s.state, s.queue)
-	return err
+	id, err := Initialize(ctx, fn, evt, s.state, s.queue)
+	if err != nil {
+		return err
+	}
+
+	triggerType := "event"
+	if evt.Event().Name == "inngest/scheduled.timer" {
+		triggerType = "cron"
+	}
+
+	return s.cqrs.InsertFunctionRun(ctx, cqrs.FunctionRun{
+		RunID:        id.RunID,
+		RunStartedAt: ulid.Time(id.RunID.Time()),
+		FunctionID:   fn.ID,
+		EventID:      evt.InternalID(),
+		TriggerType:  triggerType,
+	})
 }
 
 // Initialize creates a new funciton run identifier for the given workflow and

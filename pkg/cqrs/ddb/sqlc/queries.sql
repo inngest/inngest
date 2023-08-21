@@ -30,9 +30,11 @@ UPDATE apps SET url = ? WHERE id = ? RETURNING *;
 -- name: UpdateAppError :one
 UPDATE apps SET error = ? WHERE id = ? RETURNING *;
 
+
 --
--- Functions
+-- functions
 --
+
 
 -- note - this is very basic right now.
 -- name: InsertFunction :one
@@ -57,3 +59,43 @@ DELETE FROM functions WHERE app_id = ?;
 
 -- name: DeleteFunctionsByIDs :exec
 DELETE FROM functions WHERE id IN (sqlc.slice('ids'));
+
+
+--
+-- function runs
+--
+
+-- name: InsertFunctionRun :exec
+INSERT INTO function_runs
+	(run_id, run_started_at, function_id, function_version, trigger_type, event_id, batch_id, original_run_id) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: GetFunctionRunsTimebound :many
+SELECT * FROM function_runs WHERE run_started_at > @after AND run_started_at <= @before LIMIT ?;
+
+-- name: GetFunctionRunsFromEvents :many
+SELECT * FROM function_runs WHERE event_id IN (sqlc.slice('event_ids'));
+
+--
+-- Events
+--
+
+-- name: InsertEvent :exec
+INSERT INTO events
+	(internal_id, event_id, event_name, event_data, event_user, event_v, event_ts) VALUES
+	(?, ?, ?, ?, ?, ?, ?);
+
+-- name: GetEventByInternalID :one
+SELECT * FROM events WHERE internal_id = ?;
+
+-- name: GetEventsTimebound :many
+SELECT * FROM events WHERE event_ts > @after AND event_ts <= @before ORDER BY event_ts DESC LIMIT ?;
+
+--
+-- History
+--
+
+-- name: InsertHistory :exec
+INSERT INTO history
+	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, step_name, step_id, url, cancel_request, sleep, wait_for_event, result) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

@@ -50,3 +50,9 @@ models:
         resolver: true
       waitingFor:
         resolver: true
+      pendingSteps:
+        resolver: true
+      status:
+        resolver: true
+      function:
+        resolver: true

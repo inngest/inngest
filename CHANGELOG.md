@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.16.6] - 2023-08-19
+
+### Added
+- Added initial lifecycle interface to track execution lifecycles of steps
+
+### Fixed
+- Fixed tracking of function completions from earlier regresion due to lifecycle changes
+
 ## [v0.16.0] - 2023-07-31
 
 ### Added

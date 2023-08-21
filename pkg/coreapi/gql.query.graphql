@@ -1,6 +1,8 @@
 type Query {
   apps: [App!]!
 
+  stream(query: StreamQuery!): [StreamItem!]!
+
   # Get an individual event
   event(query: EventQuery!): Event
 
@@ -40,4 +42,16 @@ input FunctionRunQuery {
 
 input FunctionRunsQuery {
   workspaceId: ID! = "local"
+}
+
+input StreamQuery {
+  # This allows you to query for items after a specific time.  If
+  # not provided this defaults to the most recent items in the stream,
+  # eg now.
+  after: Time
+  # Before allows you to receive items in a stream before a specific time.
+  # This is useful as you can add the last stream item's time as the before
+  # field, ensuring that only new items are received.
+  before: Time
+  limit: Int! = 20
 }

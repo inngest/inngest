@@ -75,6 +75,9 @@ func NewOSSTrackedEvent(e Event) TrackedEvent {
 	if err != nil {
 		id = ulid.MustNew(ulid.Now(), rand.Reader)
 	}
+	if e.ID == "" {
+		e.ID = id.String()
+	}
 	return ossTrackedEvent{
 		id:    id,
 		event: e,

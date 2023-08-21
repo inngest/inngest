@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -63,6 +64,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	// Initialize the devserver
 	dbcqrs := ddb.NewCQRS(db)
+	hd := ddb.NewHistoryDriver(db)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	rc, err := createInmemoryRedis(ctx)
@@ -142,6 +144,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithQueue(queue),
 		executor.WithLogger(logger.From(ctx)),
 		executor.WithFunctionLoader(loader),
+		executor.WithLifecycleListeners(history.NewLifecycleListener(nil, hd)),
 	)
 	if err != nil {
 		return err
@@ -158,6 +161,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	runner := runner.NewService(
 		opts.Config,
+		runner.WithCQRS(dbcqrs),
 		runner.WithExecutor(exec),
 		runner.WithExecutionLoader(dbcqrs),
 		runner.WithEventManager(event.NewManager()),
