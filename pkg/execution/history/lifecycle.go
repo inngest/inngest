@@ -62,7 +62,7 @@ func (l lifecycle) OnFunctionScheduled(
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(ctx, h); err != nil {
-			l.log.Error("execution lifecycle error", "lifecycle", "onStepFinished", "error", err)
+			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionScheduled", "error", err)
 		}
 	}
 }
@@ -124,7 +124,7 @@ func (l lifecycle) OnFunctionFinished(
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(ctx, h); err != nil {
-			l.log.Error("execution lifecycle error", "lifecycle", "onStepFinished", "error", err)
+			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionFinished", "error", err)
 		}
 	}
 }
@@ -163,6 +163,29 @@ func (l lifecycle) OnStepScheduled(
 	id state.Identifier,
 	item queue.Item,
 ) {
+	edge, _ := queue.GetEdge(item)
+	if edge == nil {
+		return
+	}
+	h := History{
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		CreatedAt:       time.Now(),
+		FunctionID:      id.WorkflowID,
+		FunctionVersion: int64(id.WorkflowVersion),
+		RunID:           id.RunID,
+		Type:            enums.HistoryTypeStepScheduled.String(),
+		Attempt:         int64(item.Attempt),
+		IdempotencyKey:  id.IdempotencyKey(),
+		StepName:        &edge.Edge.Incoming,
+		StepID:          &edge.Edge.Incoming, // TODO: Add step name to edge.
+		EventID:         id.EventID,
+		BatchID:         id.BatchID,
+	}
+	for _, d := range l.drivers {
+		if err := d.Write(ctx, h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onStepScheduled", "error", err)
+		}
+	}
 }
 
 func (l lifecycle) OnStepStarted(
@@ -295,7 +318,7 @@ func (l lifecycle) OnWaitForEventResumed(
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(ctx, h); err != nil {
-			l.log.Error("execution lifecycle error", "lifecycle", "onStepStarted", "error", err)
+			l.log.Error("execution lifecycle error", "lifecycle", "onWaitForEventResumed", "error", err)
 		}
 	}
 }
@@ -328,7 +351,7 @@ func (l lifecycle) OnSleep(
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(ctx, h); err != nil {
-			l.log.Error("execution lifecycle error", "lifecycle", "onStepStarted", "error", err)
+			l.log.Error("execution lifecycle error", "lifecycle", "onSleep", "error", err)
 		}
 	}
 }

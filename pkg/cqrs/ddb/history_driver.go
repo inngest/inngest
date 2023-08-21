@@ -93,14 +93,14 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 		enums.HistoryTypeFunctionFailed.String():
 		// Add a function ends row.
 		end := sqlc.InsertFunctionFinishParams{
-			RunID:     h.ID,
+			RunID:     h.RunID,
 			Status:    h.Type,
 			CreatedAt: h.CreatedAt,
 		}
 		if h.Result != nil {
 			end.Output, _ = marshalJSONAsString(h.Result.Output)
 		}
-		return d.q.InsertFunctionFinish(ctx, end)
+		return d.q.InsertFunctionFinish(context.Background(), end)
 	default:
 		return nil
 	}
