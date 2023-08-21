@@ -286,6 +286,26 @@ func (l lifecycle) OnWaitForEventResumed(
 	id state.Identifier,
 	req execution.ResumeRequest,
 ) {
+	h := History{
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		CreatedAt:       time.Now(),
+		FunctionID:      id.WorkflowID,
+		FunctionVersion: int64(id.WorkflowVersion),
+		RunID:           id.RunID,
+		Type:            enums.HistoryTypeStepStarted.String(),
+		IdempotencyKey:  id.IdempotencyKey(),
+		EventID:         id.EventID,
+		BatchID:         id.BatchID,
+		WaitResult: &WaitResult{
+			EventID: req.EventID,
+			Timeout: req.EventID == nil,
+		},
+	}
+	for _, d := range l.drivers {
+		if err := d.Write(ctx, h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onStepStarted", "error", err)
+		}
+	}
 }
 
 // OnSleep is called when a sleep step is scheduled.  The

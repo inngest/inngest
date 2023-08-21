@@ -140,7 +140,4 @@ type CancelRequest struct {
 type ResumeRequest struct {
 	With    any
 	EventID *ulid.ULID
-	// Timeout, if true, indicates that the function resumed from a waitForEvent because the
-	// timeout was hit.
-	Timeout bool
 }

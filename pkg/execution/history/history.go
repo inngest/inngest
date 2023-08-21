@@ -41,6 +41,7 @@ type History struct {
 	CancelUser         *CancelUser
 	Sleep              *Sleep
 	WaitForEvent       *WaitForEvent
+	WaitResult         *WaitResult
 	Result             *Result
 }
 
@@ -61,6 +62,11 @@ type WaitForEvent struct {
 	EventName  string    `json:"event_name"`
 	Expression *string   `json:"expression"`
 	Timeout    time.Time `json:"timeout"`
+}
+
+type WaitResult struct {
+	EventID *ulid.ULID `json:"event_id"`
+	Timeout bool       `json:"timeout"`
 }
 
 type Result struct {

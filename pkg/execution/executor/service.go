@@ -249,28 +249,5 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	if err := s.state.ConsumePause(ctx, pause.ID, nil); err != nil {
-		return fmt.Errorf("error consuming timeout pause: %w", err)
-	}
-
-	if pauseTimeout.OnTimeout {
-		l.Info().Interface("pause", pauseTimeout).Interface("edge", pause.Edge()).Msg("scheduling pause timeout step")
-		// Enqueue the next job to run.  We could handle this in the
-		// same thread, but its safer to enable retries by re-enqueueing.
-		if err := s.queue.Enqueue(ctx, queue.Item{
-			Kind:       queue.KindEdge,
-			Identifier: item.Identifier,
-			Payload:    queue.PayloadEdge{Edge: pause.Edge()},
-		}, time.Now()); err != nil {
-			return fmt.Errorf("error enqueueing timeout step: %w", err)
-		}
-	} else {
-		l.Info().Interface("pause", pauseTimeout).Interface("edge", pause.Edge()).Msg("ignoring pause timeout")
-		// Finalize this action without it running.
-		if err := s.state.Finalized(ctx, item.Identifier, pause.Edge().Incoming, 0); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return s.exec.Resume(ctx, *pause, execution.ResumeRequest{})
 }

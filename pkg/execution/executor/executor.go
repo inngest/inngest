@@ -672,7 +672,10 @@ func (e *executor) Cancel(ctx context.Context, id state.Identifier, r execution.
 		return fmt.Errorf("error cancelling function: %w", err)
 	}
 
-	// XXX: Write to history here.
+	for _, e := range e.lifecycles {
+		go e.OnFunctionCancelled(ctx, id, r)
+	}
+
 	return nil
 }
 
@@ -692,7 +695,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return nil
 	}
 
-	if pause.OnTimeout {
+	if pause.OnTimeout && r.EventID != nil {
 		// Delete this pause, as an event has occured which matches
 		// the timeout.  We can do this prior to leasing a pause as it's the
 		// only work that needs to happen
@@ -700,6 +703,20 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		if err == nil || err == state.ErrPauseNotFound {
 			return nil
 		}
+		return err
+	}
+	if !pause.OnTimeout && r.EventID == nil {
+		// If this isn't a timeout and we don't have an event, we cannot consume
+		// this pause.  This is because no event occured during the timeframe the
+		// pause existed.
+		err := e.sm.ConsumePause(ctx, pause.ID, nil)
+		if err == nil || err == state.ErrPauseNotFound {
+			return nil
+		}
+		// Finalize this action without it running.
+		// if err := e.sm.Finalized(ctx, pause.Identifier, pause.Edge().Incoming, 0); err != nil {
+		// 	return err
+		// }
 		return err
 	}
 
@@ -716,10 +733,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			Kind:        queue.KindEdge,
 			Identifier:  pause.Identifier,
 			Payload: queue.PayloadEdge{
-				Edge: inngest.Edge{
-					Outgoing: pause.Outgoing,
-					Incoming: pause.Incoming,
-				},
+				Edge: pause.Edge(),
 			},
 		},
 		time.Now(),
@@ -730,6 +744,11 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	if err = e.sm.ConsumePause(ctx, pause.ID, r.With); err != nil {
 		return fmt.Errorf("error consuming pause via event: %w", err)
 	}
+
+	for _, e := range e.lifecycles {
+		go e.OnWaitForEventResumed(ctx, pause.Identifier, r)
+	}
+
 	return nil
 }
 
@@ -805,7 +824,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 	// Update the group ID in context;  we've already saved this step's success and we're now
 	// running the step again, needing a new history group
 	groupID := uuid.New().String()
-	err := e.queue.Enqueue(ctx, queue.Item{
+	nextItem := queue.Item{
 		WorkspaceID: item.WorkspaceID,
 		GroupID:     groupID,
 		Kind:        queue.KindEdge,
@@ -813,10 +832,16 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		Attempt:     0,
 		MaxAttempts: item.MaxAttempts,
 		Payload:     queue.PayloadEdge{Edge: nextEdge},
-	}, time.Now())
+	}
+	err := e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
 		return nil
 	}
+
+	for _, l := range e.lifecycles {
+		go l.OnStepScheduled(ctx, item.Identifier, nextItem)
+	}
+
 	return err
 }
 
@@ -842,7 +867,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 	// Update the group ID in context;  we're scheduling a new step, and we want
 	// to start a new history group for this item.
 	groupID := uuid.New().String()
-	err := e.queue.Enqueue(ctx, queue.Item{
+	nextItem := queue.Item{
 		JobID:       &jobID,
 		GroupID:     groupID, // Ensure we correlate future jobs with this group ID, eg. started/failed.
 		WorkspaceID: item.WorkspaceID,
@@ -853,9 +878,14 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 		Payload: queue.PayloadEdge{
 			Edge: nextEdge,
 		},
-	}, time.Now())
+	}
+	err := e.queue.Enqueue(ctx, nextItem, time.Now())
 	if err == redis_state.ErrQueueItemExists {
 		return nil
+	}
+
+	for _, l := range e.lifecycles {
+		go l.OnStepScheduled(ctx, item.Identifier, nextItem)
 	}
 	return err
 }
