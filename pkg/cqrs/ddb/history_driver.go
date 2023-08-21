@@ -109,10 +109,6 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 func (historyDriver) Close() error { return nil }
 
 func marshalJSONAsString(input any) (string, error) {
-	if input == nil {
-		return "", nil
-	}
-
 	switch v := input.(type) {
 	case []byte:
 		return string(v), nil
