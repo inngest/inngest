@@ -7,7 +7,7 @@ import BG from '@/components/BG';
 import Header from '@/components/Header';
 import Navbar from '@/components/Navbar/Navbar';
 import NavbarLink from '@/components/Navbar/NavbarLink';
-import { IconBook, IconFeed, IconFunction, IconWindow } from '@/icons';
+import { IconFeed, IconFunction, IconWindow } from '@/icons';
 import { useGetAppsQuery } from '@/store/generated';
 import classNames from '@/utils/classnames';
 
@@ -42,7 +42,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             tabName="Apps"
           />
           <NavbarLink icon={<IconFunction />} href="functions" tabName="Functions" />
-          <NavbarLink icon={<IconBook />} href="docs" tabName="Docs" />
         </Navbar>
       </Header>
       {children}
