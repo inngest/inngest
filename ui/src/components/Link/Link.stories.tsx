@@ -18,7 +18,6 @@ const meta = {
     children: {
       control: false,
     },
-    onClick: { action: 'archor clicked'}
   },
   tags: ['autodocs'],
 } satisfies Meta<typeof Link>;
@@ -27,7 +26,7 @@ export default meta;
 
 type Story = StoryObj<typeof Link>;
 
-export const InternalNavigationUsingNextLink: Story = {
+export const InternalNavigation: Story = {
   args: {
     children: <p>This is a link to inside the app</p>,
     internalNavigation: true,
@@ -36,21 +35,7 @@ export const InternalNavigationUsingNextLink: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'It is the preferable solution to take users to other pages or sections inside the app. It uses Next.js Links.'
-      }
-    }
-  }
-};
-
-export const InternalNavigationUsingAnchor: Story = {
-  args: {
-    children: <p>This is a link to inside the app</p>,
-    internalNavigation: true,
-  },
-  parameters: {
-    docs: {
-      description: {
-        story: 'It is the solution for internal navigation that requires onClick. Suitable for cases where we use a dispatch to see in-app docs.'
+        story: 'Takes users to other pages or sections inside the app. It uses Next.js Links.'
       }
     }
   }
