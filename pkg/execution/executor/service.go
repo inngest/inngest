@@ -278,7 +278,9 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		//
 		// We keep invoking Generator-based functions until they provide no more
 		// yields, signalling they're done.
-		err := s.exec.HandleGeneratorResponse(ctx, resp.Generator, item)
+		copiedItem := item
+		copiedItem.SdkVersion = resp.SdkVersion
+		err := s.exec.HandleGeneratorResponse(ctx, resp.Generator, copiedItem)
 		if err != nil {
 			return fmt.Errorf("unable to schedule generator response: %w", err)
 		}

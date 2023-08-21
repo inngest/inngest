@@ -719,6 +719,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		Attempt:     0,
 		MaxAttempts: item.MaxAttempts,
 		Payload:     queue.PayloadEdge{Edge: nextEdge},
+		SdkVersion:  item.SdkVersion,
 	}, time.Now())
 	if err == redis_state.ErrQueueItemExists {
 		return nil
@@ -759,6 +760,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 		Payload: queue.PayloadEdge{
 			Edge: nextEdge,
 		},
+		SdkVersion: item.SdkVersion,
 	}, time.Now())
 	if err == redis_state.ErrQueueItemExists {
 		return nil
@@ -799,6 +801,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 		Attempt:     0,
 		MaxAttempts: item.MaxAttempts,
 		Payload:     queue.PayloadEdge{Edge: nextEdge},
+		SdkVersion:  item.SdkVersion,
 	}, time.Now().Add(dur))
 	if err == redis_state.ErrQueueItemExists {
 		// Safely ignore this error.
@@ -879,6 +882,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 			PauseID:   pauseID,
 			OnTimeout: true,
 		},
+		SdkVersion: item.SdkVersion,
 	}, expires)
 	if err == redis_state.ErrQueueItemExists {
 		return nil
