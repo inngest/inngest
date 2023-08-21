@@ -280,6 +280,10 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		// yields, signalling they're done.
 		copiedItem := item
 		copiedItem.SdkVersion = resp.SdkVersion
+		if len(resp.Generator) > 0 {
+			copiedItem.DisableImmediateExecution = true
+		}
+
 		err := s.exec.HandleGeneratorResponse(ctx, resp.Generator, copiedItem)
 		if err != nil {
 			return fmt.Errorf("unable to schedule generator response: %w", err)

@@ -68,7 +68,9 @@ type Item struct {
 	// SdkVersion is the version of the SDK that wants to queue this item.
 	//e.g. inngest-js:v1.2.3-alpha.1
 	SdkVersion string `json:"sdkVersion"`
-
+	// DisableImmediateExecution is used to tell the SDK whether it should
+	// disallow immediate execution of steps as they are found.
+	DisableImmediateExecution bool `json:"disableImmediateExecution"`
 	// Metadata is used for storing additional metadata related to the queue item.
 	// e.g. tracing data
 	Metadata map[string]string `json:"metadata,omitempty"`

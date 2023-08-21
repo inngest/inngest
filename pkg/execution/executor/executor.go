@@ -630,6 +630,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	// consuming the pause to guarantee the event data is stored via the pause
 	// for the next run.  If the ConsumePause call comes after enqueue, the TCP
 	// conn may drop etc. and running the job may occur prior to saving state data.
+	// TODO We need to pass DisableImmediateExecution here?
 	if err := e.queue.Enqueue(
 		ctx,
 		queue.Item{
@@ -700,8 +701,9 @@ func (e *executor) HandleGenerator(ctx context.Context, gen state.GeneratorOpcod
 
 func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorOpcode, item queue.Item, edge queue.PayloadEdge) error {
 	nextEdge := inngest.Edge{
-		Outgoing: gen.ID,             // Going from the current step
-		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
+		Outgoing:                  gen.ID,             // Going from the current step
+		Incoming:                  edge.Edge.Incoming, // And re-calling the incoming function in a loop
+		DisableImmediateExecution: item.DisableImmediateExecution,
 	}
 
 	// Re-enqueue the exact same edge to run now.
@@ -712,14 +714,15 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 	// running the step again, needing a new history group
 	groupID := uuid.New().String()
 	err := e.queue.Enqueue(ctx, queue.Item{
-		WorkspaceID: item.WorkspaceID,
-		GroupID:     groupID,
-		Kind:        queue.KindEdge,
-		Identifier:  item.Identifier,
-		Attempt:     0,
-		MaxAttempts: item.MaxAttempts,
-		Payload:     queue.PayloadEdge{Edge: nextEdge},
-		SdkVersion:  item.SdkVersion,
+		WorkspaceID:               item.WorkspaceID,
+		GroupID:                   groupID,
+		Kind:                      queue.KindEdge,
+		Identifier:                item.Identifier,
+		Attempt:                   0,
+		MaxAttempts:               item.MaxAttempts,
+		Payload:                   queue.PayloadEdge{Edge: nextEdge},
+		SdkVersion:                item.SdkVersion,
+		DisableImmediateExecution: item.DisableImmediateExecution,
 	}, time.Now())
 	if err == redis_state.ErrQueueItemExists {
 		return nil
@@ -735,9 +738,10 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 		// We do, though, want to store the incomin step ID name _without_ overriding
 		// the actual DAG step, though.
 		// Run the same action.
-		IncomingGeneratorStep: gen.ID,
-		Outgoing:              edge.Edge.Outgoing,
-		Incoming:              edge.Edge.Incoming,
+		IncomingGeneratorStep:     gen.ID,
+		Outgoing:                  edge.Edge.Outgoing,
+		Incoming:                  edge.Edge.Incoming,
+		DisableImmediateExecution: item.DisableImmediateExecution,
 	}
 
 	// Re-enqueue the exact same edge to run now.
@@ -760,7 +764,8 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 		Payload: queue.PayloadEdge{
 			Edge: nextEdge,
 		},
-		SdkVersion: item.SdkVersion,
+		SdkVersion:                item.SdkVersion,
+		DisableImmediateExecution: item.DisableImmediateExecution,
 	}, time.Now())
 	if err == redis_state.ErrQueueItemExists {
 		return nil
@@ -778,8 +783,9 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	at := time.Now().Add(dur)
 
 	nextEdge := inngest.Edge{
-		Outgoing: gen.ID,             // Leaving sleep
-		Incoming: edge.Edge.Incoming, // To re-call the SDK
+		Outgoing:                  gen.ID,             // Leaving sleep
+		Incoming:                  edge.Edge.Incoming, // To re-call the SDK
+		DisableImmediateExecution: item.DisableImmediateExecution,
 	}
 
 	// XXX: Remove this after we create queues for function runs.
@@ -795,13 +801,14 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 		// Sleeps re-enqueue the step so that we can mark the step as completed
 		// in the executor after the sleep is complete.  This will re-call the
 		// generator step, but we need the same group ID for correlation.
-		GroupID:     groupID,
-		Kind:        queue.KindSleep,
-		Identifier:  item.Identifier,
-		Attempt:     0,
-		MaxAttempts: item.MaxAttempts,
-		Payload:     queue.PayloadEdge{Edge: nextEdge},
-		SdkVersion:  item.SdkVersion,
+		GroupID:                   groupID,
+		Kind:                      queue.KindSleep,
+		Identifier:                item.Identifier,
+		Attempt:                   0,
+		MaxAttempts:               item.MaxAttempts,
+		Payload:                   queue.PayloadEdge{Edge: nextEdge},
+		SdkVersion:                item.SdkVersion,
+		DisableImmediateExecution: item.DisableImmediateExecution,
 	}, time.Now().Add(dur))
 	if err == redis_state.ErrQueueItemExists {
 		// Safely ignore this error.
@@ -882,7 +889,8 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 			PauseID:   pauseID,
 			OnTimeout: true,
 		},
-		SdkVersion: item.SdkVersion,
+		SdkVersion:                item.SdkVersion,
+		DisableImmediateExecution: item.DisableImmediateExecution,
 	}, expires)
 	if err == redis_state.ErrQueueItemExists {
 		return nil
