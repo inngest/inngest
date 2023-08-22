@@ -13,6 +13,12 @@ const meta = {
   args: {
     label: 'Click me',
   },
+  argTypes: {
+    keys: {
+      options: [[], ['↵'], ['⌘', 'A']],
+      control: { type: 'select' },
+    },
+  },
 } satisfies Meta<typeof Button>;
 
 export default meta;
@@ -41,5 +47,12 @@ export const WithIcon: Story = {
   args: {
     kind: 'primary',
     icon: <IconChevron />,
+  },
+};
+
+export const WithKey: Story = {
+  args: {
+    kind: 'primary',
+    keys: ['⌘', '↵'],
   },
 };

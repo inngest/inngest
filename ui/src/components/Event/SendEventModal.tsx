@@ -3,7 +3,9 @@ import Editor, { useMonaco } from '@monaco-editor/react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
+import Button from '@/components/Button';
 import Modal from '@/components/Modal';
+import useModifierKey from '@/hooks/useModifierKey';
 import { usePortal } from '../../hooks/usePortal';
 import { useSendEventMutation } from '../../store/devApi';
 import { selectEvent } from '../../store/global';
@@ -83,6 +85,20 @@ export default function SendEventModal({ data, isOpen, onClose }) {
       return;
     }
 
+    monaco.editor.defineTheme('inngest-theme', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': '#1e293b', // slate-800
+        'editor.lineHighlightBorder': '#cbd5e11a', // slate-300/10
+        'editorIndentGuide.background': '#cbd5e133', // slate-300/20
+        'editorIndentGuide.activeBackground': '#cbd5e14d', // slate-300/30
+        'editorLineNumber.foreground': '#cbd5e14d', // slate-300/30
+        'editorLineNumber.activeForeground': '#CBD5E1', // slate-300
+      },
+    });
+
     monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
       validate: true,
       schemas: [
@@ -124,63 +140,66 @@ export default function SendEventModal({ data, isOpen, onClose }) {
   }, [monaco]);
 
   return portal(
-    <Modal isOpen={isOpen} onClose={onClose} maxWidth="max-w-7xl">
-      <div className="relative w-[60rem] h-[30rem] bg-slate-800/30 border border-slate-700/30 flex flex-col">
-        <div className="mt-4 mx-4 bg-slate-800/40 shadow border-b border-slate-700/20 flex justify-between rounded-t">
-          <div className="flex -mb-px">
-            <button className="border-indigo-400 text-white text-xs px-5 py-2.5 border-b block transition-all duration-150">
-              Payload
-            </button>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Send Event"
+      description="Send an event manually by filling or pasting a payload"
+      className="max-w-5xl w-full"
+    >
+      <div className="m-6">
+        <div className="relative w-full h-[20rem] flex flex-col rounded overflow-hidden">
+          <div className="items-center bg-slate-800 shadow border-b border-slate-700/20 flex justify-between">
+            <p className=" text-slate-300/50 text-xs px-5 py-4">Payload</p>
           </div>
-          <div className="flex gap-2 items-center mr-2">
-            <div className="py-2 flex flex-row items-center space-x-2">
-              <div className="text-4xs text-center text-white">Cmd+Enter</div>
-              <button
-                onClick={() => sendEvent()}
-                className="bg-slate-700/50 hover:bg-slate-700/80 border-slate-700/50 flex gap-1.5 items-center border text-xs rounded-sm px-2.5 py-1 text-slate-100 transition-all duration-150"
-              >
-                {sendEventState.isLoading ? 'Spinner' : 'Send event'}
-              </button>
-            </div>
-          </div>
-        </div>
-        {monaco ? (
-          <Editor
-            defaultLanguage="json"
-            value={input ?? '{}'}
-            onChange={(value) => setInput(value || '')}
-            className="overflow-x-hidden flex-1 mx-4 mb-4"
-            theme="vs-dark"
-            onMount={(editor) => {
-              editor.addAction({
-                id: 'sendInngestEvent',
-                label: 'Send Inngest Event',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
-                contextMenuGroupId: '2_execution',
-                run: () => {
-                  sendEventRef.current();
+          {monaco ? (
+            <Editor
+              defaultLanguage="json"
+              value={input ?? '{}'}
+              onChange={(value) => setInput(value || '')}
+              theme="inngest-theme"
+              onMount={(editor) => {
+                editor.addAction({
+                  id: 'sendInngestEvent',
+                  label: 'Send Inngest Event',
+                  keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+                  contextMenuGroupId: '2_execution',
+                  run: () => {
+                    sendEventRef.current();
+                  },
+                });
+              }}
+              options={{
+                fixedOverflowWidgets: false,
+                formatOnPaste: false,
+                formatOnType: false,
+                minimap: {
+                  enabled: false,
                 },
-              });
-            }}
-            options={{
-              fixedOverflowWidgets: true,
-              formatOnPaste: false,
-              formatOnType: false,
-              minimap: {
-                enabled: false,
-              },
-              lineNumbers: 'off',
-              extraEditorClassName: '',
-              theme: 'vs-dark',
-              contextmenu: false,
-              inlayHints: {
-                enabled: 'on',
-              },
-              scrollBeyondLastLine: false,
-              wordWrap: 'on',
-            }}
-          />
-        ) : null}
+                lineNumbers: 'on',
+                extraEditorClassName: '',
+                contextmenu: false,
+                inlayHints: {
+                  enabled: 'on',
+                },
+                scrollBeyondLastLine: false,
+                wordWrap: 'on',
+                fontFamily: 'Source Code Pro, monospace',
+                fontSize: 13,
+                lineHeight: 26,
+              }}
+            />
+          ) : null}
+        </div>
+      </div>
+      <div className="flex items-center justify-between p-6 border-t border-slate-800">
+        <Button label="Cancel" kind="secondary" btnAction={onClose} />
+        <Button
+          disabled={sendEventState.isLoading}
+          label="Send Event"
+          btnAction={() => sendEvent()}
+          keys={[useModifierKey(), '↵']}
+        />
       </div>
     </Modal>,
   );
