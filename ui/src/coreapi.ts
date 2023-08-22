@@ -154,3 +154,21 @@ export const DELETE_APP = gql`
     deleteApp(id: $id)
   }
 `;
+
+export const TRIGGERS_STREAM = gql`
+  query GetTriggersStream($limit: Int!, $after: Time, $before: Time) {
+    stream(query: { limit: $limit, after: $after, before: $before }) {
+      createdAt
+      id
+      trigger
+      type
+      runs {
+        functionID
+        function {
+          name
+        }
+        status
+      }
+    }
+  }
+`;

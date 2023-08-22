@@ -106,11 +106,18 @@ export enum FunctionEventType {
 export type FunctionRun = {
   __typename?: 'FunctionRun';
   event?: Maybe<Event>;
+  finishedAt?: Maybe<Scalars['Time']>;
+  function?: Maybe<Function>;
+  functionID: Scalars['String'];
   id: Scalars['ID'];
+  /** @deprecated Field no longer supported */
   name?: Maybe<Scalars['String']>;
+  output?: Maybe<Scalars['String']>;
+  /** @deprecated Field no longer supported */
   pendingSteps?: Maybe<Scalars['Int']>;
   startedAt?: Maybe<Scalars['Time']>;
   status?: Maybe<FunctionRunStatus>;
+  /** @deprecated Field no longer supported */
   timeline?: Maybe<Array<FunctionRunEvent>>;
   waitingFor?: Maybe<StepEventWait>;
   workspace?: Maybe<Workspace>;
@@ -133,6 +140,13 @@ export enum FunctionRunStatus {
 export type FunctionRunsQuery = {
   workspaceId?: Scalars['ID'];
 };
+
+export enum FunctionStatus {
+  Cancelled = 'CANCELLED',
+  Completed = 'COMPLETED',
+  Failed = 'FAILED',
+  Running = 'RUNNING'
+}
 
 export type FunctionTrigger = {
   __typename?: 'FunctionTrigger';
@@ -186,6 +200,7 @@ export type Query = {
   functionRun?: Maybe<FunctionRun>;
   functionRuns?: Maybe<Array<FunctionRun>>;
   functions?: Maybe<Array<Function>>;
+  stream: Array<StreamItem>;
 };
 
 
@@ -206,6 +221,11 @@ export type QueryFunctionRunArgs = {
 
 export type QueryFunctionRunsArgs = {
   query: FunctionRunsQuery;
+};
+
+
+export type QueryStreamArgs = {
+  query: StreamQuery;
 };
 
 export type StepEvent = {
@@ -235,6 +255,26 @@ export type StepEventWait = {
   expiryTime: Scalars['Time'];
   expression?: Maybe<Scalars['String']>;
 };
+
+export type StreamItem = {
+  __typename?: 'StreamItem';
+  createdAt: Scalars['Time'];
+  id: Scalars['ID'];
+  runs?: Maybe<Array<Maybe<FunctionRun>>>;
+  trigger: Scalars['String'];
+  type: StreamType;
+};
+
+export type StreamQuery = {
+  after?: InputMaybe<Scalars['Time']>;
+  before?: InputMaybe<Scalars['Time']>;
+  limit?: Scalars['Int'];
+};
+
+export enum StreamType {
+  Cron = 'CRON',
+  Event = 'EVENT'
+}
 
 export type UpdateAppInput = {
   id: Scalars['String'];
@@ -300,6 +340,15 @@ export type DeleteAppMutationVariables = Exact<{
 
 
 export type DeleteAppMutation = { __typename?: 'Mutation', deleteApp: string };
+
+export type GetTriggersStreamQueryVariables = Exact<{
+  limit: Scalars['Int'];
+  after?: InputMaybe<Scalars['Time']>;
+  before?: InputMaybe<Scalars['Time']>;
+}>;
+
+
+export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, trigger: string, type: StreamType, runs?: Array<{ __typename?: 'FunctionRun', functionID: string, status?: FunctionRunStatus | null, function?: { __typename?: 'Function', name: string } | null } | null> | null }> };
 
 
 export const GetEventsStreamDocument = `
@@ -448,6 +497,23 @@ export const DeleteAppDocument = `
   deleteApp(id: $id)
 }
     `;
+export const GetTriggersStreamDocument = `
+    query GetTriggersStream($limit: Int!, $after: Time, $before: Time) {
+  stream(query: {limit: $limit, after: $after, before: $before}) {
+    createdAt
+    id
+    trigger
+    type
+    runs {
+      functionID
+      function {
+        name
+      }
+      status
+    }
+  }
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -478,9 +544,12 @@ const injectedRtkApi = api.injectEndpoints({
     DeleteApp: build.mutation<DeleteAppMutation, DeleteAppMutationVariables>({
       query: (variables) => ({ document: DeleteAppDocument, variables })
     }),
+    GetTriggersStream: build.query<GetTriggersStreamQuery, GetTriggersStreamQueryVariables>({
+      query: (variables) => ({ document: GetTriggersStreamDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation } = injectedRtkApi;
+export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery } = injectedRtkApi;
 
