@@ -680,7 +680,7 @@ func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, at
 	return m.r.Do(ctx, cmd).Error()
 }
 
-func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
+func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time, disableImmExec bool) error {
 	now := time.Now()
 
 	if at != nil && at.Before(time.Now()) {
@@ -702,6 +702,7 @@ func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, a
 			},
 		},
 		now.UnixMilli(),
+		disableImmExec,
 	})
 	if err != nil {
 		return err
@@ -1346,6 +1347,11 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 		}
 		m.Context = ctx
 	}
+	if val, ok := data["disableImmediateExecution"]; ok {
+		if val == "1" {
+			m.DisableImmediateExecution = true
+		}
+	}
 
 	return m, nil
 }
@@ -1360,9 +1366,10 @@ type runMetadata struct {
 	Pending       int            `json:"pending"`
 	Debugger      bool           `json:"debugger"`
 	RunType       string         `json:"runType,omitempty"`
-	OriginalRunID string         `json:"originalRunID,omitempty"`
-	Version       int            `json:"version"`
-	Context       map[string]any `json:"ctx,omitempty"`
+	OriginalRunID             string         `json:"originalRunID,omitempty"`
+	Version                   int            `json:"version"`
+	Context                   map[string]any `json:"ctx,omitempty"`
+	DisableImmediateExecution bool           `json:"disableImmediateExecution,omitempty"`
 }
 
 func (r runMetadata) Map() map[string]any {
@@ -1372,9 +1379,10 @@ func (r runMetadata) Map() map[string]any {
 		"pending":       r.Pending,
 		"debugger":      r.Debugger,
 		"runType":       r.RunType,
-		"originalRunID": r.OriginalRunID,
-		"version":       r.Version,
-		"ctx":           r.Context,
+		"originalRunID":             r.OriginalRunID,
+		"version":                   r.Version,
+		"ctx":                       r.Context,
+		"disableImmediateExecution": r.DisableImmediateExecution,
 	}
 }
 
@@ -1383,9 +1391,10 @@ func (r runMetadata) Metadata() state.Metadata {
 		Identifier: r.Identifier,
 		Pending:    r.Pending,
 		Debugger:   r.Debugger,
-		Status:     r.Status,
-		Version:    r.Version,
-		Context:    r.Context,
+		Status:                    r.Status,
+		Version:                   r.Version,
+		Context:                   r.Context,
+		DisableImmediateExecution: r.DisableImmediateExecution,
 	}
 
 	if r.RunType != "" {

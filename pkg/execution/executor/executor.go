@@ -455,8 +455,11 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 
 	// This is a success, which means either a generator or a function result.
 	if len(resp.Generator) > 0 {
+		copiedItem := item
+		copiedItem.DisableImmediateExection = len(resp.Generator) > 1
+
 		// Handle generator responses then return.
-		if serr := e.HandleGeneratorResponse(ctx, resp.Generator, item); serr != nil {
+		if serr := e.HandleGeneratorResponse(ctx, resp.Generator, copiedItem); serr != nil {
 			// If this is an error compiling async expressions, fail the function.
 			if strings.Contains(serr.Error(), "error compiling expression") {
 				_, _ = e.sm.SaveResponse(ctx, id, *resp, item.Attempt)
@@ -875,7 +878,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 	ctx = state.WithGroupID(ctx, groupID)
 
 	// Re-enqueue the exact same edge to run now.
-	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, nil); err != nil {
+	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, nil, item.DisableImmediateExection); err != nil {
 		return err
 	}
 
@@ -921,7 +924,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 	ctx = state.WithGroupID(ctx, groupID)
 
 	// Re-enqueue the exact same edge to run now.
-	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
+	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil, item.DisableImmediateExection); err != nil {
 		return err
 	}
 
@@ -969,7 +972,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	ctx = state.WithGroupID(ctx, groupID)
 
 	// XXX: Remove this after we create queues for function runs.
-	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, &at); err != nil {
+	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, &at, item.DisableImmediateExection); err != nil {
 		return err
 	}
 
@@ -1053,7 +1056,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	// edge that is outstanding.
 	//
 	// TODO: Remove with function run specific queues
-	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.IncomingGeneratorStep, 0, nil); err != nil {
+	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.IncomingGeneratorStep, 0, nil, item.DisableImmediateExection); err != nil {
 		return fmt.Errorf("unable to schedule wait for event: %w", err)
 	}
 

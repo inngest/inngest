@@ -130,6 +130,10 @@ type Metadata struct {
 
 	// Context allows storing any other contextual data in metadata.
 	Context map[string]any `json:"ctx,omitempty"`
+
+	// DisableImmediateExecution is used to tell the SDK whether it should
+	// disallow immediate execution of steps as they are found.
+	DisableImmediateExecution bool `json:"disableImmediateExecution,omitempty"`
 }
 
 // State represents the current state of a fn run.  It is data-structure
@@ -269,7 +273,7 @@ type Mutater interface {
 	// SQS, Celery).  In thise cases recording that a step was scheduled is a separate step.
 	//
 	// Attempt is zero-indexed.
-	Scheduled(ctx context.Context, i Identifier, stepID string, attempt int, at *time.Time) error
+	Scheduled(ctx context.Context, i Identifier, stepID string, attempt int, at *time.Time, disableImmExec bool) error
 
 	// Started is called when a step is started.
 	//
