@@ -13,34 +13,30 @@ const functionRunStatusIcons = {
   [FunctionRunStatus.Cancelled]: IconStatusCircleMinus,
 } as const satisfies Record<FunctionRunStatus, React.ComponentType>;
 
-type FunctionRunListProps = {
-  functionRuns: {
-    id: string;
-    name: string;
-    status: FunctionRunStatus;
-  }[];
-};
-
-export default function FunctionRunList({ functionRuns }: FunctionRunListProps) {
+export default function FunctionRunList({ functionRuns }) {
   return (
     <>
-      {functionRuns.length < 1 ? (
+      {!functionRuns || functionRuns.length < 1 ? (
         <p className="text-slate-600">No functions called</p>
       ) : (
         <ul className="flex flex-col space-y-4">
-          {functionRuns.map((functionRun) => {
-            const FunctionRunStatusIcon = functionRunStatusIcons[functionRun.status];
-            return (
-              <li
-                key={functionRun.id}
-                data-key={functionRun.id}
-                className="flex items-center gap-2"
-              >
-                <FunctionRunStatusIcon />
-                {functionRun.name}
-              </li>
-            );
-          })}
+          {functionRuns &&
+            functionRuns.map((functionRun) => {
+              if (!functionRun || !functionRun.function || !functionRun.status) {
+                return null;
+              }
+              const FunctionRunStatusIcon = functionRunStatusIcons[functionRun.status];
+              return (
+                <li
+                  key={functionRun.functionID}
+                  data-key={functionRun.functionID}
+                  className="flex items-center gap-2"
+                >
+                  <FunctionRunStatusIcon />
+                  {functionRun.function.name}
+                </li>
+              );
+            })}
         </ul>
       )}
     </>

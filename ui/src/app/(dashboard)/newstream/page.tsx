@@ -2,40 +2,23 @@
 
 import { useRouter } from 'next/navigation';
 import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
-import { triggerStream } from 'mock/triggerStream';
 
 import { BlankSlate } from '@/components/Blank';
 import SendEventButton from '@/components/Event/SendEventButton';
 import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';
-import { FunctionRunStatus, FunctionTriggerTypes } from '@/store/generated';
+import { useGetTriggersStreamQuery, type StreamItem } from '@/store/generated';
 import { selectEvent, selectRun } from '@/store/global';
 import { useAppDispatch } from '@/store/hooks';
 import { fullDate } from '@/utils/date';
 import FunctionRunList from './FunctionRunList';
-import SourceBadge from './SourceBadge';
 
-export type Trigger = {
-  id: string;
-  startedAt: string;
-  name: string;
-  type: FunctionTriggerTypes;
-  source: {
-    type: string;
-    name: string;
-  };
-  test: boolean;
-  functionRuns: {
-    id: string;
-    name: string;
-    status: FunctionRunStatus;
-  }[];
-};
+// import SourceBadge from './SourceBadge';
 
-const columnHelper = createColumnHelper<Trigger>();
+const columnHelper = createColumnHelper<StreamItem>();
 
 const columns = [
-  columnHelper.accessor('startedAt', {
+  columnHelper.accessor('createdAt', {
     header: () => <span>Started At</span>,
     cell: (props) => (
       <time dateTime={fullDate(new Date(props.getValue()))} suppressHydrationWarning={true}>
@@ -43,22 +26,27 @@ const columns = [
       </time>
     ),
   }),
-  columnHelper.accessor((row) => row.source.name, {
-    id: 'source',
-    cell: (props) => <SourceBadge row={props.row} />,
-    header: () => <span>Source</span>,
-  }),
+  // The Source BE is not built yet
+  // columnHelper.accessor((row) => row.source.name, {
+  //   id: 'source',
+  //   cell: (props) => <SourceBadge row={props.row} />,
+  //   header: () => <span>Source</span>,
+  // }),
   columnHelper.accessor('type', {
     header: () => <span>Trigger</span>,
-    cell: (props) => <TriggerTag value={props.row.original.name} type={props.row.original.type} />,
+    cell: (props) => (
+      <TriggerTag value={props.row.original.trigger} type={props.row.original.type} />
+    ),
   }),
-  columnHelper.accessor('functionRuns', {
+  columnHelper.accessor('runs', {
     header: () => <span>Function</span>,
     cell: (props) => <FunctionRunList functionRuns={props.getValue()} />,
   }),
 ];
 
 export default function Stream() {
+  const { data } = useGetTriggersStreamQuery({ limit: 10 }, { pollingInterval: 1500 });
+  const triggers = data?.stream || [];
   const dispatch = useAppDispatch();
   const router = useRouter();
 
@@ -79,9 +67,9 @@ export default function Stream() {
     }
   }
 
-  const customRowProps = (row: Row<Trigger>) => ({
+  const customRowProps = (row: Row<StreamItem>) => ({
     style: {
-      verticalAlign: row.original.functionRuns.length > 1 ? 'baseline' : 'initial',
+      verticalAlign: row.original.runs && row.original.runs.length > 1 ? 'baseline' : 'initial',
       cursor: 'pointer',
     },
     onClick: (e: React.MouseEvent<HTMLElement>) =>
@@ -103,7 +91,7 @@ export default function Stream() {
       <div className="min-h-0 overflow-y-auto">
         <Table
           options={{
-            data: triggerStream,
+            data: triggers,
             columns,
             getCoreRowModel: getCoreRowModel(),
             enableSorting: false,
