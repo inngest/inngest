@@ -32,6 +32,7 @@ var (
 	ErrFunctionComplete   = fmt.Errorf("function completed")
 	ErrFunctionFailed     = fmt.Errorf("function failed")
 	ErrFunctionOverflowed = fmt.Errorf("function has too many steps")
+	ErrDuplicateResponse  = fmt.Errorf("duplicate response")
 )
 
 // Identifier represents the unique identifier for a workflow run.

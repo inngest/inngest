@@ -647,6 +647,10 @@ func (m mgr) SaveResponse(ctx context.Context, i state.Identifier, r state.Drive
 	if err != nil {
 		return 0, fmt.Errorf("error saving response: %w", err)
 	}
+	if index == -1 {
+		// This is a duplicate response, so we don't need to do anything.
+		return 0, state.ErrDuplicateResponse
+	}
 
 	if r.Err != nil && r.Final() {
 		// Trigger error callbacks
@@ -1363,9 +1367,9 @@ type runMetadata struct {
 	Identifier state.Identifier `json:"id"`
 	Status     enums.RunStatus  `json:"status"`
 	// These are the fields for standard state metadata.
-	Pending       int            `json:"pending"`
-	Debugger      bool           `json:"debugger"`
-	RunType       string         `json:"runType,omitempty"`
+	Pending                   int            `json:"pending"`
+	Debugger                  bool           `json:"debugger"`
+	RunType                   string         `json:"runType,omitempty"`
 	OriginalRunID             string         `json:"originalRunID,omitempty"`
 	Version                   int            `json:"version"`
 	Context                   map[string]any `json:"ctx,omitempty"`
@@ -1374,11 +1378,11 @@ type runMetadata struct {
 
 func (r runMetadata) Map() map[string]any {
 	return map[string]any{
-		"id":            r.Identifier,
-		"status":        int(r.Status), // Always store this as an int
-		"pending":       r.Pending,
-		"debugger":      r.Debugger,
-		"runType":       r.RunType,
+		"id":                        r.Identifier,
+		"status":                    int(r.Status), // Always store this as an int
+		"pending":                   r.Pending,
+		"debugger":                  r.Debugger,
+		"runType":                   r.RunType,
 		"originalRunID":             r.OriginalRunID,
 		"version":                   r.Version,
 		"ctx":                       r.Context,
@@ -1388,9 +1392,9 @@ func (r runMetadata) Map() map[string]any {
 
 func (r runMetadata) Metadata() state.Metadata {
 	m := state.Metadata{
-		Identifier: r.Identifier,
-		Pending:    r.Pending,
-		Debugger:   r.Debugger,
+		Identifier:                r.Identifier,
+		Pending:                   r.Pending,
+		Debugger:                  r.Debugger,
 		Status:                    r.Status,
 		Version:                   r.Version,
 		Context:                   r.Context,

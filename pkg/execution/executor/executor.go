@@ -484,6 +484,12 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	// This is the function result.  Save this in the state store (which will inevitably
 	// be GC'd), and end.
 	if _, serr := e.sm.SaveResponse(ctx, id, *resp, item.Attempt); serr != nil {
+		// Final function responses can be duplicated if multiple parallel
+		// executions reach the end at the same time. Steps themselves are
+		// de-duplicated in the queue.
+		if serr == state.ErrDuplicateResponse {
+			return resp
+		}
 		return fmt.Errorf("error saving function output: %w", serr)
 	}
 
