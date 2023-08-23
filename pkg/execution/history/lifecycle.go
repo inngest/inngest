@@ -77,6 +77,9 @@ func (l lifecycle) OnFunctionStarted(
 	id state.Identifier,
 	item queue.Item,
 ) {
+	latency, _ := redis_state.GetItemLatency(ctx)
+	latencyMS := latency.Milliseconds()
+
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		CreatedAt:       time.Now(),
@@ -88,6 +91,7 @@ func (l lifecycle) OnFunctionStarted(
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
+		LatencyMS:       &latencyMS,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(ctx, h); err != nil {
