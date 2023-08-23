@@ -78,6 +78,7 @@ type History struct {
 	IdempotencyKey  string
 	Type            string
 	Attempt         int64
+	LatencyMs       sql.NullInt64
 	StepName        sql.NullString
 	StepID          sql.NullString
 	Url             sql.NullString

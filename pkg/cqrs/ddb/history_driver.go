@@ -34,6 +34,12 @@ func (d historyDriver) Write(ctx context.Context, h history.History) (err error)
 		Type:            h.Type,
 		Attempt:         h.Attempt,
 	}
+	if h.LatencyMS != nil {
+		params.LatencyMs = sql.NullInt64{
+			Valid: true,
+			Int64: *h.LatencyMS,
+		}
+	}
 	if h.BatchID != nil {
 		params.BatchID = *h.BatchID
 	}
