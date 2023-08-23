@@ -31,6 +31,7 @@ type History struct {
 	GroupID         *uuid.UUID
 	IdempotencyKey  string
 	Status          *string
+	LatencyMS       *int64
 
 	// HistoryType enum
 	Type string
