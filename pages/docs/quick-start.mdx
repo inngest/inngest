@@ -185,6 +185,14 @@ Let's write your first reliable serverless function! <GuideSection show="nextpag
   );
   ```
 
+  `createFunction` takes three arguments:
+
+  - Configuration: `name` is required and is the name of your function, which is used in your dashboard to identify the function
+  - Trigger: `event` is the name of the event that triggers your function, you can also use `cron` to specifiy a schedule to trigger this function. One or the other is required.
+  - `handler` is the function that is called when the event is received
+
+Full details about [`createFunction` can be found here](/docs/reference/functions/create) in the docs.
+
   We also add this new function to the `serve` handler.
 
   ```ts
@@ -209,6 +217,14 @@ Let's write your first reliable serverless function! <GuideSection show="nextpag
     }
   );
   ```
+
+  `createFunction` takes three arguments:
+
+  - Configuration: `name` is required and is the name of your function, which is used in your dashboard to identify the function
+  - Trigger: `event` is the name of the event that triggers your function, you can also use `cron` to specifiy a schedule to trigger this function. One or the other is required.
+  - `handler` is the function that is called when the event is received
+
+Full details about [`createFunction` can be found here](/docs/reference/functions/create) in the docs.
 
   Now we need to add this new functions to the `serve` handler so Inngest can invoke it via HTTP:
 
