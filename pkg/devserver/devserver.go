@@ -102,7 +102,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		rc,
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(100),
-		redis_state.WithPollTick(250*time.Millisecond),
+		redis_state.WithPollTick(150*time.Millisecond),
 		redis_state.WithQueueKeyGenerator(&redis_state.DefaultQueueKeyGenerator{
 			Prefix: "{queue}",
 		}),

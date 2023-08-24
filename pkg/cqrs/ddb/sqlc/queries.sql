@@ -105,8 +105,8 @@ SELECT * FROM events WHERE event_ts > @after AND event_ts <= @before ORDER BY ev
 
 -- name: InsertHistory :exec
 INSERT INTO history
-	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, result) VALUES
-	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+	(id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, result) VALUES
+	(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetFunctionRunHistory :many
 SELECT * FROM history WHERE run_id = ? ORDER BY created_at ASC;

@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/exp/slog"
@@ -76,6 +77,9 @@ func (l lifecycle) OnFunctionStarted(
 	id state.Identifier,
 	item queue.Item,
 ) {
+	latency, _ := redis_state.GetItemLatency(ctx)
+	latencyMS := latency.Milliseconds()
+
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		CreatedAt:       time.Now(),
@@ -87,6 +91,7 @@ func (l lifecycle) OnFunctionStarted(
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
+		LatencyMS:       &latencyMS,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(ctx, h); err != nil {
@@ -196,6 +201,9 @@ func (l lifecycle) OnStepStarted(
 	step inngest.Step,
 	state state.State,
 ) {
+	latency, _ := redis_state.GetItemLatency(ctx)
+	latencyMS := latency.Milliseconds()
+
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		CreatedAt:       time.Now(),
@@ -210,7 +218,9 @@ func (l lifecycle) OnStepStarted(
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
 		URL:             &step.URI,
+		LatencyMS:       &latencyMS,
 	}
+
 	for _, d := range l.drivers {
 		if err := d.Write(ctx, h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onStepStarted", "error", err)

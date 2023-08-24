@@ -67,6 +67,7 @@ CREATE TABLE history (
 	idempotency_key VARCHAR NOT NULL,
 	type VARCHAR NOT NULL,
 	attempt INT NOT NULL,
+	latency_ms INT,
 	step_name VARCHAR,
 	step_id VARCHAR,
 	url VARCHAR,
