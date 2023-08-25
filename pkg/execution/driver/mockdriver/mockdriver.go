@@ -6,6 +6,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 )
@@ -19,7 +20,7 @@ const RuntimeName = "mock"
 type Mock struct {
 	// DynamicResponses allows users to specify a function which allows
 	// steps to return different data on each execution invocation.
-	DynamicResponses func(context.Context, state.State, inngest.Edge, inngest.Step, int, int) map[string]state.DriverResponse
+	DynamicResponses func(context.Context, state.State, queue.Item, inngest.Edge, inngest.Step, int, int) map[string]state.DriverResponse
 
 	// Responses stores the responses that a driver should return.
 	Responses map[string]state.DriverResponse
@@ -45,7 +46,7 @@ func (m *Mock) RuntimeType() string {
 	return m.RuntimeName
 }
 
-func (m *Mock) Execute(ctx context.Context, s state.State, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+func (m *Mock) Execute(ctx context.Context, s state.State, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -56,7 +57,7 @@ func (m *Mock) Execute(ctx context.Context, s state.State, edge inngest.Edge, st
 
 	resp := m.Responses
 	if m.DynamicResponses != nil {
-		resp = m.DynamicResponses(ctx, s, edge, step, idx, attempt)
+		resp = m.DynamicResponses(ctx, s, item, edge, step, idx, attempt)
 	}
 	response := resp[step.ID]
 	err := m.Errors[step.ID]
@@ -77,7 +78,7 @@ type Config struct {
 	Responses map[string]state.DriverResponse
 	// DynamicResponses allows users to specify a function which allows
 	// steps to return different data on each execution invocation.
-	DynamicResponses func(context.Context, state.State, inngest.Edge, inngest.Step, int, int) map[string]state.DriverResponse
+	DynamicResponses func(context.Context, state.State, queue.Item, inngest.Edge, inngest.Step, int, int) map[string]state.DriverResponse
 	// driver stores the driver once, as a singleton per config instance.
 	driver driver.Driver
 	Driver string

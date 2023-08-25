@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/gowebpki/jcs"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 )
@@ -16,6 +17,7 @@ type Driver interface {
 	Execute(
 		ctx context.Context,
 		s state.State,
+		item queue.Item,
 		edge inngest.Edge,
 		step inngest.Step,
 		stackIndex int,

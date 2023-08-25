@@ -518,7 +518,8 @@ func (e *executor) executeDriverForStep(ctx context.Context, id state.Identifier
 	if err := e.sm.Started(ctx, id, step.ID, item.Attempt); err != nil {
 		return nil, fmt.Errorf("error saving started state: %w", err)
 	}
-	response, err := d.Execute(ctx, s, edge, *step, stackIndex, item.Attempt)
+
+	response, err := d.Execute(ctx, s, item, edge, *step, stackIndex, item.Attempt)
 	if response == nil {
 		response = &state.DriverResponse{
 			Step: *step,
