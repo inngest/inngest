@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"golang.org/x/mod/semver"
@@ -71,8 +72,8 @@ func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
 	return nil
 }
 
-func Execute(ctx context.Context, s state.State, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
-	return DefaultExecutor.Execute(ctx, s, edge, step, idx, attempt)
+func Execute(ctx context.Context, s state.State, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+	return DefaultExecutor.Execute(ctx, s, item, edge, step, idx, attempt)
 }
 
 type executor struct {
@@ -147,7 +148,7 @@ func ParseGenerator(ctx context.Context, byt []byte) ([]*state.GeneratorOpcode, 
 	}, nil
 }
 
-func (e executor) Execute(ctx context.Context, s state.State, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
 	uri, err := url.Parse(step.URI)
 	if err != nil || (uri.Scheme != "http" && uri.Scheme != "https") {
 		return nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
