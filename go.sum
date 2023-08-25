@@ -596,8 +596,8 @@ github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:
 github.com/imdario/mergo v0.3.11/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
-github.com/inngest/inngestgo v0.4.3-0.20230731190123-1d1baf256abd h1:6mPLtluNu/Iv1OHIFOC2l5fYk2W6AyJPkUwdpM1voUI=
-github.com/inngest/inngestgo v0.4.3-0.20230731190123-1d1baf256abd/go.mod h1:pQ4FXRoIcpbWrCzWS88NXzgZtKK20sEs+T29xyYUmxE=
+github.com/inngest/inngestgo v0.4.3-0.20230825203709-1ffd28d9be92 h1:CWm1dzDsNyoIcZoGW5lY7ILBU/Fbt9je2MZni8k81d8=
+github.com/inngest/inngestgo v0.4.3-0.20230825203709-1ffd28d9be92/go.mod h1:pQ4FXRoIcpbWrCzWS88NXzgZtKK20sEs+T29xyYUmxE=
 github.com/jackc/chunkreader v1.0.0/go.mod h1:RT6O25fNZIuasFJRyZ4R/Y2BbhasbmZXF9QQ7T3kePo=
 github.com/jackc/chunkreader/v2 v2.0.0/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=
 github.com/jackc/chunkreader/v2 v2.0.1/go.mod h1:odVSm741yZoC3dpHEUXIqA9tQRhFrgOHwnPIn9lDKlk=

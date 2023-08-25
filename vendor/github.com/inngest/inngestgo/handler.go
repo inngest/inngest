@@ -11,6 +11,7 @@ import (
 	"os"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -78,6 +79,10 @@ type HandlerOpts struct {
 	// URL that the function is served at.  If not supplied this is taken from
 	// the incoming request's data.
 	URL *url.URL
+
+	// UseStreaming enables streaming - continued writes to the HTTP writer.  This
+	// differs from true streaming in that we don't support server-sent events.
+	UseStreaming bool
 }
 
 func Str(s string) *string {
@@ -213,9 +218,9 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 		c := fn.Config()
 
 		var retries *sdk.StepRetries
-		if c.Retries > 0 {
+		if c.Retries != nil {
 			retries = &sdk.StepRetries{
-				Attempts: c.Retries,
+				Attempts: *c.Retries,
 			}
 		}
 
@@ -410,11 +415,54 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	l := h.Logger.With("fn", fnID, "call_ctx", request.CallCtx)
 	l.Debug("calling function")
 
+	stream, streamCancel := context.WithCancel(context.Background())
+	if h.UseStreaming {
+		w.WriteHeader(201)
+		go func() {
+			for {
+				if stream.Err() != nil {
+					return
+				}
+				_, _ = w.Write([]byte(" "))
+				<-time.After(5 * time.Second)
+			}
+		}()
+	}
+
+	// Invoke the function, then immediately stop the streaming buffer.
 	resp, ops, err := invoke(r.Context(), fn, request)
+	streamCancel()
+
+	if h.UseStreaming {
+		if err != nil {
+			// TODO: Add retry-at.
+			return json.NewEncoder(w).Encode(StreamResponse{
+				StatusCode: 500,
+				Body:       fmt.Sprintf("error calling function: %s", err.Error()),
+				NoRetry:    IsNoRetryError(err),
+			})
+		}
+		if len(ops) > 0 {
+			return json.NewEncoder(w).Encode(StreamResponse{
+				StatusCode: 206,
+				Body:       ops,
+			})
+		}
+		return json.NewEncoder(w).Encode(StreamResponse{
+			StatusCode: 200,
+			Body:       resp,
+		})
+	}
+
 	if err != nil {
-		// TODO: Handle errors appropriately, including retryable/non-retryable
-		// errors using nice types.
 		l.Error("error calling function", "error", err)
+
+		if IsNoRetryError(err) {
+			w.Header().Add("x-inngest-no-retry", "true")
+		}
+
+		// TODO: Add retry-at.
+
 		return publicerr.Error{
 			Message: fmt.Sprintf("error calling function: %s", err.Error()),
 			Status:  500,
@@ -426,13 +474,19 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		// function and manage state appropriately.  Any opcode here takes precedence
 		// over function return values as the function has not yet finished.
 		w.WriteHeader(206)
-		_ = json.NewEncoder(w).Encode(ops)
-		return nil
+		return json.NewEncoder(w).Encode(ops)
 	}
 
 	// Return the function response.
-	_ = json.NewEncoder(w).Encode(resp)
-	return nil
+	return json.NewEncoder(w).Encode(resp)
+}
+
+type StreamResponse struct {
+	StatusCode int               `json:"status"`
+	Body       any               `json:"body"`
+	RetryAt    *string           `json:"retryAt"`
+	NoRetry    bool              `json:"noRetry"`
+	Headers    map[string]string `json:"headers"`
 }
 
 // invoke calls a given servable function with the specified input event.  The input event must

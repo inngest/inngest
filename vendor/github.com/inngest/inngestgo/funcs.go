@@ -16,13 +16,21 @@ type FunctionOpts struct {
 	ID          *string
 	Concurrency int
 	Idempotency *string
-	Retries     int
+	Retries     *int
 	Cancel      []inngest.Cancel
 
 	// RateLimit allows the function to be rate limited.
 	RateLimit *RateLimit
 
 	BatchEvents *inngest.EventBatchConfig
+}
+
+func StrPtr(i string) *string {
+	return &i
+}
+
+func IntPtr(i int) *int {
+	return &i
 }
 
 // GetRateLimit returns the inngest.RateLimit for function configuration.  The
