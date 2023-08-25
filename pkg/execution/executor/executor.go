@@ -215,7 +215,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	})
 	if err == state.ErrIdentifierExists {
 		// This function was already created.
-		return nil, nil
+		return nil, state.ErrIdentifierExists
 	}
 
 	if err != nil {
