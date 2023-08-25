@@ -186,7 +186,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 	if key == "" && len(req.Events) == 1 {
 		// If not provided, use the incoming event ID if there's not a batch.
-		key = req.Events[0].InternalID().String()
+		key = req.Events[0].GetInternalID().String()
 	}
 	if key == "" && req.BatchID != nil {
 		// Finally, if there is a batch use the batch ID as the idempotency key.
@@ -199,13 +199,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		StaticVersion:   req.StaticVersion,
 		RunID:           ulid.MustNew(ulid.Now(), rand.Reader),
 		BatchID:         req.BatchID,
-		EventID:         req.Events[0].InternalID(),
+		EventID:         req.Events[0].GetInternalID(),
 		Key:             key,
 	}
 
 	mapped := make([]map[string]any, len(req.Events))
 	for n, item := range req.Events {
-		mapped[n] = item.Event().Map()
+		mapped[n] = item.GetEvent().Map()
 	}
 
 	_, err := e.sm.New(ctx, state.Input{
@@ -215,7 +215,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	})
 	if err == state.ErrIdentifierExists {
 		// This function was already created.
-		return nil, nil
+		return nil, state.ErrIdentifierExists
 	}
 
 	if err != nil {
@@ -249,11 +249,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			if err != nil {
 				return &id, err
 			}
-			ed := expressions.NewData(map[string]any{"event": req.Events[0].Event().Map()})
+			ed := expressions.NewData(map[string]any{"event": req.Events[0].GetEvent().Map()})
 			data := eval.FilteredAttributes(ctx, ed).Map()
 
 			// The triggering event ID should be the first ID in the batch.
-			triggeringID := req.Events[0].InternalID().String()
+			triggeringID := req.Events[0].GetInternalID().String()
 
 			pause := state.Pause{
 				WorkspaceID:       req.WorkspaceID,
@@ -275,7 +275,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	at := time.Now()
 	if req.BatchID == nil {
-		evtTs := time.UnixMilli(req.Events[0].Event().Timestamp)
+		evtTs := time.UnixMilli(req.Events[0].GetEvent().Timestamp)
 		if evtTs.After(at) {
 			// Schedule functions in the future if there's a future
 			// event `ts` field.
@@ -305,7 +305,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 	err = e.queue.Enqueue(ctx, item, at)
 	if err == redis_state.ErrQueueItemExists {
-		return nil, nil
+		return nil, state.ErrIdentifierExists
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
@@ -399,6 +399,15 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 
+	if resp.Scheduled {
+		return resp, nil
+	}
+
+	err = e.HandleResponse(ctx, id, item, edge, resp)
+	return resp, err
+}
+
+func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, resp *state.DriverResponse) error {
 	// Check for temporary failures.  The outputs of transient errors are not
 	// stored in the state store;  they're tracked via executor lifecycle methods
 	// for logging.
@@ -408,18 +417,18 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 		// TODO: Remove this save error call;  it's unnecessary.
 		if _, serr := e.sm.SaveResponse(ctx, id, *resp, item.Attempt); serr != nil {
-			return resp, fmt.Errorf("error saving function output: %w", serr)
+			return fmt.Errorf("error saving function output: %w", serr)
 		}
-
-		return resp, err
+		return resp
 	}
 
 	// Check if this step permanently failed.  If so, the function is a failure.
 	if resp.Err != nil && !resp.Retryable() {
 		_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt, enums.RunStatusFailed)
 		if serr := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); serr != nil {
-			return resp, fmt.Errorf("error marking function as complete: %w", serr)
+			return fmt.Errorf("error marking function as complete: %w", serr)
 		}
+		s, _ := e.sm.Load(ctx, id.RunID)
 		if ferr := e.failureHandler(ctx, id, s, *resp); ferr != nil {
 			// XXX: log
 			_ = ferr
@@ -427,36 +436,35 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		for _, e := range e.lifecycles {
 			go e.OnFunctionFinished(ctx, id, item, *resp)
 		}
-		return resp, err
+		return resp
 	}
 
 	// This is a success, which means either a generator or a function result.
 	if len(resp.Generator) > 0 {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, resp.Generator, item); serr != nil {
-			return resp, fmt.Errorf("error handling generator response: %w", serr)
+			return fmt.Errorf("error handling generator response: %w", serr)
 		}
 		_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
-		return resp, err
+		return nil
 	}
 
 	// This is the function result.  Save this in the state store (which will inevitably
 	// be GC'd), and end.
 	if _, serr := e.sm.SaveResponse(ctx, id, *resp, item.Attempt); serr != nil {
-		return resp, fmt.Errorf("error saving function output: %w", serr)
+		return fmt.Errorf("error saving function output: %w", serr)
 	}
 
 	_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
 
 	if serr := e.sm.SetStatus(ctx, id, enums.RunStatusCompleted); serr != nil {
-		return resp, fmt.Errorf("error marking function as complete: %w", serr)
+		return fmt.Errorf("error marking function as complete: %w", serr)
 	}
 
 	for _, e := range e.lifecycles {
 		go e.OnFunctionFinished(ctx, id, item, *resp)
 	}
-
-	return resp, err
+	return nil
 }
 
 // run executes the step with the given step ID.
@@ -547,7 +555,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 		wg    sync.WaitGroup
 	)
 
-	evtID := evt.InternalID()
+	evtID := evt.GetInternalID()
 
 	// Schedule up to PauseHandleConcurrency pauses at once.
 	sem := semaphore.NewWeighted(int64(PauseHandleConcurrency))
@@ -568,7 +576,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			// Always release one from the capacity
 			defer sem.Release(1)
 
-			if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evt.InternalID().String() {
+			if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evt.GetInternalID().String() {
 				// Don't allow the original function trigger to trigger the
 				// cancellation
 				return
@@ -591,7 +599,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			if pause.Expression != nil {
 				// Precompute the expression data once, as a value (not pointer)
 				data := expressions.NewData(map[string]any{
-					"async": evt.Event().Map(),
+					"async": evt.GetEvent().Map(),
 				})
 
 				if len(pause.ExpressionData) > 0 {
@@ -638,7 +646,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			}
 
 			err := e.Resume(ctx, *pause, execution.ResumeRequest{
-				With:    evt.Event().Map(),
+				With:    evt.GetEvent().Map(),
 				EventID: &evtID,
 			})
 			if err != nil {
@@ -696,7 +704,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	}
 
 	if pause.OnTimeout && r.EventID != nil {
-		fmt.Println("NO MAN")
 		// Delete this pause, as an event has occured which matches
 		// the timeout.  We can do this prior to leasing a pause as it's the
 		// only work that needs to happen

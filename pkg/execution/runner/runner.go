@@ -296,7 +296,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	// Write the event to our CQRS manager for long-term storage.
 	err = s.cqrs.InsertEvent(
 		ctx,
-		cqrs.ConvertFromEvent(tracked.InternalID(), tracked.Event()),
+		cqrs.ConvertFromEvent(tracked.GetInternalID(), tracked.GetEvent()),
 	)
 	if err != nil {
 		return err
@@ -339,7 +339,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 // the incoming event and returns the function to be invoked via the RPC invoke event,
 // or nil if a function is not being invoked.
 func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqrs.ExecutionLoader) (*inngest.Function, error) {
-	evt := tracked.Event()
+	evt := tracked.GetEvent()
 
 	if evt.Name != consts.InvokeEventName {
 		return nil, nil
@@ -366,7 +366,7 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 
 // functions triggers all functions from the given event.
 func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
-	evt := tracked.Event()
+	evt := tracked.GetEvent()
 
 	// Don't use an errgroup here as we want all errors together, vs the first
 	// non-nil error.
@@ -462,7 +462,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 	logger.From(ctx).Trace().Msg("querying for pauses")
 
-	iter, err := s.state.PausesByEvent(ctx, uuid.UUID{}, evt.Event().Name)
+	iter, err := s.state.PausesByEvent(ctx, uuid.UUID{}, evt.GetEvent().Name)
 	if err != nil {
 		return fmt.Errorf("error finding event pauses: %w", err)
 	}
@@ -472,7 +472,7 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.TrackedEvent) error {
 	// Attempt to rate-limit the incoming function.
 	if s.rl != nil && fn.RateLimit != nil {
-		key, err := ratelimit.RateLimitKey(ctx, fn.ID, *fn.RateLimit, evt.Event().Map())
+		key, err := ratelimit.RateLimitKey(ctx, fn.ID, *fn.RateLimit, evt.GetEvent().Map())
 		if err != nil {
 			return err
 		}
@@ -496,7 +496,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 	}
 
 	triggerType := "event"
-	if evt.Event().Name == "inngest/scheduled.timer" {
+	if evt.GetEvent().Name == "inngest/scheduled.timer" {
 		triggerType = "cron"
 	}
 
@@ -504,7 +504,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		RunID:        id.RunID,
 		RunStartedAt: ulid.Time(id.RunID.Time()),
 		FunctionID:   fn.ID,
-		EventID:      evt.InternalID(),
+		EventID:      evt.GetInternalID(),
 		TriggerType:  triggerType,
 	})
 }

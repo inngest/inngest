@@ -1,8 +1,11 @@
 package event
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
+	"time"
 
 	"github.com/oklog/ulid/v2"
 )
@@ -12,9 +15,14 @@ const (
 	FnFailedName      = "inngest/function.failed"
 )
 
+var (
+	startTimestamp = time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC)
+	endTimestamp   = time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
+)
+
 type TrackedEvent interface {
-	InternalID() ulid.ULID
-	Event() Event
+	GetInternalID() ulid.ULID
+	GetEvent() Event
 }
 
 func NewEvent(data string) (*Event, error) {
@@ -44,6 +52,10 @@ type Event struct {
 	Version   string `json:"v,omitempty"`
 }
 
+func (evt Event) Time() time.Time {
+	return time.UnixMilli(evt.Timestamp)
+}
+
 func (evt Event) Map() map[string]any {
 	if evt.Data == nil {
 		evt.Data = make(map[string]any)
@@ -70,6 +82,25 @@ func (evt Event) Map() map[string]any {
 	return data
 }
 
+func (e Event) Validate(ctx context.Context) error {
+	if e.Name == "" {
+		return errors.New("event name is empty")
+	}
+
+	if e.Timestamp != 0 {
+		// Convert milliseconds to nanosecond precision
+		t := time.Unix(0, e.Timestamp*1_000_000)
+		if t.Before(startTimestamp) {
+			return errors.New("timestamp is before Jan 1, 1980")
+		}
+		if t.After(endTimestamp) {
+			return errors.New("timestamp is after Jan 1, 2100")
+		}
+	}
+
+	return nil
+}
+
 func NewOSSTrackedEvent(e Event) TrackedEvent {
 	id, err := ulid.Parse(e.ID)
 	if err != nil {
@@ -89,14 +120,10 @@ type ossTrackedEvent struct {
 	event Event
 }
 
-func (o ossTrackedEvent) Event() Event {
+func (o ossTrackedEvent) GetEvent() Event {
 	return o.event
 }
 
-func (o ossTrackedEvent) InternalID() ulid.ULID {
+func (o ossTrackedEvent) GetInternalID() ulid.ULID {
 	return o.id
-}
-
-func (o ossTrackedEvent) BatchID() *ulid.ULID {
-	return nil
 }

@@ -81,6 +81,15 @@ type Executor interface {
 		stackIndex int,
 	) (*state.DriverResponse, error)
 
+	// HandleResponse handles the response from running a step.
+	HandleResponse(
+		ctx context.Context,
+		id state.Identifier,
+		item queue.Item,
+		edge inngest.Edge,
+		resp *state.DriverResponse,
+	) error
+
 	// HandleGeneratorResponse handles all generator responses.
 	HandleGeneratorResponse(ctx context.Context, gen []*state.GeneratorOpcode, item queue.Item) error
 	// HandleGenerator handles an individual generator response returned from the SDK.
