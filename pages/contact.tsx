@@ -65,16 +65,21 @@ export default function Contact() {
         <main className="m-auto max-w-5xl pt-16 pb-8">
           <header className="pt-12 lg:pt-24 max-w-4xl m-auto text-center">
             <h1 className="text-white font-bold text-2xl md:text-4xl xl:text-5xl mb-2 md:mb-6 tracking-tight lg:leading-loose">
-              Chat with solutions engineering
+              Chat with sales engineering
             </h1>
             <p>
               We'll help you evaluate Inngest and show you how Inngest enables
               teams to ship more reliable code, faster.
             </p>
-            <p className="mt-4">
-              Looking for support? <a href="/discord">Chat on Discord</a> or{" "}
-              <a href="mailto:hello@inngest.com">email us</a>{" "}
-            </p>
+            <div className="flex place-content-center">
+              <p className="mt-4 py-4 px-6 rounded-full bg-white/10 flex gap-2 items-center">
+                👋&nbsp;&nbsp; Looking for support?{" "}
+                <a href="/discord">Chat on Discord</a> or{" "}
+                <a href={process.env.NEXT_PUBLIC_SUPPORT_URL}>
+                  create a support ticket
+                </a>{" "}
+              </p>
+            </div>
           </header>
 
           <div className="my-12 grid lg:grid-cols-2 gap-24">

@@ -99,6 +99,10 @@ const footerLinks = [
         label: "Contact Us",
         url: "/contact?ref=footer",
       },
+      {
+        label: "Support",
+        url: process.env.NEXT_PUBLIC_SUPPORT_URL,
+      },
     ],
   },
 ];
