@@ -804,11 +804,22 @@ func (m mgr) SavePause(ctx context.Context, p state.Pause) error {
 		},
 	}
 
+	// Add 1 second because int will truncate the float. Otherwise, timeouts
+	// will be 1 second less than configured.
+	ttl := int(time.Until(p.Expires.Time()).Seconds()) + 1
+
+	// Ensure the TTL is at least 1 second. This probably will always be true
+	// since we're adding 1 second above. But you never know if some code
+	// between expiry creation and here will take longer than expected.
+	if ttl < 1 {
+		ttl = 1
+	}
+
 	args, err := StrSlice([]any{
 		string(packed),
 		p.ID.String(),
 		evt,
-		int(time.Until(p.Expires.Time()).Seconds()),
+		ttl,
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
 		int(time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()),
