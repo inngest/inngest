@@ -1,13 +1,16 @@
 'use client';
 
+import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
 
 import { BlankSlate } from '@/components/Blank';
 import SendEventButton from '@/components/Event/SendEventButton';
 import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';
-import { useGetTriggersStreamQuery, type StreamItem } from '@/store/generated';
+import { client } from '@/store/baseApi';
+import { GetTriggersStreamDocument, type StreamItem } from '@/store/generated';
 import { selectEvent, selectRun } from '@/store/global';
 import { useAppDispatch } from '@/store/hooks';
 import { fullDate } from '@/utils/date';
@@ -45,8 +48,73 @@ const columns = [
 ];
 
 export default function Stream() {
-  const { data } = useGetTriggersStreamQuery({ limit: 10 }, { pollingInterval: 1500 });
-  const triggers = data?.stream || [];
+  const fetchTriggersStream = async ({ pageParam, direction }) => {
+    const variables = {
+      limit: 20, // Page size
+      before: direction === 'forward' ? pageParam : null,
+      after: direction === 'backward' ? pageParam : null,
+    };
+
+    const data = await client.request(GetTriggersStreamDocument, variables);
+    return data.stream;
+  };
+
+  const { data, fetchNextPage, fetchPreviousPage, isFetching, isLoading } = useInfiniteQuery({
+    queryKey: ['triggers-stream'],
+    queryFn: fetchTriggersStream,
+    initialPageParam: null,
+    getNextPageParam: (lastPage) => {
+      const lastTrigger = lastPage[lastPage.length - 1];
+      if (lastTrigger) {
+        return lastTrigger.createdAt; // Use the createdAt of the last trigger as cursor
+      }
+      return undefined;
+    },
+    getPreviousPageParam: (firstPage) => {
+      const firstTrigger = firstPage[0];
+      if (firstTrigger) {
+        return firstTrigger.createdAt; // Use the createdAt of the first trigger as cursor
+      }
+      return undefined;
+    },
+  });
+
+  // We must flatten the array of arrays from the useInfiniteQuery hook
+  const triggers = data?.pages.reduce((acc, page) => {
+    return [...acc, ...page];
+  });
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  const fetchMoreOnBottomReached = useCallback(
+    (containerRefElement?: HTMLDivElement | null) => {
+      if (containerRefElement && triggers?.length > 0) {
+        const { scrollHeight, scrollTop, clientHeight } = containerRefElement;
+        // Threshold for triggering the fetch
+        const threshold = 200;
+
+        // Check if scrolled to the bottom
+        const reachedBottom = scrollHeight - scrollTop - clientHeight < threshold;
+
+        // Check if scrolled to the top
+        const reachedTop = scrollTop < threshold;
+
+        if ((reachedBottom || reachedTop) && !isFetching) {
+          console.log(reachedBottom ? 'bottom scroll' : 'top scroll');
+          if (reachedBottom) {
+            fetchNextPage();
+          } else {
+            fetchPreviousPage();
+          }
+        }
+      }
+    },
+    [fetchNextPage, fetchPreviousPage, isFetching],
+  );
+
+  useEffect(() => {
+    fetchMoreOnBottomReached(tableContainerRef.current);
+  }, [fetchMoreOnBottomReached]);
+
   const dispatch = useAppDispatch();
   const router = useRouter();
 
@@ -88,10 +156,14 @@ export default function Stream() {
           })}
         />
       </div>
-      <div className="min-h-0 overflow-y-auto">
+      <div
+        className="min-h-0 overflow-y-auto"
+        onScroll={(e) => fetchMoreOnBottomReached(e.target as HTMLDivElement)}
+        ref={tableContainerRef}
+      >
         <Table
           options={{
-            data: triggers,
+            data: triggers ?? [],
             columns,
             getCoreRowModel: getCoreRowModel(),
             enableSorting: false,
