@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
@@ -48,20 +48,23 @@ const columns = [
 ];
 
 export default function Stream() {
+  const [prevScrollTop, setPrevScrollTop] = useState(0); // Store the previous scrollTop value
+
   const fetchTriggersStream = async ({ pageParam, direction }) => {
     const variables = {
-      limit: 20, // Page size
-      before: direction === 'forward' ? pageParam : null,
-      after: direction === 'backward' ? pageParam : null,
+      limit: 40, // Page size
+      before: direction === 'forward' && prevScrollTop > 0 ? pageParam : null,
+      after: direction === 'backward'  && prevScrollTop > 0 ? pageParam : null,
     };
 
     const data = await client.request(GetTriggersStreamDocument, variables);
     return data.stream;
   };
 
-  const { data, fetchNextPage, fetchPreviousPage, isFetching, isLoading } = useInfiniteQuery({
+  const { data, fetchNextPage, fetchPreviousPage, isFetching, hasNextPage } = useInfiniteQuery({
     queryKey: ['triggers-stream'],
     queryFn: fetchTriggersStream,
+    refetchInterval: 2500,
     initialPageParam: null,
     getNextPageParam: (lastPage) => {
       const lastTrigger = lastPage[lastPage.length - 1];
@@ -83,23 +86,20 @@ export default function Stream() {
   const triggers = data?.pages.reduce((acc, page) => {
     return [...acc, ...page];
   });
+
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  const fetchMoreOnBottomReached = useCallback(
+  const fetchMoreOnScroll = useCallback(
     (containerRefElement?: HTMLDivElement | null) => {
       if (containerRefElement && triggers?.length > 0) {
         const { scrollHeight, scrollTop, clientHeight } = containerRefElement;
-        // Threshold for triggering the fetch
-        const threshold = 200;
-
+        setPrevScrollTop(scrollTop);
         // Check if scrolled to the bottom
-        const reachedBottom = scrollHeight - scrollTop - clientHeight < threshold;
-
+        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
         // Check if scrolled to the top
-        const reachedTop = scrollTop < threshold;
+        const reachedTop = scrollTop === 0;
 
         if ((reachedBottom || reachedTop) && !isFetching) {
-          console.log(reachedBottom ? 'bottom scroll' : 'top scroll');
           if (reachedBottom) {
             fetchNextPage();
           } else {
@@ -110,10 +110,6 @@ export default function Stream() {
     },
     [fetchNextPage, fetchPreviousPage, isFetching],
   );
-
-  useEffect(() => {
-    fetchMoreOnBottomReached(tableContainerRef.current);
-  }, [fetchMoreOnBottomReached]);
 
   const dispatch = useAppDispatch();
   const router = useRouter();
@@ -158,7 +154,7 @@ export default function Stream() {
       </div>
       <div
         className="min-h-0 overflow-y-auto"
-        onScroll={(e) => fetchMoreOnBottomReached(e.target as HTMLDivElement)}
+        onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}
         ref={tableContainerRef}
       >
         <Table
@@ -174,6 +170,7 @@ export default function Stream() {
               },
             },
           }}
+          tableContainerRef={tableContainerRef}
           customRowProps={customRowProps}
           blankState={
             <BlankSlate
