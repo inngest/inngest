@@ -6,6 +6,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
 
 import { BlankSlate } from '@/components/Blank';
+import Button from '@/components/Button';
 import SendEventButton from '@/components/Event/SendEventButton';
 import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';
@@ -49,6 +50,7 @@ const columns = [
 
 export default function Stream() {
   const [prevScrollTop, setPrevScrollTop] = useState(0); // Store the previous scrollTop value
+  const [freezeStream, setFreezeStream] = useState(false);
 
   const fetchTriggersStream = async ({ pageParam, direction }) => {
     const variables = {
@@ -64,7 +66,7 @@ export default function Stream() {
   const { data, fetchNextPage, fetchPreviousPage, isFetching, hasNextPage } = useInfiniteQuery({
     queryKey: ['triggers-stream'],
     queryFn: fetchTriggersStream,
-    refetchInterval: 2500,
+    refetchInterval: freezeStream ? false:  2500,
     initialPageParam: null,
     getNextPageParam: (lastPage) => {
       const lastTrigger = lastPage[lastPage.length - 1];
@@ -142,7 +144,8 @@ export default function Stream() {
 
   return (
     <div className="flex flex-col min-h-0 min-w-0">
-      <div className="flex justify-end px-5 py-2">
+      <div className="flex justify-end px-5 py-2 gap-1">
+        <Button label={freezeStream? 'Resume Stream' : 'Freeze Stream'} btnAction={() => setFreezeStream(!freezeStream)} />
         <SendEventButton
           label="Test Event"
           data={JSON.stringify({
