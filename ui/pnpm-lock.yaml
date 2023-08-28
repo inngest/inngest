@@ -62,6 +62,9 @@ dependencies:
   react-timeago:
     specifier: 7.1.0
     version: 7.1.0(react@18.2.0)
+  react-virtual:
+    specifier: 2.10.4
+    version: 2.10.4(react@18.2.0)
   refractor:
     specifier: 4.8.0
     version: 4.8.0
@@ -3811,6 +3814,10 @@ packages:
     dependencies:
       '@babel/runtime': 7.22.10
     dev: true
+
+  /@reach/observe-rect@1.2.0:
+    resolution: {integrity: sha512-Ba7HmkFgfQxZqqaeIWWkNK0rEhpxVQHIoVyW1YDSkGsGIXzcaW4deC8B0pZrNSSyLTdIk7y+5olKt5+g0GmFIQ==}
+    dev: false
 
   /@reduxjs/toolkit@1.9.0(react-redux@8.0.5)(react@18.2.0):
     resolution: {integrity: sha512-ak11IrjYcUXRqlhNPwnz6AcvA2ynJTu8PzDbbqQw4a3xR4KZtgiqbNblQD+10CRbfK4+5C79SOyxnT9dhBqFnA==}
@@ -11103,6 +11110,15 @@ packages:
     peerDependencies:
       react: ^16.0.0 || ^17.0.0 || ^18.0.0
     dependencies:
+      react: 18.2.0
+    dev: false
+
+  /react-virtual@2.10.4(react@18.2.0):
+    resolution: {integrity: sha512-Ir6+oPQZTVHfa6+JL9M7cvMILstFZH/H3jqeYeKI4MSUX+rIruVwFC6nGVXw9wqAw8L0Kg2KvfXxI85OvYQdpQ==}
+    peerDependencies:
+      react: ^16.6.3 || ^17.0.0
+    dependencies:
+      '@reach/observe-rect': 1.2.0
       react: 18.2.0
     dev: false
 
