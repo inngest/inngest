@@ -1,4 +1,5 @@
 import { flexRender, useReactTable, type Row, type TableOptions } from '@tanstack/react-table';
+import { useVirtual } from 'react-virtual';
 
 import { IconChevron } from '@/icons';
 import classNames from '@/utils/classnames';
@@ -9,10 +10,26 @@ type TableProps = {
   options: TableOptions<any>;
   blankState: React.ReactNode;
   customRowProps?: (row: Row<any>) => void;
+  tableContainerRef: React.RefObject<HTMLDivElement>;
 };
 
-export default function Table({ options, blankState, customRowProps }: TableProps) {
+export default function Table({
+  options,
+  blankState,
+  customRowProps,
+  tableContainerRef,
+}: TableProps) {
   const table = useReactTable(options);
+  const { rows } = table.getRowModel();
+
+  const rowVirtualizer = useVirtual({
+    parentRef: tableContainerRef,
+    size: rows?.length,
+  });
+  const { virtualItems: virtualRows, totalSize } = rowVirtualizer;
+  const paddingTop = virtualRows.length > 0 ? virtualRows?.[0]?.start || 0 : 0;
+  const paddingBottom =
+    virtualRows.length > 0 ? totalSize - (virtualRows?.[virtualRows.length - 1]?.end || 0) : 0;
 
   // Calculates total colSpan of the table, to assign the colSpan of the blank state.
   // Might need to be changed if we implement the column visibity feature.
@@ -68,23 +85,37 @@ export default function Table({ options, blankState, customRowProps }: TableProp
             </td>
           </tr>
         )}
-        {table.getRowModel().rows.map((row) => (
-          <tr key={row.id} {...(customRowProps ? customRowProps(row) : {})}>
-            {row.getVisibleCells().map((cell) => (
-              <td
-                className={classNames(
-                  cellStyles,
-                  'bg-slate-950',
-                  cell.column.getIsPinned() && 'sticky left-0 z-[2]',
-                )}
-                key={cell.id}
-                style={{ width: cell.column.getSize() }}
-              >
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </td>
-            ))}
+        {paddingTop > 0 && (
+          <tr>
+            <td style={{ height: `${paddingTop}px` }} />
           </tr>
-        ))}
+        )}
+        {virtualRows &&
+          virtualRows.map((virtualRow) => {
+            const row = table.getRowModel().rows[virtualRow.index];
+            return (
+              <tr key={row.id} {...(customRowProps ? customRowProps(row) : {})}>
+                {row.getVisibleCells().map((cell) => (
+                  <td
+                    className={classNames(
+                      cellStyles,
+                      'bg-slate-950',
+                      cell.column.getIsPinned() && 'sticky left-0 z-[2]',
+                    )}
+                    key={cell.id}
+                    style={{ width: cell.column.getSize() }}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        {paddingBottom > 0 && (
+          <tr>
+            <td style={{ height: `${paddingBottom}px` }} />
+          </tr>
+        )}
       </tbody>
     </table>
   );
