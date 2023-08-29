@@ -51,6 +51,8 @@ func (l lifecycle) OnFunctionScheduled(
 ) {
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
@@ -82,6 +84,8 @@ func (l lifecycle) OnFunctionStarted(
 
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
@@ -144,6 +148,8 @@ func (l lifecycle) OnFunctionCancelled(
 ) {
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
@@ -206,6 +212,8 @@ func (l lifecycle) OnStepStarted(
 
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
@@ -313,6 +321,8 @@ func (l lifecycle) OnWaitForEventResumed(
 ) {
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
@@ -344,6 +354,8 @@ func (l lifecycle) OnSleep(
 ) {
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
