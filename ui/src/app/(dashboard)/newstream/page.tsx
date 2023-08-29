@@ -10,6 +10,7 @@ import Button from '@/components/Button';
 import SendEventButton from '@/components/Event/SendEventButton';
 import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';
+import { IconChevron } from '@/icons';
 import { client } from '@/store/baseApi';
 import { GetTriggersStreamDocument, type StreamItem } from '@/store/generated';
 import { selectEvent, selectRun } from '@/store/global';
@@ -56,7 +57,7 @@ export default function Stream() {
     const variables = {
       limit: 40, // Page size
       before: direction === 'forward' && prevScrollTop > 0 ? pageParam : null,
-      after: direction === 'backward'  && prevScrollTop > 0 ? pageParam : null,
+      after: direction === 'backward' && prevScrollTop > 0 ? pageParam : null,
     };
 
     const data = await client.request(GetTriggersStreamDocument, variables);
@@ -66,7 +67,7 @@ export default function Stream() {
   const { data, fetchNextPage, fetchPreviousPage, isFetching, hasNextPage } = useInfiniteQuery({
     queryKey: ['triggers-stream'],
     queryFn: fetchTriggersStream,
-    refetchInterval: freezeStream ? false:  2500,
+    refetchInterval: freezeStream ? false : 2500,
     initialPageParam: null,
     getNextPageParam: (lastPage) => {
       const lastTrigger = lastPage[lastPage.length - 1];
@@ -113,6 +114,15 @@ export default function Stream() {
     [fetchNextPage, fetchPreviousPage, isFetching],
   );
 
+  const scrollToTop = () => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTo({
+        top: 0,
+        behavior: 'smooth', // Enable smooth scrolling
+      });
+    }
+  };
+
   const dispatch = useAppDispatch();
   const router = useRouter();
 
@@ -145,7 +155,10 @@ export default function Stream() {
   return (
     <div className="flex flex-col min-h-0 min-w-0">
       <div className="flex justify-end px-5 py-2 gap-1">
-        <Button label={freezeStream? 'Resume Stream' : 'Freeze Stream'} btnAction={() => setFreezeStream(!freezeStream)} />
+        <Button
+          label={freezeStream ? 'Resume Stream' : 'Freeze Stream'}
+          btnAction={() => setFreezeStream(!freezeStream)}
+        />
         <SendEventButton
           label="Test Event"
           data={JSON.stringify({
@@ -188,6 +201,14 @@ export default function Stream() {
           }
         />
       </div>
+      {prevScrollTop > 0 && (
+        <span className="absolute bottom-5 right-5">
+          <Button
+            btnAction={scrollToTop}
+            icon={<IconChevron className="text-indigo-100 rotate-180" />}
+          />
+        </span>
+      )}
     </div>
   );
 }
