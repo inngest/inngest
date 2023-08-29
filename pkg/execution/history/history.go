@@ -16,39 +16,36 @@ type Driver interface {
 
 // Represents a row in the workflow_run_history table
 type History struct {
-	ID              ulid.ULID
-	CreatedAt       time.Time
-	AccountID       uuid.UUID
-	WorkspaceID     uuid.UUID
-	FunctionID      uuid.UUID
-	FunctionVersion int64
-	EventID         ulid.ULID
-	BatchID         *ulid.ULID
-	RunID           ulid.ULID
-	OriginalRunID   *ulid.ULID
-	StepID          *string
-	StepName        *string
-	GroupID         *uuid.UUID
-	IdempotencyKey  string
-	Status          *string
-	LatencyMS       *int64
-
-	// HistoryType enum
-	Type string
-
+	AccountID          uuid.UUID
 	Attempt            int64
-	CompletedStepCount *int64
-	URL                *string
+	BatchID            *ulid.ULID
 	Cancel             *execution.CancelRequest
+	CompletedStepCount *int64
+	CreatedAt          time.Time
+	EventID            ulid.ULID
+	FunctionID         uuid.UUID
+	FunctionVersion    int64
+	GroupID            *uuid.UUID
+	ID                 ulid.ULID
+	IdempotencyKey     string
+	LatencyMS          *int64
+	OriginalRunID      *ulid.ULID
+	Result             *Result
+	RunID              ulid.ULID
 	Sleep              *Sleep
+	Status             *string
+	StepID             *string
+	StepName           *string
+	Type               string
+	URL                *string
 	WaitForEvent       *WaitForEvent
 	WaitResult         *WaitResult
-	Result             *Result
+	WorkspaceID        uuid.UUID
 }
 
 type CancelEvent struct {
-	EventID    ulid.ULID `json:"event_id"`
-	Expression *string   `json:"expression"`
+	EventID    *ulid.ULID `json:"event_id"`
+	Expression *string    `json:"expression"`
 }
 
 type CancelUser struct {
@@ -71,14 +68,14 @@ type WaitResult struct {
 }
 
 type Result struct {
+	DurationMS  int                 `json:"response_duration_ms"`
 	ErrorCode   *string             `json:"error_code"`
 	Framework   *string             `json:"framework"`
+	Headers     map[string][]string `json:"response_headers"`
 	Output      any                 `json:"output"`
 	Platform    *string             `json:"platform"`
-	DurationMS  int                 `json:"response_duration_ms"`
-	Headers     map[string][]string `json:"response_headers"`
-	SizeBytes   int                 `json:"response_size_bytes"`
 	SDKLanguage string              `json:"sdk_language"`
 	SDKVersion  string              `json:"sdk_version"`
+	SizeBytes   int                 `json:"response_size_bytes"`
 	Stack       []map[string]any    `json:"stack"`
 }

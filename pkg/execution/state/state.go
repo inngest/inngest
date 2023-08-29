@@ -37,7 +37,6 @@ var (
 // Identifier represents the unique identifier for a workflow run.
 type Identifier struct {
 	RunID ulid.ULID `json:"runID"`
-
 	// WorkflowID tracks the internal ID of the function
 	WorkflowID uuid.UUID `json:"wID"`
 	// WorkflowVersion tracks the version of the function that was live
@@ -59,6 +58,10 @@ type Identifier struct {
 	//
 	// If this is not present the RunID is used as this value.
 	Key string `json:"key,omitempty"`
+	// AcountID represents the account ID for this run
+	AccountID uuid.UUID `json:"aID"`
+	// WorkspaceID represents the ws ID for this run
+	WorkspaceID uuid.UUID `json:"wsID"`
 }
 
 // IdempotencyKey returns the unique key used to represent this single
