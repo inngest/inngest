@@ -22,8 +22,10 @@ export default function Button({
   keys,
 }: ButtonProps) {
   // Replace this with alternative once we revamp the button variations
-  const iconElement = icon
-    ? React.cloneElement(icon as React.ReactElement, { className: 'icon-xs' })
+  const iconElement = React.isValidElement(icon)
+    ? React.cloneElement(icon as React.ReactElement, {
+        className: classNames('icon', icon.props.className, 'icon-xs'),
+      })
     : null;
 
   return (
