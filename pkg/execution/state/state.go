@@ -64,7 +64,7 @@ type Identifier struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 
 	// If this is a rerun, the original run ID is stored here.
-	OriginalRunID *ulid.ULID `json:"originalRunID,omitempty"`
+	OriginalRunID *ulid.ULID `json:"oRunID,omitempty"`
 }
 
 // IdempotencyKey returns the unique key used to represent this single
