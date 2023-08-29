@@ -9,6 +9,8 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
+var _ LifecycleListener = (*NoopLifecyceListener)(nil)
+
 // LifecycleListener listens to lifecycle events on the executor.
 type LifecycleListener interface {
 	// OnFunctionScheduled is called when a new function is initialized from
@@ -189,9 +191,9 @@ func (NoopLifecyceListener) OnStepFinished(
 	context.Context,
 	state.Identifier,
 	queue.Item,
+	inngest.Edge,
 	inngest.Step,
-	*state.DriverResponse,
-	error,
+	state.DriverResponse,
 ) {
 }
 
