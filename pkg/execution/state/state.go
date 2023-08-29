@@ -58,10 +58,13 @@ type Identifier struct {
 	//
 	// If this is not present the RunID is used as this value.
 	Key string `json:"key,omitempty"`
-	// AcountID represents the account ID for this run
+	// AccountID represents the account ID for this run
 	AccountID uuid.UUID `json:"aID"`
 	// WorkspaceID represents the ws ID for this run
 	WorkspaceID uuid.UUID `json:"wsID"`
+
+	// If this is a rerun, the original run ID is stored here.
+	OriginalRunID *ulid.ULID `json:"originalRunID,omitempty"`
 }
 
 // IdempotencyKey returns the unique key used to represent this single
