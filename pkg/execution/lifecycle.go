@@ -222,3 +222,5 @@ func (NoopLifecyceListener) OnSleep(
 	time.Time,
 ) {
 }
+
+func (NoopLifecyceListener) Close() error { return nil }
