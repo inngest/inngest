@@ -162,7 +162,7 @@ func (l lifecycle) OnFunctionCancelled(
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(ctx, h); err != nil {
-			l.log.Error("execution lifecycle error", "lifecycle", "onStepFinished", "error", err)
+			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionCancelled", "error", err)
 		}
 	}
 }
