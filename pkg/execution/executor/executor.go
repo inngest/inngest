@@ -203,6 +203,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Key:             key,
 		AccountID:       req.AccountID,
 		WorkspaceID:     req.WorkspaceID,
+		OriginalRunID:   req.OriginalRunID,
 	}
 
 	mapped := make([]map[string]any, len(req.Events))
