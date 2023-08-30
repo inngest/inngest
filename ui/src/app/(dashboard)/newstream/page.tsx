@@ -50,13 +50,14 @@ const columns = [
 ];
 
 export default function Stream() {
-  const [prevScrollTop, setPrevScrollTop] = useState(0); // Store the previous scrollTop value
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const [freezeStream, setFreezeStream] = useState(false);
+  const tableScrollTopPosition = (tableContainerRef && tableContainerRef?.current?.scrollTop) || 0;
 
   const fetchTriggersStream = async ({ pageParam, direction }) => {
     const variables = {
       limit: 40, // Page size
-      before: direction === 'forward' && prevScrollTop > 0 ? pageParam : null,
+      before: tableScrollTopPosition > 0 ? pageParam : null,
       after: direction === 'backward' && prevScrollTop > 0 ? pageParam : null,
     };
 
@@ -90,7 +91,6 @@ export default function Stream() {
     return [...acc, ...page];
   });
 
-  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const fetchMoreOnScroll = useCallback(
     (containerRefElement?: HTMLDivElement | null) => {
@@ -201,7 +201,7 @@ export default function Stream() {
           }
         />
       </div>
-      {prevScrollTop > 0 && (
+      {tableScrollTopPosition > 0 && (
         <span className="absolute bottom-5 right-5">
           <Button
             btnAction={scrollToTop}
