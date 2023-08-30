@@ -55,33 +55,25 @@ export default function Stream() {
   const [freezeStream, setFreezeStream] = useState(false);
   const tableScrollTopPosition = (tableContainerRef && tableContainerRef?.current?.scrollTop) || 0;
 
-  const fetchTriggersStream = async ({ pageParam, direction }) => {
+  const fetchTriggersStream = async ({ pageParam }) => {
     const variables = {
       limit: 40, // Page size
       before: tableScrollTopPosition > 0 ? pageParam : null,
-      after: direction === 'backward' && prevScrollTop > 0 ? pageParam : null,
     };
 
     const data = await client.request(GetTriggersStreamDocument, variables);
     return data.stream;
   };
 
-  const { data, fetchNextPage, fetchPreviousPage, isFetching, hasNextPage } = useInfiniteQuery({
+  const { data, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({
     queryKey: ['triggers-stream'],
     queryFn: fetchTriggersStream,
     refetchInterval: freezeStream ? false : 2500,
     initialPageParam: null,
-    getNextPageParam: (lastPage) => {
+    getNextPageParam: (lastPage, pages) => {
       const lastTrigger = lastPage[lastPage.length - 1];
       if (lastTrigger) {
         return lastTrigger.createdAt; // Use the createdAt of the last trigger as cursor
-      }
-      return undefined;
-    },
-    getPreviousPageParam: (firstPage) => {
-      const firstTrigger = firstPage[0];
-      if (firstTrigger) {
-        return firstTrigger.createdAt; // Use the createdAt of the first trigger as cursor
       }
       return undefined;
     },
@@ -92,27 +84,18 @@ export default function Stream() {
     return [...acc, ...page];
   });
 
-
   const fetchMoreOnScroll = useCallback(
     (containerRefElement?: HTMLDivElement | null) => {
       if (containerRefElement && triggers?.length > 0) {
         const { scrollHeight, scrollTop, clientHeight } = containerRefElement;
-        setPrevScrollTop(scrollTop);
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        // Check if scrolled to the top
-        const reachedTop = scrollTop === 0;
-
-        if ((reachedBottom || reachedTop) && !isFetching) {
-          if (reachedBottom) {
-            fetchNextPage();
-          } else {
-            fetchPreviousPage();
-          }
+        if (reachedBottom && !isFetching) {
+          fetchNextPage();
         }
       }
     },
-    [fetchNextPage, fetchPreviousPage, isFetching],
+    [fetchNextPage, isFetching],
   );
 
   const scrollToTop = () => {
