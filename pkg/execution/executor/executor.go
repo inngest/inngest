@@ -322,7 +322,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnFunctionScheduled(ctx, id, item)
+		go e.OnFunctionScheduled(context.WithoutCancel(ctx), id, item)
 	}
 
 	return &id, nil
@@ -384,7 +384,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// Only just starting:  run lifecycles on first attempt.
 		if item.Attempt == 0 {
 			for _, e := range e.lifecycles {
-				go e.OnFunctionStarted(ctx, id, item)
+				go e.OnFunctionStarted(context.WithoutCancel(ctx), id, item)
 			}
 		}
 	}
@@ -419,7 +419,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, resp *state.DriverResponse) error {
 	for _, e := range e.lifecycles {
-		go e.OnStepFinished(ctx, id, item, edge, resp.Step, *resp)
+		go e.OnStepFinished(context.WithoutCancel(ctx), id, item, edge, resp.Step, *resp)
 	}
 
 	// Check for temporary failures.  The outputs of transient errors are not
@@ -448,7 +448,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 			_ = ferr
 		}
 		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(ctx, id, item, *resp)
+			go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp)
 		}
 		return resp
 	}
@@ -472,7 +472,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
 
 	for _, e := range e.lifecycles {
-		go e.OnFunctionFinished(ctx, id, item, *resp)
+		go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp)
 	}
 
 	if serr := e.sm.SetStatus(ctx, id, enums.RunStatusCompleted); serr != nil {
@@ -505,7 +505,7 @@ func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnStepStarted(ctx, id, item, edge, *step, s)
+		go e.OnStepStarted(context.WithoutCancel(ctx), id, item, edge, *step, s)
 	}
 
 	// Execute the actual step.
@@ -697,7 +697,7 @@ func (e *executor) Cancel(ctx context.Context, id state.Identifier, r execution.
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnFunctionCancelled(ctx, id, r)
+		go e.OnFunctionCancelled(context.WithoutCancel(ctx), id, r)
 	}
 
 	return nil
@@ -756,7 +756,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnWaitForEventResumed(ctx, pause.Identifier, r)
+		go e.OnWaitForEventResumed(context.WithoutCancel(ctx), pause.Identifier, r)
 	}
 
 	return nil
@@ -950,7 +950,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnSleep(ctx, item.Identifier, item, gen, until)
+		go e.OnSleep(context.WithoutCancel(ctx), item.Identifier, item, gen, until)
 	}
 
 	return err
@@ -1034,7 +1034,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnWaitForEvent(ctx, item.Identifier, item, gen)
+		go e.OnWaitForEvent(context.WithoutCancel(ctx), item.Identifier, item, gen)
 	}
 
 	return err
