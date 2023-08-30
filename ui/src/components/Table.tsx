@@ -25,6 +25,7 @@ export default function Table({
   const rowVirtualizer = useVirtual({
     parentRef: tableContainerRef,
     size: rows?.length,
+    overscan: 10,
   });
   const { virtualItems: virtualRows, totalSize } = rowVirtualizer;
   const paddingTop = virtualRows.length > 0 ? virtualRows?.[0]?.start || 0 : 0;

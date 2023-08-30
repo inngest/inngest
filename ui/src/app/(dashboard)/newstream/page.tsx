@@ -141,7 +141,7 @@ export default function Stream() {
 
   const customRowProps = (row: Row<StreamItem>) => ({
     style: {
-      verticalAlign: row.original.runs && row.original.runs.length > 1 ? 'baseline' : 'initial',
+      verticalAlign: row.original.runs && row.original.runs.length > 1 ? 'baseline' : 'middle',
       cursor: 'pointer',
     },
     onClick: (e: React.MouseEvent<HTMLElement>) =>
@@ -198,7 +198,7 @@ export default function Stream() {
         />
       </div>
       {tableScrollTopPosition > 0 && (
-        <span className="absolute bottom-5 right-5">
+        <span className="absolute bottom-5 right-5 animate-bounce">
           <Button
             btnAction={scrollToTop}
             icon={<IconChevron className="text-indigo-100 rotate-180" />}
