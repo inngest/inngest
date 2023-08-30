@@ -117,6 +117,8 @@ func (l lifecycle) OnFunctionFinished(
 ) {
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
@@ -154,7 +156,7 @@ func (l lifecycle) OnFunctionCancelled(
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
 		RunID:           id.RunID,
-		Type:            enums.HistoryTypeFunctionCompleted.String(),
+		Type:            enums.HistoryTypeFunctionCancelled.String(),
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
@@ -180,6 +182,8 @@ func (l lifecycle) OnStepScheduled(
 	}
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
@@ -246,6 +250,8 @@ func (l lifecycle) OnStepFinished(
 ) {
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
@@ -288,6 +294,8 @@ func (l lifecycle) OnWaitForEvent(
 	// nothing right now.
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       id.AccountID,
+		WorkspaceID:     id.WorkspaceID,
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),

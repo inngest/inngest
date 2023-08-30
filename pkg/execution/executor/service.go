@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
@@ -193,6 +194,10 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
 		if err != nil {
 			return err
 		}
+		// After the sleep, we start a new step.  THis means we also want to start a new
+		// group ID, ensuring that we correlate the next step _after_ this sleep (to be
+		// scheduled in this executor run)
+		ctx = state.WithGroupID(ctx, uuid.New().String())
 	} else if edge.Outgoing != inngest.TriggerName {
 		// Load the position within the stack for standard edges.
 		stackIdx, err = s.state.StackIndex(ctx, item.Identifier.RunID, edge.Outgoing)

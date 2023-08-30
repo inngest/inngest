@@ -460,13 +460,14 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 
 	_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
 
+	for _, e := range e.lifecycles {
+		go e.OnFunctionFinished(ctx, id, item, *resp)
+	}
+
 	if serr := e.sm.SetStatus(ctx, id, enums.RunStatusCompleted); serr != nil {
 		return fmt.Errorf("error marking function as complete: %w", serr)
 	}
 
-	for _, e := range e.lifecycles {
-		go e.OnFunctionFinished(ctx, id, item, *resp)
-	}
 	return nil
 }
 
@@ -815,13 +816,16 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		return err
 	}
 
+	// Update the group ID in context;  we've already saved this step's success and we're now
+	// running the step again, needing a new history group
+	groupID := uuid.New().String()
+	ctx = state.WithGroupID(ctx, groupID)
+
 	// Re-enqueue the exact same edge to run now.
 	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, nil); err != nil {
 		return err
 	}
-	// Update the group ID in context;  we've already saved this step's success and we're now
-	// running the step again, needing a new history group
-	groupID := uuid.New().String()
+
 	nextItem := queue.Item{
 		WorkspaceID: item.WorkspaceID,
 		GroupID:     groupID,
@@ -856,15 +860,18 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 		Incoming:              edge.Edge.Incoming,
 	}
 
+	// Update the group ID in context;  we're scheduling a step, and we want
+	// to start a new history group for this item.
+	groupID := uuid.New().String()
+	ctx = state.WithGroupID(ctx, groupID)
+
 	// Re-enqueue the exact same edge to run now.
 	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
 		return err
 	}
 
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
-	// Update the group ID in context;  we're scheduling a new step, and we want
-	// to start a new history group for this item.
-	groupID := uuid.New().String()
+
 	nextItem := queue.Item{
 		JobID:       &jobID,
 		GroupID:     groupID, // Ensure we correlate future jobs with this group ID, eg. started/failed.
@@ -902,6 +909,11 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 		Incoming: edge.Edge.Incoming, // To re-call the SDK
 	}
 
+	// Create another group for the next item which will run.  We're enqueueing
+	// the function to run again after sleep, so need a new group.
+	groupID := uuid.New().String()
+	ctx = state.WithGroupID(ctx, groupID)
+
 	// XXX: Remove this after we create queues for function runs.
 	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, &at); err != nil {
 		return err
@@ -909,9 +921,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 
 	until := time.Now().Add(dur)
 
-	// Create another group for the next item which will run.  We're enqueueing
-	// the function to run again after sleep, so need a new group.
-	groupID := uuid.New().String()
 	err = e.queue.Enqueue(ctx, queue.Item{
 		WorkspaceID: item.WorkspaceID,
 		// Sleeps re-enqueue the step so that we can mark the step as completed
