@@ -17,8 +17,15 @@
    --shiki-token-link: #4078f2;
 }
 
+.rehype-code-title {
+  margin: 1.0rem 0;
+  color: var(--color-gray-purple);
+  font-size: 14px;
+  opacity: 0.8;
+}
+
 pre.shiki {
-  margin: 1.5rem 0;
+  margin: 0.25rem 0;
   padding: 2rem;
   position: relative;
   white-space: pre-wrap;

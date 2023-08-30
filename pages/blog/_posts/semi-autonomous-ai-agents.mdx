@@ -78,7 +78,7 @@ _Yes, this is the Inngest blog, so obviously, we are biased, but stick with me h
 
 The first step is for the user to type a query in the chat UI. They can treat this like a standard ChatGPT conversation, or they can be more specific and ask the chat about issues in their Linear workspace.
 
-```typescript
+```typescript:/apps/web/app/api/chat/route.ts
 import type { Message } from 'ai'
 import { customAlphabet } from 'nanoid';
 import { inngest } from '@/inngest/inngest.server.client';
@@ -122,7 +122,7 @@ export async function POST(req: Request) {
 
 This POSTs a request to the `/api/chat` endpoint, dispatching an Inngest event that triggers the primary workflow.
 
-```typescript
+```typescript:/apps/web/inngest/ai-flow.ts
 export const aibot = inngest.createFunction(
     {
         name: "OpenAI Linear Bot",
@@ -153,7 +153,7 @@ The workflow creates an instance of a `FunctionInvoker` class, which encapsulate
 
 The OpenAI Chat completion functions are defined like this:
 
-```typescript
+```typescript:/apps/web/inngest/ai-flow.ts
 const functions: Functions = {
   search_issues: {
     docs: {
@@ -224,7 +224,7 @@ It’s true, though, with PartyKit 🎈
 
 PartyKit takes all the misery of dealing with web sockets and crushes them while providing a simple and effective mechanism for streaming responses to our users inside an asynchronous workflow.
 
-```typescript
+```typescript:/apps/web/inngest/message-writer.ts
 /**
  * 🥳 Publish a message to the party. Sends a POST request to the partykit server.
  * The server then broadcasts it to all connected clients.
@@ -252,7 +252,7 @@ We call `publish` in our Function Invoker when we receive a response from OpenAI
 
 Inside the PartyKit server, we can broadcast that message to all connected clients.
 
-```typescript
+```typescript:/apps/openai-party/server.ts
 async onRequest(_req: PartyRequest) {
   const messageBody: {requestId: string, body: string} = await _req.json();
 
@@ -262,11 +262,11 @@ async onRequest(_req: PartyRequest) {
       `Party ${this.party.id} has received ${this.messages.length} messages`
   );
 }
-  ```
+```
 
 Finally, in our handy React hook on the UI client side, we are listening for those messages to append them to the UI.
 
-```typescript
+```typescript:/apps/web/hooks/use-backend-chat.ts
 const socket = usePartySocket({
   room: process.env.NEXT_PUBLIC_PARTYKIT_ROOM_NAME!,
   host: process.env.NEXT_PUBLIC_PARTY_KIT_URL!,
