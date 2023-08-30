@@ -179,10 +179,17 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 // Execute loads a workflow and the current run state, then executes the
 // function's step via the necessary driver.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*state.Identifier, error) {
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	var key string
 	if req.IdempotencyKey != nil {
 		// Use the given idempotency key
 		key = *req.IdempotencyKey
+	}
+	if req.OriginalRunID != nil {
+		// If this is a rerun then we want to use the run ID as the key. If we
+		// used the event or batch ID as the key then we wouldn't be able to
+		// rerun multiple times.
+		key = runID.String()
 	}
 	if key == "" && len(req.Events) == 1 {
 		// If not provided, use the incoming event ID if there's not a batch.
@@ -197,7 +204,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		WorkflowID:      req.Function.ID,
 		WorkflowVersion: req.Function.FunctionVersion,
 		StaticVersion:   req.StaticVersion,
-		RunID:           ulid.MustNew(ulid.Now(), rand.Reader),
+		RunID:           runID,
 		BatchID:         req.BatchID,
 		EventID:         req.Events[0].GetInternalID(),
 		Key:             key,
