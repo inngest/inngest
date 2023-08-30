@@ -163,12 +163,20 @@ export const TRIGGERS_STREAM = gql`
       trigger
       type
       runs {
-        functionID
-        function {
-          name
-        }
-        status
+        id
       }
+    }
+  }
+`;
+
+export const FUNCTION_RUN_STATUS = gql`
+  query GetFunctionRunStatus($id: ID!) {
+    functionRun(query: { functionRunId: $id }) {
+      id
+      function {
+        name
+      }
+      status
     }
   }
 `;

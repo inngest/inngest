@@ -348,7 +348,14 @@ export type GetTriggersStreamQueryVariables = Exact<{
 }>;
 
 
-export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, trigger: string, type: StreamType, runs?: Array<{ __typename?: 'FunctionRun', functionID: string, status?: FunctionRunStatus | null, function?: { __typename?: 'Function', name: string } | null } | null> | null }> };
+export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, trigger: string, type: StreamType, runs?: Array<{ __typename?: 'FunctionRun', id: string } | null> | null }> };
+
+export type GetFunctionRunStatusQueryVariables = Exact<{
+  id: Scalars['ID'];
+}>;
+
+
+export type GetFunctionRunStatusQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, status?: FunctionRunStatus | null, function?: { __typename?: 'Function', name: string } | null } | null };
 
 
 export const GetEventsStreamDocument = `
@@ -505,12 +512,19 @@ export const GetTriggersStreamDocument = `
     trigger
     type
     runs {
-      functionID
-      function {
-        name
-      }
-      status
+      id
     }
+  }
+}
+    `;
+export const GetFunctionRunStatusDocument = `
+    query GetFunctionRunStatus($id: ID!) {
+  functionRun(query: {functionRunId: $id}) {
+    id
+    function {
+      name
+    }
+    status
   }
 }
     `;
@@ -547,9 +561,12 @@ const injectedRtkApi = api.injectEndpoints({
     GetTriggersStream: build.query<GetTriggersStreamQuery, GetTriggersStreamQueryVariables>({
       query: (variables) => ({ document: GetTriggersStreamDocument, variables })
     }),
+    GetFunctionRunStatus: build.query<GetFunctionRunStatusQuery, GetFunctionRunStatusQueryVariables>({
+      query: (variables) => ({ document: GetFunctionRunStatusDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery } = injectedRtkApi;
+export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery } = injectedRtkApi;
 
