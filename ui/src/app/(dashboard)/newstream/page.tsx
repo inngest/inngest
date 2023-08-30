@@ -18,6 +18,7 @@ import { selectEvent, selectRun } from '@/store/global';
 import { useAppDispatch } from '@/store/hooks';
 import { fullDate } from '@/utils/date';
 import FunctionRunList from './FunctionRunList';
+import OutputList from './OutputList';
 
 // import SourceBadge from './SourceBadge';
 
@@ -47,6 +48,11 @@ const columns = [
   columnHelper.accessor('runs', {
     header: () => <span>Function</span>,
     cell: (props) => <FunctionRunList functionRuns={props.getValue()} />,
+  }),
+   columnHelper.accessor((row) => row.runs, {
+    id: 'output',
+    cell: (props) => <OutputList functionRuns={props.row.original.runs}/>,
+    header: () => <span>Output</span>,
   }),
 ];
 

@@ -37,7 +37,7 @@ export default function FunctionRunList({ functionRuns }) {
 type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'function' | 'status'>;
 
 export function FunctionRunItem({ functionRunID }) {
-  const { data } = useGetFunctionRunStatusQuery({ id: functionRunID }, { pollingInterval: 2500 });
+  const { data } = useGetFunctionRunStatusQuery({ id: functionRunID }, { pollingInterval: 1500 });
   const functionRun = (data?.functionRun as FunctionRunStatusSubset) || {};
 
   if (!functionRun || !functionRun?.function?.name || !functionRun.status) {
