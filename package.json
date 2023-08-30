@@ -115,8 +115,8 @@
   },
   "engines": {
     "node": "18.x",
-    "pnpm": "8.6.2"
+    "pnpm": "8.x"
   },
-  "packageManager": "pnpm@8.6.2",
+  "packageManager": "pnpm@8.7.0",
   "private": true
 }
