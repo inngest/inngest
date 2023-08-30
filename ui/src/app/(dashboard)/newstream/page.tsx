@@ -32,6 +32,7 @@ const columns = [
         {fullDate(new Date(props.getValue()))}
       </time>
     ),
+    size: 100,
   }),
   // The Source BE is not built yet
   // columnHelper.accessor((row) => row.source.name, {
@@ -44,10 +45,12 @@ const columns = [
     cell: (props) => (
       <TriggerTag value={props.row.original.trigger} type={props.row.original.type} />
     ),
+    size: 150,
   }),
   columnHelper.accessor('runs', {
     header: () => <span>Function</span>,
     cell: (props) => <FunctionRunList functionRuns={props.getValue()} />,
+    size: 150,
   }),
    columnHelper.accessor((row) => row.runs, {
     id: 'output',
@@ -202,7 +205,7 @@ export default function Stream() {
             enablePinning: true,
             initialState: {
               columnPinning: {
-                left: ['startedAt'],
+                left: ['createdAt'],
               },
             },
           }}
