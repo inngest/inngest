@@ -206,7 +206,7 @@ const functions: Functions = {
 
 We are providing two functions to the Chat completion API. The first is for searching issues, and the second is for deleting an issue. Note that the deletion is stubbed in, so it doesn’t do anything in this example outside of logging to the server console.
 
-[The `FunctionInvoker` is genuinely complex](https://github.com/joelhooks/inngest-partykit-nextjs-openai/blob/c396e0d77b1f396387f104017e684bb158fd0c98/apps/web/src/inngest/function-invoker.ts](https://github.com/joelhooks/inngest-partykit-nextjs-openai/blob/c396e0d77b1f396387f104017e684bb158fd0c98/apps/web/src/inngest/function-invoker.ts) and could use some additional refinement (PRs are welcome!), but it’s readable, and the complexity is contained and manageable.
+[The `FunctionInvoker` is genuinely complex](https://github.com/joelhooks/inngest-partykit-nextjs-openai/blob/c396e0d77b1f396387f104017e684bb158fd0c98/apps/web/src/inngest/function-invoker.ts) and could use some additional refinement (PRs are welcome!), but it’s readable, and the complexity is contained and manageable.
 
 But this introduces a problem. We are in the middle of an asynchronous workflow. We call the Open AI Chat API, which **streams back a response.**
 
