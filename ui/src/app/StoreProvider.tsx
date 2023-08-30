@@ -9,8 +9,9 @@ type StoreProviderProps = {
   children: React.ReactNode;
 };
 
+export const queryClient = new QueryClient();
+
 export default function StoreProvider({ children }: StoreProviderProps) {
-  const queryClient = new QueryClient();
   return (
     <QueryClientProvider client={queryClient}>
       <Provider store={store}>{children}</Provider>
