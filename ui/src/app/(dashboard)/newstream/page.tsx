@@ -53,7 +53,25 @@ const columns = [
 export default function Stream() {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [freezeStream, setFreezeStream] = useState(false);
-  const tableScrollTopPosition = (tableContainerRef && tableContainerRef?.current?.scrollTop) || 0;
+  const [tableScrollTopPosition, setTableScrollTopPosition] = useState(0);
+
+  useEffect(() => {
+    // Save table's parent scroll top value
+    if (tableContainerRef.current) {
+      const handleScroll = () => {
+        const scrollTop = tableContainerRef.current?.scrollTop;
+        if (scrollTop !== undefined) {
+          setTableScrollTopPosition(scrollTop);
+        }
+      };
+
+      tableContainerRef.current.addEventListener('scroll', handleScroll);
+
+      return () => {
+        tableContainerRef.current?.removeEventListener('scroll', handleScroll);
+      };
+    }
+  }, []);
 
   const fetchTriggersStream = async ({ pageParam }) => {
     const variables = {
@@ -65,10 +83,10 @@ export default function Stream() {
     return data.stream;
   };
 
-  const { data, fetchNextPage, isFetching, hasNextPage } = useInfiniteQuery({
+  const { data, fetchNextPage, isFetching } = useInfiniteQuery({
     queryKey: ['triggers-stream'],
     queryFn: fetchTriggersStream,
-    refetchInterval: freezeStream ? false : 2500,
+    refetchInterval: freezeStream || tableScrollTopPosition > 0 ? false : 2500,
     initialPageParam: null,
     getNextPageParam: (lastPage, pages) => {
       const lastTrigger = lastPage[lastPage.length - 1];
