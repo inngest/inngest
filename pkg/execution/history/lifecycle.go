@@ -64,7 +64,7 @@ func (l lifecycle) OnFunctionScheduled(
 		BatchID:         id.BatchID,
 	}
 	for _, d := range l.drivers {
-		if err := d.Write(ctx, h); err != nil {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionScheduled", "error", err)
 		}
 	}
@@ -98,7 +98,7 @@ func (l lifecycle) OnFunctionStarted(
 		LatencyMS:       &latencyMS,
 	}
 	for _, d := range l.drivers {
-		if err := d.Write(ctx, h); err != nil {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onStepFinished", "error", err)
 		}
 	}
@@ -134,7 +134,7 @@ func (l lifecycle) OnFunctionFinished(
 		h.Type = enums.HistoryTypeFunctionFailed.String()
 	}
 	for _, d := range l.drivers {
-		if err := d.Write(ctx, h); err != nil {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionFinished", "error", err)
 		}
 	}
@@ -163,7 +163,7 @@ func (l lifecycle) OnFunctionCancelled(
 		Cancel:          &req,
 	}
 	for _, d := range l.drivers {
-		if err := d.Write(ctx, h); err != nil {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onFunctionCancelled", "error", err)
 		}
 	}
@@ -197,7 +197,7 @@ func (l lifecycle) OnStepScheduled(
 		BatchID:         id.BatchID,
 	}
 	for _, d := range l.drivers {
-		if err := d.Write(ctx, h); err != nil {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onStepScheduled", "error", err)
 		}
 	}
@@ -234,7 +234,7 @@ func (l lifecycle) OnStepStarted(
 	}
 
 	for _, d := range l.drivers {
-		if err := d.Write(ctx, h); err != nil {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onStepStarted", "error", err)
 		}
 	}
@@ -277,7 +277,7 @@ func (l lifecycle) OnStepFinished(
 	}
 
 	for _, d := range l.drivers {
-		if err := d.Write(ctx, h); err != nil {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onStepFinished", "error", err)
 		}
 	}
@@ -314,7 +314,7 @@ func (l lifecycle) OnWaitForEvent(
 		},
 	}
 	for _, d := range l.drivers {
-		if err := d.Write(ctx, h); err != nil {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onWaitForEvent", "error", err)
 		}
 	}
@@ -345,7 +345,7 @@ func (l lifecycle) OnWaitForEventResumed(
 		},
 	}
 	for _, d := range l.drivers {
-		if err := d.Write(ctx, h); err != nil {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onWaitForEventResumed", "error", err)
 		}
 	}
@@ -380,7 +380,7 @@ func (l lifecycle) OnSleep(
 		},
 	}
 	for _, d := range l.drivers {
-		if err := d.Write(ctx, h); err != nil {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onSleep", "error", err)
 		}
 	}
