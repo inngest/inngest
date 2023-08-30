@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
 
+import { queryClient } from '@/app/StoreProvider';
 import { BlankSlate } from '@/components/Blank';
 import Button from '@/components/Button';
 import SendEventButton from '@/components/Event/SendEventButton';
@@ -122,6 +123,18 @@ export default function Stream() {
       });
     }
   };
+
+  useEffect(() => {
+    const hasMoreThanOnePage = data && data.pages?.length > 1;
+
+    // If user scrolled down multiple pages and then to the top of the table, we clear the cache to only have 1 page again
+    if (tableScrollTopPosition === 0 && hasMoreThanOnePage && !isFetching) {
+      queryClient.setQueryData(['triggers-stream'], (data) => ({
+        pages: data?.pages?.slice(0, 1),
+        pageParams: [null],
+      }));
+    }
+  }, [tableScrollTopPosition, isFetching]);
 
   const dispatch = useAppDispatch();
   const router = useRouter();
