@@ -411,6 +411,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 }
 
 func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, resp *state.DriverResponse) error {
+	for _, e := range e.lifecycles {
+		go e.OnStepFinished(ctx, id, item, edge, resp.Step, *resp)
+	}
+
 	// Check for temporary failures.  The outputs of transient errors are not
 	// stored in the state store;  they're tracked via executor lifecycle methods
 	// for logging.
@@ -500,8 +504,8 @@ func (e *executor) run(ctx context.Context, id state.Identifier, item queue.Item
 	// Execute the actual step.
 	response, err := e.executeDriverForStep(ctx, id, item, step, s, edge, stackIndex)
 
-	for _, e := range e.lifecycles {
-		go e.OnStepFinished(ctx, id, item, edge, *step, *response)
+	if response != nil && response.Scheduled {
+		return response, err
 	}
 
 	if response.Err != nil && err == nil {
