@@ -458,7 +458,6 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	if len(resp.Generator) > 0 {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, resp.Generator, item); serr != nil {
-
 			// If this is an error compiling async expressions, fail the function.
 			if strings.Contains(serr.Error(), "error compiling expression") {
 				_, _ = e.sm.SaveResponse(ctx, id, *resp, item.Attempt)
@@ -471,7 +470,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 				for _, e := range e.lifecycles {
 					go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp)
 				}
-				return resp
+				return nil
 			}
 
 			return fmt.Errorf("error handling generator response: %w", serr)
