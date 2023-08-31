@@ -58,7 +58,9 @@ export default function Table({
                 )}
                 onClick={header.column.getToggleSortingHandler()}
                 key={header.id}
-                style={{ width: header.getSize() }}
+                style={{
+                  width: header.getSize() === Number.MAX_SAFE_INTEGER ? 'auto' : header.getSize(),
+                }}
               >
                 <div className="flex items-center gap-2">
                   {header.isPlaceholder
@@ -104,7 +106,12 @@ export default function Table({
                       cell.column.getIsPinned() && 'sticky left-0 z-[2]',
                     )}
                     key={cell.id}
-                    style={{ width: cell.column.getSize() }}
+                    style={{
+                      width:
+                        cell.column.getSize() === Number.MAX_SAFE_INTEGER
+                          ? 'auto'
+                          : cell.column.getSize(),
+                    }}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>

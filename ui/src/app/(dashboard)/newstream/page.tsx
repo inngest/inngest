@@ -32,7 +32,8 @@ const columns = [
         {fullDate(new Date(props.getValue()))}
       </time>
     ),
-    size: 100,
+    size: 250,
+    minSize: 250,
   }),
   // The Source BE is not built yet
   // columnHelper.accessor((row) => row.source.name, {
@@ -45,16 +46,18 @@ const columns = [
     cell: (props) => (
       <TriggerTag value={props.row.original.trigger} type={props.row.original.type} />
     ),
-    size: 150,
+    size: 300,
+    minSize: 300,
   }),
   columnHelper.accessor('runs', {
     header: () => <span>Function</span>,
     cell: (props) => <FunctionRunList functionRuns={props.getValue()} />,
-    size: 150,
+    size: 350,
+    minSize: 350,
   }),
-   columnHelper.accessor((row) => row.runs, {
+  columnHelper.accessor((row) => row.runs, {
     id: 'output',
-    cell: (props) => <OutputList functionRuns={props.row.original.runs}/>,
+    cell: (props) => <OutputList functionRuns={props.row.original.runs} />,
     header: () => <span>Output</span>,
   }),
 ];
@@ -140,7 +143,7 @@ export default function Stream() {
     // If user scrolled down multiple pages and then to the top of the table, we clear the cache to only have 1 page again
     if (tableScrollTopPosition === 0 && hasMoreThanOnePage && !isFetching) {
       queryClient.setQueryData(['triggers-stream'], (data) => ({
-        // @ts-ignore 
+        // @ts-ignore
         pages: data?.pages?.slice(0, 1),
         pageParams: [null],
       }));
@@ -208,6 +211,11 @@ export default function Stream() {
               columnPinning: {
                 left: ['createdAt'],
               },
+            },
+            defaultColumn: {
+              minSize: 0,
+              size: Number.MAX_SAFE_INTEGER,
+              maxSize: Number.MAX_SAFE_INTEGER,
             },
           }}
           tableContainerRef={tableContainerRef}
