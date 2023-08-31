@@ -750,9 +750,13 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	// consuming the pause to guarantee the event data is stored via the pause
 	// for the next run.  If the ConsumePause call comes after enqueue, the TCP
 	// conn may drop etc. and running the job may occur prior to saving state data.
-	if err := e.queue.Enqueue(
+	//
+	// jobID ensures that we idempotently enqueue the next step.
+	jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
+	err = e.queue.Enqueue(
 		ctx,
 		queue.Item{
+			JobID: &jobID,
 			// Add a new group ID for the child;  this will be a new step.
 			GroupID:     uuid.New().String(),
 			WorkspaceID: pause.WorkspaceID,
@@ -763,7 +767,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			},
 		},
 		time.Now(),
-	); err != nil {
+	)
+	if err != nil && err != redis_state.ErrQueueItemExists {
 		return fmt.Errorf("error enqueueing after pause: %w", err)
 	}
 
@@ -853,7 +858,9 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		return err
 	}
 
+	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
 	nextItem := queue.Item{
+		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
 		GroupID:     groupID,
 		Kind:        queue.KindEdge,
@@ -898,7 +905,6 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 	}
 
 	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
-
 	nextItem := queue.Item{
 		JobID:       &jobID,
 		GroupID:     groupID, // Ensure we correlate future jobs with this group ID, eg. started/failed.
@@ -948,7 +954,9 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 
 	until := time.Now().Add(dur)
 
+	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
 	err = e.queue.Enqueue(ctx, queue.Item{
+		JobID:       &jobID,
 		WorkspaceID: item.WorkspaceID,
 		// Sleeps re-enqueue the step so that we can mark the step as completed
 		// in the executor after the sleep is complete.  This will re-call the
