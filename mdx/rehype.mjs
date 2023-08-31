@@ -5,6 +5,7 @@ import shiki from "shiki";
 import { toString } from "mdast-util-to-string";
 import * as acorn from "acorn";
 import { slugifyWithCounter } from "@sindresorhus/slugify";
+import rehypeCodeTitles from "rehype-code-titles";
 
 export function rehypeParseCodeBlocks() {
   return (tree) => {
@@ -113,6 +114,7 @@ function getSections(node) {
 }
 
 export const rehypePlugins = [
+  rehypeCodeTitles,
   mdxAnnotations.rehype,
   rehypeParseCodeBlocks,
   rehypeShiki,

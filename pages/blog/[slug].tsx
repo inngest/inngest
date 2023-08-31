@@ -18,6 +18,8 @@ import { Button } from "src/shared/Button";
 import IconCalendar from "src/shared/Icons/Calendar";
 import CTACallout from "src/shared/CTACallout";
 import Blockquote from "src/shared/Blog/Blockquote";
+import rehypeCodeTitles from "rehype-code-titles";
+
 const components = {
   DiscordCTA,
   Button,
@@ -248,6 +250,7 @@ export async function getStaticProps({ params }) {
     scope: { json: JSON.stringify(data) },
     mdxOptions: {
       rehypePlugins: [
+        rehypeCodeTitles,
         rehypeParseCodeBlocks,
         rehypeRemoveTwoSlashMarkup,
         rehypeShiki,
