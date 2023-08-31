@@ -107,6 +107,10 @@ type Edge struct {
 	Metadata *EdgeMetadata `json:"metadata,omitempty"`
 }
 
+func (e Edge) IsSource() bool {
+	return e.Outgoing == "" && e.Incoming == TriggerName || e.Outgoing == TriggerName
+}
+
 type EdgeMetadata struct {
 	Name string `json:"name,omitempty"`
 	If   string `json:"if,omitempty"`
@@ -131,10 +135,10 @@ type AsyncEdgeMetadata struct {
 
 // VersionCoinstraint represents version constraints for an action.  We use semver without
 // patches:
-// - Major versions are backwards-incompatible (eg. requesting different secrets,
-//   incompatible APIs).
-// - Minor versions are backwards compatible improvements, fixes, or additions.  We
-//   automatically use the latest minor version within every step function.
+//   - Major versions are backwards-incompatible (eg. requesting different secrets,
+//     incompatible APIs).
+//   - Minor versions are backwards compatible improvements, fixes, or additions.  We
+//     automatically use the latest minor version within every step function.
 type VersionConstraint struct {
 	Major *uint `json:"major,omitempty"`
 	Minor *uint `json:"minor,omitempty"`
