@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -457,6 +458,22 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	if len(resp.Generator) > 0 {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, resp.Generator, item); serr != nil {
+
+			// If this is an error compiling async expressions, fail the function.
+			if strings.Contains(serr.Error(), "error compiling expression") {
+				_, _ = e.sm.SaveResponse(ctx, id, *resp, item.Attempt)
+				// XXX: failureHandler is legacy.
+				if serr := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); serr != nil {
+					return fmt.Errorf("error marking function as complete: %w", serr)
+				}
+				s, _ := e.sm.Load(ctx, id.RunID)
+				_ = e.failureHandler(ctx, id, s, *resp)
+				for _, e := range e.lifecycles {
+					go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp)
+				}
+				return resp
+			}
+
 			return fmt.Errorf("error handling generator response: %w", serr)
 		}
 		_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
