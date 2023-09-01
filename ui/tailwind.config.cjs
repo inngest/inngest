@@ -10,17 +10,13 @@ module.exports = {
         },
       },
       gridTemplateColumns: {
-        // Sidebar | Timeline Scroll | Content Frame
-        'app-sm': '260px 1fr',
-        app: '340px 1fr',
-        'app-desktop': '420px 1fr',
+        // Timeline Scroll | Content Frame
         'event-overlay': '340px 1fr',
-        docs: '1fr',
+        app: '1fr',
       },
       gridTemplateRows: {
-        // Header | Action Bar | Content Frame
-        app: '50px 50px 1fr',
-        docs: '50px 1fr',
+        // Header | Content Frame
+        app: '50px 1fr',
         'event-overlay': '120px 1fr',
       },
       outlineOffset: {
