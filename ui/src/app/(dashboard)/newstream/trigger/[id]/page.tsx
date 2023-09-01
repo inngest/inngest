@@ -10,6 +10,8 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
 export default function StreamDetails() {
   const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
+  const selectedRun = useAppSelector((state) => state.global.selectedRun);
+
   const dispatch = useAppDispatch();
   const params = useParams();
 
@@ -22,9 +24,9 @@ export default function StreamDetails() {
   return (
     <>
       {selectedEvent && (
-        <div className="grid grid-cols-2 h-full text-white">
+        <div className="grid grid-cols-2 h-full text-white overflow-scroll">
           <EventSection eventId={params.id} />
-          <FunctionRunSection runId={null} />
+          <FunctionRunSection runId={selectedRun} />
         </div>
       )}
     </>

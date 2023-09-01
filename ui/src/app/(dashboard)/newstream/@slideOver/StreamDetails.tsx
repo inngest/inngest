@@ -9,7 +9,7 @@ export default function StreamDetails() {
   return (
     <>
       {selectedEvent && (
-        <div className="grid grid-cols-2 h-full text-white">
+        <div className="grid grid-cols-2 h-full text-white overflow-scroll">
           <EventSection eventId={selectedEvent} />
           <FunctionRunSection runId={selectedRun} />
         </div>
