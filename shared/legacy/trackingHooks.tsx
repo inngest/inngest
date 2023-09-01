@@ -1,6 +1,6 @@
 import deterministicSplit from "deterministic-split";
 import { useEffect, useMemo } from "react";
-import { useLocalStorage } from "react-use";
+import { useCookie, useLocalStorage } from "react-use";
 import { v4 as uuid } from "uuid";
 
 /**
@@ -13,18 +13,30 @@ export const abExperiments = {
 /**
  * Fetch and return the user's anonymous ID.
  */
-export const useAnonId = (): { anonId: string; existing: boolean } => {
-  const [anonId, setAnonId] = useLocalStorage<string>("inngest-anon-id");
-  if (!anonId) {
-    const id = uuid();
-    setAnonId(id);
+export const useAnonymousID = (): { anonymousID: string; existing: boolean } => {
+  const [anonymousID, setAnonymousID] = useCookie("inngest_anonymous_id");
+
+  // TODO: remove this once sufficient time has passed for users to get the new cookie.
+  // If the user has a legacy anonymous ID, migrate it to the new cookie.
+  const [legacyAnonymousID, _, deleteLegacyAnonymousID] = useLocalStorage<string>("inngest-anon-id");
+  if (!anonymousID && legacyAnonymousID) {
+    const sixMonthsFromNow = new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000);
+    setAnonymousID(legacyAnonymousID, { domain: process.env.NEXT_PUBLIC_HOSTNAME, path: "/", expires: sixMonthsFromNow, sameSite: 'lax' });
+    deleteLegacyAnonymousID();
+  }
+
+  if (!anonymousID) {
+    const newAnonymousID = uuid();
+    const sixMonthsFromNow = new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000);
+    setAnonymousID(newAnonymousID, { domain: process.env.NEXT_PUBLIC_HOSTNAME, path: "/", expires: sixMonthsFromNow, sameSite: 'lax' });
     return {
-      anonId: id,
+      anonymousID: newAnonymousID,
       existing: false,
     };
   }
+
   return {
-    anonId,
+    anonymousID,
     existing: true,
   };
 };
@@ -47,7 +59,7 @@ export const useAbTest = <T extends keyof typeof abExperiments>(
    */
   experimentName: T
 ) => {
-  const { anonId } = useAnonId();
+  const { anonymousID } = useAnonymousID();
 
   const variant = useMemo(() => {
     // for server side rendering, always render the first variant
@@ -55,10 +67,10 @@ export const useAbTest = <T extends keyof typeof abExperiments>(
       return abExperiments[experimentName][0];
     }
     return deterministicSplit(
-      `${anonId}_${experimentName}`,
+      `${anonymousID}_${experimentName}`,
       abExperiments[experimentName]
     ) as typeof abExperiments[T][number];
-  }, [anonId, experimentName]);
+  }, [anonymousID, experimentName]);
 
   /**
    * Whenever the variant and fetched and used, send an event to mark that this
@@ -70,14 +82,14 @@ export const useAbTest = <T extends keyof typeof abExperiments>(
       window.Inngest.event({
         name: "website/experiment.viewed",
         data: {
-          anonymous_id: anonId,
+          anonymous_id: anonymousID,
           experiment: experimentName,
           variant,
         },
       });
       tracked[experimentName] = true;
     }
-  }, [variant, anonId, experimentName]);
+  }, [variant, anonymousID, experimentName]);
 
   return {
     /**

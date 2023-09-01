@@ -2,7 +2,7 @@ import { useRouter } from "next/router";
 import styled from "@emotion/styled";
 import Logo from "../shared/Icons/Logo";
 import { useState } from "react";
-import { useAnonId } from "src/shared/legacy/trackingHooks";
+import { useAnonymousID } from "src/shared/legacy/trackingHooks";
 
 export async function getStaticProps() {
   return {
@@ -27,7 +27,7 @@ const SignUp = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>(null);
-  const { anonId } = useAnonId();
+  const { anonymousID } = useAnonymousID();
   const router = useRouter();
 
   const loc = router.query.to || "/";
@@ -53,7 +53,7 @@ const SignUp = () => {
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ email, password, anon_id: anonId }),
+        body: JSON.stringify({ email, password, anon_id: anonymousID }),
       });
     } catch (e) {
       setError("There was an error signing you up.  Please try again.");
@@ -87,7 +87,7 @@ const SignUp = () => {
             <a
               className="inline-flex flex-shrink-0 items-center gap-1 justify-center overflow-hidden text-sm font-regular rounded-[6px] transition-all shadow-outline-secondary-light font-medium px-6 py-2.5 bg-gray-900 text-white shadow-sm hover:bg-gray-700 hover:text-white"
               href={apiURL(
-                `/v1/login/oauth/github/redirect?anonid=${anonId}&to=${loc}&search=${b64search}`
+                `/v1/login/oauth/github/redirect?anonid=${anonymousID}&to=${loc}&search=${b64search}`
               )}
             >
               <img
@@ -103,7 +103,7 @@ const SignUp = () => {
             <a
               className="inline-flex flex-shrink-0 items-center gap-1 justify-center overflow-hidden text-sm font-regular rounded-[6px] transition-all shadow-outline-secondary-light font-medium px-6 py-2.5 bg-slate-700 text-white shadow-sm hover:bg-slate-500 hover:text-white"
               href={apiURL(
-                `/v1/login/oauth/google/redirect?anonid=${anonId}&to=${loc}&search=${b64search}`
+                `/v1/login/oauth/google/redirect?anonid=${anonymousID}&to=${loc}&search=${b64search}`
               )}
               style={{ marginLeft: 0 }}
             >
