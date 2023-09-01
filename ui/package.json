@@ -13,7 +13,6 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
-    "@formkit/auto-animate": "1.0.0-beta.5",
     "@headlessui/react": "1.7.14",
     "@headlessui/tailwindcss": "0.1.2",
     "@monaco-editor/react": "4.4.6",
