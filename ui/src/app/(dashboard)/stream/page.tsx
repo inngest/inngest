@@ -164,7 +164,7 @@ export default function Stream() {
   }) {
     if (e.target instanceof HTMLElement) {
       const runID = e.target.dataset.key;
-      router.push(`/newstream/trigger/${triggerID}`);
+      router.push(`/stream/trigger/${triggerID}`);
       dispatch(selectEvent(triggerID));
       if (runID) {
         dispatch(selectRun(runID));
