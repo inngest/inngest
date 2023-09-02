@@ -878,6 +878,36 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 	}
 }
 
+func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
+	// Add a default event here, which is null and overwritten by everything.  This is necessary
+	// to keep the same cluster key.
+	eventKey := m.kf.PauseEvent(ctx, p.WorkspaceID, "-")
+	if p.Event != nil {
+		eventKey = m.kf.PauseEvent(ctx, p.WorkspaceID, *p.Event)
+	}
+	keys := []string{
+		m.kf.PauseID(ctx, p.ID),
+		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
+		eventKey,
+	}
+	status, err := scripts["deletePause"].Exec(
+		ctx,
+		m.pauseR,
+		keys,
+		[]string{p.ID.String()},
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error consuming pause: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	default:
+		return fmt.Errorf("unknown response deleting pause: %d", status)
+	}
+
+}
+
 func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 	p, err := m.PauseByID(ctx, id)
 	if err != nil {

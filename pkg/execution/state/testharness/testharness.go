@@ -129,6 +129,7 @@ func CheckState(t *testing.T, gen Generator) {
 		"ConsumePause/WithData/StackIndex":   checkConsumePauseWithDataIndex,
 		"ConsumePause/WithEmptyData":         checkConsumePauseWithEmptyData,
 		"ConsumePause/WithEmptyDataKey":      checkConsumePauseWithEmptyDataKey,
+		"DeletePause":                        checkDeletePause,
 		"PausesByEvent/Empty":                checkPausesByEvent_empty,
 		"PausesByEvent/Single":               checkPausesByEvent_single,
 		"PausesByEvent/Multiple":             checkPausesByEvent_multi,
@@ -699,6 +700,60 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 	err = m.LeasePause(ctx, pause.ID)
 	require.NotNil(t, err, "Leasing an expired pause should fail")
 	require.Error(t, state.ErrPauseNotFound, err, "Leasing an expired pause should fail with ErrPauseNotFound")
+}
+
+func checkDeletePause(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	// Deleting always returns success
+	err := m.DeletePause(ctx, state.Pause{})
+	require.NoError(t, err)
+
+	// Save a pause.
+	evt := "some-wait-evt"
+	pause := state.Pause{
+		ID:          uuid.New(),
+		WorkspaceID: s.Identifier().WorkspaceID,
+		Identifier:  s.Identifier(),
+		Outgoing:    inngest.TriggerName,
+		Incoming:    w.Steps[0].ID,
+		StepName:    w.Steps[0].Name,
+		Event:       &evt,
+		Expires:     state.Time(time.Now().Add(state.PauseLeaseDuration * 2).UTC().Truncate(time.Second)),
+	}
+	err = m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	ok, err := m.EventHasPauses(ctx, s.Identifier().WorkspaceID, evt)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	iter, err := m.PausesByEvent(ctx, s.Identifier().WorkspaceID, evt)
+	require.NoError(t, err)
+	require.True(t, iter.Next(ctx))
+
+	p := iter.Val(ctx)
+	p.Expires = state.Time(p.Expires.Time().UTC())
+	require.EqualValues(t, pause, *p)
+
+	t.Run("Deleting a pause works", func(t *testing.T) {
+		// Add 1ms, ensuring that the step completed history
+		// item is always after the pause history item. history is MS precision,
+		// and without this there's a small but real chance of flakiness.
+		<-time.After(time.Millisecond)
+		// Consuming the pause should work.
+		err = m.DeletePause(ctx, pause)
+		require.NoError(t, err)
+
+		ok, err := m.EventHasPauses(ctx, s.Identifier().WorkspaceID, evt)
+		require.NoError(t, err)
+		require.False(t, ok)
+
+		iter, err := m.PausesByEvent(ctx, s.Identifier().WorkspaceID, evt)
+		require.NoError(t, err)
+		require.False(t, iter.Next(ctx))
+	})
 }
 
 func checkConsumePause(t *testing.T, m state.Manager) {
@@ -1936,9 +1991,10 @@ func setup(t *testing.T, m state.Manager) state.State {
 	ctx := context.Background()
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	id := state.Identifier{
-		WorkflowID: w.ID,
-		RunID:      runID,
-		Key:        runID.String(),
+		WorkflowID:  w.ID,
+		RunID:       runID,
+		Key:         runID.String(),
+		WorkspaceID: w.ID, // use same ID as fn ID
 	}
 
 	init := state.Input{
