@@ -961,12 +961,19 @@ func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event str
 	cntCmd := m.pauseR.B().Hlen().Key(key).Build()
 	cnt, err := m.pauseR.Do(ctx, cntCmd).AsInt64()
 	if err != nil || cnt > 1000 {
-		cmd := m.pauseR.B().Hscan().Key(m.kf.PauseEvent(ctx, workspaceID, event)).Cursor(0).Build()
+		key := m.kf.PauseEvent(ctx, workspaceID, event)
+		cmd := m.pauseR.B().Hscan().Key(key).Cursor(0).Count(500).Build()
 		scan, err := m.pauseR.Do(ctx, cmd).AsScanEntry()
 		if err != nil {
 			return nil, err
 		}
-		return &scanIter{i: -1, vals: scan}, nil
+		return &scanIter{
+			r:      m.pauseR,
+			key:    key,
+			i:      -1,
+			vals:   scan,
+			cursor: int(scan.Cursor),
+		}, nil
 	}
 
 	cmd := m.pauseR.B().Hkeys().Key(key).Cache()
@@ -1190,14 +1197,37 @@ func (i *keyIter) getNext(ctx context.Context) {
 }
 
 type scanIter struct {
-	i    int
-	vals rueidis.ScanEntry
+	r rueidis.Client
+
+	key    string
+	i      int
+	cursor int
+	vals   rueidis.ScanEntry
+}
+
+func (i *scanIter) fetch(ctx context.Context) error {
+	cmd := i.r.B().Hscan().Key(i.key).Cursor(uint64(i.cursor)).Count(500).Build()
+	scan, err := i.r.Do(ctx, cmd).AsScanEntry()
+	if err != nil {
+		return err
+	}
+	i.cursor = int(scan.Cursor)
+	i.vals = scan
+	i.i = -1
+	return nil
 }
 
 func (i *scanIter) Next(ctx context.Context) bool {
+	if i.i >= (len(i.vals.Elements)-1) && i.cursor != 0 {
+		if err := i.fetch(ctx); err != nil {
+			return false
+		}
+	}
+
 	if len(i.vals.Elements) == 0 || i.i >= (len(i.vals.Elements)-1) {
 		return false
 	}
+
 	// Skip the ID
 	i.i++
 	// Get the value.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -177,6 +178,11 @@ func WithDenyQueueNames(queues ...string) func(q *queue) {
 		q.denyQueueMap = make(map[string]*struct{})
 		for _, i := range queues {
 			q.denyQueueMap[i] = &struct{}{}
+			// If WithDenyQueueNames includes "user:*", trim the asterisc and use
+			// this as a prefix match.
+			if strings.HasSuffix(i, "*") {
+				q.denyQueuePrefixes[strings.TrimSuffix(i, "*")] = &struct{}{}
+			}
 		}
 	}
 }
@@ -188,8 +194,14 @@ func WithAllowQueueNames(queues ...string) func(q *queue) {
 	return func(q *queue) {
 		q.allowQueues = queues
 		q.allowQueueMap = make(map[string]*struct{})
+		q.allowQueuePrefixes = make(map[string]*struct{})
 		for _, i := range queues {
 			q.allowQueueMap[i] = &struct{}{}
+			// If WithAllowQueueNames includes "user:*", trim the asterisc and use
+			// this as a prefix match.
+			if strings.HasSuffix(i, "*") {
+				q.allowQueuePrefixes[strings.TrimSuffix(i, "*")] = &struct{}{}
+			}
 		}
 	}
 }
@@ -333,13 +345,16 @@ type queue struct {
 
 	// denyQueues provides a denylist ensuring that the queue will never claim
 	// this partition, meaning that no jobs from this queue will run on this worker.
-	denyQueues   []string
-	denyQueueMap map[string]*struct{}
+	denyQueues        []string
+	denyQueueMap      map[string]*struct{}
+	denyQueuePrefixes map[string]*struct{}
 
 	// allowQueues provides an allowlist, ensuring that the queue only peeks the specified
 	// partitions.  jobs from other partitions will never be scanned or processed.
 	allowQueues   []string
 	allowQueueMap map[string]*struct{}
+	// allowQueuePrefixes are memoized prefixes that can be allowed.
+	allowQueuePrefixes map[string]*struct{}
 
 	// seqLeaseID stores the lease ID if this queue is the sequential processor.
 	// all runners attempt to claim this lease automatically.
@@ -1053,7 +1068,8 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 		}
 
 		// If we have an allowlist, only accept this partition if its in the allowlist.
-		if len(q.allowQueues) > 0 && q.allowQueueMap[item.Queue()] == nil {
+		if len(q.allowQueues) > 0 && !checkList(item.Queue(), q.allowQueueMap, q.allowQueuePrefixes) {
+			// This is not in the allowlist specified, so do not allow this partition to be used.
 			ignored++
 			continue
 		}
@@ -1062,7 +1078,8 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 		// we allocate the len(encoded) amount, we also want to track the number of
 		// ignored queues to use the correct index when setting our items;  this ensures
 		// that we don't access items with an index and get nil pointers.
-		if len(q.denyQueues) > 0 && q.denyQueueMap[item.Queue()] != nil {
+		if len(q.denyQueues) > 0 && checkList(item.Queue(), q.denyQueueMap, q.denyQueuePrefixes) {
+			// This is in the denylist explicitly set, so continue
 			ignored++
 			continue
 		}
@@ -1096,6 +1113,20 @@ func (q *queue) PartitionPeek(ctx context.Context, sequential bool, until time.T
 	}
 
 	return result, nil
+}
+
+func checkList(check string, exact, prefixes map[string]*struct{}) bool {
+	for k := range exact {
+		if check == k {
+			return true
+		}
+	}
+	for k := range prefixes {
+		if strings.HasPrefix(check, k) {
+			return true
+		}
+	}
+	return false
 }
 
 // PartitionRequeue requeues a parition with a new score, ensuring that the partition will be

@@ -15,15 +15,31 @@ package expressions
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
+	"github.com/karlseguin/ccache/v2"
 	"github.com/pkg/errors"
 	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
+
+var (
+	regexpAction = regexp.MustCompile(`(actions?)\.(\d+)\.`)
+
+	CacheExtendTime = time.Minute * 30
+	CacheTTL        = time.Minute * 30
+	// cache is a global cache of precompiled expressions.
+	cache *ccache.Cache
+)
+
+func init() {
+	cache = ccache.New(ccache.Configure().MaxSize(10_000))
+}
 
 var (
 	ErrNoResult      = errors.New("expression did not return true or false")
@@ -92,6 +108,12 @@ func EvaluateBoolean(ctx context.Context, expression string, input map[string]in
 // instance can be used across many goroutines to evaluate the expression against any
 // data. The Evaluable instance is loaded from the cache, or is cached if not found.
 func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, error) {
+	sha := sum(expression)
+	if eval := cache.Get(sha); eval != nil {
+		eval.Extend(CacheExtendTime)
+		return eval.Value().(Evaluator), nil
+	}
+
 	e, err := env()
 	if err != nil {
 		return nil, err
@@ -112,7 +134,13 @@ func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, 
 		return nil, err
 	}
 
+	cache.Set(sha, eval, CacheTTL)
 	return eval, nil
+}
+
+// sum returns a checksum of the given expression, used as the cache key.
+func sum(expression string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(expression)))
 }
 
 func NewBooleanEvaluator(ctx context.Context, expression string) (BooleanEvaluator, error) {

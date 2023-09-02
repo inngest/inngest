@@ -1282,3 +1282,39 @@ func concurrencyQueueScores(t *testing.T, r *miniredis.Miniredis, key string, fr
 	}
 	return scores
 }
+
+func TestCheckList(t *testing.T) {
+	checks := []struct {
+		Check    string
+		Expected bool
+		Exact    map[string]*struct{}
+		Prefix   map[string]*struct{}
+	}{
+		{
+			// with no prefix or match
+			"user-created",
+			false,
+			map[string]*struct{}{"something-else": nil},
+			map[string]*struct{}{"user:*": nil},
+		},
+		{
+			// with exact match
+			"user-created",
+			true,
+			map[string]*struct{}{"user-created": nil},
+			nil,
+		},
+		{
+			// with prefix
+			"user-created",
+			true,
+			nil,
+			map[string]*struct{}{"user": nil},
+		},
+	}
+
+	for _, item := range checks {
+		actual := checkList(item.Check, item.Exact, item.Prefix)
+		require.Equal(t, item.Expected, actual)
+	}
+}
