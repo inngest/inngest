@@ -121,6 +121,10 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 	if name, ok := q.queueKindMapping[item.Kind]; ok {
 		queueName = &name
 	}
+	// item.QueueName takes precedence if not nil
+	if item.QueueName != nil {
+		queueName = item.QueueName
+	}
 
 	go q.scope.Tagged(map[string]string{
 		"kind": item.Kind,

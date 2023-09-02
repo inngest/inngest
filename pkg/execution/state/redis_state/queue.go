@@ -176,6 +176,7 @@ func WithDenyQueueNames(queues ...string) func(q *queue) {
 	return func(q *queue) {
 		q.denyQueues = queues
 		q.denyQueueMap = make(map[string]*struct{})
+		q.denyQueuePrefixes = make(map[string]*struct{})
 		for _, i := range queues {
 			q.denyQueueMap[i] = &struct{}{}
 			// If WithDenyQueueNames includes "user:*", trim the asterisc and use

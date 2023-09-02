@@ -17,7 +17,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
@@ -29,16 +28,17 @@ import (
 )
 
 var (
-	regexpAction = regexp.MustCompile(`(actions?)\.(\d+)\.`)
-
 	CacheExtendTime = time.Minute * 30
 	CacheTTL        = time.Minute * 30
 	// cache is a global cache of precompiled expressions.
 	cache *ccache.Cache
+
+	// On average, 20 compiled expressions fit into 1mb of ram.
+	CacheMaxSize int64 = 50_000
 )
 
 func init() {
-	cache = ccache.New(ccache.Configure().MaxSize(10_000))
+	cache = ccache.New(ccache.Configure().MaxSize(CacheMaxSize))
 }
 
 var (
