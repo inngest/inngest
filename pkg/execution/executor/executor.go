@@ -626,6 +626,10 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			if pause.Cancel {
 				// This is a cancellation signal.  Check if the function
 				// has ended, and if so remove the pause.
+				//
+				// NOTE: Bookkeeping must be added to individual function runs and handled on
+				// completion instead of here.  This is a hot path and should only exist whilst
+				// bookkeeping is not implemented.
 				if exists, err := e.sm.Exists(ctx, pause.Identifier.RunID); !exists && err == nil {
 					// This function has ended.  Delete the pause and continue
 					_ = e.sm.DeletePause(context.Background(), *pause)
