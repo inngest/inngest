@@ -611,13 +611,6 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			defer sem.Release(1)
 
 			if pause == nil {
-				// Consume this pause to remove it entirely
-				return
-			}
-
-			if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evt.GetInternalID().String() {
-				// Don't allow the original function trigger to trigger the
-				// cancellation
 				return
 			}
 
@@ -626,8 +619,18 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			// did not occur in time.
 			if pause.Expires.Time().Before(time.Now()) {
 				// Consume this pause to remove it entirely
-				_ = e.sm.ConsumePause(context.Background(), pause.ID, nil)
+				_ = e.sm.DeletePause(context.Background(), *pause)
 				return
+			}
+
+			if pause.Cancel {
+				// This is a cancellation signal.  Check if the function
+				// has ended, and if so remove the pause.
+				if exists, err := e.sm.Exists(ctx, pause.Identifier.RunID); !exists && err == nil {
+					// This function has ended.  Delete the pause and continue
+					_ = e.sm.DeletePause(context.Background(), *pause)
+					return
+				}
 			}
 
 			// Ensure that we store the group ID for this pause, letting us properly track cancellation
