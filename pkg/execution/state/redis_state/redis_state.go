@@ -358,6 +358,11 @@ func (m mgr) IsComplete(ctx context.Context, runID ulid.ULID) (bool, error) {
 	return bytes.Equal(val, []byte("0")), nil
 }
 
+func (m mgr) Exists(ctx context.Context, runID ulid.ULID) (bool, error) {
+	cmd := m.r.B().Exists().Key(m.kf.RunMetadata(ctx, runID)).Build()
+	return m.r.Do(ctx, cmd).AsBool()
+}
+
 func (m mgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error) {
 	cmd := m.r.B().Hgetall().Key(m.kf.RunMetadata(ctx, runID)).Build()
 	val, err := m.r.Do(ctx, cmd).AsStrMap()

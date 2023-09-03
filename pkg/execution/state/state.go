@@ -214,6 +214,9 @@ type FunctionCallback func(context.Context, Identifier, enums.RunStatus)
 
 // StateLoader allows loading of previously stored state based off of a given Identifier.
 type StateLoader interface {
+	// Exists checks whether the run ID exists.
+	Exists(ctx context.Context, runID ulid.ULID) (bool, error)
+
 	// Metadata returns run metadata for the given identifier.  It may be cheaper
 	// than a full load in cases where only the metadata is necessary.
 	Metadata(ctx context.Context, runID ulid.ULID) (*Metadata, error)

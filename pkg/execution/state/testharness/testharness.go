@@ -115,6 +115,7 @@ func CheckState(t *testing.T, gen Generator) {
 
 	funcs := map[string]func(t *testing.T, m state.Manager){
 		"New":                                checkNew,
+		"Exists":                             checkExists,
 		"New/StepData":                       checkNew_stepdata,
 		"Scheduled":                          checkScheduled,
 		"SaveResponse/Output":                checkSaveResponse_output,
@@ -197,6 +198,46 @@ func checkNew(t *testing.T, m state.Manager) {
 
 	metadata := loaded.Metadata()
 	require.Equal(t, 1, metadata.Pending, "New should set pending count to 1")
+}
+
+func checkExists(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{
+		WorkflowID:      w.ID,
+		WorkflowVersion: w.FunctionVersion,
+		RunID:           runID,
+		Key:             runID.String(),
+	}
+
+	t.Run("With a random unsaved ID", func(t *testing.T) {
+		exists, err := m.Exists(ctx, ulid.MustNew(ulid.Now(), rand.Reader))
+		require.NoError(t, err)
+		require.EqualValues(t, false, exists)
+	})
+
+	t.Run("With an unsaved then saved ID", func(t *testing.T) {
+		batch := []map[string]any{input.Map()}
+		init := state.Input{
+			Identifier:     id,
+			EventBatchData: batch,
+			Context: map[string]any{
+				"some": "data",
+				"true": true,
+			},
+		}
+
+		exists, err := m.Exists(ctx, id.RunID)
+		require.NoError(t, err)
+		require.EqualValues(t, false, exists)
+
+		_, err = m.New(ctx, init)
+		require.NoError(t, err)
+
+		exists, err = m.Exists(ctx, id.RunID)
+		require.NoError(t, err)
+		require.EqualValues(t, true, exists)
+	})
 }
 
 // checkNew_stepdata ensures that state stores can be initialized with
