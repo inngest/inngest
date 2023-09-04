@@ -21,6 +21,17 @@ npx inngest-cli@latest dev -u http://localhost:3333/api/inngest
 
 You can now open the dev server's browser interface on [`http://localhost:8288`](http://localhost:8288).
 
+### Connecting apps to the Dev Server
+
+There are two ways to connect apps to the Dev Server:
+
+1. Automatically. The Dev Server will keep detecting and attempting to connect to apps running in [common ports](https://github.com/inngest/inngest/blob/ea67219e7e7c33451416249f98fd5ca48e99ba28/pkg/devserver/discovery.go#L15-L30).
+2. Manually. For apps running in other ports, you’ll need to paste the local URL to connect the app selecting one of two options:
+    - Using the CLI -u param
+    - Adding the URL in the Dev Server Apps page. You can edit the URL or delete a manually added app at any point in time
+
+![Dev Server Apps Demo](/assets/docs/local-development/dev-server-apps-demo.gif)
+
 ### How functions are loaded by the Dev Server
 
 The dev server polls your app locally for any new or changed functions. Then as events are sent, the dev server calls your functions directly, just as Inngest would do in production over the public internet.
