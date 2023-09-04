@@ -11,7 +11,7 @@ The Inngest dev server is an [open source](https://github.com/inngest/inngest) e
 
 ![Dev Server Demo](/assets/docs/local-development/dev-server-demo.gif)
 
-To start the dev server is a single command. It will scan for ports and common endpoints for an Inngest `serve` API endpoint ([list of ports](https://github.com/inngest/inngest/blob/ea67219e7e7c33451416249f98fd5ca48e99ba28/pkg/devserver/discovery.go#L15-L30)):
+To start the dev server is a single command. It will scan for ports and common endpoints for an Inngest `serve` API endpoint ([list of ports](https://github.com/inngest/inngest/blob/ea67219e7e7c33451416249f98fd5ca48e99ba28/pkg/devserver/discovery.go#L15-L28)):
 
 ```shell
 npx inngest-cli@latest dev
@@ -27,8 +27,8 @@ There are two ways to connect apps to the Dev Server:
 
 1. Automatically. The Dev Server will keep detecting and attempting to connect to apps running in [common ports](https://github.com/inngest/inngest/blob/ea67219e7e7c33451416249f98fd5ca48e99ba28/pkg/devserver/discovery.go#L15-L30).
 2. Manually. For apps running in other ports, you’ll need to paste the local URL to connect the app selecting one of two options:
-  a. Using the CLI -u param.
-  b. Adding the URL in the Dev Server Apps page. You can edit the URL or delete a manually added app at any point in time. 
+    - Using the CLI -u param
+    - Adding the URL in the Dev Server Apps page. You can edit the URL or delete a manually added app at any point in time
 
 ![Dev Server Apps Demo](/assets/docs/local-development/dev-server-apps-demo.gif)
 
