@@ -1,0 +1,300 @@
+---
+heading: "Sending customer lifecycle emails with Resend and Inngest"
+subtitle: "How to Send Effective and Reliable Emails in your Next.js Applications with Resend & Inngest"
+image: "/assets/blog/lifcycle-emails-resend/customer-lifecycle-emails-with-resend-inngest.png"
+date: 2023-08-21
+author: Joel Hooks
+---
+
+Email is a fact of life. We aren't going to escape it any time soon. Your web application is likely sending customers, clients, and other users emails regularly.
+
+If you’d like to dive right into code, you can find the [full example using Next.js, Prisma, Next-Auth, Resend, and Inngest to send customer lifecycle emails here on GitHub](https://github.com/joelhooks/inngest-resend-example).
+
+## Essential Considerations when sending emails
+
+When you're sending an email to your customers, there are many things to consider, but there are two that are very important:
+
+* Not annoying your customers!
+* Getting the emails to their inboxes reliably.
+
+To avoid annoying your users, we want to send valuable emails relevant to the work they are trying to accomplish when they are trying to accomplish it. There's an art to emailing—a balance to be struck.
+
+One specific type of email is the "customer lifecycle email," these messages are sent at specific milestones along the customer's journey within your application.
+
+The customer joins your service.
+
+That's an email.
+
+The customer performs a critical action.
+
+That's an email.
+
+The customer needs to perform the necessary action.
+
+That's _definitely_ an email.
+
+
+## How to Send Emails
+
+The technical aspects of sending email are deep enough that it’s generally a good idea to let somebody else handle it for you. The problem is that sending emails has been made much more difficult because of the volume of SPAM hoisted on us over the decades since email has been mainstream.
+
+It’s a real problem, and it means that email service providers (ESPs) have had to consolidate several major services that handle the mechanics of delivering the messages you want to send to the inboxes you want to send them to.
+
+For the very brave, you can set up and configure your own SMTP email server. Unless you know what you are doing and have a specific need to do so, this approach is generally not recommended. There is a likely result of being flagged as a spammer and having your IP addresses block-listed across the internet forever.
+
+Several steps beyond that approach are using a service like [Amazon’s SES](https://aws.amazon.com/ses/) (simple email service) that manages much of the heavy lifting in delivery and compliance. 
+
+You still need to know what you’re doing, and you probably want a specific reason to use SES directly if you are using it. 
+
+The next tier is commercial ESPs like SendGrid and [Postmark](https://postmarkapp.com/). These services are simpler to set up and use and provide convenience when you don’t want to overthink how the email is delivered and just want to send some emails.
+
+And then there’s Resend.
+
+[Resend is a modern twist on sending emails ](https://resend.com/)and removes (almost) all of the friction from sending your customer’s email directly. 
+
+It’s simple!
+
+## Transactional versus Marketing Emails
+
+Most email service providers consider transactional emails separately from “bulk” or marketing emails.
+
+Here are some examples of transactional emails:
+
+* Password reset emails
+* Account creation emails
+* Welcome emails
+* Shipping confirmations
+* Payment invoices
+* Purchase receipts
+* Order confirmation emails
+* Payment failure notifications
+
+These are very specifically related to business concerns and emails your customers likely need to see every time and can’t unsubscribe from. 
+
+Transactional emails are sent to a single customer at a specific time.
+
+Marketing or bulk emails are things like:
+
+* Newsletters
+* Limited-time offers
+* Sales campaigns
+* Event announcements 
+* Vouchers and giveaways
+
+These emails are generally broadcast to all customers or a specific set of customers simultaneously and will **always include the ability to unsubscribe**.
+
+This image from [Postmark is an excellent explanation of the difference between transactional and marketing emails](https://postmarkapp.com/blog/what-is-transactional-email-and-how-is-it-used):
+
+
+![the difference between transactional and marketing emails](/assets/blog/lifcycle-emails-resend/transactional-vs-marketing-email.png)
+
+
+We will focus on transaction emails sent to individual users, but many of these principles can also be applied to marketing emails, so keep that in mind. The tactics change, but the base setup is similar.
+
+
+## Sending Customer Lifecycle Emails
+
+Customer lifecycle emails are often sent as a reaction to an event. Something has occurred in your application. 
+
+A button was clicked.
+
+A colleague was invited.
+
+A document was created.
+
+A bill is past due.
+
+The “what” depends on the context of the application you are building and your customer's needs. The critical bit is that these emails **react to an event in your application.**
+
+So how do you handle that? Where does the actual email sending happen?
+
+
+### An onboarding campaign
+
+For this example, let’s look at an onboarding campaign and focus on what happens after a new user signs up. In this example, we will have a simple application in place that allows a new user to sign up for an account, and then we will present them with a UI so they can do something after signing up.
+
+Note the example application is intentionally simple and doesn’t do anything beyond presenting the user with a button, but it demonstrates the point.
+
+
+### Authentication and the New User
+
+Next-Auth is being used, for example. Next-Auth is an excellent library that does most of the heavy lifting required for authentication in our applications, including providing “hooks” for when specific events occur such as a new account being created.
+
+In the Next-Auth configuration, we can add custom logic to intercept that creation and essentially do any work we might choose to perform as “side effects” to the new user joining our app:
+
+```ts
+export const authOptions: NextAuthOptions = {
+  callbacks: {
+    session: ({ session, user }) => ({
+      ...session,
+      user: {
+        ...session.user,
+        id: user.id,
+      },
+    }),
+  },
+  events: {
+    /**
+     * 👋 Internally next-auth creates event hooks to handle any application
+     * side effects that need to happen when an event occurs
+     * in our case we want to send an event to inngest when a user is created
+     * so that we can track user signups and other user related events.
+     * @see https://next-auth.js.org/configuration/events#createuser
+     * @param param0
+     */
+    createUser: async ({ user }) => {
+      inngest.send({ name: "user/created", user, data: {} });
+    },
+  },
+  adapter: PrismaAdapter(prisma),
+  providers: [
+    GithubProvider({
+      clientId: env.GITHUB_CLIENT_ID,
+      clientSecret: env.GITHUB_CLIENT_SECRET,
+    }),
+    /**
+     * ...add more providers here.
+     *
+     * Most other providers require a bit more work than the Github provider. For example, the
+     * GitHub provider requires you to add the `refresh_token_expires_in` field to the Account
+     * model. Refer to the NextAuth.js docs for the provider you want to use. Example:
+     *
+     * @see https://next-auth.js.org/providers/github
+     */
+  ],
+};
+```
+
+One option here is to send the email in the callback!
+
+As you can see, that’s not what happens. Instead, we use this as an opportunity to send out our event through Inngest called `user/created,` which will signal to our application that a… user was created.
+
+Why?
+
+We want better separation between our application’s authentication configuration and the workflow triggered when something occurs within the authentication system, such as a user being created. 
+
+Suppose you were planning on sending a single welcome email. In that case, it might make sense to do that here, but even in that simple case burying our application's core business logic inside of the configuration for our authentication isn’t always the most sensible choice.
+
+For this example, we aren’t simply sending a welcome email. We want to **kick off a durable, asynchronous workflo**w to help guide our new users to success!
+
+
+## The Durable Asynchronous Event-Driven Workflow
+
+Something has occurred in our application. We’ve got a new user. That’s exciting, and it usually means that a **bunch of stuff needs to happen**. 
+
+First and foremost, we want to welcome the user and onboard them in a way that reveals the capabilities of our product or service and helps them succeed in what they are trying to accomplish.
+
+The workflow that has been started with the simple `user/created` event is our **onboarding campaign**. 
+
+In this workflow, we will:
+
+* Welcome the new user to the application 👋
+* Wait for a brief time for them to perform a core activity ⌛
+* If they DON’T perform the activity, send them an encouraging note
+* If they DO perform the activity, send them an offer for helpful guidance
+
+This is a simple example, but it demonstrates this pattern well and could be expanded into a much more complex/specific scenario based on your actual customer needs!
+
+### Implementing the workflow with Inngest
+
+Inngest greatly simplifies implementing an asynchronous, durable, event-driven workflow in your serverless applications. If you’ve implemented something like this in the past, you’re well aware of the messy logic that can result in making workflows tough to maintain and reason about. With Inngest, our workflow looks like this:
+
+```ts
+export const userCreated = inngest.createFunction(
+  { name: "A User Was Created" },
+  { event: "user/created" },
+  async ({ event, step }) => {
+    const { email } = event.user;
+
+    await step.run("send-welcome-email", async () => {
+      return sendEmail({
+        to: email,
+        subject: "Welcome to our app!",
+        body: "<p>Thanks for signing up!</p>",
+      });
+    });
+
+    const completedAction = await step.waitForEvent("user/created.document", {
+      timeout: "1m",
+      if: "event.user.email == async.user.email",
+    });
+
+    if (!completedAction) {
+      await step.run("send-nudge-email", async () => {
+        return sendEmail({
+          to: email,
+          subject: "How can we help!",
+          body: "<p>What can we do better? We are always here to help you suceed.</p>",
+        });
+      });
+    } else {
+      await step.run("send-congrats-email", async () => {
+        return sendEmail({
+          to: email,
+          subject: "You did it!",
+          body: "<p>We are so glad figured it out! It's challenging to do anything in this rough and tumble world so congrats on that.</p>",
+        });
+      });
+    }
+  }
+);
+```
+
+😍
+
+This is **type-safe**. 
+
+It’s concise. 
+
+It is step-by-step.
+
+It is straightforward to make additions and changes and tweak the workflow based on evolving product needs.
+
+Do you want to add a/b testing based on user properties? No problem.
+
+Do you want to segment based on real-world data? Yup, can do.
+
+Do you want to add customer-specific personalization? 
+
+Yup, Ingest workflows make it easy.
+
+It’s not magic. It’s a lot of deep, hard-core, expertly crafted, highly scalable infrastructure, but the joy is that it is an infrastructure **you get to use, not build or maintain**.
+
+
+## Sending the emails with Resend
+
+[Resend makes sending emails a breeze](https://resend.com/):
+
+```ts
+function sendEmail({
+  to,
+  subject,
+  body,
+}: {
+  to: string;
+  subject: string;
+  body: string;
+}) {
+  const resend = new Resend(env.RESEND_API_KEY);
+  return resend.emails.send({
+    from: env.FROM_EMAIL,
+    ...(env.REPLY_TO_EMAIL && { replyTo: env.REPLY_TO_EMAIL }), // optional (defaults to from
+    to,
+    subject,
+    html: body,
+  });
+}
+```
+
+To the point where there’s not even much to talk about 😅
+
+Resend “just works,” once you’ve got your api key and sending domain configured, you’re off to the races.
+
+
+## What’s next?
+
+Using this example as a basis, you open the doors to endless possibilities regarding customer lifecycle emails, marketing emails, personalized newsletters, and more.
+
+You could potentially build an email workflow that took customer activity, AI with ChatGPT, and durable serverless event-driven workflows from Inngest to build highly customized automated emails for each customer! 🤯
+
+If you have ideas and want to chat about them, join the Inngest discord and let us know. We’d love to hear from you.

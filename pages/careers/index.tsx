@@ -166,6 +166,9 @@ export default function Careers(props) {
                     <p className="m-0">{role.location}</p>
                   </div>
                 ))}
+                {roles.length === 0 && (
+                  <p>There are currently no open roles.</p>
+                )}
               </div>
               <aside className=" max-w-[65ch] m-auto bg-indigo-900/20 text-indigo-100 flex flex-col items-start gap-4 leading-relaxed rounded-lg py-5 px-6  my-12 border border-indigo-900/50">
                 <p className="text-sm lg:text-base">

@@ -24,6 +24,7 @@ We provide framework-specific bindings to make this easy for common platforms:
 - [Cloudflare](#framework-cloudflare)
 - [DigitalOcean functions](#framework-digital-ocean-functions)
 - [Express](#framework-express)
+- [Fastify](#framework-fastify)
 - [Fresh (Deno)](#framework-fresh-deno)
 - [Google Cloud Functions](#framework-google-cloud-functions)
 - [Next.js](#framework-next-js)
@@ -117,6 +118,55 @@ app.use(
 
 You must ensure you're using the `express.json()` middleware otherwise your functions won't be
 executed.
+
+## Framework: Fastify <VersionBadge version="v2.6.0+" />
+
+You can serve Inngest functions within your existing Fastify app.
+
+We recommend using the exported `inngestFastify` plugin, though we also expose a generic `serve()` function if you'd like to manually create a route.
+
+<CodeGroup>
+```ts {{ title: "Plugin" }}
+import Fastify from "fastify";
+import inngestFastify from "inngest/fastify";
+import { inngest, fnA } from "./inngest";
+
+const fastify = Fastify();
+
+fastify.register(inngestFastify, {
+  client: inngest,
+  functions: [fnA],
+  options: {},
+});
+
+fastify.listen({ port: 3000 }, function (err, address) {
+  if (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+});
+```
+```ts {{ title: "Custom route" }}
+import Fastify from "fastify";
+import { serve } from "inngest/fastify";
+import { inngest, fnA } from "./inngest";
+
+const fastify = Fastify();
+
+fastify.route({
+  method: ["GET", "POST", "PUT"],
+  handler: serve(inngest, [fnA]),
+  url: "/api/inngest",
+});
+
+fastify.listen({ port: 3000 }, function (err, address) {
+  if (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+});
+```
+</CodeGroup>
 
 ## Framework: Fresh (Deno)
 

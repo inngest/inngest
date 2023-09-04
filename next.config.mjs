@@ -28,7 +28,7 @@ async function redirects() {
   return [
     {
       source: "/discord",
-      destination: "https://discord.gg/EuesV2ZSnX",
+      destination: "https://discord.gg/mPfcyDEdpx",
       permanent: true,
     },
     {

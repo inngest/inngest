@@ -23,14 +23,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2.1.0
 
-        # Just install only the deps we need
       - name: Install dependencies
-        if: ${{ success() }}
-        run: yarn add broken-link-checker @types/node
+        uses: pnpm/action-setup@v2
+        with:
+          run_install: true
 
       - name: Run broken-link-checker
         if: ${{ success() }}
-        run: yarn broken-link-checker ${{needs.wait_for_deploy_complete.outputs.url}}
+        run: pnpm broken-link-checker ${{needs.wait_for_deploy_complete.outputs.url}}
 
   algolia_crawler:
     runs-on: ubuntu-latest

@@ -8,9 +8,10 @@ export default function ComparisonTable({ plans, features }) {
       <h2 className="text-white mt-32 mb-8 text-4xl font-semibold">
         Compare all plans
       </h2>
-      <table className="text-slate-200 w-full table-fixed">
+      <table className="text-slate-200 w-full table-fixed ">
         <thead>
-          <tr className="border-b border-slate-900">
+          {/* Sticky header height */}
+          <tr className="border-b border-slate-900 md:sticky top-[84px] bg-slate-1000">
             <th className="px-6 py-4"></th>
             {visiblePlans.map((plan, i) => (
               <th className="text-left px-6 py-4" key={i}>
@@ -30,13 +31,15 @@ export default function ComparisonTable({ plans, features }) {
             {visiblePlans.map((plan, i) => (
               <th className="text-left px-6 py-8" key={i}>
                 <span className="block text-xs text-slate-400 font-medium mb-1">
-                  Starting at
+                  {plan.cost.startsAt ? `Starting at` : <>&nbsp;</>}
                 </span>
                 <span className="block text-4xl mb-2">
                   {plan.cost.basePrice}
-                  <span className="text-sm text-slate-400 ml-1 font-medium">
-                    /{plan.cost.period}
-                  </span>
+                  {!!plan.cost.period && (
+                    <span className="text-sm text-slate-400 ml-1 font-medium">
+                      /{plan.cost.period}
+                    </span>
+                  )}
                 </span>
                 <span className="block mb-8 text-sm font-medium mt-2 text-slate-200">
                   {plan.description}
@@ -51,7 +54,11 @@ export default function ComparisonTable({ plans, features }) {
         <tbody>
           {features.map((feature, i) => (
             <tr key={i} className="h-14 border-t border-slate-900">
-              <td className="h-14 flex items-center font-medium">
+              <td
+                className={`h-14 flex items-center font-medium ${
+                  feature.heading && "font-bold text-lg mt-6"
+                }`}
+              >
                 {feature.name}
                 {Boolean(feature.infoUrl) && (
                   <a
@@ -63,12 +70,13 @@ export default function ComparisonTable({ plans, features }) {
                 )}
               </td>
               {visiblePlans.map((plan, j) => {
-                const value =
-                  typeof feature.plans?.[plan.name] === "string"
-                    ? feature.plans?.[plan.name]
-                    : typeof feature.all === "string"
-                    ? feature.all
-                    : null;
+                const value = feature.heading
+                  ? ""
+                  : typeof feature.plans?.[plan.name] === "string"
+                  ? feature.plans?.[plan.name]
+                  : typeof feature.all === "string"
+                  ? feature.all
+                  : null;
                 const bool =
                   typeof feature.plans?.[plan.name] === "boolean"
                     ? feature.plans?.[plan.name]
@@ -76,7 +84,7 @@ export default function ComparisonTable({ plans, features }) {
                     ? feature.all
                     : null;
 
-                return value ? (
+                return typeof value === "string" ? (
                   <td key={j} className="px-6 text-sm font-medium">
                     {value}
                   </td>
@@ -104,6 +112,18 @@ export default function ComparisonTable({ plans, features }) {
             </tr>
           ))}
         </tbody>
+        <tfoot>
+          <tr>
+            <td></td>
+            {visiblePlans.map((plan, i) => (
+              <td className="text-left px-6 py-8" key={i}>
+                <Button arrow="right" href={plan.cta.href} full>
+                  {plan.cta.shortText || plan.cta.text}
+                </Button>
+              </td>
+            ))}
+          </tr>
+        </tfoot>
       </table>
     </div>
   );

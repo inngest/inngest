@@ -102,10 +102,23 @@ export const inngest = new Inngest({
 });
 ```
 ```ts {{ title: "Zod (v2)" }}
-import { EventSchemas, Inngest } from "inngest";
+import { EventSchemas, Inngest, type LiteralZodEventSchema } from "inngest";
 import { z } from "zod";
 
-const events = {
+// Define each event indiviudally
+const productPurchasedEvent = z.object({
+  name: z.literal("shop/product.purchased"),
+  data: z.object({ productId: z.string() }),
+});
+
+// You can use satisfies to provide some autocomplete when writing the event
+const productViewedEvent = z.object({
+  name: z.literal("shop/product.viewed"),
+  data: z.object({ productId: z.string() }),
+}) satisfies LiteralZodEventSchema;
+
+// Or all together in a single object
+const eventsMap = {
   "app/account.created": {
     data: z.object({
       userId: z.string(),
@@ -121,7 +134,9 @@ const events = {
 
 export const inngest = new Inngest({
   name: "My App",
-  schemas: new EventSchemas().fromZod(events),
+  schemas: new EventSchemas()
+    .fromZod([productPurchasedEvent, productViewedEvent])
+    .fromZod(eventsMap),
 });
 ```
 ```ts {{ title: "Stacking (v2)" }}

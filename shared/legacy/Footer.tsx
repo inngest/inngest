@@ -45,6 +45,7 @@ const Footer = () => {
             <a href="/blog">Blog</a>
             <a href="/careers">Careers</a>
             <a href="/contact">Contact Us</a>
+            <a href={process.env.NEXT_PUBLIC_SUPPORT_URL}>Support</a>
           </div>
           <div>
             <p>Community</p>

@@ -18,6 +18,8 @@ import { Button } from "src/shared/Button";
 import IconCalendar from "src/shared/Icons/Calendar";
 import CTACallout from "src/shared/CTACallout";
 import Blockquote from "src/shared/Blog/Blockquote";
+import rehypeCodeTitles from "rehype-code-titles";
+
 const components = {
   DiscordCTA,
   Button,
@@ -41,6 +43,8 @@ const authorURLs = {
   "Dan Farrelly": "https://twitter.com/djfarrelly",
   "Tony Holdstock-Brown": "https://twitter.com/itstonyhb",
   "Jack Williams": "https://twitter.com/atticjack",
+  "Igor Gassmann": "https://twitter.com/i_gassmann",
+  "Darwin Wu": "https://twitter.com/67darwin",
 };
 
 export default function BlogLayout(props) {
@@ -246,6 +250,7 @@ export async function getStaticProps({ params }) {
     scope: { json: JSON.stringify(data) },
     mdxOptions: {
       rehypePlugins: [
+        rehypeCodeTitles,
         rehypeParseCodeBlocks,
         rehypeRemoveTwoSlashMarkup,
         rehypeShiki,

@@ -1,11 +1,11 @@
 .PHONY: build
 build:
-	yarn build
+	pnpm build
 
 # Create a production build
 .PHONY: build-prod
 build-prod:
-	yarn build
+	pnpm build
 
 .PHONY: cloudflare-build
 cloudflare-build:
@@ -14,5 +14,5 @@ cloudflare-build:
 
 .PHONY: dirty
 dirty:
-	yarn prettier
+	pnpm prettier
 	git diff --exit-code

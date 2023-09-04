@@ -22,7 +22,7 @@ In this example, we define three functions which run automatically in parallel w
 
 You can create an event-driven system using things like NATS, Redis, or Kafka - all are reliable event streaming infrastructure components.
 
-Using this infrastructure, you'll need to configure your topics via code (or terraform), then configure stateful subscribers which listen to your topics using an always-alive service.  Your subscribers should handle parallelism themselves, ensuring that you [ack/nack](https://docs.nats.io/legacy/stan/streaming/acks) events as they're processed.  If a single subscription fails, you'll need to manage retries, dead-letter queues, and watermarks for a topic yourself. This is a common approach, though it's often a lot of work to build, set up, and maintain.
+Using this infrastructure, you'll need to configure your topics via code (or terraform), then configure stateful subscribers which listen to your topics using an always-alive service.  Your subscribers should handle parallelism themselves, ensuring that you [ack/nack](https://nats-io.gitbook.io/legacy-nats-docs/nats-streaming-server-aka-stan/developing-with-stan/acknowledgements) events as they're processed.  If a single subscription fails, you'll need to manage retries, dead-letter queues, and watermarks for a topic yourself. This is a common approach, though it's often a lot of work to build, set up, and maintain.
 
 ## Additional resources
 

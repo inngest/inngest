@@ -39,7 +39,7 @@ const Grid = styled.div<{ cols: number | string }>`
   position: relative;
   display: grid;
   grid-template-columns: repeat(${({ cols }) => cols}, 1fr);
-  grid-gap: ${({ cols }) => (cols > 3 ? "2rem" : "4rem")};
+  grid-gap: ${({ cols }) => (Number(cols) > 3 ? "2rem" : "4rem")};
 
   &::before {
     position: absolute;

@@ -6,7 +6,7 @@ import Script from "next/script";
 
 import { trackPageView } from "../utils/tracking";
 import { getOpenGraphImageURL } from "../utils/social";
-import { useAnonId } from "../shared/legacy/trackingHooks";
+import { useAnonymousID } from "../shared/legacy/trackingHooks";
 import "../styles/globals.css";
 import * as fullstory from "@fullstory/browser";
 
@@ -65,7 +65,7 @@ type DefaultProps = PageProps & DocsLayoutProps;
 
 function MyApp({ Component, pageProps }: AppProps<DefaultProps>) {
   const router = useRouter();
-  const { anonId, existing } = useAnonId();
+  const { anonymousID, existing } = useAnonymousID();
 
   // Temp Layout swapping before we move to "app" dir
   const isDocs = !!router.asPath.match(/^\/docs/);
@@ -181,7 +181,7 @@ function MyApp({ Component, pageProps }: AppProps<DefaultProps>) {
         src="/inngest-sdk.js"
         onLoad={() => {
           window.Inngest.init(process.env.NEXT_PUBLIC_INNGEST_KEY);
-          window.Inngest.identify({ anonymous_id: anonId });
+          window.Inngest.identify({ anonymous_id: anonymousID });
           // The hook should tell us if the anon id is an existing one, or it's just been set
           const firstTouch = !existing;
           let ref = null;
