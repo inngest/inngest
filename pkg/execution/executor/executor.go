@@ -588,6 +588,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	)
 
 	evtID := evt.GetInternalID()
+	evtIDStr := evtID.String()
 
 	// Schedule up to PauseHandleConcurrency pauses at once.
 	sem := semaphore.NewWeighted(int64(PauseHandleConcurrency))
@@ -620,6 +621,10 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			if pause.Expires.Time().Before(time.Now()) {
 				// Consume this pause to remove it entirely
 				_ = e.sm.DeletePause(context.Background(), *pause)
+				return
+			}
+
+			if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtIDStr {
 				return
 			}
 
