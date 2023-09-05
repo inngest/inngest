@@ -3,9 +3,11 @@ package history
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -49,6 +51,16 @@ func (l lifecycle) OnFunctionScheduled(
 	id state.Identifier,
 	item queue.Item,
 ) {
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		l.log.Error(
+			"error parsing group ID",
+			"error", err,
+			"group_id", item.GroupID,
+			"run_id", id.RunID.String(),
+		)
+	}
+
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
@@ -56,6 +68,7 @@ func (l lifecycle) OnFunctionScheduled(
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupID,
 		RunID:           id.RunID,
 		Type:            enums.HistoryTypeFunctionScheduled.String(),
 		Attempt:         int64(item.Attempt),
@@ -79,6 +92,16 @@ func (l lifecycle) OnFunctionStarted(
 	id state.Identifier,
 	item queue.Item,
 ) {
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		l.log.Error(
+			"error parsing group ID",
+			"error", err,
+			"group_id", item.GroupID,
+			"run_id", id.RunID.String(),
+		)
+	}
+
 	latency, _ := redis_state.GetItemLatency(ctx)
 	latencyMS := latency.Milliseconds()
 
@@ -89,6 +112,7 @@ func (l lifecycle) OnFunctionStarted(
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupID,
 		RunID:           id.RunID,
 		Type:            enums.HistoryTypeFunctionStarted.String(),
 		Attempt:         int64(item.Attempt),
@@ -115,6 +139,16 @@ func (l lifecycle) OnFunctionFinished(
 	item queue.Item,
 	resp state.DriverResponse,
 ) {
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		l.log.Error(
+			"error parsing group ID",
+			"error", err,
+			"group_id", item.GroupID,
+			"run_id", id.RunID.String(),
+		)
+	}
+
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
@@ -122,14 +156,15 @@ func (l lifecycle) OnFunctionFinished(
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupID,
 		RunID:           id.RunID,
 		Type:            enums.HistoryTypeFunctionCompleted.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
-		Result:          result(resp),
 	}
+	applyResponse(&h, resp)
 	if resp.Err != nil {
 		h.Type = enums.HistoryTypeFunctionFailed.String()
 	}
@@ -148,6 +183,8 @@ func (l lifecycle) OnFunctionCancelled(
 	id state.Identifier,
 	req execution.CancelRequest,
 ) {
+	groupID := uuid.New()
+
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
@@ -155,6 +192,7 @@ func (l lifecycle) OnFunctionCancelled(
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         &groupID,
 		RunID:           id.RunID,
 		Type:            enums.HistoryTypeFunctionCancelled.String(),
 		IdempotencyKey:  id.IdempotencyKey(),
@@ -180,6 +218,17 @@ func (l lifecycle) OnStepScheduled(
 	if edge == nil {
 		return
 	}
+
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		l.log.Error(
+			"error parsing group ID",
+			"error", err,
+			"group_id", item.GroupID,
+			"run_id", id.RunID.String(),
+		)
+	}
+
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
@@ -187,6 +236,7 @@ func (l lifecycle) OnStepScheduled(
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupID,
 		RunID:           id.RunID,
 		Type:            enums.HistoryTypeStepScheduled.String(),
 		Attempt:         int64(item.Attempt),
@@ -211,6 +261,16 @@ func (l lifecycle) OnStepStarted(
 	step inngest.Step,
 	state state.State,
 ) {
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		l.log.Error(
+			"error parsing group ID",
+			"error", err,
+			"group_id", item.GroupID,
+			"run_id", id.RunID.String(),
+		)
+	}
+
 	latency, _ := redis_state.GetItemLatency(ctx)
 	latencyMS := latency.Milliseconds()
 
@@ -221,6 +281,7 @@ func (l lifecycle) OnStepStarted(
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupID,
 		RunID:           id.RunID,
 		Type:            enums.HistoryTypeStepStarted.String(),
 		Attempt:         int64(item.Attempt),
@@ -248,6 +309,16 @@ func (l lifecycle) OnStepFinished(
 	step inngest.Step,
 	resp state.DriverResponse,
 ) {
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		l.log.Error(
+			"error parsing group ID",
+			"error", err,
+			"group_id", item.GroupID,
+			"run_id", id.RunID.String(),
+		)
+	}
+
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
@@ -255,6 +326,7 @@ func (l lifecycle) OnStepFinished(
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupID,
 		RunID:           id.RunID,
 		Type:            enums.HistoryTypeStepCompleted.String(),
 		Attempt:         int64(item.Attempt),
@@ -264,8 +336,8 @@ func (l lifecycle) OnStepFinished(
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
 		URL:             &step.URI,
-		Result:          result(resp),
 	}
+	applyResponse(&h, resp)
 
 	// TODO: CompletedStepCount
 
@@ -289,6 +361,16 @@ func (l lifecycle) OnWaitForEvent(
 	item queue.Item,
 	op state.GeneratorOpcode,
 ) {
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		l.log.Error(
+			"error parsing group ID",
+			"error", err,
+			"group_id", item.GroupID,
+			"run_id", id.RunID.String(),
+		)
+	}
+
 	opts, _ := op.WaitForEventOpts()
 	expires, _ := opts.Expires()
 	// nothing right now.
@@ -299,6 +381,7 @@ func (l lifecycle) OnWaitForEvent(
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupID,
 		RunID:           id.RunID,
 		Type:            enums.HistoryTypeStepSleeping.String(),
 		Attempt:         int64(item.Attempt),
@@ -326,16 +409,32 @@ func (l lifecycle) OnWaitForEventResumed(
 	ctx context.Context,
 	id state.Identifier,
 	req execution.ResumeRequest,
+	groupID string,
 ) {
+	var groupIDUUID *uuid.UUID
+	if groupID != "" {
+		val, err := toUUID(groupID)
+		if err != nil {
+			l.log.Error(
+				"error parsing group ID",
+				"error", err,
+				"group_id", groupID,
+				"run_id", id.RunID.String(),
+			)
+		}
+		groupIDUUID = val
+	}
+
 	h := History{
-		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
 		WorkspaceID:     id.WorkspaceID,
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupIDUUID,
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		RunID:           id.RunID,
-		Type:            enums.HistoryTypeStepStarted.String(),
+		Type:            enums.HistoryTypeStepCompleted.String(),
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
@@ -360,6 +459,16 @@ func (l lifecycle) OnSleep(
 	op state.GeneratorOpcode,
 	until time.Time,
 ) {
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		l.log.Error(
+			"error parsing group ID",
+			"error", err,
+			"group_id", item.GroupID,
+			"run_id", id.RunID.String(),
+		)
+	}
+
 	h := History{
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
@@ -367,6 +476,7 @@ func (l lifecycle) OnSleep(
 		CreatedAt:       time.Now(),
 		FunctionID:      id.WorkflowID,
 		FunctionVersion: int64(id.WorkflowVersion),
+		GroupID:         groupID,
 		RunID:           id.RunID,
 		Type:            enums.HistoryTypeStepSleeping.String(),
 		Attempt:         int64(item.Attempt),
@@ -386,11 +496,52 @@ func (l lifecycle) OnSleep(
 	}
 }
 
-func result(resp state.DriverResponse) *Result {
-	return &Result{
-		Output:     resp.Output,
+type stepCompletedOutput struct {
+	Data any    `json:"data"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Set some history fields based on the driver response.
+func applyResponse(
+	h *History,
+	resp state.DriverResponse,
+) {
+	output := resp.Output
+	isGeneratorStep := len(resp.Generator) > 0
+	if isGeneratorStep {
+		if outputStr, ok := resp.Output.(string); ok {
+			// If it's a completed generator step then some data is stored in
+			// the output. We'll need to extract it.
+			var parsed []stepCompletedOutput
+			if err := json.Unmarshal([]byte(outputStr), &parsed); err == nil {
+				if len(parsed) > 0 {
+					output = parsed[0].Data
+					h.StepID = &parsed[0].ID
+					h.StepName = &parsed[0].Name
+				}
+			}
+		}
+	}
+
+	h.Result = &Result{
 		DurationMS: int(resp.Duration.Milliseconds()),
+		Output:     output,
 		SizeBytes:  resp.OutputSize,
 		// XXX: Add more fields here
 	}
+}
+
+func toUUID(id string) (*uuid.UUID, error) {
+	if id == "" {
+		return nil, nil
+	}
+
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &parsed, nil
+
 }

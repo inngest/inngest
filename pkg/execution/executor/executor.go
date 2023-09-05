@@ -795,7 +795,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnWaitForEventResumed(context.WithoutCancel(ctx), pause.Identifier, r)
+		go e.OnWaitForEventResumed(context.WithoutCancel(ctx), pause.Identifier, r, pause.GroupID)
 	}
 
 	return nil
@@ -883,7 +883,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		GroupID:     groupID,
 		Kind:        queue.KindEdge,
 		Identifier:  item.Identifier,
-		Attempt:     0,
+		Attempt:     item.Attempt,
 		MaxAttempts: item.MaxAttempts,
 		Payload:     queue.PayloadEdge{Edge: nextEdge},
 	}
@@ -929,7 +929,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 		WorkspaceID: item.WorkspaceID,
 		Kind:        queue.KindEdge,
 		Identifier:  item.Identifier,
-		Attempt:     0,
+		Attempt:     item.Attempt,
 		MaxAttempts: item.MaxAttempts,
 		Payload: queue.PayloadEdge{
 			Edge: nextEdge,
@@ -982,7 +982,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 		GroupID:     groupID,
 		Kind:        queue.KindSleep,
 		Identifier:  item.Identifier,
-		Attempt:     0,
+		Attempt:     item.Attempt,
 		MaxAttempts: item.MaxAttempts,
 		Payload:     queue.PayloadEdge{Edge: nextEdge},
 	}, until)

@@ -99,6 +99,7 @@ type LifecycleListener interface {
 		context.Context,
 		state.Identifier,
 		ResumeRequest,
+		string,
 	)
 
 	// OnSleep is called when a sleep step is scheduled.  The
@@ -211,6 +212,7 @@ func (NoopLifecyceListener) OnWaitForEventResumed(
 	context.Context,
 	state.Identifier,
 	ResumeRequest,
+	string,
 ) {
 }
 
