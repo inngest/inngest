@@ -883,7 +883,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 		GroupID:     groupID,
 		Kind:        queue.KindEdge,
 		Identifier:  item.Identifier,
-		Attempt:     item.Attempt,
+		Attempt:     0,
 		MaxAttempts: item.MaxAttempts,
 		Payload:     queue.PayloadEdge{Edge: nextEdge},
 	}
@@ -929,7 +929,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 		WorkspaceID: item.WorkspaceID,
 		Kind:        queue.KindEdge,
 		Identifier:  item.Identifier,
-		Attempt:     item.Attempt,
+		Attempt:     0,
 		MaxAttempts: item.MaxAttempts,
 		Payload: queue.PayloadEdge{
 			Edge: nextEdge,
