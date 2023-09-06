@@ -17,6 +17,7 @@
     "@headlessui/react": "1.7.14",
     "@headlessui/tailwindcss": "0.1.2",
     "@monaco-editor/react": "4.4.6",
+    "@radix-ui/react-tooltip": "1.0.6",
     "@reduxjs/toolkit": "1.9.0",
     "@rtk-query/graphql-request-base-query": "2.2.0",
     "@tanstack/react-table": "8.9.3",
