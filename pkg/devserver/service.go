@@ -128,6 +128,11 @@ func (d *devserver) Run(ctx context.Context) error {
 				fmt.Println("")
 			}
 			fmt.Println("")
+			if d.opts.Autodiscover {
+				fmt.Printf("\tScanning for available serve handlers.\n")
+				fmt.Printf("\tTo disable scanning run `inngest dev` with flags: --no-discovery -u <your-serve-url>")
+				fmt.Println("")
+			}
 			fmt.Println("")
 		}()
 	}
