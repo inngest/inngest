@@ -390,13 +390,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
-	// This could have been retried due to a state load error after
-	// the particular step's code has ran; we need to load state after
-	// each action to properly evaluate the next set of edges.
-	//
-	// To fix this particular consistency issue, always check to see
-	// if there's output stored for this action ID.
-	if resp, _ := s.ActionID(edge.Incoming); resp != nil {
+	// Ensure that if users requeue steps we never re-execute.
+	incoming := edge.Incoming
+	if edge.IncomingGeneratorStep != "" {
+		incoming = edge.IncomingGeneratorStep
+	}
+	if resp, _ := s.ActionID(incoming); resp != nil {
 		// This has already successfully been executed.
 		return &state.DriverResponse{
 			Scheduled: false,
