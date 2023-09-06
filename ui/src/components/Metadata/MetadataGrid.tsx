@@ -37,7 +37,7 @@ export default function MetadataGrid({ metadataItems }: Props) {
             <span
               key={index}
               className={classNames(
-                'relative overflow-visible bg-yellow-200',
+                'relative overflow-visible',
                 spanIndex !== 0 && spanIndex % 3 !== 0 && verticalDividers,
                 excludeCondition && horizontalDividers,
                 item.size === 'large' ? 'col-span-2' : 'col-span-1',
