@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -164,7 +165,7 @@ func (l lifecycle) OnFunctionFinished(
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
 	}
-	applyResponse(&h, resp)
+	applyResponse(&h, &resp)
 	if resp.Err != nil {
 		h.Type = enums.HistoryTypeFunctionFailed.String()
 	}
@@ -337,7 +338,7 @@ func (l lifecycle) OnStepFinished(
 		BatchID:         id.BatchID,
 		URL:             &step.URI,
 	}
-	applyResponse(&h, resp)
+	applyResponse(&h, &resp)
 
 	// TODO: CompletedStepCount
 
@@ -496,40 +497,68 @@ func (l lifecycle) OnSleep(
 	}
 }
 
-type stepCompletedOutput struct {
-	Data any    `json:"data"`
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-// Set some history fields based on the driver response.
 func applyResponse(
 	h *History,
-	resp state.DriverResponse,
-) {
-	output := resp.Output
-	isGeneratorStep := len(resp.Generator) > 0
-	if isGeneratorStep {
-		if outputStr, ok := resp.Output.(string); ok {
-			// If it's a completed generator step then some data is stored in
-			// the output. We'll need to extract it.
-			var parsed []stepCompletedOutput
-			if err := json.Unmarshal([]byte(outputStr), &parsed); err == nil {
-				if len(parsed) > 0 {
-					output = parsed[0].Data
-					h.StepID = &parsed[0].ID
-					h.StepName = &parsed[0].Name
-				}
-			}
-		}
-	}
-
+	resp *state.DriverResponse,
+) error {
 	h.Result = &Result{
 		DurationMS: int(resp.Duration.Milliseconds()),
-		Output:     output,
+		RawOutput:  resp.Output,
 		SizeBytes:  resp.OutputSize,
 		// XXX: Add more fields here
 	}
+
+	if outputStr, ok := resp.Output.(string); ok {
+		// If it's a completed generator step then some data is stored in the
+		// output. We'll try to extract it.
+		isGeneratorStep := len(resp.Generator) > 0
+		if isGeneratorStep {
+			type stepCompletedOutput struct {
+				// Could be any JSON value (string, number, object, array, etc.)
+				Data any `json:"data"`
+
+				ID   string `json:"id"`
+				Name string `json:"name"`
+				Op   string `json:"op"`
+			}
+			var parsed []stepCompletedOutput
+			if err := json.Unmarshal([]byte(outputStr), &parsed); err == nil {
+				// If there's more than 1 item in the array then we're probably
+				// dealing with OpcodeStepPlanned (e.g. parallel steps).
+				if len(parsed) == 1 {
+					h.StepID = &parsed[0].ID
+					h.StepName = &parsed[0].Name
+
+					byt, err := json.Marshal(parsed[0].Data)
+					if err != nil {
+						return fmt.Errorf("error marshalling step output: %w", err)
+					}
+					h.Result.Output = string(byt)
+				}
+				return nil
+			}
+		}
+
+		// If it's a string and doesn't have extractable data, then
+		// assume it's already the stringified JSON for the data
+		// returned by the user's step. Some scenarios when that can
+		// happen:
+		// - FunctionCompleted. It isn't enveloped like generator steps.
+		// - StepFailed. It has error-related fields.
+		// - StepCompleted preceding parallel steps. Its output schema
+		//     conforms to the normal generator StepCompleted schema,
+		//     but doesn't contain any of the user's step output data.
+		h.Result.Output = outputStr
+		return nil
+	}
+
+	byt, err := json.Marshal(resp.Output)
+	if err != nil {
+		return fmt.Errorf("error marshalling step output: %w", err)
+	}
+	h.Result.Output = string(byt)
+
+	return fmt.Errorf("unexpected output type: %T", resp.Output)
 }
 
 func toUUID(id string) (*uuid.UUID, error) {
