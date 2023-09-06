@@ -165,7 +165,18 @@ func (l lifecycle) OnFunctionFinished(
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,
 	}
-	applyResponse(&h, &resp)
+
+	err = applyResponse(&h, &resp)
+	if err != nil {
+		// Swallow error and log, since we don't want a response parsing error
+		// to fail history writing.
+		l.log.Error(
+			"error applying response to history",
+			"error", err,
+			"run_id", id.RunID.String(),
+		)
+	}
+
 	if resp.Err != nil {
 		h.Type = enums.HistoryTypeFunctionFailed.String()
 	}
@@ -338,7 +349,17 @@ func (l lifecycle) OnStepFinished(
 		BatchID:         id.BatchID,
 		URL:             &step.URI,
 	}
-	applyResponse(&h, &resp)
+
+	err = applyResponse(&h, &resp)
+	if err != nil {
+		// Swallow error and log, since we don't want a response parsing error
+		// to fail history writing.
+		l.log.Error(
+			"error applying response to history",
+			"error", err,
+			"run_id", id.RunID.String(),
+		)
+	}
 
 	// TODO: CompletedStepCount
 
@@ -513,27 +534,14 @@ func applyResponse(
 		// output. We'll try to extract it.
 		isGeneratorStep := len(resp.Generator) > 0
 		if isGeneratorStep {
-			type stepCompletedOutput struct {
-				// Could be any JSON value (string, number, object, array, etc.)
-				Data any `json:"data"`
-
-				ID   string `json:"id"`
-				Name string `json:"name"`
-				Op   string `json:"op"`
-			}
-			var parsed []stepCompletedOutput
-			if err := json.Unmarshal([]byte(outputStr), &parsed); err == nil {
+			var opcodes []state.GeneratorOpcode
+			if err := json.Unmarshal([]byte(outputStr), &opcodes); err == nil {
 				// If there's more than 1 item in the array then we're probably
 				// dealing with OpcodeStepPlanned (e.g. parallel steps).
-				if len(parsed) == 1 {
-					h.StepID = &parsed[0].ID
-					h.StepName = &parsed[0].Name
-
-					byt, err := json.Marshal(parsed[0].Data)
-					if err != nil {
-						return fmt.Errorf("error marshalling step output: %w", err)
-					}
-					h.Result.Output = string(byt)
+				if len(opcodes) == 1 {
+					h.StepID = &opcodes[0].ID
+					h.StepName = &opcodes[0].Name
+					h.Result.Output = string(opcodes[0].Data)
 				}
 				return nil
 			}
