@@ -29,18 +29,8 @@ type Options struct {
 	Logger       *zerolog.Logger
 }
 
-const (
-	// DefaultMaxSize represents the maximum size of the event payload we process,
-	// currently 256KB.
-	DefaultMaxSize = 256 * 1024
-)
-
 func NewAPI(o Options) (chi.Router, error) {
 	logger := o.Logger.With().Str("caller", "api").Logger()
-
-	if o.Config.EventAPI.MaxSize == 0 {
-		o.Config.EventAPI.MaxSize = DefaultMaxSize
-	}
 
 	api := &API{
 		Router:  chi.NewMux(),
@@ -122,7 +112,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	stream := make(chan eventstream.StreamItem)
 	eg := errgroup.Group{}
 	eg.Go(func() error {
-		return eventstream.ParseStream(ctx, r.Body, stream, a.config.EventAPI.MaxSize)
+		return eventstream.ParseStream(ctx, r.Body, stream, consts.AbsoluteMaxEventSize)
 	})
 
 	// Create a new channel which holds all event IDs as a slice.

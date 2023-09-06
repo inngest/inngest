@@ -6,6 +6,13 @@ const (
 	// DefaultRetryCount is used when no retry count for a step is specified.
 	DefaultRetryCount = 3
 
+	// DefaultMaxEventSize represents the maximum size of the event payload we process,
+	// currently 512KB.
+	DefaultMaxEventSize = 512 * 1024
+
+	// AbsoluteMaxEventSize is the absolute maximum size of the event payload we process.
+	AbsoluteMaxEventSize = 3 * 1024 * 1024
+
 	// MaxFunctionTimeout represents the longest running function or step allowed within
 	// our system.
 	MaxFunctionTimeout = 2 * time.Hour
