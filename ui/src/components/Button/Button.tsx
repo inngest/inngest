@@ -24,9 +24,15 @@ const kindColors = {
 };
 
 const sizeStyles = {
-  small: 'text-xs px-2.5 py-1',
-  regular: 'text-sm px-2.5 py-1.5',
-  large: 'text-base px-2.5 py-2',
+  small: 'text-xs px-2.5 h-7',
+  regular: 'text-sm px-2.5 h-8',
+  large: 'text-base px-2.5 h-10',
+};
+
+const iconOnlySizeStyles = {
+  small: 'text-xs w-7 h-7',
+  regular: 'text-sm w-8 h-8',
+  large: 'text-base w-10 h-10',
 };
 
 export default function Button({
@@ -44,9 +50,9 @@ export default function Button({
 }: ButtonProps) {
   const buttonColors =
     appearance === 'solid'
-      ? `bg-${kindColors[kind]} border-${kindColors[kind]} hover:bg-${kindColors[kind]}/80 text-slate-100`
-      : `bg-${kindColors[kind]}/20 border-${kindColors[kind]}/80 hover:border-${kindColors[kind]} text-slate-200`;
-  const buttonSizes = sizeStyles[size];
+      ? `bg-${kindColors[kind]} border-t border-white/10 hover:bg-${kindColors[kind]}/80 text-slate-100`
+      : `bg-${kindColors[kind]}/20 border border-${kindColors[kind]}/80 hover:border-${kindColors[kind]} text-slate-200`;
+  const buttonSizes = icon && !label ? iconOnlySizeStyles[size] : sizeStyles[size];
   const keyColor =
     appearance === 'solid' && kind === 'default'
       ? `bg-slate-800`
@@ -64,7 +70,7 @@ export default function Button({
       className={classNames(
         buttonColors,
         buttonSizes,
-        'flex gap-1.5 items-center border rounded-sm disabled:text-slate-500',
+        'flex gap-1.5 items-center justify-center rounded-sm drop-shadow-sm disabled:text-slate-500',
       )}
       type={type}
       onClick={btnAction}
