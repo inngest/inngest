@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.16.7] - 2023-08-19
+
+### Added
+- Added lifecycle handlers
+- Added history lifecycle manager
+- Added note on disabling auto-discovery on boot
+
+### Changed
+- Changed max event size dev server can ingest
+
 ## [v0.16.6] - 2023-08-19
 
 ### Added
