@@ -72,7 +72,8 @@ type Result struct {
 	ErrorCode   *string             `json:"error_code"`
 	Framework   *string             `json:"framework"`
 	Headers     map[string][]string `json:"response_headers"`
-	Output      any                 `json:"output"`
+	Output      string              `json:"output"`
+	RawOutput   any                 `json:"raw_output"`
 	Platform    *string             `json:"platform"`
 	SDKLanguage string              `json:"sdk_language"`
 	SDKVersion  string              `json:"sdk_version"`
