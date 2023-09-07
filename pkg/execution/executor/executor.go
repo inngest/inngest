@@ -985,7 +985,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 		GroupID:     groupID,
 		Kind:        queue.KindSleep,
 		Identifier:  item.Identifier,
-		Attempt:     item.Attempt,
+		Attempt:     0,
 		MaxAttempts: item.MaxAttempts,
 		Payload:     queue.PayloadEdge{Edge: nextEdge},
 	}, until)
