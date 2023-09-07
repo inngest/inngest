@@ -60,6 +60,9 @@ export default function Button({
       ? `bg-slate-800/20`
       : `bg-${kindColors[kind]}/80`;
 
+  const disabledStyles =
+    'disabled:text-slate-500 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:hover:bg-slate-800 disabled:border-slate-800';
+
   // Replace this with alternative once we revamp the button variations
   const iconElement = icon
     ? React.cloneElement(icon as React.ReactElement, { className: 'icon-xs' })
@@ -70,7 +73,8 @@ export default function Button({
       className={classNames(
         buttonColors,
         buttonSizes,
-        'flex gap-1.5 items-center justify-center rounded-sm drop-shadow-sm disabled:text-slate-500',
+        disabledStyles,
+        'flex gap-1.5 items-center justify-center rounded-sm drop-shadow-sm',
       )}
       type={type}
       onClick={btnAction}
