@@ -681,6 +681,10 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 					EventID:    &evtID,
 					Expression: pause.Expression,
 				})
+				if err == state.ErrFunctionCancelled || err == state.ErrFunctionComplete || err == state.ErrFunctionFailed {
+					// Safe to ignore.
+					return
+				}
 				if err != nil && err != ErrFunctionEnded && !strings.Contains(err.Error(), "no status stored in metadata") {
 					goerr = errors.Join(goerr, fmt.Errorf("error cancelling function: %w", err))
 					return
