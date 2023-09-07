@@ -565,8 +565,7 @@ func applyResponse(
 		return fmt.Errorf("error marshalling step output: %w", err)
 	}
 	h.Result.Output = string(byt)
-
-	return fmt.Errorf("unexpected output type: %T", resp.Output)
+	return nil
 }
 
 func toUUID(id string) (*uuid.UUID, error) {
