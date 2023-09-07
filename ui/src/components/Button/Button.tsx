@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { IconSpinner } from '@/icons';
 import classNames from '@/utils/classnames';
 
 interface ButtonProps {
@@ -34,6 +35,7 @@ export default function Button({
   size = 'small',
   label,
   icon,
+  loading = false,
   disabled,
   btnAction,
 
@@ -45,7 +47,12 @@ export default function Button({
       ? `bg-${kindColors[kind]} border-${kindColors[kind]} hover:bg-${kindColors[kind]}/80 text-slate-100`
       : `bg-${kindColors[kind]}/20 border-${kindColors[kind]}/80 hover:border-${kindColors[kind]} text-slate-200`;
   const buttonSizes = sizeStyles[size];
-  const keyColor = appearance === 'solid' && kind === 'default' ? `bg-slate-800` : appearance === 'solid' ? `bg-slate-800/20` : `bg-${kindColors[kind]}/80`;
+  const keyColor =
+    appearance === 'solid' && kind === 'default'
+      ? `bg-slate-800`
+      : appearance === 'solid'
+      ? `bg-slate-800/20`
+      : `bg-${kindColors[kind]}/80`;
 
   // Replace this with alternative once we revamp the button variations
   const iconElement = icon
@@ -63,7 +70,8 @@ export default function Button({
       onClick={btnAction}
       disabled={disabled}
     >
-      {iconElement}
+      {loading && <IconSpinner className="fill-white icon-xs" />}
+      {!loading && iconElement}
       {label && label}
       {keys && (
         <kbd className="ml-auto flex items-center gap-1">
