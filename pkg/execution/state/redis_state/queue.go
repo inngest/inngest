@@ -522,8 +522,9 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		i.ID = ulid.MustNew(ulid.Now(), rnd).String()
 	}
 
-	// Hash the ID.
-	i.ID = hashID(ctx, i.ID)
+	// Ensure that we prefix the hash by workflow ID to reduce collisions.  We're using
+	// a 64 bit hash but namespacing by functions drastically reduces chances, here.
+	i.ID = hashID(ctx, i.WorkspaceID.String()) + "-" + hashID(ctx, i.ID)
 
 	priority := PriorityMin
 	if q.pf != nil {
