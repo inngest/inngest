@@ -114,8 +114,8 @@ function getSections(node) {
 }
 
 export const rehypePlugins = [
-  rehypeCodeTitles,
   mdxAnnotations.rehype,
+  rehypeCodeTitles,
   rehypeParseCodeBlocks,
   rehypeShiki,
   rehypeSlugify,

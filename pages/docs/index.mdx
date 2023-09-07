@@ -28,8 +28,8 @@ Learn how to get started:
 
 Adding sleeps, retries, and reliable steps to a function:
 
-<CodeGroup forceTabs>
-```ts {{ title: "v2" }}
+<CodeGroup>
+```ts
 import { EventSchemas, Inngest } from "inngest";
 
 type Events = {
@@ -45,46 +45,6 @@ const inngest = new Inngest({
   name: "Next.js Shop",
   schemas: new EventSchemas().fromRecord<Events>(),
 });
-
-export default inngest.createFunction(
-  { name: "Signup flow" },
-  { event: "user/new.signup" },
-  async ({ event, step }) => {
-    // ⚡ If this step fails it will retry automatically. It will only run once
-    // if it succeeds
-    const promo = await step.run("Generate promo code", async () => {
-      const promoCode = await generatePromoCode();
-      return promoCode.code;
-    });
-
-    // ⚡ Again, if the email provider is down this will retry - but we will
-    // only generate one promo code
-    await step.run("Send a welcome promo", () =>
-      sendEmail({ email: event.data, promo })
-    );
-
-    // 😴 You can sleep on any platform!
-    await step.sleep("1 day");
-
-    // ⏰ This runs exactly 1 day after the user signs up
-    await step.run("Send drip campaign", () => sendDripCampaign());
-  }
-);
-```
-```ts {{ title: "v1" }}
-import { Inngest } from "inngest";
-
-type Events = {
-  "user/new.signup": {
-    name: "user/new.signup";
-    data: {
-      email: string;
-      name: string;
-    };
-  };
-};
-
-const inngest = new Inngest<Events>({ name: "Next.js Shop" });
 
 export default inngest.createFunction(
   { name: "Signup flow" },

@@ -499,7 +499,7 @@ export function Search() {
         {...buttonProps}
       >
         <SearchIcon className="h-5 w-5 stroke-current" />
-        Search documentation...
+        Search...
         <kbd className="ml-auto text-xs font-sans text-slate-500 dark:text-slate-400">
           {modifierKey}K
         </kbd>
