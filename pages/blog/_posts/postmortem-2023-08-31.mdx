@@ -10,7 +10,7 @@ author: Tony Holdstock-Brown
 
 On Thursday 31 August at 7:06am PDT, we observed a backlog of steps processing, caused by event stream acknowledgement issues within our HTTP execution drivers.
 
-Our executor service, which invokes functions and handles responses from the SDK, encountered an issue with invalid `waitForEvent` matching expressions.  The responses in the system are handled via a message stream and the invalid expressions caused an error which resulted in these specific messages to nack (not acknowledge).  This is expected behaviour.  owever, due to ack/nack policies and how our underlying message broker handles acknowledgements, all messages during a 15 minute window were relayed regardless of whether each were acked or nacked.
+Our executor service, which invokes functions and handles responses from the SDK, encountered an issue with invalid `waitForEvent` matching expressions.  The responses in the system are handled via a message stream and the invalid expressions caused an error which resulted in these specific messages to nack (not acknowledge).  This is expected behaviour.  However, due to ack/nack policies and how our underlying message broker handles acknowledgements, all messages during a 15 minute window were relayed regardless of whether each were acked or nacked.
 
 This caused extra load on several services:  the step processing handlers;  the pause/resume service which handles waitForEvent matching;  cancellation matching;  and the executor.
 
