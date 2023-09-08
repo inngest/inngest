@@ -382,6 +382,11 @@ func (q *queue) scan(ctx context.Context) error {
 			return nil
 		}
 		if err := q.processPartition(ctx, p); err != nil {
+			if err == ErrPartitionNotFound {
+				// Another worker grabbed the partition
+				// TODO: Increase counter
+				continue
+			}
 			if errors.Unwrap(err) != context.Canceled {
 				q.logger.Error().Err(err).Msg("error processing partition")
 			}
