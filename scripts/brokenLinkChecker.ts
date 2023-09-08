@@ -18,6 +18,7 @@ const options = {
     "https://envelop.dev",
     "https://twitter.com",
     "http://localhost:8288",
+    "http://localhost:",
   ],
 };
 

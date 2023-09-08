@@ -23,11 +23,6 @@ const TEAM = [
     avatar: "/assets/team/jack-2022-10-10.jpg",
   },
   {
-    name: "Ed Poole",
-    role: "Product Designer",
-    avatar: "/assets/team/ed-p-2023-06-26.jpg",
-  },
-  {
     name: "Igor Gassmann",
     role: "Engineer",
     avatar: "/assets/team/igor-g-2023-06-26.jpg",
@@ -46,6 +41,11 @@ const TEAM = [
     name: "Darwin Wu",
     role: "Engineer",
     avatar: "/assets/team/darwin-w-2023-06-26.jpg",
+  },
+  {
+    name: "Joel Hooks",
+    role: "Developer Advocate",
+    avatar: "/assets/team/joel-h-2023-09-08.jpg",
   },
 ];
 
