@@ -195,7 +195,12 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 	now := time.Now()
 	debounceID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-	keyPtr := d.k.DebouncePointer(ctx, fn.ID)
+	key, err := d.debounceKey(ctx, di, fn)
+	if err != nil {
+		return nil, err
+	}
+
+	keyPtr := d.k.DebouncePointer(ctx, fn.ID, key)
 	keyDbc := d.k.Debounce(ctx)
 
 	byt, err := json.Marshal(di)
@@ -239,12 +244,17 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, debounceID ulid.ULID) error {
 	now := time.Now()
 
+	key, err := d.debounceKey(ctx, di, fn)
+	if err != nil {
+		return err
+	}
+
 	// NOTE: This functioon has a deadline to complete.  If this fn doesn't complete within the deadline,
 	// eg, network issues, we must check if the debounce expired and re-attempt the entire thing.
 	ctx, cancel := context.WithTimeout(ctx, buffer)
 	defer cancel()
 
-	keyPtr := d.k.DebouncePointer(ctx, fn.ID)
+	keyPtr := d.k.DebouncePointer(ctx, fn.ID, key)
 	keyDbc := d.k.Debounce(ctx)
 	byt, err := json.Marshal(di)
 	if err != nil {

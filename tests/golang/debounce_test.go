@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,8 +14,8 @@ import (
 )
 
 type DebounceEventData struct {
-	Counter int
-	Name    string
+	Counter int    `json:"counter"`
+	Name    string `json:"name"`
 }
 
 type DebounceEvent = inngestgo.GenericEvent[DebounceEventData, any]
@@ -70,7 +71,9 @@ func TestDebounce(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		<-time.After(time.Second)
+
+		i := rand.Int31n(1000)
+		<-time.After(time.Duration(i) * time.Millisecond)
 	}
 
 	<-time.After(8 * time.Second)
@@ -92,4 +95,46 @@ func TestDebounce(t *testing.T) {
 
 	<-time.After(10 * time.Second)
 	require.EqualValues(t, 1, counter)
+}
+
+// TestDebounecWithMultipleKeys
+func TestDebounecWithMultipleKeys(t *testing.T) {
+	h, server, registerFuncs := NewSDKHandler(t)
+	defer server.Close()
+
+	var counter int32
+
+	a := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name: "test sdk",
+			Debounce: &inngestgo.Debounce{
+				Key:    "event.data.name",
+				Period: 5 * time.Second,
+			},
+		},
+		inngestgo.EventTrigger("test/sdk"),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			fmt.Println("Debounced function ran", input.Event.Data.Name)
+			atomic.AddInt32(&counter, 1)
+			return nil, nil
+		},
+	)
+	h.Register(a)
+	registerFuncs()
+
+	n := 5
+	for i := 0; i < n; i++ {
+		_, err := inngestgo.Send(context.Background(), DebounceEvent{
+			Name: "test/sdk",
+			Data: DebounceEventData{
+				Counter: i,
+				Name:    fmt.Sprintf("debounce %d", i),
+			},
+		})
+		require.NoError(t, err)
+	}
+
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt32(&counter) == int32(n)
+	}, 10*time.Second, 100*time.Millisecond, "Expected %d, got %d", n, counter)
 }

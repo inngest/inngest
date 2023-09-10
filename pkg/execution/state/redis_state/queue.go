@@ -425,8 +425,6 @@ type QueueItem struct {
 	// the idempotency key immediately;  the same debounce key should become available
 	// for another debounced function run.
 	IdempotencyPeriod *time.Duration `json:"ip,omitempty"`
-
-	hashedID bool
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
