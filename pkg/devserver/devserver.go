@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/executor"
@@ -100,14 +101,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
+	queueKG := &redis_state.DefaultQueueKeyGenerator{
+		Prefix: "{queue}",
+	}
 	queue := redis_state.NewQueue(
 		rc,
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(100),
 		redis_state.WithPollTick(150*time.Millisecond),
-		redis_state.WithQueueKeyGenerator(&redis_state.DefaultQueueKeyGenerator{
-			Prefix: "{queue}",
-		}),
+		redis_state.WithQueueKeyGenerator(queueKG),
 		redis_state.WithPartitionConcurrencyKeyGenerator(func(ctx context.Context, p redis_state.QueuePartition) (string, int) {
 			// Ensure that we return the correct concurrency values per
 			// partition.
@@ -129,6 +131,8 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	rl := ratelimit.New(ctx, rc, "{ratelimit}:")
+
+	debouncer := debounce.NewRedisDebouncer(rc, queueKG, queue)
 
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
@@ -154,6 +158,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			),
 		),
 		executor.WithStepLimits(consts.DefaultMaxStepLimit),
+		executor.WithDebouncer(debouncer),
 	)
 	if err != nil {
 		return err
@@ -166,6 +171,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithState(sm),
 		executor.WithServiceQueue(queue),
 		executor.WithServiceExecutor(exec),
+		executor.WithServiceDebouncer(debouncer),
 	)
 
 	runner := runner.NewService(

@@ -1,0 +1,95 @@
+package golang
+
+import (
+	"context"
+	"fmt"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/inngest/inngestgo"
+	"github.com/inngest/inngestgo/step"
+	"github.com/stretchr/testify/require"
+)
+
+type DebounceEventData struct {
+	Counter int
+	Name    string
+}
+
+type DebounceEvent = inngestgo.GenericEvent[DebounceEventData, any]
+
+func TestDebounce(t *testing.T) {
+	h, server, registerFuncs := NewSDKHandler(t)
+	defer server.Close()
+
+	var (
+		counter    int32
+		calledWith DebounceEvent
+	)
+
+	now := time.Now()
+	a := inngestgo.CreateFunction(
+		inngestgo.FunctionOpts{
+			Name: "test sdk",
+			Debounce: &inngestgo.Debounce{
+				Key:    "event.data.name",
+				Period: 10 * time.Second,
+			},
+		},
+		inngestgo.EventTrigger("test/sdk"),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+
+			// We expect that this function is called after at least the debounce period
+			// of 5 seconds.
+			require.True(t, time.Now().After(now.Add(10*time.Second)))
+
+			if atomic.LoadInt32(&counter) == 0 {
+				calledWith = input.Event
+			}
+
+			name := step.Run(ctx, "get name", func(ctx context.Context) (string, error) {
+				fmt.Println("Running function")
+				return input.Event.Data.Name, nil
+			})
+
+			atomic.AddInt32(&counter, 1)
+
+			return name, nil
+		},
+	)
+	h.Register(a)
+	registerFuncs()
+
+	for i := 0; i < 5; i++ {
+		_, err := inngestgo.Send(context.Background(), DebounceEvent{
+			Name: "test/sdk",
+			Data: DebounceEventData{
+				Counter: i,
+				Name:    "debounce",
+			},
+		})
+		require.NoError(t, err)
+		<-time.After(time.Second)
+	}
+
+	<-time.After(8 * time.Second)
+	now = time.Now()
+	// Send one more.
+	_, err := inngestgo.Send(context.Background(), DebounceEvent{
+		Name: "test/sdk",
+		Data: DebounceEventData{
+			Counter: 999,
+			Name:    "debounce",
+		},
+	})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt32(&counter) == 1
+	}, 17*time.Second, time.Second)
+	require.EqualValues(t, DebounceEventData{Counter: 999, Name: "debounce"}, calledWith.Data)
+
+	<-time.After(10 * time.Second)
+	require.EqualValues(t, 1, counter)
+}

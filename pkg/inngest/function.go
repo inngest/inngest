@@ -55,6 +55,8 @@ type Function struct {
 	// by an individual concurrency key.
 	Concurrency *Concurrency `json:"concurrency,omitempty"`
 
+	Debounce *Debounce `json:"debounce,omitempty"`
+
 	// Trigger represnets the trigger for the function.
 	Triggers []Trigger `json:"triggers"`
 
@@ -73,6 +75,11 @@ type Function struct {
 
 	// Edges represent edges between steps in the dag.
 	Edges []Edge `json:"edges,omitempty"`
+}
+
+type Debounce struct {
+	Key    string `json:"key"`
+	Period string `json:"period"`
 }
 
 func (f Function) ConcurrencyLimit() int {

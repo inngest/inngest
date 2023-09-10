@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -491,6 +492,9 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		Str("function", fn.Name).
 		Msg("initializing fn")
 	id, err := Initialize(ctx, fn, evt, s.executor)
+	if err == executor.ErrFunctionDebounced {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -524,6 +528,8 @@ func Initialize(ctx context.Context, fn inngest.Function, tracked event.TrackedE
 		// Using a remote API, this UUID may be a surrogate primary key.
 		fn.ID = inngest.DeterministicUUID(fn)
 	}
+
+	// If this is a debounced function, run this through a debouncer.
 
 	return e.Schedule(ctx, execution.ScheduleRequest{
 		Function: fn,

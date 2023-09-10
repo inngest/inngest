@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	KindEdge  = "edge"
-	KindSleep = "sleep"
-	KindPause = "pause"
+	KindEdge     = "edge"
+	KindSleep    = "sleep"
+	KindPause    = "pause"
+	KindDebounce = "debounce"
 )
 
 type jobIDValType struct{}

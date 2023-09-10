@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -33,6 +34,7 @@ var (
 	ErrNoStateManager    = fmt.Errorf("no state manager provided")
 	ErrNoActionLoader    = fmt.Errorf("no action loader provided")
 	ErrNoRuntimeDriver   = fmt.Errorf("runtime driver for action not found")
+	ErrFunctionDebounced = fmt.Errorf("function debounced")
 
 	ErrFunctionEnded = fmt.Errorf("function already ended")
 
@@ -129,6 +131,13 @@ func WithStepLimits(limit uint) ExecutorOpt {
 	}
 }
 
+func WithDebouncer(d debounce.Debouncer) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).debouncer = d
+		return nil
+	}
+}
+
 // WithEvaluatorFactory allows customizing of the expression evaluator factory function.
 func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.Evaluator, error)) ExecutorOpt {
 	return func(e execution.Executor) error {
@@ -162,6 +171,7 @@ type executor struct {
 
 	sm             state.Manager
 	queue          queue.Queue
+	debouncer      debounce.Debouncer
 	fl             state.FunctionLoader
 	evalFactory    func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	runtimeDrivers map[string]driver.Driver
@@ -182,7 +192,25 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 
 // Execute loads a workflow and the current run state, then executes the
 // function's step via the necessary driver.
+//
+// If this function has a debounce config, this will return ErrFunctionDebounced instead
+// of an identifier as the function is not scheduled immediately.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*state.Identifier, error) {
+	if req.Function.Debounce != nil && !req.PreventDebounce {
+		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
+			AccountID:   req.AccountID,
+			WorkspaceID: req.WorkspaceID,
+			FunctionID:  req.Function.ID,
+			EventID:     req.Events[0].GetInternalID(),
+			Event:       req.Events[0].GetEvent(),
+		}, req.Function)
+		if err != nil {
+			return nil, err
+		}
+		e.log.Info().Interface("event", req.Events[0].GetEvent()).Msg("debouncing function")
+		return nil, ErrFunctionDebounced
+	}
+
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	var key string
 	if req.IdempotencyKey != nil {

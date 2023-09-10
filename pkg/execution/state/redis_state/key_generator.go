@@ -174,6 +174,14 @@ type QueueKeyGenerator interface {
 	BatchMetadata(context.Context, ulid.ULID) string
 }
 
+type DebounceKeyGenerator interface {
+	// DebouncePointer returns the key which stores the pointer to the current debounce
+	// for a given function.
+	DebouncePointer(ctx context.Context, fnID uuid.UUID) string
+	// Debounce returns the key for storing debounce-related data given a debounce ID.
+	Debounce(ctx context.Context) string
+}
+
 type DefaultQueueKeyGenerator struct {
 	Prefix string
 }
@@ -232,4 +240,16 @@ func (d DefaultQueueKeyGenerator) Batch(ctx context.Context, batchID ulid.ULID) 
 
 func (d DefaultQueueKeyGenerator) BatchMetadata(ctx context.Context, batchID ulid.ULID) string {
 	return fmt.Sprintf("%s:metadata", d.Batch(ctx, batchID))
+}
+
+// DebouncePointer returns the key which stores the pointer to the current debounce
+// for a given function.
+func (d DefaultQueueKeyGenerator) DebouncePointer(ctx context.Context, fnID uuid.UUID) string {
+	return fmt.Sprintf("%s:debounce-ptrs:%s", d.Prefix, fnID)
+}
+
+// Debounce returns the key for storing debounce-related data given a debounce ID.
+// This is a hash of debounce IDs -> debounces.
+func (d DefaultQueueKeyGenerator) Debounce(ctx context.Context) string {
+	return fmt.Sprintf("%s:debounce-hash", d.Prefix)
 }

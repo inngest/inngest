@@ -103,6 +103,12 @@ func init() {
 	rnd = &frandRNG{RNG: frand.New(), lock: &sync.Mutex{}}
 }
 
+type QueueManager interface {
+	osqueue.Queue
+	Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error
+	RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error
+}
+
 // PriorityFinder returns the priority for a given queue item.
 type PriorityFinder func(ctx context.Context, item QueueItem) uint
 
@@ -413,6 +419,18 @@ type QueueItem struct {
 	//
 	// This should almost always be nil.
 	QueueName *string `json:"queueID,omitempty"`
+
+	// IdempotencyPerioud allows customizing the idempotency period for this queue
+	// item.  For example, after a debounce queue has been consumed we want to remove
+	// the idempotency key immediately;  the same debounce key should become available
+	// for another debounced function run.
+	IdempotencyPeriod *time.Duration `json:"ip,omitempty"`
+
+	hashedID bool
+}
+
+func (q *QueueItem) SetID(ctx context.Context, str string) {
+	q.ID = hashID(ctx, str)
 }
 
 // Score returns the score (time that the item should run) for the queue item.
@@ -519,11 +537,14 @@ func (q QueuePartition) MarshalBinary() ([]byte, error) {
 // The queue score must be added in milliseconds to process sub-second items in order.
 func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (QueueItem, error) {
 	if len(i.ID) == 0 {
-		i.ID = ulid.MustNew(ulid.Now(), rnd).String()
+		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
+	} else {
+		// Hash the ID.
+		// TODO: What if this is already hashed?
+		i.ID = hashID(ctx, i.ID)
 	}
 
-	// Hash the ID.
-	i.ID = hashID(ctx, i.ID)
+	// TODO: If the length of ID >= max, error.
 
 	priority := PriorityMin
 	if q.pf != nil {
@@ -555,7 +576,8 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 		QueueName:  i.QueueName,
 		WorkflowID: i.WorkflowID,
 		Priority:   priority,
-		AtS:        at.Unix(),
+		// TODO: REMOVE
+		AtS: at.Unix(),
 	}
 
 	keys := []string{
@@ -662,6 +684,43 @@ func (q *queue) Peek(ctx context.Context, queueName string, until time.Time, lim
 	}
 
 	return result[0:n], nil
+}
+
+// RequeueByJobID requeues a job for a specific time given a partition name and job ID.
+//
+// If the queue item referenced by the job ID is not outstanding (ie. it has a lease, is in
+// progress, or doesn't exist) this returns an error.
+func (q *queue) RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error {
+	jobID = hashID(ctx, jobID)
+
+	keys := []string{
+		q.kg.QueueIndex(partitionName),
+		q.kg.QueueItem(),
+		q.kg.PartitionIndex(), // Global partition queue
+		q.kg.PartitionItem(),  // Partition hash
+	}
+	status, err := scripts["queue/requeueByID"].Exec(
+		ctx,
+		q.r,
+		keys,
+		[]string{
+			jobID,
+			strconv.Itoa(int(at.UnixMilli())),
+			partitionName,
+		},
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error leasing queue item: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	case -1:
+		return ErrQueueItemNotFound
+	default:
+		return fmt.Errorf("unknown requeue by id response: %d", status)
+	}
+
 }
 
 // Lease temporarily dequeues an item from the queue by obtaining a lease, preventing

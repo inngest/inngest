@@ -1158,6 +1158,243 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 	})
 }
 
+func TestRequeueByJobID(t *testing.T) {
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	q := queue{
+		kg: defaultQueueKey,
+		r:  rc,
+		pf: func(ctx context.Context, item QueueItem) uint {
+			return PriorityMin
+		},
+		partitionConcurrencyGen: func(ctx context.Context, p QueuePartition) (string, int) {
+			return p.Queue(), 100
+		},
+	}
+
+	wsA, wsB := uuid.New(), uuid.New()
+
+	t.Run("Failure cases", func(t *testing.T) {
+
+		t.Run("It fails with a non-existent partition and job ID", func(t *testing.T) {
+			err := q.RequeueByJobID(ctx, "foo", "bar", time.Now().Add(5*time.Second))
+			require.NotNil(t, err)
+		})
+
+		t.Run("It fails with a non-existent job ID for an existing partition", func(t *testing.T) {
+			r.FlushDB()
+
+			jid := "yeee"
+			item := QueueItem{
+				ID:          jid,
+				WorkflowID:  wsA,
+				WorkspaceID: wsA,
+			}
+
+			_, err := q.EnqueueItem(ctx, item, time.Now().Add(time.Second))
+			require.NoError(t, err)
+
+			err = q.RequeueByJobID(ctx, wsA.String(), "no bruv", time.Now().Add(5*time.Second))
+			require.NotNil(t, err)
+		})
+
+		t.Run("It fails with a non-existent partition but an existing job ID", func(t *testing.T) {
+			r.FlushDB()
+
+			jid := "another"
+			item := QueueItem{
+				ID:          jid,
+				WorkflowID:  wsA,
+				WorkspaceID: wsA,
+			}
+
+			_, err := q.EnqueueItem(ctx, item, time.Now().Add(time.Second))
+			require.NoError(t, err)
+
+			err = q.RequeueByJobID(ctx, wsB.String(), jid, time.Now().Add(5*time.Second))
+			require.NotNil(t, err)
+		})
+
+		t.Run("It fails if the job is leased", func(t *testing.T) {
+			r.FlushDB()
+
+			jid := "leased"
+			item := QueueItem{
+				ID:          jid,
+				WorkflowID:  wsA,
+				WorkspaceID: wsA,
+			}
+
+			item, err := q.EnqueueItem(ctx, item, time.Now().Add(time.Second))
+			require.NoError(t, err)
+
+			partitions, err := q.PartitionPeek(ctx, true, time.Now().Add(5*time.Second), 10)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(partitions))
+
+			// Lease
+			lid, err := q.Lease(ctx, *partitions[0], item, time.Second*10)
+			require.NoError(t, err)
+			require.NotNil(t, lid)
+
+			err = q.RequeueByJobID(ctx, wsB.String(), jid, time.Now().Add(5*time.Second))
+			require.NotNil(t, err)
+		})
+	})
+
+	t.Run("It requeues the job", func(t *testing.T) {
+		r.FlushDB()
+
+		jid := "requeue-plz"
+		at := time.Now().Add(time.Second)
+		item := QueueItem{
+			ID:          jid,
+			WorkflowID:  wsA,
+			WorkspaceID: wsA,
+			AtMS:        at.UnixMilli(),
+		}
+		item, err := q.EnqueueItem(ctx, item, at)
+		require.NoError(t, err)
+
+		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(parts))
+
+		next := at.Add(5 * time.Second)
+		err = q.RequeueByJobID(ctx, wsA.String(), jid, next)
+		require.Nil(t, err, r.Dump())
+
+		t.Run("It updates the queue's At time", func(t *testing.T) {
+			found, err := q.Peek(ctx, wsA.String(), at.Add(10*time.Second), 5)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(found))
+			require.NotEqual(t, item.AtMS, found[0].AtMS)
+			require.Equal(t, next.UnixMilli(), found[0].AtMS)
+		})
+
+		t.Run("It updates the partition index", func(t *testing.T) {
+			partsAfter, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(partsAfter))
+
+			score, err := r.ZScore(q.kg.PartitionIndex(), wsA.String())
+			require.NoError(t, err)
+			require.EqualValues(t, next.Unix(), int64(score), r.Dump())
+			require.NotEqualValues(t, parts[0], partsAfter[0])
+		})
+	})
+
+	t.Run("It requeues the 5th job to a later time", func(t *testing.T) {
+		r.FlushDB()
+
+		at := time.Now()
+		for i := 0; i < 4; i++ {
+			next := at.Add(time.Duration(i) * time.Second)
+			item := QueueItem{
+				WorkflowID:  wsA,
+				WorkspaceID: wsA,
+				AtMS:        next.UnixMilli(),
+			}
+			item, err := q.EnqueueItem(ctx, item, next)
+			require.NoError(t, err)
+		}
+
+		target := time.Now().Add(10 * time.Second)
+		jid := "requeue-plz"
+		item := QueueItem{
+			ID:          jid,
+			WorkflowID:  wsA,
+			WorkspaceID: wsA,
+			AtMS:        target.UnixMilli(),
+		}
+		item, err := q.EnqueueItem(ctx, item, target)
+		require.NoError(t, err)
+
+		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(parts))
+
+		t.Run("The earliest time is 'at' for the partition", func(t *testing.T) {
+			score, err := r.ZScore(q.kg.PartitionIndex(), wsA.String())
+			require.NoError(t, err)
+			require.EqualValues(t, at.Unix(), int64(score), r.Dump())
+		})
+
+		next := target.Add(5 * time.Second)
+		err = q.RequeueByJobID(ctx, wsA.String(), jid, next)
+		require.Nil(t, err, r.Dump())
+
+		t.Run("The earliest time is still 'at' for the partition after requeueing", func(t *testing.T) {
+			score, err := r.ZScore(q.kg.PartitionIndex(), wsA.String())
+			require.NoError(t, err)
+			require.EqualValues(t, at.Unix(), int64(score), r.Dump())
+		})
+
+		t.Run("It updates the queue's At time", func(t *testing.T) {
+			found, err := q.Peek(ctx, wsA.String(), at.Add(30*time.Second), 5)
+			require.NoError(t, err)
+			require.Equal(t, 5, len(found))
+			require.Equal(t, at.UnixMilli(), found[0].AtMS, "First job shouldn't change")
+			require.Equal(t, target.Add(5*time.Second).UnixMilli(), found[4].AtMS, "Target job didnt change")
+		})
+	})
+
+	t.Run("It requeues the 1st job to a later time", func(t *testing.T) {
+		r.FlushDB()
+
+		at := time.Now().Add(10 * time.Second)
+		for i := 0; i < 4; i++ {
+			next := at.Add(time.Duration(i) * time.Second)
+			item := QueueItem{
+				WorkflowID:  wsA,
+				WorkspaceID: wsA,
+				AtMS:        next.UnixMilli(),
+			}
+			item, err := q.EnqueueItem(ctx, item, next)
+			require.NoError(t, err)
+		}
+
+		target := time.Now().Add(1 * time.Second)
+		jid := "requeue-plz"
+		item := QueueItem{
+			ID:          jid,
+			WorkflowID:  wsA,
+			WorkspaceID: wsA,
+			AtMS:        target.UnixMilli(),
+		}
+		item, err := q.EnqueueItem(ctx, item, target)
+		require.NoError(t, err)
+
+		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(parts))
+
+		t.Run("The earliest time is 'target' for the partition", func(t *testing.T) {
+			score, err := r.ZScore(q.kg.PartitionIndex(), wsA.String())
+			require.NoError(t, err)
+			require.EqualValues(t, target.Unix(), int64(score), r.Dump())
+		})
+
+		next := target.Add(5 * time.Second)
+		err = q.RequeueByJobID(ctx, wsA.String(), jid, next)
+		require.Nil(t, err, r.Dump())
+
+		t.Run("The earliest time is 'next' for the partition after requeueing", func(t *testing.T) {
+			score, err := r.ZScore(q.kg.PartitionIndex(), wsA.String())
+			require.NoError(t, err)
+			require.EqualValues(t, next.Unix(), int64(score), r.Dump())
+		})
+	})
+}
+
 func TestQueueLeaseSequential(t *testing.T) {
 	ctx := context.Background()
 	r := miniredis.RunT(t)
