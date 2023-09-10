@@ -1303,7 +1303,7 @@ func TestRequeueByJobID(t *testing.T) {
 				WorkspaceID: wsA,
 				AtMS:        next.UnixMilli(),
 			}
-			item, err := q.EnqueueItem(ctx, item, next)
+			_, err := q.EnqueueItem(ctx, item, next)
 			require.NoError(t, err)
 		}
 
@@ -1315,7 +1315,7 @@ func TestRequeueByJobID(t *testing.T) {
 			WorkspaceID: wsA,
 			AtMS:        target.UnixMilli(),
 		}
-		item, err := q.EnqueueItem(ctx, item, target)
+		_, err := q.EnqueueItem(ctx, item, target)
 		require.NoError(t, err)
 
 		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)
@@ -1358,7 +1358,7 @@ func TestRequeueByJobID(t *testing.T) {
 				WorkspaceID: wsA,
 				AtMS:        next.UnixMilli(),
 			}
-			item, err := q.EnqueueItem(ctx, item, next)
+			_, err := q.EnqueueItem(ctx, item, next)
 			require.NoError(t, err)
 		}
 
@@ -1370,7 +1370,7 @@ func TestRequeueByJobID(t *testing.T) {
 			WorkspaceID: wsA,
 			AtMS:        target.UnixMilli(),
 		}
-		item, err := q.EnqueueItem(ctx, item, target)
+		_, err := q.EnqueueItem(ctx, item, target)
 		require.NoError(t, err)
 
 		parts, err := q.PartitionPeek(ctx, true, at.Add(time.Hour), 10)

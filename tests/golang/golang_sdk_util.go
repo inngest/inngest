@@ -103,7 +103,7 @@ func NewHTTPServer(f http.Handler) *HTTPServer {
 		MaxHeaderBytes: 1 << 20,
 	}
 	go func() {
-		go s.ListenAndServe()
+		_ = s.ListenAndServe()
 	}()
 
 	return &HTTPServer{Server: s, Port: port}
