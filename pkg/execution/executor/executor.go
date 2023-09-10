@@ -422,17 +422,18 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 		go e.OnStepFinished(context.WithoutCancel(ctx), id, item, edge, resp.Step, *resp)
 	}
 
+	if resp.Err != nil {
+		if _, serr := e.sm.SaveResponse(ctx, id, *resp, item.Attempt); serr != nil {
+			return fmt.Errorf("error saving function output: %w", serr)
+		}
+	}
+
 	// Check for temporary failures.  The outputs of transient errors are not
 	// stored in the state store;  they're tracked via executor lifecycle methods
 	// for logging.
 	if resp.Err != nil && resp.Retryable() {
 		// Retries are a native aspect of the queue;  returning errors always
 		// retries steps if possible.
-
-		// TODO: Remove this save error call;  it's unnecessary.
-		if _, serr := e.sm.SaveResponse(ctx, id, *resp, item.Attempt); serr != nil {
-			return fmt.Errorf("error saving function output: %w", serr)
-		}
 		return resp
 	}
 
