@@ -178,9 +178,11 @@ type Input[T any] struct {
 }
 
 type InputCtx struct {
+	Env        string `json:"env"`
 	FunctionID string `json:"fn_id"`
 	RunID      string `json:"run_id"`
 	StepID     string `json:"step_id"`
+	Attempt    int    `json:"attempt"`
 }
 
 type servableFunc struct {
