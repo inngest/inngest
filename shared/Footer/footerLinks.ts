@@ -64,12 +64,6 @@ const footerLinks = [
         url: "/uses/serverless-node-background-jobs?ref=footer",
         icon: IconBackgroundTasks,
       },
-
-      {
-        label: "User Journey Automation",
-        url: "/uses/user-journey-automation?ref=footer",
-        icon: IconJourney,
-      },
     ],
   },
   {
