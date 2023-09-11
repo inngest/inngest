@@ -83,7 +83,7 @@ export default function Button({
       {loading && <IconSpinner className="fill-white icon-xs" />}
       {!loading && iconElement}
       {label && label}
-      {keys && (
+      {!loading && keys && (
         <kbd className="ml-auto flex items-center gap-1">
           {keys.map((key, i) => (
             <kbd
