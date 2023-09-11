@@ -74,7 +74,7 @@ export default function Button({
         buttonColors,
         buttonSizes,
         disabledStyles,
-        'flex gap-1.5 items-center justify-center rounded-sm drop-shadow-sm',
+        'flex gap-1.5 items-center justify-center rounded-sm drop-shadow-sm transition-all active:scale-95',
       )}
       type={type}
       onClick={btnAction}
