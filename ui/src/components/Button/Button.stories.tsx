@@ -18,6 +18,10 @@ const meta = {
       options: [[], ['↵'], ['⌘', 'A']],
       control: { type: 'select' },
     },
+    icon: {
+      options: [null, <IconChevron />],
+      control: { type: 'select' },
+    }
   },
 } satisfies Meta<typeof Button>;
 
