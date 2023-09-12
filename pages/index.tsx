@@ -10,6 +10,7 @@ import LocalDev from "../shared/Home/LocalDev";
 import SocialCTA from "../shared/Home/SocialCTA";
 import Footer from "../shared/Footer";
 import CustomerQuote from "src/shared/Home/CustomerQuote";
+import SocialProof from "src/shared/Home/SocialProof";
 
 import GetThingsShipped from "src/shared/Home/GetThingsShipped";
 import RunAnywhere from "src/shared/Home/RunAnywhere";
@@ -191,6 +192,8 @@ export default function Home() {
       />
 
       <GetThingsShipped />
+
+      <SocialProof />
 
       {/* <Roadmap /> */}
 

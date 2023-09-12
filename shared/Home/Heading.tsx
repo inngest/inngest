@@ -7,7 +7,7 @@ export default function Heading({
   className,
 }: {
   title: React.ReactNode;
-  lede: React.ReactNode;
+  lede?: React.ReactNode;
   variant?: "dark" | "light";
   className?: string;
 }) {
@@ -22,15 +22,17 @@ export default function Heading({
       >
         {title}
       </h2>
-      <p
-        className={clsx(
-          "my-4 leading-loose text-sm md:text-base",
-          variant === "dark" && "text-indigo-200",
-          variant === "light" && "text-slate-500 font-medium"
-        )}
-      >
-        {lede}
-      </p>
+      {!!lede && (
+        <p
+          className={clsx(
+            "my-4 leading-loose text-sm md:text-base",
+            variant === "dark" && "text-indigo-200",
+            variant === "light" && "text-slate-500 font-medium"
+          )}
+        >
+          {lede}
+        </p>
+      )}
     </div>
   );
 }

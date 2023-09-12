@@ -16,7 +16,7 @@ export default function Hero() {
         backgroundRepeat: "no-repeat",
       }}
     >
-      <div className="mb-12 md:mb-32 text-center">
+      <div className="mb-12 md:mb-28 text-center">
         <h1 className="text-4xl md:text-[3.125rem] md:leading-[3.75rem] font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#E2BEFF] via-white to-[#AFC1FF] drop-shadow">
           Effortless serverless queues,
           <br />
@@ -31,18 +31,18 @@ export default function Hero() {
       <div className="flex flex-col gap-8 pt-12 lg:py-28 items-center justify-center">
         <div>
           <Link
-            href="/sign-up?ref=homepage-hero"
-            className="rounded-md font-medium px-9 py-3.5 bg-indigo-500 hover:bg-indigo-400 transition-all text-white"
+            href="/docs?ref=homepage-hero"
+            className="rounded-md font-medium px-11 py-3.5 bg-indigo-500 hover:bg-indigo-400 transition-all text-white whitespace-nowrap flex flex-row items-center"
           >
-            Start Building For Free
+            Quick Start Guide{" "}
+            <ChevronRightIcon className="h-5 group-hover:translate-x-1 relative top-px transition-transform duration-150" />
           </Link>
         </div>
         <Link
-          href="/docs?ref=homepage-hero"
-          className="group flex items-center gap-1 rounded-md pl-3 pr-1.5 py-1.5 bg-transparent transition-all text-indigo-200 border border-transparent hover:border-slate-800 whitespace-nowrap"
+          href="/sign-up?ref=homepage-hero"
+          className="group flex items-center gap-1 rounded-md px-3 py-1.5 bg-transparent transition-all text-indigo-200 border border-transparent hover:border-slate-800 whitespace-nowrap"
         >
-          Quick Start Guide{" "}
-          <ChevronRightIcon className="h-5 group-hover:translate-x-1 relative top-px transition-transform duration-150" />
+          Start Building For Free
         </Link>
       </div>
     </Container>
