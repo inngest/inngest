@@ -36,7 +36,6 @@ export default function RunAnywhere() {
           </>
         }
         lede="Inngest calls your code wherever it's hosted. Deploy to your existing setup, and deliver products faster without managing infrastructure."
-        variant="light"
         className="mx-auto max-w-3xl text-center"
       />
 
@@ -44,11 +43,15 @@ export default function RunAnywhere() {
         {highlights.map(({ title, description, img }, idx) => (
           <div
             key={idx}
-            className="flex flex-col justify-between rounded-lg bg-gradient-to-b from-transparent to-[#D8E2FA]"
+            style={{
+              backgroundImage:
+                "radial-gradient(114.31% 100% at 50% 0%, #131E38 0%, #0A1223 100%)",
+            }}
+            className="flex flex-col justify-between rounded-lg "
           >
             <div className="my-6 mx-9">
-              <h3 className="text-xl text-slate-600 font-semibold">{title}</h3>
-              <p className="my-1.5 text-sm text-slate-500 font-medium">
+              <h3 className="text-xl font-semibold">{title}</h3>
+              <p className="my-1.5 text-sm text-indigo-200 font-medium">
                 {description}
               </p>
             </div>

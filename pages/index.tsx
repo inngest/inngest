@@ -110,7 +110,7 @@ export default function Home() {
 
       <LocalDev className="-mb-80 md:-mb-60" />
 
-      <div className="bg-white pt-60 pb-20 md:pb-40">
+      <div className="pt-60 pb-20 md:pb-40">
         <RunAnywhere />
 
         <Logos
@@ -119,7 +119,7 @@ export default function Home() {
               Your code runs on your existing platform, or{" "}
               <Link
                 href="/docs/deploy?ref=homepage-platforms"
-                className="text-slate-700 underline hover:text-slate-900"
+                className="underline hover:text-indigo-400"
               >
                 anywhere you choose
               </Link>
@@ -128,50 +128,38 @@ export default function Home() {
           }
           logos={[
             {
-              src: "/assets/brand-logos/vercel-dark.svg",
+              src: "/assets/brand-logos/vercel-white.svg",
               name: "Vercel",
               href: "/docs/deploy/vercel?ref=homepage-platforms",
             },
             {
-              src: "/assets/brand-logos/netlify-dark.svg",
+              src: "/assets/brand-logos/netlify-white.svg",
               name: "Netlify",
               href: "/docs/deploy/netlify?ref=homepage-platforms",
             },
             {
-              src: "/assets/brand-logos/cloudflare-dark.svg",
+              src: "/assets/brand-logos/cloudflare-white.svg",
               name: "Cloudflare Pages",
               href: "/docs/sdk/serve?ref=homepage-frameworks#framework-cloudflare",
             },
             {
-              src: "/assets/brand-logos/aws-dark.svg",
+              src: "/assets/brand-logos/aws-white.svg",
               name: "AWS Lambda",
               href: "/docs/sdk/serve?ref=homepage-frameworks#framework-aws-lambda",
             },
             {
-              src: "/assets/brand-logos/google-cloud-dark.svg",
+              src: "/assets/brand-logos/google-cloud-white.svg",
               name: "Google Cloud Functions",
               href: "/docs/sdk/serve?ref=homepage-frameworks#framework-google-cloud-functions",
             },
           ]}
-          variant="light"
-          footer={
-            <div className="flex items-center justify-center mt-20">
-              <Link
-                href="/product/how-inngest-works?ref=homepage-run-anywhere"
-                className="rounded-md px-6 py-3 text-sm font-medium bg-slate-900 transition-all text-white hover:bg-slate-800 whitespace-nowrap drop-shadow"
-              >
-                Learn How Inngest Works
-              </Link>
-            </div>
-          }
         />
 
         <CustomerQuote
           quote="We switched from our PostgreSQL backed queue to Inngest in less than a day. Their approach is idiomatic with a great developer experience. Inngest allowed us to stop worrying about scalability and stability."
           name="Peter Pistorius - CEO @ Snaplet"
           avatar="/assets/customers/snaplet-peter-pistorius.png"
-          className="px-6 mx-auto mb-28 lg:mb-20 max-w-2xl"
-          variant="light"
+          className="mx-auto mb-28 lg:mb-20 max-w-2xl"
         />
       </div>
 
