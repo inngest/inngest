@@ -153,16 +153,6 @@ export default function Home() {
               href: "/docs/sdk/serve?ref=homepage-frameworks#framework-google-cloud-functions",
             },
           ]}
-          footer={
-            <div className="flex items-center justify-center mt-20">
-              <Link
-                href="/product/how-inngest-works?ref=homepage-run-anywhere"
-                className="rounded-md px-3 py-1.5 text-sm bg-transparent transition-all text-white border border-slate-800 hover:border-slate-600 hover:bg-slate-500/10 whitespace-nowrap"
-              >
-                Learn How Inngest Works
-              </Link>
-            </div>
-          }
         />
 
         <CustomerQuote
