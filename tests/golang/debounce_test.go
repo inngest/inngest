@@ -29,7 +29,7 @@ func TestDebounce(t *testing.T) {
 		calledWith DebounceEvent
 	)
 
-	now := time.Now()
+	at := time.Now()
 	a := inngestgo.CreateFunction(
 		inngestgo.FunctionOpts{
 			Name: "test sdk",
@@ -43,7 +43,14 @@ func TestDebounce(t *testing.T) {
 
 			// We expect that this function is called after at least the debounce period
 			// of 5 seconds.
-			require.True(t, time.Now().After(now.Add(10*time.Second)))
+			now := time.Now()
+			require.True(
+				t,
+				now.After(at.Add(10*time.Second)),
+				"Expected %s, got %s",
+				at.Add(10*time.Second),
+				now,
+			)
 
 			if atomic.LoadInt32(&counter) == 0 {
 				calledWith = input.Event
@@ -77,7 +84,7 @@ func TestDebounce(t *testing.T) {
 	}
 
 	<-time.After(8 * time.Second)
-	now = time.Now()
+	at = time.Now()
 	// Send one more.
 	_, err := inngestgo.Send(context.Background(), DebounceEvent{
 		Name: "test/sdk",
@@ -93,7 +100,7 @@ func TestDebounce(t *testing.T) {
 	}, 17*time.Second, time.Second)
 	require.EqualValues(t, DebounceEventData{Counter: 999, Name: "debounce"}, calledWith.Data)
 
-	<-time.After(10 * time.Second)
+	<-time.After(4 * time.Second)
 	require.EqualValues(t, 1, counter)
 }
 
