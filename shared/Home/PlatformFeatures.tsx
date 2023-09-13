@@ -59,15 +59,6 @@ export default function PlatformFeatures() {
           </div>
         ))}
       </div>
-
-      <div className="flex items-center justify-center">
-        <Link
-          href="/product/how-inngest-works?ref=homepage-run-anywhere"
-          className="rounded-md font-medium px-9 py-3.5 bg-indigo-500 hover:bg-indigo-400 transition-all text-white"
-        >
-          Start Building For Free
-        </Link>
-      </div>
     </Container>
   );
 }

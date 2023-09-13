@@ -15,7 +15,7 @@ export default function LocalDev({ className }: { className?: string }) {
         backgroundImage: "url(/assets/pricing/table-bg.png)",
         backgroundPosition: "center -50%",
         backgroundRepeat: "no-repeat",
-        backgroundSize: "2000px 1200px",
+        backgroundSize: "2000px 1100px",
       }}
     >
       <Container className={`mt-44 relative z-30 ${className}`}>
