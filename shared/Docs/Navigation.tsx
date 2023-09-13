@@ -439,14 +439,6 @@ export function Navigation(props) {
   return (
     <nav {...props}>
       <ul role="list">
-        <li>
-          <Button
-            href="/ai-personalized-documentation?ref=docs"
-            variant="secondary"
-          >
-            ✨ Create AI-Personalized Docs
-          </Button>
-        </li>
         <li className="mt-6 mb-4 flex gap-2 items-center text-base font-semibold text-slate-900 dark:text-white">
           <span className="p-0.5 bg-indigo-500 rounded-sm">
             <IconGuide />
