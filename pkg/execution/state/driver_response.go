@@ -306,10 +306,39 @@ func (r DriverResponse) UserError() map[string]any {
 		}
 	}
 
+	err := DefaultErrorMessage
+	if r.Err != nil {
+		err = *r.Err
+	}
+
+	output := any(DefaultErrorMessage)
+	switch v := r.Output.(type) {
+	case json.RawMessage:
+		if len(v) > 0 {
+			output = v
+		}
+	case []byte:
+		if len(v) > 0 {
+			output = v
+		}
+	case string:
+		if len(v) > 0 {
+			output = v
+		}
+	case interface{}:
+		if v != nil {
+			output = v
+		}
+	case nil:
+		// ignore.
+	default:
+		output = v
+	}
+
 	return map[string]any{
-		"error":   DefaultErrorMessage,
+		"error":   err,
 		"name":    "Error",
-		"message": DefaultErrorMessage,
+		"message": output,
 	}
 }
 
