@@ -143,10 +143,10 @@ export default function SocialProof({ className }: { className?: string }) {
         title="What developers are saying"
         className="mx-auto max-w-2xl text-center"
       />
-      <div className="mt-16 grid grid-cols-3 gap-8">
+      <div className="mt-16 grid md:grid-cols-2 lg:grid-cols-3 gap-8">
         {quotes.map(({ name, username, quote, avatar }) => (
-          <div className="p-6 flex flex-col gap-4 rounded-md bg-slate-900/80">
-            <div className="flex flex-row gap-4 w-full items-center text-base font-medium">
+          <div className="p-6 max-w-[420px] mx-auto flex flex-col gap-4 rounded-md bg-slate-900/80">
+            <div className="flex flex-row gap-4 w-full items-center font-medium">
               <Image
                 src={avatar}
                 alt={`Image of ${name}`}
