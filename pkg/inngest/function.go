@@ -212,7 +212,6 @@ func (f Function) URI() url.URL {
 		if err == nil {
 			return *uri
 		}
-		break
 	}
 	return url.URL{}
 }
