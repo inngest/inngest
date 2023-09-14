@@ -26,6 +26,9 @@ dependencies:
   '@rtk-query/graphql-request-base-query':
     specifier: 2.2.0
     version: 2.2.0(@reduxjs/toolkit@1.9.0)(graphql@16.6.0)
+  '@tanstack/react-query':
+    specifier: 5.0.0-beta.20
+    version: 5.0.0-beta.20(react-dom@18.2.0)(react@18.2.0)
   '@tanstack/react-table':
     specifier: 8.9.3
     version: 8.9.3(react-dom@18.2.0)(react@18.2.0)
@@ -62,6 +65,9 @@ dependencies:
   react-timeago:
     specifier: 7.1.0
     version: 7.1.0(react@18.2.0)
+  react-virtual:
+    specifier: 2.10.4
+    version: 2.10.4(react@18.2.0)
   refractor:
     specifier: 4.8.0
     version: 4.8.0
@@ -3847,6 +3853,10 @@ packages:
     dependencies:
       '@babel/runtime': 7.22.10
 
+  /@reach/observe-rect@1.2.0:
+    resolution: {integrity: sha512-Ba7HmkFgfQxZqqaeIWWkNK0rEhpxVQHIoVyW1YDSkGsGIXzcaW4deC8B0pZrNSSyLTdIk7y+5olKt5+g0GmFIQ==}
+    dev: false
+
   /@reduxjs/toolkit@1.9.0(react-redux@8.0.5)(react@18.2.0):
     resolution: {integrity: sha512-ak11IrjYcUXRqlhNPwnz6AcvA2ynJTu8PzDbbqQw4a3xR4KZtgiqbNblQD+10CRbfK4+5C79SOyxnT9dhBqFnA==}
     peerDependencies:
@@ -5362,6 +5372,28 @@ packages:
     resolution: {integrity: sha512-sJ902EfIzn1Fa+qYmjdQqh8tPsoxyBz+8yBKC2HKUxyezKJFwPGOn7pv4WY6QuQW//ySQi5lJjA/ZT9sNWWNTg==}
     dependencies:
       tslib: 2.5.3
+
+  /@tanstack/query-core@5.0.0-beta.20:
+    resolution: {integrity: sha512-KTI6b4DLXq39n/VNLvWqxM0K/bmCyL5SvOfPGZ1cZGOvVfZxpo/81ZF9cuRDyPjInmzz8d8jUZOHZVJDKSDcvQ==}
+    dev: false
+
+  /@tanstack/react-query@5.0.0-beta.20(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-L5YP1zwEMBwZJ/oCnFXLnb6S60srU7Oyj/oM5TVLcC/efdKpcdToMZTHA9Vjq3oFA9ysxFgrskkideIMa3fB4A==}
+    peerDependencies:
+      react: ^18.0.0
+      react-dom: ^18.0.0
+      react-native: '*'
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
+      react-native:
+        optional: true
+    dependencies:
+      '@tanstack/query-core': 5.0.0-beta.20
+      client-only: 0.0.1
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+    dev: false
 
   /@tanstack/react-table@8.9.3(react-dom@18.2.0)(react@18.2.0):
     resolution: {integrity: sha512-Ng9rdm3JPoSCi6cVZvANsYnF+UoGVRxflMb270tVj0+LjeT/ZtZ9ckxF6oLPLcKesza6VKBqtdF9mQ+vaz24Aw==}
@@ -11109,6 +11141,15 @@ packages:
     peerDependencies:
       react: ^16.0.0 || ^17.0.0 || ^18.0.0
     dependencies:
+      react: 18.2.0
+    dev: false
+
+  /react-virtual@2.10.4(react@18.2.0):
+    resolution: {integrity: sha512-Ir6+oPQZTVHfa6+JL9M7cvMILstFZH/H3jqeYeKI4MSUX+rIruVwFC6nGVXw9wqAw8L0Kg2KvfXxI85OvYQdpQ==}
+    peerDependencies:
+      react: ^16.6.3 || ^17.0.0
+    dependencies:
+      '@reach/observe-rect': 1.2.0
       react: 18.2.0
     dev: false
 

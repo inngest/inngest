@@ -154,3 +154,38 @@ export const DELETE_APP = gql`
     deleteApp(id: $id)
   }
 `;
+
+export const TRIGGERS_STREAM = gql`
+  query GetTriggersStream($limit: Int!, $after: Time, $before: Time) {
+    stream(query: { limit: $limit, after: $after, before: $before }) {
+      createdAt
+      id
+      trigger
+      type
+      runs {
+        id
+      }
+    }
+  }
+`;
+
+export const FUNCTION_RUN_STATUS = gql`
+  query GetFunctionRunStatus($id: ID!) {
+    functionRun(query: { functionRunId: $id }) {
+      id
+      function {
+        name
+      }
+      status
+    }
+  }
+`;
+
+export const FUNCTION_RUN_OUTPUT = gql`
+  query GetFunctionRunOutput($id: ID!) {
+    functionRun(query: { functionRunId: $id }) {
+      id
+      output
+    }
+  }
+`;

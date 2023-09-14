@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -92,6 +92,7 @@ const columns = [
 ];
 
 export default function FunctionList() {
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const [sorting, setSorting] = useState<SortingState>([
     {
       id: 'name',
@@ -134,7 +135,7 @@ export default function FunctionList() {
         debouncedSearch={debouncedSearch}
         className="py-4"
       />
-      <main className="min-h-0 overflow-y-auto">
+      <main className="min-h-0 overflow-y-auto" ref={tableContainerRef}>
         <Table
           options={{
             data: tableData,
@@ -156,6 +157,7 @@ export default function FunctionList() {
             getFilteredRowModel: getFilteredRowModel(),
             onGlobalFilterChange: setGlobalFilter,
           }}
+          tableContainerRef={tableContainerRef}
           blankState={
             <BlankSlate
               title="Inngest has not detected any functions"

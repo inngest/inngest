@@ -18,7 +18,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
       <body className="bg-slate-1000">
         <div id="app" />
         <div id="modals" />
-        <StoreProvider>{children}</StoreProvider>
+        <StoreProvider>
+          {children}
+        </StoreProvider>
       </body>
     </html>
   );
