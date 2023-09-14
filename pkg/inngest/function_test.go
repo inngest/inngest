@@ -3,6 +3,7 @@ package inngest
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -42,4 +43,59 @@ func TestDefaultEdges(t *testing.T) {
 		Outgoing: TriggerName,
 		Incoming: "step",
 	}, edges[0])
+}
+
+func TestURI(t *testing.T) {
+	str := `{
+	  "fv": 1,
+	  "id": "d1ca3d3e-9976-437d-b3e9-e2a11218bbb2",
+	  "name": "Stuff",
+	  "slug": "fn-stuff",
+	  "steps": [
+	    {
+	      "id": "step",
+	      "uri": "https://example.com/api/inngest?&fnId=fn-stuff&stepId=step",
+	      "name": "step"
+	    }
+	  ],
+	  "triggers": [
+	    {
+	      "event": "run/init"
+	    }
+	  ],
+	  "concurrency": {
+	    "limit": 1
+	  }
+	}`
+
+	fn := Function{}
+	err := json.Unmarshal([]byte(str), &fn)
+	require.NoError(t, err)
+
+	expected, err := url.Parse("https://example.com/api/inngest?&fnId=fn-stuff&stepId=step")
+	require.NoError(t, err)
+
+	actual := fn.URI()
+	require.EqualValues(t, *expected, actual)
+}
+
+func TestValidate(t *testing.T) {
+	t.Run("Failures", func(t *testing.T) {
+		t.Run("Without edges", func(t *testing.T) {
+			f := Function{
+				Name: "hi",
+				Triggers: []Trigger{
+					{
+						EventTrigger: &EventTrigger{
+							Event: "fail",
+						},
+					},
+				},
+			}
+
+			err := f.Validate(context.Background())
+			require.NotNil(t, err)
+			require.Contains(t, err.Error(), "Functions must contain one step")
+		})
+	})
 }
