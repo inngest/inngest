@@ -156,6 +156,10 @@ func (f Function) Validate(ctx context.Context) error {
 		return multierror.Append(err, aerr)
 	}
 
+	if len(f.Steps) != 1 {
+		err = multierror.Append(err, fmt.Errorf("Functions must contain one step"))
+	}
+
 	// Validate edges.
 	for _, edge := range edges {
 		// Ensure that any expressions are also valid.
@@ -202,15 +206,18 @@ func (f Function) Validate(ctx context.Context) error {
 	return err
 }
 
+// URI returns the function's URI.  It is expected that the function has already been
+// validated.
+func (f Function) URI() (*url.URL, error) {
+	if len(f.Steps) >= 1 {
+		return url.Parse(f.Steps[0].URI)
+	}
+	return nil, fmt.Errorf("No steps configured")
+}
+
 // AllEdges produces edge configuration for steps defined within the function.
 // If no edges for a step exists, an automatic step from the tirgger is added.
 func (f Function) AllEdges(ctx context.Context) ([]Edge, error) {
-	// This has no defined actions, which means its an implicit
-	// single action invocation.
-	if len(f.Steps) == 0 {
-		return nil, fmt.Errorf("This function has no steps")
-	}
-
 	edges := []Edge{}
 
 	// O1 lookup of steps.
