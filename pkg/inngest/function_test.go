@@ -75,12 +75,37 @@ func TestURI(t *testing.T) {
 	expected, err := url.Parse("https://example.com/api/inngest?&fnId=fn-stuff&stepId=step")
 	require.NoError(t, err)
 
-	actual := fn.URI()
-	require.EqualValues(t, *expected, actual)
+	actual, err := fn.URI()
+	require.NoError(t, err)
+	require.EqualValues(t, *expected, *actual)
 }
 
 func TestValidate(t *testing.T) {
 	t.Run("Failures", func(t *testing.T) {
+		t.Run("With a non-HTTP URI", func(t *testing.T) {
+			f := Function{
+				Name: "hi",
+				Triggers: []Trigger{
+					{
+						EventTrigger: &EventTrigger{
+							Event: "fail",
+						},
+					},
+				},
+				Steps: []Step{
+					{
+						ID:   "step",
+						Name: "Function body",
+						URI:  "htt://lol/what.xml.api",
+					},
+				},
+			}
+
+			err := f.Validate(context.Background())
+			require.NotNil(t, err)
+			require.Contains(t, err.Error(), "Non-HTTP steps are not yet supported")
+		})
+
 		t.Run("Without edges", func(t *testing.T) {
 			f := Function{
 				Name: "hi",

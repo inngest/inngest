@@ -206,14 +206,13 @@ func (f Function) Validate(ctx context.Context) error {
 	return err
 }
 
-func (f Function) URI() url.URL {
-	for _, step := range f.Steps {
-		uri, err := url.Parse(step.URI)
-		if err == nil {
-			return *uri
-		}
+// URI returns the function's URI.  It is expected that the function has already been
+// validated.
+func (f Function) URI() (*url.URL, error) {
+	if len(f.Steps) >= 1 {
+		return url.Parse(f.Steps[0].URI)
 	}
-	return url.URL{}
+	return nil, fmt.Errorf("No steps configured")
 }
 
 // AllEdges produces edge configuration for steps defined within the function.
