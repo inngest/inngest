@@ -29,15 +29,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <BG />
       <Header>
         <Navbar>
-          <NavbarLink icon={<IconFeed />} href="stream" tabName="Stream" />
+          <NavbarLink icon={<IconFeed />} href="/stream" tabName="Stream" />
           <NavbarLink
             icon={<IconWindow />}
-            href="apps"
+            href="/apps"
             badge={appsCount}
             hasError={hasConnectedError}
             tabName="Apps"
           />
-          <NavbarLink icon={<IconFunction />} href="functions" tabName="Functions" />
+          <NavbarLink icon={<IconFunction />} href="/functions" tabName="Functions" />
         </Navbar>
       </Header>
       {children}
