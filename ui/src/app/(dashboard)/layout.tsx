@@ -1,6 +1,5 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { Toaster } from 'sonner';
 
 import BG from '@/components/BG';
@@ -12,7 +11,6 @@ import { useGetAppsQuery } from '@/store/generated';
 import classNames from '@/utils/classnames';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
   const { appsCount, hasConnectedError } = useGetAppsQuery(undefined, {
     selectFromResult: (result) => ({
       appsCount: result.data?.apps?.length || 0,
@@ -25,23 +23,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div
       className={classNames(
         'w-screen h-screen text-slate-400 text-sm grid overflow-hidden relative',
-        pathname === '/stream'
-          ? 'grid-cols-app-sm xl:grid-cols-app 2xl:grid-cols-app-desktop grid-rows-app'
-          : 'grid-cols-docs grid-rows-docs',
+        'grid-cols-app grid-rows-app',
       )}
     >
       <BG />
       <Header>
         <Navbar>
-          <NavbarLink icon={<IconFeed />} href="stream" tabName="Stream" />
+          <NavbarLink icon={<IconFeed />} href="/stream" tabName="Stream" />
           <NavbarLink
             icon={<IconWindow />}
-            href="apps"
+            href="/apps"
             badge={appsCount}
             hasError={hasConnectedError}
             tabName="Apps"
           />
-          <NavbarLink icon={<IconFunction />} href="functions" tabName="Functions" />
+          <NavbarLink icon={<IconFunction />} href="/functions" tabName="Functions" />
         </Navbar>
       </Header>
       {children}
