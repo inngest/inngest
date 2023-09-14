@@ -14,6 +14,11 @@ export default function StreamDetails() {
           <FunctionRunSection runId={selectedRun} />
         </div>
       )}
+      {!selectedEvent && selectedRun && (
+        <div className="grid grid-cols-1 h-full text-white overflow-scroll">
+          <FunctionRunSection runId={selectedRun} />
+        </div>
+      )}
     </>
   );
 }

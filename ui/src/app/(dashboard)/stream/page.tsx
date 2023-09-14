@@ -13,7 +13,7 @@ import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';
 import { IconChevron } from '@/icons';
 import { client } from '@/store/baseApi';
-import { GetTriggersStreamDocument, type FunctionRun, type StreamItem } from '@/store/generated';
+import { GetTriggersStreamDocument, type StreamItem } from '@/store/generated';
 import { selectEvent, selectRun } from '@/store/global';
 import { useAppDispatch } from '@/store/hooks';
 import { fullDate } from '@/utils/date';
@@ -155,17 +155,21 @@ export default function Stream() {
 
   function handleOpenSlideOver({
     triggerID,
+    isCron,
     e,
     firstRunID,
   }: {
     triggerID: string;
+    isCron: boolean;
     e: React.MouseEvent<HTMLElement>;
     firstRunID?: string;
   }) {
     if (e.target instanceof HTMLElement) {
       const runID = e.target.dataset.key;
       router.push(`/stream/trigger/${triggerID}`);
-      dispatch(selectEvent(triggerID));
+      if (!isCron) {
+        dispatch(selectEvent(triggerID));
+      }
       if (runID) {
         dispatch(selectRun(runID));
       } else if (firstRunID) {
@@ -180,9 +184,15 @@ export default function Stream() {
       cursor: 'pointer',
     },
     onClick: (e: React.MouseEvent<HTMLElement>) => {
+      const isCron = row.original.type === 'CRON';
       const firstRunID =
         row.original.runs && row.original.runs?.length > 0 ? row.original.runs[0]?.id : undefined;
-      handleOpenSlideOver({ triggerID: row.original.id, e, firstRunID: firstRunID });
+      handleOpenSlideOver({
+        triggerID: row.original.id,
+        e,
+        firstRunID: firstRunID,
+        isCron: isCron,
+      });
     },
   });
 
