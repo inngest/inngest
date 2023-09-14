@@ -39,9 +39,21 @@ module.exports = {
             transform: 'translateX(100%)',
           },
         },
+        slideDownAndFade: {
+          '0%': {
+            opacity: 0,
+            transform: 'translateY(-3px)',
+          },
+          '100%': {
+            opacity: 1,
+            transform: 'translateY(0)',
+          },
+        },
       },
       animation: {
         'pulse-spin': 'pulse-spin 1s ease-out infinite',
+        // Tooltip
+        'slide-down-fade': 'slideDownAndFade 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
       },
     },
     fontSize: {

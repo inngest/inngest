@@ -390,13 +390,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
-	// This could have been retried due to a state load error after
-	// the particular step's code has ran; we need to load state after
-	// each action to properly evaluate the next set of edges.
-	//
-	// To fix this particular consistency issue, always check to see
-	// if there's output stored for this action ID.
-	if resp, _ := s.ActionID(edge.Incoming); resp != nil {
+	// Ensure that if users requeue steps we never re-execute.
+	incoming := edge.Incoming
+	if edge.IncomingGeneratorStep != "" {
+		incoming = edge.IncomingGeneratorStep
+	}
+	if resp, _ := s.ActionID(incoming); resp != nil {
 		// This has already successfully been executed.
 		return &state.DriverResponse{
 			Scheduled: false,
@@ -588,6 +587,7 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	)
 
 	evtID := evt.GetInternalID()
+	evtIDStr := evtID.String()
 
 	// Schedule up to PauseHandleConcurrency pauses at once.
 	sem := semaphore.NewWeighted(int64(PauseHandleConcurrency))
@@ -600,7 +600,9 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 		pause := iter.Val(ctx)
 
 		// Block until we have capacity
-		_ = sem.Acquire(ctx, 1)
+		if err := sem.Acquire(ctx, 1); err != nil {
+			return fmt.Errorf("error blocking on semaphore: %w", err)
+		}
 
 		wg.Add(1)
 		go func() {
@@ -608,19 +610,35 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 			// Always release one from the capacity
 			defer sem.Release(1)
 
-			if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evt.GetInternalID().String() {
-				// Don't allow the original function trigger to trigger the
-				// cancellation
+			if pause == nil {
 				return
 			}
 
 			// NOTE: Some pauses may be nil or expired, as the iterator may take
 			// time to process.  We handle that here and assume that the event
 			// did not occur in time.
-			if pause == nil || pause.Expires.Time().Before(time.Now()) {
+			if pause.Expires.Time().Before(time.Now()) {
 				// Consume this pause to remove it entirely
-				_ = e.sm.ConsumePause(context.Background(), pause.ID, nil)
+				_ = e.sm.DeletePause(context.Background(), *pause)
 				return
+			}
+
+			if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtIDStr {
+				return
+			}
+
+			if pause.Cancel {
+				// This is a cancellation signal.  Check if the function
+				// has ended, and if so remove the pause.
+				//
+				// NOTE: Bookkeeping must be added to individual function runs and handled on
+				// completion instead of here.  This is a hot path and should only exist whilst
+				// bookkeeping is not implemented.
+				if exists, err := e.sm.Exists(ctx, pause.Identifier.RunID); !exists && err == nil {
+					// This function has ended.  Delete the pause and continue
+					_ = e.sm.DeletePause(context.Background(), *pause)
+					return
+				}
 			}
 
 			// Ensure that we store the group ID for this pause, letting us properly track cancellation
@@ -663,7 +681,11 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 					EventID:    &evtID,
 					Expression: pause.Expression,
 				})
-				if err != nil {
+				if err == state.ErrFunctionCancelled || err == state.ErrFunctionComplete || err == state.ErrFunctionFailed {
+					// Safe to ignore.
+					return
+				}
+				if err != nil && err != ErrFunctionEnded && !strings.Contains(err.Error(), "no status stored in metadata") {
 					goerr = errors.Join(goerr, fmt.Errorf("error cancelling function: %w", err))
 					return
 				}
@@ -746,12 +768,15 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return err
 	}
 
+	if err = e.sm.ConsumePause(ctx, pause.ID, r.With); err != nil {
+		return fmt.Errorf("error consuming pause via event: %w", err)
+	}
+
 	// Schedule an execution from the pause's entrypoint.  We do this after
 	// consuming the pause to guarantee the event data is stored via the pause
 	// for the next run.  If the ConsumePause call comes after enqueue, the TCP
 	// conn may drop etc. and running the job may occur prior to saving state data.
-	//
-	// jobID ensures that we idempotently enqueue the next step.
+	// jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey+"-pause")
 	jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
 	err = e.queue.Enqueue(
 		ctx,
@@ -772,12 +797,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		return fmt.Errorf("error enqueueing after pause: %w", err)
 	}
 
-	if err = e.sm.ConsumePause(ctx, pause.ID, r.With); err != nil {
-		return fmt.Errorf("error consuming pause via event: %w", err)
-	}
-
 	for _, e := range e.lifecycles {
-		go e.OnWaitForEventResumed(context.WithoutCancel(ctx), pause.Identifier, r)
+		go e.OnWaitForEventResumed(context.WithoutCancel(ctx), pause.Identifier, r, pause.GroupID)
 	}
 
 	return nil
@@ -904,7 +925,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 		return err
 	}
 
-	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID)
+	jobID := fmt.Sprintf("%s-%s", item.Identifier.IdempotencyKey(), gen.ID+"-plan")
 	nextItem := queue.Item{
 		JobID:       &jobID,
 		GroupID:     groupID, // Ensure we correlate future jobs with this group ID, eg. started/failed.

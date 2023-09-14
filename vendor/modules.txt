@@ -466,6 +466,9 @@ github.com/jinzhu/copier
 # github.com/jmespath/go-jmespath v0.4.0
 ## explicit; go 1.14
 github.com/jmespath/go-jmespath
+# github.com/karlseguin/ccache/v2 v2.0.8
+## explicit; go 1.13
+github.com/karlseguin/ccache/v2
 # github.com/lib/pq v1.10.6
 ## explicit; go 1.13
 # github.com/lucasb-eyer/go-colorful v1.2.0
@@ -1062,3 +1065,4 @@ gopkg.in/yaml.v3
 # lukechampine.com/frand v1.4.2
 ## explicit; go 1.12
 lukechampine.com/frand
+# github.com/tencentcloud/tencentcloud-sdk-go v3.0.82+incompatible => github.com/tencentcloud/tencentcloud-sdk-go v1.0.191

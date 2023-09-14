@@ -358,6 +358,11 @@ func (m mgr) IsComplete(ctx context.Context, runID ulid.ULID) (bool, error) {
 	return bytes.Equal(val, []byte("0")), nil
 }
 
+func (m mgr) Exists(ctx context.Context, runID ulid.ULID) (bool, error) {
+	cmd := m.r.B().Exists().Key(m.kf.RunMetadata(ctx, runID)).Build()
+	return m.r.Do(ctx, cmd).AsBool()
+}
+
 func (m mgr) metadata(ctx context.Context, runID ulid.ULID) (*runMetadata, error) {
 	cmd := m.r.B().Hgetall().Key(m.kf.RunMetadata(ctx, runID)).Build()
 	val, err := m.r.Do(ctx, cmd).AsStrMap()
@@ -878,6 +883,36 @@ func (m mgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 	}
 }
 
+func (m mgr) DeletePause(ctx context.Context, p state.Pause) error {
+	// Add a default event here, which is null and overwritten by everything.  This is necessary
+	// to keep the same cluster key.
+	eventKey := m.kf.PauseEvent(ctx, p.WorkspaceID, "-")
+	if p.Event != nil {
+		eventKey = m.kf.PauseEvent(ctx, p.WorkspaceID, *p.Event)
+	}
+	keys := []string{
+		m.kf.PauseID(ctx, p.ID),
+		m.kf.PauseStep(ctx, p.Identifier, p.Incoming),
+		eventKey,
+	}
+	status, err := scripts["deletePause"].Exec(
+		ctx,
+		m.pauseR,
+		keys,
+		[]string{p.ID.String()},
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error consuming pause: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	default:
+		return fmt.Errorf("unknown response deleting pause: %d", status)
+	}
+
+}
+
 func (m mgr) ConsumePause(ctx context.Context, id uuid.UUID, data any) error {
 	p, err := m.PauseByID(ctx, id)
 	if err != nil {
@@ -961,12 +996,19 @@ func (m mgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event str
 	cntCmd := m.pauseR.B().Hlen().Key(key).Build()
 	cnt, err := m.pauseR.Do(ctx, cntCmd).AsInt64()
 	if err != nil || cnt > 1000 {
-		cmd := m.pauseR.B().Hscan().Key(m.kf.PauseEvent(ctx, workspaceID, event)).Cursor(0).Build()
+		key := m.kf.PauseEvent(ctx, workspaceID, event)
+		cmd := m.pauseR.B().Hscan().Key(key).Cursor(0).Count(500).Build()
 		scan, err := m.pauseR.Do(ctx, cmd).AsScanEntry()
 		if err != nil {
 			return nil, err
 		}
-		return &scanIter{i: -1, vals: scan}, nil
+		return &scanIter{
+			r:      m.pauseR,
+			key:    key,
+			i:      -1,
+			vals:   scan,
+			cursor: int(scan.Cursor),
+		}, nil
 	}
 
 	cmd := m.pauseR.B().Hkeys().Key(key).Cache()
@@ -1190,14 +1232,37 @@ func (i *keyIter) getNext(ctx context.Context) {
 }
 
 type scanIter struct {
-	i    int
-	vals rueidis.ScanEntry
+	r rueidis.Client
+
+	key    string
+	i      int
+	cursor int
+	vals   rueidis.ScanEntry
+}
+
+func (i *scanIter) fetch(ctx context.Context) error {
+	cmd := i.r.B().Hscan().Key(i.key).Cursor(uint64(i.cursor)).Count(500).Build()
+	scan, err := i.r.Do(ctx, cmd).AsScanEntry()
+	if err != nil {
+		return err
+	}
+	i.cursor = int(scan.Cursor)
+	i.vals = scan
+	i.i = -1
+	return nil
 }
 
 func (i *scanIter) Next(ctx context.Context) bool {
+	if i.i >= (len(i.vals.Elements)-1) && i.cursor != 0 {
+		if err := i.fetch(ctx); err != nil {
+			return false
+		}
+	}
+
 	if len(i.vals.Elements) == 0 || i.i >= (len(i.vals.Elements)-1) {
 		return false
 	}
+
 	// Skip the ID
 	i.i++
 	// Get the value.

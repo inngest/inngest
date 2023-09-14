@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 
 import AddAppButton from '@/components/App/AddAppButton';
 import AppCard from '@/components/App/AppCard';
+import Link from '@/components/Link/Link';
 import { IconSpinner, IconWindow } from '@/icons';
 import { useGetAppsQuery } from '@/store/generated';
 
@@ -24,8 +25,11 @@ export default function AppList() {
     <div className="px-10 py-6 h-full flex flex-col overflow-y-scroll">
       <header className="mb-8">
         <h1 className="text-lg text-slate-50">Connected Apps</h1>
-        <p className="my-4">
-          This is a list of all apps. We auto-detect apps that you have defined in specific ports.
+        <p className="my-4 flex gap-1">
+          This is a list of all apps. We auto-detect apps that you have defined in{' '}
+          <Link href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server">
+            specific ports.
+          </Link>
         </p>
         <div className="flex items-center gap-5">
           <AddAppButton />

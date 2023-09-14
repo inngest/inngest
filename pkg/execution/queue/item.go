@@ -67,6 +67,10 @@ type Item struct {
 	// Metadata is used for storing additional metadata related to the queue item.
 	// e.g. tracing data
 	Metadata map[string]string `json:"metadata,omitempty"`
+
+	// QueueName allows control over the queue name.  If not provided, this falls
+	// back to the queue mapping defined on the queue or the workflow ID of the fn.
+	QueueName *string `json:"qn,omitempty"`
 }
 
 func (i Item) GetMaxAttempts() int {

@@ -2,6 +2,8 @@ module github.com/inngest/inngest
 
 go 1.21
 
+replace github.com/tencentcloud/tencentcloud-sdk-go v3.0.82+incompatible => github.com/tencentcloud/tencentcloud-sdk-go v1.0.191
+
 require (
 	cuelang.org/go v0.4.2
 	github.com/99designs/gqlgen v0.17.27
@@ -26,6 +28,7 @@ require (
 	github.com/inngest/inngestgo v0.4.3-0.20230825203709-1ffd28d9be92
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
+	github.com/karlseguin/ccache/v2 v2.0.8
 	github.com/marcboeker/go-duckdb v1.4.1
 	github.com/mattn/go-isatty v0.0.17
 	github.com/mitchellh/go-homedir v1.1.0

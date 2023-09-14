@@ -121,6 +121,10 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 	if name, ok := q.queueKindMapping[item.Kind]; ok {
 		queueName = &name
 	}
+	// item.QueueName takes precedence if not nil
+	if item.QueueName != nil {
+		queueName = item.QueueName
+	}
 
 	go q.scope.Tagged(map[string]string{
 		"kind": item.Kind,
@@ -378,6 +382,11 @@ func (q *queue) scan(ctx context.Context) error {
 			return nil
 		}
 		if err := q.processPartition(ctx, p); err != nil {
+			if err == ErrPartitionNotFound {
+				// Another worker grabbed the partition
+				// TODO: Increase counter
+				continue
+			}
 			if errors.Unwrap(err) != context.Canceled {
 				q.logger.Error().Err(err).Msg("error processing partition")
 			}
