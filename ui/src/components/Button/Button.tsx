@@ -5,7 +5,7 @@ import classNames from '@/utils/classnames';
 
 interface ButtonProps {
   kind?: 'default' | 'primary' | 'success' | 'danger';
-  appearance?: 'solid' | 'outlined';
+  appearance?: 'solid' | 'outlined' | 'text';
   size?: 'small' | 'regular' | 'large';
   label?: React.ReactNode;
   icon?: React.ReactNode;
@@ -20,7 +20,14 @@ const kindColors = {
   default: 'slate-700',
   primary: 'indigo-500',
   success: 'emerald-600',
-  danger: 'red-700',
+  danger: 'rose-700',
+};
+
+const textColors = {
+  default: 'slate-500',
+  primary: 'indigo-500',
+  success: 'emerald-600',
+  danger: 'rose-700',
 };
 
 const sizeStyles = {
@@ -30,9 +37,15 @@ const sizeStyles = {
 };
 
 const iconOnlySizeStyles = {
-  small: 'text-xs w-7 h-7',
-  regular: 'text-sm w-8 h-8',
-  large: 'text-base w-10 h-10',
+  small: 'w-7 h-7',
+  regular: 'w-8 h-8',
+  large: 'w-10 h-10',
+};
+
+const iconSizeStyles = {
+  small: 'icon-xs',
+  regular: 'icon-sm',
+  large: 'icon-lg',
 };
 
 export default function Button({
@@ -50,8 +63,8 @@ export default function Button({
 }: ButtonProps) {
   const buttonColors =
     appearance === 'solid'
-      ? `bg-${kindColors[kind]} border-t border-white/10 hover:bg-${kindColors[kind]}/80 text-slate-100`
-      : `bg-${kindColors[kind]}/20 border border-${kindColors[kind]}/80 hover:border-${kindColors[kind]} text-slate-200`;
+      ? `bg-${kindColors[kind]} border-t border-white/10 hover:bg-${kindColors[kind]}/80 text-slate-100 hover:text-white`
+      : appearance === 'outlined' ? `bg-${kindColors[kind]}/20 border border-${kindColors[kind]}/80 hover:border-${kindColors[kind]} text-slate-200 hover:text-white` : `text-${textColors[kind]} hover:text-${textColors[kind]}/80`;
   const buttonSizes = icon && !label ? iconOnlySizeStyles[size] : sizeStyles[size];
   const keyColor =
     appearance === 'solid' && kind === 'default'
@@ -65,7 +78,7 @@ export default function Button({
 
   // Replace this with alternative once we revamp the button variations
   const iconElement = icon
-    ? React.cloneElement(icon as React.ReactElement, { className: 'icon-xs' })
+    ? React.cloneElement(icon as React.ReactElement, { className: `${iconSizeStyles[size]}` })
     : null;
 
   return (
@@ -74,13 +87,13 @@ export default function Button({
         buttonColors,
         buttonSizes,
         disabledStyles,
-        'flex gap-1.5 items-center justify-center rounded-sm drop-shadow-sm transition-all active:scale-95',
+        'flex gap-1.5 items-center justify-center rounded-sm drop-shadow-sm transition-all active:scale-95 ',
       )}
       type={type}
       onClick={btnAction}
       disabled={disabled}
     >
-      {loading && <IconSpinner className="fill-white icon-xs" />}
+      {loading && <IconSpinner className={`fill-white ${iconSizeStyles[size]}`} />}
       {!loading && iconElement}
       {label && label}
       {!loading && keys && (

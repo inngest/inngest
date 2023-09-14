@@ -2,6 +2,7 @@
 module.exports = {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   safelist: [
+    'text-white',
     'text-slate-100',
     // Primary Button
     'bg-indigo-500',
@@ -12,6 +13,7 @@ module.exports = {
     'hover:border-indigo-500',
     'hover:bg-indigo-500/80',
     'text-indigo-500',
+    'hover:text-indigo-500/80',
     // Success Button
     'bg-emerald-600',
     'bg-emerald-600/20',
@@ -21,15 +23,17 @@ module.exports = {
     'hover:border-emerald-600',
     'hover:bg-emerald-600/80',
     'text-emerald-600',
+    'hover:text-emerald-600/80',
     // Danger Button
-    'bg-red-700',
-    'bg-red-700/20',
-    'bg-red-700/80',
-    'border-red-700',
-    'border-red-700/80',
-    'hover:border-red-700',
-    'hover:bg-red-700/80',
-    'text-red-700',
+    'bg-rose-700',
+    'bg-rose-700/20',
+    'bg-rose-700/80',
+    'border-rose-700',
+    'border-rose-700/80',
+    'hover:border-rose-700',
+    'hover:bg-rose-700/80',
+    'text-rose-700',
+    'hover:text-rose-700/80',
     // Default Button
     'bg-slate-700',
     'bg-slate-700/20',
@@ -38,7 +42,8 @@ module.exports = {
     'border-slate-700/80',
     'hover:border-slate-700',
     'hover:bg-slate-700/80',
-    'text-slate-700'
+    'text-slate-700',
+    'hover:text-slate-700/80'
   ],
   theme: {
     extend: {
