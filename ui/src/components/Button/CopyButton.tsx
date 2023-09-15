@@ -5,10 +5,11 @@ import Button from './Button';
 type ButtonCopyProps = {
   code: string;
   iconOnly?: boolean;
+  isCopying: boolean;
+  handleCopyClick: (code: string) => void;
 };
 
-export default function CopyButton({ code, iconOnly }: ButtonCopyProps) {
-  const { handleCopyClick, isCopying } = useCopyToClipboard();
+export default function CopyButton({ code, iconOnly, isCopying, handleCopyClick }: ButtonCopyProps) {
   const icon = isCopying ? (
     <IconCheck className="text-teal-500 icon-2xl" />
   ) : (
