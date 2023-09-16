@@ -63,7 +63,6 @@ type Identifier struct {
 	AccountID uuid.UUID `json:"aID"`
 	// WorkspaceID represents the ws ID for this run
 	WorkspaceID uuid.UUID `json:"wsID"`
-
 	// If this is a rerun, the original run ID is stored here.
 	OriginalRunID *ulid.ULID `json:"oRunID,omitempty"`
 }
@@ -111,6 +110,8 @@ type Metadata struct {
 	OriginalRunID *ulid.ULID `json:"originalRunID,omitempty"`
 
 	// Name stores the name of the workflow as it started.
+	//
+	// DEPRECATED
 	Name string `json:"name"`
 
 	// Pending is the number of steps that have been enqueued but have
@@ -123,6 +124,8 @@ type Metadata struct {
 	// - A step that has completed, and has its next steps (children in
 	//   the dag) enqueued. Note that the step must have its children
 	//   enqueued to be considered finalized.
+	//
+	// DEPRECATED
 	Pending int `json:"pending"`
 
 	// Version is the used for making sure workloads runs are backward compatible
@@ -135,6 +138,12 @@ type Metadata struct {
 	// DisableImmediateExecution is used to tell the SDK whether it should
 	// disallow immediate execution of steps as they are found.
 	DisableImmediateExecution bool `json:"disableImmediateExecution,omitempty"`
+}
+
+type MetadataUpdate struct {
+	Debugger                  bool           `json:"debugger"`
+	Context                   map[string]any `json:"ctx,omitempty"`
+	DisableImmediateExecution bool           `json:"disableImmediateExecution,omitempty"`
 }
 
 // State represents the current state of a fn run.  It is data-structure
@@ -258,6 +267,8 @@ type Mutater interface {
 	// ErrIdentifierExists.
 	New(ctx context.Context, input Input) (State, error)
 
+	UpdateMetadata(ctx context.Context, runID ulid.ULID, md MetadataUpdate) error
+
 	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
 	// future execution of steps.
 	Cancel(ctx context.Context, i Identifier) error
@@ -274,7 +285,7 @@ type Mutater interface {
 	// SQS, Celery).  In thise cases recording that a step was scheduled is a separate step.
 	//
 	// Attempt is zero-indexed.
-	Scheduled(ctx context.Context, i Identifier, stepID string, attempt int, at *time.Time, disableImmExec bool) error
+	Scheduled(ctx context.Context, i Identifier, stepID string, attempt int, at *time.Time) error
 
 	// Started is called when a step is started.
 	//

@@ -349,6 +349,37 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 		nil
 }
 
+func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.MetadataUpdate) error {
+	byt, err := json.Marshal(md.Context)
+	if err != nil {
+		return err
+	}
+
+	input := []string{string(byt), "0", "0"}
+	if md.Debugger {
+		input[1] = "1"
+	}
+	if md.DisableImmediateExecution {
+		input[2] = "1"
+	}
+
+	status, err := scripts["updateMetadata"].Exec(
+		ctx,
+		m.r,
+		[]string{
+			m.kf.RunMetadata(ctx, runID),
+		},
+		input,
+	).AsInt64()
+	if err != nil {
+		return err
+	}
+	if status != 0 {
+		return fmt.Errorf("unknown response updating metadata: %w", err)
+	}
+	return nil
+}
+
 func (m mgr) IsComplete(ctx context.Context, runID ulid.ULID) (bool, error) {
 	cmd := m.r.B().Hget().Key(m.kf.RunMetadata(ctx, runID)).Field("pending").Build()
 	val, err := m.r.Do(ctx, cmd).AsBytes()
@@ -684,7 +715,7 @@ func (m mgr) Started(ctx context.Context, id state.Identifier, stepID string, at
 	return m.r.Do(ctx, cmd).Error()
 }
 
-func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time, disableImmExec bool) error {
+func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, attempt int, at *time.Time) error {
 	now := time.Now()
 
 	if at != nil && at.Before(time.Now()) {
@@ -706,7 +737,6 @@ func (m mgr) Scheduled(ctx context.Context, i state.Identifier, stepID string, a
 			},
 		},
 		now.UnixMilli(),
-		disableImmExec,
 	})
 	if err != nil {
 		return err
@@ -1327,7 +1357,7 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 
 	// The below fields are optional
 	if val, ok := data["debugger"]; ok {
-		if val == "true" {
+		if val == "true" || val == "1" {
 			m.Debugger = true
 		}
 	}
@@ -1351,8 +1381,8 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 		}
 		m.Context = ctx
 	}
-	if val, ok := data["disableImmediateExecution"]; ok {
-		if val == "1" {
+	if val, ok := data["die"]; ok {
+		if val == "true" || val == "1" {
 			m.DisableImmediateExecution = true
 		}
 	}
@@ -1373,20 +1403,20 @@ type runMetadata struct {
 	OriginalRunID             string         `json:"originalRunID,omitempty"`
 	Version                   int            `json:"version"`
 	Context                   map[string]any `json:"ctx,omitempty"`
-	DisableImmediateExecution bool           `json:"disableImmediateExecution,omitempty"`
+	DisableImmediateExecution bool           `json:"die,omitempty"`
 }
 
 func (r runMetadata) Map() map[string]any {
 	return map[string]any{
-		"id":                        r.Identifier,
-		"status":                    int(r.Status), // Always store this as an int
-		"pending":                   r.Pending,
-		"debugger":                  r.Debugger,
-		"runType":                   r.RunType,
-		"originalRunID":             r.OriginalRunID,
-		"version":                   r.Version,
-		"ctx":                       r.Context,
-		"disableImmediateExecution": r.DisableImmediateExecution,
+		"id":            r.Identifier,
+		"status":        int(r.Status), // Always store this as an int
+		"pending":       r.Pending,
+		"debugger":      r.Debugger,
+		"runType":       r.RunType,
+		"originalRunID": r.OriginalRunID,
+		"version":       r.Version,
+		"ctx":           r.Context,
+		"die":           r.DisableImmediateExecution,
 	}
 }
 

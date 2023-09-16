@@ -71,10 +71,6 @@ type Item struct {
 	// QueueName allows control over the queue name.  If not provided, this falls
 	// back to the queue mapping defined on the queue or the workflow ID of the fn.
 	QueueName *string `json:"qn,omitempty"`
-	// DisableImmediateExecution is used to store whether steps should be allowed
-	// to execute immediately upon being found, or whether they should be scheduled
-	// to ensure idempotency.
-	DisableImmediateExection bool `json:"disableImmExec,omitempty"`
 }
 
 func (i Item) GetMaxAttempts() int {

@@ -343,6 +343,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	md := s.Metadata()
 
+	// Store the metadata in context for future use.  This can be used to reduce
+	// reads in the future.
+	ctx = WithContextMetadata(ctx, md)
+
 	if md.Status == enums.RunStatusCancelled {
 		return nil, state.ErrFunctionCancelled
 	}
@@ -455,11 +459,8 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 
 	// This is a success, which means either a generator or a function result.
 	if len(resp.Generator) > 0 {
-		copiedItem := item
-		copiedItem.DisableImmediateExection = len(resp.Generator) > 1
-
 		// Handle generator responses then return.
-		if serr := e.HandleGeneratorResponse(ctx, resp.Generator, copiedItem); serr != nil {
+		if serr := e.HandleGeneratorResponse(ctx, resp.Generator, item); serr != nil {
 			// If this is an error compiling async expressions, fail the function.
 			if strings.Contains(serr.Error(), "error compiling expression") {
 				_, _ = e.sm.SaveResponse(ctx, id, *resp, item.Attempt)
@@ -814,6 +815,25 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 }
 
 func (e *executor) HandleGeneratorResponse(ctx context.Context, gen []*state.GeneratorOpcode, item queue.Item) error {
+	if len(gen) > 1 {
+		md, err := GetFunctionRunMetadata(ctx, e.sm, item.Identifier.RunID)
+		if err != nil || md == nil {
+			return fmt.Errorf("error loading function metadata: %w", err)
+		}
+
+		if !md.DisableImmediateExecution {
+			// With parallelism, we currently instruct the SDK to disable immediate execution,
+			// enforcing that every step becomes pre-planned.
+			if err := e.sm.UpdateMetadata(ctx, item.Identifier.RunID, state.MetadataUpdate{
+				Context:                   md.Context,
+				Debugger:                  md.Debugger,
+				DisableImmediateExecution: true,
+			}); err != nil {
+				return fmt.Errorf("error updating function metadata: %w", err)
+			}
+		}
+	}
+
 	// Ensure that we process waitForEvents first, as these are highest priority.
 	sortOps(gen)
 
@@ -884,7 +904,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 	ctx = state.WithGroupID(ctx, groupID)
 
 	// Re-enqueue the exact same edge to run now.
-	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, nil, item.DisableImmediateExection); err != nil {
+	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, nil); err != nil {
 		return err
 	}
 
@@ -930,7 +950,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 	ctx = state.WithGroupID(ctx, groupID)
 
 	// Re-enqueue the exact same edge to run now.
-	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil, item.DisableImmediateExection); err != nil {
+	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.Incoming, 0, nil); err != nil {
 		return err
 	}
 
@@ -978,7 +998,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, gen state.Generator
 	ctx = state.WithGroupID(ctx, groupID)
 
 	// XXX: Remove this after we create queues for function runs.
-	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, &at, item.DisableImmediateExection); err != nil {
+	if err := e.sm.Scheduled(ctx, item.Identifier, nextEdge.Incoming, 0, &at); err != nil {
 		return err
 	}
 
@@ -1062,7 +1082,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, gen state.Ge
 	// edge that is outstanding.
 	//
 	// TODO: Remove with function run specific queues
-	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.IncomingGeneratorStep, 0, nil, item.DisableImmediateExection); err != nil {
+	if err := e.sm.Scheduled(ctx, item.Identifier, edge.Edge.IncomingGeneratorStep, 0, nil); err != nil {
 		return fmt.Errorf("unable to schedule wait for event: %w", err)
 	}
 
