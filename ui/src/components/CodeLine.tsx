@@ -1,8 +1,6 @@
-import { useState } from 'react';
-
 import useCopyToClipboard from '@/hooks/useCopyToClipboard';
-import CopyButton from './Button/CopyButton';
 import classNames from '@/utils/classnames';
+import CopyButton from './Button/CopyButton';
 
 type CodeLineProps = {
   code: string;
@@ -10,8 +8,8 @@ type CodeLineProps = {
 };
 
 export default function CodeLine({ code, className }: CodeLineProps) {
-  const {handleCopyClick, isCopying} = useCopyToClipboard();
-  
+  const { handleCopyClick, isCopying } = useCopyToClipboard();
+
   return (
     <div
       className={classNames(
@@ -21,7 +19,12 @@ export default function CodeLine({ code, className }: CodeLineProps) {
       onClick={() => handleCopyClick(code)}
     >
       <code className="text-slate-300">{code}</code>
-      <CopyButton code={code} iconOnly={true} isCopying={isCopying} handleCopyClick={handleCopyClick}/>
+      <CopyButton
+        code={code}
+        iconOnly={true}
+        isCopying={isCopying}
+        handleCopyClick={handleCopyClick}
+      />
     </div>
   );
 }

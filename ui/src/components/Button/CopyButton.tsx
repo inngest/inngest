@@ -1,4 +1,3 @@
-import useCopyToClipboard from '@/hooks/useCopyToClipboard';
 import { IconCheck, IconCopy } from '@/icons';
 import Button from './Button';
 
@@ -9,12 +8,13 @@ type ButtonCopyProps = {
   handleCopyClick: (code: string) => void;
 };
 
-export default function CopyButton({ code, iconOnly, isCopying, handleCopyClick }: ButtonCopyProps) {
-  const icon = isCopying ? (
-    <IconCheck className="text-teal-500 icon-2xl" />
-  ) : (
-    <IconCopy className="text-slate-500 icon-2xl" />
-  );
+export default function CopyButton({
+  code,
+  iconOnly,
+  isCopying,
+  handleCopyClick,
+}: ButtonCopyProps) {
+  const icon = isCopying ? <IconCheck /> : <IconCopy />;
   const label = isCopying ? 'Copied!' : 'Copy';
 
   return (
