@@ -43,8 +43,8 @@ const iconOnlySizeStyles = {
 };
 
 const iconSizeStyles = {
-  small: 'icon-xs',
-  regular: 'icon-sm',
+  small: 'icon-sm',
+  regular: 'icon-base',
   large: 'icon-lg',
 };
 
@@ -64,7 +64,9 @@ export default function Button({
   const buttonColors =
     appearance === 'solid'
       ? `bg-${kindColors[kind]} border-t border-white/10 hover:bg-${kindColors[kind]}/80 text-slate-100 hover:text-white`
-      : appearance === 'outlined' ? `bg-${kindColors[kind]}/20 border border-${kindColors[kind]}/80 hover:border-${kindColors[kind]} text-slate-200 hover:text-white` : `text-${textColors[kind]} hover:text-${textColors[kind]}/80`;
+      : appearance === 'outlined'
+      ? `bg-${kindColors[kind]}/20 border border-${kindColors[kind]}/80 hover:border-${kindColors[kind]} text-slate-200 hover:text-white`
+      : `text-${textColors[kind]} hover:text-${textColors[kind]}/80`;
   const buttonSizes = icon && !label ? iconOnlySizeStyles[size] : sizeStyles[size];
   const keyColor =
     appearance === 'solid' && kind === 'default'
@@ -76,9 +78,10 @@ export default function Button({
   const disabledStyles =
     'disabled:text-slate-500 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:hover:bg-slate-800 disabled:border-slate-800';
 
-  // Replace this with alternative once we revamp the button variations
   const iconElement = icon
-    ? React.cloneElement(icon as React.ReactElement, { className: `${iconSizeStyles[size]}` })
+    ? React.cloneElement(icon as React.ReactElement, {
+        className: !label ? 'icon-lg' : `${iconSizeStyles[size]}`,
+      })
     : null;
 
   return (

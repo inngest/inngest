@@ -24,7 +24,6 @@ export default function CopyButton({
       label={iconOnly ? undefined : label}
       appearance={iconOnly ? 'text' : 'solid'}
       icon={iconOnly && icon}
-      size={iconOnly ? 'large' : 'small'}
     />
   );
 }
