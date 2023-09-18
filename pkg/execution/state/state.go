@@ -32,6 +32,7 @@ var (
 	ErrFunctionComplete   = fmt.Errorf("function completed")
 	ErrFunctionFailed     = fmt.Errorf("function failed")
 	ErrFunctionOverflowed = fmt.Errorf("function has too many steps")
+	ErrDuplicateResponse  = fmt.Errorf("duplicate response")
 )
 
 // Identifier represents the unique identifier for a workflow run.
@@ -62,7 +63,6 @@ type Identifier struct {
 	AccountID uuid.UUID `json:"aID"`
 	// WorkspaceID represents the ws ID for this run
 	WorkspaceID uuid.UUID `json:"wsID"`
-
 	// If this is a rerun, the original run ID is stored here.
 	OriginalRunID *ulid.ULID `json:"oRunID,omitempty"`
 }
@@ -110,6 +110,8 @@ type Metadata struct {
 	OriginalRunID *ulid.ULID `json:"originalRunID,omitempty"`
 
 	// Name stores the name of the workflow as it started.
+	//
+	// DEPRECATED
 	Name string `json:"name"`
 
 	// Pending is the number of steps that have been enqueued but have
@@ -122,6 +124,8 @@ type Metadata struct {
 	// - A step that has completed, and has its next steps (children in
 	//   the dag) enqueued. Note that the step must have its children
 	//   enqueued to be considered finalized.
+	//
+	// DEPRECATED
 	Pending int `json:"pending"`
 
 	// Version is the used for making sure workloads runs are backward compatible
@@ -130,6 +134,16 @@ type Metadata struct {
 
 	// Context allows storing any other contextual data in metadata.
 	Context map[string]any `json:"ctx,omitempty"`
+
+	// DisableImmediateExecution is used to tell the SDK whether it should
+	// disallow immediate execution of steps as they are found.
+	DisableImmediateExecution bool `json:"disableImmediateExecution,omitempty"`
+}
+
+type MetadataUpdate struct {
+	Debugger                  bool           `json:"debugger"`
+	Context                   map[string]any `json:"ctx,omitempty"`
+	DisableImmediateExecution bool           `json:"disableImmediateExecution,omitempty"`
 }
 
 // State represents the current state of a fn run.  It is data-structure
@@ -252,6 +266,8 @@ type Mutater interface {
 	// If the IdempotencyKey within Identifier already exists, the state implementation should return
 	// ErrIdentifierExists.
 	New(ctx context.Context, input Input) (State, error)
+
+	UpdateMetadata(ctx context.Context, runID ulid.ULID, md MetadataUpdate) error
 
 	// Cancel sets a function run metadata status to RunStatusCancelled, which prevents
 	// future execution of steps.

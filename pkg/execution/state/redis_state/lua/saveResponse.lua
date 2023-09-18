@@ -26,6 +26,10 @@ local failLog = ARGV[6] -- An optional fail log, if the error is final
 local logTime = tonumber(ARGV[7]) -- The timestamp for the log, unix milliseconds
 
 if isError == 0 then
+	if redis.call("HEXISTS", actionKey, stepID) == 1 then
+		return -1
+	end
+
 	-- Save the step output under step data.
 	redis.call("HSET", actionKey, stepID, data)
 	redis.call("ZADD", historyKey, logTime, stepLog)

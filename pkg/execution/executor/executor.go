@@ -346,6 +346,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	md := s.Metadata()
 
+	// Store the metadata in context for future use.  This can be used to reduce
+	// reads in the future.
+	ctx = WithContextMetadata(ctx, md)
+
 	if md.Status == enums.RunStatusCancelled {
 		return nil, state.ErrFunctionCancelled
 	}
@@ -496,6 +500,12 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	// This is the function result.  Save this in the state store (which will inevitably
 	// be GC'd), and end.
 	if _, serr := e.sm.SaveResponse(ctx, id, *resp, item.Attempt); serr != nil {
+		// Final function responses can be duplicated if multiple parallel
+		// executions reach the end at the same time. Steps themselves are
+		// de-duplicated in the queue.
+		if serr == state.ErrDuplicateResponse {
+			return resp
+		}
 		return fmt.Errorf("error saving function output: %w", serr)
 	}
 
@@ -820,6 +830,25 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 }
 
 func (e *executor) HandleGeneratorResponse(ctx context.Context, gen []*state.GeneratorOpcode, item queue.Item) error {
+	if len(gen) > 1 {
+		md, err := GetFunctionRunMetadata(ctx, e.sm, item.Identifier.RunID)
+		if err != nil || md == nil {
+			return fmt.Errorf("error loading function metadata: %w", err)
+		}
+
+		if !md.DisableImmediateExecution {
+			// With parallelism, we currently instruct the SDK to disable immediate execution,
+			// enforcing that every step becomes pre-planned.
+			if err := e.sm.UpdateMetadata(ctx, item.Identifier.RunID, state.MetadataUpdate{
+				Context:                   md.Context,
+				Debugger:                  md.Debugger,
+				DisableImmediateExecution: true,
+			}); err != nil {
+				return fmt.Errorf("error updating function metadata: %w", err)
+			}
+		}
+	}
+
 	// Ensure that we process waitForEvents first, as these are highest priority.
 	sortOps(gen)
 

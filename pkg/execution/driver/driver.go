@@ -49,6 +49,7 @@ func MarshalV1(
 			},
 			Attempt: attempt,
 		},
+		DisableImmediateExecution: s.Metadata().DisableImmediateExecution,
 	}
 
 	// empty the attrs that consume the most

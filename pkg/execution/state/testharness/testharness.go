@@ -117,6 +117,7 @@ func CheckState(t *testing.T, gen Generator) {
 		"New":                                checkNew,
 		"Exists":                             checkExists,
 		"New/StepData":                       checkNew_stepdata,
+		"UpdateMetadata":                     checkUpdateMetadata,
 		"Scheduled":                          checkScheduled,
 		"SaveResponse/Output":                checkSaveResponse_output,
 		"SaveResponse/Error":                 checkSaveResponse_error,
@@ -285,6 +286,55 @@ func checkNew_stepdata(t *testing.T, m state.Manager) {
 	data := loaded.Actions()
 	require.Equal(t, 1, len(data), "New should store predetermined step data")
 	require.Equal(t, init.Steps["step-a"], data["step-a"], "New should store predetermined step data")
+}
+
+func checkUpdateMetadata(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	id := state.Identifier{
+		WorkflowID: w.ID,
+		RunID:      runID,
+		Key:        runID.String(),
+	}
+	evt := input.Map()
+	batch := []map[string]any{evt}
+	init := state.Input{
+		Identifier:     id,
+		EventBatchData: batch,
+		Steps: map[string]any{
+			"step-a": map[string]any{
+				"result": "predetermined",
+			},
+		},
+		Context: map[string]any{
+			"ok": true,
+		},
+	}
+
+	s, err := m.New(ctx, init)
+	require.NoError(t, err)
+
+	require.False(t, s.Metadata().DisableImmediateExecution)
+
+	update := state.MetadataUpdate{
+		Debugger:                  true,
+		DisableImmediateExecution: true,
+		Context: map[string]any{
+			"ok":      true,
+			"another": "yes",
+		},
+	}
+
+	err = m.UpdateMetadata(ctx, runID, update)
+	require.NoError(t, err)
+
+	loaded, err := m.Load(ctx, s.RunID())
+	require.NoError(t, err)
+
+	found := loaded.Metadata()
+	require.EqualValues(t, true, found.DisableImmediateExecution)
+	require.EqualValues(t, true, found.Debugger)
+	require.EqualValues(t, update.Context, found.Context)
 }
 
 func checkScheduled(t *testing.T, m state.Manager) {
