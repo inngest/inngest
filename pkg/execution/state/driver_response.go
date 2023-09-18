@@ -159,6 +159,7 @@ type DriverResponse struct {
 // SetFinal indicates that this error is final, regardless of the status code
 // returned.  This is used to prevent retries when the max limit is reached.
 func (r *DriverResponse) SetFinal() {
+	r.NoRetry = true
 	r.final = true
 }
 
