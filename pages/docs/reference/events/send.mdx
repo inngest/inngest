@@ -53,6 +53,9 @@ To send events from within of the context of a function, use [`step.sendEvent()`
           </Property>
           <Property name="ts" type="number">
             A timestamp integer representing the time (in milliseconds) at which the event occurred. Defaults to the time the Inngest receives the event.
+
+	    If the `ts` time is in the future, function runs will be scheduled to start at the given time.   This has the same effect as running `await step.sleepUntil(event.ts)` at
+	    the start of the function.
           </Property>
           <Property name="v" type="string">
             A version identifier for a particular event payload. e.g. `"2023-04-14.1"`
