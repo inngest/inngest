@@ -1,15 +1,61 @@
-# Concurrency
+# Managing concurrency
+
+Limit the number of concurrently running steps for your function with the [`concurrency`](/docs/reference/functions/create#configuration) configuration options. Setting an optional `key` parameter limits the concurrency for each unique value of the expression.
 
 ```ts
-inngest.createFunction(
-  { name: "Sync contacts", concurrency: 5 },
+export default inngest.createFunction(
+  {
+    name: "Sync contacts",
+    concurrency: {
+      limit: 10,
+    }
+  },
   // ...
 );
 ```
 
-Limit the number of concurrently-running function steps by setting the `concurrency` option when creating a function.
+Setting `concurrency` limits are very useful for:
 
-A value of `0`, `undefined`, or not providing the option means the maximum concurrency for your account will be used.
+* Handling API rate limits - Limit concurrency to stay within the rate limit quotas that are allowed by a given third party API.
+* Limiting database operations or connections
+* Preventing one of your user's accounts from consuming too many resources (see `key`)
+
+---
+
+## How `concurrency` works
+
+Traditional queue and worker architectures require you to specify the number of concurrently processed messages by adding or removing worker processes that poll for messages. As Inngest executes your functions via HTTP, concurrency is managed by Inngest itself, ensuring that you can control the number of HTTP requests sent to your application.
+
+Internally, Inngest creates a queue for each of your functions in order to execute steps efficiently. Each step to be executed is added to a given function's internal queue and setting a concurrency `limit` instructs Inngest to only process and execute a certain number of these steps concurrently.
+
+## Limiting concurrency for a specific `key`
+
+Optionally, specifying a concurrency `key` applies the `limit` to unique values of your `key` expression. This is useful to limit throughput of a function for particular subsets of your events. In essence, this creates a "sub-queue" for each unique `key` (e.g. a `limit` of `2` concurrent steps processed for each `event.data.customer_id`).
+
+## Configuration
+
+<Properties>
+  <Property name="concurrency" type="object | integer">
+    Options to configure concurrency. Specifying an `integer` is a shorthand to set the `limit` property.
+
+    <Properties nested={true}>
+      <Property name="limit" type="integer" required>
+        The maximum number of concurrently running steps.
+
+        A value of `0` or `undefined` is the equivalent of not setting a limit.
+      </Property>
+      <Property name="key" type="string">
+        A unique key expression for which to restrict concurrently running steps to. The expression is evaluated for each triggering event and a unique key is generate.
+
+        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+
+        * Limit concurrency to `n` (via `limit`) per customer id: `'event.data.customer_id'`
+        * Limit concurrency to `n` per user, per import id: `'event.data.user_id + "-" + event.data.import_id'`
+
+      </Property>
+    </Properties>
+  </Property>
+</Properties>
 
 <Callout>
 The current concurrency option controls the number of concurrent _steps_ that can be running at any one time.
@@ -17,17 +63,74 @@ The current concurrency option controls the number of concurrent _steps_ that ca
 Because a single function run can contain multiple steps, it's possible that more functions than the concurrency limit are triggered, but only the set number of steps will ever be running.
 </Callout>
 
+## Examples
+
+### Handling third party API rate limits
+
+Here, we use the Resend SDK to send an email. Resend's rate limit is 10 requests per second so we set a lower concurrency as our function is simple and may execute multiple times per second. Here we use a limit of `4` to keep the throughput a bit slower than necessary:
+
+```ts
+export const send = inngest.createFunction(
+  {
+    name: 'Email: Pending invoice',
+    id: 'email-pending-invoice',
+    concurrency: {
+      limit: 4, // Resend's rate limit is 10 req/s
+    },
+  },
+  { event: 'billing/invoice.pending' },
+  async ({ event, step }) => {
+
+    await step.run('Send email', async () => {
+      return await resend.sendEmail({
+        from: 'hello@myco.com',
+        to: event.user.email,
+        subject: `Invoice pending for ${event.data.invoicePeriod}`,
+        text: `Dear user, ...`,
+      });
+    });
+
+    return { message: 'success' };
+  }
+);
+```
+
+### Restricting parallel import jobs for a customer id
+
+In this hypothetical system, customers can upload `.csv` files which each need to be processed and imported. We want to limit each customer to only one import job at a time so no two jobs are writing to a customer's data at a given time. We do this by setting a `limit: 1` and a concurrency `key` to the `customerId` which is included in every single event payload.
+
+Inngest ensures that the concurrency (`1`) applies to each unique value for `event.data.customerId`. This allows different customers to have functions running at the same exact time, but no given customer can have two functions running at once!
+
+
+```ts
+export const send = inngest.createFunction(
+  {
+    name: 'Process customer csv import',
+    id: 'process-customer-csv-import',
+    concurrency: {
+      limit: 1,
+      key: `event.data.customerId`, // You can use any piece of data from the event payload
+    },
+  },
+  { event: 'csv/file.uploaded' },
+  async ({ event, step }) => {
+
+    await step.run('Process file', async () => {
+      const file = await bucket.fetch(event.data.fileURI);
+      // ...
+    });
+
+    return { message: 'success' };
+  }
+);
+```
+
+
+## Limits
+
 The maximum possible concurrency that can be set is based on your plan.
 
 - Free: 25
 - Team: 100
 - Startup: 500
 - Enterprise: Up to 20,000 [contact us](/contact?ref=pricing-advanced)
-
-## Benefits
-
-Being able to control the concurrency of function runs provides you with a few key benefits, mostly around dealing with external services and buffering traffic spikes.
-
-- **Handling rate limits** - Most external APIs (and even the platform you're hosted on) will have rate limits and usage quotas which restrict the number of requests that you can within a certain time period. Limiting the concurrency of your function runs ensures you stay safely within these limits.
-
-- **Resource limitations** such as maximum database connections are especially prevalent in serverless offerings and still exist even if you're maintaining your own clusters. Limiting concurrency ensures you don't overload these resources when spikes of traffic arrive.

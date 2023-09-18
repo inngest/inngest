@@ -29,8 +29,17 @@ The `createFunction` method accepts a series of arguments to define your functio
   <Property name="id" type="string">
     A unique identifier for your function to override the default (a slug of your function name).
   </Property>
-  <Property name="concurrency" type="number">
+  <Property name="concurrency" type="number | object">
     Limit the number of concurrently running functions ([reference](/docs/functions/concurrency))
+
+    <Properties nested={true} collapse={true}>
+      <Property name="limit" type="number" required>
+        The maximum number of concurrently running steps.
+      </Property>
+      <Property name="key" type="string">
+        A unique key expression for which to restrict concurrently running steps to. The expression is evaluated for each triggering event and a unique key is generate.
+      </Property>
+    </Properties>
   </Property>
   <Property name="batchEvents" type="object">
     Configure how the function should consume batches of events ([reference](/docs/guides/batching))
