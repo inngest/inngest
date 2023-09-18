@@ -67,7 +67,7 @@ Inngest abstracts the complex parts of building a robust, reliable, and scalable
 - **Zero-infrastructure required** - No queues or workers to configure or manage &mdash; just write code and Inngest does the rest.
 - **Build complex workflows with simple primitives** - [Our SDK](https://github.com/inngest/inngest-js) provides easy to learn `step` tools like [`run`](https://www.inngest.com/docs/reference/functions/step-run?ref=github-inngest-readme), [`sleep`](https://www.inngest.com/docs/reference/functions/step-sleep?ref=github-inngest-readme), [`sleepUntil`](https://www.inngest.com/docs/reference/functions/step-sleep-until?ref=github-inngest-readme), and [`waitForEvent`](https://www.inngest.com/docs/reference/functions/step-wait-for-event?ref=github-inngest-readme) that you can combine using code and patterns that you're used to create complex and robust workflows.
 
-[Read more about our vision and why this Inngest exists](https://www.inngest.com/blog/inngest-add-super-powers-to-serverless-functions)
+[Read more about our vision and why Inngest exists](https://www.inngest.com/blog/inngest-add-super-powers-to-serverless-functions)
 
 <br />
 
