@@ -13,6 +13,13 @@ const (
 	// AbsoluteMaxEventSize is the absolute maximum size of the event payload we process.
 	AbsoluteMaxEventSize = 3 * 1024 * 1024
 
+	// DefaultMaxStepLimit is the maximum number of steps per function allowed.
+	DefaultMaxStepLimit = 1_000
+
+	// AbsoluteMaxStepLimit is the absolute maximium number of steps that an executor can
+	// be initialized with.
+	AbsoluteMaxStepLimit = 10_000
+
 	// MaxFunctionTimeout represents the longest running function or step allowed within
 	// our system.
 	MaxFunctionTimeout = 2 * time.Hour

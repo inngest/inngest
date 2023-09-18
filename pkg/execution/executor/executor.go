@@ -121,6 +121,9 @@ func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
 
 func WithStepLimits(limit uint) ExecutorOpt {
 	return func(e execution.Executor) error {
+		if limit > consts.AbsoluteMaxStepLimit {
+			return fmt.Errorf("%d is greater than the absolute step limit of %d", limit, consts.AbsoluteMaxStepLimit)
+		}
 		e.(*executor).steplimit = limit
 		return nil
 	}
@@ -350,9 +353,20 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if e.steplimit != 0 && len(s.Actions()) >= int(e.steplimit) {
 		// Update this function's state to overflowed, if running.
 		if md.Status == enums.RunStatusRunning {
+			_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt, enums.RunStatusFailed)
 			// XXX: Update error to failed, set error message
-			if err := e.sm.SetStatus(ctx, id, enums.RunStatusOverflowed); err != nil {
+			if err := e.sm.SetStatus(ctx, id, enums.RunStatusFailed); err != nil {
 				return nil, err
+			}
+
+			// Create a new driver response to map as the function finished error.
+			resp := state.DriverResponse{}
+			resp.SetError(state.ErrFunctionOverflowed)
+			resp.SetFinal()
+
+			_ = e.failureHandler(ctx, id, s, resp)
+			for _, e := range e.lifecycles {
+				go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, resp)
 			}
 		}
 		return nil, state.ErrFunctionOverflowed

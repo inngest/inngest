@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs/ddb"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
@@ -145,6 +146,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithLogger(logger.From(ctx)),
 		executor.WithFunctionLoader(loader),
 		executor.WithLifecycleListeners(history.NewLifecycleListener(nil, hd)),
+		executor.WithStepLimits(consts.DefaultMaxStepLimit),
 	)
 	if err != nil {
 		return err
