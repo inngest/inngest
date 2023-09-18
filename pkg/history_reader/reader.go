@@ -1,4 +1,4 @@
-package history
+package history_reader
 
 import (
 	"context"
