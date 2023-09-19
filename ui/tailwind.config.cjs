@@ -35,6 +35,7 @@ module.exports = {
     'text-rose-500',
     'hover:text-rose-500/80',
     // Default Button
+    'bg-slate-900',
     'bg-slate-800',
     'bg-slate-800/20',
     'bg-slate-800/80',

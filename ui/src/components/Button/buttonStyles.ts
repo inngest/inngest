@@ -38,7 +38,7 @@ export const getButtonColors = ({ kind, appearance }: ButtonColorParams) => {
 
 export const getKeyColor = ({ appearance, kind }: ButtonColorParams) => {
   if (appearance === 'solid' && kind === 'default') {
-    return `bg-slate-800`;
+    return `bg-slate-900`;
   } else if (appearance === 'solid') {
     return `bg-slate-800/20`;
   }
