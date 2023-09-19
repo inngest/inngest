@@ -1,4 +1,4 @@
-//go:generate go run github.com/tonyhb/enumer -trimprefix=Period -type=Period -json -gql -sql -text -transform=snake
+//go:generate go run github.com/dmarkham/enumer -trimprefix=Period -type=Period -json -gqlgen -sql -text -transform=snake
 
 package enums
 
