@@ -1,5 +1,5 @@
 const kindColors = {
-  default: 'slate-700',
+  default: 'slate-800',
   primary: 'indigo-500',
   success: 'emerald-600',
   danger: 'rose-700',
@@ -24,7 +24,7 @@ export const getButtonColors = ({ kind, appearance }: ButtonColorParams) => {
     default: 'slate-500',
     primary: 'indigo-500',
     success: 'emerald-600',
-    danger: 'rose-700',
+    danger: 'rose-500',
   };
 
   if (appearance === 'solid') {

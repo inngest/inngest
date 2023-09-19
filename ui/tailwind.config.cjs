@@ -32,18 +32,18 @@ module.exports = {
     'border-rose-700/80',
     'hover:border-rose-700',
     'hover:bg-rose-700/80',
-    'text-rose-700',
-    'hover:text-rose-700/80',
+    'text-rose-500',
+    'hover:text-rose-500/80',
     // Default Button
-    'bg-slate-700',
-    'bg-slate-700/20',
-    'bg-slate-700/80',
-    'border-slate-700',
-    'border-slate-700/80',
-    'hover:border-slate-700',
-    'hover:bg-slate-700/80',
-    'text-slate-700',
-    'hover:text-slate-700/80'
+    'bg-slate-800',
+    'bg-slate-800/20',
+    'bg-slate-800/80',
+    'border-slate-800',
+    'border-slate-800/80',
+    'hover:border-slate-800',
+    'hover:bg-slate-800/80',
+    'text-slate-800',
+    'hover:text-slate-800/80'
   ],
   theme: {
     extend: {
