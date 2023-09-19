@@ -1,0 +1,77 @@
+import { Canvas, Meta, Story } from '@storybook/blocks';
+
+import { Button } from './Button';
+import * as ButtonStories from './Button.stories';
+
+<Meta of={ButtonStories} />
+
+# Button
+
+## By Kind
+
+<div style={{ padding: '3rem' }} className="bg-slate-1000">
+    <p style={{ color: 'white' }}>Primary</p>
+    <div className="flex gap-1 align-center">
+        <Story of={ButtonStories.PrimarySolid} />
+        <Story of={ButtonStories.PrimarySolidWithIcon} />
+        <Story of={ButtonStories.PrimarySolidOnlyIcon} />
+        <Story of={ButtonStories.PrimarySolidLoading} />
+        <Story of={ButtonStories.PrimarySolidWithShortcut} />
+        <Story of={ButtonStories.PrimaryOutlined} />
+        <Story of={ButtonStories.PrimaryOutlinedWithIcon} />
+        <Story of={ButtonStories.PrimaryOutlinedOnlyIcon} />
+        <Story of={ButtonStories.PrimaryOutlinedLoading} />
+        <Story of={ButtonStories.PrimaryOutlinedWithShortcut} />
+        <Story of={ButtonStories.PrimaryDisabled} />
+    </div>
+    <p style={{ color: 'white' }}>Default</p>
+    <div className="flex gap-1 align-center">
+        <Story of={ButtonStories.DefaultSolid} />
+        <Story of={ButtonStories.DefaultSolidWithIcon} />
+        <Story of={ButtonStories.DefaultSolidOnlyIcon} />
+        <Story of={ButtonStories.DefaultSolidLoading} />
+        <Story of={ButtonStories.DefaultSolidWithShortcut} />
+        <Story of={ButtonStories.DefaultOutlined} />
+        <Story of={ButtonStories.DefaultOutlinedWithIcon} />
+        <Story of={ButtonStories.DefaultOutlinedOnlyIcon} />
+        <Story of={ButtonStories.DefaultOutlinedLoading} />
+        <Story of={ButtonStories.DefaultOutlinedWithShortcut} />
+        <Story of={ButtonStories.DefaultDisabled} />
+    </div>
+    <p style={{ color: 'white' }}>Success</p>
+    <div className="flex gap-1 align-center">
+        <Story of={ButtonStories.SuccessSolid} />
+        <Story of={ButtonStories.SuccessSolidWithIcon} />
+        <Story of={ButtonStories.SuccessSolidOnlyIcon} />
+        <Story of={ButtonStories.SuccessSolidLoading} />
+        <Story of={ButtonStories.SuccessSolidWithShortcut} />
+        <Story of={ButtonStories.SuccessOutlined} />
+        <Story of={ButtonStories.SuccessOutlinedWithIcon} />
+        <Story of={ButtonStories.SuccessOutlinedOnlyIcon} />
+        <Story of={ButtonStories.SuccessOutlinedLoading} />
+        <Story of={ButtonStories.SuccessOutlinedWithShortcut} />
+        <Story of={ButtonStories.SuccessDisabled} />
+    </div>
+    <p style={{ color: 'white' }}>Danger</p>
+    <div className="flex gap-1 align-center">
+        <Story of={ButtonStories.DangerSolid} />
+        <Story of={ButtonStories.DangerSolidWithIcon} />
+        <Story of={ButtonStories.DangerSolidOnlyIcon} />
+        <Story of={ButtonStories.DangerSolidLoading} />
+        <Story of={ButtonStories.DangerSolidWithShortcut} />
+        <Story of={ButtonStories.DangerOutlined} />
+        <Story of={ButtonStories.DangerOutlinedWithIcon} />
+        <Story of={ButtonStories.DangerOutlinedOnlyIcon} />
+        <Story of={ButtonStories.DangerOutlinedLoading} />
+        <Story of={ButtonStories.DangerOutlinedWithShortcut} />
+        <Story of={ButtonStories.DangerDisabled} />
+    </div>
+</div>
+
+## By Size
+
+<div style={{ padding: '3rem' }} className="flex items-center justify-center gap-1 bg-slate-1000">
+  <Story of={ButtonStories.SmallSize} />
+  <Story of={ButtonStories.RegularSize} />
+  <Story of={ButtonStories.LargeSize} />
+</div>
