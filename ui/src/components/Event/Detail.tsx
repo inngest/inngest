@@ -6,7 +6,7 @@ import { eventTabs } from '../../../mock/tabs';
 import { IconFeed } from '../../icons';
 import { EventStatus, FunctionRunStatus } from '../../store/generated';
 import classNames from '../../utils/classnames';
-import Button from '../Button';
+import Button from '../Button/Button';
 import CodeBlock from '../CodeBlock';
 import ContentCard from '../Content/ContentCard';
 import FuncCard from '../Function/FuncCard';

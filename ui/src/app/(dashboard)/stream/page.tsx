@@ -7,7 +7,7 @@ import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-t
 
 import { queryClient } from '@/app/StoreProvider';
 import { BlankSlate } from '@/components/Blank';
-import Button from '@/components/Button';
+import Button from '@/components/Button/Button';
 import SendEventButton from '@/components/Event/SendEventButton';
 import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';

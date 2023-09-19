@@ -7,7 +7,7 @@ import { useSendEventMutation } from '../../store/devApi';
 import { EventStatus, FunctionRunStatus, useGetEventQuery } from '../../store/generated';
 import { selectEvent, selectRun } from '../../store/global';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import Button from '../Button';
+import Button from '../Button/Button';
 import CodeBlock from '../CodeBlock';
 import ContentCard from '../Content/ContentCard';
 import FuncCard from '../Function/FuncCard';
@@ -86,7 +86,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
                       });
                   }}
                 />
-                <SendEventButton label="Edit and Replay" kind="secondary" data={event.raw} />
+                <SendEventButton label="Edit and Replay" appearance="outlined" data={event.raw} />
               </>
             }
           />
