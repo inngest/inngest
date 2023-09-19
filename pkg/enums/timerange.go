@@ -1,4 +1,4 @@
-//go:generate go run github.com/tonyhb/enumer -trimprefix=Timerange -type=Timerange -json -gql -sql -text -transform=snake
+//go:generate go run github.com/dmarkham/enumer -trimprefix=Timerange -type=Timerange -json -gqlgen -sql -text -transform=snake
 
 package enums
 
