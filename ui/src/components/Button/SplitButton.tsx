@@ -17,7 +17,7 @@ type ButtonCopyProps = {
 };
 
 export default function SplitButton({ kind = 'default', size = 'small', items }: ButtonCopyProps) {
-  const [value, setValue] = useState('item1');
+  const [value, setValue] = useState(items.length > 0 ? items[0].label : '');
   const selectedItem = items.find((item) => item.label === value);
   const { onClick: btnAction, label, icon } = selectedItem || {};
 
