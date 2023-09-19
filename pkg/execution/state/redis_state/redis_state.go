@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -272,11 +273,12 @@ func (m mgr) New(ctx context.Context, input state.Input) (state.State, error) {
 	}
 
 	metadata := runMetadata{
-		Identifier: input.Identifier,
-		Pending:    1,
-		Debugger:   input.Debugger,
-		Version:    currentVersion,
-		Context:    input.Context,
+		Identifier:     input.Identifier,
+		Pending:        1,
+		Debugger:       input.Debugger,
+		Version:        currentVersion,
+		RequestVersion: consts.RequestVersionUnknown, // Always use -1 to indicate unset hash version until first request.
+		Context:        input.Context,
 	}
 	if input.OriginalRunID != nil {
 		metadata.OriginalRunID = input.OriginalRunID.String()
@@ -355,12 +357,15 @@ func (m mgr) UpdateMetadata(ctx context.Context, runID ulid.ULID, md state.Metad
 		return err
 	}
 
-	input := []string{string(byt), "0", "0"}
+	input := []string{string(byt), "0", "0", strconv.Itoa(consts.RequestVersionUnknown)}
 	if md.Debugger {
 		input[1] = "1"
 	}
 	if md.DisableImmediateExecution {
 		input[2] = "1"
+	}
+	if md.RequestVersion != consts.RequestVersionUnknown {
+		input[3] = strconv.Itoa(md.RequestVersion)
 	}
 
 	status, err := scripts["updateMetadata"].Exec(
@@ -1355,6 +1360,14 @@ func NewRunMetadata(data map[string]string) (*runMetadata, error) {
 		m.Version = v
 	}
 
+	if val, ok := data["rv"]; ok && val != "" {
+		v, err := strconv.Atoi(val)
+		if err != nil {
+			return nil, fmt.Errorf("invalid hash version detected: %#v", val)
+		}
+		m.RequestVersion = v
+	}
+
 	// The below fields are optional
 	if val, ok := data["debugger"]; ok {
 		if val == "true" || val == "1" {
@@ -1402,6 +1415,7 @@ type runMetadata struct {
 	RunType                   string         `json:"runType,omitempty"`
 	OriginalRunID             string         `json:"originalRunID,omitempty"`
 	Version                   int            `json:"version"`
+	RequestVersion            int            `json:"rv"`
 	Context                   map[string]any `json:"ctx,omitempty"`
 	DisableImmediateExecution bool           `json:"die,omitempty"`
 }
@@ -1415,6 +1429,7 @@ func (r runMetadata) Map() map[string]any {
 		"runType":       r.RunType,
 		"originalRunID": r.OriginalRunID,
 		"version":       r.Version,
+		"rv":            r.RequestVersion,
 		"ctx":           r.Context,
 		"die":           r.DisableImmediateExecution,
 	}
@@ -1427,6 +1442,7 @@ func (r runMetadata) Metadata() state.Metadata {
 		Debugger:                  r.Debugger,
 		Status:                    r.Status,
 		Version:                   r.Version,
+		RequestVersion:            r.RequestVersion,
 		Context:                   r.Context,
 		DisableImmediateExecution: r.DisableImmediateExecution,
 	}

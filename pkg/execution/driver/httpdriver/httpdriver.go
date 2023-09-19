@@ -154,7 +154,7 @@ func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, e
 		return nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
 	}
 
-	input, err := driver.MarshalV1(ctx, s, step, idx, "local", attempt)
+	input, err := driver.MarshalV1(ctx, s, step, idx, "", attempt)
 	if err != nil {
 		return nil, err
 	}
@@ -230,18 +230,20 @@ func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, e
 			"status": resp.statusCode,
 			"body":   body,
 		},
-		Err:        errstr,
-		Duration:   resp.duration,
-		OutputSize: len(resp.body),
-		NoRetry:    resp.noRetry,
-		RetryAt:    resp.retryAt,
+		Err:            errstr,
+		Duration:       resp.duration,
+		OutputSize:     len(resp.body),
+		NoRetry:        resp.noRetry,
+		RetryAt:        resp.retryAt,
+		RequestVersion: resp.requestVersion,
 	}, nil
 }
 
 type response struct {
-	body       []byte
-	statusCode int
-	duration   time.Duration
+	body           []byte
+	statusCode     int
+	duration       time.Duration
+	requestVersion int
 	// retryAt is the time to retry this step at, on failure, if specified in the
 	// Retry-After headers, or X-Retry-After.
 	//
@@ -272,6 +274,8 @@ func (e executor) do(ctx context.Context, url string, input []byte) (*response, 
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
+	hv, _ := strconv.Atoi(resp.Header.Get("x-inngest-req-version"))
+
 	var retryAt *time.Time
 	if after := resp.Header.Get("retry-after"); after != "" {
 		if at, err := ParseRetry(after); err == nil {
@@ -289,11 +293,12 @@ func (e executor) do(ctx context.Context, url string, input []byte) (*response, 
 	// here is an error.
 	if resp.StatusCode != 201 {
 		return &response{
-			body:       byt,
-			statusCode: resp.StatusCode,
-			duration:   dur,
-			retryAt:    retryAt,
-			noRetry:    !shouldRetry(resp.StatusCode, resp),
+			body:           byt,
+			statusCode:     resp.StatusCode,
+			duration:       dur,
+			requestVersion: hv,
+			retryAt:        retryAt,
+			noRetry:        !shouldRetry(resp.StatusCode, resp),
 		}, nil
 	}
 
@@ -308,11 +313,12 @@ func (e executor) do(ctx context.Context, url string, input []byte) (*response, 
 	}
 
 	return &response{
-		body:       stream.Body,
-		statusCode: stream.StatusCode,
-		duration:   dur,
-		retryAt:    retryAt,
-		noRetry:    stream.NoRetry,
+		body:           stream.Body,
+		statusCode:     stream.StatusCode,
+		duration:       dur,
+		retryAt:        retryAt,
+		noRetry:        stream.NoRetry,
+		requestVersion: hv,
 	}, nil
 
 }

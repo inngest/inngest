@@ -74,10 +74,10 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 			// All executor requests should have this event.
 			test.SetRequestEvent(evt),
 			// And the executor should start its requests with this context.
-			test.SetRequestContext(SDKCtx{
-				FnID:   inngest.DeterministicUUID(abstract.Function).String(),
-				StepID: "step",
-				Stack: driver.FunctionStack{
+			test.SetRequestContext(driver.SDKRequestContext{
+				FunctionID: inngest.DeterministicUUID(abstract.Function),
+				StepID:     "step",
+				Stack: &driver.FunctionStack{
 					Current: 0,
 				},
 			}),

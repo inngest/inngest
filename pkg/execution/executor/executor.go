@@ -475,7 +475,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	// This is a success, which means either a generator or a function result.
 	if len(resp.Generator) > 0 {
 		// Handle generator responses then return.
-		if serr := e.HandleGeneratorResponse(ctx, resp.Generator, item); serr != nil {
+		if serr := e.HandleGeneratorResponse(ctx, resp, item); serr != nil {
 			// If this is an error compiling async expressions, fail the function.
 			if strings.Contains(serr.Error(), "error compiling expression") {
 				_, _ = e.sm.SaveResponse(ctx, id, *resp, item.Attempt)
@@ -829,31 +829,51 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	return nil
 }
 
-func (e *executor) HandleGeneratorResponse(ctx context.Context, gen []*state.GeneratorOpcode, item queue.Item) error {
-	if len(gen) > 1 {
-		md, err := GetFunctionRunMetadata(ctx, e.sm, item.Identifier.RunID)
-		if err != nil || md == nil {
-			return fmt.Errorf("error loading function metadata: %w", err)
-		}
+func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.DriverResponse, item queue.Item) error {
+	md, err := GetFunctionRunMetadata(ctx, e.sm, item.Identifier.RunID)
+	if err != nil || md == nil {
+		return fmt.Errorf("error loading function metadata: %w", err)
+	}
 
+	var update *state.MetadataUpdate
+	// NOTE: We only need to set hash versions when handling generator responses, else the
+	// fn is ending and it doesn't matter.
+	if md.RequestVersion == -1 {
+		update = &state.MetadataUpdate{
+			Context:                   md.Context,
+			Debugger:                  md.Debugger,
+			DisableImmediateExecution: md.DisableImmediateExecution,
+			RequestVersion:            resp.RequestVersion,
+		}
+	}
+
+	if len(resp.Generator) > 1 {
 		if !md.DisableImmediateExecution {
 			// With parallelism, we currently instruct the SDK to disable immediate execution,
 			// enforcing that every step becomes pre-planned.
-			if err := e.sm.UpdateMetadata(ctx, item.Identifier.RunID, state.MetadataUpdate{
-				Context:                   md.Context,
-				Debugger:                  md.Debugger,
-				DisableImmediateExecution: true,
-			}); err != nil {
-				return fmt.Errorf("error updating function metadata: %w", err)
+			if update == nil {
+				update = &state.MetadataUpdate{
+					Context:                   md.Context,
+					Debugger:                  md.Debugger,
+					DisableImmediateExecution: true,
+					RequestVersion:            resp.RequestVersion,
+				}
 			}
+			update.DisableImmediateExecution = true
+		}
+	}
+
+	if update != nil {
+		if err := e.sm.UpdateMetadata(ctx, item.Identifier.RunID, *update); err != nil {
+			return fmt.Errorf("error updating function metadata: %w", err)
 		}
 	}
 
 	// Ensure that we process waitForEvents first, as these are highest priority.
-	sortOps(gen)
+	sortOps(resp.Generator)
 
 	eg := errgroup.Group{}
-	for _, op := range gen {
+	for _, op := range resp.Generator {
 		copied := *op
 		eg.Go(func() error { return e.HandleGenerator(ctx, copied, item) })
 	}

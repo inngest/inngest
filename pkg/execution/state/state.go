@@ -128,9 +128,25 @@ type Metadata struct {
 	// DEPRECATED
 	Pending int `json:"pending"`
 
-	// Version is the used for making sure workloads runs are backward compatible
-	// and work without issues during breaking changes to backend logic
+	// Version represents the version of _metadata_ in particular.
+	//
+	// TODO: This should be removed and made specific to each particular state
+	// implementation.
 	Version int `json:"version"`
+
+	// RequestVersion represents the executor request versioning/hashing style
+	// used to manage state.
+	//
+	// TS v3, Go, Rust, Elixir, and Java all use the same hashing style (1).
+	//
+	// TS v1 + v2 use a unique hashing style (0) which cannot be transferred
+	// to other languages.
+	//
+	// This lets us send the hashing style to SDKs so that we can execute in
+	// the correct format with backcompat guarantees built in.
+	//
+	// NOTE: We can only know this the first time an SDK is responding to a step.
+	RequestVersion int `json:"rv"`
 
 	// Context allows storing any other contextual data in metadata.
 	Context map[string]any `json:"ctx,omitempty"`
@@ -144,6 +160,7 @@ type MetadataUpdate struct {
 	Debugger                  bool           `json:"debugger"`
 	Context                   map[string]any `json:"ctx,omitempty"`
 	DisableImmediateExecution bool           `json:"disableImmediateExecution,omitempty"`
+	RequestVersion            int            `json:"rv"`
 }
 
 // State represents the current state of a fn run.  It is data-structure
