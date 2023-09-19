@@ -254,7 +254,7 @@ export default function Stream() {
         <span className="absolute bottom-5 right-5 animate-bounce">
           <Button
             btnAction={scrollToTop}
-            icon={<IconChevron className="text-indigo-100 rotate-180" />}
+            icon={<IconChevron className="rotate-180" />}
           />
         </span>
       )}
