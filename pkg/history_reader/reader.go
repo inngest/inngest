@@ -36,12 +36,12 @@ type Reader interface {
 		opts GetRunOpts,
 	) (Run, error)
 	GetRuns(ctx context.Context, opts GetRunsOpts) ([]Run, error)
-	GetRunHistories(
+	GetRunHistory(
 		ctx context.Context,
 		runID ulid.ULID,
 		opts GetRunOpts,
 	) ([]*RunHistory, error)
-	GetRunHistoryOutput(
+	GetRunHistoryItemOutput(
 		ctx context.Context,
 		historyID ulid.ULID,
 		opts GetHistoryOutputOpts,

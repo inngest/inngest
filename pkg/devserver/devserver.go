@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
@@ -145,7 +146,13 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithQueue(queue),
 		executor.WithLogger(logger.From(ctx)),
 		executor.WithFunctionLoader(loader),
-		executor.WithLifecycleListeners(history.NewLifecycleListener(nil, hd)),
+		executor.WithLifecycleListeners(
+			history.NewLifecycleListener(
+				nil,
+				hd,
+				memory_writer.NewWriter(),
+			),
+		),
 		executor.WithStepLimits(consts.DefaultMaxStepLimit),
 	)
 	if err != nil {
