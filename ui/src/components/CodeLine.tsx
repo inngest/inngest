@@ -1,7 +1,6 @@
-import { useState } from 'react';
-
-import { IconCopy, IconCheck } from '@/icons';
+import useCopyToClipboard from '@/hooks/useCopyToClipboard';
 import classNames from '@/utils/classnames';
+import CopyButton from './Button/CopyButton';
 
 type CodeLineProps = {
   code: string;
@@ -9,14 +8,8 @@ type CodeLineProps = {
 };
 
 export default function CodeLine({ code, className }: CodeLineProps) {
-  const [clickedState, setClickedState] = useState(false);
-  const handleCopyClick = (code) => {
-    setClickedState(true);
-    navigator.clipboard.writeText(code);
-    setTimeout(() => {
-      setClickedState(false);
-    }, 1000);
-  };
+  const { handleCopyClick, isCopying } = useCopyToClipboard();
+
   return (
     <div
       className={classNames(
@@ -26,7 +19,12 @@ export default function CodeLine({ code, className }: CodeLineProps) {
       onClick={() => handleCopyClick(code)}
     >
       <code className="text-slate-300">{code}</code>
-      {clickedState ? <IconCheck className="text-teal-500 icon-2xl" /> : <IconCopy className="text-slate-500 icon-2xl" />}
+      <CopyButton
+        code={code}
+        iconOnly={true}
+        isCopying={isCopying}
+        handleCopyClick={handleCopyClick}
+      />
     </div>
   );
 }
