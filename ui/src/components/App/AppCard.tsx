@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 
 import AppCardHeader from '@/components/App/AppCardHeader';
 import Badge from '@/components/Badge';
+import Button from '@/components/Button/Button';
 import CodeLine from '@/components/CodeLine';
 import Link from '@/components/Link/Link';
 import useDebounce from '@/hooks/useDebounce';
@@ -246,9 +247,7 @@ export default function AppCard({ app }: { app: App }) {
         />
         {!app.autodiscovered && (
           <div className="text-white p-4 pr-6">
-            <button className="text-rose-400" onClick={handleDelete}>
-              Delete App
-            </button>
+            <Button kind="danger" appearance="text" btnAction={handleDelete} label="Delete App" />
           </div>
         )}
       </div>

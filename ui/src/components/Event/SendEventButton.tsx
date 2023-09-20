@@ -1,20 +1,20 @@
 import { useState } from 'react';
 
-import Button from '@/components/Button';
+import Button from '@/components/Button/Button';
 import SendEventModal from '@/components/Event/SendEventModal';
 
 type SendEventButtonProps = {
   data?: string | null;
   label: string;
-  kind?: 'primary' | 'secondary' | 'text';
+  appearance?: 'solid' | 'outlined' | 'text';
 };
 
-export default function SendEventButton({ data, label, kind }: SendEventButtonProps) {
+export default function SendEventButton({ data, label, appearance }: SendEventButtonProps) {
   const [isSendEventModalVisible, setSendEventModalVisible] = useState(false);
 
   return (
     <>
-      <Button label={label} kind={kind} btnAction={() => setSendEventModalVisible(true)} />
+      <Button label={label} appearance={appearance} btnAction={() => setSendEventModalVisible(true)} />
       {isSendEventModalVisible && (
         <SendEventModal
           data={data}

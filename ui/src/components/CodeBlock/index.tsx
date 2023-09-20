@@ -1,7 +1,8 @@
 import { useState } from 'react';
 
+import useCopyToClipboard from '@/hooks/useCopyToClipboard';
 import classNames from '../../utils/classnames';
-import CopyButton from './CopyButton';
+import CopyButton from '../Button/CopyButton';
 import { SyntaxHighlight } from './SyntaxHighlight';
 
 interface CodeBlockProps {
@@ -15,17 +16,10 @@ interface CodeBlockProps {
 
 export default function CodeBlock({ tabs, modal, expanded = false }: CodeBlockProps) {
   const [activeTab, setActiveTab] = useState(0);
+  const { handleCopyClick, isCopying } = useCopyToClipboard();
 
   const handleTabClick = (index) => {
     setActiveTab(index);
-  };
-
-  const handleCopyClick = () => {
-    navigator.clipboard.writeText(tabs[activeTab].content);
-  };
-
-  const handleExpandClick = () => {
-    modal?.(tabs);
   };
 
   return (
@@ -48,11 +42,11 @@ export default function CodeBlock({ tabs, modal, expanded = false }: CodeBlockPr
           ))}
         </div>
         <div className="flex gap-2 items-center mr-2">
-          <CopyButton btnAction={handleCopyClick} />
-          {/* <Button
-            label={expanded ? "Close" : "Expand"}
-            btnAction={handleExpandClick}
-          /> */}
+          <CopyButton
+            code={tabs[activeTab].content}
+            isCopying={isCopying}
+            handleCopyClick={handleCopyClick}
+          />
         </div>
       </div>
       <div

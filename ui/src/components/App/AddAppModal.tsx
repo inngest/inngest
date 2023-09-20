@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import Button from '@/components/Button';
+import Button from '@/components/Button/Button';
 import Input from '@/components/Form/Input';
 import Modal from '@/components/Modal';
 import useDebounce from '@/hooks/useDebounce';
@@ -91,7 +91,7 @@ export default function AddAppModal({ isOpen, onClose }) {
           </p>
         )}
         <div className="flex items-center justify-between p-6 border-t border-slate-800">
-          <Button label="Cancel" kind="secondary" btnAction={onClose} />
+          <Button label="Cancel" appearance="outlined" btnAction={onClose} />
           <Button disabled={isDisabled || isUrlInvalid} label="Connect App" type="submit" />
         </div>
       </form>
