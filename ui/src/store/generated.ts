@@ -14,6 +14,9 @@ export type Scalars = {
   /** The environment for the function to be run: `"prod"` or `"test"` */
   Environment: any;
   Time: any;
+  ULID: any;
+  UUID: any;
+  Uint: any;
 };
 
 export type ActionVersionQuery = {
@@ -109,6 +112,8 @@ export type FunctionRun = {
   finishedAt?: Maybe<Scalars['Time']>;
   function?: Maybe<Function>;
   functionID: Scalars['String'];
+  history: Array<RunHistoryItem>;
+  historyItemOutput: Scalars['String'];
   id: Scalars['ID'];
   /** @deprecated Field no longer supported */
   name?: Maybe<Scalars['String']>;
@@ -121,6 +126,11 @@ export type FunctionRun = {
   timeline?: Maybe<Array<FunctionRunEvent>>;
   waitingFor?: Maybe<StepEventWait>;
   workspace?: Maybe<Workspace>;
+};
+
+
+export type FunctionRunHistoryItemOutputArgs = {
+  id: Scalars['ULID'];
 };
 
 export type FunctionRunEvent = FunctionEvent | StepEvent;
@@ -167,8 +177,25 @@ export type FunctionVersion = {
   updatedAt: Scalars['Time'];
   validFrom?: Maybe<Scalars['Time']>;
   validTo?: Maybe<Scalars['Time']>;
-  version: Scalars['Int'];
+  version: Scalars['Uint'];
 };
+
+export enum HistoryType {
+  FunctionCancelled = 'FunctionCancelled',
+  FunctionCompleted = 'FunctionCompleted',
+  FunctionFailed = 'FunctionFailed',
+  FunctionScheduled = 'FunctionScheduled',
+  FunctionStarted = 'FunctionStarted',
+  FunctionStatusUpdated = 'FunctionStatusUpdated',
+  None = 'None',
+  StepCompleted = 'StepCompleted',
+  StepErrored = 'StepErrored',
+  StepFailed = 'StepFailed',
+  StepScheduled = 'StepScheduled',
+  StepSleeping = 'StepSleeping',
+  StepStarted = 'StepStarted',
+  StepWaiting = 'StepWaiting'
+}
 
 export type Mutation = {
   __typename?: 'Mutation';
@@ -226,6 +253,59 @@ export type QueryFunctionRunsArgs = {
 
 export type QueryStreamArgs = {
   query: StreamQuery;
+};
+
+export type RunHistoryCancel = {
+  __typename?: 'RunHistoryCancel';
+  eventID?: Maybe<Scalars['ULID']>;
+  expression?: Maybe<Scalars['String']>;
+  userID?: Maybe<Scalars['UUID']>;
+};
+
+export type RunHistoryItem = {
+  __typename?: 'RunHistoryItem';
+  attempt: Scalars['Int'];
+  cancel?: Maybe<RunHistoryCancel>;
+  createdAt: Scalars['Time'];
+  functionVersion: Scalars['Int'];
+  groupID?: Maybe<Scalars['UUID']>;
+  id: Scalars['ULID'];
+  result?: Maybe<RunHistoryResult>;
+  sleep?: Maybe<RunHistorySleep>;
+  stepName?: Maybe<Scalars['String']>;
+  type: HistoryType;
+  url?: Maybe<Scalars['String']>;
+  waitForEvent?: Maybe<RunHistoryWaitForEvent>;
+  waitResult?: Maybe<RunHistoryWaitResult>;
+};
+
+export type RunHistoryResult = {
+  __typename?: 'RunHistoryResult';
+  durationMS: Scalars['Int'];
+  errorCode?: Maybe<Scalars['String']>;
+  framework?: Maybe<Scalars['String']>;
+  platform?: Maybe<Scalars['String']>;
+  sdkLanguage: Scalars['String'];
+  sdkVersion: Scalars['String'];
+  sizeBytes: Scalars['Int'];
+};
+
+export type RunHistorySleep = {
+  __typename?: 'RunHistorySleep';
+  until: Scalars['Time'];
+};
+
+export type RunHistoryWaitForEvent = {
+  __typename?: 'RunHistoryWaitForEvent';
+  eventName: Scalars['String'];
+  expression?: Maybe<Scalars['String']>;
+  timeout: Scalars['Time'];
+};
+
+export type RunHistoryWaitResult = {
+  __typename?: 'RunHistoryWaitResult';
+  eventID?: Maybe<Scalars['ULID']>;
+  timeout: Scalars['Boolean'];
 };
 
 export type StepEvent = {

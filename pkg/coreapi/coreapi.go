@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/history_drivers/memory_reader"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/oklog/ulid/v2"
@@ -55,8 +56,9 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	a.Use(cors.Handler)
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
-		Data:   o.Data,
-		Runner: o.Runner,
+		Data:          o.Data,
+		HistoryReader: memory_reader.NewReader(),
+		Runner:        o.Runner,
 	}}))
 
 	// TODO - Add option for enabling GraphQL Playground

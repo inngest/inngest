@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/history_reader"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -57,6 +58,52 @@ func (r *functionRunResolver) FinishedAt(ctx context.Context, obj *models.Functi
 		return &f[0].CreatedAt, nil
 	}
 	return nil, nil
+}
+
+func (r *functionRunResolver) History(
+	ctx context.Context,
+	obj *models.FunctionRun,
+) ([]*history_reader.RunHistory, error) {
+	runID, err := ulid.Parse(obj.ID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid run ID: %w", err)
+	}
+
+	// For required UUID fields that don't matter in OSS.
+	randomUUID := uuid.New()
+
+	return r.HistoryReader.GetRunHistory(
+		ctx,
+		runID,
+		history_reader.GetRunOpts{
+			AccountID: randomUUID,
+		},
+	)
+}
+
+func (r *functionRunResolver) HistoryItemOutput(
+	ctx context.Context,
+	obj *models.FunctionRun,
+	historyID ulid.ULID,
+) (string, error) {
+	runID, err := ulid.Parse(obj.ID)
+	if err != nil {
+		return "", fmt.Errorf("invalid run ID: %w", err)
+	}
+
+	// For required UUID fields that don't matter in OSS.
+	randomUUID := uuid.New()
+
+	return r.HistoryReader.GetRunHistoryItemOutput(
+		ctx,
+		historyID,
+		history_reader.GetHistoryOutputOpts{
+			AccountID:   randomUUID,
+			RunID:       runID,
+			WorkflowID:  randomUUID,
+			WorkspaceID: randomUUID,
+		},
+	)
 }
 
 func (r *functionRunResolver) Output(ctx context.Context, obj *models.FunctionRun) (*string, error) {
