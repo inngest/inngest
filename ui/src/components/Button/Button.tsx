@@ -37,15 +37,17 @@ export default function Button({
   type,
   keys,
 }: ButtonProps) {
-  const buttonColors = getButtonColors({kind, appearance});
-  const buttonSizes = getButtonSizeStyles({size, icon, label});
+  const buttonColors = getButtonColors({ kind, appearance });
+  const buttonSizes = getButtonSizeStyles({ size, icon, label });
   const disabledStyles = getDisabledStyles();
-  const iconSizes = getIconSizeStyles({size});
-  const keyColor = getKeyColor({kind, appearance});
+  const iconSizes = getIconSizeStyles({ size });
+  const keyColor = getKeyColor({ kind, appearance });
 
-  const iconElement = icon
+  const iconElement = React.isValidElement(icon)
     ? React.cloneElement(icon as React.ReactElement, {
-        className: !label ? 'icon-lg' : iconSizes,
+        className: !label
+          ? classNames('icon-lg', icon.props.className)
+          : classNames(iconSizes, icon.props.className),
       })
     : null;
 

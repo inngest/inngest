@@ -71,7 +71,7 @@ const columns = [
         <>
           {getFirstEventValue() && (
             <SendEventButton
-              kind="secondary"
+              appearance="outlined"
               label="Trigger"
               data={JSON.stringify({
                 name: getFirstEventValue(),
@@ -81,7 +81,7 @@ const columns = [
             />
           )}
           {isCron() && (
-            <TriggerCronButton kind="secondary" functionId={props.row?.original?.slug} />
+            <TriggerCronButton appearance="outlined" functionId={props.row?.original?.slug} />
           )}
         </>
       );

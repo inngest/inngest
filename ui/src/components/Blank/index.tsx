@@ -1,5 +1,5 @@
 import Link from '@/components/Link/Link';
-import Button from '@/components/Button';
+import Button from '@/components/Button/Button';
 
 interface BlankSlateProps {
   imageUrl?: string;

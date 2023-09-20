@@ -4,7 +4,7 @@ import { IconChevron } from '@/icons';
 import Button from './Button';
 
 const meta = {
-  title: 'Components/NewButton',
+  title: 'Components/Button',
   component: Button,
   parameters: {
     layout: 'centered',

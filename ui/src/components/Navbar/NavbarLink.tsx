@@ -15,7 +15,7 @@ export type NavbarLinkProps = {
 
 export default function NavbarLink({ icon, href, badge, tabName, hasError }: NavbarLinkProps) {
   const pathname = usePathname();
-  const isActive = pathname === '/' + href;
+  const isActive = pathname === href;
 
   return (
     <Link

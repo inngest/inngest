@@ -3,7 +3,7 @@ import Editor, { useMonaco } from '@monaco-editor/react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
-import Button from '@/components/Button';
+import Button from '@/components/Button/Button';
 import Modal from '@/components/Modal';
 import useModifierKey from '@/hooks/useModifierKey';
 import { usePortal } from '../../hooks/usePortal';
@@ -193,7 +193,7 @@ export default function SendEventModal({ data, isOpen, onClose }) {
         </div>
       </div>
       <div className="flex items-center justify-between p-6 border-t border-slate-800">
-        <Button label="Cancel" kind="secondary" btnAction={onClose} />
+        <Button label="Cancel" appearance="outlined" btnAction={onClose} />
         <Button
           disabled={sendEventState.isLoading}
           label="Send Event"

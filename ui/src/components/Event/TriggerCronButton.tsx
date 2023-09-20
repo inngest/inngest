@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
-import Button from '@/components/Button';
+import Button from '@/components/Button/Button';
 import { useSendEventMutation } from '@/store/devApi';
 import { selectEvent } from '@/store/global';
 import { useAppDispatch } from '@/store/hooks';
@@ -9,13 +9,13 @@ import { useAppDispatch } from '@/store/hooks';
 type TriggerCronButtonProps = {
   functionId: string;
   label?: string;
-  kind?: 'primary' | 'secondary' | 'text';
+  appearance?: 'solid' | 'outlined' | 'text';
 };
 
 export default function TriggerCronButton({
   functionId,
   label = 'Trigger',
-  kind,
+  appearance,
 }: TriggerCronButtonProps) {
   const [sendEvent] = useSendEventMutation();
   const dispatch = useAppDispatch();
@@ -23,7 +23,7 @@ export default function TriggerCronButton({
   return (
     <Button
       label={label}
-      kind={kind}
+      appearance={appearance}
       btnAction={() => {
         const id = ulid();
 

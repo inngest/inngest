@@ -7,7 +7,7 @@ import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-t
 
 import { queryClient } from '@/app/StoreProvider';
 import { BlankSlate } from '@/components/Blank';
-import Button from '@/components/Button';
+import Button from '@/components/Button/Button';
 import SendEventButton from '@/components/Event/SendEventButton';
 import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';
@@ -254,7 +254,7 @@ export default function Stream() {
         <span className="absolute bottom-5 right-5 animate-bounce">
           <Button
             btnAction={scrollToTop}
-            icon={<IconChevron className="text-indigo-100 rotate-180" />}
+            icon={<IconChevron className="rotate-180" />}
           />
         </span>
       )}
