@@ -61,7 +61,7 @@ const PLANS: Plan[] = [
     },
     description: "Build your side project",
     cta: {
-      href: "/sign-up?ref=pricing-free",
+      href: `${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=pricing-free`,
       text: "Create an account",
     },
     features: [
@@ -98,7 +98,7 @@ const PLANS: Plan[] = [
     },
     description: "Bring your product to life",
     cta: {
-      href: "/sign-up?ref=pricing-team",
+      href: `${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=pricing-team`,
       text: "Start building",
     },
     features: [
@@ -142,7 +142,7 @@ const PLANS: Plan[] = [
     description: "Scale with us",
     popular: true,
     cta: {
-      href: "/sign-up?ref=pricing-startup",
+      href: `${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=pricing-startup`,
       text: "Start building",
     },
     features: [
@@ -570,7 +570,7 @@ export default function Pricing() {
                   </div>
                   <div className="flex flex-col gap-2 items-center">
                     <Button
-                      href="/sign-up?ref=free"
+                      href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=free`}
                       variant="tertiary"
                       arrow="right"
                       className="whitespace-nowrap"

@@ -40,7 +40,7 @@ export default function Footer({ ctaRef }: { ctaRef?: string }) {
                 <span className="">$</span> npx inngest-cli dev
               </code>
               <Link
-                href={`/sign-up?ref=${
+                href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=${
                   ctaRef ? `${ctaRef}-callout` : "callout"
                 }`}
                 className="py-3 px-5 bg-slate-800 text-white rounded-[6px] text-sm transition-all hover:bg-slate-900"

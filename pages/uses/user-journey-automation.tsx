@@ -139,7 +139,7 @@ const page = {
     subheadline:
       "Build out user-behavior driven flows for your product that are triggered by events sent from your app or third party integrations.",
     primaryCTA: {
-      href: "/sign-up?ref=user-journey",
+      href: `${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=user-journey`,
       text: "Get started for free",
     },
     secondaryCTA: {
@@ -217,7 +217,7 @@ export default function Template() {
         }
         features={calloutFeatures}
         cta={{
-          href: "/sign-up?ref=user-journey-features",
+          href: `${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=user-journey-features`,
           text: "Get started building now →",
         }}
       />

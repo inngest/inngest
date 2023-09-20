@@ -14,7 +14,7 @@ We’re launching Inngest, a platform designed to make building event-driven sys
 
 First, what is Inngest? Inngest is a serverless event platform. It aggregates events from your internal and external systems, then allows you automatically run serverless code in response to these events - as a multi-step workflow.
 
-It’s like putting GitHub Actions, Lambda, Segment, and Zapier in a blender. You can build server-side functions and glue code in minutes, with no servers. If you're interested, you can sign up to Inngest for free and start today by [visiting here](https://www.inngest.com/sign-up).
+It’s like putting GitHub Actions, Lambda, Segment, and Zapier in a blender. You can build server-side functions and glue code in minutes, with no servers. If you're interested, you can sign up to Inngest for free and start today by [visiting here](https://app.inngest.com/sign-up).
 
 </div>
 
@@ -49,7 +49,7 @@ The long version is that you can:
 - Automatically create schemas for each of your events
 - Collaborate and hand-off workflows to non-developer folk
 
-We’ll dive into more of these pieces in future posts. If you’re interested in getting started, you can [sign up here](https://www.inngest.com/sign-up).
+We’ll dive into more of these pieces in future posts. If you’re interested in getting started, you can [sign up here](https://app.inngest.com/sign-up).
 
 ## What can it be used for? Some examples…
 
@@ -65,4 +65,4 @@ There are also a bunch of things you might need to do depending on your sector:
 - When a return label is generated but no shipment sent event is received by the label expiry, generate a new label and email the user.
 - When a meeting is upcoming, send reminders
 
-It goes on, and on, and on, depending on what you're doing. And we're here to help you build it. You can [get started for free](https://www.inngest.com/sign-up), or if you're interested in chatting with us you can send us an email: <a href="mailto:founders@inngest.com">founders@inngest.com</a>
+It goes on, and on, and on, depending on what you're doing. And we're here to help you build it. You can [get started for free](https://app.inngest.com/sign-up), or if you're interested in chatting with us you can send us an email: <a href="mailto:founders@inngest.com">founders@inngest.com</a>

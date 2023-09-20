@@ -103,6 +103,6 @@ Overall, we’re happy with our decision to be one of the early production apps 
 
 In an upcoming post, we’ll discuss how debugging has changed with the introduction of React Server Components, how to handle cold boots, and more.
 
-If you’re curious to see our new app in action, check out our new Inngest Dashboard by signing up [here](/sign-up?ref=blog-5-lessons-learned-from-taking-next-js-app-router-to-production).
+If you’re curious to see our new app in action, check out our new Inngest Dashboard by signing up [here](https://app.inngest.com/sign-up?ref=blog-5-lessons-learned-from-taking-next-js-app-router-to-production).
 
 ![The Inngest Dashboard](/assets/blog/5-lessons-learned-from-taking-next-js-app-router-to-production/inngest-dashboard.png)

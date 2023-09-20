@@ -128,4 +128,4 @@ K6 was able to help us quickly and easily get some initial benchmarks for self-h
 
 **The cloud**
 
-Alternatively, if you want to build event-driven background functions that scale with zero infra and zero setup, you can always sign up with our cloud.  It lets you push millions of events per month and run functions with zero setup — plus you can use the same open-source services to test your functions and setup locally with no effort.  [Sign up here to get started.](https://www.inngest.com/sign-up?ref=load-test-post)
+Alternatively, if you want to build event-driven background functions that scale with zero infra and zero setup, you can always sign up with our cloud.  It lets you push millions of events per month and run functions with zero setup — plus you can use the same open-source services to test your functions and setup locally with no effort.  [Sign up here to get started.](https://app.inngest.com/sign-up?ref=load-test-post)

@@ -62,6 +62,11 @@ async function redirects() {
       destination: "/patterns",
       permanent: true,
     },
+    {
+      source: "/sign-up",
+      destination: process.env.NEXT_PUBLIC_SIGNUP_URL,
+      permanent: true,
+    }
   ];
 }
 

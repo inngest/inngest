@@ -46,7 +46,7 @@ function DefaultLayout({ children }) {
   const router = useRouter();
   return (
     <>
-      {!DISABLE_BANNER && router.pathname !== "/sign-up" && (
+      {!DISABLE_BANNER && (
         <PageBanner href="/blog/announcing-inngest-seed-financing?ref=page-banner">
           <FireIcon />
           <span className="sm:hidden">Inngest Raises $3M Seed</span>

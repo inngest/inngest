@@ -39,7 +39,7 @@ export default function Hero() {
           </Link>
         </div>
         <Link
-          href="/sign-up?ref=homepage-hero"
+          href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=homepage-hero`}
           className="group flex items-center gap-1 rounded-md px-3 py-1.5 bg-transparent transition-all text-indigo-200 border border-transparent hover:border-slate-800 whitespace-nowrap"
         >
           Start Building For Free

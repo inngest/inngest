@@ -129,7 +129,7 @@ export default function useCase({ stringData }) {
           image={data.heroImage}
           ctas={[
             {
-              href: `/sign-up?ref=use-case-${data.slug}`,
+              href: `${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=use-case-${data.slug}`,
               text: `Sign Up`,
               arrow: "right",
             },

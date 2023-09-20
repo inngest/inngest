@@ -28,7 +28,7 @@ const Callout: React.FC<Props> = ({
         <Button
           kind="black"
           size="medium"
-          href={`${link || "/sign-up"}${ctaRef ? "?ref=" + ctaRef : ""}`}
+          href={`${link || process.env.NEXT_PUBLIC_SIGNUP_URL}${ctaRef ? "?ref=" + ctaRef : ""}`}
         >
           {cta || ">_ Start building"}
         </Button>

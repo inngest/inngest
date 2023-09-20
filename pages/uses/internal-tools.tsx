@@ -34,7 +34,7 @@ export default function Template() {
             and ship using the most advanced tooling platform available.
           </p>
           <div className="flex flex-row justify-center pt-12">
-            <Button kind="primary" href="/sign-up?ref=tools">
+            <Button kind="primary" href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=tools`}>
               Sign up
             </Button>
             <Button kind="outline" href="/contact?ref=tools">
@@ -104,7 +104,7 @@ export default function Template() {
           <small>Between</small>
         </div>
         <div>
-          <Button kind="primary" href="/sign-up?ref=tools">
+          <Button kind="primary" href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=tools`}>
             Start building today
           </Button>
         </div>
@@ -161,7 +161,7 @@ export default function Template() {
         </div>
 
         <div className="flex justify-center pt-12">
-          <Button kind="primary" href="/sign-up?ref=tools">
+          <Button kind="primary" href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=tools`}>
             Sign up
           </Button>
           <Button kind="outline" href="/docs?ref=tools">

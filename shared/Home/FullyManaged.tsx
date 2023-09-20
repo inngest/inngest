@@ -78,7 +78,7 @@ export default function FullyManaged() {
       </Container>
       <Container className="flex items-center justify-center mb-32 mt-20">
         <a
-          href="/sign-up?ref=homepage-platform"
+          href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=homepage-platform`}
           className="group inline-flex mt-4 items-center gap-0.5 rounded-full text-sm font-medium pl-6 pr-5 py-3  bg-indigo-500 hover:bg-indigo-400 transition-all text-white"
         >
           Sign up for free

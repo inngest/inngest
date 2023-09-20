@@ -140,13 +140,13 @@ const NavContent: React.FC<Props> = (props: Props) => {
       <div className="auth-options">
         <StyledLink
           className="auth-login"
-          href="https://app.inngest.com/login?ref=nav"
+          href={`${process.env.NEXT_PUBLIC_SIGNIN_URL}?ref=nav`}
         >
-          Log in
+          Sign In
         </StyledLink>
         {!props.nolinks && (
           <Button
-            href="/sign-up?ref=nav"
+            href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=nav`}
             className="button"
             kind="primary"
             style={{ padding: "0.4rem 1rem" }}

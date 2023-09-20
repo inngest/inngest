@@ -8,7 +8,7 @@ date: 2022-02-22
 
 <div className="blog--callout">
 
-We're Inngest. We make it easy to run serverless functions in response to events. How? We're an event mesh that fully types, records, and analyzes all of your events, then runs functions instantly we receive them. It makes building reliable serverless functions much easier. [You can get started for free](/sign-up).
+We're Inngest. We make it easy to run serverless functions in response to events. How? We're an event mesh that fully types, records, and analyzes all of your events, then runs functions instantly we receive them. It makes building reliable serverless functions much easier. [You can get started for free](https://app.inngest.com/sign-up).
 
 </div>
 

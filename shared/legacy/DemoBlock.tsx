@@ -26,7 +26,7 @@ export default function DemoBlock({
       <div className="pt-8 px-2 flex flex-col md:flex-row gap-8 border-t-2">
         <div className="basis-1/4" style={{ minWidth: "260px" }}>
           <h2 className="text-lg font-normal mb-6">{headline}</h2>
-          <Button kind="primary" size="medium" href="/sign-up?ref=demo-section">
+          <Button kind="primary" size="medium" href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=demo-section`}>
             Start building
           </Button>
         </div>

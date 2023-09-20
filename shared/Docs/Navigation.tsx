@@ -472,11 +472,11 @@ export function Navigation(props) {
         ))}
         <li className="sticky bottom-0 z-10 mt-6 sm:hidden gap-2 flex dark:bg-slate-900">
           <Button
-            href={process.env.NEXT_PUBLIC_LOGIN_URL}
+            href={process.env.NEXT_PUBLIC_SIGNIN_URL}
             variant="secondary"
             className="w-full"
           >
-            Log in
+            Sign In
           </Button>
           <Button
             href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=docs-mobile-nav`}
@@ -484,7 +484,7 @@ export function Navigation(props) {
             arrow="right"
             className="w-full"
           >
-            Sign up
+            Sign Up
           </Button>
         </li>
       </ul>

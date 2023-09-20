@@ -136,14 +136,14 @@ export default function Header() {
             </div>
             <div className="px-8 md:px-10 py-8 md:py-0 flex gap-6 items-center md:w-1/3 md:justify-end flex-shrink-0">
               <a
-                href="https://app.inngest.com/login?ref=nav"
+                href={`${process.env.NEXT_PUBLIC_SIGNIN_URL}?ref=nav`}
                 className="text-white font-medium text-sm  hover:opacity-60 duration-150 transition-all flex-shrink-0"
               >
-                Log In
+                Sign In
               </a>
 
               <a
-                href="/sign-up?ref=nav"
+                href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=nav`}
                 className="group flex gap-0.5 items-center rounded-full text-sm font-medium pl-6 pr-5 py-2  bg-indigo-500 hover:bg-indigo-400 transition-all text-white flex-shrink-0"
               >
                 Sign Up

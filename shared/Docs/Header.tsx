@@ -97,18 +97,18 @@ export const Header = forwardRef<HTMLDivElement>(function Header(
         </div>
         <div className="hidden sm:flex items-center gap-3">
           <Button
-            href={process.env.NEXT_PUBLIC_LOGIN_URL}
+            href={process.env.NEXT_PUBLIC_SIGNIN_URL}
             size="sm"
             variant="secondary"
           >
-            Log in
+            Sign In
           </Button>
           <Button
             href={`${process.env.NEXT_PUBLIC_SIGNUP_URL}?ref=docs-header`}
             size="sm"
             arrow="right"
           >
-            Sign up
+            Sign Up
           </Button>
         </div>
       </div>

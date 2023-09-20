@@ -48,4 +48,4 @@ Addressing a production issue is usually an ill-choreographed dance of crawling 
 
 Replays give you some awesome tooling for quickly and safely deploying your product. We'd love to hear how you use them on [GitHub](https://github.com/inngest/inngest) or [Discord](/discord).
 
-[Start building today](/sign-up?ref=blog-introducing-cli-replays).
+[Start building today](https://app.inngest.com/sign-up?ref=blog-introducing-cli-replays).
