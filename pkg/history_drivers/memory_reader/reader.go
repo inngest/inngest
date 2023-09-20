@@ -27,8 +27,8 @@ func (r *reader) CountRuns(
 	ctx context.Context,
 	opts history_reader.CountRunOpts,
 ) (int, error) {
-	r.store.Mu.Lock()
-	defer r.store.Mu.Unlock()
+	r.store.Mu.RLock()
+	defer r.store.Mu.RUnlock()
 
 	return len(r.store.Data), nil
 }
@@ -38,8 +38,8 @@ func (r *reader) GetRun(
 	runID ulid.ULID,
 	opts history_reader.GetRunOpts,
 ) (history_reader.Run, error) {
-	r.store.Mu.Lock()
-	defer r.store.Mu.Unlock()
+	r.store.Mu.RLock()
+	defer r.store.Mu.RUnlock()
 
 	run, ok := r.store.Data[runID]
 	if !ok {
@@ -54,8 +54,8 @@ func (r *reader) GetRunHistory(
 	runID ulid.ULID,
 	opts history_reader.GetRunOpts,
 ) ([]*history_reader.RunHistory, error) {
-	r.store.Mu.Lock()
-	defer r.store.Mu.Unlock()
+	r.store.Mu.RLock()
+	defer r.store.Mu.RUnlock()
 
 	run, ok := r.store.Data[runID]
 	if !ok {
@@ -79,8 +79,8 @@ func (r *reader) GetRunHistoryItemOutput(
 	historyID ulid.ULID,
 	opts history_reader.GetHistoryOutputOpts,
 ) (string, error) {
-	r.store.Mu.Lock()
-	defer r.store.Mu.Unlock()
+	r.store.Mu.RLock()
+	defer r.store.Mu.RUnlock()
 
 	if err := opts.Validate(); err != nil {
 		return "", err
@@ -104,8 +104,8 @@ func (r *reader) GetRuns(
 	ctx context.Context,
 	opts history_reader.GetRunsOpts,
 ) ([]history_reader.Run, error) {
-	r.store.Mu.Lock()
-	defer r.store.Mu.Unlock()
+	r.store.Mu.RLock()
+	defer r.store.Mu.RUnlock()
 
 	var runs []history_reader.Run
 	for _, run := range r.store.Data {
@@ -120,8 +120,8 @@ func (r *reader) GetRunsByEventID(
 	eventID ulid.ULID,
 	opts history_reader.GetRunsByEventIDOpts,
 ) ([]history_reader.Run, error) {
-	r.store.Mu.Lock()
-	defer r.store.Mu.Unlock()
+	r.store.Mu.RLock()
+	defer r.store.Mu.RUnlock()
 
 	var runs []history_reader.Run
 	for _, run := range r.store.Data {
@@ -137,8 +137,8 @@ func (r *reader) GetUsage(
 	ctx context.Context,
 	opts history_reader.GetUsageOpts,
 ) ([]usage.UsageSlot, error) {
-	r.store.Mu.Lock()
-	defer r.store.Mu.Unlock()
+	r.store.Mu.RLock()
+	defer r.store.Mu.RUnlock()
 
 	return nil, errors.New("not implemented")
 }
