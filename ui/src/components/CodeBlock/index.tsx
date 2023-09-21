@@ -65,18 +65,26 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
       <div className="bg-slate-800/40 flex justify-between shadow border-b border-slate-700/20">
         <div className="flex -mb-px">
           {tabs.map((tab, i) => (
-            <button
-              className={classNames(
-                i === activeTab
-                  ? `border-indigo-400 text-white`
-                  : `border-transparent text-slate-400`,
-                `text-xs px-5 py-2.5 border-b block transition-all duration-150 outline-none`,
+            <>
+              {tabs.length > 1 ? (
+                <button
+                  className={classNames(
+                    i === activeTab
+                      ? `border-indigo-400 text-white`
+                      : `border-transparent text-slate-400`,
+                    `text-xs px-5 py-2.5 border-b block transition-all duration-150 outline-none`,
+                  )}
+                  onClick={() => handleTabClick(i)}
+                  key={i}
+                >
+                  {tab.label}
+                </button>
+              ) : (
+                <p key={i} className="text-xs px-5 py-2.5 text-slate-400">
+                  {tab.label}
+                </p>
               )}
-              onClick={() => handleTabClick(i)}
-              key={i}
-            >
-              {tab.label}
-            </button>
+            </>
           ))}
         </div>
         <div className="flex gap-2 items-center mr-2">
