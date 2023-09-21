@@ -6,14 +6,14 @@ type Props = {
 };
 
 export function Timeline({ history }: Props) {
-  const items = Object.values(history).sort(sortAscending);
+  const nodes = Object.values(history).sort(sortAscending);
 
   let content: JSX.Element | JSX.Element[];
-  if (items.length === 0) {
+  if (nodes.length === 0) {
     content = <div>No history yet</div>;
   } else {
-    content = items.map((item) => {
-      return <TimelineNode item={item} key={item.groupID} />;
+    content = nodes.map((node) => {
+      return <TimelineNode node={node} key={node.groupID} />;
     });
   }
 
