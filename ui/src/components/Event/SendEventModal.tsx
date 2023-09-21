@@ -8,15 +8,33 @@ import Modal from '@/components/Modal';
 import useModifierKey from '@/hooks/useModifierKey';
 import { usePortal } from '../../hooks/usePortal';
 import { useSendEventMutation } from '../../store/devApi';
-import { selectEvent } from '../../store/global';
-import { useAppDispatch } from '../../store/hooks';
 import { genericiseEvent } from '../../utils/events';
 
 export default function SendEventModal({ data, isOpen, onClose }) {
   const [_sendEvent, sendEventState] = useSendEventMutation();
   const portal = usePortal();
   const eventDataStr = data;
-  const dispatch = useAppDispatch();
+
+    // Define the keydown event handler
+    const handleGlobalKeyDown = (event) => {
+      // Check if Ctrl or Cmd key is pressed (depending on the user's OS)
+      const isCtrlCmdPressed = event.ctrlKey || event.metaKey;
+  
+      if (isCtrlCmdPressed && event.key === 'Enter') {
+        // Trigger the sendEvent function
+        sendEventRef.current();
+      }
+    };
+  
+    useEffect(() => {
+      document.addEventListener('keydown', handleGlobalKeyDown);
+  
+      // Detach the event listener when the component unmounts
+      return () => {
+        document.removeEventListener('keydown', handleGlobalKeyDown);
+      };
+    }, []);
+
 
   const snippedData = useMemo(() => genericiseEvent(eventDataStr), [eventDataStr]);
 
@@ -69,7 +87,6 @@ export default function SendEventModal({ data, isOpen, onClose }) {
       .then(() => {
         toast.success('The event was successfully added.');
         onClose();
-        dispatch(selectEvent(data.id));
       });
   }, [_sendEvent, input]);
 
