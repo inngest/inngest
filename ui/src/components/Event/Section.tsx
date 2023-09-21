@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { ulid } from 'ulid';
 
 import SendEventButton from '@/components/Event/SendEventButton';
+import MetadataGrid from '@/components/Metadata/MetadataGrid';
+import { shortDate } from '@/utils/date';
 import { usePrettyJson } from '../../hooks/usePrettyJson';
 import { useSendEventMutation } from '../../store/devApi';
 import { EventStatus, FunctionRunStatus, useGetEventQuery } from '../../store/generated';
@@ -48,14 +50,21 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
   return (
     <ContentCard
       title={event.name || 'unknown'}
-      date={event.createdAt}
-      id={eventId}
-      idPrefix={'Event ID'}
+      metadata={
+        <div className="pt-8">
+          <MetadataGrid
+            metadataItems={[
+              { label: 'Event ID', value: eventId, size: 'large' },
+              { label: 'Received At', value: shortDate(new Date(event.createdAt)) },
+            ]}
+          />
+        </div>
+      }
       active
       // button={<Button label="Open Event" icon={<IconFeed />} />}
     >
       {eventPayload ? (
-        <div className="px-4 pt-4">
+        <div className="px-5 pt-4">
           <CodeBlock tabs={[{ label: 'Payload', content: eventPayload }]} />
         </div>
       ) : null}
