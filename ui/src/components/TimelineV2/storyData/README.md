@@ -1,5 +1,22 @@
 # Storybook data
 
+## Functions
+
+```ts
+inngest.createFunction({ name: 'Succeeds with 2 steps' }, { event: 'foo' }, async ({ step }) => {
+  await step.run('First step', () => {});
+  await step.run('Second step', async () => {});
+});
+```
+
+```ts
+inngest.createFunction({ name: 'Waits for event' }, { event: 'foo' }, async ({ step }) => {
+  await step.waitForEvent('foo', '1m');
+});
+```
+
+## Getting data
+
 To get data, run this GraphQL query using the run ID:
 
 ```gql
