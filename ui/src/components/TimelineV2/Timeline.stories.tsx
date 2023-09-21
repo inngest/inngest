@@ -57,8 +57,7 @@ const meta = {
       let i = 0;
 
       const timer = setInterval(() => {
-        if (i > waitsForEventData.length - 1) {
-          clearInterval(timer);
+        if (i > _rawHistory.length - 1) {
           return;
         }
 
@@ -69,7 +68,6 @@ const meta = {
 
       return () => clearInterval(timer);
     }, [_delayMS]);
-
     return <Timeline {...args} history={history} />;
   },
   tags: ['autodocs'],
