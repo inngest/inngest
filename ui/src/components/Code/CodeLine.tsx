@@ -1,6 +1,6 @@
 import useCopyToClipboard from '@/hooks/useCopyToClipboard';
 import classNames from '@/utils/classnames';
-import CopyButton from './Button/CopyButton';
+import CopyButton from '@/components/Button/CopyButton';
 
 type CodeLineProps = {
   code: string;

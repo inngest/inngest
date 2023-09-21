@@ -8,15 +8,33 @@ import Modal from '@/components/Modal';
 import useModifierKey from '@/hooks/useModifierKey';
 import { usePortal } from '../../hooks/usePortal';
 import { useSendEventMutation } from '../../store/devApi';
-import { selectEvent } from '../../store/global';
-import { useAppDispatch } from '../../store/hooks';
 import { genericiseEvent } from '../../utils/events';
 
 export default function SendEventModal({ data, isOpen, onClose }) {
   const [_sendEvent, sendEventState] = useSendEventMutation();
   const portal = usePortal();
   const eventDataStr = data;
-  const dispatch = useAppDispatch();
+
+    // Define the keydown event handler
+    const handleGlobalKeyDown = (event) => {
+      // Check if Ctrl or Cmd key is pressed (depending on the user's OS)
+      const isCtrlCmdPressed = event.ctrlKey || event.metaKey;
+  
+      if (isCtrlCmdPressed && event.key === 'Enter') {
+        // Trigger the sendEvent function
+        sendEventRef.current();
+      }
+    };
+  
+    useEffect(() => {
+      document.addEventListener('keydown', handleGlobalKeyDown);
+  
+      // Detach the event listener when the component unmounts
+      return () => {
+        document.removeEventListener('keydown', handleGlobalKeyDown);
+      };
+    }, []);
+
 
   const snippedData = useMemo(() => genericiseEvent(eventDataStr), [eventDataStr]);
 
@@ -69,7 +87,6 @@ export default function SendEventModal({ data, isOpen, onClose }) {
       .then(() => {
         toast.success('The event was successfully added.');
         onClose();
-        dispatch(selectEvent(data.id));
       });
   }, [_sendEvent, input]);
 
@@ -88,9 +105,30 @@ export default function SendEventModal({ data, isOpen, onClose }) {
     monaco.editor.defineTheme('inngest-theme', {
       base: 'vs-dark',
       inherit: true,
-      rules: [],
+      rules: [
+        {
+          token: 'delimiter.bracket.json',
+          foreground: 'cbd5e1', //slate-300
+        },
+        {
+          token: 'string.key.json',
+          foreground: '818cf8', //indigo-400
+        },
+        {
+          token: 'number.json',
+          foreground: 'fbbf24', //amber-400
+        },
+        {
+          token: 'string.value.json',
+          foreground: '6ee7b7', //emerald-300
+        },
+        {
+          token: 'keyword.json',
+          foreground: 'f0abfc', //fuschia-300
+        },
+      ],
       colors: {
-        'editor.background': '#1e293b', // slate-800
+        'editor.background': '#1e293b4d', // slate-800/40
         'editor.lineHighlightBorder': '#cbd5e11a', // slate-300/10
         'editorIndentGuide.background': '#cbd5e133', // slate-300/20
         'editorIndentGuide.activeBackground': '#cbd5e14d', // slate-300/30
@@ -149,8 +187,8 @@ export default function SendEventModal({ data, isOpen, onClose }) {
     >
       <div className="m-6">
         <div className="relative w-full h-[20rem] flex flex-col rounded overflow-hidden">
-          <div className="items-center bg-slate-800 shadow border-b border-slate-700/20 flex justify-between">
-            <p className=" text-slate-300/50 text-xs px-5 py-4">Payload</p>
+          <div className="items-center bg-slate-800/40 shadow border-b border-slate-700/20 flex justify-between">
+            <p className=" text-slate-400 text-xs px-5 py-4">Payload</p>
           </div>
           {monaco ? (
             <Editor
@@ -170,9 +208,6 @@ export default function SendEventModal({ data, isOpen, onClose }) {
                 });
               }}
               options={{
-                fixedOverflowWidgets: false,
-                formatOnPaste: false,
-                formatOnType: false,
                 minimap: {
                   enabled: false,
                 },
@@ -184,9 +219,14 @@ export default function SendEventModal({ data, isOpen, onClose }) {
                 },
                 scrollBeyondLastLine: false,
                 wordWrap: 'on',
-                fontFamily: 'Source Code Pro, monospace',
+                fontFamily: 'Roboto_Mono',
                 fontSize: 13,
+                fontWeight: 'light',
                 lineHeight: 26,
+                padding: {
+                  top: 10,
+                  bottom: 10,
+                },
               }}
             />
           ) : null}

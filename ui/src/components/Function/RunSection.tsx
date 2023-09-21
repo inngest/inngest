@@ -13,7 +13,7 @@ import { selectRun } from '../../store/global';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { BlankSlate } from '../Blank';
 import Button from '../Button/Button';
-import CodeBlock from '../CodeBlock';
+import CodeBlock from '../Code/CodeBlock';
 import ContentCard from '../Content/ContentCard';
 import TimelineFuncProgress from '../Timeline/TimelineFuncProgress';
 import TimelineRow from '../Timeline/TimelineRow';
@@ -73,9 +73,6 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       idPrefix={'Run ID'}
       // button={<Button label="Open Function" icon={<IconFeed />} />}
     >
-      <div className="flex justify-end px-4 border-t border-slate-800/50 pt-4 mt-4">
-        <Button label="Rerun" />
-      </div>
       <div className="pr-4 mt-4">
         {timeline?.map((row, i, list) => (
           <FunctionRunTimelineRow
