@@ -6,11 +6,13 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/generated"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/execution/runner"
+	"github.com/inngest/inngest/pkg/history_reader"
 )
 
 type Resolver struct {
-	Data   cqrs.Manager
-	Runner runner.Runner
+	Data          cqrs.Manager
+	HistoryReader history_reader.Reader
+	Runner        runner.Runner
 }
 
 // Query returns generated.QueryResolver implementation.

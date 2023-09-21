@@ -11,7 +11,7 @@ import (
 var (
 	Singleton = &RunStore{
 		Data: map[ulid.ULID]RunData{},
-		Mu:   &sync.Mutex{},
+		Mu:   &sync.RWMutex{},
 	}
 )
 
@@ -22,5 +22,5 @@ type RunData struct {
 
 type RunStore struct {
 	Data map[ulid.ULID]RunData
-	Mu   *sync.Mutex
+	Mu   *sync.RWMutex
 }

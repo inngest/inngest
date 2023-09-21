@@ -7,6 +7,8 @@ import (
 	"io"
 	"strconv"
 	"time"
+
+	"github.com/inngest/inngest/pkg/history_reader"
 )
 
 type FunctionRunEvent interface {
@@ -68,19 +70,21 @@ type FunctionEvent struct {
 func (FunctionEvent) IsFunctionRunEvent() {}
 
 type FunctionRun struct {
-	ID           string             `json:"id"`
-	FunctionID   string             `json:"functionID"`
-	Function     *Function          `json:"function,omitempty"`
-	Workspace    *Workspace         `json:"workspace,omitempty"`
-	Event        *Event             `json:"event,omitempty"`
-	Status       *FunctionRunStatus `json:"status,omitempty"`
-	WaitingFor   *StepEventWait     `json:"waitingFor,omitempty"`
-	PendingSteps *int               `json:"pendingSteps,omitempty"`
-	StartedAt    *time.Time         `json:"startedAt,omitempty"`
-	FinishedAt   *time.Time         `json:"finishedAt,omitempty"`
-	Output       *string            `json:"output,omitempty"`
-	Timeline     []FunctionRunEvent `json:"timeline,omitempty"`
-	Name         *string            `json:"name,omitempty"`
+	ID                string                       `json:"id"`
+	FunctionID        string                       `json:"functionID"`
+	Function          *Function                    `json:"function,omitempty"`
+	Workspace         *Workspace                   `json:"workspace,omitempty"`
+	Event             *Event                       `json:"event,omitempty"`
+	Status            *FunctionRunStatus           `json:"status,omitempty"`
+	WaitingFor        *StepEventWait               `json:"waitingFor,omitempty"`
+	PendingSteps      *int                         `json:"pendingSteps,omitempty"`
+	StartedAt         *time.Time                   `json:"startedAt,omitempty"`
+	FinishedAt        *time.Time                   `json:"finishedAt,omitempty"`
+	Output            *string                      `json:"output,omitempty"`
+	Timeline          []FunctionRunEvent           `json:"timeline,omitempty"`
+	History           []*history_reader.RunHistory `json:"history"`
+	HistoryItemOutput string                       `json:"historyItemOutput"`
+	Name              *string                      `json:"name,omitempty"`
 }
 
 type FunctionRunQuery struct {

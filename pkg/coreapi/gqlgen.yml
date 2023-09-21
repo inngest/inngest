@@ -18,10 +18,8 @@ struct_tag: json
 models:
   NullString:
     model: github.com/inngest/inngest/pkg/coreapi.NullString
-  Int:
-    model:
-      - github.com/99designs/gqlgen/graphql.Int
-      - github.com/99designs/gqlgen/graphql.Uint
+  Uint:
+    model: github.com/99designs/gqlgen/graphql.Uint
   Environment:
     model: github.com/inngest/inngest/pkg/coreapi/graph/models.Environment
   App:
@@ -46,6 +44,10 @@ models:
         resolver: true
   FunctionRun:
     fields:
+      history:
+        resolver: true
+      historyItemOutput:
+        resolver: true
       timeline:
         resolver: true
       event:
@@ -62,3 +64,21 @@ models:
         resolver: true
       finishedAt:
         resolver: true
+  HistoryType:
+    model: github.com/inngest/inngest/pkg/enums.HistoryType
+  RunHistoryItem:
+    model: github.com/inngest/inngest/pkg/history_reader.RunHistory
+  RunHistoryCancel:
+    model: github.com/inngest/inngest/pkg/history_reader.RunHistoryCancel
+  RunHistoryResult:
+    model: github.com/inngest/inngest/pkg/history_reader.RunHistoryResult
+  RunHistorySleep:
+    model: github.com/inngest/inngest/pkg/history_reader.RunHistorySleep
+  RunHistoryWaitForEvent:
+    model: github.com/inngest/inngest/pkg/history_reader.RunHistoryWaitForEvent
+  RunHistoryWaitResult:
+    model: github.com/inngest/inngest/pkg/history_reader.RunHistoryWaitResult
+  ULID:
+    model: github.com/inngest/inngest/pkg/gql_scalars.ULID
+  UUID:
+    model: github.com/inngest/inngest/pkg/gql_scalars.UUID

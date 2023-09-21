@@ -179,6 +179,7 @@ func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, e
 		dr := &state.DriverResponse{
 			Step:       step,
 			Duration:   resp.duration,
+			Output:     string(resp.body),
 			OutputSize: len(resp.body),
 			NoRetry:    resp.noRetry,
 			RetryAt:    resp.retryAt,
