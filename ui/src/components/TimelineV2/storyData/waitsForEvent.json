@@ -1,0 +1,113 @@
+[
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-21T11:53:23.060981-04:00",
+    "groupID": "2d6bdf09-b36d-4850-8594-83437340d738",
+    "id": "01HAW749BMVE7TGZENBYPN1PE0",
+    "type": "FunctionStarted",
+    "sleep": null,
+    "stepName": null,
+    "url": null,
+    "waitForEvent": null,
+    "waitResult": null
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-21T11:53:23.061495-04:00",
+    "groupID": "2d6bdf09-b36d-4850-8594-83437340d738",
+    "id": "01HAW749BNAT6KE2P4YSZ6J4D5",
+    "type": "StepStarted",
+    "sleep": null,
+    "stepName": "step",
+    "url": "http://localhost:3939/api/inngest?fnId=local-dev-send-welcome-email&stepId=step",
+    "waitForEvent": null,
+    "waitResult": null
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-21T11:53:23.089541-04:00",
+    "groupID": "2d6bdf09-b36d-4850-8594-83437340d738",
+    "id": "01HAW749CHV89W61DS4ZR19KM6",
+    "type": "StepCompleted",
+    "sleep": null,
+    "stepName": "bar",
+    "url": "http://localhost:3939/api/inngest?fnId=local-dev-send-welcome-email&stepId=step",
+    "waitForEvent": null,
+    "waitResult": null
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-21T11:53:23.092723-04:00",
+    "groupID": "2d6bdf09-b36d-4850-8594-83437340d738",
+    "id": "01HAW749CMGRMZ07C73A6NY9V3",
+    "type": "StepSleeping",
+    "sleep": null,
+    "stepName": "bar",
+    "url": null,
+    "waitForEvent": {
+      "eventName": "bar",
+      "expression": null,
+      "timeout": "2023-09-21T11:54:23.09272-04:00"
+    },
+    "waitResult": null
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-21T11:53:34.715307-04:00",
+    "groupID": "2d6bdf09-b36d-4850-8594-83437340d738",
+    "id": "01HAW74MQVMAX73KJB4PND6XMS",
+    "type": "StepCompleted",
+    "sleep": null,
+    "stepName": null,
+    "url": null,
+    "waitForEvent": null,
+    "waitResult": {
+      "eventID": "01HAW74MMPVBF8RJSTGQHTVJFR",
+      "timeout": false
+    }
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-21T11:53:34.760759-04:00",
+    "groupID": "ed43e5f6-ad50-4f9a-89b8-060195fead3c",
+    "id": "01HAW74MS8FJ5B43A5P8QWNRYF",
+    "type": "StepStarted",
+    "sleep": null,
+    "stepName": "step",
+    "url": "http://localhost:3939/api/inngest?fnId=local-dev-send-welcome-email&stepId=step",
+    "waitForEvent": null,
+    "waitResult": null
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-21T11:53:34.771561-04:00",
+    "groupID": "ed43e5f6-ad50-4f9a-89b8-060195fead3c",
+    "id": "01HAW74MSKTDWZ4ZJADGTGW2BD",
+    "type": "StepCompleted",
+    "sleep": null,
+    "stepName": "step",
+    "url": "http://localhost:3939/api/inngest?fnId=local-dev-send-welcome-email&stepId=step",
+    "waitForEvent": null,
+    "waitResult": null
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-21T11:53:34.772362-04:00",
+    "groupID": "ed43e5f6-ad50-4f9a-89b8-060195fead3c",
+    "id": "01HAW74MSM3JE279WBNZDZXYC4",
+    "type": "FunctionCompleted",
+    "sleep": null,
+    "stepName": null,
+    "url": null,
+    "waitForEvent": null,
+    "waitResult": null
+  }
+]
