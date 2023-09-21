@@ -8,7 +8,7 @@ import { EventStatus, FunctionRunStatus, useGetEventQuery } from '../../store/ge
 import { selectEvent, selectRun } from '../../store/global';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import Button from '../Button/Button';
-import CodeBlock from '../CodeBlock';
+import CodeBlock from '../Code/CodeBlock';
 import ContentCard from '../Content/ContentCard';
 import FuncCard from '../Function/FuncCard';
 import TimelineRow from '../Timeline/TimelineRow';

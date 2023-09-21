@@ -13,7 +13,7 @@ import { selectRun } from '../../store/global';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { BlankSlate } from '../Blank';
 import Button from '../Button/Button';
-import CodeBlock from '../CodeBlock';
+import CodeBlock from '../Code/CodeBlock';
 import ContentCard from '../Content/ContentCard';
 import TimelineFuncProgress from '../Timeline/TimelineFuncProgress';
 import TimelineRow from '../Timeline/TimelineRow';
