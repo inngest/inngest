@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import ms from 'ms';
 
+import MetadataGrid from '@/components/Metadata/MetadataGrid';
+import { shortDate } from '@/utils/date';
 import { usePrettyJson } from '../../hooks/usePrettyJson';
 import {
   EventStatus,
@@ -12,7 +14,6 @@ import {
 import { selectRun } from '../../store/global';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { BlankSlate } from '../Blank';
-import Button from '../Button/Button';
 import CodeBlock from '../Code/CodeBlock';
 import ContentCard from '../Content/ContentCard';
 import TimelineFuncProgress from '../Timeline/TimelineFuncProgress';
@@ -45,7 +46,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
 
   if (query.isLoading) {
     return (
-      <ContentCard date={0} id="">
+      <ContentCard>
         <div className="w-full h-full flex items-center justify-center p-8">
           <div className="opacity-75 italic">Loading...</div>
         </div>
@@ -53,9 +54,9 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
     );
   }
 
-  if (!run) {
+  if (!run || !runId) {
     return (
-      <ContentCard date={0} id="">
+      <ContentCard>
         <BlankSlate
           imageUrl="/images/no-fn-selected.png"
           title="No function run selected"
@@ -68,10 +69,17 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
   return (
     <ContentCard
       title={run.name || 'Unknown'}
-      date={run.startedAt}
-      id={run.id}
-      idPrefix={'Run ID'}
-      // button={<Button label="Open Function" icon={<IconFeed />} />}
+      type="run"
+      metadata={
+        <div className="pt-8">
+          <MetadataGrid
+            metadataItems={[
+              { label: 'Run ID', value: runId, size: 'large' },
+              { label: 'Function Started', value: shortDate(new Date(run.startedAt)) },
+            ]}
+          />
+        </div>
+      }
     >
       <div className="pr-4 mt-4">
         {timeline?.map((row, i, list) => (
