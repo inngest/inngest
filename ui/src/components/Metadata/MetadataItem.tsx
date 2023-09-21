@@ -12,9 +12,9 @@ export type MetadataItemProps = {
 export default function MetadataItem({ value, label, tooltip }: MetadataItemProps) {
   return (
     <div className={classNames('flex flex-col p-1.5 bg-slate-950')}>
-      <span className="text-white">{value}</span>
+      <span className="text-sm text-white">{value}</span>
       <span className="flex items-center gap-1">
-        <span className="text-slate-500 capitalize">{label}</span>
+        <span className="text-sm text-slate-500 capitalize">{label}</span>
         {tooltip && (
           <Tooltip children={<IconInfo className="text-slate-400 icon-lg" />} content={tooltip} />
         )}
