@@ -49,7 +49,7 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
         },
       ],
       colors: {
-        'editor.background': '#1e293b4d', // slate-800/30
+        'editor.background': '#1e293b4d', // slate-800/40
         'editorLineNumber.foreground': '#cbd5e14d', // slate-300/30
         'editorLineNumber.activeForeground': '#CBD5E1', // slate-300
       },
@@ -120,6 +120,7 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
                   wordWrap: 'on',
                   fontFamily: 'Roboto_Mono',
                   fontSize: 13,
+                  fontWeight: 'light',
                   lineHeight: 26,
                   renderLineHighlight: 'none', // no line selected borders being shown
                   renderWhitespace: 'none', // no indentation spaces being shown
