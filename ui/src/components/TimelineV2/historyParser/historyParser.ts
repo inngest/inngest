@@ -145,6 +145,9 @@ export class HistoryParser {
       }
     }
 
-    this.history[node.groupID] = node;
+    this.history = {
+      ...this.history,
+      [node.groupID]: node,
+    };
   }
 }

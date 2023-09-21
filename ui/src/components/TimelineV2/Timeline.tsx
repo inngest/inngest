@@ -8,13 +8,16 @@ type Props = {
 export function Timeline({ history }: Props) {
   const items = Object.values(history).sort(sortAscending);
 
-  return (
-    <div className="bg-white p-4">
-      {items.map((item) => {
-        return <TimelineNode item={item} key={item.groupID} />;
-      })}
-    </div>
-  );
+  let content: JSX.Element | JSX.Element[];
+  if (items.length === 0) {
+    content = <div>No history yet</div>;
+  } else {
+    content = items.map((item) => {
+      return <TimelineNode item={item} key={item.groupID} />;
+    });
+  }
+
+  return <div className="bg-white p-4">{content}</div>;
 }
 
 function sortAscending(a: HistoryNode, b: HistoryNode) {
