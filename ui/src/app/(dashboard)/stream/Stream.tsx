@@ -211,7 +211,6 @@ export default function Stream() {
             user: {},
           })}
         />
-        t
       </div>
       <div
         className="min-h-0 overflow-y-auto"
