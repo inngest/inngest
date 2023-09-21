@@ -1,22 +1,60 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Editor, { useMonaco } from '@monaco-editor/react';
 
 import useCopyToClipboard from '@/hooks/useCopyToClipboard';
 import classNames from '../../utils/classnames';
 import CopyButton from '../Button/CopyButton';
-import { SyntaxHighlight } from './SyntaxHighlight';
 
 interface CodeBlockProps {
   tabs: {
     label: string;
     content: string;
   }[];
-  expanded?: boolean;
-  modal?: (...args: any[]) => any;
 }
 
-export default function CodeBlock({ tabs, modal, expanded = false }: CodeBlockProps) {
+export default function CodeBlock({ tabs }: CodeBlockProps) {
   const [activeTab, setActiveTab] = useState(0);
   const { handleCopyClick, isCopying } = useCopyToClipboard();
+
+  const monaco = useMonaco();
+
+  useEffect(() => {
+    if (!monaco) {
+      return;
+    }
+
+    monaco.editor.defineTheme('inngest-theme', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        {
+          token: 'delimiter.bracket.json',
+          foreground: 'cbd5e1', //slate-300
+        },
+        {
+          token: 'string.key.json',
+          foreground: '818cf8', //indigo-400
+        },
+        {
+          token: 'number.json',
+          foreground: 'fbbf24', //amber-400
+        },
+        {
+          token: 'string.value.json',
+          foreground: '6ee7b7', //emerald-300
+        },
+        {
+          token: 'keyword.json',
+          foreground: 'f0abfc', //fuschia-300
+        },
+      ],
+      colors: {
+        'editor.background': '#1e293b4d', // slate-800/30
+        'editorLineNumber.foreground': '#cbd5e14d', // slate-300/30
+        'editorLineNumber.activeForeground': '#CBD5E1', // slate-300
+      },
+    });
+  }, [monaco]);
 
   const handleTabClick = (index) => {
     setActiveTab(index);
@@ -49,22 +87,61 @@ export default function CodeBlock({ tabs, modal, expanded = false }: CodeBlockPr
           />
         </div>
       </div>
-      <div
-        className={classNames(
-          expanded ? `max-w-[800px] max-h-[800px]` : `max-h-[300px]`,
-          `overflow-scroll grid`,
-        )}
-      >
-        {tabs.map((tab, i) => (
-          <code
-            className={classNames(
-              i === activeTab ? ` ` : `opacity-0 pointer-events-none`,
-              `col-start-1 row-start-1 transition-all duration-150`,
-            )}
-          >
-            <SyntaxHighlight code={tabs[i].content} className="p-4 text-2xs" />
-          </code>
-        ))}
+      <div>
+        {monaco &&
+          tabs.map((tab, i) => (
+            <div
+              className={classNames(
+                i === activeTab ? ` ` : `opacity-0 pointer-events-none`,
+                `col-start-1 row-start-1 transition-all duration-150`,
+              )}
+            >
+              <Editor
+                defaultLanguage="json"
+                value={tabs[i].content}
+                theme="inngest-theme"
+                options={{
+                  readOnly: true,
+                  minimap: {
+                    enabled: false,
+                  },
+                  lineNumbers: 'on',
+                  extraEditorClassName: '',
+                  contextmenu: false,
+                  scrollBeyondLastLine: false,
+                  wordWrap: 'on',
+                  fontFamily: 'Roboto_Mono',
+                  fontSize: 13,
+                  lineHeight: 26,
+                  renderLineHighlight: 'none', // no line selected borders being shown
+                  renderWhitespace: 'none', // no indentation spaces being shown
+                  guides: {
+                    indentation: false, // no indentation vertical lines being shown
+                    highlightActiveBracketPair: false,
+                    highlightActiveIndentation: false,
+                  },
+                  scrollbar: { verticalScrollbarSize: 10 },
+                  padding: {
+                    top: 10,
+                    bottom: 10,
+                  },
+                }}
+                onMount={(editor) => {
+                  const numberOfLines = editor.getModel()?.getLineCount();
+                  // To do: should calculate with getContentHeight instead of number of lines but for some reason the value is wrong
+                  if (numberOfLines && numberOfLines <= 10) {
+                    // If there are 10 or fewer lines, set the editor's height to the content height
+                    const contentHeight = numberOfLines * 26 + 20;
+                    editor.layout({ height: contentHeight, width: 0 });
+                  } else {
+                    // If there are more than 10 lines, set a fixed height with a scrollbar
+                    const fixedHeight = 10 * 26 + 20;
+                    editor.layout({ height: fixedHeight, width: 0 });
+                  }
+                }}
+              />
+            </div>
+          ))}
       </div>
     </div>
   );
