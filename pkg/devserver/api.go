@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -74,6 +75,16 @@ func (a *devapi) addRoutes() {
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
+	// If there's a file that exists within `static` for this particular route,
+	// return it as a static asset.
+	path := r.URL.Path
+	if f, err := static.Open("static" + path); err == nil {
+		if stat, err := f.Stat(); err == nil && !stat.IsDir() {
+			_, _ = io.Copy(w, f)
+			return
+		}
+	}
+
 	// If there's a trailing slash, redirect to non-trailing slashes.
 	if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
 		r.URL.Path = strings.TrimSuffix(r.URL.Path, "/")

@@ -1,13 +1,14 @@
+import Stream from './Stream';
+
 type StreamLayoutProps = {
   children: React.ReactNode;
-  slideOver: React.ReactNode;
 };
 
-export default function StreamLayout({ children, slideOver }: StreamLayoutProps) {
+export default function StreamLayout({ children }: StreamLayoutProps) {
   return (
     <>
+      <Stream />
       {children}
-      {slideOver}
     </>
   );
 }
