@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import AppCardHeader from '@/components/App/AppCardHeader';
 import Badge from '@/components/Badge';
 import Button from '@/components/Button/Button';
-import CodeLine from '@/components/CodeLine';
+import CodeLine from '@/components/Code/CodeLine';
 import Link from '@/components/Link/Link';
 import useDebounce from '@/hooks/useDebounce';
 import {
