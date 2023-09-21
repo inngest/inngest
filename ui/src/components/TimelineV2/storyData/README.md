@@ -3,6 +3,16 @@
 ## Functions
 
 ```ts
+inngest.createFunction(
+  { name: "Cancels", cancelOn: [{ event: "foo" }] },
+  { event: "foo" },
+  async ({ step }) => {
+    await step.sleep("1m");
+  }
+);
+```
+
+```ts
 inngest.createFunction({ name: 'Succeeds with 2 steps' }, { event: 'foo' }, async ({ step }) => {
   await step.run('First step', () => {});
   await step.run('Second step', async () => {});
