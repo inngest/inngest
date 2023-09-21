@@ -56,7 +56,7 @@ export default function SplitButton({ kind = 'default', size = 'small', items }:
 
         <Select.Portal>
           <Select.Content
-            className="bg-slate-800 rounded-sm overflow-hidden text-white cursor-pointer"
+            className="bg-slate-800 rounded-sm overflow-hidden text-white cursor-pointer z-50"
             position="popper"
             align="end"
             sideOffset={0}
