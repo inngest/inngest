@@ -61,6 +61,7 @@ type LifecycleListener interface {
 		context.Context,
 		state.Identifier,
 		queue.Item,
+		*string, // Step name.
 	)
 
 	// OnStepStarted is called when a step begins executing.
@@ -175,6 +176,7 @@ func (NoopLifecyceListener) OnStepScheduled(
 	context.Context,
 	state.Identifier,
 	queue.Item,
+	*string, // Step name
 ) {
 }
 

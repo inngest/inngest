@@ -4,12 +4,19 @@
 
 ```ts
 inngest.createFunction(
-  { name: "Cancels", cancelOn: [{ event: "foo" }] },
-  { event: "foo" },
+  { name: 'Cancels', cancelOn: [{ event: 'foo' }] },
+  { event: 'foo' },
   async ({ step }) => {
-    await step.sleep("1m");
-  }
+    await step.sleep('1m');
+  },
 );
+```
+
+```ts
+inngest.createFunction({ name: 'Parallel steps' }, { event: 'foo' }, async ({ step }) => {
+  await step.run('a', () => {});
+  await Promise.all([step.run('b1', () => {}), step.run('b2', () => {})]);
+});
 ```
 
 ```ts
