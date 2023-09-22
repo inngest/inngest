@@ -225,6 +225,7 @@ func (l lifecycle) OnStepScheduled(
 	ctx context.Context,
 	id state.Identifier,
 	item queue.Item,
+	stepName *string,
 ) {
 	edge, _ := queue.GetEdge(item)
 	if edge == nil {
@@ -253,7 +254,7 @@ func (l lifecycle) OnStepScheduled(
 		Type:            enums.HistoryTypeStepScheduled.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  id.IdempotencyKey(),
-		StepName:        &edge.Edge.Incoming,
+		StepName:        stepName,
 		StepID:          &edge.Edge.Incoming, // TODO: Add step name to edge.
 		EventID:         id.EventID,
 		BatchID:         id.BatchID,

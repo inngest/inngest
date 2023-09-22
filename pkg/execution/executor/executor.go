@@ -940,7 +940,11 @@ func (e *executor) handleGeneratorStep(ctx context.Context, gen state.GeneratorO
 	}
 
 	for _, l := range e.lifecycles {
-		go l.OnStepScheduled(ctx, item.Identifier, nextItem)
+		// We can't specify step name here since that will result in the
+		// "followup discovery step" having the same name as its predecessor.
+		var stepName *string = nil
+
+		go l.OnStepScheduled(ctx, item.Identifier, nextItem, stepName)
 	}
 
 	return err
@@ -988,7 +992,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, gen state.Gen
 	}
 
 	for _, l := range e.lifecycles {
-		go l.OnStepScheduled(ctx, item.Identifier, nextItem)
+		go l.OnStepScheduled(ctx, item.Identifier, nextItem, &gen.Name)
 	}
 	return err
 }
