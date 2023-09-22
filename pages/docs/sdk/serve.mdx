@@ -27,6 +27,7 @@ We provide framework-specific bindings to make this easy for common platforms:
 - [Fastify](#framework-fastify)
 - [Fresh (Deno)](#framework-fresh-deno)
 - [Google Cloud Functions](#framework-google-cloud-functions)
+- [H3](#framework-h3)
 - [Next.js](#framework-next-js)
 - [Redwood](#framework-redwood)
 - [Remix](#framework-remix)
@@ -195,6 +196,27 @@ ff.http('inngest', serve(inngest, [fnA]));
 ```
 
 You can run this locally with `npx @google-cloud/functions-framework --target=inngest` which will serve your Inngest functions on port `8080`.
+
+## Framework: H3 <VersionBadge version="v2.7.0+" />
+
+Inngest supports [H3](https://github.com/unjs/h3) and frameworks built upon it. Here's a simple H3 server that hosts serves an Inngest function.
+
+<CodeGroup filename="index.js">
+```typescript
+import { createServer } from "node:http";
+import { createApp, eventHandler, toNodeListener } from "h3";
+import { serve } from "inngest/h3";
+import { inngest } from "./inngest/client";
+import fnA from "./inngest/fnA";
+
+const app = createApp();
+app.use("/api/inngest", eventHandler(serve(inngest, [fnA])));
+
+createServer(toNodeListener(app)).listen(process.env.PORT || 3000);
+```
+</CodeGroup>
+
+See the [github.com/unjs/h3](https://github.com/unjs/h3) repository for more information about how to host an H3 endpoint.
 
 ## Framework: Next.js
 
