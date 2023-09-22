@@ -1,20 +1,20 @@
 import { useMemo } from 'react';
 import { ulid } from 'ulid';
 
+import Badge from '@/components/Badge';
 import SendEventButton from '@/components/Event/SendEventButton';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { shortDate } from '@/utils/date';
 import { usePrettyJson } from '../../hooks/usePrettyJson';
 import { useSendEventMutation } from '../../store/devApi';
 import { EventStatus, FunctionRunStatus, useGetEventQuery } from '../../store/generated';
-import { selectEvent, selectRun } from '../../store/global';
+import { selectRun } from '../../store/global';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import Button from '../Button/Button';
 import CodeBlock from '../Code/CodeBlock';
 import ContentCard from '../Content/ContentCard';
 import FuncCard from '../Function/FuncCard';
 import TimelineRow from '../Timeline/TimelineRow';
-import TimelineStaticContent from '../Timeline/TimelineStaticContent';
 
 interface EventSectionProps {
   eventId: string;
@@ -27,7 +27,6 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
   const query = useGetEventQuery({ id: eventId }, { pollingInterval: 1500 });
   const event = useMemo(() => query.data?.event, [query.data?.event]);
   const eventPayload = usePrettyJson(event?.raw);
-
 
   const [sendEvent] = useSendEventMutation();
 
@@ -53,6 +52,28 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
           />
         </div>
       }
+      button={
+        <div className="flex items-center gap-1">
+          <Button
+            label="Replay"
+            btnAction={() => {
+              if (!event?.raw) {
+                return;
+              }
+
+              const eventId = ulid();
+
+              sendEvent({
+                ...JSON.parse(event.raw),
+                id: eventId,
+                ts: Date.now(),
+              })
+                .unwrap()
+            }}
+          />
+          <SendEventButton label="Edit and Replay" appearance="outlined" data={event.raw} />
+        </div>
+      }
       active
     >
       {eventPayload ? (
@@ -60,39 +81,11 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
           <CodeBlock tabs={[{ label: 'Payload', content: eventPayload }]} />
         </div>
       ) : null}
-      <div className="pr-4 pt-4">
-        <TimelineRow status={EventStatus.Completed} iconOffset={0}>
-          <TimelineStaticContent
-            label="Event Received"
-            date={event.createdAt}
-            actionBtn={
-              <>
-                <Button
-                  label="Replay"
-                  btnAction={() => {
-                    if (!event?.raw) {
-                      return;
-                    }
-
-                    const eventId = ulid();
-
-                    sendEvent({
-                      ...JSON.parse(event.raw),
-                      id: eventId,
-                      ts: Date.now(),
-                    })
-                      .unwrap()
-                      .then(() => {
-                        dispatch(selectEvent(eventId));
-                      });
-                  }}
-                />
-                <SendEventButton label="Edit and Replay" appearance="outlined" data={event.raw} />
-              </>
-            }
-          />
-        </TimelineRow>
-
+      <div className="px-5 pt-4">
+        <div className="flex items-center gap-2 py-4">
+          <h3 className="text-slate-400 text-sm">Functions</h3>
+          <Badge kind="outlined">{event.functionRuns?.length.toString() || '0'}</Badge>
+        </div>
         {event.functionRuns?.map((run, i, list) => {
           const status = run.waitingFor
             ? EventStatus.Paused
