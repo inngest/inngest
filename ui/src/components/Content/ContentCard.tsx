@@ -1,23 +1,21 @@
-import classNames from '../../utils/classnames';
-import { Time } from '../Time';
+import { IconEvent, IconFunction } from '@/icons';
+import classNames from '@/utils/classnames';
 
 interface ContentCardProps {
   children: React.ReactNode;
   title?: string;
-  date: string | number;
+  type?: 'event' | 'run';
+  metadata?: React.ReactNode;
   button?: React.ReactNode;
-  id: string;
-  idPrefix?: string;
   active?: boolean;
 }
 
 export default function ContentCard({
   children,
   title,
-  date,
+  type,
+  metadata,
   button,
-  id,
-  idPrefix = '',
   active = false,
 }: ContentCardProps) {
   return (
@@ -30,19 +28,17 @@ export default function ContentCard({
       <div
         className={classNames(title ? 'shadow-slate-950 px-5 py-4 shadow-lg relative z-30' : '')}
       >
-        {title ? (
-          <div className="mb-5">
-            <h1 className=" text-lg text-slate-50">{title}</h1>
-            <span className="text-2xs mt-1 block">
-              <Time date={date} />
-            </span>
-          </div>
-        ) : null}
-
-        <div className="flex items-center justify-between">
-          {button && button}
-          <span className="text-3xs leading-none">{[idPrefix, id].filter(Boolean).join(': ')}</span>
+        <div className="flex items-center justify-between leading-7">
+          {title ? (
+            <div className="flex items-center gap-2">
+              {type === 'event' && <IconEvent className="text-slate-300" />}
+              {type === 'run' && <IconFunction className="text-slate-400" />}
+              <h1 className="text-base text-slate-50">{title}</h1>
+            </div>
+          ) : null}
+          {button}
         </div>
+        {metadata}
       </div>
       <div className="overflow-y-scroll flex-1">{children}</div>
     </div>

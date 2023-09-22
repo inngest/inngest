@@ -36,7 +36,7 @@ export default function SlideOver({ children, onClose }: SlideOverProps) {
         </Transition.Child>
         <div className="fixed inset-0 overflow-hidden z-10">
           <div className="absolute inset-0 overflow-hidden">
-            <div className="pointer-events-none fixed inset-y-0 right-0 flex w-3/4">
+            <div className="pointer-events-none fixed inset-y-0 right-0 flex w-4/5">
               <Transition.Child
                 as="div"
                 enter="transform transition ease-in-out duration-500 sm:duration-700"
@@ -56,7 +56,7 @@ export default function SlideOver({ children, onClose }: SlideOverProps) {
                     leaveFrom="opacity-100"
                     leaveTo="opacity-0"
                   />
-                  <div className="flex h-full flex-col bg-slate-1000 shadow-xl w-3/4">
+                  <div className="flex h-full flex-col bg-slate-1000 shadow-xl w-4/5">
                     {children}
                   </div>
                 </Dialog.Panel>
