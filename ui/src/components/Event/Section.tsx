@@ -67,8 +67,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
                 ...JSON.parse(event.raw),
                 id: eventId,
                 ts: Date.now(),
-              })
-                .unwrap()
+              }).unwrap();
             }}
           />
           <SendEventButton label="Edit and Replay" appearance="outlined" data={event.raw} />
@@ -81,6 +80,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
           <CodeBlock tabs={[{ label: 'Payload', content: eventPayload }]} />
         </div>
       ) : null}
+      <hr className="border-slate-800/50 mt-8" />
       <div className="px-5 pt-4">
         <div className="flex items-center gap-2 py-4">
           <h3 className="text-slate-400 text-sm">Functions</h3>
