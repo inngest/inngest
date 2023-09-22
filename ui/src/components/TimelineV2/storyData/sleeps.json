@@ -1,0 +1,95 @@
+[
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-22T16:22:38.115783-04:00",
+    "groupID": "bd178be1-d9ab-42be-9669-15a78eaf9f2a",
+    "id": "01HAZ8Y0S3J9A2D0NT3C0XA628",
+    "type": "FunctionStarted",
+    "sleep": null,
+    "stepName": null,
+    "url": null,
+    "waitForEvent": null,
+    "waitResult": null
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-22T16:22:38.116219-04:00",
+    "groupID": "bd178be1-d9ab-42be-9669-15a78eaf9f2a",
+    "id": "01HAZ8Y0S466MZMTEAKZRVBGVE",
+    "type": "StepStarted",
+    "sleep": null,
+    "stepName": "step",
+    "url": "http://localhost:3939/api/inngest?fnId=local-dev-send-welcome-email&stepId=step",
+    "waitForEvent": null,
+    "waitResult": null
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-22T16:22:38.136404-04:00",
+    "groupID": "bd178be1-d9ab-42be-9669-15a78eaf9f2a",
+    "id": "01HAZ8Y0SRAC9VAT3Q3K5CP6BA",
+    "type": "StepCompleted",
+    "sleep": null,
+    "stepName": "10s",
+    "url": "http://localhost:3939/api/inngest?fnId=local-dev-send-welcome-email&stepId=step",
+    "waitForEvent": null,
+    "waitResult": null
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-22T16:22:38.136906-04:00",
+    "groupID": "bd178be1-d9ab-42be-9669-15a78eaf9f2a",
+    "id": "01HAZ8Y0SRB55DT2AX1FAX5DW2",
+    "type": "StepSleeping",
+    "sleep": {
+      "until": "2023-09-22T16:22:48.136637-04:00"
+    },
+    "stepName": "10s",
+    "url": null,
+    "waitForEvent": null,
+    "waitResult": null
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-22T16:22:48.140185-04:00",
+    "groupID": "c325e20c-ca1d-47ac-a13a-d27c300d2306",
+    "id": "01HAZ8YAJCQ6KVH16G1FNK3M1F",
+    "type": "StepStarted",
+    "sleep": null,
+    "stepName": "step",
+    "url": "http://localhost:3939/api/inngest?fnId=local-dev-send-welcome-email&stepId=step",
+    "waitForEvent": null,
+    "waitResult": null
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-22T16:22:48.147077-04:00",
+    "groupID": "c325e20c-ca1d-47ac-a13a-d27c300d2306",
+    "id": "01HAZ8YAJKF8WAS8MZ3JVWRKR0",
+    "type": "StepCompleted",
+    "sleep": null,
+    "stepName": "step",
+    "url": "http://localhost:3939/api/inngest?fnId=local-dev-send-welcome-email&stepId=step",
+    "waitForEvent": null,
+    "waitResult": null
+  },
+  {
+    "attempt": 0,
+    "cancel": null,
+    "createdAt": "2023-09-22T16:22:48.147643-04:00",
+    "groupID": "c325e20c-ca1d-47ac-a13a-d27c300d2306",
+    "id": "01HAZ8YAJKESPZ5AFYPFRD5CHX",
+    "type": "FunctionCompleted",
+    "sleep": null,
+    "stepName": null,
+    "url": null,
+    "waitForEvent": null,
+    "waitResult": null
+  }
+]

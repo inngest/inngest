@@ -10,8 +10,20 @@ export function Name({ node }: Props) {
     return <>{node.waitForEventConfig.eventName}</>;
   }
 
+  if (node.scope === 'function') {
+    return <>Function {node.status}</>;
+  }
+
   if (node.name) {
     return <>{node.name}</>;
+  }
+
+  if (node.status === 'errored') {
+    return <span className="opacity-50">Errored</span>;
+  }
+
+  if (node.status === 'failed' && node.scope === 'step') {
+    return <span className="opacity-50">Failed</span>;
   }
 
   if (node.status === 'scheduled') {
@@ -19,7 +31,11 @@ export function Name({ node }: Props) {
   }
 
   if (node.status === 'started') {
-    return <span className="opacity-50">Running next step...</span>;
+    if (node.attempt === 0) {
+      return <span className="opacity-50">Running next step...</span>;
+    }
+
+    return <span className="opacity-50">Retrying...</span>;
   }
 
   return null;

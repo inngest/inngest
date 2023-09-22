@@ -1,36 +1,41 @@
 import { IconStatusCircleArrowPath } from '@/icons/StatusCircleArrowPath';
 import { IconStatusCircleCheck } from '@/icons/StatusCircleCheck';
 import { IconStatusCircleCross } from '@/icons/StatusCircleCross';
-import { IconStatusCircleExclamation } from '@/icons/StatusCircleExclamation';
+import { IconStepStatusErrored } from '@/icons/IconStepStatusErrored';
+import { IconStepStatusUnknown } from '@/icons/IconStepStatusUnknown';
+import { IconStatusCircleStepRetrying } from '@/icons/StatusCircleStepRetrying';
 import { IconStatusCircleMinus } from '@/icons/StatusCircleMinus';
 import { IconStatusCircleMoon } from '@/icons/StatusCircleMoon';
 import type { HistoryNode } from '../historyParser';
 
 type Props = {
-  status: HistoryNode['status'];
+  node: HistoryNode;
 };
 
-export function Icon({ status }: Props) {
+export function Icon({ node }: Props) {
   let Icon: (props: { className?: string }) => JSX.Element;
-  if (status === 'cancelled') {
+  if (node.status === 'cancelled') {
     Icon = IconStatusCircleMinus;
-  } else if (status === 'completed') {
+  } else if (node.status === 'completed') {
     Icon = IconStatusCircleCheck;
-  } else if (status === 'errored') {
-    Icon = IconStatusCircleExclamation;
-  } else if (status === 'failed') {
+  } else if (node.status === 'errored') {
+    Icon = IconStepStatusErrored;
+  } else if (node.status === 'failed') {
     Icon = IconStatusCircleCross;
-  } else if (status === 'scheduled') {
+  } else if (node.status === 'scheduled') {
     Icon = IconStatusCircleArrowPath;
-  } else if (status === 'sleeping') {
+  } else if (node.status === 'sleeping') {
     Icon = IconStatusCircleMoon;
-  } else if (status === 'started') {
-    Icon = IconStatusCircleArrowPath;
-  } else if (status === 'waiting') {
+  } else if (node.status === 'started') {
+    if (node.attempt === 0) {
+      Icon = IconStatusCircleArrowPath;
+    } else {
+      Icon = IconStatusCircleStepRetrying;
+    }
+  } else if (node.status === 'waiting') {
     Icon = IconStatusCircleMoon;
   } else {
-    // TODO: Use a question mark icon or something.
-    throw new Error(`unexpected status: ${status}`);
+    Icon = IconStepStatusUnknown;
   }
 
   return <Icon className="mr-1 shrink-0" />;

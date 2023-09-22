@@ -117,6 +117,17 @@ export const Failed: Story = {
   },
 };
 
+export const Retrying: Story = {
+  args: {
+    node: {
+      ...defaultNode,
+      attempt: 1,
+      startedAt: oneMinuteAgo,
+      status: 'started',
+    },
+  },
+};
+
 export const Scheduled: Story = {
   args: {
     node: {

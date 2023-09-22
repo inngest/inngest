@@ -16,15 +16,13 @@ export function IconStatusCircleMoon({ className }: { className?: string }) {
         />
 
         <svg
-          x="5"
-          y="5"
-          width="20"
-          height="20"
+          x="6"
+          y="6"
+          width="18"
+          height="18"
           viewBox="0 0 14 14"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          stroke="#1b5d7a"
-          stroke-width="1"
         >
           <path
             fill-rule="evenodd"

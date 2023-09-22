@@ -13,9 +13,43 @@ inngest.createFunction(
 ```
 
 ```ts
+inngest.createFunction(
+  { name: 'Fails without steps', cancelOn: [{ event: 'foo' }] },
+  { event: 'foo' },
+  async ({ step }) => {
+    throw new Error('oh no');
+  },
+);
+```
+
+```ts
+inngest.createFunction(
+  { name: 'Fails with preceding step', cancelOn: [{ event: 'foo' }] },
+  { event: 'foo' },
+  async ({ step }) => {
+    await step.run('First step', () => {});
+
+    await step.run('Second step', () => {
+      throw new Error('oh no');
+    });
+  },
+);
+```
+
+```ts
+inngest.createFunction({ name: 'No steps' }, { event: 'foo' }, async ({ step }) => {});
+```
+
+```ts
 inngest.createFunction({ name: 'Parallel steps' }, { event: 'foo' }, async ({ step }) => {
   await step.run('a', () => {});
   await Promise.all([step.run('b1', () => {}), step.run('b2', () => {})]);
+});
+```
+
+```ts
+inngest.createFunction({ name: 'Sleeps' }, { event: 'foo' }, async ({ step }) => {
+  await step.sleep('10s');
 });
 ```
 
@@ -27,6 +61,18 @@ inngest.createFunction({ name: 'Succeeds with 2 steps' }, { event: 'foo' }, asyn
 ```
 
 ```ts
+// Need to manually send the foo event to fulfill the waitForEvent.
+inngest.createFunction(
+  { name: 'Times out waiting for event' },
+  { event: 'foo' },
+  async ({ step }) => {
+    await step.waitForEvent('foo', '10s');
+  },
+);
+```
+
+```ts
+// Need to manually send the foo event to fulfill the waitForEvent.
 inngest.createFunction({ name: 'Waits for event' }, { event: 'foo' }, async ({ step }) => {
   await step.waitForEvent('foo', '1m');
 });
