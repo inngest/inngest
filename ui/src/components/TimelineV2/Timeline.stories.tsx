@@ -2,32 +2,22 @@ import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import type { RunHistoryItem } from '@/store/generated';
-import { HistoryParser, type HistoryNode } from './historyParser/historyParser';
+import { HistoryParser, type HistoryNode } from './historyParser/index';
 import { Timeline } from './index';
+import cancelsData from './storyData/cancels.json';
+import parallelStepsData from './storyData/parallelSteps.json';
 import succeedsWith2StepsData from './storyData/succeedsWith2Steps.json';
 import waitsForEventData from './storyData/waitsForEvent.json';
 
 type PropsAndCustomArgs = React.ComponentProps<typeof Timeline> & {
-  _delayMS?: number;
   _rawHistory: RunHistoryItem[];
+  _rawHistoryFrame: number;
 };
 
 const meta = {
   title: 'Components/Timeline',
   component: Timeline,
   argTypes: {
-    _delayMS: {
-      control: { type: 'range', min: 0, max: 5000, step: 100 },
-      description: 'Not a real prop. Only used for animating timeline in Storybook.',
-      defaultValue: 0,
-    },
-    _rawHistory: {
-      table: {
-        // Hide in UI.
-        disable: true,
-      },
-    },
-
     history: {
       control: { disable: true },
     },
@@ -40,35 +30,22 @@ const meta = {
   // animated timeline. If there isn't a delayMS, then the static final history
   // is used. If there is a delayMS, then we'll simulate each history item being
   // added one at a time.
-  render: ({ _delayMS, _rawHistory, ...args }) => {
-    let defaultHistory = args.history;
-    if (_delayMS) {
-      defaultHistory = {};
-    }
-
-    const [history, setHistory] = useState<Record<string, HistoryNode>>(defaultHistory);
+  render: ({ _rawHistory, _rawHistoryFrame, ...args }) => {
+    const [history, setHistory] = useState<Record<string, HistoryNode>>(args.history);
 
     useEffect(() => {
-      if (!_delayMS) {
-        return;
-      }
-
       const parser = new HistoryParser();
-      let i = 0;
-
-      const timer = setInterval(() => {
-        if (i > _rawHistory.length - 1) {
-          return;
-        }
-
+      for (let i = 0; i <= _rawHistoryFrame; i++) {
         parser.append(_rawHistory[i]);
-        setHistory(parser.history);
-        i++;
-      }, _delayMS);
+      }
+      setHistory(parser.history);
+    }, [_rawHistoryFrame]);
 
-      return () => clearInterval(timer);
-    }, [_delayMS]);
-    return <Timeline {...args} history={history} />;
+    return (
+      <div style={{ width: 600 }}>
+        <Timeline {...args} history={history} />
+      </div>
+    );
   },
   tags: ['autodocs'],
 } satisfies Meta<PropsAndCustomArgs>;
@@ -78,13 +55,30 @@ export default meta;
 type Story = StoryObj<PropsAndCustomArgs>;
 
 function createStory(rawHistory: unknown): Story {
+  const raw = rawHistory as RunHistoryItem[];
+
   return {
     args: {
-      _rawHistory: rawHistory as RunHistoryItem[],
-      history: new HistoryParser(rawHistory as RunHistoryItem[]).history,
+      _rawHistory: raw,
+      _rawHistoryFrame: raw.length - 1,
+      history: new HistoryParser(raw).history,
+    },
+    argTypes: {
+      _rawHistory: {
+        table: {
+          // Hide in UI.
+          disable: true,
+        },
+      },
+      _rawHistoryFrame: {
+        control: { min: 0, max: raw.length - 1, step: 1, type: 'range' },
+        description: 'Not a real prop. Only used for animating timeline in Storybook.',
+      },
     },
   };
 }
 
+export const cancels = createStory(cancelsData);
+export const parallelSteps = createStory(parallelStepsData);
 export const succeedsWith2Steps = createStory(succeedsWith2StepsData);
 export const waitsForEvent = createStory(waitsForEventData);

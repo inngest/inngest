@@ -375,28 +375,8 @@ packages:
       semver: 6.3.1
     dev: true
 
-  /@babel/helper-create-class-features-plugin@7.22.5(@babel/core@7.22.10):
-    resolution: {integrity: sha512-xkb58MyOYIslxu3gKmVXmjTtUPvBU4odYzbiIQbWwLKIHCsx6UGZGX6F1IznMFVnDdirseUZopzN+ZRt8Xb33Q==}
-    engines: {node: '>=6.9.0'}
-    peerDependencies:
-      '@babel/core': ^7.0.0
-    dependencies:
-      '@babel/core': 7.22.10
-      '@babel/helper-annotate-as-pure': 7.22.5
-      '@babel/helper-environment-visitor': 7.22.5
-      '@babel/helper-function-name': 7.22.5
-      '@babel/helper-member-expression-to-functions': 7.22.5
-      '@babel/helper-optimise-call-expression': 7.22.5
-      '@babel/helper-replace-supers': 7.22.5
-      '@babel/helper-skip-transparent-expression-wrappers': 7.22.5
-      '@babel/helper-split-export-declaration': 7.22.5
-      semver: 6.3.1
-    transitivePeerDependencies:
-      - supports-color
-    dev: true
-
-  /@babel/helper-create-class-features-plugin@7.22.5(@babel/core@7.22.5):
-    resolution: {integrity: sha512-xkb58MyOYIslxu3gKmVXmjTtUPvBU4odYzbiIQbWwLKIHCsx6UGZGX6F1IznMFVnDdirseUZopzN+ZRt8Xb33Q==}
+  /@babel/helper-create-class-features-plugin@7.22.10(@babel/core@7.22.5):
+    resolution: {integrity: sha512-5IBb77txKYQPpOEdUdIhBx8VrZyDCQ+H82H0+5dX1TmuscP5vJKEE3cKurjtIw/vFwzbVH48VweE78kVDBrqjA==}
     engines: {node: '>=6.9.0'}
     peerDependencies:
       '@babel/core': ^7.0.0
@@ -407,12 +387,10 @@ packages:
       '@babel/helper-function-name': 7.22.5
       '@babel/helper-member-expression-to-functions': 7.22.5
       '@babel/helper-optimise-call-expression': 7.22.5
-      '@babel/helper-replace-supers': 7.22.5
+      '@babel/helper-replace-supers': 7.22.9(@babel/core@7.22.5)
       '@babel/helper-skip-transparent-expression-wrappers': 7.22.5
-      '@babel/helper-split-export-declaration': 7.22.5
+      '@babel/helper-split-export-declaration': 7.22.6
       semver: 6.3.1
-    transitivePeerDependencies:
-      - supports-color
     dev: true
 
   /@babel/helper-create-regexp-features-plugin@7.22.9(@babel/core@7.22.10):
@@ -551,6 +529,18 @@ packages:
       '@babel/helper-optimise-call-expression': 7.22.5
     dev: true
 
+  /@babel/helper-replace-supers@7.22.9(@babel/core@7.22.5):
+    resolution: {integrity: sha512-LJIKvvpgPOPUThdYqcX6IXRuIcTkcAub0IaDRGCZH0p5GPUp7PhRU9QVgFcDDd51BaPkk77ZjqFwh6DZTAEmGg==}
+    engines: {node: '>=6.9.0'}
+    peerDependencies:
+      '@babel/core': ^7.0.0
+    dependencies:
+      '@babel/core': 7.22.5
+      '@babel/helper-environment-visitor': 7.22.5
+      '@babel/helper-member-expression-to-functions': 7.22.5
+      '@babel/helper-optimise-call-expression': 7.22.5
+    dev: true
+
   /@babel/helper-simple-access@7.22.5:
     resolution: {integrity: sha512-n0H99E/K+Bika3++WNL17POvo4rKWZ7lZEp1Q+fStVbUi8nxPQEBOlTmCOxW/0JsS56SKKQ+ojAe2pHKJHN35w==}
     engines: {node: '>=6.9.0'}
@@ -674,32 +664,31 @@ packages:
   /@babel/plugin-proposal-class-properties@7.18.6(@babel/core@7.22.10):
     resolution: {integrity: sha512-cumfXOF0+nzZrrN8Rf0t7M+tF6sZc7vhQwYQck9q1/5w2OExlD+b4v4RpMJFaV1Z7WcDRgO6FqvxqxGlwo+RHQ==}
     engines: {node: '>=6.9.0'}
+    deprecated: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-class-properties instead.
     peerDependencies:
       '@babel/core': ^7.0.0-0
     dependencies:
       '@babel/core': 7.22.10
-      '@babel/helper-create-class-features-plugin': 7.22.5(@babel/core@7.22.10)
+      '@babel/helper-create-class-features-plugin': 7.22.10(@babel/core@7.22.10)
       '@babel/helper-plugin-utils': 7.22.5
-    transitivePeerDependencies:
-      - supports-color
     dev: true
 
   /@babel/plugin-proposal-class-properties@7.18.6(@babel/core@7.22.5):
     resolution: {integrity: sha512-cumfXOF0+nzZrrN8Rf0t7M+tF6sZc7vhQwYQck9q1/5w2OExlD+b4v4RpMJFaV1Z7WcDRgO6FqvxqxGlwo+RHQ==}
     engines: {node: '>=6.9.0'}
+    deprecated: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-class-properties instead.
     peerDependencies:
       '@babel/core': ^7.0.0-0
     dependencies:
       '@babel/core': 7.22.5
-      '@babel/helper-create-class-features-plugin': 7.22.5(@babel/core@7.22.5)
+      '@babel/helper-create-class-features-plugin': 7.22.10(@babel/core@7.22.5)
       '@babel/helper-plugin-utils': 7.22.5
-    transitivePeerDependencies:
-      - supports-color
     dev: true
 
   /@babel/plugin-proposal-export-namespace-from@7.18.9(@babel/core@7.22.10):
     resolution: {integrity: sha512-k1NtHyOMvlDDFeb9G5PhUXuGj8m/wiwojgQVEhJ/fsVsMCpLyOP4h0uGEjYJKrRI+EVPlb5Jk+Gt9P97lOGwtA==}
     engines: {node: '>=6.9.0'}
+    deprecated: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-export-namespace-from instead.
     peerDependencies:
       '@babel/core': ^7.0.0-0
     dependencies:
@@ -711,6 +700,7 @@ packages:
   /@babel/plugin-proposal-nullish-coalescing-operator@7.18.6(@babel/core@7.22.10):
     resolution: {integrity: sha512-wQxQzxYeJqHcfppzBDnm1yAY0jSRkUXR2z8RePZYrKwMKgMlE8+Z6LUno+bd6LvbGh8Gltvy74+9pIYkr+XkKA==}
     engines: {node: '>=6.9.0'}
+    deprecated: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-nullish-coalescing-operator instead.
     peerDependencies:
       '@babel/core': ^7.0.0-0
     dependencies:
@@ -722,6 +712,7 @@ packages:
   /@babel/plugin-proposal-numeric-separator@7.18.6(@babel/core@7.22.10):
     resolution: {integrity: sha512-ozlZFogPqoLm8WBr5Z8UckIoE4YQ5KESVcNudyXOR8uqIkliTEgJ3RoketfG6pmzLdeZF0H/wjE9/cCEitBl7Q==}
     engines: {node: '>=6.9.0'}
+    deprecated: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-numeric-separator instead.
     peerDependencies:
       '@babel/core': ^7.0.0-0
     dependencies:
@@ -761,6 +752,7 @@ packages:
   /@babel/plugin-proposal-optional-chaining@7.21.0(@babel/core@7.22.10):
     resolution: {integrity: sha512-p4zeefM72gpmEe2fkUr/OnOXpWEf8nAgk7ZYVqqfFiyIG7oFfVZcCrU64hWn5xp4tQ9LkV4bTIa5rD0KANpKNA==}
     engines: {node: '>=6.9.0'}
+    deprecated: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-optional-chaining instead.
     peerDependencies:
       '@babel/core': ^7.0.0-0
     dependencies:
@@ -3942,7 +3934,7 @@ packages:
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
       react-inspector: 6.0.2(react@18.2.0)
-      telejson: 7.1.0
+      telejson: 7.2.0
       ts-dedent: 2.2.0
       uuid: 9.0.0
     transitivePeerDependencies:
@@ -3976,7 +3968,7 @@ packages:
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
       react-inspector: 6.0.2(react@18.2.0)
-      telejson: 7.1.0
+      telejson: 7.2.0
       ts-dedent: 2.2.0
       uuid: 9.0.0
     transitivePeerDependencies:
@@ -4395,7 +4387,7 @@ packages:
       react: 18.2.0
       react-colorful: 5.6.1(react-dom@18.2.0)(react@18.2.0)
       react-dom: 18.2.0(react@18.2.0)
-      telejson: 7.1.0
+      telejson: 7.2.0
       tocbot: 4.21.1
       ts-dedent: 2.2.0
       util-deprecate: 1.0.2
@@ -4505,7 +4497,7 @@ packages:
       '@storybook/core-events': 7.2.2
       '@storybook/global': 5.0.0
       qs: 6.11.2
-      telejson: 7.1.0
+      telejson: 7.2.0
       tiny-invariant: 1.3.1
     dev: true
 
@@ -4516,7 +4508,7 @@ packages:
       '@storybook/core-events': 7.2.3
       '@storybook/global': 5.0.0
       qs: 6.11.2
-      telejson: 7.1.0
+      telejson: 7.2.0
       tiny-invariant: 1.3.1
     dev: true
 
@@ -4740,7 +4732,7 @@ packages:
       read-pkg-up: 7.0.1
       semver: 7.5.4
       serve-favicon: 2.5.0
-      telejson: 7.1.0
+      telejson: 7.2.0
       tiny-invariant: 1.3.1
       ts-dedent: 2.2.0
       util: 0.12.5
@@ -4862,7 +4854,7 @@ packages:
       react-dom: 18.2.0(react@18.2.0)
       semver: 7.5.4
       store2: 2.14.2
-      telejson: 7.1.0
+      telejson: 7.2.0
       ts-dedent: 2.2.0
     dev: true
 
@@ -4887,7 +4879,7 @@ packages:
       react-dom: 18.2.0(react@18.2.0)
       semver: 7.5.4
       store2: 2.14.2
-      telejson: 7.1.0
+      telejson: 7.2.0
       ts-dedent: 2.2.0
     dev: true
 
@@ -12116,8 +12108,8 @@ packages:
       yallist: 4.0.0
     dev: true
 
-  /telejson@7.1.0:
-    resolution: {integrity: sha512-jFJO4P5gPebZAERPkJsqMAQ0IMA1Hi0AoSfxpnUaV6j6R2SZqlpkbS20U6dEUtA3RUYt2Ak/mTlkQzHH9Rv/hA==}
+  /telejson@7.2.0:
+    resolution: {integrity: sha512-1QTEcJkJEhc8OnStBx/ILRu5J2p0GjvWsBx56bmZRqnrkdBMUe+nX92jxV+p3dB4CP6PZCdJMQJwCggkNBMzkQ==}
     dependencies:
       memoizerific: 1.11.3
     dev: true
