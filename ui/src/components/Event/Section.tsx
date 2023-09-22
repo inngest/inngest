@@ -24,18 +24,10 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
   const selectedRun = useAppSelector((state) => state.global.selectedRun);
   const dispatch = useAppDispatch();
 
-  // const [pollingInterval, setPollingInterval] = useState(1000);
   const query = useGetEventQuery({ id: eventId }, { pollingInterval: 1500 });
   const event = useMemo(() => query.data?.event, [query.data?.event]);
   const eventPayload = usePrettyJson(event?.raw);
 
-  /**
-   * Stop polling for changes when an event is in a final state.
-   */
-  // useEffect(() => {
-  //   if (typeof event?.pendingRuns !== "number") return;
-  //   setPollingInterval(event.pendingRuns > 0 ? 1000 : 0);
-  // }, [event?.pendingRuns]);
 
   const [sendEvent] = useSendEventMutation();
 
@@ -61,7 +53,6 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
         </div>
       }
       active
-      // button={<Button label="Open Event" icon={<IconFeed />} />}
     >
       {eventPayload ? (
         <div className="px-5 pt-4">
