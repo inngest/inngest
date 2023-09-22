@@ -42,6 +42,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
   return (
     <ContentCard
       title={event.name || 'unknown'}
+      type="event"
       metadata={
         <div className="pt-8">
           <MetadataGrid
