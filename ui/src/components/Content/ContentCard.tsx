@@ -31,11 +31,8 @@ export default function ContentCard({
         <div className="flex items-center justify-between leading-7">
           {title ? (
             <div className="flex items-center gap-2">
-              {type === 'event' ? (
-                <IconEvent className="text-slate-300" />
-              ) : type === 'run' ? (
-                <IconFunction className="text-slate-400" />
-              ) : null}
+              {type === 'event' && <IconEvent className="text-slate-300" />}
+              {type === 'run' && <IconFunction className="text-slate-400" />}
               <h1 className="text-base text-slate-50">{title}</h1>
             </div>
           ) : null}
