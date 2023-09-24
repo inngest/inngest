@@ -22,6 +22,7 @@ interface ButtonProps {
   btnAction?: (e?: React.MouseEvent) => void;
   keys?: string[];
   isSplit?: boolean;
+  className?: string;
 }
 
 export default function Button({
@@ -36,6 +37,8 @@ export default function Button({
   isSplit,
   type,
   keys,
+  className,
+  ...props
 }: ButtonProps) {
   const buttonColors = getButtonColors({ kind, appearance });
   const buttonSizes = getButtonSizeStyles({ size, icon, label });
@@ -59,10 +62,12 @@ export default function Button({
         disabledStyles,
         isSplit ? 'rounded-l-sm' : 'rounded-sm',
         'flex gap-1.5 items-center justify-center drop-shadow-sm transition-all active:scale-95 ',
+        className,
       )}
       type={type}
       onClick={btnAction}
       disabled={disabled}
+      {...props}
     >
       {loading && <IconSpinner className={`fill-white ${iconSizes}`} />}
       {!loading && iconElement}
