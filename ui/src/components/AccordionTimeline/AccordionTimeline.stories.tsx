@@ -32,8 +32,7 @@ export const TimelineList: Story = {
       {
         id: 'timeline1',
         header: <TimelineItemHeader {...(NoBadge.args as TimelineItemHeaderProps)} />,
-        expandable: true,
-        content: <p className="py-6">Content</p>,
+        expandable: false,
         position: 'first',
       },
       {
@@ -44,9 +43,14 @@ export const TimelineList: Story = {
       },
       {
         id: 'timeline3',
-        header: <TimelineItemHeader {...(NoBadge.args as TimelineItemHeaderProps)} />,
+        header: <TimelineItemHeader {...(Default.args as TimelineItemHeaderProps)} />,
         expandable: true,
         content: <p className="py-6">Content</p>,
+      },
+      {
+        id: 'timeline4',
+        header: <TimelineItemHeader {...(NoBadge.args as TimelineItemHeaderProps)} />,
+        expandable: false,
         position: 'last',
       },
     ],
