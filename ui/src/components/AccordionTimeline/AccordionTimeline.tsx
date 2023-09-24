@@ -10,7 +10,10 @@ type AccordionTimelineProps = {
 
 export default function AccordionTimeline({ timelineItems }: AccordionTimelineProps) {
   return (
-    <AccordionPrimitive.Root type="multiple" className="text-slate-100 w-full">
+    <AccordionPrimitive.Root
+      type="multiple"
+      className="text-slate-100 w-full last:border-b last:border-slate-800/50"
+    >
       {timelineItems &&
         timelineItems.map((item) => {
           if (!item) return <p></p>;
@@ -49,7 +52,7 @@ export function AccordionTimelineItem({
       key={id}
       value={id}
       disabled={!expandable}
-      className="relative border-y border-slate-800/50"
+      className="relative border-t border-slate-800/50"
     >
       <span
         className={classNames(
