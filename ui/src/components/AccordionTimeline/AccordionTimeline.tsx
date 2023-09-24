@@ -67,8 +67,10 @@ export function AccordionTimelineItem({
             <div className="border-r border-slate-800/50" />
             <AccordionPrimitive.Trigger asChild>
               <Button
-                className="data-[state=open]:-rotate-180 transform-90 transition-transform duration-500"
-                icon={<IconChevron className=" text-slate-500" />}
+                className="group"
+                icon={
+                  <IconChevron className="group-data-[state=open]:-rotate-180 transform-90 transition-transform duration-500 text-slate-500" />
+                }
               />
             </AccordionPrimitive.Trigger>
           </>
