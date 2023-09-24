@@ -16,11 +16,12 @@ export default function AccordionTimeline({ timelineItems }: AccordionTimelinePr
     >
       {timelineItems &&
         timelineItems.map((item) => {
-          if (!item) return <p></p>;
+          if (!item) return;
           const { id, header, expandable, position, content } = item;
           return (
             <AccordionTimelineItem
               id={id}
+              key={id}
               header={header}
               expandable={expandable}
               position={position}
@@ -49,7 +50,6 @@ export function AccordionTimelineItem({
 }: AccordionTimelineItemProps) {
   return (
     <AccordionPrimitive.Item
-      key={id}
       value={id}
       disabled={!expandable}
       className="relative border-t border-slate-800/50"

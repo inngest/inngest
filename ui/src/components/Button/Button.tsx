@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
 import { IconSpinner } from '@/icons';
 import classNames from '@/utils/classnames';
@@ -25,21 +25,24 @@ interface ButtonProps {
   className?: string;
 }
 
-export default function Button({
-  kind = 'default',
-  appearance = 'solid',
-  size = 'small',
-  label,
-  icon,
-  loading = false,
-  disabled,
-  btnAction,
-  isSplit,
-  type,
-  keys,
-  className,
-  ...props
-}: ButtonProps) {
+export default forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    kind = 'default',
+    appearance = 'solid',
+    size = 'small',
+    label,
+    icon,
+    loading = false,
+    disabled,
+    btnAction,
+    isSplit,
+    type,
+    keys,
+    className,
+    ...props
+  }: ButtonProps,
+  ref,
+) {
   const buttonColors = getButtonColors({ kind, appearance });
   const buttonSizes = getButtonSizeStyles({ size, icon, label });
   const disabledStyles = getDisabledStyles();
@@ -56,6 +59,7 @@ export default function Button({
 
   return (
     <button
+      ref={ref}
       className={classNames(
         buttonColors,
         buttonSizes,
@@ -88,4 +92,4 @@ export default function Button({
       )}
     </button>
   );
-}
+});
