@@ -44,6 +44,54 @@ As you can see above, all of our functions now have access to the `foo` variable
 
 We can use this pattern to add additional typed tooling to function runs.
 
+<Callout>
+
+When returning a new `ctx` object, only specify the properties you wish to mutate. Omitting a property will use the default provided by the library, keeping complex types intact.
+
+</Callout>
+
+### Advanced mutation
+
+When middleware runs and `transformInput()` returns a new `ctx`, the types and data within that returned `ctx` are merged on top of the default provided by the library. This means that you can use a few tricks to overwrite data and types safely and more accurately.
+
+For example, here we use a `const` assertion to infer the literal value of our `foo` example above.
+
+```ts
+// In middleware
+transformInput() {
+  return {
+    ctx: {
+      foo: "bar",
+    } as const,
+  };
+}
+
+// In a function
+async ({ event, foo }) => {
+  //             ^? (parameter) foo: "bar"
+}
+```
+
+Because the returned `ctx` object and the default are merged together, sometimes good inferred types are overwritten by more generic types from middleware. A common example of this might be when handling event data in middleware.
+
+To get around this, you can provide the data but omit the type by using an `as` type assertion. For example, here we use a type assertion to add `foo` and alter the event data without affecting the type.
+
+```ts
+async transformInput({ ctx }) {
+  const event = await decrypt(ctx.event);
+
+  const newCtx = {
+    foo: "bar",
+    event,
+  };
+
+  return {
+    // Don't affect the `event` type
+    ctx: newCtx as Omit<typeof newCtx, "event">,
+  };
+},
+```
+
 ## Ordering middleware and types
 
 Middleware runs in the order specified when registering it (see [Middleware - Lifecycle - Registering and order](/docs/reference/middleware/lifecycle#registering-and-order)), which affects typing too.
