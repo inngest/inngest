@@ -302,9 +302,11 @@ at the `/api` root.
 
 ## Framework: Remix
 
-You can add Inngest to Remix easily.  Add the following to `./app/routes/api/inngest.ts`:
+You can add Inngest to Remix easily.  Add the following to `./app/routes/api.inngest.ts` for Remix v2 (or `./app/routes/api/inngest.ts` for Remix v1):
 
-```typescript
+<CodeGroup forceTabs>
+```typescript {{ title: "Remix 2" }}
+// app/routes/api.inngest.ts
 import { serve } from "inngest/remix";
 import { inngest } from "~/inngest/client";
 import fnA from "~/inngest/fnA";
@@ -313,6 +315,18 @@ const handler = serve(inngest, [fnA]);
 
 export { handler as loader, handler as action };
 ```
+
+```typescript {{ title: "Remix 1" }}
+// app/routes/api/inngest.ts
+import { serve } from "inngest/remix";
+import { inngest } from "~/inngest/client";
+import fnA from "~/inngest/fnA";
+
+const handler = serve(inngest, [fnA]);
+
+export { handler as loader, handler as action };
+```
+</CodeGroup>
 
 ### Streaming <VersionBadge version="v2.3.0+" />
 
