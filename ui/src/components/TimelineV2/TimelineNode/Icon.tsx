@@ -1,9 +1,7 @@
+import { IconStepStatusUnknown } from '@/icons/IconStepStatusUnknown';
 import { IconStatusCircleArrowPath } from '@/icons/StatusCircleArrowPath';
 import { IconStatusCircleCheck } from '@/icons/StatusCircleCheck';
 import { IconStatusCircleCross } from '@/icons/StatusCircleCross';
-import { IconStepStatusErrored } from '@/icons/IconStepStatusErrored';
-import { IconStepStatusUnknown } from '@/icons/IconStepStatusUnknown';
-import { IconStatusCircleStepRetrying } from '@/icons/StatusCircleStepRetrying';
 import { IconStatusCircleMinus } from '@/icons/StatusCircleMinus';
 import { IconStatusCircleMoon } from '@/icons/StatusCircleMoon';
 import type { HistoryNode } from '../historyParser';
@@ -19,7 +17,8 @@ export function Icon({ node }: Props) {
   } else if (node.status === 'completed') {
     Icon = IconStatusCircleCheck;
   } else if (node.status === 'errored') {
-    Icon = IconStepStatusErrored;
+      // TODO: Use a different icon to disambiguate an errored and failed steps.
+    Icon = IconStatusCircleCross;
   } else if (node.status === 'failed') {
     Icon = IconStatusCircleCross;
   } else if (node.status === 'scheduled') {
@@ -30,7 +29,8 @@ export function Icon({ node }: Props) {
     if (node.attempt === 0) {
       Icon = IconStatusCircleArrowPath;
     } else {
-      Icon = IconStatusCircleStepRetrying;
+      // TODO: Use a different icon to disambiguate a retry from a normal step.
+      Icon = IconStatusCircleArrowPath;
     }
   } else if (node.status === 'waiting') {
     Icon = IconStatusCircleMoon;
