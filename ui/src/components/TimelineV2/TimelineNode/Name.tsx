@@ -5,22 +5,17 @@ type Props = {
   node: HistoryNode;
 };
 
-export function Name({ node }: Props) {
+export function renderName({ node }: Props) {
+  let name = '...';
   if (node.waitForEventConfig) {
-    return <>{node.waitForEventConfig.eventName}</>;
+    name = node.waitForEventConfig.eventName;
+  } else if (node.name) {
+    name = node.name;
+  } else if (node.status === 'scheduled') {
+    name = 'Waiting to start next step...';
+  } else if (node.status === 'started') {
+    name = 'Running next step...';
   }
 
-  if (node.name) {
-    return <>{node.name}</>;
-  }
-
-  if (node.status === 'scheduled') {
-    return <span className="opacity-50">Waiting to start next step...</span>;
-  }
-
-  if (node.status === 'started') {
-    return <span className="opacity-50">Running next step...</span>;
-  }
-
-  return null;
+  return name;
 }
