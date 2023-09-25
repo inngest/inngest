@@ -12,6 +12,8 @@ type Props = {
   node: HistoryNode;
 };
 
+type StepKind = 'sleep' | 'waitForEvent';
+
 export function TimelineNode({ className, node }: Props) {
   let durationMS: number | undefined = undefined;
   if (node.scope === 'step' && node.startedAt && node.endedAt) {
@@ -19,7 +21,9 @@ export function TimelineNode({ className, node }: Props) {
   }
 
   let stepKind: string | undefined;
-  if (node.sleepConfig) {
+  if (node.scope === 'function') {
+    stepKind = 'Function';
+  } else if (node.sleepConfig) {
     stepKind = 'Sleep';
   } else if (node.waitForEventConfig) {
     stepKind = 'Wait For Event';
@@ -28,7 +32,7 @@ export function TimelineNode({ className, node }: Props) {
   return (
     <div className={classNames('flex text-white items-start', className)}>
       <span className="flex">
-        <Icon node={node} />
+        <Icon status={node.status} />
 
         <span className="items-start flex">
           {stepKind && <Badge className="mr-2 whitespace-nowrap">{stepKind}</Badge>}
@@ -37,16 +41,11 @@ export function TimelineNode({ className, node }: Props) {
       </span>
 
       <span className="flex-grow" />
+      <Detail node={node} />
 
-      {node.scope === 'step' && (
-        <>
-          <Detail node={node} />
-
-          <span className="shrink-0">
-            <Button appearance="solid" icon={<IconChevron />} kind="primary" />
-          </span>
-        </>
-      )}
+      <span className="shrink-0">
+        <Button appearance="solid" icon={<IconChevron />} kind="primary" />
+      </span>
     </div>
   );
 }

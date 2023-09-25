@@ -51,16 +51,9 @@ export function Detail({ node }: Props) {
       </>
     );
   } else if (node.status === 'started' && node.startedAt) {
-    let text: string;
-    if (node.attempt === 0) {
-      text = 'Started at';
-    } else {
-      text = `Retried at`;
-    }
-
     content = (
       <>
-        {text}
+        Started at
         <Badge className="flex items-center ml-2">{node.startedAt.toLocaleString()}</Badge>
       </>
     );
