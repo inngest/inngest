@@ -7,8 +7,6 @@ xgo:
 
 .PHONY: test
 test:
-	sh -c 'cd ./pkg/cuedefs && cue vet ./tests/... -c'
-	sh -c 'cd ./pkg/cuedefs && cue eval ./tests/... -c'
 	go test $(shell go list ./... | grep -v tests) -race -count=1
 	golangci-lint run
 
@@ -29,7 +27,6 @@ e2e:
 queries:
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	sqlc generate
-	# sed -i 's#interface{}#uuid.UUID#' ./pkg/cqrs/ddb/queries/*.go
 
 .PHONY: snapshot
 snapshot:

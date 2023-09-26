@@ -102,8 +102,9 @@ func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
 
 // Info returns information about the dev server and its registered functions.
 func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
-	a.devserver.handlerLock.Lock()
-
+	if !a.devserver.handlerLock.TryLock() {
+		return
+	}
 	defer a.devserver.handlerLock.Unlock()
 
 	all, _ := a.devserver.data.GetFunctions(r.Context())
@@ -207,7 +208,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (err error)
 				Valid:  true,
 			}
 		}
-		_, _ = a.devserver.data.InsertApp(ctx, appParams)
+		_, _ = tx.InsertApp(ctx, appParams)
 		err = tx.Commit(ctx)
 		if err != nil {
 			logger.From(ctx).Error().Err(err).Msg("error registering functions")
