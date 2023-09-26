@@ -19,6 +19,12 @@ func NormalizeAppURL(u string) string {
 		return u
 	}
 
+	// this shouldn't be valid: https://api.example.com:80/api/inngest
+	if parsed.Scheme == "https" && port != "" {
+		parsed.Host = host
+		return parsed.String()
+	}
+
 	switch host {
 	case "localhost", "127.0.0.1", "0.0.0.0":
 		parsed.Host = fmt.Sprintf("localhost:%s", port)
