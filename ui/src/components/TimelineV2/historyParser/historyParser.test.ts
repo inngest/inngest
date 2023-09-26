@@ -13,39 +13,58 @@ async function loadHistory(filename: string) {
   });
 }
 
+const baseStepNode = {
+  attempt: 0,
+  endedAt: expect.any(Date),
+  groupID: expect.any(String),
+  outputItemID: expect.any(String),
+  scheduledAt: expect.any(Date),
+  scope: 'step',
+  sleepConfig: undefined,
+  startedAt: expect.any(Date),
+  url: 'http://localhost:3939/api/inngest',
+  waitForEventConfig: undefined,
+  waitForEventResult: undefined,
+} as const;
+
+const baseRunEndNode = {
+  attempt: 0,
+  endedAt: expect.any(Date),
+  groupID: expect.any(String),
+  name: undefined,
+  outputItemID: expect.any(String),
+  scheduledAt: expect.any(Date),
+  scope: 'function',
+  sleepConfig: undefined,
+  startedAt: expect.any(Date),
+  url: 'http://localhost:3939/api/inngest',
+  waitForEventConfig: undefined,
+  waitForEventResult: undefined,
+} as const;
+
 test('cancels', async () => {
   const history = await loadHistory('cancels.json');
 
   const expectation: HistoryNode[] = [
     {
-      attempt: 0,
-      groupID: expect.any(String),
+      ...baseStepNode,
       status: 'cancelled',
-      scheduledAt: expect.any(Date),
-      startedAt: expect.any(Date),
-      scope: 'step',
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
       name: '1m',
+      outputItemID: expect.any(String),
       sleepConfig: {
         until: expect.any(Date),
       },
     },
     {
-      attempt: 0,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
+      ...baseRunEndNode,
+      outputItemID: undefined,
+      startedAt: undefined,
       status: 'cancelled',
-      endedAt: expect.any(Date),
-      scope: 'function',
+      url: undefined,
     },
   ];
 
-  expect(history).toEqual(
-    expectation.map((exp) => {
-      return expect.objectContaining(exp);
-    }),
-  );
+  expect(history).toEqual(expectation);
 });
 
 test('fails without steps', async () => {
@@ -53,32 +72,18 @@ test('fails without steps', async () => {
 
   const expectation: HistoryNode[] = [
     {
+      ...baseStepNode,
       attempt: 2,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
       status: 'failed',
-      startedAt: expect.any(Date),
-      scope: 'step',
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
     {
+      ...baseRunEndNode,
       attempt: 2,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
       status: 'failed',
-      startedAt: expect.any(Date),
-      scope: 'function',
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
   ];
 
-  expect(history).toEqual(
-    expectation.map((exp) => {
-      return expect.objectContaining(exp);
-    }),
-  );
+  expect(history).toEqual(expectation);
 });
 
 test('fails with preceding step', async () => {
@@ -86,43 +91,23 @@ test('fails with preceding step', async () => {
 
   const expectation: HistoryNode[] = [
     {
-      attempt: 0,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
+      ...baseStepNode,
       status: 'completed',
-      startedAt: expect.any(Date),
-      scope: 'step',
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
       name: 'First step',
     },
     {
+      ...baseStepNode,
       attempt: 2,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
       status: 'failed',
-      scope: 'step',
-      startedAt: expect.any(Date),
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
     {
+      ...baseRunEndNode,
       attempt: 2,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
       status: 'failed',
-      scope: 'function',
-      startedAt: expect.any(Date),
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
   ];
 
-  expect(history).toEqual(
-    expectation.map((exp) => {
-      return expect.objectContaining(exp);
-    }),
-  );
+  expect(history).toEqual(expectation);
 });
 
 test('no steps', async () => {
@@ -130,22 +115,12 @@ test('no steps', async () => {
 
   const expectation: HistoryNode[] = [
     {
-      attempt: 0,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
+      ...baseRunEndNode,
       status: 'completed',
-      startedAt: expect.any(Date),
-      scope: 'function',
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
   ];
 
-  expect(history).toEqual(
-    expectation.map((exp) => {
-      return expect.objectContaining(exp);
-    }),
-  );
+  expect(history).toEqual(expectation);
 });
 
 test('parallel steps', async () => {
@@ -153,75 +128,35 @@ test('parallel steps', async () => {
 
   const expectation: HistoryNode[] = [
     {
-      attempt: 0,
-      groupID: expect.any(String),
+      ...baseStepNode,
       status: 'completed',
-      scheduledAt: expect.any(Date),
-      startedAt: expect.any(Date),
-      scope: 'step',
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
       name: 'a',
     },
     {
-      attempt: 0,
-      groupID: expect.any(String),
+      ...baseStepNode,
       status: 'completed',
-      scheduledAt: expect.any(Date),
-      scope: 'step',
-      startedAt: expect.any(Date),
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
     {
-      attempt: 0,
-      groupID: expect.any(String),
+      ...baseStepNode,
       status: 'completed',
       name: 'b2',
-      scheduledAt: expect.any(Date),
-      scope: 'step',
-      startedAt: expect.any(Date),
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
     {
-      attempt: 0,
-      groupID: expect.any(String),
+      ...baseStepNode,
       status: 'completed',
       name: 'b1',
-      scheduledAt: expect.any(Date),
-      scope: 'step',
-      startedAt: expect.any(Date),
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
     {
-      attempt: 0,
-      groupID: expect.any(String),
+      ...baseStepNode,
       status: 'completed',
-      scheduledAt: expect.any(Date),
-      scope: 'step',
-      startedAt: expect.any(Date),
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
     {
-      attempt: 0,
-      groupID: expect.any(String),
+      ...baseRunEndNode,
       status: 'completed',
-      scheduledAt: expect.any(Date),
-      scope: 'function',
-      startedAt: expect.any(Date),
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
   ];
 
-  expect(history).toEqual(
-    expectation.map((exp) => {
-      return expect.objectContaining(exp);
-    }),
-  );
+  expect(history).toEqual(expectation);
 });
 
 test('sleeps', async () => {
@@ -229,36 +164,20 @@ test('sleeps', async () => {
 
   const expectation: HistoryNode[] = [
     {
-      attempt: 0,
-      endedAt: expect.any(Date),
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
+      ...baseStepNode,
       status: 'completed',
-      startedAt: expect.any(Date),
-      scope: 'step',
-      url: 'http://localhost:3939/api/inngest',
       name: '10s',
       sleepConfig: {
         until: expect.any(Date),
       },
     },
     {
-      attempt: 0,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
+      ...baseRunEndNode,
       status: 'completed',
-      startedAt: expect.any(Date),
-      scope: 'function',
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
   ];
 
-  expect(history).toEqual(
-    expectation.map((exp) => {
-      return expect.objectContaining(exp);
-    }),
-  );
+  expect(history).toEqual(expectation);
 });
 
 test('succeeds with 2 steps', async () => {
@@ -266,44 +185,22 @@ test('succeeds with 2 steps', async () => {
 
   const expectation: HistoryNode[] = [
     {
-      attempt: 0,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
+      ...baseStepNode,
       status: 'completed',
-      startedAt: expect.any(Date),
-      scope: 'step',
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
       name: 'First step',
     },
     {
-      attempt: 0,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
+      ...baseStepNode,
       status: 'completed',
       name: 'Second step',
-      scope: 'step',
-      startedAt: expect.any(Date),
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
     {
-      attempt: 0,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
+      ...baseRunEndNode,
       status: 'completed',
-      scope: 'function',
-      startedAt: expect.any(Date),
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
   ];
 
-  expect(history).toEqual(
-    expectation.map((exp) => {
-      return expect.objectContaining(exp);
-    }),
-  );
+  expect(history).toEqual(expectation);
 });
 
 test('times out waiting for events', async () => {
@@ -311,14 +208,8 @@ test('times out waiting for events', async () => {
 
   const expectation: HistoryNode[] = [
     {
-      attempt: 0,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
+      ...baseStepNode,
       status: 'completed',
-      startedAt: expect.any(Date),
-      scope: 'step',
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
       waitForEventResult: {
         eventID: undefined,
         timeout: true,
@@ -330,22 +221,12 @@ test('times out waiting for events', async () => {
       },
     },
     {
-      attempt: 0,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
+      ...baseRunEndNode,
       status: 'completed',
-      startedAt: expect.any(Date),
-      scope: 'function',
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
   ];
 
-  expect(history).toEqual(
-    expectation.map((exp) => {
-      return expect.objectContaining(exp);
-    }),
-  );
+  expect(history).toEqual(expectation);
 });
 
 test('waits for event', async () => {
@@ -353,16 +234,10 @@ test('waits for event', async () => {
 
   const expectation: HistoryNode[] = [
     {
-      attempt: 0,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
+      ...baseStepNode,
       status: 'completed',
-      startedAt: expect.any(Date),
-      scope: 'step',
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
       waitForEventResult: {
-        eventID: '01HAW74MMPVBF8RJSTGQHTVJFR',
+        eventID: expect.any(String),
         timeout: false,
       },
       waitForEventConfig: {
@@ -372,20 +247,10 @@ test('waits for event', async () => {
       },
     },
     {
-      attempt: 0,
-      groupID: expect.any(String),
-      scheduledAt: expect.any(Date),
+      ...baseRunEndNode,
       status: 'completed',
-      startedAt: expect.any(Date),
-      scope: 'function',
-      url: 'http://localhost:3939/api/inngest',
-      endedAt: expect.any(Date),
     },
   ];
 
-  expect(history).toEqual(
-    expectation.map((exp) => {
-      return expect.objectContaining(exp);
-    }),
-  );
+  expect(history).toEqual(expectation);
 });

@@ -63,6 +63,7 @@ const updaters: {
       ...node,
       endedAt: new Date(rawItem.createdAt),
       name,
+      outputItemID: rawItem.id,
       scope: 'step',
       status: 'completed',
       waitForEventResult,
@@ -82,6 +83,7 @@ const updaters: {
       ...node,
       endedAt: new Date(rawItem.createdAt),
       name: parseName(rawItem.stepName ?? undefined),
+      outputItemID: rawItem.id,
       scope: 'step',
       status: 'failed',
     } satisfies HistoryNode;
