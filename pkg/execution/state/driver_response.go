@@ -37,22 +37,18 @@ type GeneratorOpcode struct {
 }
 
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {
-	opts := WaitForEventOpts{
-		Event: g.Name,
+	opts := &WaitForEventOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+	if opts.Event == "" {
+		// use the step name as a fallback, for v1/2 of the TS SDK.
+		opts.Event = g.Name
 	}
 	if opts.Event == "" {
 		return nil, fmt.Errorf("An event name must be provided when waiting for an event")
 	}
-
-	byt, err := json.Marshal(g.Opts)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := json.Unmarshal(byt, &opts); err != nil {
-		return nil, err
-	}
-	return &opts, nil
+	return opts, nil
 }
 
 func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
@@ -60,13 +56,22 @@ func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
 		return 0, fmt.Errorf("unable to return sleep duration for opcode %s", g.Op.String())
 	}
 
-	if len(g.Name) == 0 {
+	opts := &SleepOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return 0, err
+	}
+
+	if opts.Duration == "" {
+		// use step name as a fallback for v1/2 of the TS SDK
+		opts.Duration = g.Name
+	}
+	if len(opts.Duration) == 0 {
 		return 0, nil
 	}
 
 	// Quick heuristic to check if this is likely a date layout
-	if len(g.Name) >= 10 {
-		if parsed, err := dateutil.Parse(g.Name); err == nil {
+	if len(opts.Duration) >= 10 {
+		if parsed, err := dateutil.Parse(opts.Duration); err == nil {
 			at := time.Until(parsed).Round(time.Second)
 			if at < 0 {
 				return time.Duration(0), nil
@@ -75,14 +80,58 @@ func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
 		}
 	}
 
-	return str2duration.ParseDuration(g.Name)
+	return str2duration.ParseDuration(opts.Duration)
+}
+
+type SleepOpts struct {
+	Duration string `json:"duration"`
+}
+
+func (s *SleepOpts) UnmarshalAny(a any) error {
+	opts := SleepOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+	*s = opts
+	return nil
 }
 
 type WaitForEventOpts struct {
 	Timeout string  `json:"timeout"`
 	If      *string `json:"if"`
-	// Event is taken from GeneratorOpcode.Name
-	Event string `json:"-"`
+	// Event is taken from GeneratorOpcode.Name if this is empty.
+	Event string `json:"event"`
+}
+
+func (w *WaitForEventOpts) UnmarshalAny(a any) error {
+	opts := WaitForEventOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+	*w = opts
+	return nil
 }
 
 func (w WaitForEventOpts) Expires() (time.Time, error) {
@@ -106,6 +155,11 @@ type DriverResponse struct {
 
 	// Duration is how long the step took to run, from the driver itsef.
 	Duration time.Duration `json:"dur"`
+
+	// RequestVersion represents the hashing version used within the current SDK request.
+	//
+	// This allows us to store the hash version for each function run to check backcompat.
+	RequestVersion int `json:"request_version"`
 
 	// Generator indicates that this response is a partial repsonse from a
 	// SDK-based step (generator) function.  These functions are invoked

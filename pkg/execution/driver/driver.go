@@ -34,6 +34,7 @@ func MarshalV1(
 	env string,
 	attempt int,
 ) ([]byte, error) {
+	md := s.Metadata()
 	req := &SDKRequest{
 		Events:  s.Events(),
 		Event:   s.Event(),
@@ -47,9 +48,10 @@ func MarshalV1(
 				Stack:   s.Stack(),
 				Current: stackIndex,
 			},
-			Attempt: attempt,
+			Attempt:                   attempt,
+			DisableImmediateExecution: md.DisableImmediateExecution,
 		},
-		DisableImmediateExecution: s.Metadata().DisableImmediateExecution,
+		Version: md.RequestVersion,
 	}
 
 	// empty the attrs that consume the most
@@ -57,6 +59,7 @@ func MarshalV1(
 		req.Events = []map[string]any{}
 		req.Actions = map[string]any{}
 		req.UseAPI = true
+		req.Context.UseAPI = true
 	}
 
 	j, err := json.Marshal(req)
