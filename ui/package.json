@@ -24,7 +24,7 @@
     "@rtk-query/graphql-request-base-query": "2.2.0",
     "@tanstack/react-query": "5.0.0-beta.20",
     "@tanstack/react-table": "8.9.3",
-    "graphql": "16.6.0",
+    "graphql": "16.8.1",
     "graphql-request": "4.0.0",
     "lodash.debounce": "4.0.8",
     "monaco-editor": "0.34.1",
