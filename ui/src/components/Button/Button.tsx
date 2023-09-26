@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
 import { IconSpinner } from '@/icons';
 import classNames from '@/utils/classnames';
@@ -22,21 +22,27 @@ interface ButtonProps {
   btnAction?: (e?: React.MouseEvent) => void;
   keys?: string[];
   isSplit?: boolean;
+  className?: string;
 }
 
-export default function Button({
-  kind = 'default',
-  appearance = 'solid',
-  size = 'small',
-  label,
-  icon,
-  loading = false,
-  disabled,
-  btnAction,
-  isSplit,
-  type,
-  keys,
-}: ButtonProps) {
+export default forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    kind = 'default',
+    appearance = 'solid',
+    size = 'small',
+    label,
+    icon,
+    loading = false,
+    disabled,
+    btnAction,
+    isSplit,
+    type,
+    keys,
+    className,
+    ...props
+  }: ButtonProps,
+  ref,
+) {
   const buttonColors = getButtonColors({ kind, appearance });
   const buttonSizes = getButtonSizeStyles({ size, icon, label });
   const disabledStyles = getDisabledStyles();
@@ -53,16 +59,19 @@ export default function Button({
 
   return (
     <button
+      ref={ref}
       className={classNames(
         buttonColors,
         buttonSizes,
         disabledStyles,
         isSplit ? 'rounded-l-sm' : 'rounded-sm',
         'flex gap-1.5 items-center justify-center drop-shadow-sm transition-all active:scale-95 ',
+        className,
       )}
       type={type}
       onClick={btnAction}
       disabled={disabled}
+      {...props}
     >
       {loading && <IconSpinner className={`fill-white ${iconSizes}`} />}
       {!loading && iconElement}
@@ -83,4 +92,4 @@ export default function Button({
       )}
     </button>
   );
-}
+});

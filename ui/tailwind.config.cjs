@@ -44,7 +44,7 @@ module.exports = {
     'hover:border-slate-800',
     'hover:bg-slate-800/80',
     'text-slate-800',
-    'hover:text-slate-800/80'
+    'hover:text-slate-800/80',
   ],
   theme: {
     extend: {
@@ -94,11 +94,30 @@ module.exports = {
             transform: 'translateY(0)',
           },
         },
+        slideDown: {
+          '0%': {
+            height: '0',
+          },
+          '100%': {
+            height: 'var(--radix-accordion-content-height)',
+          },
+        },
+        slideUp: {
+          '0%': {
+            height: 'var(--radix-accordion-content-height)',
+          },
+          '100%': {
+            height: '0',
+          },
+        },
       },
       animation: {
         'pulse-spin': 'pulse-spin 1s ease-out infinite',
         // Tooltip
         'slide-down-fade': 'slideDownAndFade 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+        // Accordion
+        'slide-down': 'slideDown 0.3s ease-in-out forwards',
+        'slide-up': 'slideUp 0.3s ease-in-out forwards',
       },
     },
     fontSize: {

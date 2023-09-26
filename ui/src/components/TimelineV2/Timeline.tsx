@@ -18,7 +18,7 @@ export function Timeline({ history }: Props) {
         return null;
       }
 
-      return <TimelineNode className="my-2" node={node} key={node.groupID} />;
+      return <TimelineNode node={node} key={node.groupID} />;
     });
   }
 

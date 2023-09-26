@@ -406,7 +406,7 @@ func (l lifecycle) OnWaitForEvent(
 		FunctionVersion: int64(id.WorkflowVersion),
 		GroupID:         groupID,
 		RunID:           id.RunID,
-		Type:            enums.HistoryTypeStepSleeping.String(),
+		Type:            enums.HistoryTypeStepWaiting.String(),
 		Attempt:         int64(item.Attempt),
 		IdempotencyKey:  id.IdempotencyKey(),
 		EventID:         id.EventID,
