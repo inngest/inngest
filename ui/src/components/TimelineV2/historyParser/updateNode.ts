@@ -51,10 +51,6 @@ const updaters: {
   [HistoryType.StepCompleted]: (node, rawItem) => {
     const name = parseName(rawItem.stepName ?? undefined);
 
-    // If there isn't a name then assume it's an ended discovery step, which
-    // shouldn't be displayed.
-    const isVisible = Boolean(name);
-
     let waitForEventResult: HistoryNode['waitForEventResult'] | undefined;
     if (rawItem.waitResult) {
       waitForEventResult = {
