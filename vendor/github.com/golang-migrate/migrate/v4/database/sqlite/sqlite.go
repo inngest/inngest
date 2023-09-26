@@ -197,6 +197,7 @@ func (m *Sqlite) Run(migration io.Reader) error {
 		return err
 	}
 	query := string(migr[:])
+
 	if m.config.NoTxWrap {
 		return m.executeQueryNoTx(query)
 	}

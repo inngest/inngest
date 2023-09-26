@@ -506,9 +506,6 @@ github.com/lucasb-eyer/go-colorful
 # github.com/magiconair/properties v1.8.5
 ## explicit; go 1.13
 github.com/magiconair/properties
-# github.com/marcboeker/go-duckdb v1.4.1
-## explicit; go 1.18
-github.com/marcboeker/go-duckdb
 # github.com/mattn/go-isatty v0.0.17
 ## explicit; go 1.15
 github.com/mattn/go-isatty
