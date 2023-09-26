@@ -33,7 +33,10 @@ export class HistoryParser {
         attempt: rawItem.attempt,
         groupID: rawItem.groupID,
         scheduledAt: new Date(rawItem.createdAt),
+        sleepConfig: undefined,
         status: 'scheduled',
+        waitForEventConfig: undefined,
+        waitForEventResult: undefined,
       };
     }
 
@@ -50,9 +53,8 @@ export class HistoryParser {
       [node.groupID]: node,
     };
 
-    
-    if (rawItem.type === HistoryType.FunctionCancelled && node.endedAt) {
-      this.cancelNodes(node.endedAt);
+    if (rawItem.type === HistoryType.FunctionCancelled) {
+      this.cancelNodes(new Date(rawItem.createdAt));
     }
 
     this.handleCompletedSleepNodes(new Date(rawItem.createdAt));
@@ -60,7 +62,7 @@ export class HistoryParser {
 
   /**
    * Mark all in-progress nodes as cancelled.
-   * 
+   *
    * Run cancellation doesn't create StepCancelled history items for in-progress
    * steps.
    */
@@ -81,7 +83,7 @@ export class HistoryParser {
 
   /**
    * Mark sleep nodes as completed if their wake time is reached.
-   * 
+   *
    * Sleeps don't have a StepCompleted history item after they complete. So we
    * need to mark them as completed whenever their wake time is reached.
    */

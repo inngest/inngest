@@ -3,6 +3,7 @@ export type HistoryNode = {
   endedAt?: Date;
   groupID: string;
   name?: string;
+  outputItemID?: string;
   scheduledAt: Date;
   scope?: 'function' | 'step';
   sleepConfig?: {
