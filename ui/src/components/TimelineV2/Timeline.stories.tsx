@@ -4,15 +4,15 @@ import type { Meta, StoryObj } from '@storybook/react';
 import type { RunHistoryItem } from '@/store/generated';
 import { HistoryParser, type HistoryNode } from './historyParser/index';
 import { Timeline } from './index';
-import cancelsData from './storyData/cancels.json';
-import failsWithoutStepsData from './storyData/failsWithoutSteps.json';
-import failsWithPrecedingStepData from './storyData/failsWithPrecedingStep.json';
-import noStepsData from './storyData/noSteps.json';
-import parallelStepsData from './storyData/parallelSteps.json';
-import sleepsData from './storyData/sleeps.json';
-import succeedsWith2StepsData from './storyData/succeedsWith2Steps.json';
-import timesOutWaitingForEventData from './storyData/timesOutWaitingForEvent.json';
-import waitsForEventData from './storyData/waitsForEvent.json';
+import cancelsData from './historyParser/testData/cancels.json';
+import failsWithPrecedingStepData from './historyParser/testData/failsWithPrecedingStep.json';
+import failsWithoutStepsData from './historyParser/testData/failsWithoutSteps.json';
+import noStepsData from './historyParser/testData/noSteps.json';
+import parallelStepsData from './historyParser/testData/parallelSteps.json';
+import sleepsData from './historyParser/testData/sleeps.json';
+import succeedsWith2StepsData from './historyParser/testData/succeedsWith2Steps.json';
+import timesOutWaitingForEventData from './historyParser/testData/timesOutWaitingForEvent.json';
+import waitsForEventData from './historyParser/testData/waitsForEvent.json';
 
 type PropsAndCustomArgs = React.ComponentProps<typeof Timeline> & {
   _rawHistory: RunHistoryItem[];

@@ -32,6 +32,7 @@ export class HistoryParser {
       node = {
         attempt: rawItem.attempt,
         groupID: rawItem.groupID,
+        scheduledAt: new Date(rawItem.createdAt),
         status: 'scheduled',
       };
     }
