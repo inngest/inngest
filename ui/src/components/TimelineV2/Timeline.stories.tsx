@@ -5,8 +5,13 @@ import type { RunHistoryItem } from '@/store/generated';
 import { HistoryParser, type HistoryNode } from './historyParser/index';
 import { Timeline } from './index';
 import cancelsData from './historyParser/testData/cancels.json';
+import failsWithPrecedingStepData from './historyParser/testData/failsWithPrecedingStep.json';
+import failsWithoutStepsData from './historyParser/testData/failsWithoutSteps.json';
+import noStepsData from './historyParser/testData/noSteps.json';
 import parallelStepsData from './historyParser/testData/parallelSteps.json';
+import sleepsData from './historyParser/testData/sleeps.json';
 import succeedsWith2StepsData from './historyParser/testData/succeedsWith2Steps.json';
+import timesOutWaitingForEventData from './historyParser/testData/timesOutWaitingForEvent.json';
 import waitsForEventData from './historyParser/testData/waitsForEvent.json';
 
 type PropsAndCustomArgs = React.ComponentProps<typeof Timeline> & {
@@ -79,6 +84,11 @@ function createStory(rawHistory: unknown): Story {
 }
 
 export const cancels = createStory(cancelsData);
+export const failsWithoutSteps = createStory(failsWithoutStepsData);
+export const failsWithPrecedingStep = createStory(failsWithPrecedingStepData);
+export const noSteps = createStory(noStepsData);
 export const parallelSteps = createStory(parallelStepsData);
+export const sleeps = createStory(sleepsData);
 export const succeedsWith2Steps = createStory(succeedsWith2StepsData);
+export const timesOutWaitingForEvent = createStory(timesOutWaitingForEventData);
 export const waitsForEvent = createStory(waitsForEventData);

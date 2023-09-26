@@ -1,4 +1,4 @@
-export function IconStatusCircleExclamation({ className }: { className?: string }) {
+export function IconStepStatusUnknown({ className }: { className?: string }) {
   return (
     <svg
       width="28"
@@ -6,8 +6,8 @@ export function IconStatusCircleExclamation({ className }: { className?: string 
       viewBox="0 0 30 30"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      color="#F43F5E"
       className={className}
+      color="#334155"
     >
       <g>
         <path
@@ -15,8 +15,8 @@ export function IconStatusCircleExclamation({ className }: { className?: string 
           fill="currentColor"
         />
       </g>
-      <text x="12.5" y="20" fill="#FFFFFF" fontSize="15" fontWeight="bold">
-        !
+      <text x="10.5" y="20" fill="#FFFFFF" fontSize="15" fontWeight="bold">
+        ?
       </text>
     </svg>
   );

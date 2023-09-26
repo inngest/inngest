@@ -8,7 +8,7 @@ import { updateNode } from './updateNode';
  * `step.waitForEvent` then they expect a single history node, rather than the
  * multiple history items we actually store in our DB. Unlike raw history,
  * history nodes are mutable.
- * 
+ *
  * IMPORTANT: The append method expects to be called in ascending chronological
  * order. Appending older raw history items will result in bugs. This should be
  * changed in the future, but that increases complexity.
@@ -35,6 +35,12 @@ export class HistoryParser {
         scheduledAt: new Date(rawItem.createdAt),
         status: 'scheduled',
       };
+    }
+
+    if (rawItem.type === HistoryType.FunctionFailed && node.scope === 'step') {
+      // Put FunctionFailed into its own node. Its group ID is the same as
+      // StepFailed but don't want to mess up the StepFailed node's data.
+      node.groupID = 'function-end';
     }
 
     node = updateNode(node, rawItem);

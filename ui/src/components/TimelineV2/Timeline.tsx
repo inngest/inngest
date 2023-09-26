@@ -18,7 +18,7 @@ export function Timeline({ history }: Props) {
         return null;
       }
 
-      return <TimelineNode className="my-2" node={node} key={node.groupID} />;
+      return <TimelineNode node={node} key={node.groupID} />;
     });
   }
 
@@ -34,14 +34,15 @@ function sortAscending(a: HistoryNode, b: HistoryNode) {
 }
 
 function isVisible(node: HistoryNode) {
-  if (!isEndStatus(node.status)) {
-    // Always should in-progress nodes.
+  if (node.status !== 'completed') {
+    // We'll know if a node is pure discovery when it's completed. Therefore all
+    // non-completed nodes are possibly non pure discovery.
     return true;
   }
 
-  if (node.scope === "function") {
+  if (node.scope === 'function') {
     // Show nodes like "function completed".
-    return true
+    return true;
   }
 
   if (node.name) {
