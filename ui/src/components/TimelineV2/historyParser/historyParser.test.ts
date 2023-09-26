@@ -230,9 +230,10 @@ test('sleeps', async () => {
   const expectation: HistoryNode[] = [
     {
       attempt: 0,
+      endedAt: expect.any(Date),
       groupID: expect.any(String),
       scheduledAt: expect.any(Date),
-      status: 'sleeping',
+      status: 'completed',
       startedAt: expect.any(Date),
       scope: 'step',
       url: 'http://localhost:3939/api/inngest',

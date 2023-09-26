@@ -50,11 +50,20 @@ export class HistoryParser {
       [node.groupID]: node,
     };
 
+    
     if (rawItem.type === HistoryType.FunctionCancelled && node.endedAt) {
       this.cancelNodes(node.endedAt);
     }
+
+    this.handleCompletedSleepNodes(new Date(rawItem.createdAt));
   }
 
+  /**
+   * Mark all in-progress nodes as cancelled.
+   * 
+   * Run cancellation doesn't create StepCancelled history items for in-progress
+   * steps.
+   */
   private cancelNodes(endedAt: Date) {
     for (const node of Object.values(this.history)) {
       if (!node.endedAt) {
@@ -66,6 +75,30 @@ export class HistoryParser {
             status: 'cancelled',
           },
         };
+      }
+    }
+  }
+
+  /**
+   * Mark sleep nodes as completed if their wake time is reached.
+   * 
+   * Sleeps don't have a StepCompleted history item after they complete. So we
+   * need to mark them as completed whenever their wake time is reached.
+   */
+  private handleCompletedSleepNodes(time: Date) {
+    for (const node of Object.values(this.history)) {
+      if (node.status === 'sleeping' && node.sleepConfig) {
+        const isCompleted = node.sleepConfig.until <= time;
+        if (isCompleted) {
+          this.history = {
+            ...this.history,
+            [node.groupID]: {
+              ...node,
+              endedAt: node.sleepConfig.until,
+              status: 'completed',
+            },
+          };
+        }
       }
     }
   }
