@@ -16,7 +16,6 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
-	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,7 +51,7 @@ type Test struct {
 	// requestEvent stores the event that must be sent within executor requests
 	requestEvent inngestgo.Event
 	// requestCtx stores the "ctx" field that must be present within executor requests
-	requestCtx SDKCtx
+	requestCtx driver.SDKRequestContext
 	// requestSteps stores the "steps" field that must be present within executor requests
 	requestSteps map[string]any
 	// lastResponse stores the last response time
@@ -102,7 +101,7 @@ func (t *Test) SetRequestEvent(event inngestgo.Event) func() {
 	}
 }
 
-func (t *Test) SetRequestContext(ctx SDKCtx) func() {
+func (t *Test) SetRequestContext(ctx driver.SDKRequestContext) func() {
 	return func() {
 		// Ensure we set the ID here, which is deterministic but we use random ports within
 		// the test server, breaking determinism.
@@ -111,7 +110,7 @@ func (t *Test) SetRequestContext(ctx SDKCtx) func() {
 			t.Function.Steps[i].URI = util.NormalizeAppURL(t.Function.Steps[i].URI)
 		}
 		t.Function.ID = inngest.DeterministicUUID(t.Function)
-		ctx.FnID = t.Function.ID.String()
+		ctx.FunctionID = t.Function.ID
 
 		t.requestCtx = ctx
 		if t.requestCtx.Stack.Stack == nil {
@@ -151,7 +150,7 @@ func (t *Test) AddRequestSteps(s map[string]any) func() {
 	}
 }
 
-func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Duration) func() {
+func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Duration, modifiers ...func(r *driver.SDKRequestContext)) func() {
 	return func() {
 		select {
 		case r := <-t.requests:
@@ -177,6 +176,9 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			er.Event.Timestamp = ts
 			er.Event.ID = evtID
 
+			for _, m := range modifiers {
+				m(&t.requestCtx)
+			}
 			// Unset the run ID so that our unique run ID doesn't cause issues.
 			t.requestCtx.RunID = er.Ctx.RunID
 			require.EqualValues(t.test, t.requestCtx, er.Ctx, "Request ctx is incorrect")
@@ -343,16 +345,9 @@ func (t *Test) After(d time.Duration) func() {
 }
 
 type ExecutorRequest struct {
-	Event inngestgo.Event `json:"event"`
-	Steps map[string]any  `json:"steps"`
-	Ctx   SDKCtx          `json:"ctx"`
-}
-
-type SDKCtx struct {
-	FnID   string               `json:"fn_id"`
-	StepID string               `json:"step_id"`
-	RunID  ulid.ULID            `json:"run_id"`
-	Stack  driver.FunctionStack `json:"stack"`
+	Event inngestgo.Event          `json:"event"`
+	Steps map[string]any           `json:"steps"`
+	Ctx   driver.SDKRequestContext `json:"ctx"`
 }
 
 func strptr(s string) *string {

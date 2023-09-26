@@ -9,7 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/cqrs/ddb"
+	"github.com/inngest/inngest/pkg/cqrs/sqlitecqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -59,14 +59,14 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	db, err := ddb.New()
+	db, err := sqlitecqrs.New()
 	if err != nil {
 		return err
 	}
 
 	// Initialize the devserver
-	dbcqrs := ddb.NewCQRS(db)
-	hd := ddb.NewHistoryDriver(db)
+	dbcqrs := sqlitecqrs.NewCQRS(db)
+	hd := sqlitecqrs.NewHistoryDriver(db)
 	loader := dbcqrs.(state.FunctionLoader)
 
 	rc, err := createInmemoryRedis(ctx)

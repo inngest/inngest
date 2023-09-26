@@ -65,4 +65,6 @@ const (
 	// in the job.  The retry count is taken from function config for every step _but_
 	// initialization.
 	SourceEdgeRetries = 20
+
+	RequestVersionUnknown = -1
 )

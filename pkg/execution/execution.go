@@ -91,7 +91,7 @@ type Executor interface {
 	) error
 
 	// HandleGeneratorResponse handles all generator responses.
-	HandleGeneratorResponse(ctx context.Context, gen []*state.GeneratorOpcode, item queue.Item) error
+	HandleGeneratorResponse(ctx context.Context, resp *state.DriverResponse, item queue.Item) error
 	// HandleGenerator handles an individual generator response returned from the SDK.
 	HandleGenerator(ctx context.Context, gen state.GeneratorOpcode, item queue.Item) error
 
