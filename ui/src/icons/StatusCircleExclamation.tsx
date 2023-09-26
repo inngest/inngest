@@ -6,8 +6,8 @@ export function IconStatusCircleExclamation({ className }: { className?: string 
       viewBox="0 0 30 30"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={className}
       color="#F43F5E"
+      className={className}
     >
       <g>
         <path
