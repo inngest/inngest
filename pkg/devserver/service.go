@@ -19,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/devserver/discovery"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
@@ -178,7 +179,9 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 				String: deploy.DeployErrUnreachable.Error(),
 			},
 		}
-		_, _ = d.data.InsertApp(ctx, params)
+		if _, err := d.data.InsertApp(ctx, params); err != nil {
+			log.From(ctx).Error().Err(err).Msg("error inserting app from scan")
+		}
 	}
 
 	// Then poll for every added app (including apps added via the `-u` flag and via the

@@ -10,7 +10,7 @@
           <p className="text-slate-600" />
         ) : (
 
-          <ul className="">
+          <ul className="flex flex-col space-y-4">
             {functionRuns &&
               functionRuns.map((functionRun) => {
                 return <OutputItem functionRunID={functionRun.id} />;

@@ -35,36 +35,6 @@ jobs:
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v2
-
-      - name: Build UI
-        run: make build-ui
-
-      - name: Build
-        uses: crazy-max/ghaction-xgo@v2
-        with:
-          xgo_version: latest
-          go_version: "1.21"
-          dest: build
-          prefix: inngest
-          pkg: cmd
-          targets: linux/arm64,linux/amd64,darwin/arm64,darwin/amd64
-          v: false
-          x: false
-          race: false
-          ldflags: -s -w -X github.com/inngest/inngest/pkg/inngest/version.Version=${{ steps.tag.outputs.tag }} -X github.com/inngest/inngest/pkg/inngest/version.Hash=${{ steps.sha.outputs.sha }}
-          buildmode: default
-          trimpath: true
-
-      - name: 'Upload Artifact'
-        uses: actions/upload-artifact@v3
-        with:
-          name: binaries
-          path: ./build/*
-          retention-days: 1
-
-      - name: Clean UI
-        run: git checkout -- .
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:

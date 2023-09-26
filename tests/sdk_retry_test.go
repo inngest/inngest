@@ -62,10 +62,10 @@ func TestSDKRetry(t *testing.T) {
 		// All executor requests should have this event.
 		test.SetRequestEvent(evt),
 		// And the executor should start its requests with this context.
-		test.SetRequestContext(SDKCtx{
-			FnID:   inngest.DeterministicUUID(test.Function).String(),
-			StepID: "step",
-			Stack: driver.FunctionStack{
+		test.SetRequestContext(driver.SDKRequestContext{
+			FunctionID: inngest.DeterministicUUID(test.Function),
+			StepID:     "step",
+			Stack: &driver.FunctionStack{
 				Current: 0,
 			},
 		}),
@@ -90,7 +90,10 @@ func TestSDKRetry(t *testing.T) {
 			return nil
 		}),
 
-		test.ExpectRequest("Second request", "step", 45*time.Second),
+		test.ExpectRequest("Second request", "step", 45*time.Second, func(r *driver.SDKRequestContext) {
+			r.Attempt = 1
+		}),
+
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 			Op:   enums.OpcodeStep,
 			ID:   hashes["first step"],
@@ -110,7 +113,9 @@ func TestSDKRetry(t *testing.T) {
 		//
 
 		// Finally, the function should be called and should error once.
-		test.ExpectRequest("Final call", "step", time.Second),
+		test.ExpectRequest("Final call", "step", time.Second, func(r *driver.SDKRequestContext) {
+			r.Attempt = 0
+		}),
 		// Expect a 500
 		test.ExpectResponseFunc(500, func(byt []byte) error {
 			// This should be a string, because the SDK double-serializes
@@ -127,7 +132,9 @@ func TestSDKRetry(t *testing.T) {
 			require.Equal(t, "broken func", e["message"])
 			return nil
 		}),
-		test.ExpectRequest("Final call", "step", 45*time.Second),
+		test.ExpectRequest("Final call", "step", 45*time.Second, func(r *driver.SDKRequestContext) {
+			r.Attempt = 1
+		}),
 
 		test.ExpectJSONResponse(200, map[string]any{
 			"body": "ok",

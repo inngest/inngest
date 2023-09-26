@@ -323,6 +323,7 @@ func checkUpdateMetadata(t *testing.T, m state.Manager) {
 			"ok":      true,
 			"another": "yes",
 		},
+		RequestVersion: 2,
 	}
 
 	err = m.UpdateMetadata(ctx, runID, update)
@@ -335,6 +336,7 @@ func checkUpdateMetadata(t *testing.T, m state.Manager) {
 	require.EqualValues(t, true, found.DisableImmediateExecution)
 	require.EqualValues(t, true, found.Debugger)
 	require.EqualValues(t, update.Context, found.Context)
+	require.EqualValues(t, 2, found.RequestVersion)
 }
 
 func checkScheduled(t *testing.T, m state.Manager) {

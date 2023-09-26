@@ -13,14 +13,13 @@ type SDKRequest struct {
 	Events  []map[string]any   `json:"events,omitempty"`
 	Actions map[string]any     `json:"steps"`
 	Context *SDKRequestContext `json:"ctx"`
-	// UseAPI tells the SDK to retrieve `Events` and `Actions` data
-	// from the API instead of expecting it to be in the request body.
-	// This is a way to get around serverless provider's request body
-	// size limits.
+	// Version indicates the version used to manage the SDK request context.
+	//
+	// A value of -1 means that the function is starting and has no version.
+	Version int `json:"version"`
+
+	// DEPRECATED: NOTE: This is moved into SDKRequestContext for V3+/Non-TS SDKs
 	UseAPI bool `json:"use_api"`
-	// DisableImmediateExecution is used to tell the SDK whether it should
-	// disallow immediate execution of steps as they are found.
-	DisableImmediateExecution bool `json:"disable_immediate_execution"`
 }
 
 // TODO:
@@ -57,6 +56,16 @@ type SDKRequestContext struct {
 
 	// Stack represents the function stack at the time of the step invocation.
 	Stack *FunctionStack `json:"stack"`
+
+	// DisableImmediateExecution is used to tell the SDK whether it should
+	// disallow immediate execution of steps as they are found.
+	DisableImmediateExecution bool `json:"disable_immediate_execution"`
+
+	// UseAPI tells the SDK to retrieve `Events` and `Actions` data
+	// from the API instead of expecting it to be in the request body.
+	// This is a way to get around serverless provider's request body
+	// size limits.
+	UseAPI bool `json:"use_api"`
 
 	// XXX: Pass in opentracing context within ctx.
 }
