@@ -1,13 +1,24 @@
-builds:
-  -
-    builder: prebuilt
-    goos: [linux, darwin]
-    goarch: [amd64, arm64]
-    goamd64: [v1]
-    prebuilt:
-      path: ./build/inngest-{{ .Os }}-{{ .Arch }}
-    binary: inngest
+before:
+  hooks:
+    - go mod tidy
+    - make build-ui
 
+builds:
+  - env:
+      - CGO_ENABLED=0
+    main: ./cmd/
+    binary: inngest
+    ldflags:
+      - -s -w
+      - -X github.com/inngest/inngest/inngest/version.Version={{.Version}}
+      - -X github.com/inngest/inngest/inngest/version.Hash={{.ShortCommit}}
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
 
 dockers:
   - id: inngest-amd64

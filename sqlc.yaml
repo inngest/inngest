@@ -6,13 +6,13 @@ overrides:
         go_type: "github.com/google/uuid.UUID"
 sql:
   - engine: "sqlite"
-    schema: "pkg/cqrs/ddb/sqlc/schema.sql"
-    queries: "pkg/cqrs/ddb/sqlc/queries.sql"
+    schema: "pkg/cqrs/sqlitecqrs/sqlc/schema.sql"
+    queries: "pkg/cqrs/sqlitecqrs/sqlc/queries.sql"
     gen:
       go:
         emit_result_struct_pointers: true
         package: "sqlc"
-        out: "pkg/cqrs/ddb/sqlc"
+        out: "pkg/cqrs/sqlitecqrs/sqlc"
         overrides:
           - column: "apps.id"
             go_type: "github.com/google/uuid.UUID"
