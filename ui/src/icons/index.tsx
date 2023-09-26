@@ -27,6 +27,7 @@ export { IconStatusCircleMinus } from './StatusCircleMinus';
 export { IconStatusCircleCross } from './StatusCircleCross';
 export { IconStatusCircleArrowPath } from './StatusCircleArrowPath';
 export { IconStatusCircleMoon } from './StatusCircleMoon';
+export { IconStepStatusUnknown } from './IconStepStatusUnknown';
 
 // Deprecated - Status Icons
 export { DeprecatedIconStatusDefault } from './StatusDefault';
