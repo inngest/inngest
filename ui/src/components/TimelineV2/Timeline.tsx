@@ -22,7 +22,7 @@ export function Timeline({ history }: Props) {
               id: node.groupID,
               header: <TimelineNode node={node} key={node.groupID} />,
               expandable: node.scope === 'function' ? false : true,
-              position: i === 0 ? 'first' : 'middle', // or last if completed
+              position: i === 0 ? 'first' : i === nodes.length - 1 ? 'last' : 'middle',
               content: <div>Content here</div>,
             }))}
         />
