@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.17.0] - 2023-09-26
+
+### Added
+- A new stream page, allowing you to see all events and function runs in an easier view
+- Added a new code block to improve the UI for function outputs, step outputs, and events
+- Added support for V3 of the TS executor
+- Added a new execution lifecycle backend, and new history implementations
+
+### Fixed
+- Fixed dev server payload sizes, now conforming to cloud usage
+- Improved auto-scanning and local development flows
+
 ## [v0.16.7] - 2023-08-19
 
 ### Added
