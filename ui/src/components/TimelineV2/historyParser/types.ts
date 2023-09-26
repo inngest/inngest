@@ -3,7 +3,7 @@ export type HistoryNode = {
   endedAt?: Date;
   groupID: string;
   name?: string;
-  scheduledAt?: Date;
+  scheduledAt: Date;
   scope?: 'function' | 'step';
   sleepConfig?: {
     until: Date;

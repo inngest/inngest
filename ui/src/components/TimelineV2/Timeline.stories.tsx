@@ -4,10 +4,10 @@ import type { Meta, StoryObj } from '@storybook/react';
 import type { RunHistoryItem } from '@/store/generated';
 import { HistoryParser, type HistoryNode } from './historyParser/index';
 import { Timeline } from './index';
-import cancelsData from './storyData/cancels.json';
-import parallelStepsData from './storyData/parallelSteps.json';
-import succeedsWith2StepsData from './storyData/succeedsWith2Steps.json';
-import waitsForEventData from './storyData/waitsForEvent.json';
+import cancelsData from './historyParser/testData/cancels.json';
+import parallelStepsData from './historyParser/testData/parallelSteps.json';
+import succeedsWith2StepsData from './historyParser/testData/succeedsWith2Steps.json';
+import waitsForEventData from './historyParser/testData/waitsForEvent.json';
 
 type PropsAndCustomArgs = React.ComponentProps<typeof Timeline> & {
   _rawHistory: RunHistoryItem[];

@@ -1,0 +1,22 @@
+name: Test UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@0609f0983b7a228f052f81ef4c3d6510cae254ad
+        with:
+          version: 6.10.0
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+      - run: pnpm install
+        working-directory: ui
+      - run: pnpm test
+        working-directory: ui
