@@ -47,7 +47,7 @@ export function FunctionRunItem({ functionRunID }) {
 
   return (
     <li key={functionRun?.id} data-key={functionRun?.id} className="flex items-center gap-2">
-      <FunctionRunStatusIcon />
+      <FunctionRunStatusIcon className="icon-xl" />
       {functionRun?.function?.name}
     </li>
   );
