@@ -180,7 +180,7 @@ export default function Stream() {
 
   const customRowProps = (row: Row<StreamItem>) => ({
     style: {
-      verticalAlign: row.original.runs && row.original.runs.length > 1 ? 'baseline' : 'middle',
+      verticalAlign: row.original.runs && row.original.runs.length > 1 ? 'top' : 'middle',
       cursor: 'pointer',
     },
     onClick: (e: React.MouseEvent<HTMLElement>) => {
