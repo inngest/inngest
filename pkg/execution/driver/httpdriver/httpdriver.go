@@ -180,9 +180,10 @@ func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, e
 			Step:       step,
 			Duration:   resp.duration,
 			Output:     string(resp.body),
-			OutputSize: len(resp.body),
-			NoRetry:    resp.noRetry,
-			RetryAt:    resp.retryAt,
+			OutputSize:     len(resp.body),
+			NoRetry:        resp.noRetry,
+			RetryAt:        resp.retryAt,
+			RequestVersion: resp.requestVersion,
 		}
 		dr.Generator, err = ParseGenerator(ctx, resp.body)
 		if err != nil {
