@@ -370,7 +370,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 			_ = e.failureHandler(ctx, id, s, resp)
 			for _, e := range e.lifecycles {
-				go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, resp)
+				go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, resp, s)
 			}
 		}
 		return nil, state.ErrFunctionOverflowed
@@ -467,7 +467,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 			_ = ferr
 		}
 		for _, e := range e.lifecycles {
-			go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp)
+			go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp, s)
 		}
 		return resp
 	}
@@ -486,7 +486,7 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 				s, _ := e.sm.Load(ctx, id.RunID)
 				_ = e.failureHandler(ctx, id, s, *resp)
 				for _, e := range e.lifecycles {
-					go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp)
+					go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp, s)
 				}
 				return nil
 			}
@@ -510,9 +510,10 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	}
 
 	_ = e.sm.Finalized(ctx, id, edge.Incoming, item.Attempt)
+	s, _ := e.sm.Load(ctx, id.RunID)
 
 	for _, e := range e.lifecycles {
-		go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp)
+		go e.OnFunctionFinished(context.WithoutCancel(ctx), id, item, *resp, s)
 	}
 
 	if serr := e.sm.SetStatus(ctx, id, enums.RunStatusCompleted); serr != nil {
@@ -759,8 +760,10 @@ func (e *executor) Cancel(ctx context.Context, id state.Identifier, r execution.
 		return fmt.Errorf("error cancelling function: %w", err)
 	}
 
+	s, err := e.sm.Load(ctx, id.RunID)
+
 	for _, e := range e.lifecycles {
-		go e.OnFunctionCancelled(context.WithoutCancel(ctx), id, r)
+		go e.OnFunctionCancelled(context.WithoutCancel(ctx), id, r, s)
 	}
 
 	return nil

@@ -44,6 +44,7 @@ type LifecycleListener interface {
 		state.Identifier,
 		queue.Item,
 		state.DriverResponse,
+		state.State,
 	)
 
 	// OnFunctionCancelled is called when a function is cancelled.  This includes
@@ -53,6 +54,7 @@ type LifecycleListener interface {
 		context.Context,
 		state.Identifier,
 		CancelRequest,
+		state.State,
 	)
 
 	// OnStepScheduled is called when a new step is scheduled.  It contains the
@@ -157,6 +159,7 @@ func (NoopLifecyceListener) OnFunctionFinished(
 	state.Identifier,
 	queue.Item,
 	state.DriverResponse,
+	state.State,
 ) {
 }
 
@@ -167,6 +170,7 @@ func (NoopLifecyceListener) OnFunctionCancelled(
 	context.Context,
 	state.Identifier,
 	CancelRequest,
+	state.State,
 ) {
 }
 
