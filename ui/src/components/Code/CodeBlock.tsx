@@ -96,61 +96,50 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
         </div>
       </div>
       <div>
-        {monaco &&
-          tabs.map((tab, i) => (
-            <div
-              className={classNames(
-                i === activeTab ? ` ` : `opacity-0 pointer-events-none`,
-                `col-start-1 row-start-1 transition-all duration-150`,
-              )}
-            >
-              <Editor
-                defaultLanguage="json"
-                value={tabs[i].content}
-                theme="inngest-theme"
-                options={{
-                  readOnly: true,
-                  minimap: {
-                    enabled: false,
-                  },
-                  lineNumbers: 'on',
-                  extraEditorClassName: '',
-                  contextmenu: false,
-                  scrollBeyondLastLine: false,
-                  wordWrap: 'on',
-                  fontFamily: 'Roboto_Mono',
-                  fontSize: 13,
-                  fontWeight: 'light',
-                  lineHeight: 26,
-                  renderLineHighlight: 'none', // no line selected borders being shown
-                  renderWhitespace: 'none', // no indentation spaces being shown
-                  guides: {
-                    indentation: false, // no indentation vertical lines being shown
-                    highlightActiveBracketPair: false,
-                    highlightActiveIndentation: false,
-                  },
-                  scrollbar: { verticalScrollbarSize: 10 },
-                  padding: {
-                    top: 10,
-                    bottom: 10,
-                  },
-                }}
-                onMount={(editor) => {
-                  const numberOfLines = editor.getModel()?.getLineCount();
-                  // To do: should calculate with getContentHeight instead of number of lines but for some reason the value is wrong
-                  if (numberOfLines && numberOfLines <= 10) {
-                    // If there are 10 or fewer lines, set the editor's height to the content height
-                    const contentHeight = numberOfLines * 26 + 20;
-                    editor.layout({ height: contentHeight, width: 0 });
-                  } else {
-                    // If there are more than 10 lines, set a fixed height with a scrollbar
-                    const fixedHeight = 10 * 26 + 20;
-                    editor.layout({ height: fixedHeight, width: 0 });
-                  }
-                }}
-              />
-            </div>
-          ))}
+        {monaco && (
+          <Editor
+            defaultLanguage="json"
+            value={tabs[activeTab].content}
+            theme="inngest-theme"
+            options={{
+              readOnly: true,
+              minimap: {
+                enabled: false,
+              },
+              lineNumbers: 'on',
+              extraEditorClassName: '',
+              contextmenu: false,
+              scrollBeyondLastLine: false,
+              wordWrap: 'on',
+              fontFamily: 'Roboto_Mono',
+              fontSize: 13,
+              fontWeight: 'light',
+              lineHeight: 26,
+              renderLineHighlight: 'none',
+              renderWhitespace: 'none',
+              guides: {
+                indentation: false,
+                highlightActiveBracketPair: false,
+                highlightActiveIndentation: false,
+              },
+              scrollbar: { verticalScrollbarSize: 10 },
+              padding: {
+                top: 10,
+                bottom: 10,
+              },
+            }}
+            onMount={(editor) => {
+              const numberOfLines = editor.getModel()?.getLineCount();
+              if (numberOfLines && numberOfLines <= 10) {
+                const contentHeight = numberOfLines * 26 + 20;
+                editor.layout({ height: contentHeight, width: 0 });
+              } else {
+                const fixedHeight = 10 * 26 + 20;
+                editor.layout({ height: fixedHeight, width: 0 });
+              }
+            }}
+          />
+        )}
       </div>
     </div>
   );
