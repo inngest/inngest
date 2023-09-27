@@ -100,6 +100,10 @@ await inngest.send({
 });
 ```
 
+<Callout variant="warning">
+💡 Deduplication prevents duplicate function runs for 24 hours from the first event.
+</Callout>
+
 <Callout>
 
 The `id` is global across all event types, so make sure your `id` isn't a value that will be shared across different event types.

@@ -30,3 +30,6 @@
 .vercel
 
 ./library
+
+# Nix
+/.direnv/
