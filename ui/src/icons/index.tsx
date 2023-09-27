@@ -19,6 +19,7 @@ export { IconWebhook } from './Webhook';
 export { IconMagnifyingGlass } from './MagnifyingGlass';
 export { IconCheck } from './Check';
 export { IconInfo } from './Info';
+export { IconArrayDownTray } from './ArrayDownTray';
 
 // Circle Status Icons
 export { IconStatusCircleCheck } from './StatusCircleCheck';
