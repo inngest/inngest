@@ -760,7 +760,7 @@ func (e *executor) Cancel(ctx context.Context, id state.Identifier, r execution.
 		return fmt.Errorf("error cancelling function: %w", err)
 	}
 
-	s, err := e.sm.Load(ctx, id.RunID)
+	s, _ := e.sm.Load(ctx, id.RunID)
 
 	for _, e := range e.lifecycles {
 		go e.OnFunctionCancelled(context.WithoutCancel(ctx), id, r, s)
