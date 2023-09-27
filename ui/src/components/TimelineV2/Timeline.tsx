@@ -1,3 +1,4 @@
+import AccordionTimeline from '../AccordionTimeline/AccordionTimeline';
 import type { HistoryNode } from './historyParser';
 import { isEndStatus } from './historyParser/types';
 import { TimelineNode } from './TimelineNode/TimelineNode';
@@ -9,20 +10,25 @@ type Props = {
 export function Timeline({ history }: Props) {
   const nodes = Object.values(history).sort(sortAscending);
 
-  let content: JSX.Element | (JSX.Element | null)[];
-  if (nodes.length === 0) {
-    content = <div className="text-center">No history yet</div>;
-  } else {
-    content = nodes.map((node) => {
-      if (!isVisible(node)) {
-        return null;
-      }
-
-      return <TimelineNode node={node} key={node.groupID} />;
-    });
-  }
-
-  return <div className="p-4 text-white">{content}</div>;
+  return (
+    <div>
+      {nodes.length === 0 ? (
+        <div className=" text-white text-center">No history yet</div>
+      ) : (
+        <AccordionTimeline
+          timelineItems={nodes
+            .filter((node) => isVisible(node))
+            .map((node, i) => ({
+              id: node.groupID,
+              header: <TimelineNode node={node} key={node.groupID} />,
+              expandable: node.scope === 'function' ? false : true,
+              position: i === 0 ? 'first' : i === nodes.length - 1 ? 'last' : 'middle',
+              content: <div>Content here</div>,
+            }))}
+        />
+      )}
+    </div>
+  );
 }
 
 function sortAscending(a: HistoryNode, b: HistoryNode) {
