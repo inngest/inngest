@@ -345,6 +345,10 @@ const referenceNavigation = [
         href: `${baseDir}/functions/concurrency`,
         // href: `${baseDir}/reference/functions/concurrency`,
       },
+      {
+        title: "Rate limit",
+        href: `${baseDir}/reference/functions/rate-limit`,
+      },
       // {
       //   title: "Logging",
       //   href: `${baseDir}/reference/functions/logging`,

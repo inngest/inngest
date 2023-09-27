@@ -20,6 +20,8 @@ Setting `concurrency` limits are very useful for:
 * Limiting database operations or connections
 * Preventing one of your user's accounts from consuming too many resources (see `key`)
 
+Alternatively, if you want to limit the number of times that your function runs in a given period, [the `rateLimit` option](/docs/reference/functions/rate-limit) may be better for your use case.
+
 ---
 
 ## How `concurrency` works
@@ -45,7 +47,7 @@ Optionally, specifying a concurrency `key` applies the `limit` to unique values 
         A value of `0` or `undefined` is the equivalent of not setting a limit.
       </Property>
       <Property name="key" type="string">
-        A unique key expression for which to restrict concurrently running steps to. The expression is evaluated for each triggering event and a unique key is generate.
+        A unique key expression for which to restrict concurrently running steps to. The expression is evaluated for each triggering event.
 
         Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
 

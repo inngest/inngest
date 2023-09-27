@@ -1,0 +1,190 @@
+# Rate limit function execution
+
+Limit the number of times a function runs over a time `period` with an optional `key` for dynamic limits.
+
+```ts
+export default inngest.createFunction(
+  {
+    name: "Synchronize data",
+    rateLimit: {
+      key: "event.data.company_id",
+      limit: 1,
+      period: "4h",
+    },
+  },
+  { event: "intercom/company.updated" },
+  async ({ event, step }) => {
+    // This function will be rate limited
+    // It will only run 1 once per 4 hours for a given event payload with matching company_id
+  }
+);
+```
+
+As `rateLimit` will ignore events that are received in excess of the limit, this is not useful if you need to process every single event. Instead, you might be more interested in [configuring a `concurrency` limit with a `key`](/docs/functions/concurrency#limiting-concurrency-for-a-specific-key).
+
+---
+
+## How `rateLimit` works
+
+Each time an event is received that match's your function's trigger, it is evaluated prior to executing your function. If `rateLimit` is configured, Inngest uses the `limit` and `period` options to only execute a maximum number of functions during that period.
+
+Inngest's rate limiting implementation uses the [“Generic Cell Rate Algorithm”](https://en.wikipedia.org/wiki/Generic_cell_rate_algorithm) (GCRA). To _overly simplify_ how this works, Inngest will use the `limit` and `period` options to create "buckets" of time in which your function can execute _once_.
+
+```
+limit / period = bucket time window
+```
+
+For example, this means that for a `limit: 10` and `period: '60m'` (60 minutes), the bucket time window will be 6 minutes. Any event triggering the function "fills up" the bucket for that time window and any additional events are ignored until the bucket's time window is reset. The algorithm (GCRA) is more sophisticated than this, but at the basic level - `rateLimit` ensures that you'll only run the max `limit` number of items over the `period` that you specify.
+
+**How the rate limit is applied with a consistent rate of events received**
+
+<img
+  src="/assets/docs/reference/function-rate-limit.png"
+  width="800"
+  height={280}
+  quality="95"
+  alt="Visualization of how the rate limit is applied with a consistent rate of events received"
+/>
+
+**How the rate limit is applied with sporadic events received**
+
+<img
+  src="/assets/docs/reference/function-rate-limit-gaps.png"
+  width="800"
+  height={280}
+  quality="95"
+  alt="Visualization of how the rate limit is applied with sporadic events received"
+/>
+
+**How the rate limit is applied when limit is set to 1**
+
+<img
+  src="/assets/docs/reference/function-rate-limit-equal-1.png"
+  width="800"
+  height={280}
+  quality="95"
+  alt="Visualization of how the rate limit is applied when limit is set to 1"
+/>
+
+### Using a `key`
+
+When a `key` is added, a separate limit is applied for each unique value of the `key` expression. For example if your `key` is set to `event.data.customer_id`, each customer would have their individual rate limit applied to functions run meaning different users might have the same function run in same bucket time window, but two runs will not happen for the same `event.data.customer_id`.
+
+
+## Configuration
+
+<Properties>
+  <Property name="rateLimit" type="object">
+    Options to configure how to rate limit function execution
+
+    <Properties nested={true}>
+      <Property name="limit" type="integer" required>
+        The maximum number of functions to run in the given time period.
+      </Property>
+      <Property name="period" type="string" required>
+        The time period of which to set the limit. The period begins when the first matching event is received.
+        How long to wait before invoking the function with the batch even if it's not full.
+        Current permitted values are from `1s` to `60s`.
+      </Property>
+      <Property name="key" type="string">
+        A unique key expression to apply the limit to. The expression is evaluated for each triggering event.
+
+        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+
+        * Rate limit per customer id: `'event.data.customer_id'`
+        * Rate limit per account and email address: `'event.data.account_id + "-" + event.user.email'`
+      </Property>
+    </Properties>
+  </Property>
+</Properties>
+
+<Callout>
+  Any events received in excess of your `limit` are ignored by this function. This means this is not the right approach if you need to process every single event sent to Inngest. Instead, check out [concurrency](/docs/functions/concurrency).
+
+  Events that are ignored by the function will still be stored by Inngest for use in other functions or debugging purposes.
+</Callout>
+
+## Examples
+
+### Limiting synchronization triggered by webhook events
+
+In this example, we use events from the Intercom webhook. The webhook can be overly chatty and send multiple `intercom/company.updated` events in a short time window. We also only really care to sync the user's data from Intercom no more than 4 times per day, so we set our limit to `6h`:
+
+```ts
+/** Example event payload:
+{
+  name: "intercom/company.updated",
+  data: {
+    company_id: "123456789",
+    company_name: "Acme, Inc."
+  }
+}
+*/
+export default inngest.createFunction(
+  {
+    name: "Synchronize data",
+    rateLimit: {
+      key: "event.data.company_id",
+      limit: 1,
+      period: "4h",
+    },
+  },
+  { event: "intercom/company.updated" },
+  async ({ event, step }) => {
+    const company = await step.run('fetch-latest-company-data-from-intercom', async () => {
+      return await client.companies.find({
+        companyId: event.data.company_id,
+      });
+    });
+
+    await step.run('update-company-data-in-database', async () => {
+      return await database.companies.upsert({ id: company.id }, company);
+    });
+  }
+);
+```
+
+### Send at most one email for multiple alerts over an hour
+
+When there is an issue in your system, you may want to send your user an email notification, but don't want to spam them. The issue may repeat several times within the span of few minutes, but the user really just needs one email. You can
+
+```ts
+/** Example event payload:
+{
+  name: "service/check.failed",
+  data: {
+    incident_id: "01HB9PWHZ4CZJYRAGEY60XEHCZ",
+    issue: "HTTP uptime check failed at 2023-09-26T21:23:51.515631317Z",
+    user_id: "user_aW5uZ2VzdF9pc19mdWNraW5nX2F3ZXNvbWU=",
+    service_name: "api",
+    service_id: "01HB9Q2EFBYG2B7X8VCD6JVRFH"
+  },
+  user: {
+    external_id: "user_aW5uZ2VzdF9pc19mdWNraW5nX2F3ZXNvbWU=",
+    email: "user@example.com"
+  }
+}
+*/
+export default inngest.createFunction(
+  {
+    name: "Send check failed notification",
+    rateLimit: {
+      // Don't send duplicate emails to the same user for the same service over 1 hour
+      key: `event.data.user_id + "-" + event.data.service_id`,
+      limit: 1,
+      period: "1h",
+    },
+  },
+  { event: "service/check.failed" },
+  async ({ event, step }) => {
+    await step.run('send-alert-email', async () => {
+      return await resend.sendEmail({
+        from: 'notifications@myco.com',
+        to: event.user.email,
+        subject: `ALERT: ${event.data.issue}`,
+        text: `Dear user, ...`,
+      });
+    });
+  }
+);
+```

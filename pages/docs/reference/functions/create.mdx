@@ -29,6 +29,7 @@ The `createFunction` method accepts a series of arguments to define your functio
   <Property name="id" type="string">
     A unique identifier for your function to override the default (a slug of your function name).
   </Property>
+
   <Property name="concurrency" type="number | object">
     Limit the number of concurrently running functions ([reference](/docs/functions/concurrency))
 
@@ -41,6 +42,30 @@ The `createFunction` method accepts a series of arguments to define your functio
       </Property>
     </Properties>
   </Property>
+
+  <Property name="rateLimit" type="object">
+    Options to configure how to rate limit function execution ([reference](/docs/reference/functions/rate-limit))
+
+    <Properties nested={true} collapse={true}>
+      <Property name="limit" type="integer" required>
+        The maximum number of functions to run in the given time period.
+      </Property>
+      <Property name="period" type="string" required>
+        The time period of which to set the limit. The period begins when the first matching event is received.
+        How long to wait before invoking the function with the batch even if it's not full.
+        Current permitted values are from `1s` to `60s`.
+      </Property>
+      <Property name="key" type="string">
+        A unique key expression to apply the limit to. The expression is evaluated for each triggering event.
+
+        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+
+        * Rate limit per customer id: `'event.data.customer_id'`
+        * Rate limit per account and email address: `'event.data.account_id + "-" + event.user.email'`
+      </Property>
+    </Properties>
+  </Property>
+
   <Property name="batchEvents" type="object">
     Configure how the function should consume batches of events ([reference](/docs/guides/batching))
 
