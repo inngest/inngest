@@ -139,7 +139,10 @@ func (l lifecycle) OnFunctionFinished(
 	id state.Identifier,
 	item queue.Item,
 	resp state.DriverResponse,
+	s state.State,
 ) {
+	completedStepCount := int64(len(s.Actions()) + len(s.Errors()))
+
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
 		l.log.Error(
@@ -151,19 +154,20 @@ func (l lifecycle) OnFunctionFinished(
 	}
 
 	h := History{
-		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		AccountID:       id.AccountID,
-		WorkspaceID:     id.WorkspaceID,
-		CreatedAt:       time.Now(),
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
-		GroupID:         groupID,
-		RunID:           id.RunID,
-		Type:            enums.HistoryTypeFunctionCompleted.String(),
-		Attempt:         int64(item.Attempt),
-		IdempotencyKey:  id.IdempotencyKey(),
-		EventID:         id.EventID,
-		BatchID:         id.BatchID,
+		ID:                 ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:          id.AccountID,
+		WorkspaceID:        id.WorkspaceID,
+		CompletedStepCount: &completedStepCount,
+		CreatedAt:          time.Now(),
+		FunctionID:         id.WorkflowID,
+		FunctionVersion:    int64(id.WorkflowVersion),
+		GroupID:            groupID,
+		RunID:              id.RunID,
+		Type:               enums.HistoryTypeFunctionCompleted.String(),
+		Attempt:            int64(item.Attempt),
+		IdempotencyKey:     id.IdempotencyKey(),
+		EventID:            id.EventID,
+		BatchID:            id.BatchID,
 	}
 
 	err = applyResponse(&h, &resp)
@@ -194,23 +198,26 @@ func (l lifecycle) OnFunctionCancelled(
 	ctx context.Context,
 	id state.Identifier,
 	req execution.CancelRequest,
+	s state.State,
 ) {
+	completedStepCount := int64(len(s.Actions()) + len(s.Errors()))
 	groupID := uuid.New()
 
 	h := History{
-		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
-		AccountID:       id.AccountID,
-		WorkspaceID:     id.WorkspaceID,
-		CreatedAt:       time.Now(),
-		FunctionID:      id.WorkflowID,
-		FunctionVersion: int64(id.WorkflowVersion),
-		GroupID:         &groupID,
-		RunID:           id.RunID,
-		Type:            enums.HistoryTypeFunctionCancelled.String(),
-		IdempotencyKey:  id.IdempotencyKey(),
-		EventID:         id.EventID,
-		BatchID:         id.BatchID,
-		Cancel:          &req,
+		ID:                 ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:          id.AccountID,
+		WorkspaceID:        id.WorkspaceID,
+		CompletedStepCount: &completedStepCount,
+		CreatedAt:          time.Now(),
+		FunctionID:         id.WorkflowID,
+		FunctionVersion:    int64(id.WorkflowVersion),
+		GroupID:            &groupID,
+		RunID:              id.RunID,
+		Type:               enums.HistoryTypeFunctionCancelled.String(),
+		IdempotencyKey:     id.IdempotencyKey(),
+		EventID:            id.EventID,
+		BatchID:            id.BatchID,
+		Cancel:             &req,
 	}
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
