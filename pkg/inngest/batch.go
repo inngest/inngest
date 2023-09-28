@@ -23,8 +23,8 @@ func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
 		return nil, fmt.Errorf("failed to decode batch config: %v", err)
 	}
 
-	if config.MaxSize > consts.MaxBatchSize {
-		config.MaxSize = consts.MaxBatchSize
+	if config.MaxSize <= 0 {
+		config.MaxSize = consts.DefaultBatchSize
 	}
 
 	dur, err := time.ParseDuration(config.Timeout)

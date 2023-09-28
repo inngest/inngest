@@ -27,14 +27,14 @@ func TestNewEventBatchConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "should return allowed max values if config is over allowed values",
+			name: "should use default batch size if provided value is <= 0",
 			data: map[string]any{
-				"maxSize": 1000,
-				"timeout": "10m",
+				"maxSize": -1,
+				"timeout": "2s",
 			},
 			expected: &EventBatchConfig{
-				MaxSize: consts.MaxBatchSize,
-				Timeout: "60s",
+				MaxSize: consts.DefaultBatchSize,
+				Timeout: "2s",
 			},
 		},
 		{
