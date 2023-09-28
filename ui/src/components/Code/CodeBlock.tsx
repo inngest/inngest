@@ -71,8 +71,7 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
   }
 
   const downloadJson = ({ content }) => {
-    const jsonContent = JSON.stringify(JSON.parse(content), null, 2); // Parse and stringify for pretty formatting
-    const blob = new Blob([jsonContent], { type: 'application/json' });
+    const blob = new Blob([content], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const element = document.createElement('a');
     element.href = url;
