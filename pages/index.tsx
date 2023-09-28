@@ -56,15 +56,24 @@ export default function Home() {
             name: "TripAdvisor",
             featured: true,
           },
-          { src: "/assets/customers/ocoya.svg", name: "Ocoya", featured: true },
+          {
+            src: "/assets/customers/resend.svg",
+            name: "Resend",
+            featured: true,
+            scale: 0.8,
+          },
+
           {
             src: "/assets/customers/snaplet-dark.svg",
             name: "Snaplet",
           },
+          {
+            src: "/assets/customers/productlane.svg",
+            name: "Productlane",
+            scale: 1.3,
+          },
+          { src: "/assets/customers/ocoya.svg", name: "Ocoya" },
           { src: "/assets/customers/finta-logo.png?v=1", name: "Finta.io" },
-          { src: "/assets/customers/tono-logo.png", name: "Tono Health" },
-          // { src: "/assets/customers/semgrep-logo.svg", name: "Semgrep" },
-          { src: "/assets/customers/yoke-logo.svg", name: "Yoko" },
         ]}
       />
 

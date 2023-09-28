@@ -11,7 +11,13 @@ export default function Logos({
   variant = "dark",
 }: {
   heading: string | React.ReactNode;
-  logos: { src: string; name: string; href?: string; featured?: boolean }[];
+  logos: {
+    src: string;
+    name: string;
+    href?: string;
+    featured?: boolean;
+    scale?: number;
+  }[];
   footer?: React.ReactNode;
   variant?: "dark" | "light";
 }) {
@@ -36,7 +42,7 @@ export default function Logos({
           hasLinks ? "gap-x-4 gap-y-8" : "gap-x-16 gap-y-16"
         )}
       >
-        {logos.map(({ src, name, href, featured }, idx) => {
+        {logos.map(({ src, name, href, featured, scale = 1 }, idx) => {
           if (href) {
             return (
               <Link
@@ -71,10 +77,11 @@ export default function Logos({
               src={src}
               alt={name}
               title={name}
-              width={featured ? 240 : 120}
-              height={featured ? 120 : 30}
+              width={(featured ? 240 : 120) * scale}
+              height={(featured ? 120 : 30) * scale}
               className={clsx(
-                "text-white m-auto max-h-[36px] transition-all grayscale hover:grayscale-0",
+                "text-white m-auto width-auto transition-all grayscale hover:grayscale-0",
+                `max-h-[${36 * scale}px]`,
                 featured && "col-span-2 max-h-[60px]"
               )}
             />
