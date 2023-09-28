@@ -84,7 +84,7 @@ When a `key` is added, a separate limit is applied for each unique value of the 
       <Property name="period" type="string" required>
         The time period of which to set the limit. The period begins when the first matching event is received.
         How long to wait before invoking the function with the batch even if it's not full.
-        Current permitted values are from `1s` to `60s`.
+        Current permitted values are from `1s` to `24h`.
       </Property>
       <Property name="key" type="string">
         A unique key expression to apply the limit to. The expression is evaluated for each triggering event.
