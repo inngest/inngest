@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
 
 import useCopyToClipboard from '@/hooks/useCopyToClipboard';
-import classNames from '../../utils/classnames';
+import { IconArrayDownTray } from '@/icons';
+import classNames from '@/utils/classnames';
+import { maxRenderedOutputSizeBytes } from '@/utils/constants';
+import Button from '../Button/Button';
 import CopyButton from '../Button/CopyButton';
 
 interface CodeBlockProps {
@@ -60,8 +63,23 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
     setActiveTab(index);
   };
 
+  // This prevents larger outputs from crashing the browser
+  const isOutputTooLarge = tabs[activeTab].content.length > maxRenderedOutputSizeBytes;
+
+  const downloadJson = ({ content }) => {
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const element = document.createElement('a');
+    element.href = url;
+    element.download = 'data.json'; // Set the file name with a .json extension
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="w-full bg-slate-800/30 border border-slate-700/30 rounded-lg shadow overflow-hidden">
+    <div className="w-full bg-slate-800/40 border border-slate-700/30 rounded-lg shadow overflow-hidden">
       <div className="bg-slate-800/40 flex justify-between shadow border-b border-slate-700/20">
         <div className="flex -mb-px">
           {tabs.map((tab, i) => (
@@ -87,71 +105,77 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
             </>
           ))}
         </div>
-        <div className="flex gap-2 items-center mr-2">
-          <CopyButton
-            code={tabs[activeTab].content}
-            isCopying={isCopying}
-            handleCopyClick={handleCopyClick}
-          />
+        {!isOutputTooLarge && (
+          <div className="flex gap-2 items-center mr-2">
+            <CopyButton
+              code={tabs[activeTab].content}
+              isCopying={isCopying}
+              handleCopyClick={handleCopyClick}
+            />
+          </div>
+        )}
+      </div>
+      {isOutputTooLarge ? (
+        <>
+          <div className="px-5 py-2.5 text-3xs bg-amber-500/40 text-white">
+            Output size is too large to render {`( > 1MB )`}
+          </div>
+          <div className="h-24 flex items-center justify-center	">
+            <Button
+              label="Download Raw"
+              icon={<IconArrayDownTray />}
+              btnAction={() => downloadJson({ content: tabs[activeTab].content })}
+            />
+          </div>
+        </>
+      ) : (
+        <div>
+          {monaco && (
+            <Editor
+              defaultLanguage="json"
+              value={tabs[activeTab].content}
+              theme="inngest-theme"
+              options={{
+                readOnly: true,
+                minimap: {
+                  enabled: false,
+                },
+                lineNumbers: 'on',
+                extraEditorClassName: '',
+                contextmenu: false,
+                scrollBeyondLastLine: false,
+                wordWrap: 'on',
+                fontFamily: 'Roboto_Mono',
+                fontSize: 13,
+                fontWeight: 'light',
+                lineHeight: 26,
+                renderLineHighlight: 'none',
+                renderWhitespace: 'none',
+                guides: {
+                  indentation: false,
+                  highlightActiveBracketPair: false,
+                  highlightActiveIndentation: false,
+                },
+                scrollbar: { verticalScrollbarSize: 10 },
+                padding: {
+                  top: 10,
+                  bottom: 10,
+                },
+              }}
+              onMount={(editor) => {
+                const numberOfLines = editor.getModel()?.getLineCount();
+                if (numberOfLines && numberOfLines <= 10) {
+                  const contentHeight = numberOfLines * 26 + 20;
+                  editor.layout({ height: contentHeight, width: 0 });
+                } else {
+                  const fixedHeight = 10 * 26 + 20;
+                  editor.layout({ height: fixedHeight, width: 0 });
+                }
+              }}
+            />
+          )}
         </div>
-      </div>
-      <div>
-        {monaco &&
-          tabs.map((tab, i) => (
-            <div
-              className={classNames(
-                i === activeTab ? ` ` : `opacity-0 pointer-events-none`,
-                `col-start-1 row-start-1 transition-all duration-150`,
-              )}
-            >
-              <Editor
-                defaultLanguage="json"
-                value={tabs[i].content}
-                theme="inngest-theme"
-                options={{
-                  readOnly: true,
-                  minimap: {
-                    enabled: false,
-                  },
-                  lineNumbers: 'on',
-                  extraEditorClassName: '',
-                  contextmenu: false,
-                  scrollBeyondLastLine: false,
-                  wordWrap: 'on',
-                  fontFamily: 'Roboto_Mono',
-                  fontSize: 13,
-                  fontWeight: 'light',
-                  lineHeight: 26,
-                  renderLineHighlight: 'none', // no line selected borders being shown
-                  renderWhitespace: 'none', // no indentation spaces being shown
-                  guides: {
-                    indentation: false, // no indentation vertical lines being shown
-                    highlightActiveBracketPair: false,
-                    highlightActiveIndentation: false,
-                  },
-                  scrollbar: { verticalScrollbarSize: 10 },
-                  padding: {
-                    top: 10,
-                    bottom: 10,
-                  },
-                }}
-                onMount={(editor) => {
-                  const numberOfLines = editor.getModel()?.getLineCount();
-                  // To do: should calculate with getContentHeight instead of number of lines but for some reason the value is wrong
-                  if (numberOfLines && numberOfLines <= 10) {
-                    // If there are 10 or fewer lines, set the editor's height to the content height
-                    const contentHeight = numberOfLines * 26 + 20;
-                    editor.layout({ height: contentHeight, width: 0 });
-                  } else {
-                    // If there are more than 10 lines, set a fixed height with a scrollbar
-                    const fixedHeight = 10 * 26 + 20;
-                    editor.layout({ height: fixedHeight, width: 0 });
-                  }
-                }}
-              />
-            </div>
-          ))}
-      </div>
+      )}
     </div>
   );
 }
