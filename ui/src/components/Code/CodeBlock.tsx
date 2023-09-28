@@ -63,12 +63,7 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
     setActiveTab(index);
   };
 
-  let isOutputTooLarge;
-  if (tabs[activeTab].content.length > maxRenderedOutputSizeBytes) {
-    isOutputTooLarge = true;
-  } else {
-    isOutputTooLarge = false;
-  }
+  const isOutputTooLarge = tabs[activeTab].content.length > maxRenderedOutputSizeBytes;
 
   const downloadJson = ({ content }) => {
     const blob = new Blob([content], { type: 'application/json' });
