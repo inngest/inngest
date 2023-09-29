@@ -61,26 +61,25 @@ inngest.createFunction({ name: 'Succeeds with 2 steps' }, { event: 'foo' }, asyn
 ```
 
 ```ts
-// Need to manually send the foo event to fulfill the waitForEvent.
 inngest.createFunction(
   { name: 'Times out waiting for event' },
   { event: 'foo' },
   async ({ step }) => {
-    await step.waitForEvent('foo', '10s');
+    await step.waitForEvent('bar', '10s');
   },
 );
 ```
 
 ```ts
-// Need to manually send the foo event to fulfill the waitForEvent.
+// Need to manually send the bar event to fulfill the waitForEvent.
 inngest.createFunction({ name: 'Waits for event' }, { event: 'foo' }, async ({ step }) => {
-  await step.waitForEvent('foo', '1m');
+  await step.waitForEvent('bar', '1m');
 });
 ```
 
 ## Getting data
 
-To get data, run this GraphQL query using the run ID:
+To get data, run the following GraphQL query using the run ID. You can find the GraphQL playground at http://localhost:8288/v0.
 
 ```gql
 {
