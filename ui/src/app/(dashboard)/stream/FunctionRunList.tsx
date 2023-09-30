@@ -10,7 +10,7 @@ export default function FunctionRunList({ functionRuns }) {
         <ul className="flex flex-col space-y-4">
           {functionRuns &&
             functionRuns.map((functionRun) => {
-              return <FunctionRunItem functionRunID={functionRun.id} />;
+              return <FunctionRunItem key={functionRun.id} functionRunID={functionRun.id} />;
             })}
         </ul>
       )}
