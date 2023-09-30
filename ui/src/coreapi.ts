@@ -42,6 +42,7 @@ export const EVENT = gql`
         status
         startedAt
         pendingSteps
+        output
         waitingFor {
           expiryTime
           eventName
@@ -59,6 +60,8 @@ export const FUNCTION_RUN = gql`
       name
       status
       startedAt
+      finishedAt
+      output
       pendingSteps
       waitingFor {
         expiryTime
