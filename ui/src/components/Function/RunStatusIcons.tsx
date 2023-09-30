@@ -6,7 +6,7 @@ import {
   IconStatusCircleMoon,
 } from '@/icons';
 import { FunctionRunStatus } from '@/store/generated';
-import { FunctionRunExtraStatus } from '@/utils/constants';
+import { FunctionRunExtraStatus } from './RunStatus';
 
 type FunctionRunStatusIconsProps = {
   status: FunctionRunStatus | FunctionRunExtraStatus;
