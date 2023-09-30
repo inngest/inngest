@@ -89,7 +89,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
         </div>
         {event.functionRuns
           ?.slice()
-          .sort((a, b) => (a.name || 'Unknown').localeCompare(b.name || 'Unknown'))
+          .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
           .map((run) => {
             const status = renderRunStatus(run);
             return (

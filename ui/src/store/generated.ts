@@ -428,7 +428,7 @@ export type GetTriggersStreamQueryVariables = Exact<{
 }>;
 
 
-export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, trigger: string, type: StreamType, runs?: Array<{ __typename?: 'FunctionRun', id: string } | null> | null }> };
+export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, trigger: string, type: StreamType, runs?: Array<{ __typename?: 'FunctionRun', id: string, function?: { __typename?: 'Function', name: string } | null } | null> | null }> };
 
 export type GetFunctionRunStatusQueryVariables = Exact<{
   id: Scalars['ID'];
@@ -603,6 +603,9 @@ export const GetTriggersStreamDocument = `
     type
     runs {
       id
+      function {
+        name
+      }
     }
   }
 }

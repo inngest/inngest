@@ -1,3 +1,4 @@
+import { renderRunStatus } from '@/components/Function/RunStatus';
 import { FunctionRunStatusIcons } from '@/components/Function/RunStatusIcons';
 import { useGetFunctionRunStatusQuery, type FunctionRun } from '@/store/generated';
 
@@ -9,9 +10,12 @@ export default function FunctionRunList({ functionRuns }) {
       ) : (
         <ul className="flex flex-col space-y-4">
           {functionRuns &&
-            functionRuns.map((functionRun) => {
-              return <FunctionRunItem key={functionRun.id} functionRunID={functionRun.id} />;
-            })}
+            functionRuns
+              ?.slice()
+              .sort((a, b) => (a.function.name || '').localeCompare(b.function.name || ''))
+              .map((functionRun) => {
+                return <FunctionRunItem key={functionRun.id} functionRunID={functionRun.id} />;
+              })}
         </ul>
       )}
     </>
@@ -23,6 +27,7 @@ type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'function' | 'status'>;
 export function FunctionRunItem({ functionRunID }) {
   const { data } = useGetFunctionRunStatusQuery({ id: functionRunID }, { pollingInterval: 1500 });
   const functionRun = (data?.functionRun as FunctionRunStatusSubset) || {};
+  const status = renderRunStatus(functionRun);
 
   if (!functionRun || !functionRun?.function?.name || !functionRun.status) {
     return null;
@@ -30,7 +35,7 @@ export function FunctionRunItem({ functionRunID }) {
 
   return (
     <li key={functionRun?.id} data-key={functionRun?.id} className="flex items-center gap-2">
-      <FunctionRunStatusIcons status={functionRun.status} className="icon-xl" />
+      <FunctionRunStatusIcons status={status} className="icon-xl" />
       {functionRun?.function?.name}
     </li>
   );

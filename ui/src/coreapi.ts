@@ -167,6 +167,9 @@ export const TRIGGERS_STREAM = gql`
       type
       runs {
         id
+        function {
+          name
+        }
       }
     }
   }
