@@ -48,6 +48,10 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-inter)'],
+        mono: ["var(--font-roboto-mono)"], 
+      },
       colors: {
         slate: {
           950: '#0C1323',
