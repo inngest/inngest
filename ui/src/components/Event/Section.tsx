@@ -87,19 +87,23 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
           <h3 className="text-slate-400 text-sm">Functions</h3>
           <Badge kind="outlined">{event.functionRuns?.length.toString() || '0'}</Badge>
         </div>
-        {event.functionRuns?.map((run) => {
-          const status = renderRunStatus(run);
-          return (
-            <FuncCard
-              title={run.name || 'Unknown'}
-              id={run.id}
-              status={status}
-              active={selectedRun === run.id}
-              onClick={() => dispatch(selectRun(run.id))}
-              footer={<FuncCardFooter functionRun={run} />}
-            />
-          );
-        })}
+        {event.functionRuns
+          ?.slice()
+          .sort((a, b) => (a.name || 'Unknown').localeCompare(b.name || 'Unknown'))
+          .map((run) => {
+            const status = renderRunStatus(run);
+            return (
+              <FuncCard
+                key={run.id}
+                title={run.name || 'Unknown'}
+                id={run.id}
+                status={status}
+                active={selectedRun === run.id}
+                onClick={() => dispatch(selectRun(run.id))}
+                footer={<FuncCardFooter functionRun={run} />}
+              />
+            );
+          })}
       </div>
     </ContentCard>
   );
