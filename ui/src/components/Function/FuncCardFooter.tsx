@@ -54,7 +54,7 @@ export default function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
         return (
           <p className="flex items-center gap-3">
             Cancelled by:{' '}
-            <span className="flex gap-1 items-center font-medium	text-slate-300 text-xs truncate">
+            <span className="flex gap-1 items-center font-medium text-slate-300 text-xs truncate">
               <IconEvent className="icon-2xs" />
               {eventName}
             </span>
@@ -69,7 +69,7 @@ export default function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
         return (
           <p className="flex items-center gap-3">
             Waiting for:{' '}
-            <span className="flex gap-1 items-center font-medium	text-slate-300 text-xs truncate">
+            <span className="flex gap-1 items-center font-medium text-slate-300 text-xs truncate">
               <IconEvent className="icon-2xs" />
               {eventName}
             </span>
