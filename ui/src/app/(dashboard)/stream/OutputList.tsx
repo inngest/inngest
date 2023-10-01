@@ -48,7 +48,7 @@ export function OutputItem({ functionRunID }) {
     <li
       key={functionRun?.id}
       data-key={functionRun?.id}
-      className="flex items-center gap-2 font-mono"
+      className="flex items-baseline gap-2 font-mono"
     >
       {errorName && <span className={'font-bold text-rose-500'}>{errorName}</span>}
       <span className="text-xs truncate">{message}</span>
