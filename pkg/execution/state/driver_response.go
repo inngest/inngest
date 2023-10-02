@@ -261,37 +261,31 @@ func (r DriverResponse) Retryable() bool {
 		return false
 	}
 
-	// Convert output into a map to check whether this responds with our
-	// suggested JSON response
-	mapped, ok := r.Output.(map[string]any)
-	if !ok {
-		// This doesn't contain the response, so default to retrying.
-		return true
-	}
-
 	status := r.StatusCode
 	if status == 0 {
-		// Fall back to statusCode for AWS Lambda compatibility in
-		// an attempt to use this field.
-		v, ok := mapped["statusCode"]
-		if !ok {
-			// If actions don't return a status, we assume that they're
-			// always retryable.
-			return true
-		}
+		if mapped, ok := r.Output.(map[string]any); ok {
+			// Fall back to statusCode for AWS Lambda compatibility in
+			// an attempt to use this field.
+			v, ok := mapped["statusCode"]
+			if !ok {
+				// If actions don't return a status, we assume that they're
+				// always retryable.
+				return true
+			}
 
-		switch val := v.(type) {
-		case float64:
-			status = int(val)
-		case int64:
-			status = int(val)
-		case int:
-			status = val
-		default:
-			slog.Default().Error(
-				"unexpected status code type",
-				"type", fmt.Sprintf("%T", v),
-			)
+			switch val := v.(type) {
+			case float64:
+				status = int(val)
+			case int64:
+				status = int(val)
+			case int:
+				status = val
+			default:
+				slog.Default().Error(
+					"unexpected status code type",
+					"type", fmt.Sprintf("%T", v),
+				)
+			}
 		}
 	}
 
