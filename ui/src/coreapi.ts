@@ -186,6 +186,7 @@ export const FUNCTION_RUN_OUTPUT = gql`
     functionRun(query: { functionRunId: $id }) {
       id
       output
+      status
     }
   }
 `;

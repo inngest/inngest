@@ -177,9 +177,9 @@ func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, e
 	if resp.statusCode == 206 {
 		// This is a generator-based function returning opcodes.
 		dr := &state.DriverResponse{
-			Step:       step,
-			Duration:   resp.duration,
-			Output:     string(resp.body),
+			Step:           step,
+			Duration:       resp.duration,
+			Output:         string(resp.body),
 			OutputSize:     len(resp.body),
 			NoRetry:        resp.noRetry,
 			RetryAt:        resp.retryAt,
@@ -227,17 +227,15 @@ func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, e
 	}
 
 	return &state.DriverResponse{
-		Step: step,
-		Output: map[string]interface{}{
-			"status": resp.statusCode,
-			"body":   body,
-		},
+		Step:           step,
+		Output:         body,
 		Err:            errstr,
 		Duration:       resp.duration,
 		OutputSize:     len(resp.body),
 		NoRetry:        resp.noRetry,
 		RetryAt:        resp.retryAt,
 		RequestVersion: resp.requestVersion,
+		StatusCode:     resp.statusCode,
 	}, nil
 }
 

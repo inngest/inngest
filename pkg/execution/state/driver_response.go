@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/xhit/go-str2duration/v2"
+	"golang.org/x/exp/slog"
 )
 
 const DefaultErrorMessage = "Unknown error running SDK"
@@ -208,6 +209,8 @@ type DriverResponse struct {
 	//
 	// When final is true, Retryable() always returns false.
 	final bool
+
+	StatusCode int `json:"statusCode,omitempty"`
 }
 
 // SetFinal indicates that this error is final, regardless of the status code
@@ -266,32 +269,35 @@ func (r DriverResponse) Retryable() bool {
 		return true
 	}
 
-	status, ok := mapped["status"]
-	if !ok {
+	var status int
+	if r.StatusCode == 0 {
 		// Fall back to statusCode for AWS Lambda compatibility in
 		// an attempt to use this field.
-		status, ok = mapped["statusCode"]
+		v, ok := mapped["statusCode"]
 		if !ok {
 			// If actions don't return a status, we assume that they're
-			// always retryable.  We prefer that actions respond with a
-			// { "status": xxx, "body": ... } format to disable retries.
+			// always retryable.
 			return true
+		}
+
+		switch v := v.(type) {
+		case float64, int64, int:
+			status = int(v.(float64))
+		default:
+			slog.Default().Error(
+				"unexpected status code type",
+				"type", fmt.Sprintf("%T", v),
+			)
 		}
 	}
 
-	switch v := status.(type) {
-	case float64:
-		if int(v) > 499 {
-			return true
-		}
-	case int64:
-		if int(v) > 499 {
-			return true
-		}
-	case int:
-		if int(v) > 499 {
-			return true
-		}
+	if status == 0 {
+		slog.Default().Error("missing status code")
+		return true
+	}
+
+	if status > 499 {
+		return true
 	}
 
 	return false

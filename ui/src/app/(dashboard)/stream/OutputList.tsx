@@ -1,6 +1,6 @@
   import {
     useGetFunctionRunOutputQuery,
-    type FunctionRun,
+    FunctionRunStatus,
   } from '@/store/generated';
   
   export default function OutputList({ functionRuns }) {
@@ -22,17 +22,15 @@
     );
   }
   
-  type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'output'>;
-  
   export function OutputItem({ functionRunID }) {
     const { data } = useGetFunctionRunOutputQuery({ id: functionRunID }, { pollingInterval: 1500 });
-    const functionRun = (data?.functionRun as FunctionRunStatusSubset) || {};
+    const {functionRun} = data ?? {}
   
     if (!functionRun || !functionRun?.output) {
       return null;
     }
     const parsedOutput = JSON.parse(functionRun.output)
-    const wasSuccessful = parsedOutput.body?.success || (parsedOutput.status.toString().startsWith('2'));
+    const wasSuccessful = functionRun.status === FunctionRunStatus.Completed
   
     return (
       <li key={functionRun?.id} data-key={functionRun?.id} className="flex gap-2 font-mono">
@@ -41,4 +39,3 @@
       </li>
     );
   }
-  
