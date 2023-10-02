@@ -42,6 +42,7 @@ export const EVENT = gql`
         status
         startedAt
         pendingSteps
+        output
         waitingFor {
           expiryTime
           eventName
@@ -59,6 +60,8 @@ export const FUNCTION_RUN = gql`
       name
       status
       startedAt
+      finishedAt
+      output
       pendingSteps
       waitingFor {
         expiryTime
@@ -164,6 +167,9 @@ export const TRIGGERS_STREAM = gql`
       type
       runs {
         id
+        function {
+          name
+        }
       }
     }
   }
@@ -185,6 +191,7 @@ export const FUNCTION_RUN_OUTPUT = gql`
   query GetFunctionRunOutput($id: ID!) {
     functionRun(query: { functionRunId: $id }) {
       id
+      status
       output
       status
     }
