@@ -1,4 +1,3 @@
-import { FunctionRunExtraStatus } from './RunStatus';
 import { FunctionRunStatus } from '../../store/generated';
 import classNames from '../../utils/classnames';
 import { FunctionRunStatusIcons } from './RunStatusIcons';
@@ -6,7 +5,7 @@ import { FunctionRunStatusIcons } from './RunStatusIcons';
 interface FuncCardProps {
   title: string;
   id: string;
-  status: FunctionRunStatus | FunctionRunExtraStatus;
+  status?: FunctionRunStatus;
   active?: boolean;
   footer?: React.ReactNode;
   onClick?: () => void;
@@ -39,7 +38,7 @@ export default function FuncCard({
       }
     >
       <div className="flex items-center gap-2 px-5 py-3.5">
-        <FunctionRunStatusIcons status={status} className="icon-lg" />
+        {status && <FunctionRunStatusIcons status={status} className="icon-lg" />}
         <h2 className="text-white">{title}</h2>
       </div>
       <hr className="border-slate-800/50" />

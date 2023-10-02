@@ -3,13 +3,11 @@ import {
   IconStatusCircleCheck,
   IconStatusCircleCross,
   IconStatusCircleMinus,
-  IconStatusCircleMoon,
 } from '@/icons';
 import { FunctionRunStatus } from '@/store/generated';
-import { FunctionRunExtraStatus } from './RunStatus';
 
 type FunctionRunStatusIconsProps = {
-  status: FunctionRunStatus | FunctionRunExtraStatus;
+  status: FunctionRunStatus;
   className?: string;
 };
 
@@ -18,9 +16,7 @@ const functionRunStatusIcons = {
   [FunctionRunStatus.Completed]: IconStatusCircleCheck,
   [FunctionRunStatus.Failed]: IconStatusCircleCross,
   [FunctionRunStatus.Cancelled]: IconStatusCircleMinus,
-  [FunctionRunExtraStatus.WaitingFor]: IconStatusCircleMoon,
-  [FunctionRunExtraStatus.Sleeping]: IconStatusCircleMoon,
-} as const satisfies Record<FunctionRunStatus | FunctionRunExtraStatus, React.ComponentType>;
+} as const satisfies Record<FunctionRunStatus, React.ComponentType>;
 
 export function FunctionRunStatusIcons({ status, className }: FunctionRunStatusIconsProps) {
   const FunctionRunStatusIcon = functionRunStatusIcons[status];

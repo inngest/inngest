@@ -1,4 +1,3 @@
-import { renderRunStatus } from '@/components/Function/RunStatus';
 import { FunctionRunStatusIcons } from '@/components/Function/RunStatusIcons';
 import { useGetFunctionRunStatusQuery, type FunctionRun } from '@/store/generated';
 
@@ -27,7 +26,6 @@ type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'function' | 'status'>;
 export function FunctionRunItem({ functionRunID }) {
   const { data } = useGetFunctionRunStatusQuery({ id: functionRunID }, { pollingInterval: 1500 });
   const functionRun = (data?.functionRun as FunctionRunStatusSubset) || {};
-  const status = renderRunStatus(functionRun);
 
   if (!functionRun || !functionRun?.function?.name || !functionRun.status) {
     return null;
@@ -35,7 +33,7 @@ export function FunctionRunItem({ functionRunID }) {
 
   return (
     <li key={functionRun?.id} data-key={functionRun?.id} className="flex items-center gap-2">
-      <FunctionRunStatusIcons status={status} className="icon-xl" />
+      <FunctionRunStatusIcons status={functionRun.status} className="icon-xl" />
       {functionRun?.function?.name}
     </li>
   );
