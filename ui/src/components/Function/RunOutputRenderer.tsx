@@ -31,7 +31,11 @@ export default function renderRunOutput(functionRun): RenderedData {
       output = parsedOutput?.stack;
     }
   } else if (!isOutputTooLarge) {
-    output = JSON.stringify(functionRun.output);
+    if (typeof functionRun.output === 'string') {
+      output = functionRun.output;
+    } else {
+      output = JSON.stringify(functionRun.output);
+    }
   }
 
   return {
