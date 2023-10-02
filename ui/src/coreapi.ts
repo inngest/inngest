@@ -193,7 +193,6 @@ export const FUNCTION_RUN_OUTPUT = gql`
       id
       status
       output
-      status
     }
   }
 `;

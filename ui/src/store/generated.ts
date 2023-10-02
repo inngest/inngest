@@ -627,7 +627,6 @@ export const GetFunctionRunOutputDocument = `
     id
     status
     output
-    status
   }
 }
     `;
