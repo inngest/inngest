@@ -20,6 +20,6 @@ const functionRunStatusIcons = {
 
 export function FunctionRunStatusIcons({ status, className }: FunctionRunStatusIconsProps) {
   const FunctionRunStatusIcon = functionRunStatusIcons[status];
-
-  return <FunctionRunStatusIcon className={className} />;
+  const title = "Function " + status.toLowerCase();
+  return <FunctionRunStatusIcon className={className} title={title} />;
 }

@@ -1,4 +1,10 @@
-export function IconStatusCircleMinus({ className }: { className?: string }) {
+export function IconStatusCircleMinus({
+  className,
+  title,
+}: {
+  className?: string;
+  title?: string;
+}) {
   return (
     <svg
       width="28"
@@ -8,6 +14,7 @@ export function IconStatusCircleMinus({ className }: { className?: string }) {
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
+      <title>{title}</title>
       <g>
         <g>
           <g>

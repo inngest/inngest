@@ -1,4 +1,10 @@
-export function IconStatusCircleExclamation({ className }: { className?: string }) {
+export function IconStatusCircleExclamation({
+  className,
+  title,
+}: {
+  className?: string;
+  title?: string;
+}) {
   return (
     <svg
       width="28"
@@ -9,6 +15,7 @@ export function IconStatusCircleExclamation({ className }: { className?: string 
       color="#F43F5E"
       className={className}
     >
+      <title>{title}</title>
       <g>
         <path
           d="M15 26C21.0751 26 26 21.0751 26 15C26 8.92487 21.0751 4 15 4C8.92487 4 4 8.92487 4 15C4 21.0751 8.92487 26 15 26Z"
