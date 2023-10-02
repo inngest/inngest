@@ -9,13 +9,18 @@ import Button from '../Button/Button';
 import CopyButton from '../Button/CopyButton';
 
 interface CodeBlockProps {
+  header?: {
+    title?: string;
+    description?: string;
+    color?: string;
+  };
   tabs: {
     label: string;
     content: string;
   }[];
 }
 
-export default function CodeBlock({ tabs }: CodeBlockProps) {
+export default function CodeBlock({ header, tabs }: CodeBlockProps) {
   const [activeTab, setActiveTab] = useState(0);
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
@@ -80,6 +85,16 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
 
   return (
     <div className="w-full bg-slate-800/40 border border-slate-700/30 rounded-lg shadow overflow-hidden">
+      {header && (
+        <div className={classNames(header.color, 'pt-3')}>
+          {(header.title || header.description) && (
+            <div className="flex flex-col gap-1 font-mono text-2xs px-5 pb-2.5">
+              <p className="text-white">{header.title}</p>
+              <p className="text-white/60">{header.description}</p>
+            </div>
+          )}
+        </div>
+      )}
       <div className="bg-slate-800/40 flex justify-between shadow border-b border-slate-700/20">
         <div className="flex -mb-px">
           {tabs.map((tab, i) => {
@@ -91,7 +106,9 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
                 key={i}
                 className={classNames(
                   `text-xs px-5 py-2.5`,
-                  isSingleTab ? 'text-slate-400' : 'border-b block transition-all duration-150 outline-none',
+                  isSingleTab
+                    ? 'text-slate-400'
+                    : 'border-b block transition-all duration-150 outline-none',
                   isActive && 'border-indigo-400 text-white',
                   !isActive && !isSingleTab && 'border-transparent text-slate-400',
                 )}
