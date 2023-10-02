@@ -48,6 +48,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        mono: ["var(--font-roboto-mono)"], 
+      },
       colors: {
         slate: {
           950: '#0C1323',

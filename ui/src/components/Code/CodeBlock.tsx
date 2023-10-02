@@ -82,28 +82,25 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
     <div className="w-full bg-slate-800/40 border border-slate-700/30 rounded-lg shadow overflow-hidden">
       <div className="bg-slate-800/40 flex justify-between shadow border-b border-slate-700/20">
         <div className="flex -mb-px">
-          {tabs.map((tab, i) => (
-            <>
-              {tabs.length > 1 ? (
-                <button
-                  className={classNames(
-                    i === activeTab
-                      ? `border-indigo-400 text-white`
-                      : `border-transparent text-slate-400`,
-                    `text-xs px-5 py-2.5 border-b block transition-all duration-150 outline-none`,
-                  )}
-                  onClick={() => handleTabClick(i)}
-                  key={i}
-                >
-                  {tab.label}
-                </button>
-              ) : (
-                <p key={i} className="text-xs px-5 py-2.5 text-slate-400">
-                  {tab.label}
-                </p>
-              )}
-            </>
-          ))}
+          {tabs.map((tab, i) => {
+            const isSingleTab = tabs.length === 1;
+            const isActive = i === activeTab && !isSingleTab;
+
+            return (
+              <button
+                key={i}
+                className={classNames(
+                  `text-xs px-5 py-2.5`,
+                  isSingleTab ? 'text-slate-400' : 'border-b block transition-all duration-150 outline-none',
+                  isActive && 'border-indigo-400 text-white',
+                  !isActive && !isSingleTab && 'border-transparent text-slate-400',
+                )}
+                onClick={() => handleTabClick(i)}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
         {!isOutputTooLarge && (
           <div className="flex gap-2 items-center mr-2">
@@ -168,7 +165,6 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
                 } else {
                   editor.layout({ height: contentHeight, width: 0 });
                 }
-                editor.updateOptions({ wordWrap: 'on' });
               }}
             />
           )}
