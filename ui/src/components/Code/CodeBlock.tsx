@@ -69,7 +69,7 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
   };
 
   // This prevents larger outputs from crashing the browser
-  const isOutputTooLarge = tabs[activeTab].content.length > maxRenderedOutputSizeBytes;
+  const isOutputTooLarge = tabs[activeTab].content?.length > maxRenderedOutputSizeBytes;
 
   const downloadJson = ({ content }) => {
     const blob = new Blob([content], { type: 'application/json' });
