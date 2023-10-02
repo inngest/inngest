@@ -1,6 +1,6 @@
 import { type MetadataItemProps } from '@/components/Metadata/MetadataItem';
 import { FunctionRunStatus } from '@/store/generated';
-import { shortDate } from '@/utils/date';
+import { formatMilliseconds, shortDate } from '@/utils/date';
 
 export default function renderRunMetadata(functionRun) {
   const metadataItems = [
@@ -15,7 +15,7 @@ export default function renderRunMetadata(functionRun) {
     if (functionRun.startedAt && functionRun.finishedAt) {
       const duration =
         new Date(functionRun.finishedAt).getTime() - new Date(functionRun.startedAt).getTime();
-      metadataItems.push({ label: 'Duration', value: duration.toString() + 'ms' });
+      metadataItems.push({ label: 'Duration', value: formatMilliseconds(duration) });
     }
   }
   if (functionRun.status == FunctionRunStatus.Failed) {
@@ -26,7 +26,7 @@ export default function renderRunMetadata(functionRun) {
     if (functionRun.startedAt && functionRun.finishedAt) {
       const duration =
         new Date(functionRun.finishedAt).getTime() - new Date(functionRun.startedAt).getTime();
-      metadataItems.push({ label: 'Duration', value: duration.toString() + 'ms' });
+      metadataItems.push({ label: 'Duration', value: formatMilliseconds(duration) });
     }
   }
   if (functionRun.status == FunctionRunStatus.Cancelled) {
