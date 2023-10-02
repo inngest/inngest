@@ -442,7 +442,7 @@ export type GetFunctionRunOutputQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunOutputQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, output?: string | null } | null };
+export type GetFunctionRunOutputQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, status?: FunctionRunStatus | null, output?: string | null } | null };
 
 
 export const GetEventsStreamDocument = `
@@ -625,6 +625,7 @@ export const GetFunctionRunOutputDocument = `
     query GetFunctionRunOutput($id: ID!) {
   functionRun(query: {functionRunId: $id}) {
     id
+    status
     output
   }
 }

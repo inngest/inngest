@@ -15,7 +15,6 @@ import CodeBlock from '../Code/CodeBlock';
 import ContentCard from '../Content/ContentCard';
 import FuncCard from '../Function/FuncCard';
 import FuncCardFooter from '../Function/FuncCardFooter';
-import { renderRunStatus } from '../Function/RunStatus';
 
 interface EventSectionProps {
   eventId: string;
@@ -91,13 +90,12 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
           ?.slice()
           .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
           .map((run) => {
-            const status = renderRunStatus(run);
             return (
               <FuncCard
                 key={run.id}
                 title={run.name || 'Unknown'}
                 id={run.id}
-                status={status}
+                status={run.status || undefined}
                 active={selectedRun === run.id}
                 onClick={() => dispatch(selectRun(run.id))}
                 footer={<FuncCardFooter functionRun={run} />}

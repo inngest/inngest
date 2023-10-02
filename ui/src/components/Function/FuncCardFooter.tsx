@@ -1,14 +1,14 @@
 import { IconExclamationTriangle } from '@/icons';
 import { FunctionRunStatus, type FunctionRun } from '../../store/generated';
 import classNames from '../../utils/classnames';
-import renderFuncCardFooter from './FuncCardFooterRenderer';
+import renderRunOutput from './RunOutputRenderer';
 
 interface FuncCardFooterProps {
   functionRun: Omit<FunctionRun, 'history' | 'functionID' | 'historyItemOutput'>;
 }
 
 export default function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
-  const { message, errorName, status } = renderFuncCardFooter(functionRun);
+  const { message, errorName, status } = renderRunOutput(functionRun);
   const functionRunStatusFooter = {
     [FunctionRunStatus.Failed]: {
       component: () => {

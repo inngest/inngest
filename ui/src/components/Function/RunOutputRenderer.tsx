@@ -4,12 +4,14 @@ import { maxRenderedOutputSizeBytes } from '@/utils/constants';
 type RenderedData = {
   message?: string;
   errorName?: string;
+  output: string;
   status: FunctionRunStatus;
 };
 
-export default function renderFuncCardFooter(functionRun): RenderedData {
+export default function renderRunOutput(functionRun): RenderedData {
   let message = '';
   let errorName = '';
+  let output = '';
 
   if (functionRun?.status === FunctionRunStatus.Failed) {
     const isOutputTooLarge = functionRun.output?.length > maxRenderedOutputSizeBytes;
@@ -23,14 +25,19 @@ export default function renderFuncCardFooter(functionRun): RenderedData {
           parsedOutput = functionRun.output;
         }
       }
+
       message = parsedOutput?.message;
       errorName = parsedOutput?.name;
+      output = parsedOutput?.stack;
     }
+  } else {
+    output = JSON.stringify(functionRun.output);
   }
 
   return {
     message,
     errorName,
+    output,
     status: functionRun?.status,
   };
 }

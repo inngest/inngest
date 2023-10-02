@@ -1,5 +1,5 @@
 import { useGetFunctionRunOutputQuery, type FunctionRun } from '@/store/generated';
-import { maxRenderedOutputSizeBytes } from '@/utils/constants';
+import renderRunOutput from '@/components/Function/RunOutputRenderer';
 
 export default function OutputList({ functionRuns }) {
   return (
@@ -10,7 +10,7 @@ export default function OutputList({ functionRuns }) {
         <ul className="flex flex-col space-y-4">
           {functionRuns &&
             functionRuns.map((functionRun) => {
-              return <OutputItem functionRunID={functionRun.id} />;
+              return <OutputItem key={functionRun.id} functionRunID={functionRun.id} />;
             })}
         </ul>
       )}
@@ -18,7 +18,7 @@ export default function OutputList({ functionRuns }) {
   );
 }
 
-type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'output'>;
+type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'status' |  'output'>;
 
 export function OutputItem({ functionRunID }) {
   const { data } = useGetFunctionRunOutputQuery({ id: functionRunID }, { pollingInterval: 1500 });
@@ -28,21 +28,7 @@ export function OutputItem({ functionRunID }) {
     return null;
   }
 
-  let message = '';
-  let errorName = '';
-  const isOutputTooLarge = functionRun.output?.length > maxRenderedOutputSizeBytes;
-  if (functionRun.output && !isOutputTooLarge) {
-    const parsedOutput = JSON.parse(functionRun.output);
-
-    if (parsedOutput.body && typeof parsedOutput.body === 'object') {
-      message = parsedOutput.body?.message;
-      errorName = parsedOutput.body?.name;
-    } else if (parsedOutput.body && typeof parsedOutput.body === 'string') {
-      const parsedBody = JSON.parse(parsedOutput.body);
-      message = parsedBody?.message;
-      errorName = parsedBody?.name;
-    }
-  }
+  const { message, errorName, output } = renderRunOutput(functionRun);
 
   return (
     <li
@@ -51,7 +37,8 @@ export function OutputItem({ functionRunID }) {
       className="flex items-baseline gap-2 font-mono"
     >
       {errorName && <span className={'font-bold text-rose-500'}>{errorName}</span>}
-      <span className="text-xs truncate">{message}</span>
+      <span className="text-xs">{message}</span>
+      <span className="text-xs">{output}</span>
     </li>
   );
 }
