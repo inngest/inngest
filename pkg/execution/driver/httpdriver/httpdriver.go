@@ -184,6 +184,7 @@ func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, e
 			NoRetry:        resp.noRetry,
 			RetryAt:        resp.retryAt,
 			RequestVersion: resp.requestVersion,
+			StatusCode:     resp.statusCode,
 		}
 		dr.Generator, err = ParseGenerator(ctx, resp.body)
 		if err != nil {

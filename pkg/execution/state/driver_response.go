@@ -269,8 +269,8 @@ func (r DriverResponse) Retryable() bool {
 		return true
 	}
 
-	var status int
-	if r.StatusCode == 0 {
+	status := r.StatusCode
+	if status == 0 {
 		// Fall back to statusCode for AWS Lambda compatibility in
 		// an attempt to use this field.
 		v, ok := mapped["statusCode"]
@@ -280,9 +280,13 @@ func (r DriverResponse) Retryable() bool {
 			return true
 		}
 
-		switch v := v.(type) {
-		case float64, int64, int:
-			status = int(v.(float64))
+		switch val := v.(type) {
+		case float64:
+			status = int(val)
+		case int64:
+			status = int(val)
+		case int:
+			status = val
 		default:
 			slog.Default().Error(
 				"unexpected status code type",
