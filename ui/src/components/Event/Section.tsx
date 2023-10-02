@@ -46,7 +46,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
         <div className="pt-8">
           <MetadataGrid
             metadataItems={[
-              { label: 'Event ID', value: eventId, size: 'large' },
+              { label: 'Event ID', value: eventId, size: 'large', type: 'code' },
               { label: 'Received At', value: shortDate(new Date(event.createdAt)) },
             ]}
           />
