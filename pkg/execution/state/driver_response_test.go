@@ -10,13 +10,6 @@ import (
 )
 
 func TestDriverResponseRetryable(t *testing.T) {
-	var unmarshalledTrue, unmarshalledFalse map[string]interface{}
-
-	err := json.Unmarshal([]byte(`{"body":"yea","status":501}`), &unmarshalledTrue)
-	require.NoError(t, err)
-	err = json.Unmarshal([]byte(`{"body":"yea","status":403}`), &unmarshalledFalse)
-	require.NoError(t, err)
-
 	tests := []struct {
 		name     string
 		r        DriverResponse
@@ -60,10 +53,10 @@ func TestDriverResponseRetryable(t *testing.T) {
 			name: "success status with error",
 			r: DriverResponse{
 				Output: map[string]interface{}{
-					"hi":     "my g",
-					"status": 200,
+					"hi": "my g",
 				},
-				Err: strptr("some err"),
+				Err:        strptr("some err"),
+				StatusCode: 200,
 			},
 			expected: false,
 		},
@@ -71,10 +64,10 @@ func TestDriverResponseRetryable(t *testing.T) {
 			name: "4xx status",
 			r: DriverResponse{
 				Output: map[string]interface{}{
-					"hi":     "my g",
-					"status": 401,
+					"hi": "my g",
 				},
-				Err: strptr("some err"),
+				Err:        strptr("some err"),
+				StatusCode: 401,
 			},
 			expected: false,
 		},
@@ -82,10 +75,10 @@ func TestDriverResponseRetryable(t *testing.T) {
 			name: "4xx status in statusCode",
 			r: DriverResponse{
 				Output: map[string]interface{}{
-					"hi":         "my g",
-					"statusCode": 401,
+					"hi": "my g",
 				},
-				Err: strptr("some err"),
+				Err:        strptr("some err"),
+				StatusCode: 401,
 			},
 			expected: false,
 		},
@@ -93,18 +86,10 @@ func TestDriverResponseRetryable(t *testing.T) {
 			name: "499 status",
 			r: DriverResponse{
 				Output: map[string]interface{}{
-					"hi":     "my g",
-					"status": 499,
+					"hi": "my g",
 				},
-				Err: strptr("some err"),
-			},
-			expected: false,
-		},
-		{
-			name: "5xx json status",
-			r: DriverResponse{
-				Output: unmarshalledFalse,
-				Err:    strptr("some err"),
+				Err:        strptr("some err"),
+				StatusCode: 499,
 			},
 			expected: false,
 		},
@@ -112,10 +97,10 @@ func TestDriverResponseRetryable(t *testing.T) {
 			name: "5xx status",
 			r: DriverResponse{
 				Output: map[string]interface{}{
-					"hi":     "my g",
-					"status": 500,
+					"hi": "my g",
 				},
-				Err: strptr("some err"),
+				Err:        strptr("some err"),
+				StatusCode: 500,
 			},
 			expected: true,
 		},
@@ -123,37 +108,22 @@ func TestDriverResponseRetryable(t *testing.T) {
 			name: "5xx statusCode",
 			r: DriverResponse{
 				Output: map[string]interface{}{
-					"hi":         "my g",
-					"statusCode": 500,
+					"hi": "my g",
 				},
-				Err: strptr("some err"),
+				Err:        strptr("some err"),
+				StatusCode: 500,
 			},
 			expected: true,
 		},
 		{
-			name: "5xx json status",
-			r: DriverResponse{
-				Output: unmarshalledTrue,
-				Err:    strptr("some err"),
-			},
-			expected: true,
-		},
-		{
-			name: "5xx json status, no error",
-			r: DriverResponse{
-				Output: unmarshalledTrue,
-			},
-			expected: false,
-		},
-		{
-			name: "5xx wth final",
+			name: "5xx with final",
 			r: DriverResponse{
 				Output: map[string]interface{}{
-					"hi":     "dont retry me plz",
-					"status": 500,
+					"hi": "dont retry me plz",
 				},
-				Err:   strptr("some err"),
-				final: true,
+				Err:        strptr("some err"),
+				final:      true,
+				StatusCode: 500,
 			},
 			expected: false,
 		},
@@ -200,10 +170,9 @@ func TestDriverResponseFinal(t *testing.T) {
 		{
 			name: "non-retryable error is final",
 			r: DriverResponse{
-				Err: strptr("final err plz"),
-				Output: map[string]interface{}{
-					"status": 401,
-				},
+				Err:        strptr("final err plz"),
+				Output:     map[string]interface{}{},
+				StatusCode: 401,
 			},
 			expected: true,
 		},
