@@ -144,7 +144,6 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
                 extraEditorClassName: '',
                 contextmenu: false,
                 scrollBeyondLastLine: false,
-                wordWrap: 'on',
                 fontFamily: 'Roboto_Mono',
                 fontSize: 13,
                 fontWeight: 'light',
@@ -163,14 +162,13 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
                 },
               }}
               onMount={(editor) => {
-                const numberOfLines = editor.getModel()?.getLineCount();
-                if (numberOfLines && numberOfLines <= 10) {
-                  const contentHeight = numberOfLines * 26 + 20;
-                  editor.layout({ height: contentHeight, width: 0 });
+                const contentHeight = editor.getContentHeight();
+                if (contentHeight > 295) {
+                  editor.layout({ height: 295, width: 0 });
                 } else {
-                  const fixedHeight = 10 * 26 + 20;
-                  editor.layout({ height: fixedHeight, width: 0 });
+                  editor.layout({ height: contentHeight, width: 0 });
                 }
+                editor.updateOptions({ wordWrap: 'on' });
               }}
             />
           )}
