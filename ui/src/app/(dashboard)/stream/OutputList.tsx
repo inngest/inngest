@@ -1,5 +1,5 @@
-import { useGetFunctionRunOutputQuery, type FunctionRun } from '@/store/generated';
 import renderRunOutput from '@/components/Function/RunOutputRenderer';
+import { useGetFunctionRunOutputQuery, type FunctionRun } from '@/store/generated';
 
 export default function OutputList({ functionRuns }) {
   return (
@@ -18,7 +18,7 @@ export default function OutputList({ functionRuns }) {
   );
 }
 
-type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'status' |  'output'>;
+type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'status' | 'output'>;
 
 export function OutputItem({ functionRunID }) {
   const { data } = useGetFunctionRunOutputQuery({ id: functionRunID }, { pollingInterval: 1500 });
@@ -38,7 +38,7 @@ export function OutputItem({ functionRunID }) {
     >
       {errorName && <span className={'font-bold text-rose-500'}>{errorName}</span>}
       <span className="text-xs">{message}</span>
-      <span className="text-xs">{output}</span>
+      {(!errorName || !message) && <span className="text-xs">{output}</span>}
     </li>
   );
 }

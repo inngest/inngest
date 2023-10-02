@@ -13,8 +13,8 @@ export default function renderRunOutput(functionRun): RenderedData {
   let errorName = '';
   let output = '';
 
+  const isOutputTooLarge = functionRun.output?.length > maxRenderedOutputSizeBytes;
   if (functionRun?.status === FunctionRunStatus.Failed) {
-    const isOutputTooLarge = functionRun.output?.length > maxRenderedOutputSizeBytes;
     if (functionRun.output && !isOutputTooLarge) {
       let parsedOutput;
       if (typeof functionRun.output === 'string') {
@@ -30,7 +30,7 @@ export default function renderRunOutput(functionRun): RenderedData {
       errorName = parsedOutput?.name;
       output = parsedOutput?.stack;
     }
-  } else {
+  } else if (!isOutputTooLarge) {
     output = JSON.stringify(functionRun.output);
   }
 
