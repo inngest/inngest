@@ -165,7 +165,6 @@ export default function CodeBlock({ tabs }: CodeBlockProps) {
                 } else {
                   editor.layout({ height: contentHeight, width: 0 });
                 }
-                editor.updateOptions({ wordWrap: 'on' });
               }}
             />
           )}
