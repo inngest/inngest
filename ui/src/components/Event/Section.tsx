@@ -38,6 +38,11 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
     return <div>Event not found</div>;
   }
 
+  if (!selectedRun && event.functionRuns && event.functionRuns.length > 0) {
+    const firstRunId = event.functionRuns[0].id;
+    dispatch(selectRun(firstRunId))
+  }
+
   return (
     <ContentCard
       title={event.name || 'unknown'}
