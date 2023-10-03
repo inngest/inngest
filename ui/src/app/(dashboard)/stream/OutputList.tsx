@@ -37,7 +37,7 @@ export function OutputItem({ functionRunID }) {
       className="flex items-baseline gap-2 font-mono"
     >
       {errorName && <span className={'font-bold text-rose-500'}>{errorName}</span>}
-      <span className="text-xs">{message}</span>
+      {message && <span className="text-xs">{message}</span>}
       {(!errorName || !message) && <span className="text-xs">{output}</span>}
     </li>
   );

@@ -38,6 +38,11 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
     return <div>Event not found</div>;
   }
 
+  if (!selectedRun && event.functionRuns && event.functionRuns.length > 0) {
+    const firstRunId = event.functionRuns[0].id;
+    dispatch(selectRun(firstRunId))
+  }
+
   return (
     <ContentCard
       title={event.name || 'unknown'}
@@ -46,7 +51,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
         <div className="pt-8">
           <MetadataGrid
             metadataItems={[
-              { label: 'Event ID', value: eventId, size: 'large' },
+              { label: 'Event ID', value: eventId, size: 'large', type: 'code' },
               { label: 'Received At', value: shortDate(new Date(event.createdAt)) },
             ]}
           />

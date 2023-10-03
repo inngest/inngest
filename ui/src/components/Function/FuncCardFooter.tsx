@@ -8,13 +8,14 @@ interface FuncCardFooterProps {
 }
 
 export default function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
-  const { message, errorName, status } = renderRunOutput(functionRun);
+  const { message, errorName } = renderRunOutput(functionRun);
+  const status = functionRun.status || 'Unknown';
   const functionRunStatusFooter = {
     [FunctionRunStatus.Failed]: {
       component: () => {
         if (!message && !errorName) return null;
         return (
-          <p className="font-mono flex items-center gap-1">
+          <p className="font-mono flex items-center gap-2">
             <IconExclamationTriangle className="icon-2xs text-rose-400" />
             <span className="text-rose-400 font-semibold">{errorName}</span>
             <span className="truncate">{message}</span>

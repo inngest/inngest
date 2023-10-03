@@ -1,4 +1,10 @@
-export function IconStatusCircleCross({ className }: { className?: string }) {
+export function IconStatusCircleCross({
+  className,
+  title,
+}: {
+  className?: string;
+  title?: string;
+}) {
   return (
     <svg
       width="28"
@@ -9,6 +15,7 @@ export function IconStatusCircleCross({ className }: { className?: string }) {
       color="#F43F5E"
       className={className}
     >
+      <title>{title}</title>
       <rect x="5.375" y="5.375" width="19.25" height="19.25" rx="9.625" fill="white" />
       <path
         fillRule="evenodd"

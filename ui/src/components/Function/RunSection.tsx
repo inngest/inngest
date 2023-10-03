@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import ms from 'ms';
 
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
-import { shortDate } from '@/utils/date';
 import { usePrettyJson } from '../../hooks/usePrettyJson';
 import {
   EventStatus,
@@ -18,6 +17,9 @@ import CodeBlock from '../Code/CodeBlock';
 import ContentCard from '../Content/ContentCard';
 import TimelineFuncProgress from '../Timeline/TimelineFuncProgress';
 import TimelineRow from '../Timeline/TimelineRow';
+import renderRunMetadata from './RunMetadataRenderer';
+import RunOutputCard from './RunOutput';
+import { FunctionRunStatusIcons } from './RunStatusIcons';
 
 interface FunctionRunSectionProps {
   runId: string | null | undefined;
@@ -65,23 +67,27 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       </ContentCard>
     );
   }
+  const metadataItems = renderRunMetadata(run);
 
   return (
     <ContentCard
       title={run.name || 'Unknown'}
+      icon={run.status && <FunctionRunStatusIcons status={run.status} className="icon-xl" />}
       type="run"
       metadata={
         <div className="pt-8">
-          <MetadataGrid
-            metadataItems={[
-              { label: 'Run ID', value: runId, size: 'large' },
-              { label: 'Function Started', value: shortDate(new Date(run.startedAt)) },
-            ]}
-          />
+          <MetadataGrid metadataItems={metadataItems} />
         </div>
       }
     >
-      <div className="pr-4 mt-4">
+      {run.status && run.finishedAt && run.output && (
+        <div className="px-5 pt-4">
+          <RunOutputCard functionRun={run} />
+        </div>
+      )}
+      <hr className="border-slate-800/50 mt-8" />
+      <div className="px-5 pt-4">
+        <h3 className="text-slate-400 text-sm py-4">Timeline</h3>
         {timeline?.map((row, i, list) => (
           <FunctionRunTimelineRow
             createdAt={row.createdAt}
