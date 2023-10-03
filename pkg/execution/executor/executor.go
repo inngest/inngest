@@ -878,7 +878,13 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 	eg := errgroup.Group{}
 	for _, op := range resp.Generator {
 		copied := *op
-		eg.Go(func() error { return e.HandleGenerator(ctx, copied, item) })
+
+		// Give each op its own group ID, as we want to track each step
+		// individually.
+		newItem := item
+		newItem.GroupID = uuid.New().String()
+
+		eg.Go(func() error { return e.HandleGenerator(ctx, copied, newItem) })
 	}
 
 	return eg.Wait()
