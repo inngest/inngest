@@ -18,8 +18,9 @@ export default function renderRunOutput(functionRun): RenderedData {
     if (functionRun.output && !isOutputTooLarge) {
       let parsedOutput;
       if (typeof functionRun.output === 'string') {
+        const cleanedJsonString = functionRun.output.slice(1, -1).replace(/\\\"/g, '"');
         try {
-          parsedOutput = JSON.parse(functionRun.output);
+          parsedOutput = JSON.parse(cleanedJsonString);
           message = parsedOutput?.message;
           errorName = parsedOutput?.name;
           output = parsedOutput?.stack;
