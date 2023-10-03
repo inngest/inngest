@@ -1,15 +1,10 @@
 import { type MetadataItemProps } from '@/components/Metadata/MetadataItem';
-import { FunctionRunStatus } from '@/store/generated';
+import { FunctionRunStatus, type FunctionRun } from '@/store/generated';
 import { formatMilliseconds, shortDate } from '@/utils/date';
 
-type Run = {
-  finishedAt?: string;
-  id: string;
-  startedAt?: string;
-  status?: FunctionRunStatus | null;
-};
-
-export default function renderRunMetadata(functionRun: Run): MetadataItemProps[] {
+export default function renderRunMetadata(
+  functionRun: Pick<FunctionRun, 'finishedAt' | 'id' | 'startedAt' | 'status'>,
+): MetadataItemProps[] {
   if (!functionRun.startedAt) {
     throw new Error('missing startedAt');
   }

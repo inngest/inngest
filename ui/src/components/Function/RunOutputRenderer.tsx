@@ -1,10 +1,5 @@
-import { FunctionRunStatus } from '@/store/generated';
+import { FunctionRunStatus, type FunctionRun } from '@/store/generated';
 import { maxRenderedOutputSizeBytes } from '@/utils/constants';
-
-type Run = {
-  output: string;
-  status: FunctionRunStatus | null;
-};
 
 type RenderedData = {
   message?: string;
@@ -12,33 +7,37 @@ type RenderedData = {
   output: string;
 };
 
-export default function renderRunOutput(functionRun: Run): RenderedData {
+export default function renderRunOutput(
+  functionRun: Pick<FunctionRun, 'output' | 'status'>,
+): RenderedData {
   let message = '';
   let errorName = '';
   let output = '';
 
-  const isOutputTooLarge = functionRun.output?.length > maxRenderedOutputSizeBytes;
-  if (functionRun?.status === FunctionRunStatus.Failed) {
-    if (functionRun.output && !isOutputTooLarge) {
-      let parsedOutput;
-      if (typeof functionRun.output === 'string') {
-        const cleanedJsonString = functionRun.output.slice(1, -1).replace(/\\\"/g, '"');
-        try {
-          parsedOutput = JSON.parse(cleanedJsonString);
-          message = parsedOutput?.message;
-          errorName = parsedOutput?.name;
-          output = parsedOutput?.stack;
-        } catch (error) {
-          console.error(`Error parsing payload: `, error);
-          parsedOutput = functionRun.output;
+  if (functionRun.output) {
+    const isOutputTooLarge = functionRun.output?.length > maxRenderedOutputSizeBytes;
+    if (functionRun?.status === FunctionRunStatus.Failed) {
+      if (functionRun.output && !isOutputTooLarge) {
+        let parsedOutput;
+        if (typeof functionRun.output === 'string') {
+          const cleanedJsonString = functionRun.output.slice(1, -1).replace(/\\\"/g, '"');
+          try {
+            parsedOutput = JSON.parse(cleanedJsonString);
+            message = parsedOutput?.message;
+            errorName = parsedOutput?.name;
+            output = parsedOutput?.stack;
+          } catch (error) {
+            console.error(`Error parsing payload: `, error);
+            parsedOutput = functionRun.output;
+          }
         }
       }
-    }
-  } else if (!isOutputTooLarge) {
-    if (typeof functionRun.output === 'string') {
-      output = functionRun.output;
-    } else {
-      output = JSON.stringify(functionRun.output);
+    } else if (!isOutputTooLarge) {
+      if (typeof functionRun.output === 'string') {
+        output = functionRun.output;
+      } else {
+        output = JSON.stringify(functionRun.output, null, 2);
+      }
     }
   }
 
