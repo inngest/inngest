@@ -35,6 +35,12 @@ export default function renderRunMetadata(functionRun) {
       value: shortDate(new Date(functionRun.finishedAt)),
     });
   }
+  if (functionRun.status == FunctionRunStatus.Running) {
+    metadataItems.push({
+      label: 'Function Completed',
+      value: '-',
+    });
+  }
 
   return metadataItems as MetadataItemProps[];
 }
