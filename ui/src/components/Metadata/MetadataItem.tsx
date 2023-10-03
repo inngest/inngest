@@ -3,9 +3,9 @@ import { IconInfo } from '@/icons';
 import classNames from '@/utils/classnames';
 
 export type MetadataItemProps = {
-  label: String;
-  value: String;
-  tooltip?: String;
+  label: string;
+  value: string | JSX.Element;
+  tooltip?: string;
   type?: 'code' | 'text';
   size?: 'small' | 'large';
 };
