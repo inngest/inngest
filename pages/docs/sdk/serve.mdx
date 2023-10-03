@@ -220,30 +220,24 @@ See the [github.com/unjs/h3](https://github.com/unjs/h3) repository for more inf
 
 ## Framework: Next.js
 
-Inngest has first class support for Next.js API routes, allowing you to easily create the Inngest API.
-Add the following within `./pages/api/inngest.ts`:
+Inngest has first class support for Next.js API routes, allowing you to easily create the Inngest API. Both the App Router and the Pages Router are supported. For the App Router, Inngest requires `GET`, `POST`, and `PUT` methods.
 
-<CodeGroup filename="pages/api/inngest.ts">
-```typescript
-import { serve } from "inngest/next";
-import { inngest } from "../../inngest/client";
-import fnA from "../../inngest/fnA"; // Your own function
-
-export default serve(inngest, [fnA]);
-```
-</CodeGroup>
-
-### Next.js 13+ <VersionBadge version="v1.8.0+" />
-
-Version 13+ of Next.js uses [Route Handlers](https://beta.nextjs.org/docs/routing/route-handlers), requiring a separate export for each HTTP method the API supports. Inngest requires `GET`, `POST`, and `PUT` methods (see [How the API works](#how-the-api-works) below), which you can export via destructuring instead of `export default`:
-
-<CodeGroup filename="src/app/api/inngest/route.ts">
-```typescript
+<CodeGroup>
+```typescript {{ title: "App Router" }}
+// src/app/api/inngest/route.ts
 import { serve } from "inngest/next";
 import { inngest } from "../../../inngest/client";
 import fnA from "../../../inngest/fnA"; // Your own functions
 
 export const { GET, POST, PUT } = serve(inngest, [fnA]);
+```
+```typescript {{ title: "Pages Router" }}
+// pages/api/inngest.ts
+import { serve } from "inngest/next";
+import { inngest } from "../../inngest/client";
+import fnA from "../../inngest/fnA"; // Your own function
+
+export default serve(inngest, [fnA]);
 ```
 </CodeGroup>
 
