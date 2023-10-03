@@ -1,13 +1,18 @@
 import { FunctionRunStatus } from '@/store/generated';
 import { maxRenderedOutputSizeBytes } from '@/utils/constants';
 
+type Run = {
+  output: string;
+  status: FunctionRunStatus | null;
+};
+
 type RenderedData = {
   message?: string;
   errorName?: string;
   output: string;
 };
 
-export default function renderRunOutput(functionRun): RenderedData {
+export default function renderRunOutput(functionRun: Run): RenderedData {
   let message = '';
   let errorName = '';
   let output = '';
