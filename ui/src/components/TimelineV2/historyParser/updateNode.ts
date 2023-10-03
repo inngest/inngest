@@ -105,23 +105,10 @@ const updaters: {
     // the same group.
     const endedAt = undefined;
 
-    let status: Status = 'sleeping';
-
     let sleepConfig: HistoryNode['sleepConfig'] | undefined;
     if (rawItem.sleep) {
       sleepConfig = {
         until: new Date(rawItem.sleep.until),
-      };
-    }
-
-    let waitForEventConfig: HistoryNode['waitForEventConfig'] | undefined;
-    if (rawItem.waitForEvent) {
-      status = 'waiting';
-
-      waitForEventConfig = {
-        eventName: rawItem.waitForEvent.eventName,
-        expression: rawItem.waitForEvent.expression ?? undefined,
-        timeout: new Date(rawItem.waitForEvent.timeout),
       };
     }
 
@@ -130,8 +117,7 @@ const updaters: {
       endedAt,
       scope: 'step',
       sleepConfig,
-      status,
-      waitForEventConfig,
+      status: 'sleeping',
     } satisfies HistoryNode;
   },
   [HistoryType.StepStarted]: (node, rawItem) => {
@@ -148,7 +134,23 @@ const updaters: {
       url,
     } satisfies HistoryNode;
   },
-  [HistoryType.StepWaiting]: noop,
+  [HistoryType.StepWaiting]: (node, rawItem) => {
+    let waitForEventConfig: HistoryNode['waitForEventConfig'] | undefined;
+    if (rawItem.waitForEvent) {
+      waitForEventConfig = {
+        eventName: rawItem.waitForEvent.eventName,
+        expression: rawItem.waitForEvent.expression ?? undefined,
+        timeout: new Date(rawItem.waitForEvent.timeout),
+      };
+    }
+
+    return {
+      ...node,
+      scope: 'step',
+      status: 'waiting',
+      waitForEventConfig,
+    } satisfies HistoryNode;
+  },
 } as const;
 
 function parseName(name: string | undefined): string | undefined {

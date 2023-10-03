@@ -215,7 +215,7 @@ test('times out waiting for events', async () => {
         timeout: true,
       },
       waitForEventConfig: {
-        eventName: 'foo',
+        eventName: 'bar',
         expression: undefined,
         timeout: expect.any(Date),
       },
