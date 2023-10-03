@@ -381,14 +381,14 @@ export type GetEventQueryVariables = Exact<{
 }>;
 
 
-export type GetEventQuery = { __typename?: 'Query', event?: { __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null, raw?: string | null, functionRuns?: Array<{ __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
+export type GetEventQuery = { __typename?: 'Query', event?: { __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null, raw?: string | null, functionRuns?: Array<{ __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, output?: string | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
 
 export type GetFunctionRunQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
 
-export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null, event?: { __typename?: 'Event', id: string, raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
+export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, finishedAt?: any | null, output?: string | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null, event?: { __typename?: 'Event', id: string, raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
 
 export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -428,7 +428,7 @@ export type GetTriggersStreamQueryVariables = Exact<{
 }>;
 
 
-export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, trigger: string, type: StreamType, runs?: Array<{ __typename?: 'FunctionRun', id: string } | null> | null }> };
+export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, trigger: string, type: StreamType, runs?: Array<{ __typename?: 'FunctionRun', id: string, function?: { __typename?: 'Function', name: string } | null } | null> | null }> };
 
 export type GetFunctionRunStatusQueryVariables = Exact<{
   id: Scalars['ID'];
@@ -442,7 +442,7 @@ export type GetFunctionRunOutputQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunOutputQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, output?: string | null } | null };
+export type GetFunctionRunOutputQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, status?: FunctionRunStatus | null, output?: string | null } | null };
 
 
 export const GetEventsStreamDocument = `
@@ -485,6 +485,7 @@ export const GetEventDocument = `
       status
       startedAt
       pendingSteps
+      output
       waitingFor {
         expiryTime
         eventName
@@ -501,6 +502,8 @@ export const GetFunctionRunDocument = `
     name
     status
     startedAt
+    finishedAt
+    output
     pendingSteps
     waitingFor {
       expiryTime
@@ -600,6 +603,9 @@ export const GetTriggersStreamDocument = `
     type
     runs {
       id
+      function {
+        name
+      }
     }
   }
 }
@@ -619,6 +625,7 @@ export const GetFunctionRunOutputDocument = `
     query GetFunctionRunOutput($id: ID!) {
   functionRun(query: {functionRunId: $id}) {
     id
+    status
     output
   }
 }

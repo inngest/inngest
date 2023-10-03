@@ -1,6 +1,6 @@
 import type { Preview } from '@storybook/react';
 
-import 'tailwindcss/tailwind.css';
+import '../src/app/globals.css';
 
 const preview: Preview = {
   parameters: {
@@ -10,7 +10,7 @@ const preview: Preview = {
       values: [
         {
           name: 'dark',
-          value: '#080D19',  // bg-slate-1000
+          value: '#080D19', // bg-slate-1000
         },
       ],
     },
