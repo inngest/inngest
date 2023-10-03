@@ -62,7 +62,7 @@
     "autoprefixer": "10.4.13",
     "concurrently": "7.5.0",
     "nodemon": "2.0.20",
-    "postcss": "8.4.18",
+    "postcss": "8.4.31",
     "prettier": "3.0.0",
     "prettier-plugin-tailwindcss": "0.4.1",
     "storybook": "7.2.2",
