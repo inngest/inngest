@@ -8,7 +8,8 @@ interface FuncCardFooterProps {
 }
 
 export default function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
-  const { message, errorName, status } = renderRunOutput(functionRun);
+  const { message, errorName } = renderRunOutput(functionRun);
+  const status = functionRun.status || 'Unknown';
   const functionRunStatusFooter = {
     [FunctionRunStatus.Failed]: {
       component: () => {

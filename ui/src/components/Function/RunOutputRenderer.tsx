@@ -5,7 +5,6 @@ type RenderedData = {
   message?: string;
   errorName?: string;
   output: string;
-  status: FunctionRunStatus;
 };
 
 export default function renderRunOutput(functionRun): RenderedData {
@@ -42,6 +41,5 @@ export default function renderRunOutput(functionRun): RenderedData {
     message,
     errorName,
     output,
-    status: functionRun?.status,
   };
 }
