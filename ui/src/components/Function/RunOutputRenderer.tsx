@@ -20,15 +20,14 @@ export default function renderRunOutput(functionRun): RenderedData {
       if (typeof functionRun.output === 'string') {
         try {
           parsedOutput = JSON.parse(functionRun.output);
+          message = parsedOutput?.message;
+          errorName = parsedOutput?.name;
+          output = parsedOutput?.stack;
         } catch (error) {
           console.error(`Error parsing payload: `, error);
           parsedOutput = functionRun.output;
         }
       }
-
-      message = parsedOutput?.message;
-      errorName = parsedOutput?.name;
-      output = parsedOutput?.stack;
     }
   } else if (!isOutputTooLarge) {
     if (typeof functionRun.output === 'string') {
