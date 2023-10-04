@@ -115,6 +115,14 @@ type LifecycleListener interface {
 		time.Time, // Sleeping until this time.
 	)
 
+	// OnConcurrencyLimit is called when the executor hit a concurrency limit when
+	// attempted to run functions/steps.
+	OnConcurrencyLimit(
+		context.Context,
+		state.Identifier,
+		queue.Item,
+	)
+
 	// Close closes the listener and flushes any pending writes.
 	//
 	// This is backend specific and may be a noop depending on the
@@ -230,6 +238,15 @@ func (NoopLifecycleListener) OnSleep(
 	queue.Item,
 	state.GeneratorOpcode,
 	time.Time,
+) {
+}
+
+// OnConcurrencyLimit is called when the executor hit a concurrency limit when
+// attempted to run functions/steps.
+func (NoopLifecycleListener) OnConcurrencyLimit(
+	context.Context,
+	state.Identifier,
+	queue.Item,
 ) {
 }
 
