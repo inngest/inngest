@@ -9,7 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 )
 
-var _ LifecycleListener = (*NoopLifecyceListener)(nil)
+var _ LifecycleListener = (*NoopLifecycleListener)(nil)
 
 // LifecycleListener listens to lifecycle events on the executor.
 type LifecycleListener interface {
@@ -124,14 +124,14 @@ type LifecycleListener interface {
 
 // NoopLifecyceListener does nothing.  This can be embedded into a custom implementation
 // allowing other implementations to override specific functions.
-type NoopLifecyceListener struct{}
+type NoopLifecycleListener struct{}
 
 // OnFunctionScheduled is called when a new function is initialized from
 // an event or trigger.
 //
 // Note that this does not mean the function immediately starts.  A function
 // may start if and when there's capacity due to concurrency.
-func (NoopLifecyceListener) OnFunctionScheduled(
+func (NoopLifecycleListener) OnFunctionScheduled(
 	context.Context,
 	state.Identifier,
 	queue.Item,
@@ -142,7 +142,7 @@ func (NoopLifecyceListener) OnFunctionScheduled(
 // immediately after the function is scheduled, or in the case of increased
 // latency (eg. due to debouncing or concurrency limits) some time after the
 // function is scheduled.
-func (NoopLifecyceListener) OnFunctionStarted(
+func (NoopLifecycleListener) OnFunctionStarted(
 	context.Context,
 	state.Identifier,
 	queue.Item,
@@ -154,7 +154,7 @@ func (NoopLifecyceListener) OnFunctionStarted(
 // with the final driver response indicating the type of success.
 //
 // If failed, DriverResponse will contain a non nil Err string.
-func (NoopLifecyceListener) OnFunctionFinished(
+func (NoopLifecycleListener) OnFunctionFinished(
 	context.Context,
 	state.Identifier,
 	queue.Item,
@@ -166,7 +166,7 @@ func (NoopLifecyceListener) OnFunctionFinished(
 // OnFunctionCancelled is called when a function is cancelled.  This includes
 // the cancellation request, detailing either the event that cancelled the
 // function or the API request information.
-func (NoopLifecyceListener) OnFunctionCancelled(
+func (NoopLifecycleListener) OnFunctionCancelled(
 	context.Context,
 	state.Identifier,
 	CancelRequest,
@@ -176,7 +176,7 @@ func (NoopLifecyceListener) OnFunctionCancelled(
 
 // OnStepScheduled is called when a new step is scheduled.  It contains the
 // queue item which embeds the next step information.
-func (NoopLifecyceListener) OnStepScheduled(
+func (NoopLifecycleListener) OnStepScheduled(
 	context.Context,
 	state.Identifier,
 	queue.Item,
@@ -184,7 +184,7 @@ func (NoopLifecyceListener) OnStepScheduled(
 ) {
 }
 
-func (NoopLifecyceListener) OnStepStarted(
+func (NoopLifecycleListener) OnStepStarted(
 	ctx context.Context,
 	id state.Identifier,
 	item queue.Item,
@@ -194,7 +194,7 @@ func (NoopLifecyceListener) OnStepStarted(
 ) {
 }
 
-func (NoopLifecyceListener) OnStepFinished(
+func (NoopLifecycleListener) OnStepFinished(
 	context.Context,
 	state.Identifier,
 	queue.Item,
@@ -204,7 +204,7 @@ func (NoopLifecyceListener) OnStepFinished(
 ) {
 }
 
-func (NoopLifecyceListener) OnWaitForEvent(
+func (NoopLifecycleListener) OnWaitForEvent(
 	context.Context,
 	state.Identifier,
 	queue.Item,
@@ -214,7 +214,7 @@ func (NoopLifecyceListener) OnWaitForEvent(
 
 // OnWaitForEventResumed is called when a function is resumed from waiting for
 // an event.
-func (NoopLifecyceListener) OnWaitForEventResumed(
+func (NoopLifecycleListener) OnWaitForEventResumed(
 	context.Context,
 	state.Identifier,
 	ResumeRequest,
@@ -224,7 +224,7 @@ func (NoopLifecyceListener) OnWaitForEventResumed(
 
 // OnSleep is called when a sleep step is scheduled.  The
 // state.GeneratorOpcode contains the sleep details.
-func (NoopLifecyceListener) OnSleep(
+func (NoopLifecycleListener) OnSleep(
 	context.Context,
 	state.Identifier,
 	queue.Item,
@@ -233,4 +233,4 @@ func (NoopLifecyceListener) OnSleep(
 ) {
 }
 
-func (NoopLifecyceListener) Close() error { return nil }
+func (NoopLifecycleListener) Close() error { return nil }
