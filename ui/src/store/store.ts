@@ -2,12 +2,10 @@ import { configureStore } from '@reduxjs/toolkit';
 
 import devApi from './devApi';
 import { api } from './generated';
-import globalReducer from './global';
 
 export const store = configureStore({
   reducer: {
     [api.reducerPath]: api.reducer,
-    global: globalReducer,
     [devApi.reducerPath]: devApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
