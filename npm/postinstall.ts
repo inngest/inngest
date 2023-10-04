@@ -54,17 +54,6 @@ async function getBinaryUrl(): Promise<URL> {
 
   let version = process.env.npm_package_version?.trim();
   debug("npm_package_version:", version);
-  /**
-   * Windows builds are currently not working past v0.14.6, so let's pin to that
-   * version here if we're on Windows.
-   */
-  if (platform.platform === "windows") {
-    debug("Windows detected; pinning to v0.14.6");
-    console.warn(
-      "Windows detected; pinning to last known working version 0.14.6"
-    );
-    version = "0.14.6";
-  }
 
   if (!version) {
     throw new Error("Could not find package version to install binary");
@@ -104,16 +93,6 @@ function getArchPlatform() {
 
   if (!platform) {
     throw new Error(`Unsupported platform: ${process.platform}`);
-  }
-
-  /**
-   * Windows x64 builds pre v0.15 had an 'x86_64' suffix instead of 'amd64'.
-   * We are explicitly pinning Windows versions to 0.14.6 for now, so handle
-   * this problem here.
-   */
-  if (platform.platform === "windows" && arch === "amd64") {
-    debug("Old Windows x64 build; using 'x86_64' to access binary");
-    return { arch: "x86_64", platform };
   }
 
   return { arch, platform };
