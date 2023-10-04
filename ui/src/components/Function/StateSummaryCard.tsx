@@ -13,17 +13,17 @@ export function StateSummaryCard({
   );
 }
 
-StateSummaryCard.Accent = function Content({ className }: { className: string }) {
-  return <div className={classNames('pt-3', className)} />;
+StateSummaryCard.Accent = ({ className }: { className: string }) => {
+  return <div className={classNames('pt-2', className)} />;
 };
 
-StateSummaryCard.Content = function Content({ children }: PropsWithChildren) {
-  return <div className="p-2.5">{children}</div>;
+StateSummaryCard.Content = ({ children }: PropsWithChildren) => {
+  return <div className="bg-slate-800/40 p-2">{children}</div>;
 };
 
-StateSummaryCard.Header = function Content({ children }: PropsWithChildren) {
+StateSummaryCard.Header = ({ children }: PropsWithChildren) => {
   return (
-    <div className="flex flex-col gap-1 px-5 py-3 border-b border-slate-700/30 text-white">
+    <div className="bg-slate-800/40 flex flex-col gap-1 px-3 py-3 border-b border-slate-700 text-white">
       {children}
     </div>
   );
