@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import ms from 'ms';
 
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
@@ -28,7 +28,7 @@ import { Timeline } from '../TimelineV2';
 import { client } from '@/store/baseApi';
 
 // TODO: Delete this. It's only here to make it easy to switch between the old and new timeline during dev.
-const isNewTimelineVisible = true;
+const isNewTimelineVisible = false;
 
 interface FunctionRunSectionProps {
   runId: string | null | undefined;
@@ -55,6 +55,19 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       dispatch(selectRun(null));
     }
   }, [selectedEvent, run?.event?.id]);
+
+
+  const getOutput = useCallback(
+    (historyItemID: string) => {
+      if (!runId) {
+        // Should be unreachable.
+        return new Promise<string>((resolve) => resolve(''))
+      }
+
+      return getHistoryItemOutput({ historyItemID, runID: runId })
+    },
+    [runId],
+  );
 
   if (query.isLoading) {
     return (
@@ -104,9 +117,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
         <h3 className="text-slate-400 text-sm py-4">Timeline</h3>
         {isNewTimelineVisible && (
           <Timeline
-            getOutput={(historyItemID) => {
-              return getHistoryItemOutput({ historyItemID, runID: run.id });
-            }}
+            getOutput={getOutput}
             history={history}
           />
         )}

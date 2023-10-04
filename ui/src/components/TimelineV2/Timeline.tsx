@@ -1,9 +1,10 @@
-import AccordionTimeline, { AccordionTimelineItem } from '../AccordionTimeline/AccordionTimeline';
+import * as AccordionPrimitive from '@radix-ui/react-accordion';
+
 import type { HistoryNode } from './historyParser';
 import { TimelineNode } from './TimelineNode/TimelineNode';
 
 type Props = {
-  getOutput: (id: string) => Promise<string>;
+  getOutput: (historyItemID: string) => Promise<string>;
   history: Record<string, HistoryNode>;
 };
 
@@ -15,30 +16,18 @@ export function Timeline({ getOutput, history }: Props) {
       {nodes.length === 0 ? (
         <div className=" text-white text-center">No history yet</div>
       ) : (
-        <AccordionTimeline>
+        <AccordionPrimitive.Root
+          type="multiple"
+          className="text-slate-100 w-full last:border-b last:border-slate-800/50"
+        >
           {nodes.map((node) => {
             if (!isVisible(node)) {
-              return null
+              return null;
             }
 
-            const { outputItemID } = node;
-            let getContent: (() => Promise<string>) | undefined;
-            if (node.scope === 'step' && outputItemID) {
-              getContent = () => {
-                return getOutput(outputItemID);
-              };
-            }
-
-            return (
-              <AccordionTimelineItem
-                getContent={getContent}
-                header={<TimelineNode getOutput={getOutput} node={node} key={node.groupID} />}
-                id={node.groupID}
-                key={node.groupID}
-              />
-            );
+            return <TimelineNode getOutput={getOutput} node={node} />;
           })}
-        </AccordionTimeline>
+        </AccordionPrimitive.Root>
       )}
     </div>
   );
