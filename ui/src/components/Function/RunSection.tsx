@@ -28,7 +28,7 @@ import { Timeline } from '../TimelineV2';
 import { client } from '@/store/baseApi';
 
 // TODO: Delete this. It's only here to make it easy to switch between the old and new timeline during dev.
-const isNewTimelineVisible = false;
+const isNewTimelineVisible = true;
 
 interface FunctionRunSectionProps {
   runId: string | null | undefined;
