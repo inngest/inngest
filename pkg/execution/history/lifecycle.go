@@ -526,6 +526,14 @@ func (l lifecycle) OnSleep(
 	}
 }
 
+// Do nothing
+func (lifecycle) OnConcurrencyLimit(
+	context.Context,
+	state.Identifier,
+	queue.Item,
+) {
+}
+
 func applyResponse(
 	h *History,
 	resp *state.DriverResponse,

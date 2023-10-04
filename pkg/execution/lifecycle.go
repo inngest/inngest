@@ -117,6 +117,9 @@ type LifecycleListener interface {
 
 	// OnConcurrencyLimit is called when the executor hit a concurrency limit when
 	// attempted to run functions/steps.
+	//
+	// TODO: This is currently not triggered from anywhere yet, but is a placeholder
+	// as we make concurrency instrumentation easier
 	OnConcurrencyLimit(
 		context.Context,
 		state.Identifier,
