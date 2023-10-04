@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 
+import { Card } from '@/components/Card';
+import MetadataItem from '@/components/Metadata/MetadataItem';
+import type { HistoryNode } from '@/components/TimelineV2/historyParser';
 import { IconEvent } from '@/icons';
-import MetadataItem from '../Metadata/MetadataItem';
-import type { HistoryNode } from '../TimelineV2/historyParser';
-import { StateSummaryCard } from './StateSummaryCard';
 
 type Props = {
   history: Record<string, HistoryNode>;
@@ -26,14 +26,14 @@ export function WaitingSummary({ history }: Props) {
         }
 
         return (
-          <StateSummaryCard
+          <Card
+            accentColor="bg-sky-400"
             className={i < waits.length - 1 ? 'mb-4' : undefined}
             key={wait.groupID}
           >
-            <StateSummaryCard.Accent className="bg-sky-400" />
-            <StateSummaryCard.Header>Waiting for event</StateSummaryCard.Header>
+            <Card.Header>Waiting for event</Card.Header>
 
-            <StateSummaryCard.Content>
+            <Card.Content>
               <MetadataItem
                 label="Event name"
                 value={
@@ -50,8 +50,8 @@ export function WaitingSummary({ history }: Props) {
               />
 
               <MetadataItem label="Timeout" value={config.timeout.toLocaleString()} />
-            </StateSummaryCard.Content>
-          </StateSummaryCard>
+            </Card.Content>
+          </Card>
         );
       })}
     </>

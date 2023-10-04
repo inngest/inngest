@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
-import MetadataItem from '../Metadata/MetadataItem';
-import type { HistoryNode } from '../TimelineV2/historyParser';
-import { StateSummaryCard } from './StateSummaryCard';
+import { Card } from '@/components/Card';
+import MetadataItem from '@/components/Metadata/MetadataItem';
+import type { HistoryNode } from '@/components/TimelineV2/historyParser';
 
 type Props = {
   history: Record<string, HistoryNode>;
@@ -25,17 +25,17 @@ export function SleepingSummary({ history }: Props) {
         }
 
         return (
-          <StateSummaryCard
+          <Card
+            accentColor="bg-sky-400"
             className={i < sleeps.length - 1 ? 'mb-4' : undefined}
             key={sleep.groupID}
           >
-            <StateSummaryCard.Accent className="bg-sky-400" />
-            <StateSummaryCard.Header>Sleeping</StateSummaryCard.Header>
+            <Card.Header>Sleeping</Card.Header>
 
-            <StateSummaryCard.Content>
+            <Card.Content>
               <MetadataItem label="Sleep until" value={config.until.toLocaleString()} />
-            </StateSummaryCard.Content>
-          </StateSummaryCard>
+            </Card.Content>
+          </Card>
         );
       })}
     </>
