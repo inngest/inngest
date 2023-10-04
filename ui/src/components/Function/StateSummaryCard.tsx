@@ -13,21 +13,18 @@ export function StateSummaryCard({
   );
 }
 
+StateSummaryCard.Accent = function Content({ className }: { className: string }) {
+  return <div className={classNames('pt-3', className)} />;
+};
+
 StateSummaryCard.Content = function Content({ children }: PropsWithChildren) {
   return <div className="p-2.5">{children}</div>;
 };
 
-StateSummaryCard.Header = function Content({
-  children,
-  barColor,
-}: PropsWithChildren<{ barColor?: string }>) {
+StateSummaryCard.Header = function Content({ children }: PropsWithChildren) {
   return (
-    <>
-      <div className="pt-3" style={{ backgroundColor: barColor }}></div>
-
-      <div className="flex flex-col gap-1 px-5 py-3 border-b border-slate-700/30 text-white">
-        {children}
-      </div>
-    </>
+    <div className="flex flex-col gap-1 px-5 py-3 border-b border-slate-700/30 text-white">
+      {children}
+    </div>
   );
 };

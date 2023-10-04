@@ -30,7 +30,8 @@ export function WaitingSummary({ history }: Props) {
             className={i < waits.length - 1 ? 'mb-4' : undefined}
             key={wait.groupID}
           >
-            <StateSummaryCard.Header barColor="#38BDF8">Waiting for event</StateSummaryCard.Header>
+            <StateSummaryCard.Accent className="bg-sky-400" />
+            <StateSummaryCard.Header>Waiting for event</StateSummaryCard.Header>
 
             <StateSummaryCard.Content>
               <MetadataItem

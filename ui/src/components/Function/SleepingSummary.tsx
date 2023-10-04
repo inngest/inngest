@@ -29,7 +29,8 @@ export function SleepingSummary({ history }: Props) {
             className={i < sleeps.length - 1 ? 'mb-4' : undefined}
             key={sleep.groupID}
           >
-            <StateSummaryCard.Header barColor="#38BDF8">Sleeping</StateSummaryCard.Header>
+            <StateSummaryCard.Accent className="bg-sky-400" />
+            <StateSummaryCard.Header>Sleeping</StateSummaryCard.Header>
 
             <StateSummaryCard.Content>
               <MetadataItem label="Sleep until" value={config.until.toLocaleString()} />
