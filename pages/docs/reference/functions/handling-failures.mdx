@@ -7,11 +7,11 @@ import { inngest } from "./client";
 
 export default inngest.createFunction(
   {
-    name: "Import product images",
+    id: "import-product-images",
     onFailure: async ({ error, event, step }) => {
       // This is the failure handler which can be used to
       // send an alert, notification, or whatever you need to do
-    }
+    },
   },
   { event: "shop/product.imported" },
   async ({ event, step, runId }) => {
@@ -77,7 +77,7 @@ Inngest sends an `"inngest/function.failed"` event to your [environment](/docs/p
         Data about the error payload as returned from the failed function.
         <Properties nested collapse>
           <Property name="message" type="string" attribute>
-            The error message when an error is caught 
+            The error message when an error is caught
           </Property>
           <Property name="name" type="string" attribute>
             The name of the error, defaulting to "Error" if unspecified
@@ -135,15 +135,14 @@ Inngest sends an `"inngest/function.failed"` event to your [environment](/docs/p
 In this example, the function attempts to sync all products from a Shopify store, and if it fails, it sends a message to the team's _#eng-alerts_ Slack channel using the Slack Web Api's `chat.postMessage` ([docs](https://api.slack.com/methods/chat.postMessage)) API.
 
 ```ts
-import { inngest } from "./client";
 import { client } from "@slack/web-api";
+import { inngest } from "./client";
 
 export default inngest.createFunction(
   {
-    name: "Sync Shopify products",
+    id: "sync-shopify-products",
     // Your handler should be an async function:
     onFailure: async ({ error, event }) => {
-
       const originalEvent = event.data.event;
 
       // Post a message to the Engineering team's alerts channel in Slack:
@@ -155,25 +154,27 @@ export default inngest.createFunction(
             type: "section",
             text: {
               type: "mrkdwn",
-              text: `Sync Shopify function failed for Store ${originalEvent.storeId}: ${error.toString()}`
-            }
-          }
-        ]
+              text: `Sync Shopify function failed for Store ${
+                originalEvent.storeId
+              }: ${error.toString()}`,
+            },
+          },
+        ],
       });
 
       return result;
-    }
+    },
   },
   { event: "shop/product_sync.requested" },
   async ({ event, step, runId }) => {
     // This is the main function handler's code
-    const products = await step.run("Fetch products", async () => {
+    const products = await step.run("fetch-products", async () => {
       const storeId = event.data.storeId;
       // The function might fail here or...
-    })
-    await step.run("Save products", async () => {
+    });
+    await step.run("save-products", async () => {
       // The function might fail here after the maximum number of retries
-    })
+    });
   }
 );
 ```
@@ -183,22 +184,20 @@ export default inngest.createFunction(
 You can use the `"inngest/function.failed"` event to handle all failed functions in a single place. This can enable you to send metrics, alerts, or events to external systems like Datadog for all of your Inngest functions. Here's an example using [Datadog's Events API](https://docs.datadoghq.com/api/latest/events/) to send all failures the Datadog event stream.
 
 ```ts
-import { inngest } from "./client";
 import { client, v1 } from "@datadog/datadog-api-client";
+import { inngest } from "./client";
 
 const configuration = client.createConfiguration();
 const apiInstance = new v1.EventsApi(configuration);
 
 export default inngest.createFunction(
-  { name: "Send failed function events to Datadog" },
+  { id: "send-failed-function-events-to-datadog" },
   { event: "inngest/function.failed" },
   async ({ event, step }) => {
-
     // This is a normal Inngest function, so we can use steps as we normally do:
-    await step.run("Send event to Datadog", async () => {
-
+    await step.run("send-event-to-datadog", async () => {
       // Parse the event from the event's error.body object as it's serialized JSON:
-      const error = JSON.parse(event.data.error.body)
+      const error = JSON.parse(event.data.error.body);
 
       // Create the Datadog event body using information about the failed function:
       const params: v1.EventsApiCreateEventRequest = {
@@ -208,13 +207,13 @@ export default inngest.createFunction(
           text: `The ${event.data.function_id} function failed with the error: ${error.message}`,
           tags: [
             // Add a tag with the Inngest function id:
-            `inngest_function_id:${event.data.function_id}`
+            `inngest_function_id:${event.data.function_id}`,
           ],
         },
       };
 
       // Send to Datadog:
-      const data = await apiInstance.createEvent(params)
+      const data = await apiInstance.createEvent(params);
 
       // Return the data to Inngest for viewing in function logs:
       return { message: "Event sent successfully", data };

@@ -4,7 +4,18 @@ Use `step.sleep()` to pause the execution of your function for a specific amount
 
 Functions that are sleeping do not count towards [concurrency](/docs/functions/concurrency) limits.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+export default inngest.createFunction(
+  { id: "send-delayed-email" },
+  { event: "app/user.signup" },
+  async ({ event, step }) => {
+    await step.sleep("wait-a-couple-of-days", "2d");
+    // Do something else
+  }
+);
+```
+```ts {{ title: "v2" }}
 export default inngest.createFunction(
   { name: "Send delayed email" },
   { event: "app/user.signup" },
@@ -14,6 +25,7 @@ export default inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 To sleep until a particular date time, use [`step.sleepUntil()`](/docs/reference/functions/step-sleep-until) instead.
 
@@ -33,12 +45,20 @@ To sleep until a particular date time, use [`step.sleepUntil()`](/docs/reference
     </Properties>
   </Col>
   <Col>
-  ```ts
+  <CodeGroup>
+  ```ts {{ title: "v3" }}
+  // Sleep for 30 minutes
+  await step.sleep("wait-with-string", "30m");
+  await step.sleep("wait-with-string-alt", "30 minutes");
+  await step.sleep("wait-with-ms", 30 * 60 * 1000);
+  ```
+  ```ts {{ title: "v2" }}
   // Sleep for 30 minutes
   await step.sleep("30m");
   await step.sleep("30 minutes");
   await step.sleep(30 * 60 * 1000);
   ```
+  </CodeGroup>
   </Col>
 </Row>
 

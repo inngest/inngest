@@ -2,17 +2,30 @@
 
 Limit the number of concurrently running steps for your function with the [`concurrency`](/docs/reference/functions/create#configuration) configuration options. Setting an optional `key` parameter limits the concurrency for each unique value of the expression.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+export default inngest.createFunction(
+  {
+    id: "sync-contacts",
+    concurrency: {
+      limit: 10,
+    },
+  }
+  // ...
+);
+```
+```ts {{ title: "v2" }}
 export default inngest.createFunction(
   {
     name: "Sync contacts",
     concurrency: {
       limit: 10,
-    }
-  },
+    },
+  }
   // ...
 );
 ```
+</CodeGroup>
 
 Setting `concurrency` limits are very useful for:
 
@@ -74,25 +87,24 @@ Here, we use the Resend SDK to send an email. Resend's rate limit is 10 requests
 ```ts
 export const send = inngest.createFunction(
   {
-    name: 'Email: Pending invoice',
-    id: 'email-pending-invoice',
+    name: "Email: Pending invoice",
+    id: "email-pending-invoice",
     concurrency: {
       limit: 4, // Resend's rate limit is 10 req/s
     },
   },
-  { event: 'billing/invoice.pending' },
+  { event: "billing/invoice.pending" },
   async ({ event, step }) => {
-
-    await step.run('Send email', async () => {
+    await step.run("send-email", async () => {
       return await resend.sendEmail({
-        from: 'hello@myco.com',
+        from: "hello@myco.com",
         to: event.user.email,
         subject: `Invoice pending for ${event.data.invoicePeriod}`,
         text: `Dear user, ...`,
       });
     });
 
-    return { message: 'success' };
+    return { message: "success" };
   }
 );
 ```
@@ -107,22 +119,21 @@ Inngest ensures that the concurrency (`1`) applies to each unique value for `eve
 ```ts
 export const send = inngest.createFunction(
   {
-    name: 'Process customer csv import',
-    id: 'process-customer-csv-import',
+    name: "Process customer csv import",
+    id: "process-customer-csv-import",
     concurrency: {
       limit: 1,
       key: `event.data.customerId`, // You can use any piece of data from the event payload
     },
   },
-  { event: 'csv/file.uploaded' },
+  { event: "csv/file.uploaded" },
   async ({ event, step }) => {
-
-    await step.run('Process file', async () => {
+    await step.run("process-file", async () => {
       const file = await bucket.fetch(event.data.fileURI);
       // ...
     });
 
-    return { message: 'success' };
+    return { message: "success" };
   }
 );
 ```

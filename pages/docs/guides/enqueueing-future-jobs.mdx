@@ -17,7 +17,24 @@ You can easily enqueue jobs in the future with Inngest. Inngest offers two ways 
 
 You can delay jobs using the [`step.sleep()`](/docs/reference/functions/step-sleep) utility:
 
-```tsx
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ id: "signup-flow" });
+
+export const fn = inngest.createFunction(
+  { id: "send-signup-email" },
+  { event: "user/created" },
+  async ({ event, step }) => {
+    await step.sleep("wait-a-moment", "1 hour");
+    await step.run("do-some-work-in-the-future", async () => {
+      // This runs after 1 hour
+    });
+  }
+);
+```
+```ts {{ title: "v2" }}
 import { Inngest } from "inngest";
 
 const inngest = new Inngest({ name: "Signup flow" });
@@ -25,7 +42,7 @@ const inngest = new Inngest({ name: "Signup flow" });
 export const fn = inngest.createFunction(
   { name: "Send signup email" },
   { event: "user/created" },
-  ({ event, step }) => {
+  async ({ event, step }) => {
     await step.sleep("1 hour");
     await step.run("Do some work in the future", async () => {
       // This runs after 1 hour
@@ -33,6 +50,7 @@ export const fn = inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 For more information on `step.sleep()` read [the reference guide](/docs/reference/functions/step-sleep)
 
@@ -41,7 +59,29 @@ For more information on `step.sleep()` read [the reference guide](/docs/referenc
 
 You can run jobs at a specific time using the [`step.sleepUntil()`](/docs/reference/functions/step-sleep-until) utility:
 
-```tsx
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ id: "signup-flow" });
+
+export const fn = inngest.createFunction(
+  { id: "send-signup-email" },
+  { event: "user/created" },
+  async ({ event, step }) => {
+    await step.sleepUntil("wait-for-iso-string", "2023-04-01T12:30:00");
+
+    // You can also sleep until a timestamp within the event data.  This lets you
+    // pass in a time for you to run the job:
+    await step.sleepUntil("wait-for-timestamp", event.data.run_at); // Assuming event.data.run_at is a timestamp.
+
+    await step.run("do-some-work-in-the-future", async () => {
+      // This runs at the specified time.
+    });
+  }
+);
+```
+```ts {{ title: "v2" }}
 import { Inngest } from "inngest";
 
 const inngest = new Inngest({ name: "Signup flow" });
@@ -49,7 +89,7 @@ const inngest = new Inngest({ name: "Signup flow" });
 export const fn = inngest.createFunction(
   { name: "Send signup email" },
   { event: "user/created" },
-  ({ event, step }) => {
+  async ({ event, step }) => {
     await step.sleepUntil("2023-04-01T12:30:00");
 
     // You can also sleep until a timestamp within the event data.  This lets you
@@ -62,6 +102,7 @@ export const fn = inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 For more information on `step.sleepUntil()` [read the reference guide](/docs/reference/functions/step-sleep-until).
 

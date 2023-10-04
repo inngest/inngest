@@ -2,17 +2,33 @@
 
 The `serve()` API handler is used to serve your application's [functions](/docs/reference/functions/create) via HTTP. This handler enables Inngest to remotely and securely read your functions' configuration and invoke your function code. This enables you to host your function code on any platform.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
 import { serve } from "inngest/next"; // or your preferred framework
-import { inngest } from './client';
-import { sendSignupEmail, summarizeText, importProductImages } from './functions';
-
-serve(inngest, [
+import { inngest } from "./client";
+import {
+  importProductImages,
   sendSignupEmail,
   summarizeText,
-  importProductImages,
-])
+} from "./functions";
+
+serve({
+  client: inngest,
+  functions: [sendSignupEmail, summarizeText, importProductImages],
+});
 ```
+```ts {{ title: "v2" }}
+import { serve } from "inngest/next"; // or your preferred framework
+import { inngest } from "./client";
+import {
+  importProductImages,
+  sendSignupEmail,
+  summarizeText,
+} from "./functions";
+
+serve(inngest, [sendSignupEmail, summarizeText, importProductImages]);
+```
+</CodeGroup>
 
 `serve` handlers are imported from convenient framework-specific packages like `"inngest/next"`, `"inngest/express"`, or `"inngest/lambda"`. [Click here for a full list of officially supported frameworks](/docs/sdk/serve). For any framework that is not support, you can [create a custom handler](#custom-frameworks).
 
@@ -31,7 +47,7 @@ serve(inngest, [
     Options for configuring how to wait for the event.
     <Properties nested={true}>
       <Property name="signingKey" type="string" required>
-        The Inngest Signing Key for your [selected environment](/docs/platform/environments). We recommend setting the `INNGEST_SIGNING_KEY` environment variable instead of passing the `signingKey` option. You can find this in [the Inngest dashboard](https://app.inngest.com/env/production/manage/signing-key).
+        The Inngest Signing Key for your [selected environment](/docs/platform/environments). We recommend setting the [`INNGEST_SIGNING_KEY`](/docs/sdk/environment-variables#inngest-signing-key) environment variable instead of passing the `signingKey` option. You can find this in [the Inngest dashboard](https://app.inngest.com/env/production/manage/signing-key).
       </Property>
       <Property name="serveHost" type="string">
         The domain host of your application, _including_ protocol, e.g. `https://myapp.com`. The SDK attempts to infer this via HTTP headers at runtime, but this may be required when using platforms like AWS Lambda or when using a reverse proxy.
@@ -59,7 +75,7 @@ serve(inngest, [
 </Properties>
 
 <Callout>
-  We always recommend setting the `INNGEST_SIGNING_KEY` over using the `signingKey` option. As with any secret, it's not a good practice to hard-code the signing key in your codebase.
+  We always recommend setting the [`INNGEST_SIGNING_KEY`](/docs/sdk/environment-variables#inngest-signing-key) over using the `signingKey` option. As with any secret, it's not a good practice to hard-code the signing key in your codebase.
 </Callout>
 
 ## How the `serve` API handler works

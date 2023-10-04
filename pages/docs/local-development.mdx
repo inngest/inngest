@@ -57,14 +57,14 @@ There are different ways that you can send events to the dev server when testing
 When using the Inngest SDK locally, it tries to detect if the dev server is running on your machine. If it's running, the event will be sent there.
 
 ```ts
-const inngest = new Inngest({ name: "My App" });
+const inngest = new Inngest({ id: "my-app" });
 await inngest.send({
   name: "user.avatar.uploaded",
-  data: { url: "https://a-bucket.s3.us-west-2.amazonaws.com/..." }
+  data: { url: "https://a-bucket.s3.us-west-2.amazonaws.com/..." },
 });
 ```
 
-**Note** - During local development, you can use a dummy value for your `INNGEST_EVENT_KEY` environment variable. The dev server does not validate keys locally.
+**Note** - During local development, you can use a dummy value for your [`INNGEST_EVENT_KEY`](/docs/sdk/environment-variables#inngest-event-key?ref=local-development) environment variable. The dev server does not validate keys locally.
 
 #### Using the "Send event" button
 
@@ -97,14 +97,16 @@ curl -X POST -v "http://localhost:8288/e/123" \
 
 ## Inngest SDK Debug page
 
-When developing locally, by default, the [SDK's `serve` API endpoint](/docs/sdk/serve) will display a landing page that allows you to check that your functions have been successfully served.
+The [SDK's `serve` API endpoint](/docs/sdk/serve) will display a landing page that allows you to check that your functions have been successfully served and the endpoint is accessible.
 
-To view this, you can visit the route where (default `/api/inngest`) on your local serve, e.g. `http://localhost:3000/api/inngest`. In the below screenshot, you can see that a single function is being served:
+To view this, you can visit the route where (default `/api/inngest`) on your local serve, e.g. `http://localhost:3000/api/inngest`. Here we cURL a local app to see some basic health check data.
 
-<img
-  src="/assets/docs/sdk/sdk-ui.png"
-  width="600"
-  height={600/2436*1479}
-  className="max-w-2xl"
-  quality="95"
-/>
+```sh
+$ curl -s http://localhost:3000/api/inngest | jq
+{
+  "message": "Inngest endpoint configured correctly.",
+  "hasEventKey": false,
+  "hasSigningKey": false,
+  "functionsFound": 1
+}
+```

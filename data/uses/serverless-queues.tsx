@@ -43,7 +43,7 @@ type Events = {
   };
 };
 const inngest = new Inngest({
-  name: "My App",
+  id: "my-app",
   schemas: new EventSchemas().fromRecord<Events>(),
 });
 
@@ -55,7 +55,7 @@ await inngest.send({
 
 // Define your function to handle that event
 inngest.createFunction(
-  { name: "Post-signup email" },
+  { id: "post-signup-email" },
   { event: "user.signup" },
   async ({ event }) => {
     // Handle your event

@@ -423,18 +423,18 @@ const EXAMPLE_PROMPTS = [
       description: `Here we create a function called "_Summarize text_" that takes a long string of text, splits the text into chunks, uses openAI to summarize the chunks in parallel, then summarizes all summaries. We use step tooling to run as many actions in parallel as possible and provide retries and durability to each.`,
       references: ["https://www.inngest.com/docs/functions/multi-step"],
       code: `inngest.createFunction(
-  { name: "Summarize text" },
+  { id: "summarize-text" },
   { event: "app/text.summarize" },
   async ({ event, step }) => {
     const chunks = splitTextIntoChunks(event.data.text);
 
     const summaries = await Promise.all(
       chunks.map((chunk) =>
-        step.run("Summarize chunk", () => summarizeChunk(chunk))
+        step.run("summarize-chunk", () => summarizeChunk(chunk))
       )
     );
 
-    await step.run("Summarize summaries", () => summarizeSummaries(summaries));
+    await step.run("summarize-summaries", () => summarizeSummaries(summaries));
   }
 );`,
     },
@@ -449,14 +449,14 @@ const EXAMPLE_PROMPTS = [
       description: `Here we create a function that runs every Friday at 9AM and queries our database for all users. It then sends an event for each user, where another function listens to that event and sends an email. We use step tooling to run as many actions in parallel as possible and provide retries and durability to each.`,
       references: ["https://www.inngest.com/docs/functions/multi-step"],
       code: `inngest.createFunction(
-  { name: "Send weekly email" },
+  { id: "send-weekly-email" },
   { cron: "0 9 * * 5" },
   async ({ step }) => {
-    const users = await step.run("Get users", () => getUsers());
+    const users = await step.run("get-users", () => getUsers());
 
     await Promise.all(
       users.map((user) =>
-        step.run("Send user email event", () =>
+        step.run("send-user-email-event", () =>
           inngest.send("app/user.email.send", {
             data: {
               userId: user.id,
@@ -469,8 +469,8 @@ const EXAMPLE_PROMPTS = [
 );
 
 inngest.createFunction(
-  "Send user email",
-  "app/user.email.send",
+  { id: "send-user-email" },
+  { event: "app/user.email.send" },
   async ({ event }) => {
     const user = await getUser(event.data.userId);
     return sendEmail(user.email);
@@ -488,63 +488,59 @@ inngest.createFunction(
       description: `Here we create a function called "_Order processing_" triggered by an \`app/order.created\` event. It charges the customer for the product in the order, failing if the charge did not succeed. We then wait for the order to be picked up. If it wasn't picked up within an hour, refund and notify the user. If the order was picked up, send a push notification to the user that it's been collected. We wait again for the order to be delivered this time. If it hasn't been delivered within an hour, refund and notify the user the same as before. If it does get delivered, send a push notification that the order has been delivered, wait 30 minutes, then another push notification asking them to rate their meal. We use step tooling to run as many actions in parallel as possible and provide retries and durability to each.`,
       references: ["https://www.inngest.com/docs/functions/multi-step"],
       code: `inngest.createFunction(
-  { name: "Order processing" },
+  { id: "order-processing" },
   { event: "app/order.created" },
   async ({ event, step }) => {
-    await step.run("Charge customer", () =>
+    await step.run("charge-customer", () =>
       chargeCustomer(event.data.customerId, event.data.productId)
     );
 
-    const orderPickedUp = await step.waitForEvent(
-      "app/order.pickedup",
-      {
-        timeout: "1h",
-        match: "data.orderId",
-      }
-    );
+    const orderPickedUp = await step.waitForEvent("wait-for-pickup", {
+      event: "app/order.pickedup",
+      timeout: "1h",
+      match: "data.orderId",
+    });
 
     if (!orderPickedUp) {
-      await step.run("Refund customer", () =>
+      await step.run("refund-customer", () =>
         refundCustomer(event.data.customerId, event.data.productId)
       );
 
-      await step.run("Notify user", () =>
+      await step.run("notify-user", () =>
         notifyUser(event.data.customerId, "Your order was not picked up")
       );
 
       return;
     }
 
-    await step.run("Notify user", () =>
+    await step.run("notify-user", () =>
       notifyUser(event.data.customerId, "Your order has been picked up")
     );
 
-    const orderDelivered = await step.waitForEvent(
-      "app/order.delivered",
-      {
-        timeout: "1h",
-        match: "data.orderId",
-      }
-    );
+    const orderDelivered = await step.waitForEvent("wait-for-delivery", {
+      event: "app/order.delivered",
+      timeout: "1h",
+      match: "data.orderId",
+    });
 
     if (!orderDelivered) {
-      await step.run("Refund customer", () =>
+      await step.run("refund-customer", () =>
         refundCustomer(event.data.customerId, event.data.productId)
       );
 
-      await step.run("Notify user", () =>
+      await step.run("notify-user", () =>
         notifyUser(event.data.customerId, "Your order was not delivered")
       );
       return;
     }
 
-    await step.run("Notify user", () =>
+    await step.run("notify-user", () =>
       notifyUser(event.data.customerId, "Your order has been delivered")
     );
 
     await step.sleep("30m");
 
-    await step.run("Notify user", () =>
+    await step.run("notify-user", () =>
       notifyUser(event.data.customerId, "Please rate your meal")
     );
   }

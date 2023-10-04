@@ -12,19 +12,22 @@ Inngest allows you to specify a schedule in [cron expression format](https://cro
 import { inngest } from "./client";
 
 inngest.createFunction(
-  { name: "Send Weekly Digest" },
+  { id: "send-weekly-digest" },
   { cron: "0 9 * * MON" },
   async ({ step }) => {
-    const accounts = await step.run("Load accounts", async () => {
+    const accounts = await step.run("load-accounts", async () => {
       return await getAllAccounts();
     });
     // For each account, reliably send a weekly digest.
     for (let account of accounts) {
-      await step.run("send digest", async () => await sentWeeklyDigest(account));
+      await step.run(
+        "send-digest",
+        async () => await sentWeeklyDigest(account)
+      );
     }
     return `Sent ${accounts.length} weekly digest emails`;
-  },
-)
+  }
+);
 ```
 
 After deploying your scheduled function to Inngest [using your preferred platform](/docs/deploy?ref=patterns), you'll be able to view previous run's logs and next run times in the Inngest dashboard.

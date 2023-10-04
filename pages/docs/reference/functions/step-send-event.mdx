@@ -2,7 +2,22 @@
 
 Use to send event(s) reliability within your function. Use this instead of [`inngest.send()`](/docs/reference/events/send) to ensure reliable event delivery from within functions. This is especially useful when [creating functions that fan-out](/docs/guides/fan-out-jobs).
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+export default inngest.createFunction(
+  { id: "user-onboarding" },
+  { event: "app/user.signup" },
+  async ({ event, step }) => {
+    // Do something
+    await step.sendEvent("send-activation-event", {
+      name: "app/user.activated",
+      data: { userId: event.data.userId },
+    });
+    // Do something else
+  }
+);
+```
+```ts {{ title: "v2" }}
 export default inngest.createFunction(
   { name: "User onboarding" },
   { event: "app/user.signup" },
@@ -10,12 +25,13 @@ export default inngest.createFunction(
     // Do something
     await step.sendEvent({
       name: "app/user.activated",
-      data: { userId: event.data.userId }
+      data: { userId: event.data.userId },
     });
     // Do something else
   }
 );
 ```
+</CodeGroup>
 
 To send events from outside of the context of a function, use [`inngest.send()`](/docs/reference/events/send).
 
@@ -34,25 +50,46 @@ To send events from outside of the context of a function, use [`inngest.send()`]
     </Properties>
   </Col>
   <Col>
-  ```ts
+  <CodeGroup>
+  ```ts {{ title: "v3" }}
+  // Send a single event
+  await step.sendEvent("send-activation-event", {
+    name: "app/user.activated",
+    data: { userId: "01H08SEAXBJFJNGTTZ5TAWB0BD" },
+  });
+
+  // Send an array of events
+  await step.sendEvent("send-invoice-events", [
+    {
+      name: "app/invoice.created",
+      data: { invoiceId: "645e9e024befa68763f5b500" },
+    },
+    {
+      name: "app/invoice.created",
+      data: { invoiceId: "645e9e08f29fb563c972b1f7" },
+    },
+  ]);
+  ```
+  ```ts {{ title: "v2" }}
   // Send a single event
   await step.sendEvent({
     name: "app/user.activated",
-    data: { userId: "01H08SEAXBJFJNGTTZ5TAWB0BD" }
-  })
+    data: { userId: "01H08SEAXBJFJNGTTZ5TAWB0BD" },
+  });
 
   // Send an array of events
   await step.sendEvent([
     {
       name: "app/invoice.created",
-      data: { invoiceId: "645e9e024befa68763f5b500" }
+      data: { invoiceId: "645e9e024befa68763f5b500" },
     },
     {
       name: "app/invoice.created",
-      data: { invoiceId: "645e9e08f29fb563c972b1f7" }
+      data: { invoiceId: "645e9e08f29fb563c972b1f7" },
     },
-  ])
+  ]);
   ```
+  </CodeGroup>
   </Col>
 </Row>
 

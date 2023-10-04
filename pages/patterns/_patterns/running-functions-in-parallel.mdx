@@ -9,11 +9,31 @@ If you want to run 5 background jobs after a user signs up, using an event-drive
 Inngest allows you to create as many functions as you need which subscribe to the same event:
 
 ```typescript
-import { createFunction } from "inngest";
+import { inngest } from "@/inngest";
 
-const funcA = createFunction("A", "user/signup", ({ event }) => { /* Your logic runs on signup here */ });
-const funcB = createFunction("B", "user/signup", ({ event }) => { /* And this function runs in parallel on signup */ });
-const funcC = createFunction("C", "user/signup", ({ event }) => { /* This function _also_ runs at the same time */ });
+const funcA = inngest.createFunction(
+  { id: "a" },
+  { event: "user/signup" },
+  ({ event }) => {
+    /* Your logic runs on signup here */
+  }
+);
+
+const funcB = inngest.createFunction(
+  { id: "b" },
+  { event: "user/signup" },
+  ({ event }) => {
+    /* And this function runs in parallel on signup */
+  }
+);
+
+const funcC = inngest.createFunction(
+  { id: "c" },
+  { event: "user/signup" },
+  ({ event }) => {
+    /* This function _also_ runs at the same time */
+  }
+);
 ```
 
 In this example, we define three functions which run automatically in parallel whenever the `user/signup` event is received.  Each of these run independently, and can be defined in different projects - without worrying about managing queues or subscribers.

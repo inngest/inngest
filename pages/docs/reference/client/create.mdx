@@ -2,13 +2,22 @@
 
 The `Inngest` client object is used to configure your application, enabling you to create functions and send events.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({
+  id: "my-application",
+});
+```
+```ts {{ title: "v2" }}
 import { Inngest } from "inngest";
 
 const inngest = new Inngest({
   name: "My application",
 });
 ```
+</CodeGroup>
 
 ---
 
@@ -19,13 +28,13 @@ const inngest = new Inngest({
     The unique name of your application.
   </Property>
   <Property name="eventKey" type="string">
-    An Inngest [Event Key](/docs/events/creating-an-event-key). Alternatively, set the `INNGEST_EVENT_KEY` environment variable.
+    An Inngest [Event Key](/docs/events/creating-an-event-key). Alternatively, set the [`INNGEST_EVENT_KEY`](/docs/sdk/environment-variables#inngest-event-key) environment variable.
   </Property>
   <Property name="schemas" type="EventSchemas" version="v2.0.0+">
     Event payload types. See [Defining Event Payload Types](#defining-event-payload-types).
   </Property>
   <Property name="logger" type="Logger" version="v2.0.0+">
-    A logger object that provides the following interfaces (`.info()`, `.warn()`, `.error()`, `.debug()`). Defaults to using `console` if not provided. See [logging guide](/docs/guides/logging) for more details.
+    A logger object that provides the following interfaces (`.info()`, `.warn()`, `.error()`, `.debug()`). Defaults to using `console` if not provided. Overwrites [`INNGEST_LOG_LEVEL`](/docs/sdk/environment-variables#inngest-log-level) if set. See [logging guide](/docs/guides/logging) for more details.
   </Property>
   <Property name="middleware" type="array" version="v2.0.0+">
     A stack of [middleware](/docs/reference/middleware/overview) to add to the client.
@@ -42,7 +51,7 @@ const inngest = new Inngest({
 </Properties>
 
 <Callout>
-We recommend setting the `INNGEST_EVENT_KEY` as an environment variable over using the `eventKey` option. As with any secret, it's not a good practice to hard-code the event key in your codebase.
+We recommend setting the [`INNGEST_EVENT_KEY`](/docs/sdk/environment-variables#inngest-event-key) as an environment variable over using the `eventKey` option. As with any secret, it's not a good practice to hard-code the event key in your codebase.
 </Callout>
 
 ## Defining Event Payload Types
@@ -54,7 +63,7 @@ Click the toggles on the top left of the code block to see the different methods
 </Callout>
 
 <CodeGroup forceTabs={true}>
-```ts {{ title: "Union (v2)" }}
+```ts {{ title: "Union" }}
 import { EventSchemas, Inngest } from "inngest";
 
 type AppAccountCreated = {
@@ -75,11 +84,10 @@ type AppSubscriptionStarted = {
 type Events = AppAccountCreated | AppSubscriptionStarted;
 
 export const inngest = new Inngest({
-  name: "My App",
   schemas: new EventSchemas().fromUnion<Events>(),
 });
 ```
-```ts {{ title: "Record (v2)"}}
+```ts {{ title: "Record"}}
 import { EventSchemas, Inngest } from "inngest";
 
 type Events = {
@@ -97,11 +105,10 @@ type Events = {
 };
 
 export const inngest = new Inngest({
-  name: "My App",
   schemas: new EventSchemas().fromRecord<Events>(),
 });
 ```
-```ts {{ title: "Zod (v2)" }}
+```ts {{ title: "Zod" }}
 import { EventSchemas, Inngest, type LiteralZodEventSchema } from "inngest";
 import { z } from "zod";
 
@@ -133,13 +140,12 @@ const eventsMap = {
 };
 
 export const inngest = new Inngest({
-  name: "My App",
   schemas: new EventSchemas()
     .fromZod([productPurchasedEvent, productViewedEvent])
     .fromZod(eventsMap),
 });
 ```
-```ts {{ title: "Stacking (v2)" }}
+```ts {{ title: "Stacking" }}
 import { EventSchemas, Inngest } from "inngest";
 import { z } from "zod";
 
@@ -168,31 +174,11 @@ type AppPostDeleted = {
 };
 
 export const inngest = new Inngest({
-  name: "My App",
   schemas: new EventSchemas()
     .fromRecord<Events>()
     .fromUnion<AppPostCreated | AppPostDeleted>()
     .fromZod(zodEventSchemas),
 });
-```
-```ts {{ title: "v1" }}
-type Events = {
-  "app/account.created": {
-    name: "app/account.created";
-    data: {
-      userId: string;
-    };
-  };
-  "app/subscription.started": {
-    name: "app/subscription.started";
-    data: {
-      userId: string;
-      planId: string;
-    };
-  };
-};
-
-export const inngest = new Inngest<Events>({ name: "My App" });
 ```
 </CodeGroup>
 
@@ -208,7 +194,6 @@ It's recommended to use this instead of directly reusing your event types, as In
 import { EventSchemas, Inngest, type GetEvents } from "inngest";
 
 export const inngest = new Inngest({
-  name: "Example App",
   schemas: new EventSchemas().fromRecord<{
     "app/user.created": { data: { userId: string } };
   }>(),
@@ -224,11 +209,18 @@ type AppUserCreated = Events["app/user.created"];
 
 Instantiating the `Inngest` client in a single file and sharing it across your codebase is ideal as you only need a single place to configure your client and define types which can be leveraged anywhere you send events or create functions.
 
-```ts  {{ filename: './inngest/client.ts' }}
+<CodeGroup filename="./inngest/client.ts">
+```ts  {{ title: "v3" }}
+import { Inngest } from "inngest";
+
+export const inngest = new Inngest({ id: "my-app" });
+```
+```ts  {{ title: "v2" }}
 import { Inngest } from "inngest";
 
 export const inngest = new Inngest({ name: "My App" });
 ```
+</CodeGroup>
 
 ```ts  {{ filename: './inngest/myFunction.ts' }}
 import { inngest } from "./client";

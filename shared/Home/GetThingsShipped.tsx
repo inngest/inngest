@@ -35,7 +35,7 @@ export default function GetThingsShipped() {
           import { inngest } from "./client";
 
           export default inngest.createFunction(
-            { name: "Send confirmation SMS" },
+            { id: "send-confirmation-sms" },
             { event: "app/request.confirmed" },
             async ({ event }) => {
               const result = await sendSMS({
@@ -73,7 +73,7 @@ export default function GetThingsShipped() {
           import { inngest } from "./client";
 
           export default inngest.createFunction(
-            { name: "Send Weekly Digest" },
+            { id: "send-weekly-digest" },
             { cron: "0 9 * * MON" },
             sendWeeklyDigestEmails
           );`),
@@ -102,10 +102,10 @@ export default function GetThingsShipped() {
           import { inngest } from "./client";
 
           export default inngest.createFunction(
-            { name: "Handle failed payments" },
+            { id: "handle-failed-payments" },
             { name: "stripe/charge.failed" },
             async ({ event, step }) => {
-              const account = await step.run("Get account", () =>
+              const account = await step.run("get-account", () =>
                 findAccountByCustomerId(event.user.stripe_customer_id)
               );
 
@@ -139,7 +139,7 @@ export default function GetThingsShipped() {
           import { inngest } from "./client";
 
           export default inngest.createFunction(
-            { name: "Run user data backfill" },
+            { id: "run-user-data-backfill" },
             { event: "retool/backfill.requested" },
             async ({ event }) => {
               const result = await runBackfillForUser(event.data.user_id);
@@ -173,24 +173,22 @@ export default function GetThingsShipped() {
           import { inngest } from "./client";
 
           export default inngest.createFunction(
-            { name: "User onboarding campaign" },
+            { id: "user-onboarding-campaign" },
             { event: "app/user.signup" },
             async ({ event, step }) => {
-              await step.run("Send welcome email", () =>
+              await step.run("send-welcome-email", () =>
                 sendEmail({
                   to: event.user.email,
                   template: "welcome",
                 })
               );
-              const profileComplete = await step.waitForEvent(
-                "app/user.profile.completed",
-                {
-                  timeout: "24h",
-                  match: "data.userId",
-                }
-              );
+              const profileComplete = await step.waitForEvent("wait-for-profile", {
+                event: "app/user.profile.completed",
+                timeout: "24h",
+                match: "data.userId",
+              });
               if (!profileComplete) {
-                await step.run("Send reminder email", () =>
+                await step.run("send-reminder-email", () =>
                   sendEmail({
                     to: event.user.email,
                     template: "reminder",
@@ -219,27 +217,38 @@ export default function GetThingsShipped() {
       code: {
         title: "eventDriven.ts",
         content: stripIndent(`
-          import { createFunction } from "inngest";
+          import { inngest } from "@/inngest";
 
-          export const handleApptRequested = createFunction(
-            "...",
-            "appointment.requested",
-            async () => { /* ... */ }
+          export const handleApptRequested = inngest.createFunction(
+            { id: "..." },
+            { event: "appointment.requested" },
+            async () => {
+              /* ... */
+            }
           );
-          export const handleApptScheduled = createFunction(
-            "...",
-            "appointment.scheduled",
-            async () => { /* ... */ }
+
+          export const handleApptScheduled = inngest.createFunction(
+            { id: "..." },
+            { event: "appointment.scheduled" },
+            async () => {
+              /* ... */
+            }
           );
-          export const handleApptConfirmed = createFunction(
-            "...",
-            "appointment.confirmed",
-            async () => { /* ... */ }
+
+          export const handleApptConfirmed = inngest.createFunction(
+            { id: "..." },
+            { event: "appointment.confirmed" },
+            async () => {
+              /* ... */
+            }
           );
-          export const handleApptCancelled = createFunction(
-            "...",
-            "appointment.cancelled",
-            async () => { /* ... */ }
+
+          export const handleApptCancelled = inngest.createFunction(
+            { id: "..." },
+            { event: "appointment.cancelled" },
+            async () => {
+              /* ... */
+            }
           );`),
       },
     },

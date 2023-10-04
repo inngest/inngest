@@ -33,16 +33,28 @@ It can be helpful to visualize the typical Inngest developer workflow using Bran
 
 As Branch Environments are created on-demand, all of your Branch Environments share the same Event Keys and Signing Key. This enables you to use the same environment variables in each of your application's deployment preview environments and set the environment dynamically using the `env` option with the `Inngest` client:
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
 const inngest = new Inngest({
-    name: "My app",
-    env: process.env.BRANCH,
+  id: "my-app",
+  env: process.env.BRANCH,
+});
+// Alternatively, you can set the INNGEST_ENV environment variable in your app
+
+// Pass the client to the serve handler to complete the setup
+serve({ client: inngest, functions: [myFirstFunction, mySecondFunction] });
+```
+```ts {{ title: "v2" }}
+const inngest = new Inngest({
+  name: "My app",
+  env: process.env.BRANCH,
 });
 // Alternatively, you can set the INNGEST_ENV environment variable in your app
 
 // Pass the client to the serve handler to complete the setup
 serve(inngest, [myFirstFunction, mySecondFunction]);
 ```
+</CodeGroup>
 
 ### Automatically Supported Platforms
 
@@ -50,18 +62,26 @@ The Inngest SDK tries to automatically detect your application's branch and use 
 
 -   **Vercel** - `VERCEL_GIT_COMMIT_REF` - This works perfectly with our Vercel integration.
 
-You can always override this using `INNGEST_ENV` or by manually passing `env` to the `Inngest` client.
+You can always override this using [`INNGEST_ENV`](/docs/sdk/environment-variables#inngest-env) or by manually passing `env` to the `Inngest` client.
 
 ### Other Platforms
 
 Some platforms only pass an environment variable at build time. This means you'll have to explicitly set `env` to the platform's specific environment variable. For example, here's how you would set it on Netlify:
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
 const inngest = new Inngest({
-    name: "My app",
-    env: process.env.BRANCH,
+  id: "my-app",
+  env: process.env.BRANCH,
 });
 ```
+```ts {{ title: "v2" }}
+const inngest = new Inngest({
+  name: "My app",
+  env: process.env.BRANCH,
+});
+```
+</CodeGroup>
 
 -   **Netlify** - `BRANCH` ([docs](https://docs.netlify.com/configure-builds/environment-variables/#git-metadata))
 -   **Cloudflare Pages** - `CF_PAGES_BRANCH` ([docs](https://developers.cloudflare.com/pages/platform/build-configuration/#environment-variables))

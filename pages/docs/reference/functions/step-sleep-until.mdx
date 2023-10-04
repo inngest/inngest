@@ -2,7 +2,19 @@
 
 Use `step.sleepUntil()` to pause the execution of your function until a specific date time.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+export default inngest.createFunction(
+  { id: "send-scheduled-reminder" },
+  { event: "app/reminder.scheduled" },
+  async ({ event, step }) => {
+    const d = new Date(event.data.remind_at);
+    await step.sleepUntil("wait-for-the-date", d);
+    // Do something else
+  }
+);
+```
+```ts {{ title: "v2" }}
 export default inngest.createFunction(
   { name: "Send scheduled reminder" },
   { event: "app/reminder.scheduled" },
@@ -13,6 +25,7 @@ export default inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 To sleep until a particular amount of time from now, use [`step.sleep()`](/docs/reference/functions/step-sleep) instead.
 
@@ -32,7 +45,19 @@ To sleep until a particular amount of time from now, use [`step.sleep()`](/docs/
     </Properties>
   </Col>
   <Col>
-  ```ts
+  <CodeGroup>
+  ```ts {{ title: "v3" }}
+  // Sleep until the new year
+  await step.sleepUntil("happy-new-year", "2024-01-01");
+
+  // Sleep until September ends
+  await step.sleepUntil("wake-me-up", "2023-09-30T11:59:59");
+
+  // Sleep until the end of the this week
+  const d = dayjs().endOf("week").toDate();
+  await step.sleepUntil("wait-for-end-of-the-week", d);
+  ```
+  ```ts {{ title: "v2" }}
   // Sleep until the new year
   await step.sleepUntil("2024-01-01");
 
@@ -43,6 +68,7 @@ To sleep until a particular amount of time from now, use [`step.sleep()`](/docs/
   const d = dayjs().endOf('week').toDate();
   await step.sleepUntil(d)
   ```
+  </CodeGroup>
   </Col>
 </Row>
 

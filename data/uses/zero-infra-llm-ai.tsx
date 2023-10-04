@@ -39,31 +39,35 @@ export const data: UseCase = {
         code: `import { inngest } from "./client";
 
 inngest.createFunction(
-  { name: "Summarize chat and documents" },
+  { id: "summarize-chat-and-documents" },
   { event: "api/chat.submitted" },
   async ({ event, step }) => {
     const llm = new OpenAI();
 
-    const output = await step.run("Summarize input", async () => {
+    const output = await step.run("summarize-input", async () => {
       return await llm.createCompletion({
         model: "gpt-3.5-turbo",
         prompt: createSummaryPrompt(event.data.input),
       });
     });
 
-    const title = await step.run("Generate a title", async () => {
+    const title = await step.run("generate-a-title", async () => {
       return await llm.createCompletion({
         model: "gpt-3.5-turbo",
         prompt: createTitlePrompt(output),
       });
     });
 
-    await step.run("Save to DB", async () => {
-      await db.summaries.create({ output, title, requestID: event.data.requestID });
+    await step.run("save-to-db", async () => {
+      await db.summaries.create({
+        output,
+        title,
+        requestID: event.data.requestID,
+      });
     });
 
     return { output, title };
-  },
+  }
 );`,
       },
     ],

@@ -127,10 +127,15 @@ pnpm add inngest
   import { serve } from "inngest/next";
 
   // Create a client to send and receive events
-  export const inngest = new Inngest({ name: "My App" });
+  export const inngest = new Inngest({ id: "my-app" });
 
   // Create an API that serves zero functions
-  export default serve(inngest, [/* your functions will be passed here later! */]);
+  export default serve({
+    client: inngest,
+    functions: [
+      /* your functions will be passed here later! */
+    ],
+  });
   ```
 </GuideSection>
 
@@ -143,7 +148,7 @@ pnpm add inngest
   import { Inngest } from "inngest";
 
   // Create a client to send and receive events
-  export const inngest = new Inngest({ name: "My App" });
+  export const inngest = new Inngest({ id: "my-app" });
   ```
 
   And now create a route handler to handle the `/api/inngest` route within your app directory at `src/app/api/inngest/route.ts`:
@@ -153,9 +158,12 @@ pnpm add inngest
   import { inngest } from "../../../inngest/client";
 
   // Create an API that serves zero functions
-  export const { GET, POST, PUT } = serve(inngest, [
-    /* your functions will be passed here later! */
-  ]);
+  export const { GET, POST, PUT } = serve({
+    client: inngest,
+    functions: [
+      /* your functions will be passed here later! */
+    ],
+  });
   ```
 </GuideSection>
 
@@ -176,10 +184,10 @@ Let's write your first reliable serverless function! <GuideSection show="nextpag
   // Step 2 code...
 
   const helloWorld = inngest.createFunction(
-    { name: "Hello World" },
+    { id: "hello-world" },
     { event: "test/hello.world" },
     async ({ event, step }) => {
-      await step.sleep("1s");
+      await step.sleep("wait-a-moment", "1s");
       return { event, body: "Hello, World!" };
     }
   );
@@ -196,9 +204,12 @@ Full details about [`createFunction` can be found here](/docs/reference/function
   We also add this new function to the `serve` handler.
 
   ```ts
-  export default serve(inngest, [
-    helloWorld, // <-- This is where you'll always add your new functions
-  ]);
+  export default serve({
+    client: inngest,
+    functions: [
+      helloWorld, // <-- This is where you'll always add your new functions
+    ],
+  });
   ```
 </GuideSection>
 
@@ -209,10 +220,10 @@ Full details about [`createFunction` can be found here](/docs/reference/function
   import { inngest } from "./client";
 
   export const helloWorld = inngest.createFunction(
-    { name: "Hello World" },
+    { id: "hello-world" },
     { event: "test/hello.world" },
     async ({ event, step }) => {
-      await step.sleep("1s");
+      await step.sleep("wait-a-moment", "1s");
       return { event, body: "Hello, World!" };
     }
   );
@@ -233,9 +244,12 @@ Full details about [`createFunction` can be found here](/docs/reference/function
   import { inngest } from "../../../inngest/client";
   import { helloWorld } from "../../../inngest/functions";
 
-  export const { GET, POST, PUT } = serve(inngest, [
-    helloWorld, // <-- This is where you'll always add your new functions
-  ]);
+  export const { GET, POST, PUT } = serve({
+    client: inngest,
+    functions: [
+      helloWorld, // <-- This is where you'll always add your new functions
+    ],
+  });
   ```
 
 </GuideSection>

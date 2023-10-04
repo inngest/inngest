@@ -29,18 +29,21 @@ Workflow is an overloaded term, but in the scope of this guide, we define a work
 We'll show a simple example, then walk through how to build something like this yourself. This example shows a custom workflow that might get triggered when a CRM product's user changes the status of one of their leads.
 
 ```ts
-import { inngest } from "./client";
 import { sendEmail, sendSlackNotification } from "../lib/emails"; // your custom code
+import { inngest } from "./client";
 
 export const workflowExecutor = inngest.createFunction(
-  { name: "CRM Workflow Executor" },
+  { id: "crm-workflow-executor" },
   { event: "crm/lead_status.changed" },
   async ({ event, step }) => {
     const { accountId } = event.data;
 
     // Load the workflow that the user defined
     const workflow = await step.run("Load workflow from database", async () => {
-      return database.workflows.find({ accountId, trigger: "lead_status_changed" });
+      return database.workflows.find({
+        accountId,
+        trigger: "lead_status_changed",
+      });
     });
     // The workflow here is represented as a simple series of actions
     /*
@@ -65,10 +68,9 @@ export const workflowExecutor = inngest.createFunction(
 
       // We now run one of our pre-build actions:
       switch (action.type) {
-
         // The filter action sets shouldContinue and can end the workflow at any time
         case "filter":
-          shouldContinue = await step.run("Filter", async () => {
+          shouldContinue = await step.run("filter", async () => {
             // Filter uses the action's configuration to match against the values
             // in the triggering event:
             return event.data[action.data.field] === action.data.value;
@@ -77,18 +79,21 @@ export const workflowExecutor = inngest.createFunction(
 
         // The email action just calls some external code that you imported
         case "email":
-          await step.run("Send email", async () => {
+          await step.run("send-email", async () => {
             // Determine who the email should be sent to
             const sendToAddress = event.data[action.data.to];
-            return await sendEmail({ to: sendToAddress, template: action.data.template });
+            return await sendEmail({
+              to: sendToAddress,
+              template: action.data.template,
+            });
           });
           break;
 
         // The slack action sends a pre-defined Slack notification to the user's channel
         case "slack":
-          await step.run("Slack notification", async () => {
+          await step.run("slack-notification", async () => {
             // Grab the slack token from the database and post a message to the user's Slack
-            const slackToken = await database.slack_tokens.find({ accountId })
+            const slackToken = await database.slack_tokens.find({ accountId });
             return await sendSlackNotification({
               channelId: action.data.channel,
               notificationType: event.data.status, // i.e. "proposal_created"
@@ -99,7 +104,7 @@ export const workflowExecutor = inngest.createFunction(
 
         // The sleep action allows the workflow to pause for any amount of time
         case "sleep":
-          await step.sleep(action.data.duration);
+          await step.sleep("pause-workflow", action.data.duration);
           break;
       }
     }
@@ -112,7 +117,7 @@ export const workflowExecutor = inngest.createFunction(
       accountId,
     };
   }
-)
+);
 ```
 
 ## How do I build this?

@@ -21,8 +21,8 @@ export default serve("Your app's name", [ firstFunction, anotherFunction ]);
 
 Installing [Inngest's official Vercel integraiton](https://vercel.com/integrations/inngest) does 3 things:
 
-1. Automatically sets the required `INNGEST_SIGNING_KEY` environment variable to securely communicate with Inngest's API
-2. Automatically sets the `INNGEST_EVENT_KEY` environment variable to enable your application to send events ([docs](/docs/events/creating-an-event-key))
+1. Automatically sets the required [`INNGEST_SIGNING_KEY`](/docs/sdk/environment-variables#inngest-signing-key) environment variable to securely communicate with Inngest's API
+2. Automatically sets the [`INNGEST_EVENT_KEY`](/docs/sdk/environment-variables#inngest-event-key) environment variable to enable your application to send events ([docs](/docs/events/creating-an-event-key))
 3. Automatically deploys new functions to Inngest every time you deploy updated code to Vercel - no need to change your existing workflow!
 
 <ButtonDeploy href="https://vercel.com/integrations/inngest" type="vercel" label="Install the Inngest Vercel integration" />

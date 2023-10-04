@@ -32,7 +32,42 @@ Using `useInngest` just requires that you have an Inngest client (see the [Quick
 
 Here's a single-file example of how to add the plugin.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { useInngest } from "envelop-plugin-inngest";
+import { createSchema, createYoga } from "graphql-yoga";
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ id: "my-app" });
+
+// Provide your schema
+const yoga = createYoga({
+  schema: createSchema({
+    typeDefs: /* GraphQL */ `
+      type Query {
+        greetings: String!
+      }
+    `,
+    resolvers: {
+      Query: {
+        greetings: () => "Hello World!",
+      },
+    },
+  }),
+
+  // Add the plugin to the server. RedwoodJS users can use the
+  // `extraPlugins` option instead.
+  plugins: [useInngest({ inngestClient: inngest })],
+});
+
+// Start the server and explore http://localhost:4000/graphql
+const server = createServer(yoga);
+
+server.listen(4000, () => {
+  console.info("Server is running on http://localhost:4000/graphql");
+});
+```
+```ts {{ title: "v2" }}
 import { useInngest } from "envelop-plugin-inngest";
 import { createSchema, createYoga } from "graphql-yoga";
 import { Inngest } from "inngest";
@@ -66,6 +101,7 @@ server.listen(4000, () => {
   console.info("Server is running on http://localhost:4000/graphql");
 });
 ```
+</CodeGroup>
 
 {/* Discuss and show screenshots of example events */}
 
@@ -113,7 +149,7 @@ We can react to this event by creating a new Inngest function with the event as 
 
 ```ts
 inngest.createFunction(
-  { name: "Send cart alert" },
+  { id: "send-cart-alert" },
   { event: "graphql/create-cart-item.mutation" },
   async ({ event }) => {
     await sendSlackMessage(

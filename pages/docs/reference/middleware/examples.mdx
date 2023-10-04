@@ -102,6 +102,16 @@ While this example uses Prisma, it serves as a good example of using the [onFunc
 </Callout>
 
 ```ts
+inngest.createFunction(
+  { name: "Example" },
+  { event: "app/user.loggedin" },
+  async ({ prisma }) => {
+    await prisma.auditTrail.create(/* ... */);
+  }
+);
+```
+
+```ts
 import { PrismaClient } from "@prisma/client";
 
 const prismaMiddleware = new InngestMiddleware({
@@ -125,16 +135,9 @@ const prismaMiddleware = new InngestMiddleware({
     };
   },
 });
-
-// When defining a function...
-inngest.createFunction(
-  { name: "Example" },
-  { event: "app/user.loggedin" },
-  async ({ prisma }) => {
-    await prisma.auditTrail.create(/* ... */);
-  }
-);
 ```
+
+Check out [Common actions for every function](http://localhost:3001/docs/reference/middleware/examples#common-actions-for-every-function) to see how this technique can be used to create steps for all of your unique logic.
 
 ## Logging
 
@@ -198,4 +201,110 @@ new InngestMiddleware({
     };
   },
 })
+```
+
+## Common actions for every function
+
+You likely reuse the same steps across many functions - whether it be fetching user data or sending an email, your app is hopefully full of reusable blocks of code.
+
+We could add some middleware to pass these into any Inngest function, automatically wrapping them in `step.run()` and allowing the code inside our function to feel a little bit cleaner.
+
+```ts
+/**
+ * Pass to a client to provide a set of actions as steps to all functions, or to
+ * a function to provide a set of actions as steps only to that function.
+ */
+const inngest = new Inngest({
+  id: "my-app",
+  middleware: [
+    createActionsMiddleware({
+      getUser(id: string) {
+        return db.user.get(id);
+      },
+    }),
+  ],
+});
+
+inngest.createFunction(
+  { id: "user-data-dump" },
+  { event: "app/data.requested" },
+  async ({ event, action: { getUser } }) => {
+    // The first parameter is the step's options or ID
+    const user = await getUser("get-user-details", event.data.userId);
+  }
+);
+```
+
+```ts
+import { InngestMiddleware, StepOptionsOrId } from "inngest";
+
+/**
+ * Create a middleware that wraps a set of functions in step tooling, allowing
+ * them to be invoked directly instead of using `step.run()`.
+ *
+ * This is useful for providing a set of common actions to a particular function
+ * or to all functions created by a client.
+ */
+export const createActionsMiddleware = <T extends Actions>(rawActions: T) => {
+  return new InngestMiddleware({
+    name: "Inngest: Actions",
+    init: () => {
+      return {
+        onFunctionRun: () => {
+          return {
+            transformInput: ({ ctx: { step } }) => {
+              const action: FilterActions<T> = Object.entries(
+                rawActions
+              ).reduce((acc, [key, value]) => {
+                if (typeof value !== "function") {
+                  return acc;
+                }
+
+                const action = (
+                  idOrOptions: StepOptionsOrId,
+                  ...args: unknown[]
+                ) => {
+                  return step.run(idOrOptions, () => value(...args));
+                };
+
+                return {
+                  ...acc,
+                  [key]: action,
+                };
+              }, {} as FilterActions<T>);
+
+              return {
+                ctx: { action },
+              };
+            },
+          };
+        },
+      };
+    },
+  });
+};
+
+type Actions = Record<string, unknown>;
+
+/**
+ * Filter out all keys from `T` where the associated value does not match type
+ * `U`.
+ */
+type KeysNotOfType<T, U> = {
+  [P in keyof T]: T[P] extends U ? never : P;
+}[keyof T];
+
+/**
+ * Given a set of generic objects, extract any top-level functions and
+ * appropriately shim their types.
+ *
+ * We use this type to allow users to spread a set of functions into the
+ * middleware without having to worry about non-function properties.
+ */
+type FilterActions<Fns extends Record<string, any>> = {
+  [K in keyof Omit<Fns, KeysNotOfType<Fns, (...args: any[]) => any>>]: (
+    idOrOptions: StepOptionsOrId,
+    ...args: Parameters<Fns[K]>
+  ) => Promise<Awaited<ReturnType<Fns[K]>>>;
+};
 ```

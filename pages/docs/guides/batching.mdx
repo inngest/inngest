@@ -15,26 +15,26 @@ Now if you're convinced this is a feature you need, here's how you can enable ba
 consumption with Inngest.
 
 ```ts {{ title: "record-api-calls.ts"}}
-const fn = inngest.createFunction(
-  { name: "Record API calls", batchEvents: { maxSize: 100, timeout: "5s" } },
+inngest.createFunction(
+  { id: "record-api-calls", batchEvents: { maxSize: 100, timeout: "5s" } },
   { event: "log/api.call" },
   // NOTE: Use the `events` argument, which is an array of event payloads
   async ({ events, step }) => {
-    const attrs = events.map(evt => {
+    const attrs = events.map((evt) => {
       return {
         user_id: evt.data.user_id,
         endpoint: evt.data.endpoint,
-        timestamp: toDateTime(evt.ts)
-      }
-    })
+        timestamp: toDateTime(evt.ts),
+      };
+    });
 
-    const result = await step.run("record data to DB", async () => {
-      return db.bulkWrite(attrs)
-    })
+    const result = await step.run("record-data-to-db", async () => {
+      return db.bulkWrite(attrs);
+    });
 
-    return { success: true, recorded: result.length }
+    return { success: true, recorded: result.length };
   }
-)
+);
 ```
 
 Imagine we have a job that we use for counting calls made to our API, and we want to track that to

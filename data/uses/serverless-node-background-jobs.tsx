@@ -43,20 +43,20 @@ export const data: UseCase = {
 // Instead of sending a welcome email or adding a user to your CRM
 // within your signup API endpoint, you can offload to the background:
 inngest.createFunction(
-  { name: "Post signup flow" },
+  { id: "post-signup-flow" },
   { event: "user.signup" },
   async ({ event, step }) => {
-    await step.run("Send welcome email", async () => {
+    await step.run("send-welcome-email", async () => {
       await sendWelcomeEmail({ email: event.data.email });
     });
 
-    await step.run("Add user to CRM", await () => {
+    await step.run("add-user-to-crm", async () => {
       await addUserToHubspot({
         id: event.data.userId,
         email: event.data.email,
       });
     });
-  },
+  }
 );
 
 // Elsewhere in your code, send an event to trigger the function
@@ -65,8 +65,8 @@ await inngest.send({
   data: {
     userId: "6f47ebaa",
     email: "user@example.com",
-  }
-})`,
+  },
+});`,
       },
     ],
   },

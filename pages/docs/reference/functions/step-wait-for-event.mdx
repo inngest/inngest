@@ -2,19 +2,37 @@
 
 Use `step.waitForEvent()` to wait for a particular event to be received before continuing. It returns a `Promise` that is resolved with the received event or `null` if the event is not received within the timeout.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
 export default inngest.createFunction(
-  { name: "Send onboarding nudge email" },
+  { id: "send-onboarding-nudge-email" },
   { event: "app/account.created" },
   async ({ event, step }) => {
-    const onboardingCompleted = await step.waitForEvent("app/onboarding.completed", {
-      timeout: "3d",
-      match: "data.userId"
-    });
+    const onboardingCompleted = await step.waitForEvent(
+      "wait-for-onboarding-completion",
+      { event: "app/onboarding.completed", timeout: "3d", match: "data.userId" }
+    );
     // Do something else
   }
 );
 ```
+```ts {{ title: "v2" }}
+export default inngest.createFunction(
+  { name: "Send onboarding nudge email" },
+  { event: "app/account.created" },
+  async ({ event, step }) => {
+    const onboardingCompleted = await step.waitForEvent(
+      "app/onboarding.completed",
+      {
+        timeout: "3d",
+        match: "data.userId",
+      }
+    );
+    // Do something else
+  }
+);
+```
+</CodeGroup>
 
 To add a simple time based delay to your code, use [`step.sleep()`](/docs/reference/functions/step-sleep) instead.
 
@@ -45,26 +63,38 @@ To add a simple time based delay to your code, use [`step.sleep()`](/docs/refere
     </Properties>
   </Col>
   <Col>
-  ```ts
+  <CodeGroup>
+  ```ts {{ title: "v3" }}
   // Wait 7 days for an approval and match invoice IDs
-  const approval = await step.waitForEvent(
-    "app/invoice.approved",
-    {
-      timeout: "7d",
-      match: "data.invoiceId"
-    }
-  );
+  const approval = await step.waitForEvent("wait-for-approval", {
+    event: "app/invoice.approved",
+    timeout: "7d",
+    match: "data.invoiceId",
+  });
 
   // Wait 30 days for a user to start a subscription
   // on the pro plan
-  const subscription = await step.waitForEvent(
-    "app/subscription.created",
-    {
-      timeout: "30d",
-      if: "event.data.userId == async.data.userId && async.data.billing_plan == 'pro'"
-    }
-  );
+  const subscription = await step.waitForEvent("wait-for-subscription", {
+    event: "app/subscription.created",
+    timeout: "30d",
+    if: "event.data.userId == async.data.userId && async.data.billing_plan == 'pro'",
+  });
   ```
+  ```ts {{ title: "v2" }}
+  // Wait 7 days for an approval and match invoice IDs
+  const approval = await step.waitForEvent("app/invoice.approved", {
+    timeout: "7d",
+    match: "data.invoiceId",
+  });
+
+  // Wait 30 days for a user to start a subscription
+  // on the pro plan
+  const subscription = await step.waitForEvent("app/subscription.created", {
+    timeout: "30d",
+    if: "event.data.userId == async.data.userId && async.data.billing_plan == 'pro'",
+  });
+  ```
+  </CodeGroup>
   </Col>
 </Row>
 
@@ -78,7 +108,43 @@ To add a simple time based delay to your code, use [`step.sleep()`](/docs/refere
 
 Below is an example of an Inngest function that creates an Intercom or Customer.io-like drip email campaign, customized based on
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+export default inngest.createFunction(
+  { id: "onboarding-email-drip-campaign" },
+  { event: "app/account.created" },
+  async ({ event, step }) => {
+    // Send the user the welcome email immediately
+    await step.run("send-welcome-email", async () => {
+      await sendEmail(event.user.email, "welcome");
+    });
+
+    // Wait up to 3 days for the user to complete the final onboarding step
+    // If the event is received within these 3 days, onboardingCompleted will be the
+    // event payload itself, if not it will be null
+    const onboardingCompleted = await step.waitForEvent("wait-for-onboarding", {
+      event: "app/onboarding.completed",
+      timeout: "3d",
+      // The "data.userId" must match in both the "app/account.created" and
+      // the "app/onboarding.completed" events
+      match: "data.userId",
+    });
+
+    // If the user has not completed onboarding within 3 days, send them a nudge email
+    if (!onboardingCompleted) {
+      await step.run("send-onboarding-nudge-email", async () => {
+        await sendEmail(event.user.email, "onboarding_nudge");
+      });
+    } else {
+      // If they have completed onboarding, send them a tips email
+      await step.run("send-tips-email", async () => {
+        await sendEmail(event.user.email, "new_user_tips");
+      });
+    }
+  }
+);
+```
+```ts {{ title: "v2" }}
 export default inngest.createFunction(
   { name: "Onboarding email drip campaign" },
   { event: "app/account.created" },
@@ -91,12 +157,15 @@ export default inngest.createFunction(
     // Wait up to 3 days for the user to complete the final onboarding step
     // If the event is received within these 3 days, onboardingCompleted will be the
     // event payload itself, if not it will be null
-    const onboardingCompleted = await step.waitForEvent("app/onboarding.completed", {
-      timeout: "3d",
-      // The "data.userId" must match in both the "app/account.created" and
-      // the "app/onboarding.completed" events
-      match: "data.userId"
-    });
+    const onboardingCompleted = await step.waitForEvent(
+      "app/onboarding.completed",
+      {
+        timeout: "3d",
+        // The "data.userId" must match in both the "app/account.created" and
+        // the "app/onboarding.completed" events
+        match: "data.userId",
+      }
+    );
 
     // If the user has not completed onboarding within 3 days, send them a nudge email
     if (!onboardingCompleted) {
@@ -112,6 +181,7 @@ export default inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 ### Advanced event matching with `if`
 
@@ -119,12 +189,66 @@ For more complex functions, you may want to match the event payload against some
 
 In this example, we have built an AI blog post generator which returns three ideas to the user to select. Then when the user selects an idea from that batch of ideas, we generate an entire blog post and save it.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+export default inngest.createFunction(
+  { id: "generate-blog-post-with-ai" },
+  { event: "ai/post.generator.requested" },
+  async ({ event, step }) => {
+    // Generate a number of suggestions for topics with OpenAI
+    const generatedTopics = await step.run("generate-topic-ideas", async () => {
+      const completion = await openai.createCompletion({
+        model: "text-davinci-003",
+        prompt: helpers.topicIdeaPromptWrapper(event.data.prompt),
+        n: 3,
+      });
+      return {
+        completionId: completion.data.id,
+        topics: completion.data.choices,
+      };
+    });
+
+    // Send the topics to the user via Websockets so they can select one
+    // Also send the completion id so we can match that later
+    await step.run("send-user-topics", () => {
+      pusher.sendToUser(event.data.userId, "topics_generated", {
+        sessionId: event.data.sessionId,
+        completionId: generatedTopics.completionId,
+        topics: generatedTopics.topics,
+      });
+    });
+
+    // Wait up to 5 minutes for the user to select a topic
+    // Ensuring the topic is from this batch of suggestions generated
+    const topicSelected = await step.waitForEvent("wait-for-topic-selection", {
+      event: "ai/post.topic.selected",
+      timeout: "5m",
+      // "async" is the "ai/post.topic.selected" event here:
+      if: `async.data.completionId == "${generatedTopics.completionId}"`,
+    });
+
+    // If the user selected a topic within 5 minutes, "topicSelected" will
+    // be the event payload, otherwise it is null
+    if (topicSelected) {
+      // Now that we've confirmed the user selected their topic idea from
+      // this batch of suggestions, let's generate a blog post
+      await step.run("generate-blog-post-draft", async () => {
+        const completion = await openai.createCompletion({
+          model: "text-davinci-003",
+          prompt: helpers.blogPostPromptWrapper(topicSelected.data.prompt),
+        });
+        // Do something with the blog post draft like save it or something else...
+        await blog.saveDraft(completion.data.choices[0]);
+      });
+    }
+  }
+);
+```
+```ts {{ title: "v2" }}
 export default inngest.createFunction(
   { name: "Generate blog post with AI" },
   { event: "ai/post.generator.requested" },
   async ({ event, step }) => {
-
     // Generate a number of suggestions for topics with OpenAI
     const generatedTopics = await step.run("Generate topic ideas", async () => {
       const completion = await openai.createCompletion({
@@ -145,7 +269,7 @@ export default inngest.createFunction(
         sessionId: event.data.sessionId,
         completionId: generatedTopics.completionId,
         topics: generatedTopics.topics,
-      })
+      });
     });
 
     // Wait up to 5 minutes for the user to select a topic
@@ -153,7 +277,7 @@ export default inngest.createFunction(
     const topicSelected = await step.waitForEvent("ai/post.topic.selected", {
       timeout: "5m",
       // "async" is the "ai/post.topic.selected" event here:
-      if: `async.data.completionId == "${generatedTopics.completionId}"`
+      if: `async.data.completionId == "${generatedTopics.completionId}"`,
     });
 
     // If the user selected a topic within 5 minutes, "topicSelected" will
@@ -167,9 +291,11 @@ export default inngest.createFunction(
           prompt: helpers.blogPostPromptWrapper(topicSelected.data.prompt),
         });
         // Do something with the blog post draft like save it or something else...
-        await blog.saveDraft(completion.data.choices[0])
-      })
+        await blog.saveDraft(completion.data.choices[0]);
+      });
     }
   }
 );
+
 ```
+</CodeGroup>

@@ -6,7 +6,7 @@ Define your functions using the `createFunction` method on the [Inngest client](
 import { inngest } from "./client";
 
 export default inngest.createFunction(
-  { name: "Import product images" },
+  { id: "import-product-images" },
   { event: "shop/product.imported" },
   async ({ event, step, runId }) => {
     // Your function code

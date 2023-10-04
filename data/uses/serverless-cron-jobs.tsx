@@ -31,31 +31,33 @@ export const data: UseCase = {
 
 // Define a function to run on a cron-schedule:
 inngest.createFunction(
-  { name: "Send weekly digest email" },
+  { id: "send-weekly-digest-email" },
   { cron: "TZ=America/New_York 0 9 * * MON " },
   async () => {
     // This function will run every Monday at 9am New York time
-  },
+  }
 );`,
       },
       {
-        steps: [
-          "Run at a specific timestamp defined in an event",
-        ],
+        steps: ["Run at a specific timestamp defined in an event"],
         description:
           "Use when you needs to schedule something dynamically, like a reminder time set by a user.",
         code: `import { inngest } from "./client";
 
 // Define a function which sleeps until a given timestamp:
 inngest.createFunction(
-  { name: "Post Slack reminder" },
+  { id: "post-slack-reminder" },
   { event: "slack.reminder.scheduled" },
   async ({ event, step }) => {
-    await step.sleepUntil(event.data.reminderTimestamp);
-    await step.run("Send Slack notification", async () => {
+    await step.sleepUntil(
+      "wait-for-reminder-time",
+      event.data.reminderTimestamp
+    );
+
+    await step.run("send-slack-notification", async () => {
       // This will run after the given reminder timestamp
-    })
-  },
+    });
+  }
 );`,
       },
     ],

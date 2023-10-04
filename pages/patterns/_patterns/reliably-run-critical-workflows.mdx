@@ -8,34 +8,43 @@ The challenge with this pattern is often on the developer determining how to bre
 
 ## How to implement with Inngest
 
-Inngest enables you to compose workflows using a set of [pre-built tools](/docs/functions/multi-step?ref=patterns) to break functionality down into independently run steps. You can leverage these tools using the `createFunction` helper. The following example demonstrates processing a large CSV upload including validation, data enrichment all when a custom `api/contact_list.uploaded` event is sent from an application.
+Inngest enables you to compose workflows using a set of [pre-built tools](/docs/functions/multi-step?ref=patterns) to break functionality down into independently run steps. You can leverage these tools using `inngest.createFunction`. The following example demonstrates processing a large CSV upload including validation, data enrichment all when a custom `api/contact_list.uploaded` event is sent from an application.
 
 ```typescript
 import { inngest } from "./client";
 
 inngest.createFunction(
-  { name: "Process contacts csv upload" },
+  { id: "process-contacts-csv-upload" },
   { event: "api/contact_list.uploaded" },
   async ({ event, step }) => {
-    const { isValid, errors } = await step.run("Validate upload contents", async () => {
-      const uploadFilename = event.data.filename;
-      // Download the csv file from object storage, validate columns and data in each row
-    });
+    const { isValid, errors } = await step.run(
+      "validate-upload-contents",
+      async () => {
+        const uploadFilename = event.data.filename;
+        // Download the csv file from object storage, validate columns and data in each row
+      }
+    );
     if (!isValid) {
-      return await step.run("Notify user of invalid contents", async () =>
-        await sendContactsImportFailedEmail(event.user.id, errors)
+      return await step.run(
+        "notify-user-of-invalid-contents",
+        async () => await sendContactsImportFailedEmail(event.user.id, errors)
       );
     }
-    await step.run("Enrich address information", async () => {
+    await step.run("enrich-address-information", async () => {
       // Call a third party API service to enriches each contact's address information
       // with zip codes, etc., then uploads the enriched data to the object store
     });
-    const { totalUsersAdded } = await step.run("Create contacts in CRM", async () => {
-      // Download the enriched file and insert into contacts into the database
-    });
-    await step.run("Notify user of successful import", async () =>
-      await sendContactsImportSuccessEmail(event.user.id, totalUsersAdded)
-    )
+    const { totalUsersAdded } = await step.run(
+      "create-contacts-in-crm",
+      async () => {
+        // Download the enriched file and insert into contacts into the database
+      }
+    );
+    await step.run(
+      "notify-user-of-successful-import",
+      async () =>
+        await sendContactsImportSuccessEmail(event.user.id, totalUsersAdded)
+    );
   }
 );
 ```

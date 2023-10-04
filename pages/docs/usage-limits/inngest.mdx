@@ -50,7 +50,16 @@ The limit for each event request is `512KB`, though this can be increased up to 
 Maximum number of events you can send in one request is `5000`.
 If you're doing fan out, you'll need to be aware of this limitation when you run `step.sendEvent(events)`.
 
-```typescript
+<CodeGroup>
+```ts {{ title: "v3" }}
+// this `events` list will need to be <= 5000
+const events = [{name: "<event-name>", data: {}}, ...];
+
+await step.sendEvent("send-example-events", events);
+// or
+await inngest.send(events);;
+```
+```ts {{ title: "v2" }}
 // this `events` list will need to be <= 5000
 const events = [{name: "<event-name>", data: {}}, ...];
 
@@ -58,6 +67,7 @@ await step.sendEvent(events);
 // or
 await inngest.send(events);;
 ```
+</CodeGroup>
 
 [provider-docs]: /docs/usage-limits/providers
 [fanout-guide]: /docs/guides/fan-out-jobs

@@ -1,16 +1,25 @@
 # Cancel running functions
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
 inngest.createFunction(
   {
-    name: "Sync contacts",
-    cancelOn: [
-      { event: "app/user.deleted", match: "data.userId" }
-    ],
+    id: "sync-contacts",
+    cancelOn: [{ event: "app/user.deleted", match: "data.userId" }],
   }
   // ...
 );
 ```
+```ts {{ title: "v2" }}
+inngest.createFunction(
+  {
+    name: "Sync contacts",
+    cancelOn: [{ event: "app/user.deleted", match: "data.userId" }],
+  }
+  // ...
+);
+```
+</CodeGroup>
 
 Cancellation allows you to stop the execution of a function when a specific event is received. This is useful for handling scenarios where a long-running function should be terminated early due to changes elsewhere in your system.
 
@@ -53,7 +62,17 @@ In this case, the function will be canceled because the `data.userId` field in b
 
 Cancel a function's execution if a matching event is received within a given amount of time from the function being triggered.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+inngest.createFunction(
+  {
+    id: "sync-contacts",
+    cancelOn: [{ event: "app/user.deleted", timeout: "1h" }],
+  }
+  // ...
+);
+```
+```ts {{ title: "v2" }}
 inngest.createFunction(
   {
     name: "Sync contacts",
@@ -62,5 +81,6 @@ inngest.createFunction(
   // ...
 );
 ```
+</CodeGroup>
 
 This is useful when you want to limit the time window for cancellation, ensuring that the function will continue to execute if no matching event is received within the specified time frame.

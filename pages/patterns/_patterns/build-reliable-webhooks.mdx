@@ -34,25 +34,25 @@ After connecting your webhook, you'll start to receive events in your Inngest da
 import { inngest } from "./client";
 
 inngest.createFunction(
-  { name: "Downgrade customer" },
+  { id: "downgrade-customer" },
   { event: "stripe/invoice.payment_failed" },
   async ({ event, step }) => {
     const invoice = event.data.data.object;
 
-    const user = await step.run("Load user via stripe ID", async () => {
+    const user = await step.run("load-user-via-stripe-id", async () => {
       return await getUserByStripeCustomerId(invoice.customer);
     });
 
-    await step.run("Downgrade user", async () => {
+    await step.run("downgrade-user", async () => {
       await billingUtils.downgradeUser(user.id);
     });
 
-    await step.run("Send email", async () => {
+    await step.run("send-email", async () => {
       sendDowngradeEmail(user.email);
     });
 
     return `Downgraded user plan & ${user.id}`;
-  },
+  }
 );
 ```
 

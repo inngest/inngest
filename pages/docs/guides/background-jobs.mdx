@@ -15,7 +15,44 @@ There are two parts to background jobs:
 Let's get started on a background job that sends an email to new signups. This code creates
 a new Inngest function [as outlined in the function reference](/docs/reference/functions/create):
 
-```typescript
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ id: "signup-flow" });
+
+export const fn = inngest.createFunction(
+  { id: "send-signup-email" },
+  { event: "user/created" }, // Trigger
+  ({ event, step }) => {
+
+    // This runs in the background any time the `user/created` event is
+    // sent to Inngest.
+    //
+    // Whatever event data you send is accessible within `event`.
+
+    await step.run("send-the-user-a-signup-email", async () => {
+      // Reliably send an email.  Anything in `step.run` automatically retries
+      await sesclient.clientsendEmail({
+        to: event.data.user_email,
+        subject: "Welcome to Inngest!"
+        message: "...",
+      });
+    });
+
+    // You can schedule work for the future by sleeping within functions.
+    // NOTE: This actually *****stops***** functions and continues execution automatically,
+    // across server restarts or serverless functions.  You don't have to worry about
+    // scale, memory leaks, connections, or restarts.
+    await step.sleepUntil("wait-for-the-future", "2023-02-01T16:30:00");
+
+    await step.run("do-some-work-in-the-future", async () => {
+      // Code here runs in the future automatically.
+    });
+  }
+);
+```
+```ts {{ title: "v2" }}
 import { Inngest } from "inngest";
 
 const inngest = new Inngest({ name: "Signup flow" });
@@ -51,6 +88,7 @@ export const fn = inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 <aside>
 👉 Note: You’ll need to [serve this function in your inngest API](/docs/sdk/serve) for the function to be available to Inngest.
@@ -58,7 +96,7 @@ export const fn = inngest.createFunction(
 
 You can **trigger this background function by sending an event** to Inngest:
 
-```typescript
+```ts
 await inngest.send({
   name: "user/created", // This matches the event used in `createFunction`
   data: {

@@ -7,33 +7,32 @@ import Heading from "./Heading";
 
 const codeSnippet = `
 inngest.createFunction(
-  { name: "Handle payments" },
+  { id: "handle-payments" },
   { event: "api/invoice.created" },
   async ({ event, step }) => {
-
     // Wait until the next billing date
-    await step.sleepUntil(event.data.invoiceDate);
+    await step.sleepUntil("wait-for-billing-date", event.data.invoiceDate);
 
     // Steps automatically retry on error, and only run
     // once on success - automatically, with no work.
-    const charge = await step.run("Charge", async () => {
+    const charge = await step.run("charge", async () => {
       return await stripe.charges.create({
         amount: event.data.amount,
       });
     });
 
-    await step.run("Update db", async () => {
-      await db.payments.upsert(charge)
+    await step.run("update-db", async () => {
+      await db.payments.upsert(charge);
     });
 
-    await step.run("Send receipt", async () => {
+    await step.run("send-receipt", async () => {
       await resend.emails.send({
         to: event.user.email,
         subject: "Your receipt for Inngest",
-      })
+      });
     });
   }
-)
+);
 `;
 
 const highlights = [

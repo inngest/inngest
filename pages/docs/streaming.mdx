@@ -13,11 +13,20 @@ Select your platform above and follow the relevant "Streaming" section to enable
 
 Every Inngest serve handler provides a `streaming` option, for example:
 
-```typescript
+<CodeGroup>
+```ts {{ title: "v3" }}
+serve({
+  client: inngest,
+  functions: [...fns],
+  streaming: "allow",
+});
+```
+```ts {{ title: "v2" }}
 serve(inngest, [...fns], {
   streaming: "allow"
 });
 ```
+</CodeGroup>
 
 This can be one of the following values:
 

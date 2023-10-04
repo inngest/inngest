@@ -2,7 +2,35 @@
 
 Middleware allows you to specify functions to run at various points in an Inngest client's lifecycle, such as during a function's execution or when sending an event. Use the `InngestMiddleware` class to define new middleware.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { Inngest, InngestMiddleware } from "inngest";
+
+const myMiddleware = new InngestMiddleware({
+  name: "My Middleware",
+  init() {
+    return {
+      onFunctionRun({ fn }) {
+        // This will be logged whenever a function is executed
+        console.log(`Function ${fn.name} is running!`);
+
+        // This is where you can optionally specify hooks for this particular run
+        return {
+          afterExecution() {
+            console.log(`Function ${fn.name} has finished running!`);
+          },
+        };
+      },
+    };
+  },
+});
+
+const inngest = new Inngest({
+  id: "my-app",
+  middleware: [myMiddleware],
+});
+```
+```ts {{ title: "v2" }}
 import { Inngest, InngestMiddleware } from "inngest";
 
 const myMiddleware = new InngestMiddleware({
@@ -29,6 +57,7 @@ const inngest = new Inngest({
   middleware: [myMiddleware],
 });
 ```
+</CodeGroup>
 
 This can be used for a wide range of uses, for example:
 

@@ -18,7 +18,7 @@ export default function SendEvents() {
       fnVersion: 27,
       fnID: "01GGG522ZATDGVQBCND4ZEAS6Z",
       code: stripIndent(`inngest.createFunction(
-        { name: "Post-signup" },
+        { name: "post-signup" },
         { event: "app/user.signup" },
         async ({ event }) => {
           await sendEmail({
@@ -42,12 +42,12 @@ export default function SendEvents() {
       import { inngest } from "./client";
 
       export default inngest.createFunction(
-        { name: "Handle failed payments" },
+        { id: "handle-failed-payments" },
         { event: "stripe/charge.failed" },
         async ({ event, step }) => {
           // step.run creates a reliable step which retries automatically,
           // storing the returned data in function state.
-          const account = await step.run("Get account", () =>
+          const account = await step.run("get-account", () =>
             findAccountByCustomerId(event.user.stripe_customer_id)
           );
 
@@ -60,9 +60,9 @@ export default function SendEvents() {
 
           // The function will be woken up in 3 days with full state
           // injected, on any platform - even serverless functions.
-          await step.sleep("3 days");
+          await step.sleep("wait-before-reminder", "3 days");
 
-          await step.run("Send reminder", () => {
+          await step.run("send-reminder", () => {
             sendReminder(account.email);
           });
         }

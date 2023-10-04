@@ -10,7 +10,60 @@ Sometimes you might need to trigger new functions from existing functions, for e
 
 In order to trigger new functions you can send an event from any of your existing functions:
 
-```tsx
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { GetEvents, Inngest } from "inngest";
+
+const inngest = new Inngest({ id: "signup-flow" });
+type Events = GetEvents<typeof inngest>;
+
+export const loadCron = inngest.createFunction(
+  { id: "weekly-activity-load-users" },
+  { cron: "0 12 * * 5" },
+  async ({ event, step }) => {
+    // Fetch all users
+    const users = await step.run("fetch-users", async () => {
+      return fetchUsers();
+    });
+
+    // For each user, send us an event.  Inngest supports batches of events
+    // as long as the entire payload is less than 512KB.
+    const events = users.map<Events["app/weekly-email-activity.send"]>(
+      (user) => {
+        return {
+          name: "app/weekly-email-activity.send",
+          data: {
+            ...user,
+          },
+          user,
+        };
+      }
+    );
+
+    // Send all events to Inngest, which triggers any functions listening to
+    // the given event names.
+    await step.sendEvent(events);
+
+    // Return the number of users triggered.
+    return { count: users.length };
+  }
+);
+
+const sendReminder = inngest.createFunction(
+  { id: "weekly-activity-send-email" },
+  { event: "app/weekly-email-activity.send" },
+  async ({ event, step }) => {
+    const data = await step.run("load-user-data", async () => {
+      return loadUserData(event.data.user.id);
+    });
+
+    await step.run("email-user", async () => {
+      return sendEmail(event.data.user, data);
+    });
+  }
+);
+```
+```ts {{ title: "v2" }}
 import { Inngest } from "inngest";
 
 const inngest = new Inngest({ name: "Signup flow" });
@@ -19,7 +72,6 @@ export const loadCron = inngest.createFunction(
   { name: "Weekly activity: load users" },
   { cron: "0 12 * * 5" },
   async ({ event, step }) => {
-
     // Fetch all users
     const users = await step.run("Fetch users", async () => {
       return fetchUsers();
@@ -50,15 +102,17 @@ const sendReminder = inngest.createFunction(
   { name: "Weekly activity: send email" },
   { event: "app/weekly-email-activity.send" },
   async ({ event, step }) => {
-  const data = await step.run("Load user data", async () => {
-    return loadUserData(event.data.user.id);
-  });
+    const data = await step.run("Load user data", async () => {
+      return loadUserData(event.data.user.id);
+    });
 
-  await step.run("Email user", async () => {
-    sendEmail(event.data.user, data);
-  });
-});
+    await step.run("Email user", async () => {
+      sendEmail(event.data.user, data);
+    });
+  }
+);
 ```
+</CodeGroup>
 
 In the above example, we fetch all users within a single step.  This step will retry on error.  Once that’s complete (via `await`), we create an *array of events* which are sent to Inngest via [`step.sendEvent()`](/docs/reference/functions/step-send-event).  Each of these events trigger new functions for specific users.
 

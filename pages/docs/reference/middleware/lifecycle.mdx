@@ -4,7 +4,24 @@
 
 Middleware can be registered with Inngest clients or functions by providing an array of middleware.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+// Adding middleware to a client
+const inngest = new Inngest({
+  id: "my-app",
+  middleware: [errorHandlerMiddleware, loggingMiddleware],
+});
+
+// Adding middleware to a function
+inngest.createFunction(
+  { id: "example", middleware: [dbConnectionMiddleware] },
+  { event: "test" },
+  async () => {
+    // ...
+  }
+);
+```
+```ts {{ title: "v2" }}
 // Adding middleware to a client
 const inngest = new Inngest({
   name: "My App",
@@ -20,6 +37,7 @@ inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 Adding middleware contributes to an overall "stack" of middleware. If you register multiple middlewares, the SDK will group and run hooks for each middleware in the following order:
 
@@ -28,7 +46,31 @@ Adding middleware contributes to an overall "stack" of middleware. If you regist
 
 For example:
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+const inngest = new Inngest({
+  id: "my-app",
+  middleware: [
+    logMiddleware, // This is executed first
+    errorMiddleware, // This is executed second
+  ],
+});
+
+inngest.createFunction(
+  {
+    id: "example",
+    middleware: [
+      dbSetupMiddleware, // This is executed third
+      datadogMiddleware, // This is executed fourth
+    ],
+  },
+  { event: "test" },
+  async () => {
+    // ...
+  }
+);
+```
+```ts {{ title: "v2" }}
 const inngest = new Inngest({
   name: "My App",
   middleware: [
@@ -51,6 +93,7 @@ inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 ---
 

@@ -11,7 +11,6 @@ Another (opposite) problem is due to how Inngest handles memorization and code e
 A log statement outside of `step` function could end up running multiple times, resulting in duplicated deliveries.
 
 ```ts {{ title: "example-fn.ts" }}
-// with v1 SDK
 async ({ event, step }) => {
   logger.info("something") // this can be ran three times
 
@@ -32,19 +31,19 @@ A `logger` object is available within all Inngest functions. You can use it with
 or if absent, `logger` will default to use `console`.
 
 ```ts
-const fn = inngest.createFunction(
-  { name: "My awesome function" },
+inngest.createFunction(
+  { id: "my-awesome-function" },
   { event: "func/awesome" },
   async ({ event, step, logger }) => {
-    logger.info("starting function", { metadataKey: "metadataValue" })
+    logger.info("starting function", { metadataKey: "metadataValue" });
 
-    const val = await step.run("do something", () => {
-      if (somethingBadHappens) logger.warn("something bad happened")
-    })
+    const val = await step.run("do-something", () => {
+      if (somethingBadHappens) logger.warn("something bad happened");
+    });
 
-    return { success: true, event }
+    return { success: true, event };
   }
-)
+);
 ```
 
 The exported logger provides the following interfaces.
@@ -67,7 +66,8 @@ Running `console.log` is good for local development, but you probably want somet
 
 The following is an example using [winston][winston] as the logger to be passed into Inngest functions.
 
-```ts {{ title: "inngest/client.ts" }}
+<CodeGroup filename="inngest/client.ts">
+```ts {{ title: "v3" }}
 import { Inngest } from "inngest";
 import winston from "winston";
 
@@ -77,8 +77,8 @@ const env = process.env.VERCEL_ENV || "development";
 const ddTransportOps = {
   host: "http-intake.logs.datadoghq.com",
   path: `/api/v2/logs?dd-api-key=${process.env.DD_API_KEY}&ddsource=nextjs&service=inngest&ddtags=env:${env}`,
-  ssl: true
-}
+  ssl: true,
+};
 
 const logger = winston.createLogger({
   level: "info",
@@ -86,17 +86,48 @@ const logger = winston.createLogger({
   format: winston.format.json(),
   transports: [
     new winston.transports.Console(),
-    new winston.transports.Http(ddTransportOps)
-  ]
+    new winston.transports.Http(ddTransportOps),
+  ],
+});
+
+// Pass `logger` to the Inngest client, and this winston logger will be accessible within functions
+export const inngest = new Inngest({
+  id: "my-awesome-app",
+  logger: logger,
+  // ...
+});
+```
+```ts {{ title: "v2" }}
+import { Inngest } from "inngest";
+import winston from "winston";
+
+/// Assuming we're deploying to Vercel.
+/// Other providers likely have their own pre-defined environment variables you can use.
+const env = process.env.VERCEL_ENV || "development";
+const ddTransportOps = {
+  host: "http-intake.logs.datadoghq.com",
+  path: `/api/v2/logs?dd-api-key=${process.env.DD_API_KEY}&ddsource=nextjs&service=inngest&ddtags=env:${env}`,
+  ssl: true,
+};
+
+const logger = winston.createLogger({
+  level: "info",
+  exitOnError: false,
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.Http(ddTransportOps),
+  ],
 });
 
 // Pass `logger` to the Inngest client, and this winston logger will be accessible within functions
 export const inngest = new Inngest({
   name: "My awesome app",
   logger: logger,
-  ...
+  // ...
 });
 ```
+</CodeGroup>
 
 ## How it works
 

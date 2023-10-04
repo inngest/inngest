@@ -18,7 +18,8 @@ Middleware is created using the `InngestMiddleware` class.
           </Properties>
      </Col>
      <Col>
-          ```ts
+          <CodeGroup>
+          ```ts {{ title: "v3" }}
           // Create a new middleware
           const myMiddleware = new InngestMiddleware({
             name: "My Middleware",
@@ -26,14 +27,29 @@ Middleware is created using the `InngestMiddleware` class.
               return {};
             },
           });
+
+          // Register it on the client
+          const inngest = new Inngest({
+            id: "my-app",
+            middleware: [myMiddleware],
+          });
           ```
-          ```ts
+          ```ts {{ title: "v2" }}
+          // Create a new middleware
+          const myMiddleware = new InngestMiddleware({
+            name: "My Middleware",
+            init: () => {
+              return {};
+            },
+          });
+
           // Register it on the client
           const inngest = new Inngest({
             name: "My App",
             middleware: [myMiddleware],
           });
           ```
+          </CodeGroup>
      </Col>
 </Row>
 
@@ -159,7 +175,16 @@ export const createMyMiddleware = (logEventOutput: string) => {
 };
 ```
 
-```ts {{ title: "inngest/client.ts" }}
+<CodeGroup filename="inngest/client.ts">
+```ts {{ title: "v3" }}
+import { createMyMiddleware } from "./middleware/myMiddleware";
+
+export const inngest = new Inngest({
+  id: "my-client",
+  middleware: [createMyMiddleware("app/user.created")],
+});
+```
+```ts {{ title: "v2" }}
 import { createMyMiddleware } from "./middleware/myMiddleware";
 
 export const inngest = new Inngest({
@@ -167,6 +192,7 @@ export const inngest = new Inngest({
   middleware: [createMyMiddleware("app/user.created")],
 });
 ```
+</CodeGroup>
 
 <Callout>
 Make sure to let TypeScript infer the output of the function instead of strictly typing it; this helps Inngest understand changes to input and output of arguments. See [Middleware - TypeScript](/docs/reference/middleware/typescript) for more information.

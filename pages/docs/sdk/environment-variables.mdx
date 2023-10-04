@@ -1,0 +1,81 @@
+# Environment Variables
+
+You can set environment variables to change various parts of Inngest's configuration.
+
+We'll look at all available environment variables here, what to set them to, and what our recommendations are for their use.
+
+---
+
+## INNGEST_BASE_URL
+
+Use this to tell an SDK the host to use to communicate with Inngest.
+
+If set, it should be the host including the protocol and port, e.g. `http://localhost:8288` or `https://my.tunnel.com`. Can be overwritten by manually specifying `baseUrl` in `new Inngest()` or `serve()`.
+
+In most cases we recommend keeping this unset. A common case, though, is wanting to force a production build of your app to use the Inngest Dev Server instead of Inngest Cloud for local integration testing or similar.
+
+In this case, set `INNGEST_BASE_URL=http://localhost:8288`, or wherever your Inngest Dev Server is accessible. For docker, this might be `http://host.docker.internal:8288`.
+
+---
+
+## INNGEST_ENV
+
+Use this to tell Inngest which [envionment](/docs/platform/environments?ref=environment-variables) you're wanting to send and receive events from.
+
+Can be overwritten by manually specifying `env` in `new Inngest()`.
+
+This is detected and set automatically for some platforms, but others will need manual action. See [Configuring branch environments](/docs/platform/environments#configuring-branch-environments?ref=environment-variables) to see if you need this.
+
+---
+
+## INNGEST_EVENT_KEY
+
+The key to use to send events to Inngest. See [Creating an Event Key](/docs/events/creating-an-event-key?ref=environment-variables) for more information.
+
+Can be overwritten by manually specifying `eventKey` in `new Inngest()`.
+
+---
+
+## INNGEST_LOG_LEVEL
+
+The log level to use for the SDK. Can be one of `fatal`, `error`, `warn`, `info`, `debug`, or `silent`.
+
+Defaults to `info`.
+
+---
+
+## INNGEST_SERVE_HOST
+
+The host used to access this application from Inngest Cloud.
+
+If set, it should be the host including the protocol and port, e.g. `http://localhost:8288` or `https://my.tunnel.com`. Can be overwritten by manually specifying `serveHost` in `serve()`.
+
+By default, an SDK will try to infer this using request details such as the `Host` header, but sometimes this isn't possible (e.g. when running in a more controlled environment such as AWS Lambda or when dealing with proxies/redirects).
+
+---
+
+## INNGEST_SERVE_PATH
+
+The path used to access this application from Inngest Cloud.
+
+If set, it should be a valid URL path with a leading `/`, e.g. `/api/inngest`.
+
+By default, an SDK will try to infer this using request details, but sometimes this isn't possible (e.g. when running in a more controlled environment such as AWS Lambda or when dealing with proxies/redirects).
+
+---
+
+## INNGEST_SIGNING_KEY
+
+The key used to sign requests to and from Inngest to ensure secure communication. See [Serve - Signing Key](/docs/sdk/serve#signing-key?ref=environment-variables) for more information.
+
+Can be overwritten by manually specifying `signingKey` in `serve()`.
+
+---
+
+## INNGEST_STREAMING
+
+Sets an SDK's streaming support, potentially circumventing restrictive request timeouts and other limitations. See [Streaming](/docs/streaming?ref=environment-variables) for more information.
+
+Can be one of `allow`, `force`, or `false`.
+
+By default, this is `false`, disabling streaming. It can also be overwritten by setting `streaming` in `serve()` with the same values.

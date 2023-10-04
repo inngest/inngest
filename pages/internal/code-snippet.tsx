@@ -1,16 +1,20 @@
 import styled from "@emotion/styled";
-import React, { useState } from "react";
+import { useState } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneDark as syntaxThemeDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
 
-import CodeWindow, { removeLeadingSpaces } from "src/shared/CodeWindow";
+import { removeLeadingSpaces } from "src/shared/CodeWindow";
 
 const defaultCode = `
-  import { inngest } from "./client"
+  import { inngest } from "./client";
 
-  export default inngest.createFunction("Signup", "app/user.signup", async ({ event }) => {
-    // ...
-  })
+  export default inngest.createFunction(
+    { id: "signup" },
+    { event: "app/user.signup" },
+    async ({ event }) => {
+      // ...
+    }
+  );
 `;
 
 export async function getStaticProps() {

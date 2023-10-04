@@ -1,6 +1,6 @@
 When you [schedule work for the future](/patterns/running-at-specific-times) there's always a chance that you might need to cancel or reschedule these jobs.  For example, if you're scheduling a product to go live at a specific time, you might end up changing the go-live time multiple times. You need a way to cancel work that's already scheduled.
 
-Rescheduling is very similar.  First, you cancel the current work.  Then, you schedule a new function. 
+Rescheduling is very similar.  First, you cancel the current work.  Then, you schedule a new function.
 
 ## How to implement this pattern
 
@@ -11,18 +11,18 @@ import { inngest } from "./client";
 
 const func = inngest.createFunction(
   {
-    name: "Schedules and cancels automatically"
+    id: "schedules-and-cancels-automatically",
     cancelOn: [
       // The data.postID field in both events must match.
-      { event: "blog/post.cancelled", match: "data.postID" }
+      { event: "blog/post.cancelled", match: "data.postID" },
     ],
   },
   { event: "blog/post.scheduled" },
   ({ event, step }) => {
     // Sleep until the scheduleAt time in the event.
-    await step.sleepUntil(event.data.scheduleAt);
+    await step.sleepUntil("wait-for-scheduleAt", event.data.scheduleAt);
 
-    await step.run("Publish the post", () => {
+    await step.run("publish-post", () => {
       // Publish the post.
       publishBlogPost(event.data.postID);
     });
@@ -38,7 +38,7 @@ You can send a `blog/post.cancelled` event at any time before the `scheduledAt` 
 
 **Alternative systems**
 
-In typical job systems, you'll need to record the job ID each time you schedule the job, then use the system's API to cancel the work.  If the job is already running, you might not be able to cancel the function.  
+In typical job systems, you'll need to record the job ID each time you schedule the job, then use the system's API to cancel the work.  If the job is already running, you might not be able to cancel the function.
 
 ## Additional Resources
 

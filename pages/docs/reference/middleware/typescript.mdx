@@ -32,7 +32,7 @@ new InngestMiddleware({
 
 ```ts {{ title: "inngest/fns/myFunction.ts" }}
 inngest.createFunction(
-  { name: "Example function" },
+  { id: "example-function" },
   { event: "app/user.created" },
   async ({ event, foo }) => {
     //             ^? (parameter) foo: string

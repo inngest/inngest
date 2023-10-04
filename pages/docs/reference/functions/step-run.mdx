@@ -4,12 +4,12 @@ Use `step.run()` to run synchronous or asynchronous code as a retryable step in 
 
 ```ts
 export default inngest.createFunction(
-  { name: "Import product images" },
+  { id: "import-product-images" },
   { event: "shop/product.imported" },
   async ({ event, step }) => {
-    const uploadedImageURLs = await step.run("Copy images to S3", async () => {
+    const uploadedImageURLs = await step.run("copy-images-to-s3", async () => {
       return copyAllImagesToS3(event.data.imageURLs);
-    })
+    });
   }
 );
 ```
@@ -37,18 +37,18 @@ export default inngest.createFunction(
   <Col>
   ```ts
   // Steps can have async handlers
-  const result = await step.run("Get API data", async () => {
+  const result = await step.run("get-api-data", async () => {
     // Steps should return data used in other steps
     return fetch("...").json();
   });
 
   // Steps can have synchronous handlers
-  const data = await step.run("Transform", () => {
+  const data = await step.run("transform", () => {
     return transformData(result);
   });
 
   // Returning data is optional
-  await step.run("Insert data", async () => {
+  await step.run("insert-data", async () => {
     db.insert(data);
   });
   ```
@@ -61,21 +61,21 @@ As `step.run()` returns a [Promise](https://developer.mozilla.org/en-US/docs/Web
 
 ```ts
 // Use the "await" keyword to wait for the promise to fulfil
-await step.run("Create user", () => {/* ... */})
-const user = await step.run("Create user", () => {/* ... */})
+await step.run("create-user", () => {/* ... */});
+const user = await step.run("create-user", () => {/* ... */});
 
 // Use `then` (or similar)
-step.run("Create user", () => {/* ... */})
+step.run("create-user", () => {/* ... */})
   .then((user) => {
     // do something else
-  })
+  });
 
 // Use with a Promise helper function to run in parallel
 Promise.all([
-  step.run("Create subscription", () => {/* ... */}),
-  step.run("Add to CRM", () => {/* ... */}),
-  step.run("Send welcome email", () => {/* ... */}),
-])
+  step.run("create-subscription", () => {/* ... */}),
+  step.run("add-to-crm", () => {/* ... */}),
+  step.run("send-welcome-email", () => {/* ... */}),
+]);
 ```
 
 ## Return values & serialization
@@ -83,9 +83,9 @@ Promise.all([
 All data returned from `step.run` is serialized as JSON. This is done to enable the SDK to return a valid serialized response to the Inngest service. You will be able to customize this and utilize formats like `superjson` with the addition of middleware in the Inngest SDK's 2.0 release.
 
 ```ts
-const output = await step.run("Create user", () => {
-  return { id: new ObjectId(), createdAt: new Date()  }
-})
+const output = await step.run("create-user", () => {
+  return { id: new ObjectId(), createdAt: new Date() };
+});
 /*
 {
   "id": "647731d1759aa55be43b975d",

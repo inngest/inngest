@@ -12,7 +12,7 @@ You need to do this every time your functions are updated so Inngest can registe
 
 <Callout>
 
-Inngest uses the `INNGEST_SIGNING_KEY` to securely communicate with your application and identify the correct environment to register your functions.
+Inngest uses the [`INNGEST_SIGNING_KEY`](/docs/sdk/environment-variables#inngest-signing-key?ref=deploy) to securely communicate with your application and identify the correct environment to register your functions.
 
 </Callout>
 
@@ -42,7 +42,7 @@ If you're prefer to deploy from your machine or automate this within a CI/CD pip
 curl -X PUT https://myapp.com/api/inngest
 ```
 
-This request will trigger your application to register your functions with the Inngest API, securely, using your environment's `INNGEST_SIGNING_KEY`.
+This request will trigger your application to register your functions with the Inngest API, securely, using your environment's [`INNGEST_SIGNING_KEY`](/docs/sdk/environment-variables#inngest-signing-key?ref=deploy).
 
 <Callout>
 

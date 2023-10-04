@@ -8,7 +8,17 @@ npm install inngest  # or yarn add inngest
 
 Start with creating an `Inngest` client. An "Event Key" is required to send events ([How to create an Event Key](/docs/events/creating-an-event-key)):
 
-```typescript
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { Inngest } from 'inngest';
+
+// Recommended: Set an INNGEST_EVENT_KEY environment variable for automatic configuration:
+const inngest = new Inngest({ id: "your-app-id" });
+
+// Or you can pass the eventKey explicitly to the constructor:
+const inngest = new Inngest({ id: "your-app-id", eventKey: "xyz..." });
+```
+```ts {{ title: "v2" }}
 import { Inngest } from 'inngest';
 
 // Recommended: Set an INNGEST_EVENT_KEY environment variable for automatic configuration:
@@ -17,10 +27,11 @@ const inngest = new Inngest({ name: "Your app name" });
 // Or you can pass the eventKey explicitly to the constructor:
 const inngest = new Inngest({ name: "Your app name", eventKey: "xyz..." });
 ```
+</CodeGroup>
 
 Then, sending an event is simple, just call the the `send()` method with your event payload ([Read about the payload format](/docs/reference/events/send#inngest-send-event-payload-event-payload-promise)):
 
-```typescript
+```ts
 // This sends an event to Inngest.
 await inngest.send({
   // The event name
@@ -58,7 +69,7 @@ Sending this event, named `storefront/cart.checkout.completed`, to Inngest will 
 
 You can also send multiple events in a single `send` call. This enables you to send a batch of events very easily. You can send up to `512kb` in a single call which means you can send anywhere between 10 and 1000 typically sized payloads at once. This is the default and can be increased for your account.
 
-```typescript
+```ts
 await inngest.send([
   { name: "storefront/cart.checkout.completed", data: { ... } },
   { name: "storefront/coupon.used", data: { ... } },
@@ -68,7 +79,7 @@ await inngest.send([
 
 This is especially useful if you have an array of data in your app and you want to send an event for each item in the array:
 
-```typescript
+```ts
 // This function call might return 10s or 100s of items, so we can use map
 // to transform the items into event payloads then pass that array to send:
 const importedItems = await api.fetchAllItems();
@@ -87,7 +98,7 @@ Often, you may need to prevent duplicate events from being sent and therefore pr
 
 To prevent duplicate events, you can add an `id` parameter to the event payload. Once Inngest receives an event with an `id`, any events send with the exact same `id` will be ignored regardless of the event's payload.
 
-```typescript
+```ts
 await inngest.send({
   // Your deduplication id must be specific to this event payload.
   // Use something that will not be used across event types, not a generic value like cartId

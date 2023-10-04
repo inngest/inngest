@@ -72,14 +72,15 @@ Now we'll create a file in this directory for our function - `runBackfillForUser
 <CodeGroup>
 
 ```ts {{ title: "runBackfillForUser.ts" }}
+import { runBackfillForUser } from "../lib/backfill-scripts";
 import { inngest } from "./client";
-import { runBackfillForUser }  from "../lib/backfill-scripts";
 
-export default createFunction(
-  "Run backfill for user",     // The name displayed in the Inngest dashboard
-  "retool/backfill.requested", // The event triggger
+export default inngest.createFunction(
+  { id: "run-backfill-for-user" }, // The name displayed in the Inngest dashboard
+  { event: "retool/backfill.requested" }, // The event triggger
   async ({ event }) => {
     const result = await runBackfillForUser(event.data.user_id);
+
     return {
       status: result.ok ? 200 : 500,
       message: `Ran backfill for user ${event.data.user_id}`,
@@ -91,7 +92,7 @@ export default createFunction(
 ```ts  {{ title: "client.ts" }}
 import { Inngest } from "inngest";
 
-export const inngest = new Inngest({ name: "My App" })
+export const inngest = new Inngest({ id: "my-app" })
 ```
 
 </CodeGroup>

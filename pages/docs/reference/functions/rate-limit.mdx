@@ -5,7 +5,7 @@ Limit the number of times a function runs over a time `period` with an optional 
 ```ts
 export default inngest.createFunction(
   {
-    name: "Synchronize data",
+    id: "synchronize-data",
     rateLimit: {
       key: "event.data.company_id",
       limit: 1,
@@ -122,7 +122,7 @@ In this example, we use events from the Intercom webhook. The webhook can be ove
 */
 export default inngest.createFunction(
   {
-    name: "Synchronize data",
+    id: "synchronize-data",
     rateLimit: {
       key: "event.data.company_id",
       limit: 1,
@@ -131,13 +131,16 @@ export default inngest.createFunction(
   },
   { event: "intercom/company.updated" },
   async ({ event, step }) => {
-    const company = await step.run('fetch-latest-company-data-from-intercom', async () => {
-      return await client.companies.find({
-        companyId: event.data.company_id,
-      });
-    });
+    const company = await step.run(
+      "fetch-latest-company-data-from-intercom",
+      async () => {
+        return await client.companies.find({
+          companyId: event.data.company_id,
+        });
+      }
+    );
 
-    await step.run('update-company-data-in-database', async () => {
+    await step.run("update-company-data-in-database", async () => {
       return await database.companies.upsert({ id: company.id }, company);
     });
   }
@@ -167,7 +170,7 @@ When there is an issue in your system, you may want to send your user an email n
 */
 export default inngest.createFunction(
   {
-    name: "Send check failed notification",
+    id: "send-check-failed-notification",
     rateLimit: {
       // Don't send duplicate emails to the same user for the same service over 1 hour
       key: `event.data.user_id + "-" + event.data.service_id`,
@@ -177,9 +180,9 @@ export default inngest.createFunction(
   },
   { event: "service/check.failed" },
   async ({ event, step }) => {
-    await step.run('send-alert-email', async () => {
+    await step.run("send-alert-email", async () => {
       return await resend.sendEmail({
-        from: 'notifications@myco.com',
+        from: "notifications@myco.com",
         to: event.user.email,
         subject: `ALERT: ${event.data.issue}`,
         text: `Dear user, ...`,

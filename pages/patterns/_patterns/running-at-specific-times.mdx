@@ -30,21 +30,21 @@ Then, within your function, you can pause until the time in the event:
 import { inngest } from "./client";
 
 const delayed = inngest.createFunction(
-  { name: "Schedule post" },
+  { id: "schedule-post" },
   { event: "blog/post.scheduled" },
-  ({ event, step }) => {
+  async ({ event, step }) => {
     const at = new Date(event.data.scheduleAt);
 
     // Use the built-in `sleepUntil` tool to sleep until the time in the event.
     // This function will pause then resume running the code below at the given time.
-    await step.sleepUntil(at);
+    await step.sleepUntil("wait-for-scheduled", at);
 
-    await step.run("Publish post", () => {
+    await step.run("publish-post", () => {
       // Any code here runs at the time in the event.
       schedulePost(event.data.postID);
     });
-  },
-});
+  }
+);
 ```
 
 This function runs immediately when the `blog/post.scheduled` event is received, then pauses until the time and date within the event.  This lets you create a single function that can schedule work at any time using data from the event, intsead of hard-coding times within your code.

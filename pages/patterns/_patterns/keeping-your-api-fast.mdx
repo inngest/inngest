@@ -54,14 +54,14 @@ Functions are defined by declaring which event(s) should trigger it. When matchi
 import { inngest } from "./client";
 
 inngest.createFunction(
-  { name: "Backfill User Data" },
+  { id: "backfill-user-data" },
   { event: "api/source.connected" },
   async ({ event }) => {
     const source = await getSource(event.data.sourceId);
     await backfillDataForSource(source);
     return `Successful backfill for ${source.id} (User: ${event.data.userId})`;
-  },
-)
+  }
+);
 ```
 
 Functions can be [deployed in several ways](/docs/deploy?ref=patterns) that fit your current stack or needs.

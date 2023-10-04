@@ -31,7 +31,7 @@ type CartProductAdded = {
 
 export default inngest.createFunction(
   {
-    name: "Product added to cart",
+    id: "product-added-to-cart",
     // Automatically cancel this instance of the function whenever a user adds another
     // product to their cart.  Another instance of this function will run and schedule
     // another wait from 24 hours after the new product was added to their cart.
@@ -46,7 +46,8 @@ export default inngest.createFunction(
     // This function runs as soon as a product is added to the cart.
     // We immediately pause and wait up to 24 hours for the `cart/purchased`
     // event from the same cart_id.
-    const purchased = await step.waitForEvent("cart/purchased", {
+    const purchased = await step.waitForEvent("wait-for-purchase", {
+      event: "cart/purchased",
       timeout: "24h",
       match: "data.cart_id", // The "data.cart_id" field in both events must match.
     });
@@ -59,12 +60,16 @@ export default inngest.createFunction(
       return;
     }
 
-    await step.run("Send reminder", () => {
-      sendCartReminderEmail({ email: event.user.email, cart: event.data.cart_id });
+    await step.run("send-reminder", () => {
+      sendCartReminderEmail({
+        email: event.user.email,
+        cart: event.data.cart_id,
+      });
     });
 
     // Idea: We could also wait another 6 days to send a 1 week cart reminder
-});
+  }
+);
 ```
 
 In this example we create a function that models key points in the user journey declaratively, without worrying about state or timing in code.

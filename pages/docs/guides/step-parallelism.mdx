@@ -16,7 +16,39 @@ You can run steps in parallel via `Promise.all()`:
 
 A common use case is to split work into chunks:
 
-```tsx
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ id: "signup-flow" });
+
+export const fn = inngest.createFunction(
+  { id: "post-payment-flow" },
+  { event: "stripe/charge.created" },
+  async ({ event, step }) => {
+    // These steps are not `awaited` and run in parallel when Promise.all
+    // is invoked.
+    const sendEmail = step.run("confirmation-email", async () => {
+      const emailID = await sendEmail(event.data.email);
+      return emailID;
+    });
+
+    const updateUser = step.run("update-user", async () => {
+      return db.updateUserWithCharge(event);
+    });
+
+    // Run both steps in parallel.  Once complete, Promise.all will return all
+    // parallelized state here.
+    //
+    // This ensures that all steps complete as fast as possible, and we still have
+    // access to each step's data once they're compelte.
+    const [emailID, updates] = await Promise.all([sendEmail, updateUser]);
+
+    return { emailID, updates };
+  }
+);
+```
+```ts {{ title: "v2" }}
 import { Inngest } from "inngest";
 
 const inngest = new Inngest({ name: "Signup flow" });
@@ -25,7 +57,6 @@ export const fn = inngest.createFunction(
   { name: "Post-payment flow" },
   { event: "stripe/charge.created" },
   async ({ event, step }) => {
-
     // These steps are not `awaited` and run in parallel when Promise.all
     // is invoked.
     const sendEmail = step.run("Confirmation email", async () => {
@@ -48,6 +79,7 @@ export const fn = inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 When each step is finished, Inngest will aggregate each step's state and re-invoke the function with all state available.
 
@@ -55,7 +87,29 @@ When each step is finished, Inngest will aggregate each step's state and re-invo
 
 A common use case is to chunk work. For example, when using OpenAI's APIs you might need to chunk a user's input and run the API on many chunks, then aggregate all data:
 
-```tsx
+<CodeGroup>
+```ts {{ title: "v3" }}
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ id: "signup-flow" });
+
+export const fn = inngest.createFunction(
+  { id: "summarize-text" },
+  { event: "app/text.summarize" },
+  async ({ event, step }) => {
+    const chunks = splitTextIntoChunks(event.data.text);
+
+    const summaries = await Promise.all(
+      chunks.map((chunk) =>
+        step.run("summarize-chunk", () => summarizeChunk(chunk))
+      )
+    );
+
+    await step.run("summarize-summaries", () => summarizeSummaries(summaries));
+  }
+);
+```
+```ts {{ title: "v2" }}
 import { Inngest } from "inngest";
 
 const inngest = new Inngest({ name: "Signup flow" });
@@ -76,6 +130,7 @@ export const fn = inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 This allows you to run many independent steps, wait until they're all finished, then fetch the results from all steps within a few lines of code. Doing this in a traditional system would require creating many jobs, polling the status of all jobs, and manually combining state.
 

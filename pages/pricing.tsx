@@ -468,7 +468,7 @@ const FEATURES: Feature[] = [
 const stepExamples = {
   singleStep: `
   export default inngest.createFunction(
-    { name: "Send Welcome Email" },
+    { id: "send-welcome-email" },
     { event: "app/user.signup" },
     async ({ event, step }) => {
       await emailAPI.send({
@@ -480,19 +480,19 @@ const stepExamples = {
   `,
   multiStep: `
   export default inngest.createFunction(
-    { name: "New Signup Drip Campaign" },
+    { id: "new-signup-drip-campaign" },
     { event: "app/user.signup" },
     async ({ event, step }) => {
-      await step.run("Send welcome email", async () => {
+      await step.run("send-welcome-email", async () => {
         await emailAPI.send({
           template: "welcome",
           to: event.user.email,
         });
       });
 
-      await step.sleep("3 days");
+      await step.sleep("wait-before-tips", "3 days");
 
-      await step.run("Send new user tips email", async () => {
+      await step.run("send-new-user-tips-email", async () => {
         await emailAPI.send({
           template: "new-user-tips",
           to: event.user.email,

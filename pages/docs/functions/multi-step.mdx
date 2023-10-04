@@ -20,10 +20,24 @@ Multi-step functions are written using the `createFunction()` method on the `Inn
 
 First, let's look at a simple single-step function.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
 import { Inngest } from "inngest";
 
-const inngest = new Inngest({ name: "My App" })
+const inngest = new Inngest({ id: "my-app" });
+
+export default inngest.createFunction(
+  { id: "activation-email" },
+  { event: "app/user.created" },
+  async ({ event }) => {
+    await sendEmail({ email: event.user.email, template: "welcome" });
+  }
+);
+```
+```ts {{ title: "v2" }}
+import { Inngest } from "inngest";
+
+const inngest = new Inngest({ name: "My App" });
 
 export default inngest.createFunction(
   { name: "Activation email" },
@@ -33,6 +47,7 @@ export default inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 This function will send a user an email when they sign up. Nice and simple.
 
@@ -45,10 +60,10 @@ First, let's convert out function to a multi-step function. To do this, we'll do
 
 ```ts
 export default inngest.createFunction(
-  { name: "Activation email" },
+  { id: "activation-email" },
   { event: "app/user.created" },
   async ({ event, step }) => {
-    await step.run("Send welcome email", async () => {
+    await step.run("send-welcome-email", async () => {
       return await sendEmail({ email: event.user.email, template: "welcome" });
     });
   }
@@ -63,7 +78,26 @@ Once our welcome email is sent, we want to wait at most 24 hours for our user to
 
 To do this, we can use the `waitForEvent` step tool. This tool will wait for a matching event to be fired, and then return the event data. If the event is not fired within the timeout, it will return `null`, which we can use to decide whether to send the reminder email.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+export default inngest.createFunction(
+  { id: "activation-email" },
+  { event: "app/user.created" },
+  async ({ event, step }) => {
+    await step.run("send-welcome-email", async () => {
+      return await sendEmail({ email: event.user.email, template: "welcome" });
+    });
+
+    // Wait for an "app/post.created" event
+    const postCreated = await step.waitForEvent("wait-for-post-creation", {
+      event: "app/post.created",
+      match: "data.user.id", // the field "data.user.id" must match
+      timeout: "24h", // wait at most 24 hours
+    });
+  }
+);
+```
+```ts {{ title: "v2" }}
 export default inngest.createFunction(
   { name: "Activation email" },
   { event: "app/user.created" },
@@ -80,12 +114,42 @@ export default inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 Now we have our `postCreated` variable, which will be `null` if the user hasn't created a post within 24 hours, or the event data if they have.
 
 Finally, we can use this to send the reminder email if the user hasn't created a post by running another block of code with `step.run()`.
 
-```ts
+<CodeGroup>
+```ts {{ title: "v3" }}
+export default inngest.createFunction(
+  { id: "activation-email" },
+  { event: "app/user.created" },
+  async ({ event, step }) => {
+    await step.run("send-welcome-email", async () => {
+      return await sendEmail({ email: event.user.email, template: "welcome" });
+    });
+
+    // Wait for an "app/post.created" event
+    const postCreated = await step.waitForEvent("wait-for-post-creation", {
+      event: "app/post.created",
+      match: "data.user.id", // the field "data.user.id" must match
+      timeout: "24h", // wait at most 24 hours
+    });
+
+    if (!postCreated) {
+      // If no post was created, send a reminder email
+      await step.run("send-reminder-email", async () => {
+        return await sendEmail({
+          email: event.user.email,
+          template: "reminder",
+        });
+      });
+    }
+  }
+);
+```
+```ts {{ title: "v2" }}
 export default inngest.createFunction(
   { name: "Activation email" },
   { event: "app/user.created" },
@@ -112,6 +176,7 @@ export default inngest.createFunction(
   }
 );
 ```
+</CodeGroup>
 
 That's it! We've now written a multi-step function that will send a welcome email, and then send a reminder email if the user hasn't created a post within 24 hours.
 
@@ -140,7 +205,7 @@ For this reason, placing business logic outside of a `step.run()` call is a bad 
 `step.run()` accepts an `async` function, like so:
 
 ```ts
-await step.run("Do something", async () => {
+await step.run("do-something", async () => {
   // your code
 });
 ```
@@ -148,7 +213,7 @@ await step.run("Do something", async () => {
 Each call to `step.run()` is a single retryable step - a lightweight transaction.  Therefore, each step should have a single side effect.  For example, the below code is problematic:
 
 ```ts
-await step.run("Create alert", async () => {
+await step.run("create-alert", async () => {
   const alertId = await createAlert();
   await sendAlertLinkToSlack(alertId);
 });
@@ -159,9 +224,9 @@ If `createAlert()` succeeds but `sendAlertLinkToSlack()` fails, the code will be
 Instead, we should split out asynchronous actions into multiple steps so they're retried independently.
 
 ```ts
-const alertId = await step.run("Create alert", () => createAlert());
+const alertId = await step.run("create-alert", () => createAlert());
 
-await step.run("Send alert link", () => sendAlertLinkToSlack(alertId));
+await step.run("send-alert-link", () => sendAlertLinkToSlack(alertId));
 ```
 
 ### My variable isn't updating
@@ -176,8 +241,8 @@ This can be confusing if you're using steps to update variables within the funct
 let userId;
 
 // Do NOT do this!  Instead, return data from step.run.
-await step.run("Get user", async () => {
-  userId = await getRandomUserId()
+await step.run("get-user", async () => {
+  userId = await getRandomUserId();
 });
 
 console.log(userId); // undefined
@@ -187,7 +252,7 @@ Instead, make sure that any variables needed for the overall function are _retur
 
 ```ts
 // This is the right way to set variables within step.run :)
-const userId = await step.run("Get user", () => getRandomUserId());
+const userId = await step.run("get-user", () => getRandomUserId());
 
 console.log(userId); // 123
 ```
@@ -202,18 +267,18 @@ Always use `sleep()` if you'd like to wait a particular time from _now_.
 // ❌ Bad
 const tomorrow = new Date();
 tomorrow.setDate(tomorrow.getDate() + 1);
-await step.sleepUntil(tomorrow);
+await step.sleepUntil("wait-until-tomorrow", tomorrow);
 
 // ✅ Good
-await step.sleep("1 day");
+await step.sleep("wait-a-day", "1 day");
 ```
 
 ```ts
 // ✅ Good
-const userBirthday = await step.run("Get user birthday", async () => {
+const userBirthday = await step.run("get-user-birthday", async () => {
   const user = await getUser();
   return user.birthday; // Date
 });
 
-await sleepUntil(userBirthday);
+await sleepUntil("wait-for-user-birthday", userBirthday);
 ```
