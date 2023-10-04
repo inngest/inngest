@@ -223,3 +223,11 @@ export const FUNCTION_RUN_OUTPUT = gql`
     }
   }
 `;
+
+export const HISTORY_ITEM_OUTPUT = gql`
+  query GetHistoryItemOutput($historyItemID: ULID!, $runID: ID!) {
+    functionRun(query: { functionRunId: $runID }) {
+      historyItemOutput(id: $historyItemID)
+    }
+  }
+`;

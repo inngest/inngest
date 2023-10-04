@@ -444,6 +444,14 @@ export type GetFunctionRunOutputQueryVariables = Exact<{
 
 export type GetFunctionRunOutputQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, status?: FunctionRunStatus | null, output?: string | null } | null };
 
+export type GetHistoryItemOutputQueryVariables = Exact<{
+  historyItemID: Scalars['ULID'];
+  runID: Scalars['ID'];
+}>;
+
+
+export type GetHistoryItemOutputQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', historyItemOutput: string } | null };
+
 
 export const GetEventsStreamDocument = `
     query GetEventsStream {
@@ -657,6 +665,13 @@ export const GetFunctionRunOutputDocument = `
   }
 }
     `;
+export const GetHistoryItemOutputDocument = `
+    query GetHistoryItemOutput($historyItemID: ULID!, $runID: ID!) {
+  functionRun(query: {functionRunId: $runID}) {
+    historyItemOutput(id: $historyItemID)
+  }
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -696,9 +711,12 @@ const injectedRtkApi = api.injectEndpoints({
     GetFunctionRunOutput: build.query<GetFunctionRunOutputQuery, GetFunctionRunOutputQueryVariables>({
       query: (variables) => ({ document: GetFunctionRunOutputDocument, variables })
     }),
+    GetHistoryItemOutput: build.query<GetHistoryItemOutputQuery, GetHistoryItemOutputQueryVariables>({
+      query: (variables) => ({ document: GetHistoryItemOutputDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery } = injectedRtkApi;
+export const { useGetEventsStreamQuery, useLazyGetEventsStreamQuery, useGetFunctionsStreamQuery, useLazyGetFunctionsStreamQuery, useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery } = injectedRtkApi;
 

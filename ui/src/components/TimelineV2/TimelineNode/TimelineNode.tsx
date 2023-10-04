@@ -3,6 +3,7 @@ import { type HistoryNode } from '../historyParser/index';
 import renderTimelineNode from './TimelineNodeRenderer';
 
 type Props = {
+  getOutput: (id: string) => Promise<string>;
   node: HistoryNode;
 };
 
