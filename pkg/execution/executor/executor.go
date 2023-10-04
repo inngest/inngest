@@ -879,7 +879,9 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 	for _, op := range resp.Generator {
 		if op == nil {
 			// This is clearly an error.
-			e.log.Error().Err(fmt.Errorf("nil generator returned")).Msg("error handling generator")
+			if e.log != nil {
+				e.log.Error().Err(fmt.Errorf("nil generator returned")).Msg("error handling generator")
+			}
 			continue
 		}
 		copied := *op
