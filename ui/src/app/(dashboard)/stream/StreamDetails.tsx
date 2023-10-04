@@ -1,22 +1,24 @@
+import { useSearchParams } from 'next/navigation';
 import { EventSection } from '@/components/Event/Section';
 import { FunctionRunSection } from '@/components/Function/RunSection';
-import { useAppSelector } from '@/store/hooks';
 
 export default function StreamDetails() {
-  const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
-  const selectedRun = useAppSelector((state) => state.global.selectedRun);
+  const params = useSearchParams();
+  const eventID = params.get('event');
+  const cronID = params.get('cron');
+  const runID = params.get('run');
 
   return (
     <>
-      {selectedEvent && (
+      {eventID && (
         <div className="grid grid-cols-2 h-full text-white">
-          <EventSection eventId={selectedEvent} />
-          <FunctionRunSection runId={selectedRun} />
+          <EventSection eventId={eventID} />
+          <FunctionRunSection runId={runID} />
         </div>
       )}
-      {!selectedEvent && selectedRun && (
+      {cronID && runID && (
         <div className="grid grid-cols-1 h-full text-white">
-          <FunctionRunSection runId={selectedRun} />
+          <FunctionRunSection runId={runID} />
         </div>
       )}
     </>

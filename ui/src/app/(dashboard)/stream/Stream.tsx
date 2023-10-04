@@ -14,8 +14,6 @@ import TriggerTag from '@/components/Trigger/TriggerTag';
 import { IconChevron } from '@/icons';
 import { client } from '@/store/baseApi';
 import { GetTriggersStreamDocument, type StreamItem } from '@/store/generated';
-import { selectEvent, selectRun } from '@/store/global';
-import { useAppDispatch } from '@/store/hooks';
 import { fullDate } from '@/utils/date';
 import FunctionRunList from './FunctionRunList';
 import OutputList from './OutputList';
@@ -150,7 +148,6 @@ export default function Stream() {
     }
   }, [tableScrollTopPosition, isFetching]);
 
-  const dispatch = useAppDispatch();
   const router = useRouter();
 
   function handleOpenSlideOver({
@@ -165,16 +162,14 @@ export default function Stream() {
     firstRunID?: string;
   }) {
     if (e.target instanceof HTMLElement) {
-      const runID = e.target.dataset.key;
-      router.push(`/stream/trigger?id=${triggerID}`);
-      if (!isCron) {
-        dispatch(selectEvent(triggerID));
-      }
+      const runID = e.target.dataset.key || firstRunID;
+      let url = isCron
+        ? `/stream/trigger?cron=${triggerID}`
+        : `/stream/trigger?event=${triggerID}`;
       if (runID) {
-        dispatch(selectRun(runID));
-      } else if (firstRunID) {
-        dispatch(selectRun(firstRunID));
+        url += `&run=${runID}`;
       }
+      router.push(url);
     }
   }
 

@@ -10,8 +10,6 @@ import {
   StepEventType,
   useGetFunctionRunQuery,
 } from '../../store/generated';
-import { selectRun } from '../../store/global';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { BlankSlate } from '../Blank';
 import CodeBlock from '../Code/CodeBlock';
 import ContentCard from '../Content/ContentCard';
@@ -33,18 +31,12 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
   );
   const run = useMemo(() => query.data?.functionRun, [query.data?.functionRun]);
   const timeline = useMemo(() => normalizeSteps(run?.timeline || null), [run]);
-  const selectedEvent = useAppSelector((state) => state.global.selectedEvent);
-  const dispatch = useAppDispatch();
 
   useEffect(() => {
     if (!run?.event?.id) {
       return;
     }
-
-    if (run.event.id !== selectedEvent) {
-      dispatch(selectRun(null));
-    }
-  }, [selectedEvent, run?.event?.id]);
+  }, [ run?.event?.id]);
 
   if (query.isLoading) {
     return (
