@@ -6,15 +6,26 @@ export type MetadataItemProps = {
   className?: string;
   label: string;
   value: string | JSX.Element;
+  title?: string;
   tooltip?: string;
   type?: 'code' | 'text';
   size?: 'small' | 'large';
 };
 
-export default function MetadataItem({ className, value, label, type, tooltip }: MetadataItemProps) {
+export default function MetadataItem({
+  className,
+  value,
+  title,
+  label,
+  type,
+  tooltip,
+}: MetadataItemProps) {
   return (
     <div className={classNames('flex flex-col p-1.5', className)}>
-      <span className={classNames(type === 'code' && 'font-mono', 'text-sm text-white')}>
+      <span
+        title={title}
+        className={classNames(type === 'code' && 'font-mono', 'text-sm text-white')}
+      >
         {value}
       </span>
       <span className="flex items-center gap-1">
