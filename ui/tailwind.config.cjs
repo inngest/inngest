@@ -117,7 +117,7 @@ module.exports = {
       animation: {
         'pulse-spin': 'pulse-spin 1s ease-out infinite',
         // Tooltip
-        'slide-down-fade': 'slideDownAndFade 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+        'slide-down-fade': 'slideDownAndFade 0.2s cubic-bezier(0, 1, 0.3, 1)',
         // Accordion
         'slide-down': 'slideDown 0.3s ease-in-out forwards',
         'slide-up': 'slideUp 0.3s ease-in-out forwards',

@@ -68,6 +68,12 @@ export const FUNCTION_RUN = gql`
         eventName
         expression
       }
+      function {
+        triggers {
+          type
+          value
+        }
+      }
       event {
         id
         raw
