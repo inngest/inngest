@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
+import { type editor } from 'monaco-editor';
 
 import useCopyToClipboard from '@/hooks/useCopyToClipboard';
-import { IconArrayDownTray } from '@/icons';
+import { IconArrayDownTray, IconOverflowText, IconWrapText } from '@/icons';
 import classNames from '@/utils/classnames';
 import { maxRenderedOutputSizeBytes } from '@/utils/constants';
 import Button from '../Button/Button';
 import CopyButton from '../Button/CopyButton';
+
+type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
 interface CodeBlockProps {
   header?: {
@@ -22,6 +25,10 @@ interface CodeBlockProps {
 
 export default function CodeBlock({ header, tabs }: CodeBlockProps) {
   const [activeTab, setActiveTab] = useState(0);
+  const editorRef = useRef<MonacoEditorType>(null);
+
+  const [wordWrap, setWordWrap] = useState('off');
+
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
   const monaco = useMonaco();
@@ -66,6 +73,18 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
 
   const handleTabClick = (index) => {
     setActiveTab(index);
+  };
+
+  function handleEditorDidMount(editor) {
+    editorRef.current = editor;
+  }
+
+  const handleWrapText = () => {
+    if (editorRef.current) {
+      const newWordWrap = wordWrap === 'on' ? 'off' : 'on';
+      editorRef.current.updateOptions({ wordWrap: newWordWrap });
+      setWordWrap(newWordWrap);
+    }
   };
 
   // This prevents larger outputs from crashing the browser
@@ -126,6 +145,10 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
               isCopying={isCopying}
               handleCopyClick={handleCopyClick}
             />
+            <Button
+              icon={wordWrap === 'on' ? <IconOverflowText /> : <IconWrapText />}
+              btnAction={handleWrapText}
+            />
           </div>
         )}
       </div>
@@ -176,6 +199,7 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
                 },
               }}
               onMount={(editor) => {
+                handleEditorDidMount(editor);
                 const contentHeight = editor.getContentHeight();
                 if (contentHeight > 295) {
                   editor.layout({ height: 295, width: 0 });
