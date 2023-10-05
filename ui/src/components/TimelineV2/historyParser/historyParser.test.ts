@@ -13,6 +13,22 @@ async function loadHistory(filename: string) {
   });
 }
 
+const baseRunStartNode = {
+  attempt: 0,
+  endedAt: expect.any(Date),
+  groupID: expect.any(String),
+  name: undefined,
+  outputItemID: undefined,
+  scheduledAt: expect.any(Date),
+  scope: 'function',
+  sleepConfig: undefined,
+  status: "started",
+  startedAt: expect.any(Date),
+  url: undefined,
+  waitForEventConfig: undefined,
+  waitForEventResult: undefined,
+} as const;
+
 const baseStepNode = {
   attempt: 0,
   endedAt: expect.any(Date),
@@ -46,6 +62,7 @@ test('cancels', async () => {
   const history = await loadHistory('cancels.json');
 
   const expectation: HistoryNode[] = [
+    baseRunStartNode,
     {
       ...baseStepNode,
       status: 'cancelled',
@@ -71,6 +88,7 @@ test('fails without steps', async () => {
   const history = await loadHistory('failsWithoutSteps.json');
 
   const expectation: HistoryNode[] = [
+    baseRunStartNode,
     {
       ...baseStepNode,
       attempt: 2,
@@ -90,6 +108,7 @@ test('fails with preceding step', async () => {
   const history = await loadHistory('failsWithPrecedingStep.json');
 
   const expectation: HistoryNode[] = [
+    baseRunStartNode,
     {
       ...baseStepNode,
       status: 'completed',
@@ -114,6 +133,7 @@ test('no steps', async () => {
   const history = await loadHistory('noSteps.json');
 
   const expectation: HistoryNode[] = [
+    baseRunStartNode,
     {
       ...baseRunEndNode,
       status: 'completed',
@@ -127,6 +147,7 @@ test('parallel steps', async () => {
   const history = await loadHistory('parallelSteps.json');
 
   const expectation: HistoryNode[] = [
+    baseRunStartNode,
     {
       ...baseStepNode,
       status: 'completed',
@@ -163,6 +184,7 @@ test('sleeps', async () => {
   const history = await loadHistory('sleeps.json');
 
   const expectation: HistoryNode[] = [
+    baseRunStartNode,
     {
       ...baseStepNode,
       status: 'completed',
@@ -184,6 +206,7 @@ test('succeeds with 2 steps', async () => {
   const history = await loadHistory('succeedsWith2Steps.json');
 
   const expectation: HistoryNode[] = [
+    baseRunStartNode,
     {
       ...baseStepNode,
       status: 'completed',
@@ -207,6 +230,7 @@ test('times out waiting for events', async () => {
   const history = await loadHistory('timesOutWaitingForEvent.json');
 
   const expectation: HistoryNode[] = [
+    baseRunStartNode,
     {
       ...baseStepNode,
       status: 'completed',
@@ -233,6 +257,7 @@ test('waits for event', async () => {
   const history = await loadHistory('waitsForEvent.json');
 
   const expectation: HistoryNode[] = [
+    baseRunStartNode,
     {
       ...baseStepNode,
       status: 'completed',

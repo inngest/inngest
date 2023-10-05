@@ -25,6 +25,10 @@ export class HistoryParser {
   }
 
   append(rawItem: RunHistoryItem) {
+    if (rawItem.type === HistoryType.FunctionStarted) {
+      this.createFunctionRunStartNode(new Date(rawItem.createdAt));
+    }
+
     let node: HistoryNode;
     if (this.history[rawItem.groupID]) {
       node = { ...this.history[rawItem.groupID] };
@@ -43,7 +47,7 @@ export class HistoryParser {
     if (rawItem.type === HistoryType.FunctionFailed && node.scope === 'step') {
       // Put FunctionFailed into its own node. Its group ID is the same as
       // StepFailed but don't want to mess up the StepFailed node's data.
-      node.groupID = 'function-end';
+      node.groupID = 'function-run-end';
     }
 
     node = updateNode(node, rawItem);
@@ -79,6 +83,30 @@ export class HistoryParser {
         };
       }
     }
+  }
+
+  /**
+   * Creates a node for the function run start. This is needed because the
+   * FunctionStarted history item represents 2 things: starting the function and
+   * scheduling the first step. Since those 2 things need separate nodes, we
+   * need this method to create the function scope node.
+   */
+  private createFunctionRunStartNode(startedAt: Date) {
+    // Create a dedicated node for function run start.
+    const node: HistoryNode = {
+      attempt: 0,
+      endedAt: startedAt,
+      groupID: 'function-run-start',
+      scheduledAt: startedAt,
+      scope: 'function',
+      startedAt,
+      status: 'started',
+    } as const;
+
+    this.history = {
+      ...this.history,
+      [node.groupID]: node,
+    };
   }
 
   /**

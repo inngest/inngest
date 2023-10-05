@@ -1,5 +1,5 @@
 import { HistoryType, type RunHistoryItem } from '@/store/generated';
-import type { HistoryNode, Status } from './types';
+import type { HistoryNode } from './types';
 
 type Updater = (node: HistoryNode, rawItem: RunHistoryItem) => HistoryNode;
 
@@ -32,13 +32,7 @@ const updaters: {
       status: 'failed',
     } satisfies HistoryNode;
   },
-  [HistoryType.FunctionScheduled]: (node, rawItem) => {
-    return {
-      ...node,
-      scheduledAt: new Date(rawItem.createdAt),
-      status: 'scheduled',
-    } satisfies HistoryNode;
-  },
+  [HistoryType.FunctionScheduled]: noop,
   [HistoryType.FunctionStarted]: (node, rawItem) => {
     return {
       ...node,
