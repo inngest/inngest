@@ -209,7 +209,7 @@ export default function Stream() {
         />
       </div>
       <div
-        className="min-h-0 overflow-y-auto"
+        className="min-h-0 overflow-y-auto pb-10"
         onScroll={(e) => fetchMoreOnScroll(e.target as HTMLDivElement)}
         ref={tableContainerRef}
       >
