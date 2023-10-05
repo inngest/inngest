@@ -1,13 +1,14 @@
-import AccordionTimeline from '../AccordionTimeline/AccordionTimeline';
+import * as AccordionPrimitive from '@radix-ui/react-accordion';
+
 import type { HistoryNode } from './historyParser';
-import { isEndStatus } from './historyParser/types';
 import { TimelineNode } from './TimelineNode/TimelineNode';
 
 type Props = {
+  getOutput: (historyItemID: string) => Promise<string>;
   history: Record<string, HistoryNode>;
 };
 
-export function Timeline({ history }: Props) {
+export function Timeline({ getOutput, history }: Props) {
   const nodes = Object.values(history).sort(sortAscending);
 
   return (
@@ -15,17 +16,18 @@ export function Timeline({ history }: Props) {
       {nodes.length === 0 ? (
         <div className=" text-white text-center">No history yet</div>
       ) : (
-        <AccordionTimeline
-          timelineItems={nodes
-            .filter((node) => isVisible(node))
-            .map((node, i) => ({
-              id: node.groupID,
-              header: <TimelineNode node={node} key={node.groupID} />,
-              expandable: node.scope === 'function' ? false : true,
-              position: i === 0 ? 'first' : i === nodes.length - 1 ? 'last' : 'middle',
-              content: <div>Content here</div>,
-            }))}
-        />
+        <AccordionPrimitive.Root
+          type="multiple"
+          className="text-slate-100 w-full last:border-b last:border-slate-800/50"
+        >
+          {nodes.map((node) => {
+            if (!isVisible(node)) {
+              return null;
+            }
+
+            return <TimelineNode getOutput={getOutput} node={node} />;
+          })}
+        </AccordionPrimitive.Root>
       )}
     </div>
   );
@@ -56,8 +58,13 @@ function isVisible(node: HistoryNode) {
     return true;
   }
 
+  if (node.sleepConfig) {
+    // Sleeps may not have a name but we still want to see it.
+    return true;
+  }
+
   if (node.waitForEventResult) {
-    // Wait for event may not have a name but we still want to see it.
+    // Waits may not have a name but we still want to see it.
     return true;
   }
 

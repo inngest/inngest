@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import ms from 'ms';
 
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
@@ -7,6 +7,7 @@ import {
   EventStatus,
   FunctionEventType,
   FunctionRunStatus,
+  GetHistoryItemOutputDocument,
   StepEventType,
   useGetFunctionRunQuery,
 } from '../../store/generated';
@@ -18,9 +19,14 @@ import TimelineRow from '../Timeline/TimelineRow';
 import renderRunMetadata from './RunMetadataRenderer';
 import RunOutputCard from './RunOutput';
 import { FunctionRunStatusIcons } from './RunStatusIcons';
-import { useParsedHistory } from '../TimelineV2/historyParser/useParsedHistory';
+import { useParsedHistory } from '../TimelineV2/historyParser';
 import { WaitingSummary } from './WaitingSummary';
 import { SleepingSummary } from './SleepingSummary';
+import { Timeline } from '../TimelineV2';
+import { client } from '@/store/baseApi';
+
+// TODO: Delete this. It's only here to make it easy to switch between the old and new timeline during dev.
+const isNewTimelineVisible = false;
 
 interface FunctionRunSectionProps {
   runId: string | null | undefined;
@@ -41,6 +47,19 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       return;
     }
   }, [ run?.event?.id]);
+
+
+  const getOutput = useCallback(
+    (historyItemID: string) => {
+      if (!runId) {
+        // Should be unreachable.
+        return new Promise<string>((resolve) => resolve(''))
+      }
+
+      return getHistoryItemOutput({ historyItemID, runID: runId })
+    },
+    [runId],
+  );
 
   if (query.isLoading) {
     return (
@@ -88,7 +107,14 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       <hr className="border-slate-800/50 mt-8" />
       <div className="px-5 pt-4">
         <h3 className="text-slate-400 text-sm py-4">Timeline</h3>
-        {timeline?.map((row, i, list) => (
+        {isNewTimelineVisible && (
+          <Timeline
+            getOutput={getOutput}
+            history={history}
+          />
+        )}
+
+        {!isNewTimelineVisible && timeline?.map((row, i, list) => (
           <FunctionRunTimelineRow
             createdAt={row.createdAt}
             rowType={row.__typename === 'FunctionEvent' ? 'function' : 'step'}
@@ -298,3 +324,37 @@ const normalizeSteps = (timeline: Timeline): Timeline => {
 
   return filtered.filter(Boolean) as Timeline;
 };
+
+async function getHistoryItemOutput({
+  historyItemID,
+  runID,
+}: {
+  historyItemID: string;
+  runID: string;
+}): Promise<string> {
+  // TODO: How to get type annotations? It returns `any`.
+  const res: unknown = await client.request(GetHistoryItemOutputDocument, {
+    historyItemID,
+    runID,
+  });
+
+  if (typeof res !== 'object' || res === null || !('functionRun' in res)) {
+    throw new Error('invalid response');
+  }
+  const { functionRun } = res;
+
+  if (
+    typeof functionRun !== 'object' ||
+    functionRun === null ||
+    !('historyItemOutput' in functionRun)
+  ) {
+    throw new Error('invalid response');
+  }
+  const { historyItemOutput } = functionRun;
+
+  if (typeof historyItemOutput !== 'string') {
+    throw new Error('invalid response');
+  }
+
+  return historyItemOutput;
+}

@@ -111,6 +111,7 @@ const updaters: {
       endedAt,
       scope: 'step',
       sleepConfig,
+      startedAt: node.startedAt ?? new Date(rawItem.createdAt),
       status: 'sleeping',
     } satisfies HistoryNode;
   },
