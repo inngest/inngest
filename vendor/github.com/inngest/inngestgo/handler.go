@@ -315,16 +315,16 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 
 	byt, err := json.Marshal(config)
 	if err != nil {
-		return err
+		return fmt.Errorf("error marshalling function config: %w", err)
 	}
 	req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating new request: %w", err)
 	}
 
 	key, err := hashedSigningKey([]byte(h.GetSigningKey()))
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating signing key: %w", err)
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", string(key)))
 	if h.GetEnv() != "" {
@@ -333,7 +333,7 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("error performing registration request: %w", err)
 	}
 	if resp.StatusCode > 299 {
 		body := map[string]any{}

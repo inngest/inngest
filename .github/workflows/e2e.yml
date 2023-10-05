@@ -1,4 +1,4 @@
-name: E2E
+name: SDK E2E Tests
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  install:
-    name: E2E tests
+  ts:
+    name: TS SDK Tests
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -44,3 +44,29 @@ jobs:
           INNGEST_SIGNING_KEY: test
           API_URL: http://127.0.0.1:8288
           SDK_URL: http://127.0.0.1:3000/api/inngest
+  golang:
+    name: Go SDK Tests
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.21"
+      - name: Build dev server
+        run: |
+          go build -o ./inngest-bin ./cmd/main.go
+      - name: Run E2E tests
+        run: |
+          echo "Running dev server"
+          nohup ./inngest-bin dev --no-discovery 2> /tmp/dev-output.txt &
+          echo "Ran dev server"
+          sleep 5
+          curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
+          go test ./tests/golang -v -count=1
+        env:
+          INNGEST_SIGNING_KEY: 7468697320697320612074657374206b6579
+          INNGEST_DEV: http://127.0.0.1:8288
