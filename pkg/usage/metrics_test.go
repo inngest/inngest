@@ -1,7 +1,6 @@
 package usage
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -29,7 +28,7 @@ func TestMetricsRequestValid(t *testing.T) {
 			name:     "missing name returns false",
 			req:      &MetricsRequest{},
 			expected: false,
-			err:      errors.New("metrics' name must be specified"),
+			err:      NoMetricsNameErr,
 		},
 		{
 			name: "missing time range will returns false",
@@ -37,7 +36,7 @@ func TestMetricsRequestValid(t *testing.T) {
 				Name: "something",
 			},
 			expected: false,
-			err:      errors.New("metrics' time range (from/to - ISO8601 format) must be specified"),
+			err:      NoMetricsTimeRangeErr,
 		},
 		{
 			name: "opposite time range (to < from) returns false",
@@ -47,7 +46,7 @@ func TestMetricsRequestValid(t *testing.T) {
 				To:   time.Now().Add(-2 * time.Hour),
 			},
 			expected: false,
-			err:      errors.New("invalid time range for metrics"),
+			err:      InvalidMetricsTimeRangeErr,
 		},
 	}
 

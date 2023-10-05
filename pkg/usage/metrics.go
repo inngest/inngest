@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+var (
+	NoMetricsNameErr           = fmt.Errorf("metrics' name must be specified")
+	NoMetricsTimeRangeErr      = fmt.Errorf("metrics' time range (from/to - ISO8601 format) must be specified")
+	InvalidMetricsTimeRangeErr = fmt.Errorf("invalid time range for metrics")
+)
+
 // MetricsRequest represents a client request for metrics based on time range
 type MetricsRequest struct {
 	Name string    `json:"name"`
@@ -14,20 +20,22 @@ type MetricsRequest struct {
 
 func (mr MetricsRequest) Valid() (bool, error) {
 	if mr.Name == "" {
-		return false, fmt.Errorf("metrics' name must be specified")
+		return false, NoMetricsNameErr
 	}
 
 	if mr.From.IsZero() || mr.To.IsZero() {
-		return false, fmt.Errorf("metrics' time range (from/to - ISO8601 format) must be specified")
+		return false, NoMetricsTimeRangeErr
 	}
 
 	if mr.To.Sub(mr.From) < 0 {
-		return false, fmt.Errorf("invalid time range for metrics")
+		return false, InvalidMetricsTimeRangeErr
 	}
 
 	return true, nil
 }
 
+// Granularity returns the predefined aggregation period for
+// the query
 func (mr MetricsRequest) Granularity() string {
 	dur := mr.To.Sub(mr.From)
 	day := 24 * time.Hour
