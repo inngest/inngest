@@ -207,7 +207,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		if err != nil {
 			return nil, err
 		}
-		e.log.Info().Interface("event", req.Events[0].GetEvent()).Msg("debouncing function")
 		return nil, ErrFunctionDebounced
 	}
 

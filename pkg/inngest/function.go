@@ -207,6 +207,10 @@ func (f Function) Validate(ctx context.Context) error {
 		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.Debounce.Key); exprErr != nil {
 			err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
 		}
+
+		if f.EventBatch != nil {
+			err = multierror.Append(err, fmt.Errorf("A function cannot specify batch and debounce"))
+		}
 	}
 
 	// Validate rate limit expression

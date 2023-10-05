@@ -65,6 +65,8 @@ type DebounceItem struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// FunctionID represents the function ID that this debounce is for.
 	FunctionID uuid.UUID `json:"fnID"`
+	// FunctionVersion represents the version of the function that was debounced.
+	FunctionVersion int `json:"fnV"`
 	// EventID represents the internal event ID that triggers the function.
 	EventID ulid.ULID `json:"eID"`
 	// Event represents the event data which triggers the function.
@@ -96,6 +98,8 @@ type DebouncePayload struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// FunctionID represents the function ID that this debounce is for.
 	FunctionID uuid.UUID `json:"fnID"`
+	// FunctionVersion represents the version of the function that was debounced.
+	FunctionVersion int `json:"fnV"`
 }
 
 // Debouncer represents an implementation-agnostic function debouncer, delaying function runs
