@@ -20,6 +20,8 @@ export { IconMagnifyingGlass } from './MagnifyingGlass';
 export { IconCheck } from './Check';
 export { IconInfo } from './Info';
 export { IconArrayDownTray } from './ArrayDownTray';
+export { IconOverflowText } from './OverflowText';
+export { IconWrapText } from './WrapText';
 
 // Circle Status Icons
 export { IconStatusCircleCheck } from './StatusCircleCheck';
