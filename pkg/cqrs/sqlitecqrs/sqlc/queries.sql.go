@@ -268,6 +268,11 @@ type GetEventsTimeboundParams struct {
 }
 
 func (q *Queries) GetEventsTimebound(ctx context.Context, arg GetEventsTimeboundParams) ([]*Event, error) {
+	// Subtract 1 ms because the QueryContext method is using `<=` instead of
+	// `<`. We don't need to make a +1ms change to arg.After because it's not
+	// having a similar issue.
+	arg.Before = arg.Before.Add(-1 * time.Millisecond)
+
 	rows, err := q.db.QueryContext(ctx, getEventsTimebound, arg.After, arg.Before, arg.Limit)
 	if err != nil {
 		return nil, err
