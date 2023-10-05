@@ -58,10 +58,10 @@ This is only needed to ensure function runs started on v2 will transition to v3;
           import { serve } from "inngest/next";
 
           const inngest = new Inngest({
-	    id: slugify("My App"),
-	  });
+            id: slugify("My App"),
+          });
 
-          inngest.createFunction(
+          const fn = inngest.createFunction(
             // NOTE: You can manually slug IDs or import slugify to convert names to IDs automatically.
             // { id: "onboarding-example", name: "Onboarding example" },
             { id: slugify("Onboarding example"), name: "Onboarding example" },
