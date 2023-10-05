@@ -27,6 +27,8 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
   const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
 
+  const [originalContentHeight, setOriginalContentHeight] = useState(0);
+  const [disableWordWrap, setDisableWordWrap] = useState(false);
   const [wordWrap, setWordWrap] = useState('off');
 
   const { handleCopyClick, isCopying } = useCopyToClipboard();
@@ -80,7 +82,15 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
   }
 
   const handleWrapText = () => {
-    if (editorRef.current) {
+    const content = tabs[activeTab].content;
+    const numberOfLines = content.split(/\r?\\n/).length;
+    if (editorRef.current && numberOfLines > 1) {
+      setDisableWordWrap(false);
+      if (wordWrap === 'off') {
+        editorRef.current.layout({ height: numberOfLines * 20, width: 0 });
+      } else {
+        editorRef.current.layout({ height: originalContentHeight, width: 0 });
+      }
       const newWordWrap = wordWrap === 'on' ? 'off' : 'on';
       editorRef.current.updateOptions({ wordWrap: newWordWrap });
       setWordWrap(newWordWrap);
@@ -148,6 +158,7 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
             <Button
               icon={wordWrap === 'on' ? <IconOverflowText /> : <IconWrapText />}
               btnAction={handleWrapText}
+              disabled={disableWordWrap}
             />
           </div>
         )}
@@ -203,8 +214,16 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
                 const contentHeight = editor.getContentHeight();
                 if (contentHeight > 295) {
                   editor.layout({ height: 295, width: 0 });
+                  setOriginalContentHeight(295);
                 } else {
                   editor.layout({ height: contentHeight, width: 0 });
+                  setOriginalContentHeight(contentHeight);
+                }
+                // Check if content string contains line breaks, to decide whether to enable the ability to do wordWrap
+                const content = tabs[activeTab].content;
+                const numberOfLines = content.split(/\r?\\n/).length;
+                if (numberOfLines === 1) {
+                  setDisableWordWrap(true);
                 }
               }}
             />
