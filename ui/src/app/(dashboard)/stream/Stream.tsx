@@ -163,12 +163,13 @@ export default function Stream() {
   }) {
     if (e.target instanceof HTMLElement) {
       const runID = e.target.dataset.key || firstRunID;
-      let url = isCron
-        ? `/stream/trigger?cron=${triggerID}`
-        : `/stream/trigger?event=${triggerID}`;
+      const params = new URLSearchParams({
+        [isCron ? 'cron' : 'event']: triggerID,
+      });
       if (runID) {
-        url += `&run=${runID}`;
+        params.append('run', runID);
       }
+      const url = `/stream/trigger?${params.toString()}`;
       router.push(url);
     }
   }
