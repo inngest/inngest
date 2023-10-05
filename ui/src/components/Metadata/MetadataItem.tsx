@@ -3,16 +3,16 @@ import { IconInfo } from '@/icons';
 import classNames from '@/utils/classnames';
 
 export type MetadataItemProps = {
-  label: String;
-  value: String;
-  tooltip?: String;
+  label: string;
+  value: string | JSX.Element;
+  tooltip?: string;
   type?: 'code' | 'text';
   size?: 'small' | 'large';
 };
 
 export default function MetadataItem({ value, label, type, tooltip }: MetadataItemProps) {
   return (
-    <div className={classNames('flex flex-col p-1.5 bg-slate-950')}>
+    <div className={classNames('flex flex-col p-1.5')}>
       <span className={classNames(type === 'code' && 'font-mono', 'text-sm text-white')}>
         {value}
       </span>

@@ -18,6 +18,9 @@ import TimelineRow from '../Timeline/TimelineRow';
 import renderRunMetadata from './RunMetadataRenderer';
 import RunOutputCard from './RunOutput';
 import { FunctionRunStatusIcons } from './RunStatusIcons';
+import { useParsedHistory } from '../TimelineV2/historyParser/useParsedHistory';
+import { WaitingSummary } from './WaitingSummary';
+import { SleepingSummary } from './SleepingSummary';
 
 interface FunctionRunSectionProps {
   runId: string | null | undefined;
@@ -31,6 +34,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
   );
   const run = useMemo(() => query.data?.functionRun, [query.data?.functionRun]);
   const timeline = useMemo(() => normalizeSteps(run?.timeline || null), [run]);
+  const history = useParsedHistory(run?.history ?? [])
 
   useEffect(() => {
     if (!run?.event?.id) {
@@ -72,11 +76,15 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
         </div>
       }
     >
-      {run.status && run.finishedAt && run.output && (
-        <div className="px-5 pt-4">
-          <RunOutputCard functionRun={run} />
-        </div>
-      )}
+      <div className="px-5 pt-4">
+        {run.status && run.finishedAt && run.output && (
+            <RunOutputCard functionRun={run} />
+        )}
+
+        <WaitingSummary history={history} />
+        <SleepingSummary history={history} />
+      </div>
+
       <hr className="border-slate-800/50 mt-8" />
       <div className="px-5 pt-4">
         <h3 className="text-slate-400 text-sm py-4">Timeline</h3>

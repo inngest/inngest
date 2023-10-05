@@ -91,6 +91,33 @@ export const FUNCTION_RUN = gql`
           output
         }
       }
+      history {
+        attempt
+        cancel {
+          eventID
+          expression
+          userID
+        }
+        createdAt
+        functionVersion
+        groupID
+        id
+        sleep {
+          until
+        }
+        stepName
+        type
+        url
+        waitForEvent {
+          eventName
+          expression
+          timeout
+        }
+        waitResult {
+          eventID
+          timeout
+        }
+      }
     }
   }
 `;
