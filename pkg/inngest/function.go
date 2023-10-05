@@ -214,8 +214,11 @@ func (f Function) Validate(ctx context.Context) error {
 		if perr != nil {
 			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is invalid: %w", f.Debounce.Period, perr))
 		}
+		if period < consts.MinDebouncePeriod {
+			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is less than the min of: %s", f.Debounce.Period, consts.MinDebouncePeriod))
+		}
 		if period > consts.MaxDebouncePeriod {
-			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is greater than the max of: %s", f.Debounce.Period, period.String()))
+			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is greater than the max of: %s", f.Debounce.Period, consts.MaxDebouncePeriod))
 		}
 	}
 
