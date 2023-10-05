@@ -205,7 +205,7 @@ func TestDriverResponseUserError(t *testing.T) {
 			name: "with no Output and no Err",
 			r:    DriverResponse{Output: nil},
 			expected: map[string]any{
-				"error":   "Unknown error running SDK",
+				"error":   DefaultErrorMessage,
 				"name":    "Error",
 				"message": DefaultErrorMessage,
 			},
@@ -276,7 +276,7 @@ func TestDriverResponseUserError(t *testing.T) {
 			name: "non map Output",
 			r:    DriverResponse{Output: "YOLO"},
 			expected: map[string]any{
-				"error":   "Unknown error running SDK",
+				"error":   DefaultErrorMessage,
 				"name":    "Error",
 				"message": "YOLO",
 			},
