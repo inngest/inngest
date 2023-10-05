@@ -210,9 +210,9 @@ func (f Function) Validate(ctx context.Context) error {
 		if f.EventBatch != nil {
 			err = multierror.Append(err, fmt.Errorf("A function cannot specify batch and debounce"))
 		}
-		period, err := str2duration.ParseDuration(f.Debounce.Period)
-		if err != nil {
-			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is invalid: %w", f.Debounce.Period, err))
+		period, perr := str2duration.ParseDuration(f.Debounce.Period)
+		if perr != nil {
+			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is invalid: %w", f.Debounce.Period, perr))
 		}
 		if period > consts.MaxDebouncePeriod {
 			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is greater than the max of: %s", f.Debounce.Period, period.String()))
