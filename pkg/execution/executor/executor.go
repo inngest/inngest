@@ -877,6 +877,13 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 
 	eg := errgroup.Group{}
 	for _, op := range resp.Generator {
+		if op == nil {
+			// This is clearly an error.
+			if e.log != nil {
+				e.log.Error().Err(fmt.Errorf("nil generator returned")).Msg("error handling generator")
+			}
+			continue
+		}
 		copied := *op
 
 		// Give each op its own group ID, as we want to track each step
