@@ -30,7 +30,7 @@ export default function ContentCard({
       )}
     >
       <div
-        className={classNames(title ? 'shadow-slate-950 px-5 py-4 shadow-lg relative z-30' : '')}
+        className={classNames(title ? 'px-5 py-4 relative z-30' : '')}
       >
         <div className="flex items-center justify-between leading-7">
           {title ? (
@@ -46,7 +46,7 @@ export default function ContentCard({
         {badge}
         {metadata}
       </div>
-      <div className="overflow-y-scroll flex-1">{children}</div>
+      <div className="overflow-y-auto flex-1">{children}</div>
     </div>
   );
 }
