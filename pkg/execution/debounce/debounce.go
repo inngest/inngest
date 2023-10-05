@@ -75,9 +75,10 @@ type DebounceItem struct {
 
 func (d DebounceItem) QueuePayload() DebouncePayload {
 	return DebouncePayload{
-		AccountID:   d.AccountID,
-		WorkspaceID: d.WorkspaceID,
-		FunctionID:  d.FunctionID,
+		AccountID:       d.AccountID,
+		WorkspaceID:     d.WorkspaceID,
+		FunctionID:      d.FunctionID,
+		FunctionVersion: d.FunctionVersion,
 	}
 }
 

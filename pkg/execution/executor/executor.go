@@ -198,11 +198,12 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*state.Identifier, error) {
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
-			AccountID:   req.AccountID,
-			WorkspaceID: req.WorkspaceID,
-			FunctionID:  req.Function.ID,
-			EventID:     req.Events[0].GetInternalID(),
-			Event:       req.Events[0].GetEvent(),
+			AccountID:       req.AccountID,
+			WorkspaceID:     req.WorkspaceID,
+			FunctionID:      req.Function.ID,
+			FunctionVersion: req.Function.FunctionVersion,
+			EventID:         req.Events[0].GetInternalID(),
+			Event:           req.Events[0].GetEvent(),
 		}, req.Function)
 		if err != nil {
 			return nil, err
