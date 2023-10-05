@@ -271,7 +271,7 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 
 		if c.Debounce != nil {
 			f.Debounce = &inngest.Debounce{
-				Key:    c.Debounce.Key,
+				Key:    &c.Debounce.Key,
 				Period: c.Debounce.Period.String(),
 			}
 		}

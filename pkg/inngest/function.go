@@ -78,8 +78,8 @@ type Function struct {
 }
 
 type Debounce struct {
-	Key    string `json:"key"`
-	Period string `json:"period"`
+	Key    *string `json:"key"`
+	Period string  `json:"period"`
 }
 
 func (f Function) ConcurrencyLimit() int {
@@ -201,6 +201,12 @@ func (f Function) Validate(ctx context.Context) error {
 
 	if len(f.Cancel) > consts.MaxCancellations {
 		err = multierror.Append(err, fmt.Errorf("This function exceeds the max number of cancellation events: %d", consts.MaxCancellations))
+	}
+
+	if f.Debounce != nil && f.Debounce.Key != nil {
+		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.Debounce.Key); exprErr != nil {
+			err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
+		}
 	}
 
 	// Validate rate limit expression

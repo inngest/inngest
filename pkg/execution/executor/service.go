@@ -195,7 +195,10 @@ func (s *svc) Run(ctx context.Context) error {
 						Events:          []event.TrackedEvent{di},
 						PreventDebounce: true,
 					})
-					return err
+					if err != nil {
+						return err
+					}
+					_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID)
 				}
 			}
 

@@ -98,9 +98,12 @@ type DebouncePayload struct {
 	FunctionID uuid.UUID `json:"fnID"`
 }
 
+// Debouncer represents an implementation-agnostic function debouncer, delaying function runs
+// until a specific time period passes when no more events matching a key are received.
 type Debouncer interface {
 	Debounce(ctx context.Context, d DebounceItem, fn inngest.Function) error
 	GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*DebounceItem, error)
+	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error
 }
 
 func NewRedisDebouncer(r rueidis.Client, k redis_state.DebounceKeyGenerator, q redis_state.QueueManager) Debouncer {
@@ -117,6 +120,18 @@ type debouncer struct {
 	q redis_state.QueueManager
 }
 
+// DeleteDebounceItem returns a DebounceItem given a debounce ID.
+func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error {
+	keyDbc := d.k.Debounce(ctx)
+	cmd := d.r.B().Hdel().Key(keyDbc).Field(debounceID.String()).Build()
+	err := d.r.Do(ctx, cmd).Error()
+	if rueidis.IsRedisNil(err) {
+		return nil
+	}
+	return fmt.Errorf("error removing debounce: %w", err)
+}
+
+// GetDebounceItem returns a DebounceItem given a debounce ID.
 func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*DebounceItem, error) {
 	keyDbc := d.k.Debounce(ctx)
 
@@ -133,6 +148,7 @@ func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*
 	return di, nil
 }
 
+// Debounce debounces a given function with the given DebounceItem.
 func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Function) error {
 	if fn.Debounce == nil {
 		return fmt.Errorf("fn has no debounce config")
@@ -249,8 +265,9 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		return err
 	}
 
-	// NOTE: This functioon has a deadline to complete.  If this fn doesn't complete within the deadline,
-	// eg, network issues, we must check if the debounce expired and re-attempt the entire thing.
+	// NOTE: This function has a deadline to complete.  If this fn doesn't complete within the deadline,
+	// eg, network issues, we must check if the debounce expired and re-attempt the entire thing, allowing
+	// us to either update or create a new debounce depending on the current time.
 	ctx, cancel := context.WithTimeout(ctx, buffer)
 	defer cancel()
 
@@ -288,7 +305,11 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 }
 
 func (d debouncer) debounceKey(ctx context.Context, evt event.TrackedEvent, fn inngest.Function) (string, error) {
-	out, _, err := expressions.Evaluate(ctx, fn.Debounce.Key, map[string]any{"event": evt.GetEvent().Map()})
+	if fn.Debounce.Key == nil {
+		return fn.ID.String(), nil
+	}
+
+	out, _, err := expressions.Evaluate(ctx, *fn.Debounce.Key, map[string]any{"event": evt.GetEvent().Map()})
 	if err != nil {
 		return "", fmt.Errorf("invalid debounce expression: %w", err)
 	}
