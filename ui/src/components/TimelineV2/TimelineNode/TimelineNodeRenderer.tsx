@@ -16,7 +16,9 @@ type RenderedData = {
 
 export default function renderTimelineNode(node: HistoryNode): RenderedData {
   let icon: JSX.Element;
-  if (node.status === 'cancelled') {
+  if (node.scope === "function" && node.status === "started") {
+    icon = <IconStatusCircleCheck />
+  } else if (node.status === 'cancelled') {
     icon = <IconStatusCircleCross className="text-slate-700" />;
   } else if (node.status === 'completed') {
     icon = <IconStatusCircleCheck />;
@@ -34,14 +36,18 @@ export default function renderTimelineNode(node: HistoryNode): RenderedData {
   }
 
   let name = '...';
-  if (node.waitForEventConfig) {
-    name = node.waitForEventConfig.eventName;
-  } else if (node.name) {
-    name = node.name;
-  } else if (node.status === 'scheduled') {
-    name = 'Waiting to start next step...';
-  } else if (node.status === 'started') {
-    name = 'Running next step...';
+  if (node.scope === "function") {
+    name = `Function ${node.status}`;
+  } else if (node.scope === "step") {
+    if (node.waitForEventConfig) {
+      name = node.waitForEventConfig.eventName;
+    } else if (node.name) {
+      name = node.name;
+    } else if (node.status === 'scheduled') {
+      name = 'Waiting to start next step...';
+    } else if (node.status === 'started') {
+      name = 'Running next step...';
+    }
   }
 
   let metadata;
