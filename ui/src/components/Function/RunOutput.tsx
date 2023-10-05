@@ -3,7 +3,7 @@ import renderRunOutput from '@/components/Function/RunOutputRenderer';
 import { FunctionRunStatus, type FunctionRun } from '@/store/generated';
 
 interface RunOutputCardProps {
-  functionRun: Omit<FunctionRun, 'history' | 'functionID' | 'historyItemOutput'>;
+  functionRun: Omit<FunctionRun, 'function' |'history' | 'functionID' | 'historyItemOutput'>;
 }
 
 export default function RunOutputCard({ functionRun }: RunOutputCardProps) {
