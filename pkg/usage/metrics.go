@@ -37,6 +37,7 @@ func (mr MetricsRequest) Granularity() string {
 
 // MetricsResponse represents an API response to a MetricsRequest
 type MetricsResponse struct {
+	Name        string        `json:"name"`
 	From        time.Time     `json:"from"`
 	To          time.Time     `json:"to"`
 	Granularity string        `json:"granularity"`
