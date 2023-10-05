@@ -1,6 +1,7 @@
 package usage
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -9,6 +10,22 @@ type MetricsRequest struct {
 	Name string    `json:"name"`
 	From time.Time `json:"from"`
 	To   time.Time `json:"to"`
+}
+
+func (mr MetricsRequest) Valid() (bool, error) {
+	if mr.Name == "" {
+		return false, fmt.Errorf("metrics' name must be specified")
+	}
+
+	if mr.From.IsZero() || mr.To.IsZero() {
+		return false, fmt.Errorf("metrics' time range (from/to - ISO8601 format) must be specified")
+	}
+
+	if mr.To.Sub(mr.From) < 0 {
+		return false, fmt.Errorf("invalid time range for metrics")
+	}
+
+	return true, nil
 }
 
 func (mr MetricsRequest) Granularity() string {

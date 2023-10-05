@@ -1,11 +1,65 @@
 package usage
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestMetricsRequestValid(t *testing.T) {
+	tests := []struct {
+		name     string
+		req      *MetricsRequest
+		expected bool
+		err      error
+	}{
+		{
+			name: "valid request returns true",
+			req: &MetricsRequest{
+				Name: "something",
+				From: time.Now().Add(-1 * time.Hour),
+				To:   time.Now(),
+			},
+			expected: true,
+			err:      nil,
+		},
+		{
+			name:     "missing name returns false",
+			req:      &MetricsRequest{},
+			expected: false,
+			err:      errors.New("metrics' name must be specified"),
+		},
+		{
+			name: "missing time range will returns false",
+			req: &MetricsRequest{
+				Name: "something",
+			},
+			expected: false,
+			err:      errors.New("metrics' time range (from/to - ISO8601 format) must be specified"),
+		},
+		{
+			name: "opposite time range (to < from) returns false",
+			req: &MetricsRequest{
+				Name: "something",
+				From: time.Now().Add(-1 * time.Hour),
+				To:   time.Now().Add(-2 * time.Hour),
+			},
+			expected: false,
+			err:      errors.New("invalid time range for metrics"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ok, err := test.req.Valid()
+
+			assert.Equal(t, test.expected, ok)
+			assert.Equal(t, test.err, err)
+		})
+	}
+}
 
 func TestMetricsRequestGranularity(t *testing.T) {
 	tests := []struct {
