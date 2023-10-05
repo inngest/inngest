@@ -207,9 +207,15 @@ func (f Function) Validate(ctx context.Context) error {
 		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.Debounce.Key); exprErr != nil {
 			err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
 		}
-
 		if f.EventBatch != nil {
 			err = multierror.Append(err, fmt.Errorf("A function cannot specify batch and debounce"))
+		}
+		period, err := str2duration.ParseDuration(f.Debounce.Period)
+		if err != nil {
+			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is invalid: %w", f.Debounce.Period, err))
+		}
+		if period > consts.MaxDebouncePeriod {
+			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is greater than the max of: %s", f.Debounce.Period, period.String()))
 		}
 	}
 
