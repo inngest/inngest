@@ -388,7 +388,7 @@ export type GetFunctionRunQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, finishedAt?: any | null, output?: string | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null, event?: { __typename?: 'Event', id: string, raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }> | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID?: any | null, id: any, stepName?: string | null, type: HistoryType, url?: string | null, cancel?: { __typename?: 'RunHistoryCancel', eventID?: any | null, expression?: string | null, userID?: any | null } | null, sleep?: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent?: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression?: string | null, timeout: any } | null, waitResult?: { __typename?: 'RunHistoryWaitResult', eventID?: any | null, timeout: boolean } | null }> } | null };
+export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, finishedAt?: any | null, output?: string | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null, function?: { __typename?: 'Function', triggers?: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null } | null, event?: { __typename?: 'Event', id: string, raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }> | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID?: any | null, id: any, stepName?: string | null, type: HistoryType, url?: string | null, cancel?: { __typename?: 'RunHistoryCancel', eventID?: any | null, expression?: string | null, userID?: any | null } | null, sleep?: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent?: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression?: string | null, timeout: any } | null, waitResult?: { __typename?: 'RunHistoryWaitResult', eventID?: any | null, timeout: boolean } | null }> } | null };
 
 export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -517,6 +517,12 @@ export const GetFunctionRunDocument = `
       expiryTime
       eventName
       expression
+    }
+    function {
+      triggers {
+        type
+        value
+      }
     }
     event {
       id

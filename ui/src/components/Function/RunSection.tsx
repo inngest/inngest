@@ -2,28 +2,31 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import ms from 'ms';
 
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
+import { IconClock } from '@/icons';
+import { client } from '@/store/baseApi';
 import { usePrettyJson } from '../../hooks/usePrettyJson';
 import {
   EventStatus,
   FunctionEventType,
   FunctionRunStatus,
+  FunctionTriggerTypes,
   GetHistoryItemOutputDocument,
   StepEventType,
   useGetFunctionRunQuery,
 } from '../../store/generated';
+import Badge from '../Badge';
 import { BlankSlate } from '../Blank';
 import CodeBlock from '../Code/CodeBlock';
 import ContentCard from '../Content/ContentCard';
 import TimelineFuncProgress from '../Timeline/TimelineFuncProgress';
 import TimelineRow from '../Timeline/TimelineRow';
+import { Timeline } from '../TimelineV2';
+import { useParsedHistory } from '../TimelineV2/historyParser';
 import renderRunMetadata from './RunMetadataRenderer';
 import RunOutputCard from './RunOutput';
 import { FunctionRunStatusIcons } from './RunStatusIcons';
-import { useParsedHistory } from '../TimelineV2/historyParser';
-import { WaitingSummary } from './WaitingSummary';
 import { SleepingSummary } from './SleepingSummary';
-import { Timeline } from '../TimelineV2';
-import { client } from '@/store/baseApi';
+import { WaitingSummary } from './WaitingSummary';
 
 // TODO: Delete this. It's only here to make it easy to switch between the old and new timeline during dev.
 const isNewTimelineVisible = false;
@@ -40,23 +43,24 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
   );
   const run = useMemo(() => query.data?.functionRun, [query.data?.functionRun]);
   const timeline = useMemo(() => normalizeSteps(run?.timeline || null), [run]);
-  const history = useParsedHistory(run?.history ?? [])
+  const history = useParsedHistory(run?.history ?? []);
+  const firstTrigger = run?.function?.triggers?.[0] ?? null;
+  const cron = firstTrigger && firstTrigger.type === FunctionTriggerTypes.Cron;
 
   useEffect(() => {
     if (!run?.event?.id) {
       return;
     }
-  }, [ run?.event?.id]);
-
+  }, [run?.event?.id]);
 
   const getOutput = useCallback(
     (historyItemID: string) => {
       if (!runId) {
         // Should be unreachable.
-        return new Promise<string>((resolve) => resolve(''))
+        return new Promise<string>((resolve) => resolve(''));
       }
 
-      return getHistoryItemOutput({ historyItemID, runID: runId })
+      return getHistoryItemOutput({ historyItemID, runID: runId });
     },
     [runId],
   );
@@ -89,6 +93,16 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       title={run.name || 'Unknown'}
       icon={run.status && <FunctionRunStatusIcons status={run.status} className="icon-xl" />}
       type="run"
+      badge={
+        cron ? (
+          <div className="py-2">
+            <Badge className="text-orange-400 bg-orange-400/10" kind="solid">
+              <IconClock />
+              {firstTrigger.value}
+            </Badge>
+          </div>
+        ) : null
+      }
       metadata={
         <div className="pt-8">
           <MetadataGrid metadataItems={metadataItems} />
@@ -96,9 +110,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       }
     >
       <div className="px-5 pt-4">
-        {run.status && run.finishedAt && run.output && (
-            <RunOutputCard functionRun={run} />
-        )}
+        {run.status && run.finishedAt && run.output && <RunOutputCard functionRun={run} />}
 
         <WaitingSummary history={history} />
         <SleepingSummary history={history} />
@@ -107,27 +119,23 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       <hr className="border-slate-800/50 mt-8" />
       <div className="px-5 pt-4">
         <h3 className="text-slate-400 text-sm py-4">Timeline</h3>
-        {isNewTimelineVisible && (
-          <Timeline
-            getOutput={getOutput}
-            history={history}
-          />
-        )}
+        {isNewTimelineVisible && <Timeline getOutput={getOutput} history={history} />}
 
-        {!isNewTimelineVisible && timeline?.map((row, i, list) => (
-          <FunctionRunTimelineRow
-            createdAt={row.createdAt}
-            rowType={row.__typename === 'FunctionEvent' ? 'function' : 'step'}
-            eventType={
-              row.__typename === 'FunctionEvent'
-                ? row.functionType || FunctionEventType.Completed
-                : row.stepType || StepEventType.Completed
-            }
-            output={row.output}
-            name={row.__typename === 'StepEvent' ? row.name || undefined : undefined}
-            last={i === list.length - 1}
-          />
-        ))}
+        {!isNewTimelineVisible &&
+          timeline?.map((row, i, list) => (
+            <FunctionRunTimelineRow
+              createdAt={row.createdAt}
+              rowType={row.__typename === 'FunctionEvent' ? 'function' : 'step'}
+              eventType={
+                row.__typename === 'FunctionEvent'
+                  ? row.functionType || FunctionEventType.Completed
+                  : row.stepType || StepEventType.Completed
+              }
+              output={row.output}
+              name={row.__typename === 'StepEvent' ? row.name || undefined : undefined}
+              last={i === list.length - 1}
+            />
+          ))}
       </div>
     </ContentCard>
   );

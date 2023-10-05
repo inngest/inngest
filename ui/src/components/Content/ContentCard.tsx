@@ -5,6 +5,7 @@ interface ContentCardProps {
   children: React.ReactNode;
   title?: string;
   icon?: React.ReactNode;
+  badge?: React.ReactNode;
   type?: 'event' | 'run';
   metadata?: React.ReactNode;
   button?: React.ReactNode;
@@ -15,6 +16,7 @@ export default function ContentCard({
   children,
   title,
   icon,
+  badge,
   type,
   metadata,
   button,
@@ -41,6 +43,7 @@ export default function ContentCard({
           ) : null}
           {button}
         </div>
+        {badge}
         {metadata}
       </div>
       <div className="overflow-y-scroll flex-1">{children}</div>
