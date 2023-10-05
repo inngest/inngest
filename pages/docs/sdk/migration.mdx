@@ -329,6 +329,10 @@ See [Handling in-progress runs triggered from v2](#handling-in-progress-runs-tri
 
 Serving functions could become a bit unwieldy with the format we had, so we've slightly altered how you serve your functions to ensure proper discoverability of options and aid in readability when revisiting the code.
 
+<Callout>
+In v2, `serve()` would always return `any`, to ensure compatibility with any version of any framework. If you're experiencing issues, you can return to this - though we don't recommend it - by using a type assertion such as `serve() as any`.
+</Callout>
+
 Also see the [Environment variables and config](#environment-variables-and-configuration) section.
 
 <Row>
@@ -439,10 +443,6 @@ When upgrading to v3, there may be function runs in progress that were started u
 We found that writing custom serve handlers could be a confusing experience, focusing heavily on Inngest concepts. With v3, we've changed these handlers to now focus almost exclusively on shared concepts around how to parse requests and send responses.
 
 A handler is now defined by telling Inngest how to access certain pieces of the request and how to send a response. Handlers are also now correctly typed, meaning the output of `serve()` will be a function signature compatible with your framework.
-
-<Callout>
-In v2, `serve()` would always return `any`. You can return to this - though we don't recommend it - by using a type assertion such as `serve() as any`.
-</Callout>
 
 See the simple handler below that uses the native `Request` and `Response` objects to see the comparison between v2 and v3.
 
