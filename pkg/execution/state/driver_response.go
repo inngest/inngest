@@ -13,7 +13,7 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-const DefaultErrorMessage = "Unknown error running SDK"
+const DefaultErrorMessage = "Function execution error"
 
 type Retryable interface {
 	Retryable() bool
