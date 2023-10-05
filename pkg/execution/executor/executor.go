@@ -875,6 +875,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 	// Ensure that we process waitForEvents first, as these are highest priority.
 	sortOps(resp.Generator)
 
+	isParallel := len(resp.Generator) > 1
 	eg := errgroup.Group{}
 	for _, op := range resp.Generator {
 		if op == nil {
@@ -886,10 +887,12 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, resp *state.Driv
 		}
 		copied := *op
 
-		// Give each op its own group ID, as we want to track each step
-		// individually.
 		newItem := item
-		newItem.GroupID = uuid.New().String()
+		if isParallel {
+			// Give each opcode its own group ID, since we want to track each
+			// parellel step individually.
+			newItem.GroupID = uuid.New().String()
+		}
 
 		eg.Go(func() error { return e.HandleGenerator(ctx, copied, newItem) })
 	}
