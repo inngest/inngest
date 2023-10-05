@@ -7,7 +7,9 @@ import StreamDetails from '../StreamDetails';
 
 const StreamSlideOver = () => {
   const params = useSearchParams();
-  const triggerID = params.get('event') || params.get('cron');
+  const isEvent = params.get('event');
+  const isCron = params.get('cron');
+  const triggerID = isEvent || isCron;
   const router = useRouter();
 
   const closeSlideOver = () => {
@@ -17,7 +19,7 @@ const StreamSlideOver = () => {
   if (!triggerID) return;
 
   return (
-    <SlideOver onClose={closeSlideOver}>
+    <SlideOver size={isCron ? 'small' : 'large'} onClose={closeSlideOver}>
       <StreamDetails />
     </SlideOver>
   );
