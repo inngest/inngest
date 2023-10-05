@@ -60,9 +60,26 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 			// These are children of events.
 			continue
 		}
+
+		var trigger string
+		if fn, err := r.Data.GetFunctionByID(ctx, i.FunctionID); err == nil {
+			if fn, err := fn.InngestFunction(); err == nil {
+				// Should always have at least 1 trigger, but we'll check anyway
+				// to avoid a panic just in case.
+				if (len(fn.Triggers)) >= 0 {
+					// This is a flawed way to get the cron, since this value is
+					// always the latest cron schedule. In other words, if a
+					// user updates the cron schedule for the function then
+					// preexisting runs will have the new cron schedule instead
+					// of the one when they ran.
+					trigger = fn.Triggers[0].Cron
+				}
+			}
+		}
+
 		items = append(items, &models.StreamItem{
 			ID:        i.RunID.String(),
-			Trigger:   "", // XXX: Load matching cron, from event data?
+			Trigger:   trigger,
 			Type:      models.StreamTypeCron,
 			CreatedAt: i.RunStartedAt,
 			Runs:      []*models.FunctionRun{models.MakeFunctionRun(i)},
