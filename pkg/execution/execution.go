@@ -136,6 +136,10 @@ type ScheduleRequest struct {
 	IdempotencyKey *string
 	// Context represents additional context used when initialiizing function runs.
 	Context map[string]any
+	// PreventDebounce prevents debouncing this function and immediately schedules
+	// execution.  This is used after the debounce has finished to force execution
+	// of the function, instead of debouncing again.
+	PreventDebounce bool
 }
 
 // CancelRequest stores information about the incoming cancellation request within

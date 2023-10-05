@@ -98,7 +98,7 @@ if concurrencyScores ~= false then
 	redis.call("ZADD", concurrencyPointer, earliestLease, partitionName)
 end
 
--- Remove the item from our sorted index, as this is now on the queue.
+-- Remove the item from our sorted index, as this is no longer on the queue.
 redis.call("ZREM", queueIndexKey, item.id)
 
 return 0

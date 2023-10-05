@@ -18,6 +18,7 @@ type FunctionOpts struct {
 	Idempotency *string
 	Retries     *int
 	Cancel      []inngest.Cancel
+	Debounce    *Debounce
 
 	// RateLimit allows the function to be rate limited.
 	RateLimit *RateLimit
@@ -41,6 +42,11 @@ func (f FunctionOpts) GetRateLimit() *inngest.RateLimit {
 		return nil
 	}
 	return f.RateLimit.Convert()
+}
+
+type Debounce struct {
+	Key    string        `json:"key"`
+	Period time.Duration `json:"period"`
 }
 
 type RateLimit struct {
@@ -70,22 +76,22 @@ func (r RateLimit) Convert() *inngest.RateLimit {
 // For example, if you have a signup event defined as a struct you can use this to strongly
 // type your input:
 //
-// 	type SignupEvent struct {
-// 		Name string
-// 		Data struct {
-// 			Email     string
-// 			AccountID string
-// 		}
-// 	}
+//	type SignupEvent struct {
+//		Name string
+//		Data struct {
+//			Email     string
+//			AccountID string
+//		}
+//	}
 //
-// 	f := CreateFunction(
-// 		inngestgo.FunctionOptions{Name: "Post-signup flow"},
-// 		inngestgo.EventTrigger("user/signed.up"),
-// 		func(ctx context.Context, input gosdk.Input[SignupEvent]) (any, error) {
-// 			// .. Your logic here.  input.Event will be strongly typed as a SignupEvent.
-// 			// step.Run(ctx, "Do some logic", func(ctx context.Context) (string, error) { return "hi", nil })
-// 		},
-// 	)
+//	f := CreateFunction(
+//		inngestgo.FunctionOptions{Name: "Post-signup flow"},
+//		inngestgo.EventTrigger("user/signed.up"),
+//		func(ctx context.Context, input gosdk.Input[SignupEvent]) (any, error) {
+//			// .. Your logic here.  input.Event will be strongly typed as a SignupEvent.
+//			// step.Run(ctx, "Do some logic", func(ctx context.Context) (string, error) { return "hi", nil })
+//		},
+//	)
 func CreateFunction[T any](
 	fc FunctionOpts,
 	trigger inngest.Trigger,
@@ -133,9 +139,9 @@ func CronTrigger(cron string) inngest.Trigger {
 //
 // This uses generics to strongly type input events:
 //
-// 	func(ctx context.Context, input gosdk.Input[SignupEvent]) (any, error) {
-// 		// .. Your logic here.  input.Event will be strongly typed as a SignupEvent.
-// 	}
+//	func(ctx context.Context, input gosdk.Input[SignupEvent]) (any, error) {
+//		// .. Your logic here.  input.Event will be strongly typed as a SignupEvent.
+//	}
 type SDKFunction[T any] func(ctx context.Context, input Input[T]) (any, error)
 
 // ServableFunction defines a function which can be called by a handler's Serve method.
@@ -172,9 +178,11 @@ type Input[T any] struct {
 }
 
 type InputCtx struct {
+	Env        string `json:"env"`
 	FunctionID string `json:"fn_id"`
 	RunID      string `json:"run_id"`
 	StepID     string `json:"step_id"`
+	Attempt    int    `json:"attempt"`
 }
 
 type servableFunc struct {

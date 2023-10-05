@@ -175,7 +175,26 @@ func (h *handler) SetAppName(name string) Handler {
 func (h *handler) Register(funcs ...ServableFunction) {
 	h.l.Lock()
 	defer h.l.Unlock()
-	h.funcs = append(h.funcs, funcs...)
+
+	// Create a map of functions by slug.  If we're registering a function
+	// that already exists, clear it.
+	slugs := map[string]ServableFunction{}
+	for _, f := range h.funcs {
+		slugs[f.Slug()] = f
+	}
+
+	for _, f := range funcs {
+		slugs[f.Slug()] = f
+	}
+
+	newFuncs := make([]ServableFunction, len(slugs))
+	i := 0
+	for _, f := range slugs {
+		newFuncs[i] = f
+		i++
+	}
+
+	h.funcs = newFuncs
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -227,8 +246,8 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 		// Modify URL to contain fn ID, step params
 		url := h.url(r)
 		values := url.Query()
-		values.Add("fnId", fn.Slug())
-		values.Add("step", "step")
+		values.Set("fnId", fn.Slug())
+		values.Set("step", "step")
 		url.RawQuery = values.Encode()
 
 		f := sdk.SDKFunction{
@@ -248,6 +267,13 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 					},
 				},
 			},
+		}
+
+		if c.Debounce != nil {
+			f.Debounce = &inngest.Debounce{
+				Key:    &c.Debounce.Key,
+				Period: c.Debounce.Period.String(),
+			}
 		}
 
 		if c.BatchEvents != nil {
@@ -289,16 +315,16 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 
 	byt, err := json.Marshal(config)
 	if err != nil {
-		return err
+		return fmt.Errorf("error marshalling function config: %w", err)
 	}
 	req, err := http.NewRequest(http.MethodPost, registerURL, bytes.NewReader(byt))
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating new request: %w", err)
 	}
 
 	key, err := hashedSigningKey([]byte(h.GetSigningKey()))
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating signing key: %w", err)
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", string(key)))
 	if h.GetEnv() != "" {
@@ -307,7 +333,7 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("error performing registration request: %w", err)
 	}
 	if resp.StatusCode > 299 {
 		body := map[string]any{}
@@ -440,6 +466,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 				StatusCode: 500,
 				Body:       fmt.Sprintf("error calling function: %s", err.Error()),
 				NoRetry:    IsNoRetryError(err),
+				RetryAt:    GetRetryAtTime(err),
 			})
 		}
 		if len(ops) > 0 {
@@ -461,7 +488,9 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 			w.Header().Add("x-inngest-no-retry", "true")
 		}
 
-		// TODO: Add retry-at.
+		if at := GetRetryAtTime(err); at != nil {
+			w.Header().Add("retry-after", at.Format(time.RFC3339))
+		}
 
 		return publicerr.Error{
 			Message: fmt.Sprintf("error calling function: %s", err.Error()),
@@ -484,7 +513,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 type StreamResponse struct {
 	StatusCode int               `json:"status"`
 	Body       any               `json:"body"`
-	RetryAt    *string           `json:"retryAt"`
+	RetryAt    *time.Time        `json:"retryAt"`
 	NoRetry    bool              `json:"noRetry"`
 	Headers    map[string]string `json:"headers"`
 }
@@ -559,6 +588,16 @@ func invoke(ctx context.Context, sf ServableFunction, input *sdkrequest.Request)
 		}
 		inputVal.FieldByName("Events").Set(reflect.ValueOf(events))
 	}
+
+	// Set InputCtx
+	callCtx := InputCtx{
+		Env:        input.CallCtx.Env,
+		FunctionID: input.CallCtx.FunctionID,
+		RunID:      input.CallCtx.RunID,
+		StepID:     input.CallCtx.StepID,
+		Attempt:    input.CallCtx.Attempt,
+	}
+	inputVal.FieldByName("InputCtx").Set(reflect.ValueOf(callCtx))
 
 	var (
 		res       []reflect.Value

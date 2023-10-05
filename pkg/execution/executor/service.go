@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -54,6 +55,12 @@ func WithServiceQueue(q queue.Queue) func(s *svc) {
 	}
 }
 
+func WithServiceDebouncer(d debounce.Debouncer) func(s *svc) {
+	return func(s *svc) {
+		s.debouncer = d
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) service.Service {
 	svc := &svc{config: c}
 	for _, o := range opts {
@@ -71,7 +78,8 @@ type svc struct {
 	// queue allows us to enqueue next steps.
 	queue queue.Queue
 	// exec runs the specific actions.
-	exec execution.Executor
+	exec      execution.Executor
+	debouncer debounce.Debouncer
 
 	wg sync.WaitGroup
 
@@ -163,6 +171,37 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleQueueItem(ctx, item)
 		case queue.KindPause:
 			err = s.handlePauseTimeout(ctx, item)
+		case queue.KindDebounce:
+			d := debounce.DebouncePayload{}
+			if err := json.Unmarshal(item.Payload.(json.RawMessage), &d); err != nil {
+				return fmt.Errorf("error unmarshalling debounce payload: %w", err)
+			}
+
+			all, err := s.data.Functions(ctx)
+			if err != nil {
+				return err
+			}
+
+			for _, f := range all {
+				if f.ID == d.FunctionID {
+					di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID)
+					if err != nil {
+						return err
+					}
+					_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
+						Function:        f,
+						AccountID:       di.AccountID,
+						WorkspaceID:     di.WorkspaceID,
+						Events:          []event.TrackedEvent{di},
+						PreventDebounce: true,
+					})
+					if err != nil {
+						return err
+					}
+					_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID)
+				}
+			}
+
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
