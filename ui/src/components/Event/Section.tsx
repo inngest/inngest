@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { ulid } from 'ulid';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import Badge from '@/components/Badge';
 import SendEventButton from '@/components/Event/SendEventButton';
@@ -8,8 +9,6 @@ import { shortDate } from '@/utils/date';
 import { usePrettyJson } from '../../hooks/usePrettyJson';
 import { useSendEventMutation } from '../../store/devApi';
 import { useGetEventQuery } from '../../store/generated';
-import { selectRun } from '../../store/global';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import Button from '../Button/Button';
 import CodeBlock from '../Code/CodeBlock';
 import ContentCard from '../Content/ContentCard';
@@ -21,9 +20,9 @@ interface EventSectionProps {
 }
 
 export const EventSection = ({ eventId }: EventSectionProps) => {
-  const selectedRun = useAppSelector((state) => state.global.selectedRun);
-  const dispatch = useAppDispatch();
-
+  const router = useRouter();
+  const params = useSearchParams();
+  const runID = params.get('run');
   const query = useGetEventQuery({ id: eventId }, { pollingInterval: 1500 });
   const event = useMemo(() => query.data?.event, [query.data?.event]);
   const eventPayload = usePrettyJson(event?.raw);
@@ -38,9 +37,9 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
     return <div>Event not found</div>;
   }
 
-  if (!selectedRun && event.functionRuns && event.functionRuns.length > 0) {
+  if (!runID && event.functionRuns && event.functionRuns.length > 0) {
     const firstRunId = event.functionRuns[0].id;
-    dispatch(selectRun(firstRunId))
+    router.push(`/stream/trigger?event=${eventId}&run=${firstRunId}`)
   }
 
   return (
@@ -101,8 +100,8 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
                 title={run.name || 'Unknown'}
                 id={run.id}
                 status={run.status || undefined}
-                active={selectedRun === run.id}
-                onClick={() => dispatch(selectRun(run.id))}
+                active={runID === run.id}
+                onClick={() => router.push(`/stream/trigger?event=${eventId}&run=${run.id}`)}
                 footer={<FuncCardFooter functionRun={run} />}
               />
             );
