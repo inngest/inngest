@@ -145,7 +145,7 @@ type UnhashedOp struct {
 	Op     enums.Opcode   `json:"op"`
 	Opts   map[string]any `json:"opts"`
 	Pos    uint           `json:"pos"`
-	Parent *string        `json:"parent"`
+	Parent *string        `json:"parent,omitempty"`
 }
 
 func (u UnhashedOp) Hash() (string, error) {

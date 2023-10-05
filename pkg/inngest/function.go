@@ -55,6 +55,8 @@ type Function struct {
 	// by an individual concurrency key.
 	Concurrency *Concurrency `json:"concurrency,omitempty"`
 
+	Debounce *Debounce `json:"debounce,omitempty"`
+
 	// Trigger represnets the trigger for the function.
 	Triggers []Trigger `json:"triggers"`
 
@@ -73,6 +75,11 @@ type Function struct {
 
 	// Edges represent edges between steps in the dag.
 	Edges []Edge `json:"edges,omitempty"`
+}
+
+type Debounce struct {
+	Key    *string `json:"key"`
+	Period string  `json:"period"`
 }
 
 func (f Function) ConcurrencyLimit() int {
@@ -194,6 +201,25 @@ func (f Function) Validate(ctx context.Context) error {
 
 	if len(f.Cancel) > consts.MaxCancellations {
 		err = multierror.Append(err, fmt.Errorf("This function exceeds the max number of cancellation events: %d", consts.MaxCancellations))
+	}
+
+	if f.Debounce != nil && f.Debounce.Key != nil {
+		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.Debounce.Key); exprErr != nil {
+			err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
+		}
+		if f.EventBatch != nil {
+			err = multierror.Append(err, fmt.Errorf("A function cannot specify batch and debounce"))
+		}
+		period, perr := str2duration.ParseDuration(f.Debounce.Period)
+		if perr != nil {
+			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is invalid: %w", f.Debounce.Period, perr))
+		}
+		if period < consts.MinDebouncePeriod {
+			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is less than the min of: %s", f.Debounce.Period, consts.MinDebouncePeriod))
+		}
+		if period > consts.MaxDebouncePeriod {
+			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is greater than the max of: %s", f.Debounce.Period, consts.MaxDebouncePeriod))
+		}
 	}
 
 	// Validate rate limit expression

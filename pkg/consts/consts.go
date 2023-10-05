@@ -38,6 +38,13 @@ const (
 	// MinRetryDuration is the soonest a retry can be scheduled.
 	MinRetryDuration = time.Second * 1
 
+	// MinDebouncePeriod is the minimum period of time that can be used to configure a debounce.
+	MinDebouncePeriod = time.Second
+
+	// MaxDebouncePeriod is the maximum period of time that can be used to configure a debounce.  This
+	// lets users delay functions for up to MaxDebouncePeriod when events are received.
+	MaxDebouncePeriod = time.Hour * 24 * 7
+
 	// MaxCancellations represents the max automatic cancellation signals per function
 	MaxCancellations = 5
 

@@ -14,7 +14,7 @@ local idempotencyKey      = KEYS[6]   -- seen:$key
 
 local queueItem      = ARGV[1] -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID        = ARGV[2] -- id
-local queueScore     = tonumber(ARGV[3]) -- vesting time, in seconds
+local queueScore     = tonumber(ARGV[3]) -- vesting time, in milliseconds
 local workflowID     = ARGV[4] -- $workflowID
 local partitionItem  = ARGV[5] -- {workflow, priority, leasedAt, etc}
 
