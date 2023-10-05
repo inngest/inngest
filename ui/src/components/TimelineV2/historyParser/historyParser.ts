@@ -95,12 +95,9 @@ export class HistoryParser {
     // Create a dedicated node for function run start.
     const node: HistoryNode = {
       attempt: 0,
+      endedAt: startedAt,
       groupID: 'function-run-start',
-
-      // Doesn't make sense for this node (since it's just for the start of
-      // the run), but we have to put something.
       scheduledAt: startedAt,
-
       scope: 'function',
       startedAt,
       status: 'started',
