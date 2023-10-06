@@ -18,20 +18,20 @@ type MetricsRequest struct {
 	To   time.Time `json:"to"`
 }
 
-func (mr MetricsRequest) Valid() (bool, error) {
+func (mr MetricsRequest) Valid() error {
 	if mr.Name == "" {
-		return false, NoMetricsNameErr
+		return NoMetricsNameErr
 	}
 
 	if mr.From.IsZero() || mr.To.IsZero() {
-		return false, NoMetricsTimeRangeErr
+		return NoMetricsTimeRangeErr
 	}
 
 	if mr.To.Sub(mr.From) < 0 {
-		return false, InvalidMetricsTimeRangeErr
+		return InvalidMetricsTimeRangeErr
 	}
 
-	return true, nil
+	return nil
 }
 
 // Granularity returns the predefined aggregation period for

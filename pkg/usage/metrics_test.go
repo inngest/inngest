@@ -9,10 +9,9 @@ import (
 
 func TestMetricsRequestValid(t *testing.T) {
 	tests := []struct {
-		name     string
-		req      *MetricsRequest
-		expected bool
-		err      error
+		name string
+		req  *MetricsRequest
+		err  error
 	}{
 		{
 			name: "valid request returns true",
@@ -21,22 +20,19 @@ func TestMetricsRequestValid(t *testing.T) {
 				From: time.Now().Add(-1 * time.Hour),
 				To:   time.Now(),
 			},
-			expected: true,
-			err:      nil,
+			err: nil,
 		},
 		{
-			name:     "missing name returns false",
-			req:      &MetricsRequest{},
-			expected: false,
-			err:      NoMetricsNameErr,
+			name: "missing name returns false",
+			req:  &MetricsRequest{},
+			err:  NoMetricsNameErr,
 		},
 		{
 			name: "missing time range will returns false",
 			req: &MetricsRequest{
 				Name: "something",
 			},
-			expected: false,
-			err:      NoMetricsTimeRangeErr,
+			err: NoMetricsTimeRangeErr,
 		},
 		{
 			name: "opposite time range (to < from) returns false",
@@ -45,17 +41,13 @@ func TestMetricsRequestValid(t *testing.T) {
 				From: time.Now().Add(-1 * time.Hour),
 				To:   time.Now().Add(-2 * time.Hour),
 			},
-			expected: false,
-			err:      InvalidMetricsTimeRangeErr,
+			err: InvalidMetricsTimeRangeErr,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ok, err := test.req.Valid()
-
-			assert.Equal(t, test.expected, ok)
-			assert.Equal(t, test.err, err)
+			assert.Equal(t, test.err, test.req.Valid())
 		})
 	}
 }
