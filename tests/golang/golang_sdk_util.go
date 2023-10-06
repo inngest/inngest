@@ -29,7 +29,7 @@ func NewSDKHandler(t *testing.T, hopts ...opt) (inngestgo.Handler, *HTTPServer, 
 	os.Setenv("INNGEST_DEV", "http://127.0.0.1:8288")
 
 	opts := inngestgo.HandlerOpts{
-		RegisterURL: inngestgo.Str("http://127.0.0.1:8288/fn/register"),
+		RegisterURL: inngestgo.StrPtr("http://127.0.0.1:8288/fn/register"),
 		Logger:      slog.Default(),
 		// Env:         inngestgo.Str("test-env"),
 	}
