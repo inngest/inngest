@@ -148,7 +148,7 @@ This is only needed to ensure function runs started on v2 will transition to v3;
 
 ## Clients and functions require IDs
 
-When instantiating a client using `new Inngest()` or creating a function via `inngest.createFunction()`, it's now required to pass an `id` instead of a `name`. We recommend just changing the property name and leaving the value the same to ensure you don't redeploy any functions.
+When instantiating a client using `new Inngest()` or creating a function via `inngest.createFunction()`, it's now required to pass an `id` instead of a `name`. We recommend changing the property name and wrapping the value in `slugify()` to ensure you don't redeploy any functions.
 
 #### Creating a client
 
@@ -156,10 +156,10 @@ When instantiating a client using `new Inngest()` or creating a function via `in
      <Col>
           <CodeGroup filename="✅ v3">
           ```ts
-          import { Inngest } from "inngest";
+          import { Inngest, slugify } from "inngest";
 
           export const inngest = new Inngest({
-            id: "My App",
+            id: slugify("My App"),
           });
           ```
           </CodeGroup>
