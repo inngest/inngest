@@ -22,6 +22,8 @@ export default inngest.createFunction(
 
 As `rateLimit` will ignore events that are received in excess of the limit, this is not useful if you need to process every single event. Instead, you might be more interested in [configuring a `concurrency` limit with a `key`](/docs/functions/concurrency#limiting-concurrency-for-a-specific-key).
 
+If you need to just prevent duplicate events from triggering your function over a 24 hour period, use [the `idempotency` option](/docs/reference/functions/create#configuration) instead.
+
 ---
 
 ## How `rateLimit` works
@@ -69,6 +71,8 @@ For example, this means that for a `limit: 10` and `period: '60m'` (60 minutes),
 ### Using a `key`
 
 When a `key` is added, a separate limit is applied for each unique value of the `key` expression. For example if your `key` is set to `event.data.customer_id`, each customer would have their individual rate limit applied to functions run meaning different users might have the same function run in same bucket time window, but two runs will not happen for the same `event.data.customer_id`.
+
+**Note** - To prevent duplicate events from triggering your function more than once in a 24 hour period, use [the `idempotency` option](/docs/reference/functions/create#configuration) which is the equivalent to setting `rateLimit` with a `key`, a `limit` of `1`  and `period` of `24hr`.
 
 
 ## Configuration

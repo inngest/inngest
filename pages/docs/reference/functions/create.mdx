@@ -43,6 +43,15 @@ The `createFunction` method accepts a series of arguments to define your functio
     </Properties>
   </Property>
 
+  <Property name="idempotency" type="string">
+    A key expression which is used to prevent duplicate events from triggering a function more than once in 24 hours. This is equivalent to setting `rateLimit` with a `key`, a `limit` of `1`  and `period` of `24hr`.
+
+    Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+
+    * Only run once for each customer id: `'event.data.customer_id'`
+    * Only run once for each account and email address: `'event.data.account_id + "-" + event.user.email'`
+  </Property>
+
   <Property name="rateLimit" type="object">
     Options to configure how to rate limit function execution ([reference](/docs/reference/functions/rate-limit))
 
