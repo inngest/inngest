@@ -28,12 +28,12 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
   const editorRef = useRef<MonacoEditorType>(null);
 
   const [originalContentHeight, setOriginalContentHeight] = useState(0);
-  const [disableWordWrap, setDisableWordWrap] = useState(false);
   const [wordWrap, setWordWrap] = useState('off');
 
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
   const monaco = useMonaco();
+  const content = tabs[activeTab].content;
 
   useEffect(() => {
     if (!monaco) {
@@ -81,15 +81,56 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
     editorRef.current = editor;
   }
 
+  function getTextWidth(text, font) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (context) {
+      context.font = font;
+      const metrics = context.measureText(text);
+      return metrics.width;
+    } else {
+      return text.length;
+    }
+  }
+
   const handleWrapText = () => {
-    const content = tabs[activeTab].content;
-    const numberOfLines = content.split(/\r?\\n/).length;
-    if (editorRef.current && numberOfLines > 1) {
-      setDisableWordWrap(false);
-      if (wordWrap === 'off') {
-        editorRef.current.layout({ height: numberOfLines * 20, width: 0 });
-      } else {
-        editorRef.current.layout({ height: originalContentHeight, width: 0 });
+    if (editorRef.current) {
+      let containerWidth = editorRef?.current?.getLayoutInfo().contentWidth;
+      const containerWidthWithLines =
+        containerWidth + editorRef.current.getLayoutInfo().contentLeft;
+      const contentWidth = editorRef?.current?.getContentWidth();
+
+      if (contentWidth > containerWidth) {
+        const linesContent = editorRef?.current?.getModel()?.getLinesContent();
+        let totalLinesThatFit = 0;
+
+        if (linesContent && linesContent.length > 0) {
+          for (let lineNumber = 1; lineNumber <= linesContent.length; lineNumber++) {
+            const lineContent = linesContent[lineNumber - 1];
+
+            const lineLengthWithWhitespace = getTextWidth(
+              lineContent,
+              '13px "Roboto Mono", monospace',
+            );
+
+            if (lineLengthWithWhitespace <= containerWidth) {
+              totalLinesThatFit++;
+            } else {
+              const linesNeeded = Math.ceil(lineLengthWithWhitespace / containerWidth);
+              totalLinesThatFit += linesNeeded;
+            }
+          }
+        }
+        if (totalLinesThatFit > 10) {
+          editorRef?.current?.layout({ height: 295, width: containerWidthWithLines });
+        } else {
+          editorRef?.current?.layout({
+            height: totalLinesThatFit * 20,
+            width: containerWidthWithLines,
+          });
+        }
+      } else if (wordWrap === 'on') {
+        editorRef.current.layout({ height: originalContentHeight, width: containerWidthWithLines });
       }
       const newWordWrap = wordWrap === 'on' ? 'off' : 'on';
       editorRef.current.updateOptions({ wordWrap: newWordWrap });
@@ -98,7 +139,7 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
   };
 
   // This prevents larger outputs from crashing the browser
-  const isOutputTooLarge = tabs[activeTab].content?.length > maxRenderedOutputSizeBytes;
+  const isOutputTooLarge = content?.length > maxRenderedOutputSizeBytes;
 
   const downloadJson = ({ content }) => {
     const blob = new Blob([content], { type: 'application/json' });
@@ -150,15 +191,10 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
         </div>
         {!isOutputTooLarge && (
           <div className="flex gap-2 items-center mr-2">
-            <CopyButton
-              code={tabs[activeTab].content}
-              isCopying={isCopying}
-              handleCopyClick={handleCopyClick}
-            />
+            <CopyButton code={content} isCopying={isCopying} handleCopyClick={handleCopyClick} />
             <Button
               icon={wordWrap === 'on' ? <IconOverflowText /> : <IconWrapText />}
               btnAction={handleWrapText}
-              disabled={disableWordWrap}
             />
           </div>
         )}
@@ -172,7 +208,7 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
             <Button
               label="Download Raw"
               icon={<IconArrayDownTray />}
-              btnAction={() => downloadJson({ content: tabs[activeTab].content })}
+              btnAction={() => downloadJson({ content: content })}
             />
           </div>
         </>
@@ -181,7 +217,7 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
           {monaco && (
             <Editor
               defaultLanguage="json"
-              value={tabs[activeTab].content}
+              value={content}
               theme="inngest-theme"
               options={{
                 readOnly: true,
@@ -218,12 +254,6 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
                 } else {
                   editor.layout({ height: contentHeight, width: 0 });
                   setOriginalContentHeight(contentHeight);
-                }
-                // Check if content string contains line breaks, to decide whether to enable the ability to do wordWrap
-                const content = tabs[activeTab].content;
-                const numberOfLines = content.split(/\r?\\n/).length;
-                if (numberOfLines === 1) {
-                  setDisableWordWrap(true);
                 }
               }}
             />

@@ -1,13 +1,14 @@
 import CodeBlock from '@/components/Code/CodeBlock';
 import renderRunOutput from '@/components/Function/RunOutputRenderer';
 import { FunctionRunStatus, type FunctionRun } from '@/store/generated';
+import { usePrettyJson } from '@/hooks/usePrettyJson';
 
 interface RunOutputCardProps {
   functionRun: Omit<FunctionRun, 'function' |'history' | 'functionID' | 'historyItemOutput'>;
 }
 
 export default function RunOutputCard({ functionRun }: RunOutputCardProps) {
-  const { message, errorName, output } = renderRunOutput(functionRun);
+  let { message, errorName, output } = renderRunOutput(functionRun);
 
   if (!message && !output) return null;
   let color = 'bg-slate-600';
@@ -16,6 +17,8 @@ export default function RunOutputCard({ functionRun }: RunOutputCardProps) {
   } else if (functionRun.status === FunctionRunStatus.Failed) {
     color = 'bg-rose-600/50';
   }
+
+  output = (functionRun.status === FunctionRunStatus.Completed && usePrettyJson(output)) ||  output;
 
   return (
     <CodeBlock
