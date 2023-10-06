@@ -90,7 +90,7 @@ const PLANS: Plan[] = [
     name: PLAN_NAMES.team,
     cost: {
       startsAt: true,
-      basePrice: "$20",
+      basePrice: "$50",
       included: "100k",
       additionalPrice: "$1",
       additionalRate: "10k",
@@ -133,7 +133,7 @@ const PLANS: Plan[] = [
     name: PLAN_NAMES.startup,
     cost: {
       startsAt: true,
-      basePrice: "$149",
+      basePrice: "$350",
       included: "5M",
       additionalPrice: "$10",
       additionalRate: "1M",
