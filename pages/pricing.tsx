@@ -136,7 +136,7 @@ const PLANS: Plan[] = [
       basePrice: "$350",
       included: "5M",
       additionalPrice: "$5",
-      additionalRate: "200K",
+      additionalRate: "200k",
       period: "month",
     },
     description: "Scale with us",
