@@ -36,27 +36,29 @@ func (mr MetricsRequest) Valid() error {
 
 // Granularity returns the predefined aggregation period for
 // the query
-func (mr MetricsRequest) Granularity() string {
+func (mr MetricsRequest) Granularity() time.Duration {
 	dur := mr.To.Sub(mr.From)
 	day := 24 * time.Hour
 
 	switch {
 	case dur >= 30*day:
-		return "12h"
+		return 12 * time.Hour
 	case dur >= 14*day:
-		return "6h"
+		return 6 * time.Hour
 	case dur >= 7*day:
-		return "3h"
+		return 3 * time.Hour
 	case dur >= 3*day:
-		return "1h"
+		return time.Hour
 	case dur >= 1*day:
-		return "30m"
+		return 30 * time.Minute
 	case dur >= 12*time.Hour:
-		return "15m"
+		return 15 * time.Minute
 	case dur >= 6*time.Hour:
-		return "10m"
+		return 10 * time.Minute
+	case dur >= 3*time.Hour:
+		return 5 * time.Minute
 	default:
-		return "5m"
+		return time.Minute
 	}
 }
 
@@ -65,7 +67,7 @@ type MetricsResponse struct {
 	Name        string        `json:"name"`
 	From        time.Time     `json:"from"`
 	To          time.Time     `json:"to"`
-	Granularity string        `json:"granularity"`
+	Granularity time.Duration `json:"granularity"`
 	Data        []MetricsData `json:"data"`
 }
 
