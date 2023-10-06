@@ -182,7 +182,8 @@ app.use(
 </CodeGroup>
 
 You must ensure you're using the `express.json()` middleware otherwise your functions won't be
-executed.
+executed. **Note** - You may need to set [`express.json()`'s `limit` option](https://expressjs.com/en/5x/api.html#express.json) to something higher than the default
+`100kb` to support larger event payloads and function state.
 
 ## Framework: Fastify <VersionBadge version="v2.6.0+" />
 
