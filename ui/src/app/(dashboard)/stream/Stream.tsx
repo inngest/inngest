@@ -16,7 +16,7 @@ import { client } from '@/store/baseApi';
 import { GetTriggersStreamDocument, type StreamItem } from '@/store/generated';
 import { fullDate } from '@/utils/date';
 import FunctionRunList from './FunctionRunList';
-import OutputList from './OutputList';
+// import OutputList from './OutputList';
 
 // import SourceBadge from './SourceBadge';
 
@@ -53,11 +53,11 @@ const columns = [
     size: 350,
     minSize: 350,
   }),
-  columnHelper.accessor((row) => row.runs, {
-    id: 'output',
-    cell: (props) => <OutputList functionRuns={props.row.original.runs} />,
-    header: () => <span>Output</span>,
-  }),
+  // columnHelper.accessor((row) => row.runs, {
+  //   id: 'output',
+  //   cell: (props) => <OutputList functionRuns={props.row.original.runs} />,
+  //   header: () => <span>Output</span>,
+  // }),
 ];
 
 export default function Stream() {
