@@ -1,0 +1,94 @@
+# Debounce functions
+
+Debounce delays a function run for the given `period`, and reschedules functions for the given `period` any time new events are received while the debounce is active.  The function run starts after the specified `period` passes and no new events have been received.  Functions use the last event as their input data.
+
+```ts
+export default inngest.createFunction(
+  {
+    id: "handle-webhook",
+    debounce: {
+      key: "event.data.account_id",
+      period: "5m",
+    },
+  },
+  { event: "intercom/company.updated" },
+  async ({ event, step }) => {
+    // This function will only be scheduled 5m after events have stopped being received with the same
+    // `event.data.account_id` field.
+    //
+    // `event` will be the last event in the series received.
+  }
+);
+```
+
+As debounce uses the *last* event received, it is a complement to idempotency (a rate limit of 1).  Idempotency ensures that a function runs once for each `key` the *first* time an event is received, while debounce uses the *last* event during a specified period.  These can be combined to ensure that once a function is debounced it does not run again.
+
+**Use cases**
+
+Debounce fundamentally limits function executions, running a single function using the last of a series of events.  This is useful in many circimstances:
+
+- Run a function once after a noisy webhook finishes sending events, using the last event
+- Prevent wasted work when handling events from user input
+- Ensuring that functions use the latest event within a series of updates
+
+## How it works
+
+The first time an event is received, a new `debounce` is created.  The `debounce` expires after yout given `period`.  Each time new
+events are received that match the same key (or function ID, if no key is present), the debounce's expiration is pushed out to expire
+after a new `period`.
+
+Once events stop being received, the debounce executes, initializing a new function run after the specified time using the last event
+as the function's input data.
+
+A visual example:
+
+<img
+  src="/assets/docs/reference/debounce.png"
+  width="800"
+  height={337}
+  quality="95"
+  alt="Visualization of how debounce is applied"
+/>
+
+
+## Using a `key`
+
+When a `key` is added, a separate limit is applied for each unique value of the `key` expression. For example if your `key` is set to `event.data.customer_id`, each customer would have their individual rate limit applied to functions run meaning different users might have the same function run in same bucket time window, but two runs will not happen for the same `event.data.customer_id`.
+
+## Configuration
+
+<Properties>
+  <Property name="debounce" type="object">
+    Options to configure how to debounce function execution
+
+    <Properties nested={true}>
+      <Property name="period" type="string" required>
+        The time period used when debouncing. The period begins when the first matching event is received.
+	Any event received within this period will reschedule the function's execution for the specified
+	period.
+
+        Current permitted values are from `1s` to `7d` (`168h`).
+      </Property>
+      <Property name="key" type="string">
+        An optional unique key expression to apply the limit to. The expression is evaluated for each triggering event,
+	and allows you to debounce against event data. 
+
+        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+
+        * Rate limit per customer id: `'event.data.customer_id'`
+        * Rate limit per account and email address: `'event.data.account_id + "-" + event.user.email'`
+      </Property>
+    </Properties>
+  </Property>
+</Properties>
+
+<Callout>
+  Functions will run using the last event received as the input data.
+</Callout>
+
+## Limitations
+
+- Debounce does not work with [batched functions](/docs/guides/batching)
+- The maximum debounce time is 7 days (168h)
+- The minimum debounce time is 1 second
+

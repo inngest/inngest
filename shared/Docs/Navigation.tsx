@@ -349,6 +349,10 @@ const referenceNavigation = [
         title: "Rate limit",
         href: `${baseDir}/reference/functions/rate-limit`,
       },
+      {
+        title: "Debounce",
+        href: `${baseDir}/reference/functions/debounce`,
+      },
       // {
       //   title: "Logging",
       //   href: `${baseDir}/reference/functions/logging`,
