@@ -15,22 +15,21 @@ export default function renderRunOutput(
   let output = '';
 
   if (functionRun.output) {
-    const isOutputTooLarge = functionRun.output?.length > maxRenderedOutputSizeBytes;
-    if (functionRun?.status === FunctionRunStatus.Failed) {
-      if (functionRun.output && !isOutputTooLarge) {
-        let parsedOutput;
-        if (typeof functionRun.output === 'string') {
-          const cleanedJsonString = functionRun.output.slice(1, -1).replace(/\\\"/g, '"');
-          try {
-            parsedOutput = JSON.parse(cleanedJsonString);
-            message = parsedOutput?.message;
-            errorName = parsedOutput?.name;
-            output = parsedOutput?.stack;
-          } catch (error) {
-            console.error(`Error parsing payload: `, error);
-            parsedOutput = functionRun.output;
-          }
+    const isOutputTooLarge = functionRun.output.length > maxRenderedOutputSizeBytes;
+
+    if (functionRun.status === FunctionRunStatus.Failed && !isOutputTooLarge) {
+      try {
+        const jsonObject = JSON.parse(functionRun.output);
+        errorName = jsonObject?.name;
+        try {
+          const messageObject = JSON.parse(jsonObject.message);
+          message = messageObject?.message;
+          output = messageObject?.stack;
+        } catch (error) {
+          console.error("Error parsing 'messageObject' JSON:", error);
         }
+      } catch (error) {
+        console.error("Error parsing 'jsonObject' JSON:", error);
       }
     } else if (!isOutputTooLarge) {
       if (typeof functionRun.output === 'string') {
