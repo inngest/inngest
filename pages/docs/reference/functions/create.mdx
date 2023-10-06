@@ -116,6 +116,19 @@ One of the following function triggers is **Required**.
   </Property>
 </Properties>
 
+When using an `event` trigger, you can optionally combine it with the `if` option to filter events:
+
+<Properties nested={true} name="Additional options">
+  <Property name="if" type="string">
+    A comparison expression that returns true or false whether the function should handle or ignore a given matching event.
+
+    Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+
+    * `'event.data.action == "published"'`
+    * `'event.data.priority >= 4'`
+  </Property>
+</Properties>
+
 ### Handler
 
 The handler is your code that runs whenever the trigger occurs. Every function handler receives a single object argument which can be deconstructed. The key arguments are `event` and `step`. Note, that scheduled functions that use a `cron` trigger will not receive an `event` argument.
