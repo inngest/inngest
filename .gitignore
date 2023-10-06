@@ -19,6 +19,7 @@
 # misc
 .DS_Store
 *.pem
+/.idea/
 
 # local env files
 .env.local
