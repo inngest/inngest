@@ -19,12 +19,14 @@ import IconCalendar from "src/shared/Icons/Calendar";
 import CTACallout from "src/shared/CTACallout";
 import Blockquote from "src/shared/Blog/Blockquote";
 import rehypeCodeTitles from "rehype-code-titles";
+import YouTube from 'react-youtube-embed'
 
 const components = {
   DiscordCTA,
   Button,
   CTACallout,
   Blockquote,
+  YouTube
 };
 
 type Props = {
@@ -45,6 +47,7 @@ const authorURLs = {
   "Jack Williams": "https://twitter.com/atticjack",
   "Igor Gassmann": "https://twitter.com/i_gassmann",
   "Darwin Wu": "https://twitter.com/67darwin",
+  "Joel Hooks": "https://twitter.com/jhooks",
 };
 
 export default function BlogLayout(props) {

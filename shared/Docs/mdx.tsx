@@ -1,9 +1,12 @@
 import Link, { LinkProps } from "next/link";
 import clsx from "clsx";
 
+
 import { Heading } from "./Heading";
 import React, { useState } from "react";
 import { ChevronDown, ChevronUp } from "react-feather";
+
+export {default as YouTube} from "react-youtube-embed"
 
 // export const a: React.FunctionComponent<LinkProps> = (props) => (
 //   <Link {...props} />
