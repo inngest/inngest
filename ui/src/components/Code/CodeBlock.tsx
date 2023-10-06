@@ -9,6 +9,15 @@ import { maxRenderedOutputSizeBytes } from '@/utils/constants';
 import Button from '../Button/Button';
 import CopyButton from '../Button/CopyButton';
 
+const LINE_HEIGHT = 26;
+const MAX_HEIGHT = 275; // Equivalent to 10 lines
+const MAX_LINES = 10;
+const FONT = {
+  size: 13,
+  type: 'monospace',
+  font: 'Roboto_Mono',
+};
+
 type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
 interface CodeBlockProps {
@@ -28,7 +37,7 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
   const editorRef = useRef<MonacoEditorType>(null);
 
   const [originalContentHeight, setOriginalContentHeight] = useState(0);
-  const [wordWrap, setWordWrap] = useState('off');
+  const [isWordWrap, setIsWordWrap] = useState(false);
 
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
@@ -96,10 +105,11 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
   const handleWrapText = () => {
     if (editorRef.current) {
       let containerWidth = editorRef?.current?.getLayoutInfo().contentWidth;
-      const containerWidthWithLines =
+      const containerWidthWithLineNumbers =
         containerWidth + editorRef.current.getLayoutInfo().contentLeft;
       const contentWidth = editorRef?.current?.getContentWidth();
 
+      // If lines are wider than the container, calculate approximately how many lines the code block has when text is wrapped
       if (contentWidth > containerWidth) {
         const linesContent = editorRef?.current?.getModel()?.getLinesContent();
         let totalLinesThatFit = 0;
@@ -108,33 +118,36 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
           for (let lineNumber = 1; lineNumber <= linesContent.length; lineNumber++) {
             const lineContent = linesContent[lineNumber - 1];
 
-            const lineLengthWithWhitespace = getTextWidth(
+            const lineLength = getTextWidth(
               lineContent,
-              '13px "Roboto Mono", monospace',
+              `${FONT.size}px ${FONT.font}, ${FONT.type}`,
             );
 
-            if (lineLengthWithWhitespace <= containerWidth) {
+            if (lineLength <= containerWidth) {
               totalLinesThatFit++;
             } else {
-              const linesNeeded = Math.ceil(lineLengthWithWhitespace / containerWidth);
+              const linesNeeded = Math.ceil(lineLength / containerWidth);
               totalLinesThatFit += linesNeeded;
             }
           }
         }
-        if (totalLinesThatFit > 10) {
-          editorRef?.current?.layout({ height: 295, width: containerWidthWithLines });
+        if (totalLinesThatFit > MAX_LINES) {
+          editorRef?.current?.layout({ height: MAX_HEIGHT, width: containerWidthWithLineNumbers });
         } else {
           editorRef?.current?.layout({
-            height: totalLinesThatFit * 20,
-            width: containerWidthWithLines,
+            height: totalLinesThatFit * LINE_HEIGHT,
+            width: containerWidthWithLineNumbers,
           });
         }
-      } else if (wordWrap === 'on') {
-        editorRef.current.layout({ height: originalContentHeight, width: containerWidthWithLines });
+      } else {
+        editorRef.current.layout({
+          height: originalContentHeight,
+          width: containerWidthWithLineNumbers,
+        });
       }
-      const newWordWrap = wordWrap === 'on' ? 'off' : 'on';
+      const newWordWrap = isWordWrap ? 'off' : 'on';
       editorRef.current.updateOptions({ wordWrap: newWordWrap });
-      setWordWrap(newWordWrap);
+      setIsWordWrap(!isWordWrap);
     }
   };
 
@@ -193,7 +206,7 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
           <div className="flex gap-2 items-center mr-2">
             <CopyButton code={content} isCopying={isCopying} handleCopyClick={handleCopyClick} />
             <Button
-              icon={wordWrap === 'on' ? <IconOverflowText /> : <IconWrapText />}
+              icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
               btnAction={handleWrapText}
             />
           </div>
@@ -228,10 +241,10 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
                 extraEditorClassName: '',
                 contextmenu: false,
                 scrollBeyondLastLine: false,
-                fontFamily: 'Roboto_Mono',
-                fontSize: 13,
+                fontFamily: FONT.font,
+                fontSize: FONT.size,
                 fontWeight: 'light',
-                lineHeight: 26,
+                lineHeight: LINE_HEIGHT,
                 renderLineHighlight: 'none',
                 renderWhitespace: 'none',
                 guides: {
@@ -248,9 +261,9 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
               onMount={(editor) => {
                 handleEditorDidMount(editor);
                 const contentHeight = editor.getContentHeight();
-                if (contentHeight > 295) {
-                  editor.layout({ height: 295, width: 0 });
-                  setOriginalContentHeight(295);
+                if (contentHeight > MAX_HEIGHT) {
+                  editor.layout({ height: MAX_HEIGHT, width: 0 });
+                  setOriginalContentHeight(MAX_HEIGHT);
                 } else {
                   editor.layout({ height: contentHeight, width: 0 });
                   setOriginalContentHeight(contentHeight);
