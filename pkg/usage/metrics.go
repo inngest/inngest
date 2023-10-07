@@ -67,7 +67,7 @@ type MetricsResponse struct {
 	Name        string        `json:"name"`
 	From        time.Time     `json:"from"`
 	To          time.Time     `json:"to"`
-	Granularity time.Duration `json:"granularity"`
+	Granularity string        `json:"granularity"`
 	Data        []MetricsData `json:"data"`
 }
 
