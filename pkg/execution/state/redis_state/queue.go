@@ -610,7 +610,6 @@ func (q *queue) EnqueueItem(ctx context.Context, i QueueItem, at time.Time) (Que
 	case 0:
 		return i, nil
 	case 1:
-		q.logger.Warn().Interface("item", i).Msg("skipping duplicate queue item")
 		return i, ErrQueueItemExists
 	default:
 		return i, fmt.Errorf("unknown response enqueueing item: %d", status)
