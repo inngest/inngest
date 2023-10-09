@@ -35,8 +35,6 @@ export default function renderRunOutput(
     }
   }
 
-  console.log(message)
-
   return {
     message,
     errorName,

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -567,20 +566,8 @@ func applyResponse(
 		//     but doesn't contain any of the user's step output data.
 		h.Result.Output = outputStr
 		return nil
-	} else if outputRaw, ok := resp.Output.(json.RawMessage); ok {
-		// Error responses are returned as json.RawMessage.
-
-		outputStr, err := strconv.Unquote(string(outputRaw))
-		if err != nil {
-			return err
-		}
-
-		h.Result.Output = outputStr
-		return nil
 	}
 
-	// Should be unreachable. All possible resp.Output types should be covered
-	// by the previous if blocks.
 	byt, err := json.Marshal(resp.Output)
 	if err != nil {
 		return fmt.Errorf("error marshalling step output: %w", err)
