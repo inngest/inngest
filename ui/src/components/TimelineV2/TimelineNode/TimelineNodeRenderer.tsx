@@ -2,6 +2,7 @@ import {
   IconStatusCircleArrowPath,
   IconStatusCircleCheck,
   IconStatusCircleCross,
+  IconStatusCircleMinus,
   IconStatusCircleExclamation,
   IconStatusCircleMoon,
 } from '@/icons';
@@ -19,7 +20,7 @@ export default function renderTimelineNode(node: HistoryNode): RenderedData {
   if (node.scope === "function" && node.status === "started") {
     icon = <IconStatusCircleCheck />
   } else if (node.status === 'cancelled') {
-    icon = <IconStatusCircleCross className="text-slate-700" />;
+    icon = <IconStatusCircleMinus />;
   } else if (node.status === 'completed') {
     icon = <IconStatusCircleCheck />;
   } else if (node.status === 'errored') {
@@ -96,12 +97,10 @@ export default function renderTimelineNode(node: HistoryNode): RenderedData {
   }
 
   let badge: string | undefined;
-  if (node.scope === 'function') {
-    badge = 'Function';
-  } else if (node.sleepConfig) {
+  if (node.sleepConfig) {
     badge = 'Sleep';
   } else if (node.waitForEventConfig) {
-    badge = 'Wait For Event';
+    badge = 'Wait';
   }
 
   return {
