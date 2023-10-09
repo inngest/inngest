@@ -29,9 +29,7 @@ export default function ContentCard({
         `flex-1 border rounded-lg border-slate-800/30 overflow-hidden flex flex-col shrink-0`,
       )}
     >
-      <div
-        className={classNames(title ? 'px-5 py-4 relative z-30' : '')}
-      >
+      <div className={classNames(title ? 'px-5 py-4 relative z-30' : '')}>
         <div className="flex items-center justify-between leading-7">
           {title ? (
             <div className="flex items-center gap-2">
@@ -46,7 +44,9 @@ export default function ContentCard({
         {badge}
         {metadata}
       </div>
-      <div className="overflow-y-auto flex-1">{children}</div>
+      <div style={{ scrollbarGutter: 'stable' }} className="overflow-hidden overflow-y-auto flex-1">
+        {children}
+      </div>
     </div>
   );
 }
