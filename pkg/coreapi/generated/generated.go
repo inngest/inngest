@@ -46,6 +46,7 @@ type Config struct {
 type ResolverRoot interface {
 	App() AppResolver
 	Event() EventResolver
+	Function() FunctionResolver
 	FunctionRun() FunctionRunResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
@@ -247,6 +248,9 @@ type EventResolver interface {
 	TotalRuns(ctx context.Context, obj *models.Event) (*int, error)
 	Raw(ctx context.Context, obj *models.Event) (*string, error)
 	FunctionRuns(ctx context.Context, obj *models.Event) ([]*models.FunctionRun, error)
+}
+type FunctionResolver interface {
+	App(ctx context.Context, obj *models.Function) (*cqrs.App, error)
 }
 type FunctionRunResolver interface {
 	Function(ctx context.Context, obj *models.FunctionRun) (*models.Function, error)
@@ -3157,7 +3161,7 @@ func (ec *executionContext) _Function_app(ctx context.Context, field graphql.Col
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.App, nil
+		return ec.resolvers.Function().App(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3178,8 +3182,8 @@ func (ec *executionContext) fieldContext_Function_app(ctx context.Context, field
 	fc = &graphql.FieldContext{
 		Object:     "Function",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
@@ -9935,35 +9939,35 @@ func (ec *executionContext) _Function(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = ec._Function_id(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "name":
 
 			out.Values[i] = ec._Function_name(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "slug":
 
 			out.Values[i] = ec._Function_slug(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "config":
 
 			out.Values[i] = ec._Function_config(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "concurrency":
 
 			out.Values[i] = ec._Function_concurrency(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "triggers":
 
@@ -9974,22 +9978,35 @@ func (ec *executionContext) _Function(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = ec._Function_url(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "appID":
 
 			out.Values[i] = ec._Function_appID(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "app":
+			field := field
 
-			out.Values[i] = ec._Function_app(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Function_app(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
 			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
