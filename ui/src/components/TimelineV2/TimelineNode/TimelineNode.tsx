@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import TimelineItemHeader from '@/components/AccordionTimeline/TimelineItemHeader';
 import Button from '@/components/Button/Button';
 import RunOutputCard from '@/components/Function/RunOutput';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { IconChevron } from '@/icons/Chevron';
+import classNames from '@/utils/classnames';
 import { formatMilliseconds } from '@/utils/date';
 import { type HistoryNode } from '../historyParser/index';
 import renderTimelineNode from './TimelineNodeRenderer';
@@ -13,11 +15,21 @@ import renderTimelineNode from './TimelineNodeRenderer';
 type Props = {
   getOutput: (historyItemID: string) => Promise<string>;
   node: HistoryNode;
+  position: 'first' | 'last' | 'middle';
 };
 
-export function TimelineNode({ getOutput, node }: Props) {
+export function TimelineNode({ position, getOutput, node }: Props) {
   const { icon, badge, name, metadata } = renderTimelineNode(node);
   const isExpandable = node.scope === 'step';
+  const [openItems, setOpenItems] = useState<string[]>([]);
+
+  const toggleItem = (itemValue: string) => {
+    if (openItems.includes(itemValue)) {
+      setOpenItems(openItems.filter((value) => value !== itemValue));
+    } else {
+      setOpenItems([...openItems, itemValue]);
+    }
+  };
 
   return (
     <AccordionPrimitive.Item
@@ -25,13 +37,22 @@ export function TimelineNode({ getOutput, node }: Props) {
       disabled={!isExpandable}
       value={node.groupID}
     >
+      <span
+        className={classNames(
+          'absolute w-px bg-slate-800 top-0 left-[0.85rem]',
+          position === 'first' && 'top-[1.8rem] h-[calc(100%-1.8rem)]',
+          position === 'last' && 'h-[1.8rem]',
+          position === 'middle' && 'h-full',
+        )}
+        aria-hidden="true"
+      />
       <AccordionPrimitive.Header className="flex gap-2 py-6">
         <div className="flex-1 z-10">
           <TimelineItemHeader icon={icon} badge={badge} title={name} metadata={metadata} />
         </div>
 
         {isExpandable && (
-          <AccordionPrimitive.Trigger asChild>
+          <AccordionPrimitive.Trigger asChild onClick={() => toggleItem(node.groupID)}>
             <Button
               className="group"
               icon={
@@ -41,10 +62,27 @@ export function TimelineNode({ getOutput, node }: Props) {
           </AccordionPrimitive.Trigger>
         )}
       </AccordionPrimitive.Header>
-
-      <AccordionPrimitive.Content>
-        <Content getOutput={getOutput} node={node} />
-      </AccordionPrimitive.Content>
+      <AnimatePresence>
+        {openItems.includes(node.groupID) && (
+          <AccordionPrimitive.Content className="ml-9" forceMount>
+            <motion.div
+              initial={{ y: -20, opacity: 0.2 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{
+                y: -20,
+                opacity: 0.2,
+                transition: { duration: 0.2, type: 'tween' },
+              }}
+              transition={{
+                duration: 0.15,
+                type: 'tween',
+              }}
+            >
+              <Content getOutput={getOutput} node={node} />
+            </motion.div>
+          </AccordionPrimitive.Content>
+        )}
+      </AnimatePresence>
     </AccordionPrimitive.Item>
   );
 }

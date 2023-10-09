@@ -20,12 +20,25 @@ export function Timeline({ getOutput, history }: Props) {
           type="multiple"
           className="text-slate-100 w-full last:border-b last:border-slate-800/50"
         >
-          {nodes.map((node) => {
+          {nodes.map((node, i) => {
+            let position: 'first' | 'last' | 'middle' = 'middle';
             if (!isVisible(node)) {
               return null;
             }
+            if (i === 0) {
+              position = 'first';
+            } else if (i === nodes.length - 1) {
+              position = 'last';
+            }
 
-            return <TimelineNode getOutput={getOutput} node={node} />;
+            return (
+              <TimelineNode
+                key={node.groupID}
+                position={position}
+                getOutput={getOutput}
+                node={node}
+              />
+            );
           })}
         </AccordionPrimitive.Root>
       )}
