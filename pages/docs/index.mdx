@@ -52,14 +52,14 @@ export default inngest.createFunction(
   async ({ event, step }) => {
     // ⚡ If this step fails it will retry automatically. It will only run once
     // if it succeeds
-    const promo = await step.run("Generate promo code", async () => {
+    const promo = await step.run("generate-promo-code", async () => {
       const promoCode = await generatePromoCode();
       return promoCode.code;
     });
 
     // ⚡ Again, if the email provider is down this will retry - but we will
     // only generate one promo code
-    await step.run("Send a welcome promo", () =>
+    await step.run("send-a-welcome-promo", () =>
       sendEmail({ email: event.data, promo })
     );
 
@@ -67,7 +67,7 @@ export default inngest.createFunction(
     await step.sleep("wait-before-followup", "1 day");
 
     // ⏰ This runs exactly 1 day after the user signs up
-    await step.run("Send drip campaign", () => sendDripCampaign());
+    await step.run("send-drip-campaign", () => sendDripCampaign());
   }
 );
 ```
