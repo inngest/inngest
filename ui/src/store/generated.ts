@@ -81,6 +81,8 @@ export type EventsQuery = {
 
 export type Function = {
   __typename?: 'Function';
+  app: App;
+  appID: Scalars['String'];
   concurrency: Scalars['Int'];
   config: Scalars['String'];
   id: Scalars['String'];

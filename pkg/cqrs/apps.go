@@ -37,6 +37,8 @@ type AppReader interface {
 	GetAppByURL(ctx context.Context, url string) (*App, error)
 	// GetAllApps returns all apps.
 	GetAllApps(ctx context.Context) ([]*App, error)
+
+	GetAppByID(ctx context.Context, id uuid.UUID) (*App, error)
 }
 
 type AppWriter interface {

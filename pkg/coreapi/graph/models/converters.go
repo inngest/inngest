@@ -31,6 +31,7 @@ func MakeFunction(f *cqrs.Function) (*Function, error) {
 	}
 
 	return &Function{
+		AppID:       f.AppID.String(),
 		ID:          f.ID.String(),
 		Name:        f.Name,
 		Slug:        f.Slug,

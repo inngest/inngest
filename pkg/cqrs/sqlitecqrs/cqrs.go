@@ -80,6 +80,13 @@ func (w wrapper) GetAppByChecksum(ctx context.Context, checksum string) (*cqrs.A
 	return copyInto(ctx, f, &cqrs.App{})
 }
 
+func (w wrapper) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs.App, error) {
+	f := func(ctx context.Context) (*sqlc.App, error) {
+		return w.q.GetAppByID(ctx, id)
+	}
+	return copyInto(ctx, f, &cqrs.App{})
+}
+
 func (w wrapper) GetAppByURL(ctx context.Context, url string) (*cqrs.App, error) {
 	// Normalize the URL before inserting into the DB.
 	url = util.NormalizeAppURL(url)

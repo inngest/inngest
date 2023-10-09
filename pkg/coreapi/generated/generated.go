@@ -85,6 +85,8 @@ type ComplexityRoot struct {
 	}
 
 	Function struct {
+		App         func(childComplexity int) int
+		AppID       func(childComplexity int) int
 		Concurrency func(childComplexity int) int
 		Config      func(childComplexity int) int
 		ID          func(childComplexity int) int
@@ -450,6 +452,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Event.Workspace(childComplexity), true
+
+	case "Function.app":
+		if e.complexity.Function.App == nil {
+			break
+		}
+
+		return e.complexity.Function.App(childComplexity), true
+
+	case "Function.appID":
+		if e.complexity.Function.AppID == nil {
+			break
+		}
+
+		return e.complexity.Function.AppID(childComplexity), true
 
 	case "Function.concurrency":
 		if e.complexity.Function.Concurrency == nil {
@@ -1402,6 +1418,8 @@ type Function {
   concurrency: Int!
   triggers: [FunctionTrigger!]
   url: String!
+  appID: String!
+  app: App!
 }
 
 enum FunctionTriggerTypes {
@@ -2137,6 +2155,10 @@ func (ec *executionContext) fieldContext_App_functions(ctx context.Context, fiel
 				return ec.fieldContext_Function_triggers(ctx, field)
 			case "url":
 				return ec.fieldContext_Function_url(ctx, field)
+			case "appID":
+				return ec.fieldContext_Function_appID(ctx, field)
+			case "app":
+				return ec.fieldContext_Function_app(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Function", field.Name)
 		},
@@ -3077,6 +3099,120 @@ func (ec *executionContext) fieldContext_Function_url(ctx context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _Function_appID(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Function_appID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AppID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Function_appID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Function",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Function_app(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Function_app(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.App, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*cqrs.App)
+	fc.Result = res
+	return ec.marshalNApp2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcqrsᚐApp(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Function_app(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Function",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_App_id(ctx, field)
+			case "name":
+				return ec.fieldContext_App_name(ctx, field)
+			case "sdkLanguage":
+				return ec.fieldContext_App_sdkLanguage(ctx, field)
+			case "sdkVersion":
+				return ec.fieldContext_App_sdkVersion(ctx, field)
+			case "framework":
+				return ec.fieldContext_App_framework(ctx, field)
+			case "url":
+				return ec.fieldContext_App_url(ctx, field)
+			case "checksum":
+				return ec.fieldContext_App_checksum(ctx, field)
+			case "error":
+				return ec.fieldContext_App_error(ctx, field)
+			case "functions":
+				return ec.fieldContext_App_functions(ctx, field)
+			case "connected":
+				return ec.fieldContext_App_connected(ctx, field)
+			case "functionCount":
+				return ec.fieldContext_App_functionCount(ctx, field)
+			case "autodiscovered":
+				return ec.fieldContext_App_autodiscovered(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type App", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _FunctionEvent_workspace(ctx context.Context, field graphql.CollectedField, obj *models.FunctionEvent) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_FunctionEvent_workspace(ctx, field)
 	if err != nil {
@@ -3456,6 +3592,10 @@ func (ec *executionContext) fieldContext_FunctionRun_function(ctx context.Contex
 				return ec.fieldContext_Function_triggers(ctx, field)
 			case "url":
 				return ec.fieldContext_Function_url(ctx, field)
+			case "appID":
+				return ec.fieldContext_Function_appID(ctx, field)
+			case "app":
+				return ec.fieldContext_Function_app(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Function", field.Name)
 		},
@@ -4982,6 +5122,10 @@ func (ec *executionContext) fieldContext_Query_functions(ctx context.Context, fi
 				return ec.fieldContext_Function_triggers(ctx, field)
 			case "url":
 				return ec.fieldContext_Function_url(ctx, field)
+			case "appID":
+				return ec.fieldContext_Function_appID(ctx, field)
+			case "app":
+				return ec.fieldContext_Function_app(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Function", field.Name)
 		},
@@ -9828,6 +9972,20 @@ func (ec *executionContext) _Function(ctx context.Context, sel ast.SelectionSet,
 		case "url":
 
 			out.Values[i] = ec._Function_url(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "appID":
+
+			out.Values[i] = ec._Function_appID(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "app":
+
+			out.Values[i] = ec._Function_app(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++

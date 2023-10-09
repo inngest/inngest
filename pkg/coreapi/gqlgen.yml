@@ -42,6 +42,10 @@ models:
         resolver: true
       raw:
         resolver: true
+  Function:
+    fields:
+      app:
+        resolver: true
   FunctionRun:
     fields:
       history:
