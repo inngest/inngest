@@ -1,4 +1,4 @@
-import { FunctionRunStatus, type FunctionRun } from '@/store/generated';
+import { FunctionRunStatus } from '@/store/generated';
 import { maxRenderedOutputSizeBytes } from '@/utils/constants';
 
 type RenderedData = {
@@ -7,19 +7,23 @@ type RenderedData = {
   output: string;
 };
 
-export default function renderRunOutput(
-  functionRun: Pick<FunctionRun, 'output' | 'status'>,
-): RenderedData {
+export default function renderRunOutput({
+  status,
+  content,
+}: {
+  status: FunctionRunStatus;
+  content: string;
+}): RenderedData {
   let message = '';
   let errorName = '';
   let output = '';
 
-  if (functionRun.output) {
-    const isOutputTooLarge = functionRun.output.length > maxRenderedOutputSizeBytes;
+  if (content) {
+    const isOutputTooLarge = content.length > maxRenderedOutputSizeBytes;
 
-    if (functionRun.status === FunctionRunStatus.Failed && !isOutputTooLarge) {
+    if (status === FunctionRunStatus.Failed && !isOutputTooLarge) {
       try {
-        const jsonObject = JSON.parse(functionRun.output);
+        const jsonObject = JSON.parse(content);
         errorName = jsonObject?.name;
         try {
           const messageObject = JSON.parse(jsonObject.message);
@@ -32,10 +36,10 @@ export default function renderRunOutput(
         console.error("Error parsing 'jsonObject' JSON:", error);
       }
     } else if (!isOutputTooLarge) {
-      if (typeof functionRun.output === 'string') {
-        output = functionRun.output;
+      if (typeof content === 'string') {
+        output = content;
       } else {
-        output = JSON.stringify(functionRun.output, null, 2);
+        output = JSON.stringify(content, null, 2);
       }
     }
   }
