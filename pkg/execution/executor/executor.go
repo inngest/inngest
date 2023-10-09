@@ -464,11 +464,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 }
 
 func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge, resp *state.DriverResponse) error {
-	if resp.Err != nil {
-		// Ensure that we parse output and error messages correctly prior to handling.
-		resp.Output = resp.UserError()
-	}
-
 	for _, e := range e.lifecycles {
 		go e.OnStepFinished(context.WithoutCancel(ctx), id, item, edge, resp.Step, *resp)
 	}
