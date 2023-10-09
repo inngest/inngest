@@ -156,6 +156,10 @@ func start(ctx context.Context, opts StartOpts) error {
 				hd,
 				memory_writer.NewWriter(),
 			),
+			lifecycle{
+				sm:   sm,
+				cqrs: dbcqrs,
+			},
 		),
 		executor.WithStepLimits(consts.DefaultMaxStepLimit),
 		executor.WithDebouncer(debouncer),
@@ -191,18 +195,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	// embed the tracker
 	ds.tracker = t
 	ds.state = sm
-
-	// Add notifications to the state manager so that we can store new function runs
-	// in the core API service.
-	if notify, ok := sm.(state.FunctionNotifier); ok {
-		notify.OnFunctionStatus(func(ctx context.Context, id state.Identifier, rs enums.RunStatus) {
-			switch rs {
-			case enums.RunStatusRunning:
-				// A new function was added, so add this to the core API
-				// for listing functions by XYZ.
-			}
-		})
-	}
 
 	return service.StartAll(ctx, ds, runner, executorSvc)
 }
