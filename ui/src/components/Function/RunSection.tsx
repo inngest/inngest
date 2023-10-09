@@ -79,9 +79,13 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
     return (
       <ContentCard>
         <BlankSlate
-          imageUrl="/images/no-fn-selected.png"
-          title="No function run selected"
-          subtitle="Select a function run on the left to see a timeline of its execution."
+          imageUrl="/images/no-results.png"
+          title="No functions called"
+          subtitle="Read our documentation to learn how to write functions"
+          link={{
+            text: 'Writing Functions',
+            url: 'https://www.inngest.com/docs/functions',
+          }}
         />
       </ContentCard>
     );
@@ -110,7 +114,9 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       }
     >
       <div className="px-5 pt-4">
-        {run.status && run.finishedAt && run.output && <RunOutputCard content={run.output} status={run.status}/>}
+        {run.status && run.finishedAt && run.output && (
+          <RunOutputCard content={run.output} status={run.status} />
+        )}
 
         <WaitingSummary history={history} />
         <SleepingSummary history={history} />
