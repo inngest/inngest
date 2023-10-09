@@ -570,8 +570,7 @@ func applyResponse(
 	} else if outputRaw, ok := resp.Output.(json.RawMessage); ok {
 		// Error responses are returned as json.RawMessage.
 
-		outputStr := string(outputRaw)
-		outputStr, err := strconv.Unquote(outputStr)
+		outputStr, err := strconv.Unquote(string(outputRaw))
 		if err != nil {
 			return err
 		}
