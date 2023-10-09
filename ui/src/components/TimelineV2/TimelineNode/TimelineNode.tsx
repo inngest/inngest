@@ -97,8 +97,8 @@ function Content({
   const output = useOutput({ getOutput, outputItemID: node.outputItemID, status: node.status });
 
   let durationMS: number | undefined;
-  if (node.startedAt && node.endedAt) {
-    durationMS = node.endedAt.getTime() - node.startedAt.getTime();
+  if (node.scheduledAt && node.endedAt) {
+    durationMS = node.endedAt.getTime() - node.scheduledAt.getTime();
   }
 
   return (
