@@ -4,8 +4,9 @@ import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import TimelineItemHeader from '@/components/AccordionTimeline/TimelineItemHeader';
 import Button from '@/components/Button/Button';
 import CodeBlock from '@/components/Code/CodeBlock';
-import MetadataItem from '@/components/Metadata/MetadataItem';
+import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { IconChevron } from '@/icons/Chevron';
+import { formatMilliseconds } from '@/utils/date';
 import { type HistoryNode } from '../historyParser/index';
 import renderTimelineNode from './TimelineNodeRenderer';
 
@@ -64,22 +65,23 @@ function Content({
 
   return (
     <>
-      <div className="flex flex-grow">
-        {node.startedAt && (
-          <MetadataItem
-            className="grow"
-            label="Started at"
-            value={node.scheduledAt.toLocaleString()}
-          />
-        )}
-
-        {node.endedAt && (
-          <MetadataItem className="grow" label="Ended at" value={node.endedAt.toLocaleString()} />
-        )}
-
-        {durationMS && (
-          <MetadataItem className="grow" label="Duration" value={`${durationMS} ms`} />
-        )}
+      <div className="pb-5">
+        <MetadataGrid
+          metadataItems={[
+            {
+              label: 'Started At',
+              value: node.scheduledAt.toLocaleString() ?? '-',
+            },
+            {
+              label: 'Ended At',
+              value: (node.endedAt && node.endedAt.toLocaleString()) ?? '-',
+            },
+            {
+              label: 'Duration',
+              value: formatMilliseconds(durationMS) ?? '-',
+            },
+          ]}
+        />
       </div>
 
       <div>{output}</div>
