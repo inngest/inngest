@@ -14,12 +14,31 @@ import {
   IconStatusCircleExclamation,
   IconStatusCircleMinus,
 } from '@/icons';
-import { useDeleteAppMutation, useUpdateAppMutation, type App } from '@/store/generated';
+import { useDeleteAppMutation, useUpdateAppMutation } from '@/store/generated';
 import classNames from '@/utils/classnames';
 import isValidUrl from '@/utils/urlValidation';
 import AppCardStep from './AppCardStep';
 
-export default function AppCard({ app }: { app: App }) {
+type Props = {
+  app: {
+    autodiscovered: boolean
+    connected: boolean
+    error?: string | null
+    framework?: string | null
+    functionCount: number
+    functions: {
+      id: string
+      name: string
+    }[]
+    id: string
+    name: string
+    sdkLanguage: string
+    sdkVersion: string
+    url?: string | null
+  }
+}
+
+export default function AppCard({ app }: Props) {
   const [inputUrl, setInputUrl] = useState(app.url || '');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
