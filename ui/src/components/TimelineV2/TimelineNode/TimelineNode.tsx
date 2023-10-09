@@ -70,15 +70,15 @@ function Content({
           metadataItems={[
             {
               label: 'Started At',
-              value: node.scheduledAt.toLocaleString() ?? '-',
+              value: node.scheduledAt ? node.scheduledAt.toLocaleString() : '-',
             },
             {
               label: 'Ended At',
-              value: (node.endedAt && node.endedAt.toLocaleString()) ?? '-',
+              value: node.endedAt ? node.endedAt.toLocaleString() : '-',
             },
             {
               label: 'Duration',
-              value: formatMilliseconds(durationMS) ?? '-',
+              value: durationMS ? formatMilliseconds(durationMS) : '-',
             },
           ]}
         />
