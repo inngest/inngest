@@ -24,11 +24,14 @@ export function OutputItem({ functionRunID }) {
   const { data } = useGetFunctionRunOutputQuery({ id: functionRunID }, { pollingInterval: 1500 });
   const functionRun = (data?.functionRun as FunctionRunStatusSubset) || {};
 
-  if (!functionRun || !functionRun?.output) {
+  if (!functionRun || !functionRun?.output || !functionRun?.status) {
     return null;
   }
 
-  const { message, errorName, output } = renderRunOutput(functionRun);
+  const { message, errorName, output } = renderRunOutput({
+    status: functionRun.status,
+    content: functionRun.output,
+  });
 
   return (
     <li

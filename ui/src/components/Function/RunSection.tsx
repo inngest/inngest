@@ -110,7 +110,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       }
     >
       <div className="px-5 pt-4">
-        {run.status && run.finishedAt && run.output && <RunOutputCard functionRun={run} />}
+        {run.status && run.finishedAt && run.output && <RunOutputCard content={run.output} status={run.status}/>}
 
         <WaitingSummary history={history} />
         <SleepingSummary history={history} />

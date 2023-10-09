@@ -3,12 +3,12 @@ import * as AccordionPrimitive from '@radix-ui/react-accordion';
 
 import TimelineItemHeader from '@/components/AccordionTimeline/TimelineItemHeader';
 import Button from '@/components/Button/Button';
-import CodeBlock from '@/components/Code/CodeBlock';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { IconChevron } from '@/icons/Chevron';
 import { formatMilliseconds } from '@/utils/date';
 import { type HistoryNode } from '../historyParser/index';
 import renderTimelineNode from './TimelineNodeRenderer';
+import RunOutputCard from '@/components/Function/RunOutput';
 
 type Props = {
   getOutput: (historyItemID: string) => Promise<string>;
@@ -56,7 +56,7 @@ function Content({
   getOutput: (historyItemID: string) => Promise<string>;
   node: HistoryNode;
 }) {
-  const output = useOutput({ getOutput, outputItemID: node.outputItemID });
+  const output = useOutput({ getOutput, outputItemID: node.outputItemID, status: node.status });
 
   let durationMS: number | undefined;
   if (node.startedAt && node.endedAt) {
@@ -92,9 +92,11 @@ function Content({
 function useOutput({
   getOutput,
   outputItemID,
+  status,
 }: {
   getOutput: (historyItemID: string) => Promise<string>;
   outputItemID?: string;
+  status: HistoryNode["status"];
 }): React.ReactNode | undefined {
   const [output, setOutput] = useState<React.ReactNode>(undefined);
 
@@ -108,7 +110,7 @@ function useOutput({
 
       try {
         const data = await getOutput(outputItemID);
-        setOutput(<CodeBlock tabs={[{ label: 'Output', content: data }]} />);
+        setOutput(<RunOutputCard content={data} status={status} />);
       } catch (e) {
         let text = 'Error loading';
         if (e instanceof Error) {

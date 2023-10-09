@@ -1,5 +1,6 @@
 import { FunctionRunStatus } from '@/store/generated';
 import { maxRenderedOutputSizeBytes } from '@/utils/constants';
+import { type HistoryNode } from '../TimelineV2/historyParser';
 
 type RenderedData = {
   message?: string;
@@ -11,7 +12,7 @@ export default function renderRunOutput({
   status,
   content,
 }: {
-  status: FunctionRunStatus;
+  status: FunctionRunStatus | HistoryNode['status'];
   content: string;
 }): RenderedData {
   let message = '';
@@ -21,7 +22,7 @@ export default function renderRunOutput({
   if (content) {
     const isOutputTooLarge = content.length > maxRenderedOutputSizeBytes;
 
-    if (status === FunctionRunStatus.Failed && !isOutputTooLarge) {
+    if ((status === FunctionRunStatus.Failed || status === 'failed') && !isOutputTooLarge) {
       try {
         const jsonObject = JSON.parse(content);
         errorName = jsonObject?.name;
