@@ -2,8 +2,8 @@ import {
   IconStatusCircleArrowPath,
   IconStatusCircleCheck,
   IconStatusCircleCross,
-  IconStatusCircleMinus,
   IconStatusCircleExclamation,
+  IconStatusCircleMinus,
   IconStatusCircleMoon,
 } from '@/icons';
 import type { HistoryNode } from '../historyParser';
@@ -17,8 +17,8 @@ type RenderedData = {
 
 export default function renderTimelineNode(node: HistoryNode): RenderedData {
   let icon: JSX.Element;
-  if (node.scope === "function" && node.status === "started") {
-    icon = <IconStatusCircleCheck />
+  if (node.scope === 'function' && node.status === 'started') {
+    icon = <IconStatusCircleCheck />;
   } else if (node.status === 'cancelled') {
     icon = <IconStatusCircleMinus />;
   } else if (node.status === 'completed') {
@@ -37,9 +37,9 @@ export default function renderTimelineNode(node: HistoryNode): RenderedData {
   }
 
   let name = '...';
-  if (node.scope === "function") {
+  if (node.scope === 'function') {
     name = `Function ${node.status}`;
-  } else if (node.scope === "step") {
+  } else if (node.scope === 'step') {
     if (node.waitForEventConfig) {
       name = node.waitForEventConfig.eventName;
     } else if (node.name) {
@@ -59,9 +59,7 @@ export default function renderTimelineNode(node: HistoryNode): RenderedData {
     };
   } else if (node.status === 'completed' && node.endedAt) {
     metadata = {
-      label: node.waitForEventResult?.timeout
-        ? 'Timed Out At:'
-        : 'Completed At:',
+      label: node.waitForEventResult?.timeout ? 'Timed Out At:' : 'Completed At:',
       value: node.endedAt.toLocaleString(),
     };
   } else if (node.status === 'errored') {
@@ -101,6 +99,8 @@ export default function renderTimelineNode(node: HistoryNode): RenderedData {
     badge = 'Sleep';
   } else if (node.waitForEventConfig) {
     badge = 'Wait';
+  } else if (node.status === 'errored') {
+    badge = 'Retry';
   }
 
   return {

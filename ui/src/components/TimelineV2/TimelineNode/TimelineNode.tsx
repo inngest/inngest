@@ -3,12 +3,12 @@ import * as AccordionPrimitive from '@radix-ui/react-accordion';
 
 import TimelineItemHeader from '@/components/AccordionTimeline/TimelineItemHeader';
 import Button from '@/components/Button/Button';
+import RunOutputCard from '@/components/Function/RunOutput';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { IconChevron } from '@/icons/Chevron';
 import { formatMilliseconds } from '@/utils/date';
 import { type HistoryNode } from '../historyParser/index';
 import renderTimelineNode from './TimelineNodeRenderer';
-import RunOutputCard from '@/components/Function/RunOutput';
 
 type Props = {
   getOutput: (historyItemID: string) => Promise<string>;
@@ -84,7 +84,7 @@ function Content({
         />
       </div>
 
-      <div>{output}</div>
+      {output && <div className="pb-5">{output}</div>}
     </>
   );
 }
@@ -96,7 +96,7 @@ function useOutput({
 }: {
   getOutput: (historyItemID: string) => Promise<string>;
   outputItemID?: string;
-  status: HistoryNode["status"];
+  status: HistoryNode['status'];
 }): React.ReactNode | undefined {
   const [output, setOutput] = useState<React.ReactNode>(undefined);
 
