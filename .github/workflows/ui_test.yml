@@ -17,6 +17,6 @@ jobs:
         with:
           node-version: "18"
       - run: pnpm install
-        working-directory: ui
+        working-directory: dev-server-ui
       - run: pnpm test
-        working-directory: ui
+        working-directory: dev-server-ui
