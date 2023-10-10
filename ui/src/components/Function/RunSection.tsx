@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ms from 'ms';
 
+import { type OutputType } from '@/components/Function/OutputRenderer';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { IconClock } from '@/icons';
 import { client } from '@/store/baseApi';
@@ -22,8 +23,8 @@ import TimelineFuncProgress from '../Timeline/TimelineFuncProgress';
 import TimelineRow from '../Timeline/TimelineRow';
 import { Timeline } from '../TimelineV2';
 import { useParsedHistory } from '../TimelineV2/historyParser';
+import OutputCard from './Output';
 import renderRunMetadata from './RunMetadataRenderer';
-import RunOutputCard from './RunOutput';
 import { FunctionRunStatusIcons } from './RunStatusIcons';
 import { SleepingSummary } from './SleepingSummary';
 import { WaitingSummary } from './WaitingSummary';
@@ -79,14 +80,24 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
     return (
       <ContentCard>
         <BlankSlate
-          imageUrl="/images/no-fn-selected.png"
-          title="No function run selected"
-          subtitle="Select a function run on the left to see a timeline of its execution."
+          imageUrl="/images/no-results.png"
+          title="No functions called"
+          subtitle="Read our documentation to learn how to write functions"
+          link={{
+            text: 'Writing Functions',
+            url: 'https://www.inngest.com/docs/functions',
+          }}
         />
       </ContentCard>
     );
   }
   const metadataItems = renderRunMetadata(run);
+  let type: OutputType | undefined;
+  if (run.status === FunctionRunStatus.Completed) {
+    type = 'completed';
+  } else if (run.status === FunctionRunStatus.Failed) {
+    type = 'failed';
+  }
 
   return (
     <ContentCard
@@ -110,7 +121,9 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       }
     >
       <div className="px-5 pt-4">
-        {run.status && run.finishedAt && run.output && <RunOutputCard functionRun={run} />}
+        {run.status && run.finishedAt && run.output && type && (
+          <OutputCard content={run.output} type={type} />
+        )}
 
         <WaitingSummary history={history} />
         <SleepingSummary history={history} />

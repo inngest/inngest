@@ -3,6 +3,7 @@ import {
   IconStatusCircleCheck,
   IconStatusCircleCross,
   IconStatusCircleExclamation,
+  IconStatusCircleMinus,
   IconStatusCircleMoon,
 } from '@/icons';
 import type { HistoryNode } from '../historyParser';
@@ -16,10 +17,10 @@ type RenderedData = {
 
 export default function renderTimelineNode(node: HistoryNode): RenderedData {
   let icon: JSX.Element;
-  if (node.scope === "function" && node.status === "started") {
-    icon = <IconStatusCircleCheck />
+  if (node.scope === 'function' && node.status === 'started') {
+    icon = <IconStatusCircleCheck />;
   } else if (node.status === 'cancelled') {
-    icon = <IconStatusCircleCross className="text-slate-700" />;
+    icon = <IconStatusCircleMinus />;
   } else if (node.status === 'completed') {
     icon = <IconStatusCircleCheck />;
   } else if (node.status === 'errored') {
@@ -36,9 +37,9 @@ export default function renderTimelineNode(node: HistoryNode): RenderedData {
   }
 
   let name = '...';
-  if (node.scope === "function") {
+  if (node.scope === 'function') {
     name = `Function ${node.status}`;
-  } else if (node.scope === "step") {
+  } else if (node.scope === 'step') {
     if (node.waitForEventConfig) {
       name = node.waitForEventConfig.eventName;
     } else if (node.name) {
@@ -58,9 +59,7 @@ export default function renderTimelineNode(node: HistoryNode): RenderedData {
     };
   } else if (node.status === 'completed' && node.endedAt) {
     metadata = {
-      label: node.waitForEventResult?.timeout
-        ? 'Timed Out At:'
-        : 'Completed At:',
+      label: node.waitForEventResult?.timeout ? 'Timed Out At:' : 'Completed At:',
       value: node.endedAt.toLocaleString(),
     };
   } else if (node.status === 'errored') {
@@ -96,12 +95,12 @@ export default function renderTimelineNode(node: HistoryNode): RenderedData {
   }
 
   let badge: string | undefined;
-  if (node.scope === 'function') {
-    badge = 'Function';
-  } else if (node.sleepConfig) {
+  if (node.sleepConfig) {
     badge = 'Sleep';
   } else if (node.waitForEventConfig) {
-    badge = 'Wait For Event';
+    badge = 'Wait';
+  } else if (node.status === 'errored') {
+    badge = 'Retry';
   }
 
   return {

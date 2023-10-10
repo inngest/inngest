@@ -1,14 +1,29 @@
 import { IconExclamationTriangle } from '@/icons';
 import { FunctionRunStatus, type FunctionRun } from '../../store/generated';
 import classNames from '../../utils/classnames';
-import renderRunOutput from './RunOutputRenderer';
+import renderOutput, { type OutputType } from './OutputRenderer';
 
 interface FuncCardFooterProps {
   functionRun: Omit<FunctionRun, 'history' | 'functionID' | 'historyItemOutput'>;
 }
 
 export default function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
-  const { message, errorName } = renderRunOutput(functionRun);
+  let type: OutputType | undefined;
+  if (functionRun?.status === FunctionRunStatus.Completed) {
+    type = 'completed';
+  } else if (functionRun?.status === FunctionRunStatus.Failed) {
+    type = 'failed';
+  }
+
+  if (!functionRun || !functionRun.output || !functionRun.status || !type) {
+    return null;
+  }
+
+  const { message, errorName } = renderOutput({
+    content: functionRun.output,
+    type,
+  });
+
   const status = functionRun.status || 'Unknown';
   const functionRunStatusFooter = {
     [FunctionRunStatus.Failed]: {

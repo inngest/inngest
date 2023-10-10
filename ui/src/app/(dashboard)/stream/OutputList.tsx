@@ -1,5 +1,9 @@
-import renderRunOutput from '@/components/Function/RunOutputRenderer';
-import { useGetFunctionRunOutputQuery, type FunctionRun } from '@/store/generated';
+import renderOutput, { type OutputType } from '@/components/Function/OutputRenderer';
+import {
+  FunctionRunStatus,
+  useGetFunctionRunOutputQuery,
+  type FunctionRun,
+} from '@/store/generated';
 
 export default function OutputList({ functionRuns }) {
   return (
@@ -23,12 +27,22 @@ type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'status' | 'output'>;
 export function OutputItem({ functionRunID }) {
   const { data } = useGetFunctionRunOutputQuery({ id: functionRunID }, { pollingInterval: 1500 });
   const functionRun = (data?.functionRun as FunctionRunStatusSubset) || {};
+  let type: OutputType | undefined;
 
-  if (!functionRun || !functionRun?.output) {
+  if (functionRun?.status === FunctionRunStatus.Completed) {
+    type = 'completed';
+  } else if (functionRun?.status === FunctionRunStatus.Failed) {
+    type = 'failed';
+  }
+
+  if (!functionRun || !functionRun?.output || !functionRun?.status || !type) {
     return null;
   }
 
-  const { message, errorName, output } = renderRunOutput(functionRun);
+  const { message, errorName, output } = renderOutput({
+    type,
+    content: functionRun.output,
+  });
 
   return (
     <li
