@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 import TimelineItemHeader from '@/components/AccordionTimeline/TimelineItemHeader';
 import Button from '@/components/Button/Button';
-import RunOutputCard from '@/components/Function/RunOutput';
+import OutputCard from '@/components/Function/Output';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { IconChevron } from '@/icons/Chevron';
 import classNames from '@/utils/classnames';
@@ -142,13 +142,16 @@ function useOutput({
     if (!outputItemID) {
       return;
     }
+    if (status !== 'completed' && status !== 'failed') {
+      return;
+    }
 
     (async () => {
       setOutput('Loading...');
 
       try {
         const data = await getOutput(outputItemID);
-        setOutput(<RunOutputCard content={data} status={status} />);
+        setOutput(<OutputCard content={data} type={status} />);
       } catch (e) {
         let text = 'Error loading';
         if (e instanceof Error) {

@@ -1,5 +1,9 @@
-import renderRunOutput from '@/components/Function/RunOutputRenderer';
-import { useGetFunctionRunOutputQuery, type FunctionRun } from '@/store/generated';
+import renderOutput, { type OutputType } from '@/components/Function/OutputRenderer';
+import {
+  FunctionRunStatus,
+  useGetFunctionRunOutputQuery,
+  type FunctionRun,
+} from '@/store/generated';
 
 export default function OutputList({ functionRuns }) {
   return (
@@ -28,8 +32,15 @@ export function OutputItem({ functionRunID }) {
     return null;
   }
 
-  const { message, errorName, output } = renderRunOutput({
-    status: functionRun.status,
+  let type: OutputType = null;
+  if (functionRun.status === FunctionRunStatus.Completed) {
+    type = 'completed';
+  } else if (functionRun.status === FunctionRunStatus.Failed) {
+    type = 'failed';
+  }
+
+  const { message, errorName, output } = renderOutput({
+    type,
     content: functionRun.output,
   });
 

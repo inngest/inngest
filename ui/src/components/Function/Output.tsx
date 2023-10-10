@@ -8,7 +8,7 @@ interface OutputCardProps {
 }
 
 export default function OutputCard({ type, content }: OutputCardProps) {
-  if (!type) return;
+  if (!type) return null;
   let { message, errorName, output } = renderOutput({ type, content });
 
   if (!message && !output) return null;

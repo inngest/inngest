@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ms from 'ms';
 
+import { type OutputType } from '@/components/Function/OutputRenderer';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { IconClock } from '@/icons';
 import { client } from '@/store/baseApi';
@@ -22,8 +23,8 @@ import TimelineFuncProgress from '../Timeline/TimelineFuncProgress';
 import TimelineRow from '../Timeline/TimelineRow';
 import { Timeline } from '../TimelineV2';
 import { useParsedHistory } from '../TimelineV2/historyParser';
+import OutputCard from './Output';
 import renderRunMetadata from './RunMetadataRenderer';
-import RunOutputCard from './RunOutput';
 import { FunctionRunStatusIcons } from './RunStatusIcons';
 import { SleepingSummary } from './SleepingSummary';
 import { WaitingSummary } from './WaitingSummary';
@@ -91,6 +92,12 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
     );
   }
   const metadataItems = renderRunMetadata(run);
+  let type: OutputType = null;
+  if (run.status === FunctionRunStatus.Completed) {
+    type = 'completed';
+  } else if (run.status === FunctionRunStatus.Failed) {
+    type = 'failed';
+  }
 
   return (
     <ContentCard
@@ -115,7 +122,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
     >
       <div className="px-5 pt-4">
         {run.status && run.finishedAt && run.output && (
-          <RunOutputCard content={run.output} status={run.status} />
+          <OutputCard content={run.output} type={type} />
         )}
 
         <WaitingSummary history={history} />
