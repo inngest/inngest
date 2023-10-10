@@ -24,8 +24,8 @@ const inngest = new Inngest({
 ## Configuration
 
 <Properties>
-  <Property name="name" type="string" required>
-    The unique name of your application.
+  <Property name="id" type="string" required>
+    A unique identifier for your application. We recommend a hyphenated slug.
   </Property>
   <Property name="eventKey" type="string">
     An Inngest [Event Key](/docs/events/creating-an-event-key). Alternatively, set the [`INNGEST_EVENT_KEY`](/docs/sdk/environment-variables#inngest-event-key) environment variable.
