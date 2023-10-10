@@ -133,7 +133,10 @@ func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID)
 	if rueidis.IsRedisNil(err) {
 		return nil
 	}
-	return fmt.Errorf("error removing debounce: %w", err)
+	if err != nil {
+		return fmt.Errorf("error removing debounce: %w", err)
+	}
+	return nil
 }
 
 // GetDebounceItem returns a DebounceItem given a debounce ID.
