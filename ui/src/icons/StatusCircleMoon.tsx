@@ -24,8 +24,8 @@ export function IconStatusCircleMoon({ className, title }: { className?: string;
           viewBox="0 0 14 14"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          stroke="#1b5d7a"
-          strokeWidth="1"
+          stroke="#0ea5e9"
+          strokeWidth="0.5"
         >
           <path
             fillRule="evenodd"
