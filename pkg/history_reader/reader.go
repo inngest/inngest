@@ -45,7 +45,7 @@ type Reader interface {
 		ctx context.Context,
 		historyID ulid.ULID,
 		opts GetHistoryOutputOpts,
-	) (string, error)
+	) (*string, error)
 	GetRunsByEventID(
 		ctx context.Context,
 		eventID ulid.ULID,

@@ -132,7 +132,7 @@ async function getHistoryItemOutput({
 }: {
   historyItemID: string;
   runID: string;
-}): Promise<string> {
+}): Promise<string | undefined> {
   // TODO: How to get type annotations? It returns `any`.
   const res: unknown = await client.request(GetHistoryItemOutputDocument, {
     historyItemID,
@@ -153,6 +153,9 @@ async function getHistoryItemOutput({
   }
   const { historyItemOutput } = functionRun;
 
+  if (historyItemOutput === null) {
+    return undefined;
+  }
   if (typeof historyItemOutput !== 'string') {
     throw new Error('invalid response');
   }

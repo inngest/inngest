@@ -258,7 +258,7 @@ type FunctionRunResolver interface {
 	Output(ctx context.Context, obj *models.FunctionRun) (*string, error)
 	Timeline(ctx context.Context, obj *models.FunctionRun) ([]models.FunctionRunEvent, error)
 	History(ctx context.Context, obj *models.FunctionRun) ([]*history_reader.RunHistory, error)
-	HistoryItemOutput(ctx context.Context, obj *models.FunctionRun, id ulid.ULID) (string, error)
+	HistoryItemOutput(ctx context.Context, obj *models.FunctionRun, id ulid.ULID) (*string, error)
 }
 type MutationResolver interface {
 	CreateApp(ctx context.Context, input models.CreateAppInput) (*cqrs.App, error)
@@ -1482,7 +1482,7 @@ type FunctionRun {
 
   timeline: [FunctionRunEvent!] @deprecated
   history: [RunHistoryItem!]!
-  historyItemOutput(id: ULID!): String!
+  historyItemOutput(id: ULID!): String
   name: String @deprecated # use the embedded function field instead.
 }
 
@@ -3961,14 +3961,11 @@ func (ec *executionContext) _FunctionRun_historyItemOutput(ctx context.Context, 
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_FunctionRun_historyItemOutput(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -10082,9 +10079,6 @@ func (ec *executionContext) _FunctionRun(ctx context.Context, sel ast.SelectionS
 					}
 				}()
 				res = ec._FunctionRun_historyItemOutput(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
 				return res
 			}
 

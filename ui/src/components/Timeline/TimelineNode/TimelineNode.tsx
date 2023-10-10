@@ -13,7 +13,7 @@ import { type HistoryNode } from '../historyParser/index';
 import renderTimelineNode from './TimelineNodeRenderer';
 
 type Props = {
-  getOutput: (historyItemID: string) => Promise<string>;
+  getOutput: (historyItemID: string) => Promise<string | undefined>;
   node: HistoryNode;
   position: 'first' | 'last' | 'middle';
 };
@@ -91,7 +91,7 @@ function Content({
   getOutput,
   node,
 }: {
-  getOutput: (historyItemID: string) => Promise<string>;
+  getOutput: (historyItemID: string) => Promise<string | undefined>;
   node: HistoryNode;
 }) {
   const output = useOutput({ getOutput, outputItemID: node.outputItemID, status: node.status });
@@ -132,7 +132,7 @@ function useOutput({
   outputItemID,
   status,
 }: {
-  getOutput: (historyItemID: string) => Promise<string>;
+  getOutput: (historyItemID: string) => Promise<string | undefined>;
   outputItemID?: string;
   status: HistoryNode['status'];
 }): React.ReactNode | undefined {
@@ -151,6 +151,11 @@ function useOutput({
 
       try {
         const data = await getOutput(outputItemID);
+        if (data === undefined) {
+          setOutput(undefined);
+          return;
+        }
+
         setOutput(<OutputCard content={data} type={status} />);
       } catch (e) {
         let text = 'Error loading';

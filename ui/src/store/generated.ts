@@ -113,7 +113,7 @@ export type FunctionRun = {
   function?: Maybe<Function>;
   functionID: Scalars['String'];
   history: Array<RunHistoryItem>;
-  historyItemOutput: Scalars['String'];
+  historyItemOutput?: Maybe<Scalars['String']>;
   id: Scalars['ID'];
   /** @deprecated Field no longer supported */
   name?: Maybe<Scalars['String']>;
@@ -450,7 +450,7 @@ export type GetHistoryItemOutputQueryVariables = Exact<{
 }>;
 
 
-export type GetHistoryItemOutputQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', historyItemOutput: string } | null };
+export type GetHistoryItemOutputQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', historyItemOutput?: string | null } | null };
 
 
 export const GetEventsStreamDocument = `

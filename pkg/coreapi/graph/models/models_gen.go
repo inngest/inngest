@@ -83,7 +83,7 @@ type FunctionRun struct {
 	Output            *string                      `json:"output,omitempty"`
 	Timeline          []FunctionRunEvent           `json:"timeline,omitempty"`
 	History           []*history_reader.RunHistory `json:"history"`
-	HistoryItemOutput string                       `json:"historyItemOutput"`
+	HistoryItemOutput *string                      `json:"historyItemOutput,omitempty"`
 	Name              *string                      `json:"name,omitempty"`
 }
 
