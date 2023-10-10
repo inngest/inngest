@@ -49,7 +49,7 @@ The dev server polls your app locally for any new or changed functions. Then as 
 There are different ways that you can send events to the dev server when testing locally:
 
 1. Using the Inngest SDK
-2. Using the "Send event" button in the Dev Server's interface
+2. Using the "Test Event" button in the Dev Server's interface
 3. Via HTTP request (e.g. curl)
 
 #### Using the Inngest SDK
@@ -66,15 +66,15 @@ await inngest.send({
 
 **Note** - During local development, you can use a dummy value for your [`INNGEST_EVENT_KEY`](/docs/sdk/environment-variables#inngest-event-key?ref=local-development) environment variable. The dev server does not validate keys locally.
 
-#### Using the "Send event" button
+#### Using the "Test Event" button
 
-The dev server's interface also has a "Send event" button on the top right that enables you to enter any JSON event payload and send it manually. This is useful for testing out different variants of event payloads with your functions.
+The dev server's interface also has a "Test Event" button on the top right that enables you to enter any JSON event payload and send it manually. This is useful for testing out different variants of event payloads with your functions.
 
 <img
-  src="/assets/docs/local-development/dev-server-send-event.png"
+  src="/assets/docs/local-development/dev-server-send-event-modal.jpg"
   width="600"
   height={600/2288*1310}
-  className="max-w-2xl"
+  className="max-w-2xl rounded-md"
   quality="95"
 />
 
