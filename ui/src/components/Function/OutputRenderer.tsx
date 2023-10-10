@@ -26,13 +26,8 @@ export default function renderOutput({
       try {
         const jsonObject = JSON.parse(content);
         errorName = jsonObject?.name;
-        try {
-          const messageObject = JSON.parse(jsonObject.message);
-          message = messageObject?.message;
-          output = messageObject?.stack;
-        } catch (error) {
-          console.error("Error parsing 'messageObject' JSON:", error);
-        }
+        message = jsonObject?.message;
+        output = jsonObject?.stack;
       } catch (error) {
         console.error("Error parsing 'jsonObject' JSON:", error);
       }
