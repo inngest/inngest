@@ -2,206 +2,13 @@
 
 The following examples show how you might use middleware in some real-world scenarios.
 
-## Sentry error reporting and tracing
+- [Common actions for every function](#common-actions-for-every-function)
+- [E2E Encryption](#e2-e-encryption)
+- [Logging](#logging)
+- [Prisma in function context](#prisma-in-function-context)
+- [Sentry error reporting and tracing](#sentry-error-reporting-and-tracing)
 
-This example uses [Sentry](https://sentry.io/?ref=inngest) to:
-
-- Capture exceptions for reporting
-- Add tracing to each function run
-- Include useful context for each exception and trace like function ID and event names
-
-```ts
-import * as Sentry from "@sentry/node";
-
-const sentryMiddleware = new InngestMiddleware({
-  name: "Sentry Middleware",
-  init({ client }) {
-    // Initialize Sentry as soon as possible, creating a hub
-    Sentry.init({ dsn: "..." });
-
-    // Set up some tags that will be applied to all events
-    Sentry.setTag("inngest.client.name", client.name);
-
-    return {
-      onFunctionRun({ ctx, fn }) {
-        // Add specific context for the given function run
-        Sentry.setTags({
-          "inngest.function.id": fn.id(client.name),
-          "inngest.function.name": fn.name,
-          "inngest.event": ctx.event.name,
-          "inngest.run.id": ctx.runId,
-        });
-
-        // Start a transaction for this run
-        const transaction = Sentry.startTransaction({
-          name: "Inngest Function Run",
-          op: "run",
-          data: ctx.event,
-        });
-
-        let memoSpan: Sentry.Span;
-        let execSpan: Sentry.Span;
-
-        return {
-          transformInput() {
-            return {
-              ctx: {
-                // Add the Sentry client to the input arg so our
-                // functions can use it directly too
-                sentry: Sentry.getCurrentHub(),
-              },
-            };
-          },
-          beforeMemoization() {
-            // Track different spans for memoization and execution
-            memoSpan = transaction.startChild({ op: "memoization" });
-          },
-          afterMemoization() {
-            memoSpan.finish();
-          },
-          beforeExecution() {
-            execSpan = transaction.startChild({ op: "execution" });
-          },
-          afterExecution() {
-            execSpan.finish();
-          },
-          transformOutput({ result, step }) {
-            // Capture step output and log errors
-            if (step) {
-              Sentry.setTags({
-                "inngest.step.name": step.name,
-                "inngest.step.op": step.op,
-              });
-
-              if (result.error) {
-                Sentry.captureException(result.error);
-              }
-            }
-          },
-          async beforeResponse() {
-            // Finish the transaction and flush data to Sentry before the
-            // request closes
-            transaction.finish();
-            await Sentry.flush();
-          },
-        };
-      },
-    };
-  },
-});
-```
-
-## Prisma in function context
-
-The following is an example of adding a [Prisma](https://www.prisma.io/?ref=inngest) client to all Inngest functions, allowing them immediate access without needing to create the client themselves.
-
-While this example uses Prisma, it serves as a good example of using the [onFunctionRun -> input](/docs/reference/middleware/lifecycle#on-function-run-lifecycle) hook to mutate function input to perform crucial setup for your functions and keep them to just business logic.
-
-<Callout>
-💡 Types are inferred from middleware outputs, so your Inngest functions will see an appropriately-typed `prisma` property in their input.
-</Callout>
-
-```ts
-inngest.createFunction(
-  { name: "Example" },
-  { event: "app/user.loggedin" },
-  async ({ prisma }) => {
-    await prisma.auditTrail.create(/* ... */);
-  }
-);
-```
-
-```ts
-import { PrismaClient } from "@prisma/client";
-
-const prismaMiddleware = new InngestMiddleware({
-  name: "Prisma Middleware",
-  init() {
-    const prisma = new PrismaClient();
-
-    return {
-      onFunctionRun(ctx) {
-        return {
-          transformInput(ctx) {
-            return {
-              // Anything passed via `ctx` will be merged with the function's arguments
-              ctx: {
-                prisma,
-              },
-            };
-          },
-        };
-      },
-    };
-  },
-});
-```
-
-Check out [Common actions for every function](http://localhost:3001/docs/reference/middleware/examples#common-actions-for-every-function) to see how this technique can be used to create steps for all of your unique logic.
-
-## Logging
-
-The following shows you how you can create a logger middleware and customize it to your needs.
-
-It is based on the [built-in logger middleware](/docs/guides/logging) in the SDK, and hope it gives you an idea of what you can do if the built-in logger doesn't meet your needs.
-
-```ts
-new InngestMiddleware({
-  name: "Inngest: Logger",
-  init({ client }) {
-    return {
-      onFunctionRun(arg) {
-        const { ctx } = arg;
-        const metadata = {
-          runID: ctx.runId,
-          eventName: ctx.event.name,
-          functionName: arg.fn.name,
-        };
-
-        let providedLogger: Logger = client["logger"];
-        // create a child logger if the provided logger has child logger implementation
-        try {
-          if ("child" in providedLogger) {
-            type ChildLoggerFn = (
-              metadata: Record<string, unknown>
-            ) => Logger;
-            providedLogger = (providedLogger.child as ChildLoggerFn)(metadata)
-          }
-        } catch (err) {
-          console.error('failed to create "childLogger" with error: ', err);
-          // no-op
-        }
-        const logger = new ProxyLogger(providedLogger);
-
-        return {
-          transformInput() {
-            return {
-              ctx: {
-                /**
-                 * The passed in logger from the user.
-                 * Defaults to a console logger if not provided.
-                 */
-                logger,
-              },
-            };
-          },
-          beforeExecution() {
-            logger.enable();
-          },
-          transformOutput({ result: { error } }) {
-            if (error) {
-              logger.error(error);
-            }
-          },
-          async beforeResponse() {
-            await logger.flush();
-          },
-        };
-      },
-    };
-  },
-})
-```
+---
 
 ## Common actions for every function
 
@@ -307,4 +114,370 @@ type FilterActions<Fns extends Record<string, any>> = {
     ...args: Parameters<Fns[K]>
   ) => Promise<Awaited<ReturnType<Fns[K]>>>;
 };
+```
+
+## E2E Encryption
+
+Inngest helps memoize state between steps within a function, but you may want to encrypt this, ensuring plaintext data never leaves your server.
+
+<Callout>
+⚠️ If you encrypt your step data and lose your encryption key, you'll lose access to all encrypted state. Be careful!
+</Callout>
+
+```ts
+const inngest = new Inngest({
+  id: "my-app",
+  middleware: [stepEncryptionMiddleware()],
+});
+
+inngest.createFunction(
+  { id: "example-function" },
+  { event: "app/user.created" },
+  async ({ event, step }) => {
+    /**
+     * The return value of `db.get()` - and therefore the value of `user` is now
+     * silently encrypted and decrypted by the middleware; no plain-text step
+     * data leaves your server or is stored in Inngest Cloud.
+     */
+    const user = await step.run("get-user", () =>
+      db.get("user", event.data.userId)
+    );
+  }
+);
+```
+
+This example's "encryption" is just stringifying and reversing the value - in practice you'll want to replace this with your own method using something like [`node:crypto`](https://nodejs.org/api/crypto.html).
+
+```ts
+const prefix = "__ENCRYPTED__";
+
+export const stepEncryptionMiddleware = ({
+  key = process.env.YOUR_ENCRYPTION_KEY || "",
+}: { key?: string } = {}) => {
+  if (!key) {
+    throw new Error("Must provide an encryption key");
+  }
+
+  // Change `encrypt` to whatever implementation you want.
+  const encrypt = <T = string>(value: unknown): T => {
+    return `${prefix}${JSON.stringify(value)
+      .split("")
+      .reverse()
+      .join("")}` as T;
+  };
+
+  // Change `decrypt` to whatever implementation you want.
+  const decrypt = <T>(value: T): T => {
+    if (typeof value === "string" && value.startsWith(prefix)) {
+      return JSON.parse(
+        value.slice(prefix.length).split("").reverse().join("")
+      );
+    }
+
+    // Assume the value is not encrypted, e.g. sent from the UI or something.
+    return value;
+  };
+
+  return new InngestMiddleware({
+    name: "Step Encryption Middleware",
+    init: () => {
+      return {
+        onFunctionRun: () => {
+          return {
+            /**
+             * Step data is decrypted as it comes in.
+             */
+            transformInput: ({ ctx, steps }) => {
+              return {
+                steps: steps.map((step) => ({
+                  ...step,
+                  data: step.data && decrypt(step.data),
+                })),
+              };
+            },
+            /**
+             * Step data is encrypted as it goes out.
+             */
+            transformOutput: (ctx) => {
+              if (!ctx.step) {
+                return;
+              }
+
+              return {
+                result: {
+                  data: ctx.result.data && encrypt(ctx.result.data),
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+  });
+};
+```
+
+We could expand this middleware to transform event data entering and leaving the SDK. Be aware that, unlike step data, event data is much more
+commonly shared between systems; think about if you need to also encrypt your event data before doing so.
+
+```ts
+new InngestMiddleware({
+  name: "Full Encryption Middleware",
+  init: () => {
+    return {
+      /**
+       * All outgoing events are encrypted.
+       */
+      onSendEvent: () => {
+        return {
+          transformInput: ({ payloads }) => {
+            return {
+              payloads: payloads.map((payload) => ({
+                ...payload,
+                data: payload.data && encrypt(payload.data),
+              })),
+            };
+          },
+        };
+      },
+      onFunctionRun: () => {
+        return {
+          transformInput: ({ ctx, steps }) => {
+            return {
+              steps: steps.map((step) => ({
+                ...step,
+                data: step.data && decrypt(step.data),
+              })),
+              /**
+               * Incoming event triggers are decrypted as they come in.
+               */
+              ctx: {
+                event: ctx.event && decrypt(ctx.event),
+                events: ctx.events && ctx.events.map(decrypt),
+              } as {},
+            };
+          },
+          transformOutput: (ctx) => {
+            if (!ctx.step) {
+              return;
+            }
+
+            return {
+              result: {
+                data: ctx.result.data && encrypt(ctx.result.data),
+              },
+            };
+          },
+        };
+      },
+    };
+  },
+});
+```
+
+---
+
+## Logging
+
+The following shows you how you can create a logger middleware and customize it to your needs.
+
+It is based on the [built-in logger middleware](/docs/guides/logging) in the SDK, and hope it gives you an idea of what you can do if the built-in logger doesn't meet your needs.
+
+```ts
+new InngestMiddleware({
+  name: "Inngest: Logger",
+  init({ client }) {
+    return {
+      onFunctionRun(arg) {
+        const { ctx } = arg;
+        const metadata = {
+          runID: ctx.runId,
+          eventName: ctx.event.name,
+          functionName: arg.fn.name,
+        };
+
+        let providedLogger: Logger = client["logger"];
+        // create a child logger if the provided logger has child logger implementation
+        try {
+          if ("child" in providedLogger) {
+            type ChildLoggerFn = (
+              metadata: Record<string, unknown>
+            ) => Logger;
+            providedLogger = (providedLogger.child as ChildLoggerFn)(metadata)
+          }
+        } catch (err) {
+          console.error('failed to create "childLogger" with error: ', err);
+          // no-op
+        }
+        const logger = new ProxyLogger(providedLogger);
+
+        return {
+          transformInput() {
+            return {
+              ctx: {
+                /**
+                 * The passed in logger from the user.
+                 * Defaults to a console logger if not provided.
+                 */
+                logger,
+              },
+            };
+          },
+          beforeExecution() {
+            logger.enable();
+          },
+          transformOutput({ result: { error } }) {
+            if (error) {
+              logger.error(error);
+            }
+          },
+          async beforeResponse() {
+            await logger.flush();
+          },
+        };
+      },
+    };
+  },
+})
+```
+
+---
+
+## Prisma in function context
+
+The following is an example of adding a [Prisma](https://www.prisma.io/?ref=inngest) client to all Inngest functions, allowing them immediate access without needing to create the client themselves.
+
+While this example uses Prisma, it serves as a good example of using the [onFunctionRun -> input](/docs/reference/middleware/lifecycle#on-function-run-lifecycle) hook to mutate function input to perform crucial setup for your functions and keep them to just business logic.
+
+<Callout>
+💡 Types are inferred from middleware outputs, so your Inngest functions will see an appropriately-typed `prisma` property in their input.
+</Callout>
+
+```ts
+inngest.createFunction(
+  { name: "Example" },
+  { event: "app/user.loggedin" },
+  async ({ prisma }) => {
+    await prisma.auditTrail.create(/* ... */);
+  }
+);
+```
+
+```ts
+import { PrismaClient } from "@prisma/client";
+
+const prismaMiddleware = new InngestMiddleware({
+  name: "Prisma Middleware",
+  init() {
+    const prisma = new PrismaClient();
+
+    return {
+      onFunctionRun(ctx) {
+        return {
+          transformInput(ctx) {
+            return {
+              // Anything passed via `ctx` will be merged with the function's arguments
+              ctx: {
+                prisma,
+              },
+            };
+          },
+        };
+      },
+    };
+  },
+});
+```
+
+Check out [Common actions for every function](http://localhost:3001/docs/reference/middleware/examples#common-actions-for-every-function) to see how this technique can be used to create steps for all of your unique logic.
+
+---
+
+## Sentry error reporting and tracing
+
+This example uses [Sentry](https://sentry.io/?ref=inngest) to:
+
+- Capture exceptions for reporting
+- Add tracing to each function run
+- Include useful context for each exception and trace like function ID and event names
+
+```ts
+import * as Sentry from "@sentry/node";
+
+const sentryMiddleware = new InngestMiddleware({
+  name: "Sentry Middleware",
+  init({ client }) {
+    // Initialize Sentry as soon as possible, creating a hub
+    Sentry.init({ dsn: "..." });
+
+    // Set up some tags that will be applied to all events
+    Sentry.setTag("inngest.client.name", client.name);
+
+    return {
+      onFunctionRun({ ctx, fn }) {
+        // Add specific context for the given function run
+        Sentry.setTags({
+          "inngest.function.id": fn.id(client.name),
+          "inngest.function.name": fn.name,
+          "inngest.event": ctx.event.name,
+          "inngest.run.id": ctx.runId,
+        });
+
+        // Start a transaction for this run
+        const transaction = Sentry.startTransaction({
+          name: "Inngest Function Run",
+          op: "run",
+          data: ctx.event,
+        });
+
+        let memoSpan: Sentry.Span;
+        let execSpan: Sentry.Span;
+
+        return {
+          transformInput() {
+            return {
+              ctx: {
+                // Add the Sentry client to the input arg so our
+                // functions can use it directly too
+                sentry: Sentry.getCurrentHub(),
+              },
+            };
+          },
+          beforeMemoization() {
+            // Track different spans for memoization and execution
+            memoSpan = transaction.startChild({ op: "memoization" });
+          },
+          afterMemoization() {
+            memoSpan.finish();
+          },
+          beforeExecution() {
+            execSpan = transaction.startChild({ op: "execution" });
+          },
+          afterExecution() {
+            execSpan.finish();
+          },
+          transformOutput({ result, step }) {
+            // Capture step output and log errors
+            if (step) {
+              Sentry.setTags({
+                "inngest.step.name": step.name,
+                "inngest.step.op": step.op,
+              });
+
+              if (result.error) {
+                Sentry.captureException(result.error);
+              }
+            }
+          },
+          async beforeResponse() {
+            // Finish the transaction and flush data to Sentry before the
+            // request closes
+            transaction.finish();
+            await Sentry.flush();
+          },
+        };
+      },
+    };
+  },
+});
 ```
