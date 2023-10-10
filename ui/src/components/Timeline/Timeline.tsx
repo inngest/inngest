@@ -4,7 +4,7 @@ import type { HistoryNode } from './historyParser';
 import { TimelineNode } from './TimelineNode/TimelineNode';
 
 type Props = {
-  getOutput: (historyItemID: string) => Promise<string>;
+  getOutput: (historyItemID: string) => Promise<string | undefined>;
   history: Record<string, HistoryNode>;
 };
 

@@ -85,10 +85,10 @@ func (r *functionRunResolver) HistoryItemOutput(
 	ctx context.Context,
 	obj *models.FunctionRun,
 	historyID ulid.ULID,
-) (string, error) {
+) (*string, error) {
 	runID, err := ulid.Parse(obj.ID)
 	if err != nil {
-		return "", fmt.Errorf("invalid run ID: %w", err)
+		return nil, fmt.Errorf("invalid run ID: %w", err)
 	}
 
 	// For required UUID fields that don't matter in OSS.

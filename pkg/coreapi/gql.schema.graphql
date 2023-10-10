@@ -191,7 +191,7 @@ type FunctionRun {
 
   timeline: [FunctionRunEvent!] @deprecated
   history: [RunHistoryItem!]!
-  historyItemOutput(id: ULID!): String!
+  historyItemOutput(id: ULID!): String
   name: String @deprecated # use the embedded function field instead.
 }
 
