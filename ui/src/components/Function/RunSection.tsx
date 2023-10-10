@@ -1,26 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import ms from 'ms';
 
 import { type OutputType } from '@/components/Function/OutputRenderer';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { IconClock } from '@/icons';
 import { client } from '@/store/baseApi';
-import { usePrettyJson } from '../../hooks/usePrettyJson';
 import {
-  EventStatus,
-  FunctionEventType,
   FunctionRunStatus,
   FunctionTriggerTypes,
   GetHistoryItemOutputDocument,
-  StepEventType,
   useGetFunctionRunQuery,
 } from '../../store/generated';
 import Badge from '../Badge';
 import { BlankSlate } from '../Blank';
-import CodeBlock from '../Code/CodeBlock';
 import ContentCard from '../Content/ContentCard';
-import TimelineFuncProgress from '../Timeline/TimelineFuncProgress';
-import TimelineRow from '../Timeline/TimelineRow';
 import { Timeline } from '../TimelineV2';
 import { useParsedHistory } from '../TimelineV2/historyParser';
 import OutputCard from './Output';
