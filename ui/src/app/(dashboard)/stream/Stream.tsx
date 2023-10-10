@@ -170,7 +170,7 @@ export default function Stream() {
         params.append('run', runID);
       }
       const url = `/stream/trigger?${params.toString()}`;
-      router.replace(url);
+      router.push(url);
     }
   }
 
