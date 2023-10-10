@@ -7,17 +7,17 @@ disableCTA: true
 focus: true
 ---
 
-We're excited to announce the general availability of Inngest's Typescript SDK V3.0.  This version includes a refactored core loop, improved function versioning, improved parallelism, paves the road for multi-language support, and small quality of life issues such as support for top-level `await` keywords outside of steps.
+We're excited to announce the general availability of Inngest's Typescript SDK v3.0.  This version includes a refactored core loop, improved function versioning, improved parallelism, paves the road for multi-language support, and small quality of life issues such as support for top-level `await` keywords outside of steps.
 
 We encourage all users to upgrade.  Function versioning and lifecycle management is a large improvement. Check out the [v3 migration guide](/docs/sdk/migration?ref=blog-sdk-3-0) to learn how to upgrade today.
 
 ## Multi-language support
 
-V3 of the SDK introduces a new hashing scheme for steps.  This approach is shared across all other language SDKs, of which Go, Elixir, and Rust are currently in development.  By sharing the hashing scheme, V3 provides the foundation for live-migrating functions across languages and clouds.  If you start developing a function with the TypeScript SDK, you can rewrite the function entirely in another language, redeploy, and functions will pick up where they left off without any extra effort.
+v3 of the SDK introduces a new hashing scheme for steps.  This approach is shared across all other language SDKs, of which Go, Elixir, and Rust are currently in development.  By sharing the hashing scheme, v3 provides the foundation for live-migrating functions across languages and clouds.  If you start developing a function with the TypeScript SDK, you can rewrite the function entirely in another language, redeploy, and functions will pick up where they left off without any extra effort.
 
 ## Mixed async logic
 
-SDK V3 changes the core execution loop, allowing top-level code to call `await` on promises without erroring.  Our V2 SDK was extremely protective in how promises were handled to prevent non-deterministic playback.  A new core loop allows us to relax this constraint whilst still providing determinism.
+SDK v3 changes the core execution loop, allowing top-level code to call `await` on promises without erroring.  Our v2 SDK was extremely protective in how promises were handled to prevent non-deterministic playback.  A new core loop allows us to relax this constraint whilst still providing determinism.
 
 ```ts
 inngest.createFunction(
@@ -37,15 +37,15 @@ Previously, the type signature for a step was `step.run<T>(name: string, fn: () 
 
 ## Improved function versioning and upgrades
 
-Inngest's Typescript V3.0 improves function versioning.  This allows you to deploy hotfixes and logic changes to long running functions without fear of errors, failures, and panics.  Beforehand, any changes to a function resulted in an irrecoverable error if step definitions changed.  Now, changes to a function are smartly applied by default.  New steps are ran the first time a function is re-invoked.  Steps that have been removed will be ignored.  In the future, any changes in steps will show as a warning in the UI.  This keeps deterministic semantics whilst allowing functions to be modified.
+Inngest's Typescript v3.0 improves function versioning.  This allows you to deploy hotfixes and logic changes to long running functions without fear of errors, failures, and panics.  Beforehand, any changes to a function resulted in an irrecoverable error if step definitions changed.  Now, changes to a function are smartly applied by default.  New steps are ran the first time a function is re-invoked.  Steps that have been removed will be ignored.  In the future, any changes in steps will show as a warning in the UI.  This keeps deterministic semantics whilst allowing functions to be modified.
 
 ## What's next
 
-Future plans for the V3 SDK include:
+Future plans for the v3 SDK include:
 
 - Invoke, allowing you to invoke functions directly and await their responses
 - Debouncing, allowing you to run functions based off of the latest in a series of events
 - Strict mode, keeping V2-like semantics of erroring on step changes for strict determinism
-- Version switching, allowing you to track versioning explicitly to handle logic with finer ganularity
+- Version switching, allowing you to track versioning explicitly to handle logic with finer granularity
 
-With V3 as the foundation going forwards, it's much easier to iterate on and develop new features.  We're excited to see what you'll create with v3! Check out the [v3 migration guide](/docs/sdk/migration?ref=blog-sdk-3-0) to learn how to upgrade today.
+With v3 as the foundation going forwards, it's much easier to iterate on and develop new features.  We're excited to see what you'll create with v3! Check out the [v3 migration guide](/docs/sdk/migration?ref=blog-sdk-3-0) to learn how to upgrade today.
