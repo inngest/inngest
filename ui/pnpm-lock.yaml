@@ -50,9 +50,6 @@ dependencies:
   monaco-editor:
     specifier: 0.34.1
     version: 0.34.1
-  ms:
-    specifier: 2.1.3
-    version: 2.1.3
   next:
     specifier: 13.4.5
     version: 13.4.5(@babel/core@7.22.10)(react-dom@18.2.0)(react@18.2.0)
@@ -68,9 +65,6 @@ dependencies:
   react-refractor:
     specifier: 2.1.7
     version: 2.1.7(react@18.2.0)
-  react-timeago:
-    specifier: 7.1.0
-    version: 7.1.0(react@18.2.0)
   react-virtual:
     specifier: 2.10.4
     version: 2.10.4(react@18.2.0)
@@ -9777,6 +9771,7 @@ packages:
 
   /ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
+    dev: true
 
   /mute-stream@0.0.8:
     resolution: {integrity: sha512-nnbWWOkoWyUsTjKrhgD0dcz22mdkSnpYqbEjIm2nhwhuxlSkpywJmBo8h0ZqJdkp73mb90SssHkN4rsRaBAfAA==}
@@ -11042,14 +11037,6 @@ packages:
       invariant: 2.2.4
       react: 18.2.0
       tslib: 2.5.3
-
-  /react-timeago@7.1.0(react@18.2.0):
-    resolution: {integrity: sha512-rouF7MiEm55fH791Y8cg+VobIJgx8gtNJ+gjr86R4ZqO1WKPkXiXjdT/lRzrvEkUzsxT1exHqV2V+Zdi114H3A==}
-    peerDependencies:
-      react: ^16.0.0 || ^17.0.0 || ^18.0.0
-    dependencies:
-      react: 18.2.0
-    dev: false
 
   /react-virtual@2.10.4(react@18.2.0):
     resolution: {integrity: sha512-Ir6+oPQZTVHfa6+JL9M7cvMILstFZH/H3jqeYeKI4MSUX+rIruVwFC6nGVXw9wqAw8L0Kg2KvfXxI85OvYQdpQ==}
