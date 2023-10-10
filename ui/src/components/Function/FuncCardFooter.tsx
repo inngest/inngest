@@ -8,14 +8,15 @@ interface FuncCardFooterProps {
 }
 
 export default function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
-  if (!functionRun || !functionRun.output || !functionRun.status) {
-    return null;
-  }
-  let type: OutputType = null;
-  if (functionRun.status === FunctionRunStatus.Completed) {
+  let type: OutputType | undefined;
+  if (functionRun?.status === FunctionRunStatus.Completed) {
     type = 'completed';
-  } else if (functionRun.status === FunctionRunStatus.Failed) {
+  } else if (functionRun?.status === FunctionRunStatus.Failed) {
     type = 'failed';
+  }
+
+  if (!functionRun || !functionRun.output || !functionRun.status || !type) {
+    return null;
   }
 
   const { message, errorName } = renderOutput({

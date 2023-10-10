@@ -27,16 +27,16 @@ type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'status' | 'output'>;
 export function OutputItem({ functionRunID }) {
   const { data } = useGetFunctionRunOutputQuery({ id: functionRunID }, { pollingInterval: 1500 });
   const functionRun = (data?.functionRun as FunctionRunStatusSubset) || {};
+  let type: OutputType | undefined;
 
-  if (!functionRun || !functionRun?.output || !functionRun?.status) {
-    return null;
+  if (functionRun?.status === FunctionRunStatus.Completed) {
+    type = 'completed';
+  } else if (functionRun?.status === FunctionRunStatus.Failed) {
+    type = 'failed';
   }
 
-  let type: OutputType = null;
-  if (functionRun.status === FunctionRunStatus.Completed) {
-    type = 'completed';
-  } else if (functionRun.status === FunctionRunStatus.Failed) {
-    type = 'failed';
+  if (!functionRun || !functionRun?.output || !functionRun?.status || !type) {
+    return null;
   }
 
   const { message, errorName, output } = renderOutput({

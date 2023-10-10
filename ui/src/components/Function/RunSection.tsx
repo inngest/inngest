@@ -92,7 +92,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
     );
   }
   const metadataItems = renderRunMetadata(run);
-  let type: OutputType = null;
+  let type: OutputType | undefined;
   if (run.status === FunctionRunStatus.Completed) {
     type = 'completed';
   } else if (run.status === FunctionRunStatus.Failed) {
@@ -121,7 +121,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       }
     >
       <div className="px-5 pt-4">
-        {run.status && run.finishedAt && run.output && (
+        {run.status && run.finishedAt && run.output && type && (
           <OutputCard content={run.output} type={type} />
         )}
 

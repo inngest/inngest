@@ -6,7 +6,7 @@ type RenderedData = {
   output: string;
 };
 
-export type OutputType = 'failed' | 'completed' | null;
+export type OutputType = 'failed' | 'completed';
 
 export default function renderOutput({
   type,
