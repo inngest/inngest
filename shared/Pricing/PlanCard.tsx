@@ -78,7 +78,7 @@ export default function PlanCard({
               theme[variant].price
             } ${!!content.cost.period && "pl-4"}`}
           >
-            ${price}
+            {typeof price === "string" ? price : '$' + price}
             <span
               className={`text-sm font-medium ml-0.5 ${theme[variant].secondary}`}
             >
