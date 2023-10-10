@@ -23,11 +23,11 @@ The `createFunction` method accepts a series of arguments to define your functio
 ### Configuration
 
 <Properties>
-  <Property name="name" type="string" required>
-    A unique name for your function. This will be used to create a unique slug `id` by default.
+  <Property name="id" type="string" required>
+    A unique identifier for your function. This should not change between deploys.
   </Property>
-  <Property name="id" type="string">
-    A unique identifier for your function to override the default (a slug of your function name).
+  <Property name="name" type="string">
+    A name for your function. If defined, this will be shown in the UI as a friendly display name instead of the ID.
   </Property>
 
   <Property name="concurrency" type="number | object">

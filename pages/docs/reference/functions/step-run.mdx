@@ -16,13 +16,13 @@ export default inngest.createFunction(
 
 ---
 
-## `step.run(name, handler): Promise`
+## `step.run(id, handler): Promise`
 
 <Row>
   <Col>
     <Properties>
-      <Property name="name" type="string" required>
-        The name of the step. This will be what appears in your function's logs.
+      <Property name="id" type="string" required>
+        The ID of the step. This will be what appears in your function's logs and is used to memoize step state across function versions.
       </Property>
       <Property name="handler" type="function" required>
         The function that code that you want to run and automatically retry for this step. Functions can be:

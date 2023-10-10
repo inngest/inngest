@@ -38,17 +38,20 @@ To add a simple time based delay to your code, use [`step.sleep()`](/docs/refere
 
 ---
 
-## `step.waitForEvent(eventName, options): Promise<null | EventPayload>`
+## `step.waitForEvent(id, options): Promise<null | EventPayload>`
 
 <Row>
   <Col>
     <Properties>
-      <Property name="eventName" type="string" required>
-        The name of a given event to wait for.
+      <Property name="id" type="string" required>
+        The ID of the step. This will be what appears in your function's logs and is used to memoize step state across function versions.
       </Property>
       <Property name="options" type="object" required>
         Options for configuring how to wait for the event.
         <Properties nested={true}>
+          <Property name="event" type="string" required>
+            The name of a given event to wait for.
+          </Property>
           <Property name="timeout" type="string" required>
             The amount of time to wait to receive the event. A time string compatible with the [ms](https://npm.im/ms) package, e.g. `"30m"`, `"3 hours"`, or `"2.5d"`
           </Property>

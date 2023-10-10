@@ -31,11 +31,14 @@ To sleep until a particular date time, use [`step.sleepUntil()`](/docs/reference
 
 ---
 
-## `step.sleep(duration): Promise`
+## `step.sleep(id, duration): Promise`
 
 <Row>
   <Col>
     <Properties>
+      <Property name="id" type="string" required>
+        The ID of the step. This will be what appears in your function's logs and is used to memoize step state across function versions.
+      </Property>
       <Property name="duration" type="number | string" required>
         The duration of time to sleep:
 

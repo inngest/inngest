@@ -37,11 +37,14 @@ To send events from outside of the context of a function, use [`inngest.send()`]
 
 ---
 
-## `step.sendEvent(eventPayload | eventPayload[]): Promise`
+## `step.sendEvent(id, eventPayload | eventPayload[]): Promise`
 
 <Row>
   <Col>
     <Properties>
+      <Property name="id" type="string" required>
+        The ID of the step. This will be what appears in your function's logs and is used to memoize step state across function versions.
+      </Property>
       <Property name="eventPayload" type="object | object[]" required>
         An event payload object or an array of event payload objects.
 

@@ -34,43 +34,38 @@ serve(inngest, [sendSignupEmail, summarizeText, importProductImages]);
 
 ---
 
-## `serve(client, functions[], options)`
+## `serve(options)`
 
 <Properties>
   <Property name="client" type="Inngest client" required>
-    An Inngest client ([reference](/docs/reference/client/create))
+    An Inngest client ([reference](/docs/reference/client/create)).
   </Property>
   <Property name="functions" type="InngestFunctions[]" required>
-    An array of Inngest functions defined using `inngest.createFunction()` ([reference](/docs/reference/functions/create))
+    An array of Inngest functions defined using `inngest.createFunction()` ([reference](/docs/reference/functions/create)).
   </Property>
-  <Property name="options" type="object">
-    Options for configuring how to wait for the event.
-    <Properties nested={true}>
-      <Property name="signingKey" type="string" required>
-        The Inngest Signing Key for your [selected environment](/docs/platform/environments). We recommend setting the [`INNGEST_SIGNING_KEY`](/docs/sdk/environment-variables#inngest-signing-key) environment variable instead of passing the `signingKey` option. You can find this in [the Inngest dashboard](https://app.inngest.com/env/production/manage/signing-key).
-      </Property>
-      <Property name="serveHost" type="string">
-        The domain host of your application, _including_ protocol, e.g. `https://myapp.com`. The SDK attempts to infer this via HTTP headers at runtime, but this may be required when using platforms like AWS Lambda or when using a reverse proxy.
-      </Property>
-      <Property name="servePath" type="string">
-        The path where your `serve` handler is hosted. The SDK attempts to infer this via HTTP headers at runtime. We recommend `/api/inngest`.
-      </Property>
-      <Property name="streaming" type={`"allow" | "force" | false`}>
-        Enables streaming responses back to Inngest which can enable maximum serverless function timeouts. See [reference](/docs/streaming) for more information on the configuration.
-      </Property>
-      <Property name="logLevel" type={`"fatal" | "error" | "warn" | "info" | "debug" | "silent"`}>
-        The minimum level to log from the Inngest serve endpoint. Defaults to `"info"`.
-      </Property>
-      <Property name="inngestRegisterUrl" type="string">
-        The URL used to register functions with Inngest. This can be useful in testing environments when using the Inngest Dev Server. Defaults to: `"https://api.inngest.com/fn/register"`
-      </Property>
-      <Property name="fetch" type="Fetch API compatible interface">
-        Override the default [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) implementation. Defaults to the runtime's native Fetch API.
-      </Property>
-      <Property name="landingPage" type="boolean">
-        Force a landing page to be rendered by the `serve` handler to help debug the setup of your application. This is disabled by default in production (`NODE_ENV !== "production"`).
-      </Property>
-    </Properties>
+  <Property name="signingKey" type="string" required>
+    The Inngest Signing Key for your [selected environment](/docs/platform/environments). We recommend setting the [`INNGEST_SIGNING_KEY`](/docs/sdk/environment-variables#inngest-signing-key) environment variable instead of passing the `signingKey` option. You can find this in [the Inngest dashboard](https://app.inngest.com/env/production/manage/signing-key).
+  </Property>
+  <Property name="serveHost" type="string">
+    The domain host of your application, _including_ protocol, e.g. `https://myapp.com`. The SDK attempts to infer this via HTTP headers at runtime, but this may be required when using platforms like AWS Lambda or when using a reverse proxy. See also [`INNGEST_SERVE_HOST`](/docs/sdk/environment-variables#inngest-serve-host).
+  </Property>
+  <Property name="servePath" type="string">
+    The path where your `serve` handler is hosted. The SDK attempts to infer this via HTTP headers at runtime. We recommend `/api/inngest`. See also [`INNGEST_SERVE_PATH`](/docs/sdk/environment-variables#inngest-serve-path).
+  </Property>
+  <Property name="streaming" type={`"allow" | "force" | false`}>
+    Enables streaming responses back to Inngest which can enable maximum serverless function timeouts. See [reference](/docs/streaming) for more information on the configuration.  See also [`INNGEST_SERVE_HOST`](/docs/sdk/environment-variables#inngest-serve-host).
+  </Property>
+  <Property name="logLevel" type={`"fatal" | "error" | "warn" | "info" | "debug" | "silent"`}>
+    The minimum level to log from the Inngest serve endpoint. Defaults to `"info"`. See also [`INNGEST_LOG_LEVEL`](/docs/sdk/environment-variables#inngest-log-level).
+  </Property>
+  <Property name="baseUrl" type="string">
+    The URL used to communicate with Inngest. This can be useful in testing environments when using the Inngest Dev Server. Defaults to: `"https://api.inngest.com/"`. See also [`INNGEST_BASE_URL`](/docs/sdk/environment-variables#inngest-base-url).
+  </Property>
+  <Property name="fetch" type="Fetch API compatible interface">
+    Override the default [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) implementation. Defaults to the runtime's native Fetch API.
+  </Property>
+  <Property name="id" type="string">
+    The ID to use to represent this application instead of the client's ID. Useful for creating many Inngest endpoints in a single application.
   </Property>
 </Properties>
 
@@ -90,4 +85,39 @@ The API works by exposing a single endpoint at `/api/inngest` which handles diff
 
 If the framework that your application uses is not included in our list of [first-party supported frameworks](/docs/sdk/serve), you can create a custom `serve` handler.
 
-To create your own handler, check out the [example handler](https://github.com/inngest/inngest-js/blob/main/packages/inngest/src/test/functions/handler.ts) in our SDK's open source repo to understand how it works.
+To create your own handler, check out the [example handler](https://github.com/inngest/inngest-js/blob/main/packages/inngest/src/test/functions/handler.ts) in our SDK's open source repo to understand how it works. Here's an example of a custom handler being created and used:
+
+```ts
+import { Inngest, InngestCommHandler, type ServeHandlerOptions } from "inngest";
+
+const serve = (options: ServeHandlerOptions) => {
+  const handler = new InngestCommHandler({
+    frameworkName: "edge",
+    fetch: fetch.bind(globalThis),
+    ...options,
+    handler: (req: Request) => {
+      return {
+        body: () => req.json(),
+        headers: (key) => req.headers.get(key),
+        method: () => req.method,
+        url: () => new URL(req.url, `https://${req.headers.get("host") || ""}`),
+        transformResponse: ({ body, status, headers }) => {
+          return new Response(body, { status, headers });
+        },
+      };
+    },
+  });
+
+  return handler.createHandler();
+};
+
+const inngest = new Inngest({ id: "example-edge-app" });
+
+const fn = inngest.createFunction(
+  { id: "hello-world" },
+  { event: "test/hello.world" },
+  () => "Hello, World!"
+);
+
+export default serve({ client: inngest, functions: [fn] });
+```

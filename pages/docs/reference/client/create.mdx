@@ -45,8 +45,8 @@ const inngest = new Inngest({
   <Property name="fetch" type="Fetch API compatible interface">
     Override the default [`fetch`](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) implementation. Defaults to the runtime's native Fetch API.
   </Property>
-  <Property name="inngestBaseUrl" type="string">
-    Override the default (`https://inn.gs/`) base URL for sending events.
+  <Property name="baseUrl" type="string">
+    Override the default (`https://inn.gs/`) base URL for sending events. See also the [`INNGEST_BASE_URL`](/docs/sdk/environment-variables#inngest-base-url) environment variable.
   </Property>
 </Properties>
 
@@ -56,13 +56,50 @@ We recommend setting the [`INNGEST_EVENT_KEY`](/docs/sdk/environment-variables#i
 
 ## Defining Event Payload Types
 
-You can leverage TypeScript to define your event payload types. When you pass types to the Inngest client, events are fully typed when using them with `inngest.send()` and `inngest.createFunction()`. This can more easily alert you to issues with your code during compile time.
+You can leverage TypeScript or Zod to define your event payload types. When you pass types to the Inngest client, events are fully typed when using them with `inngest.send()` and `inngest.createFunction()`. This can more easily alert you to issues with your code during compile time.
 
 <Callout>
 Click the toggles on the top left of the code block to see the different methods available!
 </Callout>
 
 <CodeGroup forceTabs={true}>
+```ts {{ title: "Zod" }}
+import { EventSchemas, Inngest, type LiteralZodEventSchema } from "inngest";
+import { z } from "zod";
+
+// Define each event indiviudally
+const productPurchasedEvent = z.object({
+  name: z.literal("shop/product.purchased"),
+  data: z.object({ productId: z.string() }),
+});
+
+// You can use satisfies to provide some autocomplete when writing the event
+const productViewedEvent = z.object({
+  name: z.literal("shop/product.viewed"),
+  data: z.object({ productId: z.string() }),
+}) satisfies LiteralZodEventSchema;
+
+// Or all together in a single object
+const eventsMap = {
+  "app/account.created": {
+    data: z.object({
+      userId: z.string(),
+    }),
+  },
+  "app/subscription.started": {
+    data: z.object({
+      userId: z.string(),
+      planId: z.string(),
+    }),
+  },
+};
+
+export const inngest = new Inngest({
+  schemas: new EventSchemas()
+    .fromZod([productPurchasedEvent, productViewedEvent])
+    .fromZod(eventsMap),
+});
+```
 ```ts {{ title: "Union" }}
 import { EventSchemas, Inngest } from "inngest";
 
@@ -106,43 +143,6 @@ type Events = {
 
 export const inngest = new Inngest({
   schemas: new EventSchemas().fromRecord<Events>(),
-});
-```
-```ts {{ title: "Zod" }}
-import { EventSchemas, Inngest, type LiteralZodEventSchema } from "inngest";
-import { z } from "zod";
-
-// Define each event indiviudally
-const productPurchasedEvent = z.object({
-  name: z.literal("shop/product.purchased"),
-  data: z.object({ productId: z.string() }),
-});
-
-// You can use satisfies to provide some autocomplete when writing the event
-const productViewedEvent = z.object({
-  name: z.literal("shop/product.viewed"),
-  data: z.object({ productId: z.string() }),
-}) satisfies LiteralZodEventSchema;
-
-// Or all together in a single object
-const eventsMap = {
-  "app/account.created": {
-    data: z.object({
-      userId: z.string(),
-    }),
-  },
-  "app/subscription.started": {
-    data: z.object({
-      userId: z.string(),
-      planId: z.string(),
-    }),
-  },
-};
-
-export const inngest = new Inngest({
-  schemas: new EventSchemas()
-    .fromZod([productPurchasedEvent, productViewedEvent])
-    .fromZod(eventsMap),
 });
 ```
 ```ts {{ title: "Stacking" }}
