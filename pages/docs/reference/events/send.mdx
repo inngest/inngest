@@ -110,10 +110,9 @@ To send events from within of the context of a function, use [`step.sendEvent()`
 
 ## User data encryption 🔐
 
-All data sent in the `user` object is fully encrypted at rest. Each unique user gets their own encryption key and when you delete the user from our system, which helps comply with GDPR and CCPA.
+All data sent in the `user` object is fully encrypted at rest.
 
-An API is planned to allow you to do this programmatically which will use the `user.external_id` (see above) to perform the delete operation.
-
+In the future, this object will be used to support programmatic deletion via API endpoint to support certain right-to-be-forgotten flows in your system. This will use the `user.external_id` property for lookup.
 
 ## Send Events via HTTP (Event API)
 
