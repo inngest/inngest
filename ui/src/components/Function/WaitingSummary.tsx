@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { Card } from '@/components/Card';
 import MetadataItem from '@/components/Metadata/MetadataItem';
-import type { HistoryNode } from '@/components/TimelineV2/historyParser';
+import type { HistoryNode } from '@/components/Timeline/historyParser';
 import { IconEvent } from '@/icons';
 
 type Props = {

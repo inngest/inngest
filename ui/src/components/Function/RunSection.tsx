@@ -13,8 +13,8 @@ import {
 import Badge from '../Badge';
 import { BlankSlate } from '../Blank';
 import ContentCard from '../Content/ContentCard';
-import { Timeline } from '../TimelineV2';
-import { useParsedHistory } from '../TimelineV2/historyParser';
+import { Timeline } from '../Timeline';
+import { useParsedHistory } from '../Timeline/historyParser';
 import OutputCard from './Output';
 import renderRunMetadata from './RunMetadataRenderer';
 import { FunctionRunStatusIcons } from './RunStatusIcons';
