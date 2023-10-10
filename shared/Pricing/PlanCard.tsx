@@ -136,7 +136,7 @@ export default function PlanCard({
             <div className={`text-sm font-medium ${theme[variant].secondary}`}>
               {content.cost.additionalPrice ? (
                 <>
-                  + <strong>{content.cost.additionalPrice}</strong> per
+                  + $<strong>{content.cost.additionalPrice}</strong> per
                   additional{" "}
                   <strong>
                     {content.cost.additionalRate.toLocaleString(undefined, {

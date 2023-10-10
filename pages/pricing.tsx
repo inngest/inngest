@@ -141,7 +141,7 @@ const PLANS: Plan[] = [
       additionalPrice: 5,
       additionalRate: 200_000,
       period: "month",
-      max: 20_000_000,
+      max: 30_000_000,
     },
     description: "Scale with us",
     popular: true,
@@ -254,7 +254,7 @@ function getPlanStepsMonth(plan: Plan): string {
   if (!plan.cost.additionalPrice) {
     return `$${base}`;
   }
-  return `$${base} + ${
+  return `$${base} + $${
     plan.cost.additionalPrice
   } per additional ${plan.cost.additionalRate.toLocaleString(undefined, {
     notation: "compact",
