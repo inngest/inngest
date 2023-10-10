@@ -21,19 +21,21 @@ export default inngest.createFunction(
 );
 ```
 
-As debounce uses the *last* event received, it is a complement to idempotency (a rate limit of 1).  Idempotency ensures that a function runs once for each `key` the *first* time an event is received, while debounce uses the *last* event during a specified period.  These can be combined to ensure that once a function is debounced it does not run again.
+As debounce uses the *last* event received, it is a complement to [`idempotency`](https://www.inngest.com/docs/reference/functions/create#inngest-create-function-configuration-trigger-handler-inngest-function) (a [rate limit](/docs/reference/functions/rate-limit) of 1).  Idempotency ensures that a function runs once for each `key` the *first* time an event is received, while debounce uses the *last* event during a specified period.  These can be combined to ensure that once a function is debounced it does not run again.
 
 **Use cases**
 
-Debounce fundamentally limits function executions, running a single function using the last of a series of events.  This is useful in many circimstances:
+Debounce fundamentally limits function executions, running a single function using the last of a series of events.  This is useful in many circumstances:
 
 - Run a function once after a noisy webhook finishes sending events, using the last event
 - Prevent wasted work when handling events from user input
 - Ensuring that functions use the latest event within a series of updates
 
+---
+
 ## How it works
 
-The first time an event is received, a new `debounce` is created.  The `debounce` expires after yout given `period`.  Each time new
+The first time an event is received, a new `debounce` is created.  The `debounce` expires after your given `period`.  Each time new
 events are received that match the same key (or function ID, if no key is present), the debounce's expiration is pushed out to expire
 after a new `period`.
 
@@ -71,7 +73,7 @@ When a `key` is added, a separate limit is applied for each unique value of the 
       </Property>
       <Property name="key" type="string">
         An optional unique key expression to apply the limit to. The expression is evaluated for each triggering event,
-	and allows you to debounce against event data. 
+	and allows you to debounce against event data.
 
         Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
 
