@@ -35,6 +35,7 @@
     "@mdx-js/react": "2.2.1",
     "@monaco-editor/react": "4.4.6",
     "@next/mdx": "13.1.1",
+    "@radix-ui/react-slider": "1.1.2",
     "@sindresorhus/slugify": "2.1.1",
     "@vercel/og": "0.0.22",
     "acorn": "8.8.1",

@@ -8,15 +8,17 @@ import { Button } from "src/shared/Button";
 import CodeWindow from "src/shared/CodeWindow";
 import InformationCircle from "src/shared/Icons/InformationCircle";
 
-type Plan = {
+export type Plan = {
   name: string;
   cost: {
     startsAt?: boolean;
-    basePrice: string;
-    included: string;
-    additionalPrice: string | null;
-    additionalRate?: string;
+    // Use numbers for calculators
+    basePrice: number | string;
+    included: number | string;
+    additionalPrice: number | string | null;
+    additionalRate?: number;
     period?: string;
+    max?: number;
   };
   description: React.ReactFragment | string;
   hideFromCards?: boolean;
@@ -54,8 +56,8 @@ const PLANS: Plan[] = [
     hideFromCards: true,
     name: PLAN_NAMES.free,
     cost: {
-      basePrice: "$0",
-      included: "50k",
+      basePrice: 0,
+      included: 50_000,
       period: "month",
       additionalPrice: null,
     },
@@ -90,11 +92,12 @@ const PLANS: Plan[] = [
     name: PLAN_NAMES.team,
     cost: {
       startsAt: true,
-      basePrice: "$50",
-      included: "100k",
-      additionalPrice: "$1",
-      additionalRate: "10k",
+      basePrice: 50,
+      included: 100_000,
+      additionalPrice: 1,
+      additionalRate: 10_000,
       period: "month",
+      max: 3_000_000,
     },
     description: "Bring your product to life",
     cta: {
@@ -133,11 +136,12 @@ const PLANS: Plan[] = [
     name: PLAN_NAMES.startup,
     cost: {
       startsAt: true,
-      basePrice: "$350",
-      included: "5M",
-      additionalPrice: "$5",
-      additionalRate: "200k",
+      basePrice: 350,
+      included: 5_000_000,
+      additionalPrice: 5,
+      additionalRate: 200_000,
       period: "month",
+      max: 20_000_000,
     },
     description: "Scale with us",
     popular: true,
@@ -176,11 +180,9 @@ const PLANS: Plan[] = [
   {
     name: PLAN_NAMES.enterprise,
     cost: {
-      // startsAt: true,
       basePrice: "Custom",
       included: "Custom",
       additionalPrice: null,
-      // period: "month",
     },
     description: "Powerful access for any scale",
     cta: {
@@ -241,18 +243,35 @@ function getPlanFeatureQuantity(planName: string, feature: string): string {
   );
 }
 
+function getPlanStepsMonth(plan: Plan): string {
+  if (typeof plan.cost.basePrice === "string") {
+    return plan.cost.basePrice;
+  }
+  const base = plan.cost.included.toLocaleString(undefined, {
+    notation: "compact",
+    compactDisplay: "short",
+  });
+  if (!plan.cost.additionalPrice) {
+    return `$${base}`;
+  }
+  return `$${base} + ${
+    plan.cost.additionalPrice
+  } per additional ${plan.cost.additionalRate.toLocaleString(undefined, {
+    notation: "compact",
+    compactDisplay: "short",
+  })}`;
+}
+
 const FEATURES: Feature[] = [
   {
     name: "Steps/month",
     plans: {
-      [PLAN_NAMES.free]: `${getPlan(PLAN_NAMES.free).cost.included}`,
-      [PLAN_NAMES.team]: `${getPlan(PLAN_NAMES.team).cost.included} + ${
-        getPlan(PLAN_NAMES.team).cost.additionalPrice
-      } per additional ${getPlan(PLAN_NAMES.team).cost.additionalRate}`,
-      [PLAN_NAMES.startup]: `${getPlan(PLAN_NAMES.startup).cost.included} + ${
-        getPlan(PLAN_NAMES.startup).cost.additionalPrice
-      } per additional ${getPlan(PLAN_NAMES.startup).cost.additionalRate}`,
-      [PLAN_NAMES.enterprise]: getPlan(PLAN_NAMES.enterprise).cost.included,
+      [PLAN_NAMES.free]: getPlanStepsMonth(getPlan(PLAN_NAMES.free)),
+      [PLAN_NAMES.team]: getPlanStepsMonth(getPlan(PLAN_NAMES.team)),
+      [PLAN_NAMES.startup]: getPlanStepsMonth(getPlan(PLAN_NAMES.startup)),
+      [PLAN_NAMES.enterprise]: getPlanStepsMonth(
+        getPlan(PLAN_NAMES.enterprise)
+      ),
     },
   },
   {

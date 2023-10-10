@@ -34,7 +34,9 @@ export default function ComparisonTable({ plans, features }) {
                   {plan.cost.startsAt ? `Starting at` : <>&nbsp;</>}
                 </span>
                 <span className="block text-4xl mb-2">
-                  {plan.cost.basePrice}
+                  {typeof plan.cost.basePrice === "string"
+                    ? plan.cost.basePrice
+                    : `$${plan.cost.basePrice}`}
                   {!!plan.cost.period && (
                     <span className="text-sm text-slate-400 ml-1 font-medium">
                       /{plan.cost.period}
