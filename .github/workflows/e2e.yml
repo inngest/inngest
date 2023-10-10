@@ -3,7 +3,11 @@ name: SDK E2E Tests
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "ui/**"
   pull_request:
+    paths-ignore:
+      - "ui/**"
 
 jobs:
   ts:
