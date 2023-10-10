@@ -30,13 +30,3 @@ export { IconStatusCircleMinus } from './StatusCircleMinus';
 export { IconStatusCircleCross } from './StatusCircleCross';
 export { IconStatusCircleArrowPath } from './StatusCircleArrowPath';
 export { IconStatusCircleMoon } from './StatusCircleMoon';
-export { IconStepStatusUnknown } from './IconStepStatusUnknown';
-
-// Deprecated - Status Icons
-export { DeprecatedIconStatusDefault } from './StatusDefault';
-export { DeprecatedIconStatusRunning } from './StatusRunning';
-export { DeprecatedIconStatusCompleted } from './StatusCompleted';
-export { DeprecatedIconStatusFailed } from './StatusFailed';
-export { DeprecatedIconStatusPaused } from './StatusPaused';
-export { DeprecatedIconStatusActionReq } from './StatusActionReq';
-export { DeprecatedIconStatusNoFn } from './StatusNoFn';
