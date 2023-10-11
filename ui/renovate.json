@@ -1,0 +1,6 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["local>inngest/.github:renovate-config", "config:js-app"],
+  "ignorePaths": ["**/node_modules/**"],
+  "printConfig": true
+}

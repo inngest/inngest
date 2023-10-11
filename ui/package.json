@@ -1,0 +1,20 @@
+{
+  "scripts": {
+    "format": "prettier . --write",
+    "preinstall": "npx only-allow pnpm",
+    "prepare": "cd .. && husky install ./ui/.husky"
+  },
+  "devDependencies": {
+    "@ianvs/prettier-plugin-sort-imports": "3.7.2",
+    "husky": "8.0.2",
+    "lint-staged": "13.0.4",
+    "prettier": "2.8.7",
+    "prettier-plugin-tailwindcss": "0.2.7"
+  },
+  "engines": {
+    "node": "18.x",
+    "pnpm": "8.6.2"
+  },
+  "packageManager": "pnpm@8.6.2",
+  "private": true
+}

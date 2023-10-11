@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "noUncheckedIndexedAccess": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "baseUrl": "./",
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": [
+    "./src/**/*",
+    "./next-env.d.ts",
+    ".next/types/**/*.ts",
+    "./next.config.js",
+    "./tailwind.config.js",
+    "./svgo.config.js",
+    "./sentry.client.config.ts",
+    "./sentry.edge.config.ts",
+    "./sentry.server.config.ts"
+  ],
+  "exclude": ["node_modules"]
+}

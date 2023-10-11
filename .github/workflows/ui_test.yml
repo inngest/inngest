@@ -3,7 +3,11 @@ name: Test UI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "ui/**"
   pull_request:
+    paths-ignore:
+      - "ui/**"
 
 jobs:
   build:
