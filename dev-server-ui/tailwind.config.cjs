@@ -4,51 +4,6 @@ const defaultTheme = require('tailwindcss/defaultTheme');
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{ts,tsx}'],
-  safelist: [
-    'text-white',
-    'text-slate-100',
-    // Primary Button
-    'bg-indigo-500',
-    'bg-indigo-500/20',
-    'bg-indigo-500/80',
-    'border-indigo-500',
-    'border-indigo-500/80',
-    'hover:border-indigo-500',
-    'hover:bg-indigo-500/80',
-    'text-indigo-500',
-    'hover:text-indigo-500/80',
-    // Success Button
-    'bg-emerald-600',
-    'bg-emerald-600/20',
-    'bg-emerald-600/80',
-    'border-emerald-600',
-    'border-emerald-600/80',
-    'hover:border-emerald-600',
-    'hover:bg-emerald-600/80',
-    'text-emerald-600',
-    'hover:text-emerald-600/80',
-    // Danger Button
-    'bg-rose-700',
-    'bg-rose-700/20',
-    'bg-rose-700/80',
-    'border-rose-700',
-    'border-rose-700/80',
-    'hover:border-rose-700',
-    'hover:bg-rose-700/80',
-    'text-rose-500',
-    'hover:text-rose-500/80',
-    // Default Button
-    'bg-slate-900',
-    'bg-slate-800',
-    'bg-slate-800/20',
-    'bg-slate-800/80',
-    'border-slate-800',
-    'border-slate-800/80',
-    'hover:border-slate-800',
-    'hover:bg-slate-800/80',
-    'text-slate-800',
-    'hover:text-slate-800/80',
-  ],
   theme: {
     extend: {
       fontFamily: {
