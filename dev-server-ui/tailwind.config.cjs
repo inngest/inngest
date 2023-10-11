@@ -1,3 +1,5 @@
+const defaultTheme = require('tailwindcss/defaultTheme');
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{ts,tsx}'],
@@ -49,7 +51,7 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        mono: ["var(--font-roboto-mono)"],
+        mono: ['var(--font-roboto-mono)', ...defaultTheme.fontFamily.mono],
       },
       colors: {
         slate: {
