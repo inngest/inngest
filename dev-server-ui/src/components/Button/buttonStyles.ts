@@ -1,10 +1,3 @@
-const kindColors = {
-  default: 'slate-800',
-  primary: 'indigo-500',
-  success: 'emerald-600',
-  danger: 'rose-700',
-};
-
 interface ButtonColorParams {
   kind: 'default' | 'primary' | 'success' | 'danger';
   appearance: 'solid' | 'outlined' | 'text';
@@ -20,29 +13,49 @@ interface ButtonSizeStyleParams extends ButtonSizeParams {
 }
 
 export const getButtonColors = ({ kind, appearance }: ButtonColorParams) => {
-  const textColors = {
-    default: 'slate-500',
-    primary: 'indigo-500',
-    success: 'emerald-600',
-    danger: 'rose-500',
+  const solidButtonStyles = {
+    default: 'bg-slate-800 border-t border-white/10 hover:bg-slate-800/80 text-slate-100 hover:text-white',
+    primary: 'bg-indigo-500 border-t border-white/10 hover:bg-indigo-500/80 text-slate-100 hover:text-white',
+    success: 'bg-emerald-600 border-t border-white/10 hover:bg-emerald-600/80 text-slate-100 hover:text-white',
+    danger: 'bg-rose-700 border-t border-white/10 hover:bg-rose-700/80 text-slate-100 hover:text-white',
+  }
+
+  const outlinedButtonStyles = {
+    default: 'bg-slate-800/20 border border-slate-800/80 hover:border-slate-800 text-slate-200 hover:text-white',
+    primary: 'bg-indigo-500/20 border border-indigo-500/80 hover:border-indigo-500 text-slate-200 hover:text-white',
+    success: 'bg-emerald-600/20 border border-emerald-600/80 hover:border-emerald-600 text-slate-200 hover:text-white',
+    danger: 'bg-rose-700/20 border border-rose-700/80 hover:border-rose-700 text-slate-200 hover:text-white',
+  }
+
+  const textButtonStyles = {
+    default: 'text-slate-500 hover:text-slate-500/80',
+    primary: 'text-indigo-500 hover:text-indigo-500/80',
+    success: 'text-emerald-600 hover:text-emerald-600/80',
+    danger: 'text-rose-500 hover:text-rose-500/80',
   };
 
   if (appearance === 'solid') {
-    return `bg-${kindColors[kind]} border-t border-white/10 hover:bg-${kindColors[kind]}/80 text-slate-100 hover:text-white`;
+    return solidButtonStyles[kind];
   } else if (appearance === 'outlined') {
-    return `bg-${kindColors[kind]}/20 border border-${kindColors[kind]}/80 hover:border-${kindColors[kind]} text-slate-200 hover:text-white`;
+    return outlinedButtonStyles[kind];
   } else {
-    return `text-${textColors[kind]} hover:text-${textColors[kind]}/80`;
+    return textButtonStyles[kind];
   }
 };
 
 export const getKeyColor = ({ appearance, kind }: ButtonColorParams) => {
   if (appearance === 'solid' && kind === 'default') {
-    return `bg-slate-900`;
+    return 'bg-slate-900';
   } else if (appearance === 'solid') {
-    return `bg-slate-800/20`;
+    return 'bg-slate-800/20';
   }
-  return `bg-${kindColors[kind]}/80`;
+  const defaultKeyStyles = {
+    default: 'bg-slate-800/80',
+    primary: 'bg-indigo-500/80',
+    success: 'bg-emerald-600/80',
+    danger: 'bg-rose-700/80',
+  }
+  return defaultKeyStyles[kind];
 };
 
 export const getButtonSizeStyles = ({ size, icon, label }: ButtonSizeStyleParams) => {
