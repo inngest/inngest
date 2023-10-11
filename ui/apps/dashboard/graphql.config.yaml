@@ -1,0 +1,25 @@
+schema: 'http://127.0.0.1:8090/gql'
+documents: './src/**/*.{tsx,ts}'
+extensions:
+  codegen:
+    generates:
+      './src/gql/':
+        preset: 'client'
+        config:
+          defaultScalarType: 'unknown'
+          useTypeImports: true
+          scalars:
+            Bytes: 'string'
+            IngestSource: 'string'
+            IP: 'string'
+            JSON: 'null | boolean | number | string | Record<string, unknown> | unknown[]'
+            Map: 'Record<string, unknown>'
+            NullString: 'null | string'
+            NullTime: 'null | string'
+            SchemaSource: 'string'
+            Time: 'string'
+            ULID: 'string'
+            UUID: 'string'
+        presetConfig:
+          fragmentMasking:
+            unmaskFunctionName: 'getFragmentData'

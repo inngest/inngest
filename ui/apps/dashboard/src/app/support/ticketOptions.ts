@@ -1,0 +1,76 @@
+export const formOptions = [
+  {
+    label: 'Report a bug or issue',
+    value: 'bug' as const,
+  },
+  {
+    label: 'Book a demo',
+    value: 'demo' as const,
+  },
+  {
+    label: 'Billing or payment issue',
+    value: 'billing' as const,
+  },
+  {
+    label: 'Suggest a feature',
+    value: 'feature' as const,
+  },
+  {
+    label: 'Report a security issue',
+    value: 'security' as const,
+  },
+  {
+    label: 'General question or request',
+    value: 'question' as const,
+  },
+];
+export type TicketType = (typeof formOptions)[number]['value'] | null;
+export const ticketTypeTitles: { [K in Exclude<TicketType, null>]: string } = {
+  bug: 'Bug report',
+  demo: 'Demo request',
+  billing: 'Billing issue',
+  feature: 'Feature request',
+  security: 'Security report',
+  question: 'General question',
+};
+
+type SeverityOption = {
+  label: string;
+  description: string;
+  value: string;
+  paidOnly?: boolean;
+  enterpriseOnly?: boolean;
+};
+export const severityOptions: SeverityOption[] = [
+  {
+    label: 'Technical guidance',
+    description: 'A bug or general question',
+    value: '4' as const,
+  },
+  {
+    label: 'Low impact',
+    description: 'Service fully usable',
+    paidOnly: true,
+    value: '3' as const,
+  },
+  {
+    label: 'Medium impact',
+    description: 'Production system impaired',
+    paidOnly: true,
+    value: '2' as const,
+  },
+  {
+    label: 'High impact',
+    description: 'Production system down',
+    paidOnly: true,
+    value: '1' as const,
+  },
+  {
+    label: 'Major impact',
+    description: 'Business critical systems down',
+    enterpriseOnly: true,
+    value: '0' as const,
+  },
+];
+export type BugSeverity = (typeof severityOptions)[number]['value'];
+export const DEFAULT_BUG_SEVERITY_LEVEL = '4';
