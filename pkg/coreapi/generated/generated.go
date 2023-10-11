@@ -1512,7 +1512,6 @@ enum HistoryType {
 }
 
 enum HistoryStepType {
-  Planned
   Run
   Sleep
   Wait
