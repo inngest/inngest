@@ -1,0 +1,10 @@
+# GitHub Linguist Overrides (https://github.com/github-linguist/linguist/blob/master/docs/overrides.md)
+#
+# Used to hide generated file from displaying in diffs on GitHub.
+# See https://docs.github.com/en/repositories/working-with-files/managing-files/customizing-how-changed-files-appear-on-github
+
+# GraphQL generated files
+**/src/gql/ linguist-generated=true
+
+# pnpm lock file
+pnpm-lock.yaml linguist-generated=true

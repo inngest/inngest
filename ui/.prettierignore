@@ -1,0 +1,8 @@
+# GraphQL generated files
+**/src/gql/
+
+# Next.js build output
+.next/
+
+# pnpm lock file
+pnpm-lock.yaml
