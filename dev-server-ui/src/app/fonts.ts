@@ -5,7 +5,7 @@ export const inter = Inter({
   variable: '--font-inter',
 });
 
-export const roboto_mono = Roboto_Mono({
+export const robotoMono = Roboto_Mono({
   subsets: ['latin'],
   variable: '--font-roboto-mono',
 });
