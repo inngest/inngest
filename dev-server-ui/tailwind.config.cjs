@@ -1,3 +1,4 @@
+// @ts-check
 const defaultTheme = require('tailwindcss/defaultTheme');
 
 /** @type {import('tailwindcss').Config} */
