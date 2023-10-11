@@ -60,11 +60,9 @@ module.exports = {
       gridTemplateColumns: {
         // Timeline Scroll | Content Frame
         'event-overlay': '340px 1fr',
-        app: '1fr',
       },
       gridTemplateRows: {
         // Header | Content Frame
-        app: '50px 1fr',
         'event-overlay': '120px 1fr',
       },
       outlineOffset: {
