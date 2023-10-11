@@ -23,7 +23,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div
       className={classNames(
         'w-screen h-screen text-slate-400 text-sm grid overflow-hidden relative',
-        'grid-cols-app grid-rows-app',
+        'grid-cols-1 grid-rows-[50px_1fr]',
       )}
     >
       <BG />
