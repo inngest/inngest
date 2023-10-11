@@ -18,7 +18,7 @@ export default function SearchInput({
   return (
     <div
       className={classNames(
-        'relative text-slate-400 flex items-center bg-slate-950 pl-6 ',
+        'relative text-slate-400 flex items-center bg-slate-910 pl-6 ',
         className,
       )}
     >

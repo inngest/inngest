@@ -54,7 +54,7 @@ export default function Modal({
               <Dialog.Panel
                 className={classNames(
                   className,
-                  'transform overflow-hidden rounded-lg bg-slate-950 shadow-xl transition-all',
+                  'transform overflow-hidden rounded-lg bg-slate-910 shadow-xl transition-all',
                 )}
               >
                 {(title || description) && (

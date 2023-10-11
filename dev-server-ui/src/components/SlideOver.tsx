@@ -67,7 +67,7 @@ export default function SlideOver({ children, onClose, size }: SlideOverProps) {
                   <div
                     className={classNames(
                       size === 'small' ? 'w-2/5' : 'w-4/5',
-                      'flex h-full flex-col bg-slate-1000 shadow-xl',
+                      'flex h-full flex-col bg-slate-940 shadow-xl',
                     )}
                   >
                     {children}

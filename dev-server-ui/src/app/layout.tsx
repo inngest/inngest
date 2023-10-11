@@ -16,7 +16,7 @@ type RootLayoutProps = {
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" className={`${roboto_mono.variable}`}>
-      <body className="bg-slate-1000">
+      <body className="bg-slate-940">
         <div id="app" />
         <div id="modals" />
         <StoreProvider>{children}</StoreProvider>

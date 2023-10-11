@@ -8,7 +8,7 @@ export function Card({
   className,
 }: PropsWithChildren<{ accentColor?: string; className?: string }>) {
   return (
-    <div className={classNames('w-full bg-slate-950 rounded-lg shadow overflow-hidden border border-slate-700/30', className)}>
+    <div className={classNames('w-full bg-slate-910 rounded-lg shadow overflow-hidden border border-slate-700/30', className)}>
       {accentColor && <div className={classNames('pt-2', accentColor)} />}
       {children}
     </div>
