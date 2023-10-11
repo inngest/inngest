@@ -219,7 +219,7 @@ export default function SendEventModal({ data, isOpen, onClose }) {
                 },
                 scrollBeyondLastLine: false,
                 wordWrap: 'on',
-                fontFamily: 'Roboto_Mono',
+                fontFamily: 'RobotoMono',
                 fontSize: 13,
                 fontWeight: 'light',
                 lineHeight: 26,
