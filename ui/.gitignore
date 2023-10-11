@@ -3,7 +3,3 @@
 # Dependencies
 node_modules/
 /.direnv/
-
-# All env files except .env
-.env*
-!.env
