@@ -171,7 +171,7 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
       {header && (
         <div className={classNames(header.color, 'pt-3')}>
           {(header.title || header.description) && (
-            <div className="flex flex-col gap-1 font-mono text-2xs px-5 pb-2.5">
+            <div className="flex flex-col gap-1 font-mono text-xs px-5 pb-2.5">
               <p className="text-white">{header.title}</p>
               <p className="text-white/60">{header.description}</p>
             </div>
@@ -214,7 +214,7 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
       </div>
       {isOutputTooLarge ? (
         <>
-          <div className="px-5 py-2.5 text-3xs bg-amber-500/40 text-white">
+          <div className="px-5 py-2.5 text-xs bg-amber-500/40 text-white">
             Output size is too large to render {`( > 1MB )`}
           </div>
           <div className="h-24 flex items-center justify-center	">
