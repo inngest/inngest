@@ -19,16 +19,16 @@ export default function SendEventModal({ data, isOpen, onClose }) {
     const handleGlobalKeyDown = (event) => {
       // Check if Ctrl or Cmd key is pressed (depending on the user's OS)
       const isCtrlCmdPressed = event.ctrlKey || event.metaKey;
-  
+
       if (isCtrlCmdPressed && event.key === 'Enter') {
         // Trigger the sendEvent function
         sendEventRef.current();
       }
     };
-  
+
     useEffect(() => {
       document.addEventListener('keydown', handleGlobalKeyDown);
-  
+
       // Detach the event listener when the component unmounts
       return () => {
         document.removeEventListener('keydown', handleGlobalKeyDown);
@@ -186,7 +186,7 @@ export default function SendEventModal({ data, isOpen, onClose }) {
       className="max-w-5xl w-full"
     >
       <div className="m-6">
-        <div className="relative w-full h-[20rem] flex flex-col rounded overflow-hidden">
+        <div className="relative w-full h-[20rem] flex flex-col rounded-lg overflow-hidden">
           <div className="items-center bg-slate-800/40 shadow border-b border-slate-700/20 flex justify-between">
             <p className=" text-slate-400 text-xs px-5 py-4">Payload</p>
           </div>

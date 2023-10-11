@@ -123,14 +123,6 @@ module.exports = {
         'slide-up': 'slideUp 0.3s ease-in-out forwards',
       },
     },
-    borderRadius: {
-      none: '0',
-      sm: '4px',
-      md: '6px',
-      DEFAULT: '8px',
-      lg: '10px',
-      full: '9999px',
-    },
   },
   plugins: [
     require('@headlessui/tailwindcss'),

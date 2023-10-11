@@ -64,7 +64,7 @@ export default forwardRef<HTMLButtonElement, ButtonProps>(function Button(
         buttonColors,
         buttonSizes,
         disabledStyles,
-        isSplit ? 'rounded-l-sm' : 'rounded-sm',
+        isSplit ? 'rounded-l' : 'rounded',
         'flex gap-1.5 items-center justify-center drop-shadow-sm transition-all active:scale-95 ',
         className,
       )}
@@ -82,7 +82,7 @@ export default forwardRef<HTMLButtonElement, ButtonProps>(function Button(
             <kbd
               className={classNames(
                 keyColor,
-                'ml-auto flex h-6 w-6 items-center justify-center rounded-sm font-sans text-xs',
+                'ml-auto flex h-6 w-6 items-center justify-center rounded font-sans text-xs',
               )}
             >
               {key}
