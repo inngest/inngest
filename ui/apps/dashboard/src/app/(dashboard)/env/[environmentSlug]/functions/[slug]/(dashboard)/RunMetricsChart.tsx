@@ -1,6 +1,5 @@
 'use client';
 
-import { ChartBarIcon } from '@heroicons/react/20/solid';
 import { useQuery } from 'urql';
 
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
@@ -105,12 +104,7 @@ export default function FunctionRunsChart({
 
   return (
     <SimpleLineChart
-      title={
-        <>
-          <ChartBarIcon className="h-4" fill="#334155" /> Function Runs{' '}
-          {!fetching && '(' + granularity + ')'}
-        </>
-      }
+      title={`Function Runs ${!fetching && `(${granularity})`}`}
       data={metrics}
       legend={[
         { name: 'queued', dataKey: 'queued', color: '#fa8128' },
