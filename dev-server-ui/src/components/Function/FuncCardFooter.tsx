@@ -49,7 +49,7 @@ export default function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
   if (!content) return null;
 
   return (
-    <div className={classNames(backgroundColor, 'text-2xs px-5 py-4 text-slate-100')}>
+    <div className={classNames(backgroundColor, 'text-xs px-5 py-4 text-slate-100')}>
       {content}
     </div>
   );

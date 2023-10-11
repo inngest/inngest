@@ -42,7 +42,7 @@ export default function FuncCard({
         <h2 className="text-white">{title}</h2>
       </div>
       <hr className="border-slate-800/50" />
-      <div className="text-3xs text-slate-500 leading-none px-5 py-3.5">
+      <div className="text-xs text-slate-500 leading-none px-5 py-3.5">
         Run ID: <span className="font-mono">{id}</span>
       </div>
       {footer}
