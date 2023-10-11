@@ -1513,6 +1513,7 @@ enum HistoryType {
 
 enum HistoryStepType {
   Run
+  Send
   Sleep
   Wait
 }

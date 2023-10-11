@@ -6,6 +6,7 @@ type HistoryStepType int
 
 const (
 	HistoryStepTypeRun HistoryStepType = iota
+	HistoryStepTypeSend
 	HistoryStepTypeSleep
 	HistoryStepTypeWait
 )

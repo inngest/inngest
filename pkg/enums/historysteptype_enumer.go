@@ -10,11 +10,11 @@ import (
 	"strings"
 )
 
-const _HistoryStepTypeName = "RunSleepWait"
+const _HistoryStepTypeName = "RunSendSleepWait"
 
-var _HistoryStepTypeIndex = [...]uint8{0, 3, 8, 12}
+var _HistoryStepTypeIndex = [...]uint8{0, 3, 7, 12, 16}
 
-const _HistoryStepTypeLowerName = "runsleepwait"
+const _HistoryStepTypeLowerName = "runsendsleepwait"
 
 func (i HistoryStepType) String() string {
 	if i < 0 || i >= HistoryStepType(len(_HistoryStepTypeIndex)-1) {
@@ -28,25 +28,29 @@ func (i HistoryStepType) String() string {
 func _HistoryStepTypeNoOp() {
 	var x [1]struct{}
 	_ = x[HistoryStepTypeRun-(0)]
-	_ = x[HistoryStepTypeSleep-(1)]
-	_ = x[HistoryStepTypeWait-(2)]
+	_ = x[HistoryStepTypeSend-(1)]
+	_ = x[HistoryStepTypeSleep-(2)]
+	_ = x[HistoryStepTypeWait-(3)]
 }
 
-var _HistoryStepTypeValues = []HistoryStepType{HistoryStepTypeRun, HistoryStepTypeSleep, HistoryStepTypeWait}
+var _HistoryStepTypeValues = []HistoryStepType{HistoryStepTypeRun, HistoryStepTypeSend, HistoryStepTypeSleep, HistoryStepTypeWait}
 
 var _HistoryStepTypeNameToValueMap = map[string]HistoryStepType{
-	_HistoryStepTypeName[0:3]:       HistoryStepTypeRun,
-	_HistoryStepTypeLowerName[0:3]:  HistoryStepTypeRun,
-	_HistoryStepTypeName[3:8]:       HistoryStepTypeSleep,
-	_HistoryStepTypeLowerName[3:8]:  HistoryStepTypeSleep,
-	_HistoryStepTypeName[8:12]:      HistoryStepTypeWait,
-	_HistoryStepTypeLowerName[8:12]: HistoryStepTypeWait,
+	_HistoryStepTypeName[0:3]:        HistoryStepTypeRun,
+	_HistoryStepTypeLowerName[0:3]:   HistoryStepTypeRun,
+	_HistoryStepTypeName[3:7]:        HistoryStepTypeSend,
+	_HistoryStepTypeLowerName[3:7]:   HistoryStepTypeSend,
+	_HistoryStepTypeName[7:12]:       HistoryStepTypeSleep,
+	_HistoryStepTypeLowerName[7:12]:  HistoryStepTypeSleep,
+	_HistoryStepTypeName[12:16]:      HistoryStepTypeWait,
+	_HistoryStepTypeLowerName[12:16]: HistoryStepTypeWait,
 }
 
 var _HistoryStepTypeNames = []string{
 	_HistoryStepTypeName[0:3],
-	_HistoryStepTypeName[3:8],
-	_HistoryStepTypeName[8:12],
+	_HistoryStepTypeName[3:7],
+	_HistoryStepTypeName[7:12],
+	_HistoryStepTypeName[12:16],
 }
 
 // HistoryStepTypeString retrieves an enum value from the enum constants string name.

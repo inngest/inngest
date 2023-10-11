@@ -182,6 +182,7 @@ export type FunctionVersion = {
 
 export enum HistoryStepType {
   Run = 'Run',
+  Send = 'Send',
   Sleep = 'Sleep',
   Wait = 'Wait'
 }

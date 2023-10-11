@@ -544,13 +544,18 @@ func applyResponse(
 		if isGeneratorStep {
 			var opcodes []state.GeneratorOpcode
 			if err := json.Unmarshal([]byte(outputStr), &opcodes); err == nil {
-				if len(opcodes) > 1 {
+				if len(opcodes) > 0 && opcodes[0].Op != enums.OpcodeStepPlanned {
+					h.StepID = &opcodes[0].ID
 					h.StepType = getStepType(opcodes[0])
+					h.Result.Output = string(opcodes[0].Data)
 
-					if opcodes[0].Op != enums.OpcodeStepPlanned {
-						h.StepID = &opcodes[0].ID
+					if opcodes[0].DisplayName != nil {
+						h.StepName = opcodes[0].DisplayName
+					} else {
+						// SDK versions < 3.?.? don't respond with the display
+						// name, so we we'll use the deprecated name field as a
+						// fallback.
 						h.StepName = &opcodes[0].Name
-						h.Result.Output = string(opcodes[0].Data)
 					}
 				}
 				return nil
@@ -606,9 +611,13 @@ func getStepType(opcode state.GeneratorOpcode) *enums.HistoryStepType {
 			return nil
 		}
 
-		// TODO: Find a way to differentiate `step.run()` and
-		// `step.sendEvent()`.
-		out = enums.HistoryStepTypeRun
+		// This is a hacky way to detect `step.sendEvent()`, but it's all we
+		// have until we add an opcode for it.
+		if opcode.Name == "sendEvent" {
+			out = enums.HistoryStepTypeSend
+		} else {
+			out = enums.HistoryStepTypeRun
+		}
 	case enums.OpcodeWaitForEvent:
 		out = enums.HistoryStepTypeWait
 	default:
