@@ -1,5 +1,3 @@
-import { ChartBarIcon } from '@heroicons/react/20/solid';
-
 import { getTimeRangeLabel } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/DashboardTimeRangeFilter';
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import StackedBarChart from '@/components/Charts/StackedBarChart';
@@ -38,11 +36,7 @@ export default function VolumeChart({
 
   return (
     <StackedBarChart
-      title={
-        <>
-          <ChartBarIcon className="h-4" fill="#334155" /> Usage
-        </>
-      }
+      title="Usage"
       data={usage}
       total={usageMetrics?.totalRuns || 0}
       totalDescription={`${getTimeRangeLabel(timeRange)} Volume`}
