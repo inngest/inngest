@@ -606,13 +606,13 @@ func getStepType(opcode state.GeneratorOpcode) *enums.HistoryStepType {
 			return nil
 		}
 
-		// TODO: Find a way to differential `step.run()` and `step.sendEvent()`.
+		// TODO: Find a way to differentiate `step.run()` and
+		// `step.sendEvent()`.
 		out = enums.HistoryStepTypeRun
-	case enums.OpcodeStepPlanned:
-		out = enums.HistoryStepTypePlan
 	case enums.OpcodeWaitForEvent:
 		out = enums.HistoryStepTypeWait
 	default:
+		// Not a user-facing step.
 		return nil
 	}
 

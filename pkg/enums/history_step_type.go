@@ -5,8 +5,7 @@ package enums
 type HistoryStepType int
 
 const (
-	HistoryStepTypePlan HistoryStepType = iota
-	HistoryStepTypeRun
+	HistoryStepTypeRun HistoryStepType = iota
 	HistoryStepTypeSleep
 	HistoryStepTypeWait
 )
