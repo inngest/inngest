@@ -14,7 +14,7 @@
 
 /* Handle */
 ::-webkit-scrollbar-thumb {
-  @apply rounded bg-slate-800;
+  @apply rounded-lg bg-slate-800;
 }
 
 /* Handle on hover */
