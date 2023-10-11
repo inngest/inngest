@@ -7,7 +7,7 @@ type Props = {
 
 export default function Header(props: Props) {
   return (
-    <header className="flex w-full items-center justify-between bg-slate-950 pr-5 pl-6 border-b border-slate-800/30 col-span-3">
+    <header className="flex w-full items-center justify-between bg-slate-910 pr-5 pl-6 border-b border-slate-800/30 col-span-3">
       <nav className="flex items-center gap-3">
         <h1 className="text-slate-300 text-sm flex items-end">
           <InngestSmallLogo className="block md:hidden" />

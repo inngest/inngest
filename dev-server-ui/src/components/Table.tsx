@@ -102,7 +102,7 @@ export default function Table({
                   <td
                     className={classNames(
                       cellStyles,
-                      'bg-slate-950',
+                      'bg-slate-910',
                       cell.column.getIsPinned() && 'sticky left-0 z-[2]',
                     )}
                     key={cell.id}

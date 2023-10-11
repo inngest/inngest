@@ -53,8 +53,8 @@ module.exports = {
       },
       colors: {
         slate: {
-          950: '#0C1323',
-          1000: '#080D19',
+          910: '#0C1323',
+          940: '#080D19',
         },
       },
       gridTemplateColumns: {

@@ -17,7 +17,7 @@ export default function MetadataGrid({ metadataItems }: Props) {
   let currentIndex = 0;
 
   return (
-    <div className="p-2.5 border rounded-lg border-slate-800/50 bg-slate-950">
+    <div className="p-2.5 border rounded-lg border-slate-800/50 bg-slate-910">
       <div className={`grid grid-cols-${columns} grid-rows-${rows} gap-5`}>
         {metadataItems.map((item, index) => {
           const spanIndex = currentIndex;

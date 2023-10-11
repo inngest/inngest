@@ -14,7 +14,7 @@ export default function CodeLine({ code, className }: CodeLineProps) {
     <div
       className={classNames(
         className,
-        'flex items-center justify-between bg-slate-950 rounded-md cursor-pointer',
+        'flex items-center justify-between bg-slate-910 rounded-md cursor-pointer',
       )}
       onClick={() => handleCopyClick(code)}
     >
