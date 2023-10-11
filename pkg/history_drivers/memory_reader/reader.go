@@ -204,6 +204,7 @@ func toRunHistory(item history.History) (*history_reader.RunHistory, error) {
 		RunID:           item.RunID,
 		Sleep:           sleep,
 		StepName:        item.StepName,
+		StepType:        item.StepType,
 		Type:            historyType,
 		URL:             item.URL,
 		WaitForEvent:    waitForEvent,

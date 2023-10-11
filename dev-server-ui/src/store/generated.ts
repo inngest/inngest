@@ -180,6 +180,13 @@ export type FunctionVersion = {
   version: Scalars['Uint'];
 };
 
+export enum HistoryStepType {
+  Run = 'Run',
+  Send = 'Send',
+  Sleep = 'Sleep',
+  Wait = 'Wait'
+}
+
 export enum HistoryType {
   FunctionCancelled = 'FunctionCancelled',
   FunctionCompleted = 'FunctionCompleted',
@@ -273,6 +280,7 @@ export type RunHistoryItem = {
   result?: Maybe<RunHistoryResult>;
   sleep?: Maybe<RunHistorySleep>;
   stepName?: Maybe<Scalars['String']>;
+  stepType?: Maybe<HistoryStepType>;
   type: HistoryType;
   url?: Maybe<Scalars['String']>;
   waitForEvent?: Maybe<RunHistoryWaitForEvent>;

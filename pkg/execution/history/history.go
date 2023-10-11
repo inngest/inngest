@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/oklog/ulid/v2"
 )
@@ -36,6 +37,7 @@ type History struct {
 	Status             *string
 	StepID             *string
 	StepName           *string
+	StepType           *enums.HistoryStepType
 	Type               string
 	URL                *string
 	WaitForEvent       *WaitForEvent
