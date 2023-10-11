@@ -230,6 +230,7 @@ type RunHistory struct {
 	RunID           ulid.ULID               `json:"runID"`
 	Sleep           *RunHistorySleep        `json:"sleep"`
 	StepName        *string                 `json:"stepName"`
+	StepType        *enums.HistoryStepType  `json:"stepType"`
 	Type            enums.HistoryType       `json:"type"`
 	URL             *string                 `json:"url"`
 	WaitForEvent    *RunHistoryWaitForEvent `json:"waitForEvent"`

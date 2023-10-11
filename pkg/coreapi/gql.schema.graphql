@@ -212,6 +212,13 @@ enum HistoryType {
 	StepWaiting
 }
 
+enum HistoryStepType {
+  Planned
+  Run
+  Sleep
+  Wait
+}
+
 type RunHistoryItem {
   attempt: Int!
   cancel: RunHistoryCancel
@@ -222,6 +229,7 @@ type RunHistoryItem {
   result: RunHistoryResult
   sleep: RunHistorySleep
   stepName: String
+  stepType: HistoryStepType
   type: HistoryType!
   url: String
   waitForEvent: RunHistoryWaitForEvent

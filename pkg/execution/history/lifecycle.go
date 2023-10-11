@@ -544,12 +544,14 @@ func applyResponse(
 		if isGeneratorStep {
 			var opcodes []state.GeneratorOpcode
 			if err := json.Unmarshal([]byte(outputStr), &opcodes); err == nil {
-				// If there's more than 1 item in the array then we're probably
-				// dealing with OpcodeStepPlanned (e.g. parallel steps).
-				if len(opcodes) == 1 {
-					h.StepID = &opcodes[0].ID
-					h.StepName = &opcodes[0].Name
-					h.Result.Output = string(opcodes[0].Data)
+				if len(opcodes) > 1 {
+					h.StepType = getStepType(opcodes[0])
+
+					if opcodes[0].Op != enums.OpcodeStepPlanned {
+						h.StepID = &opcodes[0].ID
+						h.StepName = &opcodes[0].Name
+						h.Result.Output = string(opcodes[0].Data)
+					}
 				}
 				return nil
 			}
@@ -588,4 +590,31 @@ func toUUID(id string) (*uuid.UUID, error) {
 
 	return &parsed, nil
 
+}
+
+// Returns the user-facing step type. In other words, the returned step type
+// should match the code the user wrote (e.g. `step.sleep()` becomes
+// enums.HistoryStepTypeSleep).
+func getStepType(opcode state.GeneratorOpcode) *enums.HistoryStepType {
+	var out enums.HistoryStepType
+	switch opcode.Op {
+	case enums.OpcodeSleep:
+		out = enums.HistoryStepTypeSleep
+	case enums.OpcodeStep:
+		if opcode.Data == nil {
+			// Not a user-facing step.
+			return nil
+		}
+
+		// TODO: Find a way to differential `step.run()` and `step.sendEvent()`.
+		out = enums.HistoryStepTypeRun
+	case enums.OpcodeStepPlanned:
+		out = enums.HistoryStepTypePlan
+	case enums.OpcodeWaitForEvent:
+		out = enums.HistoryStepTypeWait
+	default:
+		return nil
+	}
+
+	return &out
 }

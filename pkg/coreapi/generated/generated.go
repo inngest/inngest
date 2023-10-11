@@ -167,6 +167,7 @@ type ComplexityRoot struct {
 		Result          func(childComplexity int) int
 		Sleep           func(childComplexity int) int
 		StepName        func(childComplexity int) int
+		StepType        func(childComplexity int) int
 		Type            func(childComplexity int) int
 		URL             func(childComplexity int) int
 		WaitForEvent    func(childComplexity int) int
@@ -902,6 +903,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunHistoryItem.StepName(childComplexity), true
 
+	case "RunHistoryItem.stepType":
+		if e.complexity.RunHistoryItem.StepType == nil {
+			break
+		}
+
+		return e.complexity.RunHistoryItem.StepType(childComplexity), true
+
 	case "RunHistoryItem.type":
 		if e.complexity.RunHistoryItem.Type == nil {
 			break
@@ -1503,6 +1511,13 @@ enum HistoryType {
 	StepWaiting
 }
 
+enum HistoryStepType {
+  Planned
+  Run
+  Sleep
+  Wait
+}
+
 type RunHistoryItem {
   attempt: Int!
   cancel: RunHistoryCancel
@@ -1513,6 +1528,7 @@ type RunHistoryItem {
   result: RunHistoryResult
   sleep: RunHistorySleep
   stepName: String
+  stepType: HistoryStepType
   type: HistoryType!
   url: String
   waitForEvent: RunHistoryWaitForEvent
@@ -3925,6 +3941,8 @@ func (ec *executionContext) fieldContext_FunctionRun_history(ctx context.Context
 				return ec.fieldContext_RunHistoryItem_sleep(ctx, field)
 			case "stepName":
 				return ec.fieldContext_RunHistoryItem_stepName(ctx, field)
+			case "stepType":
+				return ec.fieldContext_RunHistoryItem_stepType(ctx, field)
 			case "type":
 				return ec.fieldContext_RunHistoryItem_type(ctx, field)
 			case "url":
@@ -5810,6 +5828,47 @@ func (ec *executionContext) fieldContext_RunHistoryItem_stepName(ctx context.Con
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunHistoryItem_stepType(ctx context.Context, field graphql.CollectedField, obj *history_reader.RunHistory) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunHistoryItem_stepType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.StepType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*enums.HistoryStepType)
+	fc.Result = res
+	return ec.marshalOHistoryStepType2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋenumsᚐHistoryStepType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunHistoryItem_stepType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunHistoryItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type HistoryStepType does not have child fields")
 		},
 	}
 	return fc, nil
@@ -10536,6 +10595,10 @@ func (ec *executionContext) _RunHistoryItem(ctx context.Context, sel ast.Selecti
 
 			out.Values[i] = ec._RunHistoryItem_stepName(ctx, field, obj)
 
+		case "stepType":
+
+			out.Values[i] = ec._RunHistoryItem_stepType(ctx, field, obj)
+
 		case "type":
 
 			out.Values[i] = ec._RunHistoryItem_type(ctx, field, obj)
@@ -12281,6 +12344,22 @@ func (ec *executionContext) marshalOFunctionTrigger2ᚕᚖgithubᚗcomᚋinngest
 	}
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalOHistoryStepType2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋenumsᚐHistoryStepType(ctx context.Context, v interface{}) (*enums.HistoryStepType, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(enums.HistoryStepType)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOHistoryStepType2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋenumsᚐHistoryStepType(ctx context.Context, sel ast.SelectionSet, v *enums.HistoryStepType) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v interface{}) (*string, error) {
