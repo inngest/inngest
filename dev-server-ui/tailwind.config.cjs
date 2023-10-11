@@ -57,14 +57,6 @@ module.exports = {
           940: '#080D19',
         },
       },
-      gridTemplateColumns: {
-        // Timeline Scroll | Content Frame
-        'event-overlay': '340px 1fr',
-      },
-      gridTemplateRows: {
-        // Header | Content Frame
-        'event-overlay': '120px 1fr',
-      },
       outlineOffset: {
         3: '3px',
       },
