@@ -16,7 +16,7 @@ module.exports = {
         sm: '4px',
       },
       fontFamily: {
-        sans: ['var(--font-inter)', ...defaultTheme.fontFamily.sans],
+        sans: ['var(--font-inter-tight)', ...defaultTheme.fontFamily.sans],
         mono: ['var(--font-roboto-mono)', ...defaultTheme.fontFamily.mono],
       },
       gridTemplateColumns: {
