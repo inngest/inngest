@@ -1,6 +1,13 @@
 {
-  "name": "ui",
+  "name": "@inngest/dev-server-ui",
+  "description": "Inngest Development Server UI",
   "main": "n/a",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/inngest/inngest.git",
+    "directory": "ui/apps/dashboard"
+  },
+  "author": "Inngest Inc. <info@inngest.com> (https://inngest.com/)",
   "scripts": {
     "dev": "pnpm install && concurrently --prefix-colors \"green.inverse,magenta.inverse,blue.inverse\" pnpm:dev:*",
     "dev:next": "next dev",
