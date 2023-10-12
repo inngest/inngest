@@ -527,7 +527,7 @@ export type FunctionRun = {
   events: Array<ArchivedEvent>;
   function: Workflow;
   history: Array<RunHistoryItem>;
-  historyItemOutput: Scalars['String'];
+  historyItemOutput?: Maybe<Scalars['String']>;
   id: Scalars['ULID'];
   originalRunID?: Maybe<Scalars['ULID']>;
   output?: Maybe<Scalars['Bytes']>;
@@ -1383,6 +1383,7 @@ export type VisibleApiKey = {
 
 export type Workflow = {
   __typename?: 'Workflow';
+  appName?: Maybe<Scalars['String']>;
   archivedAt?: Maybe<Scalars['Time']>;
   communication: Array<Communication>;
   current?: Maybe<WorkflowVersion>;
