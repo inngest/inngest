@@ -6,8 +6,8 @@ node_modules/
 # Next.js
 .next/
 
-# Local environment variables
-.env*.local
+# Environment variable files; we keep our environment variables on Vercel
+.env*
 
 # Vercel
 .vercel
