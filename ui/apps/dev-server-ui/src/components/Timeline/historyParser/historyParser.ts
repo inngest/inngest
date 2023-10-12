@@ -31,7 +31,7 @@ export class HistoryParser {
 
     let node: HistoryNode;
     if (this.history[rawItem.groupID]) {
-      node = { ...this.history[rawItem.groupID] };
+      node = { ...(this.history[rawItem.groupID] as HistoryNode) };
     } else {
       node = {
         attempt: rawItem.attempt,

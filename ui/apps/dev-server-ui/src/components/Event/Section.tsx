@@ -38,7 +38,7 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
   }
 
   if (!runID && event.functionRuns && event.functionRuns.length > 0) {
-    const firstRunId = event.functionRuns[0].id;
+    const firstRunId = event.functionRuns[0]?.id;
     router.push(`/stream/trigger?event=${eventId}&run=${firstRunId}`);
   }
 
@@ -84,10 +84,10 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
           <CodeBlock tabs={[{ label: 'Payload', content: eventPayload }]} />
         </div>
       ) : null}
-      <hr className="border-slate-800/50 mt-8" />
-      <div className="px-5 py-4 gap-6 flex flex-col">
+      <hr className="mt-8 border-slate-800/50" />
+      <div className="flex flex-col gap-6 px-5 py-4">
         <div className="flex items-center gap-2 pt-4">
-          <h3 className="text-slate-400 text-sm">Functions</h3>
+          <h3 className="text-sm text-slate-400">Functions</h3>
           <Badge kind="outlined">{event.functionRuns?.length.toString() || '0'}</Badge>
         </div>
         {event.functionRuns

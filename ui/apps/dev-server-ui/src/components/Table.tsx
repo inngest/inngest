@@ -45,14 +45,14 @@ export default function Table({
 
   return (
     <table className="w-full border-b border-slate-700/30">
-      <thead className="text-left sticky top-0 z-[3]">
+      <thead className="sticky top-0 z-[3] text-left">
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id}>
             {headerGroup.headers.map((header) => (
               <th
                 className={classNames(
                   cellStyles,
-                  'bg-slate-900 text-slate-500 font-medium',
+                  'bg-slate-900 font-medium text-slate-500',
                   header.column.getIsPinned() && 'sticky left-0 z-[4]',
                   header.column.getCanSort() && 'cursor-pointer'
                 )}
@@ -96,6 +96,7 @@ export default function Table({
         {virtualRows &&
           virtualRows.map((virtualRow) => {
             const row = table.getRowModel().rows[virtualRow.index];
+            if (!row) return;
             return (
               <tr key={row.id} {...(customRowProps ? customRowProps(row) : {})}>
                 {row.getVisibleCells().map((cell) => (

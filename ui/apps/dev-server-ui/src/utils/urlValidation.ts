@@ -1,4 +1,4 @@
-export default function isValidUrl(string) {
+export default function isValidUrl(string: string) {
   try {
     const newUrl = new URL(string);
     return true;
