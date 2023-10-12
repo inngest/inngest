@@ -140,8 +140,8 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
             </div> */}
           </div>
         )}
-        <div className="bg-slate-950 to-slate-950 rounded-lg bg-gradient-to-br from-slate-900 px-8 pt-8">
-          <div className="bg-slate-950/20 -mt-8 pt-6 backdrop-blur-sm">
+        <div className="bg-slate-910 to-slate-910 rounded-lg bg-gradient-to-br from-slate-900 px-8 pt-8">
+          <div className="bg-slate-910/20 -mt-8 pt-6 backdrop-blur-sm">
             <h3 className="flex items-center text-xl font-medium text-white">
               <span className="mr-2 inline-flex h-6 w-6  items-center justify-center rounded-full bg-slate-700 text-center text-sm text-white">
                 {isBranchParent ? '2' : '1'}

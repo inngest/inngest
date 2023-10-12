@@ -16,7 +16,7 @@ const contextButtonStyles = {
 const contextSheetStyles = {
   light: 'shadow-outline-secondary-light bg-slate-50',
   dark: 'shadow-outline-secondary-dark bg-slate-900',
-  nav: 'bg-slate-1000/95 backdrop-blur divide-y divide-dashed divide-slate-700',
+  nav: 'bg-slate-940/95 backdrop-blur divide-y divide-dashed divide-slate-700',
 };
 
 type DropdownProps = {

@@ -58,7 +58,7 @@ export default function AppNavigation({ environmentSlug }: AppNavigationProps) {
   const visibleItems = items.filter((item) => !item.hide.includes(environmentSlug));
 
   return (
-    <nav className="bg-slate-1000 left-0 right-0 top-0 z-50 flex w-full items-center justify-between pl-6">
+    <nav className="bg-slate-940 left-0 right-0 top-0 z-50 flex w-full items-center justify-between pl-6">
       <div className="flex h-12 items-center gap-3">
         <Link href={process.env.NEXT_PUBLIC_HOME_PATH as Route}>
           <InngestLogo className="mr-2 mt-0.5 text-white" width={66} />

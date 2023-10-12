@@ -95,7 +95,7 @@ export default function TimelineItem({ item, isFirst = false, isLast = false }: 
 
         {parsedOutput && (
           <div className="relative z-10 mt-3 p-2">
-            <div className="bg-slate-1000 rounded-lg p-6">
+            <div className="bg-slate-940 rounded-lg p-6">
               <SyntaxHighlighter language="json" className="text-xs">
                 {JSON.stringify(parsedOutput, null, 2)}
               </SyntaxHighlighter>

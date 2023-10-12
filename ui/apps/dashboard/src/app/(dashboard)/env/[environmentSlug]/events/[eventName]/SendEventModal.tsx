@@ -205,7 +205,7 @@ await inngest.send({
                 className="rounded-md bg-slate-900"
                 onSubmit={submitAction}
               >
-                <header className="bg bg-slate-950 flex items-center justify-between rounded-t-md p-2">
+                <header className="bg bg-slate-910 flex items-center justify-between rounded-t-md p-2">
                   <h3 className="px-2 text-white">{tabTitle}</h3>
                   <Button type="submit" context="dark" disabled={!submitButtonEnabled}>
                     {submitButtonLabel}
