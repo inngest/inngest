@@ -19,12 +19,6 @@ module.exports = {
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 400px',
       },
-      opacity: {
-        1: '0.01',
-        2.5: '0.025',
-        7.5: '0.075',
-        15: '0.15',
-      },
       boxShadow: {
         'outline-primary-light':
           'inset 0 1px 0 0 rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 1px 3px rgba(0, 0, 0, 0.2)',
