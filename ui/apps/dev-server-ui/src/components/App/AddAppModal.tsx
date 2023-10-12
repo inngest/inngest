@@ -9,7 +9,12 @@ import { IconExclamationTriangle } from '@/icons';
 import { useCreateAppMutation } from '@/store/generated';
 import isValidUrl from '@/utils/urlValidation';
 
-export default function AddAppModal({ isOpen, onClose }) {
+type AddAppModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
   const [inputUrl, setInputUrl] = useState('');
   const [isUrlInvalid, setUrlInvalid] = useState(false);
   const [isDisabled, setDisabled] = useState(true);
@@ -50,12 +55,12 @@ export default function AddAppModal({ isOpen, onClose }) {
     // To do: add optimistic render in the list
   }
 
-  function handleSubmit(e) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     createApp();
   }
 
-  function handleKeyDown(e) {
+  function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleSubmit(e);
@@ -73,7 +78,7 @@ export default function AddAppModal({ isOpen, onClose }) {
         <div className="p-6">
           <label htmlFor="addAppUrlModal" className="text-sm font-semibold text-white">
             App URL
-            <span className="text-slate-500 text-sm pb-4 block">The URL of your application</span>
+            <span className="block pb-4 text-sm text-slate-500">The URL of your application</span>
           </label>
           <Input
             id="addAppUrlModal"
@@ -85,12 +90,12 @@ export default function AddAppModal({ isOpen, onClose }) {
           />
         </div>
         {isUrlInvalid && inputUrl.length > 0 && (
-          <p className="bg-rose-600/50 text-white flex items-center gap-2 text-sm px-6 py-2">
+          <p className="flex items-center gap-2 bg-rose-600/50 px-6 py-2 text-sm text-white">
             <IconExclamationTriangle />
             Please enter a valid URL
           </p>
         )}
-        <div className="flex items-center justify-between p-6 border-t border-slate-800">
+        <div className="flex items-center justify-between border-t border-slate-800 p-6">
           <Button label="Cancel" appearance="outlined" btnAction={onClose} />
           <Button disabled={isDisabled || isUrlInvalid} label="Connect App" type="submit" />
         </div>

@@ -1,10 +1,10 @@
 import { IconMagnifyingGlass } from '@/icons';
 import classNames from '@/utils/classnames';
 
-interface SearchInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface SearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
   value: string;
   className?: string;
-  onChange: (e) => void;
+  onChange: (value: string) => void;
   debouncedSearch: () => void;
 }
 
@@ -18,13 +18,13 @@ export default function SearchInput({
   return (
     <div
       className={classNames(
-        'relative text-slate-400 flex items-center bg-slate-910 pl-6 ',
-        className
+        'bg-slate-910 relative flex items-center pl-6 text-slate-400 ',
+        className ?? ''
       )}
     >
       <input
         type="text"
-        className="text-slate-100 w-96 placeholder-slate-400 py-1 pl-4 bg-transparent"
+        className="w-96 bg-transparent py-1 pl-4 text-slate-100 placeholder-slate-400"
         placeholder={props?.placeholder ?? 'Search...'}
         value={value ?? ''}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,7 +33,7 @@ export default function SearchInput({
         }}
         {...props}
       />
-      <IconMagnifyingGlass className="absolute left-6 h-3 w-3 text--slate-400" />
+      <IconMagnifyingGlass className="text--slate-400 absolute left-6 h-3 w-3" />
     </div>
   );
 }

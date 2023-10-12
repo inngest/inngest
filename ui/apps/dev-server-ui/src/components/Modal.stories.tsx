@@ -17,13 +17,14 @@ export default meta;
 
 type Story = StoryObj<typeof Modal>;
 
+//@ts-ignore
 const ModalWithHooks = (props) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <>
       <Button label="Open Modal" btnAction={() => setIsOpen(true)} />
       <Modal {...props} isOpen={isOpen} onClose={() => setIsOpen(false)}>
-        <p className="text-white p-6">This is the body of the modal</p>
+        <p className="p-6 text-white">This is the body of the modal</p>
       </Modal>
     </>
   );

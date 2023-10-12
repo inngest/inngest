@@ -1,7 +1,11 @@
 import { FunctionRunStatusIcons } from '@/components/Function/RunStatusIcons';
 import { useGetFunctionRunStatusQuery, type FunctionRun } from '@/store/generated';
 
-export default function FunctionRunList({ functionRuns }) {
+type FunctionRunList = {
+  functionRuns: FunctionRun[];
+};
+
+export default function FunctionRunList({ functionRuns }: FunctionRunList) {
   return (
     <>
       {!functionRuns || functionRuns.length < 1 ? (
@@ -11,7 +15,7 @@ export default function FunctionRunList({ functionRuns }) {
           {functionRuns &&
             functionRuns
               ?.slice()
-              .sort((a, b) => (a.function.name || '').localeCompare(b.function.name || ''))
+              .sort((a, b) => (a.function?.name || '').localeCompare(b.function?.name || ''))
               .map((functionRun) => {
                 return <FunctionRunItem key={functionRun.id} functionRunID={functionRun.id} />;
               })}
@@ -23,7 +27,7 @@ export default function FunctionRunList({ functionRuns }) {
 
 type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'function' | 'status'>;
 
-export function FunctionRunItem({ functionRunID }) {
+export function FunctionRunItem({ functionRunID }: { functionRunID: string }) {
   const { data } = useGetFunctionRunStatusQuery({ id: functionRunID }, { pollingInterval: 1500 });
   const functionRun = (data?.functionRun as FunctionRunStatusSubset) || {};
 
