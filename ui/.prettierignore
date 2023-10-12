@@ -1,5 +1,6 @@
 # GraphQL generated files
 **/src/gql/
+**/src/store/generated.ts
 
 # Next.js build output
 .next/
