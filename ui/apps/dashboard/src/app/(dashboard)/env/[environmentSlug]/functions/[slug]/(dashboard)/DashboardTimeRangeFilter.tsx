@@ -137,7 +137,7 @@ export default function DashboardTimeRangeFilter({
                     >
                       {getTimeRangeLabel(timeRange)}{' '}
                       {!isPlanSufficient && minimumPlanName && (
-                        <span className="inline-flex items-center rounded-sm px-[5px] py-0.5 text-[12px] font-semibold leading-tight text-indigo-500 ring-1 ring-inset ring-indigo-300">
+                        <span className="inline-flex items-center rounded px-[5px] py-0.5 text-[12px] font-semibold leading-tight text-indigo-500 ring-1 ring-inset ring-indigo-300">
                           {minimumPlanName} Plan
                         </span>
                       )}

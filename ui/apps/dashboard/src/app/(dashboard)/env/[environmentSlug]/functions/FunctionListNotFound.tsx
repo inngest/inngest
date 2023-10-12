@@ -40,7 +40,7 @@ export default function FunctionListNotFound({ environmentSlug }: { environmentS
             </span>
           </h3>
         </div>
-        <div className="to-slate-1000 bg-slate-950 overflow-hidden rounded-lg bg-gradient-to-br from-slate-900 pt-8">
+        <div className="to-slate-940 bg-slate-910 overflow-hidden rounded-lg bg-gradient-to-br from-slate-900 pt-8">
           <div className="translate-x-1/4">
             <Image
               src={DevServerImage}
@@ -48,7 +48,7 @@ export default function FunctionListNotFound({ environmentSlug }: { environmentS
               alt="Development Server"
             />
           </div>
-          <div className="bg-slate-950/20 -mt-48 px-8 py-6 backdrop-blur-sm">
+          <div className="bg-slate-910/20 -mt-48 px-8 py-6 backdrop-blur-sm">
             <h3 className="flex items-center text-xl font-medium text-white">
               <span className="mr-2 inline-flex h-6 w-6  items-center justify-center rounded-full bg-slate-700 text-center text-sm text-white">
                 1

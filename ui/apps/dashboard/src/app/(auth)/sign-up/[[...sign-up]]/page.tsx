@@ -23,7 +23,7 @@ export default function SignUpPage() {
           }}
         />
       </div>
-      <p className="text-2xs mt-auto text-center text-slate-400">
+      <p className="mt-auto text-center text-xs text-slate-400">
         By signing up, you agree to our{' '}
         <a
           className="text-indigo-400 hover:underline"

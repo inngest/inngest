@@ -172,7 +172,7 @@ await inngest.send({
             {tabs.map(({ tabLabel }) => (
               <Tab
                 key={tabLabel}
-                className="ui-selected:bg-white ui-selected:shadow-outline-secondary-light ui-selected:text-slate-700 ui-selected:hover:bg-white ui-selected:hover:text-slate-700 rounded-sm px-3 py-1 text-sm font-medium text-slate-400 hover:bg-slate-100 hover:text-indigo-500"
+                className="ui-selected:bg-white ui-selected:shadow-outline-secondary-light ui-selected:text-slate-700 ui-selected:hover:bg-white ui-selected:hover:text-slate-700 rounded px-3 py-1 text-sm font-medium text-slate-400 hover:bg-slate-100 hover:text-indigo-500"
               >
                 {tabLabel}
               </Tab>
@@ -205,7 +205,7 @@ await inngest.send({
                 className="rounded-md bg-slate-900"
                 onSubmit={submitAction}
               >
-                <header className="bg bg-slate-950 flex items-center justify-between rounded-t-md p-2">
+                <header className="bg bg-slate-910 flex items-center justify-between rounded-t-md p-2">
                   <h3 className="px-2 text-white">{tabTitle}</h3>
                   <Button type="submit" context="dark" disabled={!submitButtonEnabled}>
                     {submitButtonLabel}
