@@ -5,10 +5,9 @@
   "homepage": "https://app.inngest.com/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/inngest/web-monorepo.git",
-    "directory": "apps/dashboard"
+    "url": "https://github.com/inngest/inngest.git",
+    "directory": "ui/apps/dashboard"
   },
-  "bugs": "https://linear.app/inngest/team/INN",
   "author": "Inngest Inc. <info@inngest.com> (https://inngest.com/)",
   "main": "n/a",
   "scripts": {
