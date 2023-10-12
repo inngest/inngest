@@ -119,7 +119,7 @@ function createColumns(environmentSlug: string) {
             />
             <Link
               key="name"
-              href={`/env/${environmentSlug}/functions/${slug}`}
+              href={`/env/${environmentSlug}/functions/${encodeURIComponent(slug)}`}
               className="group flex w-full items-center gap-2 px-2 py-3 text-sm font-medium text-slate-700  hover:text-indigo-600"
             >
               {name}

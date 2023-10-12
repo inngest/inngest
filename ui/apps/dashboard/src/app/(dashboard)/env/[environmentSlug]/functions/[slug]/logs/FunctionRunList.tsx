@@ -157,7 +157,9 @@ function FunctionRunListResultPage({
             </li>
           );
         }
-        const functionRunPathname = `/env/${environmentSlug}/functions/${functionSlug}/logs/${functionRun.id}`;
+        const functionRunPathname = `/env/${environmentSlug}/functions/${encodeURIComponent(
+          functionSlug
+        )}/logs/${functionRun.id}`;
         const isActive = pathname === functionRunPathname;
         const StatusIcon = functionRunStatusIcons[functionRun.status].icon;
 

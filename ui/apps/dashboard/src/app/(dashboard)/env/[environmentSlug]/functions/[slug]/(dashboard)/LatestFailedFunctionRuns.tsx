@@ -91,7 +91,9 @@ export default function LatestFailedFunctionRuns({
         <Button
           className="ml-auto"
           variant="secondary"
-          href={`/env/${environmentSlug}/functions/${functionSlug}/logs` as Route}
+          href={
+            `/env/${environmentSlug}/functions/${encodeURIComponent(functionSlug)}/logs` as Route
+          }
         >
           View All Logs
         </Button>
@@ -140,7 +142,9 @@ export default function LatestFailedFunctionRuns({
                       className="cursor-pointer truncate transition-all hover:bg-slate-100"
                       onClick={() =>
                         router.push(
-                          `/env/${environmentSlug}/functions/${functionSlug}/logs/${functionRun.id}` as Route
+                          `/env/${environmentSlug}/functions/${encodeURIComponent(
+                            functionSlug
+                          )}/logs/${functionRun.id}` as Route
                         )
                       }
                     >
