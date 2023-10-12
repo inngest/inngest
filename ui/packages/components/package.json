@@ -1,0 +1,19 @@
+{
+  "name": "@inngest/components",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@inngest/tsconfig": "workspace:*",
+    "@types/react": "18.2.11",
+    "typescript": "5.1.3"
+  },
+  "private": true
+}

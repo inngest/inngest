@@ -65,6 +65,7 @@
     "zod": "3.22.3"
   },
   "devDependencies": {
+    "@inngest/components": "workspace:*",
     "@inngest/tsconfig": "workspace:*",
     "@graphql-codegen/cli": "3.2.2",
     "@graphql-codegen/client-preset": "2.1.0",

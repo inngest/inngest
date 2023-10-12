@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@inngest/tsconfig/react-library.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
+    "outDir": "./dist/"
+  },
+  "include": ["./src/**/*"],
+  "exclude": ["node_modules", "./dist/"]
+}
