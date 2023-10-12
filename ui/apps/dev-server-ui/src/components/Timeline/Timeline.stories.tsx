@@ -41,6 +41,7 @@ const meta = {
     useEffect(() => {
       const parser = new HistoryParser();
       for (let i = 0; i <= _rawHistoryFrame; i++) {
+        // @ts-ignore
         parser.append(_rawHistory[i]);
       }
       setHistory(parser.history);

@@ -23,10 +23,10 @@ export default function FuncCard({
     <a
       className={classNames(
         active
-          ? `outline outline-2 outline-indigo-400 outline-offset-3 bg-slate-900 border-slate-700/50`
-          : null,
-        `overflow-hidden bg-slate-800/50 w-full rounded-lg block`,
-        onClick ? 'hover:bg-slate-800/80 cursor-pointer' : null
+          ? `outline-offset-3 border-slate-700/50 bg-slate-900 outline outline-2 outline-indigo-400`
+          : undefined,
+        `block w-full overflow-hidden rounded-lg bg-slate-800/50`,
+        onClick ? 'cursor-pointer hover:bg-slate-800/80' : undefined
       )}
       onClick={
         onClick
@@ -42,7 +42,7 @@ export default function FuncCard({
         <h2 className="text-white">{title}</h2>
       </div>
       <hr className="border-slate-800/50" />
-      <div className="text-xs text-slate-500 leading-none px-5 py-3.5">
+      <div className="px-5 py-3.5 text-xs leading-none text-slate-500">
         Run ID: <span className="font-mono">{id}</span>
       </div>
       {footer}

@@ -2,7 +2,7 @@ import { IconCheck, IconCopy } from '@/icons';
 import Button from './Button';
 
 type ButtonCopyProps = {
-  code: string;
+  code?: string;
   iconOnly?: boolean;
   isCopying: boolean;
   handleCopyClick: (code: string) => void;
@@ -19,8 +19,9 @@ export default function CopyButton({
 
   return (
     <Button
+      disabled={!code}
       kind={isCopying ? 'success' : 'default'}
-      btnAction={() => handleCopyClick(code)}
+      btnAction={code ? () => handleCopyClick(code) : undefined}
       label={iconOnly ? undefined : label}
       appearance={iconOnly ? 'text' : 'solid'}
       icon={iconOnly && icon}

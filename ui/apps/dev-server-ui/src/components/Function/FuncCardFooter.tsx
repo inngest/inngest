@@ -25,30 +25,24 @@ export default function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
   });
 
   const status = functionRun.status || 'Unknown';
-  const functionRunStatusFooter = {
-    [FunctionRunStatus.Failed]: {
-      component: () => {
-        if (!message && !errorName) return null;
-        return (
-          <p className="font-mono flex items-center gap-2">
-            <IconExclamationTriangle className="h-3 w-3 text-rose-400" />
-            <span className="text-rose-400 font-semibold">{errorName}</span>
-            <span className="truncate">{message}</span>
-          </p>
-        );
-      },
-      color: 'bg-rose-600/10',
-    },
-  } as const;
 
-  const content =
-    functionRunStatusFooter[status]?.component && functionRunStatusFooter[status].component();
-  const backgroundColor =
-    functionRunStatusFooter[status]?.color && functionRunStatusFooter[status].color;
+  let content: JSX.Element | null = null;
+  let backgroundColor: string = '';
+
+  if (status === FunctionRunStatus.Failed && message && errorName) {
+    content = (
+      <p className="flex items-center gap-2 font-mono">
+        <IconExclamationTriangle className="h-3 w-3 text-rose-400" />
+        <span className="font-semibold text-rose-400">{errorName}</span>
+        <span className="truncate">{message}</span>
+      </p>
+    );
+    backgroundColor = 'bg-rose-600/10';
+  }
 
   if (!content) return null;
 
   return (
-    <div className={classNames(backgroundColor, 'text-xs px-5 py-4 text-slate-100')}>{content}</div>
+    <div className={classNames(backgroundColor, 'px-5 py-4 text-xs text-slate-100')}>{content}</div>
   );
 }

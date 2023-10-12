@@ -6,13 +6,12 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "noImplicitAny": false, // TODO: remove (default is true)
     "esModuleInterop": true,
     "verbatimModuleSyntax": true,
     "module": "esnext",
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "noUncheckedIndexedAccess": false, // TODO: set to true
+    "noUncheckedIndexedAccess": true,
     "jsx": "preserve",
     "incremental": true,
     "plugins": [

@@ -5,7 +5,11 @@ import {
   type FunctionRun,
 } from '@/store/generated';
 
-export default function OutputList({ functionRuns }) {
+type OutputListProps = {
+  functionRuns: FunctionRun[];
+};
+
+export default function OutputList({ functionRuns }: OutputListProps) {
   return (
     <>
       {!functionRuns || functionRuns.length < 1 ? (
@@ -24,7 +28,7 @@ export default function OutputList({ functionRuns }) {
 
 type FunctionRunStatusSubset = Pick<FunctionRun, 'id' | 'status' | 'output'>;
 
-export function OutputItem({ functionRunID }) {
+export function OutputItem({ functionRunID }: { functionRunID: string }) {
   const { data } = useGetFunctionRunOutputQuery({ id: functionRunID }, { pollingInterval: 1500 });
   const functionRun = (data?.functionRun as FunctionRunStatusSubset) || {};
   let type: OutputType | undefined;

@@ -17,7 +17,7 @@ type ButtonCopyProps = {
 };
 
 export default function SplitButton({ kind = 'default', size = 'small', items }: ButtonCopyProps) {
-  const [value, setValue] = useState(items.length > 0 ? items[0].label : '');
+  const [value, setValue] = useState(items.length > 0 ? items[0]?.label : '');
   const selectedItem = items.find((item) => item.label === value);
   const { onClick: btnAction, label, icon } = selectedItem || {};
 
@@ -45,7 +45,7 @@ export default function SplitButton({ kind = 'default', size = 'small', items }:
             buttonColors,
             buttonSizes,
             disabledStyles,
-            'flex gap-1.5 items-center justify-center rounded-r drop-shadow-sm transition-all active:scale-95 relative border-l-transparent',
+            'relative flex items-center justify-center gap-1.5 rounded-r border-l-transparent drop-shadow-sm transition-all active:scale-95',
             verticalDivider
           )}
         >
@@ -56,7 +56,7 @@ export default function SplitButton({ kind = 'default', size = 'small', items }:
 
         <Select.Portal>
           <Select.Content
-            className="bg-slate-800 rounded overflow-hidden text-white cursor-pointer z-50"
+            className="z-50 cursor-pointer overflow-hidden rounded bg-slate-800 text-white"
             position="popper"
             align="end"
             sideOffset={0}

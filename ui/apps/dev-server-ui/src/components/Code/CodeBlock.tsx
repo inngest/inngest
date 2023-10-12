@@ -42,7 +42,7 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
   const monaco = useMonaco();
-  const content = tabs[activeTab].content;
+  const content = tabs[activeTab]?.content;
 
   useEffect(() => {
     if (!monaco) {
@@ -82,15 +82,15 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
     });
   }, [monaco]);
 
-  const handleTabClick = (index) => {
+  const handleTabClick = (index: number) => {
     setActiveTab(index);
   };
 
-  function handleEditorDidMount(editor) {
+  function handleEditorDidMount(editor: MonacoEditorType) {
     editorRef.current = editor;
   }
 
-  function getTextWidth(text, font) {
+  function getTextWidth(text: string, font: string) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     if (context) {
@@ -118,10 +118,9 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
           for (let lineNumber = 1; lineNumber <= linesContent.length; lineNumber++) {
             const lineContent = linesContent[lineNumber - 1];
 
-            const lineLength = getTextWidth(
-              lineContent,
-              `${FONT.size}px ${FONT.font}, ${FONT.type}`
-            );
+            const lineLength = lineContent
+              ? getTextWidth(lineContent, `${FONT.size}px ${FONT.font}, ${FONT.type}`)
+              : 0;
 
             if (lineLength <= containerWidth) {
               totalLinesThatFit++;
@@ -152,34 +151,36 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
   };
 
   // This prevents larger outputs from crashing the browser
-  const isOutputTooLarge = content?.length > maxRenderedOutputSizeBytes;
+  const isOutputTooLarge = (content?.length ?? 0) > maxRenderedOutputSizeBytes;
 
-  const downloadJson = ({ content }) => {
-    const blob = new Blob([content], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const element = document.createElement('a');
-    element.href = url;
-    element.download = 'data.json'; // Set the file name with a .json extension
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    URL.revokeObjectURL(url);
+  const downloadJson = ({ content }: { content?: string }) => {
+    if (content) {
+      const blob = new Blob([content], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const element = document.createElement('a');
+      element.href = url;
+      element.download = 'data.json'; // Set the file name with a .json extension
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      URL.revokeObjectURL(url);
+    }
   };
 
   return (
-    <div className="w-full bg-slate-800/40 border border-slate-700/30 rounded-lg shadow overflow-hidden">
+    <div className="w-full overflow-hidden rounded-lg border border-slate-700/30 bg-slate-800/40 shadow">
       {header && (
         <div className={classNames(header.color, 'pt-3')}>
           {(header.title || header.description) && (
-            <div className="flex flex-col gap-1 font-mono text-xs px-5 pb-2.5">
+            <div className="flex flex-col gap-1 px-5 pb-2.5 font-mono text-xs">
               <p className="text-white">{header.title}</p>
               <p className="text-white/60">{header.description}</p>
             </div>
           )}
         </div>
       )}
-      <div className="bg-slate-800/40 flex justify-between shadow border-b border-slate-700/20">
-        <div className="flex -mb-px">
+      <div className="flex justify-between border-b border-slate-700/20 bg-slate-800/40 shadow">
+        <div className="-mb-px flex">
           {tabs.map((tab, i) => {
             const isSingleTab = tabs.length === 1;
             const isActive = i === activeTab && !isSingleTab;
@@ -188,10 +189,10 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
               <button
                 key={i}
                 className={classNames(
-                  `text-xs px-5 py-2.5`,
+                  `px-5 py-2.5 text-xs`,
                   isSingleTab
                     ? 'text-slate-400'
-                    : 'border-b block transition-all duration-150 outline-none',
+                    : 'block border-b outline-none transition-all duration-150',
                   isActive && 'border-indigo-400 text-white',
                   !isActive && !isSingleTab && 'border-transparent text-slate-400'
                 )}
@@ -203,7 +204,7 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
           })}
         </div>
         {!isOutputTooLarge && (
-          <div className="flex gap-2 items-center mr-2">
+          <div className="mr-2 flex items-center gap-2">
             <CopyButton code={content} isCopying={isCopying} handleCopyClick={handleCopyClick} />
             <Button
               icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
@@ -214,10 +215,10 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
       </div>
       {isOutputTooLarge ? (
         <>
-          <div className="px-5 py-2.5 text-xs bg-amber-500/40 text-white">
+          <div className="bg-amber-500/40 px-5 py-2.5 text-xs text-white">
             Output size is too large to render {`( > 1MB )`}
           </div>
-          <div className="h-24 flex items-center justify-center	">
+          <div className="flex h-24 items-center justify-center	">
             <Button
               label="Download Raw"
               icon={<IconArrayDownTray />}

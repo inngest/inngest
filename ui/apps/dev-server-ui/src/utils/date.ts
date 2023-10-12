@@ -18,7 +18,7 @@ const second = 1000;
 const minute = 60 * second;
 const hour = 60 * minute;
 
-export function formatMilliseconds(durationInMs): string {
+export function formatMilliseconds(durationInMs: number) {
   if (durationInMs >= hour) {
     const hours = Math.floor(durationInMs / hour);
     durationInMs %= hour;
