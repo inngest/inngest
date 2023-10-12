@@ -250,7 +250,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		mapped[n] = item.GetEvent().Map()
 	}
 
-	_, err := e.sm.New(ctx, state.Input{
+	factor, err := req.Function.RunPriorityFactor(ctx, mapped[0])
+	if err != nil && e.log != nil {
+		e.log.Warn().Err(err).Msg("run priority errored")
+	}
+	if factor != 0 {
+		id.PriorityFactor = &factor
+	}
+
+	_, err = e.sm.New(ctx, state.Input{
 		Identifier:     id,
 		EventBatchData: mapped,
 		Context:        req.Context,

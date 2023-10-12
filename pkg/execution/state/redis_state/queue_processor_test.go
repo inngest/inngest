@@ -185,9 +185,9 @@ func TestQueueRunBasic(t *testing.T) {
 	r.Close()
 	rc.Close()
 
-	// TODO: Assert queue items have been processed
-	// TODO: Assert queue items have been dequeued, and peek is nil for workflows.
-	// XXX: Assert metrics are correct.
+	// Assert queue items have been processed
+	// Assert queue items have been dequeued, and peek is nil for workflows.
+	// Assert metrics are correct.
 }
 
 func TestQueueRunRetry(t *testing.T) {
@@ -433,4 +433,82 @@ func TestQueueRunExtended(t *testing.T) {
 
 	<-time.After(time.Second)
 	r.Close()
+}
+
+func TestRunPriorityFactor(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	q := NewQueue(
+		rc,
+		// We can't add more than 8128 goroutines when detecting race conditions.
+		WithNumWorkers(10),
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	idA, idB := uuid.New(), uuid.New()
+	factor2 := int64(2)
+	items := []osqueue.Item{
+		{
+			WorkspaceID: idA,
+			Kind:        osqueue.KindEdge,
+			MaxAttempts: max(1),
+			Identifier: state.Identifier{
+				WorkflowID: idA,
+				RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+			},
+		},
+		{
+			WorkspaceID: idB,
+			Kind:        osqueue.KindEdge,
+			MaxAttempts: max(1),
+			Identifier: state.Identifier{
+				WorkflowID: idB,
+				RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+				// Enqueue 2 seconds prior to the actual At time
+				PriorityFactor: &factor2,
+			},
+		},
+	}
+
+	var handled int32
+	go func() {
+		_ = q.Run(ctx, func(ctx context.Context, item osqueue.Item) error {
+			atomic.AddInt32(&handled, 1)
+			return nil
+		})
+	}()
+
+	// Run at the next 2 second mark
+	at := time.Now().Add(2 * time.Second)
+
+	for _, item := range items {
+		err := q.Enqueue(ctx, item, at)
+		require.NoError(t, err)
+	}
+
+	<-time.After(500 * time.Millisecond)
+	// Immediately we should run the task with a higher priority
+	require.EqualValues(t, 1, atomic.LoadInt32(&handled))
+
+	<-time.After(2 * time.Second)
+	require.EqualValues(t, 2, atomic.LoadInt32(&handled))
+
+	// Nothing else runs after 5 seconds
+	<-time.After(5 * time.Second)
+	require.EqualValues(t, 2, atomic.LoadInt32(&handled))
+
+	cancel()
+	r.Close()
+	rc.Close()
+
+	// Assert queue items have been processed
+	// Assert queue items have been dequeued, and peek is nil for workflows.
+	// Assert metrics are correct.
 }

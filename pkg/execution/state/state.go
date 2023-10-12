@@ -65,6 +65,9 @@ type Identifier struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// If this is a rerun, the original run ID is stored here.
 	OriginalRunID *ulid.ULID `json:"oRunID,omitempty"`
+	// PriorityFactor is the overall priority factor for this particular function
+	// run.  This allows individual runs to take precedence within the same queue.
+	PriorityFactor *int64 `json:"pf,omitempty"`
 }
 
 // IdempotencyKey returns the unique key used to represent this single

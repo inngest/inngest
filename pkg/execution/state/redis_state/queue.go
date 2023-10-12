@@ -15,6 +15,7 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -65,7 +66,7 @@ const (
 	PriorityMin     uint = 9
 
 	// FunctionStartScoreBufferTime is the grace period used to compare function start
-	// times to edg enqueue times.
+	// times to edge enqueue times.
 	FunctionStartScoreBufferTime = 10 * time.Second
 
 	defaultNumWorkers           = 100
@@ -441,6 +442,21 @@ func (q *QueueItem) SetID(ctx context.Context, str string) {
 // We can ONLY do this for the first attempt, and we can ONLY do this for edges that
 // are not sleeps (eg. immediate runs)
 func (q QueueItem) Score() int64 {
+	// Apply the priority factor after scoring taking into account function start times.
+	// This applies priorities while also ensuring we finish older functions first.
+	score := q.scoreByFunctionStart()
+
+	// If this is > 2 seconds in the future, don't mess with the time.
+	// This prevents any accidental fudging of future run times if event.ts is
+	// in the future.
+	if score > time.Now().Add(consts.FutureAtLimit).UnixMilli() {
+		return score
+	}
+
+	return score - q.Data.GetPriorityFactor()
+}
+
+func (q QueueItem) scoreByFunctionStart() int64 {
 	// If this is not an edge, we can ignore this.
 	if q.Data.Kind != osqueue.KindEdge || q.Data.Attempt > 0 {
 		return q.AtMS
@@ -449,7 +465,7 @@ func (q QueueItem) Score() int64 {
 	// If this is > 2 seconds in the future, don't mess with the time.
 	// This prevents any accidental fudging of future run times, even if the
 	// kind is edge (which should never exist... but, better to be safe).
-	if q.AtMS > time.Now().Add(2*time.Second).UnixMilli() {
+	if q.AtMS > time.Now().Add(consts.FutureAtLimit).UnixMilli() {
 		return q.AtMS
 	}
 
@@ -458,6 +474,7 @@ func (q QueueItem) Score() int64 {
 	if q.AtMS-startAt > FunctionStartScoreBufferTime.Milliseconds() {
 		return startAt
 	}
+
 	return q.AtMS
 }
 
