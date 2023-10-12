@@ -1,20 +1,19 @@
-// @ts-check
-const defaultTheme = require('tailwindcss/defaultTheme');
+import type { Config } from 'tailwindcss';
+import defaultTheme from 'tailwindcss/defaultTheme';
 
-/** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-inter-tight)', ...defaultTheme.fontFamily.sans],
+        mono: ['var(--font-roboto-mono)', ...defaultTheme.fontFamily.mono],
+      },
       colors: {
         slate: {
           910: '#0C1323',
           940: '#080D19',
         },
-      },
-      fontFamily: {
-        sans: ['var(--font-inter-tight)', ...defaultTheme.fontFamily.sans],
-        mono: ['var(--font-roboto-mono)', ...defaultTheme.fontFamily.mono],
       },
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 400px',
@@ -32,20 +31,20 @@ module.exports = {
       },
       keyframes: {
         'slide-down-and-fade': {
-          '0%': { opacity: 0, transform: 'translateY(-3px)' },
-          '100%': { opacity: 1, transform: 'translateY(0)' },
+          '0%': { opacity: '0', transform: 'translateY(-3px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         'slide-left-and-fade': {
-          '0%': { opacity: 0, transform: 'translateX(2px)' },
-          '100%': { opacity: 1, transform: 'translateX(0)' },
+          '0%': { opacity: '0', transform: 'translateX(2px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
         },
         'slide-up-and-fade': {
-          '0%': { opacity: 0, transform: 'translateY(2px)' },
-          '100%': { opacity: 1, transform: 'translateY(0)' },
+          '0%': { opacity: '0', transform: 'translateY(2px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         'slide-right-and-fade': {
-          '0%': { opacity: 0, transform: 'translateX(2px)' },
-          '100%': { opacity: 1, transform: 'translateX(0)' },
+          '0%': { opacity: '0', transform: 'translateX(2px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
         },
         shimmer: {
           '100%': {
@@ -65,4 +64,4 @@ module.exports = {
     },
   },
   plugins: [require('@tailwindcss/forms'), require('@headlessui/tailwindcss')],
-};
+} satisfies Config;

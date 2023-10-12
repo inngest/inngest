@@ -1,8 +1,7 @@
-// @ts-check
-const defaultTheme = require('tailwindcss/defaultTheme');
+import type { Config } from 'tailwindcss';
+import defaultTheme from 'tailwindcss/defaultTheme';
 
-/** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
@@ -26,8 +25,8 @@ module.exports = {
           },
         },
         'slide-down-and-fade': {
-          '0%': { opacity: 0, transform: 'translateY(-3px)' },
-          '100%': { opacity: 1, transform: 'translateY(0)' },
+          '0%': { opacity: '0', transform: 'translateY(-3px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
       },
       animation: {
@@ -36,4 +35,4 @@ module.exports = {
     },
   },
   plugins: [require('@headlessui/tailwindcss')],
-};
+} satisfies Config;
