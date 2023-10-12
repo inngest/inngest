@@ -59,7 +59,9 @@ export default function RerunButton({
     const newFunctionRunID = response.data?.retryWorkflowRun?.id as string;
     router.refresh();
     router.push(
-      `/env/${environmentSlug}/functions/${function_.slug}/logs/${newFunctionRunID}` as Route
+      `/env/${environmentSlug}/functions/${encodeURIComponent(
+        function_.slug
+      )}/logs/${newFunctionRunID}` as Route
     );
   }
 
