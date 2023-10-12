@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Badge } from '@inngest/components/Badge';
 import { Button } from '@inngest/components/Button';
+import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
+import { IconStatusCircleMinus } from '@inngest/components/icons/StatusCircleMinus';
 import { classNames } from '@inngest/components/utils/classNames';
 import { toast } from 'sonner';
 
@@ -8,13 +10,7 @@ import AppCardHeader from '@/components/App/AppCardHeader';
 import CodeLine from '@/components/Code/CodeLine';
 import Link from '@/components/Link/Link';
 import useDebounce from '@/hooks/useDebounce';
-import {
-  IconChevron,
-  IconSpinner,
-  IconStatusCircleCheck,
-  IconStatusCircleExclamation,
-  IconStatusCircleMinus,
-} from '@/icons';
+import { IconChevron, IconSpinner, IconStatusCircleExclamation } from '@/icons';
 import { useDeleteAppMutation, useUpdateAppMutation, type App } from '@/store/generated';
 import isValidUrl from '@/utils/urlValidation';
 import AppCardStep from './AppCardStep';

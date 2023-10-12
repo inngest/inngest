@@ -1,4 +1,5 @@
-import { FunctionRunStatusIcons } from '@/components/Function/RunStatusIcons';
+import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+
 import { useGetFunctionRunStatusQuery, type FunctionRun } from '@/store/generated';
 
 type FunctionRunList = {
@@ -37,7 +38,7 @@ export function FunctionRunItem({ functionRunID }: { functionRunID: string }) {
 
   return (
     <li key={functionRun?.id} data-key={functionRun?.id} className="flex items-center gap-2">
-      <FunctionRunStatusIcons status={functionRun.status} className="h-5 w-5" />
+      <FunctionRunStatusIcon status={functionRun.status} className="h-5 w-5" />
       {functionRun?.function?.name}
     </li>
   );
