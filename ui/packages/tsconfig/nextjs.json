@@ -3,13 +3,11 @@
   "extends": "./base.json",
   "display": "Next.js",
   "compilerOptions": {
-    "target": "es5",
     "lib": ["dom", "dom.iterable", "ESNext"],
     "allowJs": true,
     "checkJs": true,
     "declaration": false,
     "declarationMap": false,
-    "incremental": true,
     "noEmit": true,
     "jsx": "preserve",
     "incremental": true,
