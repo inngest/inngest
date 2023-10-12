@@ -15,6 +15,7 @@ const nextConfig = {
       },
     ],
   },
+  transpilePackages: ['@inngest/components'],
   async redirects() {
     return [
       {

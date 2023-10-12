@@ -4,6 +4,7 @@
 const nextConfig = {
   output: 'export',
   distDir: './dist',
+  transpilePackages: ['@inngest/components'],
 };
 
 module.exports = nextConfig;
