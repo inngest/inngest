@@ -51,8 +51,12 @@ const columns = [
   columnHelper.accessor('runs', {
     header: () => <span>Function</span>,
     cell: (props) => {
-      const functionRuns = props.getValue() as FunctionRun[];
-      const validFunctionRuns = functionRuns.filter((run) => run !== null);
+      let validFunctionRuns: FunctionRun[] = []
+      for (const run of props.getValue() ?? [])  {
+        if (run) {
+          validFunctionRuns.push(run);
+        }
+      }
 
       return <FunctionRunList functionRuns={validFunctionRuns} />;
     },
