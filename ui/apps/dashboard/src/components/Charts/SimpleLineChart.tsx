@@ -130,7 +130,7 @@ export default function SimpleLineChart({
                             className="flex items-center text-sm font-medium text-slate-800"
                           >
                             <span
-                              className="mr-2 inline-flex h-3 w-3 rounded-sm"
+                              className="mr-2 inline-flex h-3 w-3 rounded"
                               style={{ backgroundColor: l?.color || p.color }}
                             ></span>
                             {p.value} {l?.name || p.name}

@@ -172,7 +172,7 @@ await inngest.send({
             {tabs.map(({ tabLabel }) => (
               <Tab
                 key={tabLabel}
-                className="ui-selected:bg-white ui-selected:shadow-outline-secondary-light ui-selected:text-slate-700 ui-selected:hover:bg-white ui-selected:hover:text-slate-700 rounded-sm px-3 py-1 text-sm font-medium text-slate-400 hover:bg-slate-100 hover:text-indigo-500"
+                className="ui-selected:bg-white ui-selected:shadow-outline-secondary-light ui-selected:text-slate-700 ui-selected:hover:bg-white ui-selected:hover:text-slate-700 rounded px-3 py-1 text-sm font-medium text-slate-400 hover:bg-slate-100 hover:text-indigo-500"
               >
                 {tabLabel}
               </Tab>

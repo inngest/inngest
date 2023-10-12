@@ -129,7 +129,7 @@ function IntegrationCard({ metadata }: { metadata: DeployMetadata }): JSX.Elemen
           ) : (
             <span>{capitalCase(integrationName || '')} </span>
           )}
-          <span className="rounded-sm bg-sky-50 px-1.5 py-1 text-xs font-medium text-sky-600">
+          <span className="rounded bg-sky-50 px-1.5 py-1 text-xs font-medium text-sky-600">
             Integration
           </span>
         </div>

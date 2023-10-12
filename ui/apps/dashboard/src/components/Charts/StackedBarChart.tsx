@@ -147,7 +147,7 @@ export default function StackedBarChart({
                             className="flex items-center text-sm font-medium text-slate-800"
                           >
                             <span
-                              className="mr-2 inline-flex h-3 w-3 rounded-sm"
+                              className="mr-2 inline-flex h-3 w-3 rounded"
                               style={{ backgroundColor: l?.color || p.color }}
                             ></span>
                             {p.value} {l?.name || p.name}
@@ -185,7 +185,7 @@ export default function StackedBarChart({
         {legend.map((l) => (
           <span key={l.name} className="inline-flex items-center text-sm">
             <span
-              className="mr-2 inline-flex h-3 w-3 rounded-sm"
+              className="mr-2 inline-flex h-3 w-3 rounded"
               style={{ backgroundColor: l.color }}
             ></span>
             {l.name}

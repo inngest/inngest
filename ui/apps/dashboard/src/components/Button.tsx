@@ -23,7 +23,7 @@ const contextStyles = {
 } as const;
 
 const sizeStyles = {
-  sm: 'px-2.5 py-1 h-[26px] text-xs rounded-sm',
+  sm: 'px-2.5 py-1 h-[26px] text-xs rounded',
   base: 'px-3 h-8',
   lg: 'px-6 py-2.5',
 };

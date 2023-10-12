@@ -12,9 +12,6 @@ module.exports = {
           940: '#080D19',
         },
       },
-      borderRadius: {
-        sm: '4px',
-      },
       fontFamily: {
         sans: ['var(--font-inter-tight)', ...defaultTheme.fontFamily.sans],
         mono: ['var(--font-roboto-mono)', ...defaultTheme.fontFamily.mono],
