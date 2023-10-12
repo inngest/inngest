@@ -31,7 +31,7 @@ export default function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
         if (!message && !errorName) return null;
         return (
           <p className="font-mono flex items-center gap-2">
-            <IconExclamationTriangle className="icon-2xs text-rose-400" />
+            <IconExclamationTriangle className="h-3 w-3 text-rose-400" />
             <span className="text-rose-400 font-semibold">{errorName}</span>
             <span className="truncate">{message}</span>
           </p>

@@ -90,7 +90,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
   return (
     <ContentCard
       title={run.name || 'Unknown'}
-      icon={run.status && <FunctionRunStatusIcons status={run.status} className="icon-xl" />}
+      icon={run.status && <FunctionRunStatusIcons status={run.status} className="h-5 w-5" />}
       type="run"
       badge={
         cron ? (

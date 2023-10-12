@@ -74,16 +74,5 @@ module.exports = {
   },
   plugins: [
     require('@headlessui/tailwindcss'),
-    function ({ addUtilities, theme }) {
-      const iconSizeUtilities = {};
-      Object.keys(theme('fontSize')).forEach((size) => {
-        const value = theme('fontSize')[size];
-        iconSizeUtilities[`.icon-${size}`] = {
-          width: value,
-          height: value,
-        };
-      });
-      addUtilities(iconSizeUtilities, ['responsive', 'hover']);
-    },
   ],
 };

@@ -12,15 +12,15 @@ export default function AppCardHeader({ connected, functionCount }: AppCardHeade
   if (!connected) {
     headerColor = 'bg-rose-600/50';
     headerLabel = 'No Connection';
-    headerIcon = <IconExclamationTriangle className="text-white icon-xl" />;
+    headerIcon = <IconExclamationTriangle className="text-white h-5 w-5" />;
   } else if (functionCount < 1) {
     headerColor = 'bg-orange-400/70';
     headerLabel = 'No Functions Found';
-    headerIcon = <IconExclamationTriangle className="text-white icon-xl" />;
+    headerIcon = <IconExclamationTriangle className="text-white h-5 w-5" />;
   } else {
     headerColor = 'bg-teal-400/50';
     headerLabel = 'Connected';
-    headerIcon = <IconCheckCircle className="text-white icon-xl" />;
+    headerIcon = <IconCheckCircle className="text-white h-5 w-5" />;
   }
 
   return (

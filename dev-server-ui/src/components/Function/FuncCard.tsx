@@ -38,7 +38,7 @@ export default function FuncCard({
       }
     >
       <div className="flex items-center gap-2 px-5 py-3.5">
-        {status && <FunctionRunStatusIcons status={status} className="icon-lg" />}
+        {status && <FunctionRunStatusIcons status={status} className="h-4 w-4" />}
         <h2 className="text-white">{title}</h2>
       </div>
       <hr className="border-slate-800/50" />

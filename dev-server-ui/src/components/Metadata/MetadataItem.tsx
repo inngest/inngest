@@ -31,7 +31,7 @@ export default function MetadataItem({
       <span className="flex items-center gap-1">
         <span className="text-sm text-slate-500 capitalize">{label}</span>
         {tooltip && (
-          <Tooltip children={<IconInfo className="text-slate-400 icon-lg" />} content={tooltip} />
+          <Tooltip children={<IconInfo className="text-slate-400 h-4 w-4" />} content={tooltip} />
         )}
       </span>
     </div>
