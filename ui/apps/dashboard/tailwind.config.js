@@ -19,11 +19,6 @@ module.exports = {
       gridTemplateColumns: {
         dashboard: '1fr 1fr 1fr 400px',
       },
-      fontSize: {
-        '2xs': '0.75rem',
-        xs: '0.8125rem',
-        '5xl': ['3rem', '1.3'],
-      },
       maxWidth: {
         'container-desktop': '1600px',
         lg: '33rem',

@@ -86,7 +86,7 @@ export default function SimpleBarChart({
       <header className="flex items-center justify-between">
         <div className="flex">
           <h3 className="mr-4 flex flex-row items-center gap-2 font-medium">{title}</h3>
-          <div className="text-2xs flex items-center rounded-full bg-slate-800 px-3 py-1 capitalize leading-none text-white">
+          <div className="flex items-center rounded-full bg-slate-800 px-3 py-1 text-xs capitalize leading-none text-white">
             {period}
           </div>
         </div>

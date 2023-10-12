@@ -96,7 +96,7 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
                 1
               </span>
               Set up the SDK
-              <div className="text-2xs ml-4 flex items-center rounded-full bg-slate-200 px-3 py-1 leading-none text-slate-600">
+              <div className="ml-4 flex items-center rounded-full bg-slate-200 px-3 py-1 text-xs leading-none text-slate-600">
                 Added in v1.7.0
               </div>
             </h3>
