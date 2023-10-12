@@ -13,7 +13,7 @@ import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';
 import { IconChevron } from '@/icons';
 import { client } from '@/store/baseApi';
-import { GetTriggersStreamDocument, type StreamItem } from '@/store/generated';
+import { GetTriggersStreamDocument, type FunctionRun, type StreamItem } from '@/store/generated';
 import { fullDate } from '@/utils/date';
 import FunctionRunList from './FunctionRunList';
 
@@ -50,7 +50,12 @@ const columns = [
   }),
   columnHelper.accessor('runs', {
     header: () => <span>Function</span>,
-    cell: (props) => <FunctionRunList functionRuns={props.getValue()} />,
+    cell: (props) => {
+      const functionRuns = props.getValue() as FunctionRun[];
+      const validFunctionRuns = functionRuns.filter((run) => run !== null);
+
+      return <FunctionRunList functionRuns={validFunctionRuns} />;
+    },
     size: 350,
     minSize: 350,
   }),
@@ -84,7 +89,7 @@ export default function Stream() {
     }
   }, []);
 
-  const fetchTriggersStream = async ({ pageParam }) => {
+  const fetchTriggersStream = async ({ pageParam }: { pageParam: string | null }) => {
     const variables = {
       limit: 40, // Page size
       before: tableScrollTopPosition > 0 ? pageParam : null,
@@ -143,6 +148,7 @@ export default function Stream() {
 
     // If user scrolled down multiple pages and then to the top of the table, we clear the cache to only have 1 page again
     if (tableScrollTopPosition === 0 && hasMoreThanOnePage && !isFetching) {
+      //@ts-ignore
       queryClient.setQueryData(['triggers-stream'], (data) => ({
         // @ts-ignore
         pages: data?.pages?.slice(0, 1),
@@ -196,8 +202,8 @@ export default function Stream() {
   });
 
   return (
-    <div className="flex flex-col min-h-0 min-w-0">
-      <div className="flex justify-end px-5 py-2 gap-1">
+    <div className="flex min-h-0 min-w-0 flex-col">
+      <div className="flex justify-end gap-1 px-5 py-2">
         <Button
           label={freezeStream ? 'Resume Stream' : 'Freeze Stream'}
           btnAction={() => setFreezeStream(!freezeStream)}

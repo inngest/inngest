@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type SyntheticEvent,
+} from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
@@ -10,13 +18,19 @@ import { usePortal } from '../../hooks/usePortal';
 import { useSendEventMutation } from '../../store/devApi';
 import { genericiseEvent } from '../../utils/events';
 
-export default function SendEventModal({ data, isOpen, onClose }) {
+type SendEventModalProps = {
+  data?: string | null;
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+export default function SendEventModal({ data, isOpen, onClose }: SendEventModalProps) {
   const [_sendEvent, sendEventState] = useSendEventMutation();
   const portal = usePortal();
   const eventDataStr = data;
 
   // Define the keydown event handler
-  const handleGlobalKeyDown = (event) => {
+  const handleGlobalKeyDown = (event: KeyboardEvent) => {
     // Check if Ctrl or Cmd key is pressed (depending on the user's OS)
     const isCtrlCmdPressed = event.ctrlKey || event.metaKey;
 
@@ -27,10 +41,12 @@ export default function SendEventModal({ data, isOpen, onClose }) {
   };
 
   useEffect(() => {
+    //@ts-ignore
     document.addEventListener('keydown', handleGlobalKeyDown);
 
     // Detach the event listener when the component unmounts
     return () => {
+      //@ts-ignore
       document.removeEventListener('keydown', handleGlobalKeyDown);
     };
   }, []);
@@ -182,12 +198,12 @@ export default function SendEventModal({ data, isOpen, onClose }) {
       onClose={onClose}
       title="Send Event"
       description="Send an event manually by filling or pasting a payload"
-      className="max-w-5xl w-full"
+      className="w-full max-w-5xl"
     >
       <div className="m-6">
-        <div className="relative w-full h-[20rem] flex flex-col rounded-lg overflow-hidden">
-          <div className="items-center bg-slate-800/40 shadow border-b border-slate-700/20 flex justify-between">
-            <p className=" text-slate-400 text-xs px-5 py-4">Payload</p>
+        <div className="relative flex h-[20rem] w-full flex-col overflow-hidden rounded-lg">
+          <div className="flex items-center justify-between border-b border-slate-700/20 bg-slate-800/40 shadow">
+            <p className=" px-5 py-4 text-xs text-slate-400">Payload</p>
           </div>
           {monaco ? (
             <Editor
@@ -231,7 +247,7 @@ export default function SendEventModal({ data, isOpen, onClose }) {
           ) : null}
         </div>
       </div>
-      <div className="flex items-center justify-between p-6 border-t border-slate-800">
+      <div className="flex items-center justify-between border-t border-slate-800 p-6">
         <Button label="Cancel" appearance="outlined" btnAction={onClose} />
         <Button
           disabled={sendEventState.isLoading}

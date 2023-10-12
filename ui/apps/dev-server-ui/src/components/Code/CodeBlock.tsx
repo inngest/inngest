@@ -82,15 +82,15 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
     });
   }, [monaco]);
 
-  const handleTabClick = (index) => {
+  const handleTabClick = (index: number) => {
     setActiveTab(index);
   };
 
-  function handleEditorDidMount(editor) {
+  function handleEditorDidMount(editor: MonacoEditorType) {
     editorRef.current = editor;
   }
 
-  function getTextWidth(text, font) {
+  function getTextWidth(text: string, font: string) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     if (context) {
@@ -118,10 +118,9 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
           for (let lineNumber = 1; lineNumber <= linesContent.length; lineNumber++) {
             const lineContent = linesContent[lineNumber - 1];
 
-            const lineLength = getTextWidth(
-              lineContent,
-              `${FONT.size}px ${FONT.font}, ${FONT.type}`
-            );
+            const lineLength = lineContent
+              ? getTextWidth(lineContent, `${FONT.size}px ${FONT.font}, ${FONT.type}`)
+              : 0;
 
             if (lineLength <= containerWidth) {
               totalLinesThatFit++;
@@ -154,16 +153,18 @@ export default function CodeBlock({ header, tabs }: CodeBlockProps) {
   // This prevents larger outputs from crashing the browser
   const isOutputTooLarge = (content?.length ?? 0) > maxRenderedOutputSizeBytes;
 
-  const downloadJson = ({ content }) => {
-    const blob = new Blob([content], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const element = document.createElement('a');
-    element.href = url;
-    element.download = 'data.json'; // Set the file name with a .json extension
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    URL.revokeObjectURL(url);
+  const downloadJson = ({ content }: { content?: string }) => {
+    if (content) {
+      const blob = new Blob([content], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const element = document.createElement('a');
+      element.href = url;
+      element.download = 'data.json'; // Set the file name with a .json extension
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      URL.revokeObjectURL(url);
+    }
   };
 
   return (

@@ -55,7 +55,7 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
     // To do: add optimistic render in the list
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     createApp();
   }
