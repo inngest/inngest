@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Badge } from '@inngest/components/Badge';
 
 import { type OutputType } from '@/components/Function/OutputRenderer';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
@@ -10,7 +11,6 @@ import {
   GetHistoryItemOutputDocument,
   useGetFunctionRunQuery,
 } from '../../store/generated';
-import Badge from '../Badge';
 import { BlankSlate } from '../Blank';
 import ContentCard from '../Content/ContentCard';
 import { Timeline } from '../Timeline';
@@ -57,8 +57,8 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
   if (query.isLoading) {
     return (
       <ContentCard>
-        <div className="w-full h-full flex items-center justify-center p-8">
-          <div className="opacity-75 italic">Loading...</div>
+        <div className="flex h-full w-full items-center justify-center p-8">
+          <div className="italic opacity-75">Loading...</div>
         </div>
       </ContentCard>
     );
@@ -95,7 +95,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       badge={
         cron ? (
           <div className="py-2">
-            <Badge className="text-orange-400 bg-orange-400/10" kind="solid">
+            <Badge className="bg-orange-400/10 text-orange-400" kind="solid">
               <IconClock />
               {firstTrigger.value}
             </Badge>
@@ -117,9 +117,9 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
         <SleepingSummary history={history} />
       </div>
 
-      <hr className="border-slate-800/50 mt-8" />
+      <hr className="mt-8 border-slate-800/50" />
       <div className="px-5 pt-4">
-        <h3 className="text-slate-400 text-sm py-4">Timeline</h3>
+        <h3 className="py-4 text-sm text-slate-400">Timeline</h3>
         <Timeline getOutput={getOutput} history={history} />
       </div>
     </ContentCard>
