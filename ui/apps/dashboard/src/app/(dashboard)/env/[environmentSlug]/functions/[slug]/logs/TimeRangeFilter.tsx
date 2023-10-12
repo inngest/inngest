@@ -142,7 +142,7 @@ export default function TimeRangeFilter({
             >
               <Listbox.Options className="shadow-floating absolute left-0 z-10 mt-[5px] w-52 origin-top-left overflow-hidden rounded-md  bg-white/95 py-[9px] ring-1 ring-black/5 backdrop-blur-[3px] focus:outline-none">
                 <GroupButton
-                  className="justify-stretch mx-2 grid grid-flow-col"
+                  className="mx-2 grid grid-flow-col justify-stretch"
                   handleClick={onTimeFieldChange}
                   options={fieldOptions}
                   selectedOption={selectedTimeField}
@@ -167,7 +167,7 @@ export default function TimeRangeFilter({
                     >
                       {label}{' '}
                       {!isPlanSufficient && minimumPlanName && (
-                        <span className="inline-flex items-center rounded-sm px-[5px] py-0.5 text-[12px] font-semibold leading-tight text-indigo-500 ring-1 ring-inset ring-indigo-300">
+                        <span className="inline-flex items-center rounded px-[5px] py-0.5 text-[12px] font-semibold leading-tight text-indigo-500 ring-1 ring-inset ring-indigo-300">
                           {minimumPlanName} Plan
                         </span>
                       )}

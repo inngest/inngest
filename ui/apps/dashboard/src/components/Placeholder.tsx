@@ -10,5 +10,5 @@ const shimmer = `relative overflow-hidden before:absolute before:inset-0 before:
  * @param className string
  */
 export default function Placeholder({ className = '' }: { className?: string }) {
-  return <span className={cn('rounded-sm', shimmer, className)}></span>;
+  return <span className={cn('rounded', shimmer, className)}></span>;
 }

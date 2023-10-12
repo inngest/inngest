@@ -30,7 +30,7 @@ export default async function EventPayload({ event }: EventPayloadProps) {
 
   return (
     <div className="flex h-full flex-col space-y-1.5 rounded-xl bg-slate-900 text-white">
-      <header className="bg-slate-950 flex items-center justify-between rounded-t-xl p-1.5">
+      <header className="bg-slate-910 flex items-center justify-between rounded-t-xl p-1.5">
         <h3 className="px-6 py-2.5">Payload</h3>
       </header>
       <div className="flex-1 overflow-auto">

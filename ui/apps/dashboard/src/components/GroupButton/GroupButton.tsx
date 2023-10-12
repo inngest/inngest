@@ -30,7 +30,7 @@ export default function GroupButton<T extends Options>({
       {options?.map((option) => {
         const isSelected = option.id === selectedOption;
         const classNames = cn(
-          'text-slate-400 hover:bg-slate-100 hover:text-indigo-500 font-medium px-3 py-1 rounded-sm text-sm cursor-pointer',
+          'text-slate-400 hover:bg-slate-100 hover:text-indigo-500 font-medium px-3 py-1 rounded text-sm cursor-pointer',
           isSelected &&
             'bg-white shadow-outline-secondary-light text-slate-700 cursor-default hover:bg-white hover:text-slate-700'
         );

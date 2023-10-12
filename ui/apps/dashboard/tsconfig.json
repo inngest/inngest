@@ -23,7 +23,7 @@
     "./next-env.d.ts",
     ".next/types/**/*.ts",
     "./next.config.js",
-    "./tailwind.config.js",
+    "./tailwind.config.ts",
     "./svgo.config.js",
     "./sentry.client.config.ts",
     "./sentry.edge.config.ts",

@@ -221,7 +221,7 @@ function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
                     <kbd
                       aria-label="press enter to jump to page"
-                      className="ml-auto hidden rounded-sm bg-slate-500 p-2 text-white group-aria-selected:block"
+                      className="ml-auto hidden rounded bg-slate-500 p-2 text-white group-aria-selected:block"
                     >
                       <ArrowUturnRightIcon className="h-3 w-3 rotate-180" />
                     </kbd>
@@ -277,10 +277,10 @@ export default function SearchNavigation() {
         >
           Search by ID...
           <kbd className="ml-auto flex items-center gap-1">
-            <kbd className="ml-auto flex h-6 w-6 items-center justify-center rounded-sm bg-slate-600 font-sans text-xs text-white">
+            <kbd className="ml-auto flex h-6 w-6 items-center justify-center rounded bg-slate-600 font-sans text-xs text-white">
               {modifierKey}
             </kbd>
-            <kbd className="ml-auto flex h-6 w-6 items-center justify-center rounded-sm bg-slate-600 font-sans text-xs text-white">
+            <kbd className="ml-auto flex h-6 w-6 items-center justify-center rounded bg-slate-600 font-sans text-xs text-white">
               K
             </kbd>
           </kbd>

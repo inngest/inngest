@@ -164,7 +164,7 @@ function EventTypesListPaginationPage({
               <div className="flex w-56 items-center justify-end gap-2">
                 <Pill className="gap-1 bg-white align-middle text-slate-600">
                   <ChartBarIcon className="-ml-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
-                  <span className="text-2xs overflow-hidden whitespace-nowrap text-slate-600">
+                  <span className="overflow-hidden whitespace-nowrap text-xs text-slate-600">
                     {dailyVolume.toLocaleString(undefined, {
                       notation: 'compact',
                       compactDisplay: 'short',

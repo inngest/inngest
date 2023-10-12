@@ -14,7 +14,7 @@ export function FunctionDistribution({ activeCount, disabledCount, removedCount 
     <div className="mt-4 flex items-center gap-2">
       {activeCount > 0 && (
         <div style={{ flexBasis: `${activePercent}%` }}>
-          <span className="block h-3 rounded-sm bg-teal-400" />
+          <span className="block h-3 rounded bg-teal-400" />
           <span className="mt-2 block whitespace-nowrap text-center text-xs text-slate-500">
             {activeCount} Active
           </span>
@@ -23,7 +23,7 @@ export function FunctionDistribution({ activeCount, disabledCount, removedCount 
 
       {disabledCount > 0 && (
         <div style={{ flexBasis: `${disabledPercent}%` }}>
-          <span className="block h-3 rounded-sm bg-slate-600" />
+          <span className="block h-3 rounded bg-slate-600" />
           <span className="mt-2 block whitespace-nowrap text-center text-xs text-slate-500">
             {disabledCount} Disabled
           </span>
@@ -32,7 +32,7 @@ export function FunctionDistribution({ activeCount, disabledCount, removedCount 
 
       {removedCount > 0 && (
         <div style={{ flexBasis: `${removedPercent}%` }}>
-          <span className="block h-3 rounded-sm bg-red-400" />
+          <span className="block h-3 rounded bg-red-400" />
           <span className="mt-2 block whitespace-nowrap text-center text-xs text-slate-500">
             {removedCount} Removed
           </span>
