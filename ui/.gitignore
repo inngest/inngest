@@ -2,4 +2,11 @@
 
 # Dependencies
 node_modules/
-/.direnv/
+
+# TypeScript
+*.tsbuildinfo
+
+# Code editors and IDEs
+.idea/
+*.iml
+.vscode/
