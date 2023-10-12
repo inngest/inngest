@@ -1,7 +1,6 @@
 {
   "name": "@inngest/dashboard",
   "description": "Inngest Dashboard",
-  "license": "UNLICENSED",
   "homepage": "https://app.inngest.com/",
   "repository": {
     "type": "git",
