@@ -10,10 +10,7 @@
     "declarationMap": false,
     "noEmit": true,
     "jsx": "preserve",
-    "incremental": true,
-    "plugins": [{ "name": "next" }],
-    "baseUrl": "./",
-    "paths": { "@/*": ["./src/*"] }
+    "incremental": true
   },
   "include": [
     "./src/**/*",

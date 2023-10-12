@@ -144,6 +144,9 @@ importers:
       '@graphql-codegen/client-preset':
         specifier: 2.1.0
         version: 2.1.0(graphql@16.8.1)
+      '@inngest/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
       '@storybook/addon-essentials':
         specifier: 7.2.2
         version: 7.2.2(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0)(react@18.2.0)
@@ -316,6 +319,9 @@ importers:
       '@ianvs/prettier-plugin-sort-imports':
         specifier: 4.1.0
         version: 4.1.0(prettier@3.0.0)
+      '@inngest/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
       '@storybook/addon-a11y':
         specifier: 7.2.3
         version: 7.2.3(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0)(react@18.2.0)
@@ -388,6 +394,8 @@ importers:
       vitest:
         specifier: 0.34.5
         version: 0.34.5(less@4.2.0)
+
+  packages/tsconfig: {}
 
 packages:
 
