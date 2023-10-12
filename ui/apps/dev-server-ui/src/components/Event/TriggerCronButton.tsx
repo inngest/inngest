@@ -1,7 +1,7 @@
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
-import Button from '@/components/Button/Button';
 import { useSendEventMutation } from '@/store/devApi';
 
 type TriggerCronButtonProps = {

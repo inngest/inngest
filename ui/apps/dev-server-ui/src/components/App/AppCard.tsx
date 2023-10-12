@@ -1,9 +1,9 @@
 import { useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 
 import AppCardHeader from '@/components/App/AppCardHeader';
 import Badge from '@/components/Badge';
-import Button from '@/components/Button/Button';
 import CodeLine from '@/components/Code/CodeLine';
 import Link from '@/components/Link/Link';
 import useDebounce from '@/hooks/useDebounce';
@@ -80,18 +80,18 @@ export default function AppCard({ app }: { app: App }) {
   return (
     <div>
       <AppCardHeader connected={app.connected} functionCount={app.functionCount} />
-      <div className="border border-slate-700/30 rounded-b-md divide-y divide-slate-700/30 bg-slate-800/30">
+      <div className="divide-y divide-slate-700/30 rounded-b-md border border-slate-700/30 bg-slate-800/30">
         {!app.name ? (
-          <div className="p-4 pr-6 flex items-center gap-2">
+          <div className="flex items-center gap-2 p-4 pr-6">
             <IconSpinner />
-            <p className="text-slate-400 text-lg font-normal">Connecting...</p>
+            <p className="text-lg font-normal text-slate-400">Connecting...</p>
           </div>
         ) : (
           <div className="flex items-center justify-between px-6 py-4 ">
             {!app.connected ? (
               <div className="flex items-center gap-2">
                 <IconSpinner />
-                <p className="text-slate-400 text-lg font-normal">Connecting to {app.name}...</p>
+                <p className="text-lg font-normal text-slate-400">Connecting to {app.name}...</p>
               </div>
             ) : (
               <p className=" text-lg text-white">{app.name}</p>
@@ -110,10 +110,10 @@ export default function AppCard({ app }: { app: App }) {
                     <>{<IconStatusCircleExclamation />}No Connection to App</>
                   )}
                 </div>
-                <p className="text-slate-300 ui-open:hidden xl:hidden pl-10">{app.url}</p>
+                <p className="ui-open:hidden pl-10 text-slate-300 xl:hidden">{app.url}</p>
               </div>
               <div className="flex items-center gap-4">
-                <p className="text-slate-300 xl:flex xl:ui-open:hidden hidden">{app.url}</p>
+                <p className="xl:ui-open:hidden hidden text-slate-300 xl:flex">{app.url}</p>
                 <IconChevron className="ui-open:-rotate-180 transform-90 text-slate-500 transition-transform duration-500" />
               </div>
             </>
@@ -128,14 +128,14 @@ export default function AppCard({ app }: { app: App }) {
                     <span className="text-white">multiple ports</span> by default.
                   </p>
                   {app.error && (
-                    <p className="pb-4 text-rose-400 font-medium	">Error: {app.error}</p>
+                    <p className="pb-4 font-medium text-rose-400	">Error: {app.error}</p>
                   )}
                 </>
               )}
-              <form className="block xl:flex xl:items-center xl:justify-between pb-4">
+              <form className="block pb-4 xl:flex xl:items-center xl:justify-between">
                 <label htmlFor="editAppUrl" className="text-sm font-semibold text-white">
                   App URL
-                  <span className="text-slate-400 text-sm block font-normal">
+                  <span className="block text-sm font-normal text-slate-400">
                     The URL of your application
                   </span>
                 </label>
@@ -143,7 +143,7 @@ export default function AppCard({ app }: { app: App }) {
                   <input
                     id="editAppUrl"
                     className={classNames(
-                      'w-full bg-slate-800 rounded-md text-slate-300 py-2 px-4 outline-2 outline-indigo-500 focus:outline read-only:outline-transparent',
+                      'w-full rounded-md bg-slate-800 px-4 py-2 text-slate-300 outline-2 outline-indigo-500 read-only:outline-transparent focus:outline',
                       isUrlInvalid && ' outline-rose-400',
                       isLoading && 'pr-6'
                     )}
@@ -152,15 +152,15 @@ export default function AppCard({ app }: { app: App }) {
                     onChange={handleChange}
                     readOnly={app.autodiscovered}
                   />
-                  {isLoading && <IconSpinner className="absolute top-1/3 right-2" />}
+                  {isLoading && <IconSpinner className="absolute right-2 top-1/3" />}
                   {isUrlInvalid && (
-                    <p className="absolute text-rose-400 top-10 left-14">
+                    <p className="absolute left-14 top-10 text-rose-400">
                       Please enter a valid URL
                     </p>
                   )}
                 </div>
               </form>
-              <div className="grid grid-cols-3 mb-4 border-y border-slate-700/30">
+              <div className="mb-4 grid grid-cols-3 border-y border-slate-700/30">
                 <div className="py-4">
                   <p className="text-sm font-semibold text-white">{app.framework}</p>
                   <p className="text-sm text-slate-400">Framework</p>
@@ -223,7 +223,7 @@ export default function AppCard({ app }: { app: App }) {
                     There are currently no functions registered at this URL. Ensure you have created
                     a function and are exporting it correctly from your serve command.
                   </p>
-                  <CodeLine code="serve(client, [list_of_fns]);" className="p-4 mb-4" />
+                  <CodeLine code="serve(client, [list_of_fns]);" className="mb-4 p-4" />
                   <Link className="w-fit" href="https://www.inngest.com/docs/functions">
                     Creating Functions
                   </Link>
@@ -246,7 +246,7 @@ export default function AppCard({ app }: { app: App }) {
           }
         />
         {!app.autodiscovered && (
-          <div className="text-white p-4 pr-6">
+          <div className="p-4 pr-6 text-white">
             <Button kind="danger" appearance="text" btnAction={handleDelete} label="Delete App" />
           </div>
         )}

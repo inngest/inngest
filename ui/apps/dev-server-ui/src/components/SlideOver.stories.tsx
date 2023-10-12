@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import Button from './Button/Button';
 import SlideOver from './SlideOver';
 
 const meta = {

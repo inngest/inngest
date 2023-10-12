@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
 
 import { queryClient } from '@/app/StoreProvider';
 import { BlankSlate } from '@/components/Blank';
-import Button from '@/components/Button/Button';
 import SendEventButton from '@/components/Event/SendEventButton';
 import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';
@@ -51,8 +51,8 @@ const columns = [
   columnHelper.accessor('runs', {
     header: () => <span>Function</span>,
     cell: (props) => {
-      let validFunctionRuns: FunctionRun[] = []
-      for (const run of props.getValue() ?? [])  {
+      let validFunctionRuns: FunctionRun[] = [];
+      for (const run of props.getValue() ?? []) {
         if (run) {
           validFunctionRuns.push(run);
         }

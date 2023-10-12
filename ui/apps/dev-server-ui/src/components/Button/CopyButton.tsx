@@ -1,5 +1,6 @@
+import { Button } from '@inngest/components/Button';
+
 import { IconCheck, IconCopy } from '@/icons';
-import Button from './Button';
 
 type ButtonCopyProps = {
   code?: string;

@@ -1,4 +1,5 @@
-import Button from '@/components/Button/Button';
+import { Button } from '@inngest/components/Button';
+
 import Link from '@/components/Link/Link';
 
 interface BlankSlateProps {
@@ -14,15 +15,15 @@ interface BlankSlateProps {
 
 export const BlankSlate = ({ imageUrl, title, subtitle, button, link }: BlankSlateProps) => {
   return (
-    <div className="w-full h-full flex items-center justify-center text-white">
-      <div className="max-w-[24rem] flex flex-col items-center justify-center text-center space-y-3">
+    <div className="flex h-full w-full items-center justify-center text-white">
+      <div className="flex max-w-[24rem] flex-col items-center justify-center space-y-3 text-center">
         {imageUrl ? (
-          <div className="w-48 mb-4">
+          <div className="mb-4 w-48">
             <img src={imageUrl} />
           </div>
         ) : null}
 
-        {title ? <div className="font-semibold text-lg">{title}</div> : null}
+        {title ? <div className="text-lg font-semibold">{title}</div> : null}
         {subtitle ? <div>{subtitle}</div> : null}
 
         {link ? (

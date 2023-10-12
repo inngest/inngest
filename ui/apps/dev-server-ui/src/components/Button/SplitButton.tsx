@@ -1,10 +1,14 @@
 import { useState } from 'react';
+import {
+  Button,
+  getButtonColors,
+  getButtonSizeStyles,
+  getDisabledStyles,
+} from '@inngest/components/Button';
 import * as Select from '@radix-ui/react-select';
 
 import { IconChevron } from '@/icons';
 import classNames from '@/utils/classnames';
-import Button from './Button';
-import { getButtonColors, getButtonSizeStyles, getDisabledStyles } from './buttonStyles';
 
 type ButtonCopyProps = {
   kind?: 'default' | 'primary' | 'success' | 'danger';

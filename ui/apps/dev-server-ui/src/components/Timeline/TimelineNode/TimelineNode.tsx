@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import TimelineItemHeader from '@/components/AccordionTimeline/TimelineItemHeader';
-import Button from '@/components/Button/Button';
 import OutputCard from '@/components/Function/Output';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { IconChevron } from '@/icons/Chevron';
@@ -39,7 +39,7 @@ export function TimelineNode({ position, getOutput, node }: Props) {
     >
       <span
         className={classNames(
-          'absolute w-px bg-slate-800 top-0 left-[0.85rem]',
+          'absolute left-[0.85rem] top-0 w-px bg-slate-800',
           position === 'first' && 'top-[1.8rem] h-[calc(100%-1.8rem)]',
           position === 'last' && 'h-[1.8rem]',
           position === 'middle' && 'h-full'
@@ -47,7 +47,7 @@ export function TimelineNode({ position, getOutput, node }: Props) {
         aria-hidden="true"
       />
       <AccordionPrimitive.Header className="flex gap-2 py-6">
-        <div className="flex-1 z-10">
+        <div className="z-10 flex-1">
           <TimelineItemHeader icon={icon} badge={badge} title={name} metadata={metadata} />
         </div>
 
@@ -56,7 +56,7 @@ export function TimelineNode({ position, getOutput, node }: Props) {
             <Button
               className="group"
               icon={
-                <IconChevron className="group-data-[state=open]:-rotate-180 transform-90 transition-transform duration-500 text-slate-500" />
+                <IconChevron className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
               }
             />
           </AccordionPrimitive.Trigger>

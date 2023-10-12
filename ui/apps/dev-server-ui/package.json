@@ -24,6 +24,7 @@
   "dependencies": {
     "@headlessui/react": "1.7.17",
     "@headlessui/tailwindcss": "0.1.2",
+    "@inngest/components": "workspace:*",
     "@monaco-editor/react": "4.5.2",
     "@radix-ui/react-accordion": "1.1.2",
     "@radix-ui/react-select": "1.2.2",
@@ -48,7 +49,6 @@
     "ulid": "2.3.0"
   },
   "devDependencies": {
-    "@inngest/components": "workspace:*",
     "@inngest/tsconfig": "workspace:*",
     "@graphql-codegen/cli": "3.2.2",
     "@graphql-codegen/typescript-operations": "2.5.7",

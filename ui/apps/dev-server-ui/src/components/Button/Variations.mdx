@@ -1,6 +1,6 @@
+import { Button } from '@inngest/components/Button';
 import { Canvas, Meta, Story } from '@storybook/blocks';
 
-import { Button } from './Button';
 import * as ButtonStories from './Button.stories';
 
 <Meta of={ButtonStories} />
@@ -70,7 +70,7 @@ import * as ButtonStories from './Button.stories';
 
 ## By Size
 
-<div style={{ padding: '3rem' }} className="flex items-center justify-center gap-1 bg-slate-940">
+<div style={{ padding: '3rem' }} className="bg-slate-940 flex items-center justify-center gap-1">
   <Story of={ButtonStories.SmallSize} />
   <Story of={ButtonStories.RegularSize} />
   <Story of={ButtonStories.LargeSize} />
