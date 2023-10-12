@@ -52,7 +52,7 @@ export default forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   const iconElement = React.isValidElement(icon)
     ? React.cloneElement(icon as React.ReactElement, {
         className: !label
-          ? classNames('icon-lg', icon.props.className)
+          ? classNames('h-4 w-4', icon.props.className)
           : classNames(iconSizes, icon.props.className),
       })
     : null;

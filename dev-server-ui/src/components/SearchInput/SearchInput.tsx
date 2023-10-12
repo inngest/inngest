@@ -33,7 +33,7 @@ export default function SearchInput({
         }}
         {...props}
       />
-      <IconMagnifyingGlass className="absolute left-6 icon-xs text--slate-400" />
+      <IconMagnifyingGlass className="absolute left-6 h-3 w-3 text--slate-400" />
     </div>
   );
 }

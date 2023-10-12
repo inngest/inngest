@@ -40,7 +40,7 @@ export default function AppList() {
         </div>
       </header>
       <div className="flex items-center gap-3 mb-4">
-        <IconWindow className="icon-xl" />
+        <IconWindow className="h-5 w-5" />
         <p className="text-slate-200">
           {numberOfConnectedApps} / {apps.length} Apps Connected
         </p>

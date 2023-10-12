@@ -80,9 +80,9 @@ export const getDisabledStyles = () => {
 
 export const getIconSizeStyles = ({ size }: ButtonSizeParams) => {
   const sizeStyles = {
-    small: 'icon-sm',
-    regular: 'icon-base',
-    large: 'icon-lg',
+    small: 'h-3.5 w-3.5',
+    regular: 'h-3.5 w-3.5',
+    large: 'h-4 w-4',
   };
 
   return sizeStyles[size];

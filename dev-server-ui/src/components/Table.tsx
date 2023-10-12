@@ -69,7 +69,7 @@ export default function Table({
                   {header.column.getIsSorted() && options.data.length > 1 && (
                     <IconChevron
                       className={classNames(
-                        'icon-xs transition-all duration-500',
+                        'h-3 w-3 transition-all duration-500',
                         header.column.getIsSorted() === 'asc' && '-rotate-180',
                       )}
                     />
