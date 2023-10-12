@@ -34,10 +34,10 @@ snapshot:
 
 .PHONY: build-ui
 build-ui:
-	cd dev-server-ui && pnpm install
-	cd dev-server-ui && pnpm build
-	cp -r ./dev-server-ui/dist/* ./pkg/devserver/static/
-	cp -r ./dev-server-ui/.next/routes-manifest.json ./pkg/devserver/static/
+	cd ui/apps/dev-server-ui && pnpm install
+	cd ui/apps/dev-server-ui && pnpm build
+	cp -r ./ui/apps/dev-server-ui/dist/* ./pkg/devserver/static/
+	cp -r ./ui/apps/dev-server-ui/.next/routes-manifest.json ./pkg/devserver/static/
 
 .PHONY: build
 build:

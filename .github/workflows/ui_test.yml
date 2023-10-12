@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - "ui/**"
+      - "ui/apps/dashboard/**"
   pull_request:
     paths-ignore:
-      - "ui/**"
+      - "ui/apps/dashboard/**"
 
 jobs:
   build:
@@ -21,6 +21,6 @@ jobs:
         with:
           node-version: "18"
       - run: pnpm install
-        working-directory: dev-server-ui
+        working-directory: ui/apps/dev-server-ui
       - run: pnpm test
-        working-directory: dev-server-ui
+        working-directory: ui/apps/dev-server-ui
