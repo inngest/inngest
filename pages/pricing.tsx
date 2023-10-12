@@ -254,7 +254,7 @@ function getPlanStepsMonth(plan: Plan): string {
   if (!plan.cost.additionalPrice) {
     return `$${base}`;
   }
-  return `$${base} + $${
+  return `${base} + $${
     plan.cost.additionalPrice
   } per additional ${plan.cost.additionalRate.toLocaleString(undefined, {
     notation: "compact",
