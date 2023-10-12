@@ -55,7 +55,7 @@ export default function Page() {
             <a
               href={status.url}
               target="_blank"
-              className="flex items-center gap-2 rounded-sm bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100 hover:text-indigo-500"
+              className="flex items-center gap-2 rounded bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-100 hover:text-indigo-500"
             >
               <span
                 className={`mx-1 inline-flex h-2.5 w-2.5 rounded-full`}
@@ -173,7 +173,7 @@ function SupportChannel({
       <h2 className="flex items-center gap-4 text-lg font-semibold">
         {title}
         {label && (
-          <span className="inline-flex items-center rounded-sm px-[5px] py-0.5 text-[12px] font-semibold leading-tight text-indigo-500 ring-1 ring-inset ring-indigo-300">
+          <span className="inline-flex items-center rounded px-[5px] py-0.5 text-[12px] font-semibold leading-tight text-indigo-500 ring-1 ring-inset ring-indigo-300">
             {label}
           </span>
         )}

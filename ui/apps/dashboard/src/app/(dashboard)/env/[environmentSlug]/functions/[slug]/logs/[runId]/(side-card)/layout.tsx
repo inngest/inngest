@@ -26,7 +26,7 @@ export default async function FunctionRunDetailsCardLayout({
 }: FunctionRunDetailsCardLayoutProps) {
   return (
     <div className="flex h-full flex-col space-y-1.5 rounded-xl bg-slate-900 text-white">
-      <nav className="bg-slate-950 flex gap-2 rounded-t-xl px-4" aria-label="Tabs">
+      <nav className="bg-slate-910 flex gap-2 rounded-t-xl px-4" aria-label="Tabs">
         {tabs.map((tab) => (
           <FunctionRunTab
             icon={tab.name === 'Timeline' ? tab.icon : undefined}

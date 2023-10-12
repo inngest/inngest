@@ -180,7 +180,7 @@ function createColumns(environmentSlug: string) {
           <div className="flex items-center justify-end gap-2">
             <span
               key="volume-count"
-              className="text-2xs overflow-hidden whitespace-nowrap text-slate-600"
+              className="overflow-hidden whitespace-nowrap text-xs text-slate-600"
             >
               <Pill className="gap-1 bg-white align-middle text-slate-600">
                 <ChartBarIcon className="-ml-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />

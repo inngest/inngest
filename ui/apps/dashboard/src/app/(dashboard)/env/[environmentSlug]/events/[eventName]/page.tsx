@@ -71,7 +71,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
                 <Link
                   href={`/env/${params.environmentSlug}/functions/${w.slug}`}
                   key={w.id}
-                  className="shadow-outline-secondary-light mb-4 block overflow-hidden rounded-sm bg-white p-4 hover:bg-slate-50"
+                  className="shadow-outline-secondary-light mb-4 block overflow-hidden rounded bg-white p-4 hover:bg-slate-50"
                 >
                   <div className="flex min-w-0 items-center">
                     <div className="min-w-0 flex-1">

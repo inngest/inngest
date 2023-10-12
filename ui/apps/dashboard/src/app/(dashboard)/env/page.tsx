@@ -48,7 +48,7 @@ export default async function Envs() {
             </p>
             <Link
               href={process.env.NEXT_PUBLIC_HOME_PATH as Route}
-              className="to-slate-1000 mt-4 flex items-center justify-between rounded-lg bg-slate-900 bg-gradient-to-br from-slate-800 px-4 py-4 hover:bg-slate-800 hover:from-slate-700 hover:to-slate-900"
+              className="to-slate-940 mt-4 flex items-center justify-between rounded-lg bg-slate-900 bg-gradient-to-br from-slate-800 px-4 py-4 hover:bg-slate-800 hover:from-slate-700 hover:to-slate-900"
             >
               <h3 className="flex items-center gap-2 text-sm font-medium tracking-wide text-white">
                 <span className="block h-2 w-2 rounded-full bg-teal-400" />

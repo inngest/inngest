@@ -142,7 +142,7 @@ export default function EnvironmentSelectMenu({ environmentSlug }: EnvironmentSe
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Listbox.Options className="bg-slate-1000/95 absolute left-0 z-10 mt-2 w-[280px] origin-top-right divide-y divide-dashed divide-slate-700 rounded-md text-sm backdrop-blur focus:outline-none">
+            <Listbox.Options className="bg-slate-940/95 absolute left-0 z-10 mt-2 w-[280px] origin-top-right divide-y divide-dashed divide-slate-700 rounded-md text-sm backdrop-blur focus:outline-none">
               {/* <div className="py-1 pl-4 pr-1 flex gap-1 items-center border-b border-slate-700">
                 <MagnifyingGlassIcon className="h-3 text-white" />
                 <input
