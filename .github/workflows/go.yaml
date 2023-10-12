@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - "ui/**"
+      - "ui/apps/dashboard/**"
   pull_request:
     paths-ignore:
-      - "ui/**"
+      - "ui/apps/dashboard/**"
 
 jobs:
   golangci:
