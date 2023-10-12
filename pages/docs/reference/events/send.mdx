@@ -112,6 +112,10 @@ To send events from within of the context of a function, use [`step.sendEvent()`
 
 All data sent in the `user` object is fully encrypted at rest.
 
+<Callout variant="warning">
+  <span className="text-yellow-300">⚠️</span> When rerunning a function, `event.user` will be empty. This will be fixed in the future, but for now assume that you cannot rerun functions that rely on `event.user` data.
+</Callout>
+
 In the future, this object will be used to support programmatic deletion via API endpoint to support certain right-to-be-forgotten flows in your system. This will use the `user.external_id` property for lookup.
 
 ## Send Events via HTTP (Event API)
