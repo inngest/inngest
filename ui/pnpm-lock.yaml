@@ -325,6 +325,9 @@ importers:
       '@ianvs/prettier-plugin-sort-imports':
         specifier: 4.1.0
         version: 4.1.0(prettier@3.0.0)
+      '@inngest/components':
+        specifier: workspace:*
+        version: link:../../packages/components
       '@inngest/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
