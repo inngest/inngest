@@ -15,6 +15,7 @@ const failedResponseBody = z.object({
 // pkg/applogic/sdkhandlers/registration.go (as of the writing of this comment).
 // We should eventually codegen this array, rather than manually maintaining it.
 export const registrationErrorCodes = [
+  'batch_size_too_large',
   'forbidden',
   'internal_server_error',
   'invalid_function',

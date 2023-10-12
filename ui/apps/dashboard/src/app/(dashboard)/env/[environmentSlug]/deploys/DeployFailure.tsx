@@ -72,6 +72,10 @@ function createMessage(errorCode: RegistrationErrorCode | undefined) {
   let message: string;
 
   switch (errorCode) {
+    case 'batch_size_too_large':
+      docsURL = 'https://www.inngest.com/docs/reference/functions/create#configuration';
+      message = 'Your function has a batch size that is too large.';
+      break;
     case 'forbidden':
       message =
         'Your app rejected the request as forbidden. Is the URL behind required authentication?';
