@@ -90,6 +90,8 @@ export default function Stream() {
     };
 
     const data = await client.request(GetTriggersStreamDocument, variables);
+
+    // @ts-expect-error
     return data.stream;
   };
 
