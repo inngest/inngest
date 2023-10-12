@@ -1,10 +1,11 @@
 {
   "name": "@inngest/components",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
-    }
+    "./*": [
+      "./src/*.ts",
+      "./src/*.tsx",
+      "./src/*/index.ts"
+    ]
   },
   "dependencies": {
     "react": "18.2.0",

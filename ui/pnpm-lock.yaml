@@ -41,6 +41,9 @@ importers:
       '@heroicons/react':
         specifier: 2.0.16
         version: 2.0.16(react@18.2.0)
+      '@inngest/components':
+        specifier: workspace:*
+        version: link:../../packages/components
       '@radix-ui/react-select':
         specifier: 1.2.2
         version: 1.2.2(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0)(react@18.2.0)
@@ -144,9 +147,6 @@ importers:
       '@graphql-codegen/client-preset':
         specifier: 2.1.0
         version: 2.1.0(graphql@16.8.1)
-      '@inngest/components':
-        specifier: workspace:*
-        version: link:../../packages/components
       '@inngest/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
