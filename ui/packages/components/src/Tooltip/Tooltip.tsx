@@ -6,7 +6,7 @@ type TooltipProps = {
   content: React.ReactNode;
 };
 
-export default function Tooltip({ children, content, ...props }: TooltipProps) {
+export function Tooltip({ children, content, ...props }: TooltipProps) {
   return (
     <TooltipPrimitive.Provider>
       <TooltipPrimitive.Root>

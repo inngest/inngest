@@ -1,4 +1,5 @@
-import Tooltip from '@/components/Tooltip/Tooltip';
+import { Tooltip } from '@inngest/components/Tooltip/Tooltip';
+
 import { IconInfo } from '@/icons';
 import classNames from '@/utils/classnames';
 
@@ -29,9 +30,9 @@ export default function MetadataItem({
         {value}
       </span>
       <span className="flex items-center gap-1">
-        <span className="text-sm text-slate-500 capitalize">{label}</span>
+        <span className="text-sm capitalize text-slate-500">{label}</span>
         {tooltip && (
-          <Tooltip children={<IconInfo className="text-slate-400 h-4 w-4" />} content={tooltip} />
+          <Tooltip children={<IconInfo className="h-4 w-4 text-slate-400" />} content={tooltip} />
         )}
       </span>
     </div>
