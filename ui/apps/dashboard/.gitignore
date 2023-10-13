@@ -12,3 +12,4 @@ next-env.d.ts
 
 # Sentry
 .sentryclirc
+.env*.local
