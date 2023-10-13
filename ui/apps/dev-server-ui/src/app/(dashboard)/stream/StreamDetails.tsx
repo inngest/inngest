@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { EventSection } from '@inngest/components/RunDetails/EventSection';
 import { ulid } from 'ulid';
@@ -47,6 +47,16 @@ export default function StreamDetails() {
     }).unwrap();
   }
 
+  const renderSendEventButton = useMemo(() => {
+    return () => (
+      <SendEventButton
+        label="Edit and Replay"
+        appearance="outlined"
+        data={eventResult.data?.payload}
+      />
+    );
+  }, [eventResult.data?.payload]);
+
   return (
     <>
       <div className="grid h-full grid-cols-2 text-white">
@@ -57,13 +67,7 @@ export default function StreamDetails() {
             onFunctionRunClick={setSelectedRunID}
             onReplayEvent={onReplayEvent}
             selectedRunID={selectedRunID}
-            SendEventButton={() => (
-              <SendEventButton
-                label="Edit and Replay"
-                appearance="outlined"
-                data={eventResult.data.payload}
-              />
-            )}
+            SendEventButton={renderSendEventButton}
           />
         )}
 
