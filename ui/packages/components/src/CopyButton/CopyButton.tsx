@@ -1,6 +1,6 @@
 import { Button } from '@inngest/components/Button';
-
-import { IconCheck, IconCopy } from '@/icons';
+import { IconCheck } from '@inngest/components/icons/Check';
+import { IconCopy } from '@inngest/components/icons/Copy';
 
 type ButtonCopyProps = {
   code?: string;
@@ -9,12 +9,7 @@ type ButtonCopyProps = {
   handleCopyClick: (code: string) => void;
 };
 
-export default function CopyButton({
-  code,
-  iconOnly,
-  isCopying,
-  handleCopyClick,
-}: ButtonCopyProps) {
+export function CopyButton({ code, iconOnly, isCopying, handleCopyClick }: ButtonCopyProps) {
   const icon = isCopying ? <IconCheck /> : <IconCopy />;
   const label = isCopying ? 'Copied!' : 'Copy';
 
