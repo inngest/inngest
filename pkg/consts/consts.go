@@ -54,6 +54,7 @@ const (
 
 	DefaultBatchSize = 100
 	MaxBatchTimeout  = 60 * time.Second
+
 	// MaxEvents is the maximum number of events we can parse in a single batch.
 	MaxEvents = 5_000
 
@@ -74,4 +75,12 @@ const (
 	SourceEdgeRetries = 20
 
 	RequestVersionUnknown = -1
+
+	// PriorityFactorMin is the minimum priority factor for any function run, in seconds.
+	PriorityFactorMin = int64(-600)
+	// PriorityFactorMax is the maximum priority factor for any function run, in seconds.
+	PriorityFactorMax = int64(600)
+	// FutureQueeueFudgeLimit is the inclusive time range between [now, now() + FutureAtLimit]
+	// in which priority factors are taken into account.
+	FutureAtLimit = 2 * time.Second
 )

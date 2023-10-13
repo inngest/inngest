@@ -64,14 +64,34 @@ type Item struct {
 	// Payload stores item-specific data for use when processing the item.  For example,
 	// this may contain the function's edge for running a step.
 	Payload any `json:"payload,omitempty"`
-
 	// Metadata is used for storing additional metadata related to the queue item.
 	// e.g. tracing data
 	Metadata map[string]string `json:"metadata,omitempty"`
-
 	// QueueName allows control over the queue name.  If not provided, this falls
 	// back to the queue mapping defined on the queue or the workflow ID of the fn.
 	QueueName *string `json:"qn,omitempty"`
+}
+
+// GetPriorityFactor returns the priority factor for the queue item.  This fudges the job item's
+// visibility time on enqueue, allowing fair prioritization.
+//
+// For example, a job with a PriorityFactor of 100 will be inserted 100 seconds prior to the job's
+// actual RunAt time.  This pushes the job ahead of other work, except for work older than 100 seconds.
+//
+// Therefore, when two jobs are enqueued at the same time with differeng factors the job with the higher
+// factor will always run first (without a queue backlog).
+//
+// Note: the returned time is the factor in milliseconds.
+func (i Item) GetPriorityFactor() int64 {
+	switch i.Kind {
+	case KindEdge:
+		// Only support edges right now.  We don't account for the factor on other queue entries,
+		// else eg. sleeps would wake up at the wrong time.
+		if i.Identifier.PriorityFactor != nil {
+			return int64(*i.Identifier.PriorityFactor * 1000)
+		}
+	}
+	return 0
 }
 
 func (i Item) GetMaxAttempts() int {

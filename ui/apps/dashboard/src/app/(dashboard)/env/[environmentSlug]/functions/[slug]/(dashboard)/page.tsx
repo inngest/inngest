@@ -79,30 +79,6 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
   const failureRate = !usageMetrics?.totalRuns
     ? '0.00'
     : (((usageMetrics?.totalFailures || 0) / (usageMetrics?.totalRuns || 0)) * 100).toFixed(2);
-  const metrics = [
-    {
-      title: (
-        <>
-          <ChartBarIcon className="h-5 text-indigo-500" /> Volume
-        </>
-      ),
-      description: `Total of started function runs in the last ${getTimeRangeLabel(
-        selectedTimeRange
-      )}`,
-      value: usageMetrics?.totalRuns,
-      unavailable: false,
-    },
-    {
-      title: (
-        <>
-          <XCircleIcon className="h-5 text-red-500" /> Failure rate
-        </>
-      ),
-      description: `Function runs failed in the last ${getTimeRangeLabel(selectedTimeRange)}`,
-      value: `${failureRate}%`,
-      unavailable: false,
-    },
-  ];
 
   function handleTimeRangeChange(timeRange: TimeRange) {
     setSelectedTimeRange(timeRange);
@@ -112,7 +88,27 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     <>
       <div className="grid-cols-dashboard grid min-h-0 flex-1 bg-slate-100">
         <main className="col-span-3 overflow-y-auto">
-          <div className="flex items-center justify-end gap-1.5 border-b border-slate-300 bg-white px-5 py-2">
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+            <div className="flex gap-14">
+              <div className="inline-flex gap-3">
+                <h3 className="inline-flex items-center gap-2 font-medium text-slate-600">
+                  <ChartBarIcon className="h-5 text-indigo-500" />
+                  Volume
+                </h3>
+                <span className="text-xl font-medium text-slate-800">
+                  {usageMetrics?.totalRuns.toLocaleString(undefined, {
+                    notation: 'compact',
+                    compactDisplay: 'short',
+                  })}
+                </span>
+              </div>
+              <div className="inline-flex gap-3">
+                <h3 className="inline-flex items-center gap-2 font-medium text-slate-600">
+                  <XCircleIcon className="h-5 text-red-500" /> Failure rate
+                </h3>
+                <span className="text-xl font-medium text-slate-800">{`${failureRate}%`}</span>
+              </div>
+            </div>
             <DashboardTimeRangeFilter
               selectedTimeRange={selectedTimeRange}
               onTimeRangeChange={handleTimeRangeChange}
@@ -130,30 +126,6 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               timeRange={selectedTimeRange}
             />
           </ClientFeatureFlag>
-          <div className={`mt-6 grid grid-cols-${metrics.length} gap-4 px-6`}>
-            {metrics.map((m, idx) => (
-              <Block key={idx}>
-                <div className="relative rounded-lg bg-slate-900 p-4 text-white">
-                  {m.unavailable && (
-                    <div className="absolute inset-0 rounded-lg bg-slate-900 opacity-80" />
-                  )}
-                  {m.unavailable && (
-                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg">
-                      <Badge>Coming soon</Badge>
-                    </div>
-                  )}
-                  <h3 className="mb-2 flex flex-row items-center gap-2 text-lg font-medium">
-                    {m.title}
-                  </h3>
-                  <p className="text-sm text-slate-400">{m.description}</p>
-                  <div className="mt-6 flex flex-row items-center justify-between">
-                    <div className="text-2xl">{m.value}</div>
-                  </div>
-                </div>
-              </Block>
-            ))}
-          </div>
-
           <div className="mt-4 px-6">
             <LatestFailedFunctionRuns
               environmentSlug={params.environmentSlug}

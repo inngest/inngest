@@ -150,6 +150,12 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time) er
 	// Use the queue item's score, ensuring we process older function runs first
 	// (eg. before at)
 	next := time.UnixMilli(qi.Score())
+
+	if factor := qi.Data.GetPriorityFactor(); factor != 0 {
+		// Ensure we mutate the AtMS time by the given priority factor.
+		qi.AtMS -= factor
+	}
+
 	_, err := q.EnqueueItem(ctx, qi, next)
 	if err != nil {
 		return err

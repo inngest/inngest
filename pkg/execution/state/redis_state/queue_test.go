@@ -104,6 +104,56 @@ func TestQueueItemScore(t *testing.T) {
 				},
 			},
 		},
+		// PriorityFactor
+		{
+			name:     "With PriorityFactor of -60",
+			expected: old.Add(60 * time.Second).UnixMilli(), // subtract two seconds given factor
+			qi: QueueItem{
+				AtMS: start.UnixMilli(),
+				Data: osqueue.Item{
+					Kind: osqueue.KindEdge,
+					Identifier: state.Identifier{
+						RunID: ulid.MustNew(
+							uint64(old.UnixMilli()),
+							rand.Reader,
+						),
+						PriorityFactor: int64ptr(-60),
+					},
+				},
+			},
+		},
+		{
+			name:     "With PriorityFactor of 30",
+			expected: old.Add(-30 * time.Second).UnixMilli(), // subtract two seconds given factor
+			qi: QueueItem{
+				AtMS: start.UnixMilli(),
+				Data: osqueue.Item{
+					Kind: osqueue.KindEdge,
+					Identifier: state.Identifier{
+						RunID: ulid.MustNew(
+							uint64(old.UnixMilli()),
+							rand.Reader,
+						),
+						PriorityFactor: int64ptr(30),
+					},
+				},
+			},
+		},
+		{
+			name:     "Sleep with PF does nothing",
+			expected: start.UnixMilli(),
+			qi: QueueItem{
+				AtMS: start.UnixMilli(),
+				Data: osqueue.Item{
+					Kind: osqueue.KindSleep,
+					Identifier: state.Identifier{
+						RunID: ulid.MustNew(uint64(old.UnixMilli()), rand.Reader),
+						// Subtract 2
+						PriorityFactor: int64ptr(30),
+					},
+				},
+			},
+		},
 	}
 
 	for _, item := range tests {
@@ -1555,3 +1605,5 @@ func TestCheckList(t *testing.T) {
 		require.Equal(t, item.Expected, actual)
 	}
 }
+
+func int64ptr(i int64) *int64 { return &i }

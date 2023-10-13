@@ -150,7 +150,11 @@ export default function StackedBarChart({
                               className="mr-2 inline-flex h-3 w-3 rounded"
                               style={{ backgroundColor: l?.color || p.color }}
                             ></span>
-                            {p.value} {l?.name || p.name}
+                            {p.value?.toLocaleString(undefined, {
+                              notation: 'compact',
+                              compactDisplay: 'short',
+                            })}{' '}
+                            {l?.name || p.name}
                           </div>
                         );
                       }) || ''}
