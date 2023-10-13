@@ -19,8 +19,8 @@ import DashboardTimeRangeFilter, {
   defaultTimeRange,
   getTimeRangeLabel,
 } from './DashboardTimeRangeFilter';
+import FunctionThroughputChart from './FunctionThroughputChart';
 import LatestFailedFunctionRuns from './LatestFailedFunctionRuns';
-import FunctionRunsChart from './RunMetricsChart';
 import VolumeChart, { type UsageMetrics } from './VolumeChart';
 
 type FunctionDashboardProps = {
@@ -124,7 +124,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
             timeRange={selectedTimeRange}
           />
           <ClientFeatureFlag flag="fn-metrics-chart">
-            <FunctionRunsChart
+            <FunctionThroughputChart
               environmentSlug={params.environmentSlug}
               functionSlug={functionSlug}
               timeRange={selectedTimeRange}

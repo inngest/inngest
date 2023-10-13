@@ -47,17 +47,17 @@ const GetFnRunMetricsDocument = graphql(`
   }
 `);
 
-type FunctionRunsChartProps = {
+type FunctionThroughputChartProps = {
   environmentSlug: string;
   functionSlug: string;
   timeRange: TimeRange;
 };
 
-export default function FunctionRunsChart({
+export default function FunctionThroughputChart({
   environmentSlug,
   functionSlug,
   timeRange,
-}: FunctionRunsChartProps) {
+}: FunctionThroughputChartProps) {
   const [{ data: environment }] = useEnvironment({
     environmentSlug,
   });
@@ -104,7 +104,12 @@ export default function FunctionRunsChart({
 
   return (
     <SimpleLineChart
-      title={`Function Runs ${!fetching && `(${granularity})`}`}
+      title={
+        <span>
+          Function Throughput{' '}
+          {!fetching && <span className="text-sm text-slate-400">/ {granularity}</span>}
+        </span>
+      }
       data={metrics}
       legend={[
         { name: 'queued', dataKey: 'queued', color: '#fa8128' },
