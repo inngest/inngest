@@ -84,7 +84,6 @@ export default function FunctionThroughputChart({
   const queued = data?.environment.function?.queued;
   const started = data?.environment.function?.started;
   const ended = data?.environment.function?.ended;
-  const granularity = queued?.granularity || null;
 
   if (queued && started && ended) {
     metrics = queued.data.map((d, idx) => {
@@ -104,12 +103,7 @@ export default function FunctionThroughputChart({
 
   return (
     <SimpleLineChart
-      title={
-        <span>
-          Function Throughput{' '}
-          {!fetching && <span className="text-sm text-slate-400">/ {granularity}</span>}
-        </span>
-      }
+      title="Function Throughput"
       data={metrics}
       legend={[
         { name: 'queued', dataKey: 'queued', color: '#fa8128' },
