@@ -257,6 +257,7 @@ func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 			Name:        fn.Name(),
 			Slug:        fn.Slug(),
 			Idempotency: c.Idempotency,
+			Priority:    fn.Config().Priority,
 			Triggers:    []inngest.Trigger{{}},
 			RateLimit:   fn.Config().GetRateLimit(),
 			Cancel:      fn.Config().Cancel,

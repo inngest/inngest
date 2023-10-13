@@ -23,6 +23,9 @@ type SDKFunction struct {
 	// This may be an int OR a struct, for backwards compatibility.
 	Concurrency any `json:"concurrency,omitempty"`
 
+	// Priority represents the priority information for this function.
+	Priority *inngest.Priority `json:"priority,omitempty"`
+
 	// EventBatch determines how a function will process a list of incoming events
 	EventBatch map[string]any `json:"batchEvents,omitempty"`
 
@@ -55,6 +58,7 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 		Name:      s.Name,
 		Slug:      s.Slug,
 		Triggers:  s.Triggers,
+		Priority:  s.Priority,
 		RateLimit: s.RateLimit,
 		Cancel:    s.Cancel,
 		Debounce:  s.Debounce,

@@ -15,6 +15,7 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/concurrency"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
@@ -65,7 +66,7 @@ const (
 	PriorityMin     uint = 9
 
 	// FunctionStartScoreBufferTime is the grace period used to compare function start
-	// times to edg enqueue times.
+	// times to edge enqueue times.
 	FunctionStartScoreBufferTime = 10 * time.Second
 
 	defaultNumWorkers           = 100
@@ -449,16 +450,19 @@ func (q QueueItem) Score() int64 {
 	// If this is > 2 seconds in the future, don't mess with the time.
 	// This prevents any accidental fudging of future run times, even if the
 	// kind is edge (which should never exist... but, better to be safe).
-	if q.AtMS > time.Now().Add(2*time.Second).UnixMilli() {
+	if q.AtMS > time.Now().Add(consts.FutureAtLimit).UnixMilli() {
 		return q.AtMS
 	}
 
 	// Only fudge the numbers if the run is older than the buffer time.
 	startAt := int64(q.Data.Identifier.RunID.Time())
 	if q.AtMS-startAt > FunctionStartScoreBufferTime.Milliseconds() {
-		return startAt
+		// Remove the PriorityFactor from the time to push higher priority work
+		// earlier.
+		return startAt - q.Data.GetPriorityFactor()
 	}
-	return q.AtMS
+
+	return q.AtMS - q.Data.GetPriorityFactor()
 }
 
 func (q QueueItem) MarshalBinary() ([]byte, error) {

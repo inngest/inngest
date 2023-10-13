@@ -65,6 +65,12 @@ type Identifier struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// If this is a rerun, the original run ID is stored here.
 	OriginalRunID *ulid.ULID `json:"oRunID,omitempty"`
+	// PriorityFactor is the overall priority factor for this particular function
+	// run.  This allows individual runs to take precedence within the same queue.
+	// The higher the number (up to consts.PriorityFactorMax), the higher priority
+	// this run has.  All next steps will use this as the factor when scheduling
+	// future edge jobs (on their first attempt).
+	PriorityFactor *int64 `json:"pf,omitempty"`
 }
 
 // IdempotencyKey returns the unique key used to represent this single
