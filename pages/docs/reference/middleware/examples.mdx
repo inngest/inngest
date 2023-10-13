@@ -149,70 +149,76 @@ inngest.createFunction(
 This example's "encryption" is just stringifying and reversing the value - in practice you'll want to replace this with your own method using something like [`node:crypto`](https://nodejs.org/api/crypto.html).
 
 ```ts
-const prefix = "__ENCRYPTED__";
+const encryptionMarker = "__ENCRYPTED__";
+type EncryptedValue = { [encryptionMarker]: true; data: string };
 
-export const stepEncryptionMiddleware = ({
-  key = process.env.YOUR_ENCRYPTION_KEY || "",
-}: { key?: string } = {}) => {
+export const encryptionMiddleware = (
+  key: string = process.env.INNGEST_ENCRYPTION_KEY as string
+) => {
   if (!key) {
-    throw new Error("Must provide an encryption key");
+    throw new Error("Missing INNGEST_ENCRYPTION_KEY environment variable");
   }
 
-  // Change `encrypt` to whatever implementation you want.
-  const encrypt = <T = string>(value: unknown): T => {
-    return `${prefix}${JSON.stringify(value)
-      .split("")
-      .reverse()
-      .join("")}` as T;
+  // Some internal functions that we'll use to encrypt and decrypt values.
+  // In practice, you'll want to use the `key` passed in to handle encryption
+  // properly.
+  const isEncryptedValue = (value: unknown): value is EncryptedValue => {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      encryptionMarker in value &&
+      value[encryptionMarker] === true &&
+      "data" in value &&
+      typeof value["data"] === "string"
+    );
   };
 
-  // Change `decrypt` to whatever implementation you want.
+  const encrypt = (value: unknown): EncryptedValue => {
+    return {
+      [encryptionMarker]: true,
+      data: JSON.stringify(value).split("").reverse().join(""),
+    };
+  };
+
   const decrypt = <T>(value: T): T => {
-    if (typeof value === "string" && value.startsWith(prefix)) {
-      return JSON.parse(
-        value.slice(prefix.length).split("").reverse().join("")
-      );
+    if (isEncryptedValue(value)) {
+      return JSON.parse(value.data.split("").reverse().join("")) as T;
     }
 
-    // Assume the value is not encrypted, e.g. sent from the UI or something.
     return value;
   };
 
   return new InngestMiddleware({
     name: "Step Encryption Middleware",
-    init: () => {
-      return {
-        onFunctionRun: () => {
-          return {
-            /**
-             * Step data is decrypted as it comes in.
-             */
-            transformInput: ({ ctx, steps }) => {
-              return {
-                steps: steps.map((step) => ({
-                  ...step,
-                  data: step.data && decrypt(step.data),
-                })),
-              };
-            },
-            /**
-             * Step data is encrypted as it goes out.
-             */
-            transformOutput: (ctx) => {
-              if (!ctx.step) {
-                return;
-              }
+    init: () => ({
+      onSendEvent: () => ({
+        transformInput: ({ payloads }) => ({
+          payloads: payloads.map((payload) => ({
+            ...payload,
+            data: payload.data && encrypt(payload.data),
+          })),
+        }),
+      }),
+      onFunctionRun: () => ({
+        transformInput: ({ ctx, steps }) => ({
+          steps: steps.map((step) => ({
+            ...step,
+            data: step.data && decrypt(step.data),
+          })),
+        }),
+        transformOutput: (ctx) => {
+          if (!ctx.step) {
+            return;
+          }
 
-              return {
-                result: {
-                  data: ctx.result.data && encrypt(ctx.result.data),
-                },
-              };
+          return {
+            result: {
+              data: ctx.result.data && encrypt(ctx.result.data),
             },
           };
         },
-      };
-    },
+      }),
+    }),
   });
 };
 ```
@@ -223,55 +229,47 @@ commonly shared between systems; think about if you need to also encrypt your ev
 ```ts
 new InngestMiddleware({
   name: "Full Encryption Middleware",
-  init: () => {
-    return {
-      /**
-       * All outgoing events are encrypted.
-       */
-      onSendEvent: () => {
-        return {
-          transformInput: ({ payloads }) => {
-            return {
-              payloads: payloads.map((payload) => ({
-                ...payload,
-                data: payload.data && encrypt(payload.data),
-              })),
-            };
+  init: () => ({
+    onSendEvent: () => ({
+      transformInput: ({ payloads }) => ({
+        payloads: payloads.map((payload) => ({
+          ...payload,
+          data: payload.data && encrypt(payload.data),
+        })),
+      }),
+    }),
+    onFunctionRun: () => ({
+      transformInput: ({ ctx, steps }) => ({
+        steps: steps.map((step) => ({
+          ...step,
+          data: step.data && decrypt(step.data),
+        })),
+        ctx: {
+          event: ctx.event && {
+            ...ctx.event,
+            data: ctx.event.data && decrypt(ctx.event.data),
           },
-        };
-      },
-      onFunctionRun: () => {
-        return {
-          transformInput: ({ ctx, steps }) => {
-            return {
-              steps: steps.map((step) => ({
-                ...step,
-                data: step.data && decrypt(step.data),
-              })),
-              /**
-               * Incoming event triggers are decrypted as they come in.
-               */
-              ctx: {
-                event: ctx.event && decrypt(ctx.event),
-                events: ctx.events && ctx.events.map(decrypt),
-              } as {},
-            };
-          },
-          transformOutput: (ctx) => {
-            if (!ctx.step) {
-              return;
-            }
+          events:
+            ctx.events &&
+            ctx.events?.map((event) => ({
+              ...event,
+              data: event.data && decrypt(event.data),
+            })),
+        } as {},
+      }),
+      transformOutput: (ctx) => {
+        if (!ctx.step) {
+          return;
+        }
 
-            return {
-              result: {
-                data: ctx.result.data && encrypt(ctx.result.data),
-              },
-            };
+        return {
+          result: {
+            data: ctx.result.data && encrypt(ctx.result.data),
           },
         };
       },
-    };
-  },
+    }),
+  }),
 });
 ```
 
