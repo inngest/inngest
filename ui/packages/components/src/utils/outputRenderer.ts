@@ -8,7 +8,7 @@ type RenderedData = {
 
 export type OutputType = 'failed' | 'completed';
 
-export default function renderOutput({
+export function renderOutput({
   type,
   content,
 }: {

@@ -4,6 +4,8 @@ import { Badge } from '@inngest/components/Badge';
 import { Button } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock';
 import { ContentCard } from '@inngest/components/ContentCard';
+import { FuncCard } from '@inngest/components/FuncCard';
+import { FuncCardFooter } from '@inngest/components/FuncCardFooter';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { ulid } from 'ulid';
 
@@ -11,9 +13,7 @@ import SendEventButton from '@/components/Event/SendEventButton';
 import { shortDate } from '@/utils/date';
 import { usePrettyJson } from '../../hooks/usePrettyJson';
 import { useSendEventMutation } from '../../store/devApi';
-import { useGetEventQuery } from '../../store/generated';
-import FuncCard from '../Function/FuncCard';
-import FuncCardFooter from '../Function/FuncCardFooter';
+import { FunctionRunStatus, useGetEventQuery } from '../../store/generated';
 
 interface EventSectionProps {
   eventId: string;
@@ -93,11 +93,18 @@ export const EventSection = ({ eventId }: EventSectionProps) => {
         {event.functionRuns
           ?.slice()
           .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-          .map((run) => {
+          .map((r) => {
+            const run = {
+              ...r,
+              name: r.name ?? 'Unknown',
+              output: r.output ?? undefined,
+              status: r.status ?? FunctionRunStatus.Running,
+            };
+
             return (
               <FuncCard
                 key={run.id}
-                title={run.name || 'Unknown'}
+                title={run.name}
                 id={run.id}
                 status={run.status || undefined}
                 active={runID === run.id}

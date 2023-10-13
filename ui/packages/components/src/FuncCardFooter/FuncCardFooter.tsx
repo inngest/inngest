@@ -1,18 +1,17 @@
+import { IconExclamationTriangle } from '@inngest/components/icons/ExclamationTriangle';
+import type { FunctionRun } from '@inngest/components/types/functionRun';
 import { classNames } from '@inngest/components/utils/classNames';
 import { renderOutput, type OutputType } from '@inngest/components/utils/outputRenderer';
 
-import { IconExclamationTriangle } from '@/icons';
-import { FunctionRunStatus, type FunctionRun } from '../../store/generated';
-
 interface FuncCardFooterProps {
-  functionRun: Omit<FunctionRun, 'history' | 'functionID' | 'historyItemOutput'>;
+  functionRun: Pick<FunctionRun, 'output' | 'status'>;
 }
 
-export default function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
+export function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
   let type: OutputType | undefined;
-  if (functionRun?.status === FunctionRunStatus.Completed) {
+  if (functionRun.status === 'COMPLETED') {
     type = 'completed';
-  } else if (functionRun?.status === FunctionRunStatus.Failed) {
+  } else if (functionRun.status === 'FAILED') {
     type = 'failed';
   }
 
@@ -30,7 +29,7 @@ export default function FuncCardFooter({ functionRun }: FuncCardFooterProps) {
   let content: JSX.Element | null = null;
   let backgroundColor: string = '';
 
-  if (status === FunctionRunStatus.Failed && message && errorName) {
+  if (status === 'FAILED' && message && errorName) {
     content = (
       <p className="flex items-center gap-2 font-mono">
         <IconExclamationTriangle className="h-3 w-3 text-rose-400" />

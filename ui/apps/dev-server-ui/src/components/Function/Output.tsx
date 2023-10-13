@@ -1,6 +1,6 @@
 import { CodeBlock } from '@inngest/components/CodeBlock';
+import { renderOutput, type OutputType } from '@inngest/components/utils/outputRenderer';
 
-import renderOutput, { type OutputType } from '@/components/Function/OutputRenderer';
 import { usePrettyJson } from '@/hooks/usePrettyJson';
 
 interface OutputCardProps {
