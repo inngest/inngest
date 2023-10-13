@@ -51,14 +51,7 @@ export default function StreamDetails() {
   }, [event?.payload]);
 
   return (
-    <div
-      className={classNames(
-        'grid h-full text-white',
-
-        // Need 2 columns if the run has an event.
-        event ? 'grid-cols-2' : 'grid-cols-1'
-      )}
-    >
+    <div className={classNames('grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}>
       {event && (
         <EventSection
           event={event}
