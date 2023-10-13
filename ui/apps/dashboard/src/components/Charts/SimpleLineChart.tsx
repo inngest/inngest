@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 
 import cn from '@/utils/cn';
-import { hourTime } from '@/utils/date';
+import { minuteTime } from '@/utils/date';
 
 type SimpleLineChartProps = {
   className?: string;
@@ -58,7 +58,7 @@ function CustomizedXAxisTick(props: AxisProps) {
       className="font-medium"
       textAnchor="middle"
     >
-      {hourTime(props.payload.value)}
+      {minuteTime(props.payload.value)}
     </text>
   );
 }
