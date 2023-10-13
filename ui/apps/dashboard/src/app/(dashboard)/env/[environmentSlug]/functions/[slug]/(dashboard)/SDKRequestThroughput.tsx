@@ -108,6 +108,7 @@ export default function SDKReqThroughputChart({
   return (
     <SimpleLineChart
       title="SDK Request Throughput"
+      desc="The number of requests to your SDKs over time executing the function and steps, including retries"
       data={metrics}
       legend={[
         { name: 'queued', dataKey: 'queued', color: '#fa8128' },

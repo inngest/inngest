@@ -92,7 +92,7 @@ export default function SimpleLineChart({
           <h3 className="flex flex-row items-center gap-2 font-medium">{title}</h3>
           {desc && (
             <IngsTooltip content={desc}>
-              <InformationCircleIcon className="h-6 w-6 text-gray-500" />
+              <InformationCircleIcon className="h-6 w-6 text-gray-400" />
             </IngsTooltip>
           )}
         </div>
