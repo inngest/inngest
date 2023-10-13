@@ -1,5 +1,6 @@
 'use client';
 
+import { classNames } from '@inngest/components/utils/classNames';
 import { Toaster } from 'sonner';
 
 import BG from '@/components/BG';
@@ -8,7 +9,6 @@ import Navbar from '@/components/Navbar/Navbar';
 import NavbarLink from '@/components/Navbar/NavbarLink';
 import { IconFeed, IconFunction, IconWindow } from '@/icons';
 import { useGetAppsQuery } from '@/store/generated';
-import classNames from '@/utils/classnames';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { appsCount, hasConnectedError } = useGetAppsQuery(undefined, {
@@ -22,7 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div
       className={classNames(
-        'w-screen h-screen text-slate-400 text-sm grid overflow-hidden relative',
+        'relative grid h-screen w-screen overflow-hidden text-sm text-slate-400',
         'grid-cols-1 grid-rows-[50px_1fr]'
       )}
     >

@@ -1,6 +1,7 @@
+import { classNames } from '@inngest/components/utils/classNames';
+
 import { IconExclamationTriangle } from '@/icons';
 import { FunctionRunStatus, type FunctionRun } from '../../store/generated';
-import classNames from '../../utils/classnames';
 import renderOutput, { type OutputType } from './OutputRenderer';
 
 interface FuncCardFooterProps {

@@ -1,4 +1,4 @@
-import classNames from '../utils/classnames';
+import { classNames } from '@inngest/components/utils/classNames';
 
 type TabProps = {
   key: string;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function useCopyToClipboard() {
+export function useCopyToClipboard() {
   const [clickedState, setClickedState] = useState(false);
 
   const handleCopyClick = async (code: string) => {

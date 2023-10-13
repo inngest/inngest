@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
+import { classNames } from '@inngest/components/utils/classNames';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -7,7 +8,6 @@ import TimelineItemHeader from '@/components/AccordionTimeline/TimelineItemHeade
 import OutputCard from '@/components/Function/Output';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { IconChevron } from '@/icons/Chevron';
-import classNames from '@/utils/classnames';
 import { formatMilliseconds } from '@/utils/date';
 import { type HistoryNode } from '../historyParser/index';
 import renderTimelineNode from './TimelineNodeRenderer';

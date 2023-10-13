@@ -1,7 +1,7 @@
 import { Tooltip } from '@inngest/components/Tooltip/Tooltip';
+import { classNames } from '@inngest/components/utils/classNames';
 
 import { IconInfo } from '@/icons';
-import classNames from '@/utils/classnames';
 
 export type MetadataItemProps = {
   className?: string;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@inngest/components/Badge';
+import { ContentCard } from '@inngest/components/ContentCard';
 
 import { type OutputType } from '@/components/Function/OutputRenderer';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
@@ -12,7 +13,6 @@ import {
   useGetFunctionRunQuery,
 } from '../../store/generated';
 import { BlankSlate } from '../Blank';
-import ContentCard from '../Content/ContentCard';
 import { Timeline } from '../Timeline';
 import { useParsedHistory } from '../Timeline/historyParser';
 import OutputCard from './Output';

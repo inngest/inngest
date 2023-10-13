@@ -2,8 +2,7 @@ import type { Route } from 'next';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Badge } from '@inngest/components/Badge';
-
-import classNames from '@/utils/classnames';
+import { classNames } from '@inngest/components/utils/classNames';
 
 export type NavbarLinkProps = {
   icon: React.ReactNode;

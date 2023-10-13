@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Badge } from '@inngest/components/Badge';
 import { Button } from '@inngest/components/Button';
+import { classNames } from '@inngest/components/utils/classNames';
 import { toast } from 'sonner';
 
 import AppCardHeader from '@/components/App/AppCardHeader';
@@ -15,7 +16,6 @@ import {
   IconStatusCircleMinus,
 } from '@/icons';
 import { useDeleteAppMutation, useUpdateAppMutation, type App } from '@/store/generated';
-import classNames from '@/utils/classnames';
 import isValidUrl from '@/utils/urlValidation';
 import AppCardStep from './AppCardStep';
 

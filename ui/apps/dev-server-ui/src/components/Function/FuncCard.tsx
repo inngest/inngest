@@ -1,5 +1,6 @@
+import { classNames } from '@inngest/components/utils/classNames';
+
 import { FunctionRunStatus } from '../../store/generated';
-import classNames from '../../utils/classnames';
 import { FunctionRunStatusIcons } from './RunStatusIcons';
 
 interface FuncCardProps {

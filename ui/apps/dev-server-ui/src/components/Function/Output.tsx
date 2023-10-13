@@ -1,4 +1,5 @@
-import CodeBlock from '@/components/Code/CodeBlock';
+import { CodeBlock } from '@inngest/components/CodeBlock';
+
 import renderOutput, { type OutputType } from '@/components/Function/OutputRenderer';
 import { usePrettyJson } from '@/hooks/usePrettyJson';
 

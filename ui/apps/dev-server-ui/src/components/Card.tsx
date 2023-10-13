@@ -1,6 +1,5 @@
 import { type PropsWithChildren } from 'react';
-
-import classNames from '@/utils/classnames';
+import { classNames } from '@inngest/components/utils/classNames';
 
 export function Card({
   accentColor,
@@ -10,7 +9,7 @@ export function Card({
   return (
     <div
       className={classNames(
-        'w-full bg-slate-910 rounded-lg shadow overflow-hidden border border-slate-700/30',
+        'bg-slate-910 w-full overflow-hidden rounded-lg border border-slate-700/30 shadow',
         className
       )}
     >
@@ -26,7 +25,7 @@ Card.Content = ({ children }: PropsWithChildren) => {
 
 Card.Header = ({ children }: PropsWithChildren) => {
   return (
-    <div className="bg-slate-800/40 flex flex-col gap-1 px-4 py-2.5 border-b border-slate-800/50 text-slate-400 text-sm">
+    <div className="flex flex-col gap-1 border-b border-slate-800/50 bg-slate-800/40 px-4 py-2.5 text-sm text-slate-400">
       {children}
     </div>
   );
