@@ -1,7 +1,6 @@
-import { Tooltip } from '@inngest/components/Tooltip/Tooltip';
+import { Tooltip } from '@inngest/components/Tooltip';
+import { IconInfo } from '@inngest/components/icons/Info';
 import { classNames } from '@inngest/components/utils/classNames';
-
-import { IconInfo } from '@/icons';
 
 export type MetadataItemProps = {
   className?: string;
@@ -13,14 +12,7 @@ export type MetadataItemProps = {
   size?: 'small' | 'large';
 };
 
-export default function MetadataItem({
-  className,
-  value,
-  title,
-  label,
-  type,
-  tooltip,
-}: MetadataItemProps) {
+export function MetadataItem({ className, value, title, label, type, tooltip }: MetadataItemProps) {
   return (
     <div className={classNames('flex flex-col p-1.5', className)}>
       <span

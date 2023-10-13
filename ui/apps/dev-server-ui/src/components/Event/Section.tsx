@@ -4,10 +4,10 @@ import { Badge } from '@inngest/components/Badge';
 import { Button } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock';
 import { ContentCard } from '@inngest/components/ContentCard';
+import { MetadataGrid } from '@inngest/components/Metadata';
 import { ulid } from 'ulid';
 
 import SendEventButton from '@/components/Event/SendEventButton';
-import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { shortDate } from '@/utils/date';
 import { usePrettyJson } from '../../hooks/usePrettyJson';
 import { useSendEventMutation } from '../../store/devApi';

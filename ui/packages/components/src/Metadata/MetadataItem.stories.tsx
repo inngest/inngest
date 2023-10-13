@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import MetadataItem from './MetadataItem';
+import { MetadataItem } from './MetadataItem';
 
 const meta = {
   title: 'Components/MetadataItem',
