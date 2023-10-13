@@ -1,4 +1,5 @@
-import CopyButton from '@/components/Button/CopyButton';
+import { CopyButton } from '@inngest/components/CopyButton';
+
 import useCopyToClipboard from '@/hooks/useCopyToClipboard';
 import classNames from '@/utils/classnames';
 
@@ -14,7 +15,7 @@ export default function CodeLine({ code, className }: CodeLineProps) {
     <div
       className={classNames(
         className,
-        'flex items-center justify-between bg-slate-910 rounded-md cursor-pointer'
+        'bg-slate-910 flex cursor-pointer items-center justify-between rounded-md'
       )}
       onClick={() => handleCopyClick(code)}
     >
