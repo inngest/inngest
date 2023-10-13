@@ -110,14 +110,14 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
 
   return (
     <>
-      <div className="flex items-center gap-1.5 border-b border-slate-300 px-5 py-2">
-        <DashboardTimeRangeFilter
-          selectedTimeRange={selectedTimeRange}
-          onTimeRangeChange={handleTimeRangeChange}
-        />
-      </div>
       <div className="grid-cols-dashboard grid min-h-0 flex-1 bg-slate-100">
         <main className="col-span-3 overflow-y-auto">
+          <div className="flex items-center justify-end gap-1.5 border-b border-slate-300 bg-white px-5 py-2">
+            <DashboardTimeRangeFilter
+              selectedTimeRange={selectedTimeRange}
+              onTimeRangeChange={handleTimeRangeChange}
+            />
+          </div>
           <FunctionRunsChart
             environmentSlug={params.environmentSlug}
             functionSlug={functionSlug}
