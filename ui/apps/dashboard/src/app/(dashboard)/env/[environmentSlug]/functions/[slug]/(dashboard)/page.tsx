@@ -96,7 +96,10 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                   Volume
                 </h3>
                 <span className="text-xl font-medium text-slate-800">
-                  {usageMetrics?.totalRuns}
+                  {usageMetrics?.totalRuns.toLocaleString(undefined, {
+                    notation: 'compact',
+                    compactDisplay: 'short',
+                  })}
                 </span>
               </div>
               <div className="inline-flex gap-3">
