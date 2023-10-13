@@ -19,9 +19,9 @@ import DashboardTimeRangeFilter, {
   defaultTimeRange,
   getTimeRangeLabel,
 } from './DashboardTimeRangeFilter';
+import FunctionRunsChart, { type UsageMetrics } from './FunctionRunsChart';
+import FunctionThroughputChart from './FunctionThroughputChart';
 import LatestFailedFunctionRuns from './LatestFailedFunctionRuns';
-import FunctionRunsChart from './RunMetricsChart';
-import VolumeChart, { type UsageMetrics } from './VolumeChart';
 
 type FunctionDashboardProps = {
   params: {
@@ -118,13 +118,13 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
       </div>
       <div className="grid-cols-dashboard grid min-h-0 flex-1 bg-slate-100">
         <main className="col-span-3 overflow-y-auto">
-          <VolumeChart
+          <FunctionRunsChart
             environmentSlug={params.environmentSlug}
             functionSlug={functionSlug}
             timeRange={selectedTimeRange}
           />
           <ClientFeatureFlag flag="fn-metrics-chart">
-            <FunctionRunsChart
+            <FunctionThroughputChart
               environmentSlug={params.environmentSlug}
               functionSlug={functionSlug}
               timeRange={selectedTimeRange}
