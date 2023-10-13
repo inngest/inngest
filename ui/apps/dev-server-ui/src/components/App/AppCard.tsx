@@ -1,9 +1,9 @@
 import { useState } from 'react';
+import { Badge } from '@inngest/components/Badge';
 import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 
 import AppCardHeader from '@/components/App/AppCardHeader';
-import Badge from '@/components/Badge';
 import CodeLine from '@/components/Code/CodeLine';
 import Link from '@/components/Link/Link';
 import useDebounce from '@/hooks/useDebounce';

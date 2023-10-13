@@ -1,4 +1,4 @@
-import { IconExclamationTriangle } from '@/icons';
+import { IconExclamationTriangle } from '@inngest/components/icons/ExclamationTriangle';
 
 const kindStyles = {
   outlined: 'border-white/20 text-slate-300',
@@ -6,7 +6,7 @@ const kindStyles = {
   solid: 'border-transparent',
 };
 
-export default function Badge({
+export function Badge({
   children,
   className = '',
   kind = 'outlined',
@@ -19,7 +19,7 @@ export default function Badge({
 
   return (
     <span className={classNames}>
-      {kind === 'error' && <IconExclamationTriangle className="text-rose-400 h-3 w-3 mt-0.5" />}
+      {kind === 'error' && <IconExclamationTriangle className="mt-0.5 h-3 w-3 text-rose-400" />}
       {children}
     </span>
   );

@@ -1,6 +1,6 @@
+import { Badge } from '@inngest/components/Badge';
 import type { Row } from '@tanstack/react-table';
 
-import Badge from '@/components/Badge';
 import { IconClock, IconReplay, IconWebhook, IconWindow } from '@/icons';
 
 type Item = {
@@ -53,7 +53,7 @@ export default function SourceBadge({ row }: SourceBadgeProps) {
         </span>
       </Badge>
       {test && (
-        <Badge kind="solid" className="text-pink-400 bg-pink-400/10">
+        <Badge kind="solid" className="bg-pink-400/10 text-pink-400">
           Test
         </Badge>
       )}

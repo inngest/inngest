@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Badge } from '@inngest/components/Badge';
 import { Button } from '@inngest/components/Button';
 import { ulid } from 'ulid';
 
-import Badge from '@/components/Badge';
 import SendEventButton from '@/components/Event/SendEventButton';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { shortDate } from '@/utils/date';
