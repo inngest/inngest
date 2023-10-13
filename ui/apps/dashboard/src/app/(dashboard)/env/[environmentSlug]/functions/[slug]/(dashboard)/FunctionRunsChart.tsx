@@ -5,18 +5,18 @@ import { useFunctionUsage } from '@/queries';
 
 export type UsageMetrics = { totalRuns: number; totalFailures: number };
 
-type VolumeChartProps = {
+type FunctionRunsChartProps = {
   environmentSlug: string;
   functionSlug: string;
   timeRange: TimeRange;
 };
 
-export default function VolumeChart({
+export default function FunctionRunsChart({
   environmentSlug,
   functionSlug,
   timeRange,
-}: VolumeChartProps) {
-  const [{ data: usage }] = useFunctionUsage({
+}: FunctionRunsChartProps) {
+  const [{ data: usage, fetching: isFetching }] = useFunctionUsage({
     environmentSlug: environmentSlug,
     functionSlug: functionSlug,
     timeRange: timeRange,
@@ -36,7 +36,7 @@ export default function VolumeChart({
 
   return (
     <StackedBarChart
-      title="Usage"
+      title="Function Runs"
       data={usage}
       total={usageMetrics?.totalRuns || 0}
       totalDescription={`${getTimeRangeLabel(timeRange)} Volume`}
