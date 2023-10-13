@@ -1,4 +1,5 @@
-import { type MetadataItemProps } from '@/components/Metadata/MetadataItem';
+import { type MetadataItemProps } from '@inngest/components/Metadata/MetadataItem';
+
 import { FunctionRunStatus, type FunctionRun } from '@/store/generated';
 import { formatMilliseconds, shortDate } from '@/utils/date';
 

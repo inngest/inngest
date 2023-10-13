@@ -1,12 +1,12 @@
 import { classNames } from '@inngest/components/utils/classNames';
 
-import MetadataItem, { type MetadataItemProps } from './MetadataItem';
+import { MetadataItem, type MetadataItemProps } from './MetadataItem';
 
 type Props = {
   metadataItems: MetadataItemProps[];
 };
 
-export default function MetadataGrid({ metadataItems }: Props) {
+export function MetadataGrid({ metadataItems }: Props) {
   // Each metadata element that has a large size counts as two items
   const items = metadataItems.reduce((count, item) => {
     return count + (item.size === 'large' ? 2 : 1);

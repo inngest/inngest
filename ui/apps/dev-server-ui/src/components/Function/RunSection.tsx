@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@inngest/components/Badge';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { MetadataGrid } from '@inngest/components/Metadata';
 
 import { type OutputType } from '@/components/Function/OutputRenderer';
-import MetadataGrid from '@/components/Metadata/MetadataGrid';
 import { IconClock } from '@/icons';
 import { client } from '@/store/baseApi';
 import {

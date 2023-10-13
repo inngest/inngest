@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import MetadataGrid from './MetadataGrid';
+import { MetadataGrid } from './MetadataGrid';
 import { type MetadataItemProps } from './MetadataItem';
 
 const MetadataArray: MetadataItemProps[] = [
