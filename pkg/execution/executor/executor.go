@@ -493,6 +493,13 @@ func (e *executor) HandleResponse(ctx context.Context, id state.Identifier, item
 	if resp.Err != nil && resp.Retryable() {
 		// Retries are a native aspect of the queue;  returning errors always
 		// retries steps if possible.
+
+		for _, e := range e.lifecycles {
+			// Run the lifecycle method for this retry, which is baked into the queue.
+			item.Attempt += 1
+			go e.OnStepScheduled(context.WithoutCancel(ctx), id, item, &resp.Step.Name)
+		}
+
 		return resp
 	}
 
