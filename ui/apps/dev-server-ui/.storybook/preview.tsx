@@ -1,8 +1,17 @@
 import type { Preview } from '@storybook/react';
 
-import '../src/app/globals.css';
+import { BaseWrapper } from '@/app/baseWrapper';
 
 const preview: Preview = {
+  decorators: [
+    (Story) => {
+      return (
+        <BaseWrapper>
+          <Story />
+        </BaseWrapper>
+      );
+    },
+  ],
   parameters: {
     actions: { argTypesRegex: '^on[A-Z].*' },
     backgrounds: {
