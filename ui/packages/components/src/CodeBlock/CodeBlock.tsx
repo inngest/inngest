@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
+import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
+import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
+import { IconArrayDownTray } from '@inngest/components/icons/ArrayDownTray';
+import { IconOverflowText } from '@inngest/components/icons/OverflowText';
+import { IconWrapText } from '@inngest/components/icons/WrapText';
+import { classNames } from '@inngest/components/utils/classNames';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { type editor } from 'monaco-editor';
-
-import useCopyToClipboard from '@/hooks/useCopyToClipboard';
-import { IconArrayDownTray, IconOverflowText, IconWrapText } from '@/icons';
-import classNames from '@/utils/classnames';
-import { maxRenderedOutputSizeBytes } from '@/utils/constants';
 
 const LINE_HEIGHT = 26;
 const MAX_HEIGHT = 275; // Equivalent to 10 lines
@@ -32,7 +33,7 @@ interface CodeBlockProps {
   }[];
 }
 
-export default function CodeBlock({ header, tabs }: CodeBlockProps) {
+export function CodeBlock({ header, tabs }: CodeBlockProps) {
   const [activeTab, setActiveTab] = useState(0);
   const editorRef = useRef<MonacoEditorType>(null);
 

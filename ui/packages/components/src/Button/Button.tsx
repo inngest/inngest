@@ -1,7 +1,7 @@
 import React, { forwardRef } from 'react';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
-import classNames from '@inngest/components/utils/classnames';
 
+import classNames from '../utils/classNames';
 import {
   getButtonColors,
   getButtonSizeStyles,

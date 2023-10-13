@@ -1,5 +1,6 @@
+import { classNames } from '@inngest/components/utils/classNames';
+
 import { IconCheckCircle, IconExclamationTriangle } from '@/icons';
-import classNames from '@/utils/classnames';
 
 type AppCardHeaderProps = {
   functionCount: number;
@@ -12,22 +13,22 @@ export default function AppCardHeader({ connected, functionCount }: AppCardHeade
   if (!connected) {
     headerColor = 'bg-rose-600/50';
     headerLabel = 'No Connection';
-    headerIcon = <IconExclamationTriangle className="text-white h-5 w-5" />;
+    headerIcon = <IconExclamationTriangle className="h-5 w-5 text-white" />;
   } else if (functionCount < 1) {
     headerColor = 'bg-orange-400/70';
     headerLabel = 'No Functions Found';
-    headerIcon = <IconExclamationTriangle className="text-white h-5 w-5" />;
+    headerIcon = <IconExclamationTriangle className="h-5 w-5 text-white" />;
   } else {
     headerColor = 'bg-teal-400/50';
     headerLabel = 'Connected';
-    headerIcon = <IconCheckCircle className="text-white h-5 w-5" />;
+    headerIcon = <IconCheckCircle className="h-5 w-5 text-white" />;
   }
 
   return (
     <header
       className={classNames(
         headerColor,
-        `text-white rounded-t-md px-6 py-2.5 capitalize flex gap-2 items-center justify-between`
+        `flex items-center justify-between gap-2 rounded-t-md px-6 py-2.5 capitalize text-white`
       )}
     >
       <div className="flex items-center gap-2 leading-7">

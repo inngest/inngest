@@ -1,6 +1,5 @@
 import { Disclosure, Transition } from '@headlessui/react';
-
-import classNames from '@/utils/classnames';
+import { classNames } from '@inngest/components/utils/classNames';
 
 type AppCardStepProps = {
   isExpandable?: boolean;
@@ -31,7 +30,7 @@ export default function AppCardStep({
       />
       <Disclosure.Button
         as={'div'}
-        className="flex items-center text-white justify-between p-4 pr-6 w-full cursor-pointer"
+        className="flex w-full cursor-pointer items-center justify-between p-4 pr-6 text-white"
       >
         {lineContent}
       </Disclosure.Button>
@@ -44,7 +43,7 @@ export default function AppCardStep({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <Disclosure.Panel className="text-gray-500 pl-14 pr-6 pb-4 ">
+          <Disclosure.Panel className="pb-4 pl-14 pr-6 text-gray-500 ">
             {expandedContent}
           </Disclosure.Panel>
         </Transition>

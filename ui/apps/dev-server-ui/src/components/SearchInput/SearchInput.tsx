@@ -1,5 +1,6 @@
+import { classNames } from '@inngest/components/utils/classNames';
+
 import { IconMagnifyingGlass } from '@/icons';
-import classNames from '@/utils/classnames';
 
 interface SearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
   value: string;

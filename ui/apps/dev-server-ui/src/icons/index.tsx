@@ -17,9 +17,6 @@ export { IconReplay } from './Replay';
 export { IconWebhook } from './Webhook';
 export { IconMagnifyingGlass } from './MagnifyingGlass';
 export { IconInfo } from './Info';
-export { IconArrayDownTray } from './ArrayDownTray';
-export { IconOverflowText } from './OverflowText';
-export { IconWrapText } from './WrapText';
 
 // Circle Status Icons
 export { IconStatusCircleCheck } from './StatusCircleCheck';

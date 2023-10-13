@@ -5,10 +5,10 @@ import {
   getButtonSizeStyles,
   getDisabledStyles,
 } from '@inngest/components/Button';
+import { classNames } from '@inngest/components/utils/classNames';
 import * as Select from '@radix-ui/react-select';
 
 import { IconChevron } from '@/icons';
-import classNames from '@/utils/classnames';
 
 type ButtonCopyProps = {
   kind?: 'default' | 'primary' | 'success' | 'danger';

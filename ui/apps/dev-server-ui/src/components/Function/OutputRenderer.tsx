@@ -1,4 +1,4 @@
-import { maxRenderedOutputSizeBytes } from '@/utils/constants';
+import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
 
 type RenderedData = {
   message?: string;

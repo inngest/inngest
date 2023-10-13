@@ -1,7 +1,6 @@
 import { Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-
-import classNames from '@/utils/classnames';
+import { classNames } from '@inngest/components/utils/classNames';
 
 type ModalProps = {
   children?: React.ReactNode;
@@ -34,12 +33,12 @@ export default function Modal({
         >
           {/* The backdrop, rendered as a fixed sibling to the panel container */}
           <div
-            className="fixed inset-0 bg-[#04060C]/90 transition-opacity z-50"
+            className="fixed inset-0 z-50 bg-[#04060C]/90 transition-opacity"
             aria-hidden="true"
           />
         </Transition.Child>
         {/* Full-screen container to center the panel */}
-        <div className="fixed inset-0 overflow-y-auto z-50">
+        <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-6">
             <Transition.Child
               as={Fragment}
@@ -54,15 +53,15 @@ export default function Modal({
               <Dialog.Panel
                 className={classNames(
                   className,
-                  'transform overflow-hidden rounded-lg bg-slate-910 shadow-xl transition-all'
+                  'bg-slate-910 transform overflow-hidden rounded-lg shadow-xl transition-all'
                 )}
               >
                 {(title || description) && (
                   <div className="border-b border-slate-800 p-6">
-                    <Dialog.Title className="text-white text-xl font-semibold">
+                    <Dialog.Title className="text-xl font-semibold text-white">
                       {title}
                     </Dialog.Title>
-                    <Dialog.Description className="text-slate-400 text-sm font-medium">
+                    <Dialog.Description className="text-sm font-medium text-slate-400">
                       {description}
                     </Dialog.Description>
                   </div>

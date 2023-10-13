@@ -1,7 +1,7 @@
 import NextLink from 'next/link';
+import { classNames } from '@inngest/components/utils/classNames';
 
 import { IconArrowTopRightOnSquare, IconChevron } from '@/icons';
-import classNames from '@/utils/classnames';
 
 interface LinkProps {
   internalNavigation?: boolean;

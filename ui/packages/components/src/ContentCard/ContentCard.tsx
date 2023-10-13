@@ -1,5 +1,7 @@
-import { IconEvent, IconFunction } from '@/icons';
-import classNames from '@/utils/classnames';
+import { IconEvent } from '@inngest/components/icons/Event';
+import { IconFunction } from '@inngest/components/icons/Function';
+
+import classNames from '../utils/classNames';
 
 interface ContentCardProps {
   children: React.ReactNode;
@@ -12,7 +14,7 @@ interface ContentCardProps {
   active?: boolean;
 }
 
-export default function ContentCard({
+export function ContentCard({
   children,
   title,
   icon,
@@ -26,10 +28,10 @@ export default function ContentCard({
     <div
       className={classNames(
         active ? `bg-slate-910` : ``,
-        `flex-1 border rounded-lg border-slate-800/30 overflow-hidden flex flex-col shrink-0`
+        `flex flex-1 shrink-0 flex-col overflow-hidden rounded-lg border border-slate-800/30`
       )}
     >
-      <div className={classNames(title ? 'px-5 py-4 relative z-30' : '')}>
+      <div className={classNames(title ? 'relative z-30 px-5 py-4' : '')}>
         <div className="flex items-center justify-between leading-7">
           {title ? (
             <div className="flex items-center gap-2">
@@ -44,7 +46,7 @@ export default function ContentCard({
         {badge}
         {metadata}
       </div>
-      <div style={{ scrollbarGutter: 'stable' }} className="overflow-hidden overflow-y-auto flex-1">
+      <div style={{ scrollbarGutter: 'stable' }} className="flex-1 overflow-hidden overflow-y-auto">
         {children}
       </div>
     </div>

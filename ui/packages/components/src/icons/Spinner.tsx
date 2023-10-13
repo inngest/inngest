@@ -1,4 +1,4 @@
-import classNames from '@inngest/components/utils/classnames';
+import classNames from '../utils/classNames';
 
 export function IconSpinner({ className }: { className?: string }) {
   return (

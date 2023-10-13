@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Badge } from '@inngest/components/Badge';
 import { Button } from '@inngest/components/Button';
+import { CodeBlock } from '@inngest/components/CodeBlock';
+import { ContentCard } from '@inngest/components/ContentCard';
 import { ulid } from 'ulid';
 
 import SendEventButton from '@/components/Event/SendEventButton';
@@ -10,8 +12,6 @@ import { shortDate } from '@/utils/date';
 import { usePrettyJson } from '../../hooks/usePrettyJson';
 import { useSendEventMutation } from '../../store/devApi';
 import { useGetEventQuery } from '../../store/generated';
-import CodeBlock from '../Code/CodeBlock';
-import ContentCard from '../Content/ContentCard';
 import FuncCard from '../Function/FuncCard';
 import FuncCardFooter from '../Function/FuncCardFooter';
 

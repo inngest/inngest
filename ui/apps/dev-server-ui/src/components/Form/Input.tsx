@@ -1,5 +1,6 @@
+import { classNames } from '@inngest/components/utils/classNames';
+
 import { IconExclamationTriangle } from '@/icons';
-import classNames from '@/utils/classnames';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   value: string;
@@ -14,8 +15,8 @@ export default function Input({ value, className, onChange, isInvalid, ...props 
       <input
         id="addAppUrlModal"
         className={classNames(
-          'min-w-[420px] bg-slate-800 rounded-md text-slate-300 py-2 px-4',
-          isInvalid && value.length > 0 && 'pr-8 border-rose-400 border-2',
+          'min-w-[420px] rounded-md bg-slate-800 px-4 py-2 text-slate-300',
+          isInvalid && value.length > 0 && 'border-2 border-rose-400 pr-8',
           className
         )}
         value={value}
@@ -23,7 +24,7 @@ export default function Input({ value, className, onChange, isInvalid, ...props 
         {...props}
       />
       {isInvalid && value.length > 0 && (
-        <IconExclamationTriangle className="absolute top-2/4 right-2 -translate-y-2/4 text-rose-400" />
+        <IconExclamationTriangle className="absolute right-2 top-2/4 -translate-y-2/4 text-rose-400" />
       )}
     </div>
   );
