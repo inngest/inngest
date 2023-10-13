@@ -18,26 +18,27 @@ export default function StreamDetails() {
   if (eventResult.error) {
     throw eventResult.error;
   }
+  const event = eventResult.data;
 
   const [selectedRunID, setSelectedRunID] = useState<string | undefined>(runID ?? undefined);
   const [sendEvent] = useSendEventMutation();
 
   useEffect(() => {
-    if (!selectedRunID && eventResult.data?.functionRuns[0]) {
-      const firstRunID = eventResult.data.functionRuns[0].id;
+    if (!selectedRunID && event?.functionRuns[0]) {
+      const firstRunID = event.functionRuns[0].id;
       setSelectedRunID(firstRunID);
     }
-  }, [selectedRunID, eventResult.data?.functionRuns]);
+  }, [selectedRunID, event?.functionRuns]);
 
   function onReplayEvent() {
-    if (!eventResult.data?.payload) {
+    if (!event?.payload) {
       return;
     }
 
     const eventId = ulid();
 
     sendEvent({
-      ...JSON.parse(eventResult.data.payload),
+      ...JSON.parse(event.payload),
       id: eventId,
       ts: Date.now(),
     }).unwrap();
@@ -45,13 +46,9 @@ export default function StreamDetails() {
 
   const renderSendEventButton = useMemo(() => {
     return () => (
-      <SendEventButton
-        label="Edit and Replay"
-        appearance="outlined"
-        data={eventResult.data?.payload}
-      />
+      <SendEventButton label="Edit and Replay" appearance="outlined" data={event?.payload} />
     );
-  }, [eventResult.data?.payload]);
+  }, [event?.payload]);
 
   return (
     <div
@@ -59,13 +56,13 @@ export default function StreamDetails() {
         'grid h-full text-white',
 
         // Need 2 columns if the run has an event.
-        eventResult.data ? 'grid-cols-2' : 'grid-cols-1'
+        event ? 'grid-cols-2' : 'grid-cols-1'
       )}
     >
-      {eventResult.data && (
+      {event && (
         <EventSection
-          event={eventResult.data}
-          functionRuns={eventResult.data.functionRuns}
+          event={event}
+          functionRuns={event.functionRuns}
           onFunctionRunClick={setSelectedRunID}
           onReplayEvent={onReplayEvent}
           selectedRunID={selectedRunID}
