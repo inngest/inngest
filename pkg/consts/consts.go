@@ -76,9 +76,9 @@ const (
 
 	RequestVersionUnknown = -1
 
-	// PriorityFactorMin is the minimum priority factor for any function run
+	// PriorityFactorMin is the minimum priority factor for any function run, in seconds.
 	PriorityFactorMin = int64(-600)
-	// PriorityFactorMax is the maximum priority factor for any function run
+	// PriorityFactorMax is the maximum priority factor for any function run, in seconds.
 	PriorityFactorMax = int64(600)
 	// FutureQueeueFudgeLimit is the inclusive time range between [now, now() + FutureAtLimit]
 	// in which priority factors are taken into account.
