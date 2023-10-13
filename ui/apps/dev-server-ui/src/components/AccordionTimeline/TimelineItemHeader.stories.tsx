@@ -1,6 +1,6 @@
+import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { IconStatusCircleCheck } from '@/icons';
 import TimelineItemHeader from './TimelineItemHeader';
 
 const meta = {

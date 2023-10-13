@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@inngest/components/Badge';
 import { ContentCard } from '@inngest/components/ContentCard';
+import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 
 import { type OutputType } from '@/components/Function/OutputRenderer';
 import MetadataGrid from '@/components/Metadata/MetadataGrid';
@@ -17,7 +18,6 @@ import { Timeline } from '../Timeline';
 import { useParsedHistory } from '../Timeline/historyParser';
 import OutputCard from './Output';
 import renderRunMetadata from './RunMetadataRenderer';
-import { FunctionRunStatusIcons } from './RunStatusIcons';
 import { SleepingSummary } from './SleepingSummary';
 import { WaitingSummary } from './WaitingSummary';
 
@@ -90,7 +90,7 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
   return (
     <ContentCard
       title={run.name || 'Unknown'}
-      icon={run.status && <FunctionRunStatusIcons status={run.status} className="h-5 w-5" />}
+      icon={run.status && <FunctionRunStatusIcon status={run.status} className="h-5 w-5" />}
       type="run"
       badge={
         cron ? (

@@ -1,11 +1,9 @@
-import {
-  IconStatusCircleArrowPath,
-  IconStatusCircleCheck,
-  IconStatusCircleCross,
-  IconStatusCircleExclamation,
-  IconStatusCircleMinus,
-  IconStatusCircleMoon,
-} from '@/icons';
+import { IconStatusCircleArrowPath } from '@inngest/components/icons/StatusCircleArrowPath';
+import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
+import { IconStatusCircleCross } from '@inngest/components/icons/StatusCircleCross';
+import { IconStatusCircleMinus } from '@inngest/components/icons/StatusCircleMinus';
+
+import { IconStatusCircleExclamation, IconStatusCircleMoon } from '@/icons';
 import type { HistoryNode } from '../historyParser';
 
 type RenderedData = {
