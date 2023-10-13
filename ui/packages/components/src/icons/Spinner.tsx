@@ -1,4 +1,4 @@
-import classNames from '../utils/classNames';
+import { classNames } from '../utils/classNames';
 
 export function IconSpinner({ className }: { className?: string }) {
   return (

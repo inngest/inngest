@@ -1,7 +1,7 @@
 import { IconEvent } from '@inngest/components/icons/Event';
 import { IconFunction } from '@inngest/components/icons/Function';
 
-import classNames from '../utils/classNames';
+import { classNames } from '../utils/classNames';
 
 interface ContentCardProps {
   children: React.ReactNode;
