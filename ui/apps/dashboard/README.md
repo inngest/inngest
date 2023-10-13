@@ -89,6 +89,9 @@ Environment variables are managed with the [Vercel CLI](https://vercel.com/docs/
 following commands to manage them:
 
 ```sh
+# Link the project on Vercel
+$ pnpm vercel link # and follow the steps
+
 # Download development environment variables for running the app locally
 $ pnpm env:pull
 
