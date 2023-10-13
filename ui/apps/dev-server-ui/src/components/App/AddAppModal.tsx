@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 
-import Button from '@/components/Button/Button';
 import Input from '@/components/Form/Input';
 import Modal from '@/components/Modal';
 import useDebounce from '@/hooks/useDebounce';

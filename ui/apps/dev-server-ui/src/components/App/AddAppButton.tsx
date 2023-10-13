@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { Button } from '@inngest/components/Button';
 
 import AddAppModal from '@/components/App/AddAppModal';
-import Button from '@/components/Button/Button';
 import { IconPlus } from '@/icons';
 
 export default function AddAppButton() {

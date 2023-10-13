@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { type editor } from 'monaco-editor';
 
@@ -6,7 +7,6 @@ import useCopyToClipboard from '@/hooks/useCopyToClipboard';
 import { IconArrayDownTray, IconOverflowText, IconWrapText } from '@/icons';
 import classNames from '@/utils/classnames';
 import { maxRenderedOutputSizeBytes } from '@/utils/constants';
-import Button from '../Button/Button';
 import CopyButton from '../Button/CopyButton';
 
 const LINE_HEIGHT = 26;
