@@ -7,8 +7,11 @@ import { FunctionRunStatus, useGetEventQuery } from '@/store/generated';
 
 type Data = Event & { functionRuns: FunctionRun[] };
 
-export function useEvent(eventID: string): FetchResult<Data> {
-  const query = useGetEventQuery({ id: eventID }, { pollingInterval: 1500 });
+export function useEvent(
+  eventID: string,
+  { skip = false }: { skip?: boolean } = {}
+): FetchResult<Data> {
+  const query = useGetEventQuery({ id: eventID }, { pollingInterval: 1500, skip });
 
   // In addition to memoizing, this hook will also transform the API data into
   // the shape our shared UI expects.
@@ -38,16 +41,30 @@ export function useEvent(eventID: string): FetchResult<Data> {
   }, [query.data?.event]);
 
   if (query.isLoading) {
-    return { data: undefined, error: undefined, isLoading: true };
+    return { data: undefined, error: undefined, isLoading: true, isSkipped: false };
+  }
+
+  if (skip) {
+    return { data: undefined, error: undefined, isLoading: false, isSkipped: true };
+  }
+
+  if (query.error) {
+    return {
+      data: undefined,
+      error: new Error(query.error.message),
+      isLoading: false,
+      isSkipped: false,
+    };
   }
 
   if (!data) {
     return {
       data: undefined,
-      error: new Error('finished loading but missing event'),
+      error: new Error('finished loading but missing data'),
       isLoading: false,
+      isSkipped: false,
     };
   }
 
-  return { data, error: undefined, isLoading: false };
+  return { data, error: undefined, isLoading: false, isSkipped: false };
 }
