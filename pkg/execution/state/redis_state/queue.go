@@ -442,21 +442,6 @@ func (q *QueueItem) SetID(ctx context.Context, str string) {
 // We can ONLY do this for the first attempt, and we can ONLY do this for edges that
 // are not sleeps (eg. immediate runs)
 func (q QueueItem) Score() int64 {
-	// Apply the priority factor after scoring taking into account function start times.
-	// This applies priorities while also ensuring we finish older functions first.
-	score := q.scoreByFunctionStart()
-
-	// If this is > 2 seconds in the future, don't mess with the time.
-	// This prevents any accidental fudging of future run times if event.ts is
-	// in the future.
-	if score > time.Now().Add(consts.FutureAtLimit).UnixMilli() {
-		return score
-	}
-
-	return score - q.Data.GetPriorityFactor()
-}
-
-func (q QueueItem) scoreByFunctionStart() int64 {
 	// If this is not an edge, we can ignore this.
 	if q.Data.Kind != osqueue.KindEdge || q.Data.Attempt > 0 {
 		return q.AtMS
@@ -472,10 +457,12 @@ func (q QueueItem) scoreByFunctionStart() int64 {
 	// Only fudge the numbers if the run is older than the buffer time.
 	startAt := int64(q.Data.Identifier.RunID.Time())
 	if q.AtMS-startAt > FunctionStartScoreBufferTime.Milliseconds() {
-		return startAt
+		// Remove the PriorityFactor from the time to push higher priority work
+		// earlier.
+		return startAt - q.Data.GetPriorityFactor()
 	}
 
-	return q.AtMS
+	return q.AtMS - q.Data.GetPriorityFactor()
 }
 
 func (q QueueItem) MarshalBinary() ([]byte, error) {
