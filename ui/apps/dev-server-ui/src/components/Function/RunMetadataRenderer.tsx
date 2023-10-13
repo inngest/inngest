@@ -1,7 +1,7 @@
 import { type MetadataItemProps } from '@inngest/components/Metadata/MetadataItem';
+import { formatMilliseconds, shortDate } from '@inngest/components/utils/date';
 
 import { FunctionRunStatus, type FunctionRun } from '@/store/generated';
-import { formatMilliseconds, shortDate } from '@/utils/date';
 
 export default function renderRunMetadata(
   functionRun: Pick<FunctionRun, 'finishedAt' | 'id' | 'startedAt' | 'status' | 'history'>
