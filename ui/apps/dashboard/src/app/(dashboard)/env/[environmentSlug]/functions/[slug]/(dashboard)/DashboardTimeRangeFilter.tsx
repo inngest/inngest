@@ -115,7 +115,7 @@ export default function DashboardTimeRangeFilter({
               leaveFrom="opacity-100"
               leaveTo="opacity-0"
             >
-              <Listbox.Options className="shadow-floating absolute left-0 z-10 mt-[5px] w-52 origin-top-left overflow-hidden rounded-md bg-white/95 py-[9px] ring-1 ring-black/5 backdrop-blur-[3px] focus:outline-none">
+              <Listbox.Options className="shadow-floating absolute right-0 z-10 mt-[5px] w-52 origin-top-right overflow-hidden rounded-md bg-white/95 py-[9px] ring-1 ring-black/5 backdrop-blur-[3px] focus:outline-none">
                 {timeRanges.map((timeRange) => {
                   const timeRangeStartInDaysAgo = dayjs(currentTime).diff(
                     dayjs(timeRange.start),
