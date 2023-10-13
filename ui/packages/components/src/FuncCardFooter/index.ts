@@ -1,0 +1,1 @@
+export { FuncCardFooter } from './FuncCardFooter';

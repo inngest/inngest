@@ -1,4 +1,5 @@
-import renderOutput, { type OutputType } from '@/components/Function/OutputRenderer';
+import { renderOutput, type OutputType } from '@inngest/components/utils/outputRenderer';
+
 import {
   FunctionRunStatus,
   useGetFunctionRunOutputQuery,
