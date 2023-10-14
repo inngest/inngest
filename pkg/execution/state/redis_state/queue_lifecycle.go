@@ -13,5 +13,5 @@ type QueueLifecycleListener interface {
 	//
 	// In the future, we should specify which concurrency limit was reached (account,
 	// partition, or custom).
-	OnConcurrencyLimitReached(ctx context.Context, fnID uuid.UUID) error
+	OnConcurrencyLimitReached(ctx context.Context, fnID uuid.UUID)
 }
