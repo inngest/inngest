@@ -44,6 +44,10 @@ export function hourTime(d: dayjs.ConfigType): string {
   return dayjs(d).format('ha');
 }
 
+export function minuteTime(d: dayjs.ConfigType): string {
+  return dayjs(d).format('h:mma');
+}
+
 export function day(d: dayjs.ConfigType): string {
   return dayjs(d).format('MMMM D, YYYY');
 }

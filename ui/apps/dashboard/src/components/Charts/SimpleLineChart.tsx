@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
+import { InformationCircleIcon } from '@heroicons/react/24/outline';
+import { Tooltip as IngsTooltip } from '@inngest/components/Tooltip';
 import {
   CartesianGrid,
   Legend,
@@ -13,12 +15,13 @@ import {
 } from 'recharts';
 
 import cn from '@/utils/cn';
-import { hourTime } from '@/utils/date';
+import { minuteTime } from '@/utils/date';
 
 type SimpleLineChartProps = {
   className?: string;
   height?: number;
   title: string | React.ReactNode;
+  desc?: string;
   total?: number;
   totalDescription?: string;
   data?: {
@@ -55,7 +58,7 @@ function CustomizedXAxisTick(props: AxisProps) {
       className="font-medium"
       textAnchor="middle"
     >
-      {hourTime(props.payload.value)}
+      {minuteTime(props.payload.value)}
     </text>
   );
 }
@@ -72,6 +75,7 @@ export default function SimpleLineChart({
   className = '',
   height = 200,
   title,
+  desc,
   total,
   totalDescription,
   data = [],
@@ -86,6 +90,11 @@ export default function SimpleLineChart({
       <header className="flex items-center justify-between">
         <div className="flex gap-4">
           <h3 className="flex flex-row items-center gap-2 font-medium">{title}</h3>
+          {desc && (
+            <IngsTooltip content={desc}>
+              <InformationCircleIcon className="h-6 w-6 text-gray-400" />
+            </IngsTooltip>
+          )}
         </div>
         <div>
           <div className="text-right text-lg font-medium">{total}</div>

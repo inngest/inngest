@@ -225,7 +225,6 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
             </div>
           </div>
           {failure && !isDeploying ? <DeployFailure {...failure} /> : null}
-          <div>hi</div>
         </div>
 
         <div className="rounded-lg border border-slate-300 px-8 pt-8">
