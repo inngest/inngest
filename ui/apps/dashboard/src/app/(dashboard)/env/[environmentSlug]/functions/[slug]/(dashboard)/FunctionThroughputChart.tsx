@@ -58,11 +58,12 @@ export default function FunctionThroughputChart({
   functionSlug,
   timeRange,
 }: FunctionThroughputChartProps) {
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
+  const [{ data: environment, error: environmentError, fetching: isFetchingEnvironment }] =
+    useEnvironment({
+      environmentSlug,
+    });
 
-  const [{ data, fetching: isFetchingMetrics }] = useQuery({
+  const [{ data, error: metricsError, fetching: isFetchingMetrics }] = useQuery({
     query: GetFnRunMetricsDocument,
     variables: {
       environmentID: environment?.id!,
@@ -112,6 +113,7 @@ export default function FunctionThroughputChart({
         { name: 'ended', dataKey: 'ended', color: '#8884d8' },
       ]}
       isLoading={isFetchingEnvironment || isFetchingMetrics}
+      error={environmentError || metricsError}
     />
   );
 }
