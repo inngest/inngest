@@ -6,22 +6,18 @@ import { ChartBarIcon, FolderIcon, RocketLaunchIcon, XCircleIcon } from '@heroic
 
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import { Alert } from '@/components/Alert';
-import { Badge } from '@/components/Badge/Badge';
 import Block from '@/components/Block';
-import { ClientFeatureFlag } from '@/components/FeatureFlags/ClientFeatureFlag';
 import ListContainer from '@/components/Lists/ListContainer';
 import ListItem from '@/components/Lists/ListItem';
 import LoadingIcon from '@/icons/LoadingIcon';
 import EventIcon from '@/icons/event.svg';
 import { useFunction, useFunctionUsage } from '@/queries';
 import { relativeTime } from '@/utils/date';
-import DashboardTimeRangeFilter, {
-  defaultTimeRange,
-  getTimeRangeLabel,
-} from './DashboardTimeRangeFilter';
+import DashboardTimeRangeFilter, { defaultTimeRange } from './DashboardTimeRangeFilter';
 import FunctionRunsChart, { type UsageMetrics } from './FunctionRunsChart';
 import FunctionThroughputChart from './FunctionThroughputChart';
 import LatestFailedFunctionRuns from './LatestFailedFunctionRuns';
+import SDKRequestThroughputChart from './SDKRequestThroughput';
 
 type FunctionDashboardProps = {
   params: {
@@ -119,13 +115,16 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
             functionSlug={functionSlug}
             timeRange={selectedTimeRange}
           />
-          <ClientFeatureFlag flag="fn-metrics-chart">
-            <FunctionThroughputChart
-              environmentSlug={params.environmentSlug}
-              functionSlug={functionSlug}
-              timeRange={selectedTimeRange}
-            />
-          </ClientFeatureFlag>
+          <FunctionThroughputChart
+            environmentSlug={params.environmentSlug}
+            functionSlug={functionSlug}
+            timeRange={selectedTimeRange}
+          />
+          <SDKRequestThroughputChart
+            environmentSlug={params.environmentSlug}
+            functionSlug={functionSlug}
+            timeRange={selectedTimeRange}
+          />
           <div className="mt-4 px-6">
             <LatestFailedFunctionRuns
               environmentSlug={params.environmentSlug}

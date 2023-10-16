@@ -13,16 +13,12 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import colors from 'tailwindcss/colors';
 
 import { type TimeSeries } from '@/gql/graphql';
 import { StepCounter } from './StepCounter';
 import { formatXAxis, formatYAxis, toLocaleUTCDateString } from './format';
 import { transformData } from './transformData';
-
-const colors = {
-  brand: '#6266f1',
-  dark: '#475569',
-} as const;
 
 const dataKeys = {
   additionalStepCount: {
@@ -152,7 +148,7 @@ export function BillableStepUsage({ data, includedStepCountLimit }: Props) {
 
             <Bar
               dataKey={dataKeys.includedStepCount.key}
-              fill={colors.dark}
+              fill={colors.slate['600']}
               name={dataKeys.includedStepCount.title}
               radius={3}
               stackId="slot"
@@ -179,7 +175,7 @@ export function BillableStepUsage({ data, includedStepCountLimit }: Props) {
 
             <Bar
               dataKey={dataKeys.additionalStepCount.key}
-              fill={colors.brand}
+              fill={colors.indigo['500']}
               name={dataKeys.additionalStepCount.title}
               radius={[3, 3, 0, 0]}
               stackId="slot"

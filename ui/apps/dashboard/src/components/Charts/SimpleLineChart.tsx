@@ -1,6 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
+import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { InformationCircleIcon } from '@heroicons/react/24/outline';
+import { Tooltip as IngsTooltip } from '@inngest/components/Tooltip';
 import {
   CartesianGrid,
   Legend,
@@ -12,13 +15,15 @@ import {
   YAxis,
 } from 'recharts';
 
+import LoadingIcon from '@/icons/LoadingIcon';
 import cn from '@/utils/cn';
-import { hourTime } from '@/utils/date';
+import { minuteTime } from '@/utils/date';
 
 type SimpleLineChartProps = {
   className?: string;
   height?: number;
   title: string | React.ReactNode;
+  desc?: string;
   total?: number;
   totalDescription?: string;
   data?: {
@@ -33,6 +38,8 @@ type SimpleLineChartProps = {
     color: string;
     default?: boolean;
   }[];
+  isLoading: boolean;
+  error?: Error;
 };
 
 type AxisProps = {
@@ -55,7 +62,7 @@ function CustomizedXAxisTick(props: AxisProps) {
       className="font-medium"
       textAnchor="middle"
     >
-      {hourTime(props.payload.value)}
+      {minuteTime(props.payload.value)}
     </text>
   );
 }
@@ -72,10 +79,13 @@ export default function SimpleLineChart({
   className = '',
   height = 200,
   title,
+  desc,
   total,
   totalDescription,
   data = [],
   legend = [],
+  isLoading,
+  error,
 }: SimpleLineChartProps) {
   const flattenData = useMemo(() => {
     return data.map((d) => ({ ...d.values, name: d.name }));
@@ -86,15 +96,38 @@ export default function SimpleLineChart({
       <header className="flex items-center justify-between">
         <div className="flex gap-4">
           <h3 className="flex flex-row items-center gap-2 font-medium">{title}</h3>
+          {desc && (
+            <IngsTooltip content={desc}>
+              <InformationCircleIcon className="h-6 w-6 text-gray-400" />
+            </IngsTooltip>
+          )}
         </div>
-        <div>
-          <div className="text-right text-lg font-medium">{total}</div>
-          <div className="text-sm text-slate-600">{totalDescription}</div>
+        <div className="flex justify-end gap-4">
+          {legend.map((l) => (
+            <span key={l.name} className="inline-flex items-center text-sm text-slate-800">
+              <span
+                className="mr-2 inline-flex h-3 w-3 rounded"
+                style={{ backgroundColor: l.color }}
+              ></span>
+              {l.name}
+            </span>
+          ))}
         </div>
       </header>
       <div style={{ minHeight: `${height}px` }}>
-        {data.length ? (
-          <ResponsiveContainer height={height} width="100%">
+        <ResponsiveContainer height={height} width="100%">
+          {isLoading ? (
+            <div className="flex h-full w-full items-center justify-center">
+              <LoadingIcon />
+            </div>
+          ) : error ? (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-5">
+              <div className="inline-flex items-center gap-2 text-red-600">
+                <ExclamationCircleIcon className="h-4 w-4" />
+                <h2 className="text-sm">Failed to load chart</h2>
+              </div>
+            </div>
+          ) : (
             <LineChart data={flattenData} margin={{ top: 16, bottom: 16 }} barCategoryGap={8}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
@@ -147,8 +180,6 @@ export default function SimpleLineChart({
                 wrapperStyle={{ outline: 'none' }}
                 cursor={false}
               />
-              <Legend />
-
               {legend.map((l) => (
                 <Line
                   dot={false}
@@ -159,10 +190,8 @@ export default function SimpleLineChart({
                 />
               ))}
             </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          'Loading...'
-        )}
+          )}
+        </ResponsiveContainer>
       </div>
     </div>
   );

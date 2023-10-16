@@ -106,6 +106,7 @@ func init() {
 
 type QueueManager interface {
 	osqueue.Queue
+
 	Requeue(ctx context.Context, p QueuePartition, i QueueItem, at time.Time) error
 	RequeueByJobID(ctx context.Context, partitionName string, jobID string, at time.Time) error
 }
@@ -118,6 +119,12 @@ type QueueOpt func(q *queue)
 func WithName(name string) func(q *queue) {
 	return func(q *queue) {
 		q.name = name
+	}
+}
+
+func WithQueueLifecycles(l ...QueueLifecycleListener) func(q *queue) {
+	return func(q *queue) {
+		q.lifecycles = l
 	}
 }
 
@@ -315,6 +322,8 @@ type queue struct {
 	r  rueidis.Client
 	pf PriorityFinder
 	kg QueueKeyGenerator
+
+	lifecycles []QueueLifecycleListener
 
 	accountConcurrencyGen   QueueItemConcurrencyKeyGenerator
 	partitionConcurrencyGen PartitionConcurrencyKeyGenerator

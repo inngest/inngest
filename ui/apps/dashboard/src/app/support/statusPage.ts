@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import colors from 'tailwindcss/colors';
 
 type Indicator = 'none' | 'minor' | 'major' | 'critical';
 type StatusPageStatusResponse = {
@@ -26,10 +27,10 @@ type Status = {
 
 // We use hex colors b/c tailwind only includes what is initially rendered
 export const indicatorColor: { [K in Indicator]: string } = {
-  none: '#22c55e', // green-500
-  minor: '#fde047', // yellow-300
-  major: '#f97316', // orange-500
-  critical: '#dc2626', // red-600
+  none: colors.green['500'],
+  minor: colors.yellow['300'],
+  major: colors.orange['500'],
+  critical: colors.red['600'],
 };
 
 const STATUS_PAGE_URL = 'https://status.inngest.com';

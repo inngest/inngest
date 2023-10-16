@@ -1,0 +1,26 @@
+name: Test UI components
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ui/packages/components/**"
+  pull_request:
+    paths:
+      - "ui/packages/components/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2.4.0
+        with:
+          version: "8.6.2"
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+      - run: pnpm install
+        working-directory: ui/packages/components
+      - run: pnpm test
+        working-directory: ui/packages/components

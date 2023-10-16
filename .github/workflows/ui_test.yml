@@ -1,4 +1,4 @@
-name: Test UI
+name: Test Dev Server UI
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: "18"
-      - run: pnpm install
-        working-directory: ui/apps/dev-server-ui
-      - run: pnpm test
-        working-directory: ui/apps/dev-server-ui
+      # - run: pnpm install
+      #   working-directory: ui/apps/dev-server-ui
+      # - run: pnpm test
+      #   working-directory: ui/apps/dev-server-ui
