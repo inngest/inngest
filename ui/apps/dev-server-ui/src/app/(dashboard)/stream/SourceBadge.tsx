@@ -1,7 +1,8 @@
 import { Badge } from '@inngest/components/Badge';
+import { IconClock } from '@inngest/components/icons/Clock';
 import type { Row } from '@tanstack/react-table';
 
-import { IconClock, IconReplay, IconWebhook, IconWindow } from '@/icons';
+import { IconReplay, IconWebhook, IconWindow } from '@/icons';
 
 type Item = {
   source: {
