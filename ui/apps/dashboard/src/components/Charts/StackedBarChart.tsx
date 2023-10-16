@@ -113,10 +113,7 @@ export default function StackedBarChart({
               <LoadingIcon />
             </div>
           ) : error ? (
-            <div
-              className="flex w-full flex-col items-center justify-center gap-5"
-              style={{ height: `${height}px` }}
-            >
+            <div className="flex h-full w-full flex-col items-center justify-center gap-5">
               <div className="inline-flex items-center gap-2 text-red-600">
                 <ExclamationCircleIcon className="h-4 w-4" />
                 <h2 className="text-sm">Failed to load chart</h2>
