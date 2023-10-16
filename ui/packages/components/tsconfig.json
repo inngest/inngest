@@ -5,6 +5,6 @@
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
     "outDir": "./dist/"
   },
-  "include": ["./src/**/*"],
+  "include": ["./src/**/*", "./.storybook/**/preview.tsx"],
   "exclude": ["node_modules", "./dist/"]
 }
