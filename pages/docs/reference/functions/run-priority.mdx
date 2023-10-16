@@ -1,0 +1,112 @@
+# Function run priority
+
+Defining a function's run priority allows you to **prioritize specific function runs above other runs within the same function**.  For example:
+
+- Given you have a single function
+- And you initialize two function runs at the same time, A and B
+- Function run priority allows you to run run B ahead of A
+
+This is useful to prioritize specific function runs, such as ensuring paid user's functions run ahead of free users when scheduled at similar times.
+
+```ts
+export default inngest.createFunction(
+  {
+    id: "synchronize-data",
+    priority: {
+      // Allow runs to have a dynamic "factor" between -600 and 600.  This changes
+      // the order of jobs in the queue;  returning `120` means that this new run should
+      // execute before any jobs enqueued in the last 120 seconds (as it has a higher priority).
+      //
+      // Example:
+      //
+      // If two jobs are enqueued at time 150 (t150) with the following factors:
+      //
+      //  - Job X: t150, factor 0 (no expression or data)
+      //  - Job Y: t150, factor 120
+      //
+      // Then Job Y will run ahead of Job X.  Job Y will also run before any jobs scheduled
+      // 120 seconds beforehand.  Visually:
+      //
+      //   Jobs:          [A,  B,  C, ]
+      //   Priority/Time: [10, 40, 130]
+      //
+      // Becomes:
+      //
+      //   Jobs:          [A,  Y,  B,  C,   X]
+      //   Priority/Time: [10, 30, 40, 130, 150]
+      //
+      // Job Y's score becomes 30 (t150 - 120 = 30), going before any other work except job A.
+      //
+      // NOTE: returning a negative number delays the function run's jobs by the given value
+      // in seconds.
+      run: "event.data.account_type == 'enterprise' ? 120 : 0",
+    },
+  },
+  { event: "intercom/company.updated" },
+  async ({ event, step }) => {
+  }
+);
+```
+
+## How `priority.run` works
+
+**The queue**
+
+Within Inngest, each function's scheduled runs is a priority queue scored by the time that jobs
+should run.  When you create new function runs by sending events, a new job is inserted into the
+queue with a score of the current time (as a millisecond epoch).
+
+**Expressions**
+
+Any time a new function run is scheduled, Inngest evaluates the `priority.run` expression given
+the input event's data.  By default, this returns 0.
+
+For example, the expression `"event.data.plan == 'enterprise' ? 300 : 0"` may return 300 or 0.  If
+an event's `data.plan` field equals `enterprise`, the expression returns `300`.
+
+**Prioritization**
+
+We take the returning number from the expression, and subtract this from the function run's epoch
+time (as seconds).  Returning `300` subtracts 300 seconds from the function run's epoch time,
+pushing the new run ahead of any other functions in the last 300 seconds (5 minutes).
+
+If two function runs are scheduled at similar times, the functions with a higher priority run sooner
+when at capacity. 
+
+**Fairness**
+
+The expression defined within `priority.run` has a max return value of 600 by default, though this
+can be increased upon request.
+
+That is, we only skew a function run's priority by up to 600 seconds.  This ensures that you can
+never starve work older than 600 seconds;  the longer a run exists in the queue without work,
+the more likely it is to be worked on.
+
+Using this model, it's impossible to stave work on lower priority items and functions always exhibit
+some level of fairness.
+
+## Configuration
+
+<Properties>
+  <Property name="priority" type="object">
+    Options to configure how to prioritize functions
+
+    <Properties nested={true}>
+      <Property name="run" type="string">
+        An expression which must return an integer between -600 and 600 (by default), with higher
+	return values resulting in a higher priority.  Examples:
+
+        * Return the priority within an event directly: `event.data.priority` (where
+	  `event.data.priority` is an int within your account's range)
+        * Rate limit by a string field: `event.data.plan == 'enterprise' ? 180 : 0`
+      </Property>
+    </Properties>
+  </Property>
+</Properties>
+
+<Callout>
+  Return values outside of your account's range (by default, -600 to 600) will automatically be clipped
+  to your max bounds.
+
+  An invalid expression will evaluate to 0, as in "no priority".
+</Callout>

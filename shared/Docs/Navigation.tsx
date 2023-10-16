@@ -353,6 +353,10 @@ const referenceNavigation = [
         title: "Debounce",
         href: `${baseDir}/reference/functions/debounce`,
       },
+      {
+        title: "Function run priority",
+        href: `${baseDir}/reference/functions/run-priority`,
+      },
       // {
       //   title: "Logging",
       //   href: `${baseDir}/reference/functions/logging`,

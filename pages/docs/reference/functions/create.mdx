@@ -75,6 +75,26 @@ The `createFunction` method accepts a series of arguments to define your functio
     </Properties>
   </Property>
 
+  <Property name="debounce" type="object">
+    Options to configure function debounce ([reference](/docs/reference/functions/debounce))
+    <Properties nested={true} collapse={true}>
+      <Property name="period" type="string" required>
+        The time period of which to set the limit. The period begins when the first matching event is received.
+        How long to wait before invoking the function with the batch even if it's not full.
+        Current permitted values are from `1s` to `7d` (`168h`).
+      </Property>
+      <Property name="key" type="string">
+        A unique key expression to apply the debounce to. The expression is evaluated for each triggering event.
+
+        Expressions are defined using the [Common Expression Language (CEL)](https://github.com/google/cel-go) with the original event accessible using dot-notation. Examples:
+
+        * Debounce per customer id: `'event.data.customer_id'`
+        * Debounce per account and email address: `'event.data.account_id + "-" + event.user.email'`
+      </Property>
+    </Properties>
+  </Property>
+
+
   <Property name="batchEvents" type="object">
     Configure how the function should consume batches of events ([reference](/docs/guides/batching))
 
@@ -108,6 +128,24 @@ The `createFunction` method accepts a series of arguments to define your functio
       </Property>
     </Properties>
   </Property>
+
+  <Properties>
+    <Property name="priority" type="object">
+      Options to configure how to prioritize functions
+  
+      <Properties nested={true}>
+        <Property name="run" type="string">
+          An expression which must return an integer between -600 and 600 (by default), with higher
+  	return values resulting in a higher priority.  Examples:
+  
+          * Return the priority within an event directly: `event.data.priority` (where
+  	  `event.data.priority` is an int within your account's range)
+          * Rate limit by a string field: `event.data.plan == 'enterprise' ? 180 : 0`
+        </Property>
+      </Properties>
+    </Property>
+  </Properties>
+
 </Properties>
 
 {/* TODO - Document fns arg */}
