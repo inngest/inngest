@@ -17,9 +17,7 @@ const GetSDKReqMetricsDocument = graphql(`
   ) {
     environment: workspace(id: $environmentID) {
       function: workflowBySlug(slug: $fnSlug) {
-        queued: metrics(
-          opts: { name: "step_run_scheduled_total", from: $startTime, to: $endTime }
-        ) {
+        queued: metrics(opts: { name: "sdk_req_scheduled_total", from: $startTime, to: $endTime }) {
           from
           to
           granularity
@@ -28,7 +26,7 @@ const GetSDKReqMetricsDocument = graphql(`
             value
           }
         }
-        started: metrics(opts: { name: "step_run_started_total", from: $startTime, to: $endTime }) {
+        started: metrics(opts: { name: "sdk_req_started_total", from: $startTime, to: $endTime }) {
           from
           to
           granularity
@@ -38,7 +36,7 @@ const GetSDKReqMetricsDocument = graphql(`
           }
         }
 
-        ended: metrics(opts: { name: "step_run_ended_total", from: $startTime, to: $endTime }) {
+        ended: metrics(opts: { name: "sdk_req_ended_total", from: $startTime, to: $endTime }) {
           from
           to
           granularity
