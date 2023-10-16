@@ -5,6 +5,7 @@ import './globals.css';
 import React from 'react';
 import { type Metadata } from 'next';
 import { ClerkProvider } from '@clerk/nextjs';
+import colors from 'tailwindcss/colors';
 
 import { BaseWrapper } from './baseWrapper';
 
@@ -25,13 +26,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             logoPlacement: 'outside',
           },
           variables: {
-            colorPrimary: '#6366F1', // indigo-500
-            colorDanger: '#EF4444', // red-500
-            colorSuccess: '#14B8A6', // teal-500
-            colorWarning: '#F59E0B', // amber-500
-            colorAlphaShade: '#0F172A', // slate-900
-            colorText: '#1E293B', // slate-800
-            colorTextSecondary: '#475569', //slate-600
+            colorPrimary: colors.indigo['500'],
+            colorDanger: colors.red['500'],
+            colorSuccess: colors.teal['500'],
+            colorWarning: colors.amber['500'],
+            colorAlphaShade: colors.slate['900'],
+            colorText: colors.slate['800'],
+            colorTextSecondary: colors.slate['600'],
           },
           elements: {
             card: 'shadow-none border-0',

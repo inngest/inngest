@@ -1,3 +1,4 @@
+import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
@@ -104,9 +105,9 @@ export default function FunctionRunsChart({
       title="Function Runs"
       data={metrics}
       legend={[
-        { name: 'Completed', dataKey: 'completed', color: '#14B8A6' },
-        { name: 'Failed', dataKey: 'failed', color: '#EF4444' },
-        { name: 'Canceled', dataKey: 'canceled', color: '#64748B' },
+        { name: 'Completed', dataKey: 'completed', color: colors.teal['500'] },
+        { name: 'Failed', dataKey: 'failed', color: colors.red['500'] },
+        { name: 'Canceled', dataKey: 'canceled', color: colors.slate['500'] },
       ]}
       isLoading={isFetchingEnvironment || isFetchingFunctionRunsMetrics}
       error={environmentError || functionRunsMetricsError}

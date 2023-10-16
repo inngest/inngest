@@ -1,5 +1,6 @@
 'use client';
 
+import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
@@ -108,9 +109,9 @@ export default function FunctionThroughputChart({
       desc="The number of functions being processed over time"
       data={metrics}
       legend={[
-        { name: 'Queued', dataKey: 'queued', color: '#F59E0B' },
-        { name: 'Started', dataKey: 'started', color: '#0EA5E9' },
-        { name: 'Ended', dataKey: 'ended', color: '#14B8A6' },
+        { name: 'Queued', dataKey: 'queued', color: colors.amber['500'] },
+        { name: 'Started', dataKey: 'started', color: colors.sky['500'] },
+        { name: 'Ended', dataKey: 'ended', color: colors.teal['500'] },
       ]}
       isLoading={isFetchingEnvironment || isFetchingMetrics}
       error={environmentError || metricsError}
