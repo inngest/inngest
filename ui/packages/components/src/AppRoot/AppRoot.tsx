@@ -1,8 +1,7 @@
-import { interTight, robotoMono } from '@/app/fonts';
-import '@/app/globals.css';
+import { interTight, robotoMono } from './fonts';
+import './globals.css';
 
-// This is separated from RootLayout so that we can use it in Storybook.
-export function BaseWrapper({ children }: { children: React.ReactNode }) {
+export function AppRoot({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${interTight.variable} ${robotoMono.variable}`}>
       <body className="bg-slate-940">

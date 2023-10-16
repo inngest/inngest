@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
+import { AppRoot } from '@inngest/components/AppRoot';
 
 import StoreProvider from '@/app/StoreProvider';
-import { BaseWrapper } from './baseWrapper';
 
 export const metadata: Metadata = {
   title: 'Inngest Development Server',
@@ -13,8 +13,8 @@ type RootLayoutProps = {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <BaseWrapper>
+    <AppRoot>
       <StoreProvider>{children}</StoreProvider>
-    </BaseWrapper>
+    </AppRoot>
   );
 }

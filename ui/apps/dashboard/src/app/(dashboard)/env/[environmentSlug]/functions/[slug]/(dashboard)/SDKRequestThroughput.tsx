@@ -7,12 +7,17 @@ import SimpleLineChart from '@/components/Charts/SimpleLineChart';
 import { graphql } from '@/gql';
 import { useEnvironment } from '@/queries';
 
-const GetFnRunMetricsDocument = graphql(`
-  query GetFnMetrics($environmentID: ID!, $fnSlug: String!, $startTime: Time!, $endTime: Time!) {
+const GetSDKReqMetricsDocument = graphql(`
+  query GetSDKRequestMetrics(
+    $environmentID: ID!
+    $fnSlug: String!
+    $startTime: Time!
+    $endTime: Time!
+  ) {
     environment: workspace(id: $environmentID) {
       function: workflowBySlug(slug: $fnSlug) {
         queued: metrics(
-          opts: { name: "function_run_scheduled_total", from: $startTime, to: $endTime }
+          opts: { name: "step_run_scheduled_total", from: $startTime, to: $endTime }
         ) {
           from
           to
@@ -22,9 +27,7 @@ const GetFnRunMetricsDocument = graphql(`
             value
           }
         }
-        started: metrics(
-          opts: { name: "function_run_started_total", from: $startTime, to: $endTime }
-        ) {
+        started: metrics(opts: { name: "step_run_started_total", from: $startTime, to: $endTime }) {
           from
           to
           granularity
@@ -33,7 +36,8 @@ const GetFnRunMetricsDocument = graphql(`
             value
           }
         }
-        ended: metrics(opts: { name: "function_run_ended_total", from: $startTime, to: $endTime }) {
+
+        ended: metrics(opts: { name: "step_run_ended_total", from: $startTime, to: $endTime }) {
           from
           to
           granularity
@@ -47,23 +51,23 @@ const GetFnRunMetricsDocument = graphql(`
   }
 `);
 
-type FunctionThroughputChartProps = {
+type SDKReqThroughputChartProps = {
   environmentSlug: string;
   functionSlug: string;
   timeRange: TimeRange;
 };
 
-export default function FunctionThroughputChart({
+export default function SDKReqThroughputChart({
   environmentSlug,
   functionSlug,
   timeRange,
-}: FunctionThroughputChartProps) {
+}: SDKReqThroughputChartProps) {
   const [{ data: environment }] = useEnvironment({
     environmentSlug,
   });
 
   const [{ data, fetching }] = useQuery({
-    query: GetFnRunMetricsDocument,
+    query: GetSDKReqMetricsDocument,
     variables: {
       environmentID: environment?.id!,
       fnSlug: functionSlug,
@@ -103,8 +107,8 @@ export default function FunctionThroughputChart({
 
   return (
     <SimpleLineChart
-      title="Function Throughput"
-      desc="The number of functions being processed over time"
+      title="SDK Request Throughput"
+      desc="The number of requests to your SDKs over time executing the function and steps, including retries"
       data={metrics}
       legend={[
         { name: 'queued', dataKey: 'queued', color: '#fa8128' },
