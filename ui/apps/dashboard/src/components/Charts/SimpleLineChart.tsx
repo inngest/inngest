@@ -102,9 +102,16 @@ export default function SimpleLineChart({
             </IngsTooltip>
           )}
         </div>
-        <div>
-          <div className="text-right text-lg font-medium">{total}</div>
-          <div className="text-sm text-slate-600">{totalDescription}</div>
+        <div className="flex justify-end gap-4">
+          {legend.map((l) => (
+            <span key={l.name} className="inline-flex items-center text-sm text-slate-800">
+              <span
+                className="mr-2 inline-flex h-3 w-3 rounded"
+                style={{ backgroundColor: l.color }}
+              ></span>
+              {l.name}
+            </span>
+          ))}
         </div>
       </header>
       <div style={{ minHeight: `${height}px` }}>
@@ -173,8 +180,6 @@ export default function SimpleLineChart({
                 wrapperStyle={{ outline: 'none' }}
                 cursor={false}
               />
-              <Legend />
-
               {legend.map((l) => (
                 <Line
                   dot={false}
