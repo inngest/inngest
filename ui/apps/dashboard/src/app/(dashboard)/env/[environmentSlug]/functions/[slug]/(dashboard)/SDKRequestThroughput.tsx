@@ -62,11 +62,12 @@ export default function SDKReqThroughputChart({
   functionSlug,
   timeRange,
 }: SDKReqThroughputChartProps) {
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
+  const [{ data: environment, error: environmentError, fetching: isFetchingEnvironment }] =
+    useEnvironment({
+      environmentSlug,
+    });
 
-  const [{ data, fetching: isFetchingMetrics }] = useQuery({
+  const [{ data, error: metricsError, fetching: isFetchingMetrics }] = useQuery({
     query: GetSDKReqMetricsDocument,
     variables: {
       environmentID: environment?.id!,
@@ -116,6 +117,7 @@ export default function SDKReqThroughputChart({
         { name: 'ended', dataKey: 'ended', color: '#8884d8' },
       ]}
       isLoading={isFetchingEnvironment || isFetchingMetrics}
+      error={environmentError || metricsError}
     />
   );
 }

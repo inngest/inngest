@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import {
   Bar,
   BarChart,
@@ -42,6 +43,7 @@ type BarChartProps = {
     default?: boolean;
   }[];
   isLoading: boolean;
+  error?: Error;
 };
 
 type AxisProps = {
@@ -85,6 +87,7 @@ export default function StackedBarChart({
   totalDescription,
   data = [],
   legend = [],
+  error,
   isLoading,
 }: BarChartProps) {
   const flattenedData = useMemo(() => data.map((d) => ({ ...d.values, name: d.name })), [data]);
@@ -108,6 +111,16 @@ export default function StackedBarChart({
           {isLoading ? (
             <div className="flex h-full w-full items-center justify-center">
               <LoadingIcon />
+            </div>
+          ) : error ? (
+            <div
+              className="flex w-full flex-col items-center justify-center gap-5"
+              style={{ height: `${height}px` }}
+            >
+              <div className="inline-flex items-center gap-2 text-red-600">
+                <ExclamationCircleIcon className="h-4 w-4" />
+                <h2 className="text-sm">Failed to load chart</h2>
+              </div>
             </div>
           ) : (
             <BarChart

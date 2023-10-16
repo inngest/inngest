@@ -59,20 +59,22 @@ export default function FunctionRunsChart({
   functionSlug,
   timeRange,
 }: FunctionRunsChartProps) {
-  const [{ data: environment }] = useEnvironment({
-    environmentSlug,
-  });
+  const [{ data: environment, error: environmentError, fetching: isFetchingEnvironment }] =
+    useEnvironment({
+      environmentSlug,
+    });
 
-  const [{ data }] = useQuery({
-    query: GetFunctionRunsMetricsDocument,
-    variables: {
-      environmentID: environment?.id!,
-      functionSlug,
-      startTime: timeRange.start.toISOString(),
-      endTime: timeRange.end.toISOString(),
-    },
-    pause: !environment?.id,
-  });
+  const [{ data, error: functionRunsMetricsError, fetching: isFetchingFunctionRunsMetrics }] =
+    useQuery({
+      query: GetFunctionRunsMetricsDocument,
+      variables: {
+        environmentID: environment?.id!,
+        functionSlug,
+        startTime: timeRange.start.toISOString(),
+        endTime: timeRange.end.toISOString(),
+      },
+      pause: !environment?.id,
+    });
 
   let metrics: {
     name: string;
@@ -106,7 +108,8 @@ export default function FunctionRunsChart({
         { name: 'Failed', dataKey: 'failed', color: '#EF4444' },
         { name: 'Canceled', dataKey: 'canceled', color: '#64748B' },
       ]}
-      isLoading={isFetching}
+      isLoading={isFetchingEnvironment || isFetchingFunctionRunsMetrics}
+      error={environmentError || functionRunsMetricsError}
     />
   );
 }

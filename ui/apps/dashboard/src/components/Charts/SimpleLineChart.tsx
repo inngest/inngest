@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { Tooltip as IngsTooltip } from '@inngest/components/Tooltip';
 import {
@@ -38,6 +39,7 @@ type SimpleLineChartProps = {
     default?: boolean;
   }[];
   isLoading: boolean;
+  error?: Error;
 };
 
 type AxisProps = {
@@ -83,6 +85,7 @@ export default function SimpleLineChart({
   data = [],
   legend = [],
   isLoading,
+  error,
 }: SimpleLineChartProps) {
   const flattenData = useMemo(() => {
     return data.map((d) => ({ ...d.values, name: d.name }));
@@ -109,6 +112,16 @@ export default function SimpleLineChart({
           {isLoading ? (
             <div className="flex h-full w-full items-center justify-center">
               <LoadingIcon />
+            </div>
+          ) : error ? (
+            <div
+              className="flex w-full flex-col items-center justify-center gap-5"
+              style={{ height: `${height}px` }}
+            >
+              <div className="inline-flex items-center gap-2 text-red-600">
+                <ExclamationCircleIcon className="h-4 w-4" />
+                <h2 className="text-sm">Failed to load chart</h2>
+              </div>
             </div>
           ) : (
             <LineChart data={flattenData} margin={{ top: 16, bottom: 16 }} barCategoryGap={8}>
