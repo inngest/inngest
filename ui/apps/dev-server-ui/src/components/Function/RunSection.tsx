@@ -4,6 +4,8 @@ import { BlankSlate } from '@inngest/components/BlankSlate';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { MetadataGrid } from '@inngest/components/Metadata';
+import { OutputCard } from '@inngest/components/OutputCard';
+import { Timeline } from '@inngest/components/Timeline';
 import { useParsedHistory } from '@inngest/components/hooks/useParsedHistory';
 import { type OutputType } from '@inngest/components/utils/outputRenderer';
 
@@ -15,8 +17,6 @@ import {
   GetHistoryItemOutputDocument,
   useGetFunctionRunQuery,
 } from '../../store/generated';
-import { Timeline } from '../Timeline';
-import OutputCard from './Output';
 import renderRunMetadata from './RunMetadataRenderer';
 import { SleepingSummary } from './SleepingSummary';
 import { WaitingSummary } from './WaitingSummary';

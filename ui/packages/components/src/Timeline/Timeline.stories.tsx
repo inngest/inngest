@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
-import { HistoryParser, type HistoryNode } from '@inngest/components/utils/historyParser';
+import {
+  HistoryParser,
+  type HistoryNode,
+  type RawHistoryItem,
+} from '@inngest/components/utils/historyParser';
 import cancelsData from '@inngest/components/utils/historyParser/testData/cancels.json';
 import failsWithPrecedingStepData from '@inngest/components/utils/historyParser/testData/failsWithPrecedingStep.json';
 import failsWithoutStepsData from '@inngest/components/utils/historyParser/testData/failsWithoutSteps.json';
@@ -11,11 +15,10 @@ import timesOutWaitingForEventData from '@inngest/components/utils/historyParser
 import waitsForEventData from '@inngest/components/utils/historyParser/testData/waitsForEvent.json';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import type { RunHistoryItem } from '@/store/generated';
 import { Timeline } from './index';
 
 type PropsAndCustomArgs = React.ComponentProps<typeof Timeline> & {
-  _rawHistory: RunHistoryItem[];
+  _rawHistory: RawHistoryItem[];
   _rawHistoryFrame: number;
 };
 
@@ -60,8 +63,8 @@ export default meta;
 
 type Story = StoryObj<PropsAndCustomArgs>;
 
-function createStory(rawHistory: unknown): Story {
-  const raw = rawHistory as RunHistoryItem[];
+function createStory(rawHistory: unknown) {
+  const raw = rawHistory as RawHistoryItem[];
 
   return {
     args: {
@@ -81,7 +84,7 @@ function createStory(rawHistory: unknown): Story {
         description: 'Not a real prop. Only used for animating timeline in Storybook.',
       },
     },
-  };
+  } satisfies Story;
 }
 
 export const cancels = createStory(cancelsData);
