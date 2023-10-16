@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { BlankSlate } from './index';
+import { BlankSlate } from './BlankSlate';
 
 const meta = {
   title: 'Components/BlankSlate',

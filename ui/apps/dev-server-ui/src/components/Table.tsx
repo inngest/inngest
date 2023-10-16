@@ -1,8 +1,7 @@
+import { IconChevron } from '@inngest/components/icons/Chevron';
 import { classNames } from '@inngest/components/utils/classNames';
 import { flexRender, useReactTable, type Row, type TableOptions } from '@tanstack/react-table';
 import { useVirtual } from 'react-virtual';
-
-import { IconChevron } from '@/icons';
 
 const cellStyles = 'pl-6 pr-2 py-3 whitespace-nowrap';
 

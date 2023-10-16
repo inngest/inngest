@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@inngest/components/Badge';
+import { BlankSlate } from '@inngest/components/BlankSlate';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { MetadataGrid } from '@inngest/components/Metadata';
@@ -13,7 +14,6 @@ import {
   GetHistoryItemOutputDocument,
   useGetFunctionRunQuery,
 } from '../../store/generated';
-import { BlankSlate } from '../Blank';
 import { Timeline } from '../Timeline';
 import { useParsedHistory } from '../Timeline/historyParser';
 import OutputCard from './Output';

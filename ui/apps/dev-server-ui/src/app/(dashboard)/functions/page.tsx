@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import { BlankSlate } from '@inngest/components/BlankSlate';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -9,7 +10,6 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 
-import { BlankSlate } from '@/components/Blank';
 import SendEventButton from '@/components/Event/SendEventButton';
 import TriggerCronButton from '@/components/Event/TriggerCronButton';
 import SearchInput from '@/components/SearchInput/SearchInput';
@@ -120,14 +120,14 @@ export default function FunctionList() {
       isFetching
         ? columns.map((column) => ({
             ...column,
-            cell: () => <Skeleton className="block h-5 my-[0.3rem]" />,
+            cell: () => <Skeleton className="my-[0.3rem] block h-5" />,
           }))
         : columns,
     [isFetching, functions]
   );
 
   return (
-    <div className="flex flex-col min-h-0 min-w-0">
+    <div className="flex min-h-0 min-w-0 flex-col">
       <SearchInput
         placeholder="Search function..."
         value={searchInput}

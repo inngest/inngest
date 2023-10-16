@@ -2,16 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Button } from '@inngest/components/Button';
+import { IconChevron } from '@inngest/components/icons/Chevron';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
 
 import { queryClient } from '@/app/StoreProvider';
-import { BlankSlate } from '@/components/Blank';
 import SendEventButton from '@/components/Event/SendEventButton';
 import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';
-import { IconChevron } from '@/icons';
 import { client } from '@/store/baseApi';
 import { GetTriggersStreamDocument, type FunctionRun, type StreamItem } from '@/store/generated';
 import { fullDate } from '@/utils/date';
