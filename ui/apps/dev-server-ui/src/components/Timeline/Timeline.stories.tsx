@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
+import { HistoryParser, type HistoryNode } from '@inngest/components/utils/historyParser';
+import cancelsData from '@inngest/components/utils/historyParser/testData/cancels.json';
+import failsWithPrecedingStepData from '@inngest/components/utils/historyParser/testData/failsWithPrecedingStep.json';
+import failsWithoutStepsData from '@inngest/components/utils/historyParser/testData/failsWithoutSteps.json';
+import noStepsData from '@inngest/components/utils/historyParser/testData/noSteps.json';
+import parallelStepsData from '@inngest/components/utils/historyParser/testData/parallelSteps.json';
+import sleepsData from '@inngest/components/utils/historyParser/testData/sleeps.json';
+import succeedsWith2StepsData from '@inngest/components/utils/historyParser/testData/succeedsWith2Steps.json';
+import timesOutWaitingForEventData from '@inngest/components/utils/historyParser/testData/timesOutWaitingForEvent.json';
+import waitsForEventData from '@inngest/components/utils/historyParser/testData/waitsForEvent.json';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import type { RunHistoryItem } from '@/store/generated';
-import { HistoryParser, type HistoryNode } from './historyParser/index';
-import cancelsData from './historyParser/testData/cancels.json';
-import failsWithPrecedingStepData from './historyParser/testData/failsWithPrecedingStep.json';
-import failsWithoutStepsData from './historyParser/testData/failsWithoutSteps.json';
-import noStepsData from './historyParser/testData/noSteps.json';
-import parallelStepsData from './historyParser/testData/parallelSteps.json';
-import sleepsData from './historyParser/testData/sleeps.json';
-import succeedsWith2StepsData from './historyParser/testData/succeedsWith2Steps.json';
-import timesOutWaitingForEventData from './historyParser/testData/timesOutWaitingForEvent.json';
-import waitsForEventData from './historyParser/testData/waitsForEvent.json';
 import { Timeline } from './index';
 
 type PropsAndCustomArgs = React.ComponentProps<typeof Timeline> & {

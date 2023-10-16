@@ -2,9 +2,9 @@ import { IconStatusCircleArrowPath } from '@inngest/components/icons/StatusCircl
 import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
 import { IconStatusCircleCross } from '@inngest/components/icons/StatusCircleCross';
 import { IconStatusCircleMinus } from '@inngest/components/icons/StatusCircleMinus';
+import type { HistoryNode } from '@inngest/components/utils/historyParser';
 
 import { IconStatusCircleExclamation, IconStatusCircleMoon } from '@/icons';
-import type { HistoryNode } from '../historyParser';
 
 type RenderedData = {
   icon: JSX.Element;

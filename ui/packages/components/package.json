@@ -2,6 +2,7 @@
   "name": "@inngest/components",
   "exports": {
     "./*": [
+      "./src/*",
       "./src/*.ts",
       "./src/*.tsx",
       "./src/*/index.ts"

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import {
+  HistoryParser,
+  type HistoryNode,
+  type RawHistoryItem,
+} from '@inngest/components/utils/historyParser';
 
-import type { RunHistoryItem } from '@/store/generated';
-import { HistoryParser } from './historyParser';
-import type { HistoryNode } from './types';
-
-export function useParsedHistory(rawHistory: RunHistoryItem[]): Record<string, HistoryNode> {
+export function useParsedHistory(rawHistory: RawHistoryItem[]): Record<string, HistoryNode> {
   const [history, setHistory] = useState<Record<string, HistoryNode>>({});
 
   useEffect(() => {

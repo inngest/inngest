@@ -1,14 +1,13 @@
-import { HistoryType, type RunHistoryItem } from '@/store/generated';
-import type { HistoryNode } from './types';
+import type { HistoryNode, HistoryType, RawHistoryItem } from './types';
 
-type Updater = (node: HistoryNode, rawItem: RunHistoryItem) => HistoryNode;
+type Updater = (node: HistoryNode, rawItem: RawHistoryItem) => HistoryNode;
 
 const noop: Updater = (node) => node;
 
 const updaters: {
   [key in HistoryType]: Updater;
 } = {
-  [HistoryType.FunctionCancelled]: (node, rawItem) => {
+  FunctionCancelled: (node, rawItem) => {
     return {
       ...node,
       endedAt: new Date(rawItem.createdAt),
@@ -16,7 +15,7 @@ const updaters: {
       status: 'cancelled',
     } satisfies HistoryNode;
   },
-  [HistoryType.FunctionCompleted]: (node, rawItem) => {
+  FunctionCompleted: (node, rawItem) => {
     return {
       ...node,
       endedAt: new Date(rawItem.createdAt),
@@ -24,7 +23,7 @@ const updaters: {
       status: 'completed',
     } satisfies HistoryNode;
   },
-  [HistoryType.FunctionFailed]: (node, rawItem) => {
+  FunctionFailed: (node, rawItem) => {
     return {
       ...node,
       endedAt: new Date(rawItem.createdAt),
@@ -32,17 +31,17 @@ const updaters: {
       status: 'failed',
     } satisfies HistoryNode;
   },
-  [HistoryType.FunctionScheduled]: noop,
-  [HistoryType.FunctionStarted]: (node, rawItem) => {
+  FunctionScheduled: noop,
+  FunctionStarted: (node, rawItem) => {
     return {
       ...node,
       scheduledAt: new Date(rawItem.createdAt),
       status: 'scheduled',
     } satisfies HistoryNode;
   },
-  [HistoryType.FunctionStatusUpdated]: noop,
-  [HistoryType.None]: noop,
-  [HistoryType.StepCompleted]: (node, rawItem) => {
+  FunctionStatusUpdated: noop,
+  None: noop,
+  StepCompleted: (node, rawItem) => {
     const name = parseName(rawItem.stepName ?? undefined);
 
     let waitForEventResult: HistoryNode['waitForEventResult'] | undefined;
@@ -63,7 +62,7 @@ const updaters: {
       waitForEventResult,
     } satisfies HistoryNode;
   },
-  [HistoryType.StepErrored]: (node, rawItem) => {
+  StepErrored: (node, rawItem) => {
     rawItem.attempt;
 
     return {
@@ -72,7 +71,7 @@ const updaters: {
       status: 'errored',
     } satisfies HistoryNode;
   },
-  [HistoryType.StepFailed]: (node, rawItem) => {
+  StepFailed: (node, rawItem) => {
     return {
       ...node,
       endedAt: new Date(rawItem.createdAt),
@@ -82,7 +81,7 @@ const updaters: {
       status: 'failed',
     } satisfies HistoryNode;
   },
-  [HistoryType.StepScheduled]: (node, rawItem) => {
+  StepScheduled: (node, rawItem) => {
     // When scheduling parallel steps, we know the step name ahead of time.
     const name = parseName(rawItem.stepName ?? undefined);
 
@@ -94,7 +93,7 @@ const updaters: {
       status: 'scheduled',
     } satisfies HistoryNode;
   },
-  [HistoryType.StepSleeping]: (node, rawItem) => {
+  StepSleeping: (node, rawItem) => {
     // Need to unset endedAt since StepCompleted can precede StepSleeping within
     // the same group.
     const endedAt = undefined;
@@ -115,7 +114,7 @@ const updaters: {
       status: 'sleeping',
     } satisfies HistoryNode;
   },
-  [HistoryType.StepStarted]: (node, rawItem) => {
+  ['StepStarted']: (node, rawItem) => {
     let url: string | undefined;
     if (rawItem.url) {
       url = parseURL(rawItem.url);
@@ -129,7 +128,7 @@ const updaters: {
       url,
     } satisfies HistoryNode;
   },
-  [HistoryType.StepWaiting]: (node, rawItem) => {
+  ['StepWaiting']: (node, rawItem) => {
     let waitForEventConfig: HistoryNode['waitForEventConfig'] | undefined;
     if (rawItem.waitForEvent) {
       waitForEventConfig = {
@@ -181,7 +180,7 @@ const commonUpdater: Updater = (node, rawItem) => {
   } satisfies HistoryNode;
 };
 
-export function updateNode(node: HistoryNode, rawItem: RunHistoryItem): HistoryNode {
+export function updateNode(node: HistoryNode, rawItem: RawHistoryItem): HistoryNode {
   node = updaters[rawItem.type](node, rawItem);
   return commonUpdater(node, rawItem);
 }

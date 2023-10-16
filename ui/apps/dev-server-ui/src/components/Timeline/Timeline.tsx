@@ -1,7 +1,7 @@
+import type { HistoryNode } from '@inngest/components/utils/historyParser';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 
 import { TimelineNode } from './TimelineNode/TimelineNode';
-import type { HistoryNode } from './historyParser';
 
 type Props = {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
@@ -14,11 +14,11 @@ export function Timeline({ getOutput, history }: Props) {
   return (
     <div>
       {nodes.length === 0 ? (
-        <div className=" text-white text-center">No history yet</div>
+        <div className=" text-center text-white">No history yet</div>
       ) : (
         <AccordionPrimitive.Root
           type="multiple"
-          className="text-slate-100 w-full last:border-b last:border-slate-800/50"
+          className="w-full text-slate-100 last:border-b last:border-slate-800/50"
         >
           {nodes.map((node, i) => {
             let position: 'first' | 'last' | 'middle' = 'middle';
