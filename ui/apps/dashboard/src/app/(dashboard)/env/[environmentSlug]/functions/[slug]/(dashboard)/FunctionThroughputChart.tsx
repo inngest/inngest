@@ -108,9 +108,9 @@ export default function FunctionThroughputChart({
       desc="The number of functions being processed over time"
       data={metrics}
       legend={[
-        { name: 'queued', dataKey: 'queued', color: '#fa8128' },
-        { name: 'started', dataKey: 'started', color: '#82ca9d' },
-        { name: 'ended', dataKey: 'ended', color: '#8884d8' },
+        { name: 'Queued', dataKey: 'queued', color: '#F59E0B' },
+        { name: 'Started', dataKey: 'started', color: '#0EA5E9' },
+        { name: 'Ended', dataKey: 'ended', color: '#14B8A6' },
       ]}
       isLoading={isFetchingEnvironment || isFetchingMetrics}
       error={environmentError || metricsError}
