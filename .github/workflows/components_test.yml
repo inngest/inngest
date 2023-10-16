@@ -1,13 +1,13 @@
-name: Test Dev Server UI
+name: Test UI components
 
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "ui/apps/dashboard/**"
+    paths:
+      - "ui/packages/components/**"
   pull_request:
-    paths-ignore:
-      - "ui/apps/dashboard/**"
+    paths:
+      - "ui/packages/components/**"
 
 jobs:
   build:
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: "18"
-      # - run: pnpm install
-      #   working-directory: ui/apps/dev-server-ui
-      # - run: pnpm test
-      #   working-directory: ui/apps/dev-server-ui
+      - run: pnpm install
+        working-directory: ui/packages/components
+      - run: pnpm test
+        working-directory: ui/packages/components

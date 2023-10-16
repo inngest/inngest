@@ -2,8 +2,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { expect, test } from 'vitest';
 
-import { HistoryParser } from './historyParser.js';
-import type { HistoryNode } from './types.js';
+import { HistoryParser } from './historyParser';
+import type { HistoryNode } from './types';
 
 async function loadHistory(filename: string) {
   const raw = JSON.parse(await fs.readFile(path.join(__dirname, `testData/${filename}`), 'utf8'));
