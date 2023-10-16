@@ -34,6 +34,7 @@ export default function FunctionRunsChart({
           default: true,
         },
       ]}
+      isLoading={isFetching}
     />
   );
 }

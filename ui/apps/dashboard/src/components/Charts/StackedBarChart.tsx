@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 
+import LoadingIcon from '@/icons/LoadingIcon';
 import cn from '@/utils/cn';
 import { minuteTime } from '@/utils/date';
 
@@ -40,6 +41,7 @@ type BarChartProps = {
     /** The default series to show the min bar height when no data is present */
     default?: boolean;
   }[];
+  isLoading: boolean;
 };
 
 type AxisProps = {
@@ -83,6 +85,7 @@ export default function StackedBarChart({
   totalDescription,
   data = [],
   legend = [],
+  isLoading,
 }: BarChartProps) {
   const flattenedData = useMemo(() => data.map((d) => ({ ...d.values, name: d.name })), [data]);
 
@@ -101,8 +104,12 @@ export default function StackedBarChart({
         </div>
       </header>
       <div style={{ minHeight: `${height}px` }}>
-        {data.length ? (
-          <ResponsiveContainer height={height} width="100%">
+        <ResponsiveContainer height={height} width="100%">
+          {isLoading ? (
+            <div className="flex h-full w-full items-center justify-center">
+              <LoadingIcon />
+            </div>
+          ) : (
             <BarChart
               data={flattenedData}
               margin={{
@@ -180,10 +187,8 @@ export default function StackedBarChart({
                 </Bar>
               ))}
             </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          'Loading...'
-        )}
+          )}
+        </ResponsiveContainer>
       </div>
       {/* <div className="flex justify-end gap-4">
         {legend.map((l) => (
