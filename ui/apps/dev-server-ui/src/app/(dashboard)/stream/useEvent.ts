@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { Event } from '@inngest/components/types/event';
-import type { FetchResult } from '@inngest/components/types/fetch';
+import type { FetchResultWithSkip } from '@inngest/components/types/fetch';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 
 import { FunctionRunStatus, useGetEventQuery } from '@/store/generated';
@@ -10,7 +10,7 @@ type Data = Event & { functionRuns: FunctionRun[] };
 export function useEvent(
   eventID: string,
   { skip = false }: { skip?: boolean } = {}
-): FetchResult<Data> {
+): FetchResultWithSkip<Data> {
   const query = useGetEventQuery({ id: eventID }, { pollingInterval: 1500, skip });
 
   // In addition to memoizing, this hook will also transform the API data into
