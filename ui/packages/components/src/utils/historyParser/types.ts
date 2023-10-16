@@ -1,7 +1,3 @@
-// TODO: Use `| undefined` instead of this. It's confusing to use both null and
-// undefined all over the place, but right now our GraphQL APIs use both.
-type Nullish<T> = T | null | undefined;
-
 export type HistoryNode = {
   attempt: number;
   endedAt?: Date;
@@ -45,34 +41,34 @@ export type HistoryType =
 
 export type RawHistoryItem = {
   attempt: number;
-  cancel?: Nullish<{
-    eventID?: Nullish<string>;
-    expression?: Nullish<string>;
-    userID?: Nullish<string>;
-  }>;
+  cancel?: {
+    eventID?: string | null;
+    expression?: string | null;
+    userID?: string | null;
+  } | null;
   createdAt: string;
   functionVersion: number;
-  groupID?: Nullish<string>;
+  groupID?: string | null;
   id: string;
-  result?: Nullish<{
-    errorCode?: Nullish<string>;
-  }>;
-  sleep?: Nullish<{
+  result?: {
+    errorCode?: string | null;
+  } | null;
+  sleep?: {
     until: string;
-  }>;
-  stepName?: Nullish<string>;
-  stepType?: Nullish<'Run' | 'Send' | 'Sleep' | 'Wait'>;
+  } | null;
+  stepName?: string | null;
+  stepType?: 'Run' | 'Send' | 'Sleep' | 'Wait' | null;
   type: HistoryType;
-  url?: Nullish<string>;
-  waitForEvent?: Nullish<{
+  url?: string | null;
+  waitForEvent?: {
     eventName: string;
-    expression?: Nullish<string>;
+    expression?: string | null;
     timeout: string;
-  }>;
-  waitResult?: Nullish<{
-    eventID?: Nullish<string>;
+  } | null;
+  waitResult?: {
+    eventID?: string | null;
     timeout: boolean;
-  }>;
+  } | null;
 };
 
 export type Status =
