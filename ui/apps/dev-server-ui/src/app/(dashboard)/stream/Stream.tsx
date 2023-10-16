@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Button } from '@inngest/components/Button';
 import { IconChevron } from '@inngest/components/icons/Chevron';
+import { fullDate } from '@inngest/components/utils/date';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-table';
 
@@ -14,7 +15,6 @@ import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';
 import { client } from '@/store/baseApi';
 import { GetTriggersStreamDocument, type FunctionRun, type StreamItem } from '@/store/generated';
-import { fullDate } from '@/utils/date';
 import FunctionRunList from './FunctionRunList';
 
 // import OutputList from './OutputList';

@@ -7,11 +7,11 @@ import { ContentCard } from '@inngest/components/ContentCard';
 import { FuncCard } from '@inngest/components/FuncCard';
 import { FuncCardFooter } from '@inngest/components/FuncCardFooter';
 import { MetadataGrid } from '@inngest/components/Metadata';
+import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
+import { shortDate } from '@inngest/components/utils/date';
 import { ulid } from 'ulid';
 
 import SendEventButton from '@/components/Event/SendEventButton';
-import { shortDate } from '@/utils/date';
-import { usePrettyJson } from '../../hooks/usePrettyJson';
 import { useSendEventMutation } from '../../store/devApi';
 import { FunctionRunStatus, useGetEventQuery } from '../../store/generated';
 

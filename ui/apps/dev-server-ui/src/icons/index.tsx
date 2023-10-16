@@ -14,7 +14,3 @@ export { IconWindow } from './Window';
 export { IconReplay } from './Replay';
 export { IconWebhook } from './Webhook';
 export { IconMagnifyingGlass } from './MagnifyingGlass';
-
-// Circle Status Icons
-export { IconStatusCircleExclamation } from './StatusCircleExclamation';
-export { IconStatusCircleMoon } from './StatusCircleMoon';
