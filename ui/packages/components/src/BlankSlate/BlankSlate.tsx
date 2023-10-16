@@ -1,6 +1,5 @@
 import { Button } from '@inngest/components/Button';
-
-import Link from '@/components/Link/Link';
+import { Link } from '@inngest/components/Link/Link';
 
 interface BlankSlateProps {
   imageUrl?: string;
@@ -13,7 +12,7 @@ interface BlankSlateProps {
   button?: { text: string; onClick: () => void };
 }
 
-export const BlankSlate = ({ imageUrl, title, subtitle, button, link }: BlankSlateProps) => {
+export function BlankSlate({ imageUrl, title, subtitle, button, link }: BlankSlateProps) {
   return (
     <div className="flex h-full w-full items-center justify-center text-white">
       <div className="flex max-w-[24rem] flex-col items-center justify-center space-y-3 text-center">
@@ -36,4 +35,4 @@ export const BlankSlate = ({ imageUrl, title, subtitle, button, link }: BlankSla
       </div>
     </div>
   );
-};
+}
