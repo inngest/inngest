@@ -1,5 +1,6 @@
 'use client';
 
+import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
@@ -112,9 +113,9 @@ export default function SDKReqThroughputChart({
       desc="The number of requests to your SDKs over time executing the function and steps, including retries"
       data={metrics}
       legend={[
-        { name: 'queued', dataKey: 'queued', color: '#fa8128' },
-        { name: 'started', dataKey: 'started', color: '#82ca9d' },
-        { name: 'ended', dataKey: 'ended', color: '#8884d8' },
+        { name: 'Queued', dataKey: 'queued', color: colors.amber['500'] },
+        { name: 'Started', dataKey: 'started', color: colors.sky['500'] },
+        { name: 'Ended', dataKey: 'ended', color: colors.teal['500'] },
       ]}
       isLoading={isFetchingEnvironment || isFetchingMetrics}
       error={environmentError || metricsError}

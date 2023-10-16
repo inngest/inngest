@@ -3,6 +3,7 @@
 import { forwardRef } from 'react';
 import ReactSyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/cjs/styles/hljs';
+import colors from 'tailwindcss/colors';
 
 import cn from '@/utils/cn';
 
@@ -12,17 +13,11 @@ type SyntaxHighlighterProps = {
   className?: string;
 };
 
-const colors = {
-  indigo: '#818cf8',
-  green: '#2dd4bf',
-  amber: '#ffb74f',
-};
-
 const theme = {
   ...atomOneDark,
-  'hljs-attr': { color: colors.indigo },
-  'hljs-string': { color: colors.green },
-  'hljs-number': { color: colors.amber },
+  'hljs-attr': { color: colors.indigo['400'] },
+  'hljs-string': { color: colors.teal['400'] },
+  'hljs-number': { color: colors.amber['300'] },
 };
 
 const SyntaxHighlighter = forwardRef(function SyntaxHighlighter(

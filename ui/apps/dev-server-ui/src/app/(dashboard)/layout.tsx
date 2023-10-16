@@ -2,6 +2,7 @@
 
 import { classNames } from '@inngest/components/utils/classNames';
 import { Toaster } from 'sonner';
+import colors from 'tailwindcss/colors';
 
 import BG from '@/components/BG';
 import Header from '@/components/Header';
@@ -41,7 +42,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </Navbar>
       </Header>
       {children}
-      <Toaster theme="dark" toastOptions={{ style: { background: '#334155' } }} />
+      <Toaster theme="dark" toastOptions={{ style: { background: colors.slate['700'] } }} />
     </div>
   );
 }
