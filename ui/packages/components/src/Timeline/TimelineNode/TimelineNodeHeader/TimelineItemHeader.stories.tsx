@@ -1,11 +1,11 @@
 import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import TimelineItemHeader from './TimelineItemHeader';
+import { TimelineNodeHeader } from './TimelineNodeHeader';
 
 const meta = {
-  title: 'Components/TimelineItemHeader',
-  component: TimelineItemHeader,
+  title: 'Components/TimelineNodeHeader',
+  component: TimelineNodeHeader,
   parameters: {
     layout: 'centered',
   },
@@ -25,11 +25,11 @@ const meta = {
     },
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof TimelineItemHeader>;
+} satisfies Meta<typeof TimelineNodeHeader>;
 
 export default meta;
 
-type Story = StoryObj<typeof TimelineItemHeader>;
+type Story = StoryObj<typeof TimelineNodeHeader>;
 
 export const Default: Story = {
   args: {

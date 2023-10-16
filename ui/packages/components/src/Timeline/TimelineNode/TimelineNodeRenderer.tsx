@@ -13,7 +13,7 @@ type RenderedData = {
   badge?: string;
 };
 
-export default function renderTimelineNode(node: HistoryNode): RenderedData {
+export function renderTimelineNode(node: HistoryNode): RenderedData {
   let icon: JSX.Element;
   if (node.scope === 'function' && node.status === 'started') {
     icon = <IconStatusCircleCheck />;
