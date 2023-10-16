@@ -5,11 +5,14 @@ import { ContentCard } from '@inngest/components/ContentCard';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
+import { SleepingSummary } from '@inngest/components/RunDetails/RunSection/SleepingSummary';
+import { WaitingSummary } from '@inngest/components/RunDetails/RunSection/WaitingSummary';
+import { renderRunMetadata } from '@inngest/components/RunDetails/RunSection/runMetadataRenderer';
 import { Timeline } from '@inngest/components/Timeline';
 import { useParsedHistory } from '@inngest/components/hooks/useParsedHistory';
+import { IconClock } from '@inngest/components/icons/Clock';
 import { type OutputType } from '@inngest/components/utils/outputRenderer';
 
-import { IconClock } from '@/icons';
 import { client } from '@/store/baseApi';
 import {
   FunctionRunStatus,
@@ -17,9 +20,6 @@ import {
   GetHistoryItemOutputDocument,
   useGetFunctionRunQuery,
 } from '../../store/generated';
-import renderRunMetadata from './RunMetadataRenderer';
-import { SleepingSummary } from './SleepingSummary';
-import { WaitingSummary } from './WaitingSummary';
 
 interface FunctionRunSectionProps {
   runId: string | null | undefined;
@@ -79,7 +79,14 @@ export const FunctionRunSection = ({ runId }: FunctionRunSectionProps) => {
       </ContentCard>
     );
   }
-  const metadataItems = renderRunMetadata(run);
+  const metadataItems = renderRunMetadata(
+    {
+      ...run,
+      endedAt: run.finishedAt,
+      status: run.status ?? 'RUNNING',
+    },
+    run.history
+  );
   let type: OutputType | undefined;
   if (run.status === FunctionRunStatus.Completed) {
     type = 'completed';
