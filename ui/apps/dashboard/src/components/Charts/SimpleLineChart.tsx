@@ -14,6 +14,7 @@ import {
   YAxis,
 } from 'recharts';
 
+import LoadingIcon from '@/icons/LoadingIcon';
 import cn from '@/utils/cn';
 import { minuteTime } from '@/utils/date';
 
@@ -36,6 +37,7 @@ type SimpleLineChartProps = {
     color: string;
     default?: boolean;
   }[];
+  isLoading: boolean;
 };
 
 type AxisProps = {
@@ -80,6 +82,7 @@ export default function SimpleLineChart({
   totalDescription,
   data = [],
   legend = [],
+  isLoading,
 }: SimpleLineChartProps) {
   const flattenData = useMemo(() => {
     return data.map((d) => ({ ...d.values, name: d.name }));
@@ -102,8 +105,12 @@ export default function SimpleLineChart({
         </div>
       </header>
       <div style={{ minHeight: `${height}px` }}>
-        {data.length ? (
-          <ResponsiveContainer height={height} width="100%">
+        <ResponsiveContainer height={height} width="100%">
+          {isLoading ? (
+            <div className="flex h-full w-full items-center justify-center">
+              <LoadingIcon />
+            </div>
+          ) : (
             <LineChart data={flattenData} margin={{ top: 16, bottom: 16 }} barCategoryGap={8}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
@@ -168,10 +175,8 @@ export default function SimpleLineChart({
                 />
               ))}
             </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          'Loading...'
-        )}
+          )}
+        </ResponsiveContainer>
       </div>
     </div>
   );
