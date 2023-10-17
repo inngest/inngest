@@ -9,7 +9,7 @@ export function Tag({
   className?: string;
   href?: URL;
 }) {
-  const classNames = `rounded-full inline-flex items-center h-[26px] px-3 leading-none text-xs font-medium border border-slate-700 ${className}`;
+  const classNames = `rounded-full inline-flex items-center h-[26px] px-3 leading-none text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 ${className}`;
 
   if (href) {
     return (
