@@ -13,9 +13,28 @@ import AppCardHeader from '@/components/App/AppCardHeader';
 import CodeLine from '@/components/Code/CodeLine';
 import useDebounce from '@/hooks/useDebounce';
 import { IconSpinner } from '@/icons';
-import { useDeleteAppMutation, useUpdateAppMutation, type App } from '@/store/generated';
+import {
+  useDeleteAppMutation,
+  useUpdateAppMutation,
+  type App as ApiApp,
+  type Function,
+} from '@/store/generated';
 import isValidUrl from '@/utils/urlValidation';
 import AppCardStep from './AppCardStep';
+
+type App = Pick<
+  ApiApp,
+  | 'autodiscovered'
+  | 'connected'
+  | 'error'
+  | 'framework'
+  | 'functionCount'
+  | 'id'
+  | 'name'
+  | 'sdkLanguage'
+  | 'sdkVersion'
+  | 'url'
+> & { functions: Pick<Function, 'id' | 'name'>[] };
 
 export default function AppCard({ app }: { app: App }) {
   const [inputUrl, setInputUrl] = useState(app.url || '');
