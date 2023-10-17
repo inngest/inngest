@@ -1,14 +1,15 @@
-import { FunctionTriggerTypes } from '@/store/generated';
-import TriggerTag from './TriggerTag';
+import { TriggerTypes } from '@inngest/components/types/triggers';
+
+import { TriggerTag } from './TriggerTag';
 
 type TriggerTagsProps = {
   triggers: {
-    type: FunctionTriggerTypes.Event | FunctionTriggerTypes.Cron;
+    type: TriggerTypes;
     value: string;
   }[];
 };
 
-export default function TriggerTags({ triggers }: TriggerTagsProps) {
+export function TriggerTags({ triggers }: TriggerTagsProps) {
   return (
     <>
       {triggers?.map((trigger, index) => {
