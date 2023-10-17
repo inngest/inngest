@@ -13,11 +13,13 @@
     "@monaco-editor/react": "4.5.2",
     "@radix-ui/react-accordion": "1.1.2",
     "@radix-ui/react-tooltip": "1.0.6",
+    "@tanstack/react-table": "8.9.3",
     "framer-motion": "10.16.4",
     "monaco-editor": "0.34.1",
     "next": "13.4.12",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "react-virtual": "2.10.4"
   },
   "devDependencies": {
     "@inngest/tsconfig": "workspace:*",

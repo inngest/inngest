@@ -300,9 +300,6 @@ importers:
       react-refractor:
         specifier: 2.1.7
         version: 2.1.7(react@18.2.0)
-      react-virtual:
-        specifier: 2.10.4
-        version: 2.10.4(react@18.2.0)
       refractor:
         specifier: 4.8.0
         version: 4.8.0
@@ -415,6 +412,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: 1.0.6
         version: 1.0.6(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0)(react@18.2.0)
+      '@tanstack/react-table':
+        specifier: 8.9.3
+        version: 8.9.3(react-dom@18.2.0)(react@18.2.0)
       framer-motion:
         specifier: 10.16.4
         version: 10.16.4(react-dom@18.2.0)(react@18.2.0)
@@ -430,6 +430,9 @@ importers:
       react-dom:
         specifier: 18.2.0
         version: 18.2.0(react@18.2.0)
+      react-virtual:
+        specifier: 2.10.4
+        version: 2.10.4(react@18.2.0)
     devDependencies:
       '@inngest/tsconfig':
         specifier: workspace:*
