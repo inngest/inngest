@@ -32,7 +32,6 @@ export function renderRunMetadata(
   }
 
   if (functionRun.status === 'COMPLETED') {
-    console.log(functionRun);
     if (!functionRun.endedAt) {
       throw new Error('missing endedAt');
     }

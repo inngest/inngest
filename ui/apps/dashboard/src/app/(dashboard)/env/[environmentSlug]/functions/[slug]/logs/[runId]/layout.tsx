@@ -1,20 +1,59 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ClockIcon, RectangleStackIcon, RocketLaunchIcon } from '@heroicons/react/20/solid';
+import { HistoryParser } from '@inngest/components/utils/historyParser';
 
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import EventIcon from '@/icons/event.svg';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';
-import { relativeTime } from '@/utils/date';
 import FunctionRunStatusCard from './FunctionRunStatusCard';
+import { StreamDetails } from './StreamDetails';
+
+// TODO: Delete this when the new stream details are ready.
+const isNewStreamDetailsVisible = false;
 
 const GetFunctionRunDetailsDocument = graphql(`
   query GetFunctionRunDetails($environmentID: ID!, $functionSlug: String!, $functionRunID: ULID!) {
     environment: workspace(id: $environmentID) {
       function: workflowBySlug(slug: $functionSlug) {
+        id
+        name
         run(id: $functionRunID) {
+          event {
+            id
+            name
+            payload: event
+            receivedAt
+          }
+          history {
+            attempt
+            cancel {
+              eventID
+              expression
+              userID
+            }
+            createdAt
+            functionVersion
+            groupID
+            id
+            sleep {
+              until
+            }
+            stepName
+            type
+            url
+            waitForEvent {
+              eventName
+              expression
+              timeout
+            }
+            waitResult {
+              eventID
+              timeout
+            }
+          }
           id
           status
           startedAt
@@ -26,7 +65,12 @@ const GetFunctionRunDetailsDocument = graphql(`
               id
               createdAt
             }
+            triggers {
+              eventName
+              schedule
+            }
           }
+          output
           version: workflowVersion {
             triggers {
               eventName
@@ -71,6 +115,51 @@ export default async function FunctionRunDetailsLayout({
 
   const eventName = functionRun.version.triggers[0]?.eventName;
   const scheduleName = functionRun.version.triggers[0]?.schedule;
+  const func = response.environment?.function;
+  const { run } = func ?? {};
+  const triggers = (run?.version?.triggers ?? []).map((trigger) => {
+    return {
+      type: trigger.schedule ? 'CRON' : 'EVENT',
+      value: trigger.schedule ?? trigger.eventName ?? '',
+    } as const;
+  });
+  const { event } = func?.run ?? {};
+  const history = new HistoryParser(run?.history ?? []);
+
+  if (!func) {
+    throw new Error('missing function');
+  }
+  if (!run) {
+    throw new Error('missing run');
+  }
+
+  if (isNewStreamDetailsVisible) {
+    return (
+      <StreamDetails
+        envID={environment.id}
+        event={
+          event
+            ? {
+                ...event,
+                receivedAt: new Date(event.receivedAt),
+              }
+            : undefined
+        }
+        func={{
+          ...func,
+          triggers,
+        }}
+        rawHistory={run?.history ?? []}
+        run={{
+          ...run,
+          endedAt: run.endedAt ?? null,
+          output: run.output ?? null,
+        }}
+      />
+    );
+  }
+
+  // Everything below this line is the legacy details.
 
   let triggerCard: React.ReactNode;
   if (eventName) {

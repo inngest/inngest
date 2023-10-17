@@ -27,7 +27,7 @@ export function ContentCard({
     <div
       className={classNames(
         active ? `bg-slate-910` : ``,
-        `flex flex-1 shrink-0 flex-col overflow-hidden rounded-lg border border-slate-800/30`
+        `flex flex-1 shrink-0 flex-col overflow-hidden border border-slate-800/30`
       )}
     >
       <div className={classNames(title ? 'relative z-30 px-5 py-4' : '')}>
