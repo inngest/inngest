@@ -1,5 +1,7 @@
+import { IconClock } from '@inngest/components/icons/Clock';
+import { IconEvent } from '@inngest/components/icons/Event';
+
 import Tag from '@/components/Tag';
-import { IconClock, IconEvent } from '@/icons';
 import { FunctionTriggerTypes } from '@/store/generated';
 
 type TriggerTagProps = {

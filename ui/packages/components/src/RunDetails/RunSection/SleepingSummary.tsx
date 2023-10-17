@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Card } from '@inngest/components/Card';
 import { MetadataItem } from '@inngest/components/Metadata';
-
-import { Card } from '@/components/Card';
-import type { HistoryNode } from '@/components/Timeline/historyParser';
+import type { HistoryNode } from '@inngest/components/utils/historyParser';
 
 type Props = {
   history: Record<string, HistoryNode>;

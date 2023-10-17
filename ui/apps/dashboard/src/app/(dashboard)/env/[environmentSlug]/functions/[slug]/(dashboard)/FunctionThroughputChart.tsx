@@ -1,5 +1,6 @@
 'use client';
 
+import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
@@ -58,11 +59,12 @@ export default function FunctionThroughputChart({
   functionSlug,
   timeRange,
 }: FunctionThroughputChartProps) {
-  const [{ data: environment }] = useEnvironment({
-    environmentSlug,
-  });
+  const [{ data: environment, error: environmentError, fetching: isFetchingEnvironment }] =
+    useEnvironment({
+      environmentSlug,
+    });
 
-  const [{ data, fetching }] = useQuery({
+  const [{ data, error: metricsError, fetching: isFetchingMetrics }] = useQuery({
     query: GetFnRunMetricsDocument,
     variables: {
       environmentID: environment?.id!,
@@ -107,10 +109,12 @@ export default function FunctionThroughputChart({
       desc="The number of functions being processed over time"
       data={metrics}
       legend={[
-        { name: 'queued', dataKey: 'queued', color: '#fa8128' },
-        { name: 'started', dataKey: 'started', color: '#82ca9d' },
-        { name: 'ended', dataKey: 'ended', color: '#8884d8' },
+        { name: 'Queued', dataKey: 'queued', color: colors.amber['500'] },
+        { name: 'Started', dataKey: 'started', color: colors.sky['500'] },
+        { name: 'Ended', dataKey: 'ended', color: colors.teal['500'] },
       ]}
+      isLoading={isFetchingEnvironment || isFetchingMetrics}
+      error={environmentError || metricsError}
     />
   );
 }

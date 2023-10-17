@@ -1,5 +1,6 @@
 'use client';
 
+import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
@@ -16,9 +17,7 @@ const GetSDKReqMetricsDocument = graphql(`
   ) {
     environment: workspace(id: $environmentID) {
       function: workflowBySlug(slug: $fnSlug) {
-        queued: metrics(
-          opts: { name: "step_run_scheduled_total", from: $startTime, to: $endTime }
-        ) {
+        queued: metrics(opts: { name: "sdk_req_scheduled_total", from: $startTime, to: $endTime }) {
           from
           to
           granularity
@@ -27,7 +26,7 @@ const GetSDKReqMetricsDocument = graphql(`
             value
           }
         }
-        started: metrics(opts: { name: "step_run_started_total", from: $startTime, to: $endTime }) {
+        started: metrics(opts: { name: "sdk_req_started_total", from: $startTime, to: $endTime }) {
           from
           to
           granularity
@@ -37,7 +36,7 @@ const GetSDKReqMetricsDocument = graphql(`
           }
         }
 
-        ended: metrics(opts: { name: "step_run_ended_total", from: $startTime, to: $endTime }) {
+        ended: metrics(opts: { name: "sdk_req_ended_total", from: $startTime, to: $endTime }) {
           from
           to
           granularity
@@ -62,11 +61,12 @@ export default function SDKReqThroughputChart({
   functionSlug,
   timeRange,
 }: SDKReqThroughputChartProps) {
-  const [{ data: environment }] = useEnvironment({
-    environmentSlug,
-  });
+  const [{ data: environment, error: environmentError, fetching: isFetchingEnvironment }] =
+    useEnvironment({
+      environmentSlug,
+    });
 
-  const [{ data, fetching }] = useQuery({
+  const [{ data, error: metricsError, fetching: isFetchingMetrics }] = useQuery({
     query: GetSDKReqMetricsDocument,
     variables: {
       environmentID: environment?.id!,
@@ -111,10 +111,12 @@ export default function SDKReqThroughputChart({
       desc="The number of requests to your SDKs over time executing the function and steps, including retries"
       data={metrics}
       legend={[
-        { name: 'queued', dataKey: 'queued', color: '#fa8128' },
-        { name: 'started', dataKey: 'started', color: '#82ca9d' },
-        { name: 'ended', dataKey: 'ended', color: '#8884d8' },
+        { name: 'Queued', dataKey: 'queued', color: colors.amber['500'] },
+        { name: 'Started', dataKey: 'started', color: colors.sky['500'] },
+        { name: 'Ended', dataKey: 'ended', color: colors.teal['500'] },
       ]}
+      isLoading={isFetchingEnvironment || isFetchingMetrics}
+      error={environmentError || metricsError}
     />
   );
 }

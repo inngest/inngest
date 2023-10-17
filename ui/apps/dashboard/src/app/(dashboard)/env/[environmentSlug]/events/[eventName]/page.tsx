@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ChartBarIcon, ChevronRightIcon, CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import colors from 'tailwindcss/colors';
 
 import { Alert } from '@/components/Alert';
 import Block from '@/components/Block';
@@ -54,7 +55,7 @@ export default function EventDashboard({ params }: EventDashboardProps) {
             {
               name: 'Events',
               dataKey: 'count',
-              color: '#475569',
+              color: colors.slate['600'],
               default: true,
             },
           ]}

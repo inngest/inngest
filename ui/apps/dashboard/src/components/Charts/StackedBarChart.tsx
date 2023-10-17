@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import {
   Bar,
   BarChart,
@@ -12,6 +13,7 @@ import {
   YAxis,
 } from 'recharts';
 
+import LoadingIcon from '@/icons/LoadingIcon';
 import cn from '@/utils/cn';
 import { minuteTime } from '@/utils/date';
 
@@ -40,6 +42,8 @@ type BarChartProps = {
     /** The default series to show the min bar height when no data is present */
     default?: boolean;
   }[];
+  isLoading: boolean;
+  error?: Error;
 };
 
 type AxisProps = {
@@ -83,6 +87,8 @@ export default function StackedBarChart({
   totalDescription,
   data = [],
   legend = [],
+  error,
+  isLoading,
 }: BarChartProps) {
   const flattenedData = useMemo(() => data.map((d) => ({ ...d.values, name: d.name })), [data]);
 
@@ -95,14 +101,32 @@ export default function StackedBarChart({
         <div className="flex gap-4">
           <h3 className="flex flex-row items-center gap-2 font-medium">{title}</h3>
         </div>
-        <div>
-          <div className="text-right text-lg font-medium">{total}</div>
-          <div className="text-sm capitalize text-slate-600">{totalDescription}</div>
+        <div className="flex justify-end gap-4">
+          {legend.map((l) => (
+            <span key={l.name} className="inline-flex items-center text-sm text-slate-800">
+              <span
+                className="mr-2 inline-flex h-3 w-3 rounded"
+                style={{ backgroundColor: l.color }}
+              ></span>
+              {l.name}
+            </span>
+          ))}
         </div>
       </header>
       <div style={{ minHeight: `${height}px` }}>
-        {data.length ? (
-          <ResponsiveContainer height={height} width="100%">
+        <ResponsiveContainer height={height} width="100%">
+          {isLoading ? (
+            <div className="flex h-full w-full items-center justify-center">
+              <LoadingIcon />
+            </div>
+          ) : error ? (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-5">
+              <div className="inline-flex items-center gap-2 text-red-600">
+                <ExclamationCircleIcon className="h-4 w-4" />
+                <h2 className="text-sm">Failed to load chart</h2>
+              </div>
+            </div>
+          ) : (
             <BarChart
               data={flattenedData}
               margin={{
@@ -180,22 +204,9 @@ export default function StackedBarChart({
                 </Bar>
               ))}
             </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          'Loading...'
-        )}
+          )}
+        </ResponsiveContainer>
       </div>
-      {/* <div className="flex justify-end gap-4">
-        {legend.map((l) => (
-          <span key={l.name} className="inline-flex items-center text-sm">
-            <span
-              className="mr-2 inline-flex h-3 w-3 rounded"
-              style={{ backgroundColor: l.color }}
-            ></span>
-            {l.name}
-          </span>
-        ))}
-      </div> */}
     </div>
   );
 }

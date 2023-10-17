@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { MetadataGrid } from '@inngest/components/Metadata';
+import { OutputCard } from '@inngest/components/OutputCard';
+import { IconChevron } from '@inngest/components/icons/Chevron';
 import { classNames } from '@inngest/components/utils/classNames';
+import { formatMilliseconds } from '@inngest/components/utils/date';
+import { type HistoryNode } from '@inngest/components/utils/historyParser';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import TimelineItemHeader from '@/components/AccordionTimeline/TimelineItemHeader';
-import OutputCard from '@/components/Function/Output';
-import { IconChevron } from '@/icons/Chevron';
-import { formatMilliseconds } from '@/utils/date';
-import { type HistoryNode } from '../historyParser/index';
-import renderTimelineNode from './TimelineNodeRenderer';
+import { TimelineNodeHeader } from './TimelineNodeHeader';
+import { renderTimelineNode } from './TimelineNodeRenderer';
 
 type Props = {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
@@ -48,7 +48,7 @@ export function TimelineNode({ position, getOutput, node }: Props) {
       />
       <AccordionPrimitive.Header className="flex gap-2 py-6">
         <div className="z-10 flex-1">
-          <TimelineItemHeader icon={icon} badge={badge} title={name} metadata={metadata} />
+          <TimelineNodeHeader icon={icon} badge={badge} title={name} metadata={metadata} />
         </div>
 
         {isExpandable && (

@@ -1,6 +1,6 @@
 import { Badge } from '@inngest/components/Badge';
 
-export type TimelineItemHeaderProps = {
+type Props = {
   icon: React.ReactNode;
   badge?: string;
   title?: string;
@@ -10,12 +10,7 @@ export type TimelineItemHeaderProps = {
   };
 };
 
-export default function TimelineItemHeader({
-  icon,
-  badge,
-  title,
-  metadata,
-}: TimelineItemHeaderProps) {
+export function TimelineNodeHeader({ icon, badge, title, metadata }: Props) {
   return (
     <div className="flex items-start justify-between leading-7 text-slate-100	">
       <div className="mr-2 flex flex-1 items-start gap-2">

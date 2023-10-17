@@ -1,10 +1,10 @@
 import { IconStatusCircleArrowPath } from '@inngest/components/icons/StatusCircleArrowPath';
 import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
 import { IconStatusCircleCross } from '@inngest/components/icons/StatusCircleCross';
+import { IconStatusCircleExclamation } from '@inngest/components/icons/StatusCircleExclamation';
 import { IconStatusCircleMinus } from '@inngest/components/icons/StatusCircleMinus';
-
-import { IconStatusCircleExclamation, IconStatusCircleMoon } from '@/icons';
-import type { HistoryNode } from '../historyParser';
+import { IconStatusCircleMoon } from '@inngest/components/icons/StatusCircleMoon';
+import type { HistoryNode } from '@inngest/components/utils/historyParser';
 
 type RenderedData = {
   icon: JSX.Element;
@@ -13,7 +13,7 @@ type RenderedData = {
   badge?: string;
 };
 
-export default function renderTimelineNode(node: HistoryNode): RenderedData {
+export function renderTimelineNode(node: HistoryNode): RenderedData {
   let icon: JSX.Element;
   if (node.scope === 'function' && node.status === 'started') {
     icon = <IconStatusCircleCheck />;

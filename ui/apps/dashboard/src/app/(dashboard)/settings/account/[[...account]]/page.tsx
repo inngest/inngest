@@ -1,4 +1,5 @@
 import { UserProfile } from '@clerk/nextjs';
+import colors from 'tailwindcss/colors';
 
 const UserProfilePage = () => (
   <div className="min-h-0 flex-1">
@@ -7,7 +8,7 @@ const UserProfilePage = () => (
       routing="path"
       appearance={{
         variables: {
-          colorAlphaShade: '#FFF', // white to hide the Clerk's scrollbar
+          colorAlphaShade: colors.white, // white to hide the Clerk's scrollbar
         },
         elements: {
           rootBox: 'h-full',

@@ -1,0 +1,1 @@
+export { BlankSlate } from './BlankSlate';

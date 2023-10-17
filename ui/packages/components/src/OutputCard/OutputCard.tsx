@@ -1,14 +1,13 @@
 import { CodeBlock } from '@inngest/components/CodeBlock';
+import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import { renderOutput, type OutputType } from '@inngest/components/utils/outputRenderer';
-
-import { usePrettyJson } from '@/hooks/usePrettyJson';
 
 interface OutputCardProps {
   type: OutputType;
   content: string;
 }
 
-export default function OutputCard({ type, content }: OutputCardProps) {
+export function OutputCard({ type, content }: OutputCardProps) {
   let { message, errorName, output } = renderOutput({ type, content });
 
   if (!message && !output) return null;

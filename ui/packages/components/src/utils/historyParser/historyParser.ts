@@ -1,5 +1,4 @@
-import { HistoryType, type RunHistoryItem } from '@/store/generated';
-import { type HistoryNode } from './types';
+import type { HistoryNode, HistoryType, RawHistoryItem } from './types';
 import { updateNode } from './updateNode';
 
 /**
@@ -16,7 +15,7 @@ import { updateNode } from './updateNode';
 export class HistoryParser {
   history: Record<string, HistoryNode> = {};
 
-  constructor(rawHistory?: RunHistoryItem[]) {
+  constructor(rawHistory?: RawHistoryItem[]) {
     if (rawHistory) {
       for (const item of rawHistory) {
         this.append(item);
@@ -24,19 +23,21 @@ export class HistoryParser {
     }
   }
 
-  append(rawItem: RunHistoryItem) {
-    if (rawItem.type === HistoryType.FunctionStarted) {
+  append(rawItem: RawHistoryItem) {
+    const groupID = rawItem.groupID ?? 'unknown';
+
+    if (rawItem.type === 'FunctionStarted') {
       this.createFunctionRunStartNode(new Date(rawItem.createdAt));
     }
 
     let node: HistoryNode;
-    const existingNode = this.history[rawItem.groupID];
+    const existingNode = this.history[groupID];
     if (existingNode) {
       node = { ...existingNode };
     } else {
       node = {
         attempt: rawItem.attempt,
-        groupID: rawItem.groupID,
+        groupID,
         scheduledAt: new Date(rawItem.createdAt),
         sleepConfig: undefined,
         status: 'scheduled',
@@ -45,7 +46,7 @@ export class HistoryParser {
       };
     }
 
-    if (rawItem.type === HistoryType.FunctionFailed && node.scope === 'step') {
+    if (rawItem.type === 'FunctionFailed' && node.scope === 'step') {
       // Put FunctionFailed into its own node. Its group ID is the same as
       // StepFailed but don't want to mess up the StepFailed node's data.
       node.groupID = 'function-run-end';
@@ -58,7 +59,7 @@ export class HistoryParser {
       [node.groupID]: node,
     };
 
-    if (rawItem.type === HistoryType.FunctionCancelled) {
+    if (rawItem.type === 'FunctionCancelled') {
       this.cancelNodes(new Date(rawItem.createdAt));
     }
 
