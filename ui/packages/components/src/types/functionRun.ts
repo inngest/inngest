@@ -5,10 +5,10 @@ export function isFunctionRunStatus(s: string): s is FunctionRunStatus {
 }
 
 export type FunctionRun = {
-  endedAt?: string | null;
+  endedAt: string | null;
   id: string;
   name: string;
-  output?: string | null;
-  startedAt?: string | null;
+  output: string | null;
+  startedAt: string | null;
   status: FunctionRunStatus;
 };

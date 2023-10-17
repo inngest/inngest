@@ -11,7 +11,7 @@ import type { FunctionRun } from '@inngest/components/types/functionRun';
 
 import { FunctionRunStatus, useGetEventQuery } from '@/store/generated';
 
-type Data = Event & { functionRuns: FunctionRun[] };
+type Data = Event & { functionRuns: Pick<FunctionRun, 'id' | 'name' | 'output' | 'status'>[] };
 
 export function useEvent(eventID: string | null): FetchResult<Data, { skippable: true }> {
   const skip = !eventID;
@@ -26,11 +26,11 @@ export function useEvent(eventID: string | null): FetchResult<Data, { skippable:
       return undefined;
     }
 
-    const functionRuns: FunctionRun[] = (event.functionRuns ?? []).map((run) => {
+    const functionRuns: Data['functionRuns'] = (event.functionRuns ?? []).map((run) => {
       return {
-        ...run,
+        id: run.id,
         name: run.name ?? 'Unknown',
-        output: run.output ?? undefined,
+        output: run.output ?? null,
         status: run.status ?? FunctionRunStatus.Running,
       };
     });
