@@ -1,4 +1,3 @@
-import { TriggerTypes } from '@inngest/components/types/triggers';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { TriggerTag } from './TriggerTag';
@@ -18,14 +17,14 @@ type Story = StoryObj<typeof TriggerTag>;
 
 export const Event: Story = {
   args: {
-    type: TriggerTypes.Event,
+    type: 'EVENT',
     value: 'billing/payment.failed',
   },
 };
 
 export const Cron: Story = {
   args: {
-    type: TriggerTypes.Cron,
+    type: 'CRON',
     value: '* * * * *',
   },
 };

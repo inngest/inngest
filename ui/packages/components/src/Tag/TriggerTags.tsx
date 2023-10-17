@@ -1,15 +1,7 @@
-import { TriggerTypes } from '@inngest/components/types/triggers';
-
+import { type Trigger } from '../types/trigger';
 import { TriggerTag } from './TriggerTag';
 
-type TriggerTagsProps = {
-  triggers: {
-    type: TriggerTypes;
-    value: string;
-  }[];
-};
-
-export function TriggerTags({ triggers }: TriggerTagsProps) {
+export function TriggerTags({ triggers }: { triggers: Trigger[] }) {
   return (
     <>
       {triggers?.map((trigger, index) => {
