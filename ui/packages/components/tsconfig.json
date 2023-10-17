@@ -3,8 +3,8 @@
   "extends": "@inngest/tsconfig/react-library.json",
   "compilerOptions": {
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
-    "outDir": "./dist/"
+    "rootDirs": ["./src/", "./.storybook/", "./"]
   },
-  "include": ["./src/**/*", "./.storybook/**/preview.tsx"],
+  "include": ["./src/**/*", "./.storybook/**/preview.tsx", "./tailwind.config.ts"],
   "exclude": ["node_modules", "./dist/"]
 }
