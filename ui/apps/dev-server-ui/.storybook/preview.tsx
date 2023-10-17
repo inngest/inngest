@@ -1,8 +1,16 @@
+import { AppRoot } from '@inngest/components/AppRoot';
 import type { Preview } from '@storybook/react';
 
-import '../src/app/globals.css';
-
 const preview: Preview = {
+  decorators: [
+    (Story) => {
+      return (
+        <AppRoot>
+          <Story />
+        </AppRoot>
+      );
+    },
+  ],
   parameters: {
     actions: { argTypesRegex: '^on[A-Z].*' },
     backgrounds: {
