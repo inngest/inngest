@@ -9,10 +9,12 @@ import {
   Tooltip as ChartTooltip,
   Line,
   LineChart,
+  ReferenceArea,
   ResponsiveContainer,
   XAxis,
   YAxis,
 } from 'recharts';
+import colors from 'tailwindcss/colors';
 
 import LoadingIcon from '@/icons/LoadingIcon';
 import cn from '@/utils/cn';
@@ -140,6 +142,26 @@ export default function SimpleLineChart({
                 tick={CustomizedYAxisTick}
                 width={10}
               />
+              <ReferenceArea
+                y1={0}
+                y2={1}
+                x1="2023-10-17T12:30:00Z"
+                x2="2023-10-17T12:30:00Z"
+                stroke="red"
+                fill="red"
+              />
+              {data?.map(({ name, values }, index) => {
+                if (!values.concurrencyLimit) return;
+                return (
+                  <ReferenceArea
+                    key={name}
+                    x1={name}
+                    x2={index < data.length - 1 ? data[index + 1]!.name : name}
+                    fill={colors.amber['500']}
+                    fillOpacity={0.15}
+                  />
+                );
+              })}
               <ChartTooltip
                 content={(props) => {
                   const { label, payload } = props;
@@ -149,6 +171,8 @@ export default function SimpleLineChart({
                         {new Date(label).toLocaleString()}
                       </span>
                       {payload?.map((p, idx) => {
+                        // @ts-ignore
+                        if (p.value === false) return;
                         const l = legend.find((l) => l.dataKey == p.name);
                         return (
                           <div
@@ -159,10 +183,12 @@ export default function SimpleLineChart({
                               className="mr-2 inline-flex h-3 w-3 rounded"
                               style={{ backgroundColor: l?.color || p.color }}
                             ></span>
-                            {p.value?.toLocaleString(undefined, {
-                              notation: 'compact',
-                              compactDisplay: 'short',
-                            })}{' '}
+                            {typeof p.value === 'number'
+                              ? p.value.toLocaleString(undefined, {
+                                  notation: 'compact',
+                                  compactDisplay: 'short',
+                                })
+                              : ''}{' '}
                             {l?.name || p.name}
                           </div>
                         );

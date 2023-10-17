@@ -43,6 +43,17 @@ const GetFnRunMetricsDocument = graphql(`
             value
           }
         }
+        concurrencyLimit: metrics(
+          opts: { name: "concurrency_limit_reached_total", from: $startTime, to: $endTime }
+        ) {
+          from
+          to
+          granularity
+          data {
+            bucket
+            value
+          }
+        }
       }
     }
   }
@@ -86,21 +97,18 @@ export default function FunctionThroughputChart({
   const queued = data?.environment.function?.queued;
   const started = data?.environment.function?.started;
   const ended = data?.environment.function?.ended;
+  const concurrencyLimit = data?.environment.function?.concurrencyLimit;
 
-  if (queued && started && ended) {
-    metrics = queued.data.map((d, idx) => {
-      const startedCount = started.data[idx]?.value || 0;
-      const endedCount = ended.data[idx]?.value || 0;
-
-      return {
-        name: d.bucket,
-        values: {
-          queued: d.value,
-          started: startedCount,
-          ended: endedCount,
-        },
-      };
-    });
+  if (queued && started && ended && concurrencyLimit) {
+    metrics = queued.data.map((d, idx) => ({
+      name: d.bucket,
+      values: {
+        queued: d.value,
+        started: started.data[idx]?.value ?? 0,
+        ended: ended.data[idx]?.value ?? 0,
+        concurrencyLimit: Boolean(concurrencyLimit.data[idx]?.value),
+      },
+    }));
   }
 
   return (
@@ -109,7 +117,8 @@ export default function FunctionThroughputChart({
       desc="The number of function runs being processed over time."
       data={metrics}
       legend={[
-        { name: 'Queued', dataKey: 'queued', color: colors.amber['500'] },
+        { name: 'Concurrency Limit', dataKey: 'concurrencyLimit', color: colors.amber['500'] },
+        { name: 'Queued', dataKey: 'queued', color: colors.slate['500'] },
         { name: 'Started', dataKey: 'started', color: colors.sky['500'] },
         { name: 'Ended', dataKey: 'ended', color: colors.teal['500'] },
       ]}
