@@ -90,19 +90,14 @@ export default function SDKReqThroughputChart({
   const ended = data?.environment.function?.ended;
 
   if (queued && started && ended) {
-    metrics = queued.data.map((d, idx) => {
-      const startedCount = started.data[idx]?.value || 0;
-      const endedCount = ended.data[idx]?.value || 0;
-
-      return {
-        name: d.bucket,
-        values: {
-          queued: d.value,
-          started: startedCount,
-          ended: endedCount,
-        },
-      };
-    });
+    metrics = queued.data.map((d, idx) => ({
+      name: d.bucket,
+      values: {
+        queued: d.value,
+        started: started.data[idx]?.value || 0,
+        ended: ended.data[idx]?.value || 0,
+      },
+    }));
   }
 
   return (
@@ -111,7 +106,7 @@ export default function SDKReqThroughputChart({
       desc="The number of requests to your SDKs over time running the function and steps, including retries."
       data={metrics}
       legend={[
-        { name: 'Queued', dataKey: 'queued', color: colors.amber['500'] },
+        { name: 'Queued', dataKey: 'queued', color: colors.slate['500'] },
         { name: 'Started', dataKey: 'started', color: colors.sky['500'] },
         { name: 'Ended', dataKey: 'ended', color: colors.teal['500'] },
       ]}
