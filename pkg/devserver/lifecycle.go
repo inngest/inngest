@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -21,8 +22,8 @@ func (l lifecycle) OnFunctionScheduled(
 	ctx context.Context,
 	id state.Identifier,
 	item queue.Item,
+	event event.Event,
 ) {
-
 	state, err := l.sm.Load(ctx, id.RunID)
 	if err != nil {
 		return
@@ -41,5 +42,6 @@ func (l lifecycle) OnFunctionScheduled(
 		FunctionID:   id.WorkflowID,
 		EventID:      id.EventID,
 		TriggerType:  triggerType,
+		Cron:         event.Cron,
 	})
 }

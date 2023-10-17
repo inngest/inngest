@@ -362,7 +362,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnFunctionScheduled(context.WithoutCancel(ctx), id, item)
+		go e.OnFunctionScheduled(context.WithoutCancel(ctx), id, item, req.Events[0].GetEvent())
 	}
 
 	return &id, nil
