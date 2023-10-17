@@ -6,6 +6,7 @@ import { ChartBarIcon, FolderIcon, RocketLaunchIcon, XCircleIcon } from '@heroic
 
 import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import { Alert } from '@/components/Alert';
+import { Badge } from '@/components/Badge/Badge';
 import Block from '@/components/Block';
 import ListContainer from '@/components/Lists/ListContainer';
 import ListItem from '@/components/Lists/ListItem';
@@ -105,10 +106,13 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 <span className="text-xl font-medium text-slate-800">{`${failureRate}%`}</span>
               </div>
             </div>
-            <DashboardTimeRangeFilter
-              selectedTimeRange={selectedTimeRange}
-              onTimeRangeChange={handleTimeRangeChange}
-            />
+            <div className="flex items-center gap-4">
+              <Badge size="sm">Beta</Badge>
+              <DashboardTimeRangeFilter
+                selectedTimeRange={selectedTimeRange}
+                onTimeRangeChange={handleTimeRangeChange}
+              />
+            </div>
           </div>
           <FunctionRunsChart
             environmentSlug={params.environmentSlug}
