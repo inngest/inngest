@@ -12,12 +12,7 @@ type TableProps = {
   tableContainerRef: React.RefObject<HTMLDivElement>;
 };
 
-export default function Table({
-  options,
-  blankState,
-  customRowProps,
-  tableContainerRef,
-}: TableProps) {
+export function Table({ options, blankState, customRowProps, tableContainerRef }: TableProps) {
   const table = useReactTable(options);
   const { rows } = table.getRowModel();
 
