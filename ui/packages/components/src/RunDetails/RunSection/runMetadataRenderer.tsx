@@ -1,18 +1,18 @@
 import { type MetadataItemProps } from '@inngest/components/Metadata/MetadataItem';
 import { type FunctionRun } from '@inngest/components/types/functionRun';
 import { formatMilliseconds, shortDate } from '@inngest/components/utils/date';
-import type { RawHistoryItem } from '@inngest/components/utils/historyParser';
+import type { HistoryParser } from '@inngest/components/utils/historyParser';
 
 export function renderRunMetadata(
   functionRun: Pick<FunctionRun, 'endedAt' | 'id' | 'startedAt' | 'status'>,
-  history: RawHistoryItem[]
+  history: HistoryParser
 ): MetadataItemProps[] {
   if (!functionRun.startedAt) {
     throw new Error('missing startedAt');
   }
 
   // The current startedAt is in reality the queuedAt timestamp. We are getting the real startedAt from the first history item
-  const startedAt = history[0]?.createdAt;
+  const startedAt = history.runStartedAt;
   const startedAtLabel = startedAt ? shortDate(new Date(startedAt)) : '-';
   const metadataItems: MetadataItemProps[] = [
     { label: 'Run ID', value: functionRun.id, size: 'large', type: 'code' },
@@ -32,6 +32,7 @@ export function renderRunMetadata(
   }
 
   if (functionRun.status === 'COMPLETED') {
+    console.log(functionRun);
     if (!functionRun.endedAt) {
       throw new Error('missing endedAt');
     }

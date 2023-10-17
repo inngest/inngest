@@ -1,4 +1,4 @@
-import type { HistoryNode, HistoryType, RawHistoryItem } from './types';
+import type { HistoryNode, RawHistoryItem } from './types';
 import { updateNode } from './updateNode';
 
 /**
@@ -13,7 +13,8 @@ import { updateNode } from './updateNode';
  * changed in the future, but that increases complexity.
  */
 export class HistoryParser {
-  history: Record<string, HistoryNode> = {};
+  groups: Record<string, HistoryNode> = {};
+  runStartedAt?: Date;
 
   constructor(rawHistory?: RawHistoryItem[]) {
     if (rawHistory) {
@@ -27,11 +28,12 @@ export class HistoryParser {
     const groupID = rawItem.groupID ?? 'unknown';
 
     if (rawItem.type === 'FunctionStarted') {
+      this.runStartedAt = new Date(rawItem.createdAt);
       this.createFunctionRunStartNode(new Date(rawItem.createdAt));
     }
 
     let node: HistoryNode;
-    const existingNode = this.history[groupID];
+    const existingNode = this.groups[groupID];
     if (existingNode) {
       node = { ...existingNode };
     } else {
@@ -54,8 +56,8 @@ export class HistoryParser {
 
     node = updateNode(node, rawItem);
 
-    this.history = {
-      ...this.history,
+    this.groups = {
+      ...this.groups,
       [node.groupID]: node,
     };
 
@@ -73,10 +75,10 @@ export class HistoryParser {
    * steps.
    */
   private cancelNodes(endedAt: Date) {
-    for (const node of Object.values(this.history)) {
+    for (const node of Object.values(this.groups)) {
       if (!node.endedAt) {
-        this.history = {
-          ...this.history,
+        this.groups = {
+          ...this.groups,
           [node.groupID]: {
             ...node,
             endedAt,
@@ -105,8 +107,8 @@ export class HistoryParser {
       status: 'started',
     } as const;
 
-    this.history = {
-      ...this.history,
+    this.groups = {
+      ...this.groups,
       [node.groupID]: node,
     };
   }
@@ -118,12 +120,12 @@ export class HistoryParser {
    * need to mark them as completed whenever their wake time is reached.
    */
   private handleCompletedSleepNodes(time: Date) {
-    for (const node of Object.values(this.history)) {
+    for (const node of Object.values(this.groups)) {
       if (node.status === 'sleeping' && node.sleepConfig) {
         const isCompleted = node.sleepConfig.until <= time;
         if (isCompleted) {
-          this.history = {
-            ...this.history,
+          this.groups = {
+            ...this.groups,
             [node.groupID]: {
               ...node,
               endedAt: node.sleepConfig.until,
