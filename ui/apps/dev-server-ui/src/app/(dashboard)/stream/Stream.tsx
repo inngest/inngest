@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
 import { Button } from '@inngest/components/Button';
+import { Table } from '@inngest/components/Table';
 import { IconChevron } from '@inngest/components/icons/Chevron';
 import { fullDate } from '@inngest/components/utils/date';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -11,7 +12,6 @@ import { createColumnHelper, getCoreRowModel, type Row } from '@tanstack/react-t
 
 import { queryClient } from '@/app/StoreProvider';
 import SendEventButton from '@/components/Event/SendEventButton';
-import Table from '@/components/Table';
 import TriggerTag from '@/components/Trigger/TriggerTag';
 import { client } from '@/store/baseApi';
 import { GetTriggersStreamDocument, type FunctionRun, type StreamItem } from '@/store/generated';
