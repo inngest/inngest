@@ -24,9 +24,7 @@ For replays, you'll also need to:
 
 Inngest is a serverless platform which combines an event hub and a job scheduler. This means that it is designed to receive huge volumes of events via HTTP request and call functions that are defined to run when those given events are received. It simplifies building reliable webhooks by enabling you to just write the code to process the webhook event, leaving the rest to Inngest.
 
-You can set up a webhook with Inngest in 2 ways:
-
-* Create a [webhook "source" in the Inngest dashboard](https://app.inngest.com/env/production/manage/webhooks) which will give you a unique URL which you can add to any third party service that
+You can set up a webhook with Inngest by creating a [webhook "source" in the Inngest dashboard](https://app.inngest.com/env/production/manage/webhooks) which will give you a unique URL which you can add to any third party service that supports webhooks. You can then write an Inngest function that will run when that webhook event is received.
 
 After connecting your webhook, you'll start to receive events in your Inngest dashboard. Here's an example of using the `stripe/invoice.payment_failed` event ([Stripe docs](https://stripe.com/docs/api/invoices/object))
 
