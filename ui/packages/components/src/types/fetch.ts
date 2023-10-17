@@ -3,6 +3,32 @@ type FetchLoading = { error: undefined; data: undefined; isLoading: true };
 type FetchSkipped = { error: undefined; data: undefined; isLoading: false; isSkipped: true };
 type FetchSucceeded<T = never> = { error: undefined; data: T; isLoading: false };
 
+export const baseFetchFailed = {
+  data: undefined,
+  isLoading: false,
+  isSkipped: false,
+} as const satisfies Omit<FetchFailed, 'error'> & { isSkipped: false };
+
+export const baseFetchLoading = {
+  data: undefined,
+  error: undefined,
+  isLoading: true,
+  isSkipped: false,
+} as const satisfies FetchLoading & { isSkipped: false };
+
+export const baseFetchSkipped = {
+  data: undefined,
+  error: undefined,
+  isLoading: false,
+  isSkipped: true,
+} as const satisfies FetchSkipped;
+
+export const baseFetchSucceeded = {
+  error: undefined,
+  isLoading: false,
+  isSkipped: false,
+} as const satisfies Omit<FetchSucceeded, 'data'> & { isSkipped: false };
+
 // A generic type that represents failed, loading, succeeded, and skipped fetch
 // states.
 //

@@ -1,17 +1,21 @@
 import { useMemo } from 'react';
 import type { Event } from '@inngest/components/types/event';
-import type { FetchResult } from '@inngest/components/types/fetch';
+import {
+  baseFetchFailed,
+  baseFetchLoading,
+  baseFetchSkipped,
+  baseFetchSucceeded,
+  type FetchResult,
+} from '@inngest/components/types/fetch';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 
 import { FunctionRunStatus, useGetEventQuery } from '@/store/generated';
 
-type Data = Event & { functionRuns: FunctionRun[] };
+type Data = Event & { functionRuns: Pick<FunctionRun, 'id' | 'name' | 'output' | 'status'>[] };
 
-export function useEvent(
-  eventID: string,
-  { skip = false }: { skip?: boolean } = {}
-): FetchResult<Data, { skippable: true }> {
-  const query = useGetEventQuery({ id: eventID }, { pollingInterval: 1500, skip });
+export function useEvent(eventID: string | null): FetchResult<Data, { skippable: true }> {
+  const skip = !eventID;
+  const query = useGetEventQuery({ id: eventID ?? '' }, { pollingInterval: 1000, skip });
 
   // In addition to memoizing, this hook will also transform the API data into
   // the shape our shared UI expects.
@@ -22,11 +26,11 @@ export function useEvent(
       return undefined;
     }
 
-    const functionRuns: FunctionRun[] = (event.functionRuns ?? []).map((run) => {
+    const functionRuns: Data['functionRuns'] = (event.functionRuns ?? []).map((run) => {
       return {
-        ...run,
+        id: run.id,
         name: run.name ?? 'Unknown',
-        output: run.output ?? undefined,
+        output: run.output ?? null,
         status: run.status ?? FunctionRunStatus.Running,
       };
     });
@@ -41,30 +45,30 @@ export function useEvent(
   }, [query.data?.event]);
 
   if (query.isLoading) {
-    return { data: undefined, error: undefined, isLoading: true, isSkipped: false };
+    return baseFetchLoading;
   }
 
   if (skip) {
-    return { data: undefined, error: undefined, isLoading: false, isSkipped: true };
+    return baseFetchSkipped;
   }
 
   if (query.error) {
     return {
-      data: undefined,
+      ...baseFetchFailed,
       error: new Error(query.error.message),
-      isLoading: false,
-      isSkipped: false,
     };
   }
 
   if (!data) {
+    // Should be unreachable.
     return {
-      data: undefined,
+      ...baseFetchFailed,
       error: new Error('finished loading but missing data'),
-      isLoading: false,
-      isSkipped: false,
     };
   }
 
-  return { data, error: undefined, isLoading: false, isSkipped: false };
+  return {
+    ...baseFetchSucceeded,
+    data,
+  };
 }

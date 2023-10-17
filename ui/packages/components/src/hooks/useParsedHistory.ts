@@ -1,17 +1,13 @@
 import { useEffect, useState } from 'react';
-import {
-  HistoryParser,
-  type HistoryNode,
-  type RawHistoryItem,
-} from '@inngest/components/utils/historyParser';
+import { HistoryParser, type RawHistoryItem } from '@inngest/components/utils/historyParser';
 
-export function useParsedHistory(rawHistory: RawHistoryItem[]): Record<string, HistoryNode> {
-  const [history, setHistory] = useState<Record<string, HistoryNode>>({});
+export function useParsedHistory(rawHistory: RawHistoryItem[]): HistoryParser {
+  const [history, setHistory] = useState<HistoryParser>(new HistoryParser());
 
   useEffect(() => {
     if (rawHistory.length === 0) {
-      if (Object.keys(history).length > 0) {
-        setHistory({});
+      if (Object.keys(history.groups).length > 0) {
+        setHistory(new HistoryParser());
       }
 
       // Return early to prevent infinite rerendering when consumers default
@@ -19,7 +15,7 @@ export function useParsedHistory(rawHistory: RawHistoryItem[]): Record<string, H
       return;
     }
 
-    setHistory(new HistoryParser(rawHistory).history);
+    setHistory(new HistoryParser(rawHistory));
   }, [rawHistory]);
 
   return history;
