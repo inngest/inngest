@@ -12,7 +12,7 @@ import { shortDate } from '@inngest/components/utils/date';
 
 type BaseProps = {
   event: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>;
-  onReplayEvent?: undefined;
+  onReplayEvent: () => void;
 
   // TODO: Replace this with an imported component.
   SendEventButton?: React.ElementType;
