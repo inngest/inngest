@@ -8,6 +8,11 @@
       "./src/*/index.ts"
     ]
   },
+  "scripts": {
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "test": "vitest"
+  },
   "dependencies": {
     "@headlessui/tailwindcss": "0.1.2",
     "@monaco-editor/react": "4.5.2",
@@ -38,10 +43,5 @@
     "typescript": "5.1.3",
     "vitest": "0.34.5"
   },
-  "private": true,
-  "scripts": {
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build",
-    "test": "vitest"
-  }
+  "private": true
 }
