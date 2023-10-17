@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Badge } from '@inngest/components/Badge/Badge';
 import { Button } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock';
@@ -22,7 +21,7 @@ type Props = {
   SendEventButton: React.ElementType;
 };
 
-export function EventSection({
+export function EventDetails({
   event,
   functionRuns,
   onFunctionRunClick,
