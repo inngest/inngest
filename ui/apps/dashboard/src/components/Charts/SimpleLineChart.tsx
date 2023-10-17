@@ -3,14 +3,13 @@
 import { useMemo } from 'react';
 import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
-import { Tooltip as IngsTooltip } from '@inngest/components/Tooltip';
+import { Tooltip } from '@inngest/components/Tooltip';
 import {
   CartesianGrid,
-  Legend,
+  Tooltip as ChartTooltip,
   Line,
   LineChart,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -24,8 +23,6 @@ type SimpleLineChartProps = {
   height?: number;
   title: string | React.ReactNode;
   desc?: string;
-  total?: number;
-  totalDescription?: string;
   data?: {
     name: string;
     values: {
@@ -80,8 +77,6 @@ export default function SimpleLineChart({
   height = 200,
   title,
   desc,
-  total,
-  totalDescription,
   data = [],
   legend = [],
   isLoading,
@@ -94,12 +89,12 @@ export default function SimpleLineChart({
   return (
     <div className={cn('border-b border-slate-200 bg-white px-6 py-4', className)}>
       <header className="flex items-center justify-between">
-        <div className="flex gap-4">
-          <h3 className="flex flex-row items-center gap-2 font-medium">{title}</h3>
+        <div className="flex gap-2">
+          <h3 className="flex flex-row items-center gap-1.5 font-medium">{title}</h3>
           {desc && (
-            <IngsTooltip content={desc}>
-              <InformationCircleIcon className="h-6 w-6 text-gray-400" />
-            </IngsTooltip>
+            <Tooltip content={desc}>
+              <InformationCircleIcon className="h-4 w-4 text-slate-400" />
+            </Tooltip>
           )}
         </div>
         <div className="flex justify-end gap-4">
@@ -135,19 +130,17 @@ export default function SimpleLineChart({
                 axisLine={false}
                 tickLine={false}
                 tickSize={2}
-                /* @ts-ignore */
-                tick={<CustomizedXAxisTick />}
+                tick={CustomizedXAxisTick}
               />
               <YAxis
                 domain={[0, 'auto']}
                 allowDataOverflow
                 axisLine={false}
                 tickLine={false}
-                /* @ts-ignore */
-                tick={<CustomizedYAxisTick />}
+                tick={CustomizedYAxisTick}
                 width={10}
               />
-              <Tooltip
+              <ChartTooltip
                 content={(props) => {
                   const { label, payload } = props;
                   return (

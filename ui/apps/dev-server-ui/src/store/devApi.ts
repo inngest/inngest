@@ -40,10 +40,13 @@ export const devApi = createApi({
               __typename: 'Query',
               event: {
                 __typename: 'Event',
+                functionRuns: null,
                 id: event.id,
                 name: event.name,
+                pendingRuns: null,
                 raw: JSON.stringify(event),
                 createdAt: event.ts,
+                status: null,
               },
             }
           )
@@ -55,9 +58,17 @@ export const devApi = createApi({
           api.util.updateQueryData('GetEventsStream', undefined, (draftEvents) => {
             const normalizedEvent: Event = {
               __typename: 'Event',
+              functionRuns: null,
               id: event.id,
               name: event.name,
               createdAt: event.ts,
+              payload: null,
+              pendingRuns: null,
+              raw: null,
+              schema: null,
+              status: null,
+              totalRuns: null,
+              workspace: null,
             } as const;
             if (draftEvents.events) {
               draftEvents.events.unshift(normalizedEvent);
