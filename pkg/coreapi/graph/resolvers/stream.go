@@ -66,7 +66,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 			if fn, err := fn.InngestFunction(); err == nil {
 				// Should always have at least 1 trigger, but we'll check anyway
 				// to avoid a panic just in case.
-				if (len(fn.Triggers)) >= 0 {
+				if (len(fn.Triggers)) >= 0 && fn.Triggers[0].CronTrigger != nil {
 					// This is a flawed way to get the cron, since this value is
 					// always the latest cron schedule. In other words, if a
 					// user updates the cron schedule for the function then
