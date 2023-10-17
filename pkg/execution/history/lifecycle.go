@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -51,6 +52,7 @@ func (l lifecycle) OnFunctionScheduled(
 	ctx context.Context,
 	id state.Identifier,
 	item queue.Item,
+	event event.Event,
 ) {
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {

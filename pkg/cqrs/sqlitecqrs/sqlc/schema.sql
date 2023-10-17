@@ -40,7 +40,8 @@ CREATE TABLE function_runs (
 	trigger_type VARCHAR NOT NULL,
 	event_id CHAR(26) NOT NULL, 
 	batch_id CHAR(26), 
-	original_run_id CHAR(26)
+	original_run_id CHAR(26),
+	cron VARCHAR
 );
 
 CREATE TABLE function_finishes (

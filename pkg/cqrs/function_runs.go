@@ -19,6 +19,7 @@ type FunctionRun struct {
 	EventID         ulid.ULID
 	BatchID         ulid.ULID
 	OriginalRunID   ulid.ULID
+	Cron            *string
 }
 
 // FunctionRunFinish represents the end of a function.  This may be
