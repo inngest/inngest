@@ -47,7 +47,7 @@ const meta = {
         // @ts-ignore
         parser.append(_rawHistory[i]);
       }
-      setHistory(parser.history);
+      setHistory(parser.groups);
     }, [_rawHistoryFrame]);
 
     return (
@@ -70,7 +70,7 @@ function createStory(rawHistory: unknown) {
     args: {
       _rawHistory: raw,
       _rawHistoryFrame: raw.length - 1,
-      history: new HistoryParser(raw).history,
+      history: new HistoryParser(raw).groups,
     },
     argTypes: {
       _rawHistory: {
