@@ -129,7 +129,6 @@ export default function StackedBarChart({
                 top: 16,
                 bottom: 16,
               }}
-              barCategoryGap={8}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
@@ -137,17 +136,14 @@ export default function StackedBarChart({
                 axisLine={false}
                 tickLine={false}
                 tickSize={2}
-                interval={1}
-                /* @ts-ignore */
-                tick={<CustomizedXAxisTick />}
+                tick={CustomizedXAxisTick}
               />
               <YAxis
                 domain={[0, 'auto']}
                 allowDataOverflow
                 axisLine={false}
                 tickLine={false}
-                /* @ts-ignore */
-                tick={<CustomizedYAxisTick />}
+                tick={CustomizedYAxisTick}
                 width={10}
               />
 
