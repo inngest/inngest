@@ -8,7 +8,7 @@ import type { HistoryNode } from './types';
 async function loadHistory(filename: string) {
   const raw = JSON.parse(await fs.readFile(path.join(__dirname, `testData/${filename}`), 'utf8'));
 
-  return Object.values(new HistoryParser(raw).history).sort((a, b) => {
+  return Object.values(new HistoryParser(raw).groups).sort((a, b) => {
     return a.scheduledAt.getTime() - b.scheduledAt.getTime();
   });
 }
