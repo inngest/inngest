@@ -30,6 +30,7 @@
     "@storybook/addon-links": "7.2.2",
     "@storybook/addon-onboarding": "^1.0.8",
     "@storybook/addon-styling": "1.3.6",
+    "@storybook/addon-themes": "7.5.0",
     "@storybook/blocks": "7.2.2",
     "@storybook/nextjs": "7.2.2",
     "@storybook/react": "7.2.2",

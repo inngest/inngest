@@ -1,5 +1,6 @@
 import { AppRoot } from '@inngest/components/AppRoot';
-import type { Preview } from '@storybook/react';
+import { withThemeByClassName } from '@storybook/addon-themes';
+import type { Preview, ReactRenderer } from '@storybook/react';
 
 const preview: Preview = {
   decorators: [
@@ -10,6 +11,13 @@ const preview: Preview = {
         </AppRoot>
       );
     },
+    withThemeByClassName<ReactRenderer>({
+      themes: {
+        light: '',
+        dark: 'dark',
+      },
+      defaultTheme: 'dark',
+    }),
   ],
   parameters: {
     actions: { argTypesRegex: '^on[A-Z].*' },
