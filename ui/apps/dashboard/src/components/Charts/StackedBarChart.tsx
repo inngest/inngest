@@ -25,8 +25,6 @@ type BarChartProps = {
   className?: string;
   height?: number;
   title: string | React.ReactNode;
-  total?: number;
-  totalDescription?: string;
   data?: {
     name: string;
     values: {
@@ -83,8 +81,6 @@ export default function StackedBarChart({
   className = '',
   height = 200,
   title,
-  total,
-  totalDescription,
   data = [],
   legend = [],
   error,
