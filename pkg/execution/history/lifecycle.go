@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -52,7 +51,7 @@ func (l lifecycle) OnFunctionScheduled(
 	ctx context.Context,
 	id state.Identifier,
 	item queue.Item,
-	event event.Event,
+	s state.State,
 ) {
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
@@ -65,6 +64,7 @@ func (l lifecycle) OnFunctionScheduled(
 	}
 
 	h := History{
+		Cron:            s.Cron(),
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
 		WorkspaceID:     id.WorkspaceID,
@@ -94,6 +94,7 @@ func (l lifecycle) OnFunctionStarted(
 	ctx context.Context,
 	id state.Identifier,
 	item queue.Item,
+	s state.State,
 ) {
 	groupID, err := toUUID(item.GroupID)
 	if err != nil {
@@ -109,6 +110,7 @@ func (l lifecycle) OnFunctionStarted(
 	latencyMS := latency.Milliseconds()
 
 	h := History{
+		Cron:            s.Cron(),
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
 		WorkspaceID:     id.WorkspaceID,
@@ -156,6 +158,7 @@ func (l lifecycle) OnFunctionFinished(
 	}
 
 	h := History{
+		Cron:               s.Cron(),
 		ID:                 ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:          id.AccountID,
 		WorkspaceID:        id.WorkspaceID,
@@ -206,6 +209,7 @@ func (l lifecycle) OnFunctionCancelled(
 	groupID := uuid.New()
 
 	h := History{
+		Cron:               s.Cron(),
 		ID:                 ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:          id.AccountID,
 		WorkspaceID:        id.WorkspaceID,

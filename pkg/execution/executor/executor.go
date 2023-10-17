@@ -258,7 +258,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		id.PriorityFactor = &factor
 	}
 
-	_, err = e.sm.New(ctx, state.Input{
+	s, err := e.sm.New(ctx, state.Input{
 		Identifier:     id,
 		EventBatchData: mapped,
 		Context:        req.Context,
@@ -362,7 +362,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	for _, e := range e.lifecycles {
-		go e.OnFunctionScheduled(context.WithoutCancel(ctx), id, item, req.Events[0].GetEvent())
+		go e.OnFunctionScheduled(context.WithoutCancel(ctx), id, item, s)
 	}
 
 	return &id, nil
@@ -439,7 +439,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// Only just starting:  run lifecycles on first attempt.
 		if item.Attempt == 0 {
 			for _, e := range e.lifecycles {
-				go e.OnFunctionStarted(context.WithoutCancel(ctx), id, item)
+				go e.OnFunctionStarted(context.WithoutCancel(ctx), id, item, s)
 			}
 		}
 	}

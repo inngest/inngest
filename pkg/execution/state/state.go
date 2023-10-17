@@ -219,6 +219,8 @@ type State interface {
 	//
 	// Note that if an action has errored this should return false.
 	ActionComplete(id string) bool
+
+	Cron() *string
 }
 
 // Manager represents a state manager which can both load and mutate state.

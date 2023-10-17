@@ -109,3 +109,11 @@ func (s memstate) ActionComplete(id string) bool {
 	_, hasAction := s.Actions()[id]
 	return hasAction
 }
+
+func (s memstate) Cron() *string {
+	if val, ok := s.Event()["cron"].(*string); ok && val != nil && *val != "" {
+		return val
+	}
+
+	return nil
+}
