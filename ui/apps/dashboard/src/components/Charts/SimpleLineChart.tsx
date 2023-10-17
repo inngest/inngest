@@ -135,16 +135,14 @@ export default function SimpleLineChart({
                 axisLine={false}
                 tickLine={false}
                 tickSize={2}
-                /* @ts-ignore */
-                tick={<CustomizedXAxisTick />}
+                tick={CustomizedXAxisTick}
               />
               <YAxis
                 domain={[0, 'auto']}
                 allowDataOverflow
                 axisLine={false}
                 tickLine={false}
-                /* @ts-ignore */
-                tick={<CustomizedYAxisTick />}
+                tick={CustomizedYAxisTick}
                 width={10}
               />
               <Tooltip
