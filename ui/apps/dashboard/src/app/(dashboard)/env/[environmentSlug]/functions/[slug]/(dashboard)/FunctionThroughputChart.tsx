@@ -106,7 +106,7 @@ export default function FunctionThroughputChart({
   return (
     <SimpleLineChart
       title="Function Throughput"
-      desc="The number of functions being processed over time"
+      desc="The number of function runs being processed over time."
       data={metrics}
       legend={[
         { name: 'Queued', dataKey: 'queued', color: colors.amber['500'] },
