@@ -14,7 +14,7 @@ const GetFunctionRunTimelineDocument = graphql(/* GraphQL */ `
   query GetFunctionRunTimeline($environmentID: ID!, $functionSlug: String!, $functionRunID: ULID!) {
     environment: workspace(id: $environmentID) {
       function: workflowBySlug(slug: $functionSlug) {
-        ...FunctionItem
+        id
         run(id: $functionRunID) {
           canRerun
 
@@ -70,9 +70,11 @@ export default async function FunctionTimeline({ params }: FunctionTimelineProps
         <h3>Function Timeline</h3>
         {function_.run.canRerun && (
           <RerunButton
-            environmentSlug={environment.slug}
-            environmentID={environment.id}
-            function_={function_}
+            environment={environment}
+            func={{
+              id: function_.id,
+              slug: params.slug,
+            }}
             functionRunID={params.runId}
           />
         )}

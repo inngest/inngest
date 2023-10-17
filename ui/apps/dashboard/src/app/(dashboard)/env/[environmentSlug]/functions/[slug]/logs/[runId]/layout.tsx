@@ -21,6 +21,7 @@ const GetFunctionRunDetailsDocument = graphql(`
         id
         name
         run(id: $functionRunID) {
+          canRerun
           event {
             id
             name
@@ -79,6 +80,7 @@ const GetFunctionRunDetailsDocument = graphql(`
             url
           }
         }
+        slug
       }
     }
   }
@@ -136,7 +138,10 @@ export default async function FunctionRunDetailsLayout({
   if (isNewStreamDetailsVisible) {
     return (
       <StreamDetails
-        envID={environment.id}
+        environment={{
+          id: environment.id,
+          slug: params.environmentSlug,
+        }}
         event={
           event
             ? {
