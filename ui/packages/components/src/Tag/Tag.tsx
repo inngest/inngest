@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-export default function Tag({
+export function Tag({
   children,
   className = '',
   href,
