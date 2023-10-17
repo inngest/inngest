@@ -6,6 +6,9 @@ const config: CodegenConfig = {
   documents: 'src/**/*',
   generates: {
     'src/store/generated.ts': {
+      config: {
+        avoidOptionals: true,
+      },
       plugins: [
         'typescript',
         'typescript-operations',

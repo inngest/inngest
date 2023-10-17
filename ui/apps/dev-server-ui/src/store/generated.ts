@@ -21,24 +21,24 @@ export type Scalars = {
 
 export type ActionVersionQuery = {
   dsn: Scalars['String'];
-  versionMajor?: InputMaybe<Scalars['Int']>;
-  versionMinor?: InputMaybe<Scalars['Int']>;
+  versionMajor: InputMaybe<Scalars['Int']>;
+  versionMinor: InputMaybe<Scalars['Int']>;
 };
 
 export type App = {
   __typename?: 'App';
   autodiscovered: Scalars['Boolean'];
-  checksum?: Maybe<Scalars['String']>;
+  checksum: Maybe<Scalars['String']>;
   connected: Scalars['Boolean'];
-  error?: Maybe<Scalars['String']>;
-  framework?: Maybe<Scalars['String']>;
+  error: Maybe<Scalars['String']>;
+  framework: Maybe<Scalars['String']>;
   functionCount: Scalars['Int'];
   functions: Array<Function>;
   id: Scalars['ID'];
   name: Scalars['String'];
   sdkLanguage: Scalars['String'];
   sdkVersion: Scalars['String'];
-  url?: Maybe<Scalars['String']>;
+  url: Maybe<Scalars['String']>;
 };
 
 export type CreateAppInput = {
@@ -47,22 +47,22 @@ export type CreateAppInput = {
 
 export type Event = {
   __typename?: 'Event';
-  createdAt?: Maybe<Scalars['Time']>;
-  functionRuns?: Maybe<Array<FunctionRun>>;
+  createdAt: Maybe<Scalars['Time']>;
+  functionRuns: Maybe<Array<FunctionRun>>;
   id: Scalars['ID'];
-  name?: Maybe<Scalars['String']>;
-  payload?: Maybe<Scalars['String']>;
-  pendingRuns?: Maybe<Scalars['Int']>;
-  raw?: Maybe<Scalars['String']>;
-  schema?: Maybe<Scalars['String']>;
-  status?: Maybe<EventStatus>;
-  totalRuns?: Maybe<Scalars['Int']>;
-  workspace?: Maybe<Workspace>;
+  name: Maybe<Scalars['String']>;
+  payload: Maybe<Scalars['String']>;
+  pendingRuns: Maybe<Scalars['Int']>;
+  raw: Maybe<Scalars['String']>;
+  schema: Maybe<Scalars['String']>;
+  status: Maybe<EventStatus>;
+  totalRuns: Maybe<Scalars['Int']>;
+  workspace: Maybe<Workspace>;
 };
 
 export type EventQuery = {
   eventId: Scalars['ID'];
-  workspaceId?: Scalars['ID'];
+  workspaceId: Scalars['ID'];
 };
 
 export enum EventStatus {
@@ -75,8 +75,8 @@ export enum EventStatus {
 }
 
 export type EventsQuery = {
-  lastEventId?: InputMaybe<Scalars['ID']>;
-  workspaceId?: Scalars['ID'];
+  lastEventId: InputMaybe<Scalars['ID']>;
+  workspaceId: Scalars['ID'];
 };
 
 export type Function = {
@@ -86,17 +86,17 @@ export type Function = {
   id: Scalars['String'];
   name: Scalars['String'];
   slug: Scalars['String'];
-  triggers?: Maybe<Array<FunctionTrigger>>;
+  triggers: Maybe<Array<FunctionTrigger>>;
   url: Scalars['String'];
 };
 
 export type FunctionEvent = {
   __typename?: 'FunctionEvent';
-  createdAt?: Maybe<Scalars['Time']>;
-  functionRun?: Maybe<FunctionRun>;
-  output?: Maybe<Scalars['String']>;
-  type?: Maybe<FunctionEventType>;
-  workspace?: Maybe<Workspace>;
+  createdAt: Maybe<Scalars['Time']>;
+  functionRun: Maybe<FunctionRun>;
+  output: Maybe<Scalars['String']>;
+  type: Maybe<FunctionEventType>;
+  workspace: Maybe<Workspace>;
 };
 
 export enum FunctionEventType {
@@ -108,24 +108,24 @@ export enum FunctionEventType {
 
 export type FunctionRun = {
   __typename?: 'FunctionRun';
-  event?: Maybe<Event>;
-  finishedAt?: Maybe<Scalars['Time']>;
-  function?: Maybe<Function>;
+  event: Maybe<Event>;
+  finishedAt: Maybe<Scalars['Time']>;
+  function: Maybe<Function>;
   functionID: Scalars['String'];
   history: Array<RunHistoryItem>;
-  historyItemOutput?: Maybe<Scalars['String']>;
+  historyItemOutput: Maybe<Scalars['String']>;
   id: Scalars['ID'];
   /** @deprecated Field no longer supported */
-  name?: Maybe<Scalars['String']>;
-  output?: Maybe<Scalars['String']>;
+  name: Maybe<Scalars['String']>;
+  output: Maybe<Scalars['String']>;
   /** @deprecated Field no longer supported */
-  pendingSteps?: Maybe<Scalars['Int']>;
-  startedAt?: Maybe<Scalars['Time']>;
-  status?: Maybe<FunctionRunStatus>;
+  pendingSteps: Maybe<Scalars['Int']>;
+  startedAt: Maybe<Scalars['Time']>;
+  status: Maybe<FunctionRunStatus>;
   /** @deprecated Field no longer supported */
-  timeline?: Maybe<Array<FunctionRunEvent>>;
-  waitingFor?: Maybe<StepEventWait>;
-  workspace?: Maybe<Workspace>;
+  timeline: Maybe<Array<FunctionRunEvent>>;
+  waitingFor: Maybe<StepEventWait>;
+  workspace: Maybe<Workspace>;
 };
 
 
@@ -137,7 +137,7 @@ export type FunctionRunEvent = FunctionEvent | StepEvent;
 
 export type FunctionRunQuery = {
   functionRunId: Scalars['ID'];
-  workspaceId?: Scalars['ID'];
+  workspaceId: Scalars['ID'];
 };
 
 export enum FunctionRunStatus {
@@ -148,7 +148,7 @@ export enum FunctionRunStatus {
 }
 
 export type FunctionRunsQuery = {
-  workspaceId?: Scalars['ID'];
+  workspaceId: Scalars['ID'];
 };
 
 export enum FunctionStatus {
@@ -175,8 +175,8 @@ export type FunctionVersion = {
   createdAt: Scalars['Time'];
   functionId: Scalars['ID'];
   updatedAt: Scalars['Time'];
-  validFrom?: Maybe<Scalars['Time']>;
-  validTo?: Maybe<Scalars['Time']>;
+  validFrom: Maybe<Scalars['Time']>;
+  validTo: Maybe<Scalars['Time']>;
   version: Scalars['Uint'];
 };
 
@@ -229,11 +229,11 @@ export type MutationUpdateAppArgs = {
 export type Query = {
   __typename?: 'Query';
   apps: Array<App>;
-  event?: Maybe<Event>;
-  events?: Maybe<Array<Event>>;
-  functionRun?: Maybe<FunctionRun>;
-  functionRuns?: Maybe<Array<FunctionRun>>;
-  functions?: Maybe<Array<Function>>;
+  event: Maybe<Event>;
+  events: Maybe<Array<Event>>;
+  functionRun: Maybe<FunctionRun>;
+  functionRuns: Maybe<Array<FunctionRun>>;
+  functions: Maybe<Array<Function>>;
   stream: Array<StreamItem>;
 };
 
@@ -264,35 +264,35 @@ export type QueryStreamArgs = {
 
 export type RunHistoryCancel = {
   __typename?: 'RunHistoryCancel';
-  eventID?: Maybe<Scalars['ULID']>;
-  expression?: Maybe<Scalars['String']>;
-  userID?: Maybe<Scalars['UUID']>;
+  eventID: Maybe<Scalars['ULID']>;
+  expression: Maybe<Scalars['String']>;
+  userID: Maybe<Scalars['UUID']>;
 };
 
 export type RunHistoryItem = {
   __typename?: 'RunHistoryItem';
   attempt: Scalars['Int'];
-  cancel?: Maybe<RunHistoryCancel>;
+  cancel: Maybe<RunHistoryCancel>;
   createdAt: Scalars['Time'];
   functionVersion: Scalars['Int'];
-  groupID?: Maybe<Scalars['UUID']>;
+  groupID: Maybe<Scalars['UUID']>;
   id: Scalars['ULID'];
-  result?: Maybe<RunHistoryResult>;
-  sleep?: Maybe<RunHistorySleep>;
-  stepName?: Maybe<Scalars['String']>;
-  stepType?: Maybe<HistoryStepType>;
+  result: Maybe<RunHistoryResult>;
+  sleep: Maybe<RunHistorySleep>;
+  stepName: Maybe<Scalars['String']>;
+  stepType: Maybe<HistoryStepType>;
   type: HistoryType;
-  url?: Maybe<Scalars['String']>;
-  waitForEvent?: Maybe<RunHistoryWaitForEvent>;
-  waitResult?: Maybe<RunHistoryWaitResult>;
+  url: Maybe<Scalars['String']>;
+  waitForEvent: Maybe<RunHistoryWaitForEvent>;
+  waitResult: Maybe<RunHistoryWaitResult>;
 };
 
 export type RunHistoryResult = {
   __typename?: 'RunHistoryResult';
   durationMS: Scalars['Int'];
-  errorCode?: Maybe<Scalars['String']>;
-  framework?: Maybe<Scalars['String']>;
-  platform?: Maybe<Scalars['String']>;
+  errorCode: Maybe<Scalars['String']>;
+  framework: Maybe<Scalars['String']>;
+  platform: Maybe<Scalars['String']>;
   sdkLanguage: Scalars['String'];
   sdkVersion: Scalars['String'];
   sizeBytes: Scalars['Int'];
@@ -306,26 +306,26 @@ export type RunHistorySleep = {
 export type RunHistoryWaitForEvent = {
   __typename?: 'RunHistoryWaitForEvent';
   eventName: Scalars['String'];
-  expression?: Maybe<Scalars['String']>;
+  expression: Maybe<Scalars['String']>;
   timeout: Scalars['Time'];
 };
 
 export type RunHistoryWaitResult = {
   __typename?: 'RunHistoryWaitResult';
-  eventID?: Maybe<Scalars['ULID']>;
+  eventID: Maybe<Scalars['ULID']>;
   timeout: Scalars['Boolean'];
 };
 
 export type StepEvent = {
   __typename?: 'StepEvent';
-  createdAt?: Maybe<Scalars['Time']>;
-  functionRun?: Maybe<FunctionRun>;
-  name?: Maybe<Scalars['String']>;
-  output?: Maybe<Scalars['String']>;
-  stepID?: Maybe<Scalars['String']>;
-  type?: Maybe<StepEventType>;
-  waitingFor?: Maybe<StepEventWait>;
-  workspace?: Maybe<Workspace>;
+  createdAt: Maybe<Scalars['Time']>;
+  functionRun: Maybe<FunctionRun>;
+  name: Maybe<Scalars['String']>;
+  output: Maybe<Scalars['String']>;
+  stepID: Maybe<Scalars['String']>;
+  type: Maybe<StepEventType>;
+  waitingFor: Maybe<StepEventWait>;
+  workspace: Maybe<Workspace>;
 };
 
 export enum StepEventType {
@@ -339,24 +339,24 @@ export enum StepEventType {
 
 export type StepEventWait = {
   __typename?: 'StepEventWait';
-  eventName?: Maybe<Scalars['String']>;
+  eventName: Maybe<Scalars['String']>;
   expiryTime: Scalars['Time'];
-  expression?: Maybe<Scalars['String']>;
+  expression: Maybe<Scalars['String']>;
 };
 
 export type StreamItem = {
   __typename?: 'StreamItem';
   createdAt: Scalars['Time'];
   id: Scalars['ID'];
-  runs?: Maybe<Array<Maybe<FunctionRun>>>;
+  runs: Maybe<Array<Maybe<FunctionRun>>>;
   trigger: Scalars['String'];
   type: StreamType;
 };
 
 export type StreamQuery = {
-  after?: InputMaybe<Scalars['Time']>;
-  before?: InputMaybe<Scalars['Time']>;
-  limit?: Scalars['Int'];
+  after: InputMaybe<Scalars['Time']>;
+  before: InputMaybe<Scalars['Time']>;
+  limit: Scalars['Int'];
 };
 
 export enum StreamType {
@@ -377,50 +377,50 @@ export type Workspace = {
 export type GetEventsStreamQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetEventsStreamQuery = { __typename?: 'Query', events?: Array<{ __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, totalRuns?: number | null }> | null };
+export type GetEventsStreamQuery = { __typename?: 'Query', events: Array<{ __typename?: 'Event', id: string, name: string | null, createdAt: any | null, status: EventStatus | null, totalRuns: number | null }> | null };
 
 export type GetFunctionsStreamQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetFunctionsStreamQuery = { __typename?: 'Query', functionRuns?: Array<{ __typename?: 'FunctionRun', id: string, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, name?: string | null, event?: { __typename?: 'Event', id: string } | null }> | null };
+export type GetFunctionsStreamQuery = { __typename?: 'Query', functionRuns: Array<{ __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, startedAt: any | null, pendingSteps: number | null, name: string | null, event: { __typename?: 'Event', id: string } | null }> | null };
 
 export type GetEventQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
 
-export type GetEventQuery = { __typename?: 'Query', event?: { __typename?: 'Event', id: string, name?: string | null, createdAt?: any | null, status?: EventStatus | null, pendingRuns?: number | null, raw?: string | null, functionRuns?: Array<{ __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, pendingSteps?: number | null, output?: string | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }> | null } | null };
+export type GetEventQuery = { __typename?: 'Query', event: { __typename?: 'Event', id: string, name: string | null, createdAt: any | null, status: EventStatus | null, pendingRuns: number | null, raw: string | null, functionRuns: Array<{ __typename?: 'FunctionRun', id: string, name: string | null, status: FunctionRunStatus | null, startedAt: any | null, pendingSteps: number | null, output: string | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null }> | null } | null };
 
 export type GetFunctionRunQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
 
-export type GetFunctionRunQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, name?: string | null, status?: FunctionRunStatus | null, startedAt?: any | null, finishedAt?: any | null, output?: string | null, pendingSteps?: number | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null, function?: { __typename?: 'Function', triggers?: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null } | null, event?: { __typename?: 'Event', id: string, raw?: string | null } | null, timeline?: Array<{ __typename: 'FunctionEvent', createdAt?: any | null, output?: string | null, functionType?: FunctionEventType | null } | { __typename: 'StepEvent', createdAt?: any | null, output?: string | null, name?: string | null, stepType?: StepEventType | null, waitingFor?: { __typename?: 'StepEventWait', expiryTime: any, eventName?: string | null, expression?: string | null } | null }> | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID?: any | null, id: any, stepName?: string | null, type: HistoryType, url?: string | null, cancel?: { __typename?: 'RunHistoryCancel', eventID?: any | null, expression?: string | null, userID?: any | null } | null, sleep?: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent?: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression?: string | null, timeout: any } | null, waitResult?: { __typename?: 'RunHistoryWaitResult', eventID?: any | null, timeout: boolean } | null }> } | null };
+export type GetFunctionRunQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, name: string | null, status: FunctionRunStatus | null, startedAt: any | null, finishedAt: any | null, output: string | null, pendingSteps: number | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null, function: { __typename?: 'Function', triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null } | null, event: { __typename?: 'Event', id: string, raw: string | null } | null, timeline: Array<{ __typename: 'FunctionEvent', createdAt: any | null, output: string | null, functionType: FunctionEventType | null } | { __typename: 'StepEvent', createdAt: any | null, output: string | null, name: string | null, stepType: StepEventType | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null }> | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: any, functionVersion: number, groupID: any | null, id: any, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: any | null, expression: string | null, userID: any | null } | null, sleep: { __typename?: 'RunHistorySleep', until: any } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: any } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: any | null, timeout: boolean } | null }> } | null };
 
 export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetFunctionsQuery = { __typename?: 'Query', functions?: Array<{ __typename?: 'Function', id: string, slug: string, name: string, url: string, triggers?: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> | null };
+export type GetFunctionsQuery = { __typename?: 'Query', functions: Array<{ __typename?: 'Function', id: string, slug: string, name: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> | null };
 
 export type GetAppsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework?: string | null, url?: string | null, error?: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
+export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
 
 export type CreateAppMutationVariables = Exact<{
   input: CreateAppInput;
 }>;
 
 
-export type CreateAppMutation = { __typename?: 'Mutation', createApp: { __typename?: 'App', url?: string | null } };
+export type CreateAppMutation = { __typename?: 'Mutation', createApp: { __typename?: 'App', url: string | null } };
 
 export type UpdateAppMutationVariables = Exact<{
   input: UpdateAppInput;
 }>;
 
 
-export type UpdateAppMutation = { __typename?: 'Mutation', updateApp: { __typename?: 'App', url?: string | null, id: string } };
+export type UpdateAppMutation = { __typename?: 'Mutation', updateApp: { __typename?: 'App', url: string | null, id: string } };
 
 export type DeleteAppMutationVariables = Exact<{
   id: Scalars['String'];
@@ -431,26 +431,26 @@ export type DeleteAppMutation = { __typename?: 'Mutation', deleteApp: string };
 
 export type GetTriggersStreamQueryVariables = Exact<{
   limit: Scalars['Int'];
-  after?: InputMaybe<Scalars['Time']>;
-  before?: InputMaybe<Scalars['Time']>;
+  after: InputMaybe<Scalars['Time']>;
+  before: InputMaybe<Scalars['Time']>;
 }>;
 
 
-export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, trigger: string, type: StreamType, runs?: Array<{ __typename?: 'FunctionRun', id: string, function?: { __typename?: 'Function', name: string } | null } | null> | null }> };
+export type GetTriggersStreamQuery = { __typename?: 'Query', stream: Array<{ __typename?: 'StreamItem', createdAt: any, id: string, trigger: string, type: StreamType, runs: Array<{ __typename?: 'FunctionRun', id: string, function: { __typename?: 'Function', name: string } | null } | null> | null }> };
 
 export type GetFunctionRunStatusQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
 
-export type GetFunctionRunStatusQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, status?: FunctionRunStatus | null, function?: { __typename?: 'Function', name: string } | null } | null };
+export type GetFunctionRunStatusQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, function: { __typename?: 'Function', name: string } | null } | null };
 
 export type GetFunctionRunOutputQueryVariables = Exact<{
   id: Scalars['ID'];
 }>;
 
 
-export type GetFunctionRunOutputQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', id: string, status?: FunctionRunStatus | null, output?: string | null } | null };
+export type GetFunctionRunOutputQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, output: string | null } | null };
 
 export type GetHistoryItemOutputQueryVariables = Exact<{
   historyItemID: Scalars['ULID'];
@@ -458,7 +458,7 @@ export type GetHistoryItemOutputQueryVariables = Exact<{
 }>;
 
 
-export type GetHistoryItemOutputQuery = { __typename?: 'Query', functionRun?: { __typename?: 'FunctionRun', historyItemOutput?: string | null } | null };
+export type GetHistoryItemOutputQuery = { __typename?: 'Query', functionRun: { __typename?: 'FunctionRun', historyItemOutput: string | null } | null };
 
 
 export const GetEventsStreamDocument = `
