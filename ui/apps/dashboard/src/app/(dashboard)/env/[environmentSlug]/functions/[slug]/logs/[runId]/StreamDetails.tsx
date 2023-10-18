@@ -7,6 +7,7 @@ import { useParsedHistory } from '@inngest/components/hooks/useParsedHistory';
 import type { Event } from '@inngest/components/types/event';
 import type { Function } from '@inngest/components/types/function';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
+import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 import { classNames } from '@inngest/components/utils/classNames';
 import { type RawHistoryItem } from '@inngest/components/utils/historyParser';
 import { Client, useClient } from 'urql';
@@ -17,11 +18,12 @@ type Props = {
   envID: string;
   event?: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>;
   func: Pick<Function, 'id' | 'name' | 'triggers'>;
+  functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
   rawHistory: RawHistoryItem[];
   run: Pick<FunctionRun, 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
 };
 
-export function StreamDetails({ envID, event, func, rawHistory, run }: Props) {
+export function StreamDetails({ envID, event, func, functionVersion, rawHistory, run }: Props) {
   const client = useClient();
 
   const getOutput = useMemo(() => {
@@ -42,7 +44,13 @@ export function StreamDetails({ envID, event, func, rawHistory, run }: Props) {
     <div className={classNames('grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}>
       {event && <EventDetails event={event} />}
 
-      <RunDetails func={func} getHistoryItemOutput={getOutput} history={history} run={run} />
+      <RunDetails
+        func={func}
+        functionVersion={functionVersion}
+        getHistoryItemOutput={getOutput}
+        history={history}
+        run={run}
+      />
     </div>
   );
 }

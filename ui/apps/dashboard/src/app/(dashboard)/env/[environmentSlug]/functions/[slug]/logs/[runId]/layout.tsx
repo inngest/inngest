@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ClockIcon, RectangleStackIcon, RocketLaunchIcon } from '@heroicons/react/20/solid';
-import { HistoryParser } from '@inngest/components/utils/historyParser';
 
 import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { Time } from '@/components/Time';
@@ -56,9 +55,8 @@ const GetFunctionRunDetailsDocument = graphql(`
           status
           startedAt
           endedAt
-          functionVersion: workflowVersion {
-            validFrom
-            version
+          output
+          version: workflowVersion {
             deploy {
               id
               createdAt
@@ -67,14 +65,9 @@ const GetFunctionRunDetailsDocument = graphql(`
               eventName
               schedule
             }
-          }
-          output
-          version: workflowVersion {
-            triggers {
-              eventName
-              schedule
-            }
             url
+            validFrom
+            version
           }
         }
       }
@@ -105,16 +98,15 @@ export default async function FunctionRunDetailsLayout({
     functionRunID: params.runId,
   });
 
-  const functionRun = response.environment.function?.run;
+  const { run } = response.environment.function ?? {};
 
-  if (!functionRun) {
+  if (!run) {
     notFound();
   }
 
-  const eventName = functionRun.version.triggers[0]?.eventName;
-  const scheduleName = functionRun.version.triggers[0]?.schedule;
+  const eventName = run.version.triggers[0]?.eventName;
+  const scheduleName = run.version.triggers[0]?.schedule;
   const func = response.environment?.function;
-  const { run } = func ?? {};
   const triggers = (run?.version?.triggers ?? []).map((trigger) => {
     return {
       type: trigger.schedule ? 'CRON' : 'EVENT',
@@ -122,13 +114,9 @@ export default async function FunctionRunDetailsLayout({
     } as const;
   });
   const { event } = func?.run ?? {};
-  const history = new HistoryParser(run?.history ?? []);
 
   if (!func) {
     throw new Error('missing function');
-  }
-  if (!run) {
-    throw new Error('missing run');
   }
 
   if (await getBooleanFlag('new-run-details')) {
@@ -147,6 +135,7 @@ export default async function FunctionRunDetailsLayout({
           ...func,
           triggers,
         }}
+        functionVersion={run.version ?? undefined}
         rawHistory={run?.history ?? []}
         run={{
           ...run,
@@ -188,18 +177,18 @@ export default async function FunctionRunDetailsLayout({
   return (
     <div className="flex h-full">
       <main className="w-96 flex-shrink-0 overflow-y-auto px-5 py-4">
-        <FunctionRunStatusCard status={functionRun.status} />
+        <FunctionRunStatusCard status={run.status} />
         <header className="mt-6 flex flex-col gap-1 ">
           <h1 className="font-medium text-slate-800">
-            Started at: <Time value={new Date(functionRun.startedAt)} />
+            Started at: <Time value={new Date(run.startedAt)} />
           </h1>
 
-          {functionRun.endedAt && (
+          {run.endedAt && (
             <h1 className="font-medium text-slate-800">
-              Ended at: <Time value={new Date(functionRun.endedAt)} />
+              Ended at: <Time value={new Date(run.endedAt)} />
             </h1>
           )}
-          <span className="font-mono text-xs text-slate-400">Run ID: {functionRun.id}</span>
+          <span className="font-mono text-xs text-slate-400">Run ID: {run.id}</span>
         </header>
         <div className="mt-6 space-y-3">
           <Link
@@ -208,32 +197,28 @@ export default async function FunctionRunDetailsLayout({
           >
             <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
               <RectangleStackIcon className="h-3 w-3 text-sky-500" />
-              {`version-${functionRun.functionVersion.version}`}
+              {`version-${run.version.version}`}
             </div>
 
-            {functionRun.functionVersion.validFrom && (
+            {run.version.validFrom && (
               <Time
                 className="text-sm text-slate-500"
                 format="relative"
-                value={new Date(functionRun.functionVersion.validFrom)}
+                value={new Date(run.version.validFrom)}
               />
             )}
           </Link>
-          {functionRun.functionVersion.deploy && (
+          {run.version.deploy && (
             <Link
-              href={`/env/${params.environmentSlug}/deploys/${functionRun.functionVersion.deploy.id}`}
+              href={`/env/${params.environmentSlug}/deploys/${run.version.deploy.id}`}
               className="block overflow-hidden rounded-md border border-slate-200 bg-white px-5 py-2.5 shadow hover:bg-slate-50"
             >
               <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
                 <RocketLaunchIcon className="h-3 w-3 text-indigo-500" />
-                {functionRun.functionVersion.deploy.id}
+                {run.version.deploy.id}
               </div>
               <span className="text-sm text-slate-500">
-                Deployed{' '}
-                <Time
-                  format="relative"
-                  value={new Date(functionRun.functionVersion.deploy.createdAt)}
-                />
+                Deployed <Time format="relative" value={new Date(run.version.deploy.createdAt)} />
               </span>
             </Link>
           )}
@@ -241,7 +226,7 @@ export default async function FunctionRunDetailsLayout({
 
           <div className="block overflow-scroll rounded-md border border-slate-200 bg-white px-5 py-2.5 shadow">
             <div className="flex items-center gap-2 whitespace-nowrap text-sm font-medium text-slate-900">
-              {functionRun.version.url}
+              {run.version.url}
             </div>
             <span className="text-sm text-slate-500">URL</span>
           </div>

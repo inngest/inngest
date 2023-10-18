@@ -1,12 +1,18 @@
 import { type MetadataItemProps } from '@inngest/components/Metadata/MetadataItem';
 import { type FunctionRun } from '@inngest/components/types/functionRun';
+import { type FunctionVersion } from '@inngest/components/types/functionVersion';
 import { formatMilliseconds, shortDate } from '@inngest/components/utils/date';
 import type { HistoryParser } from '@inngest/components/utils/historyParser';
 
-export function renderRunMetadata(
-  functionRun: Pick<FunctionRun, 'endedAt' | 'id' | 'startedAt' | 'status'>,
-  history: HistoryParser
-): MetadataItemProps[] {
+export function renderRunMetadata({
+  functionRun,
+  functionVersion,
+  history,
+}: {
+  functionRun: Pick<FunctionRun, 'endedAt' | 'id' | 'startedAt' | 'status'>;
+  functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
+  history: HistoryParser;
+}): MetadataItemProps[] {
   if (!functionRun.startedAt) {
     throw new Error('missing startedAt');
   }
@@ -94,6 +100,20 @@ export function renderRunMetadata(
       {
         label: 'Duration',
         value: '-',
+      }
+    );
+  }
+
+  if (functionVersion) {
+    metadataItems.push(
+      {
+        label: 'URL',
+        size: 'large',
+        value: <div className="overflow-scroll whitespace-nowrap">{functionVersion.url}</div>,
+      },
+      {
+        label: 'Function Version',
+        value: `${functionVersion.version}`,
       }
     );
   }
