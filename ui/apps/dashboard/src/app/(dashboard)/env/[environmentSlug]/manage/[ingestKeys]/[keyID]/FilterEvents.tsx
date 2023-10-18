@@ -14,9 +14,9 @@ type FilterEventsProps = {
   keyID: string;
   keyName: string | null;
   filter: {
-    type?: any;
-    ips?: any[] | null | undefined;
-    events?: string[] | null | undefined;
+    type: 'allow' | 'deny';
+    ips: string[] | null;
+    events: string[] | null;
   };
 };
 
