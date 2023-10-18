@@ -68,7 +68,7 @@ export default function useUpdateVercelIntegration(initialVercelIntegration: Ver
     const createVercelAppPromises = projectsToCreate.map((project) =>
       createVercelApp({
         input: {
-          path: project.servePath,
+          path: project.servePath ?? null,
           projectID: project.id,
           workspaceID: environment!.id,
         },

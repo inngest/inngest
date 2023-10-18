@@ -28,6 +28,10 @@ const preview: Preview = {
           name: 'dark',
           value: '#080D19', // bg-slate-940
         },
+        {
+          name: 'light',
+          value: '#fff',
+        },
       ],
     },
     controls: {

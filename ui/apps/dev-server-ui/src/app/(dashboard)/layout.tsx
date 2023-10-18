@@ -24,8 +24,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div
       className={classNames(
         'relative grid h-screen w-screen overflow-hidden text-sm text-slate-400',
-        'grid-cols-1 grid-rows-[50px_1fr]',
-        'dark' // Manually setting darkMode in Dev Server. Will get it from user preferences in the future.
+        'grid-cols-1 grid-rows-[50px_1fr]'
       )}
     >
       <BG />

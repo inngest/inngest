@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
-import Tag from './Tag';
+import { Tag } from './Tag';
 
 const meta = {
   title: 'Components/Tag',
@@ -18,15 +18,10 @@ export default meta;
 
 type Story = StoryObj<typeof Tag>;
 
-export const Default: Story = {
-  args: {
-    className: 'text-white',
-  },
-};
+export const Default: Story = {};
 
 export const WithLink: Story = {
   args: {
-    className: 'text-white',
-    href: new URL('http://ingest.com'),
+    href: new URL('http://inngest.com'),
   },
 };

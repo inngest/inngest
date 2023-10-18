@@ -98,11 +98,11 @@ function FunctionRunListResultPage({
     variables: {
       environmentID: environment?.id!,
       functionSlug,
-      functionRunStatuses: selectedStatuses.length ? selectedStatuses : undefined,
+      functionRunStatuses: selectedStatuses.length ? selectedStatuses : null,
       timeRangeStart: selectedTimeRange.start.toISOString(),
       timeRangeEnd: selectedTimeRange.end.toISOString(),
       timeField,
-      functionRunCursor: functionRunCursor || undefined,
+      functionRunCursor: functionRunCursor || null,
     },
     pause: !environment?.id,
   });

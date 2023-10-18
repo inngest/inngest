@@ -41,6 +41,7 @@ export default function CreateKeyButton({ environmentSlug }: NewKeyButtonProps) 
     if (currentContent) {
       createSourceKey({
         input: {
+          filterList: null,
           workspaceID: environmentID,
           name: `My new ${currentContent.name}`,
           source: currentContent.type,
