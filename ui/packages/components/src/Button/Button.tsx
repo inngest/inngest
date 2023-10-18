@@ -14,6 +14,7 @@ interface ButtonProps {
   kind?: 'default' | 'primary' | 'success' | 'danger';
   appearance?: 'solid' | 'outlined' | 'text';
   size?: 'small' | 'regular' | 'large';
+  iconSide?: 'right' | 'left';
   label?: React.ReactNode;
   icon?: React.ReactNode;
   disabled?: boolean;
@@ -32,6 +33,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     size = 'small',
     label,
     icon,
+    iconSide = 'left',
     loading = false,
     disabled,
     btnAction,
@@ -74,12 +76,14 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       {...props}
     >
       {loading && <IconSpinner className={`fill-white ${iconSizes}`} />}
-      {!loading && iconElement}
+      {!loading && iconSide === 'left' && iconElement}
       {label && label}
+      {!loading && iconSide === 'right' && iconElement}
       {!loading && keys && (
         <kbd className="ml-auto flex items-center gap-1">
           {keys.map((key, i) => (
             <kbd
+              key={i}
               className={classNames(
                 keyColor,
                 'ml-auto flex h-6 w-6 items-center justify-center rounded font-sans text-xs'
