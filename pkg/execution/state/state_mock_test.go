@@ -717,3 +717,11 @@ func (mr *MockManagerMockRecorder) Scheduled(ctx, i, step interface{}) *gomock.C
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Scheduled", reflect.TypeOf((*MockManager)(nil).Scheduled), ctx, i, step)
 }
+
+func (m *MockState) Cron() *string {
+	if val, ok := m.Event()["cron"].(*string); ok && val != nil && *val != "" {
+		return val
+	}
+
+	return nil
+}
