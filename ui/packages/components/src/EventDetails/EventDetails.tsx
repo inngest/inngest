@@ -12,21 +12,24 @@ import { shortDate } from '@inngest/components/utils/date';
 
 type BaseProps = {
   event: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>;
-  onReplayEvent: () => void;
-
-  // TODO: Replace this with an imported component.
-  SendEventButton?: React.ElementType;
 };
 
 type WithRunSelector = {
   functionRuns: Pick<FunctionRun, 'id' | 'name' | 'output' | 'status'>[];
   onFunctionRunClick: (runID: string) => void;
+  onReplayEvent: () => void;
+
+  // TODO: Replace this with an imported component.
+  SendEventButton: React.ElementType;
+
   selectedRunID: string | undefined;
 };
 
 type WithoutRunSelector = {
   functionRuns?: undefined;
   onFunctionRunClick?: undefined;
+  onReplayEvent?: undefined;
+  SendEventButton?: undefined;
   selectedRunID?: undefined;
 };
 

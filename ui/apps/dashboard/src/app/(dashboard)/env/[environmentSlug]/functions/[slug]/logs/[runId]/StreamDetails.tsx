@@ -40,13 +40,7 @@ export function StreamDetails({ envID, event, func, rawHistory, run }: Props) {
 
   return (
     <div className={classNames('grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}>
-      {event && (
-        <EventDetails
-          event={event}
-          // TODO
-          onReplayEvent={console.log}
-        />
-      )}
+      {event && <EventDetails event={event} />}
 
       <RunDetails func={func} getHistoryItemOutput={getOutput} history={history} run={run} />
     </div>
