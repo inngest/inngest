@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { CreditCardIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { useMutation } from 'urql';
 
 import { Alert } from '@/components/Alert';
-import Button from '@/components/Button';
 import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 import { type StripeSubscriptionItemsInput } from '@/gql/graphql';
@@ -143,13 +143,12 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
       <div className="mt-6 flex flex-row justify-end">
         <Button
           type="submit"
-          size="lg"
+          size="large"
           className="px-16"
           disabled={!stripe || loading}
-          onClick={handleSubmit}
-        >
-          Complete Upgrade
-        </Button>
+          btnAction={handleSubmit}
+          label="Complete Upgrade"
+        />
       </div>
       {/* TODO - Explore re-use alert from signing key page PR */}
       {Boolean(error) && (

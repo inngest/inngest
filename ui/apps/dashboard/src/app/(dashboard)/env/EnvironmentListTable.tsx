@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { type Route } from 'next';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import Button from '@/components/Button';
 import { Toggle } from '@/components/Toggle';
 import { graphql } from '@/gql';
 import cn from '@/utils/cn';
@@ -231,9 +231,12 @@ function TableRow(props: { env: Environment }) {
       </td>
 
       <td className="pl-4">
-        <Button disabled={isModifying} onClick={() => setIsModalOpen(true)} variant="secondary">
-          {env.isArchived ? 'Unarchive' : 'Archive'}
-        </Button>
+        <Button
+          disabled={isModifying}
+          btnAction={() => setIsModalOpen(true)}
+          appearance="outlined"
+          label={env.isArchived ? 'Unarchive' : 'Archive'}
+        />
 
         <EnvironmentArchiveModal
           isArchived={isArchived}
@@ -247,9 +250,7 @@ function TableRow(props: { env: Environment }) {
       </td>
 
       <td className="px-4">
-        <Button href={`/env/${slug}/functions` as Route} variant="primary">
-          View
-        </Button>
+        <Button href={`/env/${slug}/functions` as Route} kind="primary" label="View" />
       </td>
       {/* <td>
         <div className="flex justify-end px-4 items-center gap-2">

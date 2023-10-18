@@ -1,6 +1,6 @@
 import { type Route } from 'next';
+import { Button } from '@inngest/components/Button';
 
-import Button from '@/components/Button';
 import InngestLogo from '@/icons/InngestLogo';
 
 type VercelIntegrationCallbackSuccessPageProps = {
@@ -31,7 +31,11 @@ export default function VercelIntegrationCallbackSuccessPage({
           </li>
         </ol>
         <div className="flex justify-end">
-          <Button href={searchParams.onSuccessRedirectURL as Route}>Continue to Vercel →</Button>
+          <Button
+            kind="primary"
+            href={searchParams.onSuccessRedirectURL as Route}
+            label="Continue to Vercel →"
+          />
         </div>
       </main>
     </div>

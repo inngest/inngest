@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { RocketLaunchIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import * as Sentry from '@sentry/nextjs';
 import { useLocalStorage } from 'react-use';
 import { toast } from 'sonner';
 
 import { Alert } from '@/components/Alert';
-import Button from '@/components/Button';
 import Modal from '@/components/Modal';
 import { DOCS_URLS } from '@/utils/urls';
 import { DeployFailure } from './DeployFailure';
@@ -85,13 +85,13 @@ export default function DeployModal({ environmentSlug, isOpen, onClose }: Deploy
       {failure && !isLoading ? <DeployFailure {...failure} /> : null}
       <div className="mt-2 flex flex-row justify-end">
         <Button
-          size="lg"
+          size="large"
+          kind="primary"
           className="px-16"
-          onClick={onClickDeploy}
+          btnAction={onClickDeploy}
           disabled={disabled || isLoading}
-        >
-          Deploy
-        </Button>
+          label="Deploy"
+        />
       </div>
     </Modal>
   );

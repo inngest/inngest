@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { CreditCardIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import { capitalCase } from 'change-case';
 import { useMutation } from 'urql';
 
-import Button from '@/components/Button';
 import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 import { type CheckoutItem } from './CheckoutModal';
@@ -84,7 +84,11 @@ export default function ConfirmPlanChangeModal({
         </p>
         <p className="my-4 font-semibold">New monthly cost: ${amount / 100}</p>
         <div className="mt-6 flex flex-row justify-end">
-          <Button onClick={handlePlanChange}>Confirm {capitalCase(action)}</Button>
+          <Button
+            kind="primary"
+            btnAction={handlePlanChange}
+            label={`Confirm ${capitalCase(action)}`}
+          />
         </div>
       </div>
       {/* TODO - Explore re-use alert from signing key page PR */}

@@ -1,8 +1,8 @@
 import { type Route } from 'next';
 import Link from 'next/link';
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 
-import Button from '@/components/Button';
 import AppNavigation from '@/components/Navigation/AppNavigation';
 import Toaster from '@/components/Toaster';
 import getAllEnvironments from '@/queries/server-only/getAllEnvironments';
@@ -31,16 +31,12 @@ export default async function Envs() {
             <div className="mb-4 flex w-full items-center  justify-between">
               <h2 className="text-lg font-medium text-slate-800">Production Environment</h2>
               <div className="flex items-center gap-2">
-                <Button href="/env/production/manage" variant="secondary" size="base">
-                  Manage
-                </Button>
+                <Button href="/env/production/manage" appearance="outlined" label="Manage" />
                 <Button
                   href={'/env/production/deploys?intent=deploy-modal' as Route}
-                  variant="primary"
-                  size="base"
-                >
-                  Deploy
-                </Button>
+                  kind="primary"
+                  label="Deploy"
+                />
               </div>
             </div>
             <p className="mt-2 max-w-[400px] text-sm font-medium text-slate-600">
@@ -65,16 +61,12 @@ export default async function Envs() {
                 <div className="mb-4 flex w-full items-center  justify-between">
                   <h2 className="text-lg font-medium text-slate-800">Test Mode</h2>
                   <div className="flex items-center gap-2">
-                    <Button href="/env/test/manage" variant="secondary" size="base">
-                      Manage
-                    </Button>
+                    <Button href="/env/test/manage" appearance="outlined" label="Manage" />
                     <Button
                       href="/env/test/deploys?intent=deploy-modal"
-                      variant="primary"
-                      size="base"
-                    >
-                      Deploy
-                    </Button>
+                      kind="primary"
+                      label="Deploy"
+                    />
                   </div>
                 </div>
                 <Link
@@ -109,19 +101,16 @@ export default async function Envs() {
                   <div className="flex items-center gap-2">
                     <Button
                       href={`/env/${branchParent?.slug}/manage`}
-                      variant="secondary"
-                      size="base"
-                    >
-                      Manage
-                    </Button>
+                      appearance="outlined"
+                      label="Manage"
+                    />
+
                     {/* Here we don't link to the modal since the /deploy empty state has more info on branch envs */}
                     <Button
                       href={`/env/${branchParent?.slug || 'branch'}/deploys` as Route}
-                      variant="primary"
-                      size="base"
-                    >
-                      Deploy
-                    </Button>
+                      kind="primary"
+                      label="Deploy"
+                    />
                   </div>
                 </div>
 
@@ -137,16 +126,16 @@ export default async function Envs() {
                   <div className="mb-4 flex w-full items-center  justify-between">
                     <h2 className="text-lg font-medium text-slate-800">{env.name}</h2>
                     <div className="flex items-center gap-2">
-                      <Button href={`/env/${env.slug}/manage`} variant="secondary" size="base">
-                        Manage
-                      </Button>
+                      <Button
+                        href={`/env/${env.slug}/manage`}
+                        appearance="outlined"
+                        label="Manage"
+                      />
                       <Button
                         href={`/env/${env.slug}/deploys?intent=deploy-modal` as Route}
-                        variant="primary"
-                        size="base"
-                      >
-                        Deploy
-                      </Button>
+                        kind="primary"
+                        label="Deploy"
+                      />
                     </div>
                   </div>
                   <Link

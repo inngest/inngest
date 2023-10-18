@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { ArrowTopRightOnSquareIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 
-import Button from '@/components/Button';
 import cn from '@/utils/cn';
 import { WEBSITE_CONTACT_URL, WEBSITE_PRICING_URL } from '@/utils/urls';
 import BillingPlanOption, { type ChangePlanArgs } from './BillingPlanOption';
@@ -85,11 +85,11 @@ export default function BillingPlanSelector({
         <Button
           href={`${WEBSITE_PRICING_URL}?ref=billing-view-pricing` as Route}
           target="_blank"
-          variant="secondary"
-          className="text-slate-500 hover:text-indigo-600"
-        >
-          View Pricing Comparison <ArrowTopRightOnSquareIcon className="h-4" />
-        </Button>
+          appearance="outlined"
+          iconSide="right"
+          icon={<ArrowTopRightOnSquareIcon />}
+          label="View Pricing Comparison"
+        />
       </div>
       {showCheckoutModal && (
         <CheckoutModal

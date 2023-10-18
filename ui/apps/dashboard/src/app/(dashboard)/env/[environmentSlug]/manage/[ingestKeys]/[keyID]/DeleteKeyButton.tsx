@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { TrashIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 
-import Button from '@/components/Button';
 import useManagePageTerminology from './../useManagePageTerminology';
 import DeleteKeyModal from './DeleteKeyModal';
 
@@ -24,13 +24,12 @@ export default function DeleteKeyButton({
   return (
     <>
       <Button
-        icon={<TrashIcon className="h-4" />}
-        variant="secondary"
-        onClick={() => setIsDeleteKeyModalVisible(true)}
-        className="text-red-500 hover:text-red-700"
-      >
-        {'Delete ' + currentContent?.titleType}
-      </Button>
+        icon={<TrashIcon />}
+        appearance="outlined"
+        kind="danger"
+        btnAction={() => setIsDeleteKeyModalVisible(true)}
+        label={'Delete ' + currentContent?.titleType}
+      />
       {isDeleteKeyModalVisible && (
         <DeleteKeyModal
           environmentID={environmentID}

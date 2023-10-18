@@ -3,10 +3,10 @@
 import { type Route } from 'next';
 import { useAuth } from '@clerk/nextjs';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import { useQuery } from 'urql';
 
 import AppLink from '@/components/AppLink';
-import Button from '@/components/Button';
 import { graphql } from '@/gql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import GitHubIcon from '@/icons/github.svg';
@@ -44,10 +44,13 @@ export default function Page() {
     <div className="h-full overflow-y-scroll">
       <div className="mx-auto max-w-screen-xl px-6">
         <div className="my-4">
-          <Button href={process.env.NEXT_PUBLIC_HOME_PATH as Route} size="sm" variant="secondary">
-            <ArrowLeftIcon className="h-3" />{' '}
-            {isSignedIn ? 'Back to dashboard' : 'Sign in to dashboard'}
-          </Button>
+          <Button
+            href={process.env.NEXT_PUBLIC_HOME_PATH as Route}
+            size="small"
+            appearance="outlined"
+            icon={<ArrowLeftIcon className="h-3" />}
+            label={isSignedIn ? 'Back To Dashboard' : 'Sign In To Dashboard'}
+          />
         </div>
         <header className="flex items-center justify-between border-b border-slate-200 py-6">
           <h1 className="text-2xl font-semibold">Inngest Support</h1>
@@ -79,12 +82,16 @@ export default function Page() {
               <>
                 <p>Sign in or sign up for an account to create a ticket.</p>
                 <div className="flex gap-2">
-                  <Button href={`${process.env.NEXT_PUBLIC_SIGN_IN_PATH}?ref=support` as Route}>
-                    Sign in
-                  </Button>
-                  <Button href={`${process.env.NEXT_PUBLIC_SIGN_UP_PATH}?ref=support` as Route}>
-                    Sign up
-                  </Button>
+                  <Button
+                    kind="primary"
+                    href={`${process.env.NEXT_PUBLIC_SIGN_IN_PATH}?ref=support` as Route}
+                    label="Sign In"
+                  />
+                  <Button
+                    kind="primary"
+                    href={`${process.env.NEXT_PUBLIC_SIGN_UP_PATH}?ref=support` as Route}
+                    label="Sign Up"
+                  />
                 </div>
               </>
             ) : (
@@ -130,24 +137,32 @@ export default function Page() {
               />{' '}
               channel or submit your own question.
             </p>
-            <Button href="https://www.inngest.com/discord" target="_blank">
-              Join our Discord
-            </Button>
+            <Button
+              kind="primary"
+              href="https://www.inngest.com/discord"
+              target="_blank"
+              label="Join our Discord"
+            />
           </SupportChannel>
           <SupportChannel title="Open Source">
             <p>File an issue in our open source repos on Github:</p>
             <div>
               <p className="mb-2 text-sm font-medium">Inngest CLI + Dev Server</p>
-              <Button href="https://github.com/inngest/inngest/issues" variant="secondary">
-                <GitHubIcon className="-ml-0.5 mr-1 h-4 w-4" /> inngest/inngest
-              </Button>
+              <Button
+                appearance="outlined"
+                href="https://github.com/inngest/inngest/issues"
+                label="inngest/inngest"
+                icon={<GitHubIcon className="-ml-0.5 mr-1" />}
+              />
             </div>
             <div>
               <p className="mb-2 text-sm font-medium">SDKs</p>
-
-              <Button href="https://github.com/inngest/inngest-js/issues" variant="secondary">
-                <GitHubIcon className="-ml-0.5 mr-1 h-4 w-4" /> inngest/inngest-js
-              </Button>
+              <Button
+                appearance="outlined"
+                href="https://github.com/inngest/inngest-js/issues"
+                label="inngest/inngest-js"
+                icon={<GitHubIcon className="-ml-0.5 mr-1" />}
+              />
             </div>
           </SupportChannel>
         </div>

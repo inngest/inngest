@@ -3,11 +3,11 @@
 import type { Route } from 'next';
 import Image from 'next/image';
 import { ClipboardIcon, ExclamationTriangleIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import { capitalCase } from 'change-case';
 import { useCopyToClipboard } from 'react-use';
 import { toast } from 'sonner';
 
-import Button from '@/components/Button';
 import DevServerImage from '@/images/devserver.png';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 
@@ -69,15 +69,12 @@ export default function FunctionListNotFound({ environmentSlug }: { environmentS
 
           <div className="flex items-center gap-2 border-t border-slate-800/50 px-8 py-4">
             <Button
-              variant="secondary"
-              context="dark"
               target="_blank"
               href={
                 'https://www.inngest.com/docs/quick-start?ref=app-onboarding-functions' as Route
               }
-            >
-              Read the Quick Start Guide
-            </Button>
+              label=" Read the Quick Start Guide"
+            />
           </div>
         </div>
 
@@ -95,9 +92,11 @@ export default function FunctionListNotFound({ environmentSlug }: { environmentS
             with our Vercel integration.
           </p>
           <div className="mt-6 flex items-center gap-2 border-t border-slate-100 py-4">
-            <Button variant="primary" href={`/env/${environmentSlug}/deploys` as Route}>
-              Go To Deploys
-            </Button>
+            <Button
+              kind="primary"
+              href={`/env/${environmentSlug}/deploys` as Route}
+              label="Go To Deploys"
+            />
             <div className="flex gap-2 border-l border-slate-100 pl-2">
               <Button
                 href={
@@ -105,19 +104,16 @@ export default function FunctionListNotFound({ environmentSlug }: { environmentS
                 }
                 target="_blank"
                 rel="noreferrer"
-                variant="secondary"
-                context="light"
-              >
-                <VercelLogomark className="-ml-0.5 h-4 w-4" />
-                Vercel Integration
-              </Button>
+                appearance="outlined"
+                label="Vercel Integration"
+                icon={<VercelLogomark className="-ml-0.5" />}
+              />
               <Button
-                variant="secondary"
+                appearance="outlined"
                 target="_blank"
                 href={'https://www.inngest.com/docs/deploy?ref=app-onboarding-functions' as Route}
-              >
-                Read The Docs
-              </Button>
+                label="Read The Docs"
+              />
             </div>
           </div>
         </div>

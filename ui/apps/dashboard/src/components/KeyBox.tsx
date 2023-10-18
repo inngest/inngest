@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { CheckIcon, ClipboardIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import { useCopyToClipboard } from 'react-use';
 import { toast } from 'sonner';
-
-import Button from '@/components/Button';
 
 type Props = {
   value: string;
@@ -37,26 +36,23 @@ export function KeyBox({ value, maskedValue, label }: Props) {
         <Button
           aria-label="Copy key to clipboard"
           iconSide="right"
-          onClick={() => {
+          btnAction={() => {
             setShowKey(!showKey);
             handleCopy();
           }}
-          variant="text"
+          appearance="text"
           title="Click to reveal"
           className="h-10 min-w-[690px] justify-start gap-4 rounded-none bg-slate-100 px-4 font-mono font-medium text-indigo-600 hover:bg-indigo-100 hover:no-underline"
-        >
-          {showKey ? value : maskedValue}
-        </Button>
+          label={showKey ? value : maskedValue}
+        />
         <Button
           aria-label="Copy key to clipboard"
           iconSide="right"
-          onClick={handleCopy}
-          variant="text"
+          btnAction={handleCopy}
+          appearance="text"
+          icon={isCopied ? <CheckIcon /> : <ClipboardIcon />}
           title="Click to copy"
-          className="h-10 rounded-none bg-slate-100 px-4 font-medium text-indigo-600 hover:bg-indigo-100 hover:no-underline"
-        >
-          {isCopied ? <CheckIcon className="w-4" /> : <ClipboardIcon className="w-4" />}
-        </Button>
+        />
       </div>
       <h3 className="rounded-b-md bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-500">
         {label}

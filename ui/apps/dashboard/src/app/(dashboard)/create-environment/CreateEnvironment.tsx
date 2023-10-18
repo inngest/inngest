@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import Button from '@/components/Button';
 import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 
@@ -60,9 +60,7 @@ export default function CreateEnvironment({}) {
           required
           error={error}
         />
-        <Button type="submit" disabled={isDisabled}>
-          Create environment
-        </Button>
+        <Button kind="primary" type="submit" disabled={isDisabled} label="Create Environment" />
       </form>
     </>
   );

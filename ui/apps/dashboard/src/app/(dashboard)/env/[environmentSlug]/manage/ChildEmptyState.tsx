@@ -1,9 +1,8 @@
 'use client';
 
 import type { Route } from 'next';
-import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 
-import Button from '@/components/Button';
 import { staticSlugs } from '@/utils/environments';
 
 export default function ChildEmptyState() {
@@ -19,9 +18,11 @@ export default function ChildEmptyState() {
             your events to the correct branch.
           </p>
           <div className="mt-6 flex items-center gap-2 border-t border-slate-100 py-4">
-            <Button variant="primary" href={`/env/${staticSlugs.branch}/manage/keys` as Route}>
-              Manage
-            </Button>
+            <Button
+              kind="primary"
+              href={`/env/${staticSlugs.branch}/manage/keys` as Route}
+              label="Manage"
+            />
             {/* <Button className="ml-auto" variant="secondary" target="_blank" href={'' as Route}>
               Learn More About Branch Environments
             </Button> */}

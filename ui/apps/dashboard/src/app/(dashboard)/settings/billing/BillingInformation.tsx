@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import Button from '@/components/Button';
 import Input from '@/components/Forms/Input';
 import { graphql } from '@/gql';
 import BillingCard from './BillingCard';
@@ -68,18 +68,15 @@ export default function BillingInformation({
         <>
           {isEditing ? (
             <Button
-              variant="text"
+              appearance="text"
               disabled={isSaveDisabled}
               className="font-semibold"
               type="submit"
-              onClick={handleSubmit}
-            >
-              Save
-            </Button>
+              btnAction={handleSubmit}
+              label="Save"
+            />
           ) : (
-            <Button variant="text" className="font-semibold" onClick={onEditButtonClick}>
-              Edit
-            </Button>
+            <Button appearance="text" kind="primary" btnAction={onEditButtonClick} label="Edit" />
           )}
         </>
       }

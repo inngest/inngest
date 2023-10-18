@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 
-import Button from '@/components/Button';
 import DeployModal from './DeployModal';
 
 type DeployButtonProps = {
@@ -17,9 +17,7 @@ export default function DeployButton({ environmentSlug }: DeployButtonProps) {
 
   return (
     <>
-      <Button variant="primary" context="dark" onClick={() => setIsDeployModalVisible(true)}>
-        Deploy
-      </Button>
+      <Button kind="primary" btnAction={() => setIsDeployModalVisible(true)} label="Deploy" />
       <DeployModal
         isOpen={isDeployModalVisible}
         environmentSlug={environmentSlug}
