@@ -66,6 +66,8 @@ function PauseFunctionModal({
     if (functionID && currentVersion) {
       pauseFunctionMutation({
         input: {
+          description: null,
+          promote: null,
           workflowID: functionID,
           disable: new Date().toISOString(),
           version: currentVersion,
@@ -88,6 +90,8 @@ function PauseFunctionModal({
     if (functionID && previousVersion) {
       pauseFunctionMutation({
         input: {
+          disable: null,
+          description: null,
           workflowID: functionID,
           promote: new Date().toISOString(),
           version: previousVersion,

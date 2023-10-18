@@ -66,7 +66,7 @@ export default function FunctionRunsLayout({ children, params }: FunctionRunsLay
     variables: {
       environmentID: environment?.id!,
       functionSlug,
-      functionRunStatuses: selectedStatuses.length ? selectedStatuses : undefined,
+      functionRunStatuses: selectedStatuses.length ? selectedStatuses : null,
       timeRangeStart: selectedTimeRange.start.toISOString(),
       timeRangeEnd: selectedTimeRange.end.toISOString(),
       timeField: selectedTimeField,

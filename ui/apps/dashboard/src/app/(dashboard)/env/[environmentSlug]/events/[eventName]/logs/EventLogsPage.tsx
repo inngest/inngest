@@ -51,7 +51,7 @@ export function EventLogsPage({
     variables: {
       // API expects "unset cursor" to be undefined, so change empty strings to
       // undefined.
-      cursor: cursor || undefined,
+      cursor: cursor || null,
 
       environmentID,
       eventName,

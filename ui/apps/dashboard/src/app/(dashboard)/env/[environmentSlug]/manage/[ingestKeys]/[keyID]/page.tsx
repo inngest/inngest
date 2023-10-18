@@ -56,10 +56,14 @@ export default async function Keys({
     notFound();
   }
 
-  const key = response?.environment?.ingestKey;
+  const key = response.environment.ingestKey;
 
   if (!key) {
     return null;
+  }
+  const filterType = key.filter.type;
+  if (!filterType || !isFilterType(filterType)) {
+    throw new Error(`invalid filter type: ${filterType}`);
   }
 
   let value = '',
@@ -91,8 +95,19 @@ export default async function Keys({
           <KeyBox value={value} maskedValue={maskedValue} label={keyLabel} />
         </div>
         <TransformEvent keyID={keyID} metadata={key.metadata} keyName={key.name} />
-        <FilterEvents keyID={keyID} filter={key.filter} keyName={key.name} />
+        <FilterEvents
+          keyID={keyID}
+          filter={{
+            ...key.filter,
+            type: filterType,
+          }}
+          keyName={key.name}
+        />
       </Provider>
     </div>
   );
+}
+
+function isFilterType(value: string): value is 'allow' | 'deny' {
+  return value === 'allow' || value === 'deny';
 }
