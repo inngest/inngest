@@ -8,6 +8,7 @@ import {
   getDisabledStyles,
   getIconSizeStyles,
   getKeyColor,
+  getSpinnerStyles,
 } from './buttonStyles';
 
 interface ButtonProps {
@@ -47,7 +48,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 ) {
   const buttonColors = getButtonColors({ kind, appearance });
   const buttonSizes = getButtonSizeStyles({ size, icon, label });
-  const disabledStyles = getDisabledStyles();
+  const disabledStyles = getDisabledStyles({ kind, appearance });
+  const spinnerStyles = getSpinnerStyles({ kind, appearance });
   const iconSizes = getIconSizeStyles({ size });
   const keyColor = getKeyColor({ kind, appearance });
 
@@ -75,7 +77,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled}
       {...props}
     >
-      {loading && <IconSpinner className={`fill-white ${iconSizes}`} />}
+      {loading && <IconSpinner className={classNames(spinnerStyles, iconSizes)} />}
       {!loading && iconSide === 'left' && iconElement}
       {label && label}
       {!loading && iconSide === 'right' && iconElement}
@@ -85,7 +87,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
             <kbd
               key={i}
               className={classNames(
-                keyColor,
+                disabled
+                  ? 'bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
+                  : keyColor,
                 'ml-auto flex h-6 w-6 items-center justify-center rounded font-sans text-xs'
               )}
             >
