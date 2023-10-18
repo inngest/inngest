@@ -37,7 +37,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   {
     kind = 'default',
     appearance = 'solid',
-    size = 'small',
+    size = 'regular',
     label,
     icon,
     iconSide = 'left',
