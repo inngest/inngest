@@ -10,16 +10,30 @@ import type { Event } from '@inngest/components/types/event';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 import { shortDate } from '@inngest/components/utils/date';
 
-type Props = {
-  event: Pick<Event, 'createdAt' | 'id' | 'name' | 'payload'>;
+type BaseProps = {
+  event: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>;
+};
+
+type WithRunSelector = {
   functionRuns: Pick<FunctionRun, 'id' | 'name' | 'output' | 'status'>[];
   onFunctionRunClick: (runID: string) => void;
   onReplayEvent: () => void;
-  selectedRunID?: string;
 
   // TODO: Replace this with an imported component.
   SendEventButton: React.ElementType;
+
+  selectedRunID: string | undefined;
 };
+
+type WithoutRunSelector = {
+  functionRuns?: undefined;
+  onFunctionRunClick?: undefined;
+  onReplayEvent?: undefined;
+  SendEventButton?: undefined;
+  selectedRunID?: undefined;
+};
+
+type Props = BaseProps & (WithoutRunSelector | WithRunSelector);
 
 export function EventDetails({
   event,
@@ -40,18 +54,21 @@ export function EventDetails({
           <MetadataGrid
             metadataItems={[
               { label: 'Event ID', value: event.id, size: 'large', type: 'code' },
-              { label: 'Received At', value: shortDate(event.createdAt) },
+              { label: 'Received At', value: shortDate(event.receivedAt) },
             ]}
           />
         </div>
       }
       button={
-        <div className="flex items-center gap-1">
-          <Button label="Replay" btnAction={onReplayEvent} />
-
-          {/* TODO */}
-          <SendEventButton />
-        </div>
+        onReplayEvent &&
+        SendEventButton && (
+          <>
+            <div className="flex items-center gap-1">
+              <Button label="Replay" btnAction={onReplayEvent} />
+              <SendEventButton />
+            </div>
+          </>
+        )
       }
       active
     >
@@ -59,29 +76,33 @@ export function EventDetails({
         <CodeBlock tabs={[{ label: 'Payload', content: prettyPayload ?? 'Unknown' }]} />
       </div>
 
-      <hr className="mt-8 border-slate-800/50" />
-      <div className="flex flex-col gap-6 px-5 py-4">
-        <div className="flex items-center gap-2 pt-4">
-          <h3 className="text-sm text-slate-400">Functions</h3>
-          <Badge kind="outlined">{functionRuns.length.toString() || '0'}</Badge>
-        </div>
-        {functionRuns
-          .slice()
-          .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-          .map((run) => {
-            return (
-              <FuncCard
-                key={run.id}
-                title={run.name}
-                id={run.id}
-                status={run.status}
-                active={selectedRunID === run.id}
-                onClick={() => onFunctionRunClick(run.id)}
-                footer={<FuncCardFooter functionRun={run} />}
-              />
-            );
-          })}
-      </div>
+      {functionRuns && onFunctionRunClick && (
+        <>
+          <hr className="mt-8 border-slate-800/50" />
+          <div className="flex flex-col gap-6 px-5 py-4">
+            <div className="flex items-center gap-2 pt-4">
+              <h3 className="text-sm text-slate-400">Functions</h3>
+              <Badge kind="outlined">{functionRuns.length.toString() || '0'}</Badge>
+            </div>
+            {functionRuns
+              .slice()
+              .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+              .map((run) => {
+                return (
+                  <FuncCard
+                    key={run.id}
+                    title={run.name}
+                    id={run.id}
+                    status={run.status}
+                    active={selectedRunID === run.id}
+                    onClick={() => onFunctionRunClick(run.id)}
+                    footer={<FuncCardFooter functionRun={run} />}
+                  />
+                );
+              })}
+          </div>
+        </>
+      )}
     </ContentCard>
   );
 }

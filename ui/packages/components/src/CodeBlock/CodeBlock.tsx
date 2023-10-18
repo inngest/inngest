@@ -1,3 +1,5 @@
+'use client';
+
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';

@@ -1,3 +1,5 @@
+'use client';
+
 import { Badge } from '@inngest/components/Badge';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
@@ -35,6 +37,7 @@ export function RunDetails({ func, getHistoryItemOutput, history, run }: Props) 
 
   return (
     <ContentCard
+      active
       title={func.name}
       icon={run.status && <FunctionRunStatusIcon status={run.status} className="h-5 w-5" />}
       type="run"
