@@ -67,7 +67,6 @@ func (evt Event) Map() map[string]any {
 	}
 
 	data := map[string]any{
-		"cron": evt.Cron,
 		"name": evt.Name,
 		"data": evt.Data,
 		"user": evt.User,

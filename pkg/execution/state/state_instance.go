@@ -111,8 +111,10 @@ func (s memstate) ActionComplete(id string) bool {
 }
 
 func (s memstate) Cron() *string {
-	if val, ok := s.Event()["cron"].(*string); ok && val != nil && *val != "" {
-		return val
+	if data, ok := s.Event()["data"].(map[string]any); ok {
+		if cron, ok := data["cron"].(string); ok && cron != "" {
+			return &cron
+		}
 	}
 
 	return nil

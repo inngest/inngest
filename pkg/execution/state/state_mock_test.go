@@ -719,8 +719,10 @@ func (mr *MockManagerMockRecorder) Scheduled(ctx, i, step interface{}) *gomock.C
 }
 
 func (m *MockState) Cron() *string {
-	if val, ok := m.Event()["cron"].(*string); ok && val != nil && *val != "" {
-		return val
+	if data, ok := m.Event()["data"].(map[string]any); ok {
+		if cron, ok := data["cron"].(string); ok && cron != "" {
+			return &cron
+		}
 	}
 
 	return nil
