@@ -23,10 +23,8 @@ func (l lifecycle) OnFunctionScheduled(
 	item queue.Item,
 	s state.State,
 ) {
-	evt := s.Event()
-
 	triggerType := "event"
-	if name, _ := evt["name"].(string); name == "inngest/scheduled.timer" {
+	if s.IsCron() {
 		triggerType = "cron"
 	}
 
@@ -36,6 +34,6 @@ func (l lifecycle) OnFunctionScheduled(
 		FunctionID:   id.WorkflowID,
 		EventID:      id.EventID,
 		TriggerType:  triggerType,
-		Cron:         s.Cron(),
+		Cron:         s.CronSchedule(),
 	})
 }

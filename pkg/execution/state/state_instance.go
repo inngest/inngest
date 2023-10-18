@@ -2,6 +2,7 @@ package state
 
 import (
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
@@ -110,7 +111,11 @@ func (s memstate) ActionComplete(id string) bool {
 	return hasAction
 }
 
-func (s memstate) Cron() *string {
+func (s memstate) CronSchedule() *string {
+	if !s.IsCron() {
+		return nil
+	}
+
 	if data, ok := s.Event()["data"].(map[string]any); ok {
 		if cron, ok := data["cron"].(string); ok && cron != "" {
 			return &cron
@@ -118,4 +123,12 @@ func (s memstate) Cron() *string {
 	}
 
 	return nil
+}
+
+func (s memstate) IsCron() bool {
+	if name, _ := s.Event()["name"].(string); name != event.FnCronName {
+		return false
+	}
+
+	return true
 }

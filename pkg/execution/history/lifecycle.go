@@ -64,7 +64,7 @@ func (l lifecycle) OnFunctionScheduled(
 	}
 
 	h := History{
-		Cron:            s.Cron(),
+		Cron:            s.CronSchedule(),
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
 		WorkspaceID:     id.WorkspaceID,
@@ -110,7 +110,7 @@ func (l lifecycle) OnFunctionStarted(
 	latencyMS := latency.Milliseconds()
 
 	h := History{
-		Cron:            s.Cron(),
+		Cron:            s.CronSchedule(),
 		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:       id.AccountID,
 		WorkspaceID:     id.WorkspaceID,
@@ -158,7 +158,7 @@ func (l lifecycle) OnFunctionFinished(
 	}
 
 	h := History{
-		Cron:               s.Cron(),
+		Cron:               s.CronSchedule(),
 		ID:                 ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:          id.AccountID,
 		WorkspaceID:        id.WorkspaceID,
@@ -209,7 +209,7 @@ func (l lifecycle) OnFunctionCancelled(
 	groupID := uuid.New()
 
 	h := History{
-		Cron:               s.Cron(),
+		Cron:               s.CronSchedule(),
 		ID:                 ulid.MustNew(ulid.Now(), rand.Reader),
 		AccountID:          id.AccountID,
 		WorkspaceID:        id.WorkspaceID,

@@ -229,7 +229,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 						"cron": t.CronTrigger.Cron,
 					},
 					ID:   time.Now().UTC().Format(time.RFC3339),
-					Name: "inngest/scheduled.timer",
+					Name: event.FnCronName,
 				}))
 				if err != nil {
 					logger.From(ctx).Error().Err(err).Msg("error initializing scheduled function")

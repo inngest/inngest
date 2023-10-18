@@ -718,7 +718,7 @@ func (mr *MockManagerMockRecorder) Scheduled(ctx, i, step interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Scheduled", reflect.TypeOf((*MockManager)(nil).Scheduled), ctx, i, step)
 }
 
-func (m *MockState) Cron() *string {
+func (m *MockState) CronSchedule() *string {
 	if data, ok := m.Event()["data"].(map[string]any); ok {
 		if cron, ok := data["cron"].(string); ok && cron != "" {
 			return &cron
