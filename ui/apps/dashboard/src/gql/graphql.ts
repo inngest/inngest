@@ -1905,7 +1905,7 @@ export type GetHistoryItemOutputQueryVariables = Exact<{
 }>;
 
 
-export type GetHistoryItemOutputQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function?: { __typename?: 'Workflow', run: { __typename?: 'FunctionRun', historyItemOutput?: string | null } } | null } };
+export type GetHistoryItemOutputQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', run: { __typename?: 'FunctionRun', historyItemOutput: string | null } } | null } };
 
 export type GetFunctionRunDetailsQueryVariables = Exact<{
   environmentID: Scalars['ID'];
@@ -1914,7 +1914,7 @@ export type GetFunctionRunDetailsQueryVariables = Exact<{
 }>;
 
 
-export type GetFunctionRunDetailsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', run: { __typename?: 'FunctionRun', id: string, status: FunctionRunStatus, startedAt: string, endedAt: string | null, functionVersion: { __typename?: 'WorkflowVersion', validFrom: string | null, version: number, deploy: { __typename?: 'Deploy', id: string, createdAt: string } | null }, version: { __typename?: 'WorkflowVersion', url: string, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }> } } } | null } };
+export type GetFunctionRunDetailsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', function: { __typename?: 'Workflow', id: string, name: string, run: { __typename?: 'FunctionRun', id: string, status: FunctionRunStatus, startedAt: string, endedAt: string | null, output: string | null, event: { __typename?: 'ArchivedEvent', id: string, name: string, receivedAt: string, payload: string } | null, history: Array<{ __typename?: 'RunHistoryItem', attempt: number, createdAt: string, functionVersion: number, groupID: string | null, id: string, stepName: string | null, type: HistoryType, url: string | null, cancel: { __typename?: 'RunHistoryCancel', eventID: string | null, expression: string | null, userID: string | null } | null, sleep: { __typename?: 'RunHistorySleep', until: string } | null, waitForEvent: { __typename?: 'RunHistoryWaitForEvent', eventName: string, expression: string | null, timeout: string } | null, waitResult: { __typename?: 'RunHistoryWaitResult', eventID: string | null, timeout: boolean } | null }>, functionVersion: { __typename?: 'WorkflowVersion', validFrom: string | null, version: number, deploy: { __typename?: 'Deploy', id: string, createdAt: string } | null, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }> }, version: { __typename?: 'WorkflowVersion', url: string, triggers: Array<{ __typename?: 'WorkflowTrigger', eventName: null | string | null, schedule: null | string | null }> } } } | null } };
 
 export type GetFunctionRunsCountQueryVariables = Exact<{
   environmentID: Scalars['ID'];
