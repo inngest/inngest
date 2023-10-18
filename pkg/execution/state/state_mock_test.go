@@ -10,6 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/event"
 	inngest "github.com/inngest/inngest/pkg/inngest"
 	v2 "github.com/oklog/ulid/v2"
 )
@@ -726,4 +727,12 @@ func (m *MockState) CronSchedule() *string {
 	}
 
 	return nil
+}
+
+func (m *MockState) IsCron() bool {
+	if name, _ := m.Event()["name"].(string); name != event.FnCronName {
+		return false
+	}
+
+	return true
 }
