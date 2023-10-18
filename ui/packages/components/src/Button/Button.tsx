@@ -1,4 +1,6 @@
+import type { UrlObject } from 'url';
 import React, { forwardRef } from 'react';
+import Link from 'next/link';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 
 import { classNames } from '../utils/classNames';
@@ -22,6 +24,7 @@ interface ButtonProps {
   loading?: boolean;
   type?: 'submit' | 'button';
   btnAction?: (e?: React.MouseEvent) => void;
+  href?: string | UrlObject;
   keys?: string[];
   isSplit?: boolean;
   className?: string;
@@ -38,6 +41,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     loading = false,
     disabled,
     btnAction,
+    href,
     isSplit,
     type,
     keys,
@@ -61,22 +65,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       })
     : null;
 
-  return (
-    <button
-      ref={ref}
-      className={classNames(
-        buttonColors,
-        buttonSizes,
-        disabledStyles,
-        isSplit ? 'rounded-l' : 'rounded',
-        'flex items-center justify-center gap-1.5 drop-shadow-sm transition-all active:scale-95 ',
-        className
-      )}
-      type={type}
-      onClick={btnAction}
-      disabled={disabled}
-      {...props}
-    >
+  const children = (
+    <>
       {loading && <IconSpinner className={classNames(spinnerStyles, iconSizes)} />}
       {!loading && iconSide === 'left' && iconElement}
       {label && label}
@@ -98,6 +88,42 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
           ))}
         </kbd>
       )}
+    </>
+  );
+
+  const Element = href ? (
+    <Link
+      className={classNames(
+        buttonColors,
+        buttonSizes,
+        disabledStyles,
+        'flex items-center justify-center gap-1.5 drop-shadow-sm transition-all active:scale-95 ',
+        className
+      )}
+      href={href}
+      {...props}
+    >
+      {children}
+    </Link>
+  ) : (
+    <button
+      ref={ref}
+      className={classNames(
+        buttonColors,
+        buttonSizes,
+        disabledStyles,
+        isSplit ? 'rounded-l' : 'rounded',
+        'flex items-center justify-center gap-1.5 drop-shadow-sm transition-all active:scale-95 ',
+        className
+      )}
+      type={type}
+      onClick={btnAction}
+      disabled={disabled}
+      {...props}
+    >
+      {children}
     </button>
   );
+
+  return Element;
 });
