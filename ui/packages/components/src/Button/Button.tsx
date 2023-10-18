@@ -13,7 +13,7 @@ import {
   getSpinnerStyles,
 } from './buttonStyles';
 
-interface ButtonProps {
+type ButtonProps = {
   kind?: 'default' | 'primary' | 'success' | 'danger';
   appearance?: 'solid' | 'outlined' | 'text';
   size?: 'small' | 'regular' | 'large';
@@ -23,12 +23,15 @@ interface ButtonProps {
   disabled?: boolean;
   loading?: boolean;
   type?: 'submit' | 'button';
-  btnAction?: (e?: React.MouseEvent) => void;
+  btnAction?: (e: React.MouseEvent | React.SyntheticEvent) => void;
   href?: string | UrlObject;
   keys?: string[];
   isSplit?: boolean;
   className?: string;
-}
+  target?: string;
+  rel?: string;
+  title?: string;
+};
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
