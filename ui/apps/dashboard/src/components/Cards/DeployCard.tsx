@@ -1,4 +1,5 @@
 import type { Route } from 'next';
+import { Button } from '@inngest/components/Button';
 import { capitalCase } from 'change-case';
 
 import DeployStatus from '@/components/Status/DeployStatus';
@@ -7,7 +8,6 @@ import ClockIcon from '@/icons/ClockIcon';
 import GitHubIcon from '@/icons/github.svg';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 import VercelWordmark from '@/logos/vercel-wordmark.svg';
-import Button from '../Button';
 import { FunctionDistribution } from './FunctionDistribution';
 import { FunctionList } from './FunctionList';
 import { getIntegrationName, isIntegration, type DeployMetadata } from './deployMetadata';
@@ -140,16 +140,12 @@ function IntegrationCard({ metadata }: { metadata: DeployMetadata }): JSX.Elemen
                 href={projectUrl}
                 target="_blank"
                 rel="noreferrer"
-                variant="secondary"
-                context="light"
-              >
-                {IntegrationLogomark ? (
-                  <IntegrationLogomark className="-ml-0.5 h-4 w-4" />
-                ) : (
-                  <span>{capitalCase(integrationName || '')} </span>
-                )}
-                Project
-              </Button>
+                appearance="outlined"
+                icon={IntegrationLogomark ? <IntegrationLogomark className="-ml-0.5" /> : undefined}
+                label={
+                  IntegrationLogomark ? 'Project' : `${capitalCase(integrationName || '')} Project`
+                }
+              />
             )}
             {deploymentUrl && (
               <Button
@@ -157,16 +153,14 @@ function IntegrationCard({ metadata }: { metadata: DeployMetadata }): JSX.Elemen
                 href={deploymentUrl}
                 target="_blank"
                 rel="noreferrer"
-                variant="secondary"
-                context="light"
-              >
-                {IntegrationLogomark ? (
-                  <IntegrationLogomark className="-ml-0.5 h-4 w-4" />
-                ) : (
-                  <span>{capitalCase(integrationName || '')} </span>
-                )}
-                Deployment
-              </Button>
+                appearance="outlined"
+                icon={IntegrationLogomark ? <IntegrationLogomark className="-ml-0.5" /> : undefined}
+                label={
+                  IntegrationLogomark
+                    ? 'Deployment'
+                    : `${capitalCase(integrationName || '')} Deployment`
+                }
+              />
             )}
           </div>
           {repoUrl && (
@@ -174,12 +168,10 @@ function IntegrationCard({ metadata }: { metadata: DeployMetadata }): JSX.Elemen
               href={repoUrl}
               target="_blank"
               rel="noreferrer"
-              variant="secondary"
-              context="light"
-            >
-              <GitHubIcon className="-ml-0.5 h-4 w-4" />
-              Repo
-            </Button>
+              appearance="outlined"
+              icon={<GitHubIcon className="-ml-0.5" />}
+              label="Repo"
+            />
           )}
         </div>
       </div>

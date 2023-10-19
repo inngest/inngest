@@ -4,10 +4,10 @@ import { useCallback, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { ExclamationTriangleIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import { capitalCase } from 'change-case';
 import { useLocalStorage } from 'react-use';
 
-import Button from '@/components/Button';
 import SyntaxHighlighter from '@/components/SyntaxHighlighter';
 import LoadingIcon from '@/icons/LoadingIcon';
 import VercelLogomark from '@/logos/vercel-logomark-dark.svg';
@@ -194,13 +194,12 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
 
           <div className="mt-6 flex items-center gap-2 border-t border-slate-800/50 py-4">
             <Button
-              variant="primary"
+              kind="primary"
               target="_blank"
-              onClick={() => onClickDeploy()}
+              btnAction={() => onClickDeploy()}
               disabled={isDeploying || input.length === 0}
-            >
-              {isDeploying ? 'Deploying your functions...' : 'Deploy Your Functions'}
-            </Button>
+              label={isDeploying ? 'Deploying your functions...' : 'Deploy Your Functions'}
+            />
             <div className="flex gap-2 border-l border-slate-800/50 pl-2">
               <Button
                 href={
@@ -208,20 +207,14 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
                 }
                 target="_blank"
                 rel="noreferrer"
-                variant="secondary"
-                context="dark"
-              >
-                <VercelLogomark className="-ml-0.5 h-4 w-4" />
-                Vercel Integration
-              </Button>
+                icon={<VercelLogomark className="-ml-0.5 h-4 w-4" />}
+                label="Vercel Integration"
+              />
               <Button
-                variant="secondary"
-                context="dark"
                 target="_blank"
                 href={'https://www.inngest.com/docs/deploy?ref=app-onboarding-deploys' as Route}
-              >
-                Read The Docs
-              </Button>
+                label="Read The Docs"
+              />
             </div>
           </div>
           {failure && !isDeploying ? <DeployFailure {...failure} /> : null}
@@ -240,23 +233,26 @@ export default function DeploysOnboarding({ environmentSlug }: DeploysOnboarding
           </p>
           <div className="mt-6 flex items-center gap-2 border-t border-slate-100 py-4">
             {isBranchParent ? (
-              <Button variant="primary" href={`/env/${environmentSlug}/manage/keys`}>
-                Get Event Key
-              </Button>
+              <Button
+                kind="primary"
+                href={`/env/${environmentSlug}/manage/keys`}
+                label="Get Event Key"
+              />
             ) : (
-              <Button variant="primary" href={`/env/${environmentSlug}/events` as Route}>
-                Go To Events
-              </Button>
+              <Button
+                kind="primary"
+                href={`/env/${environmentSlug}/events` as Route}
+                label="Go To Events"
+              />
             )}
 
             <div className="flex gap-2 border-l border-slate-100 pl-2">
               <Button
-                variant="secondary"
+                appearance="outlined"
                 target="_blank"
                 href={'https://www.inngest.com/docs/functions' as Route}
-              >
-                Read The Docs
-              </Button>
+                label="Read The Docs"
+              />
             </div>
           </div>
         </div>

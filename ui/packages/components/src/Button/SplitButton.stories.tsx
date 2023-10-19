@@ -1,7 +1,7 @@
+import { IconFunction } from '@inngest/components/icons/Function';
 import type { Meta, StoryObj } from '@storybook/react';
 
-import { IconReplay } from '@/icons';
-import SplitButton from './SplitButton';
+import { SplitButton } from './SplitButton';
 
 const meta = {
   title: 'Components/SplitButton',
@@ -18,7 +18,7 @@ export default meta;
 const items = [
   {
     label: 'item1',
-    icon: <IconReplay />,
+    icon: <IconFunction />,
     onClick: () => {},
   },
   {

@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { PaperAirplaneIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 
 import { SendEventModal } from '@/app/(dashboard)/env/[environmentSlug]/events/[eventName]/SendEventModal';
-import Button from '@/components/Button';
 
 type SendEventButtonProps = {
   environmentSlug: string;
@@ -17,12 +17,11 @@ export default function SendEventButton({ environmentSlug, eventName }: SendEven
   return (
     <>
       <Button
-        onClick={() => setIsModalVisible(true)}
-        context="dark"
-        icon={<PaperAirplaneIcon className="h-3" />}
-      >
-        Send Event
-      </Button>
+        btnAction={() => setIsModalVisible(true)}
+        kind="primary"
+        icon={<PaperAirplaneIcon />}
+        label="Send Event"
+      />
       <SendEventModal
         isOpen={isModalVisible}
         environmentSlug={environmentSlug}

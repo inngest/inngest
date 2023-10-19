@@ -22,10 +22,21 @@ interface Props {
   functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
   getHistoryItemOutput: (historyItemID: string) => Promise<string | undefined>;
   history: HistoryParser;
+
+  // TODO: Replace this with an imported component.
+  rerunButton?: React.ReactNode;
+
   run: Pick<FunctionRun, 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
 }
 
-export function RunDetails({ func, functionVersion, getHistoryItemOutput, history, run }: Props) {
+export function RunDetails({
+  func,
+  functionVersion,
+  getHistoryItemOutput,
+  history,
+  rerunButton,
+  run,
+}: Props) {
   const firstTrigger = func.triggers[0] ?? null;
   const cron = firstTrigger && firstTrigger.type === 'CRON';
 
@@ -44,6 +55,7 @@ export function RunDetails({ func, functionVersion, getHistoryItemOutput, histor
   return (
     <ContentCard
       active
+      button={rerunButton}
       title={func.name}
       icon={run.status && <FunctionRunStatusIcon status={run.status} className="h-5 w-5" />}
       type="run"

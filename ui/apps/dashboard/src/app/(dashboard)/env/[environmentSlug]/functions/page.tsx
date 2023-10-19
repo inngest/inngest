@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { CodeBracketSquareIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 
-import Button from '@/components/Button';
 import Header from '@/components/Header/Header';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useEnvironment } from '@/queries';
@@ -73,9 +73,12 @@ export default function FunctionListPage({ params }: FunctionListPageProps) {
 
         {functionList.hasNextPage && (
           <div className="flex w-full justify-center py-2.5">
-            <Button disabled={functionList.isLoading} variant="secondary" onClick={loadMore}>
-              {functionList.isLoading ? 'Loading' : 'Load More'}
-            </Button>
+            <Button
+              disabled={functionList.isLoading}
+              appearance="outlined"
+              btnAction={loadMore}
+              label={functionList.isLoading ? 'Loading' : 'Load More'}
+            />
           </div>
         )}
       </div>

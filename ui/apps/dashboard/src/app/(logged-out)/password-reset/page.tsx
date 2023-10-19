@@ -4,9 +4,9 @@ import process from 'process';
 import { useState } from 'react';
 import { type Route } from 'next';
 import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 
 import AppLink from '@/components/AppLink';
-import Button from '@/components/Button';
 import Input from '@/components/Forms/Input';
 import InngestLogo from '@/icons/InngestLogo';
 import SplitView from '../SplitView';
@@ -48,9 +48,12 @@ export default function PasswordReset() {
         <h1 className="text-lg font-semibold text-slate-800">Request a password reset</h1>
         <form className="my-5 flex flex-col gap-4 text-center" onSubmit={handleSubmit}>
           <Input size="lg" type="text" name="email" placeholder="Email" required />
-          <Button type="submit" disabled={isLoading} size="lg">
-            {isLoading ? 'Requesting Password Reset...' : 'Request Password Reset'}
-          </Button>
+          <Button
+            type="submit"
+            disabled={isLoading}
+            size="large"
+            label={isLoading ? 'Requesting Password Reset...' : 'Request Password Reset'}
+          />
           {error && (
             <div className="my-4 flex rounded-md border border-red-600 bg-red-100 p-4 text-left text-sm text-red-600">
               <ExclamationCircleIcon className="mr-2 max-h-5 text-red-600" />

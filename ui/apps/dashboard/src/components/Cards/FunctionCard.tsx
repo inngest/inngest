@@ -1,6 +1,5 @@
 import { CommandLineIcon } from '@heroicons/react/20/solid';
-
-import Button from '../Button';
+import { Button } from '@inngest/components/Button';
 
 type FunctionCardTypes = {
   name: string;
@@ -38,9 +37,7 @@ export default function FunctionCard({
       </div>
       <div className="flex items-center justify-between px-4 py-2">
         <span>Status</span>
-        <Button context="dark" size="sm" variant="secondary">
-          Pause
-        </Button>
+        <Button size="small" label="Pause" />
       </div>
     </div>
   );

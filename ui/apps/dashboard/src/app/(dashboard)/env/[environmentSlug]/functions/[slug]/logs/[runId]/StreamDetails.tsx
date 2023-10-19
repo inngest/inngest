@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { EventDetails } from '@inngest/components/EventDetails';
 import { RunDetails } from '@inngest/components/RunDetails';
 import { useParsedHistory } from '@inngest/components/hooks/useParsedHistory';
+import type { Environment } from '@inngest/components/types/environment';
 import type { Event } from '@inngest/components/types/event';
 import type { Function } from '@inngest/components/types/function';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
@@ -13,30 +14,38 @@ import { type RawHistoryItem } from '@inngest/components/utils/historyParser';
 import { Client, useClient } from 'urql';
 
 import { graphql } from '@/gql';
+import RerunButton from './(side-card)/(timeline)/RerunButton';
 
 type Props = {
-  envID: string;
+  environment: Pick<Environment, 'id' | 'slug'>;
   event?: Pick<Event, 'id' | 'name' | 'payload' | 'receivedAt'>;
-  func: Pick<Function, 'id' | 'name' | 'triggers'>;
+  func: Pick<Function, 'id' | 'name' | 'slug' | 'triggers'>;
   functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
   rawHistory: RawHistoryItem[];
-  run: Pick<FunctionRun, 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
+  run: Pick<FunctionRun, 'canRerun' | 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
 };
 
-export function StreamDetails({ envID, event, func, functionVersion, rawHistory, run }: Props) {
+export function StreamDetails({
+  environment,
+  event,
+  func,
+  functionVersion,
+  rawHistory,
+  run,
+}: Props) {
   const client = useClient();
 
   const getOutput = useMemo(() => {
     return (historyItemID: string) => {
       return getHistoryItemOutput({
         client,
-        envID,
+        envID: environment.id,
         functionID: func.id,
         historyItemID,
         runID: run.id,
       });
     };
-  }, [client, envID, func.id, run.id]);
+  }, [client, environment.id, func.id, run.id]);
 
   const history = useParsedHistory(rawHistory);
 
@@ -49,6 +58,7 @@ export function StreamDetails({ envID, event, func, functionVersion, rawHistory,
         functionVersion={functionVersion}
         getHistoryItemOutput={getOutput}
         history={history}
+        rerunButton={<RerunButton environment={environment} func={func} functionRunID={run.id} />}
         run={run}
       />
     </div>

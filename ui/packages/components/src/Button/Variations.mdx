@@ -9,8 +9,8 @@ import * as ButtonStories from './Button.stories';
 
 ## By Kind
 
-<div style={{ padding: '3rem' }} className="bg-slate-940">
-  <p style={{ color: 'white' }}>Primary</p>
+<div style={{ padding: '3rem' }} className="dark:bg-slate-940 bg-white">
+  <p className="text-slate-500 dark:text-white">Primary</p>
   <div className="align-center flex gap-1">
     <Story of={ButtonStories.PrimarySolid} />
     <Story of={ButtonStories.PrimarySolidWithIcon} />
@@ -24,7 +24,7 @@ import * as ButtonStories from './Button.stories';
     <Story of={ButtonStories.PrimaryOutlinedWithShortcut} />
     <Story of={ButtonStories.PrimaryDisabled} />
   </div>
-  <p style={{ color: 'white' }}>Default</p>
+  <p className="text-slate-500 dark:text-white">Default</p>
   <div className="align-center flex gap-1">
     <Story of={ButtonStories.DefaultSolid} />
     <Story of={ButtonStories.DefaultSolidWithIcon} />
@@ -38,7 +38,7 @@ import * as ButtonStories from './Button.stories';
     <Story of={ButtonStories.DefaultOutlinedWithShortcut} />
     <Story of={ButtonStories.DefaultDisabled} />
   </div>
-  <p style={{ color: 'white' }}>Success</p>
+  <p className="text-slate-500 dark:text-white">Success</p>
   <div className="align-center flex gap-1">
     <Story of={ButtonStories.SuccessSolid} />
     <Story of={ButtonStories.SuccessSolidWithIcon} />
@@ -52,7 +52,7 @@ import * as ButtonStories from './Button.stories';
     <Story of={ButtonStories.SuccessOutlinedWithShortcut} />
     <Story of={ButtonStories.SuccessDisabled} />
   </div>
-  <p style={{ color: 'white' }}>Danger</p>
+  <p className="text-slate-500 dark:text-white">Danger</p>
   <div className="align-center flex gap-1">
     <Story of={ButtonStories.DangerSolid} />
     <Story of={ButtonStories.DangerSolidWithIcon} />
@@ -70,7 +70,10 @@ import * as ButtonStories from './Button.stories';
 
 ## By Size
 
-<div style={{ padding: '3rem' }} className="bg-slate-940 flex items-center justify-center gap-1">
+<div
+  style={{ padding: '3rem' }}
+  className="dark:bg-slate-940 flex items-center justify-center gap-1 bg-white"
+>
   <Story of={ButtonStories.SmallSize} />
   <Story of={ButtonStories.RegularSize} />
   <Story of={ButtonStories.LargeSize} />

@@ -1,9 +1,9 @@
 import { type Route } from 'next';
 import Link from 'next/link';
 import { KeyIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import { useQuery } from 'urql';
 
-import Button from '@/components/Button';
 import { Pill } from '@/components/Pill/Pill';
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
@@ -58,11 +58,10 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
         <h1 className="font-semibold text-slate-700">Latest</h1>
         <Button
           className="ml-auto"
-          variant="secondary"
+          appearance="outlined"
           href={`/env/${environmentSlug}/events/${encodeURIComponent(eventName)}/logs` as Route}
-        >
-          View All Logs
-        </Button>
+          label="View All Logs"
+        />
       </header>
 
       <main className="mx-2 min-h-0 flex-1 overflow-y-auto">

@@ -3,9 +3,9 @@
 import { useContext, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 
-import Button from '@/components/Button';
 import CodeEditor from '@/components/Textarea/CodeEditor';
 import { getManageKey } from '@/utils/urls';
 import makeVM from '@/utils/vm';
@@ -154,11 +154,10 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
         </div>
         <Button
           href={'https://www.inngest.com/docs/events/event-format-and-structure' as Route}
-          variant="secondary"
+          appearance="outlined"
           className="ml-auto"
-        >
-          Read Documentation
-        </Button>
+          label="Read Documentation"
+        />
       </div>
 
       <div className="mb-6 flex h-full w-full space-y-1.5 rounded-xl bg-slate-900 text-white">
@@ -183,9 +182,7 @@ export default function TransformEvents({ keyID, metadata, keyName }: FilterEven
         </TransformEditor>
       </div>
       <div className="mb-8 flex justify-end">
-        <Button disabled={isDisabled} type="submit">
-          Save Transform Changes
-        </Button>
+        <Button kind="primary" type="submit" label="Save Transform Changes" />
       </div>
     </form>
   );

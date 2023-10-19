@@ -2,9 +2,9 @@
 
 import { useContext, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 
-import Button from '@/components/Button';
 import GroupButton from '@/components/GroupButton/GroupButton';
 import CodeEditor from '@/components/Textarea/CodeEditor';
 import { Context } from './Context';
@@ -114,9 +114,7 @@ export default function FilterEvents({ keyID, filter, keyName }: FilterEventsPro
         </FilterEditor>
       </div>
       <div className="flex justify-end">
-        <Button disabled={isDisabled} type="submit">
-          Save Filter Changes
-        </Button>
+        <Button kind="primary" disabled={isDisabled} type="submit" label="Save Filter Changes" />
       </div>
     </form>
   );

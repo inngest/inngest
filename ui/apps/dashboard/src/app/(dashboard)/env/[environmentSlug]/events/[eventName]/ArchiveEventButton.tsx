@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { ArchiveBoxIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 
-import Button from '@/components/Button';
 import ArchiveEventModal from './ArchiveEventModal';
 
 type ArchiveButtonProps = {
@@ -16,12 +16,11 @@ export default function ArchiveEventButton({ environmentSlug, eventName }: Archi
   return (
     <>
       <Button
-        icon={<ArchiveBoxIcon className="h-4" />}
-        variant="secondary"
-        onClick={() => setIsArchiveEventModalVisible(true)}
-      >
-        Archive Event
-      </Button>
+        icon={<ArchiveBoxIcon />}
+        appearance="outlined"
+        btnAction={() => setIsArchiveEventModalVisible(true)}
+        label="Archive Event"
+      />
       <ArchiveEventModal
         environmentSlug={environmentSlug}
         eventName={eventName}
