@@ -24,7 +24,7 @@ const ModalWithHooks = (props) => {
     <>
       <Button label="Open Modal" btnAction={() => setIsOpen(true)} />
       <Modal {...props} isOpen={isOpen} onClose={() => setIsOpen(false)}>
-        <p className="p-6 text-white">This is the body of the modal</p>
+        <p className="p-6 text-slate-400">This is the body of the modal</p>
       </Modal>
     </>
   );

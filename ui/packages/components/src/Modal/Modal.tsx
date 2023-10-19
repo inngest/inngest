@@ -6,7 +6,7 @@ type ModalProps = {
   children?: React.ReactNode;
   isOpen: boolean;
   onClose: () => void;
-  title?: string;
+  title?: string | React.ReactNode;
   description?: string;
   className?: string;
   footer?: React.ReactNode;
@@ -50,11 +50,11 @@ export function Modal({
                 <Dialog.Content
                   className={classNames(
                     className,
-                    'dark:bg-slate-910 transform overflow-hidden rounded-lg bg-slate-900 shadow-xl transition-all'
+                    'dark:bg-slate-910 transform overflow-hidden rounded-lg bg-white shadow-xl transition-all'
                   )}
                 >
                   {(title || description) && (
-                    <div className="border-b border-slate-200 p-6 dark:border-slate-800">
+                    <div className="dark:bg-slate-910 border-b border-slate-200 bg-slate-900 p-6 dark:border-slate-800">
                       <Dialog.Title className="text-xl font-semibold text-white">
                         {title}
                       </Dialog.Title>
@@ -63,14 +63,12 @@ export function Modal({
                       </Dialog.Description>
                     </div>
                   )}
-                  <div className="dark:bg-slate-910 bg-white">
-                    {children}
-                    {footer && (
-                      <div className="border-t border-slate-200 p-6 dark:border-slate-800">
-                        {footer}
-                      </div>
-                    )}
-                  </div>
+                  {children}
+                  {footer && (
+                    <div className="border-t border-slate-200 p-6 dark:border-slate-800">
+                      {footer}
+                    </div>
+                  )}
                 </Dialog.Content>
               </motion.div>
             </div>
