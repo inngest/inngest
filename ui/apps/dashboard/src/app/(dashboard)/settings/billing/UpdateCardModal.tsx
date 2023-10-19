@@ -114,10 +114,10 @@ function CheckoutForm({ onSuccess }: { onSuccess: () => void }) {
       <div className="mt-6 flex flex-row justify-end">
         <Button
           type="submit"
-          size="large"
           className="px-16"
           disabled={!stripe || loading}
           btnAction={handleSubmit}
+          kind="primary"
           label="Change Payment Method"
         />
       </div>

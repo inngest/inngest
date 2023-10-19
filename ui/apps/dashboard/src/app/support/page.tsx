@@ -43,7 +43,7 @@ export default function Page() {
   return (
     <div className="h-full overflow-y-scroll">
       <div className="mx-auto max-w-screen-xl px-6">
-        <div className="my-4">
+        <div className="my-4 inline-block">
           <Button
             href={process.env.NEXT_PUBLIC_HOME_PATH as Route}
             size="small"

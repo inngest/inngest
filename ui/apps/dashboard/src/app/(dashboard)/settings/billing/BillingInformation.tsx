@@ -76,7 +76,13 @@ export default function BillingInformation({
               label="Save"
             />
           ) : (
-            <Button appearance="text" kind="primary" btnAction={onEditButtonClick} label="Edit" />
+            <Button
+              appearance="text"
+              kind="primary"
+              className="font-semibold"
+              btnAction={onEditButtonClick}
+              label="Edit"
+            />
           )}
         </>
       }

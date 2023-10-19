@@ -85,7 +85,6 @@ export default function DeployModal({ environmentSlug, isOpen, onClose }: Deploy
       {failure && !isLoading ? <DeployFailure {...failure} /> : null}
       <div className="mt-2 flex flex-row justify-end">
         <Button
-          size="large"
           kind="primary"
           className="px-16"
           btnAction={onClickDeploy}

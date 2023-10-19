@@ -81,7 +81,7 @@ export default function BillingPlanSelector({
           </div>
         );
       })}
-      <div className="col-span-4 mt-8 text-center text-sm font-medium">
+      <div className="col-span-4 mx-auto mt-8 text-center text-sm font-medium">
         <Button
           href={`${WEBSITE_PRICING_URL}?ref=billing-view-pricing` as Route}
           target="_blank"

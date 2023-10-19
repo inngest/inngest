@@ -39,6 +39,7 @@ export default function PaymentMethod({
           kind="primary"
           btnAction={() => setIsEditing(true)}
           label="Edit"
+          className="font-semibold"
         />
       }
     >

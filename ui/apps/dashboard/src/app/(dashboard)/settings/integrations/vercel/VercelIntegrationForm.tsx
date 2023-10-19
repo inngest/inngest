@@ -207,14 +207,12 @@ function AddIntegrationPage() {
         <div className="flex gap-2">
           <Button
             kind="primary"
-            size="large"
             href={'https://vercel.com/integrations/inngest' as Route}
             target="_blank"
             icon={<VercelLogomark />}
             label="Install Vercel Integration"
           />
           <Button
-            size="large"
             appearance="outlined"
             href={'https://www.inngest.com/docs/deploy/vercel?ref=app-integrations' as Route}
             target="_blank"

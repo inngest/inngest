@@ -101,7 +101,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(functio
         buttonColors,
         buttonSizes,
         disabledStyles,
-        'flex items-center justify-center gap-1.5 drop-shadow-sm transition-all active:scale-95 ',
+        'flex items-center justify-center gap-1.5 rounded drop-shadow-sm transition-all active:scale-95',
         className
       )}
       href={href as Route}

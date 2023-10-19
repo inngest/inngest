@@ -97,7 +97,7 @@ export function UserCreator() {
 
           <div className="flex flex-row justify-end gap-4">
             <Button btnAction={cancel} appearance="outlined" label="Cancel" />
-            <Button type="submit" label="Yes" kind="primary" />
+            <Button type="submit" label="Create" kind="primary" />
           </div>
         </form>
       </Modal>

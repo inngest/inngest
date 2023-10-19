@@ -250,7 +250,12 @@ function TableRow(props: { env: Environment }) {
       </td>
 
       <td className="px-4">
-        <Button href={`/env/${slug}/functions` as Route} kind="primary" label="View" />
+        <Button
+          href={`/env/${slug}/functions` as Route}
+          kind="primary"
+          appearance="outlined"
+          label="View"
+        />
       </td>
       {/* <td>
         <div className="flex justify-end px-4 items-center gap-2">
