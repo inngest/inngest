@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useUser } from '@clerk/nextjs';
+import { Button } from '@inngest/components/Button';
 import * as Sentry from '@sentry/nextjs';
 
 import { Alert } from '@/components/Alert';
-import Button from '@/components/Button';
 import { SelectInput } from '@/components/Forms/SelectInput';
 import { Textarea } from '@/components/Forms/Textarea';
 import { type RequestBody } from '../api/support-form/route';
@@ -156,9 +156,7 @@ export function SupportForm({ isEnterprise = false, isPaid = false }: SupportFor
           />
         </label>
       )}
-      <Button type="submit" disabled={isFetching}>
-        Create support ticket
-      </Button>
+      <Button type="submit" disabled={isFetching} label="Create Support Ticket" kind="primary" />
       {result.message && <Alert severity={result.ok ? 'info' : 'error'}>{result.message}</Alert>}
       <p className="mt-4 text-sm">
         {isPaid ? (

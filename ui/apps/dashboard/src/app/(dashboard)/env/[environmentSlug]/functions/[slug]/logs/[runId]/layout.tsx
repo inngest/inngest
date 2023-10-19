@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { ClockIcon, RectangleStackIcon, RocketLaunchIcon } from '@heroicons/react/20/solid';
 import { HistoryParser } from '@inngest/components/utils/historyParser';
 
+import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { Time } from '@/components/Time';
 import { graphql } from '@/gql';
 import EventIcon from '@/icons/event.svg';
@@ -10,9 +11,6 @@ import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';
 import FunctionRunStatusCard from './FunctionRunStatusCard';
 import { StreamDetails } from './StreamDetails';
-
-// TODO: Delete this when the new stream details are ready.
-const isNewStreamDetailsVisible = false;
 
 const GetFunctionRunDetailsDocument = graphql(`
   query GetFunctionRunDetails($environmentID: ID!, $functionSlug: String!, $functionRunID: ULID!) {
@@ -135,7 +133,7 @@ export default async function FunctionRunDetailsLayout({
     throw new Error('missing run');
   }
 
-  if (isNewStreamDetailsVisible) {
+  if (await getBooleanFlag('new-run-details')) {
     return (
       <StreamDetails
         environment={{

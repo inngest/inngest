@@ -1,8 +1,8 @@
 'use client';
 
 import { type Route } from 'next';
+import { Button } from '@inngest/components/Button';
 
-import Button from '@/components/Button';
 import cn from '@/utils/cn';
 import { WEBSITE_CONTACT_URL } from '@/utils/urls';
 import { type CheckoutItem } from './CheckoutModal';
@@ -89,21 +89,23 @@ export default function BillingPlanOption({
       <Button
         href={isPremium ? (`${WEBSITE_CONTACT_URL}?ref=billing-enterprise` as Route) : undefined}
         target={isPremium ? '_blank' : undefined}
-        onClick={!isPremium ? onClick : undefined}
+        btnAction={!isPremium ? onClick : undefined}
         className="mt-5 w-full"
-        variant={isActive ? 'danger' : isLowerTierPlan ? 'secondary' : 'primary'}
+        appearance={isActive || isLowerTierPlan ? 'outlined' : 'solid'}
+        kind={isActive ? 'danger' : isLowerTierPlan ? 'default' : 'primary'}
         disabled={preventDowngrade && isLowerTierPlan}
-      >
-        {isLowerTierPlan
-          ? 'Downgrade Plan'
-          : isActive && isPremium
-          ? 'Contact Account Manager'
-          : isActive
-          ? 'Cancel Subscription'
-          : isPremium
-          ? 'Get In Touch'
-          : 'Upgrade'}
-      </Button>
+        label={
+          isLowerTierPlan
+            ? 'Downgrade Plan'
+            : isActive && isPremium
+            ? 'Contact Account Manager'
+            : isActive
+            ? 'Cancel Subscription'
+            : isPremium
+            ? 'Get In Touch'
+            : 'Upgrade'
+        }
+      />
     </div>
   );
 }

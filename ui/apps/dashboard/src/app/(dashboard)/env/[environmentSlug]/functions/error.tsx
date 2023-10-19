@@ -1,7 +1,8 @@
 'use client';
 
+import { Button } from '@inngest/components/Button';
+
 import { Alert } from '@/components/Alert';
-import Button from '@/components/Button';
 
 export default function ErrorPage({ error, reset }: { error: Error; reset: () => void }) {
   return (
@@ -13,7 +14,7 @@ export default function ErrorPage({ error, reset }: { error: Error; reset: () =>
           {error.message}
         </pre>
       </Alert>
-      <Button onClick={() => reset()}>Try again</Button>
+      <Button btnAction={() => reset()} kind="primary" label="Try Again" />
     </div>
   );
 }

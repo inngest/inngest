@@ -1,12 +1,8 @@
-import { capitalCase } from 'change-case';
-
-import Button from '@/components/Button';
 import { graphql } from '@/gql';
 import type { BillingPlan } from '@/gql/graphql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { BillableStepUsage } from './BillableStepUsage/BillableStepUsage';
 import { transformData } from './BillableStepUsage/transformData';
-import BillingCard from './BillingCard';
 import BillingInformation from './BillingInformation';
 import BillingPlanSelector from './BillingPlanSelector';
 import CurrentSubscription from './CurrentSubscription';

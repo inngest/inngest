@@ -5,10 +5,10 @@ import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@headlessui/react';
 import { ArrowPathIcon } from '@heroicons/react/20/solid';
+import { Button } from '@inngest/components/Button';
 import { toast } from 'sonner';
 
 import type VercelIntegration from '@/app/(dashboard)/settings/integrations/vercel/VercelIntegration';
-import Button from '@/components/Button';
 import Input from '@/components/Forms/Input';
 import VercelLogomark from '@/logos/vercel-logomark.svg';
 import VercelWordmark from '@/logos/vercel-wordmark.svg';
@@ -72,22 +72,20 @@ export default function VercelIntegrationForm({ vercelIntegration }: VercelInteg
         <div className="flex shrink-0 gap-2.5">
           <div className="flex gap-2">
             <Button
-              variant="secondary"
-              onClick={() => router.refresh()}
-              icon={<ArrowPathIcon className="h-4 w-4 text-slate-500" />}
-            >
-              Refresh Project List
-            </Button>
+              appearance="outlined"
+              btnAction={() => router.refresh()}
+              icon={<ArrowPathIcon className=" text-slate-500" />}
+              label="Refresh Project List"
+            />
             <Button
-              variant="secondary"
+              appearance="outlined"
               href={'https://vercel.com/integrations/inngest' as Route}
-              icon={<VercelLogomark className="h-3.5 w-3.5" />}
-            >
-              Go to Vercel
-            </Button>
+              icon={<VercelLogomark />}
+              label="Go to Vercel"
+            />
           </div>
           <div className="h-8 w-px bg-slate-200" aria-hidden="true" />
-          <Button type="submit">Save Configuration</Button>
+          <Button type="submit" label="Save Configuration" />
         </div>
       </header>
       <main>
@@ -208,22 +206,18 @@ function AddIntegrationPage() {
       <main>
         <div className="flex gap-2">
           <Button
-            variant="primary"
-            size="lg"
+            kind="primary"
             href={'https://vercel.com/integrations/inngest' as Route}
             target="_blank"
-            icon={<VercelLogomark className="h-3.5 w-3.5" />}
-          >
-            Install Vercel Integration
-          </Button>
+            icon={<VercelLogomark />}
+            label="Install Vercel Integration"
+          />
           <Button
-            size="lg"
-            variant="secondary"
+            appearance="outlined"
             href={'https://www.inngest.com/docs/deploy/vercel?ref=app-integrations' as Route}
             target="_blank"
-          >
-            Read the Docs
-          </Button>
+            label="Read the Docs"
+          />
         </div>
       </main>
     </div>

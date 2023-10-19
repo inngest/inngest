@@ -1,8 +1,8 @@
 'use client';
 
+import { Button } from '@inngest/components/Button';
 import { useMutation } from 'urql';
 
-import Button from '@/components/Button';
 import Modal from '@/components/Modal';
 import { graphql } from '@/gql';
 import { useEnvironment } from '@/queries';
@@ -39,19 +39,17 @@ export default function ArchiveEventModal({
     <Modal className="flex max-w-xl flex-col gap-4" isOpen={isOpen} onClose={onClose}>
       <p className="pb-4">Are you sure you want to archive this event?</p>
       <div className="flex content-center justify-end">
-        <Button variant="secondary" onClick={() => onClose()}>
-          No
-        </Button>
+        <Button appearance="outlined" btnAction={() => onClose()} label="No" />
         <Button
-          variant="text-danger"
+          kind="danger"
+          appearance="text"
           disabled={missingData}
-          onClick={() => {
+          btnAction={() => {
             !missingData && archiveEvent({ name: eventName, environmentId });
             !missingData && onClose();
           }}
-        >
-          Yes
-        </Button>
+          label="Yes"
+        />
       </div>
     </Modal>
   );
