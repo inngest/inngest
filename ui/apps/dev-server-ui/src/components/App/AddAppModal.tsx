@@ -73,6 +73,12 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
       description="Connect your Inngest application to the Dev Server"
       isOpen={isOpen}
       onClose={onClose}
+      footer={
+        <div className="flex items-center justify-between">
+          <Button label="Cancel" appearance="outlined" btnAction={onClose} />
+          <Button disabled={isDisabled || isUrlInvalid} label="Connect App" type="submit" />
+        </div>
+      }
     >
       <form onSubmit={handleSubmit}>
         <div className="p-6">
@@ -95,10 +101,6 @@ export default function AddAppModal({ isOpen, onClose }: AddAppModalProps) {
             Please enter a valid URL
           </p>
         )}
-        <div className="flex items-center justify-between border-t border-slate-800 p-6">
-          <Button label="Cancel" appearance="outlined" btnAction={onClose} />
-          <Button disabled={isDisabled || isUrlInvalid} label="Connect App" type="submit" />
-        </div>
       </form>
     </Modal>
   );
