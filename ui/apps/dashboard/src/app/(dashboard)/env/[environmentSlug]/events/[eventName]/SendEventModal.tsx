@@ -207,9 +207,12 @@ await inngest.send({
               >
                 <header className="bg bg-slate-910 flex items-center justify-between rounded-t-md p-2">
                   <h3 className="px-2 text-white">{tabTitle}</h3>
-                  <Button type="submit" context="dark" disabled={!submitButtonEnabled}>
-                    {submitButtonLabel}
-                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={!submitButtonEnabled}
+                    label={submitButtonLabel}
+                    kind="primary"
+                  />
                 </header>
                 <div className="w-full overflow-auto p-4">
                   <CodeEditor

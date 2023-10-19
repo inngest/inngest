@@ -1,5 +1,6 @@
 import type { UrlObject } from 'url';
 import React, { forwardRef } from 'react';
+import type { Route } from 'next';
 import Link from 'next/link';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 
@@ -13,7 +14,7 @@ import {
   getSpinnerStyles,
 } from './buttonStyles';
 
-type ButtonProps = {
+type ButtonProps<PassedHref extends string> = {
   kind?: 'default' | 'primary' | 'success' | 'danger';
   appearance?: 'solid' | 'outlined' | 'text';
   size?: 'small' | 'regular' | 'large';
@@ -24,7 +25,7 @@ type ButtonProps = {
   loading?: boolean;
   type?: 'submit' | 'button';
   btnAction?: (e: React.MouseEvent | React.SyntheticEvent) => void;
-  href?: string | UrlObject;
+  href?: PassedHref | UrlObject;
   keys?: string[];
   isSplit?: boolean;
   className?: string;
@@ -33,7 +34,7 @@ type ButtonProps = {
   title?: string;
 };
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(function Button(
   {
     kind = 'default',
     appearance = 'solid',
@@ -50,7 +51,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     keys,
     className,
     ...props
-  }: ButtonProps,
+  }: ButtonProps<string>,
   ref
 ) {
   const buttonColors = getButtonColors({ kind, appearance });
@@ -103,7 +104,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         'flex items-center justify-center gap-1.5 drop-shadow-sm transition-all active:scale-95 ',
         className
       )}
-      href={href}
+      href={href as Route}
       {...props}
     >
       {children}
