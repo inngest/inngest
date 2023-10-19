@@ -4,20 +4,15 @@ import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { ArrowPathIcon } from '@heroicons/react/20/solid';
 import { Button } from '@inngest/components/Button';
+import type { Environment } from '@inngest/components/types/environment';
+import type { Function } from '@inngest/components/types/function';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import { getFragmentData, graphql, type FragmentType } from '@/gql';
+import { graphql } from '@/gql';
 import cn from '@/utils/cn';
 
-const FunctionItemFragment = graphql(`
-  fragment FunctionItem on Workflow {
-    id
-    slug
-  }
-`);
-
-const RerunFunctionRunDocument = graphql(/* GraphQL */ `
+export const RerunFunctionRunDocument = graphql(/* GraphQL */ `
   mutation RerunFunctionRun($environmentID: ID!, $functionID: ID!, $functionRunID: ULID!) {
     retryWorkflowRun(
       input: { workspaceID: $environmentID, workflowID: $functionID }
@@ -29,27 +24,20 @@ const RerunFunctionRunDocument = graphql(/* GraphQL */ `
 `);
 
 type RerunButtonProps = {
-  environmentSlug: string;
-  environmentID: string;
-  function_: FragmentType<typeof FunctionItemFragment>;
+  environment: Pick<Environment, 'id' | 'slug'>;
+  func: Pick<Function, 'id' | 'slug'>;
   functionRunID: string;
 };
 
-export default function RerunButton({
-  environmentSlug,
-  environmentID,
-  functionRunID,
-  ...props
-}: RerunButtonProps) {
-  const function_ = getFragmentData(FunctionItemFragment, props.function_);
+export default function RerunButton({ environment, functionRunID, func }: RerunButtonProps) {
   const [{ fetching: isMutating }, rerunFunctionRunMutation] =
     useMutation(RerunFunctionRunDocument);
   const router = useRouter();
 
   async function rerunFunction() {
     const response = await rerunFunctionRunMutation({
-      environmentID,
-      functionID: function_.id,
+      environmentID: environment.id,
+      functionID: func.id,
       functionRunID,
     });
     if (response.error) {
@@ -59,8 +47,8 @@ export default function RerunButton({
     const newFunctionRunID = response.data?.retryWorkflowRun?.id as string;
     router.refresh();
     router.push(
-      `/env/${environmentSlug}/functions/${encodeURIComponent(
-        function_.slug
+      `/env/${environment.slug}/functions/${encodeURIComponent(
+        func.slug
       )}/logs/${newFunctionRunID}` as Route
     );
   }
