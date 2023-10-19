@@ -40,8 +40,6 @@ export function StreamDetails({ environment, event, func, rawHistory, run }: Pro
 
   const history = useParsedHistory(rawHistory);
 
-  // const rerunButton = <div>hi</div>;
-
   return (
     <div className={classNames('grid h-full text-white', event ? 'grid-cols-2' : 'grid-cols-1')}>
       {event && <EventDetails event={event} />}
